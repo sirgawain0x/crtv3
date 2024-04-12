@@ -1,8 +1,4 @@
 import { Flex, Link, Text, VStack } from '@chakra-ui/react';
-import { ConnectButton } from "@/app/thirdweb";
-import { sepolia } from "thirdweb/chains";
-import { client } from "@/app/client";
-import { ACCOUNT_FACTORY_ADDRESS } from "../../../utils/context";
 // import Link from 'next/link';
 
 const NonLoggedInView = () => {
@@ -50,26 +46,6 @@ const NonLoggedInView = () => {
           Collab.Land Token-Gate Docs
         </Link>
       </VStack>
-      <ConnectButton
-            client={client}
-            chain={sepolia}
-            connectButton={{
-              label: "Get Started",
-              className: "my-custom-class",
-              style: {
-                borderRadius: "10px",
-              },
-            }}
-            accountAbstraction={{
-              factoryAddress: ACCOUNT_FACTORY_ADDRESS.sepolia,
-              chain: sepolia,
-              gasless: true,
-            }}
-            appMetadata={{
-              name: "Creative TV",
-              url: "https://tv.creativeplatform.xyz",
-            }}
-          />
     </Flex>
   );
 };
