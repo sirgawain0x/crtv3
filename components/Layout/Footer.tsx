@@ -39,8 +39,8 @@ export default function Footer(props: Props): JSX.Element {
           <Image src={CREATIVE_ICON} alt="Creative Logo" width={250} height={'auto'} boxSize="100px" objectFit="contain" />
         </Flex>
       </Box>
-      <Container as={Stack} maxW={'6xl'} py={10}>
-        <SimpleGrid columns={{ base: 1, sm: 2, md: 4 }} spacing={8}>
+      <Container as={Stack} maxW={'6xl'} minW={'fit-content'} alignItems={'center'} py={10}>
+        <SimpleGrid columns={{ base: 2, sm: 2, md: 4 }} spacing={8}>
           <Stack align={'flex-start'}>
             <ListHeader>Product</ListHeader>
             <Link href={FOOTER_LINKS.whitepaper} target={'_blank'}>
