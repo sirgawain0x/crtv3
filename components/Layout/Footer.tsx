@@ -1,4 +1,4 @@
-import { Box, Container, Flex, Image, Link, SimpleGrid, Stack, Tag, Text, useColorModeValue } from '@chakra-ui/react'
+import { Box, Container, Flex, Image, SimpleGrid, Stack, Tag, Text, Link } from '@chakra-ui/react'
 import { ReactNode } from 'react'
 import { CREATIVE_ICON, FOOTER_LINKS, SOCIAL_LINKS, SITE_COPYRIGHT } from '../../utils/context'
  
@@ -47,7 +47,7 @@ export default function Footer(props: Props): JSX.Element {
               Overview
             </Link>
             <Stack direction={'row'} align={'center'} spacing={2}>
-              <Link href={FOOTER_LINKS.releases}>Features</Link>
+              <Link href={FOOTER_LINKS.releases} target={'_blank'}>Features</Link>
               <Tag size={'sm'} bg={'green.300'} ml={2} color={'white'}>
                 New
               </Tag>

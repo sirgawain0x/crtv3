@@ -66,3 +66,22 @@ export const PROFILE_CAMPAIGNS = {
   tooltip_position: 'bottom',
 }
 
+// Livepeer API
+export const LIVEPEER_API_URL = 'https://livepeer.com/api'
+export const LIVEPEER_HERO_PLAYBACK_ID = 'cbd1dw72qst9xmps' // Welcome To Creative Organization DAO
+export const LIVEPEER_FEATURED_PLAYBACK_ID = '5c2bzf537qbq0r7o' // The Creative Podcast Episode 03
+
+export const HERO_NAME = {
+    top: 'Record Once,',
+    bottom: 'Use Everywhere!',
+  }
+  
+  export const HERO_DESCRIPTION = `${SITE_NAME} is a decentralized live streaming platform that puts you in control of your content and earnings. Get paid 100% of streaming revenue, have access to your own social token, and monetize your content into NFTs.`
+  
+  export const HERO_BUTTONS = {
+    primary: { text: 'Get Started', href: 'https://app.unlock-protocol.com/checkout?id=bbbcff5f-835d-4fa3-9761-988d5da9da18' },
+    secondary: { text: 'How It Works', href: 'https://creativeplatform.xyz/docs/intro', target: '_blank' },
+  }
+  
+  export const HERO_IMAGE = 'https://bafybeiefwmq6zykvyhwih5qbhucxrc34zbtxjbwboz7hdgkyh3u6p2ykfa.ipfs.nftstorage.link'
+

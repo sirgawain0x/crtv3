@@ -1,21 +1,19 @@
 import { useQuery } from '@tanstack/react-query'
 import { Box, SimpleGrid } from '@chakra-ui/react'
 import { LivepeerConfig } from '@livepeer/react'
-import { useAddress } from '@thirdweb-dev/react'
-import { useLivepeerClient } from 'hooks/useLivepeerClient'
-import { AssetData } from 'utils/fetchers/assets'
-import VideoCard from './VideoCard'
+import { useLivepeerClient } from '../hooks/useLivepeerClient'
+import { AssetData } from '../utils/fetchers/assets'
+import VideoCard from './VideoCard/VideoCard'
 // import { Discussion } from "@orbisclub/components";
 // import "@orbisclub/components/dist/index.modern.css";
 
 type ApiResponse<TData> = { data?: TData; errors?: any[] }
 
 export default function AllAssets() {
-
-  const address = useAddress()
-  const videosQuery = useQuery<ApiResponse<AssetData['video'][]>>(['allVideos'], () => fetch('/api/livepeer/assets').then((res) => res.json()), {
-    staleTime: 3000,
-  })
+  const videosQuery = useQuery<ApiResponse<AssetData['video'][]>>({
+    queryKey: ['allVideos'],
+    queryFn: () => fetch('/api/livepeer/assets').then((res) => res.json()),
+  });
 
   if (videosQuery.isLoading) {
     console.log('loading...')
@@ -23,9 +21,9 @@ export default function AllAssets() {
     return <Box mb={24}>Loading...</Box>
   }
 
-  if (videosQuery?.isError || videosQuery?.data.errors) {
+  if (videosQuery?.isError || videosQuery?.error) {
     console.log('error', videosQuery?.error)
-    return <Box children="Error loading resource." mb={24} />
+    return <Box mb={24}>{"Error loading resource."}</Box>
   }
 
   const readyVideos =

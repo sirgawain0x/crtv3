@@ -56,7 +56,7 @@ export type Views = {
 export const videoApi = axios.create({
   baseURL: 'https://livepeer.studio/api/asset',
   headers: {
-    Authorization: `Bearer ${process.env.NEXT_PUBLIC_STUDIO_API_KEY}`,
+    Authorization: `Bearer ${process.env.LIVEPEER_API_KEY}`,
     Accept: 'application/json',
     'Content-Type': 'application/json',
   },

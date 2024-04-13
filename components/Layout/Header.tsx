@@ -217,7 +217,6 @@ export default function Header({ className, handleLoading }: Props) {
   }
 
   const MobileNavContent = (props: any) => {
-    const connector = useColorModeValue('light', 'dark')
     return (
       <Drawer isOpen={mobileNav.isOpen} placement="top" onClose={mobileNav.onClose} size={{ base: 'full', sm: 'full', md: 'xs' }}>
       <DrawerOverlay />

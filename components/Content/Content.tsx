@@ -18,21 +18,17 @@ const Content = () => {
   }
 
   return (
-    <Flex
-      direction={['column', 'column', 'column', 'row']}
-      className="pt-24 pb-3 mx-auto"
-      justifyContent="center"
-      alignItems="center"
-      maxW="1500px"
-    >
-      <S.WebGraphic
-        src="/web_graphic.gif"
-        width={450}
-        height={550}
-        alt="Creative mascot"
-      />
+    // <Flex
+    //   direction={['column', 'column', 'column', 'row']}
+    //   className="pt-24 pb-3 mx-auto"
+    //   justifyContent="center"
+    //   alignItems="center"
+    //   maxW="1500px"
+    // >
+    <>
       {activeAccount ? <Member /> : <NonLoggedInView />}
-    </Flex>
+    </>
+    // </Flex>
   );
 };
 
