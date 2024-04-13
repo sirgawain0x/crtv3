@@ -1,13 +1,14 @@
 'use client';
 import { ConnectButton } from "thirdweb/react";
-import { client } from "./client";
+import { client } from "../../src/app/client";
+import { ACCOUNT_FACTORY_ADDRESS } from "../../utils/context";
 import { SmartWalletOptions, createWallet } from "thirdweb/wallets";
-import { baseSepolia } from "thirdweb/chains";
+import { sepolia } from "thirdweb/chains";
 
 export default function ConnectButtonWrapper() {  
-  const chain = baseSepolia; // REPLACE WITH THE CHAIN YOU WANT TO USE
+  const chain = sepolia; 
   const smartWalletConfig: SmartWalletOptions = {
-    factoryAddress: "", // REPLACE WITH YOUR FACTORY ADDRESS (deploy one here: https://thirdweb.com/thirdweb.eth/AccountFactory)
+    factoryAddress: ACCOUNT_FACTORY_ADDRESS.sepolia,
     chain,
     gasless: true,
   };
@@ -20,8 +21,8 @@ export default function ConnectButtonWrapper() {
       wallets={[inAppWallet]}
       chain={chain}
       appMetadata={{
-        name: "Example App",
-        url: "https://example.com",
+        name: "Creative TV",
+        url: "https://tv.creativeplatform.xyz",
       }}
     />
   );

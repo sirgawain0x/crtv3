@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useRef, useState, useContext } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import NextLink from 'next/link'
 import {
@@ -10,7 +10,6 @@ import {
   AccordionPanel,
   Box,
   Button,
-  ButtonGroup,
   Center,
   Divider,
   Drawer,
@@ -35,15 +34,12 @@ import {
   chakra,
   useColorModeValue,
   useDisclosure,
-  MenuGroup,
 } from '@chakra-ui/react'
-import { ConnectButton, useActiveAccount} from 'thirdweb/react'
 import { useScroll } from 'framer-motion'
 import { AiOutlineMenu } from 'react-icons/ai'
 import { IoIosArrowDown } from 'react-icons/io'
-import { client } from '@/app/client'
-import { sepolia } from "thirdweb/chains";
-import { ROLES, ACCOUNT_FACTORY_ADDRESS, SITE_LOGO, SITE_NAME } from '../../utils/context';
+import ConnectButtonWrapper from "../Button/connectButtonWrapper";
+import { SITE_LOGO, SITE_NAME } from '../../utils/context';
 import { ThemeSwitcher } from '../ThemeSwitcher'
 
 interface Props {
@@ -58,9 +54,9 @@ export default function Header({ className, handleLoading }: Props) {
   const styleName = className ?? '';
   const ref = useRef(null);
   const router = useRouter();
-  const activeAccount = useActiveAccount();
-  const connector = useColorModeValue('light', 'dark');
-  const isConnected = activeAccount? true : false;
+  // const activeAccount = useActiveAccount();
+  // const connector = useColorModeValue('light', 'dark');
+  // const isConnected = activeAccount? true : false;
 
   const [y, setY] = useState(0)
   const { scrollY } = useScroll()
@@ -319,27 +315,7 @@ export default function Header({ className, handleLoading }: Props) {
             </Accordion>
           </p>
           <chakra.p my={4}>
-              <ConnectButton
-                client={client}
-                chain={sepolia}
-                connectButton={{
-                  label: "Get Started",
-                  className: "my-custom-class",
-                  style: {
-                    borderRadius: "10px",
-                  },
-                }}
-                accountAbstraction={{
-                  factoryAddress: ACCOUNT_FACTORY_ADDRESS.sepolia,
-                  chain: sepolia,
-                  gasless: true,
-                }}
-                appMetadata={{
-                  name: "Creative TV",
-                  url: "https://tv.creativeplatform.xyz",
-                }}
-              />
-
+              <ConnectButtonWrapper />
               {/* <ButtonGroup>
               { isConnected && (
               <Menu>
@@ -511,26 +487,7 @@ export default function Header({ className, handleLoading }: Props) {
             </HStack>
           </Flex>
           <chakra.div display={{ base: 'none', md: 'none', lg: 'block' }}>
-              <ConnectButton
-                client={client}
-                chain={sepolia}
-                connectButton={{
-                  label: "Get Started",
-                  className: "my-custom-class",
-                  style: {
-                    borderRadius: "10px",
-                  },
-                }}
-                accountAbstraction={{
-                  factoryAddress: ACCOUNT_FACTORY_ADDRESS.sepolia,
-                  chain: sepolia,
-                  gasless: true,
-                }}
-                appMetadata={{
-                  name: "Creative TV",
-                  url: "https://tv.creativeplatform.xyz",
-                }}
-              />
+              <ConnectButtonWrapper />
               {/* <ButtonGroup>
               <Menu>
                 <MenuButton mx={4} as={Button} rightIcon={<ChevronDownIcon />} color={'#EC407A'}>
