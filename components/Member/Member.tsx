@@ -248,10 +248,10 @@ const Member = () => {
                     <Button onClick={onOpen}>
                     Creative TV Menu
                   </Button> : <Link
-                      href="https://app.unlock-protocol.com/checkout?id=cac7160c-260b-467b-9012-0864039df0e3"
+                      href="https://app.unlock-protocol.com/checkout?id=1505d0df-b86c-4171-80d5-da502a081db7"
                       target="_blank"
                     >
-                      <Button my={4}>Purchase Membership Pass</Button>
+                      <Button my={4}>Purchase A Membership Pass</Button>
                     </Link>
                   }
                   <Drawer placement={'left'} onClose={onClose} isOpen={isOpen}>
@@ -260,8 +260,7 @@ const Member = () => {
                       <DrawerHeader borderBottomWidth='1px'>Creative TV Menu</DrawerHeader>
                       <DrawerBody>
                         <Link href={`/profile/${activeAccount?.address}`}>My Profile</Link>
-                        <p>Some contents...</p>
-                        <p>Some contents...</p>
+                        <p>Upload</p>
                       </DrawerBody>
                     </DrawerContent>
                   </Drawer>
