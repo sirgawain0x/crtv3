@@ -27,8 +27,8 @@ const defaultRules = {
     type: 'ERC721',
     chainId: 11155111, // Sepolia
     minToken: '1',
-    contractAddress: ROLES.sepolia.test, // NFT contract address
-    roleId: '001',
+    contractAddress: ROLES.sepolia.test.address, // NFT contract address
+    roleId: ROLES.sepolia.test.role, // NFT role id
 };
 
 const RulesValidationSchema = Yup.object().shape({
