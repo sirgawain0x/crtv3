@@ -6,13 +6,13 @@ export default async function AllVideosPage() {
 
   return (
     <main>
-      <Box p={4}>
+      <Box my={10} p={4}>
         <Breadcrumb>
           <BreadcrumbItem>
             <BreadcrumbLink href='/'><span role="img" aria-label="home">🏠</span> Home</BreadcrumbLink>
           </BreadcrumbItem>
-          <BreadcrumbItem isCurrentPage className="active-crumb">
-            <BreadcrumbLink isCurrentPage>Explore</BreadcrumbLink>
+          <BreadcrumbItem isCurrentPage>
+            <BreadcrumbLink>Explore</BreadcrumbLink>
           </BreadcrumbItem>
         </Breadcrumb>
       </Box>

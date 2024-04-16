@@ -1,3 +1,3 @@
-export default function CreateVote(){
-    return <p>Create Vote Page</p>;
+export default function MoreOptionsPage() {
+    return <p>More Options Page</p>;
 }
