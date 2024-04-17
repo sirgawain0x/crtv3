@@ -23,6 +23,7 @@ import {
   Heading,
   IconButton,
   Image,
+  Link,
   LinkBox,
   LinkOverlay,
   Popover,
@@ -54,9 +55,6 @@ export default function Header({ className, handleLoading }: Props) {
   const styleName = className ?? '';
   const ref = useRef(null);
   const router = useRouter();
-  // const activeAccount = useActiveAccount();
-  // const connector = useColorModeValue('light', 'dark');
-  // const isConnected = activeAccount? true : false;
 
   const [y, setY] = useState(0)
   const { scrollY } = useScroll()
@@ -257,40 +255,10 @@ export default function Header({ className, handleLoading }: Props) {
             </Accordion>
           </p>
           <chakra.p paddingLeft={15.9}>
-            <Button
-              color="black.700"
-              display="inline-flex"
-              alignItems="center"
-              fontSize="14px"
-              px="0"
-              my={4}
-              fontWeight={700}
-              _hover={{ color: cl }}
-              _focus={{ boxShadow: 'none' }}
-              onClick={() => {
-                mobileNav.onClose()
-                router.push('/discover')
-              }}>
-              Discover
-            </Button>
+            <Link as={NextLink} href='/discover' display="inline-flex" alignItems="center" fontSize="14px" px="0" my={4} fontWeight={700} _hover={{ color: cl }}>Discover</Link>
           </chakra.p>
           <chakra.p paddingLeft={15.9}>
-            <Button
-              color="black.700"
-              display="inline-flex"
-              alignItems="center"
-              fontSize="14px"
-              px={0}
-              my={4}
-              fontWeight={700}
-              _hover={{ color: cl }}
-              _focus={{ boxShadow: 'none' }}
-              onClick={() => {
-                mobileNav.onClose()
-                router.push('/vote')
-              }}>
-              Vote
-            </Button>
+            <Link as={NextLink} href='/vote' display="inline-flex" alignItems="center" fontSize="14px" px="0" my={4} fontWeight={700} _hover={{ color: cl }}>Vote</Link>
           </chakra.p>
           <p>
             <Accordion allowToggle my={4}>
@@ -316,51 +284,6 @@ export default function Header({ className, handleLoading }: Props) {
           </p>
           <chakra.p my={4}>
               <ConnectButtonWrapper />
-              {/* <ButtonGroup>
-              { isConnected && (
-              <Menu>
-                <MenuButton mx={4} mb={2} as={Button} rightIcon={<ChevronDownIcon />} color={'#EC407A'}>
-                  User Menu
-                </MenuButton>
-                {!subscribed ? (
-                  <MenuList>
-                    <MenuGroup title='⛔️ Creator Access Only ⛔️'>
-                        <Center>
-                          <WertPurchaseNFT />
-                        </Center>
-                      </MenuGroup>
-                  </MenuList>
-                ) : (
-                  <MenuList>
-                    <MenuGroup title='Active Member'>
-                    <MenuItem
-                      icon={<MdOutlineAccountCircle />}
-                      onClick={() => {
-                        mobileNav.onClose()
-                        router.push(`/profile/${activeAccount?.address}}`)
-                      }}>
-                      Profile
-                    </MenuItem>
-                    <MenuItem
-                      icon={<RiVideoUploadFill />}
-                      onClick={() => {
-                        mobileNav.onClose()
-                        router.push(`/profile/${activeAccount?.address}/upload`)
-                      }}>
-                      Upload
-                    </MenuItem>
-                    </MenuGroup>
-                    <MenuDivider />
-                    <MenuGroup title='Wallet Options'>
-                      <Center>
-                        <AddFunds />
-                      </Center>
-                    </MenuGroup>
-                  </MenuList>
-                )}
-              </Menu>
-              )}
-              </ButtonGroup> */}
           </chakra.p>
         </DrawerBody>
       </DrawerContent>
@@ -433,32 +356,12 @@ export default function Header({ className, handleLoading }: Props) {
                   </LinkBox>
                 </PopoverContent>
               </Popover>
-              <Button
-                color="black.700"
-                display="inline-flex"
-                alignItems="center"
-                fontSize="14px"
-                px="0"
-                fontWeight={700}
-                _hover={{ color: cl }}
-                _focus={{ boxShadow: 'none' }}
-                onClick={() => {
-                  router.push('/discover')
-                }}>
-                Discover
-              </Button>
-              <Button
-                color="black.700"
-                display="inline-flex"
-                alignItems="center"
-                fontSize="14px"
-                px="0"
-                fontWeight={700}
-                _hover={{ color: cl }}
-                _focus={{ boxShadow: 'none' }}
-                onClick={() => router.push('/vote')}>
-                Vote
-              </Button>
+              <chakra.div>
+                <Link as={NextLink} href='/discover' display="inline-flex" alignItems="center" fontSize="14px" px="0" my={4} fontWeight={700} _hover={{ color: cl }}>Discover</Link>
+              </chakra.div>
+              <chakra.div>
+                <Link as={NextLink} href='/vote' display="inline-flex" alignItems="center" fontSize="14px" px="0" my={4} fontWeight={700} _hover={{ color: cl }}>Vote</Link>
+              </chakra.div>
               <Center height="50px">
                 <Divider orientation="vertical" />
               </Center>
@@ -488,47 +391,6 @@ export default function Header({ className, handleLoading }: Props) {
           </Flex>
           <chakra.div display={{ base: 'none', md: 'none', lg: 'block' }}>
               <ConnectButtonWrapper />
-              {/* <ButtonGroup>
-              <Menu>
-                <MenuButton mx={4} as={Button} rightIcon={<ChevronDownIcon />} color={'#EC407A'}>
-                  User Menu
-                </MenuButton>                
-                  {!subscribed ? (
-                    <MenuList>
-                      <MenuGroup title='⛔️ Creator Access Only ⛔️'>
-                        <Center>
-                          <WertPurchaseNFT />
-                        </Center>
-                      </MenuGroup>
-                    </MenuList>
-                  ) : (
-                    <MenuList>
-                      <MenuGroup title='Active Member'>
-                          <MenuItem
-                            icon={<MdOutlineAccountCircle />}
-                            onClick={() => {
-                              router.push(`/profile/${activeAccount?.address}`)
-                            }}>
-                            Profile
-                          </MenuItem>
-                          <MenuItem
-                            icon={<RiVideoUploadFill />}
-                            onClick={() => {
-                              router.push(`/profile/${activeAccount?.address}/upload`)
-                            }}>
-                            Upload
-                          </MenuItem>
-                      </MenuGroup>
-                      <MenuDivider />
-                      <MenuGroup title='Wallet Options'>
-                        <Center>
-                          <AddFunds />
-                        </Center>
-                      </MenuGroup>
-                    </MenuList>
-                  )}
-              </Menu>
-              </ButtonGroup> */}
           </chakra.div>
           <Flex gap="1.2rem" display={{ base: 'flex', md: 'flex', lg: 'none' }}>
             <Center>

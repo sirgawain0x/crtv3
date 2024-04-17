@@ -14,11 +14,6 @@ export const metadata: Metadata = {
     url: "https://tv.creativeplatform.xyz",
     images: [
       {
-        url: 'https://bafybeifr3b4kzjyirunr3qzc65252xz3gjhb5feqffiy22d2lnnousjpha.ipfs.nftstorage.link/',
-        width: 800,
-        height: 600,
-      },
-      {
         url: 'https://bafkreicsmowyquojavdt6lyq7a6mgub3ae7fseprt3dcwqk2asqth4nm6y.ipfs.nftstorage.link/',
         width: 875,
         height: 875,
