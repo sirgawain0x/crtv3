@@ -2,8 +2,8 @@ import React from 'react'
 import { Container, Stack, Flex, Box, Heading, Text, createIcon } from '@chakra-ui/react'
 import Image from 'next/image'
 import { LivepeerConfig, Player } from '@livepeer/react'
-import { useLivepeerClient } from '../hooks/useLivepeerClient'
-import { LIVEPEER_FEATURED_PLAYBACK_ID, CREATIVE_LOGO_BLK, FEATURED_TEXT } from '../utils/context'
+import { useLivepeerClient } from '../../hooks/useLivepeerClient'
+import { LIVEPEER_FEATURED_PLAYBACK_ID, CREATIVE_LOGO_BLK, FEATURED_TEXT } from '../../utils/context'
 
 const PosterImage = () => {
   return (

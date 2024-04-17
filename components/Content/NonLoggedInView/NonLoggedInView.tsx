@@ -1,6 +1,6 @@
 import { chakra, Box } from '@chakra-ui/react';
-import HeroSection from '../../HeroSection';
-import FeaturedVideo from '../../Featured';
+import HeroSection from '../../home-page/HeroSection';
+import FeaturedVideo from '../../home-page/Featured';
 
 const NonLoggedInView = () => {
 
