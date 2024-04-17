@@ -21,10 +21,10 @@ export default async function AllVideosPage() {
         <Flex flexDirection="column" my={10} gap={5} maxW="md">
           <Text>This is the Discover page.</Text>
           <Box>
-            <Link href="/videos/video-1">Video 1</Link>
+            <Link href="/discover/video-1">Video 1</Link>
           </Box>
           <Box>
-            <Link href="/videos/video-2">Video 2</Link>
+            <Link href="/discover/video-2">Video 2</Link>
           </Box>
         </Flex>
       </Box>

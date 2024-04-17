@@ -255,7 +255,7 @@ export default function Header({ className, handleLoading }: Props) {
             </Accordion>
           </p>
           <chakra.p paddingLeft={15.9}>
-            <Link as={NextLink} href='/videos' display="inline-flex" alignItems="center" fontSize="14px" px="0" my={4} fontWeight={700} _hover={{ color: cl }}>Discover</Link>
+            <Link as={NextLink} href='/discover' display="inline-flex" alignItems="center" fontSize="14px" px="0" my={4} fontWeight={700} _hover={{ color: cl }}>Discover</Link>
           </chakra.p>
           <chakra.p paddingLeft={15.9}>
             <Link as={NextLink} href='/vote' display="inline-flex" alignItems="center" fontSize="14px" px="0" my={4} fontWeight={700} _hover={{ color: cl }}>Vote</Link>
@@ -357,7 +357,7 @@ export default function Header({ className, handleLoading }: Props) {
                 </PopoverContent>
               </Popover>
               <chakra.div>
-                <Link as={NextLink} href='/videos' display="inline-flex" alignItems="center" fontSize="14px" px="0" my={4} fontWeight={700} _hover={{ color: cl }}>Discover</Link>
+                <Link as={NextLink} href='/discover' display="inline-flex" alignItems="center" fontSize="14px" px="0" my={4} fontWeight={700} _hover={{ color: cl }}>Discover</Link>
               </chakra.div>
               <chakra.div>
                 <Link as={NextLink} href='/vote' display="inline-flex" alignItems="center" fontSize="14px" px="0" my={4} fontWeight={700} _hover={{ color: cl }}>Vote</Link>
