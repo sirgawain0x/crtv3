@@ -12,14 +12,14 @@ export default async function AllVideosPage() {
             <BreadcrumbLink href='/'><span role="img" aria-label="home">🏠</span> Home</BreadcrumbLink>
           </BreadcrumbItem>
           <BreadcrumbItem isCurrentPage>
-            <BreadcrumbLink>Explore</BreadcrumbLink>
+            <BreadcrumbLink>Discover</BreadcrumbLink>
           </BreadcrumbItem>
         </Breadcrumb>
       </Box>
       <Box>
-      <Heading mb={10}>Explore Content</Heading>
+      <Heading mb={10}>Discover Content</Heading>
         <Flex flexDirection="column" my={10} gap={5} maxW="md">
-          <Text>This is the Discover Page.</Text>
+          <Text>This is the Discover page.</Text>
           <Box>
             <Link href="/videos/video-1">Video 1</Link>
           </Box>
