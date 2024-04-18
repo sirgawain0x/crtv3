@@ -4,6 +4,7 @@ import "./globals.css";
 import { ThirdwebProvider } from "@/app/thirdweb";
 import { TokenGateProvider } from 'collabland-tokengate-react-context';
 import { Providers } from "./providers";
+import { ReactQueryClientProvider } from '../../components/ReactQueryClientProvider'
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -20,13 +21,15 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <Providers>
-          <ThirdwebProvider>
-            <TokenGateProvider>
-              {children}
-            </TokenGateProvider>
-          </ThirdwebProvider>
-        </Providers>
+        <ReactQueryClientProvider>
+          <Providers>
+            <ThirdwebProvider>
+              <TokenGateProvider>
+                {children}
+              </TokenGateProvider>
+            </ThirdwebProvider>
+          </Providers>
+        </ReactQueryClientProvider>
       </body>
     </html>
   );

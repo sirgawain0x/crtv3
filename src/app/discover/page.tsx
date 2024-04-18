@@ -1,11 +1,16 @@
-import React from 'react'
-import { BreadcrumbItem, BreadcrumbLink, Breadcrumb, Box, Heading, Flex, Text } from '@chakra-ui/react'
-import Link from 'next/link'
+"use client";
+import React from 'react';
+import { BreadcrumbItem, BreadcrumbLink, Breadcrumb, Box, Heading, Flex, Text } from '@chakra-ui/react';
+import Link from 'next/link';
+import AllAssets from '../../../components/Videos/AllAssets';
 
-export default async function AllVideosPage() {
 
+
+
+const AllVideosPage =() => {
   return (
     <main>
+
       <Box my={10} p={4}>
         <Breadcrumb>
           <BreadcrumbItem>
@@ -20,14 +25,10 @@ export default async function AllVideosPage() {
       <Heading mb={10}>Discover Content</Heading>
         <Flex flexDirection="column" my={10} gap={5} maxW="md">
           <Text>This is the Discover page.</Text>
-          <Box>
-            <Link href="/discover/video-1">Video 1</Link>
-          </Box>
-          <Box>
-            <Link href="/discover/video-2">Video 2</Link>
-          </Box>
+          <AllAssets />
         </Flex>
       </Box>
     </main>
   )
 }
+export default AllVideosPage;
