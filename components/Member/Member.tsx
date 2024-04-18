@@ -5,6 +5,12 @@ import {
   Link,
   Text,
   VStack,
+  useDisclosure,
+  Drawer,
+  DrawerOverlay,
+  DrawerContent,
+  DrawerHeader,
+  DrawerBody,
 } from '@chakra-ui/react';
 import { TokenGateContext } from 'collabland-tokengate-react-context';
 import { useFormik } from 'formik';
@@ -21,8 +27,8 @@ const defaultRules = {
     type: 'ERC721',
     chainId: 11155111, // Sepolia
     minToken: '1',
-    contractAddress: ROLES.sepolia.test, // NFT contract address
-    roleId: '001',
+    contractAddress: ROLES.sepolia.test.address, // NFT contract address
+    roleId: ROLES.sepolia.test.role, // NFT role id
 };
 
 const RulesValidationSchema = Yup.object().shape({
@@ -36,6 +42,7 @@ const RulesValidationSchema = Yup.object().shape({
 const Member = () => {
     const activeAccount = useActiveAccount();
     const { checkRoles, isLoading, result, error } = useContext(TokenGateContext);
+    const { isOpen, onOpen, onClose } = useDisclosure();
     const formik = useFormik({
         initialValues: {
           address: activeAccount?.address,
@@ -200,17 +207,10 @@ const Member = () => {
                 </Link>
                 <Link
                   className="underline"
-                  href="https://creativeplatform.xyz/docs/intro"
-                  target="_blank"
-                >
-                  Creative Docs
-                </Link>
-                <Link
-                  className="underline"
                   href="https://creativeplatform.xyz/blog"
                   target="_blank"
                 >
-                  Purchase Membership Pass
+                  Membership Pricing
                 </Link>
               </VStack>
               {result?.roles?.[0] && (
@@ -244,6 +244,26 @@ const Member = () => {
                       4
                     )}
                   </pre>
+                  { result.roles[0].granted ? 
+                    <Button onClick={onOpen}>
+                    Creative TV Menu
+                  </Button> : <Link
+                      href="https://app.unlock-protocol.com/checkout?id=1505d0df-b86c-4171-80d5-da502a081db7"
+                      target="_blank"
+                    >
+                      <Button my={4}>Purchase A Membership Pass</Button>
+                    </Link>
+                  }
+                  <Drawer placement={'left'} onClose={onClose} isOpen={isOpen}>
+                    <DrawerOverlay />
+                    <DrawerContent>
+                      <DrawerHeader borderBottomWidth='1px'>Creative TV Menu</DrawerHeader>
+                      <DrawerBody>
+                        <Link href={`/profile/${activeAccount?.address}`}>My Profile</Link>
+                        <p>Upload</p>
+                      </DrawerBody>
+                    </DrawerContent>
+                  </Drawer>
                 </div>
               )}
             </VStack>
