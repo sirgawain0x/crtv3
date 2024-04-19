@@ -1,5 +1,5 @@
 import { NextFetchEvent, NextRequest, NextResponse } from 'next/server';
-import { ROLES } from './app/lib/utils/context';
+import { ROLES } from '@app/lib/utils/context';
 
 export function middleware(req: NextRequest, ev: NextFetchEvent): NextResponse | Promise<NextResponse> {
   // Define role requirements for different paths
