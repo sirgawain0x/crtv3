@@ -1,7 +1,7 @@
 import React from 'react'
 import { Box, SimpleGrid, Text } from '@chakra-ui/react';
 import VideoCard from './VideoCard';
-import { AssetData } from '../../utils/fetchers/assets';
+import { AssetData } from '../../../lib/utils/fetchers/assets';
 
 interface VideoCardGridProps {
     videos: AssetData['video'][];

@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { ThirdwebProvider } from "@/app/thirdweb";
+import { ThirdwebProvider } from "@app/lib/sdk/thirdweb/components";
 import { TokenGateProvider } from 'collabland-tokengate-react-context';
 import { Providers } from "./providers";
-import { ReactQueryClientProvider } from '../../components/ReactQueryClientProvider'
+import { ReactQueryClientProvider } from '@app/ui/components/ReactQueryClientProvider'
 
 const inter = Inter({ subsets: ["latin"] });
 

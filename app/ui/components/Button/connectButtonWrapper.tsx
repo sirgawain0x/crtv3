@@ -1,7 +1,7 @@
 'use client';
-import { ConnectButton } from "thirdweb/react";
-import { client } from "../../src/app/client";
-import { ACCOUNT_FACTORY_ADDRESS } from "../../utils/context";
+import { ConnectButton } from "@app/lib/sdk/thirdweb/components";
+import { client } from "@app/lib/sdk/thirdweb/client";
+import { ACCOUNT_FACTORY_ADDRESS } from "@app/lib/utils/context";
 import { SmartWalletOptions, createWallet } from "thirdweb/wallets";
 import { sepolia } from "thirdweb/chains";
 

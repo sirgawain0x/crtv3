@@ -15,7 +15,7 @@ import {
 } from "@chakra-ui/react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { LIVEPEER_HERO_PLAYBACK_ID, HERO_NAME, HERO_DESCRIPTION, HERO_BUTTONS, CREATIVE_LOGO_BLK } from "../../utils/context";
+import { LIVEPEER_HERO_PLAYBACK_ID, HERO_NAME, HERO_DESCRIPTION, HERO_BUTTONS, CREATIVE_LOGO_BLK } from "../../../lib/utils/context";
 import { LivepeerConfig, Player } from "@livepeer/react";
 import { useLivepeerClient } from "../../hooks/useLivepeerClient";
 

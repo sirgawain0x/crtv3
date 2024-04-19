@@ -1,7 +1,7 @@
 import { Metadata } from "next";
-import Content from "../../components/Content/Content";
-import Header from "../../components/Layout/Header";
-import Footer from "../../components/Layout/Footer";
+import Content from "@app/ui/components/Content/Content";
+import Header from "@app/ui/components/Layout/Header";
+import Footer from "@app/ui/components/Layout/Footer";
 
 export const metadata: Metadata = {
   title: "Creative TV",

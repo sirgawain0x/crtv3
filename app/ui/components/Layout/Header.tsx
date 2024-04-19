@@ -40,7 +40,7 @@ import { useScroll } from 'framer-motion'
 import { AiOutlineMenu } from 'react-icons/ai'
 import { IoIosArrowDown } from 'react-icons/io'
 import ConnectButtonWrapper from "../Button/connectButtonWrapper";
-import { SITE_LOGO, SITE_NAME } from '../../utils/context';
+import { SITE_LOGO, SITE_NAME } from '../../../lib/utils/context';
 import { ThemeSwitcher } from './ThemeSwitcher'
 
 interface Props {

@@ -3,8 +3,8 @@ import { Player } from '@livepeer/react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { PosterImage } from './PosterImage';
-import { SITE_LOGO, CREATIVE_LOGO_WHT } from '../../utils/context';
-import { AssetData } from '../../utils/fetchers/assets';
+import { SITE_LOGO, CREATIVE_LOGO_WHT } from '../../../lib/utils/context';
+import { AssetData } from '../../../lib/utils/fetchers/assets';
 
 interface VideoCardProps {
     video: AssetData['video'];
