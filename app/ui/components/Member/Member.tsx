@@ -68,7 +68,7 @@ const Member = () => {
                 },
               ],
             },
-            process.env.NEXT_PUBLIC_COLLAB_LAND_API_KEY!
+            process.env.COLLAB_LAND_API_KEY!
           );
         },
         validationSchema: RulesValidationSchema,

@@ -14,9 +14,9 @@ import {
   Breadcrumb,
   useColorModeValue,
 } from "@chakra-ui/react";
-import PricingBoxA from "../../../components/Pricing/PricingBoxA";
-import PricingBoxB from "../../../components/Pricing/PricingBoxB";
-import { QUARTERLY_PRICES, ANNUAL_PRICES } from "../../../utils/context";
+import PricingBoxA from "../ui/components/Pricing/PricingBoxA";
+import PricingBoxB from "../ui/components/Pricing/PricingBoxB";
+import { QUARTERLY_PRICES, ANNUAL_PRICES } from "../lib/utils/context";
 
 const aPrices = QUARTERLY_PRICES;
 const bPrices = ANNUAL_PRICES;

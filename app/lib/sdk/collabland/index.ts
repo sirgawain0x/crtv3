@@ -4,17 +4,17 @@ import { CollabLandClient } from '@collabland/sdk';
 // eslint-disable-next-line import/no-mutable-exports
 let collabLandClient: CollabLandClient = new CollabLandClient(
   {},
-  process.env.REACT_APP_API_SERVER_URL,
+  process.env.NEXT_PUBLIC_COLLAB_LAND_SERVER_URL || '',
 );
 
 export const connectToSDK = async (): Promise<void> => {
   try {
     const client = new CollabLandClient(
       {
-        apiKey: process.env.REACT_APP_COLLABLAND_KEY,
+        apiKey: process.env.COLLAB_LAND_API_KEY,
         // authenticatedEncryption: `AE ${token}`,
       },
-      process.env.REACT_APP_API_SERVER_URL,
+      process.env.NEXT_PUBLIC_COLLAB_LAND_SERVER_URL || '',
     );
 
     await client.connect();

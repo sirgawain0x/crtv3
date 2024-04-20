@@ -1,7 +1,6 @@
 import { Metadata } from "next";
 import Content from "@app/ui/components/Content/Content";
-import Header from "@app/ui/components/Layout/Header";
-import Footer from "@app/ui/components/Layout/Footer";
+import { Box, Container } from "@chakra-ui/react";
 
 export const metadata: Metadata = {
   title: "Creative TV",
@@ -28,14 +27,10 @@ export const metadata: Metadata = {
 export default function Home() {
    
   return (
-    <div>
-      <Header />
-      <main className="p-4 pb-5 min-h-[100vh] flex items-center justify-center container max-w-screen-xl mx-auto">
-        <div className="py-10">
+    <Container maxW='7xl' centerContent>
+        <Box py={10}>
           <Content />
-        </div>
-      </main>
-      <Footer />
-    </div>
+        </Box>
+    </Container>
   );
 }

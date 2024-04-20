@@ -6,10 +6,10 @@ import FeaturedVideo from '../../home-page/Featured';
 const NonLoggedInView = () => {
 
   return (
-  <>
+  <Box>
     <HeroSection />
     <FeaturedVideo />
-  </>
+  </Box>
   );
 };
 
