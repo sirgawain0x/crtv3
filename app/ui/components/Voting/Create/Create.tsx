@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Box,
   Heading,
@@ -11,78 +11,77 @@ import {
   Breadcrumb,
   BreadcrumbItem,
   BreadcrumbLink,
-} from '@chakra-ui/react'
-import { ChevronRightIcon } from "@chakra-ui/icons";
-import snapshot from '@snapshot-labs/snapshot.js'
+} from '@chakra-ui/react';
+import { ChevronRightIcon } from '@chakra-ui/icons';
+import snapshot from '@snapshot-labs/snapshot.js';
 import { useActiveAccount, useSetActiveWallet } from 'thirdweb/react';
-import { FaWindowClose } from 'react-icons/fa'
-import { useRouter } from 'next/navigation'
+import { FaWindowClose } from 'react-icons/fa';
+import { useRouter } from 'next/navigation';
 
-const hub = 'https://hub.snapshot.org'
-const client = new snapshot.Client712(hub)
+const hub = 'https://hub.snapshot.org';
+const client = new snapshot.Client712(hub);
 
 /**
  * Renders the Create component.
- * 
+ *
  * @returns The JSX element representing the Create component.
  */
 export default function Create(account: any) {
-  const [title, setTitle] = useState('')
-  const [content, setContent] = useState('')
-  const [startDate, setStartDate] = useState(new Date())
-  const [startTime, setStartTime] = useState(new Date())
-  const [endDate, setEndDate] = useState(new Date())
-  const [endTime, setEndTime] = useState(new Date())
-  const [choices, setChoices] = useState(['yes', 'no'])
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const inputRef = useRef()
-  const router = useRouter()
+  const [title, setTitle] = useState('');
+  const [content, setContent] = useState('');
+  const [startDate, setStartDate] = useState(new Date());
+  const [startTime, setStartTime] = useState(new Date());
+  const [endDate, setEndDate] = useState(new Date());
+  const [endTime, setEndTime] = useState(new Date());
+  const [choices, setChoices] = useState(['yes', 'no']);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const inputRef = useRef();
+  const router = useRouter();
 
   /**
    * Handles the change event for a choice input field.
-   * 
+   *
    * @param i - The index of the choice in the array.
    * @param event - The change event object.
    */
   function handleChange(i: any, event: any) {
-    const values = [...choices]
-    values[i] = event.target.value
-    setChoices(values)
+    const values = [...choices];
+    values[i] = event.target.value;
+    setChoices(values);
   }
 
   /**
    * Adds an empty choice to the list of choices.
    */
   function handleAdd() {
-    const values = [...choices]
-    values.push('')
-    setChoices(values)
+    const values = [...choices];
+    values.push('');
+    setChoices(values);
   }
 
   /**
    * Removes a choice from the list of choices.
-   * 
+   *
    * @param i - The index of the choice to remove.
    */
   function handleRemove(i: any) {
-    const values = [...choices]
-    values.splice(i, 1)
-    setChoices(values)
+    const values = [...choices];
+    values.splice(i, 1);
+    setChoices(values);
   }
-
 
   /**
    * Submits a vote proposal.
-   * 
+   *
    * @returns {Promise<void>} A promise that resolves when the proposal is created.
    */
   const submit = async () => {
     try {
-      setIsSubmitting(true)
+      setIsSubmitting(true);
       // get current block of Gnosis network
-      const provider = await snapshot.utils.getProvider('100')
-      const block = await snapshot.utils.getBlockNumber(provider)
-      
+      const provider = await snapshot.utils.getProvider('100');
+      const block = await snapshot.utils.getBlockNumber(provider);
+
       const receipt = (await client.proposal(provider, account, {
         space: 'thecreative.eth',
         type: 'single-choice',
@@ -90,38 +89,38 @@ export default function Create(account: any) {
         body: content,
         choices: choices,
         start: parseInt(
-          (Number(new Date(`${startDate} ${startTime}`)) / 1000).toFixed()
+          (Number(new Date(`${startDate} ${startTime}`)) / 1000).toFixed(),
         ),
         end: parseInt(
-          (Number(new Date(`${endDate} ${endTime}`)) / 1000).toFixed()
+          (Number(new Date(`${endDate} ${endTime}`)) / 1000).toFixed(),
         ),
         snapshot: block,
         discussion: '',
         plugins: JSON.stringify({}),
-      })) as any
-      console.log(`created proposal ${receipt.id}`)
-      router.push('/vote')
+      })) as any;
+      console.log(`created proposal ${receipt.id}`);
+      router.push('/vote');
     } catch (error) {
-      console.log(error)
-      setIsSubmitting(false)
+      console.log(error);
+      setIsSubmitting(false);
     }
-  }
+  };
 
   const changeInput = (event: any, type: string) => {
     if (type === 'title') {
-      setTitle(event.target.value)
+      setTitle(event.target.value);
     } else if (type === 'content') {
-      setContent(event.target.value)
+      setContent(event.target.value);
     } else if (type === 'start date') {
-      setStartDate(event.target.value)
+      setStartDate(event.target.value);
     } else if (type === 'start time') {
-      setStartTime(event.target.value)
+      setStartTime(event.target.value);
     } else if (type === 'end time') {
-      setEndTime(event.target.value)
+      setEndTime(event.target.value);
     } else if (type === 'end date') {
-      setEndDate(event.target.value)
+      setEndDate(event.target.value);
     }
-  }
+  };
 
   return (
     <Box
@@ -133,13 +132,17 @@ export default function Create(account: any) {
       padding={2}
     >
       <Box padding={5} width={['100%', '100%', '100%', '40%']}>
-        <Breadcrumb spacing='8px' mb={4} separator={<ChevronRightIcon color='gray.500' />}>
+        <Breadcrumb
+          spacing="8px"
+          mb={4}
+          separator={<ChevronRightIcon color="gray.500" />}
+        >
           <BreadcrumbItem>
-            <BreadcrumbLink href='/'>Home</BreadcrumbLink>
+            <BreadcrumbLink href="/">Home</BreadcrumbLink>
           </BreadcrumbItem>
 
           <BreadcrumbItem>
-            <BreadcrumbLink href='/vote'>Vote</BreadcrumbLink>
+            <BreadcrumbLink href="/vote">Vote</BreadcrumbLink>
           </BreadcrumbItem>
 
           <BreadcrumbItem isCurrentPage>
@@ -167,7 +170,7 @@ export default function Create(account: any) {
               placeholder="[#BrandName] Campaign Voting"
               background={'default'}
               onChange={(event) => {
-                changeInput(event, 'title')
+                changeInput(event, 'title');
               }}
             />
           </Box>
@@ -192,7 +195,7 @@ export default function Create(account: any) {
               background={'default'}
               placeholder="Here is a sample placeholder"
               onChange={(event) => {
-                changeInput(event, 'content')
+                changeInput(event, 'content');
               }}
             />
           </Box>
@@ -227,12 +230,12 @@ export default function Create(account: any) {
                         onChange={(e) => handleChange(index, e)}
                       />
                       <InputRightElement>
-                          <Box onClick={() => handleRemove(index)}>
-                            <FaWindowClose />
-                          </Box>
+                        <Box onClick={() => handleRemove(index)}>
+                          <FaWindowClose />
+                        </Box>
                       </InputRightElement>
                     </InputGroup>
-                  )
+                  );
                 })}
               </form>
             </Stack>
@@ -273,7 +276,7 @@ export default function Create(account: any) {
             type="date"
             background={'default'}
             onChange={(event) => {
-              changeInput(event, 'start date')
+              changeInput(event, 'start date');
             }}
           />
           <Heading marginTop={4} color="white" size="sm">
@@ -283,7 +286,7 @@ export default function Create(account: any) {
             type="time"
             background={'default'}
             onChange={(event) => {
-              changeInput(event, 'start time')
+              changeInput(event, 'start time');
             }}
           />
           <Heading marginTop={4} color="white" size="sm">
@@ -293,7 +296,7 @@ export default function Create(account: any) {
             type="date"
             background={'default'}
             onChange={(event) => {
-              changeInput(event, 'end date')
+              changeInput(event, 'end date');
             }}
           />
           <Heading marginTop={4} color="white" size="sm">
@@ -303,7 +306,7 @@ export default function Create(account: any) {
             type="time"
             background={'default'}
             onChange={(event) => {
-              changeInput(event, 'end time')
+              changeInput(event, 'end time');
             }}
           />
           <Button
@@ -319,5 +322,5 @@ export default function Create(account: any) {
         </Box>
       </Box>
     </Box>
-  )
+  );
 }

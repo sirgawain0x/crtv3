@@ -1,23 +1,23 @@
-"use client";
-import React, { ReactNode } from "react";
-import { ApolloLink, HttpLink } from "@apollo/client";
+'use client';
+import React, { ReactNode } from 'react';
+import { ApolloLink, HttpLink } from '@apollo/client';
 import {
   ApolloNextAppProvider,
   NextSSRInMemoryCache,
   NextSSRApolloClient,
   SSRMultipartLink,
-} from "@apollo/experimental-nextjs-app-support/ssr";
+} from '@apollo/experimental-nextjs-app-support/ssr';
 
 function makeClient() {
   const httpLink = new HttpLink({
-    uri: "https://hub.snapshot.org/graphql",
-    fetchOptions: { cache: "no-cache" },
+    uri: 'https://hub.snapshot.org/graphql',
+    fetchOptions: { cache: 'no-cache' },
   });
 
   return new NextSSRApolloClient({
     cache: new NextSSRInMemoryCache(),
     link:
-      typeof window === "undefined"
+      typeof window === 'undefined'
         ? ApolloLink.from([
             new SSRMultipartLink({
               stripDefer: true,

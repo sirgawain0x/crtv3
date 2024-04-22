@@ -1,7 +1,10 @@
 import { NextFetchEvent, NextRequest, NextResponse } from 'next/server';
 import { ROLES } from '@app/lib/utils/context';
 
-export function middleware(req: NextRequest, ev: NextFetchEvent): NextResponse | Promise<NextResponse> {
+export function middleware(
+  req: NextRequest,
+  ev: NextFetchEvent,
+): NextResponse | Promise<NextResponse> {
   // Define role requirements for different paths
   const roleRequirements: { [key: string]: string[] } = {
     '/discover': ['001', '002', '003', '004', '005'],
@@ -19,7 +22,7 @@ export function middleware(req: NextRequest, ev: NextFetchEvent): NextResponse |
   const userRoles = getUserRoles(req);
 
   // Check if any of the user's roles match the required roles for the current path
-  if (!roleRequirements[path].some(role => userRoles.includes(role))) {
+  if (!roleRequirements[path].some((role) => userRoles.includes(role))) {
     return NextResponse.redirect(new URL('/unauthorized', req.url));
   }
 

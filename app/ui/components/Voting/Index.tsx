@@ -1,73 +1,89 @@
 'use client';
-import React, { Fragment, useState, useEffect, useMemo } from 'react'
-import { BreadcrumbItem, BreadcrumbLink, Breadcrumb, Box, Heading, Flex, Text, Container, Button, RadioGroup, Stack, Radio, filter } from '@chakra-ui/react'
-import Link from 'next/link'
-import {  FaUsers, FaCertificate } from 'react-icons/fa'
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+  BreadcrumbItem,
+  BreadcrumbLink,
+  Breadcrumb,
+  Box,
+  Heading,
+  Flex,
+  Text,
+  Container,
+  Button,
+  RadioGroup,
+  Stack,
+  Radio,
+  filter,
+} from '@chakra-ui/react';
+import Link from 'next/link';
+import { FaUsers, FaCertificate } from 'react-icons/fa';
 import { useActiveAccount } from 'thirdweb/react';
-import { ROLES, CREATIVE_ADDRESS } from '@app/lib/utils/context';  
+import { ROLES, CREATIVE_ADDRESS } from '@app/lib/utils/context';
 import { getCollabClient } from '@app/lib/sdk/collabland/index';
-import { Card } from "@app/ui/components/Voting/Card"
+import { Card } from '@app/ui/components/Voting/Card';
 import { gql, useQuery } from '@apollo/client';
 
+// GraphQL query to fetch proposals
 const GET_PROPOSALS = gql`
-    query {
-        proposals (
-            first: 50,
-            skip: 0,
-            where: {
-                space_in: ["thecreative.eth"],
-            },
-            orderBy: "created",
-            orderDirection: desc
-        ) 
-        {
-            id
-            title
-            body
-            choices
-            start
-            end
-            snapshot
-            state
-            scores
-            scores_by_strategy
-            scores_total
-            scores_updated
-            author
-            type
-            quorum
-            space {
-                id
-                name
-            }
-        }
+  query {
+    proposals(
+      first: 50
+      skip: 0
+      where: { space_in: ["thecreative.eth"] }
+      orderBy: "created"
+      orderDirection: desc
+    ) {
+      id
+      title
+      body
+      choices
+      start
+      end
+      snapshot
+      state
+      scores
+      scores_by_strategy
+      scores_total
+      scores_updated
+      author
+      type
+      quorum
+      space {
+        id
+        name
+      }
     }
+  }
 `;
 
+// Interface for proposal data
 interface Proposal {
   id: string;
   title: string;
   body: string;
   start: number; // assuming timestamp
-  end: number;   // assuming timestamp
+  end: number; // assuming timestamp
   snapshot: any; // specify more precise types if possible
   state: string;
-  scores: any;   // specify more precise types if possible
+  scores: any; // specify more precise types if possible
   scores_total: number;
   author: string;
   type: string;
-  quorum: any;   // specify more precise types if possible
+  quorum: any; // specify more precise types if possible
   space: {
-      id: string;
-      name: string;
+    id: string;
+    name: string;
   };
   choices: any[]; // specify more precise types if possible
 }
-  
+
 const Vote = () => {
   const activeAccount = useActiveAccount();
   const { loading, error, data } = useQuery(GET_PROPOSALS);
-  const proposals: Proposal[] = useMemo(() => data ? data.proposals : [], [data]);
+  const proposals: Proposal[] = useMemo(
+    () => (data ? data.proposals : []),
+    [data],
+  );
 
   // Explicitly declare the type of state variable as Proposal[]
   const [snapshots, setSnapshots] = useState<Proposal[]>([]);
@@ -82,9 +98,20 @@ const Vote = () => {
   const convertDate = (date: number) => new Date(date * 1000).toUTCString();
 
   useEffect(() => {
-    const reset = () => setSnapshots(proposals.filter(item => item.state === value));
-    const filterCore = () => setSnapshots(proposals.filter(item => item.author === CREATIVE_ADDRESS && item.state === value));
-    const filterCommunity = () => setSnapshots(proposals.filter(item => item.author !== CREATIVE_ADDRESS && item.state === value));
+    const reset = () =>
+      setSnapshots(proposals.filter((item) => item.state === value));
+    const filterCore = () =>
+      setSnapshots(
+        proposals.filter(
+          (item) => item.author === CREATIVE_ADDRESS && item.state === value,
+        ),
+      );
+    const filterCommunity = () =>
+      setSnapshots(
+        proposals.filter(
+          (item) => item.author !== CREATIVE_ADDRESS && item.state === value,
+        ),
+      );
 
     if (selectionType[0]) {
       filterCore();
@@ -98,16 +125,15 @@ const Vote = () => {
   if (loading) return <p>Loading...</p>;
   if (error) return <p>Error: {error.message}</p>;
 
-
   return (
-    <Fragment>
+    <>
       <Box my={5} p={4}>
         <Breadcrumb>
           <BreadcrumbItem>
             <BreadcrumbLink href="/">
               <span role="img" aria-label="home">
                 🏠
-              </span>{" "}
+              </span>{' '}
               Home
             </BreadcrumbLink>
           </BreadcrumbItem>
@@ -126,9 +152,9 @@ const Vote = () => {
           </Box>
           {activeAccount && (
             <Box marginTop={5}>
-              <Link href={"/vote/create"}>
-                <Button padding={5} backgroundColor={"brand.400"}>
-                  <Heading size="sm" color={"white"}>
+              <Link href={'/vote/create'}>
+                <Button padding={5} backgroundColor={'brand.400'}>
+                  <Heading size="sm" color={'white'}>
                     Make a Proposal
                   </Heading>
                 </Button>
@@ -142,78 +168,78 @@ const Vote = () => {
               <Heading>Proposals</Heading>
             </Box>
             <Box
-              display={"flex"}
-              flexDir={"row"}
-              minW={"40vw"}
+              display={'flex'}
+              flexDir={'row'}
+              minW={'40vw'}
               marginTop={5}
               padding={2}
               borderTopRadius={10}
               bgGradient="linear(to-l, #FFCC80, #D32F2F, #EC407A)"
             >
               <Box
-                cursor={"pointer"}
+                cursor={'pointer'}
                 margin={2}
-                display={"flex"}
-                flexDir={"row"}
-                justifyContent={"center"}
-                alignItems={"center"}
+                display={'flex'}
+                flexDir={'row'}
+                justifyContent={'center'}
+                alignItems={'center'}
                 minW={10}
                 padding={2}
                 borderRadius={10}
                 onClick={() => handleTypeChange(0)}
-                background={selectionType[0] ? "white" : "brand.400"}
+                background={selectionType[0] ? 'white' : 'brand.400'}
               >
-                <FaCertificate color={selectionType[0] ? "#ec407a" : "white"} />
+                <FaCertificate color={selectionType[0] ? '#ec407a' : 'white'} />
                 <Text
                   marginLeft={2}
-                  color={selectionType[0] ? "#ec407a" : "white"}
+                  color={selectionType[0] ? '#ec407a' : 'white'}
                 >
                   Core
                 </Text>
               </Box>
               <Box
-                cursor={"pointer"}
+                cursor={'pointer'}
                 margin={2}
-                display={"flex"}
-                flexDir={"row"}
-                justifyContent={"center"}
-                alignItems={"center"}
+                display={'flex'}
+                flexDir={'row'}
+                justifyContent={'center'}
+                alignItems={'center'}
                 minW={10}
                 padding={2}
                 borderRadius={10}
                 onClick={() => handleTypeChange(1)}
-                background={selectionType[1] ? "white" : "#ec407a"}
+                background={selectionType[1] ? 'white' : '#ec407a'}
               >
-                <FaUsers color={selectionType[1] ? "#ec407a" : "white"} />
+                <FaUsers color={selectionType[1] ? '#ec407a' : 'white'} />
                 <Text
                   marginLeft={2}
-                  color={selectionType[1] ? "#ec407a" : "white"}
+                  color={selectionType[1] ? '#ec407a' : 'white'}
                 >
                   Community
                 </Text>
               </Box>
               <Box
-                cursor={"pointer"}
+                cursor={'pointer'}
                 margin={2}
-                display={"flex"}
-                flexDir={"row"}
+                display={'flex'}
+                flexDir={'row'}
                 minW={10}
                 padding={2}
                 borderRadius={10}
-                justifyContent={"center"}
-                alignItems={"center"}
+                justifyContent={'center'}
+                alignItems={'center'}
                 onClick={() => handleTypeChange(2)}
-                background={selectionType[2] ? "white" : "#ec407a"}
+                background={selectionType[2] ? 'white' : '#ec407a'}
               >
-                <Text color={selectionType[2] ? "#ec407a" : "white"}>All</Text>
+                <Text color={selectionType[2] ? '#ec407a' : 'white'}>All</Text>
               </Box>
             </Box>
             <Box
-              display={"flex"}
-              flexDir={"row"}
-              minW={"40vw"}
+              display={'flex'}
+              flexDir={'row'}
+              minW={'40vw'}
               padding={2}
-              background={"#1A202C"}
+              background={'#1A202C'}
             >
               <RadioGroup onChange={setValue} value={value}>
                 <Stack direction="row">
@@ -230,7 +256,7 @@ const Vote = () => {
               </RadioGroup>
             </Box>
             <Box
-              border={"2px solid #ec407a"}
+              border={'2px solid #ec407a'}
               padding={5}
               borderBottomRadius={25}
             >
@@ -257,7 +283,7 @@ const Vote = () => {
           </Box>
         </Box>
       </Box>
-    </Fragment>
+    </>
   );
-}
+};
 export default Vote;

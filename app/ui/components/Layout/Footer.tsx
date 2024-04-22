@@ -1,10 +1,24 @@
-import { Box, Container, Flex, Image, SimpleGrid, Stack, Tag, Text, Link } from '@chakra-ui/react'
-import { ReactNode } from 'react'
-import { CREATIVE_ICON, FOOTER_LINKS, SOCIAL_LINKS, SITE_COPYRIGHT } from '../../../lib/utils/context'
- 
+import {
+  Box,
+  Container,
+  Flex,
+  Image,
+  SimpleGrid,
+  Stack,
+  Tag,
+  Text,
+  Link,
+} from '@chakra-ui/react';
+import { ReactNode } from 'react';
+import {
+  CREATIVE_ICON,
+  FOOTER_LINKS,
+  SOCIAL_LINKS,
+  SITE_COPYRIGHT,
+} from '../../../lib/utils/context';
 
 interface Props {
-  className?: string
+  className?: string;
 }
 
 const ListHeader = ({ children }: { children: ReactNode }) => {
@@ -12,11 +26,11 @@ const ListHeader = ({ children }: { children: ReactNode }) => {
     <Text fontWeight={'500'} fontSize={'lg'} mb={2}>
       {children}
     </Text>
-  )
-}
+  );
+};
 
 export default function Footer(props: Props): JSX.Element {
-  const className = props.className ?? ''
+  const className = props.className ?? '';
   return (
     <Box className={className} color={'gray.500'}>
       <Box py={10}>
@@ -32,14 +46,28 @@ export default function Footer(props: Props): JSX.Element {
           _after={{
             content: '""',
             borderBottom: '1px solid',
-            borderColor:  'gray.700',
+            borderColor: 'gray.700',
             flexGrow: 1,
             ml: 8,
-          }}>
-          <Image src={CREATIVE_ICON} alt="Creative Logo" width={250} height={'auto'} boxSize="100px" objectFit="contain" />
+          }}
+        >
+          <Image
+            src={CREATIVE_ICON}
+            alt="Creative Logo"
+            width={250}
+            height={'auto'}
+            boxSize="100px"
+            objectFit="contain"
+          />
         </Flex>
       </Box>
-      <Container as={Stack} maxW={'6xl'} minW={'fit-content'} alignItems={'center'} py={10}>
+      <Container
+        as={Stack}
+        maxW={'6xl'}
+        minW={'fit-content'}
+        alignItems={'center'}
+        py={10}
+      >
         <SimpleGrid columns={{ base: 2, sm: 2, md: 4 }} spacing={8}>
           <Stack align={'flex-start'}>
             <ListHeader>Product</ListHeader>
@@ -47,7 +75,9 @@ export default function Footer(props: Props): JSX.Element {
               Overview
             </Link>
             <Stack direction={'row'} align={'center'} spacing={2}>
-              <Link href={FOOTER_LINKS.releases} target={'_blank'}>Features</Link>
+              <Link href={FOOTER_LINKS.releases} target={'_blank'}>
+                Features
+              </Link>
               <Tag size={'sm'} bg={'green.300'} ml={2} color={'white'}>
                 New
               </Tag>
@@ -115,5 +145,5 @@ export default function Footer(props: Props): JSX.Element {
         </Text>
       </Box>
     </Box>
-  )
+  );
 }

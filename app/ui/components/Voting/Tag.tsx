@@ -1,8 +1,6 @@
-import React from "react";
-import { Box } from "@chakra-ui/react";
+import React from 'react';
+import { Box } from '@chakra-ui/react';
 
 export const Tag = () => {
-    return (
-        <Box></Box>
-    )
+  return <Box></Box>;
 };

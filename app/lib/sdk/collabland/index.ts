@@ -1,4 +1,4 @@
-'use client'
+'use client';
 import { CollabLandClient } from '@collabland/sdk';
 
 // eslint-disable-next-line import/no-mutable-exports

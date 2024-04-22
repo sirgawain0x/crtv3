@@ -1,7 +1,7 @@
-import React from 'react'
-import { Box, StatGroup, Stat, StatLabel, StatNumber } from '@chakra-ui/react'
+import React from 'react';
+import { Box, StatGroup, Stat, StatLabel, StatNumber } from '@chakra-ui/react';
 
-function ViewsComponent (props: any) {
+function ViewsComponent(props: any) {
   return (
     <Box>
       <StatGroup key={props.id}>
@@ -11,7 +11,7 @@ function ViewsComponent (props: any) {
         </Stat>
       </StatGroup>
     </Box>
-  )
+  );
 }
 
 export default ViewsComponent;

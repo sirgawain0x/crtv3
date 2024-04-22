@@ -25,19 +25,18 @@ interface Props {
 // Utility function for API URL construction
 const constructApiUrl = (path: string) => `${API_BASE_URL}/${path}`;
 
-
 /**
  * Component for claiming POAP (Proof of Attendance Protocol) tokens.
- * 
+ *
  * @component
  * @example
  * // Usage
  * <ClaimPoap address="0x1234567890" proposalId="abc123" snapshot="xyz789" />
- * 
+ *
  * @param {string} address - The address of the user claiming the POAP token.
  * @param {string} proposalId - The ID of the proposal associated with the POAP token.
  * @param {string} snapshot - The snapshot ID associated with the POAP token.
- * 
+ *
  * @returns {JSX.Element} The ClaimPoap component.
  */
 const ClaimPoap = ({ address, proposalId, snapshot }: Props) => {
@@ -48,9 +47,14 @@ const ClaimPoap = ({ address, proposalId, snapshot }: Props) => {
   useEffect(() => {
     const fetchState = async () => {
       try {
-        const response = await fetch(constructApiUrl(`snapshot/proposal/${snapshot}`));
+        const response = await fetch(
+          constructApiUrl(`snapshot/proposal/${snapshot}`),
+        );
         if (!response.ok) throw new Error('Failed to fetch event');
-        const { image_url, currentState }: { image_url: string; currentState: State } = await response.json();
+        const {
+          image_url,
+          currentState,
+        }: { image_url: string; currentState: State } = await response.json();
         setPoapImg(image_url || '');
         setCurrentState(currentState);
       } catch (error) {
@@ -75,8 +79,18 @@ const ClaimPoap = ({ address, proposalId, snapshot }: Props) => {
   };
 
   return (
-    <Box display="flex" flexDirection="column" alignItems="center" justifyContent="center">
-      <Image src={STATES[currentState].headerImage} alt="" width={125} height={125} />
+    <Box
+      display="flex"
+      flexDirection="column"
+      alignItems="center"
+      justifyContent="center"
+    >
+      <Image
+        src={STATES[currentState].headerImage}
+        alt=""
+        width={125}
+        height={125}
+      />
       <Text marginBottom={2} fontWeight="semibold">
         {STATES[currentState].header}
       </Text>
@@ -89,7 +103,10 @@ const ClaimPoap = ({ address, proposalId, snapshot }: Props) => {
           style={{ verticalAlign: 'middle' }}
         />
         {currentState !== NO_POAP && (
-          <Button isLoading={currentState === LOADING || loadButton} onClick={action}>
+          <Button
+            isLoading={currentState === LOADING || loadButton}
+            onClick={action}
+          >
             {STATES[currentState].buttonText}
           </Button>
         )}

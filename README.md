@@ -9,7 +9,7 @@ Refer to [Creating a client](https://portal.thirdweb.com/typescript/v5/client) g
 Go to `src/client.ts` file and replace the placeholder `clientId` with your client ID.
 
 ```ts
-const clientId = "......";
+const clientId = '......';
 ```
 
 ## Usage with App Router
@@ -20,8 +20,8 @@ You should export them from the `src/thirdweb.ts` file instead which has been ma
 
 ```ts
 // server component
-import { ThirdwebProvider } from "thirdweb/react"; // ❌
-import { ThirdwebProvider } from "@/app/thirdweb"; // ✅
+import { ThirdwebProvider } from 'thirdweb/react'; // ❌
+import { ThirdwebProvider } from '@/app/thirdweb'; // ✅
 ```
 
 ## Usage

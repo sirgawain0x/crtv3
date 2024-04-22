@@ -1,7 +1,7 @@
-import React from'react'
-import { Box, Flex, Heading, Text } from '@chakra-ui/react'
-import Link from 'next/link'
- 
+import React from 'react';
+import { Box, Flex, Heading, Text } from '@chakra-ui/react';
+import Link from 'next/link';
+
 export default function NotFound() {
   return (
     <Box>
@@ -11,5 +11,5 @@ export default function NotFound() {
         <Link href="/">Return Home</Link>
       </Flex>
     </Box>
-  )
+  );
 }
