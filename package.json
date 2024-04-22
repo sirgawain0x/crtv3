@@ -18,7 +18,7 @@
     "@emotion/react": "^11.11.4",
     "@emotion/styled": "^11.11.5",
     "@livepeer/react": "^2.5.8",
-    "@snapshot-labs/snapshot.js": "^0.1.2",
+    "@snapshot-labs/snapshot.js": "^0.1.10",
     "@tanstack/react-query": "^5.29.2",
     "@wert-io/widget-initializer": "^6.1.1",
     "axios": "^1.6.8",
