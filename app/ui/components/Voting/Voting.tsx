@@ -2,9 +2,6 @@
 import React from 'react';
 import {
   Box,
-  Slider,
-  SliderTrack,
-  SliderFilledTrack,
   Text,
   Progress,
 } from '@chakra-ui/react';

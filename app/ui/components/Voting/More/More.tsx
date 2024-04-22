@@ -9,6 +9,7 @@ import {
   BreadcrumbLink,
   Grid,
   GridItem,
+  Container,
 } from '@chakra-ui/react';
 import { ChevronRightIcon } from '@chakra-ui/icons';
 import { useActiveAccount } from 'thirdweb/react';
@@ -49,96 +50,113 @@ export default function MoreOptions() {
   };
 
   return (
-    <Box
-      display="flex"
-      flexDirection="row"
-      flexWrap={'wrap'}
-      alignItems="flex-start"
-      justifyContent="center"
-    >
-      <Box maxW={['100vw']}>
-        <Box padding={4}>
-          <Breadcrumb
-            spacing="8px"
-            mb={4}
-            separator={<ChevronRightIcon color="gray.500" />}
-          >
-            <BreadcrumbItem>
-              <span role="img" aria-label="home">
-                🏠
-              </span>{' '}
-              <BreadcrumbLink href="/">Home</BreadcrumbLink>
-            </BreadcrumbItem>
-
-            <BreadcrumbItem>
-              <BreadcrumbLink href="/vote">Vote</BreadcrumbLink>
-            </BreadcrumbItem>
-
-            <BreadcrumbItem isCurrentPage>
-              <BreadcrumbLink>Details</BreadcrumbLink>
-            </BreadcrumbItem>
-          </Breadcrumb>
-        </Box>
-        <Grid
-          templateColumns={[
-            'repeat(1, 1fr)',
-            'repeat(1, 1fr)',
-            'repeat(2, 1fr)',
-          ]}
-          gap={6}
-          p={4}
+    <>
+      <Box padding={4}>
+        <Breadcrumb
+          spacing="8px"
+          mb={4}
+          separator={<ChevronRightIcon color="gray.500" />}
         >
-          <GridItem colSpan={[1, 1, 1]}>
+          <BreadcrumbItem>
+            <span role="img" aria-label="home">
+              🏠
+            </span>{' '}
+            <BreadcrumbLink href="/">Home</BreadcrumbLink>
+          </BreadcrumbItem>
+
+          <BreadcrumbItem>
+            <BreadcrumbLink href="/vote">Vote</BreadcrumbLink>
+          </BreadcrumbItem>
+
+          <BreadcrumbItem isCurrentPage>
+            <BreadcrumbLink>Details</BreadcrumbLink>
+          </BreadcrumbItem>
+        </Breadcrumb>
+      </Box>
+      <Grid
+        templateColumns={['repeat(1, 1fr)', 'repeat(1, 1fr)', 'repeat(2, 1fr)']}
+        gap={6}
+        p={4}
+      >
+        <GridItem colSpan={[1, 1, 1]}>
+          <Box padding={4}>
             <Box>
               <Heading>{title}</Heading>
             </Box>
-            <Box padding={4}>
-              <Box>
-                <Text>{body}</Text>
+            <Box>
+              <Text>{body}</Text>
+            </Box>
+          </Box>
+        </GridItem>
+        <GridItem colSpan={[1, 1, 1]}>
+          <Box>
+            <Box
+              padding={5}
+              marginBottom={5}
+              maxWidth={'100vw'}
+              cursor="pointer"
+            >
+              <Box
+                bgGradient="linear(to-l, #FFCC80, #D32F2F, #EC407A)"
+                padding={2}
+                display="flex"
+                borderTopLeftRadius={10}
+                borderTopRightRadius={10}
+                flexDirection="row"
+              >
+                <Heading size={'md'} color="white">
+                  Details
+                </Heading>
+              </Box>
+              <Box
+                border={'2px solid #ec407a'}
+                borderBottomRadius={10}
+                padding={10}
+              >
+                <Box padding={2}>
+                  <Text>{`Creator: ${creator ? truncateAddress(creator) : 'Unknown'}`}</Text>
+                  <Text
+                    onClick={() => goTo(snapshot)}
+                  >{`Snapshot:  ${snapshot}`}</Text>
+                </Box>
+                <Box background={'black'} padding={2} borderRadius={10}>
+                  <Box display="flex" flexDirection="row">
+                    <Text color="white">{`Start Date: ${start}`}</Text>
+                  </Box>
+                  <Box display="flex" flexDirection="row">
+                    <Text color="white">{`End Date: ${end}`}</Text>
+                  </Box>
+                </Box>
               </Box>
             </Box>
-          </GridItem>
-          <GridItem colSpan={[1, 1, 1]}>
-            <Box>
+            <Box
+              padding={5}
+              marginBottom={5}
+              cursor="pointer"
+              minW={['100vw', '100vw', '100vw', '20px']}
+              maxWidth={'100vw'}
+            >
               <Box
-                padding={5}
-                marginBottom={5}
-                maxWidth={'100vw'}
-                cursor="pointer"
+                bgGradient="linear(to-l, #FFCC80, #D32F2F, #EC407A)"
+                padding={2}
+                display="flex"
+                borderTopLeftRadius={10}
+                borderTopRightRadius={10}
+                flexDirection="row"
               >
-                <Box
-                  bgGradient="linear(to-l, #FFCC80, #D32F2F, #EC407A)"
-                  padding={2}
-                  display="flex"
-                  borderTopLeftRadius={10}
-                  borderTopRightRadius={10}
-                  flexDirection="row"
-                >
-                  <Heading size={'md'} color="white">
-                    Details
-                  </Heading>
-                </Box>
-                <Box
-                  border={'2px solid #ec407a'}
-                  borderBottomRadius={10}
-                  padding={10}
-                >
-                  <Box padding={2}>
-                    <Text>{`Creator: ${creator ? truncateAddress(creator) : 'Unknown'}`}</Text>
-                    <Text
-                      onClick={() => goTo(snapshot)}
-                    >{`Snapshot:  ${snapshot}`}</Text>
-                  </Box>
-                  <Box background={'black'} padding={2} borderRadius={10}>
-                    <Box display="flex" flexDirection="row">
-                      <Text color="white">{`Start Date: ${start}`}</Text>
-                    </Box>
-                    <Box display="flex" flexDirection="row">
-                      <Text color="white">{`End Date: ${end}`}</Text>
-                    </Box>
-                  </Box>
-                </Box>
+                <Heading size={'md'} color="white">
+                  Current Results
+                </Heading>
               </Box>
+              <Box
+                border={'2px solid #ec407a'}
+                borderBottomRadius={10}
+                padding={10}
+              >
+                <Voting choices={choices} score={score} scores={scores} />
+              </Box>
+            </Box>
+            {activeAccount && (
               <Box
                 padding={5}
                 marginBottom={5}
@@ -147,7 +165,7 @@ export default function MoreOptions() {
                 maxWidth={'100vw'}
               >
                 <Box
-                  bgGradient="linear(to-l, #FFCC80, #D32F2F, #EC407A)"
+                  background="brand.400"
                   padding={2}
                   display="flex"
                   borderTopLeftRadius={10}
@@ -155,7 +173,7 @@ export default function MoreOptions() {
                   flexDirection="row"
                 >
                   <Heading size={'md'} color="white">
-                    Current Results
+                    I Voted POAP
                   </Heading>
                 </Box>
                 <Box
@@ -163,46 +181,17 @@ export default function MoreOptions() {
                   borderBottomRadius={10}
                   padding={10}
                 >
-                  <Voting choices={choices} score={score} scores={scores} />
+                  <ClaimPoap
+                    address={activeAccount?.address as string}
+                    proposalId={identifier as string}
+                    snapshot={snapshot as string}
+                  />
                 </Box>
               </Box>
-              {activeAccount && (
-                <Box
-                  padding={5}
-                  marginBottom={5}
-                  cursor="pointer"
-                  minW={['100vw', '100vw', '100vw', '20px']}
-                  maxWidth={'100vw'}
-                >
-                  <Box
-                    background="brand.400"
-                    padding={2}
-                    display="flex"
-                    borderTopLeftRadius={10}
-                    borderTopRightRadius={10}
-                    flexDirection="row"
-                  >
-                    <Heading size={'md'} color="white">
-                      I Voted POAP
-                    </Heading>
-                  </Box>
-                  <Box
-                    border={'2px solid #ec407a'}
-                    borderBottomRadius={10}
-                    padding={10}
-                  >
-                    <ClaimPoap
-                      address={activeAccount?.address as string}
-                      proposalId={identifier as string}
-                      snapshot={snapshot as string}
-                    />
-                  </Box>
-                </Box>
-              )}
-            </Box>
-          </GridItem>
-        </Grid>
-      </Box>
-    </Box>
+            )}
+          </Box>
+        </GridItem>
+      </Grid>
+    </>
   );
 }

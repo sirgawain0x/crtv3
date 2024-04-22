@@ -421,16 +421,13 @@ export default function Header({ className, handleLoading }: Props) {
         >
           <Flex align="flex-start">
             <HStack p={2}>
-              <Button
+              <Box
                 bg={cbg}
                 px="0px"
                 color="black.900"
                 display="inline-flex"
                 alignItems="center"
                 fontSize={{ base: '0.85rem', sm: '0.9rem', md: '16px' }}
-                _hover={{ color: 'black' }}
-                _focus={{ boxShadow: 'none', color: 'black.500' }}
-                onClick={() => router.push('/')}
               >
                 <Image
                   src={SITE_LOGO}
@@ -447,7 +444,7 @@ export default function Header({ className, handleLoading }: Props) {
                 >
                   {SITE_NAME}
                 </Heading>
-              </Button>
+              </Box>
             </HStack>
           </Flex>
           <Flex>
