@@ -1,10 +1,6 @@
 'use client';
 import React from 'react';
-import {
-  Box,
-  Text,
-  Progress,
-} from '@chakra-ui/react';
+import { Box, Text, Progress } from '@chakra-ui/react';
 
 interface VotingProps {
   choices: any[];

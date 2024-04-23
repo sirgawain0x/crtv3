@@ -19,7 +19,7 @@ import Link from 'next/link';
 import { FaUsers, FaCertificate } from 'react-icons/fa';
 import { useActiveAccount } from 'thirdweb/react';
 import { ROLES, CREATIVE_ADDRESS } from '@app/lib/utils/context';
-import { getCollabClient } from '@app/lib/sdk/collabland/index';
+import { getCollabClient } from '@app/lib/sdk/collabland/client';
 import { Card } from '@app/ui/components/Voting/Card';
 import { gql, useQuery } from '@apollo/client';
 
@@ -153,7 +153,12 @@ const Vote = () => {
           {activeAccount && (
             <Box marginTop={5}>
               <Link href={'/vote/create'}>
-                <Button padding={5} backgroundColor={'brand.400'}>
+                <Button
+                  padding={5}
+                  backgroundColor={'#EC407A'}
+                  _hover={{ bg: '#A62953' }}
+                  _focus={{ bg: '#A62953' }}
+                >
                   <Heading size="sm" color={'white'}>
                     Make a Proposal
                   </Heading>

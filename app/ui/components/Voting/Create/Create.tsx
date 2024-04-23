@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
+'use client';
+import React, { useState, useRef } from 'react';
 import {
   Box,
   Heading,
@@ -14,19 +15,21 @@ import {
 } from '@chakra-ui/react';
 import { ChevronRightIcon } from '@chakra-ui/icons';
 import snapshot from '@snapshot-labs/snapshot.js';
-import { useActiveAccount, useSetActiveWallet } from 'thirdweb/react';
+import { useActiveAccount } from 'thirdweb/react';
+import { getAddress } from 'thirdweb/utils';
 import { FaWindowClose } from 'react-icons/fa';
 import { useRouter } from 'next/navigation';
 
 const hub = 'https://hub.snapshot.org';
-const client = new snapshot.Client712(hub);
+const client = new snapshot.Client(hub);
+const plugin = new snapshot.plugins.poap();
 
 /**
  * Renders the Create component.
  *
  * @returns The JSX element representing the Create component.
  */
-export default function Create(account: any) {
+export default function Create() {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [startDate, setStartDate] = useState(new Date());
@@ -37,6 +40,7 @@ export default function Create(account: any) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const inputRef = useRef();
   const router = useRouter();
+  const activeAccount = useActiveAccount();
 
   /**
    * Handles the change event for a choice input field.
@@ -76,33 +80,37 @@ export default function Create(account: any) {
    * @returns {Promise<void>} A promise that resolves when the proposal is created.
    */
   const submit = async () => {
-    try {
-      setIsSubmitting(true);
-      // get current block of Gnosis network
-      const provider = await snapshot.utils.getProvider('100');
-      const block = await snapshot.utils.getBlockNumber(provider);
-
-      const receipt = (await client.proposal(provider, account, {
-        space: 'thecreative.eth',
-        type: 'single-choice',
-        title: title,
-        body: content,
-        choices: choices,
-        start: parseInt(
-          (Number(new Date(`${startDate} ${startTime}`)) / 1000).toFixed(),
-        ),
-        end: parseInt(
-          (Number(new Date(`${endDate} ${endTime}`)) / 1000).toFixed(),
-        ),
-        snapshot: block,
-        discussion: '',
-        plugins: JSON.stringify({}),
-      })) as any;
-      console.log(`created proposal ${receipt.id}`);
-      router.push('/vote');
-    } catch (error) {
-      console.log(error);
-      setIsSubmitting(false);
+    if (activeAccount) {
+      try {
+        setIsSubmitting(true);
+        // get current block of Gnosis network
+        const provider = await snapshot.utils.getProvider('100');
+        const block = await snapshot.utils.getBlockNumber(provider);
+        const space = 'thecreative.eth';
+        const account = getAddress(activeAccount?.address);
+        const receipt = (await client.proposal(provider, account, space, {
+          type: 'custom',
+          name: title,
+          body: content,
+          choices: choices,
+          start: startDate,
+          end: endDate,
+          snapshot: block,
+          metadata: '',
+        })) as any;
+        console.log(`created proposal ${receipt.id}`);
+        const poap = await plugin.getCurrentState(
+          receipt.id,
+          activeAccount?.address,
+        );
+        console.log('POAP:', poap);
+        router.push('/vote');
+      } catch (error) {
+        console.log(error);
+        setIsSubmitting(false);
+      }
+    } else {
+      console.log('Please connect your wallet to create a proposal.');
     }
   };
 
@@ -242,7 +250,10 @@ export default function Create(account: any) {
 
             <Button
               marginTop={4}
-              background={'brand.400'}
+              color={'white'}
+              _hover={{ background: '#A62953' }}
+              _focus={{ background: '#A62953' }}
+              background={'#EC407A'}
               onClick={() => handleAdd()}
             >
               <Heading color="white" size="sm">
@@ -252,7 +263,7 @@ export default function Create(account: any) {
           </Box>
         </Box>
       </Box>
-      <Box padding={5} width={['100%', '100%', '100%', '40%']}>
+      <Box mt={10} padding={5} width={['100%', '100%', '100%', '40%']}>
         <Box
           padding={4}
           borderTopRadius={20}
@@ -312,12 +323,13 @@ export default function Create(account: any) {
           <Button
             isLoading={isSubmitting}
             marginTop={4}
-            background={'brand.400'}
+            color={'white'}
+            _hover={{ background: '#A62953' }}
+            _focus={{ background: '#A62953' }}
+            background={'#EC407A'}
             onClick={() => submit()}
           >
-            <Heading color="white" size="sm">
-              Submit
-            </Heading>
+            Submit
           </Button>
         </Box>
       </Box>

@@ -10,6 +10,7 @@ export const ACCOUNT_FACTORY_ADDRESS = {
   sepolia: '0xE90DebFD907F5B655f22bfC16083E45994d708bE',
   polygon: '0xE90DebFD907F5B655f22bfC16083E45994d708bE',
 };
+
 export const ACCOUNT_FACTORY_ABI = [
   {
     type: 'event',
@@ -1851,6 +1852,12 @@ export const ACCOUNT_FACTORY_ABI = [
 ];
 
 export const QUARTERLY_PRICES = [
+  {
+    name: 'Fan',
+    features: ['Free-mium Content', 'Creative Influence'],
+    info: 'Enjoy content that inspires and elevate your influence!',
+    url: 'https://app.unlock-protocol.com/checkout?id=6aa04eef-d516-4c2d-81ad-b797f1dcf3be',
+  },
   {
     name: 'Creator',
     price: '$30',

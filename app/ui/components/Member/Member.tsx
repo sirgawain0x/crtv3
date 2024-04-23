@@ -97,10 +97,14 @@ const Member = () => {
             <Text fontSize="md">
               The form is populated with your wallet address, and data to check
               the wallet for{' '}
-              <Link href="https://creativeplatform.xyz/blog">
+              <Link
+                href="https://tv.creativeplatform.xyz/blog"
+                color={'#EC407A'}
+                fontWeight={'bold'}
+              >
                 1 Creative Membership Pass
               </Link>{' '}
-              on Polygon.
+              on <strong>Polygon</strong>.
               <br />
             </Text>
             <Text fontSize="md" pb="4">
