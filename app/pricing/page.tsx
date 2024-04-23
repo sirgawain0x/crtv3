@@ -17,6 +17,7 @@ import {
 import PricingBoxA from '../ui/components/Pricing/PricingBoxA';
 import PricingBoxB from '../ui/components/Pricing/PricingBoxB';
 import { QUARTERLY_PRICES, ANNUAL_PRICES } from '../lib/utils/context';
+import Link from 'next/link';
 
 const aPrices = QUARTERLY_PRICES;
 const bPrices = ANNUAL_PRICES;
@@ -61,7 +62,7 @@ const Pricing = () => {
             <Heading color="#EC407A">Pricing</Heading>
             <Text mb={5} textAlign="center">
               Choose the path that best suits your creative journey with our
-              tailored membership plans. Whether you&apos;re here to explore,
+              tailored <Link href={"https://creativeplatform.xyz/blog"} target={'_blank'} style={{fontWeight: 'bold', color: '#EC407A'}}>membership plans</Link>. Whether you&apos;re here to explore,
               create, support, or expand your business, we&apos;ve got the tools
               and perks to enhance your experience. Unlock a world of
               possibilities and take the next step towards shaping the future of

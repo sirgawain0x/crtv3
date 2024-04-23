@@ -1,7 +1,7 @@
 'use client';
 import React, { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import NextLink from 'next/link';
+import Link from 'next/link';
 import {
   Accordion,
   AccordionButton,
@@ -23,7 +23,6 @@ import {
   Heading,
   IconButton,
   Image,
-  Link,
   LinkBox,
   LinkOverlay,
   Popover,
@@ -84,27 +83,27 @@ export default function Header({ className, handleLoading }: Props) {
         rounded="lg"
         _hover={{ bg: hbg, cursor: 'pointer' }}
       >
-        <chakra.svg
-          flexShrink={0}
-          h={6}
-          w={6}
-          color={ic}
-          xmlns="http://www.w3.org/2000/svg"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          aria-hidden="true"
-        >
-          {icon}
-        </chakra.svg>
-        <Box pl={4}>
-          <Text size="sm" fontWeight="700" color={tcl}>
-            {title}
-          </Text>
-          <chakra.div mt={1} fontSize="sm" color={dcl}>
-            {children}
-          </chakra.div>
-        </Box>
+          <chakra.svg
+            flexShrink={0}
+            h={6}
+            w={6}
+            color={ic}
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            aria-hidden="true"
+          >
+            {icon}
+          </chakra.svg>
+          <Box pl={4}>
+            <Text size="sm" fontWeight="700" color={tcl}>
+              {title}
+            </Text>
+            <chakra.div mt={1} fontSize="sm" color={dcl}>
+              {children}
+            </chakra.div>
+          </Box>
       </Box>
     );
   };
@@ -322,7 +321,7 @@ export default function Header({ className, handleLoading }: Props) {
                         Exclusive
                       </Box>
                       <Heading size="md" my="2">
-                        <LinkOverlay as={NextLink} href="#">
+                        <LinkOverlay as={Link} href="#">
                           New Year, New Beginnings: Creative Kidz
                         </LinkOverlay>
                       </Heading>
@@ -338,32 +337,20 @@ export default function Header({ className, handleLoading }: Props) {
             </p>
             <chakra.p paddingLeft={15.9}>
               <Link
-                as={NextLink}
                 href="/discover"
-                display="inline-flex"
-                alignItems="center"
-                fontSize="14px"
-                px="0"
-                my={4}
-                fontWeight={700}
-                _hover={{ color: cl }}
               >
-                Discover
+                <Text fontWeight={700} my={4} fontSize="14px">
+                  Discover
+                </Text>
               </Link>
             </chakra.p>
             <chakra.p paddingLeft={15.9}>
               <Link
-                as={NextLink}
                 href="/vote"
-                display="inline-flex"
-                alignItems="center"
-                fontSize="14px"
-                px="0"
-                my={4}
-                fontWeight={700}
-                _hover={{ color: cl }}
               >
-                Vote
+                <Text fontWeight={700} my={4} fontSize="14px">
+                  Vote
+                </Text>
               </Link>
             </chakra.p>
             <p>
@@ -421,30 +408,32 @@ export default function Header({ className, handleLoading }: Props) {
         >
           <Flex align="flex-start">
             <HStack p={2}>
-              <Box
-                bg={cbg}
-                px="0px"
-                color="black.900"
-                display="inline-flex"
-                alignItems="center"
-                fontSize={{ base: '0.85rem', sm: '0.9rem', md: '16px' }}
-              >
-                <Image
-                  src={SITE_LOGO}
-                  alt="Creative Logo"
-                  boxSize={'4rem'}
-                  objectFit="contain"
-                />
-                <Heading
-                  color={useColorModeValue('black.900', 'white')}
-                  as="h1"
-                  size="16px"
-                  fontWeight={900}
-                  gap={5}
+              <Link href={'/'}>
+                <Box
+                  bg={cbg}
+                  px="0px"
+                  color="black.900"
+                  display="inline-flex"
+                  alignItems="center"
+                  fontSize={{ base: '0.85rem', sm: '0.9rem', md: '16px' }}
                 >
-                  {SITE_NAME}
-                </Heading>
-              </Box>
+                  <Image
+                    src={SITE_LOGO}
+                    alt="Creative Logo"
+                    boxSize={'4rem'}
+                    objectFit="contain"
+                  />
+                  <Heading
+                    color={useColorModeValue('black.900', 'white')}
+                    as="h1"
+                    size="16px"
+                    fontWeight={900}
+                    gap={5}
+                  >
+                    {SITE_NAME}
+                  </Heading>
+                </Box>
+              </Link>
             </HStack>
           </Flex>
           <Flex>
@@ -487,7 +476,7 @@ export default function Header({ className, handleLoading }: Props) {
                     </Box>
                     <Heading size="md" my="2">
                       <LinkOverlay
-                        as={NextLink}
+                        as={Link}
                         href="https://kidz.creativeplatform.xyz"
                         target="_blank"
                       >
@@ -504,32 +493,20 @@ export default function Header({ className, handleLoading }: Props) {
               </Popover>
               <chakra.div>
                 <Link
-                  as={NextLink}
                   href="/discover"
-                  display="inline-flex"
-                  alignItems="center"
-                  fontSize="14px"
-                  px="0"
-                  my={4}
-                  fontWeight={700}
-                  _hover={{ color: cl }}
                 >
-                  Discover
+                  <Text fontWeight={700} my={4} fontSize="14px">
+                    Discover
+                  </Text>
                 </Link>
               </chakra.div>
               <chakra.div>
                 <Link
-                  as={NextLink}
                   href="/vote"
-                  display="inline-flex"
-                  alignItems="center"
-                  fontSize="14px"
-                  px="0"
-                  my={4}
-                  fontWeight={700}
-                  _hover={{ color: cl }}
                 >
-                  Vote
+                  <Text fontWeight={700} my={4} fontSize="14px">
+                    Vote
+                  </Text>
                 </Link>
               </chakra.div>
               <Center height="50px">

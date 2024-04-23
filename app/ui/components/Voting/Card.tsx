@@ -10,6 +10,7 @@ import {
   FaCertificate,
 } from 'react-icons/fa';
 import More from '@app/ui/components/Voting/More/More';
+import Link from 'next/link';
 
 export const Card = ({
   title,
@@ -42,22 +43,17 @@ export const Card = ({
   const searchParams = useSearchParams();
 
   // Read a parameter
-  const query = `title: ${title},
-        end: ${end},
-        start: ${start}, 
-        body: ${body},
-        choices: ${choices},
-        creator: ${creator},
-        identifier: ${identifier},
-        snapshot: ${snapshot},
-        scores: ${scores},
-        score: ${score}`;
-
-  const goNext = (event: any) => {
-    event.preventDefault();
-    router.push(
-      `/vote/more?title=${encodeURIComponent(title)}&end=${end}&start=${start}&body=${body}&choices=${encodeURIComponent(JSON.stringify(choices))}&creator=${encodeURIComponent(creator)}&identifier=${encodeURIComponent(identifier)}&snapshot=${encodeURIComponent(snapshot)}&scores=${encodeURIComponent(scores)}&score=${score}`,
-    );
+  const query = {
+    'title': title,
+    'end': end,
+    'start': start, 
+    'body': body,
+    'choices': choices,
+    'creator': creator,
+    'identifier': identifier,
+    'snapshot': snapshot,
+    'scores': scores,
+    'score': score
   };
 
   const goTo = (id: any) => {
@@ -66,6 +62,7 @@ export const Card = ({
   };
 
   return (
+    <Link href={`/vote/more?title=${encodeURIComponent(title)}&end=${end}&start=${start}&body=${body}&choices=${encodeURIComponent(JSON.stringify(choices))}&creator=${encodeURIComponent(creator)}&identifier=${encodeURIComponent(identifier)}&snapshot=${encodeURIComponent(snapshot)}&scores=${encodeURIComponent(scores)}&score=${score}`}>
     <Box
       cursor={'pointer'}
       padding={5}
@@ -74,7 +71,6 @@ export const Card = ({
       flexDirection="row"
       justifyContent="space-between"
       alignItems="center"
-      onClick={(event) => goNext(event)}
     >
       <Box>
         <Box marginBottom={5}>
@@ -135,11 +131,12 @@ export const Card = ({
         </Box>
       </Box>
       <Box>
-        <Text>{}</Text>
+        <Text>{''}</Text>
       </Box>
       <Box>
         <FaArrowRight />
       </Box>
     </Box>
+    </Link>
   );
 };

@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   Flex,
+  Box,
   FormControl,
   FormLabel,
   Link,
@@ -83,22 +84,25 @@ const Member = () => {
         justifyContent="center"
         maxW="1500px"
       >
-        <S.WebGraphic
-          src="/web_graphic.gif"
-          width={450}
-          height={550}
-          alt="Creative mascot"
-        />
+        <Box my={10} mx={10} alignItems={['center', 'center', 'flex-start']}>
+          <S.WebGraphic
+            unoptimized
+            src="/web_graphic.gif"
+            width={450}
+            height={550}
+            alt="Creative mascot"
+          />
+        </Box>
         <VStack width="424px" ml="40px">
           <VStack alignItems="flex-start">
-            <Text fontSize={'3xl'} fontWeight={'normal'} color={'#EC407A'}>
-              Wallet Connected
+            <Text fontSize={'3xl'} fontWeight={'bold'} color={'#EC407A'}>
+              Account Connected 🦾
             </Text>
             <Text fontSize="md">
-              The form is populated with your wallet address, and data to check
-              the wallet for{' '}
+              The form is populated with your account address, and data to check
+              the account for{' '}
               <Link
-                href="https://tv.creativeplatform.xyz/blog"
+                href="/pricing"
                 color={'#EC407A'}
                 fontWeight={'bold'}
               >
@@ -108,7 +112,7 @@ const Member = () => {
               <br />
             </Text>
             <Text fontSize="md" pb="4">
-              Keep, or adjust the inputs, then click &apos;Check Role&apos; to
+              Keep, or adjust the inputs, then click &apos;<strong>Check Role</strong>&apos; to
               validate your assets and obtain access.
             </Text>
           </VStack>

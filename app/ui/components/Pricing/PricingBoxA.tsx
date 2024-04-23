@@ -88,7 +88,7 @@ const PricingBoxA: React.FC<PricingBoxProps> = ({
         ))}
       </List>
       <Box>
-        <Link href={url} target={'blank'}>
+        <Link href={url} target={'_blank'}>
           <Button
             variant="solid"
             size="sm"
