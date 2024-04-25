@@ -33,8 +33,8 @@ export function middleware(
 // This needs to be implemented based on how you handle user sessions or authentication
 function getUserRoles(req: NextRequest): string[] {
   // This is a placeholder, assuming role data might be stored in cookies or another way in your application
-  const roleData = req.cookies.get(ROLES?.sepolia.test.role);
-  return roleData ? JSON.parse(ROLES?.sepolia.test.role) : [];
+  const roleData = req.cookies.get(ROLES?.polygon.contributor.roleId);
+  return roleData ? JSON.parse(ROLES?.polygon.contributor.roleId) : [];
 }
 
 export const config = {

@@ -82,11 +82,9 @@ export default function Footer(props: Props): JSX.Element {
                 New
               </Tag>
             </Stack>
-            <Link href={FOOTER_LINKS.tutorial} target={'_blank'}>
-              Tutorials
-            </Link>
-            <Link href={FOOTER_LINKS.pricing} target={'_blank'}>
-              Pricing
+            <Link href={FOOTER_LINKS.pricing}>Pricing</Link>
+            <Link href={FOOTER_LINKS.status} target={'_blank'}>
+              Status
             </Link>
           </Stack>
           <Stack align={'flex-start'}>
@@ -114,9 +112,6 @@ export default function Footer(props: Props): JSX.Element {
             </Link>
             <Link href={FOOTER_LINKS.terms_and_conditions} target={'_blank'}>
               Terms of Service
-            </Link>
-            <Link href={FOOTER_LINKS.status} target={'_blank'}>
-              Status
             </Link>
           </Stack>
           <Stack align={'flex-start'}>

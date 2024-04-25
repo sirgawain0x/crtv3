@@ -83,27 +83,27 @@ export default function Header({ className, handleLoading }: Props) {
         rounded="lg"
         _hover={{ bg: hbg, cursor: 'pointer' }}
       >
-          <chakra.svg
-            flexShrink={0}
-            h={6}
-            w={6}
-            color={ic}
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            aria-hidden="true"
-          >
-            {icon}
-          </chakra.svg>
-          <Box pl={4}>
-            <Text size="sm" fontWeight="700" color={tcl}>
-              {title}
-            </Text>
-            <chakra.div mt={1} fontSize="sm" color={dcl}>
-              {children}
-            </chakra.div>
-          </Box>
+        <chakra.svg
+          flexShrink={0}
+          h={6}
+          w={6}
+          color={ic}
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          aria-hidden="true"
+        >
+          {icon}
+        </chakra.svg>
+        <Box pl={4}>
+          <Text size="sm" fontWeight="700" color={tcl}>
+            {title}
+          </Text>
+          <chakra.div mt={1} fontSize="sm" color={dcl}>
+            {children}
+          </chakra.div>
+        </Box>
       </Box>
     );
   };
@@ -336,18 +336,14 @@ export default function Header({ className, handleLoading }: Props) {
               </Accordion>
             </p>
             <chakra.p paddingLeft={15.9}>
-              <Link
-                href="/discover"
-              >
+              <Link href="/discover">
                 <Text fontWeight={700} my={4} fontSize="14px">
                   Discover
                 </Text>
               </Link>
             </chakra.p>
             <chakra.p paddingLeft={15.9}>
-              <Link
-                href="/vote"
-              >
+              <Link href="/vote">
                 <Text fontWeight={700} my={4} fontSize="14px">
                   Vote
                 </Text>
@@ -492,18 +488,14 @@ export default function Header({ className, handleLoading }: Props) {
                 </PopoverContent>
               </Popover>
               <chakra.div>
-                <Link
-                  href="/discover"
-                >
+                <Link href="/discover">
                   <Text fontWeight={700} my={4} fontSize="14px">
                     Discover
                   </Text>
                 </Link>
               </chakra.div>
               <chakra.div>
-                <Link
-                  href="/vote"
-                >
+                <Link href="/vote">
                   <Text fontWeight={700} my={4} fontSize="14px">
                     Vote
                   </Text>

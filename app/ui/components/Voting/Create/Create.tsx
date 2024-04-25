@@ -146,7 +146,12 @@ export default function Create() {
           separator={<ChevronRightIcon color="gray.500" />}
         >
           <BreadcrumbItem>
-            <BreadcrumbLink href="/">Home</BreadcrumbLink>
+            <BreadcrumbLink href="/">
+              <span role="img" aria-label="home">
+                🏠
+              </span>{' '}
+              Home
+            </BreadcrumbLink>
           </BreadcrumbItem>
 
           <BreadcrumbItem>

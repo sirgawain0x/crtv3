@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Flex,
   Box,
@@ -13,25 +13,58 @@ import {
   DrawerContent,
   DrawerHeader,
   DrawerBody,
+  useToast,
 } from '@chakra-ui/react';
-import { TokenGateContext } from 'collabland-tokengate-react-context';
+import {
+  connectToSDK,
+  getCollabClient,
+} from '../../../lib/sdk/collabland/client';
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
-import { useContext } from 'react';
+import { ROLES } from '@app/lib/utils/context';
 import { useActiveAccount } from 'thirdweb/react';
 import { truncateAddress } from '../../../lib/utils/shortenAddress';
-import { ROLES } from '../../../lib/utils/context';
 import CustomInput from '../Input/Input';
 import Button from '../Button/Button';
 import * as S from '../Content/Content.styled';
 
-const defaultRules = {
-  type: 'ERC721',
-  chainId: 137, // Polygon
-  minToken: '1',
-  contractAddress: ROLES?.polygon.fan.address, // NFT contract address
-  roleId: ROLES.sepolia.test.role, // NFT role id
-};
+const newRules = [
+  {
+    type: 'ERC721',
+    chainId: 137,
+    minToken: '1',
+    contractAddress: '0xb9c69af58109927cc2dcce8043f82158f7b96ca7',
+    roleId: 'contributor',
+  },
+  {
+    type: 'ERC721',
+    chainId: 137,
+    minToken: '1',
+    contractAddress: '0xb6b645c3e2025cf69983983266d16a0aa323e2b0',
+    roleId: 'creator',
+  },
+  {
+    type: 'ERC721',
+    chainId: 137,
+    minToken: '1',
+    contractAddress: '0xace23c0669bf52c50d30c33c7e4adc78cc8754ec',
+    roleId: 'supporter',
+  },
+  {
+    type: 'ERC721',
+    chainId: 137,
+    minToken: '1',
+    contractAddress: '0x480c5081793506ffb8e4a85390e4ac7c19f2d717',
+    roleId: 'brand',
+  },
+  {
+    type: 'ERC721',
+    chainId: 137,
+    minToken: '1',
+    contractAddress: '0xe174caa294999ec622988242641a27c11e6c22d8',
+    roleId: 'fan',
+  },
+];
 
 const RulesValidationSchema = Yup.object().shape({
   type: Yup.string().required('Required'),
@@ -43,33 +76,62 @@ const RulesValidationSchema = Yup.object().shape({
 
 const Member = () => {
   const activeAccount = useActiveAccount();
-  const { checkRoles, isLoading, result, error } = useContext(TokenGateContext);
   const { isOpen, onOpen, onClose } = useDisclosure();
+  const toast = useToast();
+
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [result, setResult] = useState<any>(null);
+
   const formik = useFormik({
     initialValues: {
       address: activeAccount?.address,
-      chainId: defaultRules.chainId,
-      type: defaultRules.type,
-      contractAddress: defaultRules.contractAddress,
-      minToken: defaultRules.minToken,
-      roleId: defaultRules.roleId,
+      chainId: newRules[0].chainId,
+      type: newRules[0].type,
+      contractAddress: newRules[0].contractAddress,
+      minToken: newRules[0].minToken,
+      roleId: newRules[0].roleId,
     },
     onSubmit: (values) => {
-      checkRoles(
-        {
-          account: values.address!,
-          rules: [
-            {
-              type: values.type!,
-              chainId: values.chainId!,
-              minToken: values.minToken!,
-              contractAddress: values.contractAddress!,
-              roleId: values.roleId,
-            },
-          ],
-        },
-        process.env.COLLAB_LAND_API_KEY!,
-      );
+      setIsLoading(true);
+      connectToSDK()
+        .then(() => {
+          getCollabClient()
+            .accessControl.checkRoles({
+              account: values.address,
+              rules: newRules,
+            })
+            .then((res) => {
+              setIsLoading(false);
+              setResult(res);
+              toast({
+                title: 'Role check completed',
+                description: 'Your roles have been successfully verified.',
+                status: 'success',
+                duration: 9000,
+                isClosable: true,
+              });
+            })
+            .catch((error) => {
+              setIsLoading(false);
+              toast({
+                title: 'Failed to check roles',
+                description: `Error: ${error.message}`,
+                status: 'error',
+                duration: 9000,
+                isClosable: true,
+              });
+            });
+        })
+        .catch((error) => {
+          setIsLoading(false);
+          toast({
+            title: 'Failed to connect to SDK',
+            description: `Error: ${error.message}`,
+            status: 'error',
+            duration: 9000,
+            isClosable: true,
+          });
+        });
     },
     validationSchema: RulesValidationSchema,
   });
@@ -96,24 +158,24 @@ const Member = () => {
         <VStack width="424px" ml="40px">
           <VStack alignItems="flex-start">
             <Text fontSize={'3xl'} fontWeight={'bold'} color={'#EC407A'}>
-              Account Connected 🦾
+              Account Connected{' '}
+              <span role="img" aria-label="robot-arm">
+                🦾
+              </span>{' '}
             </Text>
             <Text fontSize="md">
               The form is populated with your account address, and data to check
               the account for{' '}
-              <Link
-                href="/pricing"
-                color={'#EC407A'}
-                fontWeight={'bold'}
-              >
+              <Link href="/pricing" color={'#EC407A'} fontWeight={'bold'}>
                 1 Creative Membership Pass
               </Link>{' '}
               on <strong>Polygon</strong>.
               <br />
             </Text>
             <Text fontSize="md" pb="4">
-              Keep, or adjust the inputs, then click &apos;<strong>Check Role</strong>&apos; to
-              validate your assets and obtain access.
+              Keep, or adjust the inputs, then click &apos;
+              <strong>Check Role</strong>&apos; to validate your assets and
+              obtain access.
             </Text>
           </VStack>
 
@@ -201,9 +263,9 @@ const Member = () => {
               </Button>
             </VStack>
           </form>
-          {error && (
+          {/* {error && (
             <div className="font-bold text-red-900">Error: {error}</div>
-          )}
+          )} */}
         </VStack>
         <VStack
           align="flex-start"
@@ -220,7 +282,8 @@ const Member = () => {
               Membership Pricing
             </Link>
           </VStack>
-          {result?.roles?.[0] && (
+          {/* need to check for a listed role */}
+          {result && (
             <div>
               <Text
                 fontSize="3xl"
