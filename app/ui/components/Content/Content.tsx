@@ -17,7 +17,6 @@ const Content = () => {
 
   // return <>{activeAccount ? <Member /> : <NonLoggedInView />}</>;
   return <>{<NonLoggedInView />}</>;
-
 };
 
 export default Content;

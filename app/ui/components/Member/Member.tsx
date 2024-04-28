@@ -18,7 +18,11 @@ import {
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
 import { ROLES } from '@app/lib/utils/context';
-import { useActiveAccount, useActiveWallet, useSendAndConfirmTransaction } from 'thirdweb/react';
+import {
+  useActiveAccount,
+  useActiveWallet,
+  useSendAndConfirmTransaction,
+} from 'thirdweb/react';
 import { truncateAddress } from '../../../lib/utils/shortenAddress';
 import CustomInput from '../Input/Input';
 import { prepareContractCall } from 'thirdweb';
@@ -79,7 +83,7 @@ const Member = () => {
   const { isOpen, onOpen, onClose } = useDisclosure();
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [result, setResult] = useState<any>(null);
-  const [subscribed, setSubscribed] = useState(false)
+  const [subscribed, setSubscribed] = useState(false);
 
   const formik = useFormik({
     initialValues: {

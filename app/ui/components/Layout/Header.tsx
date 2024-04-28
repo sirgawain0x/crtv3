@@ -44,16 +44,16 @@ import { useRouter } from 'next/navigation';
 import { useScroll } from 'framer-motion';
 import { AiOutlineMenu } from 'react-icons/ai';
 import { IoIosArrowDown } from 'react-icons/io';
-import { ChevronDownIcon } from '@chakra-ui/icons'
-import { MdOutlineAccountCircle } from 'react-icons/md'
-import { RiVideoUploadFill } from 'react-icons/ri'
+import { ChevronDownIcon } from '@chakra-ui/icons';
+import { MdOutlineAccountCircle } from 'react-icons/md';
+import { RiVideoUploadFill } from 'react-icons/ri';
 import ConnectButtonWrapper from '../Button/connectButtonWrapper';
 import { SITE_LOGO, SITE_NAME } from '../../../lib/utils/context';
 import { ThemeSwitcher } from './ThemeSwitcher';
 import { readContract } from 'thirdweb';
 import creatorContract from '@app/lib/utils/unlockContract';
 import { useActiveAccount } from 'thirdweb/react';
-import WertPurchaseNFT from "@app/ui/components/Wert/WertPurchaseNFT";
+import WertPurchaseNFT from '@app/ui/components/Wert/WertPurchaseNFT';
 import AddFunds from '@app/ui/components/Wert/AddFunds';
 
 interface Props {
@@ -67,14 +67,14 @@ interface Props {
 export default function Header({ className, handleLoading }: Props) {
   const styleName = className ?? '';
   const ref = useRef(null);
-  const activeAccount = useActiveAccount()
+  const activeAccount = useActiveAccount();
   const [y, setY] = useState(0);
   const { scrollY } = useScroll();
   const mobileNav = useDisclosure();
   const cbg = useColorModeValue('#F0F0F0', 'brand.100');
   const cl = useColorModeValue('gray.900', 'white');
   const router = useRouter();
-  const [subscribed, setSubscribed] = useState(false)
+  const [subscribed, setSubscribed] = useState(false);
 
   useEffect(() => {
     function updateScrollY() {
@@ -90,23 +90,21 @@ export default function Header({ className, handleLoading }: Props) {
   useEffect(() => {
     const getSubscribedData = async () => {
       if (!activeAccount) return;
-  
+
       try {
         const result = await readContract({
           contract: creatorContract,
-          method: "getHasValidKey",
-          params: [ activeAccount?.address as string ]
-        })
+          method: 'getHasValidKey',
+          params: [activeAccount?.address as string],
+        });
         console.log('Is your membership valid?', result);
         setSubscribed(result);
-        
       } catch (error) {
         console.log('Error getting subscription data:', error);
       }
     };
     getSubscribedData();
   }, [activeAccount]);
-
 
   const Section = ({ icon, title, children }: Props) => {
     const ic = useColorModeValue('brand.600', 'brand.300');
@@ -414,58 +412,60 @@ export default function Header({ className, handleLoading }: Props) {
             <chakra.div my={4}>
               <SimpleGrid columns={2} spacing={5}>
                 <Box>
-              <ConnectButtonWrapper />
-              </Box>
-            { subscribed ? (
-              <Box>
-                <Menu>
-                  <MenuButton> User Menu</MenuButton>
-                  <MenuList>
-                    <MenuGroup title='Active Member'>
-                    <MenuItem
-                      icon={<MdOutlineAccountCircle />}
-                      onClick={() => {
-                        mobileNav.onClose()
-                        router.push(`/profile/${activeAccount?.address}`)
-                      }}>
-                      Profile
-                    </MenuItem>
-                    <MenuItem
-                      icon={<RiVideoUploadFill />}
-                      onClick={() => {
-                        mobileNav.onClose()
-                        router.push(`/profile/${activeAccount?.address}/upload`)
-                      }}>
-                      Upload
-                    </MenuItem>
-                    </MenuGroup>
-                    <MenuDivider />
-                    <MenuGroup title='Wallet Options'>
-                      <Center>
-                        <AddFunds />
-                      </Center>
-                    </MenuGroup>
-                  </MenuList>
-                </Menu>
+                  <ConnectButtonWrapper />
                 </Box>
-            ):(
-              <Box>
-                <Menu>
-                  <MenuButton> User Menu</MenuButton>
-                  <MenuList>
-                    <MenuGroup title='⛔️ Creator Access Only ⛔️'>
-                      <Center>
-                        <WertPurchaseNFT />
-                      </Center>
-                    </MenuGroup>
-                  </MenuList>
-                </Menu>
-                </Box>
-            )
-          }
-          
-          </SimpleGrid>
-          </chakra.div>
+                {subscribed ? (
+                  <Box>
+                    <Menu>
+                      <MenuButton> User Menu</MenuButton>
+                      <MenuList>
+                        <MenuGroup title="Active Member">
+                          <MenuItem
+                            icon={<MdOutlineAccountCircle />}
+                            onClick={() => {
+                              mobileNav.onClose();
+                              router.push(`/profile/${activeAccount?.address}`);
+                            }}
+                          >
+                            Profile
+                          </MenuItem>
+                          <MenuItem
+                            icon={<RiVideoUploadFill />}
+                            onClick={() => {
+                              mobileNav.onClose();
+                              router.push(
+                                `/profile/${activeAccount?.address}/upload`,
+                              );
+                            }}
+                          >
+                            Upload
+                          </MenuItem>
+                        </MenuGroup>
+                        <MenuDivider />
+                        <MenuGroup title="Wallet Options">
+                          <Center>
+                            <AddFunds />
+                          </Center>
+                        </MenuGroup>
+                      </MenuList>
+                    </Menu>
+                  </Box>
+                ) : (
+                  <Box>
+                    <Menu>
+                      <MenuButton> User Menu</MenuButton>
+                      <MenuList>
+                        <MenuGroup title="⛔️ Creator Access Only ⛔️">
+                          <Center>
+                            <WertPurchaseNFT />
+                          </Center>
+                        </MenuGroup>
+                      </MenuList>
+                    </Menu>
+                  </Box>
+                )}
+              </SimpleGrid>
+            </chakra.div>
           </DrawerBody>
         </DrawerContent>
       </Drawer>
@@ -621,43 +621,46 @@ export default function Header({ className, handleLoading }: Props) {
           <chakra.div display={{ base: 'none', md: 'none', lg: 'block' }}>
             <SimpleGrid columns={2} spacing={5}>
               <Box>
-              <ConnectButtonWrapper />
-            </Box>
-            { activeAccount && (
-              <Box>
-                <Menu>
-                  <MenuButton> User Menu</MenuButton>
-                  <MenuList>
-                    <MenuGroup title='Active Member'>
-                    <MenuItem
-                      icon={<MdOutlineAccountCircle />}
-                      onClick={() => {
-                        mobileNav.onClose()
-                        router.push(`/profile/${activeAccount?.address}`)
-                      }}>
-                      Profile
-                    </MenuItem>
-                    <MenuItem
-                      icon={<RiVideoUploadFill />}
-                      onClick={() => {
-                        mobileNav.onClose()
-                        router.push(`/profile/${activeAccount?.address}/upload`)
-                      }}>
-                      Upload
-                    </MenuItem>
-                    </MenuGroup>
-                    <MenuDivider />
-                    <MenuGroup title='Wallet Options'>
-                      <Center>
-                        <AddFunds />
-                      </Center>
-                    </MenuGroup>
-                  </MenuList>
-                </Menu>
+                <ConnectButtonWrapper />
               </Box>
-            )
-          }
-          </SimpleGrid>
+              {activeAccount && (
+                <Box>
+                  <Menu>
+                    <MenuButton> User Menu</MenuButton>
+                    <MenuList>
+                      <MenuGroup title="Active Member">
+                        <MenuItem
+                          icon={<MdOutlineAccountCircle />}
+                          onClick={() => {
+                            mobileNav.onClose();
+                            router.push(`/profile/${activeAccount?.address}`);
+                          }}
+                        >
+                          Profile
+                        </MenuItem>
+                        <MenuItem
+                          icon={<RiVideoUploadFill />}
+                          onClick={() => {
+                            mobileNav.onClose();
+                            router.push(
+                              `/profile/${activeAccount?.address}/upload`,
+                            );
+                          }}
+                        >
+                          Upload
+                        </MenuItem>
+                      </MenuGroup>
+                      <MenuDivider />
+                      <MenuGroup title="Wallet Options">
+                        <Center>
+                          <AddFunds />
+                        </Center>
+                      </MenuGroup>
+                    </MenuList>
+                  </Menu>
+                </Box>
+              )}
+            </SimpleGrid>
           </chakra.div>
           <Flex gap="1.2rem" display={{ base: 'flex', md: 'flex', lg: 'none' }}>
             <Center>

@@ -13,66 +13,84 @@ import creatorContract from '@app/lib/utils/unlockContract';
 import Unlock from '@app/lib/utils/Unlock.json';
 
 const WertPurchaseNFT = () => {
-    const activeAccount = useActiveAccount();
+  const activeAccount = useActiveAccount();
 
-    if (activeAccount){
+  if (activeAccount) {
+    const data = encodeFunctionData({
+      abi: Unlock.abi,
+      functionName: 'purchase',
+      args: [
+        [toWei('30')],
+        [activeAccount?.address],
+        [CREATIVE_ADDRESS],
+        [CREATIVE_ADDRESS],
+        ['0x'],
+      ],
+    });
 
-        const data = encodeFunctionData({
-            abi: Unlock.abi,
-            functionName: 'purchase',
-            args: [[toWei('30')], [activeAccount?.address], [CREATIVE_ADDRESS], [CREATIVE_ADDRESS], ['0x']]
-          })
+    // WERT SIGNER HELPER
+    const signedData = signSmartContractData(
+      {
+        address: activeAccount?.address,
+        commodity: 'USDC',
+        network: 'polygon',
+        commodity_amount: 30,
+        sc_address: ROLES?.polygon.creator.contractAddress,
+        sc_input_data: data,
+      },
+      `${process.env.WERT_PRIVATE_KEY}`,
+    );
 
-        // WERT SIGNER HELPER
-        const signedData = signSmartContractData({
-            address: activeAccount?.address,
-            commodity: "USDC",
-            network: "polygon",
-            commodity_amount: 30,
-            sc_address: ROLES?.polygon.creator.contractAddress,
-            sc_input_data: data,
-        }, `${process.env.WERT_PRIVATE_KEY}`);
+    const wertOptions: Options = {
+      partner_id: '01HSD48HCYJH2SNT65S5A0JYPP',
+      click_id: uuidv4(),
+      origin: 'https://widget.wert.io',
+      color_buttons: '#EC407A',
+      lang: 'en',
+      skip_init_navigation: false,
+    };
 
-        const wertOptions: Options = {
-            partner_id: "01HSD48HCYJH2SNT65S5A0JYPP",
-            click_id: uuidv4(),
-            origin: "https://widget.wert.io",
-            color_buttons: "#EC407A",
-            lang: 'en',
-            skip_init_navigation: false,
-        }
+    const nftOptions = {
+      extra: {
+        item_info: {
+          author_image_url:
+            'https://bafkreiehm3yedt4cmtckelgfwqtgfvp6bolvk5nx2esle4tnwe7mi5q43q.ipfs.nftstorage.link/',
+          author: 'Creative Org DAO',
+          image_url:
+            'https://locksmith.unlock-protocol.com/lock/0x9a9280897C123B165E23f77cf4c58292D6aB378d/icon',
+          name: 'The BETA Membership',
+          seller: 'Creative Organization DAO',
+        },
+      },
+    };
 
-        const nftOptions = {
-            extra: {
-                item_info: {
-                    author_image_url: "https://bafkreiehm3yedt4cmtckelgfwqtgfvp6bolvk5nx2esle4tnwe7mi5q43q.ipfs.nftstorage.link/",
-                    author: "Creative Org DAO",
-                    image_url:
-                    "https://locksmith.unlock-protocol.com/lock/0x9a9280897C123B165E23f77cf4c58292D6aB378d/icon",
-                    name: "The BETA Membership",
-                    seller: "Creative Organization DAO",
-                }
-            },
-        };
-
-        const wertWidget = new WertWidget({
-            ...signedData,
-            ...wertOptions,
-            ...nftOptions,
-        })
-
+    const wertWidget = new WertWidget({
+      ...signedData,
+      ...wertOptions,
+      ...nftOptions,
+    });
 
     return (
-        <>
-            <Button leftIcon={<MdOutlineShoppingCartCheckout />} onClick={() => wertWidget.open()}>Buy with Debit/Credit</Button>
-        </>
-    )
-}
-    return (
-        <>
-            <Button leftIcon={<MdOutlineShoppingCartCheckout />} onClick={() => alert("Enter email to purchase a membership")}>Not Connected</Button>
-        </>
-    )
-}
+      <>
+        <Button
+          leftIcon={<MdOutlineShoppingCartCheckout />}
+          onClick={() => wertWidget.open()}
+        >
+          Buy with Debit/Credit
+        </Button>
+      </>
+    );
+  }
+  return (
+    <>
+      <Button
+        leftIcon={<MdOutlineShoppingCartCheckout />}
+        onClick={() => alert('Enter email to purchase a membership')}
+      >
+        Not Connected
+      </Button>
+    </>
+  );
+};
 
 export default WertPurchaseNFT;
