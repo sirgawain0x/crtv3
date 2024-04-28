@@ -1,14 +1,13 @@
-import { NextFetchEvent, NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { ROLES } from '@app/lib/utils/context';
 
 export function middleware(
   req: NextRequest,
-  ev: NextFetchEvent,
 ): NextResponse | Promise<NextResponse> {
   // Define role requirements for different paths
   const roleRequirements: { [key: string]: string[] } = {
-    '/discover': ['001', '002', '003', '004', '005'],
-    '/profile': ['001', '002', '003', '004'],
+    '/discover': ['contributor', 'creator', 'supporter', 'brand', 'fan'],
+    '/profile': ['contributor', 'creator', 'supporter', 'brand', 'fan'],
   };
 
   const path = req.nextUrl.pathname;
@@ -33,8 +32,8 @@ export function middleware(
 // This needs to be implemented based on how you handle user sessions or authentication
 function getUserRoles(req: NextRequest): string[] {
   // This is a placeholder, assuming role data might be stored in cookies or another way in your application
-  const roleData = req.cookies.get(ROLES?.polygon.contributor.roleId);
-  return roleData ? JSON.parse(ROLES?.polygon.contributor.roleId) : [];
+  const roleData = req.cookies.get(ROLES?.polygon.creator.roleId);
+  return roleData ? JSON.parse(ROLES?.polygon.creator.roleId) : [];
 }
 
 export const config = {

@@ -15,16 +15,15 @@ import {
   DrawerBody,
   useToast,
 } from '@chakra-ui/react';
-import {
-  connectToSDK,
-  getCollabClient,
-} from '../../../lib/sdk/collabland/client';
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
 import { ROLES } from '@app/lib/utils/context';
-import { useActiveAccount } from 'thirdweb/react';
+import { useActiveAccount, useActiveWallet, useSendAndConfirmTransaction } from 'thirdweb/react';
 import { truncateAddress } from '../../../lib/utils/shortenAddress';
 import CustomInput from '../Input/Input';
+import { prepareContractCall } from 'thirdweb';
+import { client } from '@app/lib/sdk/thirdweb/client';
+import { polygon } from 'thirdweb/chains';
 import Button from '../Button/Button';
 import * as S from '../Content/Content.styled';
 
@@ -76,11 +75,11 @@ const RulesValidationSchema = Yup.object().shape({
 
 const Member = () => {
   const activeAccount = useActiveAccount();
-  const { isOpen, onOpen, onClose } = useDisclosure();
   const toast = useToast();
-
+  const { isOpen, onOpen, onClose } = useDisclosure();
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [result, setResult] = useState<any>(null);
+  const [subscribed, setSubscribed] = useState(false)
 
   const formik = useFormik({
     initialValues: {
@@ -93,9 +92,10 @@ const Member = () => {
     },
     onSubmit: (values) => {
       setIsLoading(true);
-      connectToSDK()
+      //connectToSDK()
+      creatorContract
         .then(() => {
-          getCollabClient()
+          sendAndConfirmTx(tx)
             .accessControl.checkRoles({
               account: values.address,
               rules: newRules,

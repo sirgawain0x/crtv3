@@ -9,7 +9,7 @@ import {
   isLoggedIn,
   login,
   logout,
-} from '@app/lib/utils/Unlock';
+} from '@app/api/auth/unlock/Unlock';
 
 export default function ConnectButtonWrapper() {
   const chain = sepolia;

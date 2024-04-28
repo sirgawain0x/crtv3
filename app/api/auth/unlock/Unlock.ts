@@ -8,7 +8,7 @@ import {
 } from 'thirdweb/auth';
 import { privateKeyToAccount } from 'thirdweb/wallets';
 import { cookies } from 'next/headers';
-import { client } from '../sdk/thirdweb/client';
+import { client } from '../../../lib/sdk/thirdweb/client';
 
 const privateKey = process.env.THIRDWEB_ADMIN_PRIVATE_KEY || '';
 

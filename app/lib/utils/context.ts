@@ -1983,6 +1983,7 @@ export const ROLES = {
     },
   },
 };
+
 export const ROLES_ABI = [
   {
     inputs: [],

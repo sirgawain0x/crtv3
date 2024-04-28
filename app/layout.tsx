@@ -2,7 +2,6 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { ThirdwebProvider } from '@app/lib/sdk/thirdweb/components';
-// import { TokenGateProvider } from 'collabland-tokengate-react-context';
 import { Providers } from './providers';
 import Layout from './ui/components/Layout/Layout';
 import { ApolloWrapper } from './lib/utils/ApolloWrapper';
@@ -25,9 +24,7 @@ export default function RootLayout({
         <ApolloWrapper>
           <Providers>
             <ThirdwebProvider>
-              {/* <TokenGateProvider> */}
               <Layout>{children}</Layout>
-              {/* </TokenGateProvider> */}
             </ThirdwebProvider>
           </Providers>
         </ApolloWrapper>

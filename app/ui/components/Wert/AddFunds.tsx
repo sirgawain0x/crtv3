@@ -13,7 +13,7 @@ const AddFunds: NextPage = () => {
   if (activeAccount) {
     // WERT OPTIONS
     const options: Options = {
-      partner_id: '01FGKYK638SV618KZHAVEY7P79',
+      partner_id: '01HSD48HCYJH2SNT65S5A0JYPP',
       origin: 'https://sandbox.wert.io',
       commodity: 'MATIC',
       address: activeAccount?.address,
