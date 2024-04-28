@@ -5,11 +5,11 @@ import { ACCOUNT_FACTORY_ADDRESS } from '@app/lib/utils/context';
 import { SmartWalletOptions, createWallet } from 'thirdweb/wallets';
 import { sepolia } from 'thirdweb/chains';
 import {
-  generateAPayload,
+  generatePayload,
   isLoggedIn,
   login,
   logout,
-} from '@app/api/auth/unlock/Unlock';
+} from '@app/api/auth/thirdweb/thirdweb';
 
 export default function ConnectButtonWrapper() {
   const chain = sepolia;
@@ -38,21 +38,6 @@ export default function ConnectButtonWrapper() {
       appMetadata={{
         name: 'Creative TV',
         url: 'https://tv.creativeplatform.xyz',
-      }}
-      auth={{
-        isLoggedIn: async (address) => {
-          console.log('checking if logged in!', { address });
-          return await isLoggedIn();
-        },
-        doLogin: async (params) => {
-          console.log('logging in!');
-          await login(params);
-        },
-        getLoginPayload: async ({ address }) => generateAPayload({ address }),
-        doLogout: async () => {
-          console.log('logging out!');
-          await logout();
-        },
       }}
     />
   );

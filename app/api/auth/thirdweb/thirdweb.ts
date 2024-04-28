@@ -25,7 +25,6 @@ export async function login(payload: VerifyLoginPayloadParams) {
       payload: verifiedPayload.payload,
     });
     const wallet = inAppWallet();
-
     // use the account to send transactions
     const account = await wallet.connect({
       client,

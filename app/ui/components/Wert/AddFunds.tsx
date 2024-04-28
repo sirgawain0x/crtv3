@@ -13,9 +13,9 @@ const AddFunds: NextPage = () => {
   if (activeAccount) {
     // WERT OPTIONS
     const options: Options = {
-      partner_id: '01HSD48HCYJH2SNT65S5A0JYPP',
+      partner_id: '01FGKYK638SV618KZHAVEY7P79',
       origin: 'https://sandbox.wert.io',
-      commodity: 'MATIC',
+      commodity: 'ETH',
       address: activeAccount?.address,
       network: 'sepolia',
       lang: 'en',
@@ -23,8 +23,8 @@ const AddFunds: NextPage = () => {
       color_buttons: '#EC407A',
       commodities: JSON.stringify([
         {
-          commodity: 'MATIC',
-          network: 'mumbai',
+          commodity: 'ETH',
+          network: 'sepolia',
         },
       ]),
       currency_amount: 10,

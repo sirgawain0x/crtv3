@@ -109,7 +109,7 @@ export default function HeroSection() {
               position={'absolute'}
               top={'8%'}
               left={0}
-              zIndex={-1}
+              zIndex={-9999}
               color={useColorModeValue('#FF4583', '#D93B6F')}
             />
             <Box
@@ -119,6 +119,7 @@ export default function HeroSection() {
               boxShadow={'2xl'}
               width={'auto'}
               overflow={'hidden'}
+              zIndex={-9}
             >
               <IconButton
                 aria-label={'Play Button'}

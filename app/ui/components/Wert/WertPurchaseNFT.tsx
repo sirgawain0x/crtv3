@@ -9,7 +9,7 @@ import { useActiveAccount } from 'thirdweb/react';
 import { toWei } from 'thirdweb';
 import { v4 as uuidv4 } from 'uuid';
 import { encodeFunctionData } from 'viem';
-import creatorContract from '@app/lib/utils/unlockContract';
+import creatorContract from '@app/lib/utils/contracts/creatorContract';
 import Unlock from '@app/lib/utils/Unlock.json';
 
 const WertPurchaseNFT = () => {
@@ -20,7 +20,7 @@ const WertPurchaseNFT = () => {
       abi: Unlock.abi,
       functionName: 'purchase',
       args: [
-        [toWei('30')],
+        [toWei('0.01')],
         [activeAccount?.address],
         [CREATIVE_ADDRESS],
         [CREATIVE_ADDRESS],
@@ -32,17 +32,17 @@ const WertPurchaseNFT = () => {
     const signedData = signSmartContractData(
       {
         address: activeAccount?.address,
-        commodity: 'USDC',
-        network: 'polygon',
-        commodity_amount: 30,
-        sc_address: ROLES?.polygon.creator.contractAddress,
+        commodity: 'ETH',
+        network: 'sepolia',
+        commodity_amount: 0.01,
+        sc_address: "0xbc20b339c0dc2793ab4ecece98567f65632015b7",
         sc_input_data: data,
       },
       `${process.env.WERT_PRIVATE_KEY}`,
     );
 
     const wertOptions: Options = {
-      partner_id: '01HSD48HCYJH2SNT65S5A0JYPP',
+      partner_id: '01FGKYK638SV618KZHAVEY7P79',
       click_id: uuidv4(),
       origin: 'https://widget.wert.io',
       color_buttons: '#EC407A',

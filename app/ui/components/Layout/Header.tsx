@@ -51,7 +51,7 @@ import ConnectButtonWrapper from '../Button/connectButtonWrapper';
 import { SITE_LOGO, SITE_NAME } from '../../../lib/utils/context';
 import { ThemeSwitcher } from './ThemeSwitcher';
 import { readContract } from 'thirdweb';
-import creatorContract from '@app/lib/utils/unlockContract';
+import creatorContract from '@app/lib/utils/contracts/creatorContract';
 import { useActiveAccount } from 'thirdweb/react';
 import WertPurchaseNFT from '@app/ui/components/Wert/WertPurchaseNFT';
 import AddFunds from '@app/ui/components/Wert/AddFunds';
@@ -90,15 +90,14 @@ export default function Header({ className, handleLoading }: Props) {
   useEffect(() => {
     const getSubscribedData = async () => {
       if (!activeAccount) return;
-
       try {
         const result = await readContract({
           contract: creatorContract,
           method: 'getHasValidKey',
           params: [activeAccount?.address as string],
         });
-        console.log('Is your membership valid?', result);
         setSubscribed(result);
+        console.log('Is your membership valid?', result);
       } catch (error) {
         console.log('Error getting subscription data:', error);
       }
@@ -409,12 +408,25 @@ export default function Header({ className, handleLoading }: Props) {
                 </AccordionItem>
               </Accordion>
             </p>
-            <chakra.div my={4}>
-              <SimpleGrid columns={2} spacing={5}>
+            <chakra.div mx={4} my={4}>
+              <SimpleGrid columns={1} spacing={5}>
                 <Box>
                   <ConnectButtonWrapper />
                 </Box>
-                {subscribed ? (
+                {!subscribed ? (
+                  <Box>
+                    <Menu>
+                      <MenuButton fontWeight={700} fontSize={14}>User Menu</MenuButton>
+                      <MenuList>
+                        <MenuGroup title="⛔️ Creator Access Only ⛔️">
+                          <Center>
+                            <WertPurchaseNFT />
+                          </Center>
+                        </MenuGroup>
+                      </MenuList>
+                    </Menu>
+                </Box>
+                ) : (
                   <Box>
                     <Menu>
                       <MenuButton> User Menu</MenuButton>
@@ -445,19 +457,6 @@ export default function Header({ className, handleLoading }: Props) {
                         <MenuGroup title="Wallet Options">
                           <Center>
                             <AddFunds />
-                          </Center>
-                        </MenuGroup>
-                      </MenuList>
-                    </Menu>
-                  </Box>
-                ) : (
-                  <Box>
-                    <Menu>
-                      <MenuButton> User Menu</MenuButton>
-                      <MenuList>
-                        <MenuGroup title="⛔️ Creator Access Only ⛔️">
-                          <Center>
-                            <WertPurchaseNFT />
                           </Center>
                         </MenuGroup>
                       </MenuList>
@@ -624,9 +623,9 @@ export default function Header({ className, handleLoading }: Props) {
                 <ConnectButtonWrapper />
               </Box>
               {activeAccount && (
-                <Box>
+                <Box alignContent={'center'} height="100%">
                   <Menu>
-                    <MenuButton> User Menu</MenuButton>
+                    <MenuButton fontWeight={700} fontSize={14}> User Menu</MenuButton>
                     <MenuList>
                       <MenuGroup title="Active Member">
                         <MenuItem
