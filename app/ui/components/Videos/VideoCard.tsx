@@ -16,20 +16,23 @@ import {
   Badge,
   Spacer,
   ButtonGroup,
+  As,
 } from '@chakra-ui/react';
 import { Player } from '@livepeer/react';
-import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { PosterImage } from './PosterImage';
 import { SITE_LOGO, CREATIVE_LOGO_WHT } from '../../../lib/utils/context';
-import { AssetData } from '../../../lib/utils/fetchers/assets';
+import { AssetData } from '@app/lib/types';
+import Link from 'next/link';
 
 interface VideoCardProps {
   video: AssetData['video'];
+  views: AssetData['views'];
+  mintDetails: AssetData['details'];
+  currency: AssetData['currency'];
 }
 
-const VideoCard: React.FC<VideoCardProps> = ({ video }) => {
-  const navigation = useRouter(); // Using App Router navigation
+const VideoCard: React.FC<VideoCardProps> = ({ video, views, mintDetails, currency }) => {
 
   return (
     <Card key={video.id} maxW="md" variant={'elevated'} mb={12}>
@@ -38,9 +41,9 @@ const VideoCard: React.FC<VideoCardProps> = ({ video }) => {
           <Avatar name="creative" src={SITE_LOGO} />
           <Box>
             <Heading as={'h4'} size="sm">
-              thecreative.eth
+              Creator
             </Heading>
-            <Text>Creator</Text>
+            <Text>{video?.creatorId.value}</Text>
           </Box>
         </Flex>
       </CardHeader>
@@ -74,7 +77,11 @@ const VideoCard: React.FC<VideoCardProps> = ({ video }) => {
             {video?.status?.phase}
           </Badge>
           <Spacer />
-          <Text>Views: {video?.viewCount.toString()}</Text>
+          { video?.playbackId === views?.playbackId && (
+            <Text>Views: {views?.viewCount}</Text>
+          )
+        }   
+          
         </Flex>
         <Stack mt="6" spacing="3">
           <HStack>
@@ -84,7 +91,7 @@ const VideoCard: React.FC<VideoCardProps> = ({ video }) => {
             <Spacer />
             <Text color={'brand.300'} fontSize={'xl'}>
               {video?.storage?.ipfs?.spec?.nftMetadata?.properties?.pricePerNFT}
-              <span style={{ fontSize: 'sm' }}> REP</span>
+              <span style={{ fontSize: 'sm' }}>{currency}</span>
             </Text>
           </HStack>
           <Text>
@@ -97,20 +104,19 @@ const VideoCard: React.FC<VideoCardProps> = ({ video }) => {
       <CardFooter justify="space-between" flexWrap="wrap">
         {video?.status?.phase === 'ready' ? (
           <ButtonGroup mb={5} spacing={10}>
+             <Link href={`discover/${encodeURIComponent(video?.id)}`} passHref>
             <Button
               as={motion.div}
               _hover={{ transform: 'scale(1.1)', cursor: 'pointer' }}
               flex="1"
               variant="ghost"
               aria-label={`Comment on ${video.name}`}
-              onClick={() =>
-                navigation.push(`discover/${encodeURIComponent(video?.id)}`)
-              }
             >
-              {' '}
-              {/* Updated navigation method */}
-              Comment
+             
+                Details
+              
             </Button>
+            </Link>
             <Button
               as={motion.div}
               _hover={{ transform: 'scale(1.1)', cursor: 'pointer' }}

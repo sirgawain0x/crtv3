@@ -416,7 +416,9 @@ export default function Header({ className, handleLoading }: Props) {
                 {!subscribed ? (
                   <Box>
                     <Menu>
-                      <MenuButton fontWeight={700} fontSize={14}>User Menu</MenuButton>
+                      <MenuButton fontWeight={700} fontSize={14}>
+                        User Menu
+                      </MenuButton>
                       <MenuList>
                         <MenuGroup title="⛔️ Creator Access Only ⛔️">
                           <Center>
@@ -425,7 +427,7 @@ export default function Header({ className, handleLoading }: Props) {
                         </MenuGroup>
                       </MenuList>
                     </Menu>
-                </Box>
+                  </Box>
                 ) : (
                   <Box>
                     <Menu>
@@ -625,7 +627,10 @@ export default function Header({ className, handleLoading }: Props) {
               {activeAccount && (
                 <Box alignContent={'center'} height="100%">
                   <Menu>
-                    <MenuButton fontWeight={700} fontSize={14}> User Menu</MenuButton>
+                    <MenuButton fontWeight={700} fontSize={14}>
+                      {' '}
+                      User Menu
+                    </MenuButton>
                     <MenuList>
                       <MenuGroup title="Active Member">
                         <MenuItem

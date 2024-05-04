@@ -84,6 +84,7 @@ export default function HeroSection() {
               <Button
                 rounded={'full'}
                 size={'lg'}
+                color={useColorModeValue('brand.100','white')}
                 fontWeight={'normal'}
                 px={6}
                 colorScheme={'pink'}

@@ -50,11 +50,10 @@ const AddFunds: NextPage = () => {
   return (
     <>
       <Button
-        leftIcon={<TbMoneybag />}
         variant="solid"
         onClick={() => alert('You must be connected to purchase crypto')}
       >
-        Add Funds
+        Not Connected
       </Button>
     </>
   );

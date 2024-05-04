@@ -12,6 +12,7 @@ import { encodeFunctionData } from 'viem';
 import creatorContract from '@app/lib/utils/contracts/creatorContract';
 import Unlock from '@app/lib/utils/Unlock.json';
 
+
 const WertPurchaseNFT = () => {
   const activeAccount = useActiveAccount();
 
@@ -35,7 +36,7 @@ const WertPurchaseNFT = () => {
         commodity: 'ETH',
         network: 'sepolia',
         commodity_amount: 0.01,
-        sc_address: "0xbc20b339c0dc2793ab4ecece98567f65632015b7",
+        sc_address: '0xbc20b339c0dc2793ab4ecece98567f65632015b7',
         sc_input_data: data,
       },
       `${process.env.WERT_PRIVATE_KEY}`,
@@ -44,7 +45,7 @@ const WertPurchaseNFT = () => {
     const wertOptions: Options = {
       partner_id: '01FGKYK638SV618KZHAVEY7P79',
       click_id: uuidv4(),
-      origin: 'https://widget.wert.io',
+      origin: 'https://sandbox.wert.io',
       color_buttons: '#EC407A',
       lang: 'en',
       skip_init_navigation: false,

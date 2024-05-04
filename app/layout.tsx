@@ -1,10 +1,9 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
-import { ThirdwebProvider } from '@app/lib/sdk/thirdweb/components';
 import { Providers } from './providers';
 import Layout from './ui/components/Layout/Layout';
-import { ApolloWrapper } from './lib/utils/ApolloWrapper';
+
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -21,13 +20,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <ApolloWrapper>
-          <Providers>
-            <ThirdwebProvider>
+            <Providers>
               <Layout>{children}</Layout>
-            </ThirdwebProvider>
-          </Providers>
-        </ApolloWrapper>
+            </Providers>
       </body>
     </html>
   );

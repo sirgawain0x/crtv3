@@ -1,4 +1,3 @@
-'use client';
 import React from 'react';
 import {
   BreadcrumbItem,
@@ -9,10 +8,12 @@ import {
   Flex,
   Text,
 } from '@chakra-ui/react';
+import { livepeer } from '@app/lib/sdk/livepeer/client';
 import Link from 'next/link';
-import AllAssets from '../ui/components/Videos/AllAssets';
+import VideoCardGrid from '@app/ui/components/Videos/VideoCardGrid';
 
 const AllVideosPage = () => {
+  const allAssets = livepeer?.asset.getAll();
   return (
     <main>
       <Box my={10} p={4}>
@@ -34,7 +35,8 @@ const AllVideosPage = () => {
         <Heading mb={10}>Discover Content</Heading>
         <Flex flexDirection="column" my={10} gap={5} maxW="md">
           <Text>This is the Discover page.</Text>
-          <AllAssets />
+          {JSON.stringify(allAssets)}
+          {/* <VideoCardGrid  />  */}
         </Flex>
       </Box>
     </main>
