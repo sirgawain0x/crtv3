@@ -1,12 +1,13 @@
-import { Text, Heading, Box } from '@chakra-ui/react';
+import React from 'react';
+import { Text, Heading, Box, Container } from '@chakra-ui/react';
+import VideoDetailsPage from '@app/ui/components/Videos/Detail/Detail';
 
-export default function VideoDetailsPage({ params }: { params: { slug: string } }) {
+export default function VideoDetails() {
   return (
-  <main>
-    <Heading p={4}>Video Detail Page</Heading>
-    <Box>
-        {params.slug}
-    </Box>
-  </main>
+    <Container maxW="7xl" centerContent>
+      <Box py={10}>
+        <VideoDetailsPage params={{ slug: 'video-slug' }} />
+      </Box>
+    </Container>
   );
 }

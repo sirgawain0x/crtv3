@@ -1,5 +1,5 @@
-"use client";
-import { useEffect, useState } from 'react';
+'use client';
+import React, { useEffect, useState } from 'react';
 import { useActiveAccount } from 'thirdweb/react';
 import Member from '../Member/Member';
 import NonLoggedInView from './NonLoggedInView/NonLoggedInView';
@@ -15,11 +15,8 @@ const Content = () => {
     return null;
   }
 
-  return (
-    <>
-      {activeAccount ? <Member /> : <NonLoggedInView />}
-    </>
-  );
+  // return <>{activeAccount ? <Member /> : <NonLoggedInView />}</>;
+  return <>{<NonLoggedInView />}</>;
 };
 
 export default Content;

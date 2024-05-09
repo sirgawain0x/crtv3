@@ -1,16 +1,15 @@
-import type { Metadata } from "next";
-import { Inter } from "next/font/google";
-import "./globals.css";
-import { ThirdwebProvider } from "@app/lib/sdk/thirdweb/components";
-import { TokenGateProvider } from 'collabland-tokengate-react-context';
-import { Providers } from "./providers";
-import { ReactQueryClientProvider } from '@app/ui/components/ReactQueryClientProvider'
+import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
+import './globals.css';
+import { Providers } from './providers';
+import Layout from './ui/components/Layout/Layout';
 
-const inter = Inter({ subsets: ["latin"] });
+
+const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: "Creative TV",
-  description: "The way content should be",
+  title: 'Creative TV',
+  description: 'The way content should be',
 };
 
 export default function RootLayout({
@@ -21,15 +20,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <ReactQueryClientProvider>
-          <Providers>
-            <ThirdwebProvider>
-              <TokenGateProvider>
-                {children}
-              </TokenGateProvider>
-            </ThirdwebProvider>
-          </Providers>
-        </ReactQueryClientProvider>
+            <Providers>
+              <Layout>{children}</Layout>
+            </Providers>
       </body>
     </html>
   );

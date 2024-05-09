@@ -1,17 +1,16 @@
-import { Metadata } from "next";
-import Content from "@app/ui/components/Content/Content";
-import Header from "@app/ui/components/Layout/Header";
-import Footer from "@app/ui/components/Layout/Footer";
+import { Metadata } from 'next';
+import Content from '@app/ui/components/Content/Content';
+import { Box, Container } from '@chakra-ui/react';
 
 export const metadata: Metadata = {
-  title: "Creative TV",
-  description: "The way content should be",
+  title: 'Creative TV',
+  description: 'The way content should be',
   metadataBase: new URL('https://creativeplatform.xyz'),
   openGraph: {
-    title: "Creative TV",
-    description: "The way content should be",
-    type: "website",
-    url: "https://tv.creativeplatform.xyz",
+    title: 'Creative TV',
+    description: 'The way content should be',
+    type: 'website',
+    url: 'https://tv.creativeplatform.xyz',
     images: [
       {
         url: 'https://bafkreicsmowyquojavdt6lyq7a6mgub3ae7fseprt3dcwqk2asqth4nm6y.ipfs.nftstorage.link/',
@@ -20,22 +19,16 @@ export const metadata: Metadata = {
         alt: 'Creative Membership',
       },
     ],
-    locale: "en_US",
+    locale: 'en_US',
   },
-
-}
+};
 
 export default function Home() {
-   
   return (
-    <div>
-      <Header />
-      <main className="p-4 pb-5 min-h-[100vh] flex items-center justify-center container max-w-screen-xl mx-auto">
-        <div className="py-10">
-          <Content />
-        </div>
-      </main>
-      <Footer />
-    </div>
+    <Container maxW="7xl" centerContent>
+      <Box py={10}>
+        <Content />
+      </Box>
+    </Container>
   );
 }
