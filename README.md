@@ -1,4 +1,15 @@
-# thirdweb SDK + Next.js starter
+# Creative TV
+
+## Project Overview
+Creative TV is a web application for The Creative platform.  It's built with React, TypeScript, and utilizes the thirdweb SDK.
+
+## Contribution Guidelines
+
+We welcome contributions! To get started:
+
+* Check out our open issues on the **Issues** tab.
+* Follow our coding conventions (enforced by ESLint and Prettier).
+* Read up on our development process in CONTRIBUTING.md
 
 ## Setup client id
 
@@ -12,42 +23,51 @@ Go to `src/client.ts` file and replace the placeholder `clientId` with your clie
 const clientId = '......';
 ```
 
-## Usage with App Router
-
-If you are using App router, You can not import client components/hooks directly from `thirdweb/react` package directly in server components.
-
-You should export them from the `src/thirdweb.ts` file instead which has been marked with `"use client"` directive at the top of the file so that Next.js can process it properly.
-
-```ts
-// server component
-import { ThirdwebProvider } from 'thirdweb/react'; // ❌
-import { ThirdwebProvider } from '@/app/thirdweb'; // ✅
-```
-
 ## Usage
 
 ### Install dependencies
 
 ```bash
-yarn
+npm
 ```
 
 ### Start development server
 
 ```bash
-yarn dev
+npm run dev
 ```
 
 ### Create a production build
 
 ```bash
-yarn build
+npm run build
 ```
 
 ### Preview the production build
 
 ```bash
-yarn start
+npm run start
+```
+
+## Code Formatting with Prettier
+
+This project uses Prettier for consistent code formatting.
+
+```bash
+npm run prettier
+```
+
+## Check for formatting issues:
+```bash
+npm run prettier:check
+```
+
+## Testing
+
+We use Jest for unit testing.  Run tests with:
+
+```bash 
+npm run test
 ```
 
 ## Resources
@@ -56,6 +76,10 @@ yarn start
 - [React components and hooks](https://portal.thirdweb.com/typescript/v5/react)
 - [thirdweb Dashboard](https://thirdweb.com/dashboard)
 
+## License
+
+This project is licensed under the MIT License.
+
 ## Join our Discord!
 
-For any questions or suggestions, join our discord at [https://discord.gg/thirdweb](https://discord.gg/thirdweb).
+For any questions or suggestions, join our discord at [Creative](https://discord.gg/2JagPsCp3n).

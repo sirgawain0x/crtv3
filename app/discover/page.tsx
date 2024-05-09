@@ -15,8 +15,8 @@ const AllVideosPage = async () => {
     /**
      * @dev
      * The data isn't populating because it fails to pass some `Zod` validation
-     * that the sdk is using internally (probably to checkmate the `types` taht makes 
-     * up the `Assert` object)
+     * that the sdk is using internally (probably to checkmate the `types` that makes 
+     * up the `Asset` object)
      */
     const { data, error } = await livepeer.asset.getAll();
 
@@ -24,7 +24,7 @@ const AllVideosPage = async () => {
   } catch (err: any) {
     /**
      * @dev
-     * The `Assert` observed at the console is a selected few that the 
+     * The `Asset` observed at the console is a selected few that the 
      * sdk added to the `error` object inside a `rawValue` field
      * 
      * @note If only the `error` object is accessed; one would see the
