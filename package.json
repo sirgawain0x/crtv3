@@ -16,7 +16,7 @@
     "@chakra-ui/react": "^2.8.2",
     "@emotion/react": "^11.11.4",
     "@emotion/styled": "^11.11.5",
-    "@livepeer/react": "^2.5.8",
+    "@livepeer/react": "^2.9.2",
     "@noble/ed25519": "^2.1.0",
     "@snapshot-labs/snapshot.js": "^0.1.10",
     "@tanstack/react-query": "^5.29.2",

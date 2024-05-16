@@ -1,3 +1,4 @@
+'use client';
 import React from 'react';
 import {
   Card,
@@ -16,7 +17,6 @@ import {
   Badge,
   Spacer,
   ButtonGroup,
-  As,
 } from '@chakra-ui/react';
 import { Player } from '@livepeer/react';
 import { motion } from 'framer-motion';
@@ -25,17 +25,14 @@ import { SITE_LOGO, CREATIVE_LOGO_WHT } from '../../../lib/utils/context';
 import { AssetData } from '@app/lib/types';
 import Link from 'next/link';
 
-interface VideoCardProps {
-  video: AssetData['video'];
-  views: AssetData['views'];
-  mintDetails: AssetData['details'];
-  currency: AssetData['currency'];
-}
 
-const VideoCard: React.FC<VideoCardProps> = ({ video, views, mintDetails, currency }) => {
+type VideoCardProps = {
+  assetData: AssetData;
+};
 
+const VideoCard: React.FC<VideoCardProps> = ({ assetData }) => {
   return (
-    <Card key={video.id} maxW="md" variant={'elevated'} mb={12}>
+    <Card key={assetData?.id} maxW="md" variant={'elevated'} mb={12}>
       <CardHeader>
         <Flex flex={1} gap={4} align="center" flexWrap={'wrap'}>
           <Avatar name="creative" src={SITE_LOGO} />
@@ -43,13 +40,13 @@ const VideoCard: React.FC<VideoCardProps> = ({ video, views, mintDetails, curren
             <Heading as={'h4'} size="sm">
               Creator
             </Heading>
-            <Text>{video?.creatorId.value}</Text>
+            <Text>{assetData?.video.creatorId.value}</Text>
           </Box>
         </Flex>
       </CardHeader>
       <Player
-        title={video?.name}
-        playbackId={video?.playbackId}
+        title={assetData?.title}
+        playbackId={assetData?.video.playbackId}
         showTitle
         poster={<PosterImage alt="Creative logo" imgSrc={CREATIVE_LOGO_WHT} />}
         showLoadingSpinner
@@ -72,49 +69,41 @@ const VideoCard: React.FC<VideoCardProps> = ({ video, views, mintDetails, curren
       <CardBody>
         <Flex>
           <Badge
-            colorScheme={video?.status?.phase === 'ready' ? 'green' : 'red'}
+            colorScheme={assetData?.video.status?.phase === 'ready' ? 'green' : 'red'}
           >
-            {video?.status?.phase}
+            {assetData?.video.status?.phase}
           </Badge>
           <Spacer />
-          { video?.playbackId === views?.playbackId && (
-            <Text>Views: {views?.viewCount}</Text>
-          )
-        }   
-          
+            <Text>Views: {assetData?.views.viewCount || 'NAN'}</Text> 
         </Flex>
         <Stack mt="6" spacing="3">
           <HStack>
             <Heading as={'h1'} size={'lg'}>
-              {video?.name}
+              {assetData?.title}
             </Heading>
             <Spacer />
             <Text color={'brand.300'} fontSize={'xl'}>
-              {video?.storage?.ipfs?.spec?.nftMetadata?.properties?.pricePerNFT}
-              <span style={{ fontSize: 'sm' }}>{currency}</span>
+              <span style={{ fontSize: 'sm' }}>{assetData?.currency || 'USDC'}</span>
             </Text>
           </HStack>
           <Text>
-            {video?.storage?.ipfs?.spec?.nftMetadata?.description ||
-              'With Creative TV, we wanted to sync the speed of creation with the speed of design. We wanted the creator to be just as excited as the designer to create new content.'}
+            {assetData?.description || 'With Creative TV, we wanted to sync the speed of creation with the speed of design. We wanted the creator to be just as excited as the designer to create new content.'}
           </Text>
         </Stack>
       </CardBody>
       <Divider />
       <CardFooter justify="space-between" flexWrap="wrap">
-        {video?.status?.phase === 'ready' ? (
+        {assetData?.video.status?.phase === 'ready' ? (
           <ButtonGroup mb={5} spacing={10}>
-             <Link href={`discover/${encodeURIComponent(video?.id)}`} passHref>
+             <Link href={`discover/${encodeURIComponent(assetData?.id)}`} passHref>
             <Button
               as={motion.div}
               _hover={{ transform: 'scale(1.1)', cursor: 'pointer' }}
               flex="1"
               variant="ghost"
-              aria-label={`Comment on ${video.name}`}
+              aria-label={`Comment on ${assetData.title}`}
             >
-             
-                Details
-              
+              Details
             </Button>
             </Link>
             <Button

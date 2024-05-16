@@ -1,5 +1,5 @@
 export type AssetData = {
-  assetId: string | null;
+  id: string;
   user: string;
   title: string;
   description: string;
@@ -8,7 +8,7 @@ export type AssetData = {
 };
 
 export type Video = {
-  assetId?: string | null;
+  id?: string ;
   name: string;
   status: {
     phase: string | null;
@@ -50,7 +50,7 @@ export type Video = {
 
 export type Views = {
   [x: string]: any;
-  assetId?: string | null;
+  id?: string | null;
   playbackId: string;
   publicViews: any;
 };

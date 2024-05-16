@@ -1,7 +1,7 @@
 import * as z from 'zod';
 
 export type AssetData = {
-  assetId: string;
+  id: string;
   title: string;
   description: string;
   video: Asset;
@@ -12,6 +12,7 @@ export type AssetData = {
 
 export type Asset = {
   id: string;
+<<<<<<< Updated upstream
   type: string;
   playbackId: string;
   playbackUrl: string;
@@ -45,21 +46,53 @@ export type Asset = {
             pricePerNFT: number | string;
           };
         };
+=======
+  type?: AssetType;
+  playbackId?: string;
+  plabackUrl?: string;
+  downloadUrl?: string;
+  playbackPolicy?: {
+    type: PlaybackPolicyType;
+    webhookId?: string;
+    webhookContext?: {};
+    refreshInterval?: number;
+  };
+  source: {
+    type: SourceType;
+    url?: string;
+    gatewayUrl?: string;
+    encryption?: {};
+    sourceId?: string;
+    sessionId?: string;
+    playbackId?: string;
+    requesterId?: string;
+    assetId?: string;
+  }
+  creatorId: {
+    type: CreatorIdType;
+    value: string;
+  };
+  storage?: {
+    ipfs?: {
+      spec?: {
+        nftMetadataTemplate?: TemplateType;
+        nftMetadata?: {};
+>>>>>>> Stashed changes
       };
-      nftMetadata: {
+      nftMetadata?: {
         cid: string;
-        url: string;
-        gatewayUrl: string;
+        url?: string;
+        gatewayUrl?: string;
       };
-      updatedAt: number;
-      cid: string;
-      url: string;
-      gatewayUrl: string;
+      updatedAt?: number;
+      cid?: string;
+      url?: string;
+      gatewayUrl?: string;
     };
-    status: {
-      phase: string;
-      progress: number;
-      errorMessage: string;
+    status?: {
+      phase: StorageStatusPhase;
+      progress?: number;
+      errorMessage?: string;
       tasks: {
         pending: string;
         last: string;
@@ -67,13 +100,19 @@ export type Asset = {
       };
     };
   };
+<<<<<<< Updated upstream
   status: {
     phase: string;
+=======
+  status?: {
+    phase: AssetStatusPhase;
+>>>>>>> Stashed changes
     updatedAt: number;
     progress: number;
     errorMessage: string;
   };
   name: string;
+<<<<<<< Updated upstream
   projectId: string;
   createdAt: number;
   createdByTokenName: string;
@@ -106,6 +145,75 @@ export type Asset = {
     ];
   };
 }
+=======
+  projectId?: string;
+  createdAt?: number;
+  createdByTokenName?: string;
+  size?: number;
+  hash?: [{
+    hash?: string;
+    algorithm?: string;
+  }];
+  videoSpec: {
+    format?: string;
+    duration?: number;
+    bitrate?: number;
+    tracks?: [{
+      type: AssetType;
+      codec: string;
+      startTime?: number;
+      duration?: number;
+      bitrate?: number;
+      width?: number;
+      height?: number;
+      pixelFormat?: string;
+      fps?: number;
+      channels?: number;
+      sampleRate?: number;
+      bitDepth?: number;
+    }]
+  }
+};
+>>>>>>> Stashed changes
+
+export enum AssetType {
+  video = 'Video',
+  audio = 'Audio',
+}
+
+export enum SourceType {
+  url = 'url',
+  recording = 'recording',
+  directUpload = 'directUpload',
+  clip = 'clip',
+}
+
+export enum CreatorIdType {
+  unverified = 'unverified',
+}
+
+export enum TemplateType {
+  file = 'file',
+  player = 'player',
+}
+
+export enum StorageStatusPhase {
+  waiting = 'waiting',
+  processing = 'processing',
+  ready = 'ready',
+  failed = 'failed',
+  reverted ='reversed',
+}
+
+export enum AssetStatusPhase {
+  uploading = 'uploading',
+  waiting = 'waiting',
+  processing = 'processing',
+  ready ='ready',
+  failed = 'failed',
+  deleting = 'deleting',
+  deleted = 'deleted',
+}
 
 export type Views = {
   playbackId: string;
@@ -123,6 +231,64 @@ export enum Currency {
   USDC = 'USDC',
   ETH = 'ETH',
 } 
+
+export type UploadAssetData = {
+  name: string;
+  staticMp4?: boolean;
+  playbackPolicy?: {
+    type: PlaybackPolicyType;
+    webhookId?: string;
+    webhookContext?: {};
+    refreshInterval?: number;
+  }
+  creatorId?: {
+    type: string;
+    value: string;
+  }
+  storage?: {
+    ipfs?: {
+      spec?: null;
+    };
+  }
+  url?: string;
+  encryption?: {
+    encryptedKey: string;
+  }
+  c2pa?: boolean;
+  profiles?: [{
+    width?: number;
+    name?: string;
+    height?: number;
+    bitrate?: number;
+    quality?: number;
+    fps?: number;
+    fpsDen?: number;
+    gop?: string;
+    profile?: Profile;
+    encoder?: Encoder;
+  }];
+  targetSegmentSizesSecs?: number;
+}
+
+export enum PlaybackPolicyType {
+  public = 'public',
+  jwt = 'jwt',
+  webhook = 'webhook',
+}
+
+export enum Profile {
+  H264Baseline = 'H264Baseline',
+  H264Main = 'H264Main',
+  H264High = 'H264High',
+  H264ConstrainedHigh = 'H264ConstrainedHigh',
+}
+
+export enum Encoder {
+  H264 = 'H.264',
+  HEVC = 'HEVC',
+  VP8 = 'VP8',
+  VP9 = 'VP9',
+}
 
 const MAX_FILESIZE = 1073741824;
 const ACCEPTED_VIDEO_TYPES = ['video/mp4', 'video/webm', 'video/ogg', 'video/mov', 'video/flv', 'video/avi'];

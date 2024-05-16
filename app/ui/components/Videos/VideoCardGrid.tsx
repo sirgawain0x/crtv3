@@ -1,20 +1,18 @@
+'use client';
 import React from 'react';
 import { Box, SimpleGrid, Text } from '@chakra-ui/react';
 import VideoCard from './VideoCard';
 import { AssetData } from '@app/lib/types';
 
+
 // Add video props to the VideoCardGrid component
 interface VideoCardGridProps {
-  assetId: AssetData['assetId'];
-  videos: AssetData['video'][];
-  views: AssetData['views'];
-  mintDetails?: AssetData['details'];
-  currency?: AssetData['currency'];
+  assets: AssetData[];
 }
  
-const VideoCardGrid: React.FC<VideoCardGridProps> = ({ videos, views, currency, mintDetails }) => {
+const VideoCardGrid: React.FC<VideoCardGridProps> = ({ assets }) => {
   
-  if (!videos || videos.length === 0) {
+  if (!assets || assets.length === 0) {
     return <Text>No videos available.</Text>;
   }
 
@@ -25,8 +23,8 @@ const VideoCardGrid: React.FC<VideoCardGridProps> = ({ videos, views, currency, 
         spacing="40px"
         autoColumns={'max-content'}
       >
-        {videos.map(video => (
-          <VideoCard key={video?.id} video={video} views={views} currency={currency} mintDetails={mintDetails}/>
+        {assets.map((asset, index) => (
+          <VideoCard key={asset?.id} assetData={asset}/>
         ))}
       </SimpleGrid>
     </Box>

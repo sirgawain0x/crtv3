@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 import { livepeer } from '@app/lib/sdk/livepeer/client';
 import {
   Box,
@@ -32,6 +33,39 @@ const AllVideosPage = async () => {
      */
     console.log('error101: ', err.rawValue);
   }
+=======
+import { Box, Breadcrumb, BreadcrumbItem, BreadcrumbLink, Flex, Heading, Text } from '@chakra-ui/react';
+import { livepeer } from '@app/lib/sdk/livepeer/client';
+import VideoCardGrid from '@app/ui/components/Videos/VideoCardGrid';
+import { AssetData } from '@app/lib/types';
+
+// Simulating assetData fetch from the upload form
+const getAssetData = async (): Promise<AssetData[]> => {
+  // Placeholder for fetching assetData from an upload form or another source
+  return [];
+};
+
+const AllVideosPage = async () => {
+  let assets: AssetData[] = [];
+  let error: string | null = null;
+
+  try {
+    const assetsResponse = await livepeer.getAll();
+    if (typeof assetsResponse === 'string') {
+      error = assetsResponse;
+    } else {
+      assets = assetsResponse;
+    }
+  } catch (err) {
+    console.error('Failed to fetch assets:', err);
+    error = 'Failed to fetch assets.';
+  }
+
+  const assetData = await getAssetData();
+
+  console.log("Assets", assets);
+  console.log("Asset Data", assetData);
+>>>>>>> Stashed changes
 
   return (
     <main>
@@ -54,11 +88,20 @@ const AllVideosPage = async () => {
         <Heading mb={10}>Discover Content</Heading>
         <Flex flexDirection="column" my={10} gap={5} maxW="md">
           <Text>This is the Discover page.</Text>
+<<<<<<< Updated upstream
           {/* {JSON.stringify(allAssets)} */}
           {/* <VideoCardGrid  />  */}
+=======
+          {error ? (
+            <Text>Error: {error}</Text>
+          ) : (
+            <VideoCardGrid assets={assets} />
+          )}
+>>>>>>> Stashed changes
         </Flex>
       </Box>
     </main>
   );
 };
+
 export default AllVideosPage;
