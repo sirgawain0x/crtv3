@@ -1,4 +1,5 @@
 'use client';
+
 import React from 'react';
 import {
   Card,
@@ -25,12 +26,20 @@ import { SITE_LOGO, CREATIVE_LOGO_WHT } from '../../../lib/utils/context';
 import { AssetData } from '@app/lib/types';
 import Link from 'next/link';
 
-
 type VideoCardProps = {
   assetData: AssetData;
 };
 
 const VideoCard: React.FC<VideoCardProps> = ({ assetData }) => {
+  console.log('Asset Data:', assetData);
+
+  // Optional chaining and nullish coalescing to handle potential undefined values
+  const video = assetData.video || {};
+  const creatorId = video.creatorId || {};
+  const status = video.status || {};
+  const playbackId = video.playbackId || '';
+  const views = assetData.views || { viewCount: 'NAN' };
+
   return (
     <Card key={assetData?.id} maxW="md" variant={'elevated'} mb={12}>
       <CardHeader>
@@ -40,13 +49,13 @@ const VideoCard: React.FC<VideoCardProps> = ({ assetData }) => {
             <Heading as={'h4'} size="sm">
               Creator
             </Heading>
-            <Text>{assetData?.video.creatorId.value}</Text>
+            <Text>{creatorId.value}</Text>
           </Box>
         </Flex>
       </CardHeader>
       <Player
         title={assetData?.title}
-        playbackId={assetData?.video.playbackId}
+        playbackId={playbackId}
         showTitle
         poster={<PosterImage alt="Creative logo" imgSrc={CREATIVE_LOGO_WHT} />}
         showLoadingSpinner
@@ -68,13 +77,11 @@ const VideoCard: React.FC<VideoCardProps> = ({ assetData }) => {
       />
       <CardBody>
         <Flex>
-          <Badge
-            colorScheme={assetData?.video.status?.phase === 'ready' ? 'green' : 'red'}
-          >
-            {assetData?.video.status?.phase}
+          <Badge colorScheme={status === 'ready' ? 'green' : 'red'}>
+            {status ==='ready'? 'Ready' : 'Pending'}
           </Badge>
           <Spacer />
-            <Text>Views: {assetData?.views.viewCount || 'NAN'}</Text> 
+          <Text>Views: {views.viewCount}</Text>
         </Flex>
         <Stack mt="6" spacing="3">
           <HStack>
@@ -87,24 +94,25 @@ const VideoCard: React.FC<VideoCardProps> = ({ assetData }) => {
             </Text>
           </HStack>
           <Text>
-            {assetData?.description || 'With Creative TV, we wanted to sync the speed of creation with the speed of design. We wanted the creator to be just as excited as the designer to create new content.'}
+            {assetData?.description ||
+              'With Creative TV, we wanted to sync the speed of creation with the speed of design. We wanted the creator to be just as excited as the designer to create new content.'}
           </Text>
         </Stack>
       </CardBody>
       <Divider />
       <CardFooter justify="space-between" flexWrap="wrap">
-        {assetData?.video.status?.phase === 'ready' ? (
+        {status === 'ready' ? (
           <ButtonGroup mb={5} spacing={10}>
-             <Link href={`discover/${encodeURIComponent(assetData?.id)}`} passHref>
-            <Button
-              as={motion.div}
-              _hover={{ transform: 'scale(1.1)', cursor: 'pointer' }}
-              flex="1"
-              variant="ghost"
-              aria-label={`Comment on ${assetData.title}`}
-            >
-              Details
-            </Button>
+            <Link href={`discover/${encodeURIComponent(assetData?.id)}`} passHref>
+              <Button
+                as={motion.div}
+                _hover={{ transform: 'scale(1.1)', cursor: 'pointer' }}
+                flex="1"
+                variant="ghost"
+                aria-label={`Comment on ${assetData.title}`}
+              >
+                Details
+              </Button>
             </Link>
             <Button
               as={motion.div}

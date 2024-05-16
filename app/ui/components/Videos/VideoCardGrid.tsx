@@ -23,7 +23,7 @@ const VideoCardGrid: React.FC<VideoCardGridProps> = ({ assets }) => {
         spacing="40px"
         autoColumns={'max-content'}
       >
-        {assets.map((asset, index) => (
+        {assets.map((asset) => (
           <VideoCard key={asset?.id} assetData={asset}/>
         ))}
       </SimpleGrid>

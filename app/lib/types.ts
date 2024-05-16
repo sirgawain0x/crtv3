@@ -8,66 +8,31 @@ export type AssetData = {
   views: Views;
   details?: MintDetails;
   currency?: Currency;
-}
+};
 
 export type Asset = {
   id: string;
-<<<<<<< Updated upstream
-  type: string;
-  playbackId: string;
-  playbackUrl: string;
-  downloadUrl: string;
-  playbackPolicy: {
-    type: string;
-    webhookId: string;
-    webhookContext: {};
-    refreshInterval: number;
-  };
-  source: {
-    type: string;
-    url: string;
-    gatewayUrl: string;
-    encryption: {};
-  };
-  creatorId: {
-    type: string;
-    value: string;
-  };
-  storage: {
-    ipfs: {
-      spec: {
-        nftMetadataTemplate: string;
-        nftMetadata: {
-          description: string;
-          image: string;
-          properties: {
-            [idx: string]: any;
-            nFTAmountToMint: number | string;
-            pricePerNFT: number | string;
-          };
-        };
-=======
   type?: AssetType;
   playbackId?: string;
-  plabackUrl?: string;
+  playbackUrl?: string; // Corrected typo
   downloadUrl?: string;
   playbackPolicy?: {
     type: PlaybackPolicyType;
     webhookId?: string;
-    webhookContext?: {};
+    webhookContext?: Record<string, unknown>;
     refreshInterval?: number;
   };
   source: {
     type: SourceType;
     url?: string;
     gatewayUrl?: string;
-    encryption?: {};
+    encryption?: Record<string, unknown>;
     sourceId?: string;
     sessionId?: string;
     playbackId?: string;
     requesterId?: string;
     assetId?: string;
-  }
+  };
   creatorId: {
     type: CreatorIdType;
     value: string;
@@ -76,8 +41,7 @@ export type Asset = {
     ipfs?: {
       spec?: {
         nftMetadataTemplate?: TemplateType;
-        nftMetadata?: {};
->>>>>>> Stashed changes
+        nftMetadata?: Record<string, unknown>;
       };
       nftMetadata?: {
         cid: string;
@@ -100,65 +64,26 @@ export type Asset = {
       };
     };
   };
-<<<<<<< Updated upstream
-  status: {
-    phase: string;
-=======
   status?: {
     phase: AssetStatusPhase;
->>>>>>> Stashed changes
     updatedAt: number;
     progress: number;
     errorMessage: string;
   };
   name: string;
-<<<<<<< Updated upstream
-  projectId: string;
-  createdAt: number;
-  createdByTokenName: string;
-  size: number;
-  hash: [
-    {
-      hash: string;
-      algorithm: string;
-    },
-  ];
-  videoSpec: {
-    format: string;
-    duration: number;
-    bitrate: number;
-    tracks: [
-      {
-        type: string;
-        codec: string;
-        startTime: number;
-        duration: number;
-        bitrate: number;
-        width: number;
-        height: number;
-        pixelFormat: string;
-        fps: number;
-        channels: number;
-        sampleRate: number;
-        bitDepth: number;
-      },
-    ];
-  };
-}
-=======
   projectId?: string;
   createdAt?: number;
   createdByTokenName?: string;
   size?: number;
-  hash?: [{
+  hash?: Array<{
     hash?: string;
     algorithm?: string;
-  }];
+  }>;
   videoSpec: {
     format?: string;
     duration?: number;
     bitrate?: number;
-    tracks?: [{
+    tracks?: Array<{
       type: AssetType;
       codec: string;
       startTime?: number;
@@ -171,48 +96,47 @@ export type Asset = {
       channels?: number;
       sampleRate?: number;
       bitDepth?: number;
-    }]
-  }
+    }>;
+  };
 };
->>>>>>> Stashed changes
 
 export enum AssetType {
-  video = 'Video',
-  audio = 'Audio',
+  Video = 'Video',
+  Audio = 'Audio',
 }
 
 export enum SourceType {
-  url = 'url',
-  recording = 'recording',
-  directUpload = 'directUpload',
-  clip = 'clip',
+  Url = 'url',
+  Recording = 'recording',
+  DirectUpload = 'directUpload',
+  Clip = 'clip',
 }
 
 export enum CreatorIdType {
-  unverified = 'unverified',
+  Unverified = 'unverified',
 }
 
 export enum TemplateType {
-  file = 'file',
-  player = 'player',
+  File = 'file',
+  Player = 'player',
 }
 
 export enum StorageStatusPhase {
-  waiting = 'waiting',
-  processing = 'processing',
-  ready = 'ready',
-  failed = 'failed',
-  reverted ='reversed',
+  Waiting = 'waiting',
+  Processing = 'processing',
+  Ready = 'ready',
+  Failed = 'failed',
+  Reverted = 'reverted',
 }
 
 export enum AssetStatusPhase {
-  uploading = 'uploading',
-  waiting = 'waiting',
-  processing = 'processing',
-  ready ='ready',
-  failed = 'failed',
-  deleting = 'deleting',
-  deleted = 'deleted',
+  Uploading = 'uploading',
+  Waiting = 'waiting',
+  Processing = 'processing',
+  Ready = 'ready',
+  Failed = 'failed',
+  Deleting = 'deleting',
+  Deleted = 'deleted',
 }
 
 export type Views = {
@@ -220,17 +144,17 @@ export type Views = {
   dStorageUrl: string;
   viewCount: number;
   playtimeMins: number;
-}
+};
 
 export type MintDetails = {
-  nFTAmountToMint: number
-  pricePerNFT: number
-}
+  nFTAmountToMint: number;
+  pricePerNFT: number;
+};
 
 export enum Currency {
   USDC = 'USDC',
   ETH = 'ETH',
-} 
+}
 
 export type UploadAssetData = {
   name: string;
@@ -238,24 +162,24 @@ export type UploadAssetData = {
   playbackPolicy?: {
     type: PlaybackPolicyType;
     webhookId?: string;
-    webhookContext?: {};
+    webhookContext?: Record<string, unknown>;
     refreshInterval?: number;
-  }
+  };
   creatorId?: {
     type: string;
     value: string;
-  }
+  };
   storage?: {
     ipfs?: {
       spec?: null;
     };
-  }
+  };
   url?: string;
   encryption?: {
     encryptedKey: string;
-  }
+  };
   c2pa?: boolean;
-  profiles?: [{
+  profiles?: Array<{
     width?: number;
     name?: string;
     height?: number;
@@ -266,14 +190,14 @@ export type UploadAssetData = {
     gop?: string;
     profile?: Profile;
     encoder?: Encoder;
-  }];
+  }>;
   targetSegmentSizesSecs?: number;
-}
+};
 
 export enum PlaybackPolicyType {
-  public = 'public',
-  jwt = 'jwt',
-  webhook = 'webhook',
+  Public = 'public',
+  Jwt = 'jwt',
+  Webhook = 'webhook',
 }
 
 export enum Profile {
@@ -295,15 +219,13 @@ const ACCEPTED_VIDEO_TYPES = ['video/mp4', 'video/webm', 'video/ogg', 'video/mov
 
 export const createAssetSchema = z.object({
   asset: z
-  .custom<File>()
-  .refine((file) => file?.length == 1, "Video file must be provided.")
-  .refine((file) => file.size <= MAX_FILESIZE, "Video file must be less than 1GB.")
-  .refine(
-    (files) => ACCEPTED_VIDEO_TYPES.includes(files?.type),
-    ".mp4, .webm, .ogg, .flv, .avi and .mov files are accepted."),
+    .custom<File>()
+    .refine((file) => file?.length === 1, 'Video file must be provided.')
+    .refine((file) => file.size <= MAX_FILESIZE, 'Video file must be less than 1GB.')
+    .refine((files) => ACCEPTED_VIDEO_TYPES.includes(files?.type), '.mp4, .webm, .ogg, .flv, .avi and .mov files are accepted.'),
   title: z.string().max(100),
   description: z.string().max(1000),
   creatorId: z.string().max(100),
-})
+});
 
 export type CreateAssetType = z.infer<typeof createAssetSchema>;
