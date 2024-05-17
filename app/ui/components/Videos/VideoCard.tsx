@@ -33,15 +33,9 @@ type VideoCardProps = {
 const VideoCard: React.FC<VideoCardProps> = ({ assetData }) => {
   console.log('Asset Data:', assetData);
 
-  // Optional chaining and nullish coalescing to handle potential undefined values
-  const video = assetData.video || {};
-  const creatorId = video.creatorId || {};
-  const status = video.status || {};
-  const playbackId = video.playbackId || '';
-  const views = assetData.views || { viewCount: 'NAN' };
-
   return (
-    <Card key={assetData?.id} maxW="md" variant={'elevated'} mb={12}>
+    <>
+    <Card key={assetData?.id} minW={"sm"} maxW={'md'} variant={'elevated'} mb={12}>
       <CardHeader>
         <Flex flex={1} gap={4} align="center" flexWrap={'wrap'}>
           <Avatar name="creative" src={SITE_LOGO} />
@@ -49,13 +43,13 @@ const VideoCard: React.FC<VideoCardProps> = ({ assetData }) => {
             <Heading as={'h4'} size="sm">
               Creator
             </Heading>
-            <Text>{creatorId.value}</Text>
+            <Text>{assetData?.video?.creatorId.value}</Text>
           </Box>
         </Flex>
       </CardHeader>
       <Player
-        title={assetData?.title}
-        playbackId={playbackId}
+        title={assetData?.name}
+        playbackId={assetData?.video?.playbackId}
         showTitle
         poster={<PosterImage alt="Creative logo" imgSrc={CREATIVE_LOGO_WHT} />}
         showLoadingSpinner
@@ -78,15 +72,15 @@ const VideoCard: React.FC<VideoCardProps> = ({ assetData }) => {
       <CardBody>
         <Flex>
           <Badge colorScheme={status === 'ready' ? 'green' : 'red'}>
-            {status ==='ready'? 'Ready' : 'Pending'}
+            {assetData?.video?.status?.phase}
           </Badge>
           <Spacer />
-          <Text>Views: {views.viewCount}</Text>
+          <Text>Views: {assetData?.views?.viewCount}</Text>
         </Flex>
         <Stack mt="6" spacing="3">
           <HStack>
             <Heading as={'h1'} size={'lg'}>
-              {assetData?.title}
+              {assetData?.name}
             </Heading>
             <Spacer />
             <Text color={'brand.300'} fontSize={'xl'}>
@@ -101,7 +95,7 @@ const VideoCard: React.FC<VideoCardProps> = ({ assetData }) => {
       </CardBody>
       <Divider />
       <CardFooter justify="space-between" flexWrap="wrap">
-        {status === 'ready' ? (
+        {assetData?.video.status?.phase === 'ready' ? (
           <ButtonGroup mb={5} spacing={10}>
             <Link href={`discover/${encodeURIComponent(assetData?.id)}`} passHref>
               <Button
@@ -109,7 +103,7 @@ const VideoCard: React.FC<VideoCardProps> = ({ assetData }) => {
                 _hover={{ transform: 'scale(1.1)', cursor: 'pointer' }}
                 flex="1"
                 variant="ghost"
-                aria-label={`Comment on ${assetData.title}`}
+                aria-label={`Comment on ${assetData?.name}`}
               >
                 Details
               </Button>
@@ -129,6 +123,7 @@ const VideoCard: React.FC<VideoCardProps> = ({ assetData }) => {
         )}
       </CardFooter>
     </Card>
+  </>
   );
 };
 

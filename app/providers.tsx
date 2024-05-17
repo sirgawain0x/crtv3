@@ -1,9 +1,11 @@
 'use client';
 import React, {useState} from 'react';
 import { ChakraProvider, extendTheme, withDefaultColorScheme } from '@chakra-ui/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ApolloWrapper } from './lib/utils/ApolloWrapper';
 import { ThirdwebProvider } from '@app/lib/sdk/thirdweb/components';
+import { LivepeerConfig } from "@livepeer/react"
+import { useLivepeerClient } from '@app/ui/hooks/useLivepeerClient';
+import { AppProps } from 'next/app';
 
 const customTheme = extendTheme(withDefaultColorScheme({ 
   colorScheme: 'red', 
@@ -20,30 +22,19 @@ const customTheme = extendTheme(withDefaultColorScheme({
   },
 });
 
-export function Providers({ children }: { children: React.ReactNode }) {
-  const [queryClient] = useState(
-    () =>
-      new QueryClient({
-        defaultOptions: {
-          queries: {
-            // With SSR, we usually want to set some default staleTime
-            // above 0 to avoid refetching immediately on the client
-            staleTime: 60 * 1000 * 5,
-          },
-        },
-      })
-  );
+
+
+export function Providers({ children } : { children: React.ReactNode }) {
 
   return (
     <ChakraProvider theme={customTheme}>
-      
-        <QueryClientProvider client={queryClient}>
+      <LivepeerConfig dehydratedState={''} client={useLivepeerClient}>
           <ApolloWrapper>
             <ThirdwebProvider>
               {children}
             </ThirdwebProvider>
           </ApolloWrapper>
-        </QueryClientProvider>
+        </LivepeerConfig>
     </ChakraProvider>
   );
 }

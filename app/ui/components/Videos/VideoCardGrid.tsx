@@ -17,14 +17,12 @@ const VideoCardGrid: React.FC<VideoCardGridProps> = ({ assets }) => {
   }
 
   return (
-    <Box p={5}>
-      <SimpleGrid
-        minChildWidth="300px"
-        spacing="40px"
-        autoColumns={'max-content'}
-      >
+    <Box p={4}>
+      <SimpleGrid columns={[1, 1, 2, 2, 3, 4 ]} gap={4}>
         {assets.map((asset) => (
-          <VideoCard key={asset?.id} assetData={asset}/>
+          <Box key={asset.id}>
+            <VideoCard assetData={asset}/>
+          </Box>
         ))}
       </SimpleGrid>
     </Box>

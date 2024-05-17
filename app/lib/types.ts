@@ -2,10 +2,10 @@ import * as z from 'zod';
 
 export type AssetData = {
   id: string;
-  title: string;
-  description: string;
+  name: string;
+  description?: string;
   video: Asset;
-  views: Views;
+  views?: Views;
   details?: MintDetails;
   currency?: Currency;
 };
@@ -223,7 +223,7 @@ export const createAssetSchema = z.object({
     .refine((file) => file?.length === 1, 'Video file must be provided.')
     .refine((file) => file.size <= MAX_FILESIZE, 'Video file must be less than 1GB.')
     .refine((files) => ACCEPTED_VIDEO_TYPES.includes(files?.type), '.mp4, .webm, .ogg, .flv, .avi and .mov files are accepted.'),
-  title: z.string().max(100),
+  name: z.string().max(100),
   description: z.string().max(1000),
   creatorId: z.string().max(100),
 });

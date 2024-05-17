@@ -2,11 +2,23 @@ import videoApi from '../axiosConfig';
 import { handleAxiosError } from '../errorHandler';
 import { AssetData, UploadAssetData } from '@app/lib/types';
 
+
+const validateAssetData = (assets: AssetData[]): AssetData[] => {
+  return assets.map(asset => ({
+    ...asset,
+    video: asset.video || {
+      creatorId: { value: 'Unknown Creator' },
+      playbackId: '',
+      status: { phase: 'unknown' },
+    },
+  }));
+};
+
 export const fetchAllAssets = async (): Promise<AssetData[]> => {
   try {
-    const response = await videoApi.get<AssetData[]>('/asset');
-    console.log('Fetched Assets:', response.data); // Log the response data
-    return response.data;
+    const { data } = await videoApi.get<AssetData[]>('/asset');
+    console.log('Fetched Assets:', data); // Log the response data
+    return validateAssetData(data);
   } catch (error) {
     throw new Error(handleAxiosError(error));
   }

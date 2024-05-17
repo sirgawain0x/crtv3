@@ -42,12 +42,10 @@ export default async function AllVideosPage() {
       </Box>
       <Box>
         <Heading mb={10}>Discover Content</Heading>
-        <Flex flexDirection="column" my={10} gap={5} maxW="md">
           <Text>This is the Discover page.</Text>
           <Suspense fallback={<div>Loading...</div>}>
             <AllVideosContent />
           </Suspense>
-        </Flex>
       </Box>
     </main>
   );

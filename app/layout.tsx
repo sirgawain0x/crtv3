@@ -4,7 +4,6 @@ import './globals.css';
 import { Providers } from './providers';
 import Layout from './ui/components/Layout/Layout';
 
-
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {

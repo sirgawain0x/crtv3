@@ -8,7 +8,7 @@ export type VideoDetailsProps = {
   assetData: AssetData;
 };
 const VideoDetailsPage = async ({ assetData }: VideoDetailsProps) => {
-  const asset = await livepeer.getById(assetData?.assetId);
+  const asset = await livepeer.asset.get(assetData?.id);
   console.log('asset; ', asset);
 
   return (

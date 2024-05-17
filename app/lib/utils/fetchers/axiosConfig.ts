@@ -1,6 +1,5 @@
 import axios from 'axios';
 
-
 const videoApi = axios.create({
   baseURL: 'https://livepeer.studio/api',
   headers: {
