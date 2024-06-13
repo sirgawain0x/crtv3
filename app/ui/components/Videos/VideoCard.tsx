@@ -1,5 +1,4 @@
 'use client';
-
 import React from 'react';
 import {
   Card,
@@ -19,10 +18,9 @@ import {
   Spacer,
   ButtonGroup,
 } from '@chakra-ui/react';
-import { Player } from '@livepeer/react';
+import PlayerCardComponent from '../Player/Player';
 import { motion } from 'framer-motion';
-import { PosterImage } from './PosterImage';
-import { SITE_LOGO, CREATIVE_LOGO_WHT } from '../../../lib/utils/context';
+import { SITE_LOGO } from '../../../lib/utils/context';
 import { AssetData } from '@app/lib/types';
 import Link from 'next/link';
 
@@ -31,8 +29,7 @@ type VideoCardProps = {
 };
 
 const VideoCard: React.FC<VideoCardProps> = ({ assetData }) => {
-  console.log('Asset Data:', assetData);
-
+  console.log('Video Card Asset Data:', assetData);
   return (
     <>
     <Card key={assetData?.id} minW={"sm"} maxW={'md'} variant={'elevated'} mb={12}>
@@ -47,31 +44,10 @@ const VideoCard: React.FC<VideoCardProps> = ({ assetData }) => {
           </Box>
         </Flex>
       </CardHeader>
-      <Player
-        title={assetData?.name}
-        playbackId={assetData?.video?.playbackId}
-        showTitle
-        poster={<PosterImage alt="Creative logo" imgSrc={CREATIVE_LOGO_WHT} />}
-        showLoadingSpinner
-        controls={{ autohide: 500, hotkeys: false }}
-        aspectRatio="16to9"
-        showPipButton
-        autoUrlUpload={{ fallback: true, ipfsGateway: 'https://w3s.link' }}
-        theme={{
-          borderStyles: { containerBorderStyle: 'solid' },
-          colors: { accent: '#EC407A' },
-          space: {
-            controlsBottomMarginX: '10px',
-            controlsBottomMarginY: '5px',
-            controlsTopMarginX: '15px',
-            controlsTopMarginY: '10px',
-          },
-          radii: { containerBorderRadius: '0px' },
-        }}
-      />
+      <PlayerCardComponent asset={assetData}/>
       <CardBody>
         <Flex>
-          <Badge colorScheme={status === 'ready' ? 'green' : 'red'}>
+          <Badge colorScheme={assetData?.video?.status?.phase === 'ready' ? 'green' : 'red'}>
             {assetData?.video?.status?.phase}
           </Badge>
           <Spacer />

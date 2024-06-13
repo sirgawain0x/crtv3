@@ -1,11 +1,12 @@
 'use client';
-import { LivepeerCacheAsset, AssetData } from '@app/lib/types';
+import { AssetData } from '@app/lib/types';
 import { Box, Container, Heading } from '@chakra-ui/react';
-import { Player } from '@livepeer/react';
 import { useState } from 'react';
+import { getSrc } from '@livepeer/react/external';
+import * as Player from "@livepeer/react/player";
+import { PauseIcon, PlayIcon } from "@livepeer/react/assets";
 
 type VideoDetailsProps = {
-  asset: LivepeerCacheAsset;
   assetData: AssetData;
 };
 
@@ -15,11 +16,12 @@ export default function VideoDetails(props: VideoDetailsProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [assetLoading, setAssetLoading] = useState(false);
   const [error, setError] = useState('');
+  const src = getSrc(props?.assetData?.playbackInfo);
 
   return (
     <main>
       <Heading p={4}>Video Detail Page</Heading>
-      <Box p={4}>Asset ID: {props?.asset.id}</Box>
+      <Box p={4}>Asset ID: {props?.assetData.id}</Box>
       {isLoading || assetLoading ? (
         <Box>Loading...</Box>
       ) : error ? (
@@ -27,9 +29,25 @@ export default function VideoDetails(props: VideoDetailsProps) {
       ) : (
         <Container maxW="container.md">
           <Heading size="md" my="4">
-            {props?.assetData?.title}
+            {props?.assetData?.name}
           </Heading>
-            {props?.asset.id && <Player playbackId={props?.asset.playbackId} showTitle />}
+            {props?.assetData?.id && (
+              <Player.Root src={src}>
+                <Player.Container className="h-full w-full overflow-hidden bg-gray-950">
+                  <Player.Video title={asset?.name} className="h-full w-full" />
+                  <Player.Controls className="flex items-center justify-center">
+                    <Player.PlayPauseTrigger className="w-10 h-10 hover:scale-105 flex-shrink-0">
+                      <Player.PlayingIndicator asChild matcher={false}>
+                        <PlayIcon className="w-full h-full" />
+                      </Player.PlayingIndicator>
+                      <Player.PlayingIndicator asChild>
+                        <PauseIcon className="w-full h-full" />
+                      </Player.PlayingIndicator>
+                    </Player.PlayPauseTrigger>
+                  </Player.Controls>
+                </Player.Container>
+              </Player.Root>
+            )}
         </Container>
       )}
     </main>

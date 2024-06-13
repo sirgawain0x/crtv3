@@ -5,6 +5,7 @@ export type AssetData = {
   name: string;
   description?: string;
   video: Asset;
+  playbackInfo: PlaybackInfo;
   views?: Views;
   details?: MintDetails;
   currency?: Currency;
@@ -100,6 +101,83 @@ export type Asset = {
   };
 };
 
+export type PlaybackInfo = {
+  type: PlaybackType,
+  meta: {
+    live?: number,
+    playbackPolicy?: {
+      type: string,
+      webhookId: string,
+      webhookContext: {
+        streamerId: string
+      },
+      refreshInterval: number,
+      allowedOrigins: [
+        string
+      ]
+    },
+    source: [
+      {
+        hrn: "MP4",
+        type: "html5/video/mp4",
+        url: "https://asset-cdn.lp-playback.monster/hls/1bde4o2i6xycudoy/static360p0.mp4",
+        size: 494778,
+        width: 204,
+        height: 360,
+        bitrate: 449890
+      }
+    ],
+    dvrPlayback?: [
+      {
+        hrn: MetaSourceHrn,
+        type: string,
+        url: string,
+        error: string,
+      }
+    ],
+    attestation?: {
+      id: string,
+      primaryType: string,
+      domain: {
+        name: string,
+        version: string
+      },
+      message: {
+        video: string,
+        attestations: [
+          {
+            role: string,
+            address: string
+          }
+        ],
+        signer: string,
+        timestamp: number
+      },
+      signature: string,
+      createdAt: number,
+      signatureType: MetaAttSigType,
+      storage: {
+        ipfs: {
+          updatedAt: number,
+          cid: string,
+          url: string,
+          gatewayUrl: string
+        },
+        status: {
+          phase: MetaAttStorageStatusPhase,
+          progress: number,
+          errorMessage: string,
+          tasks: {
+            pending: string,
+            last: string,
+            failed: string
+          }
+        }
+      }
+    }
+  }
+}
+
 export enum AssetType {
   Video = 'Video',
   Audio = 'Audio',
@@ -154,6 +232,34 @@ export type MintDetails = {
 export enum Currency {
   USDC = 'USDC',
   ETH = 'ETH',
+}
+
+export enum PlaybackType {
+  Live = 'live',
+  Vod = 'vod',
+  Recording = 'recording',
+}
+
+export enum MetaSourceHrn {
+  HLS = 'HLS (TS)',
+  MP4 = 'MP4',
+  WebRTC = 'WebRTC (H264)',
+  FLV = 'FLV (H264)',
+  Thumbnail = 'Thumbnail (JPEG)',
+  Thumbnails = 'Thumbnails',
+}
+
+export enum MetaAttSigType {
+  EIP712 = 'eip712',
+  FLOW = 'flow',
+}
+
+export enum MetaAttStorageStatusPhase {
+  Waiting = 'waiting',
+  Ready ='ready',
+  Processing = 'processing',
+  Failed = 'failed',
+  Reverted ='reverted',
 }
 
 export type UploadAssetData = {

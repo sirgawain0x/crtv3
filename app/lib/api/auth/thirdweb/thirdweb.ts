@@ -16,7 +16,7 @@ const thirdwebAuth = createAuth({
   adminAccount: privateKeyToAccount({ client, privateKey }),
 });
 
-export const generatePayload = thirdwebAuth.generatePayload;
+//export const generatePayload = thirdwebAuth.generatePayload;
 
 export async function login(payload: VerifyLoginPayloadParams) {
   const verifiedPayload = await thirdwebAuth.verifyPayload(payload);

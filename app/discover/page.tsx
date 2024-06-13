@@ -1,7 +1,7 @@
 import { Box, Breadcrumb, BreadcrumbItem, BreadcrumbLink, Flex, Heading, Text } from '@chakra-ui/react';
 import VideoCardGrid from '@app/ui/components/Videos/VideoCardGrid';
 import { AssetData } from '@app/lib/types';
-import { fetchAllAssets } from '@app/lib/utils/fetchers/livepeer/livepeerApi';
+import { livepeer } from '@app/lib/sdk/livepeer/client';
 import { Suspense } from 'react';
 
 async function AllVideosContent() {
@@ -9,7 +9,7 @@ async function AllVideosContent() {
   let error: string | null = null;
 
   try {
-    assets = await fetchAllAssets();
+   const assets = await livepeer.asset.getAll();
   } catch (err: any) {
     console.error('Failed to fetch assets:', err);
     error = 'Failed to fetch assets.';

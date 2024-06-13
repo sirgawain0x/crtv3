@@ -38,8 +38,8 @@ export default function VideoDetailsPage({
   const fetchAssetDetails = async (assetId: AssetData) => {
     setAssetLoading(true);
     try {
-      const assetData = await livepeer?.asset.get(`${assetId.assetId}`);
-      console.log('Asset By Id', assetData);
+      const assetData = await livepeer?.asset.get(`${assetId.id}`);
+      console.log('Asset By Id', assetData.asset?.id);
       setAsset(assetData);
     } catch (err) {
       setError('Failed to load asset data');

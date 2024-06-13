@@ -19,7 +19,6 @@ import Link from 'next/link';
 import { FaUsers, FaCertificate } from 'react-icons/fa';
 import { useActiveAccount } from 'thirdweb/react';
 import { ROLES, CREATIVE_ADDRESS } from '@app/lib/utils/context';
-import { getCollabClient } from '@app/lib/sdk/collabland/client';
 import { Card } from '@app/ui/components/Voting/Card';
 import { gql, useQuery } from '@apollo/client';
 

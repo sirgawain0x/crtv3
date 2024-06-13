@@ -4,12 +4,6 @@ import { client } from '@app/lib/sdk/thirdweb/client';
 import { ACCOUNT_FACTORY_ADDRESS } from '@app/lib/utils/context';
 import { SmartWalletOptions, createWallet } from 'thirdweb/wallets';
 import { sepolia } from 'thirdweb/chains';
-import {
-  generatePayload,
-  isLoggedIn,
-  login,
-  logout,
-} from '@app/api/auth/thirdweb/thirdweb';
 
 export default function ConnectButtonWrapper() {
   const chain = sepolia;
