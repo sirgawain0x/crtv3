@@ -16,13 +16,13 @@ import {
 import { ChevronRightIcon } from '@chakra-ui/icons';
 import snapshot from '@snapshot-labs/snapshot.js';
 import { useActiveAccount } from 'thirdweb/react';
-import { getAddress } from 'thirdweb/utils';
 import { FaWindowClose } from 'react-icons/fa';
 import { useRouter } from 'next/navigation';
+import { polygon } from 'thirdweb/chains';
+import { SNAPSHOT_SUBGRAPH_URL } from '@snapshot-labs/snapshot.js/dist/utils';
 
 const hub = 'https://hub.snapshot.org';
 const client = new snapshot.Client(hub);
-const plugin = new snapshot.plugins.poap();
 
 /**
  * Renders the Create component.
@@ -32,15 +32,16 @@ const plugin = new snapshot.plugins.poap();
 export default function Create() {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
-  const [startDate, setStartDate] = useState(new Date());
+  const [startDate, setStartDate] = useState(0);
   const [startTime, setStartTime] = useState(new Date());
-  const [endDate, setEndDate] = useState(new Date());
+  const [endDate, setEndDate] = useState(0);
   const [endTime, setEndTime] = useState(new Date());
   const [choices, setChoices] = useState(['yes', 'no']);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const inputRef = useRef();
   const router = useRouter();
   const activeAccount = useActiveAccount();
+  const chain = polygon;
 
   /**
    * Handles the change event for a choice input field.
@@ -83,27 +84,25 @@ export default function Create() {
     if (activeAccount) {
       try {
         setIsSubmitting(true);
-        // get current block of Gnosis network
-        const provider = await snapshot.utils.getProvider('100');
+        // get current block of Polygon network
+        const provider = await snapshot.utils.getProvider(chain.id.toString());
         const block = await snapshot.utils.getBlockNumber(provider);
         const space = 'thecreative.eth';
-        const account = getAddress(activeAccount?.address);
-        const receipt = (await client.proposal(provider, account, space, {
-          type: 'custom',
-          name: title,
+        const receipt = (await client.proposal(provider, activeAccount?.address, {
+          space: space,
+          type: 'weighted',
+          title: title,
           body: content,
           choices: choices,
           start: startDate,
           end: endDate,
           snapshot: block,
-          metadata: '',
+          discussion: 'max',
+          plugins: JSON.stringify({
+            poap:{}
+          }),
         })) as any;
         console.log(`created proposal ${receipt.id}`);
-        const poap = await plugin.getCurrentState(
-          receipt.id,
-          activeAccount?.address,
-        );
-        console.log('POAP:', poap);
         router.push('/vote');
       } catch (error) {
         console.log(error);

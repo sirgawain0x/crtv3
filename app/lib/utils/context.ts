@@ -4,7 +4,7 @@ export const CREATIVE_LOGO_WHT = '/Blog-Logo_wht.png';
 export const CREATIVE_ICON = '/creative_logo_only.png';
 export const SITE_NAME = 'CREATIVE TV';
 
-export const CREATIVE_ADDRESS = '0xc2F7aa98F80D213Ce24e3109A49989b5340BF33C';
+export const CREATIVE_ADDRESS = '0x1Fde40a4046Eda0cA0539Dd6c77ABF8933B94260';
 
 export const ACCOUNT_FACTORY_ADDRESS = {
   sepolia: '0xE90DebFD907F5B655f22bfC16083E45994d708bE',
@@ -4345,8 +4345,15 @@ export const PROFILE_CAMPAIGNS = {
 
 // Livepeer API
 export const LIVEPEER_API_URL = 'https://livepeer.com/api';
-export const LIVEPEER_HERO_PLAYBACK_ID = 'cbd1dw72qst9xmps'; // Welcome To Creative Organization DAO
-export const LIVEPEER_FEATURED_PLAYBACK_ID = '5c2bzf537qbq0r7o'; // The Creative Podcast Episode 03
+
+// HERO
+export const HERO_VIDEO_TITLE = 'Welcome To Creative Organization DAO';
+export const LIVEPEER_HERO_PLAYBACK_ID = 'cbd1dw72qst9xmps';
+
+// FEATURED VIDEO
+export const FEATURED_VIDEO_TITLE = 'The Creative Podcast Episode 03';
+export const LIVEPEER_FEATURED_PLAYBACK_ID = '5c2bzf537qbq0r7o';
+
 
 // HERO SECTION
 export const HERO_NAME = {

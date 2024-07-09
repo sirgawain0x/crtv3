@@ -1,38 +1,28 @@
+import { Box, Breadcrumb, BreadcrumbItem, BreadcrumbLink, Flex, Heading, Text } from '@chakra-ui/react';
+import VideoCardGrid from '@app/ui/components/Videos/VideoCardGrid';
+import { AssetData } from '@app/lib/types';
 import { livepeer } from '@app/lib/sdk/livepeer/client';
-import {
-  Box,
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  Flex,
-  Heading,
-  Text,
-} from '@chakra-ui/react';
+import { Suspense } from 'react';
 
-const AllVideosPage = async () => {
+async function AllVideosContent() {
+  let assets: AssetData[] = [];
+  let error: string | null = null;
+
   try {
-
-    /**
-     * @dev
-     * The data isn't populating because it fails to pass some `Zod` validation
-     * that the sdk is using internally (probably to checkmate the `types` that makes 
-     * up the `Asset` object)
-     */
-    const { data, error } = await livepeer.asset.getAll();
-
-    console.log('data101: ', data);
+   const assets = await livepeer.asset.getAll();
   } catch (err: any) {
-    /**
-     * @dev
-     * The `Asset` observed at the console is a selected few that the 
-     * sdk added to the `error` object inside a `rawValue` field
-     * 
-     * @note If only the `error` object is accessed; one would see the
-     * entire `zod` validation error
-     */
-    console.log('error101: ', err.rawValue);
+    console.error('Failed to fetch assets:', err);
+    error = 'Failed to fetch assets.';
   }
 
+  if (error) {
+    return <Text>Error: {error}</Text>;
+  }
+
+  return <VideoCardGrid assets={assets} />;
+}
+
+export default async function AllVideosPage() {
   return (
     <main>
       <Box my={10} p={4}>
@@ -52,13 +42,11 @@ const AllVideosPage = async () => {
       </Box>
       <Box>
         <Heading mb={10}>Discover Content</Heading>
-        <Flex flexDirection="column" my={10} gap={5} maxW="md">
           <Text>This is the Discover page.</Text>
-          {/* {JSON.stringify(allAssets)} */}
-          {/* <VideoCardGrid  />  */}
-        </Flex>
+          <Suspense fallback={<div>Loading...</div>}>
+            <AllVideosContent />
+          </Suspense>
       </Box>
     </main>
   );
-};
-export default AllVideosPage;
+}
