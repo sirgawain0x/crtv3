@@ -1,5 +1,13 @@
-import { Box, Breadcrumb, BreadcrumbItem, BreadcrumbLink, Flex, Heading, Text } from '@chakra-ui/react';
-import VideoCardGrid from '@app/ui/components/Videos/VideoCardGrid';
+import {
+  Box,
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  Flex,
+  Heading,
+  Text,
+} from '@chakra-ui/react';
+import VideoCardGrid from '@app/components/Videos/VideoCardGrid';
 import { AssetData } from '@app/lib/types';
 import { livepeer } from '@app/lib/sdk/livepeer/client';
 import { Suspense } from 'react';
@@ -9,7 +17,7 @@ async function AllVideosContent() {
   let error: string | null = null;
 
   try {
-   const assets = await livepeer.asset.getAll();
+    const assets = await livepeer.asset.getAll();
   } catch (err: any) {
     console.error('Failed to fetch assets:', err);
     error = 'Failed to fetch assets.';
@@ -42,10 +50,10 @@ export default async function AllVideosPage() {
       </Box>
       <Box>
         <Heading mb={10}>Discover Content</Heading>
-          <Text>This is the Discover page.</Text>
-          <Suspense fallback={<div>Loading...</div>}>
-            <AllVideosContent />
-          </Suspense>
+        <Text>This is the Discover page.</Text>
+        <Suspense fallback={<div>Loading...</div>}>
+          <AllVideosContent />
+        </Suspense>
       </Box>
     </main>
   );

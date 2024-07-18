@@ -1,6 +1,6 @@
 import React from 'react';
 import { Container } from '@chakra-ui/react';
-import Create from '@app/ui/components/Voting/Create/Create';
+import Create from '@app/components/Voting/Create/Create';
 
 const CreateVotePage = () => {
   return (

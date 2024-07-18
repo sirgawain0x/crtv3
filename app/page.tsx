@@ -1,6 +1,5 @@
 import { Metadata } from 'next';
-import Content from '@app/ui/components/Content/Content';
-import { Box, Container } from '@chakra-ui/react';
+import Content from '@app/components/Content/Content';
 
 export const metadata: Metadata = {
   title: 'Creative TV',
@@ -25,10 +24,10 @@ export const metadata: Metadata = {
 
 export default function Home() {
   return (
-    <Container maxW="7xl" centerContent>
-      <Box py={10}>
+    <div className={'container mx-auto max-w-7xl'}>
+      <div className={'py-10'}>
         <Content />
-      </Box>
-    </Container>
+      </div>
+    </div>
   );
 }

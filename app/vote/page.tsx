@@ -1,6 +1,6 @@
 import React from 'react';
 import { Container } from '@chakra-ui/react';
-import Vote from '@app/ui/components/Voting/Index';
+import Vote from '@app/components/Voting/Index';
 
 export default function VotePage() {
   return (
