@@ -6,7 +6,7 @@ const NonLoggedInView = () => {
   return (
     <div>
       <HeroSection />
-      <FeaturedVideo />
+      {/* <FeaturedVideo /> */}
     </div>
   );
 };
