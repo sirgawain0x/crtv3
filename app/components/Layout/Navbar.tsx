@@ -7,7 +7,7 @@ import { SITE_LOGO } from '@app/lib/utils/context';
 import { Sheet, SheetTrigger, SheetContent } from '@app/components/ui/sheet';
 import { Button } from '@app/components/ui/button';
 import { useActiveAccount } from 'thirdweb/react';
-import UserMenu from './userMenu';
+import UserMenu from './UserMenu';
 
 export function Navbar() {
   const activeAccount = useActiveAccount();
@@ -23,12 +23,7 @@ export function Navbar() {
         <SheetContent side="left">
           <div>
             <Link href="/" className="mr-6 lg:flex" prefetch={false}>
-              <Image
-                src={SITE_LOGO}
-                alt="Creative Logo"
-                width={80}
-                height={80}
-              />
+              <Image src={SITE_LOGO} alt="Creative Logo" width={80} />
               <h1>
                 <span className="sr-only" style={{ color: 'GrayText' }}>
                   CREATIVE TV

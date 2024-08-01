@@ -1,12 +1,16 @@
 import React from 'react';
 import HeroSection from '../../home-page/HeroSection';
-import FeaturedVideo from '../../home-page/Featured';
+import { TopChart } from '../../home-page/TopChart';
+import FeaturedVideo from '@app/components/home-page/Featured';
+import { TopVideos } from '../../home-page/TopVideos';
 
 const NonLoggedInView = () => {
   return (
     <div>
       <HeroSection />
-      {/* <FeaturedVideo /> */}
+      <TopChart />
+      <FeaturedVideo />
+      <TopVideos />
     </div>
   );
 };

@@ -9,15 +9,21 @@ import {
 import { Button } from '@app/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@app/components/ui/avatar';
 import Link from 'next/link';
+import makeBlockie from 'ethereum-blockies-base64';
+import { useActiveAccount } from 'thirdweb/react';
 
 export default function UserMenu() {
+  const activeAccount = useActiveAccount();
   return (
     <div className="my-auto">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="icon" className="rounded-full">
             <Avatar className="h-8 w-8">
-              <AvatarImage src="/placeholder-user.jpg" />
+              <AvatarImage
+                src={makeBlockie(`${activeAccount?.address}`)}
+                aria-describedby="blockie avatar"
+              />
               <AvatarFallback>JD</AvatarFallback>
             </Avatar>
             <ChevronDownIcon className="h-4 w-4" />
@@ -26,7 +32,10 @@ export default function UserMenu() {
         <DropdownMenuContent align="end">
           <div className="flex items-center gap-2 p-2">
             <Avatar className="h-8 w-8">
-              <AvatarImage src="/placeholder-user.jpg" />
+              <AvatarImage
+                src={makeBlockie(`${activeAccount?.address}`)}
+                aria-describedby="blockie avatar"
+              />
               <AvatarFallback>JD</AvatarFallback>
             </Avatar>
             <div className="grid gap-0.5 leading-none">
