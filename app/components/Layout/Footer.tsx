@@ -1,45 +1,36 @@
 import Link from 'next/link';
+import Image from 'next/image';
+import { SITE_LOGO } from '@app/lib/utils/context';
 
 export default function Component() {
+  // 👇️ Get current Year
+  const currentYear = new Date().getFullYear();
+
   return (
     <footer className="bg-muted py-6 md:py-8">
       <div className="container flex flex-col items-center justify-between gap-4 md:flex-row">
-        <Link href="#" className="flex items-center gap-2" prefetch={false}>
-          <MountainIcon className="h-6 w-6" />
-          <span className="text-sm font-medium">Acme Inc</span>
+        <Link href="/" className="flex items-center gap-2" prefetch={false}>
+          <Image src={SITE_LOGO} alt="Creative Logo" width={40} height={40} />
+          <span className="text-sm font-medium">CREATIVE</span>
         </Link>
         <nav className="flex items-center gap-4">
           <Link
-            href="#"
+            href="https://app.creativeplatform.xyz"
             className="text-sm font-medium hover:underline"
             prefetch={false}
           >
-            Home
+            Exit dApp
           </Link>
           <Link
-            href="#"
+            href="https://app.charmverse.io/creative-like-brown-fowl/"
             className="text-sm font-medium hover:underline"
             prefetch={false}
           >
-            About
-          </Link>
-          <Link
-            href="#"
-            className="text-sm font-medium hover:underline"
-            prefetch={false}
-          >
-            Products
-          </Link>
-          <Link
-            href="#"
-            className="text-sm font-medium hover:underline"
-            prefetch={false}
-          >
-            Contact
+            Community Dashboard
           </Link>
         </nav>
         <p className="text-xs text-muted-foreground">
-          &copy; 2024 Acme Inc. All rights reserved.
+          &copy; {currentYear} Creative Organization DAO. All rights reserved.
         </p>
       </div>
     </footer>

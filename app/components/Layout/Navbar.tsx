@@ -1,23 +1,16 @@
 'use client';
 import * as React from 'react';
 import Link from 'next/link';
-import { cn } from '@app/lib/utils';
 import Image from 'next/image';
 import ConnectButtonWrapper from '../Button/connectButtonWrapper';
-import {
-  NavigationMenu,
-  NavigationMenuContent,
-  NavigationMenuItem,
-  NavigationMenuLink,
-  NavigationMenuList,
-  NavigationMenuTrigger,
-  navigationMenuTriggerStyle,
-} from '@app/components/ui/navigation-menu';
 import { SITE_LOGO } from '@app/lib/utils/context';
 import { Sheet, SheetTrigger, SheetContent } from '@app/components/ui/sheet';
 import { Button } from '@app/components/ui/button';
+import { useActiveAccount } from 'thirdweb/react';
+import UserMenu from './userMenu';
 
 export function Navbar() {
+  const activeAccount = useActiveAccount();
   return (
     <header className="flex h-20 w-full shrink-0 items-center px-4 md:px-6">
       <Sheet>
@@ -28,45 +21,53 @@ export function Navbar() {
           </Button>
         </SheetTrigger>
         <SheetContent side="left">
-          <Link href="#" className="mr-6 hidden lg:flex" prefetch={false}>
-            <Image src={SITE_LOGO} alt="Creative Logo" width={80} height={80} />
-            <span className="sr-only">Acme Inc</span>
-          </Link>
+          <div>
+            <Link href="/" className="mr-6 lg:flex" prefetch={false}>
+              <Image
+                src={SITE_LOGO}
+                alt="Creative Logo"
+                width={80}
+                height={80}
+              />
+              <h1>
+                <span className="sr-only" style={{ color: 'GrayText' }}>
+                  CREATIVE TV
+                </span>
+              </h1>
+            </Link>
+          </div>
           <div className="grid gap-2 py-6">
             <Link
               href="#"
               className="flex w-full items-center py-2 text-lg font-semibold"
               prefetch={false}
             >
-              Home
+              Discover
             </Link>
             <Link
               href="#"
               className="flex w-full items-center py-2 text-lg font-semibold"
               prefetch={false}
             >
-              About
+              Vote
             </Link>
-            <Link
-              href="#"
-              className="flex w-full items-center py-2 text-lg font-semibold"
-              prefetch={false}
-            >
-              Services
-            </Link>
-            <Link
-              href="#"
-              className="flex w-full items-center py-2 text-lg font-semibold"
-              prefetch={false}
-            >
-              Contact
-            </Link>
+          </div>
+          <hr />
+          <div className="grid gap-2 py-6">
+            <ConnectButtonWrapper />
+            {activeAccount && (
+              <div className="mt-5">
+                <UserMenu />
+              </div>
+            )}
           </div>
         </SheetContent>
       </Sheet>
-      <Link href="#" className="mr-6 hidden lg:flex" prefetch={false}>
+      <Link href="/" className="mr-6 hidden lg:flex" prefetch={false}>
         <Image src={SITE_LOGO} alt="Creative Logo" width={80} height={80} />
-        <span className="sr-only">Acme Inc</span>
+        <h1>
+          <span className="sr-only">Creative TV</span>
+        </h1>
       </Link>
       <nav className="ml-auto hidden gap-6 lg:flex">
         <Link
@@ -74,30 +75,22 @@ export function Navbar() {
           className="group inline-flex h-9 w-max items-center justify-center rounded-md bg-white px-4 py-2 text-sm font-medium transition-colors hover:bg-gray-100 hover:text-gray-900 focus:bg-gray-100 focus:text-gray-900 focus:outline-none disabled:pointer-events-none disabled:opacity-50 data-[active]:bg-gray-100/50 data-[state=open]:bg-gray-100/50 dark:bg-gray-950 dark:hover:bg-gray-800 dark:hover:text-gray-50 dark:focus:bg-gray-800 dark:focus:text-gray-50 dark:data-[active]:bg-gray-800/50 dark:data-[state=open]:bg-gray-800/50"
           prefetch={false}
         >
-          Home
+          Discover
         </Link>
         <Link
           href="#"
           className="group inline-flex h-9 w-max items-center justify-center rounded-md bg-white px-4 py-2 text-sm font-medium transition-colors hover:bg-gray-100 hover:text-gray-900 focus:bg-gray-100 focus:text-gray-900 focus:outline-none disabled:pointer-events-none disabled:opacity-50 data-[active]:bg-gray-100/50 data-[state=open]:bg-gray-100/50 dark:bg-gray-950 dark:hover:bg-gray-800 dark:hover:text-gray-50 dark:focus:bg-gray-800 dark:focus:text-gray-50 dark:data-[active]:bg-gray-800/50 dark:data-[state=open]:bg-gray-800/50"
           prefetch={false}
         >
-          About
-        </Link>
-        <Link
-          href="#"
-          className="group inline-flex h-9 w-max items-center justify-center rounded-md bg-white px-4 py-2 text-sm font-medium transition-colors hover:bg-gray-100 hover:text-gray-900 focus:bg-gray-100 focus:text-gray-900 focus:outline-none disabled:pointer-events-none disabled:opacity-50 data-[active]:bg-gray-100/50 data-[state=open]:bg-gray-100/50 dark:bg-gray-950 dark:hover:bg-gray-800 dark:hover:text-gray-50 dark:focus:bg-gray-800 dark:focus:text-gray-50 dark:data-[active]:bg-gray-800/50 dark:data-[state=open]:bg-gray-800/50"
-          prefetch={false}
-        >
-          Services
-        </Link>
-        <Link
-          href="#"
-          className="group inline-flex h-9 w-max items-center justify-center rounded-md bg-white px-4 py-2 text-sm font-medium transition-colors hover:bg-gray-100 hover:text-gray-900 focus:bg-gray-100 focus:text-gray-900 focus:outline-none disabled:pointer-events-none disabled:opacity-50 data-[active]:bg-gray-100/50 data-[state=open]:bg-gray-100/50 dark:bg-gray-950 dark:hover:bg-gray-800 dark:hover:text-gray-50 dark:focus:bg-gray-800 dark:focus:text-gray-50 dark:data-[active]:bg-gray-800/50 dark:data-[state=open]:bg-gray-800/50"
-          prefetch={false}
-        >
-          Contact
+          Vote
         </Link>
       </nav>
+      <div className=" ml-auto hidden lg:flex">
+        <div className="mr-5">
+          <ConnectButtonWrapper />
+        </div>
+        {activeAccount && <UserMenu />}
+      </div>
     </header>
   );
 }

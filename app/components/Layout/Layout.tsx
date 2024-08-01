@@ -10,11 +10,11 @@ interface LayoutProps {
 
 function Layout(props: LayoutProps) {
   return (
-    <Fragment>
+    <div className="flex min-h-screen flex-col">
       <Navbar />
-      <main>{props.children}</main>
+      <main className="mb-auto">{props.children}</main>
       <Footer />
-    </Fragment>
+    </div>
   );
 }
 
