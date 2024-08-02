@@ -1,7 +1,7 @@
 import { Livepeer } from 'livepeer';
 import { getSrc } from '@livepeer/react/external';
 
-const livepeer = new Livepeer({
+export const livepeer = new Livepeer({
   apiKey: `Bearer ${process.env.LIVEPEER_API_KEY}`,
 });
 

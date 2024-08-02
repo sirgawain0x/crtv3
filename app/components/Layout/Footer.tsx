@@ -13,20 +13,13 @@ export default function Component() {
           <Image src={SITE_LOGO} alt="Creative Logo" width={40} height={40} />
           <span className="text-sm font-medium">CREATIVE</span>
         </Link>
-        <nav className="flex items-center gap-4">
+        <nav className="mx-auto flex items-center gap-4">
           <Link
             href="https://app.creativeplatform.xyz"
             className="text-sm font-medium hover:underline"
             prefetch={false}
           >
             Exit dApp
-          </Link>
-          <Link
-            href="https://app.charmverse.io/creative-like-brown-fowl/"
-            className="text-sm font-medium hover:underline"
-            prefetch={false}
-          >
-            Community Dashboard
           </Link>
         </nav>
         <p className="text-xs text-muted-foreground">

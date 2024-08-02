@@ -1,4 +1,3 @@
-import React from 'react';
 import HeroSection from '../../home-page/HeroSection';
 import { TopChart } from '../../home-page/TopChart';
 import FeaturedVideo from '@app/components/home-page/Featured';

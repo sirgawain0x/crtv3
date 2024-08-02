@@ -11,11 +11,11 @@ const VideoDetailsPage = async ({ assetData }: VideoDetailsProps) => {
   console.log('asset; ', asset);
 
   return (
-    <Container maxW="7xl" centerContent>
-      <Box py={10}>
-        <VideoDetails asset={asset} assetData={assetData} />
-      </Box>
-    </Container>
+    <div className="container max-w-7xl content-center">
+      <div className={'py-10'}>
+        <VideoDetails assetData={assetData} />
+      </div>
+    </div>
   );
 };
 

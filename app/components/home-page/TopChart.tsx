@@ -1,135 +1,75 @@
 'use client';
-import React from 'react';
+import { useState, useEffect } from 'react';
 import { Avatar, AvatarImage, AvatarFallback } from '../ui/avatar';
+import makeBlockie from 'ethereum-blockies-base64';
+import { shortenAddress } from 'thirdweb/utils';
+import { Badge } from '../ui/badge';
+import { StackClient } from '@stackso/js-core';
+
+// Initialize the client
+const stack = new StackClient({
+  apiKey: `${process.env.NEXT_PUBLIC_STACK_API_KEY}`, // Use NEXT_PUBLIC_ prefix for client-side env vars
+  pointSystemId: 2777,
+});
+
+interface LeaderboardItem {
+  uniqueId: number;
+  address: string;
+  points: number;
+  identities: any;
+  bannerUrl?: string;
+  name?: string;
+  description?: string;
+}
 
 export function TopChart() {
+  const [data, setData] = useState<LeaderboardItem[]>([]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const leaderboard = await stack.getLeaderboard({ limit: 20 });
+      setData(
+        leaderboard?.leaderboard.map((item, i) => ({
+          uniqueId: i + 1, // Ensure unique IDs start at 1
+          address: item.address,
+          points: item.points,
+          identities: item.identities || [],
+          bannerUrl: leaderboard?.metadata.bannerUrl,
+          name: leaderboard?.metadata.name,
+          description: leaderboard?.metadata.description,
+        })),
+      );
+    };
+
+    fetchData();
+  }, []);
+
   return (
     <div className="mx-auto w-full max-w-6xl py-8">
       <div className="mb-8 text-center">
         <h2 className="flex items-center justify-center gap-2 text-3xl font-bold">
           <TrophyIcon className="h-6 w-6 text-yellow-500" />
-          Top Creatives
+          TOP CREATIVES
         </h2>
       </div>
-      <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
-        <ul className="space-y-4">
-          <li className="flex items-center space-x-2">
-            <span>1.</span>
-            <Avatar>
-              <AvatarImage src="/placeholder-user.jpg" />
-              <AvatarFallback>P</AvatarFallback>
-            </Avatar>
-            <span>plantarcowboy</span>
-          </li>
-          <li className="flex items-center space-x-2">
-            <span>2.</span>
-            <Avatar>
-              <AvatarImage src="/placeholder-user.jpg" />
-              <AvatarFallback>M</AvatarFallback>
-            </Avatar>
-            <span>maliciousnorth</span>
-          </li>
-          <li className="flex items-center space-x-2">
-            <span>3.</span>
-            <Avatar>
-              <AvatarImage src="/placeholder-user.jpg" />
-              <AvatarFallback>T</AvatarFallback>
-            </Avatar>
-            <span>thingmanager</span>
-          </li>
-          <li className="flex items-center space-x-2">
-            <span>4.</span>
-            <Avatar>
-              <AvatarImage src="/placeholder-user.jpg" />
-              <AvatarFallback>F</AvatarFallback>
-            </Avatar>
-            <span>feastpizza</span>
-          </li>
-          <li className="flex items-center space-x-2">
-            <span>5.</span>
-            <Avatar>
-              <AvatarImage src="/placeholder-user.jpg" />
-              <AvatarFallback>F</AvatarFallback>
-            </Avatar>
-            <span>fennelidentical</span>
-          </li>
-        </ul>
-        <ul className="space-y-4">
-          <li className="flex items-center space-x-2">
-            <span>6.</span>
-            <Avatar>
-              <AvatarImage src="/placeholder-user.jpg" />
-              <AvatarFallback>H</AvatarFallback>
-            </Avatar>
-            <span>hutdaily</span>
-          </li>
-          <li className="flex items-center space-x-2">
-            <span>7.</span>
-            <Avatar>
-              <AvatarImage src="/placeholder-user.jpg" />
-              <AvatarFallback>D</AvatarFallback>
-            </Avatar>
-            <span>decimalgingery</span>
-          </li>
-          <li className="flex items-center space-x-2">
-            <span>8.</span>
-            <Avatar>
-              <AvatarImage src="/placeholder-user.jpg" />
-              <AvatarFallback>N</AvatarFallback>
-            </Avatar>
-            <span>notionmoan</span>
-          </li>
-          <li className="flex items-center space-x-2">
-            <span>9.</span>
-            <Avatar>
-              <AvatarImage src="/placeholder-user.jpg" />
-              <AvatarFallback>T</AvatarFallback>
-            </Avatar>
-            <span>tatteredvast</span>
-          </li>
-          <li className="flex items-center space-x-2">
-            <span>10.</span>
-            <Avatar>
-              <AvatarImage src="/placeholder-user.jpg" />
-              <AvatarFallback>S</AvatarFallback>
-            </Avatar>
-            <span>spanbesides</span>
-          </li>
-        </ul>
-        <ul className="space-y-4">
-          <li className="flex items-center space-x-2">
-            <span>11.</span>
-            <Avatar>
-              <AvatarImage src="/placeholder-user.jpg" />
-              <AvatarFallback>U</AvatarFallback>
-            </Avatar>
-            <span>userkooky</span>
-          </li>
-          <li className="flex items-center space-x-2">
-            <span>12.</span>
-            <Avatar>
-              <AvatarImage src="/placeholder-user.jpg" />
-              <AvatarFallback>A</AvatarFallback>
-            </Avatar>
-            <span>arrangesquawk</span>
-          </li>
-          <li className="flex items-center space-x-2">
-            <span>13.</span>
-            <Avatar>
-              <AvatarImage src="/placeholder-user.jpg" />
-              <AvatarFallback>B</AvatarFallback>
-            </Avatar>
-            <span>beaverumpire</span>
-          </li>
-          <li className="flex items-center space-x-2">
-            <span>14.</span>
-            <Avatar>
-              <AvatarImage src="/placeholder-user.jpg" />
-              <AvatarFallback>F</AvatarFallback>
-            </Avatar>
-            <span>fifthmainstay</span>
-          </li>
-        </ul>
+      <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+        {data?.map(({ uniqueId, address, points }) => (
+          <div key={uniqueId} className="mx-auto space-y-4">
+            <ul className="space-y-4">
+              <li className="flex items-center space-x-2">
+                <span>{uniqueId}.</span>
+                <Avatar>
+                  <AvatarImage src={makeBlockie(address)} />
+                  <AvatarFallback>{makeBlockie('0x')}</AvatarFallback>
+                </Avatar>
+                <div className="flex flex-col">
+                  <span>{shortenAddress(address)}</span>
+                  <span className="text-gray-500">{points} points</span>
+                </div>
+              </li>
+            </ul>
+          </div>
+        ))}
       </div>
     </div>
   );

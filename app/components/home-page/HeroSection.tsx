@@ -3,7 +3,6 @@ import React from 'react';
 import { useRouter } from 'next/navigation';
 import {
   HERO_VIDEO_TITLE,
-  LIVEPEER_HERO_PLAYBACK_ID,
   HERO_NAME,
   HERO_DESCRIPTION,
   HERO_BUTTONS,
@@ -14,6 +13,7 @@ import { PauseIcon, PlayIcon } from '@livepeer/react/assets';
 
 export default function HeroSection() {
   const router = useRouter();
+  const LIVEPEER_HERO_PLAYBACK_ID = '9a24u9nsvvkp1gzi';
   return (
     <div className="md:py-18 mx-auto max-w-7xl py-10">
       <div className="flex flex-col items-center justify-between md:flex-row">

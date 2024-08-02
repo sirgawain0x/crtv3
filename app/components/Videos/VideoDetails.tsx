@@ -1,10 +1,10 @@
 'use client';
 import { AssetData } from '@app/lib/types';
-import { Box, Container, Heading } from '@chakra-ui/react';
 import { useState } from 'react';
 import { getSrc } from '@livepeer/react/external';
-import * as Player from "@livepeer/react/player";
-import { PauseIcon, PlayIcon } from "@livepeer/react/assets";
+import * as Player from '@livepeer/react/player';
+import { PauseIcon, PlayIcon } from '@livepeer/react/assets';
+import { Skeleton } from '@app/components/ui/skeleton';
 
 type VideoDetailsProps = {
   assetData: AssetData;
@@ -20,35 +20,35 @@ export default function VideoDetails(props: VideoDetailsProps) {
 
   return (
     <main>
-      <Heading p={4}>Video Detail Page</Heading>
-      <Box p={4}>Asset ID: {props?.assetData.id}</Box>
+      <h1 className={'p-4'}>Video Detail Page</h1>
+      <div className={'p-4'}>Asset ID: {props?.assetData.id}</div>
       {isLoading || assetLoading ? (
-        <Box>Loading...</Box>
+        <div className="space-y-4">
+          <Skeleton className="h-4 w-[550px]" />
+        </div>
       ) : error ? (
-        <Box color="red.500">{error}</Box>
+        <div color="red.500">{error}</div>
       ) : (
-        <Container maxW="container.md">
-          <Heading size="md" my="4">
-            {props?.assetData?.name}
-          </Heading>
-            {props?.assetData?.id && (
-              <Player.Root src={src}>
-                <Player.Container className="h-full w-full overflow-hidden bg-gray-950">
-                  <Player.Video title={asset?.name} className="h-full w-full" />
-                  <Player.Controls className="flex items-center justify-center">
-                    <Player.PlayPauseTrigger className="w-10 h-10 hover:scale-105 flex-shrink-0">
-                      <Player.PlayingIndicator asChild matcher={false}>
-                        <PlayIcon className="w-full h-full" />
-                      </Player.PlayingIndicator>
-                      <Player.PlayingIndicator asChild>
-                        <PauseIcon className="w-full h-full" />
-                      </Player.PlayingIndicator>
-                    </Player.PlayPauseTrigger>
-                  </Player.Controls>
-                </Player.Container>
-              </Player.Root>
-            )}
-        </Container>
+        <div className="container max-w-md">
+          <h2 className={'size-md my-4'}>{props?.assetData?.name}</h2>
+          {props?.assetData?.id && (
+            <Player.Root src={src}>
+              <Player.Container className="h-full w-full overflow-hidden bg-gray-950">
+                <Player.Video title={asset?.name} className="h-full w-full" />
+                <Player.Controls className="flex items-center justify-center">
+                  <Player.PlayPauseTrigger className="h-10 w-10 flex-shrink-0 hover:scale-105">
+                    <Player.PlayingIndicator asChild matcher={false}>
+                      <PlayIcon className="h-full w-full" />
+                    </Player.PlayingIndicator>
+                    <Player.PlayingIndicator asChild>
+                      <PauseIcon className="h-full w-full" />
+                    </Player.PlayingIndicator>
+                  </Player.PlayPauseTrigger>
+                </Player.Controls>
+              </Player.Container>
+            </Player.Root>
+          )}
+        </div>
       )}
     </main>
   );
