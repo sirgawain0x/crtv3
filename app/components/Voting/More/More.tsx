@@ -57,7 +57,7 @@ export default function MoreOptions() {
             <div>
               <h1 className="text-2xl font-bold">{title}</h1>
             </div>
-            <div>
+            <div className="break-words">
               <p>{body}</p>
             </div>
           </div>
