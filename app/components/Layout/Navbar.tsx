@@ -7,7 +7,7 @@ import { SITE_LOGO } from '@app/lib/utils/context';
 import { Sheet, SheetTrigger, SheetContent } from '@app/components/ui/sheet';
 import { Button } from '@app/components/ui/button';
 import { useActiveAccount } from 'thirdweb/react';
-import UserMenu from './UserMenu';
+import { UserMenu } from './UserMenu';
 
 export function Navbar() {
   const activeAccount = useActiveAccount();
