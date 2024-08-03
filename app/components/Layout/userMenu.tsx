@@ -12,7 +12,7 @@ import Link from 'next/link';
 import makeBlockie from 'ethereum-blockies-base64';
 import { useActiveAccount } from 'thirdweb/react';
 
-export default function UserMenu() {
+export function UserMenu() {
   const activeAccount = useActiveAccount();
   return (
     <div className="my-auto">
