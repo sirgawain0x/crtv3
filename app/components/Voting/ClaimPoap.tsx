@@ -1,6 +1,6 @@
 'use client';
-import React, { useEffect, useState } from 'react';
-import { Box, Button, Text } from '@chakra-ui/react';
+import { useEffect, useState } from 'react';
+import { Button } from '@app/components/ui/button';
 import Image from 'next/image';
 
 // Constants and Types
@@ -79,39 +79,33 @@ const ClaimPoap = ({ address, proposalId, snapshot }: Props) => {
   };
 
   return (
-    <Box
-      display="flex"
-      flexDirection="column"
-      alignItems="center"
-      justifyContent="center"
-    >
+    <div className="flex flex-col items-center justify-center">
       <Image
         src={STATES[currentState].headerImage}
         alt=""
         width={125}
         height={125}
       />
-      <Text marginBottom={2} fontWeight="semibold">
-        {STATES[currentState].header}
-      </Text>
-      <Box>
+      <p className="mb-2 font-semibold">{STATES[currentState].header}</p>
+      <div>
         <Image
           src={poapImg || STATES[currentState].mainImage}
           alt="POAP"
           width={125}
           height={125}
-          style={{ verticalAlign: 'middle' }}
+          className="align-middle"
         />
-        {currentState !== NO_POAP && (
-          <Button
-            isLoading={currentState === LOADING || loadButton}
-            onClick={action}
-          >
-            {STATES[currentState].buttonText}
-          </Button>
+      </div>
+      <div className="mt-5">
+        {currentState !== NO_POAP ? (
+          <Button disabled>No Claim</Button>
+        ) : LOADING || loadButton ? (
+          <Button disabled>Loading...</Button>
+        ) : (
+          <Button onClick={action}>{STATES[currentState].buttonText}</Button>
         )}
-      </Box>
-    </Box>
+      </div>
+    </div>
   );
 };
 

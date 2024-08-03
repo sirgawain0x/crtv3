@@ -31,7 +31,8 @@
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts",
-    "app/api/asset"
+    "app/api/asset",
+    "app/types/snapshot.d.ts"
   ],
   "exclude": ["node_modules"]
 }

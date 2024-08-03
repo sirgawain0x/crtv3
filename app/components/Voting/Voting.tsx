@@ -1,6 +1,6 @@
 'use client';
 import React from 'react';
-import { Box, Text, Progress } from '@chakra-ui/react';
+import { Progress } from '../ui/progress';
 
 interface VotingProps {
   choices: any[];
@@ -33,25 +33,17 @@ export const Voting = ({
         choices?.map((item: any, index: any) => {
           const number = getTotal(index);
           return (
-            <Box
+            <div
+              className='display="flex" flexDirection="column" marginTop={4} cursor="pointer"'
               key={item}
-              display="flex"
-              flexDirection="column"
-              marginTop={4}
-              cursor="pointer"
             >
-              <Text>{item}</Text>
-              <Progress
-                value={number}
-                marginTop={4}
-                colorScheme="pink"
-                size="md"
-              />
-            </Box>
+              <p>{item}</p>
+              <Progress value={number} className="mt-4" />
+            </div>
           );
         })
       ) : (
-        <Text>No choices available.</Text>
+        <p>No choices available.</p>
       )}
     </>
   );

@@ -50,148 +50,65 @@ export default function MoreOptions() {
   };
 
   return (
-    <>
-      <Box padding={4}>
-        <Breadcrumb
-          spacing="8px"
-          mb={4}
-          separator={<ChevronRightIcon color="gray.500" />}
-        >
-          <BreadcrumbItem>
-            <span role="img" aria-label="home">
-              🏠
-            </span>{' '}
-            <BreadcrumbLink href="/">Home</BreadcrumbLink>
-          </BreadcrumbItem>
-
-          <BreadcrumbItem>
-            <BreadcrumbLink href="/vote">Vote</BreadcrumbLink>
-          </BreadcrumbItem>
-
-          <BreadcrumbItem isCurrentPage>
-            <BreadcrumbLink>Details</BreadcrumbLink>
-          </BreadcrumbItem>
-        </Breadcrumb>
-      </Box>
-      <Grid
-        templateColumns={['repeat(1, 1fr)', 'repeat(1, 1fr)', 'repeat(2, 1fr)']}
-        gap={6}
-        p={4}
-      >
-        <GridItem colSpan={[1, 1, 1]}>
-          <Box padding={4}>
-            <Box>
-              <Heading>{title}</Heading>
-            </Box>
-            <Box>
-              <Text>{body}</Text>
-            </Box>
-          </Box>
-        </GridItem>
-        <GridItem colSpan={[1, 1, 1]}>
-          <Box>
-            <Box
-              padding={5}
-              marginBottom={5}
-              maxWidth={'100vw'}
-              cursor="pointer"
-            >
-              <Box
-                bgGradient="linear(to-l, #FFCC80, #D32F2F, #EC407A)"
-                padding={2}
-                display="flex"
-                borderTopLeftRadius={10}
-                borderTopRightRadius={10}
-                flexDirection="row"
-              >
-                <Heading size={'md'} color="white">
-                  Details
-                </Heading>
-              </Box>
-              <Box
-                border={'2px solid #ec407a'}
-                borderBottomRadius={10}
-                padding={10}
-              >
-                <Box padding={2}>
-                  <Text>{`Creator: ${creator ? truncateAddress(creator) : 'Unknown'}`}</Text>
-                  <Text
-                    onClick={() => goTo(snapshot)}
-                  >{`Snapshot:  ${snapshot}`}</Text>
-                </Box>
-                <Box background={'black'} padding={2} borderRadius={10}>
-                  <Box display="flex" flexDirection="row">
-                    <Text color="white">{`Start Date: ${start}`}</Text>
-                  </Box>
-                  <Box display="flex" flexDirection="row">
-                    <Text color="white">{`End Date: ${end}`}</Text>
-                  </Box>
-                </Box>
-              </Box>
-            </Box>
-            <Box
-              padding={5}
-              marginBottom={5}
-              cursor="pointer"
-              minW={['100vw', '100vw', '100vw', '20px']}
-              maxWidth={'100vw'}
-            >
-              <Box
-                bgGradient="linear(to-l, #FFCC80, #D32F2F, #EC407A)"
-                padding={2}
-                display="flex"
-                borderTopLeftRadius={10}
-                borderTopRightRadius={10}
-                flexDirection="row"
-              >
-                <Heading size={'md'} color="white">
-                  Current Results
-                </Heading>
-              </Box>
-              <Box
-                border={'2px solid #ec407a'}
-                borderBottomRadius={10}
-                padding={10}
-              >
-                <Voting choices={choices} score={score} scores={scores} />
-              </Box>
-            </Box>
-            {activeAccount && (
-              <Box
-                padding={5}
-                marginBottom={5}
-                cursor="pointer"
-                minW={['100vw', '100vw', '100vw', '20px']}
-                maxWidth={'100vw'}
-              >
-                <Box
-                  background="brand.400"
-                  padding={2}
-                  display="flex"
-                  borderTopLeftRadius={10}
-                  borderTopRightRadius={10}
-                  flexDirection="row"
-                >
-                  <Heading size={'md'} color="white">
-                    I Voted POAP
-                  </Heading>
-                </Box>
-                <Box
-                  border={'2px solid #ec407a'}
-                  borderBottomRadius={10}
-                  padding={10}
-                >
-                  <ClaimPoap
-                    address={activeAccount?.address as string}
-                    proposalId={identifier as string}
-                    snapshot={snapshot as string}
-                  />
-                </Box>
-              </Box>
-            )}
-          </Box>
-        </GridItem>
-      </Grid>
-    </>
+    <div className="flex flex-col items-center justify-center p-4">
+      <div className="grid w-full grid-cols-1 gap-6 md:grid-cols-2">
+        <div className="col-span-1">
+          <div className="p-4">
+            <div>
+              <h1 className="text-2xl font-bold">{title}</h1>
+            </div>
+            <div>
+              <p>{body}</p>
+            </div>
+          </div>
+        </div>
+        <div className="col-span-1">
+          <div className="mb-5 cursor-pointer">
+            <div className="flex rounded-t-lg bg-gradient-to-l from-yellow-300 via-red-600 to-pink-400 p-2">
+              <h2 className="text-md font-bold text-white">Details</h2>
+            </div>
+            <div className="rounded-b-lg border-2 border-pink-500 p-10">
+              <div className="p-2">
+                <p>{`Creator: ${creator ? truncateAddress(creator) : 'Unknown'}`}</p>
+                <p
+                  className="cursor-pointer"
+                  onClick={() => goTo(snapshot)}
+                >{`Snapshot: ${snapshot}`}</p>
+              </div>
+              <div className="rounded-lg bg-black p-2">
+                <div className="flex">
+                  <p className="text-white">{`Start Date: ${start}`}</p>
+                </div>
+                <div className="flex">
+                  <p className="text-white">{`End Date: ${end}`}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="mb-5 cursor-pointer">
+            <div className="flex rounded-t-lg bg-gradient-to-l from-yellow-300 via-red-600 to-pink-400 p-2">
+              <h2 className="text-md font-bold text-white">Current Results</h2>
+            </div>
+            <div className="break-words rounded-b-lg border-2 border-pink-500 p-10">
+              <Voting choices={choices} score={score} scores={scores} />
+            </div>
+          </div>
+          {activeAccount && (
+            <div className="mb-5 cursor-pointer">
+              <div className="bg-brand-400 flex rounded-t-lg p-2">
+                <h2 className="text-md font-bold text-white">I Voted POAP</h2>
+              </div>
+              <div className="rounded-b-lg border-2 border-pink-500 p-10">
+                <ClaimPoap
+                  address={activeAccount?.address as string}
+                  proposalId={identifier as string}
+                  snapshot={snapshot as string}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }

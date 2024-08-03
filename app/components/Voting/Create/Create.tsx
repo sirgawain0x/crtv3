@@ -1,25 +1,15 @@
 'use client';
 import React, { useState, useRef } from 'react';
-import {
-  Box,
-  Heading,
-  Input,
-  Textarea,
-  Button,
-  Stack,
-  InputGroup,
-  InputRightElement,
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-} from '@chakra-ui/react';
-import { ChevronRightIcon } from '@chakra-ui/icons';
+import { Input } from '@app/components/ui/input';
+import { Textarea } from '@app/components/ui/textarea';
+import { Button } from '@app/components/ui/button';
+import { Loader2 } from 'lucide-react';
 import snapshot from '@snapshot-labs/snapshot.js';
 import { useActiveAccount } from 'thirdweb/react';
 import { FaWindowClose } from 'react-icons/fa';
 import { useRouter } from 'next/navigation';
 import { polygon } from 'thirdweb/chains';
-import { SNAPSHOT_SUBGRAPH_URL } from '@snapshot-labs/snapshot.js/dist/utils';
+//import { SNAPSHOT_SUBGRAPH_URL } from '@snapshot-labs/snapshot.js/dist/utils';
 
 const hub = 'https://hub.snapshot.org';
 const client = new snapshot.Client(hub);
@@ -88,20 +78,24 @@ export default function Create() {
         const provider = await snapshot.utils.getProvider(chain.id.toString());
         const block = await snapshot.utils.getBlockNumber(provider);
         const space = 'thecreative.eth';
-        const receipt = (await client.proposal(provider, activeAccount?.address, {
-          space: space,
-          type: 'weighted',
-          title: title,
-          body: content,
-          choices: choices,
-          start: startDate,
-          end: endDate,
-          snapshot: block,
-          discussion: 'max',
-          plugins: JSON.stringify({
-            poap:{}
-          }),
-        })) as any;
+        const receipt = (await client.proposal(
+          provider,
+          activeAccount?.address,
+          {
+            space: space,
+            type: 'weighted',
+            title: title,
+            body: content,
+            choices: choices,
+            start: startDate,
+            end: endDate,
+            snapshot: block,
+            discussion: 'max',
+            plugins: JSON.stringify({
+              poap: {},
+            }),
+          },
+        )) as any;
         console.log(`created proposal ${receipt.id}`);
         router.push('/vote');
       } catch (error) {
@@ -130,213 +124,128 @@ export default function Create() {
   };
 
   return (
-    <Box
-      display="flex"
-      flexDirection="row"
-      flexWrap="wrap"
-      alignItems="flex-start"
-      justifyContent="center"
-      padding={2}
-    >
-      <Box padding={5} width={['100%', '100%', '100%', '40%']}>
-        <Breadcrumb
-          spacing="8px"
-          mb={4}
-          separator={<ChevronRightIcon color="gray.500" />}
-        >
-          <BreadcrumbItem>
-            <BreadcrumbLink href="/">
-              <span role="img" aria-label="home">
-                🏠
-              </span>{' '}
-              Home
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-
-          <BreadcrumbItem>
-            <BreadcrumbLink href="/vote">Vote</BreadcrumbLink>
-          </BreadcrumbItem>
-
-          <BreadcrumbItem isCurrentPage>
-            <BreadcrumbLink>Create</BreadcrumbLink>
-          </BreadcrumbItem>
-        </Breadcrumb>
-        <Box marginBottom={4} cursor="pointer">
-          <Box
-            padding={4}
-            borderTopRadius={20}
-            bgGradient="linear(to-l, #FFCC80, #D32F2F, #EC407A)"
-          >
-            <Heading size="md" color="white">
-              Title
-            </Heading>
-          </Box>
-          <Box
-            background={'brand.100'}
-            padding={4}
-            borderBottomRadius={20}
-            border={'1px solid #EC407A'}
-          >
+    <div className="flex flex-wrap items-start justify-center p-2">
+      <div className="w-full p-5 md:w-2/5">
+        <div className="mb-4 cursor-pointer">
+          <div className="rounded-t-3xl bg-gradient-to-l from-yellow-300 via-red-600 to-pink-400 p-4">
+            <h2 className="text-md font-bold text-white">Title</h2>
+          </div>
+          <div className="bg-brand-100 rounded-b-3xl border border-pink-400 p-4">
             <Input
-              fontWeight={'bold'}
+              className="w-full font-bold"
               placeholder="[#BrandName] Campaign Voting"
-              background={'default'}
               onChange={(event) => {
                 changeInput(event, 'title');
               }}
             />
-          </Box>
-        </Box>
-        <Box marginBottom={4} cursor="pointer">
-          <Box
-            padding={4}
-            borderTopRadius={20}
-            bgGradient="linear(to-l, #FFCC80, #D32F2F, #EC407A)"
-          >
-            <Heading color="white" size="md">
-              Content
-            </Heading>
-          </Box>
-          <Box
-            background={'brand.100'}
-            padding={4}
-            borderBottomRadius={20}
-            border={'1px solid #EC407A'}
-          >
+          </div>
+        </div>
+        <div className="mb-4 cursor-pointer">
+          <div className="rounded-t-3xl bg-gradient-to-l from-yellow-300 via-red-600 to-pink-400 p-4">
+            <h2 className="text-md font-bold text-white">Content</h2>
+          </div>
+          <div className="bg-brand-100 rounded-b-3xl border border-pink-400 p-4">
             <Textarea
-              background={'default'}
+              className="w-full"
               placeholder="Here is a sample placeholder"
               onChange={(event) => {
                 changeInput(event, 'content');
               }}
             />
-          </Box>
-        </Box>
-        <Box marginBottom={4} cursor="pointer">
-          <Box
-            padding={4}
-            borderTopRadius={20}
-            bgGradient="linear(to-l, #FFCC80, #D32F2F, #EC407A)"
-          >
-            <Heading color={'white'} size="md">
-              Choices
-            </Heading>
-          </Box>
-          <Box
-            background={'brand.100'}
-            padding={4}
-            borderBottomRadius={20}
-            border={'1px solid #EC407A'}
-          >
-            <Stack spacing={4}>
+          </div>
+        </div>
+        <div className="mb-4 cursor-pointer">
+          <div className='className="p-4 to-pink-400" rounded-t-3xl bg-gradient-to-l from-yellow-300 via-red-600'>
+            <h2 className="text-md font-bold text-white">Choices</h2>
+          </div>
+          <div className="bg-brand-100 rounded-b-3xl border border-pink-400 p-4">
+            <div className="space-y-4">
               <form>
                 {choices.map((field, index) => {
                   return (
-                    <InputGroup key={index}>
+                    <div className="relative mb-5" key={index}>
                       <Input
-                        marginBottom={5}
-                        className="choices"
-                        background={'default'}
+                        className="choices w-full"
                         placeholder="Enter Choice"
                         value={field || ''}
                         onChange={(e) => handleChange(index, e)}
                       />
-                      <InputRightElement>
-                        <Box onClick={() => handleRemove(index)}>
-                          <FaWindowClose />
-                        </Box>
-                      </InputRightElement>
-                    </InputGroup>
+                      <div
+                        className="absolute right-0 top-0 cursor-pointer p-2"
+                        onClick={() => handleRemove(index)}
+                      >
+                        <FaWindowClose />
+                      </div>
+                    </div>
                   );
                 })}
               </form>
-            </Stack>
+            </div>
 
             <Button
-              marginTop={4}
-              color={'white'}
-              _hover={{ background: '#A62953' }}
-              _focus={{ background: '#A62953' }}
-              background={'#EC407A'}
+              className="mt-4 w-full rounded bg-pink-400 p-2 text-white hover:bg-pink-600 focus:bg-pink-600"
               onClick={() => handleAdd()}
             >
-              <Heading color="white" size="sm">
-                Add
-              </Heading>
+              <h2 className="text-sm font-bold text-white">Add</h2>
             </Button>
-          </Box>
-        </Box>
-      </Box>
-      <Box mt={10} padding={5} width={['100%', '100%', '100%', '40%']}>
-        <Box
-          padding={4}
-          borderTopRadius={20}
-          bgGradient="linear(to-l, #FFCC80, #D32F2F, #EC407A)"
-          cursor="pointer"
-        >
-          <Heading color="white" size="md">
-            Actions
-          </Heading>
-        </Box>
-        <Box
-          background={'brand.100'}
-          padding={4}
-          borderBottomRadius={20}
-          border={'1px solid #EC407A'}
-        >
-          <Heading color="white" size="sm">
-            Start Date
-          </Heading>
+          </div>
+        </div>
+      </div>
+      <div className="mt-10 w-full p-5 md:w-2/5">
+        <div className="cursor-pointer rounded-t-3xl bg-gradient-to-l from-yellow-300 via-red-600 to-pink-400 p-4">
+          <h2 className="text-md font-bold text-white">Actions</h2>
+        </div>
+        <div className="bg-brand-100 rounded-b-3xl border border-pink-400 p-4">
+          <h3 className="text-sm font-bold text-white">Start Date</h3>
           <Input
             type="date"
-            background={'default'}
+            className="mt-2 w-full"
             onChange={(event) => {
               changeInput(event, 'start date');
             }}
           />
-          <Heading marginTop={4} color="white" size="sm">
-            Start time
-          </Heading>
+          <h3 className="text-sm font-bold text-white">Start time</h3>
           <Input
             type="time"
-            background={'default'}
+            className="mt-2 w-full"
             onChange={(event) => {
               changeInput(event, 'start time');
             }}
           />
-          <Heading marginTop={4} color="white" size="sm">
-            End date
-          </Heading>
+          <h3 className="mt-4 text-sm font-bold text-white">End date</h3>
           <Input
             type="date"
-            background={'default'}
+            className="mt-2 w-full"
             onChange={(event) => {
               changeInput(event, 'end date');
             }}
           />
-          <Heading marginTop={4} color="white" size="sm">
-            End time
-          </Heading>
+          <h3 className="mt-4 text-sm font-bold text-white">End time</h3>
           <Input
             type="time"
-            background={'default'}
+            className="mt-2 w-full"
             onChange={(event) => {
               changeInput(event, 'end time');
             }}
           />
-          <Button
-            isLoading={isSubmitting}
-            marginTop={4}
-            color={'white'}
-            _hover={{ background: '#A62953' }}
-            _focus={{ background: '#A62953' }}
-            background={'#EC407A'}
-            onClick={() => submit()}
-          >
-            Submit
-          </Button>
-        </Box>
-      </Box>
-    </Box>
+          {isSubmitting ? (
+            <Button
+              disabled
+              className="mt-4 w-full rounded bg-pink-400 p-2 text-white hover:bg-pink-600 focus:bg-pink-600"
+            >
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Submitting...
+            </Button>
+          ) : (
+            <Button
+              className="mt-4 w-full rounded bg-pink-400 p-2 text-white hover:bg-pink-600 focus:bg-pink-600"
+              onClick={() => submit()}
+            >
+              Submit
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }
