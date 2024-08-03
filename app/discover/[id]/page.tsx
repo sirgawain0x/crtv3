@@ -1,8 +1,7 @@
-
 import { Container, Box } from '@chakra-ui/react';
 import { AssetData } from '@app/lib/types';
 import { livepeer } from '@app/lib/sdk/livepeer/client';
-import VideoDetails from '@app/ui/components/Videos/VideoDetails';
+import VideoDetails from '@app/components/Videos/VideoDetails';
 
 export type VideoDetailsProps = {
   assetData: AssetData;
@@ -12,12 +11,12 @@ const VideoDetailsPage = async ({ assetData }: VideoDetailsProps) => {
   console.log('asset; ', asset);
 
   return (
-    <Container maxW="7xl" centerContent>
-      <Box py={10}>
-        <VideoDetails asset={asset} assetData={assetData} />
-      </Box> 
-    </Container>
+    <div className="container max-w-7xl content-center">
+      <div className={'py-10'}>
+        <VideoDetails assetData={assetData} />
+      </div>
+    </div>
   );
-}
+};
 
 export default VideoDetailsPage;

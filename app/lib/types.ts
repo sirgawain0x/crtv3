@@ -102,81 +102,79 @@ export type Asset = {
 };
 
 export type PlaybackInfo = {
-  type: PlaybackType,
+  type: PlaybackType;
   meta: {
-    live?: number,
+    live?: number;
     playbackPolicy?: {
-      type: string,
-      webhookId: string,
+      type: string;
+      webhookId: string;
       webhookContext: {
-        streamerId: string
-      },
-      refreshInterval: number,
-      allowedOrigins: [
-        string
-      ]
-    },
+        streamerId: string;
+      };
+      refreshInterval: number;
+      allowedOrigins: [string];
+    };
     source: [
       {
-        hrn: "MP4",
-        type: "html5/video/mp4",
-        url: "https://asset-cdn.lp-playback.monster/hls/1bde4o2i6xycudoy/static360p0.mp4",
-        size: 494778,
-        width: 204,
-        height: 360,
-        bitrate: 449890
-      }
-    ],
+        hrn: 'MP4';
+        type: 'html5/video/mp4';
+        url: 'https://asset-cdn.lp-playback.monster/hls/1bde4o2i6xycudoy/static360p0.mp4';
+        size: 494778;
+        width: 204;
+        height: 360;
+        bitrate: 449890;
+      },
+    ];
     dvrPlayback?: [
       {
-        hrn: MetaSourceHrn,
-        type: string,
-        url: string,
-        error: string,
-      }
-    ],
-    attestation?: {
-      id: string,
-      primaryType: string,
-      domain: {
-        name: string,
-        version: string
+        hrn: MetaSourceHrn;
+        type: string;
+        url: string;
+        error: string;
       },
+    ];
+    attestation?: {
+      id: string;
+      primaryType: string;
+      domain: {
+        name: string;
+        version: string;
+      };
       message: {
-        video: string,
+        video: string;
         attestations: [
           {
-            role: string,
-            address: string
-          }
-        ],
-        signer: string,
-        timestamp: number
-      },
-      signature: string,
-      createdAt: number,
-      signatureType: MetaAttSigType,
+            role: string;
+            address: string;
+          },
+        ];
+        signer: string;
+        timestamp: number;
+      };
+      signature: string;
+      createdAt: number;
+      signatureType: MetaAttSigType;
       storage: {
         ipfs: {
-          updatedAt: number,
-          cid: string,
-          url: string,
-          gatewayUrl: string
-        },
+          updatedAt: number;
+          cid: string;
+          url: string;
+          gatewayUrl: string;
+        };
         status: {
-          phase: MetaAttStorageStatusPhase,
-          progress: number,
-          errorMessage: string,
+          phase: MetaAttStorageStatusPhase;
+          progress: number;
+          errorMessage: string;
           tasks: {
-            pending: string,
-            last: string,
-            failed: string
-          }
-        }
-      }
-    }
-  }
-}
+            pending: string;
+            last: string;
+            failed: string;
+          };
+        };
+      };
+    };
+  };
+};
 
 export enum AssetType {
   Video = 'Video',
@@ -256,10 +254,10 @@ export enum MetaAttSigType {
 
 export enum MetaAttStorageStatusPhase {
   Waiting = 'waiting',
-  Ready ='ready',
+  Ready = 'ready',
   Processing = 'processing',
   Failed = 'failed',
-  Reverted ='reverted',
+  Reverted = 'reverted',
 }
 
 export type UploadAssetData = {
@@ -321,14 +319,27 @@ export enum Encoder {
 }
 
 const MAX_FILESIZE = 1073741824;
-const ACCEPTED_VIDEO_TYPES = ['video/mp4', 'video/webm', 'video/ogg', 'video/mov', 'video/flv', 'video/avi'];
+const ACCEPTED_VIDEO_TYPES = [
+  'video/mp4',
+  'video/webm',
+  'video/ogg',
+  'video/mov',
+  'video/flv',
+  'video/avi',
+];
 
 export const createAssetSchema = z.object({
   asset: z
     .custom<File>()
-    .refine((file) => file?.length === 1, 'Video file must be provided.')
-    .refine((file) => file.size <= MAX_FILESIZE, 'Video file must be less than 1GB.')
-    .refine((files) => ACCEPTED_VIDEO_TYPES.includes(files?.type), '.mp4, .webm, .ogg, .flv, .avi and .mov files are accepted.'),
+    .refine((file) => file, 'Video file must be provided.')
+    .refine(
+      (file) => file.size <= MAX_FILESIZE,
+      'Video file must be less than 1GB.',
+    )
+    .refine(
+      (files) => ACCEPTED_VIDEO_TYPES.includes(files?.type),
+      '.mp4, .webm, .ogg, .flv, .avi and .mov files are accepted.',
+    ),
   name: z.string().max(100),
   description: z.string().max(1000),
   creatorId: z.string().max(100),
