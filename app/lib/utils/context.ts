@@ -4354,7 +4354,6 @@ export const LIVEPEER_HERO_PLAYBACK_ID = 'cbd1dw72qst9xmps';
 export const FEATURED_VIDEO_TITLE = 'The Creative Podcast Episode 03';
 export const LIVEPEER_FEATURED_PLAYBACK_ID = '5c2bzf537qbq0r7o';
 
-
 // HERO SECTION
 export const HERO_NAME = {
   top: 'Record Once,',

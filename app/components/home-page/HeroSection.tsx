@@ -2,18 +2,21 @@
 import React from 'react';
 import { useRouter } from 'next/navigation';
 import {
-  HERO_VIDEO_TITLE,
   HERO_NAME,
   HERO_DESCRIPTION,
   HERO_BUTTONS,
 } from '../../lib/utils/context';
+import { livepeer } from '@app/lib/sdk/livepeer/client';
+import { LIVEPEER_HERO_PLAYBACK_ID } from '@app/lib/utils/context';
 import { getSrc } from '@livepeer/react/external';
-import * as Player from '@livepeer/react/player';
-import { PauseIcon, PlayIcon } from '@livepeer/react/assets';
+import { PlayIcon } from '@livepeer/react/assets';
+import PlayerComponent from '../Player/Player';
 
-export default function HeroSection() {
+const HeroSection = () => {
   const router = useRouter();
-  const LIVEPEER_HERO_PLAYBACK_ID = '9a24u9nsvvkp1gzi';
+  const playbackId = livepeer.playback.get(LIVEPEER_HERO_PLAYBACK_ID);
+  console.log('Hero Page', playbackId);
+
   return (
     <div className="md:py-18 mx-auto max-w-7xl py-10">
       <div className="flex flex-col items-center justify-between md:flex-row">
@@ -39,30 +42,14 @@ export default function HeroSection() {
         </div>
         <div className="relative mt-8 flex-1 md:ml-8 md:mt-0">
           <div className="relative z-0 h-auto overflow-hidden rounded-2xl shadow-2xl">
-            <Player.Root src={getSrc(LIVEPEER_HERO_PLAYBACK_ID)}>
-              <Player.Container className="h-full w-full overflow-hidden bg-gray-950">
-                <Player.Video
-                  title={HERO_VIDEO_TITLE}
-                  className="h-full w-full"
-                />
-                <Player.Controls className="flex items-center justify-center">
-                  <Player.PlayPauseTrigger className="h-10 w-10 flex-shrink-0 hover:scale-105">
-                    <Player.PlayingIndicator asChild matcher={false}>
-                      <PlayIcon className="h-full w-full" />
-                    </Player.PlayingIndicator>
-                    <Player.PlayingIndicator asChild>
-                      <PauseIcon className="h-full w-full" />
-                    </Player.PlayingIndicator>
-                  </Player.PlayPauseTrigger>
-                </Player.Controls>
-              </Player.Container>
-            </Player.Root>
+            <PlayerComponent src={getSrc(LIVEPEER_HERO_PLAYBACK_ID)} />
           </div>
         </div>
       </div>
     </div>
   );
-}
+};
+export default HeroSection;
 
 export const Blob = (props: React.SVGProps<SVGSVGElement>) => {
   return (
