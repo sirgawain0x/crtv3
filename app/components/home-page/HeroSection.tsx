@@ -1,21 +1,43 @@
 'use client';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   HERO_NAME,
   HERO_DESCRIPTION,
   HERO_BUTTONS,
 } from '../../lib/utils/context';
-import { livepeer } from '@app/lib/sdk/livepeer/client';
-import { LIVEPEER_HERO_PLAYBACK_ID } from '@app/lib/utils/context';
-import { getSrc } from '@livepeer/react/external';
+import { Src } from '@livepeer/react';
 import { PlayIcon } from '@livepeer/react/assets';
-import PlayerComponent from '../Player/Player';
+import { DemoPlayer } from '../Player/DemoPlayer';
+import { getHeroPlaybackSource } from '@app/lib/utils/hooks/useHeroPlaybackSource';
+import { Skeleton } from '../ui/skeleton';
+import { HERO_VIDEO_TITLE } from '../../lib/utils/context';
 
-const HeroSection = () => {
+const HeroSection: React.FC = () => {
   const router = useRouter();
-  const playbackId = livepeer.playback.get(LIVEPEER_HERO_PLAYBACK_ID);
-  console.log('Hero Page', playbackId);
+  const [src, setSrc] = useState<Src[] | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchSource = async () => {
+      try {
+        const playbackSource = await getHeroPlaybackSource();
+        setSrc(playbackSource);
+      } catch (err) {
+        console.error('Error fetching playback source:', err);
+        setError('Failed to load video.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSource();
+  }, []);
+
+  if (error) {
+    return <div>{error}</div>;
+  }
 
   return (
     <div className="md:py-18 mx-auto max-w-7xl py-10">
@@ -42,13 +64,20 @@ const HeroSection = () => {
         </div>
         <div className="relative mt-8 flex-1 md:ml-8 md:mt-0">
           <div className="relative z-0 h-auto overflow-hidden rounded-2xl shadow-2xl">
-            <PlayerComponent src={getSrc(LIVEPEER_HERO_PLAYBACK_ID)} />
+            {loading ? (
+              <div className="flex flex-col space-y-3">
+                <Skeleton className="h-[340px] w-[450px] rounded-xl"></Skeleton>
+              </div>
+            ) : (
+              <DemoPlayer src={src} title={HERO_VIDEO_TITLE} />
+            )}
           </div>
         </div>
       </div>
     </div>
   );
 };
+
 export default HeroSection;
 
 export const Blob = (props: React.SVGProps<SVGSVGElement>) => {
