@@ -16,11 +16,12 @@ import PlayerCardComponent from '../Player/Player';
 import { SITE_LOGO } from '../../lib/utils/context';
 import { AssetData } from '@app/lib/types';
 import Link from 'next/link';
+import { getSrc } from '@livepeer/react/external';
 
-type VideoCardProps = {
+interface VideoCardProps {
   className?: string;
   assetData: AssetData;
-};
+}
 
 const VideoCard: React.FC<VideoCardProps> = ({ className, ...props }) => {
   console.log('Video Card Asset Data:', props?.assetData);
@@ -39,11 +40,14 @@ const VideoCard: React.FC<VideoCardProps> = ({ className, ...props }) => {
           <CardHeader>
             <CardTitle>Creator</CardTitle>
             <CardDescription>
-              {props?.assetData?.video?.creatorId.value}
+              {props?.assetData?.video?.creatorId?.value}
             </CardDescription>
           </CardHeader>
         </div>
-        <PlayerCardComponent asset={props?.assetData} />
+        <PlayerCardComponent
+          src={getSrc(props?.assetData.playbackInfo)}
+          asset={props?.assetData}
+        />
         <CardContent>
           <div className="flex">
             <Badge

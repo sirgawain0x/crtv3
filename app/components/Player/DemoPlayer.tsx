@@ -11,7 +11,7 @@ export const DemoPlayer: React.FC<{ src: Src[] | null; title: string }> = ({
     return <div>No video source available.</div>;
   }
   return (
-    <Player.Root src={src} autoPlay volume={0}>
+    <Player.Root src={src}>
       <Player.Container>
         <Player.Video title={title} poster={null} />
         <Player.Controls className="flex items-center justify-center">

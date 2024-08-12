@@ -1,4 +1,4 @@
-import { livepeer } from '@app/lib/sdk/livepeer/client';
+import { fullLivepeer } from '@app/lib/sdk/livepeer/fullClient';
 import { getSrc } from '@livepeer/react/external';
 import { Src } from '@livepeer/react';
 import { LIVEPEER_HERO_PLAYBACK_ID } from '../context';
@@ -7,7 +7,7 @@ const playbackId = LIVEPEER_HERO_PLAYBACK_ID;
 
 export const getHeroPlaybackSource = async (): Promise<Src[] | null> => {
   try {
-    const playbackInfo = await livepeer.playback.get(playbackId);
+    const playbackInfo = await fullLivepeer.playback.get(playbackId);
     const src = getSrc(playbackInfo?.playbackInfo) as Src[];
     return src;
   } catch (error) {

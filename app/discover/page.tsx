@@ -1,6 +1,6 @@
 import VideoCardGrid from '@app/components/Videos/VideoCardGrid';
 import { AssetData } from '@app/lib/types';
-import { livepeer } from '@app/lib/sdk/livepeer/client';
+import { fullLivepeer } from '@app/lib/sdk/livepeer/fullClient';
 import { Suspense } from 'react';
 import { Skeleton } from '@app/components/ui/skeleton';
 import { Slash } from 'lucide-react';
@@ -18,7 +18,13 @@ async function AllVideosContent() {
   let error: string | null = null;
 
   try {
-    const assets = await livepeer.asset.getAll();
+    const response = await fullLivepeer.asset.getAll();
+
+    // Convert response to a plain JSON serializable object
+    assets = JSON.parse(JSON.stringify(response)) as AssetData[];
+
+    console.log('Assets:', assets);
+    console.log('Is assets an array?', Array.isArray(assets));
   } catch (err: any) {
     console.error('Failed to fetch assets:', err);
     error = 'Failed to fetch assets.';
