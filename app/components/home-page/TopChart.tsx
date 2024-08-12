@@ -8,7 +8,7 @@ import { StackClient } from '@stackso/js-core';
 
 // Initialize the client
 const stack = new StackClient({
-  apiKey: `${process.env.NEXT_PUBLIC_STACK_API_KEY}`, // Use NEXT_PUBLIC_ prefix for client-side env vars
+  apiKey: `${process.env.STACK_API_KEY}`,
   pointSystemId: 2777,
 });
 
