@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Text, Heading, Box, Button, Container, Image } from '@chakra-ui/react';
-import { Player } from '@livepeer/react';
+import PlayerComponent from '@app/components/Player/Player';
 import { AssetData } from '@app/lib/utils/fetchers/assets';
-import { livepeer } from '@app/lib/sdk/livepeer/client';
-import { CREATIVE_LOGO_WHT } from '@app/lib/utils/context';
+import { fullLivepeer } from '@app/lib/sdk/livepeer/fullClient';
 
 export default function VideoDetailsPage({
   params,
@@ -38,7 +37,7 @@ export default function VideoDetailsPage({
   const fetchAssetDetails = async (assetId: AssetData) => {
     setAssetLoading(true);
     try {
-      const assetData = await livepeer?.asset.get(`${assetId.id}`);
+      const assetData = await fullLivepeer?.asset.get(`${assetId.id}`);
       console.log('Asset By Id', assetData.asset?.id);
       setAsset(assetData);
     } catch (err) {
@@ -50,19 +49,17 @@ export default function VideoDetailsPage({
 
   return (
     <main>
-      <Heading p={4}>Video Detail Page</Heading>
-      <Box p={4}>Slug: {params.slug}</Box>
+      <h1 className="p-4">Video Detail Page</h1>
+      <div className="p-4">Slug: {params.slug}</div>
       {isLoading || assetLoading ? (
-        <Box>Loading...</Box>
+        <div>Loading...</div>
       ) : error ? (
-        <Box color="red.500">{error}</Box>
+        <div style={{ color: 'red.500' }}>{error}</div>
       ) : (
-        <Container maxW="container.md">
-          <Heading size="md" my="4">
-            {videoDetails}
-          </Heading>
-          {asset && <Player playbackId={asset.playbackId} showTitle />}
-        </Container>
+        <div className="container max-w-md">
+          <h1 className="md my-4">{videoDetails}</h1>
+          {asset && <PlayerComponent src={asset.playbackId} />}
+        </div>
       )}
     </main>
   );

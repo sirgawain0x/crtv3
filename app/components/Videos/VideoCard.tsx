@@ -1,5 +1,4 @@
 'use client';
-import React from 'react';
 import { Button } from '../ui/button';
 import {
   Card,
@@ -14,13 +13,14 @@ import { Badge } from '../ui/badge';
 import { cn } from '../../lib/utils';
 import PlayerCardComponent from '../Player/Player';
 import { SITE_LOGO } from '../../lib/utils/context';
-import { AssetData } from '@app/lib/types';
+import { Asset } from 'livepeer/models/components';
 import Link from 'next/link';
+import { getSrc } from '@livepeer/react/external';
 
-type VideoCardProps = {
+interface VideoCardProps {
   className?: string;
-  assetData: AssetData;
-};
+  assetData: Asset; // Change to Asset instead of AssetData
+}
 
 const VideoCard: React.FC<VideoCardProps> = ({ className, ...props }) => {
   console.log('Video Card Asset Data:', props?.assetData);
@@ -39,42 +39,41 @@ const VideoCard: React.FC<VideoCardProps> = ({ className, ...props }) => {
           <CardHeader>
             <CardTitle>Creator</CardTitle>
             <CardDescription>
-              {props?.assetData?.video?.creatorId.value}
+              {props?.assetData.creatorId?.value}
             </CardDescription>
           </CardHeader>
         </div>
-        <PlayerCardComponent asset={props?.assetData} />
+        <PlayerCardComponent src={getSrc(props?.assetData.playbackId)} />
         <CardContent>
           <div className="flex">
             <Badge
               className={
-                props?.assetData?.video?.status?.phase === 'ready'
+                props?.assetData.status?.phase === 'ready'
                   ? 'bg-green'
                   : 'bg-red'
               }
             >
-              {props?.assetData?.video?.status?.phase}
+              {props?.assetData?.status?.phase}
             </Badge>
             <div className="space-y-4" />
-            <p>Views: {props?.assetData?.views?.viewCount}</p>
+            <p>Views: </p>
           </div>
           <div className="mt-6 grid grid-flow-row auto-rows-max space-y-3">
             <header className="text-lg">{props?.assetData?.name}</header>
             <div className="space-y-4" />
             <p className="text-xl" color={'brand.300'}>
-              <span style={{ fontSize: 'sm' }}>
-                {props?.assetData?.currency || 'USDC'}
-              </span>
+              <span style={{ fontSize: 'sm' }}>{'USDC'}</span>
             </p>
             <p>
-              {props?.assetData?.description ||
-                'With Creative TV, we wanted to sync the speed of creation with the speed of design. We wanted the creator to be just as excited as the designer to create new content.'}
+              With Creative TV, we wanted to sync the speed of creation with the
+              speed of design. We wanted the creator to be just as excited as
+              the designer to create new content.
             </p>
           </div>
         </CardContent>
         <hr />
         <CardFooter className="flex-wrap justify-between">
-          {props?.assetData?.video.status?.phase === 'ready' ? (
+          {props?.assetData?.status?.phase === 'ready' ? (
             <div className="mb-5 space-x-10">
               <Link
                 href={`discover/${encodeURIComponent(props?.assetData?.id)}`}
@@ -85,19 +84,19 @@ const VideoCard: React.FC<VideoCardProps> = ({ className, ...props }) => {
                   aria-label={`Comment on ${props?.assetData?.name}`}
                   variant="ghost"
                 >
-                  Details
+                  Comment
                 </Button>
               </Link>
               <Button
                 className="flex-1 cursor-pointer hover:scale-105"
-                aria-label={`Comment on ${props?.assetData?.name}`}
+                aria-label={`Share ${props?.assetData?.name}`}
                 variant="ghost"
               >
                 Share
               </Button>
             </div>
           ) : (
-            <>{''}</>
+            <></>
           )}
         </CardFooter>
       </Card>

@@ -22,7 +22,7 @@ export type Asset = {
     webhookId?: string;
     webhookContext?: Record<string, unknown>;
     refreshInterval?: number;
-  };
+  } | null;
   source: {
     type: SourceType;
     url?: string;
@@ -34,10 +34,22 @@ export type Asset = {
     requesterId?: string;
     assetId?: string;
   };
-  creatorId: {
+  creatorId?: {
     type: CreatorIdType;
     value: string;
   };
+  profiles?: Array<{
+    width?: number;
+    name?: string;
+    height?: number;
+    bitrate: number;
+    quality?: number;
+    fps?: number;
+    fpsDen?: number;
+    gop?: string;
+    profile?: Profile;
+    encoder?: Encoder;
+  }>;
   storage?: {
     ipfs?: {
       spec?: {
@@ -59,17 +71,17 @@ export type Asset = {
       progress?: number;
       errorMessage?: string;
       tasks: {
-        pending: string;
-        last: string;
-        failed: string;
+        pending?: string;
+        last?: string;
+        failed?: string;
       };
     };
   };
   status?: {
     phase: AssetStatusPhase;
     updatedAt: number;
-    progress: number;
-    errorMessage: string;
+    progress?: number;
+    errorMessage?: string;
   };
   name: string;
   projectId?: string;
@@ -79,8 +91,8 @@ export type Asset = {
   hash?: Array<{
     hash?: string;
     algorithm?: string;
-  }>;
-  videoSpec: {
+  }> | null;
+  videoSpec?: {
     format?: string;
     duration?: number;
     bitrate?: number;
@@ -177,8 +189,8 @@ export type PlaybackInfo = {
 };
 
 export enum AssetType {
-  Video = 'Video',
-  Audio = 'Audio',
+  Video = 'video',
+  Audio = 'audio',
 }
 
 export enum SourceType {
