@@ -12,7 +12,7 @@ import Vote from '@app/components/Voting/Index';
 
 export default function VotePage() {
   return (
-    <div className={'container'}>
+    <div className={'min-h-screen bg-gray-100 p-6'}>
       <div className="my-5 p-4">
         <Breadcrumb>
           <BreadcrumbList>

@@ -7,7 +7,8 @@ import { SITE_LOGO } from '@app/lib/utils/context';
 import { Sheet, SheetTrigger, SheetContent } from '@app/components/ui/sheet';
 import { Button } from '@app/components/ui/button';
 import { useActiveAccount } from 'thirdweb/react';
-import { UserMenu } from './UserMenu';
+import { UserMenu } from './userMenu';
+import ThemeToggleComponent from '../ThemeToggle/toggleComponent';
 
 export function Navbar() {
   const activeAccount = useActiveAccount();
@@ -23,7 +24,13 @@ export function Navbar() {
         <SheetContent side="left">
           <div>
             <Link href="/" className="mr-6 lg:flex" prefetch={false}>
-              <Image src={SITE_LOGO} alt="Creative Logo" width={80} />
+              <Image
+                src={SITE_LOGO}
+                alt="Creative Logo"
+                width={80}
+                height={80}
+                priority
+              />
               <h1>
                 <span className="sr-only" style={{ color: 'GrayText' }}>
                   CREATIVE TV
@@ -49,6 +56,9 @@ export function Navbar() {
           </div>
           <hr />
           <div className="grid gap-2 py-6">
+            <div>
+              <ThemeToggleComponent />
+            </div>
             <ConnectButtonWrapper />
             {activeAccount && (
               <div className="mt-5">
@@ -81,6 +91,9 @@ export function Navbar() {
         </Link>
       </nav>
       <div className=" ml-auto hidden lg:flex">
+        <div className="my-auto mr-4">
+          <ThemeToggleComponent />
+        </div>
         <div className="mr-5">
           <ConnectButtonWrapper />
         </div>

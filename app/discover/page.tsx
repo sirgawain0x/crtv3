@@ -1,9 +1,4 @@
 import VideoCardGrid from '@app/components/Videos/VideoCardGrid';
-import { AssetData } from '@app/lib/types';
-import { fullLivepeer } from '@app/lib/sdk/livepeer/fullClient';
-import { Suspense } from 'react';
-import { Skeleton } from '@app/components/ui/skeleton';
-import { Slash } from 'lucide-react';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -12,35 +7,12 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from '@app/components/ui/breadcrumb';
+import { Slash } from 'lucide-react';
 
-async function AllVideosContent() {
-  let assets: AssetData[] = [];
-  let error: string | null = null;
-
-  try {
-    const response = await fullLivepeer.asset.getAll();
-
-    // Convert response to a plain JSON serializable object
-    assets = JSON.parse(JSON.stringify(response)) as AssetData[];
-
-    console.log('Assets:', assets);
-    console.log('Is assets an array?', Array.isArray(assets));
-  } catch (err: any) {
-    console.error('Failed to fetch assets:', err);
-    error = 'Failed to fetch assets.';
-  }
-
-  if (error) {
-    return <p>Error: {error}</p>;
-  }
-
-  return <VideoCardGrid assets={assets} />;
-}
-
-export default async function AllVideosPage() {
+const AllVideosContent: React.FC = () => {
   return (
-    <main>
-      <div className={'my-10 p-10'}>
+    <div className="min-h-screen bg-gray-100 p-6">
+      <div className="my-5 p-4">
         <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem>
@@ -55,24 +27,30 @@ export default async function AllVideosPage() {
               <Slash />
             </BreadcrumbSeparator>
             <BreadcrumbItem>
-              <BreadcrumbPage>Discover</BreadcrumbPage>
+              <BreadcrumbLink>
+                <BreadcrumbPage>Discover</BreadcrumbPage>
+              </BreadcrumbLink>
             </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
       </div>
-      <div className="mx-auto p-10">
-        <h1 className={'mb-10 text-6xl'}>Discover Content</h1>
-        <p className="">This is the Discover page.</p>
-        <Suspense
-          fallback={
-            <div className="space-y-4">
-              <Skeleton className="h-4 w-[550px]"></Skeleton>
-            </div>
-          }
-        >
-          <AllVideosContent />
-        </Suspense>
+      <div className="mb-8 rounded-lg bg-white p-8 shadow-md">
+        <h1 className="mb-6 text-center text-4xl font-bold text-gray-800">
+          Discover Amazing Videos
+        </h1>
+        <p className="mb-8 text-center text-gray-600">
+          Explore our collection of creative videos from talented creators
+          worldwide. Find something inspiring and share it with your friends!
+        </p>
       </div>
-    </main>
+      <div className="mx-auto max-w-screen-xl">
+        <h2 className="mb-4 text-3xl font-semibold text-gray-700">
+          Video Gallery
+        </h2>
+        <VideoCardGrid />
+      </div>
+    </div>
   );
-}
+};
+
+export default AllVideosContent;
