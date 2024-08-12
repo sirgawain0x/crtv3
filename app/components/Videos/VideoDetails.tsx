@@ -1,5 +1,5 @@
 'use client';
-import { AssetData } from '@app/lib/types';
+import { Asset } from 'livepeer/models/components';
 import { useState } from 'react';
 import { getSrc } from '@livepeer/react/external';
 import * as Player from '@livepeer/react/player';
@@ -7,7 +7,7 @@ import { PauseIcon, PlayIcon } from '@livepeer/react/assets';
 import { Skeleton } from '@app/components/ui/skeleton';
 
 type VideoDetailsProps = {
-  assetData: AssetData;
+  assetData: Asset;
 };
 
 export default function VideoDetails(props: VideoDetailsProps) {
@@ -16,7 +16,7 @@ export default function VideoDetails(props: VideoDetailsProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [assetLoading, setAssetLoading] = useState(false);
   const [error, setError] = useState('');
-  const src = getSrc(props?.assetData?.playbackInfo);
+  const src = getSrc(props?.assetData?.playbackId);
 
   return (
     <main>
