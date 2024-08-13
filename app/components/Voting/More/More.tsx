@@ -1,17 +1,4 @@
 'use client';
-import React from 'react';
-import {
-  Box,
-  Heading,
-  Text,
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  Grid,
-  GridItem,
-  Container,
-} from '@chakra-ui/react';
-import { ChevronRightIcon } from '@chakra-ui/icons';
 import { useActiveAccount } from 'thirdweb/react';
 import { truncateAddress } from '@app/lib/utils/shortenAddress';
 import { useRouter, useSearchParams } from 'next/navigation';
