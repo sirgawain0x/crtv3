@@ -2,16 +2,12 @@
 import { ConnectButton } from 'thirdweb/react';
 import { client } from '@app/lib/sdk/thirdweb/client';
 import { ACCOUNT_FACTORY_ADDRESS } from '@app/lib/utils/context';
-import {
-  SmartWalletOptions,
-  createWallet,
-  inAppWallet,
-} from 'thirdweb/wallets';
+import { createWallet, inAppWallet } from 'thirdweb/wallets';
 import { sepolia } from 'thirdweb/chains';
 
 export default function ConnectButtonWrapper() {
   const chain = sepolia;
-  const smartWalletConfig: SmartWalletOptions = {
+  const smartWalletConfig = {
     factoryAddress: ACCOUNT_FACTORY_ADDRESS.sepolia,
     chain,
     gasless: true,

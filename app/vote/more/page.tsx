@@ -6,10 +6,12 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from '@app/components/ui/breadcrumb';
+import { Suspense } from 'react';
 import { Slash } from 'lucide-react';
 import More from '@app/components/Voting/More/More';
+import { Skeleton } from '@app/components/ui/skeleton';
 
-export default function VotePage() {
+export default function MorePage() {
   return (
     <div className={'container'}>
       <div className="my-5 p-4">
@@ -38,7 +40,13 @@ export default function VotePage() {
           </BreadcrumbList>
         </Breadcrumb>
       </div>
-      <More />
+      <Suspense
+        fallback={
+          <Skeleton className="h-[500px] w-[500px]">Loading...</Skeleton>
+        }
+      >
+        <More />
+      </Suspense>
     </div>
   );
 }

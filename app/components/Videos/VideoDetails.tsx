@@ -1,28 +1,48 @@
 'use client';
 import { Asset } from 'livepeer/models/components';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { getSrc } from '@livepeer/react/external';
 import * as Player from '@livepeer/react/player';
 import { PauseIcon, PlayIcon } from '@livepeer/react/assets';
 import { Skeleton } from '@app/components/ui/skeleton';
+import { getDetailPlaybackSource } from '@app/lib/utils/hooks/useDetailPlaybackSources';
 
 type VideoDetailsProps = {
   assetData: Asset;
 };
 
 export default function VideoDetails(props: VideoDetailsProps) {
-  const [videoDetails, setVideoDetails] = useState();
+  const [videoDetails, setVideoDetails] = useState<any>();
   const [asset, setAsset] = useState<any>();
-  const [isLoading, setIsLoading] = useState(false);
-  const [assetLoading, setAssetLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    async function fetchAsset() {
+      try {
+        const assetResponse = await getDetailPlaybackSource(
+          props?.assetData?.id,
+        );
+        setAsset(assetResponse);
+        setIsLoading(false);
+      } catch (error) {
+        setError('Failed to load video details.');
+        setIsLoading(false);
+      }
+    }
+
+    if (props?.assetData?.id) {
+      fetchAsset();
+    }
+  }, [props?.assetData?.id]);
+
   const src = getSrc(props?.assetData?.playbackId);
 
   return (
     <main>
       <h1 className={'p-4'}>Video Detail Page</h1>
       <div className={'p-4'}>Asset ID: {props?.assetData.id}</div>
-      {isLoading || assetLoading ? (
+      {isLoading ? (
         <div className="space-y-4">
           <Skeleton className="h-4 w-[550px]" />
         </div>

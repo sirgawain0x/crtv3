@@ -1,5 +1,4 @@
 'use client';
-import { useRouter, useSearchParams } from 'next/navigation';
 import {
   FaArrowRight,
   FaBan,
@@ -37,9 +36,6 @@ export const Card = ({
   scores?: any;
   core: boolean;
 }) => {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-
   // Read a parameter
   const query = {
     title: title,
