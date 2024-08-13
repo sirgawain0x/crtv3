@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import { Text, Heading, Box, Button, Container, Image } from '@chakra-ui/react';
+'use client';
+import { useEffect, useState } from 'react';
 import PlayerComponent from '@app/components/Player/Player';
-import { AssetData } from '@app/lib/utils/fetchers/assets';
+import { Asset } from 'livepeer/models/components';
 import { fullLivepeer } from '@app/lib/sdk/livepeer/fullClient';
 
 export default function VideoDetailsPage({
@@ -34,10 +34,10 @@ export default function VideoDetailsPage({
     fetchVideoDetails();
   }, [params.slug]);
 
-  const fetchAssetDetails = async (assetId: AssetData) => {
+  const fetchAssetDetails = async (asset: Asset) => {
     setAssetLoading(true);
     try {
-      const assetData = await fullLivepeer?.asset.get(`${assetId.id}`);
+      const assetData = await fullLivepeer?.asset.get(`${asset.id}`);
       console.log('Asset By Id', assetData.asset?.id);
       setAsset(assetData);
     } catch (err) {

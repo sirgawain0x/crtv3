@@ -69,7 +69,13 @@ export function Navbar() {
         </SheetContent>
       </Sheet>
       <Link href="/" className="mr-6 hidden lg:flex" prefetch={false}>
-        <Image src={SITE_LOGO} alt="Creative Logo" width={80} height={80} />
+        <Image
+          src={SITE_LOGO}
+          alt="Creative Logo"
+          width={80}
+          height={80}
+          priority
+        />
         <h1>
           <span className="sr-only">Creative TV</span>
         </h1>
