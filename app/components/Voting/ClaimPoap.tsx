@@ -82,7 +82,7 @@ const ClaimPoap = ({ address, proposalId, snapshot }: Props) => {
     <div className="flex flex-col items-center justify-center">
       <Image
         src={STATES[currentState].headerImage}
-        alt=""
+        alt="POAP Default"
         width={125}
         height={125}
       />

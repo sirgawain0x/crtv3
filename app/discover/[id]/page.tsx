@@ -1,13 +1,14 @@
-import { Container, Box } from '@chakra-ui/react';
+'use client';
 import { Asset } from 'livepeer/models/components';
-import { fullLivepeer } from '@app/lib/sdk/livepeer/fullClient';
 import VideoDetails from '@app/components/Videos/VideoDetails';
+import { getDetailPlaybackSource } from '@app/lib/utils/hooks/useDetailPlaybackSources';
 
-export type VideoDetailsProps = {
+type VideoDetailsProps = {
   assetData: Asset;
 };
-const VideoDetailsPage = async ({ assetData }: VideoDetailsProps) => {
-  const asset = await fullLivepeer.asset.get(assetData?.id);
+
+const VideoDetailsPage = ({ assetData }: VideoDetailsProps) => {
+  const asset = getDetailPlaybackSource(assetData?.id);
   console.log('asset; ', asset);
 
   return (
