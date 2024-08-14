@@ -3,7 +3,6 @@ import { useState, useEffect } from 'react';
 import { Avatar, AvatarImage, AvatarFallback } from '../ui/avatar';
 import makeBlockie from 'ethereum-blockies-base64';
 import { shortenAddress } from 'thirdweb/utils';
-import { Badge } from '../ui/badge';
 import { StackClient } from '@stackso/js-core';
 
 // Initialize the client
@@ -44,6 +43,15 @@ export function TopChart() {
     fetchData();
   }, []);
 
+  // Split data into columns
+  const columns: LeaderboardItem[][] = [[], [], [], []]; // Adjust this if you want more or fewer columns
+  data.forEach((item, index) => {
+    const columnIndex = Math.floor(index / 5); // Divide items into groups of 5
+    if (columns[columnIndex]) {
+      columns[columnIndex].push(item);
+    }
+  });
+
   return (
     <div className="mx-auto w-full max-w-6xl py-8">
       <div className="mb-8 text-center">
@@ -53,10 +61,18 @@ export function TopChart() {
         </h2>
       </div>
       <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-        {data?.map(({ uniqueId, address, points }) => (
-          <div key={uniqueId} className="mx-auto space-y-4">
-            <ul className="space-y-4">
-              <li className="flex items-center space-x-2">
+        {columns.map((column, colIndex) => (
+          <div
+            key={colIndex}
+            className={`mx-auto space-y-4 ${colIndex === 3 ? 'hidden lg:block' : ''} ${
+              colIndex === 2 ? 'hidden md:block' : ''
+            } `}
+          >
+            {column.map(({ uniqueId, address, points }) => (
+              <div
+                key={uniqueId}
+                className="mx-auto flex items-center space-x-2"
+              >
                 <span>{uniqueId}.</span>
                 <Avatar>
                   <AvatarImage src={makeBlockie(address)} />
@@ -66,8 +82,8 @@ export function TopChart() {
                   <span>{shortenAddress(address)}</span>
                   <span className="text-gray-500">{points} points</span>
                 </div>
-              </li>
-            </ul>
+              </div>
+            ))}
           </div>
         ))}
       </div>
