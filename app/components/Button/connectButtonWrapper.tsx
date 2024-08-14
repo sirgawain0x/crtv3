@@ -7,11 +7,6 @@ import { sepolia } from 'thirdweb/chains';
 
 export default function ConnectButtonWrapper() {
   const chain = sepolia;
-  const smartWalletConfig = {
-    factoryAddress: ACCOUNT_FACTORY_ADDRESS.sepolia,
-    chain,
-    gasless: true,
-  };
   const wallets = [
     inAppWallet({
       auth: {
@@ -28,6 +23,7 @@ export default function ConnectButtonWrapper() {
     }),
     createWallet('io.metamask'),
     createWallet('com.coinbase.wallet'),
+    createWallet('global.safe'),
   ];
 
   return (
@@ -42,7 +38,11 @@ export default function ConnectButtonWrapper() {
           borderRadius: '10px',
         },
       }}
-      accountAbstraction={smartWalletConfig}
+      accountAbstraction={{
+        chain: chain,
+        sponsorGas: true,
+        factoryAddress: `${ACCOUNT_FACTORY_ADDRESS.sepolia}`,
+      }}
       wallets={wallets}
       chain={chain}
       appMetadata={{
