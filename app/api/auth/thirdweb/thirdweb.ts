@@ -1,4 +1,3 @@
-'use server';
 import { inAppWallet } from 'thirdweb/wallets';
 import { client } from '@app/lib/sdk/thirdweb/client';
 import { VerifyLoginPayloadParams, createAuth } from 'thirdweb/auth';
@@ -16,7 +15,8 @@ const thirdwebAuth = createAuth({
   adminAccount: privateKeyToAccount({ client, privateKey }),
 });
 
-//export const generatePayload = thirdwebAuth.generatePayload;
+export const generatePayload = thirdwebAuth.generatePayload;
+export const verifyPayload = thirdwebAuth.verifyPayload;
 
 export async function login(payload: VerifyLoginPayloadParams) {
   const verifiedPayload = await thirdwebAuth.verifyPayload(payload);

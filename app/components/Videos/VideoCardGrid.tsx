@@ -18,7 +18,7 @@ import { GetAssetsResponse } from 'livepeer/models/operations';
 import { Asset } from 'livepeer/models/components';
 import Link from 'next/link';
 import { getSrc } from '@livepeer/react/external';
-import { getAllPlaybackSources } from '@app/lib/utils/hooks/useAllPlaybackSources';
+import { fetchAllAssets } from '@app/api/livepeer/actions';
 
 const VideoCardGrid: React.FC = () => {
   // State variables to manage fetched video data, loading, and error states.
@@ -33,9 +33,9 @@ const VideoCardGrid: React.FC = () => {
     const fetchSources = async () => {
       try {
         // Fetch all video assets from the Livepeer API.
-        const response = await getAllPlaybackSources();
-        if (response && Array.isArray(response.data)) {
-          setPlaybackSources(response.data); // Update state with the data array.
+        const response = await fetchAllAssets();
+        if (response && Array.isArray((response as GetAssetsResponse).data)) {
+          setPlaybackSources((response as GetAssetsResponse).data); // Update state with the data array.
         } else {
           setPlaybackSources([]); // Handle case where data is not an array.
         }

@@ -1,13 +1,18 @@
-'use server';
-import { fullLivepeer } from '../sdk/livepeer/fullClient';
+import { fullLivepeer } from '@app/lib/sdk/livepeer/fullClient';
+import { GetAssetsResponse } from 'livepeer/models/operations';
 
 // FETCH ALL ASSETS
-export const fetchAllAssets = async () => {
-  console.log('Fetching assets...');
-  const response = await fullLivepeer?.asset.getAll();
+export const fetchAllAssets = async (): Promise<GetAssetsResponse | {}> => {
+  try {
+    console.log('Fetching assets...');
+    const response: GetAssetsResponse = await fullLivepeer?.asset.getAll();
 
-  console.log('Assets: ', response);
-  return response;
+    console.log('Assets: ', response);
+    return response;
+  } catch (error) {
+    console.error('Error fetching assets:', error);
+    return {};
+  }
 };
 
 // FETCH ASSET BY ID
