@@ -6,6 +6,10 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'snapshotsplugin.s3.us-west-2.amazonaws.com',
       },
+      {
+        protocol: 'https',
+        hostname: 'locksmith.unlock-protocol.com',
+      },
     ],
   },
 };

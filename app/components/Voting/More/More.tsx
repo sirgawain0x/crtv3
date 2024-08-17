@@ -1,6 +1,6 @@
 'use client';
 import { useActiveAccount } from 'thirdweb/react';
-import { truncateAddress } from '@app/lib/utils/shortenAddress';
+import { shortenAddress } from 'thirdweb/utils';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Voting } from '@app/components/Voting/Voting';
 import ClaimPoap from '@app/components/Voting/ClaimPoap';
@@ -56,7 +56,7 @@ export default function MoreOptions() {
             </div>
             <div className="rounded-b-lg border-2 border-pink-500 p-10">
               <div className="p-2">
-                <p>{`Creator: ${creator ? truncateAddress(creator) : 'Unknown'}`}</p>
+                <p>{`Creator: ${creator ? shortenAddress(creator) : 'Unknown'}`}</p>
                 <p
                   className="cursor-pointer"
                   onClick={() => goTo(snapshot)}
