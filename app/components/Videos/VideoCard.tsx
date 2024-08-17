@@ -11,7 +11,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { Badge } from '../ui/badge';
 import { cn } from '../../lib/utils';
-import PlayerCardComponent from '../Player/Player';
+import { PlayerComponent } from '../Player/Player';
 import { SITE_LOGO } from '../../lib/utils/context';
 import { Asset } from 'livepeer/models/components';
 import Link from 'next/link';
@@ -43,7 +43,10 @@ const VideoCard: React.FC<VideoCardProps> = ({ className, ...props }) => {
             </CardDescription>
           </CardHeader>
         </div>
-        <PlayerCardComponent src={getSrc(props?.assetData.playbackId)} />
+        <PlayerComponent
+          src={getSrc(props?.assetData.playbackId)}
+          title={props?.assetData.name}
+        />
         <CardContent>
           <div className="flex">
             <Badge
