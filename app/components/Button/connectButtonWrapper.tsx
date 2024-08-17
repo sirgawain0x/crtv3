@@ -1,9 +1,17 @@
-'use client';
 import { ConnectButton } from 'thirdweb/react';
+import { useSearchParams } from 'next/navigation';
 import { client } from '@app/lib/sdk/thirdweb/client';
 import { ACCOUNT_FACTORY_ADDRESS } from '@app/lib/utils/context';
 import { createWallet, inAppWallet } from 'thirdweb/wallets';
+import { VerifyLoginPayloadParams, LoginPayload } from 'thirdweb/auth';
 import { sepolia } from 'thirdweb/chains';
+import {
+  createPayload,
+  isLoggedIn,
+  login,
+  logout,
+  validatePayload,
+} from '@app/api/auth/thirdweb/thirdweb';
 
 export default function ConnectButtonWrapper() {
   const chain = sepolia;
@@ -25,6 +33,7 @@ export default function ConnectButtonWrapper() {
     createWallet('com.coinbase.wallet'),
     createWallet('global.safe'),
   ];
+  const searchParams = useSearchParams();
 
   return (
     <ConnectButton
@@ -70,6 +79,12 @@ export default function ConnectButtonWrapper() {
           title: 'Welcome to Creative TV',
         },
       }}
+      // auth={{
+      //   createPayload,
+      //   doLogin: (params: any) => login(params),
+      //   logout,
+      //   isLoggedIn,
+      // }}
     />
   );
 }

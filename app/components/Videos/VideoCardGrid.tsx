@@ -12,7 +12,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { Badge } from '../ui/badge';
 import { cn } from '../../lib/utils';
-import PlayerCardComponent from '../Player/Player';
+import { PlayerComponent } from '../Player/Player';
 import { SITE_LOGO } from '../../lib/utils/context';
 import { GetAssetsResponse } from 'livepeer/models/operations';
 import { Asset } from 'livepeer/models/components';
@@ -82,7 +82,10 @@ const VideoCardGrid: React.FC = () => {
                   <CardDescription>{asset.creatorId?.value}</CardDescription>
                 </CardHeader>
               </div>
-              <PlayerCardComponent src={getSrc(asset.playbackId)} />{' '}
+              <PlayerComponent
+                src={getSrc(asset?.playbackId)}
+                title={asset?.name}
+              />{' '}
               {/* Video player component */}
               <CardContent>
                 <div className="flex">

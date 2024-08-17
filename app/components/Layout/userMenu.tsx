@@ -11,6 +11,7 @@ import { Avatar, AvatarImage, AvatarFallback } from '@app/components/ui/avatar';
 import Link from 'next/link';
 import makeBlockie from 'ethereum-blockies-base64';
 import { useActiveAccount } from 'thirdweb/react';
+import PaywallButton from '@app/components/Paywall/PaywallButton';
 
 export function UserMenu() {
   const activeAccount = useActiveAccount();
@@ -43,6 +44,9 @@ export function UserMenu() {
             </Link>
           </DropdownMenuItem>
           <DropdownMenuSeparator />
+          <DropdownMenuItem>
+            <PaywallButton />
+          </DropdownMenuItem>
           <DropdownMenuItem>
             <Link href="#" className="flex items-center gap-2" prefetch={false}>
               <UploadIcon className="h-4 w-4" />

@@ -1,54 +1,6 @@
 'use server';
 import { NextRequest, NextResponse } from 'next/server';
-import {
-  verifySignature,
-  VerifySignatureParams,
-  createAuth,
-  VerifyLoginPayloadParams,
-} from 'thirdweb/auth';
-import { privateKeyToAccount } from 'thirdweb/wallets';
-import { cookies } from 'next/headers';
-import { client } from '@app/lib/sdk/thirdweb/client';
-
-const privateKey = process.env.THIRDWEB_ADMIN_PRIVATE_KEY || '';
-
-if (!privateKey) {
-  throw new Error('Missing THIRDWEB_ADMIN_PRIVATE_KEY in .env file.');
-}
-
-const thirdwebAuth = createAuth({
-  domain: process.env.NEXT_PUBLIC_THIRDWEB_AUTH_DOMAIN || '',
-  adminAccount: privateKeyToAccount({ client, privateKey }),
-});
-
-//export const generateAPayload = thirdwebAuth.generatePayload;
-
-export async function login(payload: VerifyLoginPayloadParams) {
-  const verifiedPayload = await thirdwebAuth.verifyPayload(payload);
-  if (verifiedPayload.valid) {
-    const jwt = await thirdwebAuth.generateJWT({
-      payload: verifiedPayload.payload,
-    });
-    cookies().set('jwt', jwt);
-  }
-}
-
-export async function isLoggedIn() {
-  const jwt = cookies().get('jwt');
-  if (!jwt?.value) {
-    return false;
-  }
-
-  const authResult = await thirdwebAuth.verifyJWT({ jwt: jwt.value });
-  if (!authResult.valid) {
-    return false;
-  }
-  return true;
-}
-
-export async function logout() {
-  cookies().delete('jwt');
-}
+import { verifySignature, VerifySignatureParams } from 'thirdweb/auth';
 
 /** Required query parameters:
 
@@ -61,20 +13,20 @@ Optional query parameters:
 */
 
 // Making a call to the Unlock App Checkout endpoint
-const unlock_siwe: URL = new URL('https://app.unlock-protocol.com/checkout');
+// const unlock_siwe = new URL('https://app.unlock-protocol.com/checkout');
 
 // You can set a specific redirect URL or grab the current location in your app
-const redirect_url: URL = new URL('https://creativeplatform.xyz/');
+// const redirect_uri = new URL('https://creativeplatform.xyz/');
 
 // Client Id - ensure this is correctly assigned as expected by Unlock Protocol
-const client_id: string = 'creativeplatform.xyz';
+// const client_id: string = 'creativeplatform.xyz';
 
 // Add the parameters
-unlock_siwe.searchParams.append('client_id', client_id);
-unlock_siwe.searchParams.append('redirect_uri', redirect_url.toString()); // Convert redirect_url to a string
+// unlock_siwe.searchParams.append('client_id', client_id);
+// unlock_siwe.searchParams.append('redirect_uri', redirect_uri.toString()); // Convert redirect_url to a string
 
 // Generate your SIWE (Sign-In with Ethereum) link
-console.log(unlock_siwe.toString());
+// console.log(unlock_siwe.toString());
 
 /** Redirects
 

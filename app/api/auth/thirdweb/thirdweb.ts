@@ -1,8 +1,14 @@
+'use server';
 import { inAppWallet } from 'thirdweb/wallets';
 import { client } from '@app/lib/sdk/thirdweb/client';
-import { VerifyLoginPayloadParams, createAuth } from 'thirdweb/auth';
+import {
+  VerifyLoginPayloadParams,
+  createAuth,
+  GenerateLoginPayloadParams,
+} from 'thirdweb/auth';
 import { cookies } from 'next/headers';
 import { privateKeyToAccount } from 'thirdweb/wallets';
+import { getAddress } from 'thirdweb';
 
 const privateKey = process.env.THIRDWEB_ADMIN_PRIVATE_KEY || '';
 
@@ -11,12 +17,9 @@ if (!privateKey) {
 }
 
 const thirdwebAuth = createAuth({
-  domain: process.env.NEXT_PUBLIC_THIRDWEB_AUTH_DOMAIN || '',
+  domain: 'localhost:3000',
   adminAccount: privateKeyToAccount({ client, privateKey }),
 });
-
-export const generatePayload = thirdwebAuth.generatePayload;
-export const verifyPayload = thirdwebAuth.verifyPayload;
 
 export async function login(payload: VerifyLoginPayloadParams) {
   const verifiedPayload = await thirdwebAuth.verifyPayload(payload);
@@ -36,6 +39,14 @@ export async function login(payload: VerifyLoginPayloadParams) {
     console.log('Account', account);
     cookies().set('jwt', jwt);
   }
+}
+
+export async function createPayload(params: GenerateLoginPayloadParams) {
+  thirdwebAuth.generatePayload(params);
+}
+
+export async function validatePayload(payload: VerifyLoginPayloadParams) {
+  return thirdwebAuth.verifyPayload(payload);
 }
 
 export async function isLoggedIn() {
