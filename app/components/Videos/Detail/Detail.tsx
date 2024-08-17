@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import PlayerComponent from '@app/components/Player/Player';
+import { PlayerComponent } from '@app/components/Player/Player';
 import { Asset } from 'livepeer/models/components';
 import { fullLivepeer } from '@app/lib/sdk/livepeer/fullClient';
 
@@ -58,7 +58,9 @@ export default function VideoDetailsPage({
       ) : (
         <div className="container max-w-md">
           <h1 className="md my-4">{videoDetails}</h1>
-          {asset && <PlayerComponent src={asset.playbackId} />}
+          {asset && (
+            <PlayerComponent src={asset.playbackId} title={asset?.name} />
+          )}
         </div>
       )}
     </main>
