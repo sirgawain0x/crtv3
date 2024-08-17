@@ -1,5 +1,4 @@
 import { ConnectButton } from 'thirdweb/react';
-import { useSearchParams } from 'next/navigation';
 import { client } from '@app/lib/sdk/thirdweb/client';
 import { ACCOUNT_FACTORY_ADDRESS } from '@app/lib/utils/context';
 import { createWallet, inAppWallet } from 'thirdweb/wallets';
@@ -33,7 +32,6 @@ export default function ConnectButtonWrapper() {
     createWallet('com.coinbase.wallet'),
     createWallet('global.safe'),
   ];
-  const searchParams = useSearchParams();
 
   return (
     <ConnectButton
