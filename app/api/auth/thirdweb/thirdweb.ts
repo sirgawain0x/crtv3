@@ -21,32 +21,32 @@ const thirdwebAuth = createAuth({
   adminAccount: privateKeyToAccount({ client, privateKey }),
 });
 
-export async function login(payload: VerifyLoginPayloadParams) {
-  const verifiedPayload = await thirdwebAuth.verifyPayload(payload);
-  if (verifiedPayload.valid) {
-    const jwt = await thirdwebAuth.generateJWT({
-      payload: verifiedPayload.payload,
-    });
-    const wallet = inAppWallet();
-    // use the account to send transactions
-    const account = await wallet.connect({
-      client,
-      strategy: 'auth_endpoint',
-      // This is the payload that is sent to the auth endpoint
-      payload: `${verifiedPayload.payload}`,
-      encryptionKey: process.env.THIRDWEB_ENCRYPTION_KEY as string,
-    });
-    console.log('Account', account);
-    cookies().set('jwt', jwt);
-  }
-}
+// export async function login(payload: VerifyLoginPayloadParams) {
+//   const verifiedPayload = await thirdwebAuth.verifyPayload(payload);
+//   if (verifiedPayload.valid) {
+//     const jwt = await thirdwebAuth.generateJWT({
+//       payload: verifiedPayload.payload,
+//     });
+//     const wallet = inAppWallet();
+//     // use the account to send transactions
+//     const account = await wallet.connect({
+//       client,
+//       strategy: 'auth_endpoint',
+//       // This is the payload that is sent to the auth endpoint
+//       payload: `${verifiedPayload.payload}`,
+//       encryptionKey: process.env.THIRDWEB_ENCRYPTION_KEY as string,
+//     });
+//     console.log('Account', account);
+//     cookies().set('jwt', jwt);
+//   }
+// }
 
 export async function createPayload(params: GenerateLoginPayloadParams) {
   thirdwebAuth.generatePayload(params);
 }
 
 export async function validatePayload(payload: VerifyLoginPayloadParams) {
-  return thirdwebAuth.verifyPayload(payload);
+  thirdwebAuth.verifyPayload(payload);
 }
 
 export async function isLoggedIn() {
