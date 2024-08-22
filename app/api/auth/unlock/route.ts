@@ -49,19 +49,31 @@ export async function GET(request: NextRequest) {
     return new NextResponse('User refused to sign the message', {
       status: 400,
     });
-  } else if (code && address) {
+  } else if (code) {
     try {
       const decoded = JSON.parse(atob(code));
+      console.log(decoded)
+      const addressIndex = String(decoded.d).indexOf("0x")
+      const addy = String(decoded.d).substring(addressIndex, 42 + addressIndex)
+      console.log({ addy })
       const verifyParams: VerifySignatureParams = {
         message: decoded.d, // the signed message
         signature: decoded.s, // the signature
-        address: address, // user's Ethereum address
+        address: addy, // user's Ethereum address
       };
 
       // Assuming verifySignature is a promise-based function
       const verifiedAddress = await verifySignature(verifyParams);
       console.log('Recovered address:', verifiedAddress);
-      return new NextResponse(`Address verified: ${verifiedAddress}`);
+      const response = NextResponse.redirect(new URL(request.nextUrl.origin))
+      response.cookies.set("session", JSON.stringify({
+        message: decoded.d,
+        address: addy,
+        signature: decoded.s,
+        verified: verifiedAddress
+      })) // TO DO: This should be encrypted
+      return response
+      // return new NextResponse(`Address verified: ${verifiedAddress}`);
     } catch (error) {
       console.log('Failed to verify signature:', error);
       return new NextResponse('Failed to process the signature', {

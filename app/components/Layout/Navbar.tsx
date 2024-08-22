@@ -9,6 +9,7 @@ import { Button } from '@app/components/ui/button';
 import { useActiveAccount } from 'thirdweb/react';
 import { UserMenu } from './userMenu';
 import ThemeToggleComponent from '../ThemeToggle/toggleComponent';
+import { UnlockSIWEButton } from '../Button/unlockButton';
 
 export function Navbar() {
   const activeAccount = useActiveAccount();
@@ -103,6 +104,7 @@ export function Navbar() {
         <div className="mr-5">
           <ConnectButtonWrapper />
         </div>
+        {activeAccount && <UnlockSIWEButton redirectUri={"http://localhost:3000/api/auth/unlock"} clientId='localhost:3000' />}
         {activeAccount && <UserMenu />}
       </div>
     </header>

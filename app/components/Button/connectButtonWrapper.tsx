@@ -79,9 +79,13 @@ export default function ConnectButtonWrapper() {
       }}
       // auth={{
       //   createPayload,
-      //   doLogin: (params: any) => login(params),
+      //   doLogin: (params: any) => {
+      //     console.log("doLogin params:", params)
+      //     login(params)
+      //   },
       //   logout,
       //   isLoggedIn,
+      //   validatePayload
       // }}
     />
   );

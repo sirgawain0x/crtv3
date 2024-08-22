@@ -9,8 +9,12 @@ import {
 import { cookies } from 'next/headers';
 import { privateKeyToAccount } from 'thirdweb/wallets';
 import { getAddress } from 'thirdweb';
+import { createThirdwebClient } from 'thirdweb';
 
 const privateKey = process.env.THIRDWEB_ADMIN_PRIVATE_KEY || '';
+const thirdwebClient = createThirdwebClient({
+	secretKey: process.env.THIRDWEB_SECRET_KEY
+});
 
 if (!privateKey) {
   throw new Error('Missing THIRDWEB_ADMIN_PRIVATE_KEY in .env file.');
@@ -18,30 +22,32 @@ if (!privateKey) {
 
 const thirdwebAuth = createAuth({
   domain: 'localhost:3000',
+  client: thirdwebClient,
   adminAccount: privateKeyToAccount({ client, privateKey }),
 });
 
-// export async function login(payload: VerifyLoginPayloadParams) {
-//   const verifiedPayload = await thirdwebAuth.verifyPayload(payload);
-//   if (verifiedPayload.valid) {
-//     const jwt = await thirdwebAuth.generateJWT({
-//       payload: verifiedPayload.payload,
-//     });
-//     const wallet = inAppWallet();
-//     // use the account to send transactions
-//     const account = await wallet.connect({
-//       client,
-//       strategy: 'auth_endpoint',
-//       // This is the payload that is sent to the auth endpoint
-//       payload: `${verifiedPayload.payload}`,
-//       encryptionKey: process.env.THIRDWEB_ENCRYPTION_KEY as string,
-//     });
-//     console.log('Account', account);
-//     cookies().set('jwt', jwt);
-//   }
-// }
+export async function login(payload: VerifyLoginPayloadParams) {
+  const verifiedPayload = await thirdwebAuth.verifyPayload(payload);
+  if (verifiedPayload.valid) {
+    const jwt = await thirdwebAuth.generateJWT({
+      payload: verifiedPayload.payload,
+    });
+    const wallet = inAppWallet();
+    // use the account to send transactions
+    const account = await wallet.connect({
+      client,
+      strategy: 'auth_endpoint',
+      // This is the payload that is sent to the auth endpoint
+      payload: `${verifiedPayload.payload}`,
+      encryptionKey: process.env.THIRDWEB_ENCRYPTION_KEY as string,
+    });
+    console.log('Account', account);
+    cookies().set('jwt', jwt);
+  }
+}
 
 export async function createPayload(params: GenerateLoginPayloadParams) {
+  console.log("createPayload params:", params)
   thirdwebAuth.generatePayload(params);
 }
 
