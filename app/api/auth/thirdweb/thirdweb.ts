@@ -8,12 +8,17 @@ import {
 } from 'thirdweb/auth';
 import { cookies } from 'next/headers';
 import { privateKeyToAccount } from 'thirdweb/wallets';
-import { getAddress } from 'thirdweb';
 import { createThirdwebClient } from 'thirdweb';
+
+export interface UnlockSIWEButtonProps {
+  redirectUri: string;
+  clientId: string;
+  paywallConfig?: any;
+}
 
 const privateKey = process.env.THIRDWEB_ADMIN_PRIVATE_KEY || '';
 const thirdwebClient = createThirdwebClient({
-	secretKey: process.env.THIRDWEB_SECRET_KEY
+  secretKey: process.env.THIRDWEB_SECRET_KEY,
 });
 
 if (!privateKey) {
@@ -26,29 +31,35 @@ const thirdwebAuth = createAuth({
   adminAccount: privateKeyToAccount({ client, privateKey }),
 });
 
-export async function login(payload: VerifyLoginPayloadParams) {
+export async function generatePayload(params: GenerateLoginPayloadParams) {
+  console.log('generatedPayload params:', params);
+  return thirdwebAuth.generatePayload(params);
+}
+
+export async function login(
+  payload: VerifyLoginPayloadParams,
+  { clientId, redirectUri, paywallConfig }: UnlockSIWEButtonProps,
+) {
   const verifiedPayload = await thirdwebAuth.verifyPayload(payload);
   if (verifiedPayload.valid) {
     const jwt = await thirdwebAuth.generateJWT({
       payload: verifiedPayload.payload,
     });
     const wallet = inAppWallet();
+
     // use the account to send transactions
     const account = await wallet.connect({
-      client,
-      strategy: 'auth_endpoint',
+      client: thirdwebClient,
+      strategy:
+        `https://app.unlock-protocol.com/checkout?client_id=${clientId}&redirect_uri=${redirectUri}` +
+        (paywallConfig ? `&paywallConfig=${paywallConfig}` : ''),
       // This is the payload that is sent to the auth endpoint
-      payload: `${verifiedPayload.payload}`,
+      payload: verifiedPayload.payload,
       encryptionKey: process.env.THIRDWEB_ENCRYPTION_KEY as string,
     });
     console.log('Account', account);
     cookies().set('jwt', jwt);
   }
-}
-
-export async function createPayload(params: GenerateLoginPayloadParams) {
-  console.log("createPayload params:", params)
-  thirdwebAuth.generatePayload(params);
 }
 
 export async function validatePayload(payload: VerifyLoginPayloadParams) {
