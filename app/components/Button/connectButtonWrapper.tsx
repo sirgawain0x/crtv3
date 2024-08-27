@@ -101,6 +101,7 @@ export default function ConnectButtonWrapper() {
         projectId: 'dc6a426a325d62879d4b9c6ef6dcedb1',
       }}
       connectModal={{
+        size: 'wide',
         privacyPolicyUrl:
           'https://creativeplatform.xyz/docs/legal/privacy-policy',
         termsOfServiceUrl:
@@ -122,7 +123,7 @@ export default function ConnectButtonWrapper() {
           console.log('checking if logged in!', { address });
           return await isLoggedIn();
         },
-        doLogin: async (params: any) => {
+        doLogin: async (params: VerifyLoginPayloadParams) => {
           console.log('logging in!');
           await login(params, {
             clientId: 'localhost:3000',
