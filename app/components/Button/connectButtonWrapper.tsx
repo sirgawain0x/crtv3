@@ -123,13 +123,23 @@ export default function ConnectButtonWrapper() {
           console.log('checking if logged in!', { address });
           return await isLoggedIn();
         },
-        doLogin: async (params: VerifyLoginPayloadParams) => {
+        doLogin: async (
+          params: VerifyLoginPayloadParams,
+        ): Promise<LoginPayload | void> => {
           console.log('logging in!');
-          await login(params, {
-            clientId: 'localhost:3000',
-            redirectUri: 'http://localhost:3000/api/auth/unlock',
-            paywallConfig: paywallConfig,
-          });
+          const payload = await validatePayload(params);
+          const loginPayload: LoginPayload | void = await login(
+            {
+              payload: params.payload,
+              signature: params.signature, // Add a signature property here
+            },
+            {
+              clientId: 'localhost:3000',
+              redirectUri: 'http://localhost:3000/api/auth/unlock',
+              paywallConfig: paywallConfig,
+            },
+          );
+          return loginPayload;
         },
         getLoginPayload: async ({ address }: { address: string }) =>
           generatePayload({ address }),
