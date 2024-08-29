@@ -4,11 +4,9 @@ import { Src } from '@livepeer/react';
 import { FEATURED_VIDEO_TITLE } from '@app/lib/utils/context';
 import { getFeaturedPlaybackSource } from '@app/lib/utils/hooks/useFeaturePlaybackSource';
 import { DemoPlayer } from '../Player/DemoPlayer';
-import { useRouter } from 'next/navigation';
 import { Skeleton } from '../ui/skeleton';
 
 const FeaturedVideo: React.FC = () => {
-  const router = useRouter();
   const [src, setSrc] = useState<Src[] | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
