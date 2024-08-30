@@ -26,7 +26,7 @@ export default async function VideoDetailsPage({
   return (
     <div className="container max-w-7xl content-center">
       <div className="py-10">
-        <VideoDetails assetData={assetData} />
+        <VideoDetails asset={assetData} />
       </div>
     </div>
   );

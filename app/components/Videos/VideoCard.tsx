@@ -13,10 +13,11 @@ import { Badge } from '../ui/badge';
 import { cn } from '../../lib/utils';
 import { shortenHex } from 'thirdweb/utils';
 import { PlayerComponent } from '../Player/Player';
-import { Asset, ViewershipMetric } from 'livepeer/models/components';
+import { Asset } from 'livepeer/models/components';
 import Link from 'next/link';
 import { Src } from '@livepeer/react';
 import makeBlockie from 'ethereum-blockies-base64';
+import VideoViewMetrics from './VideoViewMetrics';
 
 interface VideoCardProps {
   asset: Asset;
@@ -52,7 +53,7 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
               >
                 {asset?.status?.phase}
               </Badge>
-              <p className="p-2">Views:</p>
+              <VideoViewMetrics playbackId={asset.playbackId || ''} />
             </div>
             <div className="mt-6 grid grid-flow-row auto-rows-max space-y-3 overflow-hidden">
               <h1 className="max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-xl font-bold">

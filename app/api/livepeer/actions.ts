@@ -5,7 +5,9 @@ import { Asset } from 'livepeer/models/components';
 export const fetchAllAssets = async (): Promise<Asset[] | {}> => {
   try {
     console.log('Fetching assets...');
-    const response = await fetch('http://localhost:3000/api/livepeer');
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_THIRDWEB_AUTH_DOMAIN}/api/livepeer`,
+    );
     const json = await response.json();
     console.log('Assets: ', json);
     return json;
