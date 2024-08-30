@@ -1,14 +1,16 @@
 import { fullLivepeer } from '@app/lib/sdk/livepeer/fullClient';
-import { GetAssetsResponse } from 'livepeer/models/operations';
+import { Asset } from 'livepeer/models/components';
 
 // FETCH ALL ASSETS
-export const fetchAllAssets = async (): Promise<GetAssetsResponse | {}> => {
+export const fetchAllAssets = async (): Promise<Asset[] | {}> => {
   try {
     console.log('Fetching assets...');
-    const response: GetAssetsResponse = await fullLivepeer?.asset.getAll();
-
-    console.log('Assets: ', response);
-    return response;
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_THIRDWEB_AUTH_DOMAIN}/api/livepeer`,
+    );
+    const json = await response.json();
+    console.log('Assets: ', json);
+    return json;
   } catch (error) {
     console.error('Error fetching assets:', error);
     return {};

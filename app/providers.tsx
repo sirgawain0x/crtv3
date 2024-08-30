@@ -2,11 +2,23 @@
 import { ApolloWrapper } from './lib/utils/ApolloWrapper';
 import { ThirdwebProvider } from '@app/lib/sdk/thirdweb/components';
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { createConfig, http, WagmiProvider } from 'wagmi';
+import { sepolia } from 'wagmi/chains';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 interface ThemeContextType {
   theme: string;
   toggleTheme: () => void;
 }
+
+const config = createConfig({
+  chains: [sepolia],
+  transports: {
+    [sepolia.id]: http(),
+  },
+});
+
+const queryClient = new QueryClient();
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
@@ -35,7 +47,13 @@ export const Providers: React.FC<{ children: React.ReactNode }> = ({
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme }}>
       <ApolloWrapper>
-        <ThirdwebProvider>{children}</ThirdwebProvider>
+        <ThirdwebProvider>
+          <WagmiProvider config={config}>
+            <QueryClientProvider client={queryClient}>
+              {children}
+            </QueryClientProvider>
+          </WagmiProvider>
+        </ThirdwebProvider>
       </ApolloWrapper>
     </ThemeContext.Provider>
   );

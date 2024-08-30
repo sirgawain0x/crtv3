@@ -1,21 +1,44 @@
-import axios, { AxiosError } from 'axios';
-import { AssetData } from '@app/lib/types';
+'use server';
 
-export const videoApi = axios.create({
-  baseURL: 'https://livepeer.studio/api/data/views/query/total/',
-  headers: {
-    Authorization: `Bearer ${process.env.LIVEPEER_API_KEY}`,
-    Accept: 'application/json',
-    'Content-Type': 'application/json',
-  },
-});
+export const fetchAllViews = async (
+  playbackId: string,
+): Promise<{
+  playbackId: string;
+  viewCount: number;
+  playtimeMins: number;
+  legacyViewCount: number;
+} | null> => {
+  const myHeaders = new Headers();
+  myHeaders.append(
+    'Authorization',
+    `Bearer ${process.env.LIVEPEER_FULL_API_KEY}`,
+  );
 
-export const fetchVideoViews = async (playbackId: string) => {
-  const response = await videoApi.get<AssetData['views']>(`${playbackId}`);
+  const requestOptions = {
+    method: 'GET',
+    headers: myHeaders,
+    redirect: 'follow' as const,
+  };
+
   try {
-    return response.data;
+    const response = await fetch(
+      `https://livepeer.studio/api/data/views/query/total/${playbackId}`,
+      requestOptions,
+    );
+
+    if (!response.ok) {
+      throw new Error(`Error fetching views: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    return {
+      playbackId: data.playbackId,
+      viewCount: data.viewCount,
+      playtimeMins: data.playtimeMins,
+      legacyViewCount: data.legacyViewCount,
+    };
   } catch (error) {
-    const axiosError = error as AxiosError;
-    throw new Error(axiosError.message);
+    console.error('Failed to fetch view metrics:', error);
+    return null;
   }
 };
