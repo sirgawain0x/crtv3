@@ -4,27 +4,34 @@ import { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
 
 export default function ThemeToggleComponent() {
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('theme') === 'dark';
-    }
-    return false;
-  });
+  const [isDarkMode, setIsDarkMode] = useState<boolean | null>(null);
 
   useEffect(() => {
-    const root = window.document.documentElement;
-    if (isDarkMode) {
-      root.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
-    } else {
-      root.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
+    const savedTheme = localStorage.getItem('theme');
+    setIsDarkMode(savedTheme === 'dark');
+  }, []);
+
+  useEffect(() => {
+    if (isDarkMode !== null) {
+      const root = window.document.documentElement;
+      if (isDarkMode) {
+        root.classList.add('dark');
+        localStorage.setItem('theme', 'dark');
+      } else {
+        root.classList.remove('dark');
+        localStorage.setItem('theme', 'light');
+      }
     }
   }, [isDarkMode]);
 
   const toggleDarkMode = () => {
-    setIsDarkMode(!isDarkMode);
+    setIsDarkMode((prevMode) => !prevMode);
   };
+
+  if (isDarkMode === null) {
+    // Render nothing or a loading spinner
+    return null;
+  }
 
   return (
     <div className="flex items-center space-x-2">
@@ -32,16 +39,16 @@ export default function ThemeToggleComponent() {
         onClick={toggleDarkMode}
         className={`inline-flex items-center justify-center rounded-md px-4 py-2 text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
           isDarkMode
-            ? 'bg-gray-800 text-white hover:bg-gray-600'
-            : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+            ? 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+            : 'bg-gray-800 text-white hover:bg-gray-600'
         }`}
       >
         {isDarkMode ? (
-          <MoonIcon className="mr-2 h-5 w-5" />
-        ) : (
           <SunIcon className="mr-2 h-5 w-5" />
+        ) : (
+          <MoonIcon className="mr-2 h-5 w-5" />
         )}
-        {isDarkMode ? 'Dark' : 'Light'}
+        {isDarkMode ? 'Light' : 'Dark'}
       </Button>
     </div>
   );

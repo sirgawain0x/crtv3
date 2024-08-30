@@ -11,7 +11,7 @@ import { Slash } from 'lucide-react';
 
 const AllVideosContent: React.FC = () => {
   return (
-    <div className="min-h-screen bg-gray-100 p-6">
+    <div className="min-h-screen p-6">
       <div className="my-5 p-4">
         <Breadcrumb>
           <BreadcrumbList>
@@ -43,10 +43,7 @@ const AllVideosContent: React.FC = () => {
           worldwide. Find something inspiring and share it with your friends!
         </p>
       </div>
-      <div className="mx-auto max-w-screen-xl">
-        <h2 className="mb-4 text-3xl font-semibold text-gray-700">
-          Video Gallery
-        </h2>
+      <div>
         <VideoCardGrid />
       </div>
     </div>

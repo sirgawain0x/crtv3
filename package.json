@@ -52,8 +52,10 @@
     "styled-components": "^6.1.8",
     "tailwind-merge": "^2.4.0",
     "tailwindcss-animate": "^1.0.7",
-    "thirdweb": "^5.44.0",
+    "thirdweb": "^5.48.2",
     "uuid": "^9.0.1",
+    "viem": "^2.19.6",
+    "wagmi": "^2.12.5",
     "yup": "^1.4.0",
     "zod": "^3.22.4"
   },

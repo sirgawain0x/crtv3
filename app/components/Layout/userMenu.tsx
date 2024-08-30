@@ -12,9 +12,30 @@ import Link from 'next/link';
 import makeBlockie from 'ethereum-blockies-base64';
 import { useActiveAccount } from 'thirdweb/react';
 import PaywallButton from '@app/components/Paywall/PaywallButton';
+import { isLoggedIn } from '@app/api/auth/thirdweb/thirdweb';
 
-export function UserMenu() {
+import { useEffect, useState } from 'react';
+
+export const UserMenu = () => {
   const activeAccount = useActiveAccount();
+  const [loggedIn, setLoggedIn] = useState(false);
+
+  useEffect(() => {
+    const checkLogin = async () => {
+      const result = await isLoggedIn();
+      setLoggedIn(result);
+    };
+    checkLogin();
+  }, []);
+
+  if (!loggedIn) {
+    return (
+      <div className="my-auto">
+        <PaywallButton />
+      </div>
+    );
+  }
+
   return (
     <div className="my-auto">
       <DropdownMenu>
@@ -45,9 +66,6 @@ export function UserMenu() {
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem>
-            <PaywallButton />
-          </DropdownMenuItem>
-          <DropdownMenuItem>
             <Link href="#" className="flex items-center gap-2" prefetch={false}>
               <UploadIcon className="h-4 w-4" />
               <span>Upload</span>
@@ -57,7 +75,7 @@ export function UserMenu() {
       </DropdownMenu>
     </div>
   );
-}
+};
 
 function ChevronDownIcon(props: any) {
   return (
