@@ -1,5 +1,7 @@
 import { Asset } from 'livepeer/models/components';
+import { GetAssetResponse } from 'livepeer/models/operations';
 import VideoDetails from '@app/components/Videos/VideoDetails';
+import { fetchAssetId } from '@app/api/livepeer/actions';
 
 type VideoDetailsPageProps = {
   params: {
@@ -7,19 +9,22 @@ type VideoDetailsPageProps = {
   };
 };
 
-// Fetch asset data from server-side or static props here (example below)
 const fetchAssetData = async (id: string): Promise<Asset | null> => {
-  // Implement your data fetching logic here, return Asset or null if not found
-  return null; // Example placeholder
+  const response: GetAssetResponse | null = await fetchAssetId(id);
+
+  if (response) {
+    return response.asset?.id === id ? response.asset : null;
+  }
+
+  return null; // Return null if the response doesn't match the expected structure
 };
 
 export default async function VideoDetailsPage({
   params,
 }: VideoDetailsPageProps) {
-  const assetData = await fetchAssetData(params.id);
+  const assetData: Asset | null = await fetchAssetData(params.id);
 
   if (!assetData) {
-    // Handle case where asset data is not found
     return <div>Asset not found</div>;
   }
 

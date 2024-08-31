@@ -6,6 +6,10 @@ import VideoCard from '@app/components/Videos/VideoCard';
 import { Src } from '@livepeer/react';
 import { getDetailPlaybackSource } from '@app/lib/utils/hooks/useDetailPlaybackSources';
 
+type VideoCardProps = {
+  asset: Asset;
+};
+
 const VideoCardGrid: React.FC = () => {
   const [playbackSources, setPlaybackSources] = useState<
     (Asset & { detailedSrc: Src[] | null })[] | null
