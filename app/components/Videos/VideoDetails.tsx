@@ -272,7 +272,9 @@ export default function VideoDetails({ asset }: VideoDetailsProps) {
 
   return (
     <div>
-      <h1>{asset.name}</h1>
+      <h1 className="max-w-full whitespace-nowrap text-xl font-bold">
+        {asset.name}
+      </h1>
       {/* Render other asset details */}
       {playbackSources ? (
         <Player.Root src={playbackSources}>

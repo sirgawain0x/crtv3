@@ -49,6 +49,35 @@ export const PlayerComponent: React.FC<{
                 />
               </Player.PlayingIndicator>
             </Player.PlayPauseTrigger>
+            <div className="flex justify-between gap-4">
+              <div className="absolute bottom-0 left-0 mx-2 flex items-center justify-start gap-2.5 sm:flex-1 md:flex-[1.5]">
+                <Player.LiveIndicator
+                  matcher={false}
+                  className="flex items-center gap-2"
+                >
+                  <Player.Time
+                    className="select-none text-sm tabular-nums"
+                    style={{ color: '#EC407A' }}
+                  />
+                </Player.LiveIndicator>
+              </div>
+              <div className="absolute bottom-0 right-0 flex items-center justify-end gap-2.5 sm:flex-1 md:flex-[1.5]">
+                <Player.FullscreenTrigger className="h-6 w-6 flex-shrink-0 transition hover:scale-110">
+                  <Player.FullscreenIndicator asChild>
+                    <ExitFullscreenIcon
+                      className="h-full w-full"
+                      style={{ color: '#EC407A' }}
+                    />
+                  </Player.FullscreenIndicator>
+                  <Player.FullscreenIndicator matcher={false} asChild>
+                    <EnterFullscreenIcon
+                      className="h-full w-full"
+                      style={{ color: '#EC407A' }}
+                    />
+                  </Player.FullscreenIndicator>
+                </Player.FullscreenTrigger>
+              </div>
+            </div>
           </Player.Controls>
         </Player.Container>
       </Player.Root>
