@@ -86,6 +86,7 @@ export default function VideoDetails({ asset }: VideoDetailsProps) {
       </Player.Seek>
     ),
   );
+  Seek.displayName = 'Seek';
 
   const Settings = React.forwardRef(
     (
@@ -214,6 +215,7 @@ export default function VideoDetails({ asset }: VideoDetailsProps) {
       );
     },
   );
+  Settings.displayName = 'Settings';
 
   const RateSelectItem = React.forwardRef<
     HTMLDivElement,
@@ -235,6 +237,7 @@ export default function VideoDetails({ asset }: VideoDetailsProps) {
       </Player.RateSelectItem>
     );
   });
+  RateSelectItem.displayName = 'RateSelectItem';
 
   const VideoQualitySelectItem = React.forwardRef<
     HTMLDivElement,
@@ -256,6 +259,7 @@ export default function VideoDetails({ asset }: VideoDetailsProps) {
       </Player.VideoQualitySelectItem>
     );
   });
+  VideoQualitySelectItem.displayName = 'VideoQualitySelectItem';
 
   if (!asset) {
     return (
@@ -319,7 +323,8 @@ export default function VideoDetails({ asset }: VideoDetailsProps) {
                     Stream is private
                   </div>
                   <div className="text-xs text-gray-100 sm:text-sm">
-                    It looks like you don't have permission to view this content
+                    It looks like you don&apos;t have permission to view this
+                    content
                   </div>
                 </div>
                 <LoadingIcon className="mx-auto h-6 w-6 animate-spin md:h-8 md:w-8" />
