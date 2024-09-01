@@ -35,7 +35,15 @@ export default function VotePage() {
           </BreadcrumbList>
         </Breadcrumb>
       </div>
-      <Vote />
+      <div>
+        <h1 className="text-xl font-bold">Voting</h1>
+      </div>
+      <div className="mt-5">
+        <p>Have your say in the future of the Creative ecosystem.</p>
+      </div>
+      <div className="p-4">
+        <Vote />
+      </div>
     </div>
   );
 }

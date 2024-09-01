@@ -114,108 +114,96 @@ const Vote = () => {
 
   return (
     <>
-      <div className="p-4">
+      {activeAccount && (
+        <div className="mt-5">
+          <Link href={'/vote/create'}>
+            <Button className="rounded bg-pink-500 p-5 text-white hover:bg-pink-600 focus:bg-pink-600">
+              <h2 className="text-sm font-bold">Make a Proposal</h2>
+            </Button>
+          </Link>
+        </div>
+      )}
+      <div className="pt-10">
         <div>
           <div>
-            <h1 className="text-xl font-bold">Voting</h1>
+            <h1 className="text-xl font-bold">Proposals</h1>
           </div>
-          <div className="mt-5">
-            <p>Have your say in the future of the Creative ecosystem.</p>
+          <div className="mt-5 flex min-w-[40vw] flex-row rounded-t-lg bg-gradient-to-l from-yellow-300 via-red-600 to-pink-500 p-2">
+            <div
+              className={`m-2 flex min-w-10 cursor-pointer flex-row items-center justify-center rounded-lg p-2 ${selectionType[0] ? 'bg-white' : 'bg-brand-400'}`}
+              onClick={() => handleTypeChange(0)}
+            >
+              <FaCertificate color={selectionType[0] ? '#ec407a' : 'white'} />
+              <p
+                className={`ml-2 ${selectionType[0] ? 'text-pink-500' : 'text-white'}`}
+              >
+                Core
+              </p>
+            </div>
+            <div
+              className={`m-2 flex min-w-10 cursor-pointer flex-row items-center justify-center rounded-lg p-2 ${selectionType[1] ? 'bg-white' : 'bg-pink-500'}`}
+              onClick={() => handleTypeChange(1)}
+            >
+              <FaUsers color={selectionType[1] ? '#ec407a' : 'white'} />
+              <p
+                className={`ml-2 ${selectionType[1] ? 'text-pink-500' : 'text-white'}`}
+              >
+                Community
+              </p>
+            </div>
+            <div
+              className={`m-2 flex min-w-10 cursor-pointer flex-row items-center justify-center rounded-lg p-2 ${selectionType[2] ? 'bg-white' : 'bg-pink-500'}`}
+              onClick={() => handleTypeChange(2)}
+            >
+              <p className={`text-${selectionType[2] ? 'pink-500' : 'white'}`}>
+                All
+              </p>
+            </div>
           </div>
-          {activeAccount && (
-            <div className="mt-5">
-              <Link href={'/vote/create'}>
-                <Button className="rounded bg-pink-500 p-5 text-white hover:bg-pink-600 focus:bg-pink-600">
-                  <h2 className="text-sm font-bold">Make a Proposal</h2>
-                </Button>
-              </Link>
-            </div>
-          )}
-        </div>
-        <div className="pt-10">
-          <div>
-            <div>
-              <h1 className="text-xl font-bold">Proposals</h1>
-            </div>
-            <div className="mt-5 flex min-w-[40vw] flex-row rounded-t-lg bg-gradient-to-l from-yellow-300 via-red-600 to-pink-500 p-2">
-              <div
-                className={`m-2 flex min-w-10 cursor-pointer flex-row items-center justify-center rounded-lg p-2 ${selectionType[0] ? 'bg-white' : 'bg-brand-400'}`}
-                onClick={() => handleTypeChange(0)}
-              >
-                <FaCertificate color={selectionType[0] ? '#ec407a' : 'white'} />
-                <p
-                  className={`ml-2 ${selectionType[0] ? 'text-pink-500' : 'text-white'}`}
-                >
-                  Core
-                </p>
+          <div className="flex min-w-[40vw] flex-col border-2 border-solid border-pink-500 p-2">
+            <RadioGroup
+              onValueChange={setValue}
+              defaultValue={value}
+              className="flex flex-row space-x-4"
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="active" id="active" />
+                <Label htmlFor="active" className="text-black">
+                  Vote Now
+                </Label>
               </div>
-              <div
-                className={`m-2 flex min-w-10 cursor-pointer flex-row items-center justify-center rounded-lg p-2 ${selectionType[1] ? 'bg-white' : 'bg-pink-500'}`}
-                onClick={() => handleTypeChange(1)}
-              >
-                <FaUsers color={selectionType[1] ? '#ec407a' : 'white'} />
-                <p
-                  className={`ml-2 ${selectionType[1] ? 'text-pink-500' : 'text-white'}`}
-                >
-                  Community
-                </p>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="pending" id="pending" />
+                <Label htmlFor="pending" className="text-black">
+                  Soon
+                </Label>
               </div>
-              <div
-                className={`m-2 flex min-w-10 cursor-pointer flex-row items-center justify-center rounded-lg p-2 ${selectionType[2] ? 'bg-white' : 'bg-pink-500'}`}
-                onClick={() => handleTypeChange(2)}
-              >
-                <p
-                  className={`text-${selectionType[2] ? 'pink-500' : 'white'}`}
-                >
-                  All
-                </p>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="closed" id="closed" />
+                <Label htmlFor="closed" className="text-black">
+                  Closed
+                </Label>
               </div>
-            </div>
-            <div className="flex min-w-[40vw] flex-col border-2 border-solid border-pink-500 p-2">
-              <RadioGroup
-                onValueChange={setValue}
-                defaultValue={value}
-                className="flex flex-row space-x-4"
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="active" id="active" />
-                  <Label htmlFor="active" className="text-black">
-                    Vote Now
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="pending" id="pending" />
-                  <Label htmlFor="pending" className="text-black">
-                    Soon
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="closed" id="closed" />
-                  <Label htmlFor="closed" className="text-black">
-                    Closed
-                  </Label>
-                </div>
-              </RadioGroup>
-            </div>
-            <div className="rounded-b-3xl border-2 border-pink-500 p-5">
-              {snapshots.map((data) => (
-                <Card
-                  core={data.author === CREATIVE_ADDRESS}
-                  key={data.id}
-                  title={data.title}
-                  body={data.body}
-                  state={data.state}
-                  start={convertDate(data.start)}
-                  choices={data.choices}
-                  end={convertDate(data.end)}
-                  score={data.scores_total}
-                  scores={data.scores}
-                  creator={data.author}
-                  identifier={data.id}
-                  snapshot={data.snapshot}
-                />
-              ))}
-            </div>
+            </RadioGroup>
+          </div>
+          <div className="rounded-b-3xl border-2 border-pink-500 p-5">
+            {snapshots.map((data) => (
+              <Card
+                core={data.author === CREATIVE_ADDRESS}
+                key={data.id}
+                title={data.title}
+                body={data.body}
+                state={data.state}
+                start={convertDate(data.start)}
+                choices={data.choices}
+                end={convertDate(data.end)}
+                score={data.scores_total}
+                scores={data.scores}
+                creator={data.author}
+                identifier={data.id}
+                snapshot={data.snapshot}
+              />
+            ))}
           </div>
         </div>
       </div>

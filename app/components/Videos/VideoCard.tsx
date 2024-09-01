@@ -64,7 +64,7 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
               <p className="text-xl" color={'brand.300'}>
                 <span style={{ fontSize: 'sm' }}>{'USDC'}</span>
               </p>
-              <p>
+              <p className="overflow-hidden text-ellipsis">
                 With Creative TV, we wanted to sync the speed of creation with
                 the speed of design. We wanted the creator to be just as excited
                 as the designer to create new content.

@@ -2,6 +2,15 @@ import { Asset } from 'livepeer/models/components';
 import { GetAssetResponse } from 'livepeer/models/operations';
 import VideoDetails from '@app/components/Videos/VideoDetails';
 import { fetchAssetId } from '@app/api/livepeer/actions';
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '@app/components/ui/breadcrumb';
+import { Slash } from 'lucide-react';
 
 type VideoDetailsPageProps = {
   params: {
@@ -30,6 +39,34 @@ export default async function VideoDetailsPage({
 
   return (
     <div className="container max-w-7xl content-center">
+      <div className="my-5 p-4">
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink href="/">
+                <span role="img" aria-label="home">
+                  🏠
+                </span>{' '}
+                Home
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator>
+              <Slash />
+            </BreadcrumbSeparator>
+            <BreadcrumbItem>
+              <BreadcrumbLink href="/discover">Discover</BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator>
+              <Slash />
+            </BreadcrumbSeparator>
+            <BreadcrumbItem>
+              <BreadcrumbLink>
+                <BreadcrumbPage>{assetData?.name}</BreadcrumbPage>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+      </div>
       <div className="py-10">
         <VideoDetails asset={assetData} />
       </div>
