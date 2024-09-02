@@ -28,7 +28,7 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
   return (
     <div className="mx-auto">
       {asset?.status?.phase === 'ready' && (
-        <Card key={asset?.id} className={cn('w-[380px]')}>
+        <Card key={asset?.id} className={cn('w-[360px]')}>
           <div className="mx-auto flex-1 flex-wrap">
             <CardHeader>
               <Avatar>
@@ -63,11 +63,6 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
               <div className="space-y-4" />
               <p className="text-xl" color={'brand.300'}>
                 <span style={{ fontSize: 'sm' }}>{'USDC'}</span>
-              </p>
-              <p className="overflow-hidden text-ellipsis">
-                With Creative TV, we wanted to sync the speed of creation with
-                the speed of design. We wanted the creator to be just as excited
-                as the designer to create new content.
               </p>
             </div>
           </CardContent>

@@ -1,6 +1,12 @@
 'use client';
 import { Asset } from 'livepeer/models/components';
-import { useState, useEffect } from 'react';
+import React, {
+  useState,
+  useEffect,
+  type CSSProperties,
+  type PropsWithChildren,
+  forwardRef,
+} from 'react';
 import { Src } from '@livepeer/react';
 import * as Player from '@livepeer/react/player';
 import * as Popover from '@radix-ui/react-popover';
@@ -21,11 +27,6 @@ import {
   EnterFullscreenIcon,
   ExitFullscreenIcon,
 } from '@livepeer/react/assets';
-import React, {
-  type CSSProperties,
-  type PropsWithChildren,
-  forwardRef,
-} from 'react';
 import { Skeleton } from '@app/components/ui/skeleton';
 import { getDetailPlaybackSource } from '@app/lib/utils/hooks/useDetailPlaybackSources';
 
