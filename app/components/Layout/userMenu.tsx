@@ -66,7 +66,11 @@ export const UserMenu = () => {
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem>
-            <Link href="#" className="flex items-center gap-2" prefetch={false}>
+            <Link
+              href={`/app/profile/${activeAccount?.address}/upload`}
+              className="flex items-center gap-2"
+              prefetch={false}
+            >
               <UploadIcon className="h-4 w-4" />
               <span>Upload</span>
             </Link>
