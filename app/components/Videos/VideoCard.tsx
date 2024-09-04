@@ -18,6 +18,7 @@ import Link from 'next/link';
 import { Src } from '@livepeer/react';
 import makeBlockie from 'ethereum-blockies-base64';
 import VideoViewMetrics from './VideoViewMetrics';
+import { color } from 'framer-motion';
 
 interface VideoCardProps {
   asset: Asset;
@@ -43,7 +44,7 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
           </div>
           <PlayerComponent
             src={playbackSources} // Use the detailed playback sources here
-            title={asset.name}
+            title={asset?.name}
           />
           <CardContent>
             <div className="my-2 flex items-center justify-between">
@@ -56,7 +57,7 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
             </div>
             <div className="mt-6 grid grid-flow-row auto-rows-max space-y-3 overflow-hidden">
               <Link href={`/discover/${asset.id}`} passHref>
-                <h1 className="max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-xl font-bold">
+                <h1 className="max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-xl font-bold hover:text-orange-500 focus:text-orange-500">
                   {asset?.name}
                 </h1>
               </Link>
