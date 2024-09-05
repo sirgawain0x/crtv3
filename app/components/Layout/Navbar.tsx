@@ -4,7 +4,15 @@ import Link from 'next/link';
 import Image from 'next/image';
 import ConnectButtonWrapper from '../Button/connectButtonWrapper';
 import { SITE_LOGO } from '@app/lib/utils/context';
-import { Sheet, SheetTrigger, SheetContent } from '@app/components/ui/sheet';
+import {
+  Sheet,
+  SheetTrigger,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from '@app/components/ui/sheet';
+import * as VisuallyHidden from '@radix-ui/react-visually-hidden';
 import { Button } from '@app/components/ui/button';
 import { useActiveAccount } from 'thirdweb/react';
 import { UserMenu } from './userMenu';
@@ -22,20 +30,27 @@ export function Navbar() {
           </Button>
         </SheetTrigger>
         <SheetContent side="left">
+          <SheetHeader>
+            <SheetTitle>
+              <VisuallyHidden.Root>Menu</VisuallyHidden.Root>
+            </SheetTitle>
+            <SheetDescription>
+              <VisuallyHidden.Root>The stage is yours.</VisuallyHidden.Root>
+            </SheetDescription>
+          </SheetHeader>
           <div>
             <Link href="/" className="mr-6 lg:flex" prefetch={false}>
               <Image
+                style={{ width: 'auto', height: 'auto' }}
                 src={SITE_LOGO}
                 alt="Creative Logo"
                 width={80}
                 height={80}
                 priority
               />
-              <h1>
-                <span className="sr-only" style={{ color: 'GrayText' }}>
-                  CREATIVE TV
-                </span>
-              </h1>
+              <span className="mx-auto my-auto">
+                <h1 className="text-lg">CREATIVE TV</h1>
+              </span>
             </Link>
           </div>
           <div className="grid gap-2 py-6">
@@ -76,9 +91,9 @@ export function Navbar() {
           height={80}
           priority
         />
-        <h1>
-          <span className="sr-only">Creative TV</span>
-        </h1>
+        <span className="mx-auto my-auto">
+          <h1 className="text-lg">CREATIVE TV</h1>
+        </span>
       </Link>
       <nav className="ml-auto hidden gap-6 lg:flex">
         <Link
@@ -126,26 +141,6 @@ function MenuIcon(props: any) {
       <line x1="4" x2="20" y1="12" y2="12" />
       <line x1="4" x2="20" y1="6" y2="6" />
       <line x1="4" x2="20" y1="18" y2="18" />
-    </svg>
-  );
-}
-
-function XIcon(props: any) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M18 6 6 18" />
-      <path d="m6 6 12 12" />
     </svg>
   );
 }

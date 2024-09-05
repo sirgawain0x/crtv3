@@ -67,16 +67,14 @@ const VideoCardGrid: React.FC = () => {
   }
 
   return (
-    <div className="p-4">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-        {playbackSources.map((asset) => (
-          <VideoCard
-            key={asset.id}
-            asset={asset}
-            playbackSources={asset.detailedSrc}
-          />
-        ))}
-      </div>
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+      {playbackSources.map((asset) => (
+        <VideoCard
+          key={asset.id}
+          asset={asset}
+          playbackSources={asset.detailedSrc}
+        />
+      ))}
     </div>
   );
 };

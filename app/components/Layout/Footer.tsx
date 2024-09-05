@@ -10,7 +10,13 @@ export default function Component() {
     <footer className="bg-muted py-6 md:py-8">
       <div className="container flex flex-col items-center justify-between gap-4 md:flex-row">
         <Link href="/" className="flex items-center gap-2" prefetch={false}>
-          <Image src={SITE_LOGO} alt="Creative Logo" width={40} height={40} />
+          <Image
+            src={SITE_LOGO}
+            alt="Creative Logo"
+            style={{ width: 'auto', height: 'auto' }}
+            width={40}
+            height={40}
+          />
           <span className="text-sm font-medium">CREATIVE</span>
         </Link>
         <nav className="mx-auto flex items-center gap-4">
@@ -55,7 +61,7 @@ function PowerIcon(props: any) {
     <svg
       {...props}
       xmlns="http://www.w3.org/2000/svg"
-      idth="800px"
+      width="800px"
       height="800px"
       viewBox="0 0 24 24"
       fill="none"

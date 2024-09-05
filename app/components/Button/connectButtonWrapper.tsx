@@ -1,9 +1,10 @@
+'use client';
 import { ConnectButton } from 'thirdweb/react';
 import { client } from '@app/lib/sdk/thirdweb/client';
 import { ACCOUNT_FACTORY_ADDRESS } from '@app/lib/utils/context';
 import { createWallet, inAppWallet } from 'thirdweb/wallets';
 import { VerifyLoginPayloadParams, LoginPayload } from 'thirdweb/auth';
-import { sepolia, polygon } from 'thirdweb/chains';
+import { defineChain, sepolia, polygon, optimism, base } from 'thirdweb/chains';
 import {
   generatePayload,
   isLoggedIn,
@@ -13,7 +14,6 @@ import {
 } from '@app/api/auth/thirdweb/thirdweb';
 
 export default function ConnectButtonWrapper() {
-  const chain = sepolia;
   const wallets = [
     inAppWallet({
       auth: {
@@ -74,6 +74,7 @@ export default function ConnectButtonWrapper() {
   return (
     <ConnectButton
       client={client}
+      chains={[polygon, base, optimism, sepolia]}
       connectButton={{
         label: 'Get Started',
         className: 'my-custom-class',
@@ -84,12 +85,12 @@ export default function ConnectButtonWrapper() {
         },
       }}
       accountAbstraction={{
-        chain: chain,
-        sponsorGas: true,
-        factoryAddress: `${ACCOUNT_FACTORY_ADDRESS.sepolia}`,
+        chain: defineChain(polygon),
+        client: client,
+        sponsorGas: false,
+        factoryAddress: `${ACCOUNT_FACTORY_ADDRESS.polygon}`,
       }}
       wallets={wallets}
-      chain={chain}
       appMetadata={{
         name: 'Creative TV',
         url: 'https://tv.creativeplatform.xyz',

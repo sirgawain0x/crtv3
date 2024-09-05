@@ -1,9 +1,9 @@
 'use client';
 import { ApolloWrapper } from './lib/utils/ApolloWrapper';
 import { ThirdwebProvider } from '@app/lib/sdk/thirdweb/components';
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
 import { createConfig, http, WagmiProvider } from 'wagmi';
-import { sepolia } from 'wagmi/chains';
+import { polygon, base, sepolia, optimism } from 'wagmi/chains';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 interface ThemeContextType {
@@ -12,9 +12,12 @@ interface ThemeContextType {
 }
 
 const config = createConfig({
-  chains: [sepolia],
+  chains: [polygon, base, optimism, sepolia],
   transports: {
     [sepolia.id]: http(),
+    [polygon.id]: http(),
+    [base.id]: http(),
+    [optimism.id]: http(),
   },
 });
 
