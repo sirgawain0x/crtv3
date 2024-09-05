@@ -2,10 +2,15 @@
 import { useEffect, useRef } from 'react';
 import { Button } from '@app/components/ui/button'; // Assuming this is the Shadcn-UI button component
 import { setupCheckout } from '@app/lib/utils/checkout'; // Import your existing checkout setup
+import { Paywall } from '@unlock-protocol/paywall'; // Import the Unlock Protocol Paywall
+import { polygon, base, optimism, sepolia } from 'thirdweb/chains';
+import { useActiveAccount } from 'thirdweb/react';
+import { toast } from 'sonner';
 
 // Setting global paywall config in React component lifecycle
 const PaywallButton: React.FC = () => {
   const buttonRef = useRef<HTMLButtonElement | null>(null);
+  const activeAccount = useActiveAccount();
 
   useEffect(() => {
     if (buttonRef.current) {
@@ -65,8 +70,33 @@ const PaywallButton: React.FC = () => {
     };
   }, []);
 
+  const networkConfigs = {
+    137: {
+      provider: `https://137.rpc.thirdweb.com/${process.env.NEXT_PUBLIC_TEMPLATE_CLIENT_ID}`,
+    },
+    10: {
+      provider: `https://10.rpc.thirdweb.com/${process.env.NEXT_PUBLIC_TEMPLATE_CLIENT_ID}`,
+    },
+    8453: {
+      provider: `https://8453.rpc.thirdweb.com/${process.env.NEXT_PUBLIC_TEMPLATE_CLIENT_ID}`,
+    },
+    11155111: {
+      provider: `https://11155111.rpc.thirdweb.com/${process.env.NEXT_PUBLIC_TEMPLATE_CLIENT_ID}`,
+    },
+  };
+
+  const paywall = new Paywall(networkConfigs);
+
+  const handleButtonClick = async () => {
+    paywall.connect(activeAccount);
+    const response = await paywall.loadCheckoutModal(
+      window.unlockProtocolConfig,
+    );
+    toast(response); // Handle the response as needed
+  };
+
   return (
-    <Button ref={buttonRef} type="button">
+    <Button ref={buttonRef} type="button" onClick={() => handleButtonClick}>
       Buy Pass
     </Button>
   );
