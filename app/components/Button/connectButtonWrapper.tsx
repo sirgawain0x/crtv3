@@ -101,6 +101,12 @@ export default function ConnectButtonWrapper() {
       walletConnect={{
         projectId: 'dc6a426a325d62879d4b9c6ef6dcedb1',
       }}
+      supportedNFTs={{
+        137: [
+          '0xad597e5b24ad2a6032168c76f49f05d957223cd0',
+          '0xb6b645c3e2025cf69983983266d16a0aa323e2b0',
+        ],
+      }}
       connectModal={{
         size: 'wide',
         privacyPolicyUrl:
