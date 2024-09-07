@@ -20,21 +20,21 @@ export const UserMenu = () => {
   const activeAccount = useActiveAccount();
   const [loggedIn, setLoggedIn] = useState(false);
 
-  useEffect(() => {
-    const checkLogin = async () => {
-      const result = await isLoggedIn();
-      setLoggedIn(result);
-    };
-    checkLogin();
-  }, []);
+  // useEffect(() => {
+  //   const checkLogin = async () => {
+  //     const result = await isLoggedIn();
+  //     setLoggedIn(result);
+  //   };
+  //   checkLogin();
+  // }, []);
 
-  if (!loggedIn) {
-    return (
-      <div className="my-auto">
-        <PaywallButton />
-      </div>
-    );
-  }
+  // if (!loggedIn) {
+  //   return (
+  //     <div className="my-auto">
+  //       <PaywallButton />
+  //     </div>
+  //   );
+  // }
 
   return (
     <div className="my-auto">
@@ -53,7 +53,11 @@ export const UserMenu = () => {
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem>
-            <Link href="#" className="flex items-center gap-2" prefetch={false}>
+            <Link
+              href={`/profile/${activeAccount?.address}`}
+              className="flex items-center gap-2"
+              prefetch={false}
+            >
               <UserIcon className="h-4 w-4" />
               <span>Profile</span>
             </Link>
@@ -67,7 +71,7 @@ export const UserMenu = () => {
           <DropdownMenuSeparator />
           <DropdownMenuItem>
             <Link
-              href={`/app/profile/${activeAccount?.address}/upload`}
+              href={`/profile/${activeAccount?.address}/upload`}
               className="flex items-center gap-2"
               prefetch={false}
             >

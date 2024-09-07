@@ -17,7 +17,12 @@ export default function Component() {
             width={40}
             height={40}
           />
-          <span className="text-sm font-medium">CREATIVE</span>
+          <span
+            className="text-sm font-medium"
+            style={{ fontFamily: 'ConthraxSb-Regular , sans-serif' }}
+          >
+            CREATIVE
+          </span>
         </Link>
         <nav className="mx-auto flex items-center gap-4">
           <Link

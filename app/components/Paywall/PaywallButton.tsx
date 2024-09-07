@@ -5,19 +5,19 @@ import { setupCheckout } from '@app/lib/utils/checkout';
 import { Paywall } from '@unlock-protocol/paywall';
 import { ethers6Adapter } from 'thirdweb/adapters/ethers6';
 import { polygon, base, optimism, sepolia } from 'thirdweb/chains';
-import { networks } from '@unlock-protocol/networks';
 import {
   useActiveAccount,
-  useActiveWallet,
+  useActiveWalletChain,
   useSwitchActiveWalletChain,
 } from 'thirdweb/react';
 import { toast } from 'sonner';
+import { client } from '@app/lib/sdk/thirdweb/client';
 
 // Setting global paywall config in React component lifecycle
 const PaywallButton: React.FC = () => {
   const buttonRef = useRef<HTMLButtonElement | null>(null);
   const activeAccount = useActiveAccount();
-  const walletChain = useActiveWallet();
+  const walletChain = useActiveWalletChain();
   const switchChain = useSwitchActiveWalletChain();
   const [isLoading, setIsLoading] = useState(false);
 
@@ -58,6 +58,21 @@ const PaywallButton: React.FC = () => {
     endingCallToAction: 'Complete Checkout',
     persistentCheckout: false,
     recipient: `${activeAccount?.address}`,
+  };
+
+  const networkConfigs = {
+    137: {
+      provider: `https://137.rpc.thirdweb.com/${process.env.NEXT_PUBLIC_TEMPLATE_CLIENT_ID}`,
+    },
+    10: {
+      provider: `https://10.rpc.thirdweb.com/${process.env.NEXT_PUBLIC_TEMPLATE_CLIENT_ID}`,
+    },
+    8453: {
+      provider: `https://8453.rpc.thirdweb.com/${process.env.NEXT_PUBLIC_TEMPLATE_CLIENT_ID}`,
+    },
+    11155111: {
+      provider: `https://11155111.rpc.thirdweb.com/${process.env.NEXT_PUBLIC_TEMPLATE_CLIENT_ID}`,
+    },
   };
 
   useEffect(() => {
@@ -122,15 +137,16 @@ const PaywallButton: React.FC = () => {
   const claimPass = async () => {
     setIsLoading(true);
     if (walletChain?.id !== polygon.id) await switchChain(polygon);
-    const provider = ethers6Adapter.provider;
-    const paywall = new Paywall(networks);
-    paywall.connect(provider);
+    const paywall = new Paywall(networkConfigs);
+    console.log('paywall', paywall);
+    const provider = await paywall.getProvider(
+      ethers6Adapter.provider.toEthers({ client: client, chain: polygon }),
+    );
+    console.log('provider', provider);
+    await paywall.connect(provider);
     const response = await paywall.loadCheckoutModal(paywallConfig);
-    if (response) {
-      toast.success('Pass claimed successfully!');
-    } else {
-      toast.error('Failed to claim pass');
-    }
+    console.log('response', response);
+    toast(response);
   };
 
   return (
