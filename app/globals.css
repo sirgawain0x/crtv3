@@ -2,6 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
+/* In your global CSS file, e.g., App.css or index.css */
+@font-face {
+  font-family: 'ConthraxSb-Regular'; /* Name of your font */
+  src: url('/fonts/ConthraxSb-Regular.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;

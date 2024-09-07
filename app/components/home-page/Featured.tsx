@@ -58,9 +58,11 @@ const FeaturedVideo: React.FC = () => {
               {FEATURED_VIDEO_TITLE}
             </h2>
             <p className="max-w-[600px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
-              Dive into the latest expansion of the iconic MMORPG, with a
-              captivating cinematic trailer showcasing the new Chains of
-              Domination content.
+              Explore the intersection of technology, innovation, and the
+              creative economy. Hosted by industry leaders, each episode
+              features in-depth conversations with artists, entrepreneurs, and
+              tech pioneers who are shaping the future of creative industries
+              through blockchain, AI, and digital media.
             </p>
           </div>
         </div>

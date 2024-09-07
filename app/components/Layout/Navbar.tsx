@@ -1,5 +1,5 @@
 'use client';
-import * as React from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import ConnectButtonWrapper from '../Button/connectButtonWrapper';
@@ -15,11 +15,42 @@ import {
 import * as VisuallyHidden from '@radix-ui/react-visually-hidden';
 import { Button } from '@app/components/ui/button';
 import { useActiveAccount } from 'thirdweb/react';
-import { UserMenu } from './userMenu';
 import ThemeToggleComponent from '../ThemeToggle/toggleComponent';
+import Unlock from '@app/lib/utils/Unlock.json';
+import { client } from '@app/lib/sdk/thirdweb/client';
+import { useReadContract } from 'thirdweb/react';
+import { polygon } from 'thirdweb/chains';
+import { getContract } from 'thirdweb';
+import ClaimLockButton from '@app/components/Paywall/ClaimLock';
 
 export function Navbar() {
   const activeAccount = useActiveAccount();
+
+  /*******  CONTRACT READING ********/
+  const unlockContract = getContract({
+    client: client,
+    chain: polygon,
+    address: '0x9a9280897c123b165e23f77cf4c58292d6ab378d',
+    abi: Unlock.abi,
+  });
+
+  const { data: result, isLoading } = useReadContract({
+    contract: unlockContract,
+    method: 'getHasValidKey',
+    params: [activeAccount?.address],
+  });
+
+  const [subscribed, setSubscribed] = useState(false);
+
+  useEffect(() => {
+    if (!activeAccount || !Unlock.abi) return;
+
+    if (result !== undefined) {
+      console.log('Is your membership valid?', result);
+      setSubscribed(result);
+    }
+  }, [activeAccount, result]);
+
   return (
     <header className="flex h-20 w-full shrink-0 items-center bg-muted px-4 md:px-6">
       <Sheet>
@@ -41,7 +72,11 @@ export function Navbar() {
           <div>
             <Link href="/" className="mr-6 lg:flex" prefetch={false}>
               <Image
-                style={{ width: 'auto', height: 'auto' }}
+                style={{
+                  width: 'auto',
+                  height: 'auto',
+                  marginBottom: '0.25rem',
+                }}
                 src={SITE_LOGO}
                 alt="Creative Logo"
                 width={80}
@@ -49,7 +84,18 @@ export function Navbar() {
                 priority
               />
               <span className="mx-auto my-auto">
-                <h1 className="text-lg">CREATIVE TV</h1>
+                <h1
+                  className="text-lg"
+                  style={{ fontFamily: 'ConthraxSb-Regular , sans-serif' }}
+                >
+                  CREATIVE{' '}
+                  <span
+                    className="ml-1 text-xl font-bold text-red-500"
+                    style={{ fontFamily: 'sans-serif' }}
+                  >
+                    TV
+                  </span>
+                </h1>
               </span>
             </Link>
           </div>
@@ -77,7 +123,7 @@ export function Navbar() {
             <ConnectButtonWrapper />
             {activeAccount && (
               <div className="mt-5">
-                <UserMenu />
+                <ClaimLockButton />
               </div>
             )}
           </div>
@@ -92,7 +138,18 @@ export function Navbar() {
           priority
         />
         <span className="mx-auto my-auto">
-          <h1 className="text-lg">CREATIVE TV</h1>
+          <h1
+            className="text-lg"
+            style={{ fontFamily: 'ConthraxSb-Regular , sans-serif' }}
+          >
+            CREATIVE
+            <span
+              className="ml-1 text-xl font-bold text-red-500"
+              style={{ fontFamily: 'sans-serif' }}
+            >
+              TV
+            </span>
+          </h1>
         </span>
       </Link>
       <nav className="ml-auto hidden gap-6 lg:flex">
@@ -118,7 +175,7 @@ export function Navbar() {
         <div className="mr-5">
           <ConnectButtonWrapper />
         </div>
-        {activeAccount && <UserMenu />}
+        {activeAccount && <ClaimLockButton />}
       </div>
     </header>
   );
