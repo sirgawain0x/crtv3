@@ -3,13 +3,7 @@ import { useState, useEffect } from 'react';
 import { Avatar, AvatarImage, AvatarFallback } from '../ui/avatar';
 import makeBlockie from 'ethereum-blockies-base64';
 import { shortenAddress } from 'thirdweb/utils';
-import { StackClient } from '@stackso/js-core';
-
-// Initialize the client
-const stack = new StackClient({
-  apiKey: `${process.env.STACK_API_KEY}`,
-  pointSystemId: 2777,
-});
+import { stack } from '@app/lib/sdk/stack/client';
 
 interface LeaderboardItem {
   uniqueId: number;
