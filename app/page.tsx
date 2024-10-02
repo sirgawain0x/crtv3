@@ -1,5 +1,6 @@
 import { Metadata } from 'next';
 import Content from '@app/components/Content/Content';
+ 
 
 export const metadata: Metadata = {
   title: 'Creative TV',
@@ -27,6 +28,7 @@ export default function Home() {
     <div className={'container mx-auto max-w-7xl'}>
       <div className={'py-10'}>
         <Content />
+        
       </div>
     </div>
   );
