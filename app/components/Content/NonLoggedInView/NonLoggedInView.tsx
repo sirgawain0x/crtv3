@@ -3,7 +3,7 @@ import { TopChart } from '../../home-page/TopChart';
 import FeaturedVideo from '@app/components/home-page/Featured';
 import { TopVideos } from '../../home-page/TopVideos';
 import FileUpload from '@app/components/Upload/FileUpload';
-
+import CreateAndViewAsset from '@app/components/Videos/Upload/CreateAndViewAsset'
 const NonLoggedInView = () => {
   return (
     <div>
@@ -11,7 +11,8 @@ const NonLoggedInView = () => {
       <TopChart />
       <FeaturedVideo />
       <TopVideos />
-      <FileUpload/>
+      
+      <CreateAndViewAsset/>
     </div>
   );
 };

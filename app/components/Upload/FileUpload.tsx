@@ -24,7 +24,7 @@ const FileUpload: React.FC = () => {
     try {
       // Access API keys from environment variables
       const storage = new ThirdwebStorage({
-        clientId: process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID || "",
+        clientId: process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID || "745aee0392a556b19e8e120dade62317",
          
       });
 
@@ -40,8 +40,8 @@ const FileUpload: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-10 px-4">
-      <div className="max-w-lg w-full bg-white rounded-lg shadow-lg p-8">
+    <div className=" flex items-center justify-center bg-[#1a1c1f] py-10 px-4">
+      <div className=" w-full  rounded-lg shadow-lg p-8">
         <h1 className="text-2xl font-semibold text-gray-800 mb-4">
           Upload a File
         </h1>
