@@ -47,7 +47,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect }) => {
 
   return (
     <div className="flex items-center justify-center bg-[#1a1c1f] px-4 py-10">
-      <div className=" w-full rounded-lg p-8 shadow-lg">
+      <div className="w-full rounded-lg p-8 shadow-lg">
         <h1 className="mb-4 text-2xl font-semibold text-gray-200">
           Upload A File
         </h1>
@@ -64,12 +64,12 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect }) => {
             type="file"
             id="file-upload"
             accept="video/*"
-            className="block w-full text-sm text-gray-500
-                       file:mr-4 file:rounded-full file:border-0
-                       file:bg-indigo-50 file:px-4
-                       file:py-2 file:text-sm
-                       file:font-semibold file:text-indigo-600
-                       hover:file:bg-indigo-100"
+            className="block w-full text-sm
+                       text-[#EC407A] file:mr-4 file:rounded-full
+                       file:border-0 file:bg-white
+                       file:px-4 file:py-2
+                       file:text-sm file:font-semibold
+                       file:text-[#EC407A] hover:file:bg-gray-200"
             onChange={handleFileChange}
           />
         </div>
@@ -81,9 +81,9 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect }) => {
             disabled={!selectedFile || uploading}
             className={`${
               uploading
-                ? 'cursor-not-allowed bg-indigo-300'
-                : 'bg-indigo-600 hover:bg-indigo-700'
-            } rounded-lg px-4 py-2 font-semibold text-white`}
+                ? 'cursor-not-allowed bg-[#D63A6A]' // Change disabled color if needed
+                : 'bg-[#EC407A] hover:bg-[#D63A6A]' // Change button color
+            } cursor-pointer rounded-lg px-4 py-2 font-semibold text-white`}
           >
             {uploading ? 'Uploading...' : 'Upload File'}
           </button>
