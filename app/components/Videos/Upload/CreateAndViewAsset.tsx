@@ -19,7 +19,8 @@ import { uploadAssetByURL } from '@app/lib/utils/fetchers/livepeer/livepeerApi';
 import { ACCOUNT_FACTORY_ADDRESS } from '@app/lib/utils/context';
 import { Livepeer } from 'livepeer';
 import { toast } from 'sonner'; // Add this import for error notifications
-import FileUpload from '@app/components/Upload/FileUpload';
+import FileUpload from './FileUpload';
+import PreviewVideo from './PreviewVideo'; // {{ edit_1 }}
 
 export default function Upload() {
   // Creating state for the input field
@@ -31,10 +32,11 @@ export default function Upload() {
   const [video, setVideo] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [videoFile, setVideoFile] = useState<File | null>(null);
 
   //  Creating a ref for thumbnail and video
   const thumbnailRef = useRef();
-  const videoRef = useRef();
+  const videoRef = useRef<HTMLInputElement | null>(null); // Create a ref for the video input
 
   const chain = polygon;
   const activeAccount = useActiveAccount();
@@ -163,178 +165,172 @@ export default function Upload() {
     return videoNFT;
   };
 
-  //   const saveVideo = async (data) => {
-  //     let contract = await getContract();
-  //     await contract.uploadVideo(
-  //       data.video,
-  //       data.title,
-  //       data.description,
-  //       data.location,
-  //       data.category,
-  //       data.thumbnail,
-  //       false,
-  //       data.UploadedDate,
-  //     );
-  //   };
+  const handleReplaceVideo = () => {
+    if (videoRef.current) {
+      videoRef.current.click(); // Trigger the file input click
+    }
+  };
 
   return (
-    <div className="flex h-screen w-full flex-row bg-[#1a1c1f]">
-      <div className="flex flex-1 flex-col">
-        <div className="mr-10 mt-5 flex justify-end">
-          <div className="flex items-center">
-            <button
-              className="mr-6 rounded-lg border border-gray-600 bg-transparent px-6 py-2 text-[#9CA3AF]"
-              onClick={goBack}
-            >
-              Discard
-            </button>
-            <button
-              onClick={handleSubmit}
-              disabled={isUploading || isSubmitting}
-              className="flex flex-row items-center justify-between rounded-lg bg-blue-500 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
-            >
-              {isSubmitting ? (
-                'Uploading...'
-              ) : (
-                <>
-                  <BiCloud />
-                  <p className="ml-2">Upload</p>
-                </>
-              )}
-            </button>
-          </div>
+    <div className="flex flex-1 flex-col">
+      <div className="mb-4 flex justify-end">
+        <div className="flex items-center">
+          <button
+            className="mr-4 rounded-lg border border-[#EC407A] bg-transparent px-4 py-2 hover:border-[#A6335A] focus:border-[#A6335A]"
+            onClick={goBack}
+          >
+            Discard
+          </button>
+          <button
+            onClick={handleSubmit}
+            disabled={isUploading || isSubmitting}
+            className="flex items-center rounded-lg bg-[#EC407A] px-4 py-2 text-white hover:bg-[#A6335A] focus:bg-[#A6335A] disabled:opacity-50"
+          >
+            {isSubmitting ? (
+              'Uploading...'
+            ) : (
+              <>
+                <BiCloud className="mr-2" />
+                Upload
+              </>
+            )}
+          </button>
         </div>
-        <div className="m-10 mt-5 flex     flex-col  lg:flex-row">
-          <div className="flex flex-col lg:w-3/4 ">
-            <label htmlFor="title" className="text-sm text-[#9CA3AF]">
-              Title
-            </label>
-            <input
-              id="title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Rick Astley - Never Gonna Give You Up (Official Music Video)"
-              className="mt-2 h-12 w-[90%] rounded-md border border-[#444752] bg-[#1a1c1f] p-2 text-white placeholder:text-gray-600 focus:outline-none"
-              required
-            />
-            <label className="mt-10 text-[#9CA3AF]">Description</label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Never Gonna Give You Up was a global smash on its release in July 1987, topping the charts in 25 countries including Rick’s native UK and the US Billboard Hot 100.  It also won the Brit Award for Best single in 1988. Stock Aitken and Waterman wrote and produced the track which was the lead-off single and lead track from Rick’s debut LP “Whenever You Need Somebody."
-              className="mt-2 h-32 w-[90%] rounded-md  border border-[#444752] bg-[#1a1c1f] p-2  text-white placeholder:text-gray-600 focus:outline-none"
-            />
+      </div>
 
-            <div className="mt-10 flex w-[90%] flex-row  justify-between">
-              <div className="flex w-2/5 flex-col    ">
-                <label className="text-sm  text-[#9CA3AF]">Location</label>
-                <input
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  type="text"
-                  placeholder="Bali - Indonesia"
-                  className="mt-2 h-12 w-[90%]  rounded-md border border-[#444752] bg-[#1a1c1f] p-2  text-white placeholder:text-gray-600 focus:outline-none"
-                />
-              </div>
-              <div className="flex w-2/5 flex-col    ">
-                <label className="text-sm  text-[#9CA3AF]">Category</label>
-                <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
-                  className="mt-2 h-12 w-[90%]  rounded-md border border-[#444752] bg-[#1a1c1f] p-2  text-white placeholder:text-gray-600 focus:outline-none"
-                >
-                  <option>Music</option>
-                  <option>Sports</option>
-                  <option>Gaming</option>
-                  <option>News</option>
-                  <option>Entertainment</option>
-                  <option>Education</option>
-                  <option>Science & Technology</option>
-                  <option>Travel</option>
-                  <option>Other</option>
-                </select>
-              </div>
+      <div className="flex flex-col lg:flex-row">
+        <div className="mb-4 flex w-full flex-col lg:w-3/4">
+          <label htmlFor="title" className="text-sm">
+            Title
+          </label>
+          <input
+            id="title"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Rick Astley - Never Gonna Give You Up (Official Music Video)"
+            className="mt-2 h-12 w-full rounded-md border border-[#444752] p-2 placeholder:text-gray-600 focus:outline-none"
+            required
+          />
+          <label className="mt-10">Description</label>
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Never Gonna Give You Up was a global smash on its release in July 1987, topping the charts in 25 countries including Rick's native UK and the US Billboard Hot 100.  It also won the Brit Award for Best single in 1988. Stock Aitken and Waterman wrote and produced the track which was the lead-off single and lead track from Rick's debut LP "
+            className="mt-2 h-32 w-full rounded-md border border-[#444752] p-2 placeholder:text-gray-600 focus:outline-none"
+          />
+
+          <div className="mt-10 flex w-full flex-col justify-between lg:flex-row">
+            <div className="mb-4 flex w-full flex-col lg:mb-0 lg:w-2/5">
+              <label className="text-sm">Location</label>
+              <input
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                type="text"
+                placeholder="Bali - Indonesia"
+                className="mt-2 h-12 w-full rounded-md border border-[#444752] p-2 placeholder:text-gray-600 focus:outline-none"
+              />
             </div>
-            <label className="mt-10  text-sm text-[#9CA3AF]">Thumbnail</label>
-
-            <div
-              onClick={() => {
-                thumbnailRef?.current;
-              }}
-              className="mt-2 flex h-36  w-64 items-center justify-center rounded-md  border-2 border-dashed border-gray-600 p-2"
-            >
-              {thumbnail ? (
-                <Image
-                  onClick={() => {
-                    thumbnailRef?.current;
-                  }}
-                  src={''}
-                  alt="thumbnail"
-                  className="h-full rounded-md"
-                />
-              ) : (
-                <BiPlus size={40} color="gray" />
-              )}
+            <div className="flex w-full flex-col lg:w-2/5">
+              <label className="text-sm">Category</label>
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className="mt-2 h-12 w-full rounded-md border border-[#444752] p-2 text-gray-600 placeholder:text-gray-600 focus:outline-none"
+              >
+                <option>Music</option>
+                <option>Sports</option>
+                <option>Gaming</option>
+                <option>News</option>
+                <option>Entertainment</option>
+                <option>Education</option>
+                <option>Science & Technology</option>
+                <option>Travel</option>
+                <option>Other</option>
+              </select>
             </div>
+          </div>
+          <label className="mt-10 text-sm">Thumbnail</label>
 
-            <input
-              type="file"
-              className="hidden"
-              //ref={}
-              onChange={(e) => {
-                const file = e?.target?.files ? e.target.files[0] : null;
-                if (file) {
-                  setThumbnail(file);
-                  //Upload to IPFS
-                  upload({
-                    client: client,
-                    files: [
-                      {
-                        name: 'thumbnail',
-                        data: file,
-                        type: 'image/png',
-                      },
-                    ],
-                  });
-                }
-              }}
-            />
+          <div
+            onClick={() => {
+              thumbnailRef?.current;
+            }}
+            className="mt-2 flex h-36 w-64 items-center justify-center rounded-md border-2 border-dashed border-gray-600 p-2"
+          >
+            {thumbnail ? (
+              <Image
+                onClick={() => {
+                  thumbnailRef?.current;
+                }}
+                src={''}
+                alt="thumbnail"
+                className="h-full rounded-md"
+              />
+            ) : (
+              <BiPlus size={40} />
+            )}
           </div>
 
+          <input
+            type="file"
+            className="hidden"
+            //ref={}
+            onChange={(e) => {
+              const file = e?.target?.files ? e.target.files[0] : null;
+              if (file) {
+                setThumbnail(file);
+                //Upload to IPFS
+                upload({
+                  client: client,
+                  files: [
+                    {
+                      name: 'thumbnail',
+                      data: file,
+                      type: 'image/png',
+                    },
+                  ],
+                });
+              }
+            }}
+          />
+        </div>
+
+        <div className="mx-auto flex w-full flex-col items-center justify-center pl-4 lg:w-96">
           <div
             onClick={() => {
               videoRef?.current;
             }}
-            className={
-              video
-                ? ' flex   h-64  w-96 items-center justify-center rounded-md'
-                : 'mt-8 flex  h-64 w-96 items-center justify-center   rounded-md border-2 border-dashed border-gray-600'
-            }
+            className={`flex h-auto w-full items-center justify-center rounded-md ${videoFile ? '' : 'border-2 border-dashed border-gray-600'}`}
           >
-            {video ? (
-              <video
-                controls
-                // Get Playback Sources
-                src={''}
-                className="h-full rounded-md"
-              />
+            {videoFile ? (
+              <PreviewVideo video={videoFile} />
             ) : (
-
-                <FileUpload/>
+              <FileUpload onFileSelect={setVideoFile} />
             )}
           </div>
+          {videoFile && (
+            <button
+              onClick={handleReplaceVideo}
+              className="mt-4 rounded bg-[#EC407A] px-4 py-2 text-white hover:bg-[#A6335A] focus:bg-[#A6335A]"
+            >
+              Replace Video
+            </button>
+          )}
         </div>
-        <input
-          type="file"
-          className="hidden"
-          //ref={videoRef}
-          accept={'video/*'}
-          onChange={(e) => {
-            //setVideo(e?.target?.files[0]);
-            //console.log(e?.target?.files[0]);
-          }}
-        />
       </div>
+
+      <input
+        type="file"
+        className="hidden"
+        accept="video/*"
+        ref={videoRef}
+        onChange={(e) => {
+          const file = e.target.files?.[0] || null;
+          if (file) {
+            setVideoFile(file);
+          }
+        }}
+      />
     </div>
   );
 }
