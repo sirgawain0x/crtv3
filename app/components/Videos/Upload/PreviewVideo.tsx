@@ -4,23 +4,25 @@ interface PreviewVideoProps {
   video: File;
 }
 
-const PreviewVideo: FC<PreviewVideoProps> = (props) => {
-  const objectUrl = URL.createObjectURL(props.video); // Create the object URL
+const PreviewVideo: FC<PreviewVideoProps> = ({ video }) => {
+  const objectUrl = URL.createObjectURL(video); // Create the object URL
 
   useEffect(() => {
-    // Clean up function to run when the component unmounts or the video file changes
+    // Clean up function to revoke the object URL when the component unmounts or the video file changes
     return () => {
       URL.revokeObjectURL(objectUrl); // Revoke the object URL
     };
-  }, [props.video, objectUrl]); // Dependency array: useEffect runs when the video prop changes
+  }, [objectUrl, video]); // Dependency array: useEffect runs when the video prop changes
 
   return (
-    <div className="w-full">
-      {props.video && (
+    <div className="flex w-full justify-center">
+      {' '}
+      {/* Center the video horizontally */}
+      {video && (
         <video
           src={objectUrl}
           controls
-          style={{ maxWidth: '1000px', maxHeight: '400px', marginTop: '8px' }}
+          style={{ maxWidth: '100%', maxHeight: '400px', marginTop: '8px' }} // Make video responsive
         />
       )}
     </div>

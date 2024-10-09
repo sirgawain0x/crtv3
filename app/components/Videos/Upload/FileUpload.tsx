@@ -1,7 +1,15 @@
-import React, { useState } from "react";
-import { ThirdwebStorage } from "@thirdweb-dev/storage";
+'use client';
 
-const FileUpload: React.FC = () => {
+import React, { useState } from 'react';
+import { upload } from 'thirdweb/storage';
+import { client } from '@app/lib/sdk/thirdweb/client';
+
+interface FileUploadProps {
+  onFileSelect: (file: File | null) => void; // {{ edit_5 }}
+}
+
+const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect }) => {
+  // {{ edit_6 }}
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState<boolean>(false);
   const [uploadedUri, setUploadedUri] = useState<string | null>(null);
@@ -10,11 +18,12 @@ const FileUpload: React.FC = () => {
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] || null;
     setSelectedFile(file);
+    onFileSelect(file); // Notify parent component of the selected file
   };
 
   const handleFileUpload = async () => {
     if (!selectedFile) {
-      setError("Please select a file to upload.");
+      setError('Please select a file to upload.');
       return;
     }
 
@@ -23,45 +32,43 @@ const FileUpload: React.FC = () => {
 
     try {
       // Access API keys from environment variables
-      const storage = new ThirdwebStorage({
-        clientId: process.env.NEXT_PUBLIC_THIRDWEB_CLIENT_ID || "745aee0392a556b19e8e120dade62317",
-         
+      const uri = await upload({
+        client,
+        files: [selectedFile],
       });
-
-      // Upload the file to IPFS
-      const uri = await storage.upload(selectedFile);
 
       setUploadedUri(uri);
     } catch (err) {
-      setError("Error uploading file: " + (err as Error).message);
+      setError('Error uploading file: ' + (err as Error).message);
     } finally {
       setUploading(false);
     }
   };
 
   return (
-    <div className=" flex items-center justify-center bg-[#1a1c1f] py-10 px-4">
-      <div className=" w-full  rounded-lg shadow-lg p-8">
-        <h1 className="text-2xl font-semibold text-gray-800 mb-4">
-          Upload a File
+    <div className="flex items-center justify-center bg-[#1a1c1f] px-4 py-10">
+      <div className=" w-full rounded-lg p-8 shadow-lg">
+        <h1 className="mb-4 text-2xl font-semibold text-gray-200">
+          Upload A File
         </h1>
 
         {/* File Input */}
         <div className="mb-6">
           <label
             htmlFor="file-upload"
-            className="block text-sm font-medium text-gray-700 mb-2"
+            className="mb-2 block text-sm font-medium text-gray-400"
           >
-            Choose a file to upload:
+            Choose A File To Upload:
           </label>
           <input
             type="file"
             id="file-upload"
+            accept="video/*"
             className="block w-full text-sm text-gray-500
-                       file:mr-4 file:py-2 file:px-4
-                       file:rounded-full file:border-0
-                       file:text-sm file:font-semibold
-                       file:bg-indigo-50 file:text-indigo-600
+                       file:mr-4 file:rounded-full file:border-0
+                       file:bg-indigo-50 file:px-4
+                       file:py-2 file:text-sm
+                       file:font-semibold file:text-indigo-600
                        hover:file:bg-indigo-100"
             onChange={handleFileChange}
           />
@@ -74,22 +81,22 @@ const FileUpload: React.FC = () => {
             disabled={!selectedFile || uploading}
             className={`${
               uploading
-                ? "bg-indigo-300 cursor-not-allowed"
-                : "bg-indigo-600 hover:bg-indigo-700"
-            } text-white py-2 px-4 rounded-lg font-semibold`}
+                ? 'cursor-not-allowed bg-indigo-300'
+                : 'bg-indigo-600 hover:bg-indigo-700'
+            } rounded-lg px-4 py-2 font-semibold text-white`}
           >
-            {uploading ? "Uploading..." : "Upload File"}
+            {uploading ? 'Uploading...' : 'Upload File'}
           </button>
         </div>
 
         {/* Error Message */}
-        {error && <p className="text-red-500 mt-4">{error}</p>}
+        {error && <p className="mt-4 text-red-500">{error}</p>}
 
         {/* Success Message */}
         {uploadedUri && (
-          <div className="mt-6 p-4 bg-green-50 rounded-lg border border-green-200">
+          <div className="mt-6 rounded-lg border border-green-200 bg-green-50 p-4">
             <p className="text-green-700">
-              File uploaded successfully! IPFS URI:{" "}
+              File uploaded successfully! IPFS URI:{' '}
               <a
                 href={uploadedUri}
                 target="_blank"
