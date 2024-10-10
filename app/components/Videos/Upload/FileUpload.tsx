@@ -1,15 +1,13 @@
 'use client';
 
 import React, { useState } from 'react';
-import { upload } from 'thirdweb/storage';
-import { client } from '@app/lib/sdk/thirdweb/client';
+import * as tus from 'tus-js-client'; // Import the tus client
 
 interface FileUploadProps {
   onFileSelect: (file: File | null) => void; // {{ edit_5 }}
 }
 
 const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect }) => {
-  // {{ edit_6 }}
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState<boolean>(false);
   const [uploadedUri, setUploadedUri] = useState<string | null>(null);
@@ -31,16 +29,54 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect }) => {
     setError(null);
 
     try {
-      // Access API keys from environment variables
-      const uri = await upload({
-        client,
-        files: [selectedFile],
+      // Step 1: Request upload URL from your backend
+      const response = await fetch('/api/asset/request-upload', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          filename: selectedFile.name,
+          filetype: selectedFile.type,
+        }),
       });
 
-      setUploadedUri(uri);
+      const { tusEndpoint } = await response.json(); // Get the tusEndpoint from the response
+
+      // Step 2: Initialize the tus upload
+      const upload = new tus.Upload(selectedFile, {
+        endpoint: tusEndpoint, // Use the endpoint from the response
+        metadata: {
+          filename: selectedFile.name,
+          filetype: selectedFile.type,
+        },
+        onError(err) {
+          console.error('Error uploading file:', err);
+          setError('Error uploading file: ' + err.message);
+          setUploading(false);
+        },
+        onProgress(bytesUploaded, bytesTotal) {
+          const percentage = ((bytesUploaded / bytesTotal) * 100).toFixed(2);
+          console.log('Uploaded ' + percentage + '%');
+        },
+        onSuccess() {
+          console.log('Upload finished:', upload.url);
+          setUploadedUri(upload.url); // Save the uploaded URI
+          onFileSelect(selectedFile); // Notify parent component of the uploaded file
+          setUploading(false);
+        },
+      });
+
+      // Step 3: Resume previous uploads if any
+      const previousUploads = await upload.findPreviousUploads();
+      if (previousUploads.length > 0) {
+        upload.resumeFromPreviousUpload(previousUploads[0]);
+      }
+
+      // Step 4: Start the upload
+      upload.start();
     } catch (err) {
-      setError('Error uploading file: ' + (err as Error).message);
-    } finally {
+      setError('Error requesting upload URL: ' + (err as Error).message);
       setUploading(false);
     }
   };
@@ -72,6 +108,12 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect }) => {
                        file:text-[#EC407A] hover:file:bg-gray-200"
             onChange={handleFileChange}
           />
+          {/* Display selected file name */}
+          {selectedFile && (
+            <p className="mt-2 text-gray-300">
+              Selected file: {selectedFile.name}
+            </p>
+          )}
         </div>
 
         {/* Upload Button */}
