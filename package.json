@@ -59,6 +59,7 @@
     "tailwind-merge": "^2.4.0",
     "tailwindcss-animate": "^1.0.7",
     "thirdweb": "^5.48.2",
+    "tus-js-client": "^4.2.3",
     "uuid": "^9.0.1",
     "viem": "^2.19.6",
     "wagmi": "^2.12.5",

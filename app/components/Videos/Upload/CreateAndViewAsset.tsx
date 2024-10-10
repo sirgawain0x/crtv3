@@ -309,12 +309,22 @@ export default function Upload() {
             )}
           </div>
           {videoFile && (
-            <button
-              onClick={handleReplaceVideo}
-              className="mt-4 rounded bg-[#EC407A] px-4 py-2 text-white hover:bg-[#A6335A] focus:bg-[#A6335A]"
-            >
-              Replace Video
-            </button>
+            <div className="mb-4 flex justify-end">
+              <div className="flex items-center">
+                <button
+                  onClick={handleReplaceVideo}
+                  className="m-2 rounded-sm border border-[#EC407A] px-4 py-2 text-white hover:border-[#A6335A] focus:border-[#A6335A]"
+                >
+                  Replace
+                </button>
+                <button
+                  onClick={() => createAsset(videoFile, 'video')}
+                  className="m-2 rounded-sm border border-[#A6335A] bg-[#EC407A] px-4 py-2 text-white hover:bg-[#A6335A] focus:bg-[#A6335A]"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
           )}
         </div>
       </div>
