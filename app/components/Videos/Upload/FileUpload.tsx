@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { getLivepeerUploadUrl } from '@app/api/livepeer/livekeepActions';
+import { getLivepeerUploadUrl } from '@app/api/livepeer/livepeerActions';
 import * as tus from 'tus-js-client';
 import { download, upload } from 'thirdweb/storage';
 import { client } from '@app/lib/sdk/thirdweb/client';
