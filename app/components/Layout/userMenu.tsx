@@ -13,13 +13,12 @@ import makeBlockie from 'ethereum-blockies-base64';
 import { useActiveAccount } from 'thirdweb/react';
 import PaywallButton from '@app/components/Paywall/PaywallButton';
 import { isLoggedIn } from '@app/api/auth/thirdweb/thirdweb';
-
 import { useEffect, useState } from 'react';
+import { useTheme } from '@app/providers';
 
 export const UserMenu = () => {
   const activeAccount = useActiveAccount();
   const [loggedIn, setLoggedIn] = useState(false);
-
   // useEffect(() => {
   //   const checkLogin = async () => {
   //     const result = await isLoggedIn();
@@ -75,7 +74,7 @@ export const UserMenu = () => {
               className="flex items-center gap-2"
               prefetch={false}
             >
-              <UploadIcon className="h-4 w-4" />
+              <UploadIcon className={`h-4 w-4`} />
               <span>Upload</span>
             </Link>
           </DropdownMenuItem>

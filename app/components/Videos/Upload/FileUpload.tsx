@@ -1,10 +1,14 @@
 'use client';
 
 import React, { useState } from 'react';
-import * as tus from 'tus-js-client'; // Import the tus client
+import { getLivepeerUploadUrl } from '@app/api/livepeer/livekeepActions';
+import * as tus from 'tus-js-client';
+import { download, upload } from 'thirdweb/storage';
+import { client } from '@app/lib/sdk/thirdweb/client';
 
 interface FileUploadProps {
   onFileSelect: (file: File | null) => void; // {{ edit_5 }}
+  onFileUploaded: (fileUrl: string) => void;
 }
 
 const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect }) => {
@@ -12,14 +16,18 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect }) => {
   const [uploading, setUploading] = useState<boolean>(false);
   const [uploadedUri, setUploadedUri] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [videoSrc, setVideoSrc] = useState('');
+  const [hasUploadedSucceeded, setHasUploadSucceeded] = useState(false);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] || null;
     setSelectedFile(file);
     onFileSelect(file); // Notify parent component of the selected file
+    console.log('Select file', file?.name);
   };
 
   const handleFileUpload = async () => {
+    console.log('Start upload #1');
     if (!selectedFile) {
       setError('Please select a file to upload.');
       return;
@@ -28,55 +36,70 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect }) => {
     setUploading(true);
     setError(null);
 
+    console.log('Start upload #2');
+
     try {
-      // Step 1: Request upload URL from your backend
-      const response = await fetch('/api/asset/request-upload', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          filename: selectedFile.name,
-          filetype: selectedFile.type,
-        }),
+      // 1. Request TUS upload endpoint from your backend
+      // const response = await fetch('/api/asset/request-upload', {
+      //   method: 'POST',
+      //   headers: {
+      //     'Content-Type': 'application/json',
+      //     // Include any necessary authentication headers here
+      //   },
+      //   body: JSON.stringify({
+      //     filename: selectedFile.name,
+      //     filetype: selectedFile.type,
+      //   }),
+      // });
+      // const { uploadUrl } = await getLivepeerUploadUrl();
+
+      // console.log(uploadUrl);
+
+      // // 2. Use tus-js-client to upload
+      // const upload = new tus.Upload(selectedFile, {
+      //   endpoint: uploadUrl,
+      //   retryDelays: [0, 1000, 3000, 5000], // Customize retry delays
+      //   metadata: {
+      //     filename: selectedFile.name,
+      //     filetype: selectedFile.type,
+      //   },
+      //   onError(error) {
+      //     console.error('Failed to upload:', error);
+      //     setError('Failed to upload: ' + error.message);
+      //     setUploading(false);
+      //   },
+      //   onProgress(bytesUploaded, bytesTotal) {
+      //     const percentage = ((bytesUploaded / bytesTotal) * 100).toFixed(2);
+      //     console.log(`Uploaded ${percentage}%`);
+      //   },
+      //   onSuccess() {
+      //     console.log('Upload finished:', upload.url);
+      //     setUploadedUri(upload.url);
+      //     setUploading(false);
+      //     setHasUploadSucceeded(true);
+      //     onFileUploaded()
+      //   },
+      // });
+
+      // TODO: do upload to IPFS and call onFileUploaded() passing the video url back
+      const ipfsClient = upload({
+        client,
+        files: [
+          new File(
+            [new Blob([selectedFile])], // Create a Blob instead of using File directly
+            selectedFile?.name, // Provide a valid filename
+          ),
+        ],
       });
+      console.log('IPFS URI', ipfsClient);
+      setUploadedUri(await ipfsClient);
 
-      const { tusEndpoint } = await response.json(); // Get the tusEndpoint from the response
-
-      // Step 2: Initialize the tus upload
-      const upload = new tus.Upload(selectedFile, {
-        endpoint: tusEndpoint, // Use the endpoint from the response
-        metadata: {
-          filename: selectedFile.name,
-          filetype: selectedFile.type,
-        },
-        onError(err) {
-          console.error('Error uploading file:', err);
-          setError('Error uploading file: ' + err.message);
-          setUploading(false);
-        },
-        onProgress(bytesUploaded, bytesTotal) {
-          const percentage = ((bytesUploaded / bytesTotal) * 100).toFixed(2);
-          console.log('Uploaded ' + percentage + '%');
-        },
-        onSuccess() {
-          console.log('Upload finished:', upload.url);
-          setUploadedUri(upload.url); // Save the uploaded URI
-          onFileSelect(selectedFile); // Notify parent component of the uploaded file
-          setUploading(false);
-        },
-      });
-
-      // Step 3: Resume previous uploads if any
-      const previousUploads = await upload.findPreviousUploads();
-      if (previousUploads.length > 0) {
-        upload.resumeFromPreviousUpload(previousUploads[0]);
-      }
-
-      // Step 4: Start the upload
-      upload.start();
-    } catch (err) {
-      setError('Error requesting upload URL: ' + (err as Error).message);
+      // Call the onFileUploaded callback with the uploaded file URL
+      //onFileUploaded();
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      setError('Failed to upload file. Please try again.');
+    } finally {
       setUploading(false);
     }
   };
