@@ -4,8 +4,8 @@ export type AssetData = {
   id: string;
   name: string;
   description?: string;
-  video: Asset;
-  playbackInfo: PlaybackInfo;
+  video?: Asset;
+  playbackInfo?: PlaybackInfo;
   views?: Views;
   details?: MintDetails;
   currency?: Currency;
@@ -13,102 +13,97 @@ export type AssetData = {
 
 export type Asset = {
   id: string;
-  type?: AssetType;
-  playbackId?: string;
-  playbackUrl?: string; // Corrected typo
-  downloadUrl?: string;
-  playbackPolicy?: {
-    type: PlaybackPolicyType;
-    webhookId?: string;
-    webhookContext?: Record<string, unknown>;
-    refreshInterval?: number;
-  } | null;
+  type: AssetType; // Changed from optional to required
+  playbackId: string; // Made required
+  playbackUrl: string; // Made required
+  downloadUrl: string; // Made required
+  playbackPolicy: {
+    type: PlaybackPolicyType; // Ensure this matches the enum
+    webhookId: string; // Made required
+    webhookContext: {
+      streamerId: string; // Made required
+    };
+    refreshInterval: number; // Made required
+    allowedOrigins: string[]; // Changed from tuple to array
+  };
   source: {
-    type: SourceType;
-    url?: string;
-    gatewayUrl?: string;
-    encryption?: Record<string, unknown>;
-    sourceId?: string;
-    sessionId?: string;
-    playbackId?: string;
-    requesterId?: string;
-    assetId?: string;
+    type: SourceType; // Ensure this matches the enum
+    url: string; // Made required
+    gatewayUrl: string; // Made required
+    encryption?: Record<string, unknown>; // Optional
   };
-  creatorId?: {
-    type: CreatorIdType;
-    value: string;
+  creatorId: {
+    type: CreatorIdType; // Ensure this matches the enum
+    value: string; // Made required
   };
-  profiles?: Array<{
-    width?: number;
-    name?: string;
-    height?: number;
-    bitrate: number;
-    quality?: number;
-    fps?: number;
-    fpsDen?: number;
-    gop?: string;
-    profile?: Profile;
-    encoder?: Encoder;
+  profiles: Array<{
+    width: number; // Made required
+    name: string; // Made required
+    height: number; // Made required
+    bitrate: number; // Made required
+    quality?: number; // Optional
+    fps: number; // Made required
+    fpsDen?: number; // Optional
+    gop?: string; // Optional
+    profile: Profile; // Ensure this matches the enum
+    encoder: Encoder; // Ensure this matches the enum
   }>;
-  storage?: {
-    ipfs?: {
-      spec?: {
-        nftMetadataTemplate?: TemplateType;
-        nftMetadata?: Record<string, unknown>;
+  storage: {
+    ipfs: {
+      spec: {
+        nftMetadataTemplate: TemplateType; // Ensure this matches the enum
+        nftMetadata: Record<string, unknown>; // Made required
       };
-      nftMetadata?: {
-        cid: string;
-        url?: string;
-        gatewayUrl?: string;
+      nftMetadata: {
+        cid: string; // Made required
+        url?: string; // Optional
+        gatewayUrl?: string; // Optional
       };
-      updatedAt?: number;
-      cid?: string;
-      url?: string;
-      gatewayUrl?: string;
+      updatedAt: number; // Made required
     };
-    status?: {
-      phase: StorageStatusPhase;
-      progress?: number;
-      errorMessage?: string;
+    status: {
+      phase: StorageStatusPhase; // Ensure this matches the enum
+      progress?: number; // Optional
+      errorMessage?: string; // Optional
       tasks: {
-        pending?: string;
-        last?: string;
-        failed?: string;
+        pending?: string; // Optional
+        last?: string; // Optional
+        failed?: string; // Optional
       };
     };
   };
-  status?: {
-    phase: AssetStatusPhase;
-    updatedAt: number;
-    progress?: number;
-    errorMessage?: string;
+  status: {
+    phase: AssetStatusPhase; // Ensure this matches the enum
+    updatedAt: number; // Made required
+    progress?: number; // Optional
+    errorMessage?: string; // Optional
   };
-  name: string;
-  projectId?: string;
-  createdAt?: number;
-  createdByTokenName?: string;
-  size?: number;
+  name: string; // Made required
+  projectId?: string; // Optional
+  createdAt?: number; // Optional
+  createdByTokenName?: string; // Optional
+  size?: number; // Optional
   hash?: Array<{
-    hash?: string;
-    algorithm?: string;
-  }> | null;
+    hash: string; // Made required
+    algorithm: string; // Made required
+  }> | null; // Optional
   videoSpec?: {
-    format?: string;
-    duration?: number;
-    bitrate?: number;
-    tracks?: Array<{
-      type: AssetType;
-      codec: string;
-      startTime?: number;
-      duration?: number;
-      bitrate?: number;
-      width?: number;
-      height?: number;
-      pixelFormat?: string;
-      fps?: number;
-      channels?: number;
-      sampleRate?: number;
-      bitDepth?: number;
+    format: string; // Made required
+    duration: number; // Made required
+    bitrate: number; // Made required
+    tracks: Array<{
+      type: AssetType; // Ensure this matches the enum
+      codec: string; // Made required
+      startTime?: number; // Optional
+      duration?: number; // Optional
+      bitrate?: number; // Optional
+      width?: number; // Optional
+      height?: number; // Optional
+      pixelFormat?: string; // Optional
+      fps?: number; // Optional
+      channels?: number; // Optional
+      sampleRate?: number; // Optional
+      bitDepth?: number; // Optional
     }>;
   };
 };
