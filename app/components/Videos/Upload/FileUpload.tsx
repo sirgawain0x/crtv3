@@ -2,7 +2,19 @@
 import React, { useState } from 'react';
 import { upload } from 'thirdweb/storage'; // Ensure correct import
 import { client } from '@app/lib/sdk/thirdweb/client';
-import PreviewVideo from './PreviewVideo';
+
+// Add these functions to your component
+
+const truncateUri = (uri: string): string => {
+  if (uri.length <= 30) return uri;
+  return uri.slice(0, 15) + '...' + uri.slice(-15);
+};
+
+const copyToClipboard = (text: string) => {
+  navigator.clipboard.writeText(text).then(() => {
+    // Optionally, you can show a temporary "Copied!" message here
+  });
+};
 
 interface FileUploadProps {
   onFileSelect: (file: File | null) => void;
@@ -42,19 +54,24 @@ const FileUpload: React.FC<FileUploadProps> = ({
       // Upload to IPFS using thirdweb/storage
       const uploadedFiles = await upload({
         client,
-        files: [selectedFile],
+        files: [
+          new File(
+            [new Blob([selectedFile])], // Create a Blob instead of using File directly
+            selectedFile?.name, // Provide a valid filename
+          ),
+        ],
       });
 
       if (uploadedFiles.length === 0) {
         throw new Error('No files were uploaded.');
       }
 
-      const ipfsUrl = uploadedFiles[0]; // Get the IPFS URI
-      console.log('IPFS URI:', ipfsUrl);
-      setUploadedUri(ipfsUrl);
+      //const ipfsUrl = uploadedFiles[0]; // Get the IPFS URI
+      console.log('IPFS URI:', uploadedFiles);
+      setUploadedUri(uploadedFiles);
 
       // Call the onFileUploaded callback with the uploaded file URL
-      onFileUploaded(ipfsUrl);
+      onFileUploaded(uploadedUri || '');
     } catch (error: any) {
       console.error('Error uploading file:', error);
       setError('Failed to upload file. Please try again.');
@@ -88,7 +105,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
           {/* Display selected file name */}
           {selectedFile && (
             <div>
-              <p className="mt-2 text-gray-300">
+              <p className="mt-2 overflow-hidden text-ellipsis whitespace-nowrap text-gray-300">
                 Selected file: {selectedFile.name}
               </p>
             </div>
@@ -122,10 +139,16 @@ const FileUpload: React.FC<FileUploadProps> = ({
                 href={uploadedUri}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-green-500 underline"
+                className="overflow-hidden text-ellipsis whitespace-nowrap text-green-500 underline"
               >
-                {uploadedUri}
+                {truncateUri(uploadedUri)}
               </a>
+              <button
+                onClick={() => copyToClipboard(uploadedUri)}
+                className="ml-2 text-sm text-green-600 hover:text-green-800"
+              >
+                Copy
+              </button>
             </p>
           </div>
         )}
