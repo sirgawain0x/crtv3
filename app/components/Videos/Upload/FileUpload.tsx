@@ -2,6 +2,8 @@
 import React, { useState } from 'react';
 import { upload } from 'thirdweb/storage'; // Ensure correct import
 import { client } from '@app/lib/sdk/thirdweb/client';
+import { toast } from 'sonner';
+import { CopyIcon } from 'lucide-react';
 
 // Add these functions to your component
 
@@ -13,6 +15,7 @@ const truncateUri = (uri: string): string => {
 const copyToClipboard = (text: string) => {
   navigator.clipboard.writeText(text).then(() => {
     // Optionally, you can show a temporary "Copied!" message here
+    toast('IPFS URI Copied!');
   });
 };
 
@@ -71,7 +74,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
       setUploadedUri(uploadedFiles);
 
       // Call the onFileUploaded callback with the uploaded file URL
-      onFileUploaded(uploadedUri || '');
+      onFileUploaded(uploadedFiles);
     } catch (error: any) {
       console.error('Error uploading file:', error);
       setError('Failed to upload file. Please try again.');
@@ -147,7 +150,8 @@ const FileUpload: React.FC<FileUploadProps> = ({
                 onClick={() => copyToClipboard(uploadedUri)}
                 className="ml-2 text-sm text-green-600 hover:text-green-800"
               >
-                Copy
+                <CopyIcon className="h-5 w-5" />
+                <span>Copy</span>
               </button>
             </p>
           </div>

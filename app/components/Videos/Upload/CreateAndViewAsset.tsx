@@ -3,7 +3,10 @@ import { fullLivepeer } from '@app/lib/sdk/livepeer/fullClient';
 import Image from 'next/image';
 import React, { useState, useRef, useEffect } from 'react';
 import { BiCloud, BiMusic, BiPlus } from 'react-icons/bi';
-import { NewAssetPayload } from 'livepeer/models/components';
+import {
+  NewAssetFromUrlPayload,
+  NewAssetPayload,
+} from 'livepeer/models/components';
 import { useActiveAccount } from 'thirdweb/react';
 import { client } from '@app/lib/sdk/thirdweb/client';
 import {
@@ -29,10 +32,7 @@ import { ACCOUNT_FACTORY_ADDRESS } from '@app/lib/utils/context';
 import { toast } from 'sonner'; // Add this import for error notifications
 import FileUpload from './FileUpload';
 import PreviewVideo from './PreviewVideo';
-import {
-  createAsset as createLivepeerAsset,
-  createViaUrl as createLivepeerUrl,
-} from '@app/api/livepeer/actions'; // Import the createAsset function
+import { createAsset, createViaUrl } from '@app/api/livepeer/actions'; // Import the createAsset function
 
 export default function Upload() {
   // Creating state for the input field
@@ -62,14 +62,13 @@ export default function Upload() {
     window.history.back();
   };
 
-  const uploadVideo = async (uploadUrl: NewAssetPayload, file: File) => {
-    const response = await fetch(uploadUrl.name, {
-      method: 'PUT',
-      body: file,
+  const uploadVideo = async (payload: NewAssetFromUrlPayload) => {
+    const response = await fetch(payload.url, {
+      method: 'Post',
       headers: {
-        'Content-Type': file.type,
-        'Access-Control-Allow-Origin': `${process.env.NEXT_PUBLIC_THIRDWEB_AUTH_DOMAIN}`,
+        'Content-Type': 'application/json',
       },
+      body: JSON.stringify(payload),
     });
 
     if (!response.ok) {
@@ -85,44 +84,48 @@ export default function Upload() {
     setIsSubmitting(true);
     try {
       // Step 1: Request the upload URL
-      const uploadData = fullLivepeer.asset;
-      const uploadUrlResponse = await uploadData.createViaUrl({
-        // Await the promise to get the actual upload URL
-        name: 'filename.mp4',
-        staticMp4: true,
-        playbackPolicy: {
-          type: Type.Webhook,
-          webhookId: '1bde4o2i6xycudoy',
-          webhookContext: {
-            streamerId: 'my-custom-id',
-          },
-          refreshInterval: 600,
-        },
-        url: 'https://s3.amazonaws.com/my-bucket/path/filename.mp4',
-        profiles: [
-          {
-            width: 1280,
-            name: '720p',
-            height: 720,
-            bitrate: 3000000,
-            quality: 23,
-            fps: 30,
-            fpsDen: 1,
-            gop: '2',
-            profile: TranscodeProfileProfile.H264Baseline,
-            encoder: TranscodeProfileEncoder.H264,
-          },
-        ],
-      });
+      // const uploadData = fullLivepeer.asset;
+      // const uploadUrlResponse = await uploadData.createViaUrl({
+      //   // Await the promise to get the actual upload URL
+      //   name: videoFile?.name || '',
+      //   staticMp4: true,
+      //   playbackPolicy: {
+      //     type: Type.Webhook,
+      //     webhookId: '1bde4o2i6xycudoy',
+      //     webhookContext: {
+      //       streamerId: 'my-custom-id',
+      //     },
+      //     refreshInterval: 600,
+      //   },
+      //   url: videoUrl,
+      //   profiles: [
+      //     {
+      //       width: 1280,
+      //       name: '720p',
+      //       height: 720,
+      //       bitrate: 3000000,
+      //       quality: 23,
+      //       fps: 30,
+      //       fpsDen: 1,
+      //       gop: '2',
+      //       profile: TranscodeProfileProfile.H264Baseline,
+      //       encoder: TranscodeProfileEncoder.H264,
+      //     },
+      //   ],
+      // });
 
-      const uploadUrl: NewAssetPayload = {
-        name: uploadUrlResponse?.contentType, // Ensure name is included
-        ...uploadUrlResponse, // Spread other properties if necessary
-      };
+      // const uploadUrlResponse = createViaUrl({
+      //   name: videoFile?.name || '',
+      //   url: videoUrl,
+      // });
 
-      if (videoFile) {
+      if (videoFile && videoUrl) {
         // Check if videoFile is not null
-        const videoUrl = await uploadVideo(uploadUrl, videoFile); // Use the videoFile state
+        const uploadedVideoUrl = await uploadVideo({
+          name: title,
+          url: videoUrl,
+        });
+        setVideoUrl(uploadedVideoUrl);
 
         // Step 3: Create the asset using the createAsset function
         const assetData = {
@@ -158,7 +161,8 @@ export default function Upload() {
       toast.error('Please enter a description');
       return false;
     }
-    if (!video) {
+    if (!videoFile && !videoUrl) {
+      // Change this line
       toast.error('Please upload a video');
       return false;
     }
