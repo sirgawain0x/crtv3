@@ -9,6 +9,7 @@ import {
 } from 'livepeer/models/components';
 import { useActiveAccount } from 'thirdweb/react';
 import { client } from '@app/lib/sdk/thirdweb/client';
+import { Input } from '@app/components/ui/input';
 import {
   Type,
   TranscodeProfileProfile,
@@ -33,6 +34,15 @@ import { toast } from 'sonner'; // Add this import for error notifications
 import FileUpload from './FileUpload';
 import PreviewVideo from './PreviewVideo';
 import { createAsset, createViaUrl } from '@app/api/livepeer/actions'; // Import the createAsset function
+
+import { useForm } from 'react-hook-form';
+
+type TNewFormType = {
+  title: string;
+  description: string;
+  location: string;
+  category: string;
+};
 
 export default function Upload() {
   // Creating state for the input field
@@ -61,6 +71,10 @@ export default function Upload() {
   const goBack = () => {
     window.history.back();
   };
+
+  const form = useForm<TNewFormType>({
+    mode: 'onChange',
+  });
 
   const uploadVideo = async (payload: NewAssetFromUrlPayload) => {
     const response = await fetch(payload.url, {
@@ -222,6 +236,11 @@ export default function Upload() {
     setVideoUrl(''); // Clear the video URL
   };
 
+  const { handleSubmit: reactUseFormHandleSubmit, register } = form;
+  const onFormSubmitCallback = async (data: TNewFormType) => {
+    // This is where the form data submit happens - do server interactions, send data where you need to
+  };
+
   return (
     <div className="flex flex-1 flex-col">
       <div className="mb-4 flex justify-end">
@@ -249,101 +268,11 @@ export default function Upload() {
         </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row">
-        <div className="flex w-full flex-col p-4 lg:w-1/2">
-          <label htmlFor="title" className="text-sm">
-            Title
-          </label>
-          <input
-            id="title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Rick Astley - Never Gonna Give You Up (Official Music Video)"
-            className="mt-2 h-12 w-full rounded-md border border-[#444752] p-2 text-gray-600 placeholder:text-gray-400 focus:outline-none"
-            required
-          />
-          <label className="mt-10">Description</label>
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Never Gonna Give You Up was a global smash on its release in July 1987, topping the charts in 25 countries including Rick's native UK and the US Billboard Hot 100.  It also won the Brit Award for Best single in 1988. Stock Aitken and Waterman wrote and produced the track which was the lead-off single and lead track from Rick's debut LP "
-            className="mt-2 h-32 w-full rounded-md border border-[#444752] p-2 text-gray-600 placeholder:text-gray-400 focus:outline-none"
-          />
-
-          <div className="mt-10 flex w-full flex-col justify-between lg:flex-row">
-            <div className="mb-4 flex w-full flex-col lg:mb-0 lg:w-2/5">
-              <label className="text-sm">Location</label>
-              <input
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                type="text"
-                placeholder="New York - United States"
-                className="mt-2 h-12 w-full rounded-md border border-[#444752] p-2 text-gray-600 placeholder:text-gray-400 focus:outline-none"
-              />
-            </div>
-            <div className="flex w-full flex-col lg:w-2/5">
-              <label className="text-sm">Category</label>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="mt-2 h-12 w-full rounded-md border border-[#444752] p-2 text-gray-600 placeholder:text-gray-400 focus:outline-none"
-              >
-                <option>Music</option>
-                <option>Sports</option>
-                <option>Gaming</option>
-                <option>News</option>
-                <option>Entertainment</option>
-                <option>Education</option>
-                <option>Science & Technology</option>
-                <option>Travel</option>
-                <option>Other</option>
-              </select>
-            </div>
-          </div>
-          <label className="mt-10 text-sm">Thumbnail</label>
-
-          <div
-            onClick={() => {
-              thumbnailRef?.current;
-            }}
-            className="mt-2 flex h-36 w-64 items-center justify-center rounded-md border-2 border-dashed border-gray-600 p-2"
-          >
-            {thumbnail ? (
-              <Image
-                onClick={() => {
-                  thumbnailRef?.current;
-                }}
-                src={''}
-                alt="thumbnail"
-                className="h-full rounded-md"
-              />
-            ) : (
-              <BiPlus size={40} />
-            )}
-          </div>
-
-          <input
-            type="file"
-            className="hidden"
-            onChange={(e) => {
-              const file = e?.target?.files ? e.target.files[0] : null;
-              if (file) {
-                setThumbnail(file);
-                //Upload to IPFS
-                upload({
-                  client,
-                  files: [
-                    {
-                      name: 'thumbnail',
-                      data: file,
-                      type: 'image/png',
-                    },
-                  ],
-                });
-              }
-            }}
-          />
-        </div>
+      <form
+        onSubmit={reactUseFormHandleSubmit(onFormSubmitCallback)}
+        className="flex flex-col lg:flex-row"
+      >
+        <div className="flex w-full flex-col p-4 lg:w-1/2"></div>
 
         <div className="mx-auto flex w-full flex-col items-center justify-center pl-4 lg:w-1/2">
           <div
@@ -368,9 +297,10 @@ export default function Upload() {
           </div>
           {videoFile && <PreviewVideo video={videoFile} />}
         </div>
-      </div>
+        <button type="submit">Submit form</button>
+      </form>
 
-      <input
+      <Input
         type="file"
         className="hidden"
         accept="video/*"

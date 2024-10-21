@@ -4,6 +4,12 @@ export const CREATIVE_LOGO_WHT = '/Blog-Logo_wht.png';
 export const CREATIVE_ICON = '/creative_logo_only.png';
 export const SITE_NAME = 'CREATIVE TV';
 
+export const STEPPER_FORM_KEYS = {
+  1: ['title', 'description', 'location', 'category'],
+  2: ['video'],
+  3: ['thumbnail'],
+} as const;
+
 export const CREATIVE_ADDRESS = '0x1Fde40a4046Eda0cA0539Dd6c77ABF8933B94260';
 
 export const ACCOUNT_FACTORY_ADDRESS = {

@@ -1,9 +1,11 @@
 'use client';
 import React, { useState } from 'react';
-import { upload } from 'thirdweb/storage'; // Ensure correct import
-import { client } from '@app/lib/sdk/thirdweb/client';
 import { toast } from 'sonner';
 import { CopyIcon } from 'lucide-react';
+import { getLivepeerUploadUrl } from '@app/api/livepeer/livepeerActions';
+import * as tus from 'tus-js-client';
+import PreviewVideo from './PreviewVideo';
+import { useActiveAccount } from 'thirdweb/react';
 
 // Add these functions to your component
 
@@ -22,17 +24,21 @@ const copyToClipboard = (text: string) => {
 interface FileUploadProps {
   onFileSelect: (file: File | null) => void;
   onFileUploaded: (fileUrl: string) => void; // Callback to send the uploaded file URL back
+  title: string;
 }
 
 const FileUpload: React.FC<FileUploadProps> = ({
   onFileSelect,
   onFileUploaded,
+  title,
 }) => {
   // Destructure onFileUploaded
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState<boolean>(false);
   const [uploadedUri, setUploadedUri] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const activeAccount = useActiveAccount();
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] || null;
@@ -54,27 +60,61 @@ const FileUpload: React.FC<FileUploadProps> = ({
     try {
       console.log('Start upload #2');
 
-      // Upload to IPFS using thirdweb/storage
-      const uploadedFiles = await upload({
-        client,
-        files: [
-          new File(
-            [new Blob([selectedFile])], // Create a Blob instead of using File directly
-            selectedFile?.name, // Provide a valid filename
-          ),
-        ],
+      const uploadRequestResult = await getLivepeerUploadUrl(
+        title || String(selectedFile.name) || 'new file name',
+        activeAccount?.address || 'anonymous', // Use the active account address or 'anonymous' as fallback
+      );
+
+      const upload = new tus.Upload(selectedFile, {
+        endpoint: uploadRequestResult?.tusEndpoint, // URL from `tusEndpoint` field in the
+        metadata: {
+          filename: selectedFile.name,
+          filetype: 'video/mp4',
+        },
+        uploadSize: selectedFile.size,
+        onError(err: any) {
+          console.error('Error uploading file:', err);
+        },
+        onProgress(bytesUploaded, bytesTotal) {
+          const percentage = ((bytesUploaded / bytesTotal) * 100).toFixed(2);
+          console.log('Uploaded ' + percentage + '%');
+        },
+        onSuccess() {
+          console.log('Upload finished:', upload.url);
+        },
       });
 
-      if (uploadedFiles.length === 0) {
-        throw new Error('No files were uploaded.');
+      const previousUploads = await upload.findPreviousUploads();
+
+      if (previousUploads.length > 0) {
+        upload.resumeFromPreviousUpload(previousUploads[0]);
       }
 
+      upload.start();
+
+      // console.log('Upload url is', uploadUrl);
+
+      // Upload to IPFS using thirdweb/storage
+      // const uploadedFiles = await upload({
+      //   client,
+      //   files: [
+      //     new File(
+      //       [new Blob([selectedFile])], // Create a Blob instead of using File directly
+      //       selectedFile?.name, // Provide a valid filename
+      //     ),
+      //   ],
+      // });
+
+      // if (uploadedFiles.length === 0) {
+      //   throw new Error('No files were uploaded.');
+      // }
+
       //const ipfsUrl = uploadedFiles[0]; // Get the IPFS URI
-      console.log('IPFS URI:', uploadedFiles);
-      setUploadedUri(uploadedFiles);
+      // console.log('IPFS URI:', uploadedFiles);
+      // setUploadedUri(uploadedFiles);
 
       // Call the onFileUploaded callback with the uploaded file URL
-      onFileUploaded(uploadedFiles);
+      // onFileUploaded(uploadedFiles);
     } catch (error: any) {
       console.error('Error uploading file:', error);
       setError('Failed to upload file. Please try again.');
@@ -111,6 +151,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
               <p className="mt-2 overflow-hidden text-ellipsis whitespace-nowrap text-gray-300">
                 Selected file: {selectedFile.name}
               </p>
+              <PreviewVideo video={selectedFile} />
             </div>
           )}
         </div>
