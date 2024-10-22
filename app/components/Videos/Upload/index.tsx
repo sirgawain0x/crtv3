@@ -19,43 +19,20 @@ import {
 import { Button } from '@app/components/ui/button';
 import { toast } from 'sonner';
 import CreateInfo from './Create-info';
+import CreateThumbnail from './Create-thumbnail';
+import type { TVideoMetaForm } from './Create-info';
 import FileUpload from './FileUpload';
-
-function getStepContent(step: number) {
-  switch (step) {
-    case 1:
-      return <CreateInfo />;
-    case 2:
-      function setVideoFile(file: File | null) {
-        return file;
-      }
-      function setVideoUrl(url: string) {
-        return url;
-      }
-
-      return (
-        <FileUpload
-          onFileSelect={(file) => {
-            console.log('Selected file:', file); // Debugging line
-            setVideoFile(file);
-          }}
-          onFileUploaded={(videoUrl: string) => {
-            console.log('Uploaded video URL:', videoUrl); // Debugging line
-            setVideoUrl(videoUrl);
-          }}
-        />
-      );
-    default:
-      return 'Unknown step';
-  }
-}
+import CreateThumbnailAi from './Create-thumbnail-ai';
 
 const HookMultiStepForm = () => {
   const [activeStep, setActiveStep] = useState(1);
+  const [canNextStep, setCanNextStep] = useState(false);
   const [erroredInputName, setErroredInputName] = useState('');
   const methods = useForm<StepperFormValues>({
     mode: 'onTouched',
   });
+  const [metaData, setMetadata] = useState<TVideoMetaForm>(),
+    [livePeerAssetId, setLivePeerAssetId] = useState<string>();
 
   const {
     trigger,
@@ -90,8 +67,6 @@ const HookMultiStepForm = () => {
         });
         reject({
           message: 'There was an error submitting form',
-          // message: "Field error",
-          // errorKey: "fullName",
         });
       }, 2000);
     })
@@ -150,36 +125,44 @@ const HookMultiStepForm = () => {
           <AlertDescription>{errors.root?.formError?.message}</AlertDescription>
         </Alert>
       )}
-      <FormProvider {...methods}>
-        <form noValidate>
-          {getStepContent(activeStep)}
-          <div className="mt-5 flex justify-center space-x-[20px]">
-            <Button
-              type="button"
-              className="w-[100px]"
-              variant="secondary"
-              onClick={handleBack}
-              disabled={activeStep === 1}
-            >
-              Back
-            </Button>
-            {activeStep === 3 ? (
-              <Button
-                className="w-[100px]"
-                type="button"
-                onClick={handleSubmit(onSubmit)}
-                disabled={isSubmitting}
-              >
-                Submit
-              </Button>
-            ) : (
-              <Button type="button" className="w-[100px]" onClick={handleNext}>
-                Next
-              </Button>
-            )}
-          </div>
-        </form>
-      </FormProvider>
+      <div className={activeStep === 1 ? 'block' : 'hidden'}>
+        <CreateInfo
+          onPressNext={(metaDataFormData) => {
+            setMetadata(metaDataFormData);
+            setActiveStep((prevActiveStep) => prevActiveStep + 1);
+          }}
+        />
+      </div>
+      <div className={activeStep === 2 ? 'block' : 'hidden'}>
+        <FileUpload
+          newAssetTitle={metaData?.title || ''}
+          onFileSelect={(file) => {
+            console.log('Selected file:', file); // Debugging line
+          }}
+          onFileUploaded={(videoUrl: string) => {
+            console.log('Uploaded video URL:', videoUrl); // Debugging line
+          }}
+          onPressBack={() =>
+            setActiveStep((prevActiveStep) => prevActiveStep - 1)
+          }
+          onPressNext={(livePeerAssetId) => {
+            setLivePeerAssetId(livePeerAssetId);
+            setActiveStep((prevActiveStep) => prevActiveStep + 1);
+          }}
+        />
+      </div>
+      <div className={activeStep === 3 ? 'block' : 'hidden'}>
+        {/* <code>
+          <pre>{JSON.stringify(metaData, null, 2)}</pre>
+        </code>
+        <code>
+          <span>Livepeer asset id: {livePeerAssetId}</span>
+        </code> */}
+        <CreateThumbnail livePeerAssetId={livePeerAssetId} />
+      </div>
+
+      {/* </form>
+      </FormProvider> */}
     </div>
   );
 };
