@@ -25,6 +25,11 @@ import ClaimLockButton from '@app/components/Paywall/ClaimLock';
 
 export function Navbar() {
   const activeAccount = useActiveAccount();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  const handleLinkClick = () => {
+    setIsMenuOpen(false);
+  };
 
   /*******  CONTRACT READING ********/
   const unlockContract = getContract({
@@ -53,7 +58,7 @@ export function Navbar() {
 
   return (
     <header className="flex h-20 w-full shrink-0 items-center bg-muted px-4 md:px-6">
-      <Sheet>
+      <Sheet open={isMenuOpen} onOpenChange={setIsMenuOpen}>
         <SheetTrigger asChild>
           <Button variant="outline" size="icon" className="lg:hidden">
             <MenuIcon className="h-6 w-6" />
@@ -69,8 +74,8 @@ export function Navbar() {
               <VisuallyHidden.Root>The stage is yours.</VisuallyHidden.Root>
             </SheetDescription>
           </SheetHeader>
-          <div>
-            <Link href="/" className="mr-6 lg:flex" prefetch={false}>
+          <div onClick={handleLinkClick}>
+            <Link href="/" className="mr-6 lg:flex" prefetch={false} passHref>
               <Image
                 style={{
                   width: 'auto',
@@ -104,6 +109,7 @@ export function Navbar() {
               href="/discover"
               className="flex w-full items-center py-2 text-lg font-semibold"
               prefetch={false}
+              onClick={handleLinkClick}
             >
               Discover
             </Link>
@@ -111,6 +117,7 @@ export function Navbar() {
               href="/vote"
               className="flex w-full items-center py-2 text-lg font-semibold"
               prefetch={false}
+              onClick={handleLinkClick}
             >
               Vote
             </Link>
@@ -123,13 +130,13 @@ export function Navbar() {
             <ConnectButtonWrapper />
             {activeAccount && (
               <div className="mt-5">
-                <ClaimLockButton />
+                <ClaimLockButton closeMenu={() => setIsMenuOpen(false)} />
               </div>
             )}
           </div>
         </SheetContent>
       </Sheet>
-      <Link href="/" className="mr-6 hidden lg:flex" prefetch={false}>
+      <Link href="/" className="mr-6 hidden lg:flex" prefetch={false} passHref>
         <Image
           src={SITE_LOGO}
           alt="Creative Logo"
@@ -175,7 +182,9 @@ export function Navbar() {
         <div className="mr-5">
           <ConnectButtonWrapper />
         </div>
-        {activeAccount && <ClaimLockButton />}
+        {activeAccount && (
+          <ClaimLockButton closeMenu={() => setIsMenuOpen(false)} />
+        )}
       </div>
     </header>
   );

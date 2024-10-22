@@ -15,7 +15,7 @@ const StepperIndicator = ({ activeStep }: StepperIndicatorProps) => {
           <div
             className={clsx(
               'm-[5px] flex h-[40px] w-[40px] items-center justify-center rounded-full border-[2px]',
-              step < activeStep && 'bg-primary text-white',
+              step < activeStep && 'bg-secondary text-[#EC407A]',
               step === activeStep && 'border-primary text-primary',
             )}
           >

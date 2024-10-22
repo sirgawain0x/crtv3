@@ -20,7 +20,6 @@ import { Button } from '@app/components/ui/button';
 import { toast } from 'sonner';
 import CreateInfo from './Create-info';
 import FileUpload from './FileUpload';
-import { title } from 'process';
 
 function getStepContent(step: number) {
   switch (step) {
@@ -44,7 +43,6 @@ function getStepContent(step: number) {
             console.log('Uploaded video URL:', videoUrl); // Debugging line
             setVideoUrl(videoUrl);
           }}
-          title={title || ''}
         />
       );
     default:
@@ -55,7 +53,6 @@ function getStepContent(step: number) {
 const HookMultiStepForm = () => {
   const [activeStep, setActiveStep] = useState(1);
   const [erroredInputName, setErroredInputName] = useState('');
-  const [title, setTitle] = useState<string>('');
   const methods = useForm<StepperFormValues>({
     mode: 'onTouched',
   });
@@ -83,7 +80,6 @@ const HookMultiStepForm = () => {
   }
 
   const onSubmit = async (formData: StepperFormValues) => {
-    setTitle(formData?.title);
     console.log({ formData });
     // simulate api call
     await new Promise<SubmitResponse>((resolve, reject) => {

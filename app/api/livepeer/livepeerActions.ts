@@ -5,7 +5,7 @@ import { InputCreatorIdType } from 'livepeer/models/components';
 
 export const getLivepeerUploadUrl = async (
   fileName: string,
-  creatorValue: string,
+  creatorAddress: string,
 ) => {
   //   const livepeerUpload = `${process.env.LIVEPEER_API_URL}/api/asset/request-upload`;
   //   const headers = {
@@ -21,7 +21,7 @@ export const getLivepeerUploadUrl = async (
     },
     creatorId: {
       type: InputCreatorIdType?.Unverified,
-      value: creatorValue,
+      value: creatorAddress,
     },
   });
 

@@ -6,6 +6,7 @@ import { getLivepeerUploadUrl } from '@app/api/livepeer/livepeerActions';
 import * as tus from 'tus-js-client';
 import PreviewVideo from './PreviewVideo';
 import { useActiveAccount } from 'thirdweb/react';
+import { Progress } from '@app/components/ui/progress';
 
 // Add these functions to your component
 
@@ -24,19 +25,22 @@ const copyToClipboard = (text: string) => {
 interface FileUploadProps {
   onFileSelect: (file: File | null) => void;
   onFileUploaded: (fileUrl: string) => void; // Callback to send the uploaded file URL back
-  title: string;
 }
 
 const FileUpload: React.FC<FileUploadProps> = ({
   onFileSelect,
   onFileUploaded,
-  title,
 }) => {
   // Destructure onFileUploaded
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState<boolean>(false);
   const [uploadedUri, setUploadedUri] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<number>(0);
+  const [uploadComplete, setUploadComplete] = useState<boolean>(false);
+  const [uploadState, setUploadState] = useState<
+    'idle' | 'loading' | 'complete'
+  >('idle');
 
   const activeAccount = useActiveAccount();
 
@@ -48,21 +52,20 @@ const FileUpload: React.FC<FileUploadProps> = ({
   };
 
   const handleFileUpload = async () => {
-    console.log('Start upload #1');
     if (!selectedFile) {
       setError('Please select a file to upload.');
       return;
     }
 
-    setUploading(true);
     setError(null);
+    setUploadState('loading');
+    setProgress(0);
 
     try {
-      console.log('Start upload #2');
-
+      console.log('Start upload #1');
       const uploadRequestResult = await getLivepeerUploadUrl(
-        title || String(selectedFile.name) || 'new file name',
-        activeAccount?.address || 'anonymous', // Use the active account address or 'anonymous' as fallback
+        selectedFile.name || 'new file name',
+        activeAccount?.address || 'anonymous',
       );
 
       const upload = new tus.Upload(selectedFile, {
@@ -76,11 +79,15 @@ const FileUpload: React.FC<FileUploadProps> = ({
           console.error('Error uploading file:', err);
         },
         onProgress(bytesUploaded, bytesTotal) {
-          const percentage = ((bytesUploaded / bytesTotal) * 100).toFixed(2);
+          const percentage = Math.round((bytesUploaded / bytesTotal) * 100);
           console.log('Uploaded ' + percentage + '%');
+          setProgress(percentage);
         },
         onSuccess() {
           console.log('Upload finished:', upload.url);
+          setUploadState('complete');
+          // Call onFileUploaded here with the upload URL
+          onFileUploaded(upload?.url || '');
         },
       });
 
@@ -118,23 +125,20 @@ const FileUpload: React.FC<FileUploadProps> = ({
     } catch (error: any) {
       console.error('Error uploading file:', error);
       setError('Failed to upload file. Please try again.');
-    } finally {
-      setUploading(false);
+      setUploadState('idle');
     }
   };
 
   return (
-    <div className="flex items-center justify-center bg-[#1a1c1f] px-4 py-10">
+    <div className="flex items-center justify-center px-4 py-10">
       <div className="w-full rounded-lg p-8 shadow-lg">
-        <h1 className="mb-4 text-2xl font-semibold text-gray-200">
-          Upload A File
-        </h1>
+        <h1 className="mb-4 text-2xl font-semibold">Upload A File</h1>
 
         {/* File Input */}
         <div className="mb-6">
           <label
             htmlFor="file-upload"
-            className="mb-2 block text-sm font-medium text-gray-400"
+            className="mb-2 block text-sm font-medium"
           >
             Choose A File To Upload:
           </label>
@@ -142,33 +146,53 @@ const FileUpload: React.FC<FileUploadProps> = ({
             type="file"
             id="file-upload"
             accept="video/*"
-            className="block w-full text-sm text-[#EC407A] file:mr-4 file:rounded-full file:border-0 file:bg-white file:px-4 file:py-2 file:text-sm file:font-semibold file:text-[#EC407A] hover:file:bg-gray-200"
+            className="file:border-1 block w-full text-sm text-[#EC407A] file:mr-4 file:cursor-pointer file:rounded-full file:bg-white file:px-4 file:py-2 file:text-sm file:font-semibold file:text-[#EC407A] hover:file:bg-gray-200"
             onChange={handleFileChange}
           />
           {/* Display selected file name */}
           {selectedFile && (
             <div>
-              <p className="mt-2 overflow-hidden text-ellipsis whitespace-nowrap text-gray-300">
-                Selected file: {selectedFile.name}
+              <p className="mt-2 overflow-hidden text-ellipsis whitespace-nowrap text-lg text-gray-400">
+                Selected File: {selectedFile.name}
               </p>
               <PreviewVideo video={selectedFile} />
             </div>
           )}
         </div>
 
-        {/* Upload Button */}
-        <div className="flex items-center justify-between">
-          <button
-            onClick={handleFileUpload}
-            disabled={!selectedFile || uploading}
-            className={`${
-              uploading
-                ? 'cursor-not-allowed bg-[#D63A6A]'
-                : 'bg-[#EC407A] hover:bg-[#D63A6A]'
-            } cursor-pointer rounded-lg px-4 py-2 font-semibold text-white`}
-          >
-            {uploading ? 'Uploading...' : 'Upload File'}
-          </button>
+        {/* Upload Button and Progress Bar */}
+        <div className="flex w-full flex-col items-start space-y-4">
+          {uploadState === 'idle' ? (
+            <button
+              onClick={handleFileUpload}
+              disabled={!selectedFile}
+              className={`${
+                !selectedFile
+                  ? 'cursor-not-allowed bg-[#D63A6A]'
+                  : 'bg-[#EC407A] hover:bg-[#D63A6A]'
+              } cursor-pointer rounded-lg px-4 py-2 font-semibold text-white`}
+            >
+              Upload File
+            </button>
+          ) : (
+            <div className="w-full">
+              <Progress
+                value={progress}
+                max={100}
+                className="h-2 w-full overflow-hidden rounded-full bg-gray-200"
+              >
+                <div
+                  className="h-full bg-[#EC407A] transition-all duration-500 ease-in-out"
+                  style={{ width: `${progress}%` }}
+                />
+              </Progress>
+              <p className="mt-2 text-sm text-gray-400">
+                {uploadState === 'complete'
+                  ? 'Upload Complete!'
+                  : `${progress}% uploaded`}
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Error Message */}

@@ -284,6 +284,7 @@ export default function Upload() {
             {/* hide element once videoUrl is available */}
             <div className="">
               <FileUpload
+                title={title}
                 onFileSelect={(file) => {
                   console.log('Selected file:', file); // Debugging line
                   setVideoFile(file);

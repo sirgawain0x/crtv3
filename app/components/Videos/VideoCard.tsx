@@ -26,82 +26,79 @@ interface VideoCardProps {
 }
 
 const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
+  // Only render the card if the asset is ready
+  if (asset?.status?.phase !== 'ready') {
+    return null;
+  }
+
   return (
     <div className="mx-auto">
-      {asset?.status?.phase === 'ready' && (
-        <Card key={asset?.id} className={cn('w-[360px]')}>
-          <div className="mx-auto flex-1 flex-wrap">
-            <CardHeader>
-              <Avatar>
-                <AvatarImage src={makeBlockie(`${asset?.creatorId?.value}`)} />
-                <AvatarFallback>CRTV</AvatarFallback>
-              </Avatar>
-              <CardTitle>Creator</CardTitle>
-              <CardDescription>
-                {shortenHex(`${asset.creatorId?.value}`)}
-              </CardDescription>
-            </CardHeader>
+      <Card key={asset?.id} className={cn('w-[360px]')}>
+        <div className="mx-auto flex-1 flex-wrap">
+          <CardHeader>
+            <Avatar>
+              <AvatarImage src={makeBlockie(`${asset?.creatorId?.value}`)} />
+              <AvatarFallback>CRTV</AvatarFallback>
+            </Avatar>
+            <CardTitle>Creator</CardTitle>
+            <CardDescription>
+              {shortenHex(`${asset.creatorId?.value}`)}
+            </CardDescription>
+          </CardHeader>
+        </div>
+        <PlayerComponent src={playbackSources} title={asset?.name} />
+        <CardContent>
+          <div className="my-2 flex items-center justify-between">
+            <Badge
+              className={asset.status?.phase === 'ready' ? 'black' : 'white'}
+            >
+              {asset?.status?.phase}
+            </Badge>
+            <VideoViewMetrics playbackId={asset.playbackId || ''} />
           </div>
-          <PlayerComponent
-            src={playbackSources} // Use the detailed playback sources here
-            title={asset?.name}
-          />
-          <CardContent>
-            <div className="my-2 flex items-center justify-between">
-              <Badge
-                className={asset.status?.phase === 'ready' ? 'black' : 'white'}
+          <div className="mt-6 grid grid-flow-row auto-rows-max space-y-3 overflow-hidden">
+            <Link href={`/discover/${asset.id}`} passHref>
+              <h1 className="max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-xl font-bold hover:text-orange-500 focus:text-orange-500">
+                {asset?.name}
+              </h1>
+            </Link>
+            <div className="space-y-4" />
+            <p className="text-xl" color={'brand.300'}>
+              <span style={{ fontSize: 'sm' }}>{'USDC'}</span>
+            </p>
+          </div>
+        </CardContent>
+        <hr className="mb-5" />
+        <CardFooter className="mx-auto flex items-center justify-center">
+          {asset?.status?.phase === 'ready' ? (
+            <div className="flex space-x-10">
+              <Button
+                className="flex-1 cursor-pointer hover:scale-125"
+                aria-label={`Buy ${asset?.name}`}
+                variant="ghost"
               >
-                {asset?.status?.phase}
-              </Badge>
-              <VideoViewMetrics playbackId={asset.playbackId || ''} />
-            </div>
-            <div className="mt-6 grid grid-flow-row auto-rows-max space-y-3 overflow-hidden">
-              <Link href={`/discover/${asset.id}`} passHref>
-                <h1 className="max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-xl font-bold hover:text-orange-500 focus:text-orange-500">
-                  {asset?.name}
-                </h1>
+                Buy
+              </Button>
+              <Link href={`discover/${encodeURIComponent(asset?.id)}`} passHref>
+                <Button
+                  className="flex-1 cursor-pointer hover:scale-125"
+                  aria-label={`Comment on ${asset?.name}`}
+                  variant="ghost"
+                >
+                  Comment
+                </Button>
               </Link>
-              <div className="space-y-4" />
-              <p className="text-xl" color={'brand.300'}>
-                <span style={{ fontSize: 'sm' }}>{'USDC'}</span>
-              </p>
+              <Button
+                className="flex-1 cursor-pointer hover:scale-125"
+                aria-label={`Share ${asset?.name}`}
+                variant="ghost"
+              >
+                Share
+              </Button>
             </div>
-          </CardContent>
-          <hr className="mb-5" />
-          <CardFooter className="mx-auto flex items-center justify-center">
-            {asset?.status?.phase === 'ready' ? (
-              <div className="flex space-x-10">
-                <Button
-                  className="flex-1 cursor-pointer hover:scale-125"
-                  aria-label={`Buy ${asset?.name}`}
-                  variant="ghost"
-                >
-                  Buy
-                </Button>
-                <Link
-                  href={`discover/${encodeURIComponent(asset?.id)}`}
-                  passHref
-                >
-                  <Button
-                    className="flex-1 cursor-pointer hover:scale-125"
-                    aria-label={`Comment on ${asset?.name}`}
-                    variant="ghost"
-                  >
-                    Comment
-                  </Button>
-                </Link>
-                <Button
-                  className="flex-1 cursor-pointer hover:scale-125"
-                  aria-label={`Share ${asset?.name}`}
-                  variant="ghost"
-                >
-                  Share
-                </Button>
-              </div>
-            ) : null}
-          </CardFooter>
-        </Card>
-      )}
+          ) : null}
+        </CardFooter>
+      </Card>
     </div>
   );
 };
