@@ -1,9 +1,8 @@
+'use client';
+
 import { Controller, useForm, useFormContext } from 'react-hook-form';
-import { StepperFormValues } from '@app/types/hook-stepper';
 import { Input } from '@app/components/ui/input';
 import { Label } from '@app/components/ui/label';
-import { useRef, useEffect } from 'react';
-import Image from 'next/image';
 import {
   Select,
   SelectContent,
