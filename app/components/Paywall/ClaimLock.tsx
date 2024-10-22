@@ -15,7 +15,11 @@ import { UserMenu } from '@app/components/Layout/userMenu';
 import { Currency } from 'lucide-react';
 import { symbol } from 'zod';
 
-function ClaimLockButton() {
+interface UserMenuProps {
+  closeMenu: () => void;
+}
+
+function ClaimLockButton({ closeMenu }: { closeMenu: () => void }) {
   const activeAccount = useActiveAccount();
   const unlockAbi = Unlock.abi;
   const unlockContract = getContract({
@@ -31,7 +35,12 @@ function ClaimLockButton() {
     params: [activeAccount?.address],
   });
 
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [subscribed, setSubscribed] = useState(false);
+
+  const handleLinkClick = () => {
+    setIsMenuOpen(false);
+  };
 
   useEffect(() => {
     if (!activeAccount || !unlockAbi) return;

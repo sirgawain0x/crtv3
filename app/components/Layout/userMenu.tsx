@@ -16,9 +16,17 @@ import { isLoggedIn } from '@app/api/auth/thirdweb/thirdweb';
 import { useEffect, useState } from 'react';
 import { useTheme } from '@app/providers';
 
-export const UserMenu = () => {
+export const UserMenu: React.FC = () => {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const activeAccount = useActiveAccount();
-  const [loggedIn, setLoggedIn] = useState(false);
+
+  const handleOpenChange = (open: boolean) => {
+    setIsMenuOpen(open);
+  };
+
+  const handleLinkClick = () => {
+    setIsMenuOpen(false);
+  };
   // useEffect(() => {
   //   const checkLogin = async () => {
   //     const result = await isLoggedIn();
@@ -37,7 +45,7 @@ export const UserMenu = () => {
 
   return (
     <div className="my-auto">
-      <DropdownMenu>
+      <DropdownMenu open={isMenuOpen} onOpenChange={handleOpenChange}>
         <DropdownMenuTrigger asChild>
           <Button variant="ghost" size="icon" className="rounded-full">
             <Avatar className="h-8 w-8">
@@ -51,7 +59,7 @@ export const UserMenu = () => {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem>
+          <DropdownMenuItem onClick={handleLinkClick}>
             <Link
               href={`/profile/${activeAccount?.address}`}
               className="flex items-center gap-2"
@@ -61,18 +69,24 @@ export const UserMenu = () => {
               <span>Profile</span>
             </Link>
           </DropdownMenuItem>
-          <DropdownMenuItem>
-            <Link href="#" className="flex items-center gap-2" prefetch={false}>
+          <DropdownMenuItem onClick={handleLinkClick}>
+            <Link
+              href="#"
+              className="flex items-center gap-2"
+              prefetch={false}
+              onClick={handleLinkClick}
+            >
               <SettingsIcon className="h-4 w-4" />
               <span>Settings</span>
             </Link>
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem>
+          <DropdownMenuItem onClick={handleLinkClick}>
             <Link
               href={`/profile/${activeAccount?.address}/upload`}
               className="flex items-center gap-2"
               prefetch={false}
+              onClick={handleLinkClick}
             >
               <UploadIcon className={`h-4 w-4`} />
               <span>Upload</span>

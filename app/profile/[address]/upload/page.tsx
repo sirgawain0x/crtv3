@@ -1,4 +1,5 @@
-import CreateAndViewAsset from '@app/components/Videos/Upload/CreateAndViewAsset';
+//import CreateAndViewAsset from '@app/components/Videos/Upload/CreateAndViewAsset';
+import HookMultiStepForm from '@app/components/Videos/Upload';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -43,7 +44,7 @@ export default function Upload() {
         </Breadcrumb>
       </div>
       <div>
-        <CreateAndViewAsset />
+        <HookMultiStepForm />
       </div>
     </div>
   );

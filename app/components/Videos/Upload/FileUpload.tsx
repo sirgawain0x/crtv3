@@ -1,121 +1,144 @@
 'use client';
-
 import React, { useState } from 'react';
+import { toast } from 'sonner';
+import { CopyIcon } from 'lucide-react';
 import { getLivepeerUploadUrl } from '@app/api/livepeer/livepeerActions';
 import * as tus from 'tus-js-client';
-import { download, upload } from 'thirdweb/storage';
-import { client } from '@app/lib/sdk/thirdweb/client';
+import PreviewVideo from './PreviewVideo';
+import { useActiveAccount } from 'thirdweb/react';
+import { Progress } from '@app/components/ui/progress';
+
+// Add these functions to your component
+
+const truncateUri = (uri: string): string => {
+  if (uri.length <= 30) return uri;
+  return uri.slice(0, 15) + '...' + uri.slice(-15);
+};
+
+const copyToClipboard = (text: string) => {
+  navigator.clipboard.writeText(text).then(() => {
+    // Optionally, you can show a temporary "Copied!" message here
+    toast('IPFS URI Copied!');
+  });
+};
 
 interface FileUploadProps {
-  onFileSelect: (file: File | null) => void; // {{ edit_5 }}
-  onFileUploaded: (fileUrl: string) => void;
+  onFileSelect: (file: File | null) => void;
+  onFileUploaded: (fileUrl: string) => void; // Callback to send the uploaded file URL back
 }
 
-const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect }) => {
+const FileUpload: React.FC<FileUploadProps> = ({
+  onFileSelect,
+  onFileUploaded,
+}) => {
+  // Destructure onFileUploaded
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState<boolean>(false);
   const [uploadedUri, setUploadedUri] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [videoSrc, setVideoSrc] = useState('');
-  const [hasUploadedSucceeded, setHasUploadSucceeded] = useState(false);
+  const [progress, setProgress] = useState<number>(0);
+  const [uploadComplete, setUploadComplete] = useState<boolean>(false);
+  const [uploadState, setUploadState] = useState<
+    'idle' | 'loading' | 'complete'
+  >('idle');
+
+  const activeAccount = useActiveAccount();
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] || null;
     setSelectedFile(file);
     onFileSelect(file); // Notify parent component of the selected file
-    console.log('Select file', file?.name);
+    console.log('Selected file:', file?.name);
   };
 
   const handleFileUpload = async () => {
-    console.log('Start upload #1');
     if (!selectedFile) {
       setError('Please select a file to upload.');
       return;
     }
 
-    setUploading(true);
     setError(null);
-
-    console.log('Start upload #2');
+    setUploadState('loading');
+    setProgress(0);
 
     try {
-      // 1. Request TUS upload endpoint from your backend
-      // const response = await fetch('/api/asset/request-upload', {
-      //   method: 'POST',
-      //   headers: {
-      //     'Content-Type': 'application/json',
-      //     // Include any necessary authentication headers here
-      //   },
-      //   body: JSON.stringify({
-      //     filename: selectedFile.name,
-      //     filetype: selectedFile.type,
-      //   }),
-      // });
-      // const { uploadUrl } = await getLivepeerUploadUrl();
+      console.log('Start upload #1');
+      const uploadRequestResult = await getLivepeerUploadUrl(
+        selectedFile.name || 'new file name',
+        activeAccount?.address || 'anonymous',
+      );
 
-      // console.log(uploadUrl);
-
-      // // 2. Use tus-js-client to upload
-      // const upload = new tus.Upload(selectedFile, {
-      //   endpoint: uploadUrl,
-      //   retryDelays: [0, 1000, 3000, 5000], // Customize retry delays
-      //   metadata: {
-      //     filename: selectedFile.name,
-      //     filetype: selectedFile.type,
-      //   },
-      //   onError(error) {
-      //     console.error('Failed to upload:', error);
-      //     setError('Failed to upload: ' + error.message);
-      //     setUploading(false);
-      //   },
-      //   onProgress(bytesUploaded, bytesTotal) {
-      //     const percentage = ((bytesUploaded / bytesTotal) * 100).toFixed(2);
-      //     console.log(`Uploaded ${percentage}%`);
-      //   },
-      //   onSuccess() {
-      //     console.log('Upload finished:', upload.url);
-      //     setUploadedUri(upload.url);
-      //     setUploading(false);
-      //     setHasUploadSucceeded(true);
-      //     onFileUploaded()
-      //   },
-      // });
-
-      // TODO: do upload to IPFS and call onFileUploaded() passing the video url back
-      const ipfsClient = upload({
-        client,
-        files: [
-          new File(
-            [new Blob([selectedFile])], // Create a Blob instead of using File directly
-            selectedFile?.name, // Provide a valid filename
-          ),
-        ],
+      const upload = new tus.Upload(selectedFile, {
+        endpoint: uploadRequestResult?.tusEndpoint, // URL from `tusEndpoint` field in the
+        metadata: {
+          filename: selectedFile.name,
+          filetype: 'video/mp4',
+        },
+        uploadSize: selectedFile.size,
+        onError(err: any) {
+          console.error('Error uploading file:', err);
+        },
+        onProgress(bytesUploaded, bytesTotal) {
+          const percentage = Math.round((bytesUploaded / bytesTotal) * 100);
+          console.log('Uploaded ' + percentage + '%');
+          setProgress(percentage);
+        },
+        onSuccess() {
+          console.log('Upload finished:', upload.url);
+          setUploadState('complete');
+          // Call onFileUploaded here with the upload URL
+          onFileUploaded(upload?.url || '');
+        },
       });
-      console.log('IPFS URI', ipfsClient);
-      setUploadedUri(await ipfsClient);
+
+      const previousUploads = await upload.findPreviousUploads();
+
+      if (previousUploads.length > 0) {
+        upload.resumeFromPreviousUpload(previousUploads[0]);
+      }
+
+      upload.start();
+
+      // console.log('Upload url is', uploadUrl);
+
+      // Upload to IPFS using thirdweb/storage
+      // const uploadedFiles = await upload({
+      //   client,
+      //   files: [
+      //     new File(
+      //       [new Blob([selectedFile])], // Create a Blob instead of using File directly
+      //       selectedFile?.name, // Provide a valid filename
+      //     ),
+      //   ],
+      // });
+
+      // if (uploadedFiles.length === 0) {
+      //   throw new Error('No files were uploaded.');
+      // }
+
+      //const ipfsUrl = uploadedFiles[0]; // Get the IPFS URI
+      // console.log('IPFS URI:', uploadedFiles);
+      // setUploadedUri(uploadedFiles);
 
       // Call the onFileUploaded callback with the uploaded file URL
-      //onFileUploaded();
-    } catch (error) {
+      // onFileUploaded(uploadedFiles);
+    } catch (error: any) {
       console.error('Error uploading file:', error);
       setError('Failed to upload file. Please try again.');
-    } finally {
-      setUploading(false);
+      setUploadState('idle');
     }
   };
 
   return (
-    <div className="flex items-center justify-center bg-[#1a1c1f] px-4 py-10">
+    <div className="flex items-center justify-center px-4 py-10">
       <div className="w-full rounded-lg p-8 shadow-lg">
-        <h1 className="mb-4 text-2xl font-semibold text-gray-200">
-          Upload A File
-        </h1>
+        <h1 className="mb-4 text-2xl font-semibold">Upload A File</h1>
 
         {/* File Input */}
         <div className="mb-6">
           <label
             htmlFor="file-upload"
-            className="mb-2 block text-sm font-medium text-gray-400"
+            className="mb-2 block text-sm font-medium"
           >
             Choose A File To Upload:
           </label>
@@ -123,35 +146,53 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect }) => {
             type="file"
             id="file-upload"
             accept="video/*"
-            className="block w-full text-sm
-                       text-[#EC407A] file:mr-4 file:rounded-full
-                       file:border-0 file:bg-white
-                       file:px-4 file:py-2
-                       file:text-sm file:font-semibold
-                       file:text-[#EC407A] hover:file:bg-gray-200"
+            className="file:border-1 block w-full text-sm text-[#EC407A] file:mr-4 file:cursor-pointer file:rounded-full file:bg-white file:px-4 file:py-2 file:text-sm file:font-semibold file:text-[#EC407A] hover:file:bg-gray-200"
             onChange={handleFileChange}
           />
           {/* Display selected file name */}
           {selectedFile && (
-            <p className="mt-2 text-gray-300">
-              Selected file: {selectedFile.name}
-            </p>
+            <div>
+              <p className="mt-2 overflow-hidden text-ellipsis whitespace-nowrap text-lg text-gray-400">
+                Selected File: {selectedFile.name}
+              </p>
+              <PreviewVideo video={selectedFile} />
+            </div>
           )}
         </div>
 
-        {/* Upload Button */}
-        <div className="flex items-center justify-between">
-          <button
-            onClick={handleFileUpload}
-            disabled={!selectedFile || uploading}
-            className={`${
-              uploading
-                ? 'cursor-not-allowed bg-[#D63A6A]' // Change disabled color if needed
-                : 'bg-[#EC407A] hover:bg-[#D63A6A]' // Change button color
-            } cursor-pointer rounded-lg px-4 py-2 font-semibold text-white`}
-          >
-            {uploading ? 'Uploading...' : 'Upload File'}
-          </button>
+        {/* Upload Button and Progress Bar */}
+        <div className="flex w-full flex-col items-start space-y-4">
+          {uploadState === 'idle' ? (
+            <button
+              onClick={handleFileUpload}
+              disabled={!selectedFile}
+              className={`${
+                !selectedFile
+                  ? 'cursor-not-allowed bg-[#D63A6A]'
+                  : 'bg-[#EC407A] hover:bg-[#D63A6A]'
+              } cursor-pointer rounded-lg px-4 py-2 font-semibold text-white`}
+            >
+              Upload File
+            </button>
+          ) : (
+            <div className="w-full">
+              <Progress
+                value={progress}
+                max={100}
+                className="h-2 w-full overflow-hidden rounded-full bg-gray-200"
+              >
+                <div
+                  className="h-full bg-[#EC407A] transition-all duration-500 ease-in-out"
+                  style={{ width: `${progress}%` }}
+                />
+              </Progress>
+              <p className="mt-2 text-sm text-gray-400">
+                {uploadState === 'complete'
+                  ? 'Upload Complete!'
+                  : `${progress}% uploaded`}
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Error Message */}
@@ -166,10 +207,17 @@ const FileUpload: React.FC<FileUploadProps> = ({ onFileSelect }) => {
                 href={uploadedUri}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-green-500 underline"
+                className="overflow-hidden text-ellipsis whitespace-nowrap text-green-500 underline"
               >
-                {uploadedUri}
+                {truncateUri(uploadedUri)}
               </a>
+              <button
+                onClick={() => copyToClipboard(uploadedUri)}
+                className="ml-2 text-sm text-green-600 hover:text-green-800"
+              >
+                <CopyIcon className="h-5 w-5" />
+                <span>Copy</span>
+              </button>
             </p>
           </div>
         )}
