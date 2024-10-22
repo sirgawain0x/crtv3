@@ -1,3 +1,4 @@
+'use client';
 import { getLivePeerAiGeneratedImages } from '@app/api/livepeer/livepeerAiActions';
 import { Button } from '@app/components/ui/button';
 import { Textarea } from '@app/components/ui/textarea';

@@ -1,4 +1,5 @@
-import { useRef, useEffect, useState } from 'react';
+'use client';
+import { useEffect, useState } from 'react';
 import { Controller, useFormContext } from 'react-hook-form';
 import { BiPlus } from 'react-icons/bi';
 import Image from 'next/image';
