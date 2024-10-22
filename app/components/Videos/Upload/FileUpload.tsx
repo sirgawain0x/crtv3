@@ -25,10 +25,10 @@ const copyToClipboard = (text: string) => {
 
 interface FileUploadProps {
   onFileSelect: (file: File | null) => void;
-  onFileUploaded: (fileUrl: string) => void; // Callback to send the uploaded file URL back
-  onPressNext: (livePeerAssetId: string) => void;
-  onPressBack: () => void;
-  newAssetTitle: string;
+  onFileUploaded: (fileUrl: string) => void;
+  onPressNext?: (livePeerAssetId: string) => void; // Made optional
+  onPressBack?: () => void; // Made optional
+  newAssetTitle?: string; // Made optional
 }
 
 const FileUpload: React.FC<FileUploadProps> = ({
@@ -213,21 +213,25 @@ const FileUpload: React.FC<FileUploadProps> = ({
         </div>
       </div>
       <div className="flex items-center justify-center gap-3">
-        <Button disabled={uploadState === 'loading'} onClick={onPressBack}>
-          Back
-        </Button>
-        <Button
-          disabled={uploadState !== 'complete'}
-          onClick={() => {
-            if (livePeerUploadedAssetId) {
-              onPressNext(livePeerUploadedAssetId);
-            } else {
-              alert('Missing livepeer asset id');
-            }
-          }}
-        >
-          Next
-        </Button>
+        {onPressBack && (
+          <Button disabled={uploadState === 'loading'} onClick={onPressBack}>
+            Back
+          </Button>
+        )}
+        {onPressNext && (
+          <Button
+            disabled={uploadState !== 'complete'}
+            onClick={() => {
+              if (livePeerUploadedAssetId) {
+                onPressNext(livePeerUploadedAssetId);
+              } else {
+                alert('Missing livepeer asset id');
+              }
+            }}
+          >
+            Next
+          </Button>
+        )}
       </div>
     </div>
   );
