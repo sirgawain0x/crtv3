@@ -2,7 +2,7 @@
 import { fullLivepeer } from '@app/lib/sdk/livepeer/fullClient';
 import Image from 'next/image';
 import React, { useState, useRef, useEffect } from 'react';
-import { BiCloud, BiMusic, BiPlus } from 'react-icons/bi';
+import { BiCloud } from 'react-icons/bi';
 import {
   NewAssetFromUrlPayload,
   NewAssetPayload,
@@ -48,10 +48,6 @@ export default function Upload() {
   // Creating state for the input field
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [category, setCategory] = useState('');
-  const [location, setLocation] = useState('');
-  const [thumbnail, setThumbnail] = useState<File | string>('');
-  const [video, setVideo] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [videoFile, setVideoFile] = useState<File | null>(null);

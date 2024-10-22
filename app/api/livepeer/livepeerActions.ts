@@ -7,13 +7,6 @@ export const getLivepeerUploadUrl = async (
   fileName: string,
   creatorAddress: string,
 ) => {
-  //   const livepeerUpload = `${process.env.LIVEPEER_API_URL}/api/asset/request-upload`;
-  //   const headers = {
-  //     Authorization: `Bearer ${process.env.LIVEPEER_FULL_API_KEY}`,
-  //     ContentType: 'application/json',
-  //   };
-  //   const options = { headers  };
-  //   const response = await fetch(livepeerUpload, options);
   const result = await fullLivepeer.asset.create({
     name: fileName,
     storage: {
@@ -26,4 +19,16 @@ export const getLivepeerUploadUrl = async (
   });
 
   return result.data;
+};
+
+export const giveLivePeerAsset = async (livePeerAssetId: string) => {
+  const result = await fullLivepeer.asset.get(livePeerAssetId);
+
+  return result.asset;
+};
+
+export const getLivePeerPlaybackInfo = async (playbackId: string) => {
+  const result = await fullLivepeer.playback.get(playbackId);
+
+  return result.playbackInfo;
 };
