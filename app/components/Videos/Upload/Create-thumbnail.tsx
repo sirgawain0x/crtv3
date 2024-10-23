@@ -20,6 +20,7 @@ import { GetPlaybackInfoResponse } from 'livepeer/models/operations';
 import CreateThumbnailAi from '@app/components/Videos/Upload/Create-thumbnail-ai';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import CreateThumbnailForm from './CreateThumbnailForm';
 
 type CreateThumbnailProps = {
   livePeerAssetId: string | undefined;
@@ -104,7 +105,7 @@ export default function CreateThumbnail({
         <div className="mx-auto my-4">
           <h3 className="text-xl font-bold">Generate a Thumbnail</h3>
         </div>
-        <CreateThumbnailAi />
+        <CreateThumbnailForm />
       </div>
       <div className="flex items-center justify-center gap-3">
         <Button

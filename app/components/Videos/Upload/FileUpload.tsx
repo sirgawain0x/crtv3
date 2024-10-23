@@ -85,7 +85,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
         endpoint: uploadRequestResult?.tusEndpoint, // URL from `tusEndpoint` field in the
         metadata: {
           filename: selectedFile.name,
-          filetype: 'video/*',
+          filetype: 'video/mp4',
         },
         uploadSize: selectedFile.size,
         onError(err: any) {
