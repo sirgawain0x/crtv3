@@ -11,7 +11,7 @@ import {
   SelectLabel,
   SelectTrigger,
   SelectValue,
-} from '../../../../components/ui/select';
+} from '../../ui/select';
 import { Button } from '@app/components/ui/button';
 import { FormControl, FormLabel } from '@chakra-ui/react';
 

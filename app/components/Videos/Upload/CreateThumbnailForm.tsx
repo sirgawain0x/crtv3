@@ -8,9 +8,10 @@ import {
   SelectGroup,
   SelectLabel,
   SelectItem,
-} from '../../../../components/ui/select'; // Adjust the import path as needed
+} from '../../ui/select'; // Adjust the import path as needed
 import { Button } from '../../ui/button'; // Adjust the import path as needed
 import { SparkleIcon } from 'lucide-react';
+import Image from 'next/image';
 
 interface FormValues {
   aiModel: string;
@@ -133,7 +134,7 @@ const CreateThumbnailForm: React.FC = () => {
       {error && <p className="text-red-500">{error}</p>}
       {imageUrl && (
         <div className="mt-4">
-          <img
+          <Image
             src={imageUrl}
             alt="Generated Thumbnail"
             className="h-auto max-w-full"

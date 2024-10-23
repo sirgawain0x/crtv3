@@ -10,7 +10,7 @@ import {
   SelectLabel,
   SelectTrigger,
   SelectValue,
-} from '../../../../components/ui/select';
+} from '../../ui/select';
 import { useState } from 'react';
 import { TextToImageParams } from 'livepeer/models/components';
 import { SparklesIcon } from 'lucide-react';

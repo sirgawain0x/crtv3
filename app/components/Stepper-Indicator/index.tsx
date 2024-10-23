@@ -1,4 +1,4 @@
-import { Separator } from '../../../components/ui/separator';
+import { Separator } from '../ui/separator';
 import clsx from 'clsx';
 import { Check } from 'lucide-react';
 import React, { Fragment } from 'react';
