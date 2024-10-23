@@ -11,11 +11,7 @@ import {
 } from '@app/types/hook-stepper';
 
 import StepperIndicator from '@app/components/Stepper-Indicator';
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-} from '../../../../components/ui/alert';
+import { Alert, AlertDescription, AlertTitle } from '../../ui/alert';
 import { Button } from '@app/components/ui/button';
 import { toast } from 'sonner';
 import CreateInfo from './Create-info';
