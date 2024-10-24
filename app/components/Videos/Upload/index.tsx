@@ -18,7 +18,6 @@ import CreateInfo from './Create-info';
 import CreateThumbnail from './Create-thumbnail';
 import type { TVideoMetaForm } from './Create-info';
 import FileUpload from './FileUpload';
-import CreateThumbnailAi from './Create-thumbnail-ai';
 
 const HookMultiStepForm = () => {
   const [activeStep, setActiveStep] = useState(1);
