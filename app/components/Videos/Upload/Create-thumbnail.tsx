@@ -1,24 +1,16 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { Controller, useFormContext } from 'react-hook-form';
-import { BiPlus } from 'react-icons/bi';
-import Image from 'next/image';
-import { Input } from '@app/components/ui/input';
 import { Button } from '@app/components/ui/button';
 import { useInterval } from 'react-use';
 import { PlayerComponent } from '@app/components/Player/Player';
 import { Src } from '@livepeer/react';
 import { getSrc } from '@livepeer/react/external';
 import { Progress } from '@app/components/ui/progress';
-
 import {
   giveLivePeerAsset,
   getLivePeerPlaybackInfo,
 } from '@app/api/livepeer/livepeerActions';
 import { Asset, PlaybackInfo } from 'livepeer/models/components';
-import { GetPlaybackInfoResponse } from 'livepeer/models/operations';
-import CreateThumbnailAi from '@app/components/Videos/Upload/Create-thumbnail-ai';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import CreateThumbnailForm from './CreateThumbnailForm';
 
@@ -105,7 +97,11 @@ export default function CreateThumbnail({
         <div className="mx-auto my-4">
           <h3 className="text-xl font-bold">Generate a Thumbnail</h3>
         </div>
-        <CreateThumbnailForm />
+        <CreateThumbnailForm
+          onSelectThumbnailImages={(imgUrl) => {
+            console.log('Use selected image', imgUrl);
+          }}
+        />
       </div>
       <div className="flex items-center justify-center gap-3">
         <Button

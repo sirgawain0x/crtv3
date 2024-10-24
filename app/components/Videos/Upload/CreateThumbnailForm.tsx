@@ -10,19 +10,31 @@ import {
   SelectItem,
 } from '../../ui/select'; // Adjust the import path as needed
 import { Button } from '../../ui/button'; // Adjust the import path as needed
-import { SparkleIcon } from 'lucide-react';
+import { SparklesIcon } from 'lucide-react';
 import Image from 'next/image';
+import { Input } from '@app/components/ui/input';
+import { Textarea } from '@app/components/ui/textarea';
+import { Label } from '@app/components/ui/label';
+import { getLivePeerAiGeneratedImages } from '@app/api/livepeer/livepeerAiActions';
+import { Media } from 'livepeer/models/components';
 
 interface FormValues {
   aiModel: string;
   prompt: string;
 }
 
-const CreateThumbnailForm: React.FC = () => {
+type CreateThumbnailFormProps = {
+  onSelectThumbnailImages: (imageUrl: string) => void;
+};
+
+const CreateThumbnailForm = ({
+  onSelectThumbnailImages,
+}: CreateThumbnailFormProps) => {
   const {
     handleSubmit,
     control,
-    formState: { errors },
+    formState: { errors, isSubmitting },
+    setError,
   } = useForm<FormValues>({
     defaultValues: {
       aiModel: 'SG161222/RealVisXL_V4.0_Lightning', // Set default value if needed
@@ -30,41 +42,31 @@ const CreateThumbnailForm: React.FC = () => {
     },
   });
 
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [imagesUrl, setImagesUrl] = useState<Media[]>([]);
 
   const onSubmit = async (data: FormValues) => {
-    setLoading(true);
-    setError(null);
-    setImageUrl(null);
-
     try {
-      const response = await fetch('/api/livepeer/textToImage', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          prompt: data.prompt,
-          model_id: data.aiModel,
-        }),
+      const response = await getLivePeerAiGeneratedImages({
+        prompt: data.prompt,
+        modelId: data.aiModel,
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to generate image.');
+      if (response.success) {
+        setImagesUrl((currentImages) => [
+          ...currentImages,
+          ...response.result.images,
+        ]);
+      } else {
+        throw new Error(response.result);
       }
-
-      const result = await response.json();
-      setImageUrl(result.imageUrl); // Adjust based on your API response
-    } catch (err: any) {
-      console.error('Error generating image:', err);
-      setError(err.message || 'An unexpected error occurred.');
-    } finally {
-      setLoading(false);
+    } catch (e) {
+      console.log('Error', e);
+      setError('root', {
+        message: 'Error generating ai images',
+      });
     }
   };
+
+  console.log(imagesUrl);
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -116,7 +118,7 @@ const CreateThumbnailForm: React.FC = () => {
         control={control}
         rules={{ required: 'Prompt is required' }}
         render={({ field }) => (
-          <textarea
+          <Textarea
             {...field}
             placeholder="Enter your prompt"
             className="w-full rounded border p-2"
@@ -126,21 +128,39 @@ const CreateThumbnailForm: React.FC = () => {
       />
       {errors.prompt && <p className="text-red-500">{errors.prompt.message}</p>}
 
-      <Button type="submit" disabled={loading}>
-        <SparkleIcon className="h-4 w-4" />
-        {loading ? 'Generating...' : 'Generate Image'}
+      <Button type="submit" disabled={isSubmitting}>
+        <SparklesIcon className="mr-1 h-4 w-4" />
+        {isSubmitting ? 'Generating...' : 'Generate'}
       </Button>
 
-      {error && <p className="text-red-500">{error}</p>}
-      {imageUrl && (
-        <div className="mt-4">
-          <Image
-            src={imageUrl}
-            alt="Generated Thumbnail"
-            className="h-auto max-w-full"
-          />
-        </div>
+      {errors['root'] && (
+        <p className="text-red-500">{errors['root'].message}</p>
       )}
+      {imagesUrl.map((img, idx) => (
+        <div key={idx}>
+          <Label
+            className="relative block size-36"
+            htmlFor={`thumbnail_checkbox_${idx}`}
+          >
+            <Input
+              name="thumbnail_selector"
+              type="radio"
+              className="relative z-10"
+              id={`thumbnail_checkbox_${idx}`}
+              onChange={(e) => {
+                // if (e.currentTarget.se) {
+                onSelectThumbnailImages(img.url);
+                // }
+              }}
+            />
+            <Image
+              className="absolute left-0 top-0 h-full w-full"
+              src={img.url}
+              alt={'thumbnail'}
+            />
+          </Label>
+        </div>
+      ))}
     </form>
   );
 };

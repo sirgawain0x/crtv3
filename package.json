@@ -36,6 +36,7 @@
     "@thirdweb-dev/storage": "^2.0.15",
     "@unlock-protocol/networks": "^0.0.23",
     "@unlock-protocol/paywall": "^0.7.1",
+    "@useorbis/db-sdk": "^0.0.60-alpha",
     "@wert-io/widget-initializer": "^6.1.1",
     "@wert-io/widget-sc-signer": "^2.0.1",
     "axios": "^1.6.8",
@@ -65,7 +66,7 @@
     "thirdweb": "^5.63.2",
     "tus-js-client": "^4.2.3",
     "uuid": "^9.0.1",
-    "viem": "^2.19.6",
+    "viem": "^2.21.34",
     "wagmi": "^2.12.5",
     "yup": "^1.4.0",
     "zod": "^3.22.4"

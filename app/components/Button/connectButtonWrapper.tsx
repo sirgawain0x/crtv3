@@ -14,6 +14,7 @@ import {
 } from '@app/api/auth/thirdweb/thirdweb';
 
 export default function ConnectButtonWrapper() {
+  const storyTestnet = defineChain(1513);
   const wallets = [
     inAppWallet({
       auth: {
@@ -74,7 +75,7 @@ export default function ConnectButtonWrapper() {
   return (
     <ConnectButton
       client={client}
-      chains={[polygon, base, optimism, sepolia]}
+      chains={[polygon, base, optimism, storyTestnet]}
       connectButton={{
         label: 'Get Started',
         className: 'my-custom-class',
