@@ -9,7 +9,7 @@ import {
 import { Suspense } from 'react';
 import { Slash } from 'lucide-react';
 import More from '@app/components/Voting/More/More';
-import { Skeleton } from '@app/components/ui/skeleton';
+import Skeleton from '@app/components/ui/skeleton';
 
 export default function MorePage() {
   return (
@@ -41,9 +41,7 @@ export default function MorePage() {
         </Breadcrumb>
       </div>
       <Suspense
-        fallback={
-          <Skeleton className="h-[500px] w-[500px]">Loading...</Skeleton>
-        }
+        fallback={<Skeleton className="h-[500px] w-[500px]"></Skeleton>}
       >
         <More />
       </Suspense>
