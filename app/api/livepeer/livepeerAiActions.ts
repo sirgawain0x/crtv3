@@ -1,6 +1,6 @@
 'use server';
 import { fullLivepeer } from '@app/lib/sdk/livepeer/fullClient';
-import { TextToImageParams } from 'livepeer/models/components';
+import { TextToImageParams, AudioToTextParams } from 'livepeer/models/components';
 
 export const getLivePeerAiGeneratedImages = async ({
   prompt,
