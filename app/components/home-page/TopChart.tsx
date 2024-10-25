@@ -4,6 +4,8 @@ import { Avatar, AvatarImage, AvatarFallback } from '../ui/avatar';
 import makeBlockie from 'ethereum-blockies-base64';
 import { shortenAddress } from 'thirdweb/utils';
 import { stack } from '@app/lib/sdk/stack/client';
+import { client } from '@app/lib/sdk/thirdweb/client';
+import { resolveName } from 'thirdweb/extensions/ens';
 
 interface LeaderboardItem {
   uniqueId: number;
@@ -20,18 +22,38 @@ export function TopChart() {
 
   useEffect(() => {
     const fetchData = async () => {
-      const leaderboard = await stack.getLeaderboard({ limit: 20 });
-      setData(
-        leaderboard?.leaderboard.map((item, i) => ({
-          uniqueId: i + 1, // Ensure unique IDs start at 1
-          address: item.address,
-          points: item.points,
-          identities: item.identities || [],
-          bannerUrl: leaderboard?.metadata.bannerUrl,
-          name: leaderboard?.metadata.name,
-          description: leaderboard?.metadata.description,
-        })),
-      );
+      try {
+        const leaderboard = await stack.getLeaderboard({ limit: 20 });
+        if (!leaderboard) {
+          setData([]);
+          return;
+        }
+
+        // Resolve names for all addresses concurrently
+        const dataWithNames = await Promise.all(
+          leaderboard.leaderboard.map(async (item, i) => {
+            const name = await resolveName({
+              client,
+              address: item.address,
+            });
+
+            return {
+              uniqueId: i + 1, // Ensure unique IDs start at 1
+              address: item.address,
+              points: item.points,
+              identities: item.identities || [],
+              bannerUrl: leaderboard.metadata.bannerUrl,
+              name: name || shortenAddress(item.address), // Fallback to shortened address if name is not found
+              description: leaderboard.metadata.description,
+            };
+          }),
+        );
+
+        setData(dataWithNames);
+      } catch (error) {
+        console.error('Error fetching leaderboard data:', error);
+        setData([]);
+      }
     };
 
     fetchData();
@@ -62,7 +84,7 @@ export function TopChart() {
               colIndex === 2 ? 'hidden md:block' : ''
             } `}
           >
-            {column.map(({ uniqueId, address, points }) => (
+            {column.map(({ uniqueId, address, points, name }) => (
               <div
                 key={uniqueId}
                 className="mx-auto flex items-center space-x-2"
@@ -73,7 +95,7 @@ export function TopChart() {
                   <AvatarFallback>{makeBlockie('0x')}</AvatarFallback>
                 </Avatar>
                 <div className="flex flex-col">
-                  <span>{shortenAddress(address)}</span>
+                  <span>{name}</span>
                   <span className="text-gray-500">{points} points</span>
                 </div>
               </div>
@@ -105,26 +127,6 @@ function TrophyIcon(props: any) {
       <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" />
       <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" />
       <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
-    </svg>
-  );
-}
-
-function XIcon(props: any) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M18 6 6 18" />
-      <path d="m6 6 12 12" />
     </svg>
   );
 }

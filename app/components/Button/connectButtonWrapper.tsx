@@ -4,7 +4,14 @@ import { client } from '@app/lib/sdk/thirdweb/client';
 import { ACCOUNT_FACTORY_ADDRESS } from '@app/lib/utils/context';
 import { createWallet, inAppWallet } from 'thirdweb/wallets';
 import { VerifyLoginPayloadParams, LoginPayload } from 'thirdweb/auth';
-import { defineChain, sepolia, polygon, optimism, base } from 'thirdweb/chains';
+import {
+  defineChain,
+  polygon,
+  optimism,
+  base,
+  zora,
+  zoraSepolia,
+} from 'thirdweb/chains';
 import {
   generatePayload,
   isLoggedIn,
@@ -75,7 +82,7 @@ export default function ConnectButtonWrapper() {
   return (
     <ConnectButton
       client={client}
-      chains={[polygon, base, optimism, storyTestnet]}
+      chains={[polygon, base, optimism, storyTestnet, zora, zoraSepolia]}
       connectButton={{
         label: 'Get Started',
         className: 'my-custom-class',
