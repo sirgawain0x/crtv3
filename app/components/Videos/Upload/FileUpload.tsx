@@ -8,6 +8,7 @@ import PreviewVideo from './PreviewVideo';
 import { useActiveAccount } from 'thirdweb/react';
 import { Progress } from '@app/components/ui/progress';
 import { Button } from '@app/components/ui/button';
+import { generateSubtitles } from '@app/api/livepeer/livepeerAiActions';
 
 // Add these functions to your component
 
@@ -42,6 +43,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState<boolean>(false);
   const [uploadedUri, setUploadedUri] = useState<string | null>(null);
+  const [subtitles, setSubtitles] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<number>(0);
   const [uploadComplete, setUploadComplete] = useState<boolean>(false);
@@ -101,6 +103,12 @@ const FileUpload: React.FC<FileUploadProps> = ({
           setUploadState('complete');
           // Call onFileUploaded here with the upload URL
           onFileUploaded(upload?.url || '');
+
+          generateSubtitles(selectedFile).then((subtitlesResult) => {
+            setSubtitles(subtitlesResult)
+            // TODO: ? Save subtitles
+            console.log('Subtitles generated:', subtitlesResult);
+          });
         },
       });
 
