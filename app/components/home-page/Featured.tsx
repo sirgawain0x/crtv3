@@ -4,7 +4,7 @@ import { Src } from '@livepeer/react';
 import { FEATURED_VIDEO_TITLE } from '@app/lib/utils/context';
 import { getFeaturedPlaybackSource } from '@app/lib/utils/hooks/useFeaturePlaybackSource';
 import { DemoPlayer } from '../Player/DemoPlayer';
-import { Skeleton } from '../ui/skeleton';
+import Skeleton from '@app/components/ui/skeleton';
 
 const FeaturedVideo: React.FC = () => {
   const [src, setSrc] = useState<Src[] | null>(null);

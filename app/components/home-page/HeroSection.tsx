@@ -10,7 +10,7 @@ import { Src } from '@livepeer/react';
 import { PlayIcon } from '@livepeer/react/assets';
 import { DemoPlayer } from '../Player/DemoPlayer';
 import { getHeroPlaybackSource } from '@app/lib/utils/hooks/useHeroPlaybackSource';
-import { Skeleton } from '../ui/skeleton';
+import Skeleton from '@app/components/ui/skeleton';
 import { HERO_VIDEO_TITLE } from '../../lib/utils/context';
 
 const HeroSection: React.FC = () => {
