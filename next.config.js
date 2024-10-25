@@ -10,6 +10,10 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'locksmith.unlock-protocol.com',
       },
+      {
+        protocol: 'https',
+        hostname: 'obj-store.livepeer.cloud',
+      },
     ],
   },
 };

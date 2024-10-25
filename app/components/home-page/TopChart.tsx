@@ -6,6 +6,8 @@ import { shortenAddress } from 'thirdweb/utils';
 import { stack } from '@app/lib/sdk/stack/client';
 import { client } from '@app/lib/sdk/thirdweb/client';
 import { resolveName } from 'thirdweb/extensions/ens';
+import { Button } from '../ui/button'; // Assuming you have a Button component
+import { FaSpinner } from 'react-icons/fa';
 
 interface LeaderboardItem {
   uniqueId: number;
@@ -19,12 +21,23 @@ interface LeaderboardItem {
 
 export function TopChart() {
   const [data, setData] = useState<LeaderboardItem[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
+      setIsLoading(true);
+      setErrorMessage(null);
       try {
-        const leaderboard = await stack.getLeaderboard({ limit: 20 });
-        if (!leaderboard) {
+        // Construct the leaderboard query with a limit of 20
+        const query = stack.leaderboardQuery().limit(20).build();
+
+        // Fetch the leaderboard with the constructed query
+        const leaderboard = await stack.getLeaderboard({ query });
+
+        if (!leaderboard || !leaderboard.leaderboard) {
+          console.warn('Leaderboard data is missing or empty.');
+          setErrorMessage('Leaderboard data is missing or empty.');
           setData([]);
           return;
         }
@@ -32,10 +45,21 @@ export function TopChart() {
         // Resolve names for all addresses concurrently
         const dataWithNames = await Promise.all(
           leaderboard.leaderboard.map(async (item, i) => {
-            const name = await resolveName({
-              client,
-              address: item.address,
-            });
+            let name: string | undefined;
+
+            try {
+              name =
+                (await resolveName({
+                  client,
+                  address: item.address,
+                })) ?? undefined; // Updated line
+            } catch (nameError) {
+              console.warn(
+                `Failed to resolve name for address ${item.address}:`,
+                nameError,
+              );
+              name = shortenAddress(item.address); // Fallback if name resolution fails
+            }
 
             return {
               uniqueId: i + 1, // Ensure unique IDs start at 1
@@ -50,9 +74,12 @@ export function TopChart() {
         );
 
         setData(dataWithNames);
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error fetching leaderboard data:', error);
+        setErrorMessage('Failed to load leaderboard. Please try again later.');
         setData([]);
+      } finally {
+        setIsLoading(false);
       }
     };
 
@@ -76,33 +103,52 @@ export function TopChart() {
           TOP CREATIVES
         </h2>
       </div>
-      <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-        {columns.map((column, colIndex) => (
-          <div
-            key={colIndex}
-            className={`mx-auto space-y-4 ${colIndex === 3 ? 'hidden lg:block' : ''} ${
-              colIndex === 2 ? 'hidden md:block' : ''
-            } `}
-          >
-            {column.map(({ uniqueId, address, points, name }) => (
-              <div
-                key={uniqueId}
-                className="mx-auto flex items-center space-x-2"
-              >
-                <span>{uniqueId}.</span>
-                <Avatar>
-                  <AvatarImage src={makeBlockie(address)} />
-                  <AvatarFallback>{makeBlockie('0x')}</AvatarFallback>
-                </Avatar>
-                <div className="flex flex-col">
-                  <span>{name}</span>
-                  <span className="text-gray-500">{points} points</span>
+
+      {isLoading ? (
+        <div className="flex justify-center">
+          <FaSpinner className="mr-3 h-5 w-5 animate-spin" />{' '}
+          {/* Replace with your actual Spinner component */}
+        </div>
+      ) : errorMessage ? (
+        <div className="text-center">
+          <p className="text-red-500">{errorMessage}</p>
+          <Button onClick={() => window.location.reload()} className="mt-2">
+            Retry
+          </Button>
+        </div>
+      ) : data.length === 0 ? (
+        <p className="text-center text-gray-500">
+          No leaderboard data available.
+        </p>
+      ) : (
+        <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+          {columns.map((column, colIndex) => (
+            <div
+              key={colIndex}
+              className={`mx-auto space-y-4 ${
+                colIndex === 3 ? 'hidden lg:block' : ''
+              } ${colIndex === 2 ? 'hidden md:block' : ''} `}
+            >
+              {column.map(({ uniqueId, address, points, name }) => (
+                <div
+                  key={`${address}-${uniqueId}`} // Ensures a unique key
+                  className="mx-auto flex items-center space-x-2"
+                >
+                  <span>{uniqueId}.</span>
+                  <Avatar>
+                    <AvatarImage src={makeBlockie(address)} />
+                    <AvatarFallback>👤</AvatarFallback>
+                  </Avatar>
+                  <div className="flex flex-col">
+                    <span>{name}</span>
+                    <span className="text-gray-500">{points} points</span>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        ))}
-      </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
