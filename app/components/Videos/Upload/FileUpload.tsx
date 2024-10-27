@@ -8,8 +8,7 @@ import PreviewVideo from './PreviewVideo';
 import { useActiveAccount } from 'thirdweb/react';
 import { Progress } from '@app/components/ui/progress';
 import { Button } from '@app/components/ui/button';
-import { generateSubtitles } from '@app/api/livepeer/livepeerAiActions';
-
+import { openAsBlob } from 'fs';
 // Add these functions to your component
 
 const truncateUri = (uri: string): string => {
@@ -104,11 +103,11 @@ const FileUpload: React.FC<FileUploadProps> = ({
           // Call onFileUploaded here with the upload URL
           onFileUploaded(upload?.url || '');
 
-          generateSubtitles(selectedFile).then((subtitlesResult) => {
-            setSubtitles(subtitlesResult)
-            // TODO: ? Save subtitles
-            console.log('Subtitles generated:', subtitlesResult);
-          });
+          // generateSubtitles(selectedFile).then((subtitlesResult) => {
+          //   setSubtitles(subtitlesResult)
+          //   // TODO: ? Save subtitles
+          //   console.log('Subtitles generated:', subtitlesResult);
+          // });
         },
       });
 

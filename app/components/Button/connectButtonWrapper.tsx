@@ -58,6 +58,16 @@ export default function ConnectButtonWrapper() {
         maxRecipients: 1,
         recurringPayments: 'forever',
       },
+      '0xb6b645C3e2025Cf69983983266D16A0aA323e2B0': {
+        name: 'Creative Creator',
+        order: 2,
+        network: 137,
+        recipient: '',
+        dataBuilder: '',
+        emailRequired: true,
+        maxRecipients: 1,
+        recurringPayments: 'forever',
+      },
     },
     title: 'The Creative Membership',
     referrer: '0x1Fde40a4046Eda0cA0539Dd6c77ABF8933B94260',
@@ -106,6 +116,7 @@ export default function ConnectButtonWrapper() {
         137: [
           '0xad597e5b24ad2a6032168c76f49f05d957223cd0',
           '0xb6b645c3e2025cf69983983266d16a0aa323e2b0',
+          '0xb6b645C3e2025Cf69983983266D16A0aA323e2B0'
         ],
       }}
       connectModal={{
