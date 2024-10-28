@@ -19,6 +19,7 @@ import { Src } from '@livepeer/react';
 import makeBlockie from 'ethereum-blockies-base64';
 import VideoViewMetrics from './VideoViewMetrics';
 import { color } from 'framer-motion';
+import { VideoJSPlayer } from '../Player/VideoJSPlayer';
 
 interface VideoCardProps {
   asset: Asset;
@@ -46,7 +47,8 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
             </CardDescription>
           </CardHeader>
         </div>
-        <PlayerComponent src={playbackSources} title={asset?.name} />
+        <VideoJSPlayer playbackUrl={playbackSources?.[0].src} />
+        {/* <PlayerComponent src={playbackSources} title={asset?.name} /> */}
         <CardContent>
           <div className="my-2 flex items-center justify-between">
             <Badge

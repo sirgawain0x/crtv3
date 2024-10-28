@@ -27,9 +27,10 @@ const copyToClipboard = (text: string) => {
 interface FileUploadProps {
   onFileSelect: (file: File | null) => void;
   onFileUploaded: (fileUrl: string) => void;
-  onPressNext?: (livePeerAssetId: string) => void; // Made optional
-  onPressBack?: () => void; // Made optional
-  newAssetTitle?: string; // Made optional
+  onPressNext?: (livePeerAssetId: string) => void; //  optional
+  onPressBack?: () => void; //  optional
+  metadata?: any; // optional
+  newAssetTitle?: string; // optional
 }
 
 const FileUpload: React.FC<FileUploadProps> = ({
@@ -37,6 +38,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
   onFileUploaded,
   onPressNext,
   onPressBack,
+  metadata,
   newAssetTitle,
 }) => {
   // Destructure onFileUploaded
@@ -103,12 +105,6 @@ const FileUpload: React.FC<FileUploadProps> = ({
           setUploadState('complete');
           // Call onFileUploaded here with the upload URL
           onFileUploaded(upload?.url || '');
-
-          // generateSubtitles(selectedFile).then((subtitlesResult) => {
-          //   setSubtitles(subtitlesResult)
-          //   // TODO: ? Save subtitles
-          //   console.log('Subtitles generated:', subtitlesResult);
-          // });
         },
       });
 
@@ -120,6 +116,28 @@ const FileUpload: React.FC<FileUploadProps> = ({
       upload.start();
 
       const subtitlesResult = await generateTextFromAudio(selectedFile);
+
+      type AssetMetadata = {
+        assetId: string;
+        title: string;
+        description?: string;
+        location?: string;
+        category?: string;
+        thumbnail?: string;
+        subtitlesUri?: string;
+      };
+
+      const metadata: AssetMetadata = {
+        assetId: livePeerUploadedAssetId,
+        title: newAssetTitle,
+        description: a.description,
+        ...(a?.location !== undefined && { location: a.location })
+        ...(a?.category !== undefined && { category: a.category })
+        ...(a?.thumbnailUri !== undefined && { thumbnailUri: a.thumbnailUri })
+        ...(subtitlesResult.vttUri !== undefined && { subtitlesUri: subtitlesResult.vttUri })
+      };
+
+
     } catch (error: any) {
       console.error('Error uploading file:', error);
       setError('Failed to upload file. Please try again.');

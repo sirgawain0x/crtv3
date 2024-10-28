@@ -1,19 +1,14 @@
 'use server';
-
-import type { NextApiRequest, NextApiResponse } from 'next';
+import { upload, download } from "thirdweb/storage";
+import { client } from "@app/lib/sdk/thirdweb/client";
 import { openAsBlob } from 'node:fs';
-
-interface AudioToTextParams {
-  video: File;
-  modelId?: string | null;
-}
 
 interface SubtitleEntry {
   timestamp: [number, number]; // [startTime, endTime] in seconds
   text: string;
   label?: string;
   srclang?: string;
-}
+};
 
 function secondsToVTTTime(seconds: number): string {
   // Handle negative numbers or invalid input
@@ -30,7 +25,7 @@ function secondsToVTTTime(seconds: number): string {
     .padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${milliseconds
     .toString()
     .padStart(3, '0')}`;
-}
+};
 
 function generateVTTFile(subtitles: SubtitleEntry[]): string {
   // Sort subtitles by start time to ensure proper sequence
@@ -54,10 +49,10 @@ function generateVTTFile(subtitles: SubtitleEntry[]): string {
   });
 
   return vttContent;
-}
+};
 
 // Helper function to save VTT content to a file (browser environment)
-async function downloadVTT(
+async function downloadVTTFromHTTPS(
   vttContent: string,
   filename: string = 'subtitles.vtt',
 ): Promise<void> {
@@ -70,16 +65,29 @@ async function downloadVTT(
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+};
+
+export const downloadVTTFromIPFS = async (vttUri: string): Promise<File> => {
+  const file = await download({
+    client,
+    uri: vttUri,
+  });
+  return file;
 }
 
-const generateSubtitles = async (video: any) => {
+export const generateTextFromAudio = async (
+  video: File,
+  model_id: string ='whisper-large-v3',
+) => {
   try {
+
     const myHeaders = new Headers();
     myHeaders.append('Content-Type', 'application/json');
     myHeaders.append('Authorization', `Bearer ${process.env.LIVEPEER_API_KEY}`);
 
     const raw = JSON.stringify({
       audio: await openAsBlob(video),
+      model_id,
     });
 
     const requestOptions: RequestInit = {
@@ -111,57 +119,22 @@ const generateSubtitles = async (video: any) => {
     // Generate VTT file from chunks and append to response as vtt property
     result.vtt = generateVTTFile(result.chunks);
 
-    return result;
-  } catch (error: any) {
-    console.error('Error in generateSubtitles API:', error);
-    return { error: error.message || 'Internal Server Error' };
-  }
-};
-
-const generateTextFromAudio = async (
-  // req: NextApiRequest,
-  // res: NextApiResponse,
-  video: File,
-  model_id: string ='whisper-large-v3',
-) => {
-  try {
-    // const { video, model_id } = req.body;
-
-    const myHeaders = new Headers();
-    myHeaders.append('Content-Type', 'application/json');
-    myHeaders.append('Authorization', `Bearer ${process.env.LIVEPEER_API_KEY}`);
-
-    const raw = JSON.stringify({
-      audio: await openAsBlob(video),
-      model_id,
-    });
-
-    const requestOptions: RequestInit = {
-      method: 'POST',
-      headers: myHeaders,
-      body: raw,
-      redirect: 'follow',
-    };
-
-    const response = await fetch(
-      'https://dream-gateway.livepeer.cloud/audio-to-text',
-      requestOptions,
-    );
-
-    // if (!response.ok) {
-    //   const errorText = await response.text();
-    //   throw new Error(`Error: ${response.status} - ${errorText}`);
-    // }
+    const uri = await upload({
+      client,
+      files: [
+        new File(result.vtt, `${video.name}.vtt`),
+      ],
+     });
 
     if (response.ok) {
       return {
         success: true,
-        result: await response.json(),
+        result: result,
       };
     } else {
       return {
         success: false,
-        result: await response.json(),
+        result: result,
       };
     }
   } catch (error: any) {
@@ -169,5 +142,3 @@ const generateTextFromAudio = async (
     return { error: error.message || 'Internal Server Error' };
   }
 };
-
-export default generateTextFromAudio;
