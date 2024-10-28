@@ -19,7 +19,6 @@ import { Src } from '@livepeer/react';
 import makeBlockie from 'ethereum-blockies-base64';
 import VideoViewMetrics from './VideoViewMetrics';
 import { color } from 'framer-motion';
-import { VideoJSPlayer } from '../Player/VideoJSPlayer';
 
 interface VideoCardProps {
   asset: Asset;
