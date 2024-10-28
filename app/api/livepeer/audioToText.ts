@@ -118,16 +118,14 @@ const generateSubtitles = async (video: any) => {
   }
 };
 
-const audioToTextHandler = async (
-  req: NextApiRequest,
-  res: NextApiResponse,
+const generateTextFromAudio = async (
+  // req: NextApiRequest,
+  // res: NextApiResponse,
+  video: File,
+  model_id: string ='whisper-large-v3',
 ) => {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method Not Allowed' });
-  }
-
   try {
-    const { video, model_id } = req.body;
+    // const { video, model_id } = req.body;
 
     const myHeaders = new Headers();
     myHeaders.append('Content-Type', 'application/json');
@@ -150,19 +148,26 @@ const audioToTextHandler = async (
       requestOptions,
     );
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Error: ${response.status} - ${errorText}`);
-    }
+    // if (!response.ok) {
+    //   const errorText = await response.text();
+    //   throw new Error(`Error: ${response.status} - ${errorText}`);
+    // }
 
-    const result = await response.json();
-    return res.status(200).json(result);
+    if (response.ok) {
+      return {
+        success: true,
+        result: await response.json(),
+      };
+    } else {
+      return {
+        success: false,
+        result: await response.json(),
+      };
+    }
   } catch (error: any) {
     console.error('Error in audioToText API:', error);
-    return res
-      .status(500)
-      .json({ error: error.message || 'Internal Server Error' });
+    return { error: error.message || 'Internal Server Error' };
   }
 };
 
-export default audioToTextHandler;
+export default generateTextFromAudio;

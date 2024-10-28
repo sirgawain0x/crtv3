@@ -9,6 +9,7 @@ import { useActiveAccount } from 'thirdweb/react';
 import { Progress } from '@app/components/ui/progress';
 import { Button } from '@app/components/ui/button';
 import { openAsBlob } from 'fs';
+import generateTextFromAudio from '@app/api/livepeer/audioToText';
 // Add these functions to your component
 
 const truncateUri = (uri: string): string => {
@@ -117,6 +118,8 @@ const FileUpload: React.FC<FileUploadProps> = ({
         upload.resumeFromPreviousUpload(previousUploads[0]);
       }
       upload.start();
+
+      const subtitlesResult = await generateTextFromAudio(selectedFile);
     } catch (error: any) {
       console.error('Error uploading file:', error);
       setError('Failed to upload file. Please try again.');
