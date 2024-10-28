@@ -13,6 +13,8 @@ import {
 import { Asset, PlaybackInfo } from 'livepeer/models/components';
 import { useRouter } from 'next/navigation';
 import CreateThumbnailForm from './CreateThumbnailForm';
+import { FaSpinner } from 'react-icons/fa';
+import { Spinner } from '@chakra-ui/react';
 
 type CreateThumbnailProps = {
   livePeerAssetId: string | undefined;
@@ -79,10 +81,7 @@ export default function CreateThumbnail({
       </div>
       {livepeerAssetData?.status?.phase !== 'ready' && (
         <div className="my-4">
-          <Progress
-            value={livepeerAssetData?.status?.progress}
-            className="w-full"
-          />
+          <Spinner className="mx-auto h-5 w-5 animate-pulse" />
         </div>
       )}
       {livepeerAssetData?.status?.phase === 'ready' && livepeerPlaybackData && (
