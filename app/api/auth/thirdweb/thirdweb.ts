@@ -54,21 +54,25 @@ export async function login(
       payload: verifiedPayload.payload,
     });
 
-    // Initialize an in-app wallet connection.
+    // // Initialize an in-app wallet connection.
     const wallet = inAppWallet();
 
-    // Connect to the wallet using a strategy URL that includes the client ID, redirect URI, and optional paywall configuration.
-    const account = await wallet.connect({
-      client: thirdwebClient, // The thirdweb client instance.
-      strategy:
-        `https://app.unlock-protocol.com/checkout?client_id=${clientId}&redirect_uri=${redirectUri}` +
-        (paywallConfig ? `&paywallConfig=${paywallConfig}` : ''), // Construct the strategy URL with query parameters.
-      // The payload to be sent to the auth endpoint.
-      payload: verifiedPayload.payload,
-      // Use the encryption key from environment variables.
-      encryptionKey: process.env.THIRDWEB_ENCRYPTION_KEY as string,
-    });
-    console.log('Account', account); // Log the connected account for debugging.
+    console.log('clientId', clientId);
+    console.log('redirectUri', redirectUri);
+    console.log('paywallConfig', paywallConfig);
+
+    // // Connect to the wallet using a strategy URL that includes the client ID, redirect URI, and optional paywall configuration.
+    // const account = await wallet.connect({
+    //   client: thirdwebClient, // The thirdweb client instance.
+    //   strategy:
+    //     `https://app.unlock-protocol.com/checkout?client_id=${clientId}&redirect_uri=${redirectUri}` +
+    //     (paywallConfig ? `&paywallConfig=${paywallConfig}` : ''), // Construct the strategy URL with query parameters.
+    //   // The payload to be sent to the auth endpoint.
+    //   payload: verifiedPayload.payload,
+    //   // Use the encryption key from environment variables.
+    //   encryptionKey: process.env.THIRDWEB_ENCRYPTION_KEY as string,
+    // });
+    // console.log('Account', account); // Log the connected account for debugging.
     // Set a cookie with the generated JWT to maintain the user's session.
     cookies().set('jwt', jwt);
   }
@@ -80,7 +84,7 @@ export async function validatePayload(payload: VerifyLoginPayloadParams) {
 }
 
 // Function to check if the user is logged in.
-export async function isLoggedIn() {
+export async function isLoggedIn(address: string) {
   // Retrieve the JWT from cookies.
   const jwt = cookies().get('jwt');
   if (!jwt?.value) {

@@ -9,6 +9,10 @@ import { useActiveAccount } from 'thirdweb/react';
 import { Progress } from '@app/components/ui/progress';
 import { Button } from '@app/components/ui/button';
 import { openAsBlob } from 'fs';
+import generateTextFromAudio from '@app/api/livepeer/audioToText';
+import { AssetMetadata } from '../../../lib/sdk/orbisDB/models/AssetMetadata';
+import { useOrbisContext } from "@app/lib/sdk/orbisDB/context";import { use } from "react";
+
 // Add these functions to your component
 
 const truncateUri = (uri: string): string => {
@@ -26,9 +30,10 @@ const copyToClipboard = (text: string) => {
 interface FileUploadProps {
   onFileSelect: (file: File | null) => void;
   onFileUploaded: (fileUrl: string) => void;
-  onPressNext?: (livePeerAssetId: string) => void; // Made optional
-  onPressBack?: () => void; // Made optional
-  newAssetTitle?: string; // Made optional
+  onPressNext?: (livePeerAssetId: string) => void; //  optional
+  onPressBack?: () => void; //  optional
+  metadata?: any; // optional
+  newAssetTitle?: string; // optional
 }
 
 const FileUpload: React.FC<FileUploadProps> = ({
@@ -36,6 +41,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
   onFileUploaded,
   onPressNext,
   onPressBack,
+  metadata,
   newAssetTitle,
 }) => {
   // Destructure onFileUploaded
@@ -52,6 +58,8 @@ const FileUpload: React.FC<FileUploadProps> = ({
 
   const [livePeerUploadedAssetId, setLivePeerUploadedAssetId] =
     useState<string>();
+
+  const { insert } = useOrbisContext();
 
   const activeAccount = useActiveAccount();
 
@@ -102,12 +110,6 @@ const FileUpload: React.FC<FileUploadProps> = ({
           setUploadState('complete');
           // Call onFileUploaded here with the upload URL
           onFileUploaded(upload?.url || '');
-
-          // generateSubtitles(selectedFile).then((subtitlesResult) => {
-          //   setSubtitles(subtitlesResult)
-          //   // TODO: ? Save subtitles
-          //   console.log('Subtitles generated:', subtitlesResult);
-          // });
         },
       });
 
@@ -117,6 +119,21 @@ const FileUpload: React.FC<FileUploadProps> = ({
         upload.resumeFromPreviousUpload(previousUploads[0]);
       }
       upload.start();
+
+      const subtitlesResult = await generateTextFromAudio(selectedFile, livePeerUploadedAssetId, 'whisper-large-v3');
+
+      const metadata: AssetMetadata = {
+        assetId: livePeerUploadedAssetId,
+        title: newAssetTitle,
+        // description: a.description,
+        // ...(a?.location !== undefined && { location: a.location })
+        // ...(a?.category !== undefined && { category: a.category })
+        // ...(a?.thumbnailUri !== undefined && { thumbnailUri: a.thumbnailUri })
+        ...(subtitlesResult.uri !== undefined && { subtitlesUri: subtitlesResult.uri })
+      };
+
+      await insert(metadata, 'AssetMetadata');
+
     } catch (error: any) {
       console.error('Error uploading file:', error);
       setError('Failed to upload file. Please try again.');
