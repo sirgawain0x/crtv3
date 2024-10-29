@@ -125,7 +125,7 @@ export const generateTextFromAudio = async (
       files: [
         new File(result.vtt, `${video.toString}.vtt`),
       ],
-     });
+    });
 
     if (response.ok) {
       return {

@@ -13,7 +13,7 @@ interface OrbisContextProps {
     insert: (value: any, modelId: string) => Promise<void>;
     update: (docId: string, updates: any) => Promise<void>;
     getAssetMetadata: (assetId: string) => Promise<any>;
-    orbisLogin: (privateKey: string) => Promise<void>;
+    orbisLogin: (privateKey?: string) => Promise<void>;
     isConnected: (address: string) => Promise<Boolean>;
     getCurrentUser: () => Promise<any>;
 }

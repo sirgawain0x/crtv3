@@ -128,11 +128,11 @@ export function Navbar() {
               <ThemeToggleComponent />
             </div>
             <ConnectButtonWrapper />
-            {activeAccount && (
+            {/* {activeAccount && (
               <div className="mt-5">
                 <ClaimLockButton closeMenu={() => setIsMenuOpen(false)} />
               </div>
-            )}
+            )} */}
           </div>
         </SheetContent>
       </Sheet>
