@@ -10,6 +10,9 @@ import { Progress } from '@app/components/ui/progress';
 import { Button } from '@app/components/ui/button';
 import { openAsBlob } from 'fs';
 import generateTextFromAudio from '@app/api/livepeer/audioToText';
+import { AssetMetadata } from '../../../lib/sdk/orbisDB/models/AssetMetadata';
+import { useOrbisContext } from "@app/lib/sdk/orbisDB/context";import { use } from "react";
+
 // Add these functions to your component
 
 const truncateUri = (uri: string): string => {
@@ -55,6 +58,8 @@ const FileUpload: React.FC<FileUploadProps> = ({
 
   const [livePeerUploadedAssetId, setLivePeerUploadedAssetId] =
     useState<string>();
+
+  const { insert } = useOrbisContext();
 
   const activeAccount = useActiveAccount();
 
@@ -115,28 +120,19 @@ const FileUpload: React.FC<FileUploadProps> = ({
       }
       upload.start();
 
-      const subtitlesResult = await generateTextFromAudio(selectedFile);
-
-      type AssetMetadata = {
-        assetId: string;
-        title: string;
-        description?: string;
-        location?: string;
-        category?: string;
-        thumbnail?: string;
-        subtitlesUri?: string;
-      };
+      const subtitlesResult = await generateTextFromAudio(selectedFile, livePeerUploadedAssetId, 'whisper-large-v3');
 
       const metadata: AssetMetadata = {
         assetId: livePeerUploadedAssetId,
         title: newAssetTitle,
-        description: a.description,
-        ...(a?.location !== undefined && { location: a.location })
-        ...(a?.category !== undefined && { category: a.category })
-        ...(a?.thumbnailUri !== undefined && { thumbnailUri: a.thumbnailUri })
-        ...(subtitlesResult.vttUri !== undefined && { subtitlesUri: subtitlesResult.vttUri })
+        // description: a.description,
+        // ...(a?.location !== undefined && { location: a.location })
+        // ...(a?.category !== undefined && { category: a.category })
+        // ...(a?.thumbnailUri !== undefined && { thumbnailUri: a.thumbnailUri })
+        ...(subtitlesResult.uri !== undefined && { subtitlesUri: subtitlesResult.uri })
       };
 
+      await insert(metadata, 'AssetMetadata');
 
     } catch (error: any) {
       console.error('Error uploading file:', error);

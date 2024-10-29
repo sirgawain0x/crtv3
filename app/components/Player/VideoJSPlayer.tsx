@@ -1,3 +1,4 @@
+import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
 import React, { useEffect, useRef } from 'react';
 import videojs from 'video.js';
 import Player from 'video.js/dist/types/player';
@@ -32,6 +33,8 @@ export const VideoJSPlayer: React.FC<VideoPlayerProps> = ({
 }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const playerRef = useRef<Player | null>(null);
+
+  const { getAssetMetadata } = useOrbisContext();
 
   if (!playbackId && !playbackUrl) {
     throw new Error('Either playbackId or playbackUrl must be provided');
@@ -79,23 +82,27 @@ export const VideoJSPlayer: React.FC<VideoPlayerProps> = ({
       }
     });
 
-    // Add subtitles/captions if provided
-    // subtitles.forEach(subtitle => {
-    if (subtitles !== '') {
-      playerRef.current?.addRemoteTextTrack({
-            kind: 'subtitles',
-            srclang: 'en', // subtitles.language,
-            label: 'English', // subtitles.label,
-            src: subtitles,
-            default: true, // subtitles.language === 'en',
-        }, false);
-    }
-    // });
-
     // Add quality level change listener
     playerRef.current?.qualityLevels().on('change', () => {
       console.log('Quality level changed');
     });
+
+    if (playbackId) {
+      const assetMetadata = getAssetMetadata(playbackId);
+
+      // Add subtitles/captions if provided
+      // subtitles.forEach(subtitle => {
+        if (subtitles !== '') {
+          playerRef.current?.addRemoteTextTrack({
+                kind: 'subtitles',
+                srclang: 'en', // subtitles.language,
+                label: 'English', // subtitles.label,
+                src: assetMetadata?.subtitlesUri,
+                default: true, // subtitles.language === 'en',
+            }, false);
+        }
+        // });
+    }
 
     // Cleanup
     return () => {

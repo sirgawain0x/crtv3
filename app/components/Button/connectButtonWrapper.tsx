@@ -19,10 +19,11 @@ import {
   logout,
   validatePayload,
 } from '@app/api/auth/thirdweb/thirdweb';
-import { db } from '../../lib/sdk/orbisDB/client';
-import { OrbisEVMAuth, OrbisConnectResult } from '@useorbis/sdk';
+import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
 
 export default function ConnectButtonWrapper() {
+  const { orbisLogin } = useOrbisContext();
+
   const storyTestnet = defineChain(1513);
   const wallets = [
     inAppWallet({
@@ -138,7 +139,7 @@ export default function ConnectButtonWrapper() {
         client: client,
         isLoggedIn: async (address: string) => {
           console.log('checking if logged in!', { address });
-          return await isLoggedIn();
+          return await isLoggedIn(address);
         },
         doLogin: async (
           params: VerifyLoginPayloadParams,
@@ -157,20 +158,7 @@ export default function ConnectButtonWrapper() {
             },
           );
 
-          // Browser provider
-          const provider = window.ethereum;
-
-          // Ethers provider
-          // const provider = new Wallet(...)
-
-          // Orbis Authenticator
-          const auth = new OrbisEVMAuth(provider);
-
-          // Authenticate the user and persist the session in localStorage
-          const authResult: OrbisConnectResult = await db.connectUser({ auth });
-
-          // Log the result
-          console.log({ authResult })
+          orbisLogin();
 
           return loginPayload;
         },

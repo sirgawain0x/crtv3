@@ -1,7 +1,7 @@
 'use server';
 import { upload, download } from "thirdweb/storage";
 import { client } from "@app/lib/sdk/thirdweb/client";
-import { openAsBlob } from 'node:fs';
+import { openAsBlob, PathLike } from 'node:fs';
 
 interface SubtitleEntry {
   timestamp: [number, number]; // [startTime, endTime] in seconds
@@ -67,7 +67,7 @@ async function downloadVTTFromHTTPS(
   URL.revokeObjectURL(url);
 };
 
-export const downloadVTTFromIPFS = async (vttUri: string): Promise<File> => {
+export const downloadVTTFromIPFS = async (vttUri: string): Promise<any> => {
   const file = await download({
     client,
     uri: vttUri,
@@ -76,8 +76,9 @@ export const downloadVTTFromIPFS = async (vttUri: string): Promise<File> => {
 }
 
 export const generateTextFromAudio = async (
-  video: File,
-  model_id: string ='whisper-large-v3',
+  video: PathLike,
+  assetId: string,
+  modelId: string ='whisper-large-v3',
 ) => {
   try {
 
@@ -87,7 +88,7 @@ export const generateTextFromAudio = async (
 
     const raw = JSON.stringify({
       audio: await openAsBlob(video),
-      model_id,
+      modelId,
     });
 
     const requestOptions: RequestInit = {
@@ -119,10 +120,10 @@ export const generateTextFromAudio = async (
     // Generate VTT file from chunks and append to response as vtt property
     result.vtt = generateVTTFile(result.chunks);
 
-    const uri = await upload({
+    result.uri = await upload({
       client,
       files: [
-        new File(result.vtt, `${video.name}.vtt`),
+        new File(result.vtt, `${video.toString}.vtt`),
       ],
      });
 
