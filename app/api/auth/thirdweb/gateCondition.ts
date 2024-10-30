@@ -3,7 +3,7 @@ import { polygon } from "thirdweb/chains";
 import { client } from "../../../lib/sdk/thirdweb/client";
 import { balanceOf as balanceOfERC721 } from "thirdweb/extensions/erc721";
 
-export async function hasAccess(address: string): Promise<boolean> {
+export async function hasCreatorPass(address: string): Promise<boolean> {
   return await hasCreatorPassNFT(address);
 }
 

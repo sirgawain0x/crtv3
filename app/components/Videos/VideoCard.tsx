@@ -50,7 +50,7 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
           </CardHeader>
         </div>
         {/* <VideoJSPlayer playbackUrl={playbackSources?.[0].src} /> */}
-        <VideoPlayer
+        {/* <VideoPlayer
           src={`https://playback.livepeer.studio/asset/${asset?.playbackId}`}
           autoplay={false}
           controls={true}
@@ -60,7 +60,7 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
           onPlay={() => console.log('Video started playing')}
           onPause={() => console.log('Video paused')}
           onEnded={() => console.log('Video ended')}
-        />
+        /> */}
         <PlayerComponent src={playbackSources} title={asset?.name} />
         <CardContent>
           <div className="my-2 flex items-center justify-between">

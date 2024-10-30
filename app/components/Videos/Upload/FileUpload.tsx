@@ -35,6 +35,24 @@ interface FileUploadProps {
   newAssetTitle?: string; // optional
 }
 
+// Helper function to convert file to Blob
+function getFileBlob(file: File): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      const blob = new Blob([reader.result as ArrayBuffer], { type: file.type });
+      resolve(blob);
+    };
+
+    reader.onerror = (error) => {
+      reject(error);
+    };
+
+    // reader.readAsArrayBuffer(blob);
+  });
+}
+
 const FileUpload: React.FC<FileUploadProps> = ({
   onFileSelect,
   onFileUploaded,
@@ -120,7 +138,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
       upload.start();
 
       const subtitlesResult = await generateTextFromAudio(
-        selectedFile,
+        await getFileBlob(selectedFile),
         livePeerUploadedAssetId || '',
         'whisper-large-v3',
       );

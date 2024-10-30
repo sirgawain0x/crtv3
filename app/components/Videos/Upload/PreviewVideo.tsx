@@ -26,7 +26,6 @@ const PreviewVideo: FC<PreviewVideoProps> = ({ video }) => {
   return (
     <div className="flex w-full justify-center">
       {videoUrl && (
-        // <VideoJSPlayer playbackUrl={videoUrl}/>
         <PlayerComponent src={[videoUrl]} title={video ? video.name : null}/> 
       )}
     </div>

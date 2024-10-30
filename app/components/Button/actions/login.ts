@@ -32,5 +32,6 @@ export async function isLoggedIn() {
 }
 
 export async function logout() {
+  console.log('logging out!');
   cookies().delete("jwt");
 }

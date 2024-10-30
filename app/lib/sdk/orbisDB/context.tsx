@@ -118,25 +118,32 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
         return result;
     }
 
-    const orbisLogin = async (privateKey: string = ''): Promise<void> => {
-        let provider; 
+    const orbisLogin = async (/* privateKey: string = '' */): Promise<OrbisConnectResult> => {
+        // console.log({ privateKey });
         
-        if (privateKey !== '') {
+        let provider; 
+
+        // if (privateKey !== '') {
             // Browser provider
-            provider = window.ethereum;
-        } else {
-            // Ethers provider
-            provider = new Wallet(privateKey);
-        }
+        provider = window.ethereum;
+        // } else {
+        //     // Ethers provider
+        //     provider = new Wallet(privateKey);
+        // }
+
+        // console.log({ provider });
 
         // Orbis Authenticator
         const auth = new OrbisEVMAuth(provider);
+
+        // console.log({ auth });
 
         // Authenticate the user and persist the session in localStorage
         const authResult: OrbisConnectResult = await db.connectUser({ auth });
 
         // Log the result
-        console.log({ authResult })
+        // console.log({ authResult })
+        return authResult;
     }
 
     const isConnected = async (address: string = ''): Promise<Boolean> => {

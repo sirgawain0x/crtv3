@@ -1,113 +1,108 @@
-// "use client";
-// import type { NextPage } from "next";
-// import { ConnectButton } from "thirdweb/react";
-// import { client } from "../../lib/sdk/thirdweb/client";
-// import { generatePayload, isLoggedIn, login, logout } from "../../api/auth/thirdweb/auth";
-// import { useOrbisContext } from "@app/lib/sdk/orbisDB/context";
-
-// const CRTVConnectButton = () => {
-//   const { orbisLogin } = useOrbisContext();
-  
-//   return (
-//     <ConnectButton
-//       client={client}
-//       auth={{
-//         isLoggedIn: async (address: string) => {
-//           console.log("checking if logged in!", { address });
-//           return await isLoggedIn(address);
-//         },
-//         doLogin: async (params: any) => {
-//           console.log("logging in!");
-//           await orbisLogin(params);
-//           await login(params);
-//         },
-//         getLoginPayload: async ({ address }: { address: string }) => generatePayload({ address }),
-//         doLogout: async () => {
-//           console.log("logging out!");
-//           await logout();
-//         },
-//       }}
-//     />
-//   );
-// };
-
-// export default CRTVConnectButton;
-
-// CRTVConnectButton.tsx
 "use client";
 
 import {
   useActiveAccount,
   useActiveWalletChain,
 } from "thirdweb/react";
-import { generatePayload, login } from "@app/components/Button/actions/login"; // we'll add this file in the next section
+import { generatePayload, login, isLoggedIn, logout } from "@app/components/Button/actions/login"; // we'll add this file in the next section
 import { signLoginPayload } from "thirdweb/auth";
 import { createWallet } from "thirdweb/wallets";
 import { useConnect } from "thirdweb/react"
 import { client } from "@app/lib/sdk/thirdweb/client";
 import { useOrbisContext } from "@app/lib/sdk/orbisDB/context";
+import { Button } from "@chakra-ui/react"
+import { useEffect, useState } from "react";
 
 export const CRTVConnectButton = () => {
+  const [isActivelyLoggedIn, setIsLoggedIn] = useState(false);
+  
   const account = useActiveAccount();
   const chain = useActiveWalletChain();
   const { connect, isConnecting, error } = useConnect();
 
   const { orbisLogin } = useOrbisContext();
+
+  useEffect(() => {
+    const checkIfLoggedIn = async () => {
+      const loggedIn = await isLoggedIn();
+      if (loggedIn) {
+        setIsLoggedIn(true);
+      }
+    }
+    checkIfLoggedIn();
+  }, []);
   
   async function handleClick() {
 
-    // console.log({ account, chain });
+    if ( !isActivelyLoggedIn ) {
+      // console.log({ account, chain });
 
-    let activeAccount;
+      let activeAccount;
 
-    if (!account) {
-      const wallet = await connect(async () => {
-        const wallet = createWallet("io.metamask"); // update this to your wallet of choice or create a custom UI to select wallets
-        await wallet.connect({
-          client,
+      if (!account) {
+        const wallet = await connect(async () => {
+          const wallet = createWallet("io.metamask"); // update this to your wallet of choice or create a custom UI to select wallets
+          await wallet.connect({
+            client,
+          });
+          return wallet;
         });
-        return wallet;
+        activeAccount = wallet.getAccount();
+      } else {
+        activeAccount = account;
+      }
+
+      console.log('activeAccount', activeAccount);
+
+      // Step 1: fetch the payload from the server
+      const payload = await generatePayload({
+        address: activeAccount.address,
+        chainId: 137 // chain.id,
       });
-      activeAccount = wallet.getAccount();
-    } else {
-      activeAccount = account;
+
+      // console.log({ payload });
+
+      // Step 2: Sign the payload
+      const signatureResult = await signLoginPayload({
+        payload,
+        account: activeAccount,
+      });
+
+      // console.log({ signatureResult });
+
+      // Step 3: Send the signature to the server for verification
+      const finalResult = await login(signatureResult);
+
+      // console.log({ finalResult });
+
+      if (finalResult.valid) {
+        const orbisDBAuthResult = await orbisLogin();
+        console.log({ orbisDBAuthResult });
+        setIsLoggedIn(true);
+      }
+
+      // alert(finalResult.valid ? "Login successful" : "Login failed");
     }
-
-    console.log('activeAccount', activeAccount);
-
-    // Step 1: fetch the payload from the server
-    const payload = await generatePayload({
-      address: activeAccount.address,
-      chainId: 137 // chain.id,
-    });
-
-    // console.log({ payload });
-
-    // Step 2: Sign the payload
-    const signatureResult = await signLoginPayload({
-      payload,
-      account: activeAccount,
-    });
-
-    // console.log({ signatureResult });
-
-    // Step 3: Send the signature to the server for verification
-    const finalResult = await login(signatureResult);
-
-    // console.log({ finalResult });
-
-    if (finalResult.valid) {
-      await orbisLogin();
-    }
-
-    // alert(finalResult.valid ? "Login successful" : "Login failed");
   }
 
-  return (
-    <button onClick={handleClick}>
-      Login
-    </button>
-  );
+  return !isActivelyLoggedIn ? (
+      <Button 
+        colorScheme="pink"
+        className="flex items-center space-x-2 rounded-full bg-pink-500 px-6 py-2 text-lg font-normal text-white transition duration-200 hover:bg-pink-600 lg:py-3"
+        onClick={handleClick}
+      >
+        Connect Wallet
+      </Button>
+    ) : (
+      <Button 
+        colorScheme="grey" 
+        className="flex items-center space-x-2 rounded-full bg-grey-500 px-6 py-2 text-lg font-normal text-white-500 transition duration-200 hover:bg-grey-600 lg:py-3"
+        variant="solid" 
+        onClick={() => logout}
+      >
+        Disconnect
+      </Button>
+    );
 };
 
 export default CRTVConnectButton;

@@ -1,8 +1,8 @@
-/// <reference types="react-scripts" />
-import { ExternalProvider } from "@ethersproject/providers";
+// /// <reference types="react-scripts" />
+// import { IEVMProvider, IGenericSignerProvider } from "@useorbis/db-sdk";
 
-declare global {
-  interface Window {
-    ethereum?: ExternalProvider;
-  }
-}
+// declare global {
+//   interface Window {
+//     ethereum?: IEVMProvider | IGenericSignerProvider;
+//   }
+// }

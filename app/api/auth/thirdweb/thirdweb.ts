@@ -7,7 +7,7 @@ import {
 import { privateKeyToAccount } from 'thirdweb/wallets';
 import { client } from '@app/lib/sdk/thirdweb/client';
 import { cookies } from 'next/headers';
-import { hasAccess } from './gateCondition';
+// import { hasCreatorPass } from './gateCondition';
 
 const privateKey = process.env.THIRDWEB_ADMIN_PRIVATE_KEY || '';
 
@@ -28,8 +28,8 @@ export async function login(payload: VerifyLoginPayloadParams) {
   const verifiedPayload = await thirdwebAuth.verifyPayload(payload);
   console.log({ payload });
 
-  const hasCreatorPass = await hasAccess(payload.address);
-  console.log({hasCreatorPass});
+  // const hasAccess = await hasCreatorPass(payload.address);
+  // console.log({hasAccess});
 
   if (verifiedPayload.valid) {
     const jwt = await thirdwebAuth.generateJWT({
