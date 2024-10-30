@@ -1,9 +1,12 @@
 'use client';
-import { ConnectButton } from 'thirdweb/react';
+import { ConnectButton, useActiveAccount } from 'thirdweb/react';
 import { client } from '@app/lib/sdk/thirdweb/client';
 import { ACCOUNT_FACTORY_ADDRESS } from '@app/lib/utils/context';
-import { createWallet, inAppWallet } from 'thirdweb/wallets';
-import { VerifyLoginPayloadParams, LoginPayload } from 'thirdweb/auth';
+import {
+  createWallet,
+  inAppWallet,
+  privateKeyToAccount,
+} from 'thirdweb/wallets';
 import {
   defineChain,
   polygon,
@@ -17,14 +20,13 @@ import {
   isLoggedIn,
   login,
   logout,
-  validatePayload,
 } from '@app/api/auth/thirdweb/thirdweb';
 import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
 
 export default function ConnectButtonWrapper() {
   const { orbisLogin } = useOrbisContext();
+  const activeAccount = useActiveAccount();
 
-  const storyTestnet = defineChain(1513);
   const wallets = [
     inAppWallet({
       auth: {
@@ -43,6 +45,8 @@ export default function ConnectButtonWrapper() {
     createWallet('com.coinbase.wallet'),
     createWallet('global.safe'),
   ];
+
+  const storyTestnet = defineChain(1513);
 
   const paywallConfig = {
     icon: 'https://storage.unlock-protocol.com/7b2b45eb-ed97-4a1a-b460-b31ce79d087d',
@@ -135,38 +139,22 @@ export default function ConnectButtonWrapper() {
         },
       }}
       auth={{
-        chain: polygon,
-        client: client,
-        isLoggedIn: async (address: string) => {
-          console.log('checking if logged in!', { address });
-          return await isLoggedIn(address);
+        getLoginPayload: async (params: any) => {
+          const address = params.address;
+          // fetch the login payload here using address
+          login(address);
         },
-        doLogin: async (
-          params: VerifyLoginPayloadParams,
-        ): Promise<LoginPayload | void> => {
-          console.log('logging in!');
-          const payload = await validatePayload(params);
-          const loginPayload: LoginPayload | void = await login(
-            {
-              payload: params.payload,
-              signature: params.signature, // Add a signature property here
-            },
-            {
-              clientId: 'localhost:3000',
-              redirectUri: 'http://localhost:3000/api/auth/unlock',
-              paywallConfig: paywallConfig,
-            },
-          );
-
-          orbisLogin();
-
-          return loginPayload;
+        doLogin: async (params: any) => {
+          // send the signed login payload (params) to the server
+          generatePayload(params);
         },
-        getLoginPayload: async ({ address }: { address: string }) =>
-          generatePayload({ address }),
+        isLoggedIn: async () => {
+          // fetch the user's login status from the server
+          isLoggedIn();
+        },
         doLogout: async () => {
-          console.log('logging out!');
-          await logout();
+          // send a logout request to the server
+          logout();
         },
       }}
     />

@@ -1,7 +1,6 @@
 import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
 import React, { useEffect, useRef } from 'react';
 import videojs from 'video.js';
-import Player from 'video.js/dist/types/player';
 import 'video.js/dist/video-js.css';
 // Import videojs-contrib-quality-levels for Livepeer's adaptive bitrate
 import 'videojs-contrib-quality-levels';
@@ -27,12 +26,11 @@ export const VideoJSPlayer: React.FC<VideoPlayerProps> = ({
   playbackUrl,
   thumbnail,
   subtitles,
-//   height = 480,
-//   width = 854,;
+  //   height = 480,
+  //   width = 854,;
   autoplay = false,
 }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const playerRef = useRef<Player | null>(null);
 
   const { getAssetMetadata } = useOrbisContext();
 
@@ -45,73 +43,79 @@ export const VideoJSPlayer: React.FC<VideoPlayerProps> = ({
 
     // Construct Livepeer URLs
     const playbackUrl = `https://livepeercdn.com/hls/${playbackId}/index.m3u8`;
-    
+
     // Initialize video.js player with Livepeer-specific configuration
-    playerRef.current = videojs(videoRef.current, {
-      controls: true,
-      fluid: true,
-      responsive: true,
-      playbackRates: [0.75, 0.9, 1, 1.1, 1.25, 1.5],
-      html5: {
-        vhs: {
-          overrideNative: true,
-          useDevicePixelRatio: true,
-          enableLowInitialPlaylist: true,
+    const player = videojs(
+      videoRef.current,
+      {
+        controls: true,
+        fluid: true,
+        responsive: true,
+        playbackRates: [0.75, 0.9, 1, 1.1, 1.25, 1.5],
+        html5: {
+          vhs: {
+            overrideNative: true,
+            useDevicePixelRatio: true,
+            enableLowInitialPlaylist: true,
+          },
+          nativeAudioTracks: false,
+          nativeVideoTracks: false,
         },
-        nativeAudioTracks: false,
-        nativeVideoTracks: false,
+        sources: [
+          {
+            src: playbackUrl,
+            type: 'application/x-mpegURL',
+          },
+        ],
+        poster: thumbnail,
+        autoplay: autoplay,
+        plugins: {
+          httpSourceSelector: {
+            default: 'auto',
+          },
+        },
       },
-      sources: [{
-        src: playbackUrl,
-        type: 'application/x-mpegURL',
-      }],
-      poster: thumbnail,
-      autoplay: autoplay,
-    }, () => {
-      // Player is ready
-      console.log('Player ready');
-      
-      // Enable HTTP Source Selector plugin
-    if (playerRef.current) {
-        playerRef.current.httpSourceSelector();
-        
-        // Handle error events
-        playerRef.current.on('error', (error: any) => {
-          console.error('Video.js error:', error);
-        });
-      }
-    });
+      () => {
+        // Player is ready
+        console.log('Player ready');
+
+        // Enable HTTP Source Selector plugin
+        if (player) {
+          player.usingPlugin('httpSourceSelector');
+
+          // Handle error events
+          player.on('error', (error: any) => {
+            console.error('Video.js error:', error);
+          });
+        }
+      },
+    );
 
     // Add quality level change listener
-    playerRef.current?.qualityLevels().on('change', () => {
-      console.log('Quality level changed');
-    });
+    // player?.on('change', () => {
+    //   console.log('Quality level changed');
+    // });
 
     if (playbackId) {
       const assetMetadata = getAssetMetadata(playbackId);
 
       // Add subtitles/captions if provided
       // subtitles.forEach(subtitle => {
-        if (subtitles !== '') {
-          playerRef.current?.addRemoteTextTrack({
-                kind: 'subtitles',
-                srclang: 'en', // subtitles.language,
-                label: 'English', // subtitles.label,
-                src: assetMetadata?.subtitlesUri,
-                default: true, // subtitles.language === 'en',
-            }, false);
-        }
-        // });
-    }
-
-    // Cleanup
-    return () => {
-      if (playerRef.current) {
-        playerRef.current.dispose();
-        playerRef.current = null;
+      if (subtitles !== '') {
+        player.addRemoteTextTrack(
+          {
+            kind: 'subtitles',
+            srclang: 'en', // subtitles.language,
+            label: 'English', // subtitles.label,
+            src: '',
+            default: true, // subtitles.language === 'en',
+          },
+          false,
+        );
       }
-    };
-  }, [playbackId, subtitles, thumbnail, autoplay]);
+      // });
+    }
+  }, [playbackId, subtitles, thumbnail, autoplay, getAssetMetadata]);
 
   return (
     <div data-vjs-player>

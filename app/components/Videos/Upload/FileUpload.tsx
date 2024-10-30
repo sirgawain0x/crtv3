@@ -9,9 +9,9 @@ import { useActiveAccount } from 'thirdweb/react';
 import { Progress } from '@app/components/ui/progress';
 import { Button } from '@app/components/ui/button';
 import { openAsBlob } from 'fs';
-import generateTextFromAudio from '@app/api/livepeer/audioToText';
+import { generateTextFromAudio } from '@app/api/livepeer/audioToText';
 import { AssetMetadata } from '../../../lib/sdk/orbisDB/models/AssetMetadata';
-import { useOrbisContext } from "@app/lib/sdk/orbisDB/context";import { use } from "react";
+import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
 
 // Add these functions to your component
 
@@ -120,7 +120,11 @@ const FileUpload: React.FC<FileUploadProps> = ({
       }
       upload.start();
 
-      const subtitlesResult = await generateTextFromAudio(selectedFile, livePeerUploadedAssetId, 'whisper-large-v3');
+      const subtitlesResult = await generateTextFromAudio(
+        selectedFile?.webkitRelativePath,
+        livePeerUploadedAssetId || '',
+        'whisper-large-v3',
+      );
 
       const metadata: AssetMetadata = {
         assetId: livePeerUploadedAssetId,
@@ -129,11 +133,12 @@ const FileUpload: React.FC<FileUploadProps> = ({
         // ...(a?.location !== undefined && { location: a.location })
         // ...(a?.category !== undefined && { category: a.category })
         // ...(a?.thumbnailUri !== undefined && { thumbnailUri: a.thumbnailUri })
-        ...(subtitlesResult.uri !== undefined && { subtitlesUri: subtitlesResult.uri })
+        ...(subtitlesResult.result !== undefined && {
+          subtitlesUri: subtitlesResult?.result,
+        }),
       };
 
       await insert(metadata, 'AssetMetadata');
-
     } catch (error: any) {
       console.error('Error uploading file:', error);
       setError('Failed to upload file. Please try again.');
