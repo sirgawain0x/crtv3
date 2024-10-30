@@ -85,6 +85,11 @@ export const CRTVConnectButton = () => {
     }
   }
 
+  async function handleLogout() {
+    await logout();
+    setIsLoggedIn(false);
+  }
+
   return !isActivelyLoggedIn ? (
       <Button 
         colorScheme="pink"
@@ -98,7 +103,7 @@ export const CRTVConnectButton = () => {
         colorScheme="grey" 
         className="flex items-center space-x-2 rounded-full bg-grey-500 px-6 py-2 text-lg font-normal text-white-500 transition duration-200 hover:bg-grey-600 lg:py-3"
         variant="solid" 
-        onClick={() => logout}
+        onClick={handleLogout}
       >
         Disconnect
       </Button>
