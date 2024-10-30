@@ -9,7 +9,7 @@ import { useActiveAccount } from 'thirdweb/react';
 import { Progress } from '@app/components/ui/progress';
 import { Button } from '@app/components/ui/button';
 import { openAsBlob } from 'fs';
-import generateTextFromAudio from '@app/api/livepeer/audioToText';
+import { generateTextFromAudio } from '@app/api/livepeer/audioToText';
 import { AssetMetadata } from '../../../lib/sdk/orbisDB/models/AssetMetadata';
 import { useOrbisContext } from "@app/lib/sdk/orbisDB/context";import { use } from "react";
 
