@@ -22,6 +22,7 @@ import { useReadContract } from 'thirdweb/react';
 import { polygon } from 'thirdweb/chains';
 import { getContract } from 'thirdweb';
 import ClaimLockButton from '@app/components/Paywall/ClaimLock';
+import CRTVConnectButton from '../Button/connectButton';
 
 export function Navbar() {
   const activeAccount = useActiveAccount();
@@ -32,29 +33,29 @@ export function Navbar() {
   };
 
   /*******  CONTRACT READING ********/
-  const unlockContract = getContract({
-    client: client,
-    chain: polygon,
-    address: '0x9a9280897c123b165e23f77cf4c58292d6ab378d',
-    abi: Unlock.abi,
-  });
+  // const unlockContract = getContract({
+  //   client: client,
+  //   chain: polygon,
+  //   address: '0x9a9280897c123b165e23f77cf4c58292d6ab378d',
+  //   abi: Unlock.abi,
+  // });
 
-  const { data: result, isLoading } = useReadContract({
-    contract: unlockContract,
-    method: 'getHasValidKey',
-    params: [activeAccount?.address],
-  });
+  // const { data: result, isLoading } = useReadContract({
+  //   contract: unlockContract,
+  //   method: 'getHasValidKey',
+  //   params: [activeAccount?.address],
+  // });
 
-  const [subscribed, setSubscribed] = useState(false);
+  // const [subscribed, setSubscribed] = useState(false);
 
-  useEffect(() => {
-    if (!activeAccount || !Unlock.abi) return;
+  // useEffect(() => {
+  //   if (!activeAccount || !Unlock.abi) return;
 
-    if (result !== undefined) {
-      console.log('Is your membership valid?', result);
-      setSubscribed(result);
-    }
-  }, [activeAccount, result]);
+  //   if (result !== undefined) {
+  //     console.log('Is your membership valid?', result);
+  //     setSubscribed(result);
+  //   }
+  // }, [activeAccount, result]);
 
   return (
     <header className="flex h-20 w-full shrink-0 items-center bg-muted px-4 md:px-6">
@@ -180,7 +181,8 @@ export function Navbar() {
           <ThemeToggleComponent />
         </div>
         <div className="mr-5">
-          <ConnectButtonWrapper />
+          <CRTVConnectButton />
+          {/* <ConnectButtonWrapper /> */}
         </div>
         {activeAccount && (
           <ClaimLockButton closeMenu={() => setIsMenuOpen(false)} />

@@ -1,3 +1,4 @@
+import { PlayerComponent } from '@app/components/Player/Player';
 import { VideoJSPlayer } from '@app/components/Player/VideoJSPlayer';
 import React, { FC, useEffect, useState } from 'react';
 
@@ -25,7 +26,8 @@ const PreviewVideo: FC<PreviewVideoProps> = ({ video }) => {
   return (
     <div className="flex w-full justify-center">
       {videoUrl && (
-        <VideoJSPlayer playbackUrl={videoUrl}/> 
+        // <VideoJSPlayer playbackUrl={videoUrl}/>
+        <PlayerComponent src={[videoUrl]} title={video ? video.name : null}/> 
       )}
     </div>
   );

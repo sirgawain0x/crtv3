@@ -1,7 +1,27 @@
 'use server';
 import { upload, download } from "thirdweb/storage";
 import { client } from "@app/lib/sdk/thirdweb/client";
-import { openAsBlob, PathLike } from 'node:fs';
+import { PathLike } from 'node:fs';
+import { readFile } from "node:fs/promises";
+import { File } from "node:buffer";
+
+// Helper function to convert file to Blob
+function getFileBlob(file: File): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      const blob = new Blob([reader.result as ArrayBuffer], { type: file.type });
+      resolve(blob);
+    };
+
+    reader.onerror = (error) => {
+      reject(error);
+    };
+
+    // reader.readAsArrayBuffer(blob);
+  });
+}
 
 interface SubtitleEntry {
   timestamp: [number, number]; // [startTime, endTime] in seconds
@@ -76,7 +96,7 @@ export const downloadVTTFromIPFS = async (vttUri: string): Promise<any> => {
 }
 
 export const generateTextFromAudio = async (
-  video: PathLike,
+  video: File,
   assetId: string,
   modelId: string ='whisper-large-v3',
 ) => {
@@ -86,8 +106,10 @@ export const generateTextFromAudio = async (
     myHeaders.append('Content-Type', 'application/json');
     myHeaders.append('Authorization', `Bearer ${process.env.LIVEPEER_API_KEY}`);
 
+    const audioBlob = await getFileBlob(video);
+    
     const raw = JSON.stringify({
-      audio: await openAsBlob(video),
+      audio: audioBlob,
       modelId,
     });
 
@@ -120,10 +142,12 @@ export const generateTextFromAudio = async (
     // Generate VTT file from chunks and append to response as vtt property
     result.vtt = generateVTTFile(result.chunks);
 
+    const videoTitle = video.name.replaceAll(' ', '_').toLowerCase();
+    
     result.uri = await upload({
       client,
       files: [
-        new File(result.vtt, `${video.toString}.vtt`),
+        new File(result.vtt, `${videoTitle}.vtt`),
       ],
     });
 

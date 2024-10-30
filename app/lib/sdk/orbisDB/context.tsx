@@ -118,10 +118,10 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
         return result;
     }
 
-    const orbisLogin = async (privateKey: string): Promise<void> => {
+    const orbisLogin = async (privateKey: string = ''): Promise<void> => {
         let provider; 
-
-        if (!privateKey) {
+        
+        if (privateKey !== '') {
             // Browser provider
             provider = window.ethereum;
         } else {

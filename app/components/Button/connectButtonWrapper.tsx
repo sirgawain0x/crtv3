@@ -1,9 +1,12 @@
 'use client';
-import { ConnectButton } from 'thirdweb/react';
+import { ConnectButton, useActiveAccount } from 'thirdweb/react';
 import { client } from '@app/lib/sdk/thirdweb/client';
 import { ACCOUNT_FACTORY_ADDRESS } from '@app/lib/utils/context';
-import { createWallet, inAppWallet } from 'thirdweb/wallets';
-import { VerifyLoginPayloadParams, LoginPayload } from 'thirdweb/auth';
+import {
+  createWallet,
+  inAppWallet,
+  privateKeyToAccount,
+} from 'thirdweb/wallets';
 import {
   defineChain,
   polygon,
@@ -17,14 +20,13 @@ import {
   isLoggedIn,
   login,
   logout,
-  // validatePayload,
 } from '@app/api/auth/thirdweb/thirdweb';
 import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
 
 export default function ConnectButtonWrapper() {
   const { orbisLogin } = useOrbisContext();
+  const activeAccount = useActiveAccount();
 
-  const storyTestnet = defineChain(1513);
   const wallets = [
     inAppWallet({
       auth: {
@@ -43,6 +45,8 @@ export default function ConnectButtonWrapper() {
     createWallet('com.coinbase.wallet'),
     createWallet('global.safe'),
   ];
+
+  const storyTestnet = defineChain(1513);
 
   const paywallConfig = {
     icon: 'https://storage.unlock-protocol.com/7b2b45eb-ed97-4a1a-b460-b31ce79d087d',
@@ -175,17 +179,18 @@ export default function ConnectButtonWrapper() {
       autoConnect={true}
       client={client}
       auth={{
-        isLoggedIn: async (address: string) => {
-          console.log("checking if logged in!", { address });
+        // fetch the login payload here using address
+        getLoginPayload: async ({ address }: { address: string }) => await generatePayload({ address }),
+        // send the signed login payload (params) to the server
+        doLogin: async (params: any) => {
+          await login(params.address);
+        },
+        // fetch the user's login status from the server
+        isLoggedIn: async () => {
           return await isLoggedIn();
         },
-        doLogin: async (params: VerifyLoginPayloadParams) => {
-          console.log("logging in!");
-          await login(params);
-        },
-        getLoginPayload: async ({ address }: { address: string }) => generatePayload({ address }),
+        // send a logout request to the server
         doLogout: async () => {
-          console.log("logging out!");
           await logout();
         },
       }}

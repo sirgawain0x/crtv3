@@ -66,7 +66,7 @@
     "styled-components": "^6.1.8",
     "tailwind-merge": "^2.4.0",
     "tailwindcss-animate": "^1.0.7",
-    "thirdweb": "^5",
+    "thirdweb": "^5.64.3",
     "tus-js-client": "^4.2.3",
     "uuid": "^9.0.1",
     "video.js": "^8.19.1",
@@ -83,6 +83,7 @@
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0npm a",
     "@types/uuid": "^9.0.8",
+    "@types/video.js": "^7.3.58",
     "@vercel/style-guide": "^5.0.1",
     "autoprefixer": "^10.0.1",
     "dotenv": "^16.4.5",
@@ -100,3 +101,4 @@
     "node": ">=18.17.0"
   }
 }
+
