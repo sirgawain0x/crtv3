@@ -92,35 +92,35 @@ export const generateTextFromAudio = async (formData: FormData) => {
 
     const file =  formData.get("file") as File;
     
-    // console.log('Generating subtitles:', { fileName: file.name });
+    console.log('Generating subtitles:', { fileName: file.name });
 
-    // const result = await fullLivepeer.generate.audioToText({
-    //   audio: new Blob([file], { type: 'video/mp4' }),
-    // });
+    const result = await fullLivepeer.generate.audioToText({
+      audio: new Blob([file], { type: 'video/mp4' }),
+    });
   
-    // console.log('result1', result);
+    console.log('result1', result);
 
-    // const rawResponse = await result.rawResponse.json();
+    const rawResponse = await result.rawResponse.json();
 
-    const options = {
-      method: 'POST',
-      body: JSON.stringify({
-        audio: new Blob([file], { type: 'audio/mp3' }),
-      }),
-      headers: {Authorization: `Bearer ${process.env.LIVEPEER_API_KEY}`, 'Content-Type': 'multipart/form-data'}
-    };
+    // const options = {
+    //   method: 'POST',
+    //   body: JSON.stringify({
+    //     audio: new Blob([file], { type: 'audio/mp3' }),
+    //   }),
+    //   headers: {Authorization: `Bearer ${process.env.LIVEPEER_API_KEY}`, 'Content-Type': 'multipart/form-data'}
+    // };
     
-    const res = await fetch('https://dream-gateway.livepeer.cloud/audio-to-text', options)
+    // const res = await fetch('https://dream-gateway.livepeer.cloud/audio-to-text', options)
     
-    const result = await res.json();
+    // const result = await res.json();
 
-    console.log('reslt', result);
+    console.log('rawResponse', rawResponse);
 
-    if (result.success) {
+    // if (result.success) {
       let output: any; 
 
       // Add label and srclang to each subtitle
-      output.chunks = result.chunks.map((subtitle: any) => {
+      output.chunks = rawResponse.chunks.map((subtitle: any) => {
         subtitle.label = 'English';
         subtitle.srclang = 'en';
         return subtitle;
@@ -140,11 +140,11 @@ export const generateTextFromAudio = async (formData: FormData) => {
       console.log('result2', output);
 
       return output;
-    }
+    // }
 
-    if (result.error) {
-      console.error(result.error);
-    }
+    // if (result.error) {
+    //   console.error(result.error);
+    // }
   } catch (error: any) {
     console.error('Error in audioToText API:', error);
     return { error: error.message || 'Internal Server Error' };

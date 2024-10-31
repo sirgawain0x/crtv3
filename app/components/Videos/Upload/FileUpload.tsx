@@ -128,45 +128,51 @@ const FileUpload: React.FC<FileUploadProps> = ({
 
       console.log('Start generateTextFromAudio');
 
-      const formData = new FormData()
+      // const formData = new FormData()
       
-      formData.append('audio', selectedFile)
+      // formData.append('audio', selectedFile)
 
-      const options = {
-        method: 'POST',
-        body: formData, /* JSON.stringify({
-          audio: new Blob([selectedFile], { type: 'video/mp4' }),
-        }), */
-        headers: {Authorization: `Bearer ${process.env.LIVEPEER_API_KEY}`, 'Content-Type': 'multipart/form-data'}
-      };
+      // const options = {
+      //   method: 'POST',
+      //   body: formData, /* JSON.stringify({
+      //     audio: new Blob([selectedFile], { type: 'video/mp4' }),
+      //   }), */
+      //   headers: {Authorization: `Bearer ${process.env.LIVEPEER_API_KEY}`/* , 'Content-Type': 'multipart/form-data' */}
+      // };
       
-      const res = await fetch('https://dream-gateway.livepeer.cloud/audio-to-text', options)
+      // const res = await fetch('https://dream-gateway.livepeer.cloud/audio-to-text', options)
       
-      const result = await res.json();
+      // const result = await res.json();
   
-      console.log('reslt', result);
+      // console.log('reslt', result);
 
-      let subtitles: any;
+      // let subtitles: any;
 
-       // Add label and srclang to each subtitle
-       subtitles.chunks = result.chunks.map((subtitle: any) => {
-        subtitle.label = 'English';
-        subtitle.srclang = 'en';
-        return subtitle;
-      });
+      //  // Add label and srclang to each subtitle
+      //  subtitles.chunks = result.chunks.map((subtitle: any) => {
+      //   subtitle.label = 'English';
+      //   subtitle.srclang = 'en';
+      //   return subtitle;
+      // });
 
-      subtitles.vtt = generateVTTFile(subtitles.chunks);
+      // subtitles.vtt = generateVTTFile(subtitles.chunks);
 
-      const vttFile = new File(subtitles.vtt, `${selectedFile.name}-en.vtt`)
+      // const vttFile = new File(subtitles.vtt, `${selectedFile.name}-en.vtt`)
 
-      subtitles.uri = await upload({
-        client,
-        files: [
-          vttFile
-        ],
-      });
+      // subtitles.uri = await upload({
+      //   client,
+      //   files: [
+      //     vttFile
+      //   ],
+      // });
 
-      console.log('result2', subtitles);
+      // console.log('result2', subtitles);
+
+      const formData = new FormData();
+
+      formData.append('file', selectedFile);
+
+      const subtitles = await generateTextFromAudio(formData);
         
       const orbisMetadata: AssetMetadata = {
         assetId: livePeerUploadedAssetId,
