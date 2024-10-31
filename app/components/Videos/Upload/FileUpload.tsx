@@ -8,9 +8,14 @@ import PreviewVideo from './PreviewVideo';
 import { useActiveAccount } from 'thirdweb/react';
 import { Progress } from '@app/components/ui/progress';
 import { Button } from '@app/components/ui/button';
-import { generateTextFromAudio } from '@app/api/livepeer/audioToText';
+// import { generateTextFromAudio } from '@app/api/livepeer/audioToText';
 import { AssetMetadata } from '../../../lib/sdk/orbisDB/models/AssetMetadata';
 import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
+import { upload, download } from "thirdweb/storage";
+import { client } from "@app/lib/sdk/thirdweb/client";
+import { fullLivepeer } from "@app/lib/sdk/livepeer/fullClient";
+import { openAsBlob } from "node:fs";
+import { generateTextFromAudio } from '@app/api/livepeer/audioToText';
 
 // Add these functions to your component
 
@@ -33,24 +38,6 @@ interface FileUploadProps {
   onPressBack?: () => void; //  optional
   metadata?: any; // optional
   newAssetTitle?: string; // optional
-}
-
-// Helper function to convert file to Blob
-function getFileBlob(file: File): Promise<Blob> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-
-    reader.onload = () => {
-      const blob = new Blob([reader.result as ArrayBuffer], { type: file.type });
-      resolve(blob);
-    };
-
-    reader.onerror = (error) => {
-      reject(error);
-    };
-
-    // reader.readAsArrayBuffer(blob);
-  });
 }
 
 const FileUpload: React.FC<FileUploadProps> = ({
@@ -107,7 +94,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
       // Save asset id to send back to parent component later
       setLivePeerUploadedAssetId(uploadRequestResult?.asset.id);
 
-      const upload = new tus.Upload(selectedFile, {
+      const tusUpload = new tus.Upload(selectedFile, {
         endpoint: uploadRequestResult?.tusEndpoint, // URL from `tusEndpoint` field in the
         metadata: {
           filename: selectedFile.name,
@@ -123,45 +110,180 @@ const FileUpload: React.FC<FileUploadProps> = ({
           setProgress(percentage);
         },
         onSuccess() {
-          console.log('Upload finished:', upload.url);
+          console.log('Upload finished:', tusUpload.url);
+
           setUploadState('complete');
           // Call onFileUploaded here with the upload URL
-          onFileUploaded(upload?.url || '');
+          onFileUploaded(tusUpload?.url || '');
         },
       });
 
-      const previousUploads = await upload.findPreviousUploads();
+      const previousUploads = await tusUpload.findPreviousUploads();
 
       if (previousUploads.length > 0) {
-        upload.resumeFromPreviousUpload(previousUploads[0]);
+        tusUpload.resumeFromPreviousUpload(previousUploads[0]);
       }
-      upload.start();
 
-      const subtitlesResult = await generateTextFromAudio(
-        await getFileBlob(selectedFile),
-        livePeerUploadedAssetId || '',
-        'whisper-large-v3',
-      );
+      tusUpload.start();
 
-      const metadata: AssetMetadata = {
+      console.log('Start generateTextFromAudio');
+
+      const formData = new FormData()
+      
+      formData.append('audio', selectedFile)
+
+      const options = {
+        method: 'POST',
+        body: formData, /* JSON.stringify({
+          audio: new Blob([selectedFile], { type: 'video/mp4' }),
+        }), */
+        headers: {Authorization: `Bearer ${process.env.LIVEPEER_API_KEY}`, 'Content-Type': 'multipart/form-data'}
+      };
+      
+      const res = await fetch('https://dream-gateway.livepeer.cloud/audio-to-text', options)
+      
+      const result = await res.json();
+  
+      console.log('reslt', result);
+
+      let subtitles: any;
+
+       // Add label and srclang to each subtitle
+       subtitles.chunks = result.chunks.map((subtitle: any) => {
+        subtitle.label = 'English';
+        subtitle.srclang = 'en';
+        return subtitle;
+      });
+
+      subtitles.vtt = generateVTTFile(subtitles.chunks);
+
+      const vttFile = new File(subtitles.vtt, `${selectedFile.name}-en.vtt`)
+
+      subtitles.uri = await upload({
+        client,
+        files: [
+          vttFile
+        ],
+      });
+
+      console.log('result2', subtitles);
+        
+      const orbisMetadata: AssetMetadata = {
         assetId: livePeerUploadedAssetId,
         title: newAssetTitle,
-        // description: a.description,
-        // ...(a?.location !== undefined && { location: a.location })
-        // ...(a?.category !== undefined && { category: a.category })
-        // ...(a?.thumbnailUri !== undefined && { thumbnailUri: a.thumbnailUri })
-        ...(subtitlesResult.result !== undefined && {
-          subtitlesUri: subtitlesResult?.result,
-        }),
+        description: metadata?.description,
+        ...(metadata?.location !== undefined && { location: metadata?.location }),
+        ...(metadata?.category !== undefined && { category: metadata?.category }),
+        ...(metadata?.thumbnailUri !== undefined && { thumbnailUri: metadata?.thumbnailUri }),
+        ...(subtitles?.uri && { subtitlesUri: subtitles?.uri }),
       };
 
-      await insert(metadata, 'AssetMetadata');
+      console.log({ orbisMetadata, subtitles });
+
+      const metadataUri = await insert(orbisMetadata, 'kjzl6hvfrbw6c9vo5z3ctmct12rqfb7cb0t37lrtyh1rwjmau71gvy3xt9zv5e4');
+
+      console.log('metadataUri', metadataUri);
     } catch (error: any) {
       console.error('Error uploading file:', error);
       setError('Failed to upload file. Please try again.');
       setUploadState('idle');
     }
   };
+
+  function secondsToVTTTime(seconds: number): string {
+    // Handle negative numbers or invalid input
+    if (seconds < 0) seconds = 0;
+  
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+    const milliseconds = Math.floor((seconds * 1000) % 1000);
+  
+    // Format with leading zeros and ensure milliseconds has 3 digits
+    return `${hours.toString().padStart(2, '0')}:${minutes
+      .toString()
+      .padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${milliseconds
+      .toString()
+      .padStart(3, '0')}`;
+  };
+  
+  function generateVTTFile(subtitles: /* SubtitleEntry */ any[]): string {
+    // Sort subtitles by start time to ensure proper sequence
+    // const sortedSubtitles = [...subtitles].sort((a, b) => a.timestamp[0] - b.timestamp[0]);
+  
+    // Start with the WebVTT header
+    let vttContent = 'WEBVTT\n\n';
+  
+    // Process each subtitle entry
+    subtitles.forEach((subtitle, index) => {
+      const [startTime, endTime] = subtitle.timestamp;
+  
+      // Add cue number (optional but helpful for debugging)
+      vttContent += `${index + 1}\n`;
+  
+      // Add timestamp line
+      vttContent += `${secondsToVTTTime(startTime)} --> ${secondsToVTTTime(endTime)}\n`;
+  
+      // Add subtitle text and blank line
+      vttContent += `${subtitle.text}\n\n`;
+    });
+  
+    return vttContent;
+  };
+  
+  // Helper function to convert file to Blob
+  // function getFileBlob(file: File): Promise<Blob> {
+  //   return new Promise((resolve, reject) => {
+  //     const reader = new FileReader();
+  
+  //     reader.onload = () => {
+  //       const blob = new Blob([reader.result as ArrayBuffer], { type: file.type });
+  //       resolve(blob);
+  //     };
+  
+  //     reader.onerror = (error) => {
+  //       reject(error);
+  //     };
+  
+  //     reader.readAsArrayBuffer(file);
+  //   });
+  // }
+  
+  // const generateTextFromAudio = async (file: File) => {
+  //   try {
+  
+  //     console.log('Generating subtitles:', { fileName: file.name });
+  
+  //     const result = await fullLivepeer.generate.audioToText({
+  //       audio: new Blob([file], { type: 'video/mp4' }) // await getFileBlob(file),
+  //     });
+    
+  //     console.log('result1', result);
+
+  //     const rawResult: any = await result.rawResponse.json();
+  
+  //     let output: any;
+  
+  //     output.vtt = generateVTTFile(rawResult.chunks);
+  
+  //     const vttFile = new File(output.vtt, `${file.name}-en.vtt`)
+  
+  //     output.uri = await upload({
+  //       client,
+  //       files: [
+  //         vttFile
+  //       ],
+  //     });
+  
+  //     console.log('result2', output);
+  
+  //     return output;
+  //   } catch (error: any) {
+  //     console.error('Error in audioToText API:', error);
+  //     return { error: error.message || 'Internal Server Error' };
+  //   }
+  // };
+  
 
   return (
     <div>

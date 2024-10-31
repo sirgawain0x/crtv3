@@ -22,13 +22,8 @@ async function hasCreatorPassNFT(address: string) {
   const requiredQuantity = 1n;
 
   const creatorPassAnnual = getContract({
-    // replace with your own NFT contract address
     address: "0xad597e5b24ad2a6032168c76f49f05d957223cd0",
-
-    // replace with the chain that your nft contract was deployed on
-    // if that chain isn't included in our default list, use `defineChain`
     chain: polygon,
-
     client,
   });
 
@@ -38,13 +33,8 @@ async function hasCreatorPassNFT(address: string) {
   });
 
   const creatorPass3Month = getContract({
-    // replace with your own NFT contract address
     address: "0xb6b645c3e2025cf69983983266d16a0aa323e2b0",
-
-    // replace with the chain that your nft contract was deployed on
-    // if that chain isn't included in our default list, use `defineChain`
     chain: polygon,
-
     client,
   });
 

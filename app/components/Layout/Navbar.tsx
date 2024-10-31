@@ -27,6 +27,7 @@ import CRTVConnectButton from '../Button/connectButton';
 export function Navbar() {
   const activeAccount = useActiveAccount();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   const handleLinkClick = () => {
     setIsMenuOpen(false);
@@ -128,7 +129,7 @@ export function Navbar() {
             <div>
               <ThemeToggleComponent />
             </div>
-            <ConnectButtonWrapper />
+            {/* <ConnectButtonWrapper /> */}
             {/* {activeAccount && (
               <div className="mt-5">
                 <ClaimLockButton closeMenu={() => setIsMenuOpen(false)} />
@@ -181,7 +182,7 @@ export function Navbar() {
           <ThemeToggleComponent />
         </div>
         <div className="mr-5">
-          <CRTVConnectButton />
+          <CRTVConnectButton /* onLoginLogout={() => { setIsLoggedIn(!isLoggedIn) }} */ />
           {/* <ConnectButtonWrapper /> */}
         </div>
         {activeAccount && (

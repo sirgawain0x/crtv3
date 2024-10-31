@@ -11,9 +11,15 @@ import { useConnect } from "thirdweb/react"
 import { client } from "@app/lib/sdk/thirdweb/client";
 import { useOrbisContext } from "@app/lib/sdk/orbisDB/context";
 import { Button } from "@chakra-ui/react"
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 
-export const CRTVConnectButton = () => {
+// interface CRTVConnectButtonProps {
+//   onLoginLogout: () => Promise<void>;
+// }
+
+const CRTVConnectButton: React.FC</* CRTVConnectButtonProps */any> = (/* {  
+  onLoginLogout: () => Promise<void>
+} */) => {
   const [isActivelyLoggedIn, setIsLoggedIn] = useState(false);
   
   const account = useActiveAccount();
@@ -87,6 +93,7 @@ export const CRTVConnectButton = () => {
 
   async function handleLogout() {
     await logout();
+    // onLoginLogout();
     setIsLoggedIn(false);
   }
 

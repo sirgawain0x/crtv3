@@ -26,7 +26,7 @@ import {
   useActiveAccount,
 } from "thirdweb/react";
 
-import { redirect } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 
 const HookMultiStepForm = () => {
   const [activeStep, setActiveStep] = useState(1);
@@ -40,14 +40,21 @@ const HookMultiStepForm = () => {
 
   const activeAccount = useActiveAccount();
 
-  useEffect(() => {
-    const tokenGate = async () => {
-      if (!(await isLoggedIn()) && !(await hasCreatorPass(activeAccount.address))) {
-        redirect("/connect-button");
-      }
-    }
-    tokenGate();
-  }, []);
+  const router = useRouter();
+
+  // useEffect(() => {
+  //   const tokenGate = async () => {
+  //     if (!(await isLoggedIn()) || !activeAccount /* || !(await hasCreatorPass(activeAccount?.address)) */) {
+  //       console.log({ 
+  //         isLoggedIn: !(await isLoggedIn()), 
+  //         activeAccount: !activeAccount, 
+  //         // hasCreatorPass: !(await hasCreatorPass(activeAccount?.address))}
+  //       });
+  //       router.push("/");
+  //     }
+  //   }
+  //   tokenGate();
+  // }, []);
 
   const {
     trigger,
@@ -150,6 +157,7 @@ const HookMultiStepForm = () => {
       </div>
       <div className={activeStep === 2 ? 'block' : 'hidden'}>
         <FileUpload
+          metadata={metaData}
           newAssetTitle={metaData?.title || ''}
           onFileSelect={(file) => {
             console.log('Selected file:', file); // Debugging line

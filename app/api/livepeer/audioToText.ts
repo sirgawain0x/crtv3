@@ -1,15 +1,8 @@
 'use server';
 import { upload, download } from "thirdweb/storage";
 import { client } from "@app/lib/sdk/thirdweb/client";
-import { PathLike } from 'node:fs';
-import { readFile } from "node:fs/promises";
-
-interface SubtitleEntry {
-  timestamp: [number, number]; // [startTime, endTime] in seconds
-  text: string;
-  label?: string;
-  srclang?: string;
-};
+import { openAsBlob } from "node:fs";
+import { fullLivepeer } from "@app/lib/sdk/livepeer/fullClient";
 
 function secondsToVTTTime(seconds: number): string {
   // Handle negative numbers or invalid input
@@ -28,7 +21,7 @@ function secondsToVTTTime(seconds: number): string {
     .padStart(3, '0')}`;
 };
 
-function generateVTTFile(subtitles: SubtitleEntry[]): string {
+function generateVTTFile(subtitles: any[]): string {
   // Sort subtitles by start time to ensure proper sequence
   // const sortedSubtitles = [...subtitles].sort((a, b) => a.timestamp[0] - b.timestamp[0]);
 
@@ -76,71 +69,81 @@ export const downloadVTTFromIPFS = async (vttUri: string): Promise<any> => {
   return file;
 }
 
-export const generateTextFromAudio = async (
-  blob: Blob,
-  assetId: string,
-  modelId: string ='whisper-large-v3',
-) => {
-  try {
+// Helper function to convert file to Blob
+function getFileBlob(file: File): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
 
-    const myHeaders = new Headers();
-    myHeaders.append('Content-Type', 'application/json');
-    myHeaders.append('Authorization', `Bearer ${process.env.LIVEPEER_API_KEY}`);
-
-    
-    const raw = JSON.stringify({
-      audio: blob,
-      modelId,
-    });
-
-    const requestOptions: RequestInit = {
-      method: 'POST',
-      headers: myHeaders,
-      body: raw,
-      redirect: 'follow',
+    reader.onload = () => {
+      const blob = new Blob([reader.result as ArrayBuffer], { type: file.type });
+      resolve(blob);
     };
 
-    const response = await fetch(
-      'https://dream-gateway.livepeer.cloud/audio-to-text',
-      requestOptions,
-    );
+    reader.onerror = (error) => {
+      reject(error);
+    };
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Error: ${response.status} - ${errorText}`);
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+export const generateTextFromAudio = async (formData: FormData) => {
+  try {
+
+    const file =  formData.get("file") as File;
+    
+    // console.log('Generating subtitles:', { fileName: file.name });
+
+    // const result = await fullLivepeer.generate.audioToText({
+    //   audio: new Blob([file], { type: 'video/mp4' }),
+    // });
+  
+    // console.log('result1', result);
+
+    // const rawResponse = await result.rawResponse.json();
+
+    const options = {
+      method: 'POST',
+      body: JSON.stringify({
+        audio: new Blob([file], { type: 'audio/mp3' }),
+      }),
+      headers: {Authorization: `Bearer ${process.env.LIVEPEER_API_KEY}`, 'Content-Type': 'multipart/form-data'}
+    };
+    
+    const res = await fetch('https://dream-gateway.livepeer.cloud/audio-to-text', options)
+    
+    const result = await res.json();
+
+    console.log('reslt', result);
+
+    if (result.success) {
+      let output: any; 
+
+      // Add label and srclang to each subtitle
+      output.chunks = result.chunks.map((subtitle: any) => {
+        subtitle.label = 'English';
+        subtitle.srclang = 'en';
+        return subtitle;
+      });
+
+      output.vtt = generateVTTFile(output.chunks);
+
+      const vttFile = new File(output.vtt, `${file.name}-en.vtt`)
+
+      output.uri = await upload({
+        client,
+        files: [
+          vttFile
+        ],
+      });
+
+      console.log('result2', output);
+
+      return output;
     }
 
-    const result = await response.json();
-
-    // Add label and srclang to each subtitle
-    result.chunks = result.chunks.map((subtitle: any) => {
-      subtitle.label = 'English';
-      subtitle.srclang = 'en';
-      return subtitle;
-    });
-
-    // Generate VTT file from chunks and append to response as vtt property
-    result.vtt = generateVTTFile(result.chunks);
-
-    const file = new File(result.vtt, `${assetId}-en.vtt`)
-
-    result.uri = await upload({
-      client,
-      files: [
-        file
-      ],
-    });
-
-    if (response.ok) {
-      return {
-        success: true,
-        result: result,
-      };
-    } else {
-      return {
-        success: false,
-        result: result,
-      };
+    if (result.error) {
+      console.error(result.error);
     }
   } catch (error: any) {
     console.error('Error in audioToText API:', error);

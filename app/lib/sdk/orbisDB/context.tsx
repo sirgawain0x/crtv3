@@ -33,8 +33,9 @@ const crtvEnvId = process.env.ORBIS_ENVIRONMENT_ID || '';
 
 export const OrbisProvider = ({ children }: { children: ReactNode }) => {
     const [authResult, setAuthResult] = useState<OrbisConnectResult | null>(null);
-
+    
     const insert = async (value: any, modelId: string): Promise<void> => {
+        console.log('insert', { value, modelId });
         if (!value) {
             throw new Error('No value provided. Please provide a value to insert.')
         }
