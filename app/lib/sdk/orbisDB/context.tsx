@@ -51,10 +51,9 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
             .value(
                 value
             )
-            // optionally, you can scope this insert to a specific context
             .context(crtvEnvId);
 
-            // Perform local JSON Schema validation before running the query
+        // Perform local JSON Schema validation before running the query
         const validation = await insertStatement.validate()
 
         if(!validation.valid){
@@ -67,7 +66,7 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
             console.error(error);
         }
 
-        console.log(result)
+        console.log('result', result);
     }
 
     const update = async (docId: string, updates: any): Promise<void> => {

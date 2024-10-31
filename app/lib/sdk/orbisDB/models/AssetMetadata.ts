@@ -6,7 +6,7 @@ export type AssetMetadata = {
     description?: string;
     location?: string;
     category?: string;
-    thumbnail?: string;
+    thumbnailUri?: string;
     subtitlesUri?: string;
 };
 

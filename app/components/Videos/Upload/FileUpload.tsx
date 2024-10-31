@@ -152,25 +152,23 @@ const FileUpload: React.FC<FileUploadProps> = ({
       console.log('status', data.status);
       console.log('data', data);
   
-      // if (data.status === 200) {
-  
-        const vttText = generateVTTContent(data?.chunks);
-        const blob = new Blob([vttText], { type: 'text/vtt' });
-        const vttFile = new File([blob], `${selectedFile.name}-en.vtt`);
-  
-        console.log({ vttFile });
-  
-        const subtitlesUri = await upload({
-          client,
-          files: [
-            vttFile
-          ],
-        });
-  
-        console.log('subtitlesUri', subtitlesUri);
+      const vttText = generateVTTContent(data?.chunks);
+      const blob = new Blob([vttText], { type: 'text/vtt' });
+      const vttFile = new File([blob], `${selectedFile.name}-en.vtt`);
+
+      console.log({ vttFile });
+
+      const subtitlesUri = await upload({
+        client,
+        files: [
+          vttFile
+        ],
+      });
+
+      console.log('subtitlesUri', subtitlesUri);
         
       const orbisMetadata: AssetMetadata = {
-        assetId: uploadRequestResult?.asset.id,
+        playbackId: uploadRequestResult?.asset.id,
         title: newAssetTitle,
         description: metadata?.description,
         ...(metadata?.location !== undefined && { location: metadata?.location }),
@@ -181,7 +179,10 @@ const FileUpload: React.FC<FileUploadProps> = ({
 
       console.log({ orbisMetadata, subtitles });
 
-      const metadataUri = await insert(orbisMetadata, 'kjzl6hvfrbw6c9vo5z3ctmct12rqfb7cb0t37lrtyh1rwjmau71gvy3xt9zv5e4');
+      const metadataUri = await insert(
+        orbisMetadata, 
+        'kjzl6hvfrbw6c9vo5z3ctmct12rqfb7cb0t37lrtyh1rwjmau71gvy3xt9zv5e4'
+      );
 
       console.log('metadataUri', metadataUri);
     } catch (error: any) {
@@ -229,60 +230,6 @@ const FileUpload: React.FC<FileUploadProps> = ({
     return vttContent;
   };
   
-  // Helper function to convert file to Blob
-  // function getFileBlob(file: File): Promise<Blob> {
-  //   return new Promise((resolve, reject) => {
-  //     const reader = new FileReader();
-  
-  //     reader.onload = () => {
-  //       const blob = new Blob([reader.result as ArrayBuffer], { type: file.type });
-  //       resolve(blob);
-  //     };
-  
-  //     reader.onerror = (error) => {
-  //       reject(error);
-  //     };
-  
-  //     reader.readAsArrayBuffer(file);
-  //   });
-  // }
-  
-  // const generateTextFromAudio = async (file: File) => {
-  //   try {
-  
-  //     console.log('Generating subtitles:', { fileName: file.name });
-  
-  //     const result = await fullLivepeer.generate.audioToText({
-  //       audio: new Blob([file], { type: 'video/mp4' }) // await getFileBlob(file),
-  //     });
-    
-  //     console.log('result1', result);
-
-  //     const rawResult: any = await result.rawResponse.json();
-  
-  //     let output: any;
-  
-  //     output.vtt = generateVTTFile(rawResult.chunks);
-  
-  //     const vttFile = new File(output.vtt, `${file.name}-en.vtt`)
-  
-  //     output.uri = await upload({
-  //       client,
-  //       files: [
-  //         vttFile
-  //       ],
-  //     });
-  
-  //     console.log('result2', output);
-  
-  //     return output;
-  //   } catch (error: any) {
-  //     console.error('Error in audioToText API:', error);
-  //     return { error: error.message || 'Internal Server Error' };
-  //   }
-  // };
-  
-
   return (
     <div>
       <div className="flex items-center justify-center px-4 py-10">
