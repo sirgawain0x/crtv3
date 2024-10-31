@@ -128,60 +128,55 @@ const FileUpload: React.FC<FileUploadProps> = ({
 
       console.log('Start generateTextFromAudio');
 
-      // const formData = new FormData()
-      
-      // formData.append('audio', selectedFile)
-
-      // const options = {
-      //   method: 'POST',
-      //   body: formData, /* JSON.stringify({
-      //     audio: new Blob([selectedFile], { type: 'video/mp4' }),
-      //   }), */
-      //   headers: {Authorization: `Bearer ${process.env.LIVEPEER_API_KEY}`/* , 'Content-Type': 'multipart/form-data' */}
-      // };
-      
-      // const res = await fetch('https://dream-gateway.livepeer.cloud/audio-to-text', options)
-      
-      // const result = await res.json();
-  
-      // console.log('reslt', result);
-
-      // let subtitles: any;
-
-      //  // Add label and srclang to each subtitle
-      //  subtitles.chunks = result.chunks.map((subtitle: any) => {
-      //   subtitle.label = 'English';
-      //   subtitle.srclang = 'en';
-      //   return subtitle;
-      // });
-
-      // subtitles.vtt = generateVTTFile(subtitles.chunks);
-
-      // const vttFile = new File(subtitles.vtt, `${selectedFile.name}-en.vtt`)
-
-      // subtitles.uri = await upload({
-      //   client,
-      //   files: [
-      //     vttFile
-      //   ],
-      // });
-
-      // console.log('result2', subtitles);
-
       const formData = new FormData();
 
-      formData.append('file', selectedFile);
+      formData.append('audio', /* await openAsBlob(file) */ new Blob([selectedFile], { type: selectedFile.type }));
+      formData.append('model_id', 'openai/whisper-large-v3');
 
-      const subtitles = await generateTextFromAudio(formData);
+      console.log({ formData });
+
+      const options = {
+        method: 'POST',
+        body: formData,
+        headers: { Authorization: `Bearer ${process.env.LIVEPEER_API_KEY}` }
+      };
+      
+      const res = await fetch('https://dream-gateway.livepeer.cloud/audio-to-text', options)
+
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+      
+      const data = await res.json();
+    
+      console.log('status', data.status);
+      console.log('data', data);
+  
+      // if (data.status === 200) {
+  
+        const vttText = generateVTTContent(data?.chunks);
+        const blob = new Blob([vttText], { type: 'text/vtt' });
+        const vttFile = new File([blob], `${selectedFile.name}-en.vtt`);
+  
+        console.log({ vttFile });
+  
+        const subtitlesUri = await upload({
+          client,
+          files: [
+            vttFile
+          ],
+        });
+  
+        console.log('subtitlesUri', subtitlesUri);
         
       const orbisMetadata: AssetMetadata = {
-        assetId: livePeerUploadedAssetId,
+        assetId: uploadRequestResult?.asset.id,
         title: newAssetTitle,
         description: metadata?.description,
         ...(metadata?.location !== undefined && { location: metadata?.location }),
         ...(metadata?.category !== undefined && { category: metadata?.category }),
         ...(metadata?.thumbnailUri !== undefined && { thumbnailUri: metadata?.thumbnailUri }),
-        ...(subtitles?.uri && { subtitlesUri: subtitles?.uri }),
+        ...(subtitlesUri !== undefined && { subtitlesUri: subtitlesUri }),
       };
 
       console.log({ orbisMetadata, subtitles });
@@ -213,10 +208,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
       .padStart(3, '0')}`;
   };
   
-  function generateVTTFile(subtitles: /* SubtitleEntry */ any[]): string {
-    // Sort subtitles by start time to ensure proper sequence
-    // const sortedSubtitles = [...subtitles].sort((a, b) => a.timestamp[0] - b.timestamp[0]);
-  
+  function generateVTTContent(subtitles: /* SubtitleEntry */ any[]): string {
     // Start with the WebVTT header
     let vttContent = 'WEBVTT\n\n';
   
