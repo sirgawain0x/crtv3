@@ -29,6 +29,7 @@ const VideoCardGrid: React.FC = () => {
                 const detailedSrc = await getDetailPlaybackSource(
                   `${asset.playbackId}`,
                 );
+                console.log(asset.playbackId + ': ', detailedSrc);
                 return { ...asset, detailedSrc }; // Add detailedSrc to the asset object
               } catch (err) {
                 console.error(
@@ -44,7 +45,7 @@ const VideoCardGrid: React.FC = () => {
           setPlaybackSources([]);
         }
       } catch (err) {
-        console.error('Error fetching playback sources:', err);
+        console.error('Error fetching playback sources: ', err);
         setError('Failed to load videos.');
       } finally {
         setLoading(false);

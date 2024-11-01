@@ -13,9 +13,9 @@ export async function GET(request: NextRequest) {
   
   const response = await fetch(livepeerUrl, options);
   
-  if (!response.ok) {
-    return NextResponse.json({ error: 'Internal Server Error', data: await response.json() }, { status: 500 });
-  }
+  // if (!response.ok) {
+  //   return NextResponse.json({ error: 'Internal Server Error', data: await response.json() }, { status: 500 });
+  // }
   
   const json = await response.json();
   
@@ -34,9 +34,9 @@ export async function POST(request: NextRequest) {
   
   const response = await fetch(livepeerUpload, options);
 
-  if (!response.ok) {
-    return NextResponse.json({ error: 'Internal Server Error', data: await response.json() }, { status: 500 });
-  }
+  // if (!response.ok) {
+  //   return NextResponse.json({ error: 'Internal Server Error', data: await response.json() }, { status: 500 });
+  // }
 
   const json = await response.json();
   
