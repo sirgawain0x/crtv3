@@ -53,7 +53,6 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
             )
             .context(crtvEnvId);
 
-        // Perform local JSON Schema validation before running the query
         const validation = await insertStatement.validate()
 
         if(!validation.valid){

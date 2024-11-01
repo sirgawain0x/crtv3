@@ -29,13 +29,15 @@ const CRTVConnectButton: React.FC</* CRTVConnectButtonProps */any> = (/* {
   const { orbisLogin } = useOrbisContext();
 
   useEffect(() => {
-    const checkIfLoggedIn = async () => {
+    const isConnected = async () => {
       const loggedIn = await isLoggedIn();
       if (loggedIn) {
         setIsLoggedIn(true);
+      } else {
+        setIsLoggedIn(false);
       }
     }
-    checkIfLoggedIn();
+    isConnected();
   }, []);
   
   async function handleClick() {

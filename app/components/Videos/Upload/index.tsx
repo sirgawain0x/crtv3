@@ -42,19 +42,19 @@ const HookMultiStepForm = () => {
 
   const router = useRouter();
 
-  // useEffect(() => {
-  //   const tokenGate = async () => {
-  //     if (!(await isLoggedIn()) || !activeAccount /* || !(await hasCreatorPass(activeAccount?.address)) */) {
-  //       console.log({ 
-  //         isLoggedIn: !(await isLoggedIn()), 
-  //         activeAccount: !activeAccount, 
-  //         // hasCreatorPass: !(await hasCreatorPass(activeAccount?.address))}
-  //       });
-  //       router.push("/");
-  //     }
-  //   }
-  //   tokenGate();
-  // }, []);
+  useEffect(() => {
+    const tokenGate = async () => {
+      if (!(await isLoggedIn()) || !activeAccount /* || !(await hasCreatorPass(activeAccount?.address)) */) {
+        console.log({ 
+          isLoggedIn: !(await isLoggedIn()), 
+          activeAccount: !activeAccount, 
+          // hasCreatorPass: !(await hasCreatorPass(activeAccount?.address))}
+        });
+        router.push("/");
+      }
+    }
+    tokenGate();
+  }, []);
 
   const {
     trigger,

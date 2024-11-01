@@ -129,6 +129,7 @@ export function Navbar() {
             <div>
               <ThemeToggleComponent />
             </div>
+            <CRTVConnectButton />
             {/* <ConnectButtonWrapper /> */}
             {/* {activeAccount && (
               <div className="mt-5">
