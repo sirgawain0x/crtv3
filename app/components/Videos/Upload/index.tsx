@@ -54,7 +54,7 @@ const HookMultiStepForm = () => {
       }
     }
     tokenGate();
-  }, []);
+  }, [activeAccount, router]);
 
   const {
     trigger,
