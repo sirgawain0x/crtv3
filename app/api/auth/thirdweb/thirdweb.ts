@@ -7,6 +7,7 @@ import {
 import { privateKeyToAccount } from 'thirdweb/wallets';
 import { client } from '@app/lib/sdk/thirdweb/client';
 import { cookies } from 'next/headers';
+// import { hasCreatorPass } from './gateCondition';
 
 const privateKey = process.env.THIRDWEB_ADMIN_PRIVATE_KEY || '';
 
@@ -15,7 +16,8 @@ if (!privateKey) {
 }
 
 const thirdwebAuth = createAuth({
-  domain: process.env.NEXT_PUBLIC_THIRDWEB_AUTH_DOMAIN || '',
+  domain: process.env.NEXT_PUBLIC_THIRDWEB_AUTH_DOMAIN || 'http://localhost:3000',
+  client,
   adminAccount: privateKeyToAccount({ client, privateKey }),
 });
 
@@ -24,6 +26,11 @@ export const generatePayload = async (params: GenerateLoginPayloadParams) =>
 
 export async function login(payload: VerifyLoginPayloadParams) {
   const verifiedPayload = await thirdwebAuth.verifyPayload(payload);
+  console.log({ payload });
+
+  // const hasAccess = await hasCreatorPass(payload.address);
+  // console.log({hasAccess});
+
   if (verifiedPayload.valid) {
     const jwt = await thirdwebAuth.generateJWT({
       payload: verifiedPayload.payload,
@@ -39,6 +46,8 @@ export async function isLoggedIn() {
   }
 
   const authResult = await thirdwebAuth.verifyJWT({ jwt: jwt.value });
+  console.log({ authResult });
+  
   if (!authResult.valid) {
     return false;
   }

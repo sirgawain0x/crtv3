@@ -1,12 +1,12 @@
 import { db } from "../client";
 
 export type AssetMetadata = {
-    assetId?: string;
+    playbackId?: string;
     title?: string;
     description?: string;
     location?: string;
     category?: string;
-    thumbnail?: string;
+    thumbnailUri?: string;
     subtitlesUri?: string;
 };
 

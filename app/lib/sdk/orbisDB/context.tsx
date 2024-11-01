@@ -13,7 +13,7 @@ interface OrbisContextProps {
     insert: (value: any, modelId: string) => Promise<void>;
     update: (docId: string, updates: any) => Promise<void>;
     getAssetMetadata: (assetId: string) => Promise<any>;
-    orbisLogin: (privateKey: string) => Promise<void>;
+    orbisLogin: (privateKey?: string) => Promise<void>;
     isConnected: (address: string) => Promise<Boolean>;
     getCurrentUser: () => Promise<any>;
 }
@@ -33,8 +33,9 @@ const crtvEnvId = process.env.ORBIS_ENVIRONMENT_ID || '';
 
 export const OrbisProvider = ({ children }: { children: ReactNode }) => {
     const [authResult, setAuthResult] = useState<OrbisConnectResult | null>(null);
-
+    
     const insert = async (value: any, modelId: string): Promise<void> => {
+        console.log('insert', { value, modelId });
         if (!value) {
             throw new Error('No value provided. Please provide a value to insert.')
         }
@@ -50,10 +51,8 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
             .value(
                 value
             )
-            // optionally, you can scope this insert to a specific context
             .context(crtvEnvId);
 
-            // Perform local JSON Schema validation before running the query
         const validation = await insertStatement.validate()
 
         if(!validation.valid){
@@ -66,7 +65,7 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
             console.error(error);
         }
 
-        console.log(result)
+        console.log('result', result);
     }
 
     const update = async (docId: string, updates: any): Promise<void> => {
@@ -118,25 +117,32 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
         return result;
     }
 
-    const orbisLogin = async (privateKey: string): Promise<void> => {
+    const orbisLogin = async (/* privateKey: string = '' */): Promise<OrbisConnectResult> => {
+        // console.log({ privateKey });
+        
         let provider; 
 
-        if (!privateKey) {
+        // if (privateKey !== '') {
             // Browser provider
-            provider = window.ethereum;
-        } else {
-            // Ethers provider
-            provider = new Wallet(privateKey);
-        }
+        provider = window.ethereum;
+        // } else {
+        //     // Ethers provider
+        //     provider = new Wallet(privateKey);
+        // }
+
+        // console.log({ provider });
 
         // Orbis Authenticator
         const auth = new OrbisEVMAuth(provider);
+
+        // console.log({ auth });
 
         // Authenticate the user and persist the session in localStorage
         const authResult: OrbisConnectResult = await db.connectUser({ auth });
 
         // Log the result
-        console.log({ authResult })
+        // console.log({ authResult })
+        return authResult;
     }
 
     const isConnected = async (address: string = ''): Promise<Boolean> => {

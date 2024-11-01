@@ -1,7 +1,7 @@
 'use client';
 
 import { FaExclamationTriangle } from 'react-icons/fa';
-import { useEffect, useState } from 'react';
+import { use, useEffect, useState } from 'react';
 import { FormProvider, useForm } from 'react-hook-form';
 
 import { STEPPER_FORM_KEYS } from '@app/lib/utils/context';
@@ -19,6 +19,15 @@ import CreateThumbnail from './Create-thumbnail';
 import type { TVideoMetaForm } from './Create-info';
 import FileUpload from './FileUpload';
 
+import { hasCreatorPass } from '@app/api/auth/thirdweb/gateCondition';
+import { isLoggedIn } from '@app/components/Button/actions/login';
+
+import {
+  useActiveAccount,
+} from "thirdweb/react";
+
+import { useRouter } from 'next/navigation';
+
 const HookMultiStepForm = () => {
   const [activeStep, setActiveStep] = useState(1);
   const [canNextStep, setCanNextStep] = useState(false);
@@ -28,6 +37,24 @@ const HookMultiStepForm = () => {
   });
   const [metaData, setMetadata] = useState<TVideoMetaForm>(),
     [livePeerAssetId, setLivePeerAssetId] = useState<string>();
+
+  const activeAccount = useActiveAccount();
+
+  const router = useRouter();
+
+  useEffect(() => {
+    const tokenGate = async () => {
+      if (!(await isLoggedIn()) || !activeAccount /* || !(await hasCreatorPass(activeAccount?.address)) */) {
+        console.log({ 
+          isLoggedIn: !(await isLoggedIn()), 
+          activeAccount: !activeAccount, 
+          // hasCreatorPass: !(await hasCreatorPass(activeAccount?.address))}
+        });
+        router.push("/");
+      }
+    }
+    tokenGate();
+  }, []);
 
   const {
     trigger,
@@ -130,6 +157,7 @@ const HookMultiStepForm = () => {
       </div>
       <div className={activeStep === 2 ? 'block' : 'hidden'}>
         <FileUpload
+          metadata={metaData}
           newAssetTitle={metaData?.title || ''}
           onFileSelect={(file) => {
             console.log('Selected file:', file); // Debugging line
