@@ -7,7 +7,10 @@ export const getLivePeerAiGeneratedImages = async ({
 }: TextToImageParams) => {
   const myHeaders = new Headers();
   myHeaders.append('Content-Type', 'application/json');
-  myHeaders.append('Authorization', `Bearer ${process.env.LIVEPEER_API_KEY}`);
+  myHeaders.append(
+    'Authorization',
+    `Bearer ${process.env.LIVEPEER_FULL_API_KEY}`,
+  );
 
   const raw = JSON.stringify({
     prompt,
@@ -38,4 +41,3 @@ export const getLivePeerAiGeneratedImages = async ({
     };
   }
 };
-

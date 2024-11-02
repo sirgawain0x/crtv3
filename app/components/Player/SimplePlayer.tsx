@@ -1,36 +1,39 @@
-import { useOrbisContext } from "@app/lib/sdk/orbisDB/context";
-import React, { useState } from "react";
+import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
+import React, { useState } from 'react';
 
 interface SimplePlayerProps {
-    src: string,
-    playbackId?: string,
+  src: string;
+  playbackId?: string;
 }
 
 export const SimplePlayer: React.FC<SimplePlayerProps> = async ({
-    src,
-    playbackId,
+  src,
+  playbackId,
 }) => {
-    const [assetMetadata, setAssetMetadata] = useState<any | null>(null);
+  const [assetMetadata, setAssetMetadata] = useState<any | null>(null);
 
-    const { getAssetMetadata } = useOrbisContext();
+  const { getAssetMetadata } = useOrbisContext();
 
-    if (playbackId) {
-        setAssetMetadata(await getAssetMetadata(playbackId));
-    }
+  if (playbackId) {
+    setAssetMetadata(await getAssetMetadata(playbackId));
+  }
 
-    return (
-        <video id="video" controls poster={assetMetadata?.thumbnailUri} preload="metadata">
-            <source src={src} type="video/mp4" />
-            {/* {subtitles.map(el => ( */}
-            {subtitles && (
-                <track
-                    label="English"
-                    kind="subtitles"
-                    // srclang="en"
-                    src={assetMetadata.subtitles}
-                    default />
-            )}
-            {/* )} */}
-            </video>
-    );
-}
+  return (
+    <video
+      id="video"
+      controls
+      poster={assetMetadata?.thumbnailUri}
+      preload="metadata"
+    >
+      <source src={src} type="video/mp4" />
+      {assetMetadata?.subtitles && (
+        <track
+          label={assetMetadata.subtitles.language}
+          kind="subtitles"
+          src={assetMetadata.subtitles}
+          default
+        />
+      )}
+    </video>
+  );
+};
