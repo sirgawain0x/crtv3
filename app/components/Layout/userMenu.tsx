@@ -27,21 +27,11 @@ export const UserMenu: React.FC = () => {
   const handleLinkClick = () => {
     setIsMenuOpen(false);
   };
-  // useEffect(() => {
-  //   const checkLogin = async () => {
-  //     const result = await isLoggedIn();
-  //     setLoggedIn(result);
-  //   };
-  //   checkLogin();
-  // }, []);
 
-  // if (!loggedIn) {
-  //   return (
-  //     <div className="my-auto">
-  //       <PaywallButton />
-  //     </div>
-  //   );
-  // }
+  // If no active account, don't render the menu
+  if (!activeAccount) {
+    return null;
+  }
 
   return (
     <div className="my-auto">
@@ -54,7 +44,7 @@ export const UserMenu: React.FC = () => {
           >
             <Avatar className="h-8 w-8">
               <AvatarImage
-                src={makeBlockie(`${activeAccount?.address}`)}
+                src={makeBlockie(`${activeAccount.address}`)}
                 alt="User avatar"
               />
               <AvatarFallback>JD</AvatarFallback>
@@ -74,21 +64,10 @@ export const UserMenu: React.FC = () => {
               <span>Profile</span>
             </Link>
           </DropdownMenuItem>
-          {/* <DropdownMenuItem onClick={handleLinkClick}>
-            <Link
-              href="#"
-              className="flex items-center gap-2"
-              prefetch={false}
-              onClick={handleLinkClick}
-            >
-              <SettingsIcon className="h-4 w-4" />
-              <span>Settings</span>
-            </Link>
-          </DropdownMenuItem> */}
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={handleLinkClick}>
             <Link
-              href={`/profile/${activeAccount?.address}/upload`}
+              href={`/profile/${activeAccount.address}/upload`}
               className="flex items-center gap-2"
               prefetch={false}
               onClick={handleLinkClick}
