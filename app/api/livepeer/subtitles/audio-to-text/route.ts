@@ -4,7 +4,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { fullLivepeer } from '@app/lib/sdk/livepeer/fullClient';
 import { GenAudioToTextResponse } from 'livepeer/models/operations';
 import { SubtitleResponse } from '@app/lib/types';
-import aiClient from '@app/lib/sdk/livepeer/aiClient';
 
 export const config = {
   api: {

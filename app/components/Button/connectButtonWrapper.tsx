@@ -20,7 +20,7 @@ import {
   authedOnly,
   login,
   logout,
-} from '@app/api/auth/thirdweb/testing123';
+} from '@app/api/auth/thirdweb/authentication';
 import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
 
 export default function ConnectButtonWrapper() {
