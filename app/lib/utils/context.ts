@@ -4350,7 +4350,7 @@ export const PROFILE_CAMPAIGNS = {
 };
 
 // Livepeer API
-export const LIVEPEER_API_URL = 'https://livepeer.com/api';
+export const LIVEPEER_FULL_API_URL = 'https://livepeer.com/api';
 
 // HERO
 export const HERO_VIDEO_TITLE = 'Welcome To Creative Organization DAO';

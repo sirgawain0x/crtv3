@@ -1,3 +1,4 @@
+import { Chunk } from 'livepeer/models/components';
 import * as z from 'zod';
 
 export type AssetData = {
@@ -353,3 +354,8 @@ export const createAssetSchema = z.object({
 });
 
 export type CreateAssetType = z.infer<typeof createAssetSchema>;
+
+export type SubtitleResponse = {
+  text: string;
+  chunks?: Chunk[];
+}

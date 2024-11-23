@@ -91,8 +91,6 @@ export const createAsset = async (data: NewAssetPayload) => {
 
     const asset = await fullLivepeer?.asset.create(data);
 
-    // const asset = response;
-
     console.log('Created: ', asset);
     
     return [asset];
@@ -107,8 +105,6 @@ export const createViaUrl = async (data: NewAssetFromUrlPayload) => {
     console.log('Creating URL...');
 
     const asset = await fullLivepeer?.asset?.createViaUrl(data);
-    
-    // const asset = response;
     
     console.log('Created: ', asset);
 

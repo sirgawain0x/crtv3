@@ -26,7 +26,7 @@ export const generatePayload = async (params: GenerateLoginPayloadParams) =>
 
 export async function login(payload: VerifyLoginPayloadParams) {
   const verifiedPayload = await thirdwebAuth.verifyPayload(payload);
-  console.log({ payload });
+  console.log({ verifiedPayload, payload });
 
   // const hasAccess = await hasCreatorPass(payload.address);
   // console.log({hasAccess});

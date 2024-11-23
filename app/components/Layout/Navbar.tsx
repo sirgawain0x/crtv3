@@ -21,13 +21,28 @@ import { client } from '@app/lib/sdk/thirdweb/client';
 import { useReadContract } from 'thirdweb/react';
 import { polygon } from 'thirdweb/chains';
 import { getContract } from 'thirdweb';
+import {
+  isLoggedIn,
+} from '@app/components/Button/actions/login'; 
 import ClaimLockButton from '@app/components/Paywall/ClaimLock';
 import CRTVConnectButton from '../Button/connectButton';
 
 export function Navbar() {
-  const activeAccount = useActiveAccount();
+  const account = useActiveAccount();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
+
+  useEffect(() => {
+    const isConnected = async () => {
+      const loggedIn = await isLoggedIn();
+      if (loggedIn) {
+        setIsConnected(true);
+      } else {
+        setIsConnected(false);
+      }
+    };
+    isConnected();
+  }, [account]);
 
   const handleLinkClick = () => {
     setIsMenuOpen(false);
@@ -44,19 +59,19 @@ export function Navbar() {
   // const { data: result, isLoading } = useReadContract({
   //   contract: unlockContract,
   //   method: 'getHasValidKey',
-  //   params: [activeAccount?.address],
+  //   params: [account?.address],
   // });
 
   // const [subscribed, setSubscribed] = useState(false);
 
   // useEffect(() => {
-  //   if (!activeAccount || !Unlock.abi) return;
+  //   if (!account || !Unlock.abi) return;
 
   //   if (result !== undefined) {
   //     console.log('Is your membership valid?', result);
   //     setSubscribed(result);
   //   }
-  // }, [activeAccount, result]);
+  // }, [account, result]);
 
   return (
     <header className="flex h-20 w-full shrink-0 items-center bg-muted px-4 md:px-6">
@@ -129,9 +144,9 @@ export function Navbar() {
             <div>
               <ThemeToggleComponent />
             </div>
-            {/* <CRTVConnectButton /> */}
-            <ConnectButtonWrapper />
-            {activeAccount && (
+            <CRTVConnectButton isConnected={isConnected} />
+            {/* <ConnectButtonWrapper /> */}
+            {isConnected && (
               <div className="mt-5">
                 <ClaimLockButton closeMenu={() => setIsMenuOpen(false)} />
               </div>
@@ -183,10 +198,10 @@ export function Navbar() {
           <ThemeToggleComponent />
         </div>
         <div className="mr-5">
-          {/* <CRTVConnectButton /* onLoginLogout={() => { setIsLoggedIn(!isLoggedIn) }} */ /> */}
-          <ConnectButtonWrapper />
+          <CRTVConnectButton isConnected={isConnected} />
+          {/* <ConnectButtonWrapper /> */}
         </div>
-        {activeAccount && (
+        {isConnected && (
           <ClaimLockButton closeMenu={() => setIsMenuOpen(false)} />
         )}
       </div>

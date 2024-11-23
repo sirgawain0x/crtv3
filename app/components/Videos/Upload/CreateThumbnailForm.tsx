@@ -14,7 +14,7 @@ import { SparklesIcon } from 'lucide-react';
 import Image from 'next/image';
 import { Textarea } from '@app/components/ui/textarea';
 import { Label } from '@app/components/ui/label';
-import { getLivePeerAiGeneratedImages } from '@app/api/livepeer/livepeerAiActions';
+import { getLivepeerAiGeneratedImages } from '@app/api/livepeer/livepeerAiActions';
 import { Media } from 'livepeer/models/components';
 import { RadioGroup, RadioGroupItem } from '@app/components/ui/radio-group';
 import Skeleton from '@app/components/ui/skeleton';
@@ -52,7 +52,7 @@ const CreateThumbnailForm = ({
   const onSubmit = async (data: FormValues) => {
     setLoading(true); // Set loading state to true
     try {
-      const response = await getLivePeerAiGeneratedImages({
+      const response = await getLivepeerAiGeneratedImages({
         prompt: data.prompt,
         modelId: data.aiModel,
       });

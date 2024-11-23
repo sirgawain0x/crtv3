@@ -1,10 +1,8 @@
 'use client';
+
 import React, {
   useState,
   useEffect,
-  type CSSProperties,
-  type PropsWithChildren,
-  forwardRef,
 } from 'react';
 import {
   EnterFullscreenIcon,
@@ -17,12 +15,22 @@ import {
 } from '@livepeer/react/assets';
 import { Src } from '@livepeer/react';
 import * as Player from '@livepeer/react/player';
-//import Skeleton from '../ui/skeleton';
+import { SubtitlesControl, SubtitlesDisplay } from './Subtitles';
+import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
+import { AssetMetadata } from '@app/lib/sdk/orbisDB/models/AssetMetadata';
 
-export const PlayerComponent: React.FC<{
+interface PlayerComponentProps {
   src: Src[] | null;
+  assetId: string;
   title: string;
-}> = ({ src, title }) => {
+  accessKey?: string;
+};
+
+export const PlayerComponent: React.FC<PlayerComponentProps> = ({ src, assetId, title, accessKey }) => {
+  const [assetMetadata, setAssetMetadata] = useState<AssetMetadata | null>(null);
+  
+  const { getAssetMetadata } = useOrbisContext();
+
   // if (!src) {
   //   return (
   //     <div className={'relative flex w-full'}>
@@ -33,11 +41,27 @@ export const PlayerComponent: React.FC<{
   //   );
   // }
 
+  useEffect(() => {
+    fetchAssetDetails(assetId);
+  }, [assetId]);
+
+  const fetchAssetDetails = async (assetId: string): Promise<void> => {
+    setAssetMetadata(await getAssetMetadata(assetId));
+  };
+
   return (
     <>
-      <Player.Root src={src}>
+      <Player.Root src={src} accessKey={accessKey}>
         <Player.Container className="h-full w-full overflow-hidden bg-gray-950">
           <Player.Video title={title} className="h-full w-full" poster={null} />
+
+          <SubtitlesDisplay
+            subtitles={assetMetadata?.subtitles ? assetMetadata.subtitles['English'] : undefined}
+            style={{
+              color: '#EC407A',
+              textShadow: '0 0 10px rgba(236, 64, 122, 0.5)',
+            }}
+          />
 
           <Player.LoadingIndicator className="relative h-full w-full bg-black/50 backdrop-blur data-[visible=true]:animate-in data-[visible=false]:animate-out data-[visible=false]:fade-out-0 data-[visible=true]:fade-in-0">
             <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
@@ -134,6 +158,7 @@ export const PlayerComponent: React.FC<{
                     />
                   </Player.VolumeIndicator>
                 </Player.MuteTrigger>
+                <SubtitlesControl />
               </div>
 
               <div className="absolute bottom-0 right-0 mx-2 my-2 flex items-center justify-end gap-2.5 sm:flex-1 md:flex-[1.5]">

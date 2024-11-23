@@ -1,13 +1,16 @@
 'use server';
 import { TextToImageParams } from 'livepeer/models/components';
 
-export const getLivePeerAiGeneratedImages = async ({
+export const getLivepeerAiGeneratedImages = async ({
   prompt,
   modelId,
 }: TextToImageParams) => {
   const myHeaders = new Headers();
   myHeaders.append('Content-Type', 'application/json');
-  myHeaders.append('Authorization', `Bearer ${process.env.LIVEPEER_API_KEY}`);
+  myHeaders.append(
+    'Authorization',
+    `Bearer ${process.env.LIVEPEER_FULL_API_KEY}`,
+  );
 
   const raw = JSON.stringify({
     prompt,
@@ -38,4 +41,3 @@ export const getLivePeerAiGeneratedImages = async ({
     };
   }
 };
-

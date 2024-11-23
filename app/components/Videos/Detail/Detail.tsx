@@ -9,7 +9,7 @@ export default function VideoDetailsPage({
 }: {
   params: { slug: string };
 }) {
-  const [videoDetails, setVideoDetails] = useState();
+  // const [videoDetails, setVideoDetails] = useState();
   const [asset, setAsset] = useState<any>();
   const [isLoading, setIsLoading] = useState(false);
   const [assetLoading, setAssetLoading] = useState(false);
@@ -19,9 +19,9 @@ export default function VideoDetailsPage({
     const fetchVideoDetails = async () => {
       setIsLoading(true);
       try {
-        const response = await fetch(`asset/${params.slug}`);
-        const data = await response.json();
-        setVideoDetails(data);
+        // const response = await fetch(`asset/${params.slug}`);
+        // const data = await response.json();
+        // setVideoDetails(data);
         // Once video details are fetched, fetch the asset
         await fetchAssetDetails(data.assetId);
       } catch (err) {
@@ -57,9 +57,9 @@ export default function VideoDetailsPage({
         <div style={{ color: 'red.500' }}>{error}</div>
       ) : (
         <div className="container max-w-md">
-          <h1 className="md my-4">{videoDetails}</h1>
+          <h1 className="md my-4">{asset}</h1>
           {asset && (
-            <PlayerComponent src={asset.playbackId} title={asset?.name} />
+            <PlayerComponent src={asset.playbackId} assetId={asset.id} title={asset?.name} />
           )}
         </div>
       )}

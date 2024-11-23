@@ -36,7 +36,7 @@ const HookMultiStepForm = () => {
     mode: 'onTouched',
   });
   const [metaData, setMetadata] = useState<TVideoMetaForm>(),
-    [livePeerAssetId, setLivePeerAssetId] = useState<string>();
+    [livePeerAssetId, setLivepeerAssetId] = useState<string>();
 
   const activeAccount = useActiveAccount();
 
@@ -169,7 +169,7 @@ const HookMultiStepForm = () => {
             setActiveStep((prevActiveStep) => prevActiveStep - 1)
           }
           onPressNext={(livePeerAssetId) => {
-            setLivePeerAssetId(livePeerAssetId);
+            setLivepeerAssetId(livePeerAssetId);
             setActiveStep((prevActiveStep) => prevActiveStep + 1);
           }}
         />
