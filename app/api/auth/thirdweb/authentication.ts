@@ -1,10 +1,10 @@
 "use server";
 
-import { VerifyLoginPayloadParams, createAuth } from "thirdweb/auth";
+import { GenerateLoginPayloadParams, VerifyLoginPayloadParams, createAuth } from "thirdweb/auth";
 import { privateKeyToAccount } from "thirdweb/wallets";
 import { client } from "../../../lib/sdk/thirdweb/client";
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
+// import { redirect } from "next/navigation";
 
 const privateKey = process.env.THIRDWEB_ADMIN_PRIVATE_KEY || "";
 
@@ -21,28 +21,31 @@ export const generatePayload = thirdwebAuth.generatePayload;
 
 export async function login(payload: VerifyLoginPayloadParams) {
     console.log({ payload });
-  const verifiedPayload = await thirdwebAuth.verifyPayload(payload);
-  console.log({ verifiedPayload });
-  if (verifiedPayload.valid) {
-    const jwt = await thirdwebAuth.generateJWT({
-      payload: verifiedPayload.payload,
-    });
-    console.log({ jwt });
-    cookies().set("jwt", jwt);
-    // redirect to the secure page
-    return redirect("/jwt-cookie/secure");
-  }
+    const verifiedPayload = await thirdwebAuth.verifyPayload(payload);
+    
+    if (verifiedPayload.valid) {
+        const jwt = await thirdwebAuth.generateJWT({
+            payload: verifiedPayload.payload,
+        });
+        console.log({ jwt });
+        
+        cookies().set("jwt", jwt);
+
+        // return redirect("/jwt-cookie/secure");
+    }
 }
 
 export async function authedOnly() {
   const jwt = cookies().get("jwt");
   if (!jwt?.value) {
-    redirect("/jwt-cookie");
+    // redirect("/jwt-cookie");
+    return false;
   }
 
   const authResult = await thirdwebAuth.verifyJWT({ jwt: jwt.value });
   if (!authResult.valid) {
-    redirect("/jwt-cookie");
+    // redirect("/jwt-cookie");
+    return false;
   }
   return authResult.parsedJWT;
 }

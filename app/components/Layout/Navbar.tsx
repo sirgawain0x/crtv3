@@ -21,28 +21,28 @@ import { client } from '@app/lib/sdk/thirdweb/client';
 import { useReadContract } from 'thirdweb/react';
 import { polygon } from 'thirdweb/chains';
 import { getContract } from 'thirdweb';
-import {
-  isLoggedIn,
-} from '@app/components/Button/actions/login'; 
+// import {
+//   isLoggedIn,
+// } from '@app/components/Button/actions/login'; 
 import ClaimLockButton from '@app/components/Paywall/ClaimLock';
 import CRTVConnectButton from '../Button/connectButton';
 
 export function Navbar() {
-  const account = useActiveAccount();
+  const activeAccount = useActiveAccount();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
 
-  useEffect(() => {
-    const isConnected = async () => {
-      const loggedIn = await isLoggedIn();
-      if (loggedIn) {
-        setIsConnected(true);
-      } else {
-        setIsConnected(false);
-      }
-    };
-    isConnected();
-  }, [account]);
+  // useEffect(() => {
+  //   const isConnected = async () => {
+  //     const loggedIn = await isLoggedIn();
+  //     if (loggedIn) {
+  //       setIsConnected(true);
+  //     } else {
+  //       setIsConnected(false);
+  //     }
+  //   };
+  //   isConnected();
+  // }, [account]);
 
   const handleLinkClick = () => {
     setIsMenuOpen(false);
@@ -144,9 +144,9 @@ export function Navbar() {
             <div>
               <ThemeToggleComponent />
             </div>
-            <CRTVConnectButton isConnected={isConnected} />
-            {/* <ConnectButtonWrapper /> */}
-            {isConnected && (
+            {/* <CRTVConnectButton /> */}
+            <ConnectButtonWrapper />
+            {activeAccount && (
               <div className="mt-5">
                 <ClaimLockButton closeMenu={() => setIsMenuOpen(false)} />
               </div>
@@ -198,10 +198,10 @@ export function Navbar() {
           <ThemeToggleComponent />
         </div>
         <div className="mr-5">
-          <CRTVConnectButton isConnected={isConnected} />
-          {/* <ConnectButtonWrapper /> */}
+          {/* <CRTVConnectButton /> */}
+          <ConnectButtonWrapper />
         </div>
-        {isConnected && (
+        {activeAccount && (
           <ClaimLockButton closeMenu={() => setIsMenuOpen(false)} />
         )}
       </div>

@@ -42,9 +42,10 @@ const HookMultiStepForm = () => {
 
   const router = useRouter();
 
+  // TODO: Replace with next-auth token gating or debug hasCreatorPass (cannot rely on activeAccount?.address due to delay in load times)
   useEffect(() => {
     const tokenGate = async () => {
-      if (!(await isLoggedIn()) || !activeAccount /* || !(await hasCreatorPass(activeAccount?.address)) */) {
+      if (!(await isLoggedIn()) || !activeAccount /* || !(await hasCreatorPass()) */ )  {
         console.log({ 
           isLoggedIn: !(await isLoggedIn()), 
           activeAccount: !activeAccount, 

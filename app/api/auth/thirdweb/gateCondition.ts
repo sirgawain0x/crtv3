@@ -3,8 +3,8 @@ import { polygon } from "thirdweb/chains";
 import { client } from "../../../lib/sdk/thirdweb/client";
 import { balanceOf as balanceOfERC721 } from "thirdweb/extensions/erc721";
 
-export async function hasCreatorPass(address: string): Promise<boolean> {
-  return await hasCreatorPassNFT(address);
+export async function hasCreatorPass(): Promise<boolean> {
+  return await hasCreatorPassNFT();
 }
 
 /**
@@ -18,7 +18,7 @@ export async function hasCreatorPass(address: string): Promise<boolean> {
  *
  * The sky is the limit.
  */
-async function hasCreatorPassNFT(address: string) {
+async function hasCreatorPassNFT() {
   const requiredQuantity = 1n;
 
   const creatorPassAnnual = getContract({
