@@ -29,11 +29,17 @@ export const getLivepeerAudioToText = async (
             }
         };
 
-        const result = await fetch(`${livepeerApiUrl}/audio-to-text`, options)
+        console.log({ options });
+
+        const result = await fetch(`${livepeerApiUrl}/audio-to-text`, options);
+
+        console.log({ result });
 
         const data = await result.json();
 
-        return data;
+        console.log({ data });
+
+        return data.textResponse;
     } catch (error: any) {
         console.error('Error generating text from audio:', error);
         throw new Error(error.message || 'Failed to generate text from audio');

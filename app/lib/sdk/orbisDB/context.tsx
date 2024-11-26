@@ -6,11 +6,13 @@ declare global {
 
 import { createContext, ReactNode, useContext, useState } from 'react';
 import { db } from './client';
+import { client } from '@app/lib/sdk/thirdweb/client';
 import { catchError } from "@useorbis/db-sdk/util"
 import { OrbisEVMAuth } from "@useorbis/db-sdk/auth";
 import {  OrbisConnectResult } from '@useorbis/db-sdk';
 // import { Wallet } from 'ethers';
 import createAssetMetadataModel, { AssetMetadata } from './models/AssetMetadata';
+import { download } from 'thirdweb/storage';
 
 interface OrbisContextProps {
     assetMetadataModelID: string;
@@ -18,47 +20,29 @@ interface OrbisContextProps {
     setAuthResult: React.Dispatch<React.SetStateAction<OrbisConnectResult | null>>;
     insert: (value: any, modelId: string) => Promise<void>;
     update: (docId: string, updates: any) => Promise<void>;
-    getAssetMetadata: (assetId: string) => Promise<AssetMetadata>;
-    orbisLogin: (privateKey?: string) => Promise<OrbisConnectResult>;
+    getAssetMetadata: (assetId: string) => Promise<AssetMetadata | null>;
+    orbisLogin: (privateKey?: string) => Promise<OrbisConnectResult | null>;
     isConnected: (address: string) => Promise<Boolean>;
     getCurrentUser: () => Promise<any>;
 }
 
 const OrbisContext = createContext<OrbisContextProps | undefined> ({
-    assetMetadataModelID: '',
+    assetMetadataModelID: 'kjzl6hvfrbw6c6itfx7h76zcrpch2gm2u4bws8gxi0zvw1n8pg5v8rvli7b1blr',
     authResult: null,
     setAuthResult: () => {},
     insert: async () => {},
     update: async () => {},
-    getAssetMetadata: async (assetId: string) => { 
-        return { 
-            assetId: '',
-            playbackId: '',
-            title: '',
-            description: '',
-            location: '',
-            category: '',
-            thumbnailUri: '',
-            subtitles: {
-                'English': [
-                    {
-                        text: '',
-                        timestamp: [0, 1]
-                    }
-                ]
-            },
-        } 
-    },
+    getAssetMetadata: async () => {},
     orbisLogin: async () => {},
     isConnected: async () => false,
     getCurrentUser: async () => {}
-});
+} as unknown as OrbisContextProps);
 
 const crtvEnvId = process.env.ORBIS_ENVIRONMENT_ID || '';
 const crtvContextId = process.env.ORBIS_APP_CONTEXT || '';   
 
 export const OrbisProvider = ({ children }: { children: ReactNode }) => {
-    const assetMetadataModelID: string = '';
+    const assetMetadataModelID: string = 'kjzl6hvfrbw6c6itfx7h76zcrpch2gm2u4bws8gxi0zvw1n8pg5v8rvli7b1blr';
 
     const [authResult, setAuthResult] = useState<OrbisConnectResult | null>(null);
     
@@ -114,7 +98,7 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
   };
 
     const getAssetMetadata = async (assetId: string): Promise<AssetMetadata> => {
-        const selectStatement = await db
+        const selectStatement = db
             .select()
             .from("AssetMetadata")
             .where(
@@ -143,12 +127,19 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
       return acc;
     }, {} as AssetMetadata);
 
-    console.log({ columns, rows });
+    if (assetMetadata?.subtitlesUri) {
+      assetMetadata.subtitles = download({
+        client,
+        uri: assetMetadata.subtitlesUri
+      });
+    };
+
+    console.log({ assetMetadata });
 
     return assetMetadata;
   };
 
-    const orbisLogin = async (): Promise<void> => {
+    const orbisLogin = async (): Promise<OrbisConnectResult> => {
         
       let provider; 
 

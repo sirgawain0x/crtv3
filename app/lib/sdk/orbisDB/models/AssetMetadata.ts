@@ -7,8 +7,9 @@ export type AssetMetadata = {
     description?: string; 
     location?: string; 
     category?: string;
-    thumbnailUri?: string; // Thumbnail IPFS URI
-    subtitles?: Subtitles;
+    thumbnailUri?: string;
+    subtitlesUri?: string;
+    subtitles? : Subtitles;
 };
 
 export type Subtitles = Record<string, Chunk[]>

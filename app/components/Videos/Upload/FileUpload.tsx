@@ -12,6 +12,8 @@ import { AssetMetadata, Subtitles, Chunk } from '../../../lib/sdk/orbisDB/models
 import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
 import JsGoogleTranslateFree from "@kreisler/js-google-translate-free";
 import { getLivepeerAudioToText } from '@app/api/livepeer/audioToText';
+import { upload, download } from 'thirdweb/storage';
+import { client } from '@app/lib/sdk/thirdweb/client';
 
 const truncateUri = (uri: string): string => {
   if (uri.length <= 30) return uri;
@@ -208,8 +210,17 @@ const FileUpload: React.FC<FileUploadProps> = ({
         modelId: 'openai/whisper-large-v3',
         returnTimestamps: 'true',
       });
+      
+      console.log({ audioToTextResponse });
 
       const subtitles = audioToTextResponse ? await translateSubtitles({ chunks: audioToTextResponse?.chunks }) : {};
+
+      const ipfsUri = await upload({
+        client,
+        files: [
+          subtitles
+        ]
+      });
 
       const orbisMetadata: AssetMetadata = {
         playbackId: uploadRequestResult?.asset.id,
@@ -218,7 +229,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
         ...(metadata?.location !== undefined && { location: metadata?.location }),
         ...(metadata?.category !== undefined && { category: metadata?.category }),
         ...(metadata?.thumbnailUri !== undefined && { thumbnailUri: metadata?.thumbnailUri }),
-        ...(subtitles !== undefined && { subtitles: subtitles }),
+        ...(subtitles !== undefined && { subtitlesUri: ipfsUri }),
       };
 
       console.log({ orbisMetadata });

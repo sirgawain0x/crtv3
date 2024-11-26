@@ -47,7 +47,7 @@ export async function authedOnly() {
     // redirect("/jwt-cookie");
     return false;
   }
-  return authResult.parsedJWT;
+  return true;
 }
 
 export async function logout() {
