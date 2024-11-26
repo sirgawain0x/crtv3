@@ -17,7 +17,7 @@ import React, { useEffect, useState } from 'react';
 import { ThirdwebAccount } from 'thirdweb/react';
 
 
-const CRTVConnectButton: React.FC<{ active: any }> = ({ active }) => {
+const CRTVConnectButton: React.FC<{ active?: any }> = ({ active }) => {
   const [isActivelyLoggedIn, setIsLoggedIn] = useState(false);
 
   const account = useActiveAccount();
