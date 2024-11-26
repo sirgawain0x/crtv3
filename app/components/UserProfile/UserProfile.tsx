@@ -35,6 +35,8 @@ import { Label } from '../ui/label';
 import MemberCard from './MemberCard';
 import { getNFT, getOwnedTokenIds } from 'thirdweb/extensions/erc721';
 import { CREATIVE_ADDRESS } from '@app/lib/utils/context';
+import CreateMetoken from '../MeToken/createMetoken';
+import AssetDetails from './AssetDetails';
 
 const ProfilePage: NextPage = () => {
   const { user } = useParams();
@@ -147,6 +149,41 @@ const ProfilePage: NextPage = () => {
                 Cancel
               </TransactionButton>
             </CardFooter>
+          </Card>
+        </TabsContent>
+        <TabsContent value="MeToken">
+          <Card className="w-full">
+            <CardHeader>
+              <CardTitle>Create A MeToken</CardTitle>
+              <CardDescription>
+                Generate your own creator token here.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <CreateMetoken />
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="Uploads">
+          <Card className="w-full">
+            <CardHeader>
+              <CardTitle>Upload History</CardTitle>
+              <CardDescription>Uploaded videos will show here.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <AssetDetails />
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="Revenue">
+          <Card className="w-full">
+            <CardHeader>
+              <CardTitle>Revenue</CardTitle>
+              <CardDescription>Your revenue will show here.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p>Coming Soon</p>
+            </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
