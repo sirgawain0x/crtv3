@@ -212,7 +212,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
       
       console.log({ audioToTextResponse });
 
-      const subtitles = audioToTextResponse ? await translateSubtitles({ chunks: audioToTextResponse?.chunks }) : {};
+      const subtitles = await translateSubtitles({ chunks: audioToTextResponse?.chunks });
 
       const ipfsUri = await upload({
         client,
@@ -221,8 +221,6 @@ const FileUpload: React.FC<FileUploadProps> = ({
         ]
       });
 
-      // console.log({ ipfsUri });
-      
       onUploadSuccess(ipfsUri);
     } catch (error: any) {
       console.error('Error uploading file:', error);
