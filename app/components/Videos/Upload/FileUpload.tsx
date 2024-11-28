@@ -221,7 +221,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
         ]
       });
 
-      console.log({ ipfsUri });
+      // console.log({ ipfsUri });
       
       onUploadSuccess(ipfsUri);
     } catch (error: any) {

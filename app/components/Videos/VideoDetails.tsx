@@ -39,21 +39,22 @@ type VideoDetailsProps = {
 
 export default function VideoDetails({ asset }: VideoDetailsProps) {
   const [playbackSources, setPlaybackSources] = useState<Src[] | null>(null);
-  const [assetMetadata, setAssetMetadata] = useState<AssetMetadata>();
+  const [assetMetadata, setAssetMetadata] = useState<AssetMetadata | null>();
   
   const { getAssetMetadata } = useOrbisContext();
 
   useEffect(() => {
     const fetchPlaybackSources = async () => {
-      const sources = await getDetailPlaybackSource(asset.playbackId || '');
+      const sources = await getDetailPlaybackSource(asset?.playbackId || '');
       setPlaybackSources(sources);
       
-      const assetMetadata = await getAssetMetadata(asset.id);
+      const assetMetadata = await getAssetMetadata(asset?.id);
       console.log({ assetMetadata });
+      setAssetMetadata(assetMetadata);
     };
 
     fetchPlaybackSources();
-  }, [asset.playbackId]);
+  }, [asset?.playbackId]);
 
   const Seek = forwardRef<HTMLButtonElement, Player.SeekProps>(
     ({ children, ...props }, forwardedRef) => (
@@ -283,7 +284,7 @@ export default function VideoDetails({ asset }: VideoDetailsProps) {
   return (
     <div>
       <h1 className="max-w-full whitespace-nowrap text-xl font-bold">
-        {asset.name}
+        {asset?.name}
       </h1>
       {/* Render other asset details */}
       {playbackSources ? (

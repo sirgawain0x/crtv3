@@ -176,7 +176,7 @@ const HookMultiStepForm = () => {
             console.log('Uploaded video URL:', videoUrl); // Debugging line
           }}
           onUploadSuccess={(subtitlesUri?: string) => {
-            console.log('onUploadSuccess', { subtitlesUri })
+            // console.log('onUploadSuccess', { subtitlesUri })
             setSubtitlesUri(subtitlesUri);
           }}
           onPressBack={() =>
