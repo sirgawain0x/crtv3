@@ -1,10 +1,10 @@
-import { db } from "../client";
+import { OrbisDB } from "@useorbis/db-sdk";
 
 export type AssetMetadata = {
-    assetId?: string; // Livepeer Asset ID
-    playbackId?: string; // Livepeer Playback ID
-    title?: string; 
-    description?: string; 
+    assetId?: string;
+    playbackId?: string;
+    title: string; 
+    description: string; 
     location?: string; 
     category?: string;
     thumbnailUri?: string;
@@ -12,106 +12,151 @@ export type AssetMetadata = {
     subtitles? : Subtitles;
 };
 
-export type Subtitles = Record<string, Chunk[]>
+export type Subtitles = Record<string, Chunk[]>;
 
 export type Chunk = {
   text: string;
   timestamp: Array<number>;
 };
 
-
-const createAssetMetadataModel = async () => await db.ceramic.createModel({
-    "name": "AssetMetadata",
-    "version": "1.0",
+// subtitlesUri w/ assetId & playbackId
+export const AssetMetadataDef = {
+    "name": "CRTVAssetMetadata",
+    "version": "2.0",
     "interface": false,
     "immutableFields": [],
     "implements": [],
     "accountRelation": {
-        "type": "single"
+      "type": "list"
     },
     "schema": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-            "assetId": {
-                "type": "string"
-            },
-            "playbackId": {
-                "type": "string"
-            },
-            "title": {
-                "type": "string"
-            },
-            "description": {
-                "type": "string"
-            },
-            "location": {
-                "type": "string"
-            },
-            "category": {
-                "type": "string"
-            },
-            "thumbnailUri": {
-                "type": "string"
-            },
-            "subtitles": {
-                "type": "object",
-                "properties": {
-                    "English": {
-                        "type": "array",
-                        "items": {
-                            "$ref": "#/definitions/Subtitle"
-                        }
-                    },
-                    "Chinese": {
-                        "type": "array",
-                        "items": {
-                            "$ref": "#/definitions/Subtitle"
-                        }
-                    },
-                    "German": {
-                        "type": "array",
-                        "items": {
-                            "$ref": "#/definitions/Subtitle"
-                        }
-                    },
-                    "Spanish": {
-                        "type": "array",
-                        "items": {
-                            "$ref": "#/definitions/Subtitle"
-                        }
-                    },
-                },
-                "additionalProperties": false,
-                "$defs": {
-                    "Subtitle": {
-                        "type": "object",
-                        "properties": {
-                            "text": {
-                                "type": "string"
-                            },
-                            "startTime": {
-                                "type": "number"
-                            },
-                            "endTime": {
-                                "type": "number"
-                            }
-                        },
-                        "additionalProperties": false
-                    }
-                },
-                "required": []
-            }
+      "type": "object",
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "properties": {
+        "assetId": {
+          "type": "string"
         },
-        "additionalProperties": false,
-        "required": [
-            "assetId",
-            "title",
-            "description",
-            "thumbnailUri",
-            "subtitles"
-        ],
+        "playbackId": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "location": {
+          "type": "string"
+        },
+        "category": {
+          "type": "string"
+        },
+        "thumbnailUri": {
+          "type": "string"
+        },
+        "subtitlesUri": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
     }
-});
+  };
+      
+const createModel = async (modelDefinition: any, db: OrbisDB) => await db.ceramic.createModel(modelDefinition);
 
-export default createAssetMetadataModel;
+export default createModel;
+
+// Subtitles Object Model
+// export const AssetMetadataModel = { 
+//     "name": "AssetMetadata",
+//     "version": "1.0",
+//     "interface": false,
+//     "immutableFields": [],
+//     "implements": [],
+//     "accountRelation": {
+//         "type": "single"
+//     },
+//     "schema": {
+//         "$schema": "https://json-schema.org/draft/2020-12/schema",
+//         "type": "object",
+//         "properties": {
+//             "assetId": {
+//                 "type": "string"
+//             },
+//             "playbackId": {
+//                 "type": "string"
+//             },
+//             "title": {
+//                 "type": "string"
+//             },
+//             "description": {
+//                 "type": "string"
+//             },
+//             "location": {
+//                 "type": "string"
+//             },
+//             "category": {
+//                 "type": "string"
+//             },
+//             "thumbnailUri": {
+//                 "type": "string"
+//             },
+//             "subtitles": {
+//                 "type": "object",
+//                 "properties": {
+//                     "English": {
+//                         "type": "array",
+//                         "items": {
+//                             "$ref": "#/definitions/Subtitle"
+//                         }
+//                     },
+//                     "Chinese": {
+//                         "type": "array",
+//                         "items": {
+//                             "$ref": "#/definitions/Subtitle"
+//                         }
+//                     },
+//                     "German": {
+//                         "type": "array",
+//                         "items": {
+//                             "$ref": "#/definitions/Subtitle"
+//                         }
+//                     },
+//                     "Spanish": {
+//                         "type": "array",
+//                         "items": {
+//                             "$ref": "#/definitions/Subtitle"
+//                         }
+//                     },
+//                 },
+//                 "additionalProperties": false,
+//                 "$defs": {
+//                     "Subtitle": {
+//                         "type": "object",
+//                         "properties": {
+//                             "text": {
+//                                 "type": "string"
+//                             },
+//                             "startTime": {
+//                                 "type": "number"
+//                             },
+//                             "endTime": {
+//                                 "type": "number"
+//                             }
+//                         },
+//                         "additionalProperties": false
+//                     }
+//                 },
+//                 "required": []
+//             }
+//         },
+//         "additionalProperties": false,
+//         "required": [
+//             "assetId",
+//             "title",
+//             "description",
+//             "thumbnailUri",
+//             "subtitles"
+//         ],
+//     }
+// };

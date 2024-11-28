@@ -29,6 +29,9 @@ import {
 } from '@livepeer/react/assets';
 import Skeleton from '@app/components/ui/skeleton';
 import { getDetailPlaybackSource } from '@app/lib/utils/hooks/useDetailPlaybackSources';
+import { SubtitlesDisplay, SubtitlesControl } from '../Player/Subtitles';
+import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
+import { AssetMetadata } from '@app/lib/sdk/orbisDB/models/AssetMetadata';
 
 type VideoDetailsProps = {
   asset: Asset;
@@ -36,11 +39,17 @@ type VideoDetailsProps = {
 
 export default function VideoDetails({ asset }: VideoDetailsProps) {
   const [playbackSources, setPlaybackSources] = useState<Src[] | null>(null);
+  const [assetMetadata, setAssetMetadata] = useState<AssetMetadata>();
+  
+  const { getAssetMetadata } = useOrbisContext();
 
   useEffect(() => {
     const fetchPlaybackSources = async () => {
       const sources = await getDetailPlaybackSource(asset.playbackId || '');
       setPlaybackSources(sources);
+      
+      const assetMetadata = await getAssetMetadata(asset.id);
+      console.log({ assetMetadata });
     };
 
     fetchPlaybackSources();
@@ -281,6 +290,15 @@ export default function VideoDetails({ asset }: VideoDetailsProps) {
         <Player.Root src={playbackSources}>
           <Player.Container className="h-full w-full overflow-hidden bg-gray-800">
             <Player.Video title={asset?.name} className="h-full w-full" />
+              { assetMetadata?.subtitles && 
+                <SubtitlesDisplay
+                  subtitles={assetMetadata.subtitles}
+                  style={{
+                    color: '#EC407A',
+                    textShadow: '0 0 10px rgba(236, 64, 122, 0.5)',
+                  }}
+                />
+              }
             <Player.LoadingIndicator className="relative h-full w-full bg-black/50 backdrop-blur data-[visible=true]:animate-in data-[visible=false]:animate-out data-[visible=false]:fade-out-0 data-[visible=true]:fade-in-0">
               <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
                 <LoadingIcon className="h-8 w-8 animate-spin" />
@@ -381,6 +399,9 @@ export default function VideoDetails({ asset }: VideoDetailsProps) {
                   </Player.Volume>
                 </div>
                 <div className="flex items-center justify-end gap-2.5 sm:flex-1 md:flex-[1.5]">
+                  {assetMetadata?.subtitles && 
+                    <SubtitlesControl />
+                  }
                   <Player.FullscreenIndicator matcher={false} asChild>
                     <Settings className="h-6 w-6 flex-shrink-0 text-gray-300 transition" />
                   </Player.FullscreenIndicator>

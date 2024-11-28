@@ -1,24 +1,24 @@
+import { createContext, ReactNode, useContext, useState } from 'react';
+import { client } from '@app/lib/sdk/thirdweb/client';
+import { catchError } from "@useorbis/db-sdk/util"
+import { OrbisEVMAuth } from "@useorbis/db-sdk/auth";
+import {  OrbisConnectResult, OrbisDB } from '@useorbis/db-sdk';
+// import { Wallet } from 'ethers';
+import createAssetMetadataModel, { AssetMetadata } from './models/AssetMetadata';
+import { download } from 'thirdweb/storage';
+
 declare global {
   interface Window {
     ethereum: any;
   }
 }
 
-import { createContext, ReactNode, useContext, useState } from 'react';
-import { db } from './client';
-import { client } from '@app/lib/sdk/thirdweb/client';
-import { catchError } from "@useorbis/db-sdk/util"
-import { OrbisEVMAuth } from "@useorbis/db-sdk/auth";
-import {  OrbisConnectResult } from '@useorbis/db-sdk';
-// import { Wallet } from 'ethers';
-import createAssetMetadataModel, { AssetMetadata } from './models/AssetMetadata';
-import { download } from 'thirdweb/storage';
-
 interface OrbisContextProps {
-    assetMetadataModelID: string;
+    assetMetadataModelId: string;
     authResult: OrbisConnectResult | null;
     setAuthResult: React.Dispatch<React.SetStateAction<OrbisConnectResult | null>>;
     insert: (value: any, modelId: string) => Promise<void>;
+    replace: (docId: string, newDoc: any) => Promise<void>;
     update: (docId: string, updates: any) => Promise<void>;
     getAssetMetadata: (assetId: string) => Promise<AssetMetadata | null>;
     orbisLogin: (privateKey?: string) => Promise<OrbisConnectResult | null>;
@@ -26,11 +26,24 @@ interface OrbisContextProps {
     getCurrentUser: () => Promise<any>;
 }
 
+const db = new OrbisDB({
+  ceramic: {
+    gateway: process.env.CERAMIC_NODE_URL || 'https://ceramic-orbisdb-mainnet-direct.hirenodes.io/',
+  },
+  nodes: [
+    {
+      gateway: process.env.ORBIS_NODE_URL || 'https://studio.useorbis.com',
+      env: process.env.ORBIS_ENVIRONMENT_ID || '',
+    },
+  ],
+});
+
 const OrbisContext = createContext<OrbisContextProps | undefined> ({
-    assetMetadataModelID: 'kjzl6hvfrbw6c6itfx7h76zcrpch2gm2u4bws8gxi0zvw1n8pg5v8rvli7b1blr',
+    assetMetadataModelId: 'kjzl6hvfrbw6c6itfx7h76zcrpch2gm2u4bws8gxi0zvw1n8pg5v8rvli7b1blr',
     authResult: null,
     setAuthResult: () => {},
     insert: async () => {},
+    replace: async () => {},
     update: async () => {},
     getAssetMetadata: async () => {},
     orbisLogin: async () => {},
@@ -38,126 +51,173 @@ const OrbisContext = createContext<OrbisContextProps | undefined> ({
     getCurrentUser: async () => {}
 } as unknown as OrbisContextProps);
 
-const crtvEnvId = process.env.ORBIS_ENVIRONMENT_ID || '';
-const crtvContextId = process.env.ORBIS_APP_CONTEXT || '';   
+const crtvContextId = process.env.ORBIS_APP_CONTEXT || 'kjzl6kcym7w8y852d7aatt2nb898ds9z8628ij6chl41ni2kz8ky18ft2xv5m5s';   
 
 export const OrbisProvider = ({ children }: { children: ReactNode }) => {
-    const assetMetadataModelID: string = 'kjzl6hvfrbw6c6itfx7h76zcrpch2gm2u4bws8gxi0zvw1n8pg5v8rvli7b1blr';
+    const assetMetadataModelId: string = 'kjzl6hvfrbw6c8ff20kxk0v7j0an1rxjyzs0afesrbcv59fiknxzogtlhxxlr14';
 
     const [authResult, setAuthResult] = useState<OrbisConnectResult | null>(null);
     
     const insert = async (value: any, modelId: string): Promise<void> => {
-        console.log('insert', { value, modelId });
-        if (!value) {
-            throw new Error('No value provided. Please provide a value to insert.')
-        }
+      // console.log('insert', { value, modelId, db });
 
-    if (!modelId) {
-      throw new Error('No modelId provided. Please provide a modelId.');
-    }
+      if (!value) {
+          throw new Error('No value provided. Please provide a value to insert.')
+      }
 
-    let insertStatement: any;
+      if (!modelId) {
+        throw new Error('No modelId provided. Please provide a modelId.');
+      }
 
-        insertStatement = await db
-            .insert(modelId)
-            .value(
-                value
-            )
-            .context(crtvContextId);
+      if (!crtvContextId) {
+        throw new Error('No contextId provided. Please provide a contextId.');
+      }
 
-    const validation = await insertStatement.validate();
+      if (!db) {
+        throw new Error('No db client found.');
+      }
 
-    if (!validation.valid) {
-      throw 'Error during validation: ' + validation.error;
-    }
+      const insertStatement: any = db
+        .insert(modelId)
+        .value(value)
+        .context(crtvContextId);
 
-    const [result, error] = await catchError(() => insertStatement.run());
+      const validation = await insertStatement.validate();
 
-    if (error) {
-      console.error(error);
-    }
+      if (!validation.valid) {
+        throw 'Error during validation: ' + validation.error;
+      }
 
-    console.log('result', result);
-  };
+      const [result, error] = await catchError(() => insertStatement.run());
 
-  const update = async (docId: string, updates: any): Promise<void> => {
-    // This will perform a shallow merge before updating the document
-    // { ...oldContent, ...newContent }
-    const updateStatement = db.update(docId).set(updates);
+      if (error) {
+        console.error(error);
+        throw error;
+      }
 
-    const [result, error] = await catchError(() => updateStatement.run());
+      // console.log('result', result);
 
-    if (error) {
-      console.error(error);
-    }
-
-    // All runs of a statement are stored within the statement, in case you want to reuse the same statmenet
-    console.log(updateStatement.runs);
-
-    console.log('result', result);
-  };
-
-    const getAssetMetadata = async (assetId: string): Promise<AssetMetadata> => {
-        const selectStatement = db
-            .select()
-            .from("AssetMetadata")
-            .where(
-                {
-                    column: assetId,
-                }
-            )
-            .context(crtvEnvId)
-
-    const query = selectStatement.build();
-
-    console.log('Query that will be run', query);
-
-    const [result, error] = await catchError(() => selectStatement.run());
-
-    if (error) {
-      throw error;
-    }
-
-    const { columns, rows } = result;
-
-    const assetMetadata = rows.reduce((acc, row) => {
-      columns.forEach((col, index) => {
-        acc[col] = row[index];
-      });
-      return acc;
-    }, {} as AssetMetadata);
-
-    if (assetMetadata?.subtitlesUri) {
-      assetMetadata.subtitles = download({
-        client,
-        uri: assetMetadata.subtitlesUri
-      });
+      console.log('insertStatement runs', insertStatement.runs);
     };
 
-    console.log({ assetMetadata });
+    const replace = async (docId: string, newDoc: any): Promise<void> => {
+      console.log('update', { docId, newDoc, db });
 
-    return assetMetadata;
-  };
+      const replaceStatement: any = db.update(docId).replace(newDoc);
+
+      const query = replaceStatement.build();
+
+      console.log('Query that will be run', query);
+
+      const [result, error] = await catchError(() => query.run());
+
+      if (error) {
+        console.error(error);
+        throw error;
+      }
+
+      console.log('result', result);
+
+      console.log(replaceStatement.runs);
+    };
+
+    const update = async (docId: string, updates: any): Promise<void> => {
+      console.log('update', { docId, updates, db });
+
+      const updateStatement: any = db.update(docId).set(updates);
+
+      const query = updateStatement.build();
+
+      console.log('Query that will be run', query);
+
+      const [result, error] = await catchError(() => query.run());
+
+      if (error) {
+        console.error(error);
+        throw error;
+      }
+
+      console.log('result', result);
+
+      console.log(updateStatement.runs);
+    };
+
+    const getAssetMetadata = async (assetId: string): Promise<AssetMetadata> => {
+      // console.log('getAssetMetadata', { assetId, assetMetadataModelId, db });
+
+      if (!assetId) {
+        throw new Error('No assetId provided. Please provide a assetId.');
+      }
+
+      const selectStatement = db
+        .select()
+        .from(assetMetadataModelId)
+        .where({
+          assetId,
+        })
+        .context(crtvContextId);
+
+      const query = selectStatement.build();
+
+      console.log('Query that will be run', query);
+
+      const [result, error] = await catchError(() => selectStatement.run());
+
+      if (error) {
+        console.log({ result });
+        console.log('selectStatement runs', selectStatement.runs);
+        console.error(error);
+        throw error;
+      }
+
+      // console.log({ result });
+
+      const { columns, rows } = result;
+
+      // console.log({ columns, rows });
+
+      console.log('selectStatement runs', selectStatement.runs);
+
+      const assetMetadata = rows.reduce((acc: any, row: any) => {
+        columns.forEach((col, index) => {
+          acc[col] = row[index];
+        });
+        return acc;
+      }, {} as AssetMetadata);
+      
+      console.log({ subtitlesUri: assetMetadata?.subtitlesUri });
+
+      if (assetMetadata?.subtitlesUri) {
+        assetMetadata.subtitles = download({
+          client,
+          uri: assetMetadata.subtitlesUri
+        });
+      };
+
+      console.log({ assetMetadata });
+
+      return assetMetadata;
+    };
 
     const orbisLogin = async (): Promise<OrbisConnectResult> => {
-        
+      
       let provider; 
 
       provider = window.ethereum;
 
-      console.log({ provider });
-
       const auth = new OrbisEVMAuth(provider);
-
-      console.log({ auth });
 
       const authResult: OrbisConnectResult = await db.connectUser({ auth });
 
-      console.log({ authResult });
+      // console.log({ authResult });
 
-      // const createRes = await createAssetMetadataModel();
+      const connected = await db.isUserConnected()
 
-      // console.log({ createRes });
+      // console.log({ connected });
+      
+      // if (!connected) {
+      //   throw new Error('User is not connected.');
+      // }
 
       return authResult;
     };
@@ -192,10 +252,11 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
 
     return (
         <OrbisContext.Provider value={{ 
-            assetMetadataModelID,
+            assetMetadataModelId,
             authResult,
             setAuthResult,
             insert,
+            replace,
             update,
             getAssetMetadata,
             orbisLogin,

@@ -39,7 +39,7 @@ export const getLivepeerAudioToText = async (
 
         console.log({ data });
 
-        return data.textResponse;
+        return data;
     } catch (error: any) {
         console.error('Error generating text from audio:', error);
         throw new Error(error.message || 'Failed to generate text from audio');

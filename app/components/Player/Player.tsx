@@ -42,11 +42,15 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({ src, assetId, 
   // }
 
   useEffect(() => {
+    console.log('Player', { assetId });
     fetchAssetDetails(assetId);
   }, [assetId]);
 
-  const fetchAssetDetails = async (assetId: string): Promise<void> => {
-    setAssetMetadata(await getAssetMetadata(assetId));
+  const fetchAssetDetails = async (id: string): Promise<void> => {
+    console.log('fetchAssetMetadata', { id });
+    const data = await getAssetMetadata(id);
+    console.log({ data });
+    setAssetMetadata(data);
   };
 
   return (
@@ -56,13 +60,15 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({ src, assetId, 
           <Player.Container className="h-full w-full overflow-hidden bg-gray-950">
             <Player.Video title={title} className="h-full w-full" poster={null} />
 
-            <SubtitlesDisplay
-              subtitles={assetMetadata?.subtitles ? assetMetadata.subtitles : undefined}
-              style={{
-                color: '#EC407A',
-                textShadow: '0 0 10px rgba(236, 64, 122, 0.5)',
-              }}
-            />
+            { assetMetadata?.subtitles && 
+              <SubtitlesDisplay
+                subtitles={assetMetadata.subtitles}
+                style={{
+                  color: '#EC407A',
+                  textShadow: '0 0 10px rgba(236, 64, 122, 0.5)',
+                }}
+              />
+            }
 
             <Player.LoadingIndicator className="relative h-full w-full bg-black/50 backdrop-blur data-[visible=true]:animate-in data-[visible=false]:animate-out data-[visible=false]:fade-out-0 data-[visible=true]:fade-in-0">
               <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
@@ -159,7 +165,9 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({ src, assetId, 
                       />
                     </Player.VolumeIndicator>
                   </Player.MuteTrigger>
-                  <SubtitlesControl />
+                  { assetMetadata?.subtitles && 
+                    <SubtitlesControl />
+                  }
                 </div>
 
                 <div className="absolute bottom-0 right-0 mx-2 my-2 flex items-center justify-end gap-2.5 sm:flex-1 md:flex-[1.5]">
