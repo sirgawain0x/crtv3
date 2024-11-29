@@ -47,14 +47,7 @@ export const Providers: React.FC<{ children: React.ReactNode }> = ({
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme }}>
       <ApolloWrapper>
-        <ThirdwebProvider
-          activeChain={base}
-          desiredChainId={base} 
-          supportedChains={[
-            base,
-          ]} 
-          clientId={process.env.NEXT_PUBLIC_TEMPLATE_CLIENT_ID}
-        >
+        <ThirdwebProvider>
           <QueryClientProvider client={queryClient}>
             <OrbisProvider>
               {children}

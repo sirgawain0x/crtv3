@@ -29,15 +29,15 @@ export const getLivepeerAudioToText = async (
             }
         };
 
-        console.log({ options });
+        // console.log({ options });
 
         const result = await fetch(`${livepeerApiUrl}/audio-to-text`, options);
 
-        console.log({ result });
+        // console.log({ result });
 
         const data = await result.json();
 
-        console.log({ data });
+        console.log({ audioToTextResponse: data });
 
         return data;
     } catch (error: any) {

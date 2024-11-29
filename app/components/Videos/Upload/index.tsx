@@ -214,11 +214,7 @@ const HookMultiStepForm = () => {
             console.log({ assetMetadata });
             
             const metadataUri = await insert(
-              {
-                ...assetMetadata,
-                thumbnailUri,
-                subtitlesUri
-              },
+              assetMetadata,
               assetMetadataModelId
             );
 

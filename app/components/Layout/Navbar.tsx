@@ -1,9 +1,4 @@
 'use client';
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import Image from 'next/image';
-import ConnectButtonWrapper from '../Button/connectButtonWrapper';
-import { SITE_LOGO } from '@app/lib/utils/context';
 import {
   Sheet,
   SheetTrigger,
@@ -12,66 +7,25 @@ import {
   SheetTitle,
   SheetDescription,
 } from '@app/components/ui/sheet';
-import * as VisuallyHidden from '@radix-ui/react-visually-hidden';
+import Link from 'next/link';
+import Image from 'next/image';
+import { useState } from 'react';
+import { SITE_LOGO } from '@app/lib/utils/context';
 import { Button } from '@app/components/ui/button';
 import { useActiveAccount } from 'thirdweb/react';
-import ThemeToggleComponent from '../ThemeToggle/toggleComponent';
-import Unlock from '@app/lib/utils/Unlock.json';
-import { client } from '@app/lib/sdk/thirdweb/client';
-import { useReadContract } from 'thirdweb/react';
-import { polygon } from 'thirdweb/chains';
-import { getContract } from 'thirdweb';
-// import {
-//   isLoggedIn,
-// } from '@app/components/Button/actions/login'; 
 import ClaimLockButton from '@app/components/Paywall/ClaimLock';
-import CRTVConnectButton from '../Button/connectButton';
+import * as VisuallyHidden from '@radix-ui/react-visually-hidden';
+import ThemeToggleComponent from '../ThemeToggle/toggleComponent';
+import ConnectButtonWrapper from '../Button/connectButtonWrapper';
 
 export function Navbar() {
   const activeAccount = useActiveAccount();
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isConnected, setIsConnected] = useState(false);
 
-  // useEffect(() => {
-  //   const isConnected = async () => {
-  //     const loggedIn = await isLoggedIn();
-  //     if (loggedIn) {
-  //       setIsConnected(true);
-  //     } else {
-  //       setIsConnected(false);
-  //     }
-  //   };
-  //   isConnected();
-  // }, [account]);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const handleLinkClick = () => {
     setIsMenuOpen(false);
   };
-
-  /*******  CONTRACT READING ********/
-  // const unlockContract = getContract({
-  //   client: client,
-  //   chain: polygon,
-  //   address: '0x9a9280897c123b165e23f77cf4c58292d6ab378d',
-  //   abi: Unlock.abi,
-  // });
-
-  // const { data: result, isLoading } = useReadContract({
-  //   contract: unlockContract,
-  //   method: 'getHasValidKey',
-  //   params: [account?.address],
-  // });
-
-  // const [subscribed, setSubscribed] = useState(false);
-
-  // useEffect(() => {
-  //   if (!account || !Unlock.abi) return;
-
-  //   if (result !== undefined) {
-  //     console.log('Is your membership valid?', result);
-  //     setSubscribed(result);
-  //   }
-  // }, [account, result]);
 
   return (
     <header className="flex h-20 w-full shrink-0 items-center bg-muted px-4 md:px-6">
@@ -144,8 +98,7 @@ export function Navbar() {
             <div>
               <ThemeToggleComponent />
             </div>
-            <CRTVConnectButton />
-            {/* <ConnectButtonWrapper /> */}
+            <ConnectButtonWrapper />
             {activeAccount && (
               <div className="mt-5">
                 <ClaimLockButton closeMenu={() => setIsMenuOpen(false)} />
@@ -198,8 +151,7 @@ export function Navbar() {
           <ThemeToggleComponent />
         </div>
         <div className="mr-5">
-          <CRTVConnectButton />
-          {/* <ConnectButtonWrapper /> */}
+          <ConnectButtonWrapper />
         </div>
         {activeAccount && (
           <ClaimLockButton closeMenu={() => setIsMenuOpen(false)} />

@@ -24,9 +24,13 @@ import {
 import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
 import { LoginPayload, VerifyLoginPayloadParams } from 'thirdweb/auth';
 import { OrbisConnectResult } from '@useorbis/db-sdk';
+import { useDisconnect } from 'thirdweb/react';
+import { useActiveWallet } from 'thirdweb/react';
 
 export default function ConnectButtonWrapper() {
   const { orbisLogin } = useOrbisContext();
+
+  const walletInstance = useActiveWallet();
 
   const wallets = [
     inAppWallet({
@@ -89,11 +93,11 @@ export default function ConnectButtonWrapper() {
 
   return (
     <ConnectButton
-      autoConnect={false}
+      // autoConnect={false}
       client={client}
       chains={[polygon, base, optimism, storyTestnet, zora, zoraSepolia]}
       connectButton={{
-        label: 'Get Started',
+        label: 'Connect Wallet',
         className: 'my-custom-class',
         style: {
           backgroundColor: '#EC407A',
@@ -141,43 +145,31 @@ export default function ConnectButtonWrapper() {
         },
       }}
       auth={{
-        getLoginPayload: async ({ address }: { address: string }) => {
-          console.log({ getLoginPayloadResponse: address });
-
-          const payload = await generatePayload({ address, chainId: 8453 });
-
-          console.log({ payload });
-        },
+        getLoginPayload: async (params: { address: string, chainId: number }) => await generatePayload(params),
         doLogin: async (
           params: VerifyLoginPayloadParams,
         ): Promise<void> => {
-          console.log('logging in!');
+          console.log('logging in...');
           
           const loginPayload: LoginPayload | void = await login(params);
           
           console.log({ doLoginResponse: loginPayload });
 
-          // {
-          //   clientId: 'localhost:3000',
-          //   redirectUri: 'http://localhost:3000/api/auth/unlock',
-          //   paywallConfig: paywallConfig,
-          // },
+          const orbisAuthResult = await orbisLogin();
 
-          // const orbisDBLogin: OrbisConnectResult = await orbisLogin();
-
-          // console.log({ orbisDBLogin });
-
+          console.log({ orbisAuthResult });
+          
           return loginPayload;
         },
-        isLoggedIn: async () => {
-          const authedOnlyRes = await authedOnly();
-          console.log({ authedOnlyRes });
-          return authedOnlyRes;
-        },
+        isLoggedIn: async () => await authedOnly(),
         doLogout: async () => {
           console.log('logging out...');
           await logout();
         },
+      }}
+      onDisconnect={(params: { account: any, wallet: any }) => {
+        console.log('disconnecting...');
+        walletInstance.disconnect();
       }}
     />
   );
