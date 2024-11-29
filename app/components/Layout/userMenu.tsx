@@ -6,15 +6,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuItem,
 } from '@app/components/ui/dropdown-menu';
-import { Button } from '@app/components/ui/button';
-import { Avatar, AvatarImage, AvatarFallback } from '@app/components/ui/avatar';
 import Link from 'next/link';
-import makeBlockie from 'ethereum-blockies-base64';
+import { useState } from 'react';
 import { useActiveAccount } from 'thirdweb/react';
-import PaywallButton from '@app/components/Paywall/PaywallButton';
-import { isLoggedIn } from '@app/api/auth/thirdweb/authentication';
-import { useEffect, useState } from 'react';
-import { useTheme } from '@app/providers';
+import { Button } from '@app/components/ui/button';
+import makeBlockie from 'ethereum-blockies-base64';
+import { Avatar, AvatarImage, AvatarFallback } from '@app/components/ui/avatar';
 
 export const UserMenu: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
