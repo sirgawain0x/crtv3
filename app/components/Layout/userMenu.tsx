@@ -12,7 +12,7 @@ import Link from 'next/link';
 import makeBlockie from 'ethereum-blockies-base64';
 import { useActiveAccount } from 'thirdweb/react';
 import PaywallButton from '@app/components/Paywall/PaywallButton';
-import { isLoggedIn } from '@app/api/auth/thirdweb/thirdweb';
+import { isLoggedIn } from '@app/api/auth/thirdweb/authentication';
 import { useEffect, useState } from 'react';
 import { useTheme } from '@app/providers';
 

@@ -1,35 +1,26 @@
 'use client';
 
-import { FaExclamationTriangle } from 'react-icons/fa';
-import { use, useEffect, useState } from 'react';
-import { FormProvider, useForm } from 'react-hook-form';
-
-import { STEPPER_FORM_KEYS } from '@app/lib/utils/context';
 import {
   StepperFormKeysType,
   StepperFormValues,
 } from '@app/types/hook-stepper';
-
+import { toast } from 'sonner';
+import FileUpload from './FileUpload';
+import CreateInfo from './Create-info';
+import { useRouter } from 'next/navigation';
+import CreateThumbnail from './Create-thumbnail';
+import { use, useEffect, useState } from 'react';
+import { useActiveAccount } from "thirdweb/react";
+import type { TVideoMetaForm } from './Create-info';
+import { FaExclamationTriangle } from 'react-icons/fa';
+import { FormProvider, useForm } from 'react-hook-form';
+import { STEPPER_FORM_KEYS } from '@app/lib/utils/context';
+import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
 import StepperIndicator from '@app/components/Stepper-Indicator';
 import { Alert, AlertDescription, AlertTitle } from '../../ui/alert';
-import { Button } from '@app/components/ui/button';
-import { toast } from 'sonner';
-import CreateInfo from './Create-info';
-import CreateThumbnail from './Create-thumbnail';
-import type { TVideoMetaForm } from './Create-info';
-import FileUpload from './FileUpload';
-
-import { hasCreatorPass } from '@app/api/auth/thirdweb/gateCondition';
-import { isLoggedIn } from '@app/components/Button/actions/login';
-
-import {
-  useActiveAccount,
-} from "thirdweb/react";
-
-import { useRouter } from 'next/navigation';
-import { metadata } from '@app/layout';
+import { hasAccess } from '@app/api/auth/thirdweb/gateCondition';
 import { AssetMetadata } from '@app/lib/sdk/orbisDB/models/AssetMetadata';
-import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
+import { authedOnly } from '@app/api/auth/thirdweb/authentication';
 
 const HookMultiStepForm = () => {
   const [activeStep, setActiveStep] = useState(1);
@@ -50,19 +41,18 @@ const HookMultiStepForm = () => {
 
   const router = useRouter();
 
-  // TODO: Replace with next-auth token gating or debug hasCreatorPass (cannot rely on activeAccount?.address due to delay in load times)
   useEffect(() => {
-    // const tokenGate = async () => {
-    //   if (!(await isLoggedIn()) || !activeAccount /* || !(await hasCreatorPass()) */ )  {
-    //     console.log({ 
-    //       isLoggedIn: !(await isLoggedIn()), 
-    //       activeAccount: !activeAccount, 
-    //       // hasCreatorPass: !(await hasCreatorPass(activeAccount?.address))}
-    //     });
-    //     router.push("/");
-    //   }
-    // }
-    // tokenGate();
+    const tokenGate = async () => {
+      if (!(await authedOnly()) || !activeAccount || !(await hasAccess(activeAccount?.address)) )  {
+        console.log({ 
+          isLoggedIn: !(await authedOnly()), 
+          activeAccount: !activeAccount, 
+          hasAccess: !(await hasAccess(activeAccount?.address))
+        });
+        router.push("/");
+      }
+    }
+    tokenGate();
   }, [activeAccount, router]);
 
   const {

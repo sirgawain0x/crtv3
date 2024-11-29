@@ -1,12 +1,4 @@
 'use client';
-import { ConnectButton } from '@app/lib/sdk/thirdweb/components';
-import { client } from '@app/lib/sdk/thirdweb/client';
-// import { ACCOUNT_FACTORY_ADDRESS } from '@app/lib/utils/context';
-import {
-  createWallet,
-  inAppWallet,
-  // privateKeyToAccount,
-} from 'thirdweb/wallets';
 import {
   defineChain,
   polygon,
@@ -16,16 +8,21 @@ import {
   zoraSepolia,
 } from 'thirdweb/chains';
 import {
+  createWallet,
+  inAppWallet,
+} from 'thirdweb/wallets';
+import {
   generatePayload,
   authedOnly,
   login,
   logout,
 } from '@app/api/auth/thirdweb/authentication';
-import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
-import { LoginPayload, VerifyLoginPayloadParams } from 'thirdweb/auth';
-import { OrbisConnectResult } from '@useorbis/db-sdk';
-import { useDisconnect } from 'thirdweb/react';
 import { useActiveWallet } from 'thirdweb/react';
+import { OrbisConnectResult } from '@useorbis/db-sdk';
+import { client } from '@app/lib/sdk/thirdweb/client';
+import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
+import { ConnectButton } from '@app/lib/sdk/thirdweb/components';
+import { LoginPayload, VerifyLoginPayloadParams } from 'thirdweb/auth';
 
 export default function ConnectButtonWrapper() {
   const { orbisLogin } = useOrbisContext();
@@ -155,7 +152,7 @@ export default function ConnectButtonWrapper() {
           
           console.log({ doLoginResponse: loginPayload });
 
-          const orbisAuthResult = await orbisLogin();
+          const orbisAuthResult: OrbisConnectResult | null = await orbisLogin();
 
           console.log({ orbisAuthResult });
           
