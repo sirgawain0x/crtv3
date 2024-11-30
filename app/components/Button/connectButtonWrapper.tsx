@@ -164,10 +164,7 @@ export default function ConnectButtonWrapper() {
           await logout();
         },
       }}
-      onDisconnect={(params: { account: any, wallet: any }) => {
-        console.log('disconnecting...');
-        walletInstance.disconnect();
-      }}
+      onDisconnect={(params: { account: any, wallet: any }) => params.wallet.disconnect()}
     />
   );
 }

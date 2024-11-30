@@ -12,8 +12,6 @@ import { toast } from 'sonner';
 import Unlock from '@app/lib/utils/Unlock.json';
 import { CREATIVE_ADDRESS } from '@app/lib/utils/context';
 import { UserMenu } from '@app/components/Layout/userMenu';
-import { Currency } from 'lucide-react';
-import { symbol } from 'zod';
 
 interface UserMenuProps {
   closeMenu: () => void;

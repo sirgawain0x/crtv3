@@ -151,11 +151,16 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
 
       const selectStatement = db
         .select()
-        .from(assetMetadataModelId)
-        .where({
-          assetId,
-        })
-        .context(crtvContextId);
+        .raw(`
+          SELECT * FROM "${assetMetadataModelId}" 
+          WHERE "assetId" = '${assetId}' 
+          AND "_metadata_context" = '${crtvContextId}';  
+        `)
+        // .from(assetMetadataModelId)
+        // .where({
+        //   assetId,
+        // })
+        // .context(crtvContextId);
 
       const query = selectStatement.build();
 
@@ -164,7 +169,6 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
       const [result, error] = await catchError(() => selectStatement.run());
 
       if (error) {
-        console.log({ result });
         console.log('selectStatement runs', selectStatement.runs);
         console.error(error);
         throw error;
