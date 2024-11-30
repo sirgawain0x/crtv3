@@ -49,7 +49,7 @@ export default function VideoDetails({ asset }: VideoDetailsProps) {
       setPlaybackSources(sources);
       
       const assetMetadata = await getAssetMetadata(asset?.id);
-      console.log({ assetMetadata });
+      // console.log({ assetMetadata });
       setAssetMetadata(assetMetadata);
     };
 

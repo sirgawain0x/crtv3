@@ -17,17 +17,15 @@ import {
   login,
   logout,
 } from '@app/api/auth/thirdweb/authentication';
-import { useActiveWallet } from 'thirdweb/react';
 import { OrbisConnectResult } from '@useorbis/db-sdk';
 import { client } from '@app/lib/sdk/thirdweb/client';
 import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
 import { ConnectButton } from '@app/lib/sdk/thirdweb/components';
 import { LoginPayload, VerifyLoginPayloadParams } from 'thirdweb/auth';
+import { ACCOUNT_FACTORY_ADDRESS } from '@app/lib/utils/context';
 
 export default function ConnectButtonWrapper() {
   const { orbisLogin } = useOrbisContext();
-
-  const walletInstance = useActiveWallet();
 
   const wallets = [
     inAppWallet({
@@ -102,12 +100,12 @@ export default function ConnectButtonWrapper() {
           borderRadius: '10px',
         },
       }}
-      // accountAbstraction={{
-      //   chain: defineChain(polygon),
-      //   client: client,
-      //   sponsorGas: false,
-      //   factoryAddress: `${ACCOUNT_FACTORY_ADDRESS.polygon}`,
-      // }}
+      accountAbstraction={{
+        chain: defineChain(polygon),
+        client: client,
+        sponsorGas: false,
+        factoryAddress: `${ACCOUNT_FACTORY_ADDRESS.polygon}`,
+      }}
       wallets={wallets}
       appMetadata={{
         name: 'Creative TV',
@@ -150,11 +148,11 @@ export default function ConnectButtonWrapper() {
           
           const loginPayload: LoginPayload | void = await login(params);
           
-          console.log({ doLoginResponse: loginPayload });
+          // console.log({ doLoginResponse: loginPayload });
 
           const orbisAuthResult: OrbisConnectResult | null = await orbisLogin();
 
-          console.log({ orbisAuthResult });
+          // console.log({ orbisAuthResult });
           
           return loginPayload;
         },

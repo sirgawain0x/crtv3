@@ -4,10 +4,10 @@ import { client } from "../../../lib/sdk/thirdweb/client";
 import { balanceOf as balanceOfERC721 } from "thirdweb/extensions/erc721";
 
 export async function hasAccess(address: string): Promise<boolean> {
-  return await hasAccessNFT(address);
+  return await hasNFT(address);
 }
 
-async function hasAccessNFT(address: string) {
+async function hasNFT(address: string) {
   const requiredQuantity = 1n;
 
   const creatorPassAnnual = getContract({
@@ -32,11 +32,11 @@ async function hasAccessNFT(address: string) {
     owner: address,
   });
 
-  console.log({ creatorPassAnnualBalance, creatorPass3MonthBalance });
+  // console.log({ creatorPassAnnualBalance, creatorPass3MonthBalance });
 
   const hasPass: boolean =  (creatorPassAnnualBalance + creatorPass3MonthBalance) >= requiredQuantity;
   
-  console.log({ hasPass });
+  // console.log({ hasPass });
   
   return hasPass;
 }

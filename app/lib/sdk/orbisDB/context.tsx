@@ -164,7 +164,7 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
 
       const query = selectStatement.build();
 
-      console.log('Query that will be run', query);
+      // console.log('Query that will be run', query);
 
       const [result, error] = await catchError(() => selectStatement.run());
 
@@ -189,7 +189,7 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
         return acc;
       }, {} as AssetMetadata);
       
-      console.log({ subtitlesUri: assetMetadata?.subtitlesUri });
+      // console.log({ subtitlesUri: assetMetadata?.subtitlesUri });
 
       if (assetMetadata?.subtitlesUri) {
         assetMetadata.subtitles = download({
@@ -198,7 +198,7 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
         });
       };
 
-      console.log({ assetMetadata });
+      // console.log({ assetMetadata });
 
       return assetMetadata;
     };

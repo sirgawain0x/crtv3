@@ -32,8 +32,8 @@ const HookMultiStepForm = () => {
   });
   
   const [metadata, setMetadata] = useState<TVideoMetaForm>(),
-            [livepeerAsset, setLivepeerAsset] = useState<any>(),
-              [subtitlesUri, setSubtitlesUri] = useState<string>();
+          [livepeerAsset, setLivepeerAsset] = useState<any>(),
+            [subtitlesUri, setSubtitlesUri] = useState<string>();
 
   const { insert, assetMetadataModelId } = useOrbisContext();
 
@@ -43,12 +43,12 @@ const HookMultiStepForm = () => {
 
   useEffect(() => {
     const tokenGate = async () => {
-      if (!(await authedOnly()) || !activeAccount || !(await hasAccess(activeAccount?.address)) )  {
-        console.log({ 
-          isLoggedIn: !(await authedOnly()), 
-          activeAccount: !activeAccount, 
-          hasAccess: !(await hasAccess(activeAccount?.address))
-        });
+      if (!(await authedOnly()) || !activeAccount || !(await hasAccess(activeAccount?.address)))  {
+        // console.log({ 
+        //   isLoggedIn: !(await authedOnly()), 
+        //   activeAccount: !activeAccount, 
+        //   hasAccess: !(await hasAccess(activeAccount?.address))
+        // });
         router.push("/");
       }
     }
@@ -160,10 +160,10 @@ const HookMultiStepForm = () => {
           newAssetTitle={metadata?.title}
           metadata={metadata}
           onFileSelect={(file) => {
-            console.log('Selected file:', file); // Debugging line
+            // console.log('Selected file:', file); 
           }}
           onFileUploaded={(videoUrl: string) => {
-            console.log('Uploaded video URL:', videoUrl); // Debugging line
+            // console.log('Uploaded video URL:', videoUrl); 
           }}
           onUploadSuccess={(subtitlesUri?: string) => {
             // console.log('onUploadSuccess', { subtitlesUri })
@@ -179,12 +179,6 @@ const HookMultiStepForm = () => {
         />
       </div>
       <div className={activeStep === 3 ? 'block' : 'hidden'}>
-        {/* <code>
-          <pre>{JSON.stringify(metadata, null, 2)}</pre>
-        </code>
-        <code>
-          <span>Livepeer asset id: {livepeerAsset?.id}</span>
-        </code> */}
         <CreateThumbnail 
           livePeerAssetId={livepeerAsset?.id}
           onThumbnailSuccess={async (thumbnailUri: string) => {
@@ -211,9 +205,6 @@ const HookMultiStepForm = () => {
             console.log('metadataUri', metadataUri);
           }} />
       </div>
-
-      {/* </form>
-      </FormProvider> */}
     </>
   );
 };
