@@ -21,7 +21,7 @@ import { OrbisConnectResult } from '@useorbis/db-sdk';
 import { client } from '@app/lib/sdk/thirdweb/client';
 import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
 import { ConnectButton } from '@app/lib/sdk/thirdweb/components';
-import { LoginPayload, VerifyLoginPayloadParams } from 'thirdweb/auth';
+import { GenerateLoginPayloadParams, LoginPayload, VerifyLoginPayloadParams } from 'thirdweb/auth';
 import { ACCOUNT_FACTORY_ADDRESS } from '@app/lib/utils/context';
 
 export default function ConnectButtonWrapper() {
@@ -88,7 +88,6 @@ export default function ConnectButtonWrapper() {
 
   return (
     <ConnectButton
-      // autoConnect={false}
       client={client}
       chains={[polygon, base, optimism, storyTestnet, zora, zoraSepolia]}
       connectButton={{
@@ -100,12 +99,12 @@ export default function ConnectButtonWrapper() {
           borderRadius: '10px',
         },
       }}
-      accountAbstraction={{
-        chain: defineChain(polygon),
-        client: client,
-        sponsorGas: false,
-        factoryAddress: `${ACCOUNT_FACTORY_ADDRESS.polygon}`,
-      }}
+      // accountAbstraction={{
+      //   chain: defineChain(polygon),
+      //   client: client,
+      //   sponsorGas: false,
+      //   factoryAddress: `${ACCOUNT_FACTORY_ADDRESS.polygon}`,
+      // }}
       wallets={wallets}
       appMetadata={{
         name: 'Creative TV',
@@ -140,7 +139,7 @@ export default function ConnectButtonWrapper() {
         },
       }}
       auth={{
-        getLoginPayload: async (params: { address: string, chainId: number }) => await generatePayload(params),
+        getLoginPayload: async (params: GenerateLoginPayloadParams) => await generatePayload(params),
         doLogin: async (
           params: VerifyLoginPayloadParams,
         ): Promise<void> => {
