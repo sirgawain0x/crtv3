@@ -17,7 +17,6 @@ import { base } from 'thirdweb/chains';
 import { getNFT, getOwnedTokenIds } from 'thirdweb/extensions/erc721';
 
 import Unlock from '@app/lib/utils/Unlock.json';
-import { base } from 'thirdweb/chains';
 import {
   TransactionButton,
   useActiveAccount,
@@ -118,7 +117,34 @@ const ProfilePage: NextPage = () => {
     };
 
     fetchData();
-  }, [activeAccount, unlockContract]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeAccount]);
+
+  useEffect(() => {
+    console.log('ownedIds: ', ownedIds);
+
+    const fetchNFTData = async () => {
+      const metadata = await getNFT({
+        contract: unlockContract,
+        tokenId: ownedIds[0],
+      });
+
+      console.log('metadata: ', metadata);
+      setNftData(metadata);
+    };
+
+    if (ownedIds.length > 0) {
+      fetchNFTData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ownedIds]);
+
+  useEffect(() => {
+    if (activeAccount) {
+      setMemberData(activeAccount);
+      setBalance('0');
+    }
+  }, [activeAccount]);
 
   return (
     <div className="container mx-auto my-5 px-4">
