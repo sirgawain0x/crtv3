@@ -99,12 +99,12 @@ export default function ConnectButtonWrapper() {
           borderRadius: '10px',
         },
       }}
-      accountAbstraction={{
-        chain: defineChain(polygon),
-        client: client,
-        sponsorGas: false,
-        factoryAddress: `${ACCOUNT_FACTORY_ADDRESS.polygon}`,
-      }}
+      // accountAbstraction={{
+      //   chain: defineChain(polygon),
+      //   client: client,
+      //   sponsorGas: false,
+      //   factoryAddress: `${ACCOUNT_FACTORY_ADDRESS.polygon}`,
+      // }}
       wallets={wallets}
       appMetadata={{
         name: 'Creative TV',
