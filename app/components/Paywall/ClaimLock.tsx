@@ -21,6 +21,7 @@ interface UserMenuProps {
 
 function ClaimLockButton({ closeMenu }: { closeMenu: () => void }) {
   const activeAccount = useActiveAccount();
+
   const unlockAbi = Unlock.abi;
   const unlockContract = getContract({
     client: client,

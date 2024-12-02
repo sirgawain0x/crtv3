@@ -1,7 +1,7 @@
 'use server';
 import { TextToImageParams } from 'livepeer/models/components';
 
-export const getLivePeerAiGeneratedImages = async ({
+export const getLivepeerAiGeneratedImages = async ({
   prompt,
   modelId,
 }: TextToImageParams) => {

@@ -5,10 +5,9 @@ import { useInterval } from 'react-use';
 import { PlayerComponent } from '@app/components/Player/Player';
 import { Src } from '@livepeer/react';
 import { getSrc } from '@livepeer/react/external';
-import { Progress } from '@app/components/ui/progress';
 import {
-  giveLivePeerAsset,
-  getLivePeerPlaybackInfo,
+  getLivepeerAsset,
+  getLivepeerPlaybackInfo,
 } from '@app/api/livepeer/livepeerActions';
 import { Asset, PlaybackInfo } from 'livepeer/models/components';
 import { useRouter } from 'next/navigation';
@@ -26,18 +25,18 @@ export default function CreateThumbnail({
   const router = useRouter();
 
   //  Creating a ref for thumbnail and video
-  const [livepeerAssetData, setLivePeerAssertData] = useState<Asset>();
-  const [livepeerPlaybackData, setLivePeerPlaybackData] =
+  const [livepeerAssetData, setLivepeerAssetData] = useState<Asset>();
+  const [livepeerPlaybackData, setLivepeerPlaybackData] =
     useState<PlaybackInfo>();
   const [progress, setProgress] = useState<number>(0);
 
   useInterval(
     () => {
       if (livePeerAssetId) {
-        giveLivePeerAsset(livePeerAssetId)
+        getLivepeerAsset(livePeerAssetId)
           .then((data) => {
             console.log(data);
-            setLivePeerAssertData(data);
+            setLivepeerAssetData(data);
           })
           .catch((e) => {
             console.log(e);
@@ -53,8 +52,8 @@ export default function CreateThumbnail({
       livepeerAssetData?.status?.phase === 'ready' &&
       livepeerAssetData.playbackId
     ) {
-      getLivePeerPlaybackInfo(livepeerAssetData.playbackId).then((data) => {
-        setLivePeerPlaybackData(data);
+      getLivepeerPlaybackInfo(livepeerAssetData.playbackId).then((data) => {
+        setLivepeerPlaybackData(data);
       });
     } else {
       console.log('Not ready to get playback info');
@@ -88,6 +87,7 @@ export default function CreateThumbnail({
         <div className="my-6">
           <PlayerComponent
             title={livepeerAssetData.name}
+            assetId={livepeerAssetData.id}
             src={getSrc(livepeerPlaybackData) as Src[]}
           />
         </div>

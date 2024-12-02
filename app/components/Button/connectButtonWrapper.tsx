@@ -17,10 +17,10 @@ import {
 } from 'thirdweb/chains';
 import {
   generatePayload,
-  isLoggedIn,
+  authedOnly,
   login,
   logout,
-} from '@app/api/auth/thirdweb/thirdweb';
+} from '@app/api/auth/thirdweb/testing123';
 import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
 
 export default function ConnectButtonWrapper() {
@@ -141,9 +141,9 @@ export default function ConnectButtonWrapper() {
     //   auth={{
     //     chain: polygon,
     //     client: client,
-    //     isLoggedIn: async (address: string) => {
+    //     authedOnly: async (address: string) => {
     //       console.log('checking if logged in!', { address });
-    //       return await isLoggedIn();
+    //       return await authedOnly();
     //     },
     //     doLogin: async (
     //       params: VerifyLoginPayloadParams,
@@ -184,10 +184,11 @@ export default function ConnectButtonWrapper() {
         // send the signed login payload (params) to the server
         doLogin: async (params: any) => {
           await login(params.address);
+          await orbisLogin();
         },
         // fetch the user's login status from the server
-        isLoggedIn: async () => {
-          return await isLoggedIn();
+        authedOnly: async () => {
+          return await authedOnly();
         },
         // send a logout request to the server
         doLogout: async () => {

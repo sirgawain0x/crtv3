@@ -16,7 +16,7 @@
 //   const playerRef = useRef<ReactPlayer>(null);
 //   const [currentTime, setCurrentTime] = useState(0);
 //   const [currentSubtitle, setCurrentSubtitle] = useState<Subtitle | null>(null);
-//   const subtitles: Subtitle[] = [
+//   const subtitles:Chunk[] = [
 //     { start: 0, end: 5, text: "Hello, world!" },
 //     { start: 5, end: 10, text: "How are you?" },
 //     // Add more subtitles as needed
