@@ -28,7 +28,7 @@ import {
   ExitFullscreenIcon,
 } from '@livepeer/react/assets';
 import Skeleton from '@app/components/ui/skeleton';
-import { getDetailPlaybackSource } from '@app/lib/utils/hooks/useDetailedPlaybackSources';
+import { getDetailPlaybackSource } from '@app/lib/utils/hooks/useDetailPlaybackSources';
 import { SubtitlesDisplay, SubtitlesControl } from '../Player/Subtitles';
 import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
 import { AssetMetadata } from '@app/lib/sdk/orbisDB/models/AssetMetadata';

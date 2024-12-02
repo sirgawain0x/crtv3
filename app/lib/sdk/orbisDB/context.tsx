@@ -162,7 +162,7 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
         // })
         // .context(crtvContextId);
 
-      // const query = selectStatement.build();
+      const query = selectStatement.build();
 
       // console.log('Query that will be run', query);
 
