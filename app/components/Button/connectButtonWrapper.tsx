@@ -1,12 +1,4 @@
 'use client';
-import { ConnectButton, useActiveAccount } from 'thirdweb/react';
-import { client } from '@app/lib/sdk/thirdweb/client';
-import { ACCOUNT_FACTORY_ADDRESS } from '@app/lib/utils/context';
-import {
-  createWallet,
-  inAppWallet,
-  privateKeyToAccount,
-} from 'thirdweb/wallets';
 import {
   defineChain,
   polygon,
@@ -16,16 +8,24 @@ import {
   zoraSepolia,
 } from 'thirdweb/chains';
 import {
+  createWallet,
+  inAppWallet,
+} from 'thirdweb/wallets';
+import {
   generatePayload,
   authedOnly,
   login,
   logout,
-} from '@app/api/auth/thirdweb/testing123';
+} from '@app/api/auth/thirdweb/authentication';
+import { OrbisConnectResult } from '@useorbis/db-sdk';
+import { client } from '@app/lib/sdk/thirdweb/client';
 import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
+import { ConnectButton } from '@app/lib/sdk/thirdweb/components';
+import { GenerateLoginPayloadParams, LoginPayload, VerifyLoginPayloadParams } from 'thirdweb/auth';
+import { ACCOUNT_FACTORY_ADDRESS } from '@app/lib/utils/context';
 
 export default function ConnectButtonWrapper() {
   const { orbisLogin } = useOrbisContext();
-  const activeAccount = useActiveAccount();
 
   const wallets = [
     inAppWallet({
@@ -87,114 +87,81 @@ export default function ConnectButtonWrapper() {
   };
 
   return (
-    // <ConnectButton
-    //   client={client}
-    //   chains={[polygon, base, optimism, storyTestnet, zora, zoraSepolia]}
-    //   connectButton={{
-    //     label: 'Get Started',
-    //     className: 'my-custom-class',
-    //     style: {
-    //       backgroundColor: '#EC407A',
-    //       color: 'white',
-    //       borderRadius: '10px',
-    //     },
-    //   }}
-    //   accountAbstraction={{
-    //     chain: defineChain(polygon),
-    //     client: client,
-    //     sponsorGas: false,
-    //     factoryAddress: `${ACCOUNT_FACTORY_ADDRESS.polygon}`,
-    //   }}
-    //   wallets={wallets}
-    //   appMetadata={{
-    //     name: 'Creative TV',
-    //     url: 'https://tv.creativeplatform.xyz',
-    //     description: 'The Stage is Yours',
-    //     logoUrl:
-    //       'https://bafybeiesvinhgaqvr62rj77jbwkazg3w6bhcrsfyg6zyozasaud53nucnm.ipfs.w3s.link/Creative%20TV%20Logo.png',
-    //   }}
-    //   walletConnect={{
-    //     projectId: 'dc6a426a325d62879d4b9c6ef6dcedb1',
-    //   }}
-    //   supportedNFTs={{
-    //     137: [
-    //       '0xad597e5b24ad2a6032168c76f49f05d957223cd0',
-    //       '0xb6b645c3e2025cf69983983266d16a0aa323e2b0',
-    //     ],
-    //   }}
-    //   connectModal={{
-    //     size: 'wide',
-    //     privacyPolicyUrl:
-    //       'https://creativeplatform.xyz/docs/legal/privacy-policy',
-    //     termsOfServiceUrl:
-    //       'https://creativeplatform.xyz/docs/legal/terms-conditions',
-    //     welcomeScreen: {
-    //       img: {
-    //         width: 200,
-    //         height: 200,
-    //         src: 'https://bafybeifvsvranpnmujrpcry6lqssxtyfdvqz64gty4vpkhvcncuqd5uimi.ipfs.w3s.link/logo-tv.gif',
-    //       },
-    //       subtitle: 'The Stage is Yours',
-    //       title: 'Welcome to Creative TV',
-    //     },
-    //   }}
-    //   auth={{
-    //     chain: polygon,
-    //     client: client,
-    //     authedOnly: async (address: string) => {
-    //       console.log('checking if logged in!', { address });
-    //       return await authedOnly();
-    //     },
-    //     doLogin: async (
-    //       params: VerifyLoginPayloadParams,
-    //     ): Promise<void> => {
-    //       console.log('logging in!');
-
-    //       await login(params);
-    //       // const payload = await validatePayload(params);
-    //       // const loginPayload: LoginPayload | void = await login(
-    //       //   {
-    //       //     payload: params.payload,
-    //       //     signature: params.signature, // Add a signature property here
-    //       //   },
-    //         // {
-    //         //   clientId: 'localhost:3000',
-    //         //   redirectUri: 'http://localhost:3000/api/auth/unlock',
-    //         //   paywallConfig: paywallConfig,
-    //         // },
-    //       // );
-
-    //       // orbisLogin();
-
-    //       // return loginPayload;
-    //     },
-    //     getLoginPayload: async ({ address }: { address: string }) => generatePayload({ address }),
-    //     doLogout: async () => {
-    //       console.log('logging out!');
-    //       await logout();
-    //     },
-    //   }}
-    // />
     <ConnectButton
-      autoConnect={true}
       client={client}
+      chains={[polygon, base, optimism, storyTestnet, zora, zoraSepolia]}
+      connectButton={{
+        label: 'Connect Wallet',
+        className: 'my-custom-class',
+        style: {
+          backgroundColor: '#EC407A',
+          color: 'white',
+          borderRadius: '10px',
+        },
+      }}
+      // accountAbstraction={{
+      //   chain: defineChain(polygon),
+      //   client: client,
+      //   sponsorGas: false,
+      //   factoryAddress: `${ACCOUNT_FACTORY_ADDRESS.polygon}`,
+      // }}
+      wallets={wallets}
+      appMetadata={{
+        name: 'Creative TV',
+        url: 'https://tv.creativeplatform.xyz',
+        description: 'The Stage is Yours',
+        logoUrl:
+          'https://bafybeiesvinhgaqvr62rj77jbwkazg3w6bhcrsfyg6zyozasaud53nucnm.ipfs.w3s.link/Creative%20TV%20Logo.png',
+      }}
+      walletConnect={{
+        projectId: 'dc6a426a325d62879d4b9c6ef6dcedb1',
+      }}
+      supportedNFTs={{
+        137: [
+          '0xad597e5b24ad2a6032168c76f49f05d957223cd0',
+          '0xb6b645c3e2025cf69983983266d16a0aa323e2b0',
+        ],
+      }}
+      connectModal={{
+        size: 'wide',
+        privacyPolicyUrl:
+          'https://creativeplatform.xyz/docs/legal/privacy-policy',
+        termsOfServiceUrl:
+          'https://creativeplatform.xyz/docs/legal/terms-conditions',
+        welcomeScreen: {
+          img: {
+            width: 200,
+            height: 200,
+            src: 'https://bafybeifvsvranpnmujrpcry6lqssxtyfdvqz64gty4vpkhvcncuqd5uimi.ipfs.w3s.link/logo-tv.gif',
+          },
+          subtitle: 'The Stage is Yours',
+          title: 'Welcome to Creative TV',
+        },
+      }}
       auth={{
-        // fetch the login payload here using address
-        getLoginPayload: async ({ address }: { address: string }) => await generatePayload({ address }),
-        // send the signed login payload (params) to the server
-        doLogin: async (params: any) => {
-          await login(params.address);
-          await orbisLogin();
+        getLoginPayload: async (params: GenerateLoginPayloadParams) => await generatePayload(params),
+        doLogin: async (
+          params: VerifyLoginPayloadParams,
+        ): Promise<void> => {
+          console.log('logging in...');
+          
+          const loginPayload: LoginPayload | void = await login(params);
+          
+          // console.log({ doLoginResponse: loginPayload });
+
+          const orbisAuthResult: OrbisConnectResult | null = await orbisLogin();
+
+          // console.log({ orbisAuthResult });
+          
+          return loginPayload;
         },
-        // fetch the user's login status from the server
-        authedOnly: async () => {
-          return await authedOnly();
-        },
-        // send a logout request to the server
+        isLoggedIn: async () => await authedOnly(),
         doLogout: async () => {
+          console.log('logging out...');
           await logout();
         },
       }}
+      onDisconnect={(params: { account: any, wallet: any }) => params.wallet.disconnect()}
     />
   );
 }

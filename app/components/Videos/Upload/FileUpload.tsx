@@ -12,6 +12,8 @@ import { AssetMetadata, Subtitles, Chunk } from '../../../lib/sdk/orbisDB/models
 import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
 import JsGoogleTranslateFree from "@kreisler/js-google-translate-free";
 import { getLivepeerAudioToText } from '@app/api/livepeer/audioToText';
+import { upload, download } from 'thirdweb/storage';
+import { client } from '@app/lib/sdk/thirdweb/client';
 
 const truncateUri = (uri: string): string => {
   if (uri.length <= 30) return uri;
@@ -27,7 +29,8 @@ const copyToClipboard = (text: string) => {
 interface FileUploadProps {
   onFileSelect: (file: File | null) => void;
   onFileUploaded: (fileUrl: string) => void;
-  onPressNext?: (livePeerAssetId: string) => void;
+  onUploadSuccess: (subtitlesUri?: string) => void;
+  onPressNext?: (livepeerAsset: any) => void;
   onPressBack?: () => void;
   metadata?: any;
   newAssetTitle?: string;
@@ -119,6 +122,7 @@ async function translateSubtitles(data: { chunks: Chunk[] }): Promise<Subtitles>
 const FileUpload: React.FC<FileUploadProps> = ({
   onFileSelect,
   onFileUploaded,
+  onUploadSuccess,
   onPressNext,
   onPressBack,
   metadata,
@@ -127,7 +131,6 @@ const FileUpload: React.FC<FileUploadProps> = ({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState<boolean>(false);
   const [uploadedUri, setUploadedUri] = useState<string | null>(null);
-  const [subtitles, setSubtitles] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<number>(0);
   const [uploadComplete, setUploadComplete] = useState<boolean>(false);
@@ -135,10 +138,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
     'idle' | 'loading' | 'complete'
   >('idle');
 
-  const [livePeerUploadedAssetId, setLivepeerUploadedAssetId] =
-    useState<string>();
-
-  const { assetMetadataModelID, insert } = useOrbisContext();
+  const [livepeerAsset, setLivepeerAsset] = useState<any>();
 
   const activeAccount = useActiveAccount();
 
@@ -167,7 +167,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
         activeAccount?.address || 'anonymous',
       );
 
-      setLivepeerUploadedAssetId(uploadRequestResult?.asset.id);
+      setLivepeerAsset(uploadRequestResult?.asset);
 
       const tusUpload = new tus.Upload(selectedFile, {
         endpoint: uploadRequestResult?.tusEndpoint,
@@ -208,28 +208,19 @@ const FileUpload: React.FC<FileUploadProps> = ({
         modelId: 'openai/whisper-large-v3',
         returnTimestamps: 'true',
       });
+      
+      console.log({ audioToTextResponse });
 
-      const subtitles = audioToTextResponse ? await translateSubtitles({ chunks: audioToTextResponse?.chunks }) : {};
+      const subtitles = await translateSubtitles({ chunks: audioToTextResponse?.chunks });
 
-      const orbisMetadata: AssetMetadata = {
-        playbackId: uploadRequestResult?.asset.id,
-        title: newAssetTitle,
-        description: metadata?.description,
-        ...(metadata?.location !== undefined && { location: metadata?.location }),
-        ...(metadata?.category !== undefined && { category: metadata?.category }),
-        ...(metadata?.thumbnailUri !== undefined && { thumbnailUri: metadata?.thumbnailUri }),
-        ...(subtitles !== undefined && { subtitles: subtitles }),
-      };
+      const ipfsUri = await upload({
+        client,
+        files: [
+          subtitles
+        ]
+      });
 
-      console.log({ orbisMetadata });
-
-      const metadataUri = await insert(
-        orbisMetadata, 
-        assetMetadataModelID
-      );
-
-      console.log('metadataUri', metadataUri);
-
+      onUploadSuccess(ipfsUri);
     } catch (error: any) {
       console.error('Error uploading file:', error);
       setError('Failed to upload file. Please try again.');
@@ -342,10 +333,10 @@ const FileUpload: React.FC<FileUploadProps> = ({
           <Button
             disabled={uploadState !== 'complete'}
             onClick={() => {
-              if (livePeerUploadedAssetId) {
-                onPressNext(livePeerUploadedAssetId);
+              if (livepeerAsset) {
+                onPressNext(livepeerAsset);
               } else {
-                alert('Missing livepeer asset id');
+                alert('Missing livepeer asset');
               }
             }}
           >
@@ -358,162 +349,3 @@ const FileUpload: React.FC<FileUploadProps> = ({
 };
 
 export default FileUpload; 
-   
-      // let subtitles: Subtitles = {};
-      
-      // const languages = [
-      //   "English", 
-      //   "Chinese", 
-      //   "German", 
-      //   "Spanish"
-      // ];
-      
-      // languages.forEach((language: string) => {
-      //   subtitles[language] = [
-      //       ...data.chunks.map(async (chunk: Chunk) => {
-      //         if (language !== "English") {
-      //           const res = await fetch(
-      //             'https://dream-gateway.livepeer.cloud/llm',
-      //             {
-      //               method: 'POST',
-      //               body: JSON.stringify({
-      //                 text: `Translate the string literal ${chunk.text} from Latin to English. Only provide the exact translation, no additional text is required.`,
-      //                 source: 'en',
-      //                 target: language
-      //               }),
-      //               headers: { 'Content-Type': 'application/json' }
-      //             }
-      //           ); 
-      //           if (!res.ok) {
-      //             throw new Error(`HTTP error! status: ${res.status}`);
-      //           } else {
-      //             const data = await res.json();
-      //             chunk.text = data.response.replace('assistant\n\n', '');
-      //           }
-      //           return chunk;
-      //         }
-      //         return chunk;
-      //       })
-      //     ]
-      // });
-
-// let subtitles: Subtitles = {
-        // 'English': data.chunks,
-      // };
-      
-      // const languages = [
-      //   "Chinese", 
-      //   "German", 
-      //   "Spanish"
-      // ];
-      
-      // subtitles = await Promise.all(
-      //   languages.map(async (language: string, i: number) => {
-      //     console.log('language - ' + i + ' ', language);
-      //     const translatedChunks = await Promise.all(
-      //       data?.chunks.map(async (chunk: Chunk) => {
-      //         if (language !== "English") {
-      //           console.log('chunk - ' + i + ' ', chunk);
-      //           console.log('language - ' + i + ' ', language);
-      //           const translatedText: string = await translateText(chunk.text, language);
-      //           console.log('translatedText - ' + i + '', translatedText);
-      //           return {
-      //             text: translatedText,
-      //             timestamp: chunk.timestamp
-      //           };
-      //         }
-      //         console.log('chunk - ' + i + ' ', chunk);
-      //         return chunk;
-      //       })
-      //     );
-      //     return { [language]: translatedChunks };
-      //   })
-      // ).then(results => {
-      //   const obj = Object.assign({}, ...results);
-      //   console.log('obj', obj);
-      //   return obj;
-      // });
-
- // const formData = new FormData();
-      
-      // formData.append('audio', audioBlob);
-      // formData.append('model_id', 'openai/whisper-large-v3');
-
-      // const options = {
-      //   method: 'POST',
-      //   body: formData,
-      //   headers: {
-      //     Authorization: `Bearer ${process.env.LIVEPEER_FULL_API_KEY}`,
-      //   },
-      // };
-
-      // const res = await fetch(
-      //   'https://dream-gateway.livepeer.cloud/audio-to-text',
-      //   options,
-      // );
-
-      // const result = await fullLivepeer.generate.audioToText({
-      //   audio: audioBlob,
-      // });
-
-      // if (!result) {
-      //   throw new Error(`HTTP error!`);
-      // }
-
-      // const data: TextResponse = result.textResponse || { text: '', chunks: [] };
-
-      // let result;
-
-      // try {
-      //   const formData = new FormData();
-      //   formData.append('blob', new Blob([selectedFile], { type: selectedFile.type }));
-      //   const response = await fetch('/api/livepeer/audio-to-text', {
-      //     method: 'POST',
-      //     headers: {
-      //       'Content-Type': 'application/json',
-      //     },
-      //     body: formData
-      //   });
-    
-      //   if (!response.ok) {
-      //     throw new Error(`HTTP error! status: ${response.status}`);
-      //   }
-    
-      //   result = await response.json();
-        
-      //   if (!result.success) {
-      //     throw new Error(result.message);
-      //   }
-    
-      // } catch (error) {
-      //   console.error('Error converting audio to text:', error);
-      //   throw error;
-      // }
-
-// const jsonBody = JSON.stringify({
-      //   audioBlob,
-      //   newAssetTitle,
-      //   metadata,
-      //   livePeerUploadedAssetId
-      // });
-
-      // console.log({ jsonBody });
-
-      // const res = await fetch('/api/liveper/subtitles', {
-      //   method: 'POST',
-      //   headers: {
-      //     'Content-Type': 'application/json',
-      //   },
-      //   body: jsonBody,
-      // });
-
-      // if (!res.ok) {
-      //   console.error(res);
-      //   throw new Error(`HTTP error! status: ${res.status} ${res.statusText}`);
-      // }
-
-      // const data = await res.json();
-
-      // const { metadataUri, subtitles } = data;
-
-      // console.log({ metadataUri, subtitles });

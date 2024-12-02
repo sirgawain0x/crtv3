@@ -4,7 +4,14 @@ import { ThirdwebProvider } from '@app/lib/sdk/thirdweb/components';
 import { createContext, useContext, useState, useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { OrbisProvider } from '@app/lib/sdk/orbisDB/context';
-import { polygon } from 'thirdweb/chains';
+import {
+  defineChain,
+  polygon,
+  optimism,
+  base,
+  zora,
+  zoraSepolia,
+} from 'thirdweb/chains';
 
 interface ThemeContextType {
   theme: string;
@@ -40,7 +47,7 @@ export const Providers: React.FC<{ children: React.ReactNode }> = ({
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme }}>
       <ApolloWrapper>
-        <ThirdwebProvider desiredChainId={polygon}>
+        <ThirdwebProvider>
           <QueryClientProvider client={queryClient}>
             <OrbisProvider>
               {children}

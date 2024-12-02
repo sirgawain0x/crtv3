@@ -22,8 +22,9 @@ type TCreateInfoProps = {
 export type TVideoMetaForm = {
   title: string;
   description: string;
-  location: string;
-  category: string;
+  location?: string;
+  category?: string;
+  subtitlesUri?: string | undefined;
 };
 
 const CreateInfo = ({ onPressNext }: TCreateInfoProps) => {

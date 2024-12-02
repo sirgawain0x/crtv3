@@ -1,42 +1,41 @@
 'use client';
 
-import { FaExclamationTriangle } from 'react-icons/fa';
-import { use, useEffect, useState } from 'react';
-import { FormProvider, useForm } from 'react-hook-form';
-
-import { STEPPER_FORM_KEYS } from '@app/lib/utils/context';
 import {
   StepperFormKeysType,
   StepperFormValues,
 } from '@app/types/hook-stepper';
-
+import { toast } from 'sonner';
+import FileUpload from './FileUpload';
+import CreateInfo from './Create-info';
+import { useRouter } from 'next/navigation';
+import CreateThumbnail from './Create-thumbnail';
+import { use, useEffect, useState } from 'react';
+import { useActiveAccount } from "thirdweb/react";
+import type { TVideoMetaForm } from './Create-info';
+import { FaExclamationTriangle } from 'react-icons/fa';
+import { FormProvider, useForm } from 'react-hook-form';
+import { STEPPER_FORM_KEYS } from '@app/lib/utils/context';
+import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
 import StepperIndicator from '@app/components/Stepper-Indicator';
 import { Alert, AlertDescription, AlertTitle } from '../../ui/alert';
-import { Button } from '@app/components/ui/button';
-import { toast } from 'sonner';
-import CreateInfo from './Create-info';
-import CreateThumbnail from './Create-thumbnail';
-import type { TVideoMetaForm } from './Create-info';
-import FileUpload from './FileUpload';
-
-import { hasCreatorPass } from '@app/api/auth/thirdweb/gateCondition';
-import { isLoggedIn } from '@app/components/Button/actions/login';
-
-import {
-  useActiveAccount,
-} from "thirdweb/react";
-
-import { useRouter } from 'next/navigation';
+import { hasAccess } from '@app/api/auth/thirdweb/gateCondition';
+import { AssetMetadata } from '@app/lib/sdk/orbisDB/models/AssetMetadata';
+import { authedOnly } from '@app/api/auth/thirdweb/authentication';
 
 const HookMultiStepForm = () => {
   const [activeStep, setActiveStep] = useState(1);
   const [canNextStep, setCanNextStep] = useState(false);
   const [erroredInputName, setErroredInputName] = useState('');
+
   const methods = useForm<StepperFormValues>({
     mode: 'onTouched',
   });
-  const [metaData, setMetadata] = useState<TVideoMetaForm>(),
-    [livePeerAssetId, setLivepeerAssetId] = useState<string>();
+  
+  const [metadata, setMetadata] = useState<TVideoMetaForm>(),
+          [livepeerAsset, setLivepeerAsset] = useState<any>(),
+            [subtitlesUri, setSubtitlesUri] = useState<string>();
+
+  const { insert, assetMetadataModelId } = useOrbisContext();
 
   const activeAccount = useActiveAccount();
 
@@ -44,12 +43,12 @@ const HookMultiStepForm = () => {
 
   useEffect(() => {
     const tokenGate = async () => {
-      if (!(await isLoggedIn()) || !activeAccount /* || !(await hasCreatorPass(activeAccount?.address)) */) {
-        console.log({ 
-          isLoggedIn: !(await isLoggedIn()), 
-          activeAccount: !activeAccount, 
-          // hasCreatorPass: !(await hasCreatorPass(activeAccount?.address))}
-        });
+      if (!(await authedOnly()) || !activeAccount || !(await hasAccess(activeAccount?.address)))  {
+        // console.log({ 
+        //   isLoggedIn: !(await authedOnly()), 
+        //   activeAccount: !activeAccount, 
+        //   hasAccess: !(await hasAccess(activeAccount?.address))
+        // });
         router.push("/");
       }
     }
@@ -128,6 +127,7 @@ const HookMultiStepForm = () => {
         }
       });
   };
+  
   const handleNext = async () => {
     const isStepValid = await trigger(undefined, { shouldFocus: true });
     if (isStepValid) setActiveStep((prevActiveStep) => prevActiveStep + 1);
@@ -138,7 +138,7 @@ const HookMultiStepForm = () => {
   };
 
   return (
-    <div>
+    <>
       <StepperIndicator activeStep={activeStep} />
       {errors.root?.formError && (
         <Alert variant="destructive" className="mt-[28px]">
@@ -149,44 +149,63 @@ const HookMultiStepForm = () => {
       )}
       <div className={activeStep === 1 ? 'block' : 'hidden'}>
         <CreateInfo
-          onPressNext={(metaDataFormData) => {
-            setMetadata(metaDataFormData);
+          onPressNext={(metadataFormData) => {
+            setMetadata(metadataFormData);
             setActiveStep((prevActiveStep) => prevActiveStep + 1);
           }}
         />
       </div>
       <div className={activeStep === 2 ? 'block' : 'hidden'}>
         <FileUpload
-          metadata={metaData}
-          newAssetTitle={metaData?.title || ''}
+          newAssetTitle={metadata?.title}
+          metadata={metadata}
           onFileSelect={(file) => {
-            console.log('Selected file:', file); // Debugging line
+            // console.log('Selected file:', file); 
           }}
           onFileUploaded={(videoUrl: string) => {
-            console.log('Uploaded video URL:', videoUrl); // Debugging line
+            // console.log('Uploaded video URL:', videoUrl); 
+          }}
+          onUploadSuccess={(subtitlesUri?: string) => {
+            // console.log('onUploadSuccess', { subtitlesUri })
+            setSubtitlesUri(subtitlesUri);
           }}
           onPressBack={() =>
             setActiveStep((prevActiveStep) => prevActiveStep - 1)
           }
-          onPressNext={(livePeerAssetId) => {
-            setLivepeerAssetId(livePeerAssetId);
+          onPressNext={(livepeerAsset: any) => {
+            setLivepeerAsset(livepeerAsset);
             setActiveStep((prevActiveStep) => prevActiveStep + 1);
           }}
         />
       </div>
       <div className={activeStep === 3 ? 'block' : 'hidden'}>
-        {/* <code>
-          <pre>{JSON.stringify(metaData, null, 2)}</pre>
-        </code>
-        <code>
-          <span>Livepeer asset id: {livePeerAssetId}</span>
-        </code> */}
-        <CreateThumbnail livePeerAssetId={livePeerAssetId} />
-      </div>
+        <CreateThumbnail 
+          livePeerAssetId={livepeerAsset?.id}
+          onThumbnailSuccess={async (thumbnailUri: string) => {
+            console.log('onThumbnailSuccess', { thumbnailUri });
+            
+            const assetMetadata: AssetMetadata = {
+              assetId: livepeerAsset?.id as string,
+              playbackId: livepeerAsset?.playbackId as string,
+              title: metadata?.title as string,
+              description: metadata?.description as string,
+              ...(metadata?.location !== undefined && { location: metadata?.location }),
+              ...(metadata?.category !== undefined && { category: metadata?.category }),
+              ...(thumbnailUri !== undefined && { thumbnailUri }),
+              ...(subtitlesUri !== undefined && { subtitlesUri }),
+            };
+            
+            console.log({ assetMetadata });
+            
+            const metadataUri = await insert(
+              assetMetadata,
+              assetMetadataModelId
+            );
 
-      {/* </form>
-      </FormProvider> */}
-    </div>
+            console.log('metadataUri', metadataUri);
+          }} />
+      </div>
+    </>
   );
 };
 

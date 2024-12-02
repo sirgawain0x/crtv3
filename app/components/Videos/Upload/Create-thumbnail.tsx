@@ -14,13 +14,16 @@ import { useRouter } from 'next/navigation';
 import CreateThumbnailForm from './CreateThumbnailForm';
 import { FaSpinner } from 'react-icons/fa';
 import { Spinner } from '@chakra-ui/react';
+import { upload } from 'thirdweb/storage';
 
 type CreateThumbnailProps = {
   livePeerAssetId: string | undefined;
+  onThumbnailSuccess: (thumbnailUri: string) => void;
 };
 
 export default function CreateThumbnail({
   livePeerAssetId,
+  onThumbnailSuccess
 }: CreateThumbnailProps) {
   const router = useRouter();
 
@@ -29,6 +32,7 @@ export default function CreateThumbnail({
   const [livepeerPlaybackData, setLivepeerPlaybackData] =
     useState<PlaybackInfo>();
   const [progress, setProgress] = useState<number>(0);
+  const [thumbnailUri, setThumbnailUri] = useState<string>();
 
   useInterval(
     () => {
@@ -65,6 +69,7 @@ export default function CreateThumbnail({
   };
 
   const handleComplete = () => {
+    thumbnailUri && onThumbnailSuccess(thumbnailUri);
     router.push('/discover');
   };
 
@@ -97,8 +102,9 @@ export default function CreateThumbnail({
           <h3 className="text-xl font-bold">Generate a Thumbnail</h3>
         </div>
         <CreateThumbnailForm
-          onSelectThumbnailImages={(imgUrl) => {
-            console.log('Use selected image', imgUrl);
+          onSelectThumbnailImages={(imgUri) => {
+            setThumbnailUri(imgUri);
+            console.log('Use selected image', imgUri);
           }}
         />
       </div>
@@ -108,6 +114,11 @@ export default function CreateThumbnail({
           onClick={handleBack}
         >
           Back
+        </Button>
+        <Button
+          onClick={() => {onThumbnailSuccess(''); router.push('/discover');}}
+        >
+          Skip
         </Button>
         <Button
           disabled={livepeerAssetData?.status?.phase !== 'ready'}

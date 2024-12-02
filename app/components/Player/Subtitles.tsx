@@ -66,7 +66,7 @@ export function SubtitlesControl() {
   )
 }
 
-export function SubtitlesDisplay({ __scopeMedia, subtitles, style }: MediaScopedProps & { subtitles: Subtitles; style?: CSSProperties }) {
+export function SubtitlesDisplay({ __scopeMedia, subtitles, style }: MediaScopedProps & { subtitles: Subtitles | undefined; style?: CSSProperties }) {
   const [currentSubtitle, setCurrentSubtitle] = useState<string>('');
 
   const { language, showSubtitles } = useSubtitles();
@@ -80,7 +80,7 @@ export function SubtitlesDisplay({ __scopeMedia, subtitles, style }: MediaScoped
   useEffect(() => {
     const updateSubtitle = () => {
       const currentTime = progress ?? 0;
-      const activeSubtitle = subtitles[language].find((subtitle: Chunk) => 
+      const activeSubtitle = subtitles && subtitles[language].find((subtitle: Chunk) => 
         currentTime >= subtitle.timestamp[0] && currentTime < subtitle.timestamp[1]
       );
       setCurrentSubtitle(activeSubtitle ? activeSubtitle.text : '');
