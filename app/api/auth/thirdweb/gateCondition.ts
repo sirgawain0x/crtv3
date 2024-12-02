@@ -32,11 +32,7 @@ async function hasNFT(address: string) {
     owner: address,
   });
 
-  // console.log({ creatorPassAnnualBalance, creatorPass3MonthBalance });
-
   const hasPass: boolean =  (creatorPassAnnualBalance + creatorPass3MonthBalance) >= requiredQuantity;
-  
-  // console.log({ hasPass });
   
   return hasPass;
 }

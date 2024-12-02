@@ -44,11 +44,6 @@ const HookMultiStepForm = () => {
   useEffect(() => {
     const tokenGate = async () => {
       if (!(await authedOnly()) || !activeAccount || !(await hasAccess(activeAccount?.address)))  {
-        // console.log({ 
-        //   isLoggedIn: !(await authedOnly()), 
-        //   activeAccount: !activeAccount, 
-        //   hasAccess: !(await hasAccess(activeAccount?.address))
-        // });
         router.push("/");
       }
     }
@@ -159,14 +154,9 @@ const HookMultiStepForm = () => {
         <FileUpload
           newAssetTitle={metadata?.title}
           metadata={metadata}
-          onFileSelect={(file) => {
-            // console.log('Selected file:', file); 
-          }}
-          onFileUploaded={(videoUrl: string) => {
-            // console.log('Uploaded video URL:', videoUrl); 
-          }}
+          onFileSelect={(file) => {}}
+          onFileUploaded={(videoUrl: string) => {}}
           onUploadSuccess={(subtitlesUri?: string) => {
-            // console.log('onUploadSuccess', { subtitlesUri })
             setSubtitlesUri(subtitlesUri);
           }}
           onPressBack={() =>

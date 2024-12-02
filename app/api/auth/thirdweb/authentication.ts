@@ -1,11 +1,9 @@
 "use server";
 
-import { GenerateLoginPayloadParams, VerifyLoginPayloadParams, createAuth } from "thirdweb/auth";
+import { VerifyLoginPayloadParams, createAuth } from "thirdweb/auth";
 import { privateKeyToAccount } from "thirdweb/wallets";
 import { client } from "../../../lib/sdk/thirdweb/client";
 import { cookies } from "next/headers";
-// import { redirect } from "next/navigation";
-
 const privateKey = process.env.THIRDWEB_ADMIN_PRIVATE_KEY || "";
 
 if (!privateKey) {

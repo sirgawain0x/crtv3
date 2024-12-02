@@ -8,8 +8,7 @@ import PreviewVideo from './PreviewVideo';
 import { useActiveAccount } from 'thirdweb/react';
 import { Progress } from '@app/components/ui/progress';
 import { Button } from '@app/components/ui/button';
-import { AssetMetadata, Subtitles, Chunk } from '../../../lib/sdk/orbisDB/models/AssetMetadata';
-import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
+import { Subtitles, Chunk } from '../../../lib/sdk/orbisDB/models/AssetMetadata';
 import JsGoogleTranslateFree from "@kreisler/js-google-translate-free";
 import { getLivepeerAudioToText } from '@app/api/livepeer/audioToText';
 import { upload, download } from 'thirdweb/storage';
@@ -49,11 +48,6 @@ const translateText = async (text: string, language: string): Promise<string> =>
         'Content-Type': 'application/json',
       },
     });
-
-    // if (!res.ok) {
-    //   console.error(res);
-    //   throw new Error(`HTTP error! status: ${res.status}`);
-    // }
 
     const data = await res.json();
     

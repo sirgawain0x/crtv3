@@ -7,7 +7,7 @@ export default NextAuth({
   providers: [
     ThirdwebAuthHandler({
       client,
-      domain: "http://localhost:3000", 
+      domain: process.env.NEXT_PUBLIC_THIRDWEB_AUTH_DOMAIN || "http://localhost:3000", 
     }),
   ],
 });

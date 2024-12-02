@@ -4441,3 +4441,5 @@ export const STATES: States = {
     buttonText: '',
   },
 };
+
+export const ASSET_METADATA_MODEL_ID = 'kjzl6hvfrbw6c8ff20kxk0v7j0an1rxjyzs0afesrbcv59fiknxzogtlhxxlr14';
