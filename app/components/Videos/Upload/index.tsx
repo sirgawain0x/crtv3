@@ -35,7 +35,7 @@ const HookMultiStepForm = () => {
           [livepeerAsset, setLivepeerAsset] = useState<any>(),
             [subtitlesUri, setSubtitlesUri] = useState<string>();
 
-  const { insert, assetMetadataModelId } = useOrbisContext();
+  const { insert, assetMetadataModelId, isConnected } = useOrbisContext();
 
   const activeAccount = useActiveAccount();
 
@@ -43,7 +43,13 @@ const HookMultiStepForm = () => {
 
   useEffect(() => {
     const tokenGate = async () => {
-      if (!(await authedOnly()) || !activeAccount || !(await hasAccess(activeAccount?.address)))  {
+      if (
+        !(await authedOnly()) 
+        || !activeAccount 
+        || !(await hasAccess(activeAccount?.address))
+        || !isConnected(activeAccount?.address)
+
+      )  {
         router.push("/");
       }
     }
