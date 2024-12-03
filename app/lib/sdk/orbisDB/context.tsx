@@ -40,7 +40,7 @@ const db = new OrbisDB({
 });
 
 const OrbisContext = createContext<OrbisContextProps | undefined> ({
-    assetMetadataModelId: 'kjzl6hvfrbw6c6itfx7h76zcrpch2gm2u4bws8gxi0zvw1n8pg5v8rvli7b1blr',
+    assetMetadataModelId: '',
     authResult: null,
     setAuthResult: () => {},
     insert: async () => {},
