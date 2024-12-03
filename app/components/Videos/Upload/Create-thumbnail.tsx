@@ -46,10 +46,10 @@ export default function CreateThumbnail({
           });
       }
       if (livepeerAssetData?.status?.phase === 'failed') {
-        throw new Error("Error transcoding video");
+        throw new Error("Error transcoding video: " + livepeerAssetData?.status?.errorMessage);
       }
     },
-    livepeerAssetData?.status?.phase !== 'ready' ? 5000 : null,
+    livepeerAssetData?.status?.phase !== 'ready' && livepeerAssetData?.status?.phase !== 'failed' ? 5000: null,
   );
 
   useEffect(() => {
