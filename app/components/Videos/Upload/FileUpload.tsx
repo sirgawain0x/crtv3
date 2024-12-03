@@ -11,7 +11,7 @@ import { Button } from '@app/components/ui/button';
 import { Subtitles, Chunk } from '../../../lib/sdk/orbisDB/models/AssetMetadata';
 import JsGoogleTranslateFree from "@kreisler/js-google-translate-free";
 import { getLivepeerAudioToText } from '@app/api/livepeer/audioToText';
-import { upload, download } from 'thirdweb/storage';
+import { upload } from 'thirdweb/storage';
 import { client } from '@app/lib/sdk/thirdweb/client';
 
 const truncateUri = (uri: string): string => {

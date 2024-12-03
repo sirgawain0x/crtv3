@@ -23,9 +23,11 @@ import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
 import { ConnectButton } from '@app/lib/sdk/thirdweb/components';
 import { GenerateLoginPayloadParams, LoginPayload, VerifyLoginPayloadParams } from 'thirdweb/auth';
 import { ACCOUNT_FACTORY_ADDRESS } from '@app/lib/utils/context';
+import { useActiveWallet } from 'thirdweb/react';
 
 export default function ConnectButtonWrapper() {
   const { orbisLogin } = useOrbisContext();
+  const activeWallet = useActiveWallet();
 
   const wallets = [
     inAppWallet({
@@ -159,6 +161,7 @@ export default function ConnectButtonWrapper() {
         doLogout: async () => {
           console.log('logging out...');
           await logout();
+          activeWallet.disconnect();
         },
       }}
       onDisconnect={(params: { account: any, wallet: any }) => params.wallet.disconnect()}

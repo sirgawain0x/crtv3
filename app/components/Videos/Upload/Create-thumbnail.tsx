@@ -27,12 +27,10 @@ export default function CreateThumbnail({
 }: CreateThumbnailProps) {
   const router = useRouter();
 
-  //  Creating a ref for thumbnail and video
-  const [livepeerAssetData, setLivepeerAssetData] = useState<Asset>();
-  const [livepeerPlaybackData, setLivepeerPlaybackData] =
-    useState<PlaybackInfo>();
   const [progress, setProgress] = useState<number>(0);
   const [thumbnailUri, setThumbnailUri] = useState<string>();
+  const [livepeerAssetData, setLivepeerAssetData] = useState<Asset>();
+  const [livepeerPlaybackData, setLivepeerPlaybackData] = useState<PlaybackInfo>();
 
   useInterval(
     () => {
@@ -46,6 +44,9 @@ export default function CreateThumbnail({
             console.log(e);
             alert(e?.message || 'Error retrieving livepeer asset');
           });
+      }
+      if (livepeerAssetData?.status?.phase === 'failed') {
+        throw new Error("Error transcoding video");
       }
     },
     livepeerAssetData?.status?.phase !== 'ready' ? 5000 : null,
@@ -121,6 +122,7 @@ export default function CreateThumbnail({
           Back
         </Button>
         <Button
+          disabled={livepeerAssetData?.status?.phase !== 'ready'}
           onClick={handleSkipThumbnail}
         >
           Skip

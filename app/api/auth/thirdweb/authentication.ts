@@ -18,15 +18,12 @@ const thirdwebAuth = createAuth({
 export const generatePayload = thirdwebAuth.generatePayload;
 
 export async function login(payload: VerifyLoginPayloadParams) {
-    console.log({ payload });
     const verifiedPayload = await thirdwebAuth.verifyPayload(payload);
     
     if (verifiedPayload.valid) {
         const jwt = await thirdwebAuth.generateJWT({
             payload: verifiedPayload.payload,
         });
-        console.log({ jwt });
-        
         cookies().set("jwt", jwt);
     }
 }

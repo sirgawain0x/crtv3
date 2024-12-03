@@ -38,19 +38,17 @@ const CreateThumbnailForm = ({
     setError,
   } = useForm<FormValues>({
     defaultValues: {
-      aiModel: 'SG161222/RealVisXL_V4.0_Lightning', // Set default value if needed
+      aiModel: 'SG161222/RealVisXL_V4.0_Lightning',
       prompt: '',
     },
   });
 
   const [imagesUrl, setImagesUrl] = useState<Media[]>([]);
-  const [selectedImage, setSelectedImage] = useState<string | undefined>(
-    undefined,
-  ); // Added state
-  const [loading, setLoading] = useState<boolean>(false); // New loading state
+  const [selectedImage, setSelectedImage] = useState<string | undefined>(undefined);
+  const [loading, setLoading] = useState<boolean>(false); 
 
   const onSubmit = async (data: FormValues) => {
-    setLoading(true); // Set loading state to true
+    setLoading(true);
     try {
       const response = await getLivepeerAiGeneratedImages({
         prompt: data.prompt,
@@ -70,7 +68,7 @@ const CreateThumbnailForm = ({
         message: 'Error generating AI images',
       });
     } finally {
-      setLoading(false); // Reset loading state
+      setLoading(false);
     }
   };
 
