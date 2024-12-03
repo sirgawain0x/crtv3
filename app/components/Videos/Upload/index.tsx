@@ -44,12 +44,10 @@ const HookMultiStepForm = () => {
   useEffect(() => {
     const tokenGate = async () => {
       if (
-        !(await authedOnly()) 
-        || !activeAccount 
-        || !(await hasAccess(activeAccount?.address))
-        || !isConnected(activeAccount?.address)
-
-      )  {
+           !await authedOnly()
+        || !await hasAccess(activeAccount?.address)
+        || !await isConnected(activeAccount?.address)
+      ) {
         router.push("/");
       }
     }
