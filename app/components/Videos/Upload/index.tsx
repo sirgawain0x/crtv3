@@ -33,9 +33,9 @@ const HookMultiStepForm = () => {
     mode: 'onTouched',
   });
   
-  const [metadata, setMetadata] = useState<TVideoMetaForm>(),
-          [livepeerAsset, setLivepeerAsset] = useState<Asset>(),
-            [subtitlesUri, setSubtitlesUri] = useState<string>();
+  const [metadata, setMetadata] = useState<TVideoMetaForm>();
+  const [livepeerAsset, setLivepeerAsset] = useState<Asset>();
+  const [subtitlesUri, setSubtitlesUri] = useState<string>();
 
   const { insert, isConnected } = useOrbisContext();
 
