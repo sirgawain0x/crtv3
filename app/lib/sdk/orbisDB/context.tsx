@@ -6,7 +6,7 @@ import {  OrbisConnectResult, OrbisDB } from '@useorbis/db-sdk';
 // import { Wallet } from 'ethers';
 import createAssetMetadataModel, { AssetMetadata } from './models/AssetMetadata';
 import { download } from 'thirdweb/storage';
-import { ASSET_METADATA_MODEL_ID } from '@app/lib/utils/context';
+import { ASSET_METADATA_MODEL_ID, CREATIVE_TV_CONTEXT_ID } from '@app/lib/utils/context';
 
 declare global {
   interface Window {
@@ -38,7 +38,7 @@ const OrbisContext = createContext<OrbisContextProps | undefined> ({
     getCurrentUser: async () => {}
 } as unknown as OrbisContextProps);
 
-const crtvContextId = process.env.ORBIS_APP_CONTEXT || 'kjzl6kcym7w8y852d7aatt2nb898ds9z8628ij6chl41ni2kz8ky18ft2xv5m5s';   
+const crtvContextId = CREATIVE_TV_CONTEXT_ID;   
 
 export const OrbisProvider = ({ children }: { children: ReactNode }) => {
   const [authResult, setAuthResult] = useState<OrbisConnectResult | null>(null);
