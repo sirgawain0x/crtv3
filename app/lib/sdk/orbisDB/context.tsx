@@ -17,7 +17,7 @@ declare global {
 interface OrbisContextProps {
     authResult: OrbisConnectResult | null;
     setAuthResult: React.Dispatch<React.SetStateAction<OrbisConnectResult | null>>;
-    insert: (value: any, modelId: string) => Promise<void>;
+    insert: (modelId: string, value: any) => Promise<void>;
     replace: (docId: string, newDoc: any) => Promise<void>;
     update: (docId: string, updates: any) => Promise<void>;
     getAssetMetadata: (assetId: string) => Promise<AssetMetadata | null>;
