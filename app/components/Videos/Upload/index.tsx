@@ -125,16 +125,13 @@ const HookMultiStepForm = () => {
             console.log('onThumbnailSuccess', { thumbnailUri });
             
             if (!livepeerAsset || !metadata) {
-              console.error({ livepeerAsset, metadata });
               throw new Error('Error saving assetMetadata: Missing asset metadata');
             } else {
               const assetMetadata: AssetMetadata = createAssetMetadata(livepeerAsset, metadata, thumbnailUri, subtitlesUri)
-              console.log({ assetMetadata });
               const metadataUri = await insert(
                 assetMetadata,
                 ASSET_METADATA_MODEL_ID
               );
-              console.log('metadataUri', metadataUri);
             }
           }} />
       </div>
