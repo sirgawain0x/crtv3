@@ -47,10 +47,12 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({ src, assetId, 
   }, [assetId]);
 
   const fetchAssetDetails = async (id: string): Promise<void> => {
-    console.log('fetchAssetMetadata', { id });
-    const data = await getAssetMetadata(id);
-    console.log({ data });
-    setAssetMetadata(data);
+    try {
+      const data = await getAssetMetadata(id);
+      setAssetMetadata(data);
+    } catch (error) {
+      console.error('Failed to fetch asset metadata:', error);
+    }
   };
 
   return (

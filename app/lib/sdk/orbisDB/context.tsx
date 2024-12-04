@@ -38,8 +38,6 @@ const OrbisContext = createContext<OrbisContextProps | undefined> ({
     getCurrentUser: async () => {}
 } as unknown as OrbisContextProps);
 
-const crtvContextId = CREATIVE_TV_CONTEXT_ID;   
-
 export const OrbisProvider = ({ children }: { children: ReactNode }) => {
   const [authResult, setAuthResult] = useState<OrbisConnectResult | null>(null);
 
@@ -74,7 +72,7 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
     if (!select) {
       if (!value) throw new Error('No value provided');
     }
-    if (!crtvContextId) throw new Error('No contextId provided');
+    if (!CREATIVE_TV_CONTEXT_ID) throw new Error('No contextId provided');
     if (!db) throw new Error('No db client found');
   };
   
@@ -84,7 +82,7 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
     const insertStatement: any = db
       .insert(modelId)
       .value(value)
-      .context(crtvContextId);
+      .context(CREATIVE_TV_CONTEXT_ID);
 
     const validation = await insertStatement.validate();
 
@@ -109,7 +107,9 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
 
     validateDbOperation(docId, newDoc);
 
-    const replaceStatement: any = db.update(docId).replace(newDoc);
+    const replaceStatement: any = db
+      .update(docId)
+      .replace(newDoc)   
 
     const query = replaceStatement.build();
 
@@ -132,7 +132,9 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
 
     validateDbOperation(docId, updates);
 
-    const updateStatement: any = db.update(docId).set(updates);
+    const updateStatement: any = db
+      .update(docId)
+      .set(updates)
 
     const query = updateStatement.build();
 
@@ -159,7 +161,7 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
       .where({
         assetId,
       })
-      .context(crtvContextId);
+      .context(CREATIVE_TV_CONTEXT_ID);
 
     const [result, error] = await catchError(() => selectStatement.run());
 

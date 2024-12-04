@@ -1,22 +1,19 @@
 'use client';
-import { Asset } from 'livepeer/models/components';
+
 import React, {
   useState,
   useEffect,
-  type CSSProperties,
-  type PropsWithChildren,
   forwardRef,
 } from 'react';
-import { Src } from '@livepeer/react';
-import * as Player from '@livepeer/react/player';
-import * as Popover from '@radix-ui/react-popover';
-import { cn } from '@app/lib/utils';
 import {
   CheckIcon,
   ChevronDownIcon,
   XIcon,
   PictureInPictureIcon,
 } from 'lucide-react';
+import { Src } from '@livepeer/react';
+import * as Popover from '@radix-ui/react-popover';
+
 import {
   PauseIcon,
   PlayIcon,
@@ -27,11 +24,15 @@ import {
   EnterFullscreenIcon,
   ExitFullscreenIcon,
 } from '@livepeer/react/assets';
+import * as Player from '@livepeer/react/player';
+import { Asset } from 'livepeer/models/components';
+
+import { cn } from '@app/lib/utils';
 import Skeleton from '@app/components/ui/skeleton';
-import { getDetailPlaybackSource } from '@app/lib/utils/hooks/useDetailPlaybackSources';
-import { SubtitlesDisplay, SubtitlesControl } from '../Player/Subtitles';
 import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
 import { AssetMetadata } from '@app/lib/sdk/orbisDB/models/AssetMetadata';
+import { SubtitlesDisplay, SubtitlesControl } from '@app/components/Player/Subtitles';
+import { getDetailPlaybackSource } from '@app/lib/utils/hooks/useDetailPlaybackSources';
 
 type VideoDetailsProps = {
   asset: Asset;
@@ -47,13 +48,17 @@ export default function VideoDetails({ asset }: VideoDetailsProps) {
     const fetchPlaybackSources = async () => {
       const sources = await getDetailPlaybackSource(asset?.playbackId || '');
       setPlaybackSources(sources);
-      
-      const assetMetadata = await getAssetMetadata(asset?.id);
-      // console.log({ assetMetadata });
-      setAssetMetadata(assetMetadata);
     };
-
+    const fetchAssetMetadata = async () => {
+      try {
+        const assetMetadata = await getAssetMetadata(asset?.id);
+        setAssetMetadata(assetMetadata);
+      } catch (error) {
+        console.error('Error fetching asset metadata', error);
+      }
+    }
     fetchPlaybackSources();
+    fetchAssetMetadata();
   }, [asset?.playbackId]);
 
   const Seek = forwardRef<HTMLButtonElement, Player.SeekProps>(
