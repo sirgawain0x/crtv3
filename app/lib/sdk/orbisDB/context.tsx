@@ -15,7 +15,6 @@ declare global {
 }
 
 interface OrbisContextProps {
-    assetMetadataModelId: string;
     authResult: OrbisConnectResult | null;
     setAuthResult: React.Dispatch<React.SetStateAction<OrbisConnectResult | null>>;
     insert: (value: any, modelId: string) => Promise<void>;
@@ -29,18 +28,17 @@ interface OrbisContextProps {
 
 const db = new OrbisDB({
   ceramic: {
-    gateway: process.env.CERAMIC_NODE_URL as string,
+    gateway: process.env.CERAMIC_NODE_URL || 'https://ceramic-orbisdb-mainnet-direct.hirenodes.io/',
   },
   nodes: [
     {
-      gateway: process.env.ORBIS_NODE_URL as string,
-      env: process.env.ORBIS_ENVIRONMENT_ID as string,
+      gateway: process.env.ORBIS_NODE_URL || 'https://studio.useorbis.com',
+      env: process.env.ORBIS_ENVIRONMENT_ID || '',
     },
   ],
 });
 
 const OrbisContext = createContext<OrbisContextProps | undefined> ({
-    assetMetadataModelId: '',
     authResult: null,
     setAuthResult: () => {},
     insert: async () => {},
@@ -55,28 +53,19 @@ const OrbisContext = createContext<OrbisContextProps | undefined> ({
 const crtvContextId = process.env.ORBIS_APP_CONTEXT || 'kjzl6kcym7w8y852d7aatt2nb898ds9z8628ij6chl41ni2kz8ky18ft2xv5m5s';   
 
 export const OrbisProvider = ({ children }: { children: ReactNode }) => {
-  const assetMetadataModelId: string = ASSET_METADATA_MODEL_ID;
-
   const [authResult, setAuthResult] = useState<OrbisConnectResult | null>(null);
+
+  const validateDbOperation = (id: string, value?: any, select: boolean = false) => {
+    if (!id) throw new Error('No id provided');
+    if (!select) {
+      if (!value) throw new Error('No value provided');
+    }
+    if (!crtvContextId) throw new Error('No contextId provided');
+    if (!db) throw new Error('No db client found');
+  };
   
   const insert = async (value: any, modelId: string): Promise<void> => {
-    // console.log('insert', { value, modelId, db });
-
-    if (!value) {
-        throw new Error('No value provided. Please provide a value to insert.')
-    }
-
-    if (!modelId) {
-      throw new Error('No modelId provided. Please provide a modelId.');
-    }
-
-    if (!crtvContextId) {
-      throw new Error('No contextId provided. Please provide a contextId.');
-    }
-
-    if (!db) {
-      throw new Error('No db client found.');
-    }
+    validateDbOperation(modelId, value);
 
     const insertStatement: any = db
       .insert(modelId)
@@ -104,6 +93,8 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
   const replace = async (docId: string, newDoc: any): Promise<void> => {
     console.log('update', { docId, newDoc, db });
 
+    validateDbOperation(docId, newDoc);
+
     const replaceStatement: any = db.update(docId).replace(newDoc);
 
     const query = replaceStatement.build();
@@ -125,6 +116,8 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
   const update = async (docId: string, updates: any): Promise<void> => {
     console.log('update', { docId, updates, db });
 
+    validateDbOperation(docId, updates);
+
     const updateStatement: any = db.update(docId).set(updates);
 
     const query = updateStatement.build();
@@ -144,13 +137,11 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const getAssetMetadata = async (assetId: string): Promise<AssetMetadata> => {
-    if (!assetId) {
-      throw new Error('No assetId provided. Please provide a assetId.');
-    }
+    validateDbOperation(assetId, true);
 
     const selectStatement = db
       .select()
-      .from(assetMetadataModelId)
+      .from(ASSET_METADATA_MODEL_ID)
       .where({
         assetId,
       })
@@ -176,10 +167,17 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
     }, {} as AssetMetadata);
     
     if (assetMetadata?.subtitlesUri) {
-      assetMetadata.subtitles = download({
-        client,
-        uri: assetMetadata.subtitlesUri
-      });
+      try {
+        assetMetadata.subtitles = await download({
+          client,
+          uri: assetMetadata.subtitlesUri
+        });
+      } catch (error) {
+        console.error('Failed to download subtitles', { 
+          uri: assetMetadata.subtitlesUri, 
+          error 
+        });
+      }
     };
 
     return assetMetadata;
@@ -199,15 +197,11 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
 
     const authResult: OrbisConnectResult = await db.connectUser({ auth });
 
-    // console.log({ authResult });
-
     const connected = await db.isUserConnected()
 
-    // console.log({ connected });
-    
-    // if (!connected) {
-    //   throw new Error('User is not connected.');
-    // }
+    if (!connected) {
+      throw new Error('User is not connected.');
+    }
 
     return authResult;
   };
@@ -215,34 +209,27 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
   const isConnected = async (address: string = ''): Promise<boolean> => {
     let connected;
 
-    // Check if any user is connected
     if (address !== '') {
       connected = await db.isUserConnected(address);
     } else {
       connected = await db.isUserConnected();
     }
 
-    console.log({ connected });
-
     return connected;
   };
 
   const getCurrentUser = async (): Promise<any> => {
-    // Get the currently connected user
     const currentUser = await db.getConnectedUser();
+
     if (!currentUser) {
-      // Notify the user or reconnect
       console.log('There is no active user session.');
     }
-
-    console.log({ currentUser });
 
     return currentUser;
   };
 
   return (
       <OrbisContext.Provider value={{ 
-          assetMetadataModelId,
           authResult,
           setAuthResult,
           insert,

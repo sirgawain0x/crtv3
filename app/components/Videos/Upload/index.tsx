@@ -14,7 +14,7 @@ import { useActiveAccount } from "thirdweb/react";
 import type { TVideoMetaForm } from './Create-info';
 import { FaExclamationTriangle } from 'react-icons/fa';
 import { FormProvider, useForm } from 'react-hook-form';
-import { STEPPER_FORM_KEYS } from '@app/lib/utils/context';
+import { ASSET_METADATA_MODEL_ID, STEPPER_FORM_KEYS } from '@app/lib/utils/context';
 import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
 import StepperIndicator from '@app/components/Stepper-Indicator';
 import { Alert, AlertDescription, AlertTitle } from '../../ui/alert';
@@ -36,7 +36,7 @@ const HookMultiStepForm = () => {
           [livepeerAsset, setLivepeerAsset] = useState<Asset>(),
             [subtitlesUri, setSubtitlesUri] = useState<string>();
 
-  const { insert, assetMetadataModelId, isConnected } = useOrbisContext();
+  const { insert, isConnected } = useOrbisContext();
 
   const activeAccount = useActiveAccount();
 
@@ -196,7 +196,7 @@ const HookMultiStepForm = () => {
               console.log({ assetMetadata });
               const metadataUri = await insert(
                 assetMetadata,
-                assetMetadataModelId
+                ASSET_METADATA_MODEL_ID
               );
               console.log('metadataUri', metadataUri);
             }
