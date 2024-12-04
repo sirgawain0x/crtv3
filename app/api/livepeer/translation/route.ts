@@ -3,11 +3,11 @@ import { Livepeer } from "@livepeer/ai";
 
 export async function POST(req: NextRequest) {
   try {
+    // Retrieve request body
     const body = await req.json();
     const { text, source, target } = body;
 
-    console.log('Translation request:', body);
-
+    // Validate request body
     if (!text || !source || !target) {
       return NextResponse.json({ 
         success: false, 
@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Input validation
+    // Additional input validation for text field
     if (text.length > 1000) {
       return NextResponse.json({ 
         success: false, 
@@ -30,13 +30,13 @@ export async function POST(req: NextRequest) {
     // Sanitize input
     const sanitizedText = text.trim();
     
+    // Create formData object and append the text, model_id, max_tokens fields
     const formData = new FormData();
     formData.append('text', `Translate '${sanitizedText}' from ${source} to ${target}. Do not include any other words than the exact, grammatically correct translation.`);
     formData.append('model_id', 'meta-llama/Meta-Llama-3.1-8B-Instruct');
     formData.append('max_tokens', '256');
 
-    console.log('Translation request:', formData);
-
+    // Send POST request to Livepeer LLM endpoint
     const result = await fetch('https://dream-gateway.livepeer.cloud/llm', {
       method: 'POST',
       body: formData,
@@ -46,25 +46,10 @@ export async function POST(req: NextRequest) {
     });
 
 
-    // if (!result.ok) {
-    //   throw new Error(`HTTP error! status: ${result.status}`);
-    // }
-
-    // if (result?.error) {
-    //   return NextResponse.json({
-    //     success: false,
-    //     message: result?.error || `Translation failed with code ${result?.rawResponse.status || 'UNKNOWN'}`,
-    //   }, {
-    //     status: 500,
-    //   });
-    // }
-
-    console.log({ result });
-
+    // Get response data
     const data = await result.json()
     
-    console.log('Translation response:', data);
-
+    // Send NextResponse with { ..., llmResponse: data.llmResponse } 
     return NextResponse.json({
       success: true,
       llmResponse: data.llmResponse
