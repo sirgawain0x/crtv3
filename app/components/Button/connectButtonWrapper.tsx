@@ -145,23 +145,27 @@ export default function ConnectButtonWrapper() {
         doLogin: async (
           params: VerifyLoginPayloadParams,
         ): Promise<void> => {
-          console.log('logging in...');
-          
-          const loginPayload: LoginPayload | void = await login(params);
-          
-          const isConnectedToOrbisDB = await isConnected(params?.payload?.address);
+          try {
+            const loginPayload = await login(params);
 
-          if (!isConnectedToOrbisDB) {
-            const orbisAuthResult: OrbisConnectResult | null = await orbisLogin();
+            const orbisConntected = await isConnected(params?.payload?.address);
+            if (!orbisConntected) {
+              const orbisAuthResult = await orbisLogin();
+            }
+
+            return loginPayload;
+          } catch (error) {
+            console.error('Login failed: ', error);
           }
-
-          return loginPayload;
         },
         isLoggedIn: async () => await authedOnly(),
         doLogout: async () => {
-          console.log('logging out...');
-          await logout();
-          activeWallet.disconnect();
+          try {
+            await logout();
+            activeWallet.disconnect();
+          } catch (error) {
+            console.error('Logout failed: ', error);
+          }
         },
       }}
       onDisconnect={(params: { account: any, wallet: any }) => params.wallet.disconnect()}
