@@ -222,7 +222,8 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
     const currentUser = await db.getConnectedUser();
 
     if (!currentUser) {
-      console.log('There is no active user session.');
+      throw new Error('No active user session. Please connect your wallet and sign in first.');
+
     }
 
     return currentUser;
