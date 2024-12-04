@@ -1,31 +1,32 @@
 'use client';
 
+import { useForm } from 'react-hook-form';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { FaExclamationTriangle } from 'react-icons/fa';
+
+import { toast } from 'sonner';
+import { useActiveAccount } from "thirdweb/react";
+import { Asset } from 'livepeer/models/components';
+
 import {
   StepperFormKeysType,
   StepperFormValues,
 } from '@app/types/hook-stepper';
-import { toast } from 'sonner';
-import FileUpload from './FileUpload';
-import CreateInfo from './Create-info';
-import { useRouter } from 'next/navigation';
-import CreateThumbnail from './Create-thumbnail';
-import { use, useEffect, useState } from 'react';
-import { useActiveAccount } from "thirdweb/react";
-import type { TVideoMetaForm } from './Create-info';
-import { FaExclamationTriangle } from 'react-icons/fa';
-import { FormProvider, useForm } from 'react-hook-form';
-import { ASSET_METADATA_MODEL_ID, STEPPER_FORM_KEYS } from '@app/lib/utils/context';
 import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
-import StepperIndicator from '@app/components/Stepper-Indicator';
-import { Alert, AlertDescription, AlertTitle } from '../../ui/alert';
 import { hasAccess } from '@app/api/auth/thirdweb/gateCondition';
-import { AssetMetadata, createAssetMetadata } from '@app/lib/sdk/orbisDB/models/AssetMetadata';
+import StepperIndicator from '@app/components/Stepper-Indicator';
 import { authedOnly } from '@app/api/auth/thirdweb/authentication';
-import { Asset } from 'livepeer/models/components';
+import FileUpload from '@app/components/Videos/Upload/FileUpload';
+import CreateInfo from '@app/components/Videos/Upload/Create-info';
+import CreateThumbnail from '@app/components/Videos/Upload/Create-thumbnail';
+import { Alert, AlertDescription, AlertTitle } from '@app/components/ui/alert';
+import type { TVideoMetaForm } from '@app/components/Videos/Upload/Create-info';
+import { ASSET_METADATA_MODEL_ID, STEPPER_FORM_KEYS } from '@app/lib/utils/context';
+import { AssetMetadata, createAssetMetadata } from '@app/lib/sdk/orbisDB/models/AssetMetadata';
 
 const HookMultiStepForm = () => {
   const [activeStep, setActiveStep] = useState(1);
-  const [canNextStep, setCanNextStep] = useState(false);
   const [erroredInputName, setErroredInputName] = useState('');
 
   const methods = useForm<StepperFormValues>({
@@ -80,71 +81,6 @@ const HookMultiStepForm = () => {
       setErroredInputName('');
     }
   }, [erroredInputName]);
-
-  interface SubmitResponse {
-    title: string;
-    description: string;
-  }
-
-  const onSubmit = async (formData: StepperFormValues) => {
-    console.log({ formData });
-    // simulate api call
-    await new Promise<SubmitResponse>((resolve, reject) => {
-      setTimeout(() => {
-        resolve({
-          title: 'Success',
-          description: 'Form submitted successfully',
-        });
-        reject({
-          message: 'There was an error submitting form',
-        });
-      }, 2000);
-    })
-      .then(({ title, description }) => {
-        toast('Title and description');
-      })
-      .catch(({ message: errorMessage, errorKey }) => {
-        if (
-          errorKey &&
-          Object.values(STEPPER_FORM_KEYS)
-            .flatMap((fieldNames) => fieldNames)
-            .includes(errorKey)
-        ) {
-          let erroredStep: number | undefined;
-          // get the step number based on input name
-          for (const [key, value] of Object.entries(STEPPER_FORM_KEYS)) {
-            if (value.includes(errorKey as never)) {
-              erroredStep = Number(key);
-              break;
-            }
-          }
-          // set active step and error
-          if (erroredStep !== undefined) {
-            setActiveStep(erroredStep);
-            setError(errorKey as StepperFormKeysType, {
-              message: errorMessage,
-            });
-            setErroredInputName(errorKey);
-          } else {
-            // Handle the case where erroredStep is not found
-            console.error('Error: Step not found for the given errorKey');
-          }
-        } else {
-          setError('root.formError', {
-            message: errorMessage,
-          });
-        }
-      });
-  };
-  
-  const handleNext = async () => {
-    const isStepValid = await trigger(undefined, { shouldFocus: true });
-    if (isStepValid) setActiveStep((prevActiveStep) => prevActiveStep + 1);
-  };
-
-  const handleBack = () => {
-    setActiveStep((prevActiveStep) => prevActiveStep - 1);
-  };
 
   return (
     <>
