@@ -7,7 +7,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { text, source, target } = body;
 
-    // Validate request body
+    // Validate request body contains required fields
     if (!text || !source || !target) {
       return NextResponse.json({ 
         success: false, 
@@ -17,6 +17,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // Request body fields are the correct type
     if (typeof text !== 'string' || typeof source !== 'string' || typeof target !== 'string') {
       return NextResponse.json({
         success: false,
@@ -45,14 +46,32 @@ export async function POST(req: NextRequest) {
     formData.append('model_id', 'meta-llama/Meta-Llama-3.1-8B-Instruct');
     formData.append('max_tokens', '256');
 
+    // Setup request timeout using AbortController
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+
     // Send POST request to Livepeer LLM endpoint
     const result = await fetch('https://dream-gateway.livepeer.cloud/llm', {
       method: 'POST',
       body: formData,
       headers: {
         'Authorization': `Bearer ${process.env.LIVEPEER_API_KEY}`
-      }
+      },
+      signal: controller.signal
     });
+
+    clearTimeout(timeout);
+
+    // If request failed, send error response
+    if (!result.ok) {
+      console.error('Translation error:', result.statusText);
+      return NextResponse.json({
+        success: false,
+        message: result.statusText || 'Translation failed...'
+      }, { 
+        status: result.status,
+      });
+    }
 
     // Get response data
     const data = await result.json()
