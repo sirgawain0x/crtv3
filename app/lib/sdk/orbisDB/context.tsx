@@ -23,7 +23,7 @@ interface OrbisContextProps {
     update: (docId: string, updates: any) => Promise<void>;
     getAssetMetadata: (assetId: string) => Promise<AssetMetadata | null>;
     orbisLogin: (privateKey?: string) => Promise<OrbisConnectResult | null>;
-    isConnected: (address: string) => Promise<Boolean>;
+    isConnected: (address: string) => Promise<boolean>;
     getCurrentUser: () => Promise<any>;
 }
 
@@ -227,7 +227,7 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
       return authResult;
     };
 
-  const isConnected = async (address: string = ''): Promise<Boolean> => {
+  const isConnected = async (address: string = ''): Promise<boolean> => {
     let connected;
 
     // Check if any user is connected

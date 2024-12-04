@@ -17,8 +17,21 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    // Input validation
+    if (text.length > 1000) {
+      return NextResponse.json({ 
+        success: false, 
+        message: 'Text exceeds maximum length of 1000 characters' 
+      }, { 
+        status: 400,
+      });
+    }
+  
+    // Sanitize input
+    const sanitizedText = text.trim();
+    
     const formData = new FormData();
-    formData.append('text', `Translate '${text}' from ${source} to ${target}. Do not include any other words than the exact, grammatically correct translation.`);
+    formData.append('text', `Translate '${sanitizedText}' from ${source} to ${target}. Do not include any other words than the exact, grammatically correct translation.`);
     formData.append('model_id', 'meta-llama/Meta-Llama-3.1-8B-Instruct');
     formData.append('max_tokens', '256');
 
@@ -54,7 +67,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      response: result
+      llmResponse: data.llmResponse
     }, { 
       status: 200,
     });

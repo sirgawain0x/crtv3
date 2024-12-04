@@ -1,4 +1,7 @@
 import { OrbisDB } from "@useorbis/db-sdk";
+import { ModelDefinition } from "@ceramicnetwork/stream-model";
+import { Asset } from "livepeer/models/components";
+import { TVideoMetaForm } from "@app/components/Videos/Upload/Create-info";
 
 export type AssetMetadata = {
     assetId?: string;
@@ -19,8 +22,30 @@ export type Chunk = {
   timestamp: Array<number>;
 };
 
+export const createAssetMetadata = (
+  livepeerAsset: Asset,
+  metadata: TVideoMetaForm,
+  thumbnailUri?: string,
+  subtitlesUri?: string
+): AssetMetadata => {
+  if (!livepeerAsset.id || !livepeerAsset.playbackId || !metadata.title) {
+    throw new Error('Missing required asset metadata fields');
+  }
+
+  return {
+    assetId: livepeerAsset.id,
+    playbackId: livepeerAsset.playbackId,
+    title: metadata.title,
+    description: metadata.description,
+    ...(metadata.location && { location: metadata.location }),
+    ...(metadata.category && { category: metadata.category }),
+    ...(thumbnailUri && { thumbnailUri }),
+    ...(subtitlesUri && { subtitlesUri }),
+  };
+};
+
 // subtitlesUri w/ assetId & playbackId
-export const AssetMetadataDef = {
+export const AssetMetadataDef: ModelDefinition = {
     "name": "CRTVAssetMetadata",
     "version": "2.0",
     "interface": false,
@@ -62,7 +87,7 @@ export const AssetMetadataDef = {
     }
   };
       
-const createModel = async (modelDefinition: any, db: OrbisDB) => await db.ceramic.createModel(modelDefinition);
+const createModel = async (modelDefinition: ModelDefinition, db: OrbisDB) => await db.ceramic.createModel(modelDefinition);
 
 export default createModel;
 

@@ -63,8 +63,9 @@ export const createAsset = async (data: NewAssetPayload) => {
   try {
     const asset = await fullLivepeer?.asset.create(data);
     return [asset];
-  } catch (error) {
-    console.error('Error creating asset:', error);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    throw new Error(`Failed to create asset: ${errorMessage}`);
   }
 };
 
@@ -73,8 +74,9 @@ export const createViaUrl = async (data: NewAssetFromUrlPayload) => {
   try {
     const asset = await fullLivepeer?.asset?.createViaUrl(data);
     return [asset];
-  } catch (error) {
-    console.error('Error creating url:', error);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    throw new Error(`Error creating url: ${errorMessage}`);
   }
 };
 

@@ -19,8 +19,9 @@ import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
 import StepperIndicator from '@app/components/Stepper-Indicator';
 import { Alert, AlertDescription, AlertTitle } from '../../ui/alert';
 import { hasAccess } from '@app/api/auth/thirdweb/gateCondition';
-import { AssetMetadata } from '@app/lib/sdk/orbisDB/models/AssetMetadata';
+import { AssetMetadata, createAssetMetadata } from '@app/lib/sdk/orbisDB/models/AssetMetadata';
 import { authedOnly } from '@app/api/auth/thirdweb/authentication';
+import { Asset } from 'livepeer/models/components';
 
 const HookMultiStepForm = () => {
   const [activeStep, setActiveStep] = useState(1);
@@ -32,7 +33,7 @@ const HookMultiStepForm = () => {
   });
   
   const [metadata, setMetadata] = useState<TVideoMetaForm>(),
-          [livepeerAsset, setLivepeerAsset] = useState<any>(),
+          [livepeerAsset, setLivepeerAsset] = useState<Asset>(),
             [subtitlesUri, setSubtitlesUri] = useState<string>();
 
   const { insert, assetMetadataModelId, isConnected } = useOrbisContext();
@@ -42,16 +43,25 @@ const HookMultiStepForm = () => {
   const router = useRouter();
 
   useEffect(() => {
-    const tokenGate = async () => {
-      if (
-           !await authedOnly()
-        || !await hasAccess(activeAccount?.address)
-        || !await isConnected(activeAccount?.address)
-      ) {
+    const tokenGate = async (address: string) => {
+      try {
+        const [isAuthed, hasUserAccess, isUserConnected] = await Promise.all([
+          authedOnly(),
+          hasAccess(address),
+          isConnected(address)
+        ]);
+        
+        if (!isAuthed || !hasUserAccess || !isUserConnected) {
+          toast.error("Access denied. Please ensure you are connected and have an active Creator Pass in your wallet.");
+          router.push("/");
+        }
+      } catch (error) {
+        console.error('Authentication check failed:', error);
+        toast.error("Failed to verify access. Please try again.");
         router.push("/");
       }
     }
-    tokenGate();
+    tokenGate(activeAccount?.address);
   }, [activeAccount, router]);
 
   const {
@@ -178,25 +188,18 @@ const HookMultiStepForm = () => {
           onThumbnailSuccess={async (thumbnailUri: string) => {
             console.log('onThumbnailSuccess', { thumbnailUri });
             
-            const assetMetadata: AssetMetadata = {
-              assetId: livepeerAsset?.id as string,
-              playbackId: livepeerAsset?.playbackId as string,
-              title: metadata?.title as string,
-              description: metadata?.description as string,
-              ...(metadata?.location !== undefined && { location: metadata?.location }),
-              ...(metadata?.category !== undefined && { category: metadata?.category }),
-              ...(thumbnailUri !== undefined && { thumbnailUri }),
-              ...(subtitlesUri !== undefined && { subtitlesUri }),
-            };
-            
-            console.log({ assetMetadata });
-            
-            const metadataUri = await insert(
-              assetMetadata,
-              assetMetadataModelId
-            );
-
-            console.log('metadataUri', metadataUri);
+            if (!livepeerAsset || !metadata) {
+              console.error({ livepeerAsset, metadata });
+              throw new Error('Error saving assetMetadata: Missing asset metadata');
+            } else {
+              const assetMetadata: AssetMetadata = createAssetMetadata(livepeerAsset, metadata, thumbnailUri, subtitlesUri)
+              console.log({ assetMetadata });
+              const metadataUri = await insert(
+                assetMetadata,
+                assetMetadataModelId
+              );
+              console.log('metadataUri', metadataUri);
+            }
           }} />
       </div>
     </>
