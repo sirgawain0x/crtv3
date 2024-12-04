@@ -144,28 +144,17 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
     };
 
     const getAssetMetadata = async (assetId: string): Promise<AssetMetadata> => {
-      // console.log('getAssetMetadata', { assetId, assetMetadataModelId, db });
-
       if (!assetId) {
         throw new Error('No assetId provided. Please provide a assetId.');
       }
 
       const selectStatement = db
         .select()
-        .raw(`
-          SELECT * FROM "${assetMetadataModelId}" 
-          WHERE "assetId" = '${assetId}' 
-          AND "_metadata_context" = '${crtvContextId}';  
-        `)
-        // .from(assetMetadataModelId)
-        // .where({
-        //   assetId,
-        // })
-        // .context(crtvContextId);
-
-      const query = selectStatement.build();
-
-      // console.log('Query that will be run', query);
+        .from(assetMetadataModelId)
+        .where({
+          assetId,
+        })
+        .context(crtvContextId);
 
       const [result, error] = await catchError(() => selectStatement.run());
 
@@ -175,11 +164,7 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
         throw error;
       }
 
-      // console.log({ result });
-
       const { columns, rows } = result;
-
-      // console.log({ columns, rows });
 
       console.log('selectStatement runs', selectStatement.runs);
 
@@ -190,16 +175,12 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
         return acc;
       }, {} as AssetMetadata);
       
-      // console.log({ subtitlesUri: assetMetadata?.subtitlesUri });
-
       if (assetMetadata?.subtitlesUri) {
         assetMetadata.subtitles = download({
           client,
           uri: assetMetadata.subtitlesUri
         });
       };
-
-      // console.log({ assetMetadata });
 
       return assetMetadata;
     };
@@ -208,7 +189,11 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
       
       let provider; 
 
-      provider = window.ethereum;
+      if (typeof window !== 'undefined' && window.ethereum) {
+        provider = window.ethereum;
+      } else {
+        throw new Error('No Ethereum provider found. Please install MetaMask or another Web3 wallet.');
+      }
 
       const auth = new OrbisEVMAuth(provider);
 
