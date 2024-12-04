@@ -29,12 +29,12 @@ interface OrbisContextProps {
 
 const db = new OrbisDB({
   ceramic: {
-    gateway: process.env.CERAMIC_NODE_URL || 'https://ceramic-orbisdb-mainnet-direct.hirenodes.io/',
+    gateway: process.env.CERAMIC_NODE_URL as string,
   },
   nodes: [
     {
-      gateway: process.env.ORBIS_NODE_URL || 'https://studio.useorbis.com',
-      env: process.env.ORBIS_ENVIRONMENT_ID || '',
+      gateway: process.env.ORBIS_NODE_URL as string,
+      env: process.env.ORBIS_ENVIRONMENT_ID as string,
     },
   ],
 });
@@ -55,162 +55,162 @@ const OrbisContext = createContext<OrbisContextProps | undefined> ({
 const crtvContextId = process.env.ORBIS_APP_CONTEXT || 'kjzl6kcym7w8y852d7aatt2nb898ds9z8628ij6chl41ni2kz8ky18ft2xv5m5s';   
 
 export const OrbisProvider = ({ children }: { children: ReactNode }) => {
-    const assetMetadataModelId: string = ASSET_METADATA_MODEL_ID;
+  const assetMetadataModelId: string = ASSET_METADATA_MODEL_ID;
 
-    const [authResult, setAuthResult] = useState<OrbisConnectResult | null>(null);
-    
-    const insert = async (value: any, modelId: string): Promise<void> => {
-      // console.log('insert', { value, modelId, db });
+  const [authResult, setAuthResult] = useState<OrbisConnectResult | null>(null);
+  
+  const insert = async (value: any, modelId: string): Promise<void> => {
+    // console.log('insert', { value, modelId, db });
 
-      if (!value) {
-          throw new Error('No value provided. Please provide a value to insert.')
-      }
+    if (!value) {
+        throw new Error('No value provided. Please provide a value to insert.')
+    }
 
-      if (!modelId) {
-        throw new Error('No modelId provided. Please provide a modelId.');
-      }
+    if (!modelId) {
+      throw new Error('No modelId provided. Please provide a modelId.');
+    }
 
-      if (!crtvContextId) {
-        throw new Error('No contextId provided. Please provide a contextId.');
-      }
+    if (!crtvContextId) {
+      throw new Error('No contextId provided. Please provide a contextId.');
+    }
 
-      if (!db) {
-        throw new Error('No db client found.');
-      }
+    if (!db) {
+      throw new Error('No db client found.');
+    }
 
-      const insertStatement: any = db
-        .insert(modelId)
-        .value(value)
-        .context(crtvContextId);
+    const insertStatement: any = db
+      .insert(modelId)
+      .value(value)
+      .context(crtvContextId);
 
-      const validation = await insertStatement.validate();
+    const validation = await insertStatement.validate();
 
-      if (!validation.valid) {
-        throw 'Error during validation: ' + validation.error;
-      }
+    if (!validation.valid) {
+      throw 'Error during validation: ' + validation.error;
+    }
 
-      const [result, error] = await catchError(() => insertStatement.run());
+    const [result, error] = await catchError(() => insertStatement.run());
 
-      if (error) {
-        console.error(error);
-        throw error;
-      }
+    if (error) {
+      console.error(error);
+      throw error;
+    }
 
-      // console.log('result', result);
+    // console.log('result', result);
 
-      console.log('insertStatement runs', insertStatement.runs);
-    };
+    console.log('insertStatement runs', insertStatement.runs);
+  };
 
-    const replace = async (docId: string, newDoc: any): Promise<void> => {
-      console.log('update', { docId, newDoc, db });
+  const replace = async (docId: string, newDoc: any): Promise<void> => {
+    console.log('update', { docId, newDoc, db });
 
-      const replaceStatement: any = db.update(docId).replace(newDoc);
+    const replaceStatement: any = db.update(docId).replace(newDoc);
 
-      const query = replaceStatement.build();
+    const query = replaceStatement.build();
 
-      console.log('Query that will be run', query);
+    console.log('Query that will be run', query);
 
-      const [result, error] = await catchError(() => query.run());
+    const [result, error] = await catchError(() => query.run());
 
-      if (error) {
-        console.error(error);
-        throw error;
-      }
+    if (error) {
+      console.error(error);
+      throw error;
+    }
 
-      console.log('result', result);
+    console.log('result', result);
 
-      console.log(replaceStatement.runs);
-    };
+    console.log(replaceStatement.runs);
+  };
 
-    const update = async (docId: string, updates: any): Promise<void> => {
-      console.log('update', { docId, updates, db });
+  const update = async (docId: string, updates: any): Promise<void> => {
+    console.log('update', { docId, updates, db });
 
-      const updateStatement: any = db.update(docId).set(updates);
+    const updateStatement: any = db.update(docId).set(updates);
 
-      const query = updateStatement.build();
+    const query = updateStatement.build();
 
-      console.log('Query that will be run', query);
+    console.log('Query that will be run', query);
 
-      const [result, error] = await catchError(() => query.run());
+    const [result, error] = await catchError(() => query.run());
 
-      if (error) {
-        console.error(error);
-        throw error;
-      }
+    if (error) {
+      console.error(error);
+      throw error;
+    }
 
-      console.log('result', result);
+    console.log('result', result);
 
-      console.log(updateStatement.runs);
-    };
+    console.log(updateStatement.runs);
+  };
 
-    const getAssetMetadata = async (assetId: string): Promise<AssetMetadata> => {
-      if (!assetId) {
-        throw new Error('No assetId provided. Please provide a assetId.');
-      }
+  const getAssetMetadata = async (assetId: string): Promise<AssetMetadata> => {
+    if (!assetId) {
+      throw new Error('No assetId provided. Please provide a assetId.');
+    }
 
-      const selectStatement = db
-        .select()
-        .from(assetMetadataModelId)
-        .where({
-          assetId,
-        })
-        .context(crtvContextId);
+    const selectStatement = db
+      .select()
+      .from(assetMetadataModelId)
+      .where({
+        assetId,
+      })
+      .context(crtvContextId);
 
-      const [result, error] = await catchError(() => selectStatement.run());
+    const [result, error] = await catchError(() => selectStatement.run());
 
-      if (error) {
-        console.log('selectStatement runs', selectStatement.runs);
-        console.error(error);
-        throw error;
-      }
-
-      const { columns, rows } = result;
-
+    if (error) {
       console.log('selectStatement runs', selectStatement.runs);
+      console.error(error);
+      throw error;
+    }
 
-      const assetMetadata = rows.reduce((acc: any, row: any) => {
-        columns.forEach((col, index) => {
-          acc[col] = row[index];
-        });
-        return acc;
-      }, {} as AssetMetadata);
-      
-      if (assetMetadata?.subtitlesUri) {
-        assetMetadata.subtitles = download({
-          client,
-          uri: assetMetadata.subtitlesUri
-        });
-      };
+    const { columns, rows } = result;
 
-      return assetMetadata;
+    console.log('selectStatement runs', selectStatement.runs);
+
+    const assetMetadata = rows.reduce((acc: any, row: any) => {
+      columns.forEach((col, index) => {
+        acc[col] = row[index];
+      });
+      return acc;
+    }, {} as AssetMetadata);
+    
+    if (assetMetadata?.subtitlesUri) {
+      assetMetadata.subtitles = download({
+        client,
+        uri: assetMetadata.subtitlesUri
+      });
     };
 
-    const orbisLogin = async (): Promise<OrbisConnectResult> => {
-      
-      let provider; 
+    return assetMetadata;
+  };
 
-      if (typeof window !== 'undefined' && window.ethereum) {
-        provider = window.ethereum;
-      } else {
-        throw new Error('No Ethereum provider found. Please install MetaMask or another Web3 wallet.');
-      }
+  const orbisLogin = async (): Promise<OrbisConnectResult> => {
+    
+    let provider; 
 
-      const auth = new OrbisEVMAuth(provider);
+    if (typeof window !== 'undefined' && window.ethereum) {
+      provider = window.ethereum;
+    } else {
+      throw new Error('No Ethereum provider found. Please install MetaMask or another Web3 wallet.');
+    }
 
-      const authResult: OrbisConnectResult = await db.connectUser({ auth });
+    const auth = new OrbisEVMAuth(provider);
 
-      // console.log({ authResult });
+    const authResult: OrbisConnectResult = await db.connectUser({ auth });
 
-      const connected = await db.isUserConnected()
+    // console.log({ authResult });
 
-      // console.log({ connected });
-      
-      // if (!connected) {
-      //   throw new Error('User is not connected.');
-      // }
+    const connected = await db.isUserConnected()
 
-      return authResult;
-    };
+    // console.log({ connected });
+    
+    // if (!connected) {
+    //   throw new Error('User is not connected.');
+    // }
+
+    return authResult;
+  };
 
   const isConnected = async (address: string = ''): Promise<boolean> => {
     let connected;
@@ -240,22 +240,22 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
     return currentUser;
   };
 
-    return (
-        <OrbisContext.Provider value={{ 
-            assetMetadataModelId,
-            authResult,
-            setAuthResult,
-            insert,
-            replace,
-            update,
-            getAssetMetadata,
-            orbisLogin,
-            isConnected,
-            getCurrentUser
-        }}>
-            {children}
-        </OrbisContext.Provider>
-    );
+  return (
+      <OrbisContext.Provider value={{ 
+          assetMetadataModelId,
+          authResult,
+          setAuthResult,
+          insert,
+          replace,
+          update,
+          getAssetMetadata,
+          orbisLogin,
+          isConnected,
+          getCurrentUser
+      }}>
+          {children}
+      </OrbisContext.Provider>
+  );
 };
 
 export const useOrbisContext = () => {
