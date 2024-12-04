@@ -26,18 +26,6 @@ interface OrbisContextProps {
     getCurrentUser: () => Promise<any>;
 }
 
-const db = new OrbisDB({
-  ceramic: {
-    gateway: process.env.CERAMIC_NODE_URL || 'https://ceramic-orbisdb-mainnet-direct.hirenodes.io/',
-  },
-  nodes: [
-    {
-      gateway: process.env.ORBIS_NODE_URL || 'https://studio.useorbis.com',
-      env: process.env.ORBIS_ENVIRONMENT_ID || '',
-    },
-  ],
-});
-
 const OrbisContext = createContext<OrbisContextProps | undefined> ({
     authResult: null,
     setAuthResult: () => {},
@@ -55,6 +43,32 @@ const crtvContextId = process.env.ORBIS_APP_CONTEXT || 'kjzl6kcym7w8y852d7aatt2n
 export const OrbisProvider = ({ children }: { children: ReactNode }) => {
   const [authResult, setAuthResult] = useState<OrbisConnectResult | null>(null);
 
+  const ceramicNodeUrl = process.env.NEXT_PUBLIC_CERAMIC_NODE_URL as string;
+  const orbisNodeUrl = process.env.NEXT_PUBLIC_ORBIS_NODE_URL as string;
+  const orbisEnvironmentId = process.env.NEXT_PUBLIC_ORBIS_ENVIRONMENT_ID as string;
+  
+  if (!ceramicNodeUrl) {
+    throw new Error('CERAMIC_NODE_URL environment variable is required');
+  }
+  if (!orbisNodeUrl) {
+    throw new Error('ORBIS_NODE_URL environment variable is required');
+  }
+  if (!orbisEnvironmentId) {
+    throw new Error('ORBIS_ENVIRONMENT_ID environment variable is required');
+  }
+  
+  const db = new OrbisDB({
+    ceramic: {
+      gateway: ceramicNodeUrl,
+    },
+    nodes: [
+      {
+        gateway: orbisNodeUrl,
+        env: orbisEnvironmentId,
+      },
+    ],
+  });
+  
   const validateDbOperation = (id: string, value?: any, select: boolean = false) => {
     if (!id) throw new Error('No id provided');
     if (!select) {
@@ -64,7 +78,7 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
     if (!db) throw new Error('No db client found');
   };
   
-  const insert = async (value: any, modelId: string): Promise<void> => {
+  const insert = async (modelId: string, value: any): Promise<void> => {
     validateDbOperation(modelId, value);
 
     const insertStatement: any = db

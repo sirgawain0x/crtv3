@@ -129,8 +129,8 @@ const HookMultiStepForm = () => {
             } else {
               const assetMetadata: AssetMetadata = createAssetMetadata(livepeerAsset, metadata, thumbnailUri, subtitlesUri)
               const metadataUri = await insert(
-                assetMetadata,
-                ASSET_METADATA_MODEL_ID
+                ASSET_METADATA_MODEL_ID,
+                assetMetadata
               );
             }
           }} />

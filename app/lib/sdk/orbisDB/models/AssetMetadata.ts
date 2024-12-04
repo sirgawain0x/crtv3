@@ -44,7 +44,6 @@ export const createAssetMetadata = (
   };
 };
 
-// subtitlesUri w/ assetId & playbackId
 export const AssetMetadataDef: ModelDefinition = {
     "name": "CRTVAssetMetadata",
     "version": "2.0",
@@ -85,7 +84,7 @@ export const AssetMetadataDef: ModelDefinition = {
       },
       "additionalProperties": false
     }
-  };
+};
       
 const createModel = async (modelDefinition: ModelDefinition, db: OrbisDB) => await db.ceramic.createModel(modelDefinition);
 

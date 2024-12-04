@@ -4,14 +4,6 @@ import { ThirdwebProvider } from '@app/lib/sdk/thirdweb/components';
 import { createContext, useContext, useState, useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { OrbisProvider } from '@app/lib/sdk/orbisDB/context';
-import {
-  defineChain,
-  polygon,
-  optimism,
-  base,
-  zora,
-  zoraSepolia,
-} from 'thirdweb/chains';
 
 interface ThemeContextType {
   theme: string;

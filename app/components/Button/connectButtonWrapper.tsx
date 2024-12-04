@@ -26,7 +26,7 @@ import { ACCOUNT_FACTORY_ADDRESS } from '@app/lib/utils/context';
 import { useActiveWallet } from 'thirdweb/react';
 
 export default function ConnectButtonWrapper() {
-  const { orbisLogin } = useOrbisContext();
+  const { isConnected, orbisLogin } = useOrbisContext();
   const activeWallet = useActiveWallet();
 
   const wallets = [
@@ -149,12 +149,12 @@ export default function ConnectButtonWrapper() {
           
           const loginPayload: LoginPayload | void = await login(params);
           
-          // console.log({ doLoginResponse: loginPayload });
+          const isConnectedToOrbisDB = await isConnected(params?.payload?.address);
 
-          const orbisAuthResult: OrbisConnectResult | null = await orbisLogin();
+          if (!isConnectedToOrbisDB) {
+            const orbisAuthResult: OrbisConnectResult | null = await orbisLogin();
+          }
 
-          // console.log({ orbisAuthResult });
-          
           return loginPayload;
         },
         isLoggedIn: async () => await authedOnly(),
