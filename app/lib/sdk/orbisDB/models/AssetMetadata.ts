@@ -28,7 +28,7 @@ export const createAssetMetadata = (
   thumbnailUri?: string,
   subtitlesUri?: string
 ): AssetMetadata => {
-  if (!livepeerAsset.id || !livepeerAsset.playbackId || !metadata.title) {
+  if (!livepeerAsset.id || !livepeerAsset.playbackId || !metadata.title || !metadata.description) {
     throw new Error('Missing required asset metadata fields');
   }
 
