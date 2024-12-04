@@ -17,6 +17,15 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    if (typeof text !== 'string' || typeof source !== 'string' || typeof target !== 'string') {
+      return NextResponse.json({
+        success: false,
+        message: 'Invalid input types'
+      }, {
+        status: 400,
+      });
+    }
+
     // Additional input validation for text field
     if (text.length > 1000) {
       return NextResponse.json({ 
@@ -44,7 +53,6 @@ export async function POST(req: NextRequest) {
         'Authorization': `Bearer ${process.env.LIVEPEER_API_KEY}`
       }
     });
-
 
     // Get response data
     const data = await result.json()
