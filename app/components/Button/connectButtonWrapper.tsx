@@ -116,7 +116,7 @@ export default function ConnectButtonWrapper() {
           'https://bafybeiesvinhgaqvr62rj77jbwkazg3w6bhcrsfyg6zyozasaud53nucnm.ipfs.w3s.link/Creative%20TV%20Logo.png',
       }}
       walletConnect={{
-        projectId: 'dc6a426a325d62879d4b9c6ef6dcedb1',
+        projectId: process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID,
       }}
       supportedNFTs={{
         137: [

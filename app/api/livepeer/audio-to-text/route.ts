@@ -13,55 +13,64 @@ export const config = {
 
 export async function POST(req: NextRequest) {
   try {
+    // Retrieve request body formData object
     const formData = await req.formData();
-    // const file = formData.get('audio') as File;
+
+    // Append additional params to formData object
     formData.append('model_id', 'openai/whisper-large-v3');
 
-    console.log('audioToText resquest body: ', formData);
+    // Validate request body formData includes audio param
+    if (!formData.get('audio')) {
+      return NextResponse.json({
+        success: false,
+        message: 'Audio file is required'
+      }, { 
+        status: 400,
+      });
+    }
 
-    // if (!file) {
-    //   return NextResponse.json({
-    //     success: false,
-    //     message: 'Audio file is required'
-    //   }, { 
-    //     status: 400,
-    //   });
-    // }
+    // Setup request timeout using AbortController
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
 
-    // const blob = new Blob([file], { type: 'video/mp4' });
+    // Set request options object
+    const options = {
+      method: 'POST',
+      body: formData,
+      headers: {
+        'Authorization': `Bearer ${process.env.LIVEPEER_FULL_API_KEY}`
+      },
+      signal: controller.signal
+    };
 
-    // console.log('blob', blob);
+    // Send POST request to Livepeer LLM endpoint
+    const res = await fetch('https://dream-gateway.livepeer.cloud/audio-to-text', options)
 
-      const options = {
-        method: 'POST',
-        body: formData,
-        headers: {
-          'Authorization': `Bearer ${process.env.LIVEPEER_FULL_API_KEY}`
-        }
-      };
+    clearTimeout(timeout);
 
-      const res = await fetch('https://dream-gateway.livepeer.cloud/audio-to-text', options)
+    const result = await res.json();
 
-      const result = await res.json();
+    // If request failed, send error response
+    if (!result.ok) {
+      console.error('Translation error:', result.statusText);
+      return NextResponse.json({
+        success: false,
+        message: result.statusText || 'Translation failed...'
+      }, { 
+        status: result.status,
+      });
+    }
 
-      console.log('result', result);
-
-    // if (result?.rawResponse.status !== 200) {
-    //   return NextResponse.json({
-    //     success: false,
-    //     message: 'ERROR: Failed to generate text from audio: ' + result?.rawResponse.statusText
-    //   }, { 
-    //     status: result?.rawResponse.status || 500,
-    //   });
-    // }
-
+    // Get response data
+    const data = await result.json()
+    
+    // Send NextResponse 
     return NextResponse.json({
       success: true,
-      result
+      response: data
     }, { 
       status: 200,
     });
-
   } catch (error) {
     console.error('Error in audio-to-text conversion:', error);
     return NextResponse.json({
@@ -78,9 +87,10 @@ export async function OPTIONS() {
   return new NextResponse(null, {
     status: 200,
     headers: {
-      'Access-Control-Allow-Origin': 'http://localhost:3000',
+      'Access-Control-Allow-Origin': process.env.NEXT_PUBLIC_THIRDWEB_AUTH_DOMAIN || 'http://localhost:3000',
       'Access-Control-Allow-Methods': 'POST',
-      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      'Access-Control-Max-Age': '86400',
     }
   });
 }
