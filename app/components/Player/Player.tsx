@@ -18,6 +18,7 @@ import * as Player from '@livepeer/react/player';
 import { SubtitlesControl, SubtitlesDisplay, SubtitlesProvider } from './Subtitles';
 import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
 import { AssetMetadata } from '@app/lib/sdk/orbisDB/models/AssetMetadata';
+import { toast } from 'sonner';
 
 interface PlayerComponentProps {
   src: Src[] | null;
@@ -48,6 +49,8 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({ src, assetId, 
         setAssetMetadata(data);
       } catch (error) {
         console.error('Failed to fetch asset metadata:', error);
+        setAssetMetadata(null);
+        toast.error("Failed to load asset metadata");
       }
     };
     fetchAssetDetails(assetId);

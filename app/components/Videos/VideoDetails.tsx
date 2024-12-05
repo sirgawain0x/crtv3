@@ -33,6 +33,7 @@ import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
 import { AssetMetadata } from '@app/lib/sdk/orbisDB/models/AssetMetadata';
 import { SubtitlesDisplay, SubtitlesControl } from '@app/components/Player/Subtitles';
 import { getDetailPlaybackSource } from '@app/lib/utils/hooks/useDetailPlaybackSources';
+import { toast } from 'sonner';
 
 type VideoDetailsProps = {
   asset: Asset;
@@ -55,6 +56,8 @@ export default function VideoDetails({ asset }: VideoDetailsProps) {
         setAssetMetadata(assetMetadata);
       } catch (error) {
         console.error('Error fetching asset metadata', error);
+        setAssetMetadata(null);
+        toast.error("Failed to load asset metadata");
       }
     }
     fetchPlaybackSources();
