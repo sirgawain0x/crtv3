@@ -71,16 +71,18 @@ async function validateAccess(payload: WebhookPayload): Promise<boolean> {
     return false;
   }
 
-  // 2. Check user-specific conditions
-  if (!context?.tokenId || !context.contractAddress && context.chain) {
+  // 2. Validate WebhookContext
+  if (!context?.tokenId || !context.contractAddress || !context.chain) {
     return false;
   }
+
+  // 3. Check user-specific conditions
   const userHasToken = await checkUserTokenBalances(address, context);
   if (!userHasToken) {
     return false;
   }
 
-  // 3. Asset or stream-specific checks
+  // 4. Asset or stream-specific checks
   const isAssetAccessible = await checkAssetAccessibility(context);
   if (!isAssetAccessible) {
     return false;
