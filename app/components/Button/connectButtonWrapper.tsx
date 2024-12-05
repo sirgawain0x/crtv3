@@ -151,11 +151,15 @@ export default function ConnectButtonWrapper() {
             const orbisConntected = await isConnected(params?.payload?.address);
             if (!orbisConntected) {
               const orbisAuthResult = await orbisLogin();
+              if (!orbisAuthResult) {
+                throw new Error('Failed to connect to Orbis');
+              }
             }
 
             return loginPayload;
           } catch (error) {
             console.error('Login failed: ', error);
+            throw error;
           }
         },
         isLoggedIn: async () => await authedOnly(),

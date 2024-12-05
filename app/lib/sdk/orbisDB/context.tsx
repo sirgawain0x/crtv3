@@ -199,7 +199,7 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
     return assetMetadata;
   };
 
-  const orbisLogin = async (): Promise<OrbisConnectResult> => {
+  const orbisLogin = async (privateKey?: string): Promise<OrbisConnectResult> => {
     
     let provider; 
 
