@@ -42,18 +42,16 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({ src, assetId, 
   // }
 
   useEffect(() => {
-    console.log('Player', { assetId });
+    const fetchAssetDetails = async (id: string): Promise<void> => {
+      try {
+        const data = await getAssetMetadata(id);
+        setAssetMetadata(data);
+      } catch (error) {
+        console.error('Failed to fetch asset metadata:', error);
+      }
+    };
     fetchAssetDetails(assetId);
-  }, [assetId]);
-
-  const fetchAssetDetails = async (id: string): Promise<void> => {
-    try {
-      const data = await getAssetMetadata(id);
-      setAssetMetadata(data);
-    } catch (error) {
-      console.error('Failed to fetch asset metadata:', error);
-    }
-  };
+  }, [assetId, getAssetMetadata]);
 
   return (
     <>

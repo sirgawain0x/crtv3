@@ -59,7 +59,7 @@ export default function VideoDetails({ asset }: VideoDetailsProps) {
     }
     fetchPlaybackSources();
     fetchAssetMetadata();
-  }, [asset?.playbackId]);
+  }, [asset?.playbackId, getAssetMetadata]);
 
   const Seek = forwardRef<HTMLButtonElement, Player.SeekProps>(
     ({ children, ...props }, forwardedRef) => (
