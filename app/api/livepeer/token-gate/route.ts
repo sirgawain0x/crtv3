@@ -1,9 +1,15 @@
 'use server';
 
-import { getJwtContext } from '@app/api/auth/thirdweb/authentication';
-import { validateAccessKey } from '@app/lib/access-key';
 import { NextRequest, NextResponse } from 'next/server';
-import { useActiveAccount } from 'thirdweb/react';
+
+import { getContract } from 'thirdweb';
+import { balanceOf as balanceOfERC1155 } from "thirdweb/extensions/erc1155";
+
+import { client } from '@app/lib/sdk/thirdweb/client';
+import { validateAccessKey } from '@app/lib/access-key';
+import { getJwtContext } from '@app/api/auth/thirdweb/authentication';
+import { defineChain } from 'thirdweb';
+
 
 export interface WebhookPayload {
   accessKey: string;
@@ -15,6 +21,7 @@ export interface WebhookContext {
   creatorAddress: string;
   tokenId: string;
   contractAddress: string;
+  chain: number;
 }
 
 export async function POST(request: NextRequest) {
@@ -68,7 +75,7 @@ async function validateAccess(payload: WebhookPayload): Promise<boolean> {
   if (!context?.tokenId || !context.contractAddress) {
     return false;
   }
-  const userHasToken = await checkUserTokenBalances(address, context.tokenId, context.contractAddress);
+  const userHasToken = await checkUserTokenBalances(address, context);
   if (!userHasToken) {
     return false;
   }
@@ -85,11 +92,20 @@ async function validateAccess(payload: WebhookPayload): Promise<boolean> {
   return true;
 }
 
-async function checkUserTokenBalances(address: string, tokenId: string, contractAddress: string): Promise<boolean> {
-  // TODO: map tokenId to tokenId in ERC1155 contract and check balance.
-  // For example, use tokenId if possible, otherwise, use a mapping
-  // stored in a orbisDB.
-  return true;
+async function checkUserTokenBalances(address: string, context: WebhookContext): Promise<boolean> {
+  const videoTokenContract = getContract({
+    address: context.contractAddress,
+    chain: defineChain(context.chain),
+    client,
+  });
+
+  const videoTokenBalance = await balanceOfERC1155({
+    contract: videoTokenContract,
+    tokenId: BigInt(context.tokenId),
+    owner: address,
+  });
+
+  return videoTokenBalance > 0n;
 }
 
 async function checkAssetAccessibility(tokenId: string, contractAddress: string): Promise<boolean> {
