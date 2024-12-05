@@ -40,7 +40,7 @@ type VideoDetailsProps = {
 
 export default function VideoDetails({ asset }: VideoDetailsProps) {
   const [playbackSources, setPlaybackSources] = useState<Src[] | null>(null);
-  const [assetMetadata, setAssetMetadata] = useState<AssetMetadata | null>();
+  const [assetMetadata, setAssetMetadata] = useState<AssetMetadata | null>(null);
   
   const { getAssetMetadata } = useOrbisContext();
 
