@@ -11,8 +11,11 @@ import {
   XIcon,
   PictureInPictureIcon,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Src } from '@livepeer/react';
 import * as Popover from '@radix-ui/react-popover';
+
+import { useActiveAccount } from 'thirdweb/react';
 
 import {
   PauseIcon,
@@ -33,7 +36,8 @@ import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
 import { AssetMetadata } from '@app/lib/sdk/orbisDB/models/AssetMetadata';
 import { SubtitlesDisplay, SubtitlesControl } from '@app/components/Player/Subtitles';
 import { getDetailPlaybackSource } from '@app/lib/utils/hooks/useDetailPlaybackSources';
-import { toast } from 'sonner';
+import { generateAccessKey } from '@app/lib/access-key';
+import { WebhookContext } from '@app/api/livepeer/token-gate/route';
 
 type VideoDetailsProps = {
   asset: Asset;
@@ -42,6 +46,9 @@ type VideoDetailsProps = {
 export default function VideoDetails({ asset }: VideoDetailsProps) {
   const [playbackSources, setPlaybackSources] = useState<Src[] | null>(null);
   const [assetMetadata, setAssetMetadata] = useState<AssetMetadata | null>(null);
+  const [conditionalProps, setConditionalProps] = useState<any>({});
+  
+  const activeAccount = useActiveAccount();
   
   const { getAssetMetadata } = useOrbisContext();
 
@@ -62,7 +69,13 @@ export default function VideoDetails({ asset }: VideoDetailsProps) {
     }
     fetchPlaybackSources();
     fetchAssetMetadata();
-  }, [asset?.playbackId, getAssetMetadata]);
+    const conProps = {
+      ...(asset.playbackPolicy && { 
+        accessKey: generateAccessKey(activeAccount?.address, asset.playbackPolicy.webhookContext as WebhookContext) 
+      })
+    }
+    setConditionalProps(conProps);
+  }, [asset, getAssetMetadata]);
 
   const Seek = forwardRef<HTMLButtonElement, Player.SeekProps>(
     ({ children, ...props }, forwardedRef) => (
@@ -296,7 +309,7 @@ export default function VideoDetails({ asset }: VideoDetailsProps) {
       </h1>
       {/* Render other asset details */}
       {playbackSources ? (
-        <Player.Root src={playbackSources}>
+        <Player.Root src={playbackSources} {...conditionalProps}>
           <Player.Container className="h-full w-full overflow-hidden bg-gray-800">
             <Player.Video title={asset?.name} className="h-full w-full" />
               { assetMetadata?.subtitles && 

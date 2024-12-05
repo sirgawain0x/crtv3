@@ -8,7 +8,7 @@ type TranslateParams = {
     maxTokens?: string;
 };
 
-export const getLivepeerAudioToText = async (
+export const getLivepeerTranslation = async (
   params: TranslateParams,
 ) => {
     try {

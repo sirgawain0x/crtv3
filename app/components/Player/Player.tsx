@@ -19,6 +19,10 @@ import { SubtitlesControl, SubtitlesDisplay, SubtitlesProvider } from './Subtitl
 import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
 import { AssetMetadata } from '@app/lib/sdk/orbisDB/models/AssetMetadata';
 import { toast } from 'sonner';
+import { fetchAssetId } from '@app/api/livepeer/actions';
+import { generateAccessKey } from '@app/lib/access-key';
+import { WebhookContext } from '@app/api/livepeer/token-gate/route';
+import { useActiveAccount } from 'thirdweb/react';
 
 interface PlayerComponentProps {
   src: Src[] | null;
@@ -27,9 +31,12 @@ interface PlayerComponentProps {
   accessKey?: string;
 };
 
-export const PlayerComponent: React.FC<PlayerComponentProps> = ({ src, assetId, title, accessKey }) => {
+export const PlayerComponent: React.FC<PlayerComponentProps> = ({ src, assetId, title }) => {
   const [assetMetadata, setAssetMetadata] = useState<AssetMetadata | null>(null);
-  
+  const [conditionalProps, setConditionalProps] = useState<any>({});
+
+  const activeAccount = useActiveAccount();
+
   const { getAssetMetadata } = useOrbisContext();
 
   // if (!src) {
@@ -47,6 +54,13 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({ src, assetId, 
       try {
         const data = await getAssetMetadata(id);
         setAssetMetadata(data);
+        const asset = await fetchAssetId(id);
+        const conProps = {
+          ...(asset?.asset?.playbackPolicy && {
+            accessKey: generateAccessKey(activeAccount?.address, asset?.asset?.playbackPolicy?.webhookContext as WebhookContext)
+          })
+        }
+        setConditionalProps(conProps);
       } catch (error) {
         console.error('Failed to fetch asset metadata:', error);
         setAssetMetadata(null);
@@ -59,7 +73,7 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({ src, assetId, 
   return (
     <>
       <SubtitlesProvider >
-        <Player.Root src={src} accessKey={accessKey}>
+        <Player.Root src={src} {...conditionalProps}>
           <Player.Container className="h-full w-full overflow-hidden bg-gray-950">
             <Player.Video title={title} className="h-full w-full" poster={null} />
 
