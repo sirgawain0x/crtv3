@@ -83,7 +83,7 @@ async function validateAccess(payload: WebhookPayload): Promise<boolean> {
   // 3. Asset or stream-specific checks
   if (context.tokenId && context.contractAddress) {
     // Check if asset is not restricted
-    const isAssetAccessible = await checkAssetAccessibility(context.tokenId, context.contractAddress);
+    const isAssetAccessible = await checkAssetAccessibility(context);
     if (!isAssetAccessible) {
       return false;
     }
@@ -108,7 +108,7 @@ async function checkUserTokenBalances(address: string, context: WebhookContext):
   return videoTokenBalance > 0n;
 }
 
-async function checkAssetAccessibility(tokenId: string, contractAddress: string): Promise<boolean> {
+async function checkAssetAccessibility(context: WebhookContext): Promise<boolean> {
   // Implement actual asset accessibility checking logic
   // For example, check if asset is published or not restricted
   return true;
