@@ -1,18 +1,15 @@
 'use server';
 
+import { Type, InputCreatorIdType } from 'livepeer/models/components';
 import { fullLivepeer } from '@app/lib/sdk/livepeer/fullClient';
-import { InputCreatorIdType, Webhook } from 'livepeer/models/components';
-import { Type } from 'livepeer/models/components';
-import { WebhookContext } from './token-gate/route';
-import { useActiveAccount } from 'thirdweb/react';
+import { WebhookContext } from '@app/api/livepeer/token-gate/route';
 
-// TODO: Add playback policy - https://docs.livepeer.org/developers/tutorials/token-gate-videos-with-lit
 export const getLivepeerUploadUrl = async (
   fileName: string,
   creatorAddress: string,
+  tokenId?: string,
+  contractAddress?: string,
   tokenGated: boolean = false,
-  // activeAccount?: ReturnType<typeof useActiveAccount>,
-  assetId?: string // Only required for tokenGated assets
 ) => {
   const createAssetBody: {
     name: string;
@@ -40,20 +37,19 @@ export const getLivepeerUploadUrl = async (
   };
 
   if (tokenGated) {
-
-    if (!creatorAddress) {
-      throw new Error('Active account is required for token gated assets');
-    }
+    if (!creatorAddress) throw new Error('Creator address is required for token gated assets');
+    if (!tokenId) throw new Error('Token ID is required for token gated assets');
+    if (!contractAddress) throw new Error('Token contract address is required for token gated assets');
 
     createAssetBody.playbackPolicy = {
       type: Type.Webhook,
-      webhookId: process.env.LIVEPEER_WEBHOOK_ID || '',
+      webhookId: process.env.LIVEPEER_WEBHOOK_ID as string,
       webhookContext: {
-        assetId: assetId,
-        address: creatorAddress,
-      },
+        creatorAddress,
+        tokenId,
+        contractAddress,
+      } as WebhookContext,
     };
-
   }
 
   const result = await fullLivepeer.asset.create(createAssetBody);

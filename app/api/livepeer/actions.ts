@@ -21,20 +21,25 @@ export const fetchAllAssets = async (): Promise<Asset[] | {}> => {
 export const fetchAssetId = async (
   id: string | { queryKey: [unknown, { assetId: string }] },
 ) => {
-  let assetId: string;
-  
-  if (typeof id === 'string') {
-    // Handle the case where `id` is a string
-    assetId = id;
-  } else {
-    // Handle the case where `id` is an object with a `queryKey` property
-    const [, { assetId: queryAssetId }] = id.queryKey;
-    assetId = queryAssetId;
+  try {
+    let assetId: string;
+    
+    if (typeof id === 'string') {
+      // Handle the case where `id` is a string
+      assetId = id;
+    } else {
+      // Handle the case where `id` is an object with a `queryKey` property
+      const [, { assetId: queryAssetId }] = id.queryKey;
+      assetId = queryAssetId;
+    }
+    
+    const asset = await fullLivepeer?.asset.get(assetId);
+    
+    return asset;
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Fetch asset by ID failed, unknown error occurred';
+    throw new Error(`Failed to fetch asset by ID: ${errorMessage}`);
   }
-  
-  const asset = await fullLivepeer?.asset.get(assetId);
-  
-  return asset;
 };
 
 // UPDATE ASSET BY ID
@@ -42,20 +47,25 @@ export const updateAsset = async (
   id: string | { queryKey: [unknown, { assetId: string }] },
   data: any,
 ) => {
-  let assetId: string;
+  try {
+    let assetId: string;
   
-  if (typeof id === 'string') {
-    // Handle the case where `id` is a string
-    assetId = id;
-  } else {
-    // Handle the case where `id` is an object with a `queryKey` property
-    const [, { assetId: queryAssetId }] = id.queryKey;
-    assetId = queryAssetId;
-  }
-  
-  const asset = await fullLivepeer?.asset.update(data, assetId);
+    if (typeof id === 'string') {
+      // Handle the case where `id` is a string
+      assetId = id;
+    } else {
+      // Handle the case where `id` is an object with a `queryKey` property
+      const [, { assetId: queryAssetId }] = id.queryKey;
+      assetId = queryAssetId;
+    }
+    
+    const asset = await fullLivepeer?.asset.update(data, assetId);
 
-  return asset;
+    return asset;
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Update asset ailed, unknown error occurred';
+    throw new Error(`Failed to update asset: ${errorMessage}`);
+  }
 };
 
 // CREATE ASSET
@@ -84,20 +94,25 @@ export const createViaUrl = async (data: NewAssetFromUrlPayload) => {
 export const deleteAsset = async (
   id: string | { queryKey: [unknown, { assetId: string }] },
 ) => {
-  let assetId: string;
+  try {
+    let assetId: string;
 
-  if (typeof id === 'object') {
-    // Handle the case where `id` is an object with a `queryKey` property
-    const [, { assetId: queryAssetId }] = id.queryKey;
-    assetId = queryAssetId;
-  } else {
-    // Handle the case where `id` is a string
-    assetId = id;
+    if (typeof id === 'object') {
+      // Handle the case where `id` is an object with a `queryKey` property
+      const [, { assetId: queryAssetId }] = id.queryKey;
+      assetId = queryAssetId;
+    } else {
+      // Handle the case where `id` is a string
+      assetId = id;
+    }
+
+    const response = await fullLivepeer?.asset.delete(assetId);
+    
+    const asset = response;
+    
+    return asset;
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Delete asset failed, unknown error occurred';
+    throw new Error(`Failed to delete asset: ${errorMessage}`);
   }
-
-  const response = await fullLivepeer?.asset.delete(assetId);
-  
-  const asset = response;
-  
-  return asset;
 };

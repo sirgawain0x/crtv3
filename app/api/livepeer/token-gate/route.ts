@@ -1,3 +1,6 @@
+'use server';
+
+import { getJwtContext } from '@app/api/auth/thirdweb/authentication';
 import { validateAccessKey } from '@app/lib/access-key';
 import { NextRequest, NextResponse } from 'next/server';
 import { useActiveAccount } from 'thirdweb/react';
@@ -9,15 +12,22 @@ export interface WebhookPayload {
 }
 
 export interface WebhookContext {
-  assetId?: string;
-  address?: string;
-  subscriptionLevel?: string;
+  creatorAddress: string;
+  tokenId: string;
+  contractAddress: string;
 }
 
 export async function POST(request: NextRequest) {
   try {
     // Parse the incoming JSON payload
     const payload: WebhookPayload = await request.json();
+
+    if (!payload.accessKey || !payload.context || !payload.timestamp) {
+      return NextResponse.json({ 
+        allowed: false,
+        message: 'Bad request, missing required fields' 
+      }, { status: 400 });
+    }
 
     // Implement your custom access control logic here
     const isAccessAllowed = await validateAccess(payload);
@@ -45,30 +55,28 @@ export async function POST(request: NextRequest) {
 }
 
 async function validateAccess(payload: WebhookPayload): Promise<boolean> {
-  const activeAccount = useActiveAccount();
-  const { accessKey, context } = payload;
+  const { accessKey, context, timestamp } = payload;
 
-  // 1. Validate access key 
-  if (activeAccount?.address && context.assetId && !validateAccessKey(accessKey, activeAccount?.address, context.assetId)) {
+  const { address } = await getJwtContext();
+
+  // 1. Validate access key
+  if (!address && !validateAccessKey(accessKey, address, context)) {
     return false;
   }
 
   // 2. Check user-specific conditions
-  if (activeAccount) {
-    // Check if user has tokens 
-    if (!activeAccount || !context?.assetId) {
-      return false;
-    }
-    const userSubscription = await checkUserTokenBalances(activeAccount.address, context.assetId);
-    if (!userSubscription) {
-      return false;
-    }
+  if (!context?.tokenId || !context.contractAddress) {
+    return false;
+  }
+  const userHasToken = await checkUserTokenBalances(address, context.tokenId, context.contractAddress);
+  if (!userHasToken) {
+    return false;
   }
 
   // 3. Asset or stream-specific checks
-  if (context.assetId) {
+  if (context.tokenId && context.contractAddress) {
     // Check if asset is not restricted
-    const isAssetAccessible = await checkAssetAccessibility(context.assetId);
+    const isAssetAccessible = await checkAssetAccessibility(context.tokenId, context.contractAddress);
     if (!isAssetAccessible) {
       return false;
     }
@@ -77,14 +85,14 @@ async function validateAccess(payload: WebhookPayload): Promise<boolean> {
   return true;
 }
 
-async function checkUserTokenBalances(activeAddress: string, assetId: string): Promise<boolean> {
-  // TODO: map assetId to tokenId in ERC1155 contract and check balance.
-  // For example, use assetId as tokenId if possible, otherwise, use a mapping
+async function checkUserTokenBalances(address: string, tokenId: string, contractAddress: string): Promise<boolean> {
+  // TODO: map tokenId to tokenId in ERC1155 contract and check balance.
+  // For example, use tokenId if possible, otherwise, use a mapping
   // stored in a orbisDB.
   return true;
 }
 
-async function checkAssetAccessibility(assetId: string): Promise<boolean> {
+async function checkAssetAccessibility(tokenId: string, contractAddress: string): Promise<boolean> {
   // Implement actual asset accessibility checking logic
   // For example, check if asset is published or not restricted
   return true;
