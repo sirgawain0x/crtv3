@@ -1,62 +1,88 @@
+import { createContext, ReactNode, useContext, useState } from 'react';
+import { client } from '@app/lib/sdk/thirdweb/client';
+import { catchError } from "@useorbis/db-sdk/util"
+import { OrbisEVMAuth } from "@useorbis/db-sdk/auth";
+import {  OrbisConnectResult, OrbisDB } from '@useorbis/db-sdk';
+// import { Wallet } from 'ethers';
+import createAssetMetadataModel, { AssetMetadata } from './models/AssetMetadata';
+import { download } from 'thirdweb/storage';
+import { ASSET_METADATA_MODEL_ID, CREATIVE_TV_CONTEXT_ID } from '@app/lib/utils/context';
+
 declare global {
   interface Window {
     ethereum: any;
   }
 }
 
-import { createContext, ReactNode, useContext, useState } from 'react';
-import { db } from './client';
-import { catchError } from '@useorbis/db-sdk/util';
-import { OrbisEVMAuth } from '@useorbis/db-sdk/auth';
-import { OrbisConnectResult } from '@useorbis/db-sdk';
-import { Wallet } from 'ethers';
-import { AssetMetadata } from './models/AssetMetadata';
-import { title } from 'process';
-
 interface OrbisContextProps {
-  authResult: OrbisConnectResult | null;
-  setAuthResult: React.Dispatch<
-    React.SetStateAction<OrbisConnectResult | null>
-  >;
-  insert: (value: any, modelId: string) => Promise<void>;
-  update: (docId: string, updates: any) => Promise<void>;
-  getAssetMetadata: (assetId: string) => Promise<any>;
-  orbisLogin: (privateKey?: string) => Promise<OrbisConnectResult>;
-  isConnected: (address: string) => Promise<Boolean>;
-  getCurrentUser: () => Promise<any>;
+    authResult: OrbisConnectResult | null;
+    setAuthResult: React.Dispatch<React.SetStateAction<OrbisConnectResult | null>>;
+    insert: (modelId: string, value: any) => Promise<void>;
+    replace: (docId: string, newDoc: any) => Promise<void>;
+    update: (docId: string, updates: any) => Promise<void>;
+    getAssetMetadata: (assetId: string) => Promise<AssetMetadata | null>;
+    orbisLogin: (privateKey?: string) => Promise<OrbisConnectResult | null>;
+    isConnected: (address: string) => Promise<boolean>;
+    getCurrentUser: () => Promise<any>;
 }
 
-const OrbisContext = createContext<OrbisContextProps | undefined>({
-  authResult: null,
-  setAuthResult: () => {},
-  insert: async () => {},
-  update: async () => {},
-  getAssetMetadata: async () => {
-    return { columns: [], rows: [] };
-  },
-  orbisLogin: async () => ({}) as OrbisConnectResult,
-  isConnected: async () => false,
-  getCurrentUser: async () => {},
-});
-
-const crtvEnvId = process.env.ORBIS_ENVIRONMENT_ID || '';
+const OrbisContext = createContext<OrbisContextProps | undefined> ({
+    authResult: null,
+    setAuthResult: () => {},
+    insert: async () => {},
+    replace: async () => {},
+    update: async () => {},
+    getAssetMetadata: async () => {},
+    orbisLogin: async () => {},
+    isConnected: async () => false,
+    getCurrentUser: async () => {}
+} as unknown as OrbisContextProps);
 
 export const OrbisProvider = ({ children }: { children: ReactNode }) => {
   const [authResult, setAuthResult] = useState<OrbisConnectResult | null>(null);
 
-  const insert = async (value: any, modelId: string): Promise<void> => {
-    console.log('insert', { value, modelId });
-    if (!value) {
-      throw new Error('No value provided. Please provide a value to insert.');
+  const ceramicNodeUrl = process.env.NEXT_PUBLIC_CERAMIC_NODE_URL as string;
+  const orbisNodeUrl = process.env.NEXT_PUBLIC_ORBIS_NODE_URL as string;
+  const orbisEnvironmentId = process.env.NEXT_PUBLIC_ORBIS_ENVIRONMENT_ID as string;
+  
+  if (!ceramicNodeUrl) {
+    throw new Error('CERAMIC_NODE_URL environment variable is required');
+  }
+  if (!orbisNodeUrl) {
+    throw new Error('ORBIS_NODE_URL environment variable is required');
+  }
+  if (!orbisEnvironmentId) {
+    throw new Error('ORBIS_ENVIRONMENT_ID environment variable is required');
+  }
+  
+  const db = new OrbisDB({
+    ceramic: {
+      gateway: ceramicNodeUrl,
+    },
+    nodes: [
+      {
+        gateway: orbisNodeUrl,
+        env: orbisEnvironmentId,
+      },
+    ],
+  });
+  
+  const validateDbOperation = (id: string, value?: any, select: boolean = false) => {
+    if (!id) throw new Error('No id provided');
+    if (!select) {
+      if (!value) throw new Error('No value provided');
     }
+    if (!CREATIVE_TV_CONTEXT_ID) throw new Error('No contextId provided');
+    if (!db) throw new Error('No db client found');
+  };
+  
+  const insert = async (modelId: string, value: any): Promise<void> => {
+    validateDbOperation(modelId, value);
 
-    if (!modelId) {
-      throw new Error('No modelId provided. Please provide a modelId.');
-    }
-
-    let insertStatement: any;
-
-    insertStatement = await db.insert(modelId).value(value).context(crtvEnvId);
+    const insertStatement: any = db
+      .insert(modelId)
+      .value(value)
+      .context(CREATIVE_TV_CONTEXT_ID);
 
     const validation = await insertStatement.validate();
 
@@ -68,128 +94,171 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
 
     if (error) {
       console.error(error);
+      throw error;
     }
 
-    console.log('result', result);
+    // console.log('result', result);
+
+    console.log('insertStatement runs', insertStatement.runs);
   };
 
-  const update = async (docId: string, updates: any): Promise<void> => {
-    // This will perform a shallow merge before updating the document
-    // { ...oldContent, ...newContent }
-    const updateStatement = await db.update(docId).set(updates);
+  const replace = async (docId: string, newDoc: any): Promise<void> => {
+    console.log('update', { docId, newDoc, db });
 
-    const [result, error] = await catchError(() => updateStatement.run());
+    validateDbOperation(docId, newDoc);
+
+    const replaceStatement: any = db
+      .update(docId)
+      .replace(newDoc)   
+
+    const query = replaceStatement.build();
+
+    console.log('Query that will be run', query);
+
+    const [result, error] = await catchError(() => query.run());
 
     if (error) {
       console.error(error);
+      throw error;
     }
 
-    // All runs of a statement are stored within the statement, in case you want to reuse the same statmenet
+    console.log('result', result);
+
+    console.log(replaceStatement.runs);
+  };
+
+  const update = async (docId: string, updates: any): Promise<void> => {
+    console.log('update', { docId, updates, db });
+
+    validateDbOperation(docId, updates);
+
+    const updateStatement: any = db
+      .update(docId)
+      .set(updates)
+
+    const query = updateStatement.build();
+
+    console.log('Query that will be run', query);
+
+    const [result, error] = await catchError(() => query.run());
+
+    if (error) {
+      console.error(error);
+      throw error;
+    }
+
+    console.log('result', result);
+
     console.log(updateStatement.runs);
   };
 
-  const getAssetMetadata = async (
-    assetId: string,
-  ): Promise<{ columns: Array<string>; rows: Array<Record<string, any>> }> => {
-    const selectStatement = await db
+  const getAssetMetadata = async (assetId: string): Promise<AssetMetadata> => {
+    validateDbOperation(assetId, true);
+
+    const selectStatement = db
       .select()
-      .from('AssetMetadata')
+      .from(ASSET_METADATA_MODEL_ID)
       .where({
-        column: assetId,
+        assetId,
       })
-      .context(crtvEnvId);
-
-    const query = selectStatement.build();
-
-    console.log('Query that will be run', query);
+      .context(CREATIVE_TV_CONTEXT_ID);
 
     const [result, error] = await catchError(() => selectStatement.run());
 
     if (error) {
+      console.log('selectStatement runs', selectStatement.runs);
+      console.error(error);
       throw error;
     }
 
-    // columns: Array<string>
-    // rows: Array<T | Record<string, any>>
     const { columns, rows } = result;
 
-    console.log({ columns, rows });
+    console.log('selectStatement runs', selectStatement.runs);
 
-    return result;
-  };
-
-  const orbisLogin =
-    async (/* privateKey: string = '' */): Promise<OrbisConnectResult> => {
-      // console.log({ privateKey });
-
-      let provider;
-
-      // if (privateKey !== '') {
-      // Browser provider
-      provider = window.ethereum;
-      // } else {
-      //     // Ethers provider
-      //     provider = new Wallet(privateKey);
-      // }
-
-      // console.log({ provider });
-
-      // Orbis Authenticator
-      const auth = new OrbisEVMAuth(provider);
-
-      // console.log({ auth });
-
-      // Authenticate the user and persist the session in localStorage
-      const authResult: OrbisConnectResult = await db.connectUser({ auth });
-
-      // Log the result
-      // console.log({ authResult })
-      return authResult;
+    const assetMetadata = rows.reduce((acc: any, row: any) => {
+      columns.forEach((col, index) => {
+        acc[col] = row[index];
+      });
+      return acc;
+    }, {} as AssetMetadata);
+    
+    if (assetMetadata?.subtitlesUri) {
+      try {
+        assetMetadata.subtitles = await download({
+          client,
+          uri: assetMetadata.subtitlesUri
+        });
+      } catch (error) {
+        console.error('Failed to download subtitles', { 
+          uri: assetMetadata.subtitlesUri, 
+          error 
+        });
+      }
     };
 
-  const isConnected = async (address: string = ''): Promise<Boolean> => {
+    return assetMetadata;
+  };
+
+  const orbisLogin = async (privateKey?: string): Promise<OrbisConnectResult> => {
+    
+    let provider; 
+
+    if (typeof window !== 'undefined' && window.ethereum) {
+      provider = window.ethereum;
+    } else {
+      throw new Error('No Ethereum provider found. Please install MetaMask or another Web3 wallet.');
+    }
+
+    const auth = new OrbisEVMAuth(provider);
+
+    const authResult: OrbisConnectResult = await db.connectUser({ auth });
+
+    const connected = await db.isUserConnected()
+
+    if (!connected) {
+      throw new Error('User is not connected.');
+    }
+
+    return authResult;
+  };
+
+  const isConnected = async (address: string = ''): Promise<boolean> => {
     let connected;
 
-    // Check if any user is connected
     if (address !== '') {
       connected = await db.isUserConnected(address);
     } else {
       connected = await db.isUserConnected();
     }
 
-    console.log({ connected });
-
     return connected;
   };
 
   const getCurrentUser = async (): Promise<any> => {
-    // Get the currently connected user
     const currentUser = await db.getConnectedUser();
-    if (!currentUser) {
-      // Notify the user or reconnect
-      console.log('There is no active user session.');
-    }
 
-    console.log({ currentUser });
+    if (!currentUser) {
+      throw new Error('No active user session. Please connect your wallet and sign in first.');
+
+    }
 
     return currentUser;
   };
 
   return (
-    <OrbisContext.Provider
-      value={{
-        authResult,
-        setAuthResult,
-        insert,
-        update,
-        getAssetMetadata,
-        orbisLogin,
-        isConnected,
-        getCurrentUser,
-      }}
-    >
-      {children}
-    </OrbisContext.Provider>
+      <OrbisContext.Provider value={{ 
+          authResult,
+          setAuthResult,
+          insert,
+          replace,
+          update,
+          getAssetMetadata,
+          orbisLogin,
+          isConnected,
+          getCurrentUser
+      }}>
+          {children}
+      </OrbisContext.Provider>
   );
 };
 

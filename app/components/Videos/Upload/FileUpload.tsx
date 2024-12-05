@@ -8,15 +8,11 @@ import PreviewVideo from './PreviewVideo';
 import { useActiveAccount } from 'thirdweb/react';
 import { Progress } from '@app/components/ui/progress';
 import { Button } from '@app/components/ui/button';
-// import { generateTextFromAudio } from '@app/api/livepeer/audioToText';
-import { AssetMetadata } from '../../../lib/sdk/orbisDB/models/AssetMetadata';
-import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
-import { upload, download } from 'thirdweb/storage';
+import { Subtitles, Chunk } from '../../../lib/sdk/orbisDB/models/AssetMetadata';
+import JsGoogleTranslateFree from "@kreisler/js-google-translate-free";
+import { getLivepeerAudioToText } from '@app/api/livepeer/audioToText';
+import { upload } from 'thirdweb/storage';
 import { client } from '@app/lib/sdk/thirdweb/client';
-import { fullLivepeer } from '@app/lib/sdk/livepeer/fullClient';
-import { openAsBlob } from 'node:fs';
-
-// Add these functions to your component
 
 const truncateUri = (uri: string): string => {
   if (uri.length <= 30) return uri;
@@ -25,7 +21,6 @@ const truncateUri = (uri: string): string => {
 
 const copyToClipboard = (text: string) => {
   navigator.clipboard.writeText(text).then(() => {
-    // Optionally, you can show a temporary "Copied!" message here
     toast('IPFS URI Copied!');
   });
 };
@@ -33,25 +28,103 @@ const copyToClipboard = (text: string) => {
 interface FileUploadProps {
   onFileSelect: (file: File | null) => void;
   onFileUploaded: (fileUrl: string) => void;
-  onPressNext?: (livePeerAssetId: string) => void; //  optional
-  onPressBack?: () => void; //  optional
-  metadata?: any; // optional
-  newAssetTitle?: string; // optional
+  onUploadSuccess: (subtitlesUri?: string) => void;
+  onPressNext?: (livepeerAsset: any) => void;
+  onPressBack?: () => void;
+  metadata?: any;
+  newAssetTitle?: string;
+}
+
+const translateText = async (text: string, language: string): Promise<string> => {
+  try {
+    const res = await fetch('http://localhost:3000/api/livepeer/subtitles/translation', {
+      method: 'POST',
+      body: JSON.stringify({
+        text: text,
+        source: 'English',
+        target: language,
+      }),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    const data = await res.json();
+    
+    console.log('Translation response:', data);
+
+    return data.response;
+  } catch (error) {
+    console.error('Translation error:', error);
+    return text; // Fallback to original text if translation fails
+  }
+};
+
+async function translateSubtitles(data: { chunks: Chunk[] }): Promise<Subtitles> {
+
+  const subtitles: Subtitles = {
+    'English': data.chunks
+  };
+
+  const languages = ["Chinese", "German", "Spanish"];
+
+  // Create a single Promise.all for all language translations to reduce nested mapping
+  const translationPromises = languages.map(async (language) => {
+    try {
+      // Skip translation for English
+      if (language === "English") return null;
+      console.log('Translating to:', language);
+      // Perform translations concurrently for each chunk
+      const translatedChunks = await Promise.all(
+        data.chunks.map(async (chunk, i) => {
+          const to = language === 'Chinese' ? 'zh' : language === 'German' ? 'de' : 'es';
+          const translation = await JsGoogleTranslateFree.translate({ to, text: chunk.text }); // a
+          const arr = {
+            text: translation, 
+            timestamp: chunk.timestamp
+          };
+          console.log('Translated chunk ' + i + ':', arr);
+          return arr;
+        })
+      );
+
+      console.log('Translated chunks:', translatedChunks);
+
+      return { [language]: translatedChunks };
+    } catch (error) {
+      console.error('Error translating subtitles:', error);
+      return {};
+    }
+  });
+
+  // Filter out null results and combine translations
+  const translations = await Promise.all(translationPromises);
+  const languageTranslations = translations.filter(Boolean);
+
+  console.log('translations:', translations);
+  console.log('Language translations:', languageTranslations);
+
+  // Merge translations efficiently
+  return languageTranslations.filter(
+    (translation): translation is { [key: string]: Chunk[] } => translation !== null)
+      .reduce((acc, curr) => ({
+        ...acc,
+        ...curr
+      }), subtitles);
 }
 
 const FileUpload: React.FC<FileUploadProps> = ({
   onFileSelect,
   onFileUploaded,
+  onUploadSuccess,
   onPressNext,
   onPressBack,
   metadata,
   newAssetTitle,
 }) => {
-  // Destructure onFileUploaded
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState<boolean>(false);
   const [uploadedUri, setUploadedUri] = useState<string | null>(null);
-  const [subtitles, setSubtitles] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<number>(0);
   const [uploadComplete, setUploadComplete] = useState<boolean>(false);
@@ -59,17 +132,14 @@ const FileUpload: React.FC<FileUploadProps> = ({
     'idle' | 'loading' | 'complete'
   >('idle');
 
-  const [livePeerUploadedAssetId, setLivePeerUploadedAssetId] =
-    useState<string>();
-
-  const { insert } = useOrbisContext();
+  const [livepeerAsset, setLivepeerAsset] = useState<any>();
 
   const activeAccount = useActiveAccount();
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] || null;
     setSelectedFile(file);
-    onFileSelect(file); // Notify parent component of the selected file
+    onFileSelect(file);
     console.log('Selected file:', file?.name);
   };
 
@@ -85,16 +155,16 @@ const FileUpload: React.FC<FileUploadProps> = ({
 
     try {
       console.log('Start upload #1');
+
       const uploadRequestResult = await getLivepeerUploadUrl(
         newAssetTitle || selectedFile.name || 'new file name',
         activeAccount?.address || 'anonymous',
       );
 
-      // Save asset id to send back to parent component later
-      setLivePeerUploadedAssetId(uploadRequestResult?.asset.id);
+      setLivepeerAsset(uploadRequestResult?.asset);
 
       const tusUpload = new tus.Upload(selectedFile, {
-        endpoint: uploadRequestResult?.tusEndpoint, // URL from `tusEndpoint` field in the
+        endpoint: uploadRequestResult?.tusEndpoint,
         metadata: {
           filename: selectedFile.name,
           filetype: 'video/mp4',
@@ -110,9 +180,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
         },
         onSuccess() {
           console.log('Upload finished:', tusUpload.url);
-
           setUploadState('complete');
-          // Call onFileUploaded here with the upload URL
           onFileUploaded(tusUpload?.url || '');
         },
       });
@@ -125,123 +193,34 @@ const FileUpload: React.FC<FileUploadProps> = ({
 
       tusUpload.start();
 
-      console.log('Start generateTextFromAudio');
-
       const formData = new FormData();
 
-      formData.append(
-        'audio',
-        /* await openAsBlob(file) */ new Blob([selectedFile], {
-          type: selectedFile.type,
-        }),
-      );
-      formData.append('model_id', 'openai/whisper-large-v3');
+      formData.append('audio',  selectedFile);
 
-      console.log({ formData });
+      const audioToTextResponse = await getLivepeerAudioToText({
+        formData,
+        modelId: 'openai/whisper-large-v3',
+        returnTimestamps: 'true',
+      });
+      
+      console.log({ audioToTextResponse });
 
-      const options = {
-        method: 'POST',
-        body: formData,
-        headers: {
-          Authorization: `Bearer ${process.env.LIVEPEER_FULL_API_KEY}`,
-        },
-      };
+      const subtitles = await translateSubtitles({ chunks: audioToTextResponse?.chunks });
 
-      const res = await fetch(
-        'https://dream-gateway.livepeer.cloud/audio-to-text',
-        options,
-      );
-
-      if (!res.ok) {
-        throw new Error(`HTTP error! status: ${res.status}`);
-      }
-
-      const data = await res.json();
-
-      console.log('status', data.status);
-      console.log('data', data);
-
-      const vttText = generateVTTContent(data?.chunks);
-      const blob = new Blob([vttText], { type: 'text/vtt' });
-      const vttFile = new File([blob], `${selectedFile.name}-en.vtt`);
-
-      console.log({ vttFile });
-
-      const subtitlesUri = await upload({
+      const ipfsUri = await upload({
         client,
-        files: [vttFile],
+        files: [
+          subtitles
+        ]
       });
 
-      console.log('subtitlesUri', subtitlesUri);
-
-      const orbisMetadata: AssetMetadata = {
-        playbackId: uploadRequestResult?.asset.id,
-        title: newAssetTitle,
-        description: metadata?.description,
-        ...(metadata?.location !== undefined && {
-          location: metadata?.location,
-        }),
-        ...(metadata?.category !== undefined && {
-          category: metadata?.category,
-        }),
-        ...(metadata?.thumbnailUri !== undefined && {
-          thumbnailUri: metadata?.thumbnailUri,
-        }),
-        ...(subtitlesUri !== undefined && { subtitlesUri: subtitlesUri }),
-      };
-
-      console.log({ orbisMetadata, subtitles });
-
-      const metadataUri = await insert(
-        orbisMetadata,
-        'kjzl6hvfrbw6c9vo5z3ctmct12rqfb7cb0t37lrtyh1rwjmau71gvy3xt9zv5e4',
-      );
-
-      console.log('metadataUri', metadataUri);
+      onUploadSuccess(ipfsUri);
     } catch (error: any) {
       console.error('Error uploading file:', error);
       setError('Failed to upload file. Please try again.');
       setUploadState('idle');
     }
   };
-
-  function secondsToVTTTime(seconds: number): string {
-    // Handle negative numbers or invalid input
-    if (seconds < 0) seconds = 0;
-
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = Math.floor(seconds % 60);
-    const milliseconds = Math.floor((seconds * 1000) % 1000);
-
-    // Format with leading zeros and ensure milliseconds has 3 digits
-    return `${hours.toString().padStart(2, '0')}:${minutes
-      .toString()
-      .padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${milliseconds
-      .toString()
-      .padStart(3, '0')}`;
-  }
-
-  function generateVTTContent(subtitles: /* SubtitleEntry */ any[]): string {
-    // Start with the WebVTT header
-    let vttContent = 'WEBVTT\n\n';
-
-    // Process each subtitle entry
-    subtitles.forEach((subtitle, index) => {
-      const [startTime, endTime] = subtitle.timestamp;
-
-      // Add cue number (optional but helpful for debugging)
-      vttContent += `${index + 1}\n`;
-
-      // Add timestamp line
-      vttContent += `${secondsToVTTTime(startTime)} --> ${secondsToVTTTime(endTime)}\n`;
-
-      // Add subtitle text and blank line
-      vttContent += `${subtitle.text}\n\n`;
-    });
-
-    return vttContent;
-  }
 
   return (
     <div>
@@ -348,10 +327,10 @@ const FileUpload: React.FC<FileUploadProps> = ({
           <Button
             disabled={uploadState !== 'complete'}
             onClick={() => {
-              if (livePeerUploadedAssetId) {
-                onPressNext(livePeerUploadedAssetId);
+              if (livepeerAsset) {
+                onPressNext(livepeerAsset);
               } else {
-                alert('Missing livepeer asset id');
+                alert('Missing livepeer asset');
               }
             }}
           >
@@ -363,4 +342,4 @@ const FileUpload: React.FC<FileUploadProps> = ({
   );
 };
 
-export default FileUpload;
+export default FileUpload; 

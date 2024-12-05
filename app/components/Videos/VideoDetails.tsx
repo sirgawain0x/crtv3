@@ -1,22 +1,19 @@
 'use client';
-import { Asset } from 'livepeer/models/components';
+
 import React, {
   useState,
   useEffect,
-  type CSSProperties,
-  type PropsWithChildren,
   forwardRef,
 } from 'react';
-import { Src } from '@livepeer/react';
-import * as Player from '@livepeer/react/player';
-import * as Popover from '@radix-ui/react-popover';
-import { cn } from '@app/lib/utils';
 import {
   CheckIcon,
   ChevronDownIcon,
   XIcon,
   PictureInPictureIcon,
 } from 'lucide-react';
+import { Src } from '@livepeer/react';
+import * as Popover from '@radix-ui/react-popover';
+
 import {
   PauseIcon,
   PlayIcon,
@@ -27,8 +24,16 @@ import {
   EnterFullscreenIcon,
   ExitFullscreenIcon,
 } from '@livepeer/react/assets';
+import * as Player from '@livepeer/react/player';
+import { Asset } from 'livepeer/models/components';
+
+import { cn } from '@app/lib/utils';
 import Skeleton from '@app/components/ui/skeleton';
+import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
+import { AssetMetadata } from '@app/lib/sdk/orbisDB/models/AssetMetadata';
+import { SubtitlesDisplay, SubtitlesControl } from '@app/components/Player/Subtitles';
 import { getDetailPlaybackSource } from '@app/lib/utils/hooks/useDetailPlaybackSources';
+import { toast } from 'sonner';
 
 type VideoDetailsProps = {
   asset: Asset;
@@ -36,15 +41,28 @@ type VideoDetailsProps = {
 
 export default function VideoDetails({ asset }: VideoDetailsProps) {
   const [playbackSources, setPlaybackSources] = useState<Src[] | null>(null);
+  const [assetMetadata, setAssetMetadata] = useState<AssetMetadata | null>(null);
+  
+  const { getAssetMetadata } = useOrbisContext();
 
   useEffect(() => {
     const fetchPlaybackSources = async () => {
-      const sources = await getDetailPlaybackSource(asset.playbackId || '');
+      const sources = await getDetailPlaybackSource(asset?.playbackId || '');
       setPlaybackSources(sources);
     };
-
+    const fetchAssetMetadata = async () => {
+      try {
+        const assetMetadata = await getAssetMetadata(asset?.id);
+        setAssetMetadata(assetMetadata);
+      } catch (error) {
+        console.error('Error fetching asset metadata', error);
+        setAssetMetadata(null);
+        toast.error("Failed to load asset metadata");
+      }
+    }
     fetchPlaybackSources();
-  }, [asset.playbackId]);
+    fetchAssetMetadata();
+  }, [asset?.playbackId, getAssetMetadata]);
 
   const Seek = forwardRef<HTMLButtonElement, Player.SeekProps>(
     ({ children, ...props }, forwardedRef) => (
@@ -274,13 +292,22 @@ export default function VideoDetails({ asset }: VideoDetailsProps) {
   return (
     <div>
       <h1 className="max-w-full whitespace-nowrap text-xl font-bold">
-        {asset.name}
+        {asset?.name}
       </h1>
       {/* Render other asset details */}
       {playbackSources ? (
         <Player.Root src={playbackSources}>
           <Player.Container className="h-full w-full overflow-hidden bg-gray-800">
             <Player.Video title={asset?.name} className="h-full w-full" />
+              { assetMetadata?.subtitles && 
+                <SubtitlesDisplay
+                  subtitles={assetMetadata.subtitles}
+                  style={{
+                    color: '#EC407A',
+                    textShadow: '0 0 10px rgba(236, 64, 122, 0.5)',
+                  }}
+                />
+              }
             <Player.LoadingIndicator className="relative h-full w-full bg-black/50 backdrop-blur data-[visible=true]:animate-in data-[visible=false]:animate-out data-[visible=false]:fade-out-0 data-[visible=true]:fade-in-0">
               <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
                 <LoadingIcon className="h-8 w-8 animate-spin" />
@@ -381,6 +408,9 @@ export default function VideoDetails({ asset }: VideoDetailsProps) {
                   </Player.Volume>
                 </div>
                 <div className="flex items-center justify-end gap-2.5 sm:flex-1 md:flex-[1.5]">
+                  {assetMetadata?.subtitles && 
+                    <SubtitlesControl />
+                  }
                   <Player.FullscreenIndicator matcher={false} asChild>
                     <Settings className="h-6 w-6 flex-shrink-0 text-gray-300 transition" />
                   </Player.FullscreenIndicator>

@@ -9,22 +9,7 @@ import {
 // FETCH ALL ASSETS
 export const fetchAllAssets = async (): Promise<Asset[] | {}> => {
   try {
-    console.log('Fetching assets...');
-
-    // const response = await fetch(
-    //   `${process.env.NEXT_PUBLIC_THIRDWEB_AUTH_DOMAIN}/api/livepeer`,
-    // );
-
-    // const json = await response.json();
-
-    // console.log('Assets: ', json);
-
-    // return json;
-
     const assets =  await fullLivepeer.asset.getAll();
-
-    console.log('Assets: ', assets.data);
-
     return assets.data as Asset[];
   } catch (error) {
     console.error('Error fetching assets:', error);
@@ -37,7 +22,7 @@ export const fetchAssetId = async (
   id: string | { queryKey: [unknown, { assetId: string }] },
 ) => {
   let assetId: string;
-
+  
   if (typeof id === 'string') {
     // Handle the case where `id` is a string
     assetId = id;
@@ -46,15 +31,9 @@ export const fetchAssetId = async (
     const [, { assetId: queryAssetId }] = id.queryKey;
     assetId = queryAssetId;
   }
-
-  console.log('Fetching asset...');
   
   const asset = await fullLivepeer?.asset.get(assetId);
-
-  // const asset = response;
-
-  console.log('Asset: ', asset);
-
+  
   return asset;
 };
 
@@ -64,7 +43,7 @@ export const updateAsset = async (
   data: any,
 ) => {
   let assetId: string;
-
+  
   if (typeof id === 'string') {
     // Handle the case where `id` is a string
     assetId = id;
@@ -73,48 +52,31 @@ export const updateAsset = async (
     const [, { assetId: queryAssetId }] = id.queryKey;
     assetId = queryAssetId;
   }
+  
+  const asset = await fullLivepeer?.asset.update(data, assetId);
 
-  console.log('Updating asset...');
-
-  const asset = await fullLivepeer?.asset.update(assetId, data);
-
-  // const asset = response;
-
-  console.log('Updated: ', asset);
   return asset;
 };
 
 // CREATE ASSET
 export const createAsset = async (data: NewAssetPayload) => {
   try {
-    console.log('Creating asset...');
-
     const asset = await fullLivepeer?.asset.create(data);
-
-    // const asset = response;
-
-    console.log('Created: ', asset);
-    
     return [asset];
-  } catch (error) {
-    console.error('Error creating asset:', error);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    throw new Error(`Failed to create asset: ${errorMessage}`);
   }
 };
 
 // CREATE ASSET VIA URL
 export const createViaUrl = async (data: NewAssetFromUrlPayload) => {
   try {
-    console.log('Creating URL...');
-
     const asset = await fullLivepeer?.asset?.createViaUrl(data);
-    
-    // const asset = response;
-    
-    console.log('Created: ', asset);
-
     return [asset];
-  } catch (error) {
-    console.error('Error creating url:', error);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    throw new Error(`Error creating url: ${errorMessage}`);
   }
 };
 
@@ -123,6 +85,7 @@ export const deleteAsset = async (
   id: string | { queryKey: [unknown, { assetId: string }] },
 ) => {
   let assetId: string;
+
   if (typeof id === 'object') {
     // Handle the case where `id` is an object with a `queryKey` property
     const [, { assetId: queryAssetId }] = id.queryKey;
@@ -131,9 +94,10 @@ export const deleteAsset = async (
     // Handle the case where `id` is a string
     assetId = id;
   }
-  console.log('Deleting asset...');
+
   const response = await fullLivepeer?.asset.delete(assetId);
+  
   const asset = response;
-  console.log('Deleted: ', asset);
+  
   return asset;
 };

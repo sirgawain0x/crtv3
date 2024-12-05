@@ -14,7 +14,7 @@ import { SparklesIcon } from 'lucide-react';
 import Image from 'next/image';
 import { Textarea } from '@app/components/ui/textarea';
 import { Label } from '@app/components/ui/label';
-import { getLivePeerAiGeneratedImages } from '@app/api/livepeer/livepeerAiActions';
+import { getLivepeerAiGeneratedImages } from '@app/api/livepeer/livepeerAiActions';
 import { Media } from 'livepeer/models/components';
 import { RadioGroup, RadioGroupItem } from '@app/components/ui/radio-group';
 import Skeleton from '@app/components/ui/skeleton';
@@ -38,21 +38,19 @@ const CreateThumbnailForm = ({
     setError,
   } = useForm<FormValues>({
     defaultValues: {
-      aiModel: 'SG161222/RealVisXL_V4.0_Lightning', // Set default value if needed
+      aiModel: 'SG161222/RealVisXL_V4.0_Lightning',
       prompt: '',
     },
   });
 
   const [imagesUrl, setImagesUrl] = useState<Media[]>([]);
-  const [selectedImage, setSelectedImage] = useState<string | undefined>(
-    undefined,
-  ); // Added state
-  const [loading, setLoading] = useState<boolean>(false); // New loading state
+  const [selectedImage, setSelectedImage] = useState<string | undefined>(undefined);
+  const [loading, setLoading] = useState<boolean>(false); 
 
   const onSubmit = async (data: FormValues) => {
-    setLoading(true); // Set loading state to true
+    setLoading(true);
     try {
-      const response = await getLivePeerAiGeneratedImages({
+      const response = await getLivepeerAiGeneratedImages({
         prompt: data.prompt,
         modelId: data.aiModel,
       });
@@ -70,7 +68,7 @@ const CreateThumbnailForm = ({
         message: 'Error generating AI images',
       });
     } finally {
-      setLoading(false); // Reset loading state
+      setLoading(false);
     }
   };
 

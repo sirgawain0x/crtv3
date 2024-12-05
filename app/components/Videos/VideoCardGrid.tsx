@@ -29,7 +29,7 @@ const VideoCardGrid: React.FC = () => {
                 const detailedSrc = await getDetailPlaybackSource(
                   `${asset.playbackId}`,
                 );
-                console.log(asset.playbackId + ': ', detailedSrc);
+                // console.log(asset.playbackId + ': ', detailedSrc);
                 return { ...asset, detailedSrc }; // Add detailedSrc to the asset object
               } catch (err) {
                 console.error(
