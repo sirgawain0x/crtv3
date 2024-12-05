@@ -72,7 +72,7 @@ async function validateAccess(payload: WebhookPayload): Promise<boolean> {
   }
 
   // 2. Check user-specific conditions
-  if (!context?.tokenId || !context.contractAddress) {
+  if (!context?.tokenId || !context.contractAddress && context.chain) {
     return false;
   }
   const userHasToken = await checkUserTokenBalances(address, context);
@@ -81,12 +81,9 @@ async function validateAccess(payload: WebhookPayload): Promise<boolean> {
   }
 
   // 3. Asset or stream-specific checks
-  if (context.tokenId && context.contractAddress) {
-    // Check if asset is not restricted
-    const isAssetAccessible = await checkAssetAccessibility(context);
-    if (!isAssetAccessible) {
-      return false;
-    }
+  const isAssetAccessible = await checkAssetAccessibility(context);
+  if (!isAssetAccessible) {
+    return false;
   }
 
   return true;
