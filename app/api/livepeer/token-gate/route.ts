@@ -66,13 +66,13 @@ async function validateAccess(payload: WebhookPayload): Promise<boolean> {
 
   const { address } = await getJwtContext();
 
-  // 1. Validate access key
-  if (!address && !validateAccessKey(accessKey, address, context)) {
+  // 1. Validate WebhookContext
+  if (!address || !context?.tokenId || !context.contractAddress || !context.chain) {
     return false;
   }
-
-  // 2. Validate WebhookContext
-  if (!context?.tokenId || !context.contractAddress || !context.chain) {
+  
+  // 2. Validate access key
+  if (!validateAccessKey(accessKey, address, context)) {
     return false;
   }
 
