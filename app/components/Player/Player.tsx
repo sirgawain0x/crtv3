@@ -68,7 +68,7 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({ src, assetId, 
       }
     };
     fetchAssetDetails(assetId);
-  }, [assetId, getAssetMetadata]);
+  }, [activeAccount, assetId, getAssetMetadata]);
 
   return (
     <>

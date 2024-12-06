@@ -63,7 +63,7 @@ const HookMultiStepForm = () => {
       }
     }
     tokenGate(activeAccount?.address);
-  }, [activeAccount, router]);
+  }, [activeAccount, isConnected, router]);
 
   const {
     trigger,

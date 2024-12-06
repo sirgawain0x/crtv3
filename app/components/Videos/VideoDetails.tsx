@@ -75,7 +75,7 @@ export default function VideoDetails({ asset }: VideoDetailsProps) {
       })
     }
     setConditionalProps(conProps);
-  }, [asset, getAssetMetadata]);
+  }, [activeAccount, asset, getAssetMetadata]);
 
   const Seek = forwardRef<HTMLButtonElement, Player.SeekProps>(
     ({ children, ...props }, forwardedRef) => (

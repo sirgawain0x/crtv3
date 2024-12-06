@@ -86,7 +86,7 @@ export function SubtitlesDisplay({ __scopeMedia, subtitles, style }: MediaScoped
       setCurrentSubtitle(activeSubtitle ? activeSubtitle.text : '');
     }
     updateSubtitle();
-  }, [progress, subtitles]);
+  }, [progress, subtitles, language]);
 
   if (!showSubtitles) return null;
 
