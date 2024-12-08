@@ -146,7 +146,7 @@ export function SubtitlesDisplay({ __scopeMedia, style }: MediaScopedProps & { s
   return (
     <>
       <div
-        className="absolute bottom-4 left-0 right-0 text-center"
+        className="absolute bottom-12 left-0 right-0 text-center"
         style={
           /* TODO: handle style prop if needed, if not, skip-- style !== undefined ? style :
           /* TODO: handle fullscreen styles-- fullscreen ? { bottom: '10%' } : */ {
