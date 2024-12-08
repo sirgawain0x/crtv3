@@ -72,7 +72,7 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({ src, assetId, 
 
   return (
     <>
-      <SubtitlesProvider >
+      <SubtitlesProvider>
         <Player.Root src={src} {...conditionalProps}>
           <Player.Container className="h-full w-full overflow-hidden bg-gray-950">
             <Player.Video title={title} className="h-full w-full" poster={null} />

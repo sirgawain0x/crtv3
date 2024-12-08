@@ -1,6 +1,6 @@
 'use client';
 
-import { Controller, useForm, useFormContext } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { Input } from '@app/components/ui/input';
 import { Label } from '@app/components/ui/label';
 import {
@@ -14,7 +14,6 @@ import {
 } from '../../ui/select';
 import { Button } from '@app/components/ui/button';
 import { FormControl, FormLabel } from '@chakra-ui/react';
-import { RadioGroup, RadioGroupItem } from '@app/components/ui/radio-group';
 
 type TCreateInfoProps = {
   onPressNext: (formData: TVideoMetaForm) => void;
@@ -25,8 +24,6 @@ export type TVideoMetaForm = {
   description: string;
   location?: string;
   category?: string;
-  tokenGateVideo?: boolean;
-  tokenPrice?: number;
   subtitlesUri?: string | undefined;
 };
 
@@ -34,6 +31,7 @@ const CreateInfo = ({ onPressNext }: TCreateInfoProps) => {
   const {
     handleSubmit,
     formState: { errors, isValid },
+    watch,
     register,
   } = useForm<TVideoMetaForm>({
     mode: 'onChange',
@@ -69,7 +67,6 @@ const CreateInfo = ({ onPressNext }: TCreateInfoProps) => {
           required: true,
         })}
       />
-
       <div className="mt-10 flex w-full flex-col justify-between lg:flex-row">
         <div className="mb-4 flex w-full flex-col lg:mb-0 lg:w-2/5">
           <Label className="text-sm">Location</Label>
@@ -108,38 +105,6 @@ const CreateInfo = ({ onPressNext }: TCreateInfoProps) => {
           </Select>
         </div>
       </div>
-
-      <div className="my-6 flex justify-center">
-        <h4 className="stepper_step_heading">Token Gating</h4>
-      </div>
-      <div className="my-4">
-        <Label htmlFor="title" className="text-sm">
-          Token Gate Video?
-        </Label>
-        <Input
-          type="checkbox"
-          defaultChecked={false}
-          className="mt-2 h-12 w-full rounded-md border border-[#444752] p-2 text-gray-600 focus:outline-none"
-          {...register('tokenGateVideo', {
-            required: false,
-          })}
-        />
-      </div>
-
-      <div className="my-4">
-        <Label htmlFor="title" className="text-sm">
-          Token Gate Video?
-        </Label>
-        <Input
-          type="number"
-          defaultChecked={false}
-          className="mt-2 h-12 w-full rounded-md border border-[#444752] p-2 text-gray-600 placeholder:text-gray-400 focus:outline-none"
-          {...register('tokenPrice', {
-            required: false,
-          })}
-        />
-      </div>
-
       <div className="mt-6 flex justify-center">
         <Button type="submit" className="w-[100px]" disabled={!isValid}>
           Next

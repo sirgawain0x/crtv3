@@ -29,7 +29,7 @@ const SubtitlesContext = createContext<SubtitlesContextType | undefined>(undefin
 
 export function SubtitlesProvider({ children }: { children: ReactNode }) {
   const [showSubtitles, setShowSubtitles] = useState<boolean>(false);
-  const [language, setLanguage] = useState<string>('en');
+  const [language, setLanguage] = useState<string>('English');
 
   const toggleSubtitles = () => {
     setShowSubtitles((prev) => !prev);
@@ -58,7 +58,7 @@ export function SubtitlesControl() {
       onClick={toggleSubtitles}
       aria-label={showSubtitles ? 'Disable subtitles' : 'Enable subtitles'}
       className={`w-8 h-8 flex items-center justify-center rounded-full ${
-        showSubtitles ? 'bg-primary text-primary-foreground' : 'bg-background text-foreground'
+        showSubtitles ? 'bg-background text-foreground' : 'bg-primary text-primary-foreground'
       }`}
     >
       <FaClosedCaptioning className="w-4 h-4" />
