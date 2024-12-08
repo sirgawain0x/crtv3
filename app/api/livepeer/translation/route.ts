@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
       method: 'POST',
       body: formData,
       headers: {
-        'Authorization': `Bearer ${process.env.LIVEPEER_API_KEY}`
+        'Authorization': `Bearer ${process.env.LIVEPEER_FULL_API_KEY}`
       },
       signal: controller.signal
     });

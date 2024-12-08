@@ -14,14 +14,13 @@ export const getLivepeerAudioToText = async (
 
         if (!file) throw new Error('No file uploaded');
 
-        if (params.modelId) params.formData.append('model_id', params.modelId);
-        if (params.returnTimestamps) params.formData.append('return_timestamps', params.returnTimestamps);
+        if (params.modelId) params.formData.append('model_id', params.modelId as string);
 
         const livepeerApiUrl = process.env.LIVEPEER_API_URL || 'https://dream-gateway.livepeer.cloud';
             
         // Setup request timeout using AbortController
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 30000);
+        // const controller = new AbortController();
+        // const timeout = setTimeout(() => controller.abort(), 30000);
 
         const options = {
             method: 'POST',
@@ -30,12 +29,12 @@ export const getLivepeerAudioToText = async (
                 'Authorization': `Bearer ${process.env.LIVEPEER_FULL_API_KEY}`,
                 'Accept': 'application/json'
             },
-            signal: controller.signal
+            // signal: controller.signal
         };
 
         const result = await fetch(`https://livepeer.studio/api/beta/generate/audio-to-text`, options);
 
-        clearTimeout(timeout);
+        // clearTimeout(timeout);
 
         if (!result.ok) {
             const errorText = await result.text();
