@@ -44,10 +44,6 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
   const ceramicNodeUrl = process.env.NEXT_PUBLIC_CERAMIC_NODE_URL as string;
   const orbisNodeUrl = process.env.NEXT_PUBLIC_ORBIS_NODE_URL as string;
   const orbisEnvironmentId = process.env.NEXT_PUBLIC_ORBIS_ENVIRONMENT_ID as string;
-  
-  console.log({
-    orbisEnvironmentId
-  });
 
   if (!ceramicNodeUrl) {
     throw new Error('CERAMIC_NODE_URL environment variable is required');
@@ -162,12 +158,12 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
     const selectStatement = db
       .select()
       // SELECT * FROM "kjzl6hvfrbw6c8ff20kxk0v7j0an1rxjyzs0afesrbcv59fiknxzogtlhxxlr14" WHERE "assetId" = '84168a9c-6020-451a-83d1-7f32fbd352cf';
-      .raw(`SELECT * FROM "${ASSET_METADATA_MODEL_ID}" WHERE "assetId" = '${assetId}';`)
-      // .from(ASSET_METADATA_MODEL_ID)
-      // .where({
-      //   assetId,
-      // })
-      // .context(CREATIVE_TV_CONTEXT_ID);
+      // .raw(`SELECT * FROM "${ASSET_METADATA_MODEL_ID}" WHERE "assetId" = '${assetId}';`)
+      .from(ASSET_METADATA_MODEL_ID)
+      .where({
+        assetId,
+      })
+      .context(CREATIVE_TV_CONTEXT_ID);
 
     const [result, error] = await catchError(() => selectStatement.run());
 
@@ -178,8 +174,6 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
     }
 
     const { columns, rows } = result;
-
-    console.log('selectStatement runs', selectStatement.runs);
 
     const assetMetadata = rows[0] as AssetMetadata;
     

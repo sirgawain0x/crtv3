@@ -34,7 +34,7 @@ import { cn } from '@app/lib/utils';
 import Skeleton from '@app/components/ui/skeleton';
 import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
 import { AssetMetadata } from '@app/lib/sdk/orbisDB/models/AssetMetadata';
-import { SubtitlesDisplay, SubtitlesControl, SubtitlesProvider } from '@app/components/Player/Subtitles';
+import { SubtitlesDisplay, SubtitlesControl, SubtitlesProvider, SubtitlesLangaugeSelect, useSubtitles } from '@app/components/Player/Subtitles';
 import { getDetailPlaybackSource } from '@app/lib/utils/hooks/useDetailPlaybackSources';
 import { generateAccessKey } from '@app/lib/access-key';
 import { WebhookContext } from '@app/api/livepeer/token-gate/route';
@@ -51,6 +51,7 @@ export default function VideoDetails({ asset }: VideoDetailsProps) {
   const activeAccount = useActiveAccount();
   
   const { getAssetMetadata } = useOrbisContext();
+  const { setSubtitles } = useSubtitles();
 
   useEffect(() => {
     const fetchPlaybackSources = async () => {
@@ -61,10 +62,10 @@ export default function VideoDetails({ asset }: VideoDetailsProps) {
       try {
         const assetMetadata = await getAssetMetadata(asset?.id);
         setAssetMetadata(assetMetadata);
+        assetMetadata?.subtitles && setSubtitles(assetMetadata?.subtitles);
       } catch (error) {
         console.error('Error fetching asset metadata', error);
         setAssetMetadata(null);
-        toast.error("Failed to load asset metadata");
       }
     }
     fetchPlaybackSources();
@@ -233,6 +234,9 @@ export default function VideoDetails({ asset }: VideoDetailsProps) {
                     </Player.SelectPortal>
                   </Player.VideoQualitySelect>
                 </div>
+                <div className="flex flex-col gap-2">
+                  <SubtitlesLangaugeSelect />
+                </div>
               </div>
               <Popover.Close
                 className="absolute right-2.5 top-2.5 inline-flex h-5 w-5 items-center justify-center rounded-full outline-none"
@@ -309,13 +313,12 @@ export default function VideoDetails({ asset }: VideoDetailsProps) {
       </h1>
       {/* Render other asset details */}
       {playbackSources ? (
-        <SubtitlesProvider>
+        <>
           <Player.Root src={playbackSources} {...conditionalProps}>
             <Player.Container className="h-full w-full overflow-hidden bg-gray-800">
               <Player.Video title={asset?.name} className="h-full w-full" />
                 { assetMetadata?.subtitles && 
                   <SubtitlesDisplay
-                    subtitles={assetMetadata.subtitles}
                     style={{
                       color: '#EC407A',
                       textShadow: '0 0 10px rgba(236, 64, 122, 0.5)',
@@ -461,7 +464,7 @@ export default function VideoDetails({ asset }: VideoDetailsProps) {
               </Player.Controls>
             </Player.Container>
           </Player.Root>
-        </SubtitlesProvider>
+        </>
       ) : (
         <Skeleton className="h-96 w-full" />
       )}
