@@ -43,8 +43,6 @@
     "@unlock-protocol/networks": "^0.0.23",
     "@unlock-protocol/paywall": "^0.7.1",
     "@useorbis/db-sdk": "^0.0.60-alpha",
-    "@wert-io/widget-initializer": "^6.1.1",
-    "@wert-io/widget-sc-signer": "^2.0.1",
     "axios": "^1.6.8",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",

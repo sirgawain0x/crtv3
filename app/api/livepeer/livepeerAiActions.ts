@@ -4,6 +4,8 @@ import { TextToImageParams } from 'livepeer/models/components';
 export const getLivepeerAiGeneratedImages = async ({
   prompt,
   modelId,
+  safetyCheck,
+  numImagesPerPrompt,
 }: TextToImageParams) => {
   const myHeaders = new Headers();
   myHeaders.append('Content-Type', 'application/json');
@@ -15,7 +17,8 @@ export const getLivepeerAiGeneratedImages = async ({
   const raw = JSON.stringify({
     prompt,
     model_id: modelId,
-    num_images_per_prompt: 4,
+    num_images_per_prompt: numImagesPerPrompt,
+    safety_check: safetyCheck,
   });
 
   const requestOptions: RequestInit = {

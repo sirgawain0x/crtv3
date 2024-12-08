@@ -9,7 +9,7 @@ import { useActiveAccount } from 'thirdweb/react';
 import { Progress } from '@app/components/ui/progress';
 import { Button } from '@app/components/ui/button';
 import { Subtitles, Chunk } from '../../../lib/sdk/orbisDB/models/AssetMetadata';
-import JsGoogleTranslateFree, { LanguagesCodigoISO639WhitoutAuto } from "@kreisler/js-google-translate-free";
+import JsGoogleTranslateFree from "@kreisler/js-google-translate-free";
 import { getLivepeerAudioToText } from '@app/api/livepeer/audioToText';
 import { upload } from 'thirdweb/storage';
 import { client } from '@app/lib/sdk/thirdweb/client';
@@ -60,66 +60,6 @@ const translateText = async (text: string, language: string): Promise<string> =>
   }
 };
 
-const translateSubtitlesTWO = async (data: { chunks: Chunk[] }): Promise<Subtitles> => {
-  const subtitles: Subtitles = {
-    'English': data.chunks
-  };
-
-  const languageConfigs: Record<string, string> = {
-    'Chinese': 'zh',
-    'German': 'de',
-    'Spanish': 'es'
-  };
-
-  try {
-    // Process all languages concurrently
-    const translations = await Promise.all(
-      Object.entries(languageConfigs).map(async ([language, langCode]) => {
-        try {
-          console.log('Translating to:', language);
-          
-          // Translate all chunks concurrently
-          const translatedChunks = await Promise.all(
-            data.chunks.map(async (chunk, i) => {
-              const translation = await JsGoogleTranslateFree.translate({ 
-                to: langCode as LanguagesCodigoISO639WhitoutAuto, 
-                text: chunk.text 
-              });
-              
-              const translatedChunk = {
-                text: translation,
-                timestamp: chunk.timestamp
-              };
-              
-              console.log('Translated chunk ' + i + ':', translatedChunk);
-              return translatedChunk;
-            })
-          );
-
-          console.log('Translated chunks:', translatedChunks);
-          return { [language]: translatedChunks };
-        } catch (error) {
-          console.error(`Error translating to ${language}:`, error);
-          return null;
-        }
-      })
-    );
-
-    // Merge results directly into subtitles object
-    translations
-      .filter((translation): translation is { [key: string]: Chunk[] } => translation !== null)
-      .forEach(translation => {
-        Object.assign(subtitles, translation);
-      });
-
-    return subtitles;
-
-  } catch (error) {
-    console.error('Error in translation process:', error);
-    return subtitles; // Return with at least English subtitles
-  }
-}
-
 async function translateSubtitles(data: { chunks: Chunk[] }): Promise<Subtitles> {
 
   const subtitles: Subtitles = {
@@ -138,7 +78,7 @@ async function translateSubtitles(data: { chunks: Chunk[] }): Promise<Subtitles>
       const translatedChunks = await Promise.all(
         data.chunks.map(async (chunk, i) => {
           const to = language === 'Chinese' ? 'zh' : language === 'German' ? 'de' : 'es';
-          const translation = await JsGoogleTranslateFree.translate({ to, text: chunk.text });
+          const translation = await JsGoogleTranslateFree.translate({ to, text: chunk.text }); // a
           const arr = {
             text: translation, 
             timestamp: chunk.timestamp
@@ -232,6 +172,8 @@ const FileUpload: React.FC<FileUploadProps> = ({
         uploadSize: selectedFile.size,
         onError(err: any) {
           console.error('Error uploading file:', err);
+          setError('Failed to upload file. Please try again.');
+          setUploadState('idle');
         },
         onProgress(bytesUploaded, bytesTotal) {
           const percentage = Math.round((bytesUploaded / bytesTotal) * 100);
@@ -241,6 +183,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
         onSuccess() {
           console.log('Upload finished:', tusUpload.url);
           setUploadState('complete');
+          setError(null); // Clear any previous errors
           onFileUploaded(tusUpload?.url || '');
         },
       });
@@ -276,9 +219,11 @@ const FileUpload: React.FC<FileUploadProps> = ({
 
       onUploadSuccess(ipfsUri);
     } catch (error: any) {
-      console.error('Error uploading file:', error);
-      setError('Failed to upload file. Please try again.');
-      setUploadState('idle');
+      console.error('Error processing file:', error);
+      if (uploadState !== 'complete') {  
+        setError('Failed to process file. Please try again.');
+        setUploadState('idle');
+      }
     }
   };
 
@@ -402,4 +347,4 @@ const FileUpload: React.FC<FileUploadProps> = ({
   );
 };
 
-export default FileUpload; 
+export default FileUpload;

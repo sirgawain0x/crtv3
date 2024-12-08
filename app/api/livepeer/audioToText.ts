@@ -27,7 +27,8 @@ export const getLivepeerAudioToText = async (
             method: 'POST',
             body: params.formData,
             headers: {
-                'Authorization': `Bearer ${process.env.LIVEPEER_FULL_API_KEY}`
+                'Authorization': `Bearer ${process.env.LIVEPEER_FULL_API_KEY}`,
+                'Accept': 'application/json'
             },
             signal: controller.signal
         };
@@ -36,9 +37,22 @@ export const getLivepeerAudioToText = async (
 
         clearTimeout(timeout);
 
-        // if (!result.ok) {
-        //   throw new Error('Translation error: ' + result.statusText);
-        // }
+        if (!result.ok) {
+            const errorText = await result.text();
+            console.error('Livepeer API Error:', {
+                status: result.status,
+                statusText: result.statusText,
+                response: errorText
+            });
+            throw new Error(`API request failed: ${result.status} ${result.statusText}`);
+        }
+
+        const contentType = result.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            const text = await result.text();
+            console.error('Unexpected response type:', contentType, text);
+            throw new Error('API returned non-JSON response');
+        }
 
         const data = await result.json();
 
