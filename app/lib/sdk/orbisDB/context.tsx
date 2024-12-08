@@ -193,8 +193,6 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
       }
     };
 
-    console.log({ assetMetadata });
-
     return assetMetadata;
   };
 

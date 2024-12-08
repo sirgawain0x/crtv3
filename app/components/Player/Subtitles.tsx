@@ -102,15 +102,18 @@ export function SubtitlesLangaugeSelect() {
       >
         <FormControl>
           <SelectTrigger
-            className="inline-flex h-7 items-center justify-between gap-1 rounded-sm  bg-gray-400 px-1 text-xs leading-none outline-none outline-1 outline-white/50"
+            className="inline-flex h-7 items-center justify-between gap-1 rounded-sm bg-gray-400 px-1 text-xs leading-none outline-none outline-1 outline-transparent/50"
           >
-            <SelectValue placeholder="English" />
+            <SelectValue 
+              className="bg-gray-400 hover:bg-gray-300 active:bg-gray-300 px-1 text-xs leading-none outline-none" 
+              placeholder="English" 
+            />
           </SelectTrigger>
         </FormControl>
-        <SelectContent className="overflow-hidden rounded-sm bg-gray-400">
+        <SelectContent className="overflow-hidden rounded-sm bg-gray-400 outline-none">
           {Object.keys(subtitles as Subtitles).map((language, i) => {
             return (
-              <SelectItem className="bg-gray-400 px-1 text-xs leading-none outline-none" value={language} key={i}>{language}</SelectItem>
+              <SelectItem className="bg-gray-400 hover:bg-gray-300 active:bg-gray-300 px-1 text-xs leading-none outline-none" value={language} key={i}>{language}</SelectItem>
             )
           })}
         </SelectContent>
@@ -147,9 +150,7 @@ export function SubtitlesDisplay({ __scopeMedia, style }: MediaScopedProps & { s
     <>
       <div
         className="absolute bottom-12 left-0 right-0 text-center"
-        style={
-          /* TODO: handle style prop if needed, if not, skip-- style !== undefined ? style :
-          /* TODO: handle fullscreen styles-- fullscreen ? { bottom: '10%' } : */ {
+        style={{
           backgroundColor: 'rgba(0, 0, 0, 0.5)',
           color: 'white',
           padding: '8px',
