@@ -126,6 +126,7 @@ export default function VideoDetails({ asset }: VideoDetailsProps) {
       { className }: { className?: string },
       ref: React.Ref<HTMLButtonElement> | undefined,
     ) => {
+      const { subtitles } = useSubtitles();
       return (
         <Popover.Root>
           <Popover.Trigger ref={ref} asChild>
@@ -235,7 +236,7 @@ export default function VideoDetails({ asset }: VideoDetailsProps) {
                   </Player.VideoQualitySelect>
                 </div>
                 <div className="flex flex-col gap-2">
-                  <SubtitlesLangaugeSelect />
+                  {subtitles && <SubtitlesLangaugeSelect />}
                 </div>
               </div>
               <Popover.Close
