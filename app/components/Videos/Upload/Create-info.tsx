@@ -1,6 +1,6 @@
 'use client';
 
-import { Controller, useForm, useFormContext } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { Input } from '@app/components/ui/input';
 import { Label } from '@app/components/ui/label';
 import {
@@ -31,6 +31,7 @@ const CreateInfo = ({ onPressNext }: TCreateInfoProps) => {
   const {
     handleSubmit,
     formState: { errors, isValid },
+    watch,
     register,
   } = useForm<TVideoMetaForm>({
     mode: 'onChange',
@@ -66,7 +67,6 @@ const CreateInfo = ({ onPressNext }: TCreateInfoProps) => {
           required: true,
         })}
       />
-
       <div className="mt-10 flex w-full flex-col justify-between lg:flex-row">
         <div className="mb-4 flex w-full flex-col lg:mb-0 lg:w-2/5">
           <Label className="text-sm">Location</Label>

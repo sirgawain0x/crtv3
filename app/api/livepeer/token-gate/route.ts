@@ -1,6 +1,15 @@
-import { validateAccessKey } from '@app/lib/access-key';
+'use server';
+
 import { NextRequest, NextResponse } from 'next/server';
-import { useActiveAccount } from 'thirdweb/react';
+
+import { getContract } from 'thirdweb';
+import { balanceOf as balanceOfERC1155 } from "thirdweb/extensions/erc1155";
+
+import { client } from '@app/lib/sdk/thirdweb/client';
+import { validateAccessKey } from '@app/lib/access-key';
+import { getJwtContext } from '@app/api/auth/thirdweb/authentication';
+import { defineChain } from 'thirdweb';
+
 
 export interface WebhookPayload {
   accessKey: string;
@@ -9,15 +18,23 @@ export interface WebhookPayload {
 }
 
 export interface WebhookContext {
-  assetId?: string;
-  address?: string;
-  subscriptionLevel?: string;
+  creatorAddress: string;
+  tokenId: string;
+  contractAddress: string;
+  chain: number;
 }
 
 export async function POST(request: NextRequest) {
   try {
     // Parse the incoming JSON payload
     const payload: WebhookPayload = await request.json();
+
+    if (!payload.accessKey || !payload.context || !payload.timestamp) {
+      return NextResponse.json({ 
+        allowed: false,
+        message: 'Bad request, missing required fields' 
+      }, { status: 400 });
+    }
 
     // Implement your custom access control logic here
     const isAccessAllowed = await validateAccess(payload);
@@ -45,46 +62,52 @@ export async function POST(request: NextRequest) {
 }
 
 async function validateAccess(payload: WebhookPayload): Promise<boolean> {
-  const activeAccount = useActiveAccount();
-  const { accessKey, context } = payload;
+  const { accessKey, context, timestamp } = payload;
 
-  // 1. Validate access key 
-  if (activeAccount?.address && context.assetId && !validateAccessKey(accessKey, activeAccount?.address, context.assetId)) {
+  const { address } = await getJwtContext();
+
+  // 1. Validate WebhookContext
+  if (!address || !context?.tokenId || !context.contractAddress || !context.chain) {
+    return false;
+  }
+  
+  // 2. Validate access key
+  if (!validateAccessKey(accessKey, address, context)) {
     return false;
   }
 
-  // 2. Check user-specific conditions
-  if (activeAccount) {
-    // Check if user has tokens 
-    if (!activeAccount || !context?.assetId) {
-      return false;
-    }
-    const userSubscription = await checkUserTokenBalances(activeAccount.address, context.assetId);
-    if (!userSubscription) {
-      return false;
-    }
+  // 3. Check user-specific conditions
+  const userHasToken = await checkUserTokenBalances(address, context);
+  if (!userHasToken) {
+    return false;
   }
 
-  // 3. Asset or stream-specific checks
-  if (context.assetId) {
-    // Check if asset is not restricted
-    const isAssetAccessible = await checkAssetAccessibility(context.assetId);
-    if (!isAssetAccessible) {
-      return false;
-    }
+  // 4. Asset or stream-specific checks
+  const isAssetAccessible = await checkAssetAccessibility(context);
+  if (!isAssetAccessible) {
+    return false;
   }
 
   return true;
 }
 
-async function checkUserTokenBalances(activeAddress: string, assetId: string): Promise<boolean> {
-  // TODO: map assetId to tokenId in ERC1155 contract and check balance.
-  // For example, use assetId as tokenId if possible, otherwise, use a mapping
-  // stored in a orbisDB.
-  return true;
+async function checkUserTokenBalances(address: string, context: WebhookContext): Promise<boolean> {
+  const videoTokenContract = getContract({
+    address: context.contractAddress,
+    chain: defineChain(context.chain),
+    client,
+  });
+
+  const videoTokenBalance = await balanceOfERC1155({
+    contract: videoTokenContract,
+    tokenId: BigInt(context.tokenId),
+    owner: address,
+  });
+
+  return videoTokenBalance > 0n;
 }
 
-async function checkAssetAccessibility(assetId: string): Promise<boolean> {
+async function checkAssetAccessibility(context: WebhookContext): Promise<boolean> {
   // Implement actual asset accessibility checking logic
   // For example, check if asset is published or not restricted
   return true;

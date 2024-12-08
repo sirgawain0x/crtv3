@@ -8,17 +8,25 @@ import React,
     useEffect, 
     ReactNode 
 } from 'react';
+import type { CSSProperties } from "react";
 import { FaClosedCaptioning } from "react-icons/fa";
+
+
+
 import {
   MediaScopedProps,
   useMediaContext,
   useStore,
 } from "@livepeer/react/player";
-import type { CSSProperties } from "react";
-import { Subtitles } from '@app/lib/sdk/orbisDB/models/AssetMetadata';
 import { Chunk } from 'livepeer/models/components';
 
+import { Subtitles } from '@app/lib/sdk/orbisDB/models/AssetMetadata';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { FormControl } from '@chakra-ui/react';
+
 interface SubtitlesContextType {
+  subtitles: Subtitles | undefined;
+  setSubtitles: (subtitles: Subtitles) => void;
   showSubtitles: boolean;
   toggleSubtitles: () => void;
   language: string;
@@ -28,15 +36,23 @@ interface SubtitlesContextType {
 const SubtitlesContext = createContext<SubtitlesContextType | undefined>(undefined);
 
 export function SubtitlesProvider({ children }: { children: ReactNode }) {
+  const [subtitles, setSubtitles] = useState<Subtitles | undefined>(undefined);
   const [showSubtitles, setShowSubtitles] = useState<boolean>(false);
-  const [language, setLanguage] = useState<string>('en');
+  const [language, setLanguage] = useState<string>('English');
 
   const toggleSubtitles = () => {
     setShowSubtitles((prev) => !prev);
   }
 
   return (
-    <SubtitlesContext.Provider value={{ showSubtitles, toggleSubtitles, language, setLanguage }}>
+    <SubtitlesContext.Provider value={{ 
+      subtitles,
+      setSubtitles,
+      showSubtitles,
+      toggleSubtitles,
+      language,
+      setLanguage
+    }}>
       {children}
     </SubtitlesContext.Provider>
   )
@@ -58,7 +74,7 @@ export function SubtitlesControl() {
       onClick={toggleSubtitles}
       aria-label={showSubtitles ? 'Disable subtitles' : 'Enable subtitles'}
       className={`w-8 h-8 flex items-center justify-center rounded-full ${
-        showSubtitles ? 'bg-primary text-primary-foreground' : 'bg-background text-foreground'
+        showSubtitles ? 'bg-background text-foreground' : 'bg-primary text-primary-foreground'
       }`}
     >
       <FaClosedCaptioning className="w-4 h-4" />
@@ -66,10 +82,50 @@ export function SubtitlesControl() {
   )
 }
 
-export function SubtitlesDisplay({ __scopeMedia, subtitles, style }: MediaScopedProps & { subtitles: Subtitles | undefined; style?: CSSProperties }) {
+export type LanguageSelectProps = {
+  subtitles:  Record<string, Chunk>;
+}
+
+export function SubtitlesLangaugeSelect() {
+  const { subtitles, language, setLanguage } = useSubtitles();
+
+  return (
+    <div className="flex flex-col gap-2">
+      <label
+        className="text-xs font-medium text-white/90"
+        htmlFor="languageSelect"
+      >
+        Subtitles Language
+      </label>
+      <Select
+        onValueChange={(value) => setLanguage(value)}
+      >
+        <FormControl>
+          <SelectTrigger
+            className="inline-flex h-7 items-center justify-between gap-1 rounded-sm bg-gray-400 px-1 text-xs leading-none outline-none outline-1 outline-transparent/50"
+          >
+            <SelectValue 
+              className="bg-gray-400 hover:bg-gray-300 active:bg-gray-300 px-1 text-xs leading-none outline-none" 
+              placeholder="English" 
+            />
+          </SelectTrigger>
+        </FormControl>
+        <SelectContent className="overflow-hidden rounded-sm bg-gray-400 outline-none">
+          {Object.keys(subtitles as Subtitles).map((language, i) => {
+            return (
+              <SelectItem className="bg-gray-400 hover:bg-gray-300 active:bg-gray-300 px-1 text-xs leading-none outline-none" value={language} key={i}>{language}</SelectItem>
+            )
+          })}
+        </SelectContent>
+      </Select>
+    </div>
+  )
+}
+
+export function SubtitlesDisplay({ __scopeMedia, style }: MediaScopedProps & { style?: CSSProperties }) {
   const [currentSubtitle, setCurrentSubtitle] = useState<string>('');
 
-  const { language, showSubtitles } = useSubtitles();
+  const { subtitles, language, showSubtitles } = useSubtitles();
 
   const context = useMediaContext("CurrentSource", __scopeMedia);
   const { progress, fullscreen } = useStore(context.store, ({ progress, fullscreen }) => ({
@@ -86,17 +142,15 @@ export function SubtitlesDisplay({ __scopeMedia, subtitles, style }: MediaScoped
       setCurrentSubtitle(activeSubtitle ? activeSubtitle.text : '');
     }
     updateSubtitle();
-  }, [progress, subtitles]);
+  }, [progress, subtitles, language]);
 
   if (!showSubtitles) return null;
 
   return (
     <>
       <div
-        className="absolute bottom-4 left-0 right-0 text-center"
-        style={
-          /* TODO: handle style prop if needed, if not, skip-- style !== undefined ? style :
-          /* TODO: handle fullscreen styles-- fullscreen ? { bottom: '10%' } : */ {
+        className="absolute bottom-12 left-0 right-0 text-center"
+        style={{
           backgroundColor: 'rgba(0, 0, 0, 0.5)',
           color: 'white',
           padding: '8px',

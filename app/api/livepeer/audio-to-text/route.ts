@@ -12,6 +12,10 @@ export const config = {
 };
 
 export async function POST(req: NextRequest) {
+  // Setup request timeout using AbortController
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
+
   try {
     // Retrieve request body formData object
     const formData = await req.formData();
@@ -29,10 +33,6 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Setup request timeout using AbortController
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 30000);
-
     // Set request options object
     const options = {
       method: 'POST',
@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
     };
 
     // Send POST request to Livepeer LLM endpoint
-    const res = await fetch('https://dream-gateway.livepeer.cloud/audio-to-text', options)
+    const res = await fetch('https://livepeer.studio/api/beta/generate/audio-to-text', options)
 
     clearTimeout(timeout);
 
@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
 
     // If request failed, send error response
     if (!result.ok) {
-      console.error('Translation error:', result.statusText);
+      console.error('Audio-to-text error: ', result.statusText);
       return NextResponse.json({
         success: false,
         message: result.statusText || 'Translation failed...'
@@ -67,11 +67,12 @@ export async function POST(req: NextRequest) {
     // Send NextResponse 
     return NextResponse.json({
       success: true,
-      response: data
+      response: data.textResponse
     }, { 
       status: 200,
     });
   } catch (error) {
+    clearTimeout(timeout)
     console.error('Error in audio-to-text conversion:', error);
     return NextResponse.json({
       success: false,
