@@ -172,6 +172,8 @@ const FileUpload: React.FC<FileUploadProps> = ({
         uploadSize: selectedFile.size,
         onError(err: any) {
           console.error('Error uploading file:', err);
+          setError('Failed to upload file. Please try again.');
+          setUploadState('idle');
         },
         onProgress(bytesUploaded, bytesTotal) {
           const percentage = Math.round((bytesUploaded / bytesTotal) * 100);
@@ -181,6 +183,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
         onSuccess() {
           console.log('Upload finished:', tusUpload.url);
           setUploadState('complete');
+          setError(null); // Clear any previous errors
           onFileUploaded(tusUpload?.url || '');
         },
       });
@@ -216,9 +219,11 @@ const FileUpload: React.FC<FileUploadProps> = ({
 
       onUploadSuccess(ipfsUri);
     } catch (error: any) {
-      console.error('Error uploading file:', error);
-      setError('Failed to upload file. Please try again.');
-      setUploadState('idle');
+      console.error('Error processing file:', error);
+      if (uploadState !== 'complete') {  
+        setError('Failed to process file. Please try again.');
+        setUploadState('idle');
+      }
     }
   };
 

@@ -44,8 +44,10 @@ const CreateThumbnailForm = ({
   });
 
   const [imagesUrl, setImagesUrl] = useState<Media[]>([]);
-  const [selectedImage, setSelectedImage] = useState<string | undefined>(undefined);
-  const [loading, setLoading] = useState<boolean>(false); 
+  const [selectedImage, setSelectedImage] = useState<string | undefined>(
+    undefined,
+  );
+  const [loading, setLoading] = useState<boolean>(false);
 
   const onSubmit = async (data: FormValues) => {
     setLoading(true);
@@ -53,12 +55,11 @@ const CreateThumbnailForm = ({
       const response = await getLivepeerAiGeneratedImages({
         prompt: data.prompt,
         modelId: data.aiModel,
+        safetyCheck: true,
+        numImagesPerPrompt: 1,
       });
       if (response.success) {
-        setImagesUrl((currentImages) => [
-          ...currentImages,
-          ...response.result.images,
-        ]);
+        setImagesUrl((currentImages) => [...currentImages, ...response.result.images]);
       } else {
         throw new Error(response.result);
       }
