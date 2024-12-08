@@ -44,10 +44,6 @@ export const getLivepeerAudioToText = async (
 
         console.log({ audioToTextResponse: data });
 
-        if (!data.chunks) {
-            return placeholderData;
-        }
-
         return data;
     } catch (error: any) {
         console.error('Error generating text from audio:', error);
