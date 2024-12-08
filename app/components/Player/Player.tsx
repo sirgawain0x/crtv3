@@ -67,7 +67,6 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({ src, assetId, 
       } catch (error) {
         console.error('Failed to fetch asset metadata:', error);
         setAssetMetadata(null);
-        toast.error("Failed to load asset metadata");
       }
     };
     fetchAssetDetails(assetId);
