@@ -6,7 +6,7 @@ import {  OrbisConnectResult, OrbisDB } from '@useorbis/db-sdk';
 // import { Wallet } from 'ethers';
 import createAssetMetadataModel, { AssetMetadata } from './models/AssetMetadata';
 import { download } from 'thirdweb/storage';
-import { ASSET_METADATA_MODEL_ID, CREATIVE_TV_CONTEXT_ID } from '@app/lib/utils/context';
+// import { ASSET_METADATA_MODEL_ID, CREATIVE_TV_CONTEXT_ID } from '@app/lib/utils/context';
 
 declare global {
   interface Window {
@@ -66,13 +66,19 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
       },
     ],
   });
+
+  const assetMetadataModelId: string = process.env.NEXT_PUBLIC_ORBIS_ASSETMETADATA_MODEL_ID as string;
+  const crtvContextId: string = process.env.NEXT_PUBLIC_ORBIS_CRTV_CONTEXT_ID as string;
+  const crtvVideosContextId: string = process.env.NEXT_PUBLIC_ORBIS_CRTV_VIDEO_CONTEXT_ID as string;
   
   const validateDbOperation = (id: string, value?: any, select: boolean = false) => {
     if (!id) throw new Error('No id provided');
     if (!select) {
       if (!value) throw new Error('No value provided');
     }
-    if (!CREATIVE_TV_CONTEXT_ID) throw new Error('No contextId provided');
+    if (!assetMetadataModelId) throw new Error('No assetMetadataModelId provided');
+    if (!crtvContextId) throw new Error('No crtvContextId provided');
+    if (!crtvVideosContextId) throw new Error('No crtvVideosContextId provided');
     if (!db) throw new Error('No db client found');
   };
   
@@ -82,7 +88,7 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
     const insertStatement: any = db
       .insert(modelId)
       .value(value)
-      .context(CREATIVE_TV_CONTEXT_ID);
+      .context(crtvVideosContextId);
 
     const validation = await insertStatement.validate();
 
@@ -159,11 +165,11 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
       .select()
       // SELECT * FROM "kjzl6hvfrbw6c8ff20kxk0v7j0an1rxjyzs0afesrbcv59fiknxzogtlhxxlr14" WHERE "assetId" = '84168a9c-6020-451a-83d1-7f32fbd352cf';
       // .raw(`SELECT * FROM "${ASSET_METADATA_MODEL_ID}" WHERE "assetId" = '${assetId}';`)
-      .from(ASSET_METADATA_MODEL_ID)
+      .from(assetMetadataModelId)
       .where({
         assetId,
       })
-      .context(CREATIVE_TV_CONTEXT_ID);
+      .context(crtvVideosContextId);
 
     const [result, error] = await catchError(() => selectStatement.run());
 

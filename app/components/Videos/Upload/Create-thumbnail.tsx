@@ -70,7 +70,7 @@ export default function CreateThumbnail({
   };
 
   const handleComplete = () => {
-    thumbnailUri && onThumbnailSuccess(thumbnailUri);
+    onThumbnailSuccess(thumbnailUri as string);
     router.push('/discover');
   };
 
@@ -122,6 +122,7 @@ export default function CreateThumbnail({
           Back
         </Button>
         <Button
+          disabled={livepeerAssetData?.status?.phase !== 'ready'}
           onClick={handleSkipThumbnail}
         >
           Skip
