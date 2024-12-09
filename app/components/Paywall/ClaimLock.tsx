@@ -74,7 +74,15 @@ function ClaimLockButton({ closeMenu }: { closeMenu: () => void }) {
                 137: [
                   {
                     address: '0x3c499c542cef5e3811e1192ce70d8cc03d5c3359',
-                    name: 'USD Coin',
+                    name: 'USDC',
+                    symbol: 'USDC',
+                    icon: 'https://bafybeidzrdgq3vllhxcza6uvkvecxdumgsgkrq22pm3sqdviujttridkku.ipfs.w3s.link/usd-coin-usdc-logo.png',
+                  },
+                ],
+                8453: [
+                  {
+                    address: '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913',
+                    name: 'USDC',
                     symbol: 'USDC',
                     icon: 'https://bafybeidzrdgq3vllhxcza6uvkvecxdumgsgkrq22pm3sqdviujttridkku.ipfs.w3s.link/usd-coin-usdc-logo.png',
                   },
