@@ -1,10 +1,6 @@
 'use client';
 
-import React, {
-  useState,
-  useEffect,
-  forwardRef,
-} from 'react';
+import React, { useState, useEffect, forwardRef } from 'react';
 import {
   CheckIcon,
   ChevronDownIcon,
@@ -34,7 +30,13 @@ import { cn } from '@app/lib/utils';
 import Skeleton from '@app/components/ui/skeleton';
 import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
 import { AssetMetadata } from '@app/lib/sdk/orbisDB/models/AssetMetadata';
-import { SubtitlesDisplay, SubtitlesControl, SubtitlesProvider, SubtitlesLangaugeSelect, useSubtitles } from '@app/components/Player/Subtitles';
+import {
+  SubtitlesDisplay,
+  SubtitlesControl,
+  SubtitlesProvider,
+  SubtitlesLangaugeSelect,
+  useSubtitles,
+} from '@app/components/Player/Subtitles';
 import { getDetailPlaybackSource } from '@app/lib/utils/hooks/useDetailPlaybackSources';
 import { generateAccessKey } from '@app/lib/access-key';
 import { WebhookContext } from '@app/api/livepeer/token-gate/route';
@@ -45,11 +47,13 @@ type VideoDetailsProps = {
 
 export default function VideoDetails({ asset }: VideoDetailsProps) {
   const [playbackSources, setPlaybackSources] = useState<Src[] | null>(null);
-  const [assetMetadata, setAssetMetadata] = useState<AssetMetadata | null>(null);
+  const [assetMetadata, setAssetMetadata] = useState<AssetMetadata | null>(
+    null,
+  );
   const [conditionalProps, setConditionalProps] = useState<any>({});
-  
+
   const activeAccount = useActiveAccount();
-  
+
   const { getAssetMetadata } = useOrbisContext();
   const { setSubtitles } = useSubtitles();
 
@@ -67,14 +71,17 @@ export default function VideoDetails({ asset }: VideoDetailsProps) {
         console.error('Error fetching asset metadata', error);
         setAssetMetadata(null);
       }
-    }
+    };
     fetchPlaybackSources();
     fetchAssetMetadata();
     const conProps = {
-      ...(asset.playbackPolicy && { 
-        accessKey: generateAccessKey(activeAccount?.address, asset.playbackPolicy.webhookContext as WebhookContext) 
-      })
-    }
+      ...(asset.playbackPolicy && {
+        accessKey: generateAccessKey(
+          activeAccount?.address,
+          asset.playbackPolicy.webhookContext as WebhookContext,
+        ),
+      }),
+    };
     setConditionalProps(conProps);
   }, [activeAccount, asset, getAssetMetadata]);
 
@@ -318,14 +325,14 @@ export default function VideoDetails({ asset }: VideoDetailsProps) {
           <Player.Root src={playbackSources} {...conditionalProps}>
             <Player.Container className="h-full w-full overflow-hidden bg-gray-800">
               <Player.Video title={asset?.name} className="h-full w-full" />
-                { assetMetadata?.subtitles && 
-                  <SubtitlesDisplay
-                    style={{
-                      color: '#EC407A',
-                      textShadow: '0 0 10px rgba(236, 64, 122, 0.5)',
-                    }}
-                  />
-                }
+              {assetMetadata?.subtitles && (
+                <SubtitlesDisplay
+                  style={{
+                    color: '#EC407A',
+                    textShadow: '0 0 10px rgba(236, 64, 122, 0.5)',
+                  }}
+                />
+              )}
               <Player.LoadingIndicator className="relative h-full w-full bg-black/50 backdrop-blur data-[visible=true]:animate-in data-[visible=false]:animate-out data-[visible=false]:fade-out-0 data-[visible=true]:fade-in-0">
                 <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
                   <LoadingIcon className="h-8 w-8 animate-spin" />
@@ -426,9 +433,7 @@ export default function VideoDetails({ asset }: VideoDetailsProps) {
                     </Player.Volume>
                   </div>
                   <div className="flex items-center justify-end gap-2.5 sm:flex-1 md:flex-[1.5]">
-                    {assetMetadata?.subtitles && 
-                      <SubtitlesControl />
-                    }
+                    {assetMetadata?.subtitles && <SubtitlesControl />}
                     <Player.FullscreenIndicator matcher={false} asChild>
                       <Settings className="h-6 w-6 flex-shrink-0 text-gray-300 transition" />
                     </Player.FullscreenIndicator>

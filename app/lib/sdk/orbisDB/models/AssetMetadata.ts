@@ -1,18 +1,18 @@
-import { OrbisDB } from "@useorbis/db-sdk";
-import { ModelDefinition } from "@ceramicnetwork/stream-model";
-import { Asset } from "livepeer/models/components";
-import { TVideoMetaForm } from "@app/components/Videos/Upload/Create-info";
+import { OrbisDB } from '@useorbis/db-sdk';
+import { ModelDefinition } from '@ceramicnetwork/stream-model';
+import { Asset } from 'livepeer/models/components';
+import { TVideoMetaForm } from '@app/components/Videos/Upload/Create-info';
 
 export type AssetMetadata = {
-    assetId?: string;
-    playbackId?: string;
-    title: string; 
-    description: string; 
-    location?: string; 
-    category?: string;
-    thumbnailUri?: string;
-    subtitlesUri?: string;
-    subtitles? : Subtitles;
+  assetId?: string;
+  playbackId?: string;
+  title: string;
+  description: string;
+  location?: string;
+  category?: string;
+  thumbnailUri?: string;
+  subtitlesUri?: string;
+  subtitles?: Subtitles;
 };
 
 export type Subtitles = Record<string, Chunk[]>;
@@ -26,9 +26,14 @@ export const createAssetMetadata = (
   livepeerAsset: Asset,
   metadata: TVideoMetaForm,
   thumbnailUri?: string,
-  subtitlesUri?: string
+  subtitlesUri?: string,
 ): AssetMetadata => {
-  if (!livepeerAsset.id || !livepeerAsset.playbackId || !metadata.title || !metadata.description) {
+  if (
+    !livepeerAsset.id ||
+    !livepeerAsset.playbackId ||
+    !metadata.title ||
+    !metadata.description
+  ) {
     throw new Error('Missing required asset metadata fields');
   }
 
@@ -45,53 +50,54 @@ export const createAssetMetadata = (
 };
 
 export const AssetMetadataDef: ModelDefinition = {
-    "name": "CRTVAssetMetadata",
-    "version": "2.0",
-    "interface": false,
-    "immutableFields": [],
-    "implements": [],
-    "accountRelation": {
-      "type": "list"
-    },
-    "schema": {
-      "type": "object",
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "properties": {
-        "assetId": {
-          "type": "string"
-        },
-        "playbackId": {
-          "type": "string"
-        },
-        "title": {
-          "type": "string"
-        },
-        "description": {
-          "type": "string"
-        },
-        "location": {
-          "type": "string"
-        },
-        "category": {
-          "type": "string"
-        },
-        "thumbnailUri": {
-          "type": "string"
-        },
-        "subtitlesUri": {
-          "type": "string"
-        }
+  name: 'CRTVAssetMetadata',
+  version: '2.0',
+  interface: false,
+  immutableFields: [],
+  implements: [],
+  accountRelation: {
+    type: 'list',
+  },
+  schema: {
+    type: 'object',
+    $schema: 'https://json-schema.org/draft/2020-12/schema',
+    properties: {
+      assetId: {
+        type: 'string',
       },
-      "additionalProperties": false
-    }
+      playbackId: {
+        type: 'string',
+      },
+      title: {
+        type: 'string',
+      },
+      description: {
+        type: 'string',
+      },
+      location: {
+        type: 'string',
+      },
+      category: {
+        type: 'string',
+      },
+      thumbnailUri: {
+        type: 'string',
+      },
+      subtitlesUri: {
+        type: 'string',
+      },
+    },
+    additionalProperties: false,
+  },
 };
-      
-const createModel = async (modelDefinition: ModelDefinition, db: OrbisDB) => await db.ceramic.createModel(modelDefinition);
+
+const createModel = async (modelDefinition: ModelDefinition, db: OrbisDB) =>
+  await db.ceramic.createModel(modelDefinition);
 
 export default createModel;
 
 // Subtitles Object Model
-// export const AssetMetadataModel = { 
+// export const AssetMetadataModel = {
 //     "name": "AssetMetadata",
 //     "version": "1.0",
 //     "interface": false,

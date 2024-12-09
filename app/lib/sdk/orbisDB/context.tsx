@@ -67,7 +67,7 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
     ],
   });
 
-  const assetMetadataModelId: string = process.env.NEXT_PUBLIC_ORBIS_ASSETMETADATA_MODEL_ID as string;
+  const assetMetadataModelId: string = process.env.NEXT_PUBLIC_ORBIS_ASSET_METADATA_MODEL_ID as string;
   const crtvContextId: string = process.env.NEXT_PUBLIC_ORBIS_CRTV_CONTEXT_ID as string;
   const crtvVideosContextId: string = process.env.NEXT_PUBLIC_ORBIS_CRTV_VIDEO_CONTEXT_ID as string;
   
