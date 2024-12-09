@@ -18,19 +18,21 @@ import { upload } from 'thirdweb/storage';
 
 type CreateThumbnailProps = {
   livePeerAssetId: string | undefined;
-  onThumbnailSuccess: (thumbnailUri: string) => void;
+  thumbnailUri?: string;
+  onComplete: (data: { thumbnailUri: string }) => void;
 };
 
 export default function CreateThumbnail({
   livePeerAssetId,
-  onThumbnailSuccess
+  thumbnailUri,
+  onComplete,
 }: CreateThumbnailProps) {
   const router = useRouter();
 
   const [progress, setProgress] = useState<number>(0);
-  const [thumbnailUri, setThumbnailUri] = useState<string>();
   const [livepeerAssetData, setLivepeerAssetData] = useState<Asset>();
-  const [livepeerPlaybackData, setLivepeerPlaybackData] = useState<PlaybackInfo>();
+  const [livepeerPlaybackData, setLivepeerPlaybackData] =
+    useState<PlaybackInfo>();
 
   useInterval(
     () => {
@@ -46,10 +48,15 @@ export default function CreateThumbnail({
           });
       }
       if (livepeerAssetData?.status?.phase === 'failed') {
-        throw new Error("Error transcoding video: " + livepeerAssetData?.status?.errorMessage);
+        throw new Error(
+          'Error transcoding video: ' + livepeerAssetData?.status?.errorMessage,
+        );
       }
     },
-    livepeerAssetData?.status?.phase !== 'ready' && livepeerAssetData?.status?.phase !== 'failed' ? 5000: null,
+    livepeerAssetData?.status?.phase !== 'ready' &&
+      livepeerAssetData?.status?.phase !== 'failed'
+      ? 5000
+      : null,
   );
 
   useEffect(() => {
@@ -70,19 +77,19 @@ export default function CreateThumbnail({
   };
 
   const handleComplete = () => {
-    onThumbnailSuccess(thumbnailUri as string);
+    onComplete({ thumbnailUri: thumbnailUri as string });
     router.push('/discover');
   };
 
   const handleSkipThumbnail = () => {
-    onThumbnailSuccess(''); 
+    onComplete({ thumbnailUri: '' });
     router.push('/discover');
-  }
+  };
 
   return (
     <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
       <div className="my-6 text-center">
-        <h4 className="text-2xl font-bold">Almost Done</h4>
+        <h4 className="text-2xl font-bold">Almost Done...</h4>
       </div>
       <div className="my-4">
         <h3 className="text-lg">
@@ -109,7 +116,6 @@ export default function CreateThumbnail({
         </div>
         <CreateThumbnailForm
           onSelectThumbnailImages={(imgUri) => {
-            setThumbnailUri(imgUri);
             console.log('Use selected image', imgUri);
           }}
         />
