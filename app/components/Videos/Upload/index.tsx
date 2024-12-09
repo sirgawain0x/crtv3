@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { FaExclamationTriangle } from 'react-icons/fa';
 
 import { toast } from 'sonner';
-import { useActiveAccount } from "thirdweb/react";
+import { useActiveAccount } from 'thirdweb/react';
 import { Asset } from 'livepeer/models/components';
 
 import {
@@ -22,8 +22,11 @@ import CreateInfo from '@app/components/Videos/Upload/Create-info';
 import CreateThumbnail from '@app/components/Videos/Upload/Create-thumbnail';
 import { Alert, AlertDescription, AlertTitle } from '@app/components/ui/alert';
 import type { TVideoMetaForm } from '@app/components/Videos/Upload/Create-info';
-import { ASSET_METADATA_MODEL_ID, STEPPER_FORM_KEYS } from '@app/lib/utils/context';
-import { AssetMetadata, createAssetMetadata } from '@app/lib/sdk/orbisDB/models/AssetMetadata';
+import { STEPPER_FORM_KEYS } from '@app/lib/utils/context';
+import {
+  AssetMetadata,
+  createAssetMetadata,
+} from '@app/lib/sdk/orbisDB/models/AssetMetadata';
 
 const HookMultiStepForm = () => {
   const [activeStep, setActiveStep] = useState(1);
@@ -32,10 +35,11 @@ const HookMultiStepForm = () => {
   const methods = useForm<StepperFormValues>({
     mode: 'onTouched',
   });
-  
+
   const [metadata, setMetadata] = useState<TVideoMetaForm>();
   const [livepeerAsset, setLivepeerAsset] = useState<Asset>();
   const [subtitlesUri, setSubtitlesUri] = useState<string>();
+  const [thumbnailUri, setThumbnailUri] = useState<string>();
 
   const { insert, isConnected } = useOrbisContext();
 
@@ -49,19 +53,21 @@ const HookMultiStepForm = () => {
         const [isAuthed, hasUserAccess, isUserConnected] = await Promise.all([
           authedOnly(),
           hasAccess(address),
-          isConnected(address)
+          isConnected(address),
         ]);
-        
+
         if (!isAuthed || !hasUserAccess || !isUserConnected) {
-          toast.error("Access denied. Please ensure you are connected and have an active Creator Pass in your wallet.");
-          router.push("/");
+          toast.error(
+            'Access denied. Please ensure you are connected and have an active Creator Pass in your wallet.',
+          );
+          router.push('/');
         }
       } catch (error) {
         console.error('Authentication check failed:', error);
-        toast.error("Failed to verify access. Please try again.");
-        router.push("/");
+        toast.error('Failed to verify access. Please try again.');
+        router.push('/');
       }
-    }
+    };
     tokenGate(activeAccount?.address);
   }, [activeAccount, isConnected, router]);
 
@@ -119,21 +125,31 @@ const HookMultiStepForm = () => {
         />
       </div>
       <div className={activeStep === 3 ? 'block' : 'hidden'}>
-        <CreateThumbnail 
+        <CreateThumbnail
           livePeerAssetId={livepeerAsset?.id}
-          onThumbnailSuccess={async (thumbnailUri: string) => {
-            console.log('onThumbnailSuccess', { thumbnailUri });
+          thumbnailUri={thumbnailUri}
+          onComplete={async (data) => {
+            setThumbnailUri(data.thumbnailUri);
             
             if (!livepeerAsset || !metadata) {
-              throw new Error('Error saving assetMetadata: Missing asset metadata');
-            } else {
-              const assetMetadata: AssetMetadata = createAssetMetadata(livepeerAsset, metadata, thumbnailUri, subtitlesUri)
-              const metadataUri = await insert(
-                ASSET_METADATA_MODEL_ID,
-                assetMetadata
+              throw new Error(
+                'Error saving assetMetadata: Missing asset metadata',
               );
             }
-          }} />
+            
+            const assetMetadata: AssetMetadata = createAssetMetadata(
+              livepeerAsset,
+              metadata,
+              data.thumbnailUri,
+              subtitlesUri,
+            );
+            
+            await insert(
+              process.env.NEXT_PUBLIC_ORBIS_ASSET_METADATA_MODEL_ID as string,
+              assetMetadata,
+            );
+          }}
+        />
       </div>
     </>
   );

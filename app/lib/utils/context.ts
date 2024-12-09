@@ -4441,6 +4441,3 @@ export const STATES: States = {
     buttonText: '',
   },
 };
-
-export const CREATIVE_TV_CONTEXT_ID = 'kjzl6kcym7w8y852d7aatt2nb898ds9z8628ij6chl41ni2kz8ky18ft2xv5m5s';
-export const ASSET_METADATA_MODEL_ID = 'kjzl6hvfrbw6c8ff20kxk0v7j0an1rxjyzs0afesrbcv59fiknxzogtlhxxlr14';
