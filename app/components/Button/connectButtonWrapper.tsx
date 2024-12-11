@@ -1,16 +1,6 @@
 'use client';
-import {
-  defineChain,
-  polygon,
-  optimism,
-  base,
-  zora,
-  zoraSepolia,
-} from 'thirdweb/chains';
-import {
-  createWallet,
-  inAppWallet,
-} from 'thirdweb/wallets';
+import { defineChain, base } from 'thirdweb/chains';
+import { createWallet, inAppWallet } from 'thirdweb/wallets';
 import {
   generatePayload,
   authedOnly,
@@ -21,7 +11,11 @@ import { OrbisConnectResult } from '@useorbis/db-sdk';
 import { client } from '@app/lib/sdk/thirdweb/client';
 import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
 import { ConnectButton } from '@app/lib/sdk/thirdweb/components';
-import { GenerateLoginPayloadParams, LoginPayload, VerifyLoginPayloadParams } from 'thirdweb/auth';
+import {
+  GenerateLoginPayloadParams,
+  LoginPayload,
+  VerifyLoginPayloadParams,
+} from 'thirdweb/auth';
 import { ACCOUNT_FACTORY_ADDRESS } from '@app/lib/utils/context';
 import { useActiveWallet } from 'thirdweb/react';
 
@@ -91,9 +85,9 @@ export default function ConnectButtonWrapper() {
   return (
     <ConnectButton
       client={client}
-      chains={[polygon, base, optimism, storyTestnet, zora, zoraSepolia]}
+      chains={[base]}
       connectButton={{
-        label: 'Connect Wallet',
+        label: 'Get Started',
         className: 'my-custom-class',
         style: {
           backgroundColor: '#EC407A',
@@ -102,10 +96,10 @@ export default function ConnectButtonWrapper() {
         },
       }}
       // accountAbstraction={{
-      //   chain: defineChain(polygon),
+      //   chain: defineChain(base),
       //   client: client,
-      //   sponsorGas: false,
-      //   factoryAddress: `${ACCOUNT_FACTORY_ADDRESS.polygon}`,
+      //   sponsorGas: true,
+      //   factoryAddress: `${ACCOUNT_FACTORY_ADDRESS.base}`,
       // }}
       wallets={wallets}
       appMetadata={{
@@ -123,6 +117,7 @@ export default function ConnectButtonWrapper() {
           '0xad597e5b24ad2a6032168c76f49f05d957223cd0',
           '0xb6b645c3e2025cf69983983266d16a0aa323e2b0',
         ],
+        8453: ['0xf7c4cd399395d80f9d61fde833849106775269c6'],
       }}
       connectModal={{
         size: 'wide',
@@ -141,10 +136,9 @@ export default function ConnectButtonWrapper() {
         },
       }}
       auth={{
-        getLoginPayload: async (params: GenerateLoginPayloadParams) => await generatePayload(params),
-        doLogin: async (
-          params: VerifyLoginPayloadParams,
-        ): Promise<void> => {
+        getLoginPayload: async (params: GenerateLoginPayloadParams) =>
+          await generatePayload(params),
+        doLogin: async (params: VerifyLoginPayloadParams): Promise<void> => {
           try {
             const loginPayload = await login(params);
 
@@ -172,7 +166,9 @@ export default function ConnectButtonWrapper() {
           }
         },
       }}
-      onDisconnect={(params: { account: any, wallet: any }) => params.wallet.disconnect()}
+      onDisconnect={(params: { account: any; wallet: any }) =>
+        params.wallet.disconnect()
+      }
     />
   );
 }

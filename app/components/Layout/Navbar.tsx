@@ -49,9 +49,8 @@ export function Navbar() {
             <Link href="/" className="mr-6 lg:flex" prefetch={false} passHref>
               <Image
                 style={{
-                  width: 'auto',
-                  height: 'auto',
-                  marginBottom: '0.25rem',
+                  width: '80px',
+                  height: 'auto'
                 }}
                 src={SITE_LOGO}
                 alt="Creative Logo"

@@ -149,6 +149,21 @@ export function TopChart() {
           ))}
         </div>
       )}
+      <div className="mt-8 flex justify-center">
+        <a
+          href="https://points.creativeplatform.xyz"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-full max-w-md"
+        >
+          <Button
+            variant="outline"
+            className="w-full py-6 text-lg font-semibold hover:bg-muted"
+          >
+            View Leaderboard
+          </Button>
+        </a>
+      </div>
     </div>
   );
 }
