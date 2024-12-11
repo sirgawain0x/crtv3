@@ -3,7 +3,7 @@ import Image from 'next/image';
 import { SITE_LOGO } from '@app/lib/utils/context';
 
 export default function Component() {
-  // 👇️ Get current Year
+  // Get current Year
   const currentYear = new Date().getFullYear();
 
   return (
@@ -13,7 +13,10 @@ export default function Component() {
           <Image
             src={SITE_LOGO}
             alt="Creative Logo"
-            style={{ width: 'auto', height: 'auto' }}
+            style={{
+              width: '40px',
+              height: 'auto'
+            }}
             width={40}
             height={40}
           />

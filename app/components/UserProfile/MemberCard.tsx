@@ -18,6 +18,7 @@ const MemberCard = ({ member, nft, balance }: MemberCardProps) => {
       {nft.metadata?.image && (
         <div className="relative w-full md:w-auto">
           <Image
+            priority
             src={nft.metadata.image}
             alt={nft.metadata.name || 'NFT Image'}
             height={250}

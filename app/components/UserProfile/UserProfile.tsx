@@ -19,7 +19,7 @@ import { shortenAddress } from 'thirdweb/utils';
 import { getContract, prepareContractCall } from 'thirdweb';
 import { CopyIcon } from 'lucide-react';
 import { client } from '@app/lib/sdk/thirdweb/client';
-import { polygon } from 'thirdweb/chains';
+import { base } from 'thirdweb/chains';
 import {
   useActiveAccount,
   useReadContract,
@@ -36,6 +36,7 @@ import MemberCard from './MemberCard';
 import { getNFT, getOwnedTokenIds } from 'thirdweb/extensions/erc721';
 import { CREATIVE_ADDRESS } from '@app/lib/utils/context';
 import CreateMetoken from '../MeToken/createMetoken';
+import Unlock from '@app/lib/utils/Unlock.json';
 import AssetDetails from './AssetDetails';
 
 const ProfilePage: NextPage = () => {
@@ -49,12 +50,14 @@ const ProfilePage: NextPage = () => {
   const [nftData, setNftData] = useState<any>(null);
   const [balance, setBalance] = useState<string>('');
 
+  const unlockAbi = Unlock.abi;
+
   /*******  CONTRACT READING ********/
   const unlockContract = getContract({
     client: client,
-    chain: polygon,
-    address: ROLES?.polygon.creator.contractAddress,
-    abi: ROLES_ABI,
+    chain: base,
+    address: '0xf7c4cd399395d80f9d61fde833849106775269c6',
+    abi: unlockAbi,
   });
 
   const { data: result, isLoading } = useReadContract({
@@ -126,10 +129,10 @@ const ProfilePage: NextPage = () => {
                     params: [ownedIds, CREATIVE_ADDRESS],
                   })
                 }
-                onSuccess={() =>
-                  toast.success('Successful Membership Renewal!')
+                onSubmit={() => toast.success('Successful Membership Renewal!')}
+                onError={(error: Error) =>
+                  toast.error('Error Renewing Membership.')
                 }
-                onError={() => toast.error('Error Renewing Membership.')}
               >
                 Renew
               </TransactionButton>
@@ -141,10 +144,12 @@ const ProfilePage: NextPage = () => {
                     params: [ownedIds],
                   })
                 }
-                onSuccess={() =>
+                onSubmit={() =>
                   toast.success('Cancelled Membership Successfully!')
                 }
-                onError={() => toast.error('Error Cancelling Your Membership.')}
+                onError={(error: Error) =>
+                  toast.error('Error Cancelling Your Membership.')
+                }
               >
                 Cancel
               </TransactionButton>

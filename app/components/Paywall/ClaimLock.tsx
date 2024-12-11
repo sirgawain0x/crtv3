@@ -7,7 +7,7 @@ import {
 } from 'thirdweb/react';
 import { getContract, prepareContractCall, toTokens, toWei } from 'thirdweb';
 import { client } from '@app/lib/sdk/thirdweb/client';
-import { polygon } from 'thirdweb/chains';
+import { base } from 'thirdweb/chains';
 import { toast } from 'sonner';
 import Unlock from '@app/lib/utils/Unlock.json';
 import { CREATIVE_ADDRESS } from '@app/lib/utils/context';
@@ -23,8 +23,8 @@ function ClaimLockButton({ closeMenu }: { closeMenu: () => void }) {
   const unlockAbi = Unlock.abi;
   const unlockContract = getContract({
     client: client,
-    chain: polygon,
-    address: '0xb6b645c3e2025cf69983983266d16a0aa323e2b0',
+    chain: base,
+    address: '0xf7c4cd399395d80f9d61fde833849106775269c6',
     abi: unlockAbi,
   });
 
@@ -94,13 +94,13 @@ function ClaimLockButton({ closeMenu }: { closeMenu: () => void }) {
                 contract: unlockContract,
                 method: 'purchase',
                 params: [
-                  [60000000000000000000],
+                  [30000000000000000000],
                   [activeAccount?.address],
                   [CREATIVE_ADDRESS],
                   [CREATIVE_ADDRESS],
                   ['0x'],
                 ],
-                value: toWei('60'),
+                value: toWei('30'),
               });
               return tx;
             }}
