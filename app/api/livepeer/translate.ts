@@ -38,13 +38,13 @@ export const getLivepeerTranslation = async (
             }
         };
 
-        const result = await fetch(`${livepeerApiUrl}/llm`, options);
+        const result = await fetch(`https://livepeer.studio/api/beta/generate/llm`, options);
 
         const data = await result.json();
 
         return data;
     } catch (error: any) {
-        console.error('Error generating text from audio:', error);
-        throw new Error(error.message || 'Failed to generate text from audio');
+        console.error('Translation error ', error);
+        throw new Error(error.message || 'Failed to translate text');
     }
 };

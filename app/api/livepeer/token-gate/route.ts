@@ -43,6 +43,17 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
+    // Validate timestamp age < 5 minutes
+    const MAX_TIMESTAMP_AGE = 5 * 60 * 1000;
+    const now = Date.now();
+    
+    if (Math.abs(now - payload.timestamp) > MAX_TIMESTAMP_AGE) {
+      return NextResponse.json({ 
+        allowed: false,
+        message: 'Request timestamp too old or from future' 
+      }, { status: 400 });
+    }
+
     // Implement custom access control logic here
     const isAccessAllowed = await validateAccess(payload);
 

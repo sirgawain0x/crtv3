@@ -32,7 +32,7 @@ export const getJwtContext: () => Promise<JwtContext> = async () => {
     throw new Error(`Failed to fetch JWT context, jwt is not defined`);
   }
 
-  const { payload, signature } = decodeJWT(jwt.value as unknown as string);
+  const { payload, signature } = decodeJWT(jwt.value);
 
   if (!payload?.ctx) {
     throw new Error(`Failed to fetch JWT context, payload.ctx is not defined`);
