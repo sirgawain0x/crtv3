@@ -1,29 +1,18 @@
-'user server';
+'use server';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { fullLivepeer } from '@app/lib/sdk/livepeer/fullClient';
 import { GenAudioToTextResponse } from 'livepeer/models/operations';
 import { SubtitleResponse } from '@app/lib/types';
 
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
-
 export async function POST(req: NextRequest) {
-  // Setup request timeout using AbortController
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30000);
-
   try {
-    // Retrieve request body formData object
     const formData = await req.formData();
 
     // Append additional params to formData object
     formData.append('model_id', 'openai/whisper-large-v3');
 
-    // Validate request body formData includes audio param
+    // Validate request body
     if (!formData.get('audio')) {
       return NextResponse.json({
         success: false,
@@ -33,46 +22,43 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Set request options object
+    // Setup request timeout using AbortController
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+
     const options = {
       method: 'POST',
       body: formData,
       headers: {
-        'Authorization': `Bearer ${process.env.LIVEPEER_FULL_API_KEY}`
+          'Authorization': `Bearer ${process.env.LIVEPEER_FULL_API_KEY}`,
+          'Accept': 'application/json'
       },
       signal: controller.signal
     };
 
-    // Send POST request to Livepeer LLM endpoint
-    const res = await fetch('https://livepeer.studio/api/beta/generate/audio-to-text', options)
+    const result = await fetch(`https://livepeer.studio/api/beta/generate/audio-to-text`, options);
 
     clearTimeout(timeout);
 
-    const result = await res.json();
-
-    // If request failed, send error response
     if (!result.ok) {
-      console.error('Audio-to-text error: ', result.statusText);
+      console.error('Audio-to-text error: ', result.text());
       return NextResponse.json({
         success: false,
-        message: result.statusText || 'Translation failed...'
+        message: result.text() || 'Failed to transcribe audio...'
       }, { 
         status: result.status,
-      });
+      });    
     }
 
-    // Get response data
     const data = await result.json()
     
-    // Send NextResponse 
     return NextResponse.json({
       success: true,
-      response: data.textResponse
+      response: data
     }, { 
       status: 200,
     });
   } catch (error) {
-    clearTimeout(timeout)
     console.error('Error in audio-to-text conversion:', error);
     return NextResponse.json({
       success: false,
