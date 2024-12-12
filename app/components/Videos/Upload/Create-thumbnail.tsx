@@ -5,47 +5,58 @@ import { useInterval } from 'react-use';
 import { PlayerComponent } from '@app/components/Player/Player';
 import { Src } from '@livepeer/react';
 import { getSrc } from '@livepeer/react/external';
-import { Progress } from '@app/components/ui/progress';
 import {
-  giveLivePeerAsset,
-  getLivePeerPlaybackInfo,
+  getLivepeerAsset,
+  getLivepeerPlaybackInfo,
 } from '@app/api/livepeer/livepeerActions';
 import { Asset, PlaybackInfo } from 'livepeer/models/components';
 import { useRouter } from 'next/navigation';
 import CreateThumbnailForm from './CreateThumbnailForm';
 import { FaSpinner } from 'react-icons/fa';
 import { Spinner } from '@chakra-ui/react';
+import { upload } from 'thirdweb/storage';
 
 type CreateThumbnailProps = {
   livePeerAssetId: string | undefined;
+  thumbnailUri?: string;
+  onComplete: (data: { thumbnailUri: string }) => void;
 };
 
 export default function CreateThumbnail({
   livePeerAssetId,
+  thumbnailUri,
+  onComplete,
 }: CreateThumbnailProps) {
   const router = useRouter();
 
-  //  Creating a ref for thumbnail and video
-  const [livepeerAssetData, setLivePeerAssertData] = useState<Asset>();
-  const [livepeerPlaybackData, setLivePeerPlaybackData] =
-    useState<PlaybackInfo>();
   const [progress, setProgress] = useState<number>(0);
+  const [livepeerAssetData, setLivepeerAssetData] = useState<Asset>();
+  const [livepeerPlaybackData, setLivepeerPlaybackData] =
+    useState<PlaybackInfo>();
 
   useInterval(
     () => {
       if (livePeerAssetId) {
-        giveLivePeerAsset(livePeerAssetId)
+        getLivepeerAsset(livePeerAssetId)
           .then((data) => {
             console.log(data);
-            setLivePeerAssertData(data);
+            setLivepeerAssetData(data);
           })
           .catch((e) => {
             console.log(e);
             alert(e?.message || 'Error retrieving livepeer asset');
           });
       }
+      if (livepeerAssetData?.status?.phase === 'failed') {
+        throw new Error(
+          'Error transcoding video: ' + livepeerAssetData?.status?.errorMessage,
+        );
+      }
     },
-    livepeerAssetData?.status?.phase !== 'ready' ? 5000 : null,
+    livepeerAssetData?.status?.phase !== 'ready' &&
+      livepeerAssetData?.status?.phase !== 'failed'
+      ? 5000
+      : null,
   );
 
   useEffect(() => {
@@ -53,8 +64,8 @@ export default function CreateThumbnail({
       livepeerAssetData?.status?.phase === 'ready' &&
       livepeerAssetData.playbackId
     ) {
-      getLivePeerPlaybackInfo(livepeerAssetData.playbackId).then((data) => {
-        setLivePeerPlaybackData(data);
+      getLivepeerPlaybackInfo(livepeerAssetData.playbackId).then((data) => {
+        setLivepeerPlaybackData(data);
       });
     } else {
       console.log('Not ready to get playback info');
@@ -66,13 +77,19 @@ export default function CreateThumbnail({
   };
 
   const handleComplete = () => {
+    onComplete({ thumbnailUri: thumbnailUri as string });
+    router.push('/discover');
+  };
+
+  const handleSkipThumbnail = () => {
+    onComplete({ thumbnailUri: '' });
     router.push('/discover');
   };
 
   return (
     <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
       <div className="my-6 text-center">
-        <h4 className="text-2xl font-bold">Almost Done</h4>
+        <h4 className="text-2xl font-bold">Almost Done...</h4>
       </div>
       <div className="my-4">
         <h3 className="text-lg">
@@ -88,6 +105,7 @@ export default function CreateThumbnail({
         <div className="my-6">
           <PlayerComponent
             title={livepeerAssetData.name}
+            assetId={livepeerAssetData.id}
             src={getSrc(livepeerPlaybackData) as Src[]}
           />
         </div>
@@ -97,8 +115,8 @@ export default function CreateThumbnail({
           <h3 className="text-xl font-bold">Generate a Thumbnail</h3>
         </div>
         <CreateThumbnailForm
-          onSelectThumbnailImages={(imgUrl) => {
-            console.log('Use selected image', imgUrl);
+          onSelectThumbnailImages={(imgUri) => {
+            console.log('Use selected image', imgUri);
           }}
         />
       </div>
@@ -108,6 +126,12 @@ export default function CreateThumbnail({
           onClick={handleBack}
         >
           Back
+        </Button>
+        <Button
+          disabled={livepeerAssetData?.status?.phase !== 'ready'}
+          onClick={handleSkipThumbnail}
+        >
+          Skip
         </Button>
         <Button
           disabled={livepeerAssetData?.status?.phase !== 'ready'}

@@ -15,6 +15,8 @@ export const CREATIVE_ADDRESS = '0x1Fde40a4046Eda0cA0539Dd6c77ABF8933B94260';
 export const ACCOUNT_FACTORY_ADDRESS = {
   sepolia: '0xE90DebFD907F5B655f22bfC16083E45994d708bE',
   polygon: '0xE90DebFD907F5B655f22bfC16083E45994d708bE',
+  base: '0xE90DebFD907F5B655f22bfC16083E45994d708bE',
+  optimism: '0xE90DebFD907F5B655f22bfC16083E45994d708bE',
 };
 
 export const ACCOUNT_FACTORY_ABI = [
@@ -4350,7 +4352,7 @@ export const PROFILE_CAMPAIGNS = {
 };
 
 // Livepeer API
-export const LIVEPEER_API_URL = 'https://livepeer.com/api';
+export const LIVEPEER_FULL_API_URL = 'https://livepeer.com/api';
 
 // HERO
 export const HERO_VIDEO_TITLE = 'Welcome To Creative Organization DAO';

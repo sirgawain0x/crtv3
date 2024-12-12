@@ -1,33 +1,75 @@
 'use client';
 
-import { FaExclamationTriangle } from 'react-icons/fa';
+import { useForm } from 'react-hook-form';
 import { useEffect, useState } from 'react';
-import { FormProvider, useForm } from 'react-hook-form';
+import { useRouter } from 'next/navigation';
+import { FaExclamationTriangle } from 'react-icons/fa';
 
-import { STEPPER_FORM_KEYS } from '@app/lib/utils/context';
+import { toast } from 'sonner';
+import { useActiveAccount } from 'thirdweb/react';
+import { Asset } from 'livepeer/models/components';
+
 import {
   StepperFormKeysType,
   StepperFormValues,
 } from '@app/types/hook-stepper';
-
+import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
+import { hasAccess } from '@app/api/auth/thirdweb/gateCondition';
 import StepperIndicator from '@app/components/Stepper-Indicator';
-import { Alert, AlertDescription, AlertTitle } from '../../ui/alert';
-import { Button } from '@app/components/ui/button';
-import { toast } from 'sonner';
-import CreateInfo from './Create-info';
-import CreateThumbnail from './Create-thumbnail';
-import type { TVideoMetaForm } from './Create-info';
-import FileUpload from './FileUpload';
+import { authedOnly } from '@app/api/auth/thirdweb/authentication';
+import FileUpload from '@app/components/Videos/Upload/FileUpload';
+import CreateInfo from '@app/components/Videos/Upload/Create-info';
+import CreateThumbnail from '@app/components/Videos/Upload/Create-thumbnail';
+import { Alert, AlertDescription, AlertTitle } from '@app/components/ui/alert';
+import type { TVideoMetaForm } from '@app/components/Videos/Upload/Create-info';
+import { STEPPER_FORM_KEYS } from '@app/lib/utils/context';
+import {
+  AssetMetadata,
+  createAssetMetadata,
+} from '@app/lib/sdk/orbisDB/models/AssetMetadata';
 
 const HookMultiStepForm = () => {
   const [activeStep, setActiveStep] = useState(1);
-  const [canNextStep, setCanNextStep] = useState(false);
   const [erroredInputName, setErroredInputName] = useState('');
+
   const methods = useForm<StepperFormValues>({
     mode: 'onTouched',
   });
-  const [metaData, setMetadata] = useState<TVideoMetaForm>(),
-    [livePeerAssetId, setLivePeerAssetId] = useState<string>();
+
+  const [metadata, setMetadata] = useState<TVideoMetaForm>();
+  const [livepeerAsset, setLivepeerAsset] = useState<Asset>();
+  const [subtitlesUri, setSubtitlesUri] = useState<string>();
+  const [thumbnailUri, setThumbnailUri] = useState<string>();
+
+  const { insert, isConnected } = useOrbisContext();
+
+  const activeAccount = useActiveAccount();
+
+  const router = useRouter();
+
+  useEffect(() => {
+    const tokenGate = async (address: string) => {
+      try {
+        const [isAuthed, hasUserAccess, isUserConnected] = await Promise.all([
+          authedOnly(),
+          hasAccess(address),
+          isConnected(address),
+        ]);
+
+        if (!isAuthed || !hasUserAccess || !isUserConnected) {
+          toast.error(
+            'Access denied. Please ensure you are connected and have an active Creator Pass in your wallet.',
+          );
+          router.push('/');
+        }
+      } catch (error) {
+        console.error('Authentication check failed:', error);
+        toast.error('Failed to verify access. Please try again.');
+        router.push('/');
+      }
+    };
+    tokenGate(activeAccount?.address);
+  }, [activeAccount, isConnected, router]);
 
   const {
     trigger,
@@ -46,72 +88,8 @@ const HookMultiStepForm = () => {
     }
   }, [erroredInputName]);
 
-  interface SubmitResponse {
-    title: string;
-    description: string;
-  }
-
-  const onSubmit = async (formData: StepperFormValues) => {
-    console.log({ formData });
-    // simulate api call
-    await new Promise<SubmitResponse>((resolve, reject) => {
-      setTimeout(() => {
-        resolve({
-          title: 'Success',
-          description: 'Form submitted successfully',
-        });
-        reject({
-          message: 'There was an error submitting form',
-        });
-      }, 2000);
-    })
-      .then(({ title, description }) => {
-        toast('Title and description');
-      })
-      .catch(({ message: errorMessage, errorKey }) => {
-        if (
-          errorKey &&
-          Object.values(STEPPER_FORM_KEYS)
-            .flatMap((fieldNames) => fieldNames)
-            .includes(errorKey)
-        ) {
-          let erroredStep: number | undefined;
-          // get the step number based on input name
-          for (const [key, value] of Object.entries(STEPPER_FORM_KEYS)) {
-            if (value.includes(errorKey as never)) {
-              erroredStep = Number(key);
-              break;
-            }
-          }
-          // set active step and error
-          if (erroredStep !== undefined) {
-            setActiveStep(erroredStep);
-            setError(errorKey as StepperFormKeysType, {
-              message: errorMessage,
-            });
-            setErroredInputName(errorKey);
-          } else {
-            // Handle the case where erroredStep is not found
-            console.error('Error: Step not found for the given errorKey');
-          }
-        } else {
-          setError('root.formError', {
-            message: errorMessage,
-          });
-        }
-      });
-  };
-  const handleNext = async () => {
-    const isStepValid = await trigger(undefined, { shouldFocus: true });
-    if (isStepValid) setActiveStep((prevActiveStep) => prevActiveStep + 1);
-  };
-
-  const handleBack = () => {
-    setActiveStep((prevActiveStep) => prevActiveStep - 1);
-  };
-
   return (
-    <div>
+    <>
       <StepperIndicator activeStep={activeStep} />
       {errors.root?.formError && (
         <Alert variant="destructive" className="mt-[28px]">
@@ -122,43 +100,58 @@ const HookMultiStepForm = () => {
       )}
       <div className={activeStep === 1 ? 'block' : 'hidden'}>
         <CreateInfo
-          onPressNext={(metaDataFormData) => {
-            setMetadata(metaDataFormData);
+          onPressNext={(metadataFormData) => {
+            setMetadata(metadataFormData);
             setActiveStep((prevActiveStep) => prevActiveStep + 1);
           }}
         />
       </div>
       <div className={activeStep === 2 ? 'block' : 'hidden'}>
         <FileUpload
-          newAssetTitle={metaData?.title || ''}
-          onFileSelect={(file) => {
-            console.log('Selected file:', file); // Debugging line
-          }}
-          onFileUploaded={(videoUrl: string) => {
-            console.log('Uploaded video URL:', videoUrl); // Debugging line
+          newAssetTitle={metadata?.title}
+          metadata={metadata}
+          onFileSelect={(file) => {}}
+          onFileUploaded={(videoUrl: string) => {}}
+          onUploadSuccess={(subtitlesUri?: string) => {
+            setSubtitlesUri(subtitlesUri);
           }}
           onPressBack={() =>
             setActiveStep((prevActiveStep) => prevActiveStep - 1)
           }
-          onPressNext={(livePeerAssetId) => {
-            setLivePeerAssetId(livePeerAssetId);
+          onPressNext={(livepeerAsset: any) => {
+            setLivepeerAsset(livepeerAsset);
             setActiveStep((prevActiveStep) => prevActiveStep + 1);
           }}
         />
       </div>
       <div className={activeStep === 3 ? 'block' : 'hidden'}>
-        {/* <code>
-          <pre>{JSON.stringify(metaData, null, 2)}</pre>
-        </code>
-        <code>
-          <span>Livepeer asset id: {livePeerAssetId}</span>
-        </code> */}
-        <CreateThumbnail livePeerAssetId={livePeerAssetId} />
+        <CreateThumbnail
+          livePeerAssetId={livepeerAsset?.id}
+          thumbnailUri={thumbnailUri}
+          onComplete={async (data) => {
+            setThumbnailUri(data.thumbnailUri);
+            
+            if (!livepeerAsset || !metadata) {
+              throw new Error(
+                'Error saving assetMetadata: Missing asset metadata',
+              );
+            }
+            
+            const assetMetadata: AssetMetadata = createAssetMetadata(
+              livepeerAsset,
+              metadata,
+              data.thumbnailUri,
+              subtitlesUri,
+            );
+            
+            await insert(
+              process.env.NEXT_PUBLIC_ORBIS_ASSET_METADATA_MODEL_ID as string,
+              assetMetadata,
+            );
+          }}
+        />
       </div>
-
-      {/* </form>
-      </FormProvider> */}
-    </div>
+    </>
   );
 };
 

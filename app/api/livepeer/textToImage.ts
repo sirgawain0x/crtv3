@@ -2,7 +2,7 @@
 import { fullLivepeer } from '@app/lib/sdk/livepeer/fullClient';
 import { TextToImageParams } from 'livepeer/models/components';
 
-export const getLivePeerAiGeneratedImages = async (
+export const getLivepeerAiGeneratedImages = async (
   params: TextToImageParams,
 ) => {
   const result = await fullLivepeer.generate.textToImage(params);

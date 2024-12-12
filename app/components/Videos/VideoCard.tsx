@@ -18,7 +18,6 @@ import Link from 'next/link';
 import { Src } from '@livepeer/react';
 import makeBlockie from 'ethereum-blockies-base64';
 import VideoViewMetrics from './VideoViewMetrics';
-import { color } from 'framer-motion';
 
 interface VideoCardProps {
   asset: Asset;
@@ -26,6 +25,7 @@ interface VideoCardProps {
 }
 
 const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
+  console.log({ asset, playbackSources });
   // Only render the card if the asset is ready
   if (asset?.status?.phase !== 'ready') {
     return null;
@@ -46,7 +46,7 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
             </CardDescription>
           </CardHeader>
         </div>
-        <PlayerComponent src={playbackSources} title={asset?.name} />
+        <PlayerComponent src={playbackSources} assetId={asset?.id} title={asset?.name} />
         <CardContent>
           <div className="my-2 flex items-center justify-between">
             <Badge

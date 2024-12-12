@@ -3,6 +3,8 @@ import { ApolloWrapper } from './lib/utils/ApolloWrapper';
 import { ThirdwebProvider } from '@app/lib/sdk/thirdweb/components';
 import { createContext, useContext, useState, useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { OrbisProvider } from '@app/lib/sdk/orbisDB/context';
+import { SubtitlesProvider } from './components/Player/Subtitles';
 
 interface ThemeContextType {
   theme: string;
@@ -37,13 +39,17 @@ export const Providers: React.FC<{ children: React.ReactNode }> = ({
 
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme }}>
-      <ApolloWrapper>
-        <ThirdwebProvider>
-          <QueryClientProvider client={queryClient}>
-            {children}
-          </QueryClientProvider>
-        </ThirdwebProvider>
-      </ApolloWrapper>
+      <SubtitlesProvider>
+        <ApolloWrapper>
+          <ThirdwebProvider>
+            <QueryClientProvider client={queryClient}>
+              <OrbisProvider>
+                {children}
+              </OrbisProvider>
+            </QueryClientProvider>
+          </ThirdwebProvider>
+        </ApolloWrapper>
+      </SubtitlesProvider>
     </ThemeContext.Provider>
   );
 };

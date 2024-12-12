@@ -8,8 +8,11 @@ import PreviewVideo from './PreviewVideo';
 import { useActiveAccount } from 'thirdweb/react';
 import { Progress } from '@app/components/ui/progress';
 import { Button } from '@app/components/ui/button';
-import { openAsBlob } from 'fs';
-// Add these functions to your component
+import { Subtitles, Chunk } from '../../../lib/sdk/orbisDB/models/AssetMetadata';
+import JsGoogleTranslateFree from "@kreisler/js-google-translate-free";
+import { getLivepeerAudioToText } from '@app/api/livepeer/audioToText';
+import { upload } from 'thirdweb/storage';
+import { client } from '@app/lib/sdk/thirdweb/client';
 
 const truncateUri = (uri: string): string => {
   if (uri.length <= 30) return uri;
@@ -18,7 +21,6 @@ const truncateUri = (uri: string): string => {
 
 const copyToClipboard = (text: string) => {
   navigator.clipboard.writeText(text).then(() => {
-    // Optionally, you can show a temporary "Copied!" message here
     toast('IPFS URI Copied!');
   });
 };
@@ -26,23 +28,103 @@ const copyToClipboard = (text: string) => {
 interface FileUploadProps {
   onFileSelect: (file: File | null) => void;
   onFileUploaded: (fileUrl: string) => void;
-  onPressNext?: (livePeerAssetId: string) => void; // Made optional
-  onPressBack?: () => void; // Made optional
-  newAssetTitle?: string; // Made optional
+  onUploadSuccess: (subtitlesUri?: string) => void;
+  onPressNext?: (livepeerAsset: any) => void;
+  onPressBack?: () => void;
+  metadata?: any;
+  newAssetTitle?: string;
+}
+
+const translateText = async (text: string, language: string): Promise<string> => {
+  try {
+    const res = await fetch('http://localhost:3000/api/livepeer/subtitles/translation', {
+      method: 'POST',
+      body: JSON.stringify({
+        text: text,
+        source: 'English',
+        target: language,
+      }),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+
+    const data = await res.json();
+    
+    console.log('Translation response:', data);
+
+    return data.response;
+  } catch (error) {
+    console.error('Translation error:', error);
+    return text; // Fallback to original text if translation fails
+  }
+};
+
+async function translateSubtitles(data: { chunks: Chunk[] }): Promise<Subtitles> {
+
+  const subtitles: Subtitles = {
+    'English': data.chunks
+  };
+
+  const languages = ["Chinese", "German", "Spanish"];
+
+  // Create a single Promise.all for all language translations to reduce nested mapping
+  const translationPromises = languages.map(async (language) => {
+    try {
+      // Skip translation for English
+      if (language === "English") return null;
+      console.log('Translating to:', language);
+      // Perform translations concurrently for each chunk
+      const translatedChunks = await Promise.all(
+        data.chunks.map(async (chunk, i) => {
+          const to = language === 'Chinese' ? 'zh' : language === 'German' ? 'de' : 'es';
+          const translation = await JsGoogleTranslateFree.translate({ to, text: chunk.text }); // a
+          const arr = {
+            text: translation, 
+            timestamp: chunk.timestamp
+          };
+          console.log('Translated chunk ' + i + ':', arr);
+          return arr;
+        })
+      );
+
+      console.log('Translated chunks:', translatedChunks);
+
+      return { [language]: translatedChunks };
+    } catch (error) {
+      console.error('Error translating subtitles:', error);
+      return {};
+    }
+  });
+
+  // Filter out null results and combine translations
+  const translations = await Promise.all(translationPromises);
+  const languageTranslations = translations.filter(Boolean);
+
+  console.log('translations:', translations);
+  console.log('Language translations:', languageTranslations);
+
+  // Merge translations efficiently
+  return languageTranslations.filter(
+    (translation): translation is { [key: string]: Chunk[] } => translation !== null)
+      .reduce((acc, curr) => ({
+        ...acc,
+        ...curr
+      }), subtitles);
 }
 
 const FileUpload: React.FC<FileUploadProps> = ({
   onFileSelect,
   onFileUploaded,
+  onUploadSuccess,
   onPressNext,
   onPressBack,
+  metadata,
   newAssetTitle,
 }) => {
-  // Destructure onFileUploaded
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState<boolean>(false);
   const [uploadedUri, setUploadedUri] = useState<string | null>(null);
-  const [subtitles, setSubtitles] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<number>(0);
   const [uploadComplete, setUploadComplete] = useState<boolean>(false);
@@ -50,15 +132,14 @@ const FileUpload: React.FC<FileUploadProps> = ({
     'idle' | 'loading' | 'complete'
   >('idle');
 
-  const [livePeerUploadedAssetId, setLivePeerUploadedAssetId] =
-    useState<string>();
+  const [livepeerAsset, setLivepeerAsset] = useState<any>();
 
   const activeAccount = useActiveAccount();
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] || null;
     setSelectedFile(file);
-    onFileSelect(file); // Notify parent component of the selected file
+    onFileSelect(file);
     console.log('Selected file:', file?.name);
   };
 
@@ -74,16 +155,16 @@ const FileUpload: React.FC<FileUploadProps> = ({
 
     try {
       console.log('Start upload #1');
+
       const uploadRequestResult = await getLivepeerUploadUrl(
         newAssetTitle || selectedFile.name || 'new file name',
         activeAccount?.address || 'anonymous',
       );
 
-      // Save asset id to send back to parent component later
-      setLivePeerUploadedAssetId(uploadRequestResult?.asset.id);
+      setLivepeerAsset(uploadRequestResult?.asset);
 
-      const upload = new tus.Upload(selectedFile, {
-        endpoint: uploadRequestResult?.tusEndpoint, // URL from `tusEndpoint` field in the
+      const tusUpload = new tus.Upload(selectedFile, {
+        endpoint: uploadRequestResult?.tusEndpoint,
         metadata: {
           filename: selectedFile.name,
           filetype: 'video/mp4',
@@ -91,6 +172,8 @@ const FileUpload: React.FC<FileUploadProps> = ({
         uploadSize: selectedFile.size,
         onError(err: any) {
           console.error('Error uploading file:', err);
+          setError('Failed to upload file. Please try again.');
+          setUploadState('idle');
         },
         onProgress(bytesUploaded, bytesTotal) {
           const percentage = Math.round((bytesUploaded / bytesTotal) * 100);
@@ -98,29 +181,49 @@ const FileUpload: React.FC<FileUploadProps> = ({
           setProgress(percentage);
         },
         onSuccess() {
-          console.log('Upload finished:', upload.url);
+          console.log('Upload finished:', tusUpload.url);
           setUploadState('complete');
-          // Call onFileUploaded here with the upload URL
-          onFileUploaded(upload?.url || '');
-
-          // generateSubtitles(selectedFile).then((subtitlesResult) => {
-          //   setSubtitles(subtitlesResult)
-          //   // TODO: ? Save subtitles
-          //   console.log('Subtitles generated:', subtitlesResult);
-          // });
+          setError(null); // Clear any previous errors
+          onFileUploaded(tusUpload?.url || '');
         },
       });
 
-      const previousUploads = await upload.findPreviousUploads();
+      const previousUploads = await tusUpload.findPreviousUploads();
 
       if (previousUploads.length > 0) {
-        upload.resumeFromPreviousUpload(previousUploads[0]);
+        tusUpload.resumeFromPreviousUpload(previousUploads[0]);
       }
-      upload.start();
+
+      tusUpload.start();
+
+      const formData = new FormData();
+
+      formData.append('audio',  selectedFile);
+
+      const audioToTextResponse = await getLivepeerAudioToText({
+        formData,
+        modelId: 'openai/whisper-large-v3',
+        returnTimestamps: 'true',
+      });
+      
+      console.log({ audioToTextResponse });
+
+      const subtitles = await translateSubtitles({ chunks: audioToTextResponse?.chunks });
+
+      const ipfsUri = await upload({
+        client,
+        files: [
+          subtitles
+        ]
+      });
+
+      onUploadSuccess(ipfsUri);
     } catch (error: any) {
-      console.error('Error uploading file:', error);
-      setError('Failed to upload file. Please try again.');
-      setUploadState('idle');
+      console.error('Error processing file:', error);
+      if (uploadState !== 'complete') {  
+        setError('Failed to process file. Please try again.');
+        setUploadState('idle');
+      }
     }
   };
 
@@ -229,10 +332,10 @@ const FileUpload: React.FC<FileUploadProps> = ({
           <Button
             disabled={uploadState !== 'complete'}
             onClick={() => {
-              if (livePeerUploadedAssetId) {
-                onPressNext(livePeerUploadedAssetId);
+              if (livepeerAsset) {
+                onPressNext(livepeerAsset);
               } else {
-                alert('Missing livepeer asset id');
+                alert('Missing livepeer asset');
               }
             }}
           >

@@ -1,10 +1,8 @@
 'use client';
+
 import React, {
   useState,
   useEffect,
-  type CSSProperties,
-  type PropsWithChildren,
-  forwardRef,
 } from 'react';
 import {
   EnterFullscreenIcon,
@@ -17,12 +15,32 @@ import {
 } from '@livepeer/react/assets';
 import { Src } from '@livepeer/react';
 import * as Player from '@livepeer/react/player';
-//import Skeleton from '../ui/skeleton';
+import { SubtitlesControl, SubtitlesDisplay, SubtitlesProvider, useSubtitles } from './Subtitles';
+import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
+import { AssetMetadata } from '@app/lib/sdk/orbisDB/models/AssetMetadata';
+import { toast } from 'sonner';
+import { fetchAssetId } from '@app/api/livepeer/actions';
+import { generateAccessKey } from '@app/lib/access-key';
+import { WebhookContext } from '@app/api/livepeer/token-gate/route';
+import { useActiveAccount } from 'thirdweb/react';
+import { GetAssetResponse } from 'livepeer/models/operations';
 
-export const PlayerComponent: React.FC<{
+interface PlayerComponentProps {
   src: Src[] | null;
+  assetId: string;
   title: string;
-}> = ({ src, title }) => {
+  accessKey?: string;
+};
+
+export const PlayerComponent: React.FC<PlayerComponentProps> = ({ src, assetId, title }) => {
+  const [assetMetadata, setAssetMetadata] = useState<AssetMetadata | null>(null);
+  const [conditionalProps, setConditionalProps] = useState<any>({});
+
+  const activeAccount = useActiveAccount();
+
+  const { getAssetMetadata } = useOrbisContext();
+  const { setSubtitles } = useSubtitles();
+
   // if (!src) {
   //   return (
   //     <div className={'relative flex w-full'}>
@@ -33,11 +51,41 @@ export const PlayerComponent: React.FC<{
   //   );
   // }
 
+  useEffect(() => {
+    const fetchAssetDetails = async (id: string): Promise<void> => {
+      try {
+        const data = await getAssetMetadata(id);
+        setAssetMetadata(data);
+        data?.subtitles && setSubtitles(data?.subtitles);
+        const asset: GetAssetResponse = await fetchAssetId(id);
+        const conProps = {
+          ...(asset?.asset?.playbackPolicy && {
+            accessKey: generateAccessKey(activeAccount?.address, asset?.asset?.playbackPolicy?.webhookContext as WebhookContext)
+          })
+        }
+        setConditionalProps(conProps);
+      } catch (error) {
+        console.error('Failed to fetch asset metadata:', error);
+        setAssetMetadata(null);
+      }
+    };
+    fetchAssetDetails(assetId);
+  }, [activeAccount, assetId, getAssetMetadata]);
+
   return (
     <>
-      <Player.Root src={src}>
+      <Player.Root src={src} {...conditionalProps}>
         <Player.Container className="h-full w-full overflow-hidden bg-gray-950">
           <Player.Video title={title} className="h-full w-full" poster={null} />
+
+          { assetMetadata?.subtitles && 
+            <SubtitlesDisplay
+              style={{
+                color: '#EC407A',
+                textShadow: '0 0 10px rgba(236, 64, 122, 0.5)',
+              }}
+            />
+          }
 
           <Player.LoadingIndicator className="relative h-full w-full bg-black/50 backdrop-blur data-[visible=true]:animate-in data-[visible=false]:animate-out data-[visible=false]:fade-out-0 data-[visible=true]:fade-in-0">
             <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
@@ -134,6 +182,9 @@ export const PlayerComponent: React.FC<{
                     />
                   </Player.VolumeIndicator>
                 </Player.MuteTrigger>
+                { assetMetadata?.subtitles && 
+                  <SubtitlesControl />
+                }
               </div>
 
               <div className="absolute bottom-0 right-0 mx-2 my-2 flex items-center justify-end gap-2.5 sm:flex-1 md:flex-[1.5]">

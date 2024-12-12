@@ -1,3 +1,4 @@
+import { PlayerComponent } from '@app/components/Player/Player';
 import React, { FC, useEffect, useState } from 'react';
 
 interface PreviewVideoProps {
@@ -24,13 +25,14 @@ const PreviewVideo: FC<PreviewVideoProps> = ({ video }) => {
   return (
     <div className="flex w-full justify-center">
       {videoUrl && (
-        <video
-          controls
-          src={videoUrl} // Directly set src attribute
-          className="mt-2 max-h-96 max-w-full"
-        >
-          Your browser does not support the video tag.
-        </video>
+          <video
+            controls
+            src={videoUrl} // Directly set src attribute
+            className="mt-2 max-h-96 max-w-full"
+          >
+            Your browser does not support the video tag.
+          </video>
+          // <PlayerComponent src={[videoUrl]} title={video ? video.name : ''}/> 
       )}
     </div>
   );

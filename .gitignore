@@ -39,3 +39,7 @@ next-env.d.ts
 
 # Env vars
 .env
+.env.sample
+
+# Cursor
+.cursorrules

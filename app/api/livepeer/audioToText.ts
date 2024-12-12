@@ -1,168 +1,162 @@
 'use server';
 
-import type { NextApiRequest, NextApiResponse } from 'next';
-import { openAsBlob } from 'node:fs';
-
-interface AudioToTextParams {
-  video: File;
-  modelId?: string | null;
-}
-
-interface SubtitleEntry {
-  timestamp: [number, number]; // [startTime, endTime] in seconds
-  text: string;
-  label?: string;
-  srclang?: string;
-}
-
-function secondsToVTTTime(seconds: number): string {
-  // Handle negative numbers or invalid input
-  if (seconds < 0) seconds = 0;
-
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = Math.floor(seconds % 60);
-  const milliseconds = Math.floor((seconds * 1000) % 1000);
-
-  // Format with leading zeros and ensure milliseconds has 3 digits
-  return `${hours.toString().padStart(2, '0')}:${minutes
-    .toString()
-    .padStart(2, '0')}:${secs.toString().padStart(2, '0')}.${milliseconds
-    .toString()
-    .padStart(3, '0')}`;
-}
-
-function generateVTTFile(subtitles: SubtitleEntry[]): string {
-  // Sort subtitles by start time to ensure proper sequence
-  // const sortedSubtitles = [...subtitles].sort((a, b) => a.timestamp[0] - b.timestamp[0]);
-
-  // Start with the WebVTT header
-  let vttContent = 'WEBVTT\n\n';
-
-  // Process each subtitle entry
-  subtitles.forEach((subtitle, index) => {
-    const [startTime, endTime] = subtitle.timestamp;
-
-    // Add cue number (optional but helpful for debugging)
-    vttContent += `${index + 1}\n`;
-
-    // Add timestamp line
-    vttContent += `${secondsToVTTTime(startTime)} --> ${secondsToVTTTime(endTime)}\n`;
-
-    // Add subtitle text and blank line
-    vttContent += `${subtitle.text}\n\n`;
-  });
-
-  return vttContent;
-}
-
-// Helper function to save VTT content to a file (browser environment)
-async function downloadVTT(
-  vttContent: string,
-  filename: string = 'subtitles.vtt',
-): Promise<void> {
-  const blob = new Blob([vttContent], { type: 'text/vtt' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
-const generateSubtitles = async (video: any) => {
-  try {
-    const myHeaders = new Headers();
-    myHeaders.append('Content-Type', 'application/json');
-    myHeaders.append('Authorization', `Bearer ${process.env.LIVEPEER_API_KEY}`);
-
-    const raw = JSON.stringify({
-      audio: await openAsBlob(video),
-    });
-
-    const requestOptions: RequestInit = {
-      method: 'POST',
-      headers: myHeaders,
-      body: raw,
-      redirect: 'follow',
-    };
-
-    const response = await fetch(
-      'https://dream-gateway.livepeer.cloud/audio-to-text',
-      requestOptions,
-    );
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Error: ${response.status} - ${errorText}`);
-    }
-
-    const result = await response.json();
-
-    // Add label and srclang to each subtitle
-    result.chunks = result.chunks.map((subtitle: any) => {
-      subtitle.label = 'English';
-      subtitle.srclang = 'en';
-      return subtitle;
-    });
-
-    // Generate VTT file from chunks and append to response as vtt property
-    result.vtt = generateVTTFile(result.chunks);
-
-    return result;
-  } catch (error: any) {
-    console.error('Error in generateSubtitles API:', error);
-    return { error: error.message || 'Internal Server Error' };
-  }
+type AudioToTextParams = {
+    formData: FormData;
+    modelId?: string;
+    returnTimestamps?: string;
 };
 
-const audioToTextHandler = async (
-  req: NextApiRequest,
-  res: NextApiResponse,
+export const getLivepeerAudioToText = async (
+  params: AudioToTextParams,
 ) => {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method Not Allowed' });
-  }
+    try {
+        const file: File | null = params.formData.get('audio') as unknown as File;
 
-  try {
-    const { video, model_id } = req.body;
+        if (!file) throw new Error('No file uploaded');
 
-    const myHeaders = new Headers();
-    myHeaders.append('Content-Type', 'application/json');
-    myHeaders.append('Authorization', `Bearer ${process.env.LIVEPEER_API_KEY}`);
+        if (params.modelId) params.formData.append('model_id', params.modelId as string);
 
-    const raw = JSON.stringify({
-      audio: await openAsBlob(video),
-      model_id,
-    });
+        const livepeerApiUrl = process.env.LIVEPEER_API_URL || 'https://dream-gateway.livepeer.cloud';
+            
+        // Setup request timeout using AbortController
+        // const controller = new AbortController();
+        // const timeout = setTimeout(() => controller.abort(), 30000);
 
-    const requestOptions: RequestInit = {
-      method: 'POST',
-      headers: myHeaders,
-      body: raw,
-      redirect: 'follow',
-    };
+        const options = {
+            method: 'POST',
+            body: params.formData,
+            headers: {
+                'Authorization': `Bearer ${process.env.LIVEPEER_FULL_API_KEY}`,
+                'Accept': 'application/json'
+            },
+            // signal: controller.signal
+        };
 
-    const response = await fetch(
-      'https://dream-gateway.livepeer.cloud/audio-to-text',
-      requestOptions,
-    );
+        const result = await fetch(`https://livepeer.studio/api/beta/generate/audio-to-text`, options);
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Error: ${response.status} - ${errorText}`);
+        // clearTimeout(timeout);
+
+        if (!result.ok) {
+            const errorText = await result.text();
+            console.error('Livepeer API Error:', {
+                status: result.status,
+                statusText: result.statusText,
+                response: errorText
+            });
+            throw new Error(`API request failed: ${result.status} ${result.statusText}`);
+        }
+
+        const contentType = result.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            const text = await result.text();
+            console.error('Unexpected response type:', contentType, text);
+            throw new Error('API returned non-JSON response');
+        }
+
+        const data = await result.json();
+
+        console.log({ audioToTextResponse: data });
+
+        return data;
+    } catch (error: any) {
+        console.error('Error generating text from audio:', error);
+        throw new Error(error.message || 'Failed to generate text from audio');
     }
-
-    const result = await response.json();
-    return res.status(200).json(result);
-  } catch (error: any) {
-    console.error('Error in audioToText API:', error);
-    return res
-      .status(500)
-      .json({ error: error.message || 'Internal Server Error' });
-  }
 };
 
-export default audioToTextHandler;
+const placeholderData = {
+    "chunks": [
+        {
+            "text": " Look, you know I love a tiger",
+            "timestamp": [
+                0,
+                2
+            ]
+        },
+        {
+            "text": " She got the Banzai Maya",
+            "timestamp": [
+                2,
+                4
+            ]
+        },
+        {
+            "text": " I'm about to buy that betcha car",
+            "timestamp": [
+                4,
+                6
+            ]
+        },
+        {
+            "text": " I'm about to send Ardy the wire",
+            "timestamp": [
+                6,
+                8
+            ]
+        },
+        {
+            "text": " You know I love a tiger",
+            "timestamp": [
+                8,
+                9
+            ]
+        },
+        {
+            "text": " I skirt her high ass like a tire",
+            "timestamp": [
+                9,
+                11
+            ]
+        },
+        {
+            "text": " She like poppin' you on fire",
+            "timestamp": [
+                11,
+                13
+            ]
+        },
+        {
+            "text": " She like poppin' you on fire",
+            "timestamp": [
+                13,
+                15
+            ]
+        },
+        {
+            "text": " 4-4 barking, aye, hold on",
+            "timestamp": [
+                15,
+                17
+            ]
+        },
+        {
+            "text": " Louder than the church choir",
+            "timestamp": [
+                17,
+                18
+            ]
+        },
+        {
+            "text": " I do a drill in the suit",
+            "timestamp": [
+                18,
+                20
+            ]
+        },
+        {
+            "text": " Then I change my attire",
+            "timestamp": [
+                20,
+                21
+            ]
+        },
+        {
+            "text": " Look, she throw that ass back in a quick sec",
+            "timestamp": [
+                21,
+                23
+            ]
+        }
+    ],
+    "text": " Look, you know I love a tiger She got the Banzai Maya I'm about to buy that betcha car I'm about to send Ardy the wire You know I love a tiger I skirt her high ass like a tire She like poppin' you on fire She like poppin' you on fire 4-4 barking, aye, hold on Louder than the church choir I do a drill in the suit Then I change my attire Look, she throw that ass back in a quick sec"
+};

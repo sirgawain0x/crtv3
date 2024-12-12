@@ -1,27 +1,28 @@
 'use client';
-import { ConnectButton } from 'thirdweb/react';
-import { client } from '@app/lib/sdk/thirdweb/client';
-import { ACCOUNT_FACTORY_ADDRESS } from '@app/lib/utils/context';
+import { defineChain, base } from 'thirdweb/chains';
 import { createWallet, inAppWallet } from 'thirdweb/wallets';
-import { VerifyLoginPayloadParams, LoginPayload } from 'thirdweb/auth';
-import {
-  defineChain,
-  polygon,
-  optimism,
-  base,
-  zora,
-  zoraSepolia,
-} from 'thirdweb/chains';
 import {
   generatePayload,
-  isLoggedIn,
+  authedOnly,
   login,
   logout,
-  validatePayload,
-} from '@app/api/auth/thirdweb/thirdweb';
+} from '@app/api/auth/thirdweb/authentication';
+import { OrbisConnectResult } from '@useorbis/db-sdk';
+import { client } from '@app/lib/sdk/thirdweb/client';
+import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
+import { ConnectButton } from '@app/lib/sdk/thirdweb/components';
+import {
+  GenerateLoginPayloadParams,
+  LoginPayload,
+  VerifyLoginPayloadParams,
+} from 'thirdweb/auth';
+import { ACCOUNT_FACTORY_ADDRESS } from '@app/lib/utils/context';
+import { useActiveWallet } from 'thirdweb/react';
 
 export default function ConnectButtonWrapper() {
-  const storyTestnet = defineChain(1513);
+  const { isConnected, orbisLogin } = useOrbisContext();
+  const activeWallet = useActiveWallet();
+
   const wallets = [
     inAppWallet({
       auth: {
@@ -40,6 +41,8 @@ export default function ConnectButtonWrapper() {
     createWallet('com.coinbase.wallet'),
     createWallet('global.safe'),
   ];
+
+  const storyTestnet = defineChain(1513);
 
   const paywallConfig = {
     icon: 'https://storage.unlock-protocol.com/7b2b45eb-ed97-4a1a-b460-b31ce79d087d',
@@ -82,7 +85,7 @@ export default function ConnectButtonWrapper() {
   return (
     <ConnectButton
       client={client}
-      chains={[polygon, base, optimism, storyTestnet, zora, zoraSepolia]}
+      chains={[base]}
       connectButton={{
         label: 'Get Started',
         className: 'my-custom-class',
@@ -92,12 +95,12 @@ export default function ConnectButtonWrapper() {
           borderRadius: '10px',
         },
       }}
-      accountAbstraction={{
-        chain: defineChain(polygon),
-        client: client,
-        sponsorGas: false,
-        factoryAddress: `${ACCOUNT_FACTORY_ADDRESS.polygon}`,
-      }}
+      // accountAbstraction={{
+      //   chain: defineChain(base),
+      //   client: client,
+      //   sponsorGas: true,
+      //   factoryAddress: `${ACCOUNT_FACTORY_ADDRESS.base}`,
+      // }}
       wallets={wallets}
       appMetadata={{
         name: 'Creative TV',
@@ -107,13 +110,14 @@ export default function ConnectButtonWrapper() {
           'https://bafybeiesvinhgaqvr62rj77jbwkazg3w6bhcrsfyg6zyozasaud53nucnm.ipfs.w3s.link/Creative%20TV%20Logo.png',
       }}
       walletConnect={{
-        projectId: 'dc6a426a325d62879d4b9c6ef6dcedb1',
+        projectId: process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID,
       }}
       supportedNFTs={{
         137: [
           '0xad597e5b24ad2a6032168c76f49f05d957223cd0',
           '0xb6b645c3e2025cf69983983266d16a0aa323e2b0',
         ],
+        8453: ['0xf7c4cd399395d80f9d61fde833849106775269c6'],
       }}
       connectModal={{
         size: 'wide',
@@ -131,38 +135,40 @@ export default function ConnectButtonWrapper() {
           title: 'Welcome to Creative TV',
         },
       }}
-      // auth={{
-      //   chain: polygon,
-      //   client: client,
-      //   isLoggedIn: async (address: string) => {
-      //     console.log('checking if logged in!', { address });
-      //     return await isLoggedIn();
-      //   },
-      //   doLogin: async (
-      //     params: VerifyLoginPayloadParams,
-      //   ): Promise<LoginPayload | void> => {
-      //     console.log('logging in!');
-      //     const payload = await validatePayload(params);
-      //     const loginPayload: LoginPayload | void = await login(
-      //       {
-      //         payload: params.payload,
-      //         signature: params.signature, // Add a signature property here
-      //       },
-      //       {
-      //         clientId: 'localhost:3000',
-      //         redirectUri: 'http://localhost:3000/api/auth/unlock',
-      //         paywallConfig: paywallConfig,
-      //       },
-      //     );
-      //     return loginPayload;
-      //   },
-      //   getLoginPayload: async ({ address }: { address: string }) =>
-      //     generatePayload({ address }),
-      //   doLogout: async () => {
-      //     console.log('logging out!');
-      //     await logout();
-      //   },
-      // }}
+      auth={{
+        getLoginPayload: async (params: GenerateLoginPayloadParams) =>
+          await generatePayload(params),
+        doLogin: async (params: VerifyLoginPayloadParams): Promise<void> => {
+          try {
+            const loginPayload = await login(params);
+
+            const orbisConntected = await isConnected(params?.payload?.address);
+            if (!orbisConntected) {
+              const orbisAuthResult = await orbisLogin();
+              if (!orbisAuthResult) {
+                throw new Error('Failed to connect to Orbis');
+              }
+            }
+
+            return loginPayload;
+          } catch (error) {
+            console.error('Login failed: ', error);
+            throw error;
+          }
+        },
+        isLoggedIn: async () => await authedOnly(),
+        doLogout: async () => {
+          try {
+            await logout();
+            activeWallet.disconnect();
+          } catch (error) {
+            console.error('Logout failed: ', error);
+          }
+        },
+      }}
+      onDisconnect={(params: { account: any; wallet: any }) =>
+        params.wallet.disconnect()
+      }
     />
   );
 }

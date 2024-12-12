@@ -22,13 +22,17 @@ const VideoCardGrid: React.FC = () => {
       try {
         const response = await fetchAllAssets();
         if (response && Array.isArray(response)) {
-          // Fetch detailed playback sources for each asset
+          // Only process assets that are ready for playback
+          const readyAssets = response.filter(asset => asset.status?.phase === 'ready');
+          
+          // Fetch detailed playback sources for each ready asset
           const detailedPlaybackSources = await Promise.all(
-            response.map(async (asset: Asset) => {
+            readyAssets.map(async (asset: Asset) => {
               try {
                 const detailedSrc = await getDetailPlaybackSource(
                   `${asset.playbackId}`,
                 );
+                // console.log(asset.playbackId + ': ', detailedSrc);
                 return { ...asset, detailedSrc }; // Add detailedSrc to the asset object
               } catch (err) {
                 console.error(
@@ -44,7 +48,7 @@ const VideoCardGrid: React.FC = () => {
           setPlaybackSources([]);
         }
       } catch (err) {
-        console.error('Error fetching playback sources:', err);
+        console.error('Error fetching playback sources: ', err);
         setError('Failed to load videos.');
       } finally {
         setLoading(false);
