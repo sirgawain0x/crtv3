@@ -22,7 +22,7 @@ describe('getLivepeerTranslation', () => {
     expect(result).toEqual({ translatedText: 'Bonjour' });
   });
 
-  it('should throw error when required params are missing', async () => {
+  it('should throw error when text param are missing', async () => {
     await expect(getLivepeerTranslation({
       text: '',
       source: 'en',
@@ -30,21 +30,19 @@ describe('getLivepeerTranslation', () => {
     })).rejects.toThrow('No text provided');
   });
 
-  it('should use default model and max tokens when not provided', async () => {
-    const mockResponse = { json: () => Promise.resolve({}) };
-    (global.fetch as jest.Mock).mockResolvedValueOnce(mockResponse);
-
-    await getLivepeerTranslation({
+  it('should throw error when source language is missing', async () => {
+    await expect(getLivepeerTranslation({
+      text: 'Hello',
+      source: '',
+      target: 'fr'
+    })).rejects.toThrow('No source language provided');
+  });
+  
+  it('should throw error when target language is missing', async () => {
+    await expect(getLivepeerTranslation({
       text: 'Hello',
       source: 'en',
-      target: 'fr'
-    });
-
-    expect(global.fetch).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.objectContaining({
-        body: expect.any(FormData)
-      })
-    );
+      target: ''
+    })).rejects.toThrow('No target language provided');
   });
 });

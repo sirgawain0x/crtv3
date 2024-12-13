@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { POST, OPTIONS } from '@app/api/livepeer/translation/route';
+import { POST } from '@app/api/livepeer/translation/route';
 import { NextRequest } from 'next/server';
 
 describe('Translation Route Handler', () => {

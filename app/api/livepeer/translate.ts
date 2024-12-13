@@ -45,6 +45,7 @@ export const getLivepeerTranslation = async (
         return data;
     } catch (error: any) {
         console.error('Translation error ', error);
-        throw new Error(error.message || 'Failed to translate text');
+        if (error instanceof Error) throw error;
+        throw new Error('Failed to translate text');
     }
 };

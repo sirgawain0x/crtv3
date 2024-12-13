@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { POST, OPTIONS } from '@app/api/livepeer/audio-to-text/route';
+import { POST } from '@app/api/livepeer/audio-to-text/route';
 import { NextRequest } from 'next/server';
 
 describe('Audio to Text Route Handler', () => {
@@ -54,9 +54,4 @@ describe('Audio to Text Route Handler', () => {
       message: 'Audio file is required'
     });
   });
-
-//   it('should handle OPTIONS request for CORS', async () => {
-//     const response = await OPTIONS();
-//     expect(response.headers.get('Access-Control-Allow-Methods')).toBe('POST');
-//   });
 });
