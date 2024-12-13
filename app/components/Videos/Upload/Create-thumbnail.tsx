@@ -114,8 +114,9 @@ export default function CreateThumbnail({
           <h3 className="text-xl font-bold">Generate a Thumbnail</h3>
         </div>
         <CreateThumbnailForm
-          onSelectThumbnailImages={(imgUri: string) => {
-            console.log('Use selected image', imgUri);
+          onSelectThumbnailImages={(thumbnailUri: string) => {
+            console.log('Use selected image', thumbnailUri);
+            onComplete({ thumbnailUri });
           }}
         />
       </div>
