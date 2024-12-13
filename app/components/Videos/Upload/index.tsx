@@ -68,7 +68,12 @@ const HookMultiStepForm = () => {
         router.push('/');
       }
     };
-    tokenGate(activeAccount?.address as string);
+    if (!activeAccount?.address) {
+      toast.error('Please connect your wallet');
+      router.push('/');
+      return;
+    }
+    tokenGate(activeAccount.address);
   }, [activeAccount, isConnected, router]);
 
   const {

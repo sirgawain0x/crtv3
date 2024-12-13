@@ -23,7 +23,7 @@ describe('Access Key Utils', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env.ACCESS_KEY_SECRET = 'ColYYQhxfEmamhKREizp44sReuvCmk7S';
+    process.env.ACCESS_KEY_SECRET = 'test-access-key';
   });
 
   describe('generateAccessKey', () => {
@@ -31,7 +31,7 @@ describe('Access Key Utils', () => {
       const address = '0x123';
       const result = generateAccessKey(address, mockContext);
 
-      expect(crypto.createHmac).toHaveBeenCalledWith('sha256', 'ColYYQhxfEmamhKREizp44sReuvCmk7S');
+      expect(crypto.createHmac).toHaveBeenCalledWith('sha256', 'test-access-key');
       expect(result).toBe('mocked-hash');
     });
     it('should throw error if ACCESS_KEY_SECRET env variable is not set', () => {
