@@ -10,9 +10,7 @@ export const getLivepeerAudioToText = async (
   params: AudioToTextParams,
 ) => {
     try {
-        const file: File | null = params.formData.get('audio') as unknown as File;
-
-        if (!file) throw new Error('No file uploaded');
+        if (!params.formData.get('audio')) throw new Error('No file uploaded');
 
         if (params.modelId) params.formData.append('model_id', params.modelId as string);
 

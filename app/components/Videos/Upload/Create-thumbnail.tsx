@@ -31,8 +31,7 @@ export default function CreateThumbnail({
 
   const [progress, setProgress] = useState<number>(0);
   const [livepeerAssetData, setLivepeerAssetData] = useState<Asset>();
-  const [livepeerPlaybackData, setLivepeerPlaybackData] =
-    useState<PlaybackInfo>();
+  const [livepeerPlaybackData, setLivepeerPlaybackData] = useState<PlaybackInfo>();
 
   useInterval(
     () => {
@@ -115,7 +114,7 @@ export default function CreateThumbnail({
           <h3 className="text-xl font-bold">Generate a Thumbnail</h3>
         </div>
         <CreateThumbnailForm
-          onSelectThumbnailImages={(imgUri) => {
+          onSelectThumbnailImages={(imgUri: string) => {
             console.log('Use selected image', imgUri);
           }}
         />

@@ -67,4 +67,14 @@ describe('Access Key Utils', () => {
       expect(crypto.timingSafeEqual).toHaveBeenCalled();
     });
   });
+
+  it('should use timing-safe comparison', () => {
+    const address = '0x123';
+    const accessKey = 'test-key';
+    
+    validateAccessKey(accessKey, address, mockContext);
+    
+    expect(crypto.timingSafeEqual).toHaveBeenCalled();
+    expect(crypto.createHmac).toHaveBeenCalledBefore(crypto.timingSafeEqual as any);
+  });
 });
