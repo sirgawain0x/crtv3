@@ -68,7 +68,7 @@ const HookMultiStepForm = () => {
         router.push('/');
       }
     };
-    tokenGate(activeAccount?.address);
+    tokenGate(activeAccount?.address as string);
   }, [activeAccount, isConnected, router]);
 
   const {
@@ -88,6 +88,11 @@ const HookMultiStepForm = () => {
     }
   }, [erroredInputName]);
 
+  const handleCreateInfoSubmit = (metadataFormData: TVideoMetaForm) => {
+    setMetadata(metadataFormData);
+    setActiveStep((prevActiveStep) => prevActiveStep + 1);
+  }
+
   return (
     <>
       <StepperIndicator activeStep={activeStep} />
@@ -100,10 +105,7 @@ const HookMultiStepForm = () => {
       )}
       <div className={activeStep === 1 ? 'block' : 'hidden'}>
         <CreateInfo
-          onPressNext={(metadataFormData) => {
-            setMetadata(metadataFormData);
-            setActiveStep((prevActiveStep) => prevActiveStep + 1);
-          }}
+          onPressNext={handleCreateInfoSubmit}
         />
       </div>
       <div className={activeStep === 2 ? 'block' : 'hidden'}>
@@ -112,7 +114,7 @@ const HookMultiStepForm = () => {
           metadata={metadata}
           onFileSelect={(file) => {}}
           onFileUploaded={(videoUrl: string) => {}}
-          onUploadSuccess={(subtitlesUri?: string) => {
+          onSubtitlesSuccess={(subtitlesUri?: string) => {
             setSubtitlesUri(subtitlesUri);
           }}
           onPressBack={() =>

@@ -90,7 +90,7 @@ const CreateThumbnailForm = ({
         rules={{ required: 'AI Model is required' }}
         render={({ field }) => (
           <Select onValueChange={field.onChange} value={field.value}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-[180px]" data-testid='create-thumbnail-select'>
               <SelectValue placeholder="Select A Model" />
             </SelectTrigger>
             <SelectContent>
@@ -136,6 +136,7 @@ const CreateThumbnailForm = ({
             {...field}
             placeholder="Enter your prompt"
             className="w-full rounded border p-2"
+            data-testid="create-thumbnail-prompt"
             rows={4}
           />
         )}

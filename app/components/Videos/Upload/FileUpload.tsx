@@ -28,7 +28,7 @@ const copyToClipboard = (text: string) => {
 interface FileUploadProps {
   onFileSelect: (file: File | null) => void;
   onFileUploaded: (fileUrl: string) => void;
-  onUploadSuccess: (subtitlesUri?: string) => void;
+  onSubtitlesSuccess: (subtitlesUri?: string) => void;
   onPressNext?: (livepeerAsset: any) => void;
   onPressBack?: () => void;
   metadata?: any;
@@ -116,7 +116,7 @@ async function translateSubtitles(data: { chunks: Chunk[] }): Promise<Subtitles>
 const FileUpload: React.FC<FileUploadProps> = ({
   onFileSelect,
   onFileUploaded,
-  onUploadSuccess,
+  onSubtitlesSuccess,
   onPressNext,
   onPressBack,
   metadata,
@@ -217,7 +217,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
         ]
       });
 
-      onUploadSuccess(ipfsUri);
+      onSubtitlesSuccess(ipfsUri);
     } catch (error: any) {
       console.error('Error processing file:', error);
       if (uploadState !== 'complete') {  
@@ -246,6 +246,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
               id="file-upload"
               accept="video/*"
               className="file:border-1 block w-full text-sm text-[#EC407A] file:mr-4 file:cursor-pointer file:rounded-full file:bg-white file:px-4 file:py-2 file:text-sm file:font-semibold file:text-[#EC407A] hover:file:bg-gray-200"
+              data-testid="file-upload-input"
               onChange={handleFileChange}
             />
             {/* Display selected file name */}
@@ -338,6 +339,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
                 alert('Missing livepeer asset');
               }
             }}
+            data-testid='file-input-next'
           >
             Next
           </Button>
