@@ -76,6 +76,6 @@ describe('Access Key Utils', () => {
     validateAccessKey(accessKey, address, mockContext);
     
     expect(crypto.timingSafeEqual).toHaveBeenCalled();
-    expect(crypto.createHmac).toHaveBeenCalledBefore(crypto.timingSafeEqual as any);
+    expect(crypto.createHmac).toHaveBeenCalledBefore(crypto.timingSafeEqual as jest.Mock);
   });
 });

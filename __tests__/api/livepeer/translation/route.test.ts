@@ -71,25 +71,30 @@ describe('Translation Route Handler', () => {
   });
 
   it('should handle missing API key', async () => {
-    process.env.LIVEPEER_FULL_API_KEY = '';
-    const mockRequest = new NextRequest('http://localhost:3000/api/livpeer/translation', {
-      method: 'POST',
-      body: JSON.stringify({
-        text: 'Hello',
-        source: 'English',
-        target: 'French'
-      })
-    });
+    const originalApiKey = process.env.LIVEPEER_FULL_API_KEY;
+    try {
+      process.env.LIVEPEER_FULL_API_KEY = '';
+      const mockRequest = new NextRequest('http://localhost:3000/api/livpeer/translation', {
+        method: 'POST',
+        body: JSON.stringify({
+          text: 'Hello',
+          source: 'English',
+          target: 'French'
+        })
+      });
 
-    const response = await POST(mockRequest);
+      const response = await POST(mockRequest);
 
-    expect(response.ok).toBeFalse();
-    expect(response.status).toBe(401)
-    expect(response.statusText).toBe('Authentication error: Please provide Livepeer API key')
-    
-    const data = await response.json();
-    
-    expect(data.success).toBeFalse();
+      expect(response.ok).toBeFalse();
+      expect(response.status).toBe(401)
+      expect(response.statusText).toBe('Authentication error: Please provide Livepeer API key')
+      
+      const data = await response.json();
+      
+      expect(data.success).toBeFalse();
+    } finally {
+      process.env.LIVEPEER_FULL_API_KEY = originalApiKey;
+    }
   });
   
   it('should handle request timeout', async () => {
@@ -113,5 +118,5 @@ describe('Translation Route Handler', () => {
     const data = await response.json();
   
     expect(data.success).toBe(false);
-  });
+  }, 32000);
 });
