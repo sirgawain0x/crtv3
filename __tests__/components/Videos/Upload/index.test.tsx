@@ -224,7 +224,25 @@ describe('HookMultiStepForm', () => {
       });
     });
 
-    // it('should pass all inputs to the onPressNext function', async () => {});
+    it('should pass all inputs to the onPressNext function', async () => {
+      const onPressNextMock = vi.fn((data: TVideoMetaForm) => console.log({ data }));
+    
+      const { getByTestId } = render(<CreateInfo onPressNext={onPressNextMock} />);
+    
+      fireEvent.change(getByTestId('create-info-title'), { target: { value: 'Test Title' } });
+      fireEvent.change(getByTestId('create-info-description'), { target: { value: 'Test Description' } });
+      
+      await userEvent.click(getByTestId('create-info-next'));
+    
+      await waitFor(() => {
+        expect(onPressNextMock).toHaveBeenCalledWith({
+          title: 'Test Title',
+          description: 'Test Description',
+          location: '',
+          category: '',
+        });
+      });
+    });
   });
 
   describe('FileUpload', () => {

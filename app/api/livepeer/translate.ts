@@ -40,6 +40,10 @@ export const getLivepeerTranslation = async (
 
         const result = await fetch(`https://livepeer.studio/api/beta/generate/llm`, options);
 
+        if (!result.ok) {
+            throw new Error(`Livepeer API error ${result?.status}: ${result?.statusText}`);
+        }
+
         const data = await result.json();
 
         return data;

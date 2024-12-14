@@ -69,4 +69,49 @@ describe('Translation Route Handler', () => {
       message: 'Text exceeds maximum length of 1000 characters'
     });
   });
+
+  it('should handle missing API key', async () => {
+    process.env.LIVEPEER_FULL_API_KEY = '';
+    const mockRequest = new NextRequest('http://localhost:3000/api/livpeer/translation', {
+      method: 'POST',
+      body: JSON.stringify({
+        text: 'Hello',
+        source: 'English',
+        target: 'French'
+      })
+    });
+
+    const response = await POST(mockRequest);
+
+    expect(response.ok).toBeFalse();
+    expect(response.status).toBe(401)
+    expect(response.statusText).toBe('Authentication error: Please provide Livepeer API key')
+    
+    const data = await response.json();
+    
+    expect(data.success).toBeFalse();
+  });
+  
+  it('should handle request timeout', async () => {
+    const mockRequest = new NextRequest('http://localhost:3000/api/livpeer/translation', {
+      method: 'POST',
+      body: JSON.stringify({
+        text: 'Hello',
+        source: 'English',
+        target: 'French'
+      })
+    });
+  
+    (global.fetch as jest.Mock).mockImplementationOnce(() => 
+      new Promise(resolve => setTimeout(resolve, 31000))
+    );
+  
+    const response = await POST(mockRequest);
+
+    expect(response.ok).toBeFalse();
+    
+    const data = await response.json();
+  
+    expect(data.success).toBe(false);
+  });
 });
