@@ -8,7 +8,7 @@ expect.extend(matchers);
 // Mock Next.js components/functions
 vi.mock('next/server', () => ({
   NextResponse: {
-    json: (data: any, init?: ResponseInit) => 
+    json: <T>(data: any, init?: ResponseInit) => 
       new Response(JSON.stringify(data), {
         ...init,
         headers: { 'content-type': 'application/json' },

@@ -93,8 +93,8 @@ const HookMultiStepForm = () => {
     }
   }, [erroredInputName]);
 
-  const handleCreateInfoSubmit = (metadataFormData: TVideoMetaForm) => {
-    setMetadata(metadataFormData);
+  const handleCreateInfoSubmit = (data: TVideoMetaForm) => {
+    setMetadata(data);
     setActiveStep((prevActiveStep) => prevActiveStep + 1);
   }
 

@@ -36,15 +36,22 @@ const CreateInfo = ({ onPressNext }: TCreateInfoProps) => {
     register,
   } = useForm<TVideoMetaForm>({
     mode: 'onChange',
+    defaultValues: {
+      title: '',
+      description: '',
+      location: '',
+      category: '',
+    },
   });
 
-  const onSubmit = (data: TVideoMetaForm) => onPressNext(data);
+  const onSubmit = (data: TVideoMetaForm) => {
+    onPressNext(data);
+  };
 
   const handleSelectCategory = (value: string) => setValue('category', value);
 
-
   return (
-    <form onSubmit={handleSubmit(onPressNext)}>
+    <form onSubmit={handleSubmit(onSubmit)}>
       <div className="my-6 flex justify-center">
         <h4 className="stepper_step_heading">Details</h4>
       </div>

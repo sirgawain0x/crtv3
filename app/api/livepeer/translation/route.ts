@@ -39,6 +39,15 @@ export async function POST(req: NextRequest) {
         status: 400,
       });
     }
+
+    if (!process.env.LIVEPEER_FULL_API_KEY) {
+      return NextResponse.json({ 
+        success: false, 
+      }, { 
+        statusText: 'Authentication error: Please provide Livepeer API key',
+        status: 401,
+      });
+    }
   
     // Sanitize input
     const sanitizedText = text.trim();
@@ -68,7 +77,7 @@ export async function POST(req: NextRequest) {
         success: false,
         message: result.statusText || 'Translation failed...'
       }, { 
-        status: result.status,
+        status: result.status
       });
     }
 

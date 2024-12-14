@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { generateAccessKey, validateAccessKey } from '@app/lib/access-key';
-import crypto from 'crypto';
+import crypto from 'node:crypto';
 
 // Mock crypto module
 vi.mock('crypto', () => ({
@@ -34,6 +34,7 @@ describe('Access Key Utils', () => {
       expect(crypto.createHmac).toHaveBeenCalledWith('sha256', 'test-access-key');
       expect(result).toBe('mocked-hash');
     });
+    
     it('should throw error if ACCESS_KEY_SECRET env variable is not set', () => {
       process.env.ACCESS_KEY_SECRET = '';
       const address = '0x123';

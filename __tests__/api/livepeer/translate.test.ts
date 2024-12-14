@@ -9,6 +9,8 @@ describe('getLivepeerTranslation', () => {
 
   it('should successfully translate text', async () => {
     const mockResponse = { 
+      ok: true, 
+      status: 200,
       json: () => Promise.resolve({ translatedText: 'Bonjour' }) 
     };
     (global.fetch as jest.Mock).mockResolvedValueOnce(mockResponse);
@@ -44,5 +46,20 @@ describe('getLivepeerTranslation', () => {
       source: 'en',
       target: ''
     })).rejects.toThrow('No target language provided');
+  });
+
+  it('should handle API errors', async () => {
+    const mockResponse = { 
+      ok: false,
+      status: 500,
+      statusText: 'Failed to translate text'
+    };
+    (global.fetch as jest.Mock).mockResolvedValueOnce(mockResponse);
+  
+    await expect(getLivepeerTranslation({
+      text: 'Hello',
+      source: 'en',
+      target: 'fr'
+    })).rejects.toThrow('Livepeer API error 500: Failed to translate text');
   });
 });

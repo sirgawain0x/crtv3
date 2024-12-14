@@ -6,6 +6,10 @@ import { GenAudioToTextResponse } from 'livepeer/models/operations';
 import { SubtitleResponse } from '@app/lib/types';
 
 export async function POST(req: NextRequest) {
+  // Setup request timeout using AbortController
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000);
+
   try {
     const formData = await req.formData();
 
@@ -22,9 +26,14 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Setup request timeout using AbortController
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 30000);
+    if (!process.env.LIVEPEER_FULL_API_KEY) {
+      return NextResponse.json({ 
+        success: false, 
+      }, { 
+        statusText: 'Authentication error: Please provide Livepeer API key',
+        status: 401,
+      });
+    }
 
     const options = {
       method: 'POST',
@@ -59,6 +68,7 @@ export async function POST(req: NextRequest) {
       status: 200,
     });
   } catch (error) {
+    clearTimeout(timeout);
     console.error('Error in audio-to-text conversion:', error);
     return NextResponse.json({
       success: false,
