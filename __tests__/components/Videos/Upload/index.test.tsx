@@ -8,9 +8,10 @@ import { authedOnly } from '@app/api/auth/thirdweb/authentication';
 import { hasAccess } from '@app/api/auth/thirdweb/gateCondition';
 import { useRouter } from 'next/navigation';
 import { ChakraProvider } from '@chakra-ui/react';
-import CreateInfo, { TVideoMetaForm } from '@app/components/Videos/Upload/Create-info';
+import CreateInfo from '@app/components/Videos/Upload/Create-info';
+import type { TVideoMetaForm } from '@app/components/Videos/Upload/Create-info';
 import FileUpload from '@app/components/Videos/Upload/FileUpload';
-import { Asset } from 'livepeer/models/components';
+import type { Asset } from 'livepeer/models/components';
 import userEvent from '@testing-library/user-event';
 import CreateThumbnail from '@app/components/Videos/Upload/Create-thumbnail';
 
@@ -59,7 +60,9 @@ describe('HookMultiStepForm', () => {
       } as any);
 
       // Default mock implementations
-      (useActiveAccount as jest.MockedFunction<typeof useActiveAccount>).mockReturnValue({ address: '0x123' } as any);
+      (useActiveAccount as jest.MockedFunction<typeof useActiveAccount>).mockReturnValue({
+        address: '0x123'
+      } as ReturnType<typeof useActiveAccount>);
       (useOrbisContext as unknown as jest.MockedFunction<(args: any[]) => {isConnected: (address: string) => Promise<boolean>, insert: () => Promise<void>}>).mockReturnValue({ 
         isConnected: vi.fn().mockResolvedValue(true),
         insert: vi.fn(),
@@ -85,7 +88,7 @@ describe('HookMultiStepForm', () => {
       // Mock failed authentication
       (authedOnly as jest.MockedFunction<typeof authedOnly>).mockResolvedValue(false);
       (hasAccess as jest.MockedFunction<typeof hasAccess>).mockResolvedValue(true);
-      (useOrbisContext().isConnected as any).mockResolvedValue(true);
+      (useOrbisContext().isConnected as jest.MockedFunction<(address: string) => Promise<boolean>>).mockResolvedValue(true);
 
       render(<HookMultiStepForm />);
 
@@ -101,7 +104,7 @@ describe('HookMultiStepForm', () => {
       // Mock failed token gate check
       (authedOnly as jest.MockedFunction<typeof authedOnly>).mockResolvedValue(true);
       (hasAccess as jest.MockedFunction<typeof hasAccess>).mockResolvedValue(false);
-      (useOrbisContext().isConnected as any).mockResolvedValue(true);
+      (useOrbisContext().isConnected as jest.MockedFunction<(address: string) => Promise<boolean>>).mockResolvedValue(true);
 
       render(<HookMultiStepForm />);
 
@@ -117,7 +120,7 @@ describe('HookMultiStepForm', () => {
       // Mock failed Orbis connection
       (authedOnly as jest.MockedFunction<typeof authedOnly>).mockResolvedValue(true);
       (hasAccess as jest.MockedFunction<typeof hasAccess>).mockResolvedValue(true);
-      (useOrbisContext().isConnected as any).mockResolvedValue(false);
+      (useOrbisContext().isConnected as jest.MockedFunction<(address: string) => Promise<boolean>>).mockResolvedValue(false);
 
       render(<HookMultiStepForm />);
 
@@ -131,7 +134,7 @@ describe('HookMultiStepForm', () => {
 
     it('should handle authentication check errors', async () => {
       // Mock error during authentication check
-      (authedOnly as any).mockRejectedValue(new Error('Auth check failed'));
+      (authedOnly as jest.MockedFunction<typeof authedOnly>).mockRejectedValue(new Error('Auth check failed'));
 
       render(<HookMultiStepForm />);
 
