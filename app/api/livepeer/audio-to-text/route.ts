@@ -1,9 +1,6 @@
 'use server';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { fullLivepeer } from '@app/lib/sdk/livepeer/fullClient';
-import { GenAudioToTextResponse } from 'livepeer/models/operations';
-import { SubtitleResponse } from '@app/lib/types';
 
 export const dynamic = 'auto';
 
@@ -57,21 +54,21 @@ export async function POST(req: NextRequest) {
 
     clearTimeout(timeout);
 
-    if (!result.ok) {
-      console.error('Audio-to-text error: ', result.statusText);
+    if (!res.ok) {
+      console.error('Audio-to-text error: ', res.statusText);
       return NextResponse.json(
         {
           success: false,
-          message: result.statusText || 'Translation failed...',
+          message: res.statusText || 'Translation failed...',
         },
         {
-          status: result.status,
+          status: res.status,
         },
       );
     }
 
     // Get response data
-    const data = await result.json();
+    const data = await res.json();
 
     // Send NextResponse
     return NextResponse.json(
@@ -97,18 +94,4 @@ export async function POST(req: NextRequest) {
       },
     );
   }
-}
-
-// Handle OPTIONS requests for CORS preflight
-export async function OPTIONS() {
-  return new NextResponse(null, {
-    status: 200,
-    headers: {
-      'Access-Control-Allow-Origin':
-        process.env.NEXT_PUBLIC_THIRDWEB_AUTH_DOMAIN || 'http://localhost:3000',
-      'Access-Control-Allow-Methods': 'POST',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-      'Access-Control-Max-Age': '86400',
-    },
-  });
 }
