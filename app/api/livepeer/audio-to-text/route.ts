@@ -1,11 +1,15 @@
-'user server';
+'use server';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { fullLivepeer } from '@app/lib/sdk/livepeer/fullClient';
 import { GenAudioToTextResponse } from 'livepeer/models/operations';
 import { SubtitleResponse } from '@app/lib/types';
 
-export const dynamic = 'auto';
+export async function dynamic() {
+  return {
+    forceDynamic: true,
+  };
+}
 
 export async function POST(req: NextRequest) {
   // Setup request timeout using AbortController
