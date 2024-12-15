@@ -5,17 +5,14 @@ import { NextRequest, NextResponse } from 'next/server';
 export const dynamic = 'auto';
 
 export async function POST(req: NextRequest) {
-  // Setup request timeout using AbortController
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 30000);
 
   try {
     const formData = await req.formData();
 
-    // Append additional params to formData object
     formData.append('model_id', 'openai/whisper-large-v3');
 
-    // Validate request body
     if (!formData.get('audio')) {
       return NextResponse.json(
         {
@@ -31,8 +28,9 @@ export async function POST(req: NextRequest) {
     if (!process.env.LIVEPEER_FULL_API_KEY) {
       return NextResponse.json({ 
         success: false, 
+        message: 'Internal server error',
       }, { 
-        statusText: 'Authentication error: Please provide Livepeer API key',
+        statusText: 'Unauthorized',
         status: 401,
       });
     }
@@ -46,7 +44,6 @@ export async function POST(req: NextRequest) {
       signal: controller.signal,
     };
 
-    // Send POST request to Livepeer LLM endpoint
     const res = await fetch(
       'https://livepeer.studio/api/beta/generate/audio-to-text',
       options,
@@ -67,8 +64,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Get response data
     const data = await res.json();
+
+    if (!data || typeof data !== 'object') {
+      console.error('Invalid response format from Livepeer API');
+      return NextResponse.json(
+        {
+          success: false,
+          message: 'Invalid response from transcription service',
+        },
+        {
+          status: 502,
+        },
+      );
+    }
 
     // Send NextResponse
     return NextResponse.json(

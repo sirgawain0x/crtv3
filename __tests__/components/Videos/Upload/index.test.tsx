@@ -14,6 +14,7 @@ import FileUpload from '@app/components/Videos/Upload/FileUpload';
 import type { Asset } from 'livepeer/models/components';
 import userEvent from '@testing-library/user-event';
 import CreateThumbnail from '@app/components/Videos/Upload/Create-thumbnail';
+import { AppRouterInstance } from 'next/dist/shared/lib/app-router-context.shared-runtime';
 
 vi.mock('next/navigation', () => ({
   useRouter: vi.fn(),
@@ -57,7 +58,12 @@ describe('HookMultiStepForm', () => {
       // Mock the router push method
       vi.mocked(useRouter).mockReturnValue({
         push: mockRouterPush,
-      } as any);
+        back: vi.fn(),
+        forward: vi.fn(),
+        refresh: vi.fn(),
+        replace: vi.fn(),
+        prefetch: vi.fn(),
+      } as AppRouterInstance);
 
       // Default mock implementations
       (useActiveAccount as jest.MockedFunction<typeof useActiveAccount>).mockReturnValue({

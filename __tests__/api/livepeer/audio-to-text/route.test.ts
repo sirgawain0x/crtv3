@@ -72,11 +72,12 @@ describe('Audio to Text Route Handler', () => {
 
       expect(response.ok).toBeFalse();
       expect(response.status).toBe(401)
-      expect(response.statusText).toBe('Authentication error: Please provide Livepeer API key')
+      expect(response.statusText).toBe('Unauthorized')
       
       const data = await response.json();
       
       expect(data.success).toBeFalse();
+      expect(data.message).toBe('Internal server error');
     } finally {
       process.env.LIVEPEER_FULL_API_KEY = originalApiKey;
     }
