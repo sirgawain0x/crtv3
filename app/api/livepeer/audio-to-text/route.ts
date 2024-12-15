@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         success: true,
-        response: data.textResponse,
+        response: data,
       },
       {
         status: 200,
