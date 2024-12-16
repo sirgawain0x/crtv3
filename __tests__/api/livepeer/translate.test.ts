@@ -42,7 +42,6 @@ describe('getLivepeerTranslation', () => {
   
   it('should throw error when target language is missing', async () => {
     await expect(getLivepeerTranslation({
-<<<<<<< HEAD
       text: 'Hello',
       source: 'en',
       target: ''
@@ -61,15 +60,6 @@ describe('getLivepeerTranslation', () => {
       text: 'Hello',
       source: 'en',
       target: 'fr'
-    })).rejects.toThrow('Livepeer API error 500: Failed to translate text');
-<<<<<<< HEAD
-=======
-      text: 'Hello',
-      source: 'en',
-      target: ''
-    })).rejects.toThrow('No target language provided');
->>>>>>> 8aefbd9 (Updates to tests, removed OPTIONS method in translation and audio-to-text route handlers)
-=======
->>>>>>> 6335cc0 (Requested coderabbitai revisions throughout)
+    })).rejects.toThrow('Livepeer API error 500: Failed to translate text');     
   });
 });

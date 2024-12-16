@@ -8,20 +8,12 @@ export const metokenDiamondOptimism = getContract({
   client,
   chain: defineChain(10),
   address: '0xdD830E2cdC4023d1744232a403Cf2F6c84e898D1',
-<<<<<<< HEAD
   abi: metokenDiamondABI.abi as any
-=======
-  abi: metokenDiamondABI as any,
->>>>>>> 8300ba5 (Resolved various bugs throughout to run build successfully)
 });
 
 export const metokenDiamondBase = getContract({
   client,
   chain: defineChain(8453),
   address: '0xba5502db2aC2cBff189965e991C07109B14eB3f5',
-<<<<<<< HEAD
   abi: metokenDiamondABI.abi as any,
-=======
-  abi: metokenDiamondABI as any,
->>>>>>> 8300ba5 (Resolved various bugs throughout to run build successfully)
 });
