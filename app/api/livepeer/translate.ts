@@ -38,7 +38,11 @@ export const getLivepeerTranslation = async (
             }
         };
 
-        const result = await fetch(`${livepeerApiUrl}/llm`, options);
+        const result = await fetch(`https://livepeer.studio/api/beta/generate/llm`, options);
+
+        if (!result.ok) {
+            throw new Error(`Livepeer API error ${result?.status}: ${result?.statusText}`);
+        }
 
         if (!result.ok) {
             throw new Error(`Livepeer API error ${result?.status}: ${result?.statusText}`);
