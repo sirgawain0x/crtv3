@@ -179,7 +179,7 @@ async function validateAccess(payload: WebhookPayload): Promise<boolean> {
 
 async function checkUserTokenBalances(address: string, context: WebhookContext): Promise<boolean> {
   try {
-    const clientId = process.env.NEXT_PUBLIC_TEMPLATE_CLIENT_ID as string;
+    const clientId = process.env.NEXT_PUBLIC_TEMPLATE_CLIENT_ID;
 
     if (!clientId) {
       throw new Error('No client ID provided');
