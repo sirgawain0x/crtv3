@@ -48,21 +48,21 @@ export function SubscribeToMetoken({
   const { data: isOwner, isPending: isPendingOwner } = useReadContract({
     contract: metokenDiamondBase,
     method: 'isOwner',
-    args: [activeAccount?.address],
+    params: [activeAccount?.address],
   });
 
   const { data: meTokenAddress, isPending: isPendingMeTokenAddress } =
     useReadContract({
       contract: metokenDiamondBase,
       method: 'getOwnerMeToken',
-      args: [activeAccount?.address],
+      params: [activeAccount?.address],
     });
 
   const { data: meTokenInfo, isPending: isPendingMeTokenInfo } =
     useReadContract({
       contract: metokenDiamondBase,
       method: 'getMeTokenInfo',
-      args: [meTokenAddress],
+      params: [meTokenAddress],
     }) as { data: MeTokenInfo | undefined; isPending: boolean };
 
   // Merge passed props with meTokenInfo

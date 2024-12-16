@@ -60,7 +60,7 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({ src, assetId, 
         const asset: GetAssetResponse = await fetchAssetId(id);
         const conProps = {
           ...(asset?.asset?.playbackPolicy && {
-            accessKey: generateAccessKey(activeAccount?.address, asset?.asset?.playbackPolicy?.webhookContext as WebhookContext)
+            accessKey: generateAccessKey(activeAccount?.address!, asset?.asset?.playbackPolicy?.webhookContext as WebhookContext)
           })
         }
         setConditionalProps(conProps);

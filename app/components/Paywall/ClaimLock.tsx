@@ -25,7 +25,7 @@ function ClaimLockButton({ closeMenu }: { closeMenu: () => void }) {
     client: client,
     chain: base,
     address: '0xf7c4cd399395d80f9d61fde833849106775269c6',
-    abi: unlockAbi,
+    abi: unlockAbi as any,
   });
 
   const { data: result, isLoading } = useReadContract({
@@ -63,7 +63,9 @@ function ClaimLockButton({ closeMenu }: { closeMenu: () => void }) {
                 image:
                   'https://bafybeiemndtnhajevhwep7mrzx62slcp6nklpw4zwq3dcqvqugj7tqem44.ipfs.w3s.link/Creator%20Membership%20Pass_both.gif',
               },
-              buyWithCrypto: true,
+              buyWithCrypto: {
+                testMode: false
+              },
               buyWithFiat: {
                 prefillSource: {
                   currency: 'USD',

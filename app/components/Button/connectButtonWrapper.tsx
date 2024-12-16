@@ -160,7 +160,7 @@ export default function ConnectButtonWrapper() {
         doLogout: async () => {
           try {
             await logout();
-            activeWallet.disconnect();
+            activeWallet?.disconnect();
           } catch (error) {
             console.error('Logout failed: ', error);
           }
