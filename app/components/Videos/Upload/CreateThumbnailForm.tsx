@@ -56,18 +56,19 @@ const CreateThumbnailForm = ({
         prompt: data.prompt,
         modelId: data.aiModel,
         safetyCheck: true,
-        numImagesPerPrompt: 1,
+        numImagesPerPrompt: 4,
       });
       if (response.success) {
         setImagesUrl((currentImages) => [...currentImages, ...response.result.images]);
       } else {
         throw new Error(response.result);
       }
-    } catch (e) {
-      console.log('Error', e);
+    } catch (err) {
+      console.log('Error', JSON.stringify(err));
       setError('root', {
         message: 'Error generating AI images',
       });
+      throw err;
     } finally {
       setLoading(false);
     }
