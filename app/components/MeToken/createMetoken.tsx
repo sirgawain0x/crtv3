@@ -77,41 +77,44 @@ export default function CreateMetoken() {
   const { data: isOwner, isPending: isPendingOwner } = useReadContract({
     contract: metokenDiamondBase,
     method: 'isOwner',
-    args: [activeAccount?.address],
+    params: [activeAccount?.address!],
   });
 
   const [isGenerated, setIsGenerated] = useState(false);
-  const { mutate: sendTransaction, isLoading } = useSendTransaction({
-    onSuccess: (result: any) => {
-      setIsGenerated(true);
-      setFormData(form.getValues());
-      toast.success('MeToken created successfully!', {
-        description: `Transaction hash: ${result.transactionHash}`,
-        action: {
-          label: 'View Transaction',
-          onClick: () =>
-            window.open(
-              `https://basescan.org/tx/${result.transactionHash}`,
-              '_blank',
-            ),
-        },
-      });
-      // Reset form
-      setActiveStep(1);
-      form.reset();
-    },
-    onError: (error: any) => {
-      setIsGenerated(false);
-      toast.error('Error generating MeToken', {
-        description: error?.message || 'Something went wrong',
-      });
-    },
-  });
+  const { mutate: sendTransaction } = useSendTransaction();
+
+  // {
+  //   onSuccess: (result: any) => {
+  //     setIsGenerated(true);
+  //     setFormData(form.getValues());
+  //     toast.success('MeToken created successfully!', {
+  //       description: `Transaction hash: ${result.transactionHash}`,
+  //       action: {
+  //         label: 'View Transaction',
+  //         onClick: () =>
+  //           window.open(
+  //             `https://basescan.org/tx/${result.transactionHash}`,
+  //             '_blank',
+  //           ),
+  //       },
+  //     });
+  //     // Reset form
+  //     setActiveStep(1);
+  //     form.reset();
+  //   },
+  //   onError: (error: any) => {
+  //     setIsGenerated(false);
+  //     toast.error('Error generating MeToken', {
+  //       description: error?.message || 'Something went wrong',
+  //     });
+  //   },
+  // }
 
   // State variables to hold form inputs
   const [name, setName] = useState('');
   const [symbol, setSymbol] = useState('');
   const [activeStep, setActiveStep] = useState(1);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const address = '0xba5502db2aC2cBff189965e991C07109B14eB3f5';
 
   const form = useForm<CreateMetokenFormData>({
@@ -134,6 +137,7 @@ export default function CreateMetoken() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
     const formValues = form.getValues();
 
     if (activeStep === 1) {
@@ -161,12 +165,14 @@ export default function CreateMetoken() {
           params: [formValues.name, formValues.symbol, formValues.address],
         });
         sendTransaction(transaction);
+        setIsLoading(false);
       } catch (error: unknown) {
         const errorMessage =
           error instanceof Error ? error.message : 'Something went wrong';
         toast.error('Transaction preparation failed', {
           description: errorMessage,
         });
+        setIsLoading(false);
       }
     }
   };

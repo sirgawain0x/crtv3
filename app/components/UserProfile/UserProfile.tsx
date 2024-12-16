@@ -50,7 +50,7 @@ const ProfilePage: NextPage = () => {
   const [nftData, setNftData] = useState<any>(null);
   const [balance, setBalance] = useState<string>('');
 
-  const unlockAbi = Unlock.abi;
+  const unlockAbi = Unlock.abi as any;
 
   /*******  CONTRACT READING ********/
   const unlockContract = getContract({
@@ -129,7 +129,7 @@ const ProfilePage: NextPage = () => {
                     params: [ownedIds, CREATIVE_ADDRESS],
                   })
                 }
-                onSubmit={() => toast.success('Successful Membership Renewal!')}
+                onClick={() => toast.success('Successful Membership Renewal!')}
                 onError={(error: Error) =>
                   toast.error('Error Renewing Membership.')
                 }
@@ -144,7 +144,7 @@ const ProfilePage: NextPage = () => {
                     params: [ownedIds],
                   })
                 }
-                onSubmit={() =>
+                onClick={() =>
                   toast.success('Cancelled Membership Successfully!')
                 }
                 onError={(error: Error) =>

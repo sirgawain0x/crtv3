@@ -6,12 +6,12 @@ export const metokenDiamondOptimism = getContract({
   client,
   chain: defineChain(10),
   address: '0xdD830E2cdC4023d1744232a403Cf2F6c84e898D1',
-  abi: metokenDiamondABI,
+  abi: metokenDiamondABI as any,
 });
 
 export const metokenDiamondBase = getContract({
   client,
   chain: defineChain(8453),
   address: '0xba5502db2aC2cBff189965e991C07109B14eB3f5',
-  abi: metokenDiamondABI,
+  abi: metokenDiamondABI as any,
 });

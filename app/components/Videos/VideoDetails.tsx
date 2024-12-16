@@ -77,7 +77,7 @@ export default function VideoDetails({ asset }: VideoDetailsProps) {
     const conProps = {
       ...(asset.playbackPolicy && {
         accessKey: generateAccessKey(
-          activeAccount?.address,
+          activeAccount!.address,
           asset.playbackPolicy.webhookContext as WebhookContext,
         ),
       }),

@@ -129,12 +129,6 @@ export default function CreateThumbnail({
         </Button>
         <Button
           disabled={livepeerAssetData?.status?.phase !== 'ready'}
-          onClick={handleSkipThumbnail}
-        >
-          Skip
-        </Button>
-        <Button
-          disabled={livepeerAssetData?.status?.phase !== 'ready'}
           onClick={handleComplete}
         >
           Complete
