@@ -251,7 +251,7 @@ describe('HookMultiStepForm', () => {
   describe('FileUpload', () => {
     const onFileSelect = vi.fn((file: File | null) => {});
     const onFileUploaded = vi.fn((fileUrl: string) => {});
-    const onSubtitlesSuccess = vi.fn((subtitlesUri: string | undefined) => {});
+    const onSubtitlesUploaded = vi.fn((subtitlesUri: string | undefined) => {});
     const onPressNext = vi.fn((livepeerAsset: Asset) => {});
     const onPressBack = vi.fn(() => {});
 
@@ -264,7 +264,7 @@ describe('HookMultiStepForm', () => {
         <FileUpload
           onFileSelect={onFileSelect}
           onFileUploaded={onFileUploaded}
-          onSubtitlesSuccess={onSubtitlesSuccess}
+          onSubtitlesUploaded={onSubtitlesUploaded}
           onPressNext={onPressNext}
           onPressBack={onPressBack}
         />
@@ -280,7 +280,7 @@ describe('HookMultiStepForm', () => {
         <FileUpload
           onFileSelect={onFileSelect}
           onFileUploaded={onFileUploaded}
-          onSubtitlesSuccess={onSubtitlesSuccess}
+          onSubtitlesUploaded={onSubtitlesUploaded}
           onPressNext={onPressNext}
           onPressBack={onPressBack}
         />
@@ -294,9 +294,47 @@ describe('HookMultiStepForm', () => {
       expect(onFileSelect).toHaveBeenCalled();
     });
 
-    // it('should handle file uploads', async () => {});
+    it('should handle file uploads', async () => {
+      const { getByTestId } = render(
+        <FileUpload
+          onFileSelect={onFileSelect}
+          onFileUploaded={onFileUploaded}
+          onSubtitlesUploaded={onSubtitlesUploaded}
+          onPressNext={onPressNext}
+          onPressBack={onPressBack}
+        />
+      );
 
-    // it('should handle subtitle uploads', async () => {});
+      const fileInput = getByTestId('file-upload-input') as HTMLInputElement;
+
+      await userEvent.upload(fileInput, file);
+      await userEvent.click(getByTestId('file-input-upload-button'));
+
+      await waitFor(() => {
+        setTimeout(() => expect(onFileUploaded).toHaveBeenCalled(), 30000);
+      });
+    });
+
+    it('should handle subtitle uploads', async () => {
+      const { getByTestId } = render(
+        <FileUpload
+          onFileSelect={onFileSelect}
+          onFileUploaded={onFileUploaded}
+          onSubtitlesUploaded={onSubtitlesUploaded}
+          onPressNext={onPressNext}
+          onPressBack={onPressBack}
+        />
+      );
+
+      const fileInput = getByTestId('file-upload-input') as HTMLInputElement;
+
+      await userEvent.upload(fileInput, file);
+      await userEvent.click(getByTestId('file-input-upload-button'));
+      
+      await waitFor(() => {
+        setTimeout(() => expect(onSubtitlesUploaded).toHaveBeenCalled(), 30000);
+      });
+    });
   });
 
   describe('CreateThumbnail', () => {

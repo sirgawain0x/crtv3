@@ -119,7 +119,7 @@ const HookMultiStepForm = () => {
           metadata={metadata}
           onFileSelect={(file) => {}}
           onFileUploaded={(videoUrl: string) => {}}
-          onSubtitlesSuccess={(subtitlesUri?: string) => {
+          onSubtitlesUploaded={(subtitlesUri?: string) => {
             setSubtitlesUri(subtitlesUri);
           }}
           onPressBack={() =>
