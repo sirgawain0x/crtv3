@@ -80,11 +80,6 @@ export default function CreateThumbnail({
     router.push('/discover');
   };
 
-  const handleSkipThumbnail = () => {
-    onComplete({ thumbnailUri: '' });
-    router.push('/discover');
-  };
-
   return (
     <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
       <div className="my-6 text-center">
