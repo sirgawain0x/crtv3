@@ -1,6 +1,17 @@
 'use client';
+import {
+  authedOnly,
+  generatePayload,
+  login,
+  logout,
+} from '@app/api/auth/thirdweb/authentication';
+import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
 import { client } from '@app/lib/sdk/thirdweb/client';
-import { ACCOUNT_FACTORY_ADDRESS } from '@app/lib/utils/context';
+import { ConnectButton } from '@app/lib/sdk/thirdweb/components';
+import {
+  GenerateLoginPayloadParams,
+  VerifyLoginPayloadParams,
+} from 'thirdweb/auth';
 import {
   base,
   baseSepolia,
@@ -11,21 +22,8 @@ import {
   zora,
   zoraSepolia,
 } from 'thirdweb/chains';
-import {
-  generatePayload,
-  authedOnly,
-  login,
-  logout,
-} from '@app/api/auth/thirdweb/authentication';
-import { OrbisConnectResult } from '@useorbis/db-sdk';
-import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
-import { ConnectButton } from '@app/lib/sdk/thirdweb/components';
-import {
-  GenerateLoginPayloadParams,
-  LoginPayload,
-  VerifyLoginPayloadParams,
-} from 'thirdweb/auth';
-import { useActiveWallet, darkTheme } from 'thirdweb/react';
+import { useActiveWallet } from 'thirdweb/react';
+
 import { createWallet, inAppWallet } from 'thirdweb/wallets';
 
 export default function ConnectButtonWrapper() {
@@ -113,11 +111,12 @@ export default function ConnectButtonWrapper() {
           borderRadius: '10px',
         },
       }}
+      // TODO: uncomment when done
       // accountAbstraction={{
       //   chain: defineChain(base),
       //   client: client,
-      //   sponsorGas: true,
-      //   factoryAddress: `${ACCOUNT_FACTORY_ADDRESS.base}`,
+      //   sponsorGas: false,
+      //   factoryAddress: ACCOUNT_FACTORY_ADDRESS.polygon,
       // }}
       wallets={wallets}
       appMetadata={{
