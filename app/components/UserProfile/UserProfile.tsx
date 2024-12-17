@@ -38,6 +38,7 @@ import {
   formatAddress,
 } from '@app/lib/sdk/stack/client';
 import MemberCard from './MemberCard';
+import LazyMintedAsset from '../lazy-minted/LazyMinted';
 
 const ProfilePage: NextPage = () => {
   const { user } = useParams();
@@ -147,6 +148,7 @@ const ProfilePage: NextPage = () => {
           <TabsTrigger value="Membership">Membership</TabsTrigger>
           <TabsTrigger value="MeToken">MeToken</TabsTrigger>
           <TabsTrigger value="Uploads">Uploads</TabsTrigger>
+          <TabsTrigger value="Minted">Minted</TabsTrigger>
           <TabsTrigger value="Revenue">Revenue</TabsTrigger>
         </TabsList>
         <TabsContent value="Membership">
@@ -218,6 +220,21 @@ const ProfilePage: NextPage = () => {
             </CardContent>
             <CardFooter className="space-x-2">
               <ListUploadedAssets activeAccount={activeAccount} />
+            </CardFooter>
+          </Card>
+        </TabsContent>
+        <TabsContent value="Minted">
+          <Card className="w-full">
+            <CardHeader>
+              <CardTitle>Lazy minted nfts</CardTitle>
+              <CardDescription>
+                Here is the list of your lazy minted nfts
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <LazyMintedAsset activeAccount={activeAccount} />
+            </CardContent>
+            <CardFooter className="space-x-2">
             </CardFooter>
           </Card>
         </TabsContent>
