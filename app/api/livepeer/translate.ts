@@ -44,6 +44,10 @@ export const getLivepeerTranslation = async (
             throw new Error(`Livepeer API error ${result?.status}: ${result?.statusText}`);
         }
 
+        if (!result.ok) {
+            throw new Error(`Livepeer API error ${result?.status}: ${result?.statusText}`);
+        }
+
         const data = await result.json();
 
         return data;
