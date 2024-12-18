@@ -77,13 +77,13 @@ export default function VideoDetails({ asset }: VideoDetailsProps) {
     const conProps = {
       ...(asset.playbackPolicy && {
         accessKey: generateAccessKey(
-          activeAccount?.address,
+          activeAccount!.address,
           asset.playbackPolicy.webhookContext as WebhookContext,
         ),
       }),
     };
     setConditionalProps(conProps);
-  }, [activeAccount, asset, getAssetMetadata]);
+  }, [activeAccount, asset, getAssetMetadata, setSubtitles]);
 
   const Seek = forwardRef<HTMLButtonElement, Player.SeekProps>(
     ({ children, ...props }, forwardedRef) => (

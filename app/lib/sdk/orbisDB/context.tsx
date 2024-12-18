@@ -1,10 +1,12 @@
 import { createContext, ReactNode, useContext, useState } from 'react';
 import { client } from '@app/lib/sdk/thirdweb/client';
-import { catchError } from "@useorbis/db-sdk/util"
-import { OrbisEVMAuth } from "@useorbis/db-sdk/auth";
-import {  OrbisConnectResult, OrbisDB } from '@useorbis/db-sdk';
+import { catchError } from '@useorbis/db-sdk/util';
+import { OrbisEVMAuth } from '@useorbis/db-sdk/auth';
+import { OrbisConnectResult, OrbisDB } from '@useorbis/db-sdk';
 // import { Wallet } from 'ethers';
-import createAssetMetadataModel, { AssetMetadata } from './models/AssetMetadata';
+import createAssetMetadataModel, {
+  AssetMetadata,
+} from './models/AssetMetadata';
 import { download } from 'thirdweb/storage';
 // import { ASSET_METADATA_MODEL_ID, CREATIVE_TV_CONTEXT_ID } from '@app/lib/utils/context';
 
@@ -15,35 +17,38 @@ declare global {
 }
 
 interface OrbisContextProps {
-    authResult: OrbisConnectResult | null;
-    setAuthResult: React.Dispatch<React.SetStateAction<OrbisConnectResult | null>>;
-    insert: (modelId: string, value: any) => Promise<void>;
-    replace: (docId: string, newDoc: any) => Promise<void>;
-    update: (docId: string, updates: any) => Promise<void>;
-    getAssetMetadata: (assetId: string) => Promise<AssetMetadata | null>;
-    orbisLogin: (privateKey?: string) => Promise<OrbisConnectResult | null>;
-    isConnected: (address: string) => Promise<boolean>;
-    getCurrentUser: () => Promise<any>;
+  authResult: OrbisConnectResult | null;
+  setAuthResult: React.Dispatch<
+    React.SetStateAction<OrbisConnectResult | null>
+  >;
+  insert: (modelId: string, value: any) => Promise<void>;
+  replace: (docId: string, newDoc: any) => Promise<void>;
+  update: (docId: string, updates: any) => Promise<void>;
+  getAssetMetadata: (assetId: string) => Promise<AssetMetadata | null>;
+  orbisLogin: (privateKey?: string) => Promise<OrbisConnectResult | null>;
+  isConnected: (address: string) => Promise<boolean>;
+  getCurrentUser: () => Promise<any>;
 }
 
-const OrbisContext = createContext<OrbisContextProps | undefined> ({
-    authResult: null,
-    setAuthResult: () => {},
-    insert: async () => {},
-    replace: async () => {},
-    update: async () => {},
-    getAssetMetadata: async () => {},
-    orbisLogin: async () => {},
-    isConnected: async () => false,
-    getCurrentUser: async () => {}
+const OrbisContext = createContext<OrbisContextProps | undefined>({
+  authResult: null,
+  setAuthResult: () => {},
+  insert: async () => {},
+  replace: async () => {},
+  update: async () => {},
+  getAssetMetadata: async () => {},
+  orbisLogin: async () => {},
+  isConnected: async () => false,
+  getCurrentUser: async () => {},
 } as unknown as OrbisContextProps);
 
 export const OrbisProvider = ({ children }: { children: ReactNode }) => {
   const [authResult, setAuthResult] = useState<OrbisConnectResult | null>(null);
 
-  const ceramicNodeUrl = process.env.NEXT_PUBLIC_CERAMIC_NODE_URL as string;
-  const orbisNodeUrl = process.env.NEXT_PUBLIC_ORBIS_NODE_URL as string;
-  const orbisEnvironmentId = process.env.NEXT_PUBLIC_ORBIS_ENVIRONMENT_ID as string;
+  const ceramicNodeUrl = 'https://ceramic-orbisdb-mainnet-direct.hirenodes.io/';
+  const orbisNodeUrl = 'https://studio.useorbis.com';
+  const orbisEnvironmentId =
+    'did:pkh:eip155:1:0x1fde40a4046eda0ca0539dd6c77abf8933b94260';
 
   if (!ceramicNodeUrl) {
     throw new Error('CERAMIC_NODE_URL environment variable is required');
@@ -54,7 +59,7 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
   if (!orbisEnvironmentId) {
     throw new Error('ORBIS_ENVIRONMENT_ID environment variable is required');
   }
-  
+
   const db = new OrbisDB({
     ceramic: {
       gateway: ceramicNodeUrl,
@@ -67,21 +72,30 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
     ],
   });
 
-  const assetMetadataModelId: string = process.env.NEXT_PUBLIC_ORBIS_ASSET_METADATA_MODEL_ID as string;
-  const crtvContextId: string = process.env.NEXT_PUBLIC_ORBIS_CRTV_CONTEXT_ID as string;
-  const crtvVideosContextId: string = process.env.NEXT_PUBLIC_ORBIS_CRTV_VIDEO_CONTEXT_ID as string;
-  
-  const validateDbOperation = (id: string, value?: any, select: boolean = false) => {
+  const assetMetadataModelId: string =
+    'kjzl6hvfrbw6c6hnahs60z0s1xenk7phux8abtx4ays1g44rpbqsrzpfutoaqug';
+  const crtvContextId: string =
+    'kjzl6kcym7w8ya3lzng3v4pruy19togu984dhu1tfyljwc5qdqjd6nugshi5kj0';
+  const crtvVideosContextId: string =
+    'kjzl6kcym7w8y5emmf4y5yxtrxeqecnhc7pg3vgzu6zxya8k9q1hcoxtn28ijuq';
+
+  const validateDbOperation = (
+    id: string,
+    value?: any,
+    select: boolean = false,
+  ) => {
     if (!id) throw new Error('No id provided');
     if (!select) {
       if (!value) throw new Error('No value provided');
     }
-    if (!assetMetadataModelId) throw new Error('No assetMetadataModelId provided');
+    if (!assetMetadataModelId)
+      throw new Error('No assetMetadataModelId provided');
     if (!crtvContextId) throw new Error('No crtvContextId provided');
-    if (!crtvVideosContextId) throw new Error('No crtvVideosContextId provided');
+    if (!crtvVideosContextId)
+      throw new Error('No crtvVideosContextId provided');
     if (!db) throw new Error('No db client found');
   };
-  
+
   const insert = async (modelId: string, value: any): Promise<void> => {
     validateDbOperation(modelId, value);
 
@@ -113,9 +127,7 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
 
     validateDbOperation(docId, newDoc);
 
-    const replaceStatement: any = db
-      .update(docId)
-      .replace(newDoc)   
+    const replaceStatement: any = db.update(docId).replace(newDoc);
 
     const query = replaceStatement.build();
 
@@ -138,9 +150,7 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
 
     validateDbOperation(docId, updates);
 
-    const updateStatement: any = db
-      .update(docId)
-      .set(updates)
+    const updateStatement: any = db.update(docId).set(updates);
 
     const query = updateStatement.build();
 
@@ -182,41 +192,44 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
     const { columns, rows } = result;
 
     const assetMetadata = rows[0] as AssetMetadata;
-    
+
     if (assetMetadata?.subtitlesUri) {
       try {
         const res = await download({
           client,
-          uri: assetMetadata.subtitlesUri
+          uri: assetMetadata.subtitlesUri,
         });
-        const data = await res.json()
+        const data = await res.json();
         assetMetadata.subtitles = data;
       } catch (error) {
-        console.error('Failed to download subtitles', { 
-          uri: assetMetadata.subtitlesUri, 
-          error 
+        console.error('Failed to download subtitles', {
+          uri: assetMetadata.subtitlesUri,
+          error,
         });
       }
-    };
+    }
 
     return assetMetadata;
   };
 
-  const orbisLogin = async (privateKey?: string): Promise<OrbisConnectResult> => {
-    
-    let provider; 
+  const orbisLogin = async (
+    privateKey?: string,
+  ): Promise<OrbisConnectResult> => {
+    let provider;
 
     if (typeof window !== 'undefined' && window.ethereum) {
       provider = window.ethereum;
     } else {
-      throw new Error('No Ethereum provider found. Please install MetaMask or another Web3 wallet.');
+      throw new Error(
+        'No Ethereum provider found. Please install MetaMask or another Web3 wallet.',
+      );
     }
 
     const auth = new OrbisEVMAuth(provider);
 
     const authResult: OrbisConnectResult = await db.connectUser({ auth });
 
-    const connected = await db.isUserConnected()
+    const connected = await db.isUserConnected();
 
     if (!connected) {
       throw new Error('User is not connected.');
@@ -241,27 +254,30 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
     const currentUser = await db.getConnectedUser();
 
     if (!currentUser) {
-      throw new Error('No active user session. Please connect your wallet and sign in first.');
-
+      throw new Error(
+        'No active user session. Please connect your wallet and sign in first.',
+      );
     }
 
     return currentUser;
   };
 
   return (
-      <OrbisContext.Provider value={{ 
-          authResult,
-          setAuthResult,
-          insert,
-          replace,
-          update,
-          getAssetMetadata,
-          orbisLogin,
-          isConnected,
-          getCurrentUser
-      }}>
-          {children}
-      </OrbisContext.Provider>
+    <OrbisContext.Provider
+      value={{
+        authResult,
+        setAuthResult,
+        insert,
+        replace,
+        update,
+        getAssetMetadata,
+        orbisLogin,
+        isConnected,
+        getCurrentUser,
+      }}
+    >
+      {children}
+    </OrbisContext.Provider>
   );
 };
 

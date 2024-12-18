@@ -1,3 +1,6 @@
+import { ContractOptions } from "thirdweb";
+import { Abi } from 'viem';
+
 export const SITE_LOGO = '/grant-logo.png';
 export const CREATIVE_LOGO_BLK = '/Blog-Logo_blk.png';
 export const CREATIVE_LOGO_WHT = '/Blog-Logo_wht.png';

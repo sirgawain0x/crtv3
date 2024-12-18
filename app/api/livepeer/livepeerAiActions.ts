@@ -28,10 +28,15 @@ export const getLivepeerAiGeneratedImages = async ({
     redirect: 'follow',
   };
 
+  console.log({ requestOptions });
+
   const response = await fetch(
-    'https://dream-gateway.livepeer.cloud/text-to-image',
+    'https://livepeer.studio/api/beta/generate/text-to-image',
     requestOptions,
   );
+
+  console.log({ response });
+
   if (response.ok) {
     return {
       success: true,

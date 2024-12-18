@@ -19,11 +19,7 @@ export default function VideoDetailsPage({
     const fetchVideoDetails = async () => {
       setIsLoading(true);
       try {
-        // const response = await fetch(`asset/${params.slug}`);
-        // const data = await response.json();
-        // setVideoDetails(data);
-        // Once video details are fetched, fetch the asset
-        await fetchAssetDetails(data.assetId);
+        await fetchAssetDetails(asset?.assetId);
       } catch (err) {
         setError('Failed to load video data');
         console.error(err);
@@ -32,7 +28,7 @@ export default function VideoDetailsPage({
     };
 
     fetchVideoDetails();
-  }, [params.slug]);
+  }, [asset?.assetId, params.slug]);
 
   const fetchAssetDetails = async (asset: Asset) => {
     setAssetLoading(true);

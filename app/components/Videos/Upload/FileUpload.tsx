@@ -8,8 +8,11 @@ import PreviewVideo from './PreviewVideo';
 import { useActiveAccount } from 'thirdweb/react';
 import { Progress } from '@app/components/ui/progress';
 import { Button } from '@app/components/ui/button';
-import { Subtitles, Chunk } from '../../../lib/sdk/orbisDB/models/AssetMetadata';
-import JsGoogleTranslateFree from "@kreisler/js-google-translate-free";
+import {
+  Subtitles,
+  Chunk,
+} from '../../../lib/sdk/orbisDB/models/AssetMetadata';
+import JsGoogleTranslateFree from '@kreisler/js-google-translate-free';
 import { getLivepeerAudioToText } from '@app/api/livepeer/audioToText';
 import { upload } from 'thirdweb/storage';
 import { client } from '@app/lib/sdk/thirdweb/client';
@@ -28,29 +31,31 @@ const copyToClipboard = (text: string) => {
 interface FileUploadProps {
   onFileSelect: (file: File | null) => void;
   onFileUploaded: (fileUrl: string) => void;
-  onUploadSuccess: (subtitlesUri?: string) => void;
+  onSubtitlesUploaded: (subtitlesUri?: string) => void;
   onPressNext?: (livepeerAsset: any) => void;
   onPressBack?: () => void;
   metadata?: any;
   newAssetTitle?: string;
 }
 
-const translateText = async (text: string, language: string): Promise<string> => {
+const translateText = async (
+  text: string,
+  language: string,
+): Promise<string> => {
   try {
-    const res = await fetch('http://localhost:3000/api/livepeer/subtitles/translation', {
+    const baseUrl =
+      process.env.NEXT_PUBLIC_THIRDWEB_AUTH_DOMAIN || 'http://localhost:3000';
+    const res = await fetch(`${baseUrl}/api/livepeer/subtitles/translation`, {
       method: 'POST',
       body: JSON.stringify({
         text: text,
         source: 'English',
         target: language,
       }),
-      headers: {
-        'Content-Type': 'application/json',
-      },
     });
 
     const data = await res.json();
-    
+
     console.log('Translation response:', data);
 
     return data.response;
@@ -60,32 +65,37 @@ const translateText = async (text: string, language: string): Promise<string> =>
   }
 };
 
-async function translateSubtitles(data: { chunks: Chunk[] }): Promise<Subtitles> {
-
+async function translateSubtitles(data: {
+  chunks: Chunk[];
+}): Promise<Subtitles> {
   const subtitles: Subtitles = {
-    'English': data.chunks
+    English: data.chunks,
   };
 
-  const languages = ["Chinese", "German", "Spanish"];
+  const languages = ['Chinese', 'German', 'Spanish'];
 
   // Create a single Promise.all for all language translations to reduce nested mapping
   const translationPromises = languages.map(async (language) => {
     try {
       // Skip translation for English
-      if (language === "English") return null;
+      if (language === 'English') return null;
       console.log('Translating to:', language);
       // Perform translations concurrently for each chunk
       const translatedChunks = await Promise.all(
         data.chunks.map(async (chunk, i) => {
-          const to = language === 'Chinese' ? 'zh' : language === 'German' ? 'de' : 'es';
-          const translation = await JsGoogleTranslateFree.translate({ to, text: chunk.text }); // a
+          const to =
+            language === 'Chinese' ? 'zh' : language === 'German' ? 'de' : 'es';
+          const translation = await JsGoogleTranslateFree.translate({
+            to,
+            text: chunk.text,
+          }); // a
           const arr = {
-            text: translation, 
-            timestamp: chunk.timestamp
+            text: translation,
+            timestamp: chunk.timestamp,
           };
           console.log('Translated chunk ' + i + ':', arr);
           return arr;
-        })
+        }),
       );
 
       console.log('Translated chunks:', translatedChunks);
@@ -105,18 +115,24 @@ async function translateSubtitles(data: { chunks: Chunk[] }): Promise<Subtitles>
   console.log('Language translations:', languageTranslations);
 
   // Merge translations efficiently
-  return languageTranslations.filter(
-    (translation): translation is { [key: string]: Chunk[] } => translation !== null)
-      .reduce((acc, curr) => ({
+  return languageTranslations
+    .filter(
+      (translation): translation is { [key: string]: Chunk[] } =>
+        translation !== null,
+    )
+    .reduce(
+      (acc, curr) => ({
         ...acc,
-        ...curr
-      }), subtitles);
+        ...curr,
+      }),
+      subtitles,
+    );
 }
 
 const FileUpload: React.FC<FileUploadProps> = ({
   onFileSelect,
   onFileUploaded,
-  onUploadSuccess,
+  onSubtitlesUploaded,
   onPressNext,
   onPressBack,
   metadata,
@@ -198,29 +214,29 @@ const FileUpload: React.FC<FileUploadProps> = ({
 
       const formData = new FormData();
 
-      formData.append('audio',  selectedFile);
+      formData.append('audio', selectedFile);
 
       const audioToTextResponse = await getLivepeerAudioToText({
         formData,
         modelId: 'openai/whisper-large-v3',
         returnTimestamps: 'true',
       });
-      
+
       console.log({ audioToTextResponse });
 
-      const subtitles = await translateSubtitles({ chunks: audioToTextResponse?.chunks });
+      const subtitles = await translateSubtitles({
+        chunks: audioToTextResponse?.chunks,
+      });
 
       const ipfsUri = await upload({
         client,
-        files: [
-          subtitles
-        ]
+        files: [subtitles],
       });
 
-      onUploadSuccess(ipfsUri);
+      onSubtitlesUploaded(ipfsUri);
     } catch (error: any) {
       console.error('Error processing file:', error);
-      if (uploadState !== 'complete') {  
+      if (uploadState !== 'complete') {
         setError('Failed to process file. Please try again.');
         setUploadState('idle');
       }
@@ -246,6 +262,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
               id="file-upload"
               accept="video/*"
               className="file:border-1 block w-full text-sm text-[#EC407A] file:mr-4 file:cursor-pointer file:rounded-full file:bg-white file:px-4 file:py-2 file:text-sm file:font-semibold file:text-[#EC407A] hover:file:bg-gray-200"
+              data-testid="file-upload-input"
               onChange={handleFileChange}
             />
             {/* Display selected file name */}
@@ -270,6 +287,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
                     ? 'cursor-not-allowed bg-[#D63A6A]'
                     : 'bg-[#EC407A] hover:bg-[#D63A6A]'
                 } cursor-pointer rounded-lg px-4 py-2 font-semibold text-white`}
+                data-testid="file-input-upload-button"
               >
                 Upload File
               </button>
@@ -338,6 +356,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
                 alert('Missing livepeer asset');
               }
             }}
+            data-testid="file-input-next"
           >
             Next
           </Button>

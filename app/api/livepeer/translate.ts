@@ -38,13 +38,22 @@ export const getLivepeerTranslation = async (
             }
         };
 
-        const result = await fetch(`${livepeerApiUrl}/llm`, options);
+        const result = await fetch(`https://livepeer.studio/api/beta/generate/llm`, options);
+
+        if (!result.ok) {
+            throw new Error(`Livepeer API error ${result?.status}: ${result?.statusText}`);
+        }
+
+        if (!result.ok) {
+            throw new Error(`Livepeer API error ${result?.status}: ${result?.statusText}`);
+        }
 
         const data = await result.json();
 
         return data;
     } catch (error: any) {
-        console.error('Error generating text from audio:', error);
-        throw new Error(error.message || 'Failed to generate text from audio');
+        console.error('Translation error ', error);
+        if (error instanceof Error) throw error;
+        throw new Error('Failed to translate text');
     }
 };

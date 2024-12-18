@@ -68,7 +68,12 @@ const HookMultiStepForm = () => {
         router.push('/');
       }
     };
-    tokenGate(activeAccount?.address);
+    if (!activeAccount?.address) {
+      toast.error('Please connect your wallet');
+      router.push('/');
+      return;
+    }
+    tokenGate(activeAccount.address);
   }, [activeAccount, isConnected, router]);
 
   const {
@@ -88,6 +93,11 @@ const HookMultiStepForm = () => {
     }
   }, [erroredInputName]);
 
+  const handleCreateInfoSubmit = (data: TVideoMetaForm) => {
+    setMetadata(data);
+    setActiveStep((prevActiveStep) => prevActiveStep + 1);
+  }
+
   return (
     <>
       <StepperIndicator activeStep={activeStep} />
@@ -100,10 +110,7 @@ const HookMultiStepForm = () => {
       )}
       <div className={activeStep === 1 ? 'block' : 'hidden'}>
         <CreateInfo
-          onPressNext={(metadataFormData) => {
-            setMetadata(metadataFormData);
-            setActiveStep((prevActiveStep) => prevActiveStep + 1);
-          }}
+          onPressNext={handleCreateInfoSubmit}
         />
       </div>
       <div className={activeStep === 2 ? 'block' : 'hidden'}>
@@ -112,7 +119,7 @@ const HookMultiStepForm = () => {
           metadata={metadata}
           onFileSelect={(file) => {}}
           onFileUploaded={(videoUrl: string) => {}}
-          onUploadSuccess={(subtitlesUri?: string) => {
+          onSubtitlesUploaded={(subtitlesUri?: string) => {
             setSubtitlesUri(subtitlesUri);
           }}
           onPressBack={() =>
@@ -148,6 +155,7 @@ const HookMultiStepForm = () => {
               process.env.NEXT_PUBLIC_ORBIS_ASSET_METADATA_MODEL_ID as string,
               assetMetadata,
             );
+            router.push('/discover');
           }}
         />
       </div>

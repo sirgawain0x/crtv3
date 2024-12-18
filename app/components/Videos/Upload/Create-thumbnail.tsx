@@ -31,8 +31,7 @@ export default function CreateThumbnail({
 
   const [progress, setProgress] = useState<number>(0);
   const [livepeerAssetData, setLivepeerAssetData] = useState<Asset>();
-  const [livepeerPlaybackData, setLivepeerPlaybackData] =
-    useState<PlaybackInfo>();
+  const [livepeerPlaybackData, setLivepeerPlaybackData] = useState<PlaybackInfo>();
 
   useInterval(
     () => {
@@ -76,13 +75,8 @@ export default function CreateThumbnail({
     router.back();
   };
 
-  const handleComplete = () => {
-    onComplete({ thumbnailUri: thumbnailUri as string });
-    router.push('/discover');
-  };
-
-  const handleSkipThumbnail = () => {
-    onComplete({ thumbnailUri: '' });
+  const handleComplete = (thumbnailUri: string) => {
+    onComplete({ thumbnailUri });
     router.push('/discover');
   };
 
@@ -115,8 +109,9 @@ export default function CreateThumbnail({
           <h3 className="text-xl font-bold">Generate a Thumbnail</h3>
         </div>
         <CreateThumbnailForm
-          onSelectThumbnailImages={(imgUri) => {
-            console.log('Use selected image', imgUri);
+          onSelectThumbnailImages={(thumbnailUri: string) => {
+            console.log('Use selected image', thumbnailUri);
+            handleComplete(thumbnailUri);
           }}
         />
       </div>
@@ -129,13 +124,7 @@ export default function CreateThumbnail({
         </Button>
         <Button
           disabled={livepeerAssetData?.status?.phase !== 'ready'}
-          onClick={handleSkipThumbnail}
-        >
-          Skip
-        </Button>
-        <Button
-          disabled={livepeerAssetData?.status?.phase !== 'ready'}
-          onClick={handleComplete}
+          onClick={() => handleComplete('')}
         >
           Complete
         </Button>
