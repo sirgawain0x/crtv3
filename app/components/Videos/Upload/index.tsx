@@ -155,6 +155,7 @@ const HookMultiStepForm = () => {
               process.env.NEXT_PUBLIC_ORBIS_ASSET_METADATA_MODEL_ID as string,
               assetMetadata,
             );
+            router.push('/discover');
           }}
         />
       </div>

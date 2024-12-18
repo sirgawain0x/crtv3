@@ -28,7 +28,7 @@ export default function VideoDetailsPage({
     };
 
     fetchVideoDetails();
-  }, [params.slug]);
+  }, [asset?.assetId, params.slug]);
 
   const fetchAssetDetails = async (asset: Asset) => {
     setAssetLoading(true);

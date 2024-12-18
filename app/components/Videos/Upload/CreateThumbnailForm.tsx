@@ -56,10 +56,13 @@ const CreateThumbnailForm = ({
         prompt: data.prompt,
         modelId: data.aiModel,
         safetyCheck: true,
-        numImagesPerPrompt: 4,
+        numImagesPerPrompt: 1,
       });
       if (response.success) {
-        setImagesUrl((currentImages) => [...currentImages, ...response.result.images]);
+        setImagesUrl((currentImages) => [
+          ...currentImages,
+          ...response.result.images,
+        ]);
       } else {
         throw new Error(response.result);
       }
@@ -91,20 +94,20 @@ const CreateThumbnailForm = ({
         rules={{ required: 'AI Model is required' }}
         render={({ field }) => (
           <Select onValueChange={field.onChange} value={field.value}>
-            <SelectTrigger className="w-[180px]" data-testid='create-thumbnail-select'>
+            <SelectTrigger
+              className="w-[180px]"
+              data-testid="create-thumbnail-select"
+            >
               <SelectValue placeholder="Select A Model" />
             </SelectTrigger>
             <SelectContent>
               <SelectGroup>
-                <SelectLabel>Models</SelectLabel>
+                <SelectLabel>Model</SelectLabel>
                 <SelectItem value="SG161222/RealVisXL_V4.0_Lightning">
-                  Lightning
+                  RealVisXL
                 </SelectItem>
                 <SelectItem value="black-forest-labs/FLUX.1-schnell">
                   Black Forest
-                </SelectItem>
-                <SelectItem value="alimama-creative/FLUX.1-Turbo-Alpha">
-                  Alima
                 </SelectItem>
                 <SelectItem value="CompVis/stable-diffusion-v1-4">
                   CompVis
@@ -117,6 +120,9 @@ const CreateThumbnailForm = ({
                 </SelectItem>
                 <SelectItem value="aleksa-codes/flux-ghibsky-illustration">
                   Ghibsky
+                </SelectItem>
+                <SelectItem value="ByteDance/SDXL-Lightning">
+                  Bytedance
                 </SelectItem>
               </SelectGroup>
             </SelectContent>
