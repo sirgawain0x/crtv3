@@ -46,9 +46,9 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
   const [authResult, setAuthResult] = useState<OrbisConnectResult | null>(null);
 
   const ceramicNodeUrl = 'https://ceramic-orbisdb-mainnet-direct.hirenodes.io/';
-  const orbisNodeUrl = process.env.NEXT_PUBLIC_ORBIS_NODE_URL as string;
-  const orbisEnvironmentId = process.env
-    .NEXT_PUBLIC_ORBIS_ENVIRONMENT_ID as string;
+  const orbisNodeUrl = 'https://studio.useorbis.com';
+  const orbisEnvironmentId =
+    'did:pkh:eip155:1:0x1fde40a4046eda0ca0539dd6c77abf8933b94260';
 
   if (!ceramicNodeUrl) {
     throw new Error('CERAMIC_NODE_URL environment variable is required');
@@ -72,12 +72,12 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
     ],
   });
 
-  const assetMetadataModelId: string = process.env
-    .NEXT_PUBLIC_ORBIS_ASSET_METADATA_MODEL_ID as string;
-  const crtvContextId: string = process.env
-    .NEXT_PUBLIC_ORBIS_CRTV_CONTEXT_ID as string;
-  const crtvVideosContextId: string = process.env
-    .NEXT_PUBLIC_ORBIS_CRTV_VIDEO_CONTEXT_ID as string;
+  const assetMetadataModelId: string =
+    'kjzl6hvfrbw6c6hnahs60z0s1xenk7phux8abtx4ays1g44rpbqsrzpfutoaqug';
+  const crtvContextId: string =
+    'kjzl6kcym7w8ya3lzng3v4pruy19togu984dhu1tfyljwc5qdqjd6nugshi5kj0';
+  const crtvVideosContextId: string =
+    'kjzl6kcym7w8y5emmf4y5yxtrxeqecnhc7pg3vgzu6zxya8k9q1hcoxtn28ijuq';
 
   const validateDbOperation = (
     id: string,
