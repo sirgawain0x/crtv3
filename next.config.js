@@ -18,6 +18,10 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'storage.unlock-protocol.com',
       },
+      {
+        protocol: 'https',
+        hostname: 'storage.googleapis.com',
+      },
     ],
   },
 };

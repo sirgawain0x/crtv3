@@ -31,7 +31,7 @@ export const getLivepeerAiGeneratedImages = async ({
   console.log({ requestOptions });
 
   const response = await fetch(
-    'https://dream-gateway.livepeer.cloud/text-to-image',
+    'https://livepeer.studio/api/beta/generate/text-to-image',
     requestOptions,
   );
 

@@ -75,8 +75,8 @@ export default function CreateThumbnail({
     router.back();
   };
 
-  const handleComplete = () => {
-    onComplete({ thumbnailUri: thumbnailUri as string });
+  const handleComplete = (thumbnailUri: string) => {
+    onComplete({ thumbnailUri });
     router.push('/discover');
   };
 
@@ -111,7 +111,7 @@ export default function CreateThumbnail({
         <CreateThumbnailForm
           onSelectThumbnailImages={(thumbnailUri: string) => {
             console.log('Use selected image', thumbnailUri);
-            onComplete({ thumbnailUri });
+            handleComplete(thumbnailUri);
           }}
         />
       </div>
@@ -124,7 +124,7 @@ export default function CreateThumbnail({
         </Button>
         <Button
           disabled={livepeerAssetData?.status?.phase !== 'ready'}
-          onClick={handleComplete}
+          onClick={() => handleComplete('')}
         >
           Complete
         </Button>

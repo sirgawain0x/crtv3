@@ -70,7 +70,7 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({ src, assetId, 
       }
     };
     fetchAssetDetails(assetId);
-  }, [activeAccount, assetId, getAssetMetadata]);
+  }, [activeAccount, assetId, getAssetMetadata, setSubtitles]);
 
   return (
     <>

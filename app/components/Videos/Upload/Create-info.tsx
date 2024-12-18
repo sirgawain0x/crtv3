@@ -1,6 +1,6 @@
 'use client';
 
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { Input } from '@app/components/ui/input';
 import { Label } from '@app/components/ui/label';
 import {
@@ -34,6 +34,7 @@ const CreateInfo = ({ onPressNext }: TCreateInfoProps) => {
     reset,
     setValue,
     register,
+    control,
   } = useForm<TVideoMetaForm>({
     mode: 'onChange',
     defaultValues: {
@@ -93,35 +94,36 @@ const CreateInfo = ({ onPressNext }: TCreateInfoProps) => {
         </div>
         <div className="flex w-full flex-col lg:w-2/5">
           <FormLabel className="text-sm">Category</FormLabel>
-          <Select
-            {...register('category', {
-              required: false,
-            })}
-            onValueChange={handleSelectCategory}
-          >
-            <FormControl>
-              <SelectTrigger data-testid="create-info-category">
-                <SelectValue placeholder="Select a Category" />
-              </SelectTrigger>
-            </FormControl>
-            <SelectContent>
-              <SelectItem value="Music">Music</SelectItem>
-              <SelectItem value="Sports">Sports</SelectItem>
-              <SelectItem value="Gaming">Gaming</SelectItem>
-              <SelectItem value="News">News</SelectItem>
-              <SelectItem value="Entertainment">Entertainment</SelectItem>
-              <SelectItem value="Education">Education</SelectItem>
-              <SelectItem value="Sci-tech">Science & Technology</SelectItem>
-              <SelectItem value="Travel">Travel</SelectItem>
-              <SelectItem value="Other">Other</SelectItem>
-            </SelectContent>
-          </Select>
+          <Controller
+            name="category"
+            control={control}
+            render={({ field }) => (
+              <Select onValueChange={field.onChange} value={field.value}>
+                <FormControl>
+                  <SelectTrigger data-testid="create-info-category">
+                    <SelectValue placeholder="Select a Category" />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="Music">Music</SelectItem>
+                  <SelectItem value="Sports">Sports</SelectItem>
+                  <SelectItem value="Gaming">Gaming</SelectItem>
+                  <SelectItem value="News">News</SelectItem>
+                  <SelectItem value="Entertainment">Entertainment</SelectItem>
+                  <SelectItem value="Education">Education</SelectItem>
+                  <SelectItem value="Sci-tech">Science & Technology</SelectItem>
+                  <SelectItem value="Travel">Travel</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
+          />
         </div>
       </div>
       <div className="mt-6 flex justify-center">
-        <Button 
-          type="submit" 
-          className="w-[100px]" 
+        <Button
+          type="submit"
+          className="w-[100px]"
           disabled={!isValid}
           data-testid="create-info-next"
         >
