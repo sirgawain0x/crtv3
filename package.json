@@ -8,8 +8,8 @@
     "prettier:check": "prettier --check --ignore-unknown .",
     "start": "next start",
     "test": "vitest",
-    "test:ui": "vitest --ui",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "test:ui": "vitest --ui"
   },
   "dependencies": {
     "@apollo/client": "^3.9.11",
@@ -124,6 +124,6 @@
     "vitest": "^2.1.8"
   },
   "engines": {
-    "node": ">=18.17.0"
+    "node": "22.x"
   }
 }
