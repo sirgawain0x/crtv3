@@ -11,6 +11,7 @@ import { useState } from 'react';
 import { useActiveAccount } from 'thirdweb/react';
 import { Button } from '@app/components/ui/button';
 import makeBlockie from 'ethereum-blockies-base64';
+import { RadioTowerIcon } from 'lucide-react';
 import { Avatar, AvatarImage, AvatarFallback } from '@app/components/ui/avatar';
 
 export const UserMenu: React.FC = () => {
@@ -71,6 +72,17 @@ export const UserMenu: React.FC = () => {
             >
               <UploadIcon className={`h-4 w-4`} />
               <span>Upload</span>
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={handleLinkClick}>
+            <Link
+              href={`/profile/${activeAccount?.address}/broadcast`}
+              className="flex items-center gap-2"
+              prefetch={false}
+            >
+              <RadioTowerIcon className="h-4 w-4" />
+              <span>Broadcast</span>
             </Link>
           </DropdownMenuItem>
         </DropdownMenuContent>
