@@ -1,13 +1,22 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { Avatar, AvatarImage, AvatarFallback } from '../ui/avatar';
+import { Avatar, AvatarImage } from '../ui/avatar';
 import makeBlockie from 'ethereum-blockies-base64';
+import {
+  AccountProvider,
+  AccountAvatar,
+  AccountName,
+  AccountBalance,
+  AccountAddress,
+  AccountBlobbie,
+} from 'thirdweb/react';
 import { shortenAddress } from 'thirdweb/utils';
 import { stack } from '@app/lib/sdk/stack/client';
 import { client } from '@app/lib/sdk/thirdweb/client';
 import { resolveName } from 'thirdweb/extensions/ens';
 import { Button } from '../ui/button'; // Assuming you have a Button component
 import { FaSpinner } from 'react-icons/fa';
+import Link from 'next/link';
 
 interface LeaderboardItem {
   uniqueId: number;
@@ -42,38 +51,10 @@ export function TopChart() {
           return;
         }
 
-        // Resolve names for all addresses concurrently
-        const dataWithNames = await Promise.all(
-          leaderboard.leaderboard.map(async (item, i) => {
-            let name: string | undefined;
-
-            try {
-              name =
-                (await resolveName({
-                  client,
-                  address: item.address,
-                })) ?? undefined; // Updated line
-            } catch (nameError) {
-              console.warn(
-                `Failed to resolve name for address ${item.address}:`,
-                nameError,
-              );
-              name = shortenAddress(item.address); // Fallback if name resolution fails
-            }
-
-            return {
-              uniqueId: i + 1, // Ensure unique IDs start at 1
-              address: item.address,
-              points: item.points,
-              identities: item.identities || [],
-              bannerUrl: leaderboard.metadata.bannerUrl,
-              name: name || shortenAddress(item.address), // Fallback to shortened address if name is not found
-              description: leaderboard.metadata.description,
-            };
-          }),
+        // Set leaderboard data directly without mapping
+        setData(
+          Array.isArray(leaderboard.leaderboard) ? leaderboard.leaderboard : [],
         );
-
-        setData(dataWithNames);
       } catch (error: any) {
         console.error('Error fetching leaderboard data:', error);
         setErrorMessage('Failed to load leaderboard. Please try again later.');
@@ -129,31 +110,64 @@ export function TopChart() {
                 colIndex === 3 ? 'hidden lg:block' : ''
               } ${colIndex === 2 ? 'hidden md:block' : ''} `}
             >
-              {column.map(({ uniqueId, address, points, name }) => (
-                <div
-                  key={`${address}-${uniqueId}`} // Ensures a unique key
-                  className="mx-auto flex items-center space-x-2"
+              {column.map(({ uniqueId, address, points }, index) => (
+                <AccountProvider
+                  key={uniqueId}
+                  address={address}
+                  client={client}
                 >
-                  <span>{uniqueId}.</span>
-                  <Avatar>
-                    <AvatarImage src={makeBlockie(address)} />
-                    <AvatarFallback>👤</AvatarFallback>
-                  </Avatar>
-                  <div className="flex flex-col">
-                    <span>{name}</span>
-                    <span className="text-gray-500">{points} points</span>
+                  <div className="flex items-center space-x-2">
+                    <span className="min-w-[24px] text-right font-medium">
+                      {colIndex * Math.ceil(data.length / 4) + index + 1}.
+                    </span>
+                    <AccountAvatar
+                      className="h-10 w-10 rounded-full"
+                      loadingComponent={
+                        <Avatar>
+                          <AvatarImage
+                            src={makeBlockie(address)}
+                            className="h-10 w-10 rounded-full"
+                          />
+                        </Avatar>
+                      }
+                      fallbackComponent={
+                        <Avatar>
+                          <AvatarImage
+                            src={makeBlockie(address)}
+                            className="h-10 w-10 rounded-full"
+                          />
+                        </Avatar>
+                      }
+                    />
+                    <div className="flex flex-col">
+                      <AccountName
+                        className="text-left"
+                        loadingComponent={
+                          <AccountAddress
+                            formatFn={shortenAddress}
+                            className="text-left"
+                          />
+                        }
+                        fallbackComponent={
+                          <AccountAddress
+                            formatFn={shortenAddress}
+                            className="text-left"
+                          />
+                        }
+                      />
+                      <span className="text-gray-500">{points} points</span>
+                    </div>
                   </div>
-                </div>
+                </AccountProvider>
               ))}
             </div>
           ))}
         </div>
       )}
       <div className="mt-8 flex justify-center">
-        <a
+        <Link
           href="https://points.creativeplatform.xyz"
           target="_blank"
-          rel="noopener noreferrer"
           className="w-full max-w-md"
         >
           <Button
@@ -162,7 +176,7 @@ export function TopChart() {
           >
             View Leaderboard
           </Button>
-        </a>
+        </Link>
       </div>
     </div>
   );
