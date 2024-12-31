@@ -38,7 +38,11 @@ import { CREATIVE_ADDRESS } from '@app/lib/utils/context';
 import CreateMetoken from '../MeToken/createMetoken';
 import Unlock from '@app/lib/utils/Unlock.json';
 import AssetDetails from './AssetDetails';
-import { stack } from '@app/lib/sdk/stack/client';
+import {
+  stack,
+  ensureValidToken,
+  formatAddress,
+} from '@app/lib/sdk/stack/client';
 
 const ProfilePage: NextPage = () => {
   const { user } = useParams();
@@ -71,27 +75,14 @@ const ProfilePage: NextPage = () => {
   // Separate effect for fetching points
   useEffect(() => {
     const fetchPoints = async () => {
-      if (activeAccount) {
+      if (activeAccount?.address) {
         try {
-          console.log('Fetching points for address:', activeAccount.address);
-          const userPoints = await stack.getPoints(activeAccount.address);
-          console.log('Received points response:', userPoints);
-
-          // Handle both possible return types
-          if (Array.isArray(userPoints)) {
-            // If it's an array, sum up all the amounts
-            const total = userPoints.reduce(
-              (sum, point) => sum + point.amount,
-              0,
-            );
-            setPoints(total);
-          } else {
-            // If it's a number, use it directly
-            setPoints(userPoints);
-          }
+          const formattedAddress = formatAddress(activeAccount);
+          const userPoints = await stack.getPoints(formattedAddress);
+          setBalance(userPoints.toString());
         } catch (error) {
           console.error('Error fetching points:', error);
-          setPoints(0);
+          setBalance('0');
         }
       }
     };
