@@ -32,13 +32,13 @@ export default function ConnectButtonWrapper() {
           'farcaster',
           'email',
           'phone',
-          'coinbase',
           'passkey',
           'guest',
         ],
       },
     }),
     createWallet('io.metamask'),
+    createWallet('com.coinbase.wallet'),
   ];
 
   const storyTestnet = defineChain(1513);
