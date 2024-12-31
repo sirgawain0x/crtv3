@@ -16,8 +16,7 @@ import {
   LoginPayload,
   VerifyLoginPayloadParams,
 } from 'thirdweb/auth';
-import { ACCOUNT_FACTORY_ADDRESS } from '@app/lib/utils/context';
-import { useActiveWallet } from 'thirdweb/react';
+import { useActiveWallet, darkTheme } from 'thirdweb/react';
 
 export default function ConnectButtonWrapper() {
   const { isConnected, orbisLogin } = useOrbisContext();
@@ -27,19 +26,19 @@ export default function ConnectButtonWrapper() {
     inAppWallet({
       auth: {
         options: [
-          'farcaster',
-          'discord',
-          'passkey',
-          'phone',
-          'apple',
           'google',
+          'discord',
+          'telegram',
+          'farcaster',
           'email',
+          'phone',
+          'coinbase',
+          'passkey',
+          'guest',
         ],
       },
     }),
     createWallet('io.metamask'),
-    createWallet('com.coinbase.wallet'),
-    createWallet('global.safe'),
   ];
 
   const storyTestnet = defineChain(1513);
@@ -85,23 +84,35 @@ export default function ConnectButtonWrapper() {
   return (
     <ConnectButton
       client={client}
-      chains={[base]}
-      connectButton={{
-        label: 'Get Started',
-        className: 'my-custom-class',
-        style: {
-          backgroundColor: '#EC407A',
-          color: 'white',
-          borderRadius: '10px',
+      wallets={wallets}
+      theme={darkTheme({
+        colors: {
+          accentText: 'hsl(340, 82%, 59%)',
+          separatorLine: 'hsl(0, 0%, 18%)',
+          modalBg: 'hsl(220, 26%, 14%)',
+          borderColor: 'hsl(223, 36%, 14%)',
+        },
+      })}
+      connectButton={{ label: 'Get Started' }}
+      connectModal={{
+        size: 'wide',
+        title: 'Sign In',
+        titleIcon:
+          'https://bafybeiesvinhgaqvr62rj77jbwkazg3w6bhcrsfyg6zyozasaud53nucnm.ipfs.w3s.link/Creative%20TV%20Logo.png',
+        termsOfServiceUrl:
+          'https://creativeplatform.xyz/docs/legal/terms-conditions',
+        privacyPolicyUrl:
+          'https://creativeplatform.xyz/docs/legal/privacy-policy',
+        welcomeScreen: {
+          img: {
+            width: 200,
+            height: 200,
+            src: 'https://bafybeifvsvranpnmujrpcry6lqssxtyfdvqz64gty4vpkhvcncuqd5uimi.ipfs.w3s.link/logo-tv.gif',
+          },
+          subtitle: 'The Stage is Yours',
+          title: 'Welcome to Creative TV',
         },
       }}
-      // accountAbstraction={{
-      //   chain: defineChain(base),
-      //   client: client,
-      //   sponsorGas: true,
-      //   factoryAddress: `${ACCOUNT_FACTORY_ADDRESS.base}`,
-      // }}
-      wallets={wallets}
       appMetadata={{
         name: 'Creative TV',
         url: 'https://tv.creativeplatform.xyz',
@@ -112,28 +123,13 @@ export default function ConnectButtonWrapper() {
       walletConnect={{
         projectId: process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID,
       }}
+      chains={[base]}
       supportedNFTs={{
         137: [
           '0xad597e5b24ad2a6032168c76f49f05d957223cd0',
           '0xb6b645c3e2025cf69983983266d16a0aa323e2b0',
         ],
         8453: ['0xf7c4cd399395d80f9d61fde833849106775269c6'],
-      }}
-      connectModal={{
-        size: 'wide',
-        privacyPolicyUrl:
-          'https://creativeplatform.xyz/docs/legal/privacy-policy',
-        termsOfServiceUrl:
-          'https://creativeplatform.xyz/docs/legal/terms-conditions',
-        welcomeScreen: {
-          img: {
-            width: 200,
-            height: 200,
-            src: 'https://bafybeifvsvranpnmujrpcry6lqssxtyfdvqz64gty4vpkhvcncuqd5uimi.ipfs.w3s.link/logo-tv.gif',
-          },
-          subtitle: 'The Stage is Yours',
-          title: 'Welcome to Creative TV',
-        },
       }}
       auth={{
         getLoginPayload: async (params: GenerateLoginPayloadParams) =>

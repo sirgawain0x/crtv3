@@ -110,9 +110,9 @@ export function TopChart() {
                 colIndex === 3 ? 'hidden lg:block' : ''
               } ${colIndex === 2 ? 'hidden md:block' : ''} `}
             >
-              {column.map(({ uniqueId, address, points }, index) => (
+              {column.map(({ address, points }, index) => (
                 <AccountProvider
-                  key={uniqueId}
+                  key={address}
                   address={address}
                   client={client}
                 >
