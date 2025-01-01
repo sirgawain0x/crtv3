@@ -28,10 +28,14 @@ export default function LazyMintModal(props: LazyMintProps) {
     });
   };
 
-  const handleLazyMinting = (e: React.FormEvent) => {
+  const handleLazyMinting = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    handleLazyMint(formData.amount, formData.price, props.baseURIForToken);
+    await handleLazyMint({
+      amount: formData.amount,
+      price: formData.price,
+      baseURIForTokens: props.baseURIForToken,
+    });
   };
 
   return (
