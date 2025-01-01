@@ -63,7 +63,21 @@ export function BroadcastWithControls({
     />
   ) : (
     <Broadcast.Root ingestUrl={ingestUrl}>
-      <Broadcast.Container className="relative aspect-video w-full overflow-hidden rounded-lg bg-black">
+      <style jsx>{`
+        .broadcast-container {
+          width: 100%;
+          max-width: 800px; /* Adjust max-width as needed */
+          height: auto;
+          aspect-ratio: 16 / 9;
+        }
+
+        @media (max-width: 768px) {
+          .broadcast-container {
+            max-width: 100%;
+          }
+        }
+      `}</style>
+      <Broadcast.Container className="relative aspect-video w-full overflow-hidden rounded-lg bg-black broadcast-container">
         <Broadcast.Video title="Broadcast preview" className="h-full w-full" />
 
         <Broadcast.Controls className="absolute bottom-0 left-0 right-0 flex items-center justify-center gap-4 bg-gradient-to-t from-black/80 p-4">
