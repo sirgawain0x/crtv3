@@ -153,11 +153,21 @@ const ProfilePage: NextPage = () => {
     <div className="container mx-auto my-5 px-4">
       <Tabs defaultValue="Membership" className="mx-auto w-full max-w-3xl">
         <TabsList className="w-full justify-start overflow-x-auto">
-          <TabsTrigger value="Membership">Membership</TabsTrigger>
-          <TabsTrigger value="MeToken">MeToken</TabsTrigger>
-          <TabsTrigger value="Uploads">Uploads</TabsTrigger>
-          <TabsTrigger value="Minted">Minted</TabsTrigger>
-          <TabsTrigger value="Revenue">Revenue</TabsTrigger>
+          <TabsTrigger id="members" value="Membership">
+            Membership
+          </TabsTrigger>
+          <TabsTrigger id="metoken" value="MeToken">
+            MeToken
+          </TabsTrigger>
+          <TabsTrigger id="uploads" value="Uploads">
+            Uploads
+          </TabsTrigger>
+          <TabsTrigger id="minted" value="Minted">
+            Minted
+          </TabsTrigger>
+          <TabsTrigger id="revenue" value="Revenue">
+            Revenue
+          </TabsTrigger>
         </TabsList>
         <TabsContent value="Membership">
           <Card className="w-full">
