@@ -21,12 +21,11 @@ export default function useLazyMinted() {
         contract: videoContract,
         start: 0,
       })) as NFT[];
-      
+
       setIsProcessing(false);
       setNFTs(data);
     } catch (err) {
       setIsProcessing(false);
-      console.error(err);
       setError(err as Error);
     }
   }, [activeAccount]);
@@ -36,10 +35,15 @@ export default function useLazyMinted() {
   }, [activeAccount, fetchLazyMintedNFTs]);
 
   const activeAccountNFTs = useMemo(() => {
-    return nfts.filter(
-      (nft) =>
-        nft.metadata.properties?.creatorAddress === activeAccount?.address,
-    );
+    return nfts
+      .filter(
+        (nft) =>
+          nft.metadata?.properties?.creatorAddress === activeAccount?.address,
+      )
+      .sort(
+        (a, b) =>
+          a.metadata.properties.dateCreated - b.metadata.properties.dateCreated,
+      );
   }, [nfts, activeAccount]);
 
   return {
