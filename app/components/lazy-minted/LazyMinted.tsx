@@ -6,7 +6,6 @@ import ConfigureMintedAsset from '../configure-minted-asset/ConfigureMintedAsset
 import { Account } from 'thirdweb/wallets';
 
 type LazyMintedProps = {
-  [index: string]: any;
   activeAccount: Account;
 };
 
@@ -56,7 +55,7 @@ export default function LazyMintedAsset(props: LazyMintedProps) {
           <tbody>
             {nfts.map((nft, i) => (
               <tr
-                key={i + '-' + nft.id}
+                key={nft.metadata.name + '-' + nft.id}
                 onClick={() => handleViewMore(nft)}
                 className="hover:cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-900"
               >
@@ -87,7 +86,7 @@ export default function LazyMintedAsset(props: LazyMintedProps) {
         </table>
       )}
 
-      {isModalOpen && nft &&  (
+      {nft && isModalOpen && (
         <ConfigureMintedAsset
           nft={nft}
           toggleModal={toggleModal}
