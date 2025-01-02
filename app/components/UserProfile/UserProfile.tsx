@@ -21,6 +21,7 @@ import {
   useActiveAccount,
   useReadContract,
 } from 'thirdweb/react';
+import { Account } from 'thirdweb/wallets';
 import LazyMintedAsset from '../lazy-minted/LazyMinted';
 import ListUploadedAssets from '../list-uploaded-assets/ListUploadedAssets';
 import CreateMetoken from '../MeToken/createMetoken';
@@ -38,7 +39,6 @@ import {
   formatAddress,
 } from '@app/lib/sdk/stack/client';
 import MemberCard from './MemberCard';
-import { Account } from 'thirdweb/wallets';
 
 const ProfilePage: NextPage = () => {
   const { user } = useParams();
@@ -120,18 +120,26 @@ const ProfilePage: NextPage = () => {
 
   useEffect(() => {
     const fetchNFTData = async () => {
-      const metadata = await getNFT({
-        contract: unlockContract,
-        tokenId: ownedIds[0],
-      });
+      try {
+        const metadata = await getNFT({
+          contract: unlockContract,
+          tokenId: ownedIds[0],
+        });
 
-      setNftData(metadata);
+        setNftData(metadata);
+      } catch (err) {
+        //TODO: Consider showing user-friendly error message
+        if (err instanceof Error) {
+          alert(`Failed to fetch NFT data ${err.message}`);
+        } else {
+          alert('Failed to fetch NFT data');
+        }
+      }
     };
 
     if (ownedIds.length > 0) {
       fetchNFTData();
     }
-
   }, [unlockContract, ownedIds]);
 
   useEffect(() => {
@@ -230,7 +238,9 @@ const ProfilePage: NextPage = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-2">
-              <LazyMintedAsset activeAccount={activeAccount} />
+              {activeAccount && (
+                <LazyMintedAsset activeAccount={activeAccount as Account} />
+              )}
             </CardContent>
             <CardFooter className="space-x-2"></CardFooter>
           </Card>
@@ -256,9 +266,7 @@ const ProfilePage: NextPage = () => {
             </CardHeader>
             <CardContent>
               {/* <AssetDetails /> */}
-              <ListUploadedAssets
-                activeAccount={activeAccount as Account}
-              />
+              <ListUploadedAssets activeAccount={activeAccount as Account} />
             </CardContent>
           </Card>
         </TabsContent>
