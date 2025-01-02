@@ -77,12 +77,12 @@ export const UserMenu: React.FC = () => {
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={handleLinkClick}>
             <Link
-              href={`/profile/${activeAccount?.address}/broadcast`}
+              href={`/profile/${activeAccount?.address}/live`}
               className="flex items-center gap-2"
               prefetch={false}
             >
               <RadioTowerIcon className="h-4 w-4" />
-              <span>Broadcast</span>
+              <span>Live</span>
             </Link>
           </DropdownMenuItem>
         </DropdownMenuContent>
