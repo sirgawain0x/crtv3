@@ -1,4 +1,5 @@
 import VideoCardGrid from '@app/components/Videos/VideoCardGrid';
+import LivestreamGrid from '@app/components/Live/LivestreamGrid';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -43,7 +44,16 @@ const AllVideosContent: React.FC = () => {
           </BreadcrumbList>
         </Breadcrumb>
       </div>
+
+      {/* Live Streams Section */}
+      <div className="mb-8">
+        <h2 className="mb-4 text-2xl font-bold">Live Now</h2>
+        <LivestreamGrid />
+      </div>
+
+      {/* Videos Section */}
       <div>
+        <h2 className="mb-4 text-2xl font-bold">Recent Videos</h2>
         <VideoCardGrid />
       </div>
     </div>
