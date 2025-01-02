@@ -23,7 +23,6 @@ function useLazyMint() {
 
   const handleLazyMint = useCallback(
     async (args: LazyMintArgs) => {
- 
       (Object.keys(args) as (keyof LazyMintArgs)[]).forEach((key) => {
         if (!args[key]) {
           throw new Error(`${key} is required`);
@@ -48,9 +47,11 @@ function useLazyMint() {
             amount: args.amount,
             price: args.price,
             creatorAddress: activeAccount?.address || '',
+            dateCreated: new Date().getTime(),
           },
         });
 
+        console.log('handleLazyMint::tknMetadata', { tknMetadata });
         const transaction = lazyMint({
           contract: videoContract,
           nfts: [tknMetadata],
@@ -61,8 +62,14 @@ function useLazyMint() {
           account: activeAccount!,
         });
 
-        setTxnHash(transactionHash);
-        setIsProcessing(false);
+        if (transactionHash) {
+          setTxnHash(transactionHash);
+          console.log('handleLazyMint::transactionHash', {
+            transactionHash,
+          });
+        } else {
+          throw new Error('Transaction failed');
+        }
       } catch (err) {
         console.error(err);
         setError(err as Error);
