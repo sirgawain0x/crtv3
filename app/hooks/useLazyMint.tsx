@@ -17,7 +17,6 @@ interface LazyMintArgs {
 
 function useLazyMint() {
   const activeAccount = useActiveAccount();
-  const [txnHash, setTxnHash] = useState('');
   const [error, setError] = useState<LazyMintError>();
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -29,9 +28,9 @@ function useLazyMint() {
         }
       });
 
+      setIsProcessing(true);
+      
       try {
-        setIsProcessing(true);
-
         const res = await fetch(args.baseURIForTokens);
         if (!res.ok) {
           throw new Error(`Failed to fetch metadata: ${res.statusText}`);
@@ -42,16 +41,18 @@ function useLazyMint() {
           throw new Error('Invalid metadata format');
         }
 
-        const tknMetadata = Object.assign(data, {
+        const tknMetadata = {
+          ...data,
           properties: {
             amount: args.amount,
             price: args.price,
             creatorAddress: activeAccount?.address || '',
-            dateCreated: new Date().getTime(),
+            createdAt: new Date().getTime(),
           },
-        });
+        };
 
-        console.log('handleLazyMint::tknMetadata', { tknMetadata });
+        console.log({ tknMetadata });
+
         const transaction = lazyMint({
           contract: videoContract,
           nfts: [tknMetadata],
@@ -63,16 +64,20 @@ function useLazyMint() {
         });
 
         if (transactionHash) {
-          setTxnHash(transactionHash);
-          console.log('handleLazyMint::transactionHash', {
-            transactionHash,
-          });
+          return transactionHash;
         } else {
           throw new Error('Transaction failed');
         }
       } catch (err) {
-        console.error(err);
-        setError(err as Error);
+        if (err instanceof Error) {
+          const lazyMintError: LazyMintError = {
+            name: err.name,
+            message: err.message,
+            code: (err as LazyMintError).code,
+          };
+
+          setError(lazyMintError);
+        }
       } finally {
         setIsProcessing(false);
       }
@@ -82,7 +87,6 @@ function useLazyMint() {
 
   return {
     handleLazyMint,
-    txnHash,
     error,
     isProcessing,
   };
