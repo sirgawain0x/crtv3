@@ -36,13 +36,11 @@ export default function LazyMintForm(props: TLazyMintFormProps) {
     }
 
     try {
-      
       await handleLazyMint({
         amount: data.numOfNFT.toString(),
         price: data.pricePerNFT.toString(),
         baseURIForTokens: props.baseURIForToken,
       });
-
       if (txnHash) {
         toast.success('Lazy Minting successful`', {
           description: `Transaction hash: ${txnHash}`,
@@ -52,21 +50,14 @@ export default function LazyMintForm(props: TLazyMintFormProps) {
               window.open(`https://basescan.org/tx/${txnHash}`, '_blank'),
           },
         });
-
       } else {
-        toast.error('Minting failed', {
-          description: lazyMintError?.message || 'Something went wrong',
-          duration: 3000,
-          closeButton: true,
-        });
+        throw new Error(`Minting failed: ${lazyMintError?.message}`);
       }
     } catch (err) {
-
       toast.error('Minting failed', {
         description:
           (err instanceof Error && err.message) || 'Something went wrong',
         duration: 3000,
-        closeButton: true,
       });
     }
   };
