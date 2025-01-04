@@ -1,20 +1,21 @@
 'use client';
-import { useEffect, useState } from 'react';
-import { Button } from '@app/components/ui/button';
-import { useInterval } from 'react-use';
-import { PlayerComponent } from '@app/components/Player/Player';
-import { Src } from '@livepeer/react';
-import { getSrc } from '@livepeer/react/external';
 import {
   getLivepeerAsset,
   getLivepeerPlaybackInfo,
 } from '@app/api/livepeer/livepeerActions';
+import ToggleSwitch from '@app/components/Button/ToggleSwitch';
+import LazyMintForm from '@app/components/forms/LazyMintForm';
+import { PlayerComponent } from '@app/components/Player/Player';
+import { Button } from '@app/components/ui/button';
+import { Spinner } from '@chakra-ui/react';
+import { Src } from '@livepeer/react';
+import { getSrc } from '@livepeer/react/external';
 import { Asset, PlaybackInfo } from 'livepeer/models/components';
 import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { useInterval } from 'react-use';
+import { useActiveAccount } from 'thirdweb/react';
 import CreateThumbnailForm from './CreateThumbnailForm';
-import { FaSpinner } from 'react-icons/fa';
-import { Spinner } from '@chakra-ui/react';
-import { upload } from 'thirdweb/storage';
 
 type CreateThumbnailProps = {
   livePeerAssetId: string | undefined;
@@ -28,10 +29,13 @@ export default function CreateThumbnail({
   onComplete,
 }: CreateThumbnailProps) {
   const router = useRouter();
+  const activeAccount = useActiveAccount();
 
   const [progress, setProgress] = useState<number>(0);
   const [livepeerAssetData, setLivepeerAssetData] = useState<Asset>();
-  const [livepeerPlaybackData, setLivepeerPlaybackData] = useState<PlaybackInfo>();
+  const [livepeerPlaybackData, setLivepeerPlaybackData] =
+    useState<PlaybackInfo>();
+
 
   useInterval(
     () => {
@@ -76,8 +80,16 @@ export default function CreateThumbnail({
   };
 
   const handleComplete = (thumbnailUri: string) => {
-    onComplete({ thumbnailUri });
-    router.push('/discover');
+    if (livepeerAssetData) {
+      onComplete({ thumbnailUri });
+      if (activeAccount) {
+        router.push(`/profile/${activeAccount.address}#minted`);
+      } else {
+        console.error('No activeAccount');
+      }
+    } else {
+      console.error('livepeerAssetData is undefined');
+    }
   };
 
   return (
@@ -115,6 +127,18 @@ export default function CreateThumbnail({
           }}
         />
       </div>
+      {livepeerAssetData?.status?.phase === 'ready' && (
+        <div className="my-5">
+          <ToggleSwitch label="Lazy Mint Token">
+            <LazyMintForm
+              baseURIForToken={String(
+                livepeerAssetData?.storage?.ipfs?.nftMetadata?.gatewayUrl,
+              )}
+            />
+          </ToggleSwitch>
+        </div>
+      )}
+
       <div className="flex items-center justify-center gap-3">
         <Button
           disabled={livepeerAssetData?.status?.phase === 'processing'}
@@ -122,6 +146,7 @@ export default function CreateThumbnail({
         >
           Back
         </Button>
+
         <Button
           disabled={livepeerAssetData?.status?.phase !== 'ready'}
           onClick={() => handleComplete('')}
