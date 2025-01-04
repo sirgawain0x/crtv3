@@ -2,6 +2,8 @@ import useLazyMint from '@app/hooks/useLazyMint';
 import { SubmitHandler, useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import type { TSwithButtonChildProps } from '../Button/ToggleSwitch';
+import { useState } from 'react';
+import { blockExplorer } from '@app/lib/utils/context';
 
 export type TLazyMintFormData = {
   pricePerNFT: number;
@@ -17,15 +19,17 @@ export default function LazyMintForm(props: TLazyMintFormProps) {
     handleLazyMint,
     isProcessing,
     error: lazyMintError,
-    txnHash,
+    // txnHash,
   } = useLazyMint();
-
+  const [txnHash, setTxnHash] = useState('');
   const { handleSubmit, formState, register } = useForm<TLazyMintFormData>();
 
   const handleSubmitLazyMint: SubmitHandler<TLazyMintFormData> = async (
     data,
   ) => {
     const { errors } = formState;
+
+    console.log({ ...data, uri: props.baseURIForToken });
 
     const isRequiredFields =
       errors.pricePerNFT?.type === 'required' ||
@@ -36,20 +40,29 @@ export default function LazyMintForm(props: TLazyMintFormProps) {
     }
 
     try {
-      await handleLazyMint({
+      const txnHash = await handleLazyMint({
         amount: data.numOfNFT.toString(),
         price: data.pricePerNFT.toString(),
         baseURIForTokens: props.baseURIForToken,
       });
+
       if (txnHash) {
-        toast.success('Lazy Minting successful`', {
+        toast.success('Lazy Minting successful', {
           description: `Transaction hash: ${txnHash}`,
+          duration: 3000,
           action: {
             label: 'View Transaction',
             onClick: () =>
-              window.open(`https://basescan.org/tx/${txnHash}`, '_blank'),
+              window.open(`${blockExplorer.polygon.amoy}/tx/${txnHash}}`, '_blank'),
           },
         });
+
+        setTimeout(() => {
+          if (props.handleToggleSwitch) {
+            props.handleToggleSwitch();
+          }
+        }, 2500);
+
       } else {
         throw new Error(`Minting failed: ${lazyMintError?.message}`);
       }
