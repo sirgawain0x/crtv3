@@ -4,7 +4,7 @@ type Properties = {
   properties: {
     price: bigint;
     amount: bigint;
-    dateCreated: number;
+    createdAt: number;
   };
 };
 export type NFT = {
