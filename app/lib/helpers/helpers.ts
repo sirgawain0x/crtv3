@@ -36,7 +36,7 @@ export function parseDate(timestamp: bigint) {
 
 /**
  * Function to parse timestamp to readable date
- * @param dateString The date object to parse
+ * @param ts The timestamp to parse
  * @returns Form input date
  *
  * @example
@@ -44,18 +44,27 @@ export function parseDate(timestamp: bigint) {
  *  =>  16/01/2024 13:13
  */
 export function parseTimestampToDate(ts: number) {
+
   if (ts <= 0) {
     return 'Not available';
   }
 
-  const d = new Date(ts * 1000);
-  const longEnUSFormat = new Intl.DateTimeFormat('en-US', {
+  const d = new Date(ts);
+  const dateFormatter = new Intl.DateTimeFormat('en-US', {
     year: 'numeric',
-    month: 'long',
+    month: 'short',
     day: 'numeric',
   });
+  const timeFormatter = new Intl.DateTimeFormat('en-US', {
+    hour: 'numeric',
+    minute: 'numeric',
+    hour12: true,
+  });
 
-  return longEnUSFormat.format(d);
+  const date = dateFormatter.format(d);
+  const time = timeFormatter.format(d);
+
+  return `${date} ${time}`;
 }
 
 /**
