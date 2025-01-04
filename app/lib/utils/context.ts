@@ -6748,6 +6748,16 @@ export const CONTRACT_ADDRESS = {
   },
 };
 
+export const blockExplorer = {
+  base: {
+    mainnet: 'https://basescan.org',
+    sepolia: '',
+  },
+  polygon: {
+    mainnet: 'https://polygonscan.com',
+    amoy: 'https://amoy.polygonscan.com',
+  },
+};
 // FOOTER
 const currentYear = new Date().getFullYear();
 
