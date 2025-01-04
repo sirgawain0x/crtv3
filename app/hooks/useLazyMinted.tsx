@@ -42,7 +42,7 @@ export default function useLazyMinted() {
       )
       .sort(
         (a, b) =>
-          a.metadata.properties.dateCreated - b.metadata.properties.dateCreated,
+          a.metadata.properties.createdAt - b.metadata.properties.createdAt,
       );
   }, [nfts, activeAccount]);
 
