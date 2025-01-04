@@ -42,7 +42,7 @@ export default function UploadAsset(props: UploadAssetProps) {
   }, [lazyMintedEvent]);
 
   return (
-    <tr key={props.asset.id}>
+    <tr key={props.asset.id} className='text-[16px]'>
       <td className="border border-slate-700 px-4 py-1">{props.idx + 1}</td>
       <td className="border border-slate-700 px-4 py-1">
         <Link
@@ -56,10 +56,10 @@ export default function UploadAsset(props: UploadAssetProps) {
         </Link>
       </td>
       <td className="border border-slate-700 px-4 py-1">
-        {helpers.parseTimestampToDate(props.asset.createdAt as any)}
+        {helpers.parseTimestampToDate(Number(props.asset.createdAt))}
       </td>
       <td className="border border-slate-700 px-4 py-1">
-        {helpers.parseTimestampToDate(props.asset.status?.updatedAt as any)}
+        {helpers.parseTimestampToDate(props.asset.status?.updatedAt)}
       </td>
 
       <td className="border border-slate-700 px-4 py-1">
