@@ -2,7 +2,6 @@ import useLazyMint from '@app/hooks/useLazyMint';
 import { SubmitHandler, useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import type { TSwithButtonChildProps } from '../Button/ToggleSwitch';
-import { useState } from 'react';
 import { blockExplorer } from '@app/lib/utils/context';
 
 export type TLazyMintFormData = {
@@ -15,21 +14,13 @@ type TLazyMintFormProps = {
 } & TSwithButtonChildProps;
 
 export default function LazyMintForm(props: TLazyMintFormProps) {
-  const {
-    handleLazyMint,
-    isProcessing,
-    error: lazyMintError,
-    // txnHash,
-  } = useLazyMint();
-  const [txnHash, setTxnHash] = useState('');
+  const { handleLazyMint, isProcessing, error } = useLazyMint();
   const { handleSubmit, formState, register } = useForm<TLazyMintFormData>();
 
   const handleSubmitLazyMint: SubmitHandler<TLazyMintFormData> = async (
     data,
   ) => {
     const { errors } = formState;
-
-    console.log({ ...data, uri: props.baseURIForToken });
 
     const isRequiredFields =
       errors.pricePerNFT?.type === 'required' ||
@@ -53,7 +44,10 @@ export default function LazyMintForm(props: TLazyMintFormProps) {
           action: {
             label: 'View Transaction',
             onClick: () =>
-              window.open(`${blockExplorer.polygon.amoy}/tx/${txnHash}}`, '_blank'),
+              window.open(
+                `${blockExplorer.polygon.amoy}/tx/${txnHash}}`,
+                '_blank',
+              ),
           },
         });
 
@@ -62,9 +56,8 @@ export default function LazyMintForm(props: TLazyMintFormProps) {
             props.handleToggleSwitch();
           }
         }, 2500);
-
       } else {
-        throw new Error(`Minting failed: ${lazyMintError?.message}`);
+        throw new Error(`Minting failed: ${error?.message}`);
       }
     } catch (err) {
       toast.error('Minting failed', {
@@ -96,7 +89,7 @@ export default function LazyMintForm(props: TLazyMintFormProps) {
               value: 1,
             })}
             className="w-full rounded-md border px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-200"
-            disabled={isProcessing || Boolean(txnHash)}
+            disabled={isProcessing}
           />
           {formState.errors.numOfNFT?.type === 'required' && (
             <span className="my-4 block text-sm text-red-500">
@@ -121,7 +114,7 @@ export default function LazyMintForm(props: TLazyMintFormProps) {
             id="pricePerNFT"
             {...register('pricePerNFT', { required: true, min: 0 })}
             className="w-full rounded-md border px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-200"
-            disabled={isProcessing || Boolean(txnHash)}
+            disabled={isProcessing}
           />
           {formState.errors.pricePerNFT?.type === 'required' && (
             <span className="mt-4 block text-sm text-red-500">
@@ -141,7 +134,7 @@ export default function LazyMintForm(props: TLazyMintFormProps) {
                 ${isProcessing && `hover: cursor-progress`}
               `}
             type="submit"
-            disabled={isProcessing || Boolean(txnHash)}
+            disabled={isProcessing}
           >
             {isProcessing ? 'Minting...' : ' Lazy Mint'}
           </button>
