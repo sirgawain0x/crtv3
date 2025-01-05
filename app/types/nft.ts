@@ -1,3 +1,4 @@
+import { ContractOptions } from 'thirdweb';
 import { NFTMetadata } from 'thirdweb/utils';
 
 type Properties = {
@@ -17,3 +18,5 @@ export type NFT = {
 };
 
 export type ResolvedReturnType<T> = T extends Promise<infer U> ? U : T;
+
+export type TVideoContract = Readonly<ContractOptions<[]>> | undefined;
