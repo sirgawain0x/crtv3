@@ -15,9 +15,12 @@ import {
   ButtonGroup,
   VStack,
 } from '@chakra-ui/react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ContractOptions, prepareEvent } from 'thirdweb';
-import { getClaimConditions } from 'thirdweb/extensions/erc1155';
+import {
+  getClaimConditions,
+  getActiveClaimCondition,
+} from 'thirdweb/extensions/erc1155';
 import { GetCurrencyMetadataResult } from 'thirdweb/extensions/erc20';
 import { useContractEvents } from 'thirdweb/react';
 import AddClaimPhaseButton from '../AddClaimPhase/AddClaimPhaseButton';
@@ -45,10 +48,20 @@ export default function ListClaimConditions(props: ListClaimConditionsProps) {
   const [erc20Metadata, setERC20Metadata] = useState<{
     [key: string]: GetCurrencyMetadataResult | null;
   }>({});
-
-  useEffect(() => {
-    setClaimConditions(props.claimConditions);
-  }, [props.claimConditions]);
+  const [processingActiveClaimCondition, setProcessingActiveClaimCondition] =
+    useState(false);
+  const [activeClaimCondition, setActionClaimCondition] = useState<
+    ResolvedReturnType<ReturnType<typeof getActiveClaimCondition>>
+  >({
+    currency: '0x0',
+    maxClaimableSupply: 0n,
+    merkleRoot: '',
+    pricePerToken: 0n,
+    metadata: '',
+    quantityLimitPerWallet: 0n,
+    startTimestamp: 0n,
+    supplyClaimed: 0n,
+  });
 
   const [editStates, setEditStates] = useState<{ [key: number]: boolean }>(
     claimConditions.reduce((acc: { [key: number]: boolean }, _, i) => {
@@ -57,24 +70,10 @@ export default function ListClaimConditions(props: ListClaimConditionsProps) {
     }, {}),
   );
 
-  const toggleEditClaim = (idx: number) => {
-    setEditStates((prev) => ({ ...prev, [idx]: !prev[idx] }));
-  };
-
   const { data: ccEvents, error: ccErrorEvents } = useContractEvents({
     contract: videoContract,
     events: [preparedClaimConditionsUpdatedEvent],
   });
-
-  const deleteClaimById = async (tokenId: string) => {
-    // TODO: stub to delete a claim by id
-    console.log('deleteClaimById: ', tokenId);
-  };
-
-  const isActiveClaimPhase = (startTimestamp: bigint) => {
-    const now = new Date();
-    return now.getTime() > Number(startTimestamp.toString());
-  };
 
   const fetchERC20Metadata = async (currencyAddress: string) => {
     try {
@@ -99,19 +98,60 @@ export default function ListClaimConditions(props: ListClaimConditionsProps) {
   }, [claimConditions, erc20Metadata]);
 
   useEffect(() => {
+    setClaimConditions(props.claimConditions);
+  }, [props.claimConditions]);
+
+  useEffect(() => {
     updateERC20Metadata();
   }, [erc20Metadata, updateERC20Metadata]);
 
   useEffect(() => {
     if (ccEvents && ccEvents.length > 0) {
-      const { claimConditions } = ccEvents[0].args;
+      // TODO: check
+      console.log({ ccEvents });
 
+      const { claimConditions } = ccEvents[0].args;
       setClaimConditions([...claimConditions]);
       updateERC20Metadata();
-    } else if (ccErrorEvents) {
-      console.error({ ccErrorEvents });
     }
-  }, [ccEvents, updateERC20Metadata, ccErrorEvents]);
+  }, [ccEvents, updateERC20Metadata]);
+
+  useEffect(() => {
+    const fetchActiveClaimCondition = async (tokenId: bigint) => {
+      setProcessingActiveClaimCondition(true);
+
+      try {
+        const activeCC = await getActiveClaimCondition({
+          contract: videoContract,
+          tokenId,
+        });
+
+        if (activeCC) {
+          setProcessingActiveClaimCondition(false);
+          setActionClaimCondition(activeCC);
+        }
+      } catch (err) {
+        setProcessingActiveClaimCondition(false);
+        console.error(err);
+      }
+    };
+
+    fetchActiveClaimCondition(props.nft.id);
+  }, [props.nft.id]);
+
+  const isActiveClaimPhase = useMemo(
+    () => (startTimestamp: bigint) => activeClaimCondition.startTimestamp === startTimestamp,
+    [activeClaimCondition.startTimestamp]
+  );
+
+  const toggleEditClaim = (idx: number) => {
+    setEditStates((prev) => ({ ...prev, [idx]: !prev[idx] }));
+  };
+
+  const deleteClaimById = async (tokenId: string) => {
+    // TODO: stub to delete a claim by id
+    console.log('deleteClaimById: ', tokenId);
+  };
 
   return (
     <>
@@ -135,17 +175,24 @@ export default function ListClaimConditions(props: ListClaimConditionsProps) {
 
           {claimConditions.map((cc, i) => (
             <div
-              key={cc.maxClaimableSupply.toString() + '-' + cc.startTimestamp.toString()}
+              key={
+                cc.maxClaimableSupply.toString() +
+                '-' +
+                cc.startTimestamp.toString()
+              }
               className="mx-auto mb-4 w-full max-w-screen-xl rounded-lg border bg-slate-700 p-6"
             >
-              <div className="mb-4 flex flex-row justify-between">
-                {isActiveClaimPhase(cc.startTimestamp) && (
-                  <span className="rounded-sm bg-green-100 p-1 text-xs font-medium text-green-700">
-                    Active
-                  </span>
-                )}
+              <div className={`mb-5 flex flex-row justify-between`}>
+                <p className="self-start">
+                  Public{' '}
+                  {isActiveClaimPhase(cc.startTimestamp) && (
+                    <span className="rounded-sm bg-green-100 p-1 text-xs font-medium text-green-700">
+                      Active
+                    </span>
+                  )}
+                </p>
 
-                <ButtonGroup variant="outline">
+                <ButtonGroup variant="outline" className="self-end">
                   <Button
                     className="text-sm"
                     colorScheme=""
