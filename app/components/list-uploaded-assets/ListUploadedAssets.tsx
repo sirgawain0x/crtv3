@@ -59,14 +59,17 @@ export default function ListUploadedAssets(props: ListUploadedAssetsProps) {
       )}
 
       {filteredCreatorAssets.length > 0 && (
-        <table className="my-6 w-full table-auto">
+        <table
+          className="my-6 w-full table-auto"
+          role="grid"
+          aria-label="Uploaded Assets"
+        >
           <thead>
             <tr className="text-sm text-gray-600">
               <th className="border border-slate-600 px-4 py-1 ">S/No.</th>
               <th className="border border-slate-600 px-4 py-1 ">Name</th>
               <th className="border border-slate-600 px-4 py-1">Created</th>
               <th className="border border-slate-600 px-4 py-1">Updated</th>
-              <th className="border border-slate-600 px-4 py-1">Status</th>
             </tr>
           </thead>
           <tbody>
@@ -75,7 +78,7 @@ export default function ListUploadedAssets(props: ListUploadedAssetsProps) {
                 activeAccount={props.activeAccount}
                 asset={video}
                 idx={i}
-                key={i + '-' + video.id}
+                key={`${video.id}-${video.createdAt}`}
               />
             ))}
           </tbody>
