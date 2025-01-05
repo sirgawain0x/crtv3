@@ -116,6 +116,18 @@ export default function CreateThumbnail({
           />
         </div>
       )}
+      
+      {/* TODO: possibly place Lazy Mint button
+      {livepeerAssetData?.status?.phase === 'ready' && livepeerPlaybackData && (
+        <div className="my-6">
+          <div className="mx-auto my-4">
+            <h3 className="text-xl font-bold">Lazy Mint Your Video</h3>
+          </div>
+          <button onClick={()=>{}}>Lazy Mint </button>
+        </div>
+      )}
+      */}
+
       <div className="my-5">
         <div className="mx-auto my-4">
           <h3 className="text-xl font-bold">Generate a Thumbnail</h3>
