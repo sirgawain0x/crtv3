@@ -14,7 +14,7 @@ import {
   setClaimConditions,
 } from 'thirdweb/extensions/erc1155';
 import { useActiveAccount } from 'thirdweb/react';
- 
+    import { decimals } from 'thirdweb/extensions/erc20';
 
 type ClaimFormData = {
   price: bigint;
@@ -50,7 +50,10 @@ export default function SetClaimConditions(props: SetClaimConditionsProps) {
   ): Promise<ethers.TransactionReceipt | `0x${string}` | void> => {
     //
     console.log({ ...formData, tokenId });
- 
+    const tokenDecimals = await decimals({ contract: erc20Contract(formData.currency)});
+    console.log({ tokenDecimals });
+
+
     const previousCCs =
       props.claimConditions.length > 0
         ? props.claimConditions?.map((cc) => {
@@ -63,7 +66,12 @@ export default function SetClaimConditions(props: SetClaimConditionsProps) {
 
     const claimConditionsInput = {
       startTime: new Date(formData.startTimestamp),
-      price: props.nft.metadata.properties.price.toString(), 
+      price: ethers
+        .parseUnits(
+          props.nft.metadata.properties.price.toString(),
+          tokenDecimals,
+        )
+        .toString(),
       currencyAddress: formData.currency,
       maxClaimablePerWallet: BigInt(formData.maxClaimablePerWallet),
       maxClaimableSupply: BigInt(formData.maxClaimableSupply),
@@ -75,7 +83,6 @@ export default function SetClaimConditions(props: SetClaimConditionsProps) {
     console.log({ previousCCs });
     console.log({ claimConditionsInput });
     // return;
-
 
     setIsSettingCC(true);
     try {
