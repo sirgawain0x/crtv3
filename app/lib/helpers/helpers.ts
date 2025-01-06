@@ -44,7 +44,6 @@ export function parseDate(timestamp: bigint) {
  *  =>  16/01/2024 13:13
  */
 export function parseTimestampToDate(ts: number) {
-
   if (ts <= 0) {
     return 'Not available';
   }
@@ -181,7 +180,8 @@ export const claimConditionsOptions = {
   currency: {
     // The tokens accepted for payment by the buyer
     USDC: CONTRACT_ADDRESS.erc20.USDC.chain.polygon.amoy,
-    TESTR: CONTRACT_ADDRESS.erc20.TESTR.chain.polygon.mumbai,
+    MATIC : CONTRACT_ADDRESS.erc20.MATIC.chain.polygon.amoy,
+    DAI : CONTRACT_ADDRESS.erc20.DAI.chain.polygon.amoy,
   },
 };
 
@@ -223,29 +223,29 @@ export async function parseMetadata2(arr: NFT[]) {
 }
 
 export function fetchMetadata(uri: string) {
-  console.log({ uri });
-
   const delimiter = '/';
   let mtd: Partial<NFTMetadata> = {};
 
   let cid = uri.split(delimiter)[2];
   console.log({ cid });
 
-  // if (cid != undefined) {
-  //   fetch(`https://ipfs.livepeer.studio/ipfs/${cid}`)
-  //     .then((res) => res)
-  //     .then(async (data) => {
-  //       const d = await data.json();
-  //       console.log(d);
-  //     })
-  //     .catch((err) => {
-  //       console.error(err);
-  //     });
-  // }
-
-  return 'ast';
+  if (cid != undefined) {
+    return fetch(`https://ipfs.livepeer.studio/ipfs/${cid}`)
+      .then((res) => res)
+      .then(async (data) => {
+        return await data.json();
+      })
+      .catch((err) => {
+        throw new Error(err);
+      });
+  }
 }
 
+export function resolver() {
+  return new Promise((res, rej) => {
+    return res('Hello world');
+  });
+}
 export function parseIpfsUri(
   uri: string,
   baseURIGateway = 'https://ipfs.livepeer.studio/',
