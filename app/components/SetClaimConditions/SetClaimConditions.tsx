@@ -1,34 +1,28 @@
 import { claimConditionsOptions } from '@app/lib/helpers/helpers';
-import { videoContract } from '@app/lib/sdk/thirdweb/get-contract';
-import { NFT, ResolvedReturnType } from '@app/types/nft';
 import {
-  Button,
-  FormControl,
-  FormHelperText,
-  FormLabel,
-  Input,
-  Select,
-  VStack,
-  useToast,
-} from '@chakra-ui/react';
+  erc20Contract,
+  videoContract,
+} from '@app/lib/sdk/thirdweb/get-contract';
+import { NFT, ResolvedReturnType } from '@app/types/nft';
 import { ethers } from 'ethers';
 import { useState } from 'react';
-import { Controller, SubmitHandler, useForm } from 'react-hook-form';
+import { SubmitHandler, useForm } from 'react-hook-form';
+import { toast } from 'sonner';
 import { sendTransaction } from 'thirdweb';
 import {
   getClaimConditions,
   setClaimConditions,
 } from 'thirdweb/extensions/erc1155';
 import { useActiveAccount } from 'thirdweb/react';
+ 
 
 type ClaimFormData = {
   price: bigint;
-  currencyAddress: string;
+  currency: string;
   phaseName: string | undefined;
   maxClaimablePerWallet: string | number;
   maxClaimableSupply: bigint | number;
-  startTime: string | number;
-  waitInSeconds: string | number;
+  startTimestamp: number;
 };
 
 type SetClaimConditionsProps = {
@@ -47,20 +41,16 @@ export default function SetClaimConditions(props: SetClaimConditionsProps) {
   const [isErrorFree, setIsErrorFree] = useState(false);
   const [ccError, SetCCError] = useState<Error>();
   const [txStatus, setTxStatus] = useState<number | undefined>(0);
-  const toast = useToast();
 
-  const {
-    handleSubmit,
-    control: ctrl,
-    formState,
-    register,
-  } = useForm<ClaimFormData>();
+  const { handleSubmit, formState, register } = useForm<ClaimFormData>();
 
   const handleSetCC = async (
     formData: ClaimFormData,
     tokenId: bigint,
   ): Promise<ethers.TransactionReceipt | `0x${string}` | void> => {
     //
+    console.log({ ...formData, tokenId });
+ 
     const previousCCs =
       props.claimConditions.length > 0
         ? props.claimConditions?.map((cc) => {
@@ -72,21 +62,23 @@ export default function SetClaimConditions(props: SetClaimConditionsProps) {
         : [];
 
     const claimConditionsInput = {
-      currencyAddress: formData.currencyAddress,
+      startTime: new Date(formData.startTimestamp),
+      price: props.nft.metadata.properties.price.toString(), 
+      currencyAddress: formData.currency,
       maxClaimablePerWallet: BigInt(formData.maxClaimablePerWallet),
       maxClaimableSupply: BigInt(formData.maxClaimableSupply),
-      price: props.nft.metadata.properties.price.toString(),
-      startTime: new Date(formData.startTime),
       metadata: {
         name: formData.phaseName,
       },
     };
 
+    console.log({ previousCCs });
     console.log({ claimConditionsInput });
+    // return;
 
+
+    setIsSettingCC(true);
     try {
-      setIsSettingCC(true);
-
       const transaction = setClaimConditions({
         contract: videoContract,
         tokenId,
@@ -94,9 +86,7 @@ export default function SetClaimConditions(props: SetClaimConditionsProps) {
           // TODO: At the moment; to add new claimCondition, you must batch the
           // previous claimConditions with the new claimCondition
           // ...previousCCs!,
-          {
-            ...claimConditionsInput,
-          },
+          { ...claimConditionsInput },
         ],
         resetClaimEligibility: false,
       });
@@ -104,7 +94,7 @@ export default function SetClaimConditions(props: SetClaimConditionsProps) {
       if (!activeAccount) {
         throw new Error('No active account found!');
       }
-      
+
       const { transactionHash } = await sendTransaction({
         transaction,
         account: activeAccount,
@@ -113,8 +103,7 @@ export default function SetClaimConditions(props: SetClaimConditionsProps) {
       return transactionHash;
     } catch (err) {
       setIsSettingCC(false);
-      console.error(err);
-      throw err;
+      throw new Error((err as Error).message);
     }
   };
 
@@ -123,11 +112,10 @@ export default function SetClaimConditions(props: SetClaimConditionsProps) {
 
     const isRequiredFields =
       errors.maxClaimablePerWallet?.type === 'required' ||
-      errors.currencyAddress?.type === 'required' ||
+      errors.currency?.type === 'required' ||
       errors.maxClaimableSupply?.type === 'required' ||
       errors.phaseName?.type === 'required' ||
-      errors.startTime?.type === 'required' ||
-      errors.waitInSeconds?.type === 'required';
+      errors.startTimestamp?.type === 'required';
 
     if (isRequiredFields) {
       return;
@@ -135,42 +123,36 @@ export default function SetClaimConditions(props: SetClaimConditionsProps) {
 
     const formatData: ClaimFormData = {
       ...data,
-      waitInSeconds: data.waitInSeconds,
-      startTime: data.startTime?.toString(),
+      startTimestamp: data.startTimestamp,
       price: props.nft.metadata.properties.price,
       maxClaimablePerWallet: data.maxClaimablePerWallet,
       maxClaimableSupply: props.nft.metadata.properties.amount,
     };
 
-    console.log('handleSetCC::formatData', formatData);
+    setIsErrorFree(true);
+    setIsSettingCC(true);
 
     try {
-      setIsErrorFree(true);
-      setIsSettingCC(true);
-
       const txnHash = await handleSetCC(formatData, props.nft.id);
+
       if (txnHash) {
+        toast.success('Set Claim Conditions', {
+          description: `Successful with status: ${1}`,
+          duration: 3000,
+        });
+
         setIsSettingCC(false);
         setTxStatus(1);
-
-        toast({
-          title: 'Set Claim Conditions',
-          description: `Successful with status: ${1}`,
-          status: 'success',
-          duration: 3000,
-          isClosable: true,
-        });
       }
-    } catch (err: any) {
-      console.error('handleSetClaimCondition', err);
+    } catch (err) {
       setIsSettingCC(false);
-      SetCCError(err);
-      toast({
-        title: 'Set Claim Conditions',
-        description: `Setting claim conditions failed!`,
-        status: 'error',
+      SetCCError(err as Error);
+      toast.error('Set Claim Conditions', {
+        description:
+          err instanceof Error
+            ? err.message
+            : `Setting claim conditions failed!`,
         duration: 4000,
-        isClosable: true,
       });
     }
   };
@@ -181,192 +163,122 @@ export default function SetClaimConditions(props: SetClaimConditionsProps) {
         Set conditions for the sale/claim of your NFT(s)
       </h4>
       <form
-        className="mt-4 font-normal text-slate-400"
-        onSubmit={handleSubmit(handleSubmitCCs)}
         id="setClaimCondtion"
+        className="my-4 flex flex-col gap-4"
+        onSubmit={handleSubmit(handleSubmitCCs)}
       >
-        <FormControl isDisabled={isErrorFree && isSettingCC}>
-          <div className="flex flex-col gap-4">
-            <VStack alignItems={'flex-start'}>
-              <FormLabel>Name of Phase</FormLabel>
-              <Controller
-                name="phaseName"
-                control={ctrl}
-                rules={{ required: true }}
-                render={({ field }) => (
-                  <Input
-                    color={'gray.300'}
-                    errorBorderColor="red.300"
-                    defaultValue={
-                      `Phase ${props.numberOfClaimsConditonsAvailable + 1}` ||
-                      ''
-                    }
-                    size="lg"
-                    {...register('phaseName')}
-                    mb={formState.errors.phaseName ? 0 : 4}
-                    placeholder="Enter name to for this phase (Phase One)"
-                    aria-invalid={formState.errors.phaseName ? 'true' : 'false'}
-                    value={field.value}
-                  />
-                )}
-              />
-              {formState.errors.phaseName?.type === 'required' && (
-                <FormHelperText mb="32px" color={'red.500'}>
-                  Select a name for the phase of sales.
-                </FormHelperText>
-              )}
-            </VStack>
-            <VStack alignItems={'flex-start'}>
-              <FormLabel>Start time of Phase</FormLabel>
-              <Controller
-                name="startTime"
-                control={ctrl}
-                rules={{ required: true }}
-                render={({ field }) => (
-                  <Input
-                    color={'gray.300'}
-                    minW={200}
-                    {...register('startTime')}
-                    type="datetime-local"
-                    size={'lg'}
-                    mb={formState.errors.startTime ? 0 : 4}
-                    placeholder="Start date and time of Phase"
-                    aria-invalid={formState.errors.startTime ? 'true' : 'false'}
-                  />
-                )}
-              />
-              {formState.errors.startTime?.type === 'required' && (
-                <FormHelperText mb="32px" color={'red.500'}>
-                  When the phase starts (i.e. when users can start claiming
-                  tokens).
-                </FormHelperText>
-              )}
-            </VStack>
+        <div className="flex flex-col space-y-1">
+          <label
+            htmlFor="startTimestamp"
+            className="my-2 font-medium dark:text-slate-400"
+          >
+            Name of Phase
+          </label>
+          <input
+            id="phaseName"
+            {...register('phaseName', { required: true })}
+            defaultValue={`Phase-${new Date().getTime()}` || ''}
+            placeholder="Enter name to for this phase (Phase One)"
+            className="w-full rounded-md border px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-200"
+            disabled={isErrorFree && isSettingCC}
+          />
+          {formState.errors.phaseName?.type === 'required' && (
+            <span className="my-4 block text-sm text-red-500">
+              Select a name for the phase of sales.
+            </span>
+          )}
+        </div>
 
-            <VStack alignItems={'flex-start'}>
-              <FormLabel>Select Payment Currency</FormLabel>
-              <Controller
-                name="currencyAddress"
-                control={ctrl}
-                rules={{ required: true }}
-                render={({ field }) => (
-                  <Select
-                    color={'gray.300'}
-                    placeholder=""
-                    size={'lg'}
-                    {...register('currencyAddress')}
-                    aria-invalid={
-                      formState.errors.currencyAddress ? 'true' : 'false'
-                    }
-                  >
-                    <option value="">Select currency</option>
-                    {Object.keys(claimConditionsOptions.currency).map(
-                      (c, i) => (
-                        <option
-                          key={i}
-                          value={
-                            Object.values(claimConditionsOptions.currency)[i]
-                          }
-                        >
-                          {c}
-                        </option>
-                      ),
-                    )}
-                  </Select>
-                )}
-              />
-              {formState.errors.currencyAddress?.type === 'required' && (
-                <FormHelperText mb="32px" color={'red.500'}>
-                  Select a purchasing currency
-                </FormHelperText>
-              )}
-            </VStack>
+        <div className="flex flex-col space-y-1">
+          <label
+            htmlFor="currency"
+            className="my-2 font-medium dark:text-slate-400"
+          >
+            Start time of Phase
+          </label>
+          <input
+            id="startTimestamp"
+            {...register('startTimestamp', { required: true })}
+            type="datetime-local"
+            placeholder="Start date and time of Phase"
+            className="w-full rounded-md border px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-200"
+            aria-invalid={formState.errors.startTimestamp ? 'true' : 'false'}
+            disabled={isErrorFree}
+          />
+          {formState.errors.startTimestamp?.type === 'required' && (
+            <span className="my-4 block text-sm text-red-500">
+              When the phase starts (i.e. when users can start claiming tokens).
+            </span>
+          )}
+        </div>
 
-            <VStack alignItems={'flex-start'}>
-              <FormLabel>Cool down period for a buyer to repurchase</FormLabel>
-              <Controller
-                name="waitInSeconds"
-                control={ctrl}
-                rules={{ required: true }}
-                render={({ field }) => (
-                  <Select
-                    placeholder=""
-                    color={'gray.300'}
-                    size={'lg'}
-                    {...register('waitInSeconds')}
-                    aria-invalid={
-                      formState.errors.waitInSeconds ? 'true' : 'false'
-                    }
-                  >
-                    {Object.keys(
-                      claimConditionsOptions.waitInSecondsOptions,
-                    ).map((time, i) => (
-                      <option
-                        key={i}
-                        value={
-                          Object.values(
-                            claimConditionsOptions.waitInSecondsOptions,
-                          )[i]
-                        }
-                      >
-                        {time}
-                      </option>
-                    ))}
-                  </Select>
-                )}
-              />
-              {formState.errors.waitInSeconds?.type === 'required' && (
-                <FormHelperText mb="32px" color={'red.500'}>
-                  The period of time users must wait between repeat claims.
-                </FormHelperText>
-              )}
-            </VStack>
+        <div className="flex flex-col space-y-1">
+          <label
+            htmlFor="currency"
+            className="my-2 font-medium dark:text-slate-400"
+          >
+            Select Payment Currency
+          </label>
+          <select
+            className="w-full rounded-md border px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-200"
+            id="currency"
+            {...register('currency', { required: true })}
+            aria-invalid={formState.errors.currency ? 'true' : 'false'}
+          >
+            <option value="">-- Select Currency --</option>
+            {Object.keys(claimConditionsOptions.currency).map((k, i) => (
+              <option
+                key={i}
+                value={Object.values(claimConditionsOptions.currency)[i]}
+              >
+                {k}
+              </option>
+            ))}
+          </select>
+          {formState.errors.currency?.type === 'required' && (
+            <span className="my-4 block text-sm text-red-500">
+              Select a purchasing currency
+            </span>
+          )}
+        </div>
 
-            <VStack alignItems={'flex-start'}>
-              <FormLabel>Maximum purchase per Wallet </FormLabel>
-              <Controller
-                name="maxClaimablePerWallet"
-                control={ctrl}
-                rules={{ required: true }}
-                render={({ field }) => (
-                  <Input
-                    color={'gray.300'}
-                    type="number"
-                    {...register('maxClaimablePerWallet')}
-                    min={1}
-                    max={5}
-                    size={'lg'}
-                    mb={formState.errors.maxClaimablePerWallet ? 0 : 4}
-                    placeholder="The maximum number of tokens a wallet can claim"
-                    aria-invalid={
-                      formState.errors.maxClaimablePerWallet ? 'true' : 'false'
-                    }
-                    value={field.value}
-                  />
-                )}
-              />
-              {formState.errors.maxClaimablePerWallet?.type === 'required' && (
-                <FormHelperText mb="32px" color={'red.500'}>
-                  The maximum number of tokens a wallet can claim.
-                </FormHelperText>
-              )}
-            </VStack>
-          </div>
-        </FormControl>
+        <div className="flex flex-col space-y-1">
+          <label
+            htmlFor="maxClaimablePerWallet"
+            className="my-2 font-medium dark:text-slate-400"
+          >
+            Maximum purchase per Wallet
+          </label>
+          <input
+            id="maxClaimablePerWallet"
+            {...register('maxClaimablePerWallet', { required: true, min: 1 })}
+            placeholder="The maximum number of tokens a wallet can claim"
+            className="w-full rounded-md border px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-200"
+            disabled={isErrorFree && isSettingCC}
+          />
+          {formState.errors.maxClaimablePerWallet?.type === 'required' && (
+            <span className="my-4 block text-sm text-red-500">
+              The maximum number of tokens a wallet can claim.
+            </span>
+          )}
+          {formState.errors.maxClaimablePerWallet?.type === 'min' && (
+            <span className="mt-4 block text-sm text-red-500">
+              The numbet to claim must be greater than zero (0).
+            </span>
+          )}
+        </div>
 
-        <Button
-          type="submit"
-          _hover={{
-            color: 'gray.300',
-            cursor: isSettingCC ? 'progress' : 'pointer',
-          }}
-          className="{min-w-4 hover:} my-6 bg-[--color-brand-red] p-3 text-slate-100 hover:text-slate-500"
-          isLoading={isSettingCC}
-          loadingText={isSettingCC ? 'Submitting...' : ''}
-          mb={20}
-        >
-          Set Conditions
-        </Button>
+        <div className="mt-4 space-x-8 space-y-3">
+          <button
+            className={`min-w-10 rounded bg-[--color-brand-red] px-4 py-2 text-white transition duration-300 hover:bg-[--color-brand-red-shade]
+                      ${isErrorFree && isSettingCC && `hover: cursor-progress`}
+                    `}
+            type="submit"
+            disabled={isErrorFree && isSettingCC}
+          >
+            {isErrorFree && isSettingCC ? 'Processing...' : '  Set Conditions'}
+          </button>
+        </div>
       </form>
     </div>
   );
