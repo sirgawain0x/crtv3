@@ -34,15 +34,15 @@ export default function ConfigureMintedAsset(props: ConfigureMintedAssetProps) {
   const [processingClaimConditions, setProcessingClaimConditions] =
     useState(false);
 
-  const { data: activeClaimCondition, error: activeClaimError } =
+  const { data: activeClaimConditionId, error: activeClaimError } =
     useReadContract({
       contract: videoContract,
       method:
         'function getActiveClaimConditionId(uint256 _tokenId) view returns (uint256)',
-      params: [props.nft.id /*1n*/], // TODO: take watch of this props.nft.id
+      params: [props.nft.id],
     });
 
-  console.log({ activeClaimCondition });
+  // console.log({ activeClaimConditionId });
 
   const handleTabsChange = (idx: number) => {
     setTabIndex(idx);
@@ -50,10 +50,9 @@ export default function ConfigureMintedAsset(props: ConfigureMintedAssetProps) {
 
   useEffect(() => {
     const getClaimConditionsById = async (tokenId: bigint) => {
-      console.log('getClaimConditionsById: ', tokenId);
+      setProcessingClaimConditions(true);
 
       try {
-        setProcessingClaimConditions(true);
         // fetch all existing claim conditions
         const cc = await getClaimConditions({
           contract: videoContract,
@@ -99,14 +98,14 @@ export default function ConfigureMintedAsset(props: ConfigureMintedAssetProps) {
                       label === activeTab
                         ? '#666'
                         : label === tabList[tabList.length - 1] &&
-                            activeClaimCondition === undefined
+                            activeClaimConditionId === undefined
                           ? '#1e1e1e'
                           : '',
                   }}
                   _hover={{
                     cursor:
                       label === tabList[tabList.length - 1] &&
-                      activeClaimCondition === undefined
+                      activeClaimConditionId === undefined
                         ? 'not-allowed'
                         : 'pointer',
                   }}
@@ -126,15 +125,20 @@ export default function ConfigureMintedAsset(props: ConfigureMintedAssetProps) {
             <TabPanel>
               <div className="my-8 flex flex-col gap-2 font-medium text-slate-400">
                 <p className="flex">
-                  <span className="min-w-28"> Token Type: </span>
-                  <span className="text-slate-300">{props.nft.type}</span>
-                </p>
-
-                <p className="flex">
                   <span className="min-w-28">Token ID:</span>
                   <span className="text-slate-300">
                     {props.nft.id.toString()}
                   </span>
+                </p>
+                <p className="flex">
+                  <span className="min-w-28"> Token Name: </span>
+                  <span className="text-slate-300">
+                    {props.nft.metadata.name}
+                  </span>
+                </p>
+                <p className="flex">
+                  <span className="min-w-28"> Token Type: </span>
+                  <span className="text-slate-300">{props.nft.type}</span>
                 </p>
 
                 <p className="flex">
@@ -168,7 +172,7 @@ export default function ConfigureMintedAsset(props: ConfigureMintedAssetProps) {
             </TabPanel>
 
             <TabPanel>
-              <ClaimVideoNFT videoContract={undefined} />
+              <ClaimVideoNFT videoContract={videoContract} usage="owner" />
             </TabPanel>
           </TabPanels>
         </Tabs>
