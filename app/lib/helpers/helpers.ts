@@ -6,6 +6,7 @@ import {
 import { NFTMetadata } from 'thirdweb/utils';
 import { erc20Contract } from '../sdk/thirdweb/get-contract';
 import { CONTRACT_ADDRESS } from '../utils/context';
+import { ethers } from 'ethers';
 
 /**
  * Function to parse `Date` string
@@ -180,8 +181,7 @@ export const claimConditionsOptions = {
   currency: {
     // The tokens accepted for payment by the buyer
     USDC: CONTRACT_ADDRESS.erc20.USDC.chain.polygon.amoy,
-    MATIC : CONTRACT_ADDRESS.erc20.MATIC.chain.polygon.amoy,
-    DAI : CONTRACT_ADDRESS.erc20.DAI.chain.polygon.amoy,
+    POL: CONTRACT_ADDRESS.erc20.POL.chain.polygon.amoy,
   },
 };
 
@@ -290,8 +290,10 @@ export function getERC20Metadata(
  * @param decimals The decimal point of the currency
  * @returns price in decimal format
  */
-export const parseCurrencyDecimals = (price: bigint, decimals: number) => {
-  if (decimals) {
-    return parseInt(price.toString()) / 10 ** decimals;
+export const priceInHumanReadable = (price: bigint, decimals: number) => {
+  if (decimals < 0) {
+    throw new Error('Decimals must be non-negative');
   }
+
+  return ethers.formatUnits(price, decimals);
 };
