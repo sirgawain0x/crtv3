@@ -1,6 +1,6 @@
 import {
   getERC20Metadata,
-  parseCurrencyDecimals,
+  priceInHumanReadable,
   timestampToDateString,
 } from '@app/lib/helpers/helpers';
 import { videoContract } from '@app/lib/sdk/thirdweb/get-contract';
@@ -13,13 +13,12 @@ import {
   AlertTitle,
   Button,
   ButtonGroup,
-  VStack,
 } from '@chakra-ui/react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ContractOptions, prepareEvent } from 'thirdweb';
 import {
-  getClaimConditions,
   getActiveClaimCondition,
+  getClaimConditions,
 } from 'thirdweb/extensions/erc1155';
 import { GetCurrencyMetadataResult } from 'thirdweb/extensions/erc20';
 import { useContractEvents } from 'thirdweb/react';
@@ -98,6 +97,8 @@ export default function ListClaimConditions(props: ListClaimConditionsProps) {
   }, [claimConditions, erc20Metadata]);
 
   useEffect(() => {
+    console.log({ claimConditions: props.claimConditions });
+
     setClaimConditions(props.claimConditions);
   }, [props.claimConditions]);
 
@@ -108,7 +109,10 @@ export default function ListClaimConditions(props: ListClaimConditionsProps) {
   useEffect(() => {
     if (ccEvents && ccEvents.length > 0) {
       const { claimConditions } = ccEvents[0].args;
-      setClaimConditions([...claimConditions]);
+      console.log('ccEvents: ', ccEvents);
+      // console.log({ claimConditions });
+
+      // setClaimConditions([...claimConditions]);
     }
   }, [ccEvents]);
 
@@ -128,7 +132,6 @@ export default function ListClaimConditions(props: ListClaimConditionsProps) {
         }
       } catch (err) {
         setProcessingActiveClaimCondition(false);
-        // console.error(err);
       }
     };
 
@@ -172,11 +175,7 @@ export default function ListClaimConditions(props: ListClaimConditionsProps) {
 
           {claimConditions.map((cc, i) => (
             <div
-              key={
-                cc.maxClaimableSupply.toString() +
-                '-' +
-                cc.startTimestamp.toString()
-              }
+              key={i + '-' + cc.startTimestamp.toString()}
               className="mx-auto mb-4 w-full max-w-screen-xl rounded-lg border bg-slate-700 p-6"
             >
               <div className={`mb-5 flex flex-row justify-between`}>
@@ -247,7 +246,7 @@ export default function ListClaimConditions(props: ListClaimConditionsProps) {
                     </p>
                     {erc20Metadata[cc.currency] ? (
                       <span className="text-sm text-slate-300">
-                        {parseCurrencyDecimals(
+                        {priceInHumanReadable(
                           cc.pricePerToken,
                           Number(erc20Metadata[cc.currency]?.decimals),
                         )}{' '}
@@ -271,7 +270,7 @@ export default function ListClaimConditions(props: ListClaimConditionsProps) {
           ))}
         </>
       ) : (
-        <VStack spacing={8}>
+        <div className="flex flex-col justify-center space-y-4">
           <Alert
             status="error"
             variant="subtle"
@@ -299,7 +298,7 @@ export default function ListClaimConditions(props: ListClaimConditionsProps) {
 
           <Button
             variant="outline"
-            className="bottom-1 border border-slate-400 p-2 text-sm font-medium"
+            className="bottom-1 rounded border border-slate-300 px-4 py-2 text-sm font-medium text-white"
             colorScheme={props.addClaimPhase ? 'red' : ''}
             leftIcon={
               !props.addClaimPhase ? (
@@ -315,7 +314,7 @@ export default function ListClaimConditions(props: ListClaimConditionsProps) {
           >
             {!props.addClaimPhase ? 'Add Claim Phase' : 'Cancel'}
           </Button>
-        </VStack>
+        </div>
       )}
 
       {claimConditions.length > 0 && (
