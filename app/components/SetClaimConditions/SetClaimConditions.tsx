@@ -1,24 +1,25 @@
-import { claimConditionsOptions } from '@app/lib/helpers/helpers';
+import {
+  claimConditionsOptions,
+  priceInHumanReadable,
+  timestampToInputDateString,
+} from '@app/lib/helpers/helpers';
+import { client } from '@app/lib/sdk/thirdweb/client';
 import {
   erc20Contract,
   videoContract,
 } from '@app/lib/sdk/thirdweb/get-contract';
+import { EditonDropContractDeployedChain } from '@app/lib/utils/context';
 import { NFT, ResolvedReturnType } from '@app/types/nft';
-import { ethers } from 'ethers';
 import { useState } from 'react';
 import { SubmitHandler, useForm } from 'react-hook-form';
 import { toast } from 'sonner';
-import { sendTransaction } from 'thirdweb';
+import { sendTransaction, waitForReceipt } from 'thirdweb';
 import {
   getClaimConditions,
   setClaimConditions,
 } from 'thirdweb/extensions/erc1155';
 import { useActiveAccount } from 'thirdweb/react';
 import { decimals } from 'thirdweb/extensions/erc20';
-import { waitForReceipt } from 'thirdweb';
-import { client } from '@app/lib/sdk/thirdweb/client';
-import { EditonDropContractDeployedChain } from '@app/lib/utils/context';
-import { TransactionReceipt } from 'viem';
 
 type ClaimFormData = {
   price: bigint;
@@ -44,69 +45,63 @@ export default function SetClaimConditions(props: SetClaimConditionsProps) {
   const [isSettingCC, setIsSettingCC] = useState(false);
   const [isErrorFree, setIsErrorFree] = useState(false);
   const [ccError, SetCCError] = useState<Error>();
-  const [txStatus, setTxStatus] = useState<number | undefined>(0);
 
-  const { handleSubmit, formState, register } = useForm<ClaimFormData>();
+  const {
+    handleSubmit,
+    formState,
+    register,
+    reset: resetForm,
+  } = useForm<ClaimFormData>();
 
-  const handleSetCC = async (
-    formData: ClaimFormData,
-    tokenId: bigint,
-  ): Promise<{
-    receipt: TransactionReceipt;
-    transactionHash: `0x${string}` | void;
-  }> => {
-    //
-    console.log({ ...formData, tokenId });
-
-    const previousCCs =
-      props.claimConditions.length > 0
-        ? props.claimConditions?.map((cc) => {
-            return {
-              ...cc,
-              price: cc.pricePerToken.toString(),
-            };
-          })
-        : [];
-
-    console.log({ previousCCs });
-    // return;
-
+  const handleSetCC = async (formData: ClaimFormData, tokenId: bigint) => {
     if (!activeAccount) {
       throw new Error('No active account found!');
     }
 
     setIsSettingCC(true);
 
-    try {
-      const tokenDecimals = await decimals({
-        contract: erc20Contract(formData.currency),
-      });
+    const updatedPreviousCCs =
+      props.claimConditions.length > 0
+        ? await Promise.all(
+            props.claimConditions.map(async (cc, i) => {
+              const decimal = await decimals({
+                contract: erc20Contract(cc.currency),
+              });
 
-      const claimConditionsInput = {
-        startTime: new Date(formData.startTimestamp),
-        price: ethers
-          .parseUnits(
-            props.nft.metadata.properties.price.toString(),
-            tokenDecimals,
+              return {
+                startTime: new Date(
+                  timestampToInputDateString(cc.startTimestamp),
+                ),
+                price: priceInHumanReadable(cc.pricePerToken, decimal),
+                currencyAddress: cc.currency,
+                maxClaimablePerWallet: cc.quantityLimitPerWallet,
+                maxClaimableSupply: BigInt(cc.maxClaimableSupply),
+                metadata: {
+                  name: `Phase-${new Date().getTime()}`,
+                },
+              };
+            }),
           )
-          .toString(),
-        currencyAddress: formData.currency,
-        maxClaimablePerWallet: BigInt(formData.maxClaimablePerWallet),
-        maxClaimableSupply: BigInt(formData.maxClaimableSupply),
-        metadata: {
-          name: formData.phaseName,
-        },
-      };
-      console.log({ claimConditionsInput });
+        : [];
 
+    try {
       const transaction = setClaimConditions({
         contract: videoContract,
         tokenId,
         phases: [
           // TODO: At the moment; to add new claimCondition, you must batch the
           // previous claimConditions with the new claimCondition
-          // ...previousCCs!,
-          claimConditionsInput,
+          ...updatedPreviousCCs,
+          {
+            startTime: new Date(formData.startTimestamp),
+            price: props.nft.metadata.properties.price.toString(),
+            currencyAddress: formData.currency,
+            maxClaimablePerWallet: BigInt(formData.maxClaimablePerWallet),
+            maxClaimableSupply: BigInt(formData.maxClaimableSupply),
+            metadata: {
+              name: formData.phaseName,
+            },
+          },
         ],
         resetClaimEligibility: false,
       });
@@ -155,16 +150,17 @@ export default function SetClaimConditions(props: SetClaimConditionsProps) {
     setIsSettingCC(true);
 
     try {
-      const {receipt} = await handleSetCC(formatData, props.nft.id);
+      const { receipt } = await handleSetCC(formatData, props.nft.id);
 
       if (receipt) {
+        resetForm();
+
         toast.success('Set Claim Conditions', {
           description: `Successful with status: ${receipt.status}`,
           duration: 3000,
         });
 
         setIsSettingCC(false);
-        setTxStatus(1);
       }
     } catch (err) {
       setIsSettingCC(false);
