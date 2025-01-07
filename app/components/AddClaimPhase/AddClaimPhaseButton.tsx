@@ -10,7 +10,7 @@ type AddClaimPhaseButtonProps = {
 export default function AddClaimPhaseButton(props: AddClaimPhaseButtonProps) {
   return (
     <Button
-      className="mt-24 border border-slate-300 text-base p-2"
+      className="mt-24 rounded border border-slate-300 px-4 py-2  text-base"
       colorScheme={props.addClaimPhase ? 'red' : ''}
       leftIcon={
         !props.addClaimPhase ? (
