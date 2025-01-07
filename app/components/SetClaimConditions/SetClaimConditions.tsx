@@ -296,6 +296,18 @@ export default function SetClaimConditions(props: SetClaimConditionsProps) {
           >
             {isErrorFree && isSettingCC ? 'Processing...' : '  Set Conditions'}
           </button>
+          <button
+            className={`min-w-10 rounded border border-slate-300 bg-slate-800 px-4 py-2 text-white`}
+            type="submit"
+            onClick={(e) => {
+              e.preventDefault();
+
+              console.log('Close form');
+              props.setAddClaimPhase(false)
+            }}
+          >
+            Cancel
+          </button>
         </div>
       </form>
     </div>
