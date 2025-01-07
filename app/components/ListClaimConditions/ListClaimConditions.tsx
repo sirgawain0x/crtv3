@@ -103,18 +103,14 @@ export default function ListClaimConditions(props: ListClaimConditionsProps) {
 
   useEffect(() => {
     updateERC20Metadata();
-  }, [erc20Metadata, updateERC20Metadata]);
+  }, [erc20Metadata, updateERC20Metadata, ccEvents]);
 
   useEffect(() => {
     if (ccEvents && ccEvents.length > 0) {
-      // TODO: check
-      console.log({ ccEvents });
-
       const { claimConditions } = ccEvents[0].args;
       setClaimConditions([...claimConditions]);
-      updateERC20Metadata();
     }
-  }, [ccEvents, updateERC20Metadata]);
+  }, [ccEvents]);
 
   useEffect(() => {
     const fetchActiveClaimCondition = async (tokenId: bigint) => {
@@ -132,7 +128,7 @@ export default function ListClaimConditions(props: ListClaimConditionsProps) {
         }
       } catch (err) {
         setProcessingActiveClaimCondition(false);
-        console.error(err);
+        // console.error(err);
       }
     };
 
@@ -140,8 +136,9 @@ export default function ListClaimConditions(props: ListClaimConditionsProps) {
   }, [props.nft.id]);
 
   const isActiveClaimPhase = useMemo(
-    () => (startTimestamp: bigint) => activeClaimCondition.startTimestamp === startTimestamp,
-    [activeClaimCondition.startTimestamp]
+    () => (startTimestamp: bigint) =>
+      activeClaimCondition.startTimestamp === startTimestamp,
+    [activeClaimCondition.startTimestamp],
   );
 
   const toggleEditClaim = (idx: number) => {
@@ -313,10 +310,10 @@ export default function ListClaimConditions(props: ListClaimConditionsProps) {
             }
             onClick={() => {
               props.setAddClaimPhase &&
-                props.setAddClaimPhase(props.addClaimPhase);
+                props.setAddClaimPhase(!props.addClaimPhase);
             }}
           >
-            {props.addClaimPhase ? 'Add Claim Phase' : 'Cancel'}
+            {!props.addClaimPhase ? 'Add Claim Phase' : 'Cancel'}
           </Button>
         </VStack>
       )}
