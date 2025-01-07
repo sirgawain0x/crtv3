@@ -15,6 +15,10 @@ import {
 } from 'thirdweb/extensions/erc1155';
 import { useActiveAccount } from 'thirdweb/react';
 import { decimals } from 'thirdweb/extensions/erc20';
+import { waitForReceipt } from 'thirdweb';
+import { client } from '@app/lib/sdk/thirdweb/client';
+import { EditonDropContractDeployedChain } from '@app/lib/utils/context';
+import { TransactionReceipt } from 'viem';
 
 type ClaimFormData = {
   price: bigint;
@@ -47,7 +51,10 @@ export default function SetClaimConditions(props: SetClaimConditionsProps) {
   const handleSetCC = async (
     formData: ClaimFormData,
     tokenId: bigint,
-  ): Promise<ethers.TransactionReceipt | `0x${string}` | void> => {
+  ): Promise<{
+    receipt: TransactionReceipt;
+    transactionHash: `0x${string}` | void;
+  }> => {
     //
     console.log({ ...formData, tokenId });
 
@@ -109,7 +116,13 @@ export default function SetClaimConditions(props: SetClaimConditionsProps) {
         account: activeAccount,
       });
 
-      return transactionHash;
+      const receipt = await waitForReceipt({
+        client,
+        chain: EditonDropContractDeployedChain,
+        transactionHash,
+      });
+
+      return { transactionHash, receipt };
     } catch (err) {
       setIsSettingCC(false);
       throw new Error((err as Error).message);
@@ -142,11 +155,11 @@ export default function SetClaimConditions(props: SetClaimConditionsProps) {
     setIsSettingCC(true);
 
     try {
-      const txnHash = await handleSetCC(formatData, props.nft.id);
+      const {receipt} = await handleSetCC(formatData, props.nft.id);
 
-      if (txnHash) {
+      if (receipt) {
         toast.success('Set Claim Conditions', {
-          description: `Successful with status: ${1}`,
+          description: `Successful with status: ${receipt.status}`,
           duration: 3000,
         });
 
