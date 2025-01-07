@@ -14,7 +14,7 @@ import {
   setClaimConditions,
 } from 'thirdweb/extensions/erc1155';
 import { useActiveAccount } from 'thirdweb/react';
-    import { decimals } from 'thirdweb/extensions/erc20';
+import { decimals } from 'thirdweb/extensions/erc20';
 
 type ClaimFormData = {
   price: bigint;
@@ -50,9 +50,6 @@ export default function SetClaimConditions(props: SetClaimConditionsProps) {
   ): Promise<ethers.TransactionReceipt | `0x${string}` | void> => {
     //
     console.log({ ...formData, tokenId });
-    const tokenDecimals = await decimals({ contract: erc20Contract(formData.currency)});
-    console.log({ tokenDecimals });
-
 
     const previousCCs =
       props.claimConditions.length > 0
@@ -64,28 +61,37 @@ export default function SetClaimConditions(props: SetClaimConditionsProps) {
           })
         : [];
 
-    const claimConditionsInput = {
-      startTime: new Date(formData.startTimestamp),
-      price: ethers
-        .parseUnits(
-          props.nft.metadata.properties.price.toString(),
-          tokenDecimals,
-        )
-        .toString(),
-      currencyAddress: formData.currency,
-      maxClaimablePerWallet: BigInt(formData.maxClaimablePerWallet),
-      maxClaimableSupply: BigInt(formData.maxClaimableSupply),
-      metadata: {
-        name: formData.phaseName,
-      },
-    };
-
     console.log({ previousCCs });
-    console.log({ claimConditionsInput });
     // return;
 
+    if (!activeAccount) {
+      throw new Error('No active account found!');
+    }
+
     setIsSettingCC(true);
+
     try {
+      const tokenDecimals = await decimals({
+        contract: erc20Contract(formData.currency),
+      });
+
+      const claimConditionsInput = {
+        startTime: new Date(formData.startTimestamp),
+        price: ethers
+          .parseUnits(
+            props.nft.metadata.properties.price.toString(),
+            tokenDecimals,
+          )
+          .toString(),
+        currencyAddress: formData.currency,
+        maxClaimablePerWallet: BigInt(formData.maxClaimablePerWallet),
+        maxClaimableSupply: BigInt(formData.maxClaimableSupply),
+        metadata: {
+          name: formData.phaseName,
+        },
+      };
+      console.log({ claimConditionsInput });
+
       const transaction = setClaimConditions({
         contract: videoContract,
         tokenId,
@@ -93,14 +99,10 @@ export default function SetClaimConditions(props: SetClaimConditionsProps) {
           // TODO: At the moment; to add new claimCondition, you must batch the
           // previous claimConditions with the new claimCondition
           // ...previousCCs!,
-          { ...claimConditionsInput },
+          claimConditionsInput,
         ],
         resetClaimEligibility: false,
       });
-
-      if (!activeAccount) {
-        throw new Error('No active account found!');
-      }
 
       const { transactionHash } = await sendTransaction({
         transaction,
