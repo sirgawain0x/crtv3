@@ -1,6 +1,8 @@
 import { ContractOptions } from 'thirdweb';
 import { Abi } from 'viem';
 
+import { polygonAmoy } from "thirdweb/chains";
+
 export const SITE_LOGO = '/grant-logo.png';
 export const CREATIVE_LOGO_BLK = '/Blog-Logo_blk.png';
 export const CREATIVE_LOGO_WHT = '/Blog-Logo_wht.png';
@@ -4310,6 +4312,7 @@ export const ROLES_ABI = [
   },
 ];
 
+export const EditonDropContractDeployedChain = polygonAmoy; 
 // Contract Address object to encapsulate all contract related data
 export const CONTRACT_ADDRESS = {
   gateway: {
@@ -6594,7 +6597,7 @@ export const CONTRACT_ADDRESS = {
     DAI: {
       chain: {
         polygon: {
-          amoy: '0xcB1e72786A6eb3b44C2a2429e317c8a2462CFeb1',
+          amoy: '0x542a0f0F599228A9A92932aAF110a2b69DbD2C11',
           mainnet: '',
         },
         ethereum: {
@@ -6606,8 +6609,8 @@ export const CONTRACT_ADDRESS = {
     MATIC: {
       chain: {
         polygon: {
-          amoy: '0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE',
-          mainnet: '"0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE"',
+          amoy: '0x0000000000000000000000000000000000001010',
+          mainnet: '0x0000000000000000000000000000000000001010',
         },
         ethereum: {
           sepolia: '',
