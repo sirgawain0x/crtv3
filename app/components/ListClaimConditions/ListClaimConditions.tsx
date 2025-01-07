@@ -36,7 +36,7 @@ type ListClaimConditionsProps = {
 
 const preparedClaimConditionsUpdatedEvent = prepareEvent({
   signature:
-    'event ClaimConditionsUpdated(uint256 indexed tokenId, (uint256 startTimestamp, uint256 maxClaimableSupply, uint256 supplyClaimed, uint256 quantityLimitPerWallet, bytes32 merkleRoot, uint256 pricePerToken, address currency, string metadata)[] claimConditions, bool resetEligibility)',
+    'event ClaimConditionsUpdated(uint256 indexed tokenId, (uint256 startTimestamp, uint256 maxClaimableSupply, uint256 supplyClaimed, uint256 quantityLimitPerWallet, bytes32 merkleRoot, uint256 pricePerToken, address currency, string metadata)[] claimConditions, bool resetEligibility)'
 });
 
 export default function ListClaimConditions(props: ListClaimConditionsProps) {
@@ -99,7 +99,7 @@ export default function ListClaimConditions(props: ListClaimConditionsProps) {
   useEffect(() => {
     console.log({ claimConditions: props.claimConditions });
 
-    setClaimConditions(props.claimConditions);
+    setClaimConditions([...props.claimConditions]);
   }, [props.claimConditions]);
 
   useEffect(() => {
@@ -109,10 +109,7 @@ export default function ListClaimConditions(props: ListClaimConditionsProps) {
   useEffect(() => {
     if (ccEvents && ccEvents.length > 0) {
       const { claimConditions } = ccEvents[0].args;
-      console.log('ccEvents: ', ccEvents);
-      // console.log({ claimConditions });
-
-      // setClaimConditions([...claimConditions]);
+      setClaimConditions([...claimConditions]);
     }
   }, [ccEvents]);
 
