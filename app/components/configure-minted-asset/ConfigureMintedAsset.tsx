@@ -74,13 +74,16 @@ export default function ConfigureMintedAsset(props: ConfigureMintedAssetProps) {
   }, [props.nft.id]);
 
   return (
-    <div className="fixed inset-0 h-screen overflow-y-auto bg-black bg-opacity-90">
+    <div className="fixed top-0 inset-0 h-screen bg-black bg-opacity-90 overflow-y-auto">
       <div className="relative top-44 mx-auto w-full max-w-2xl rounded-lg bg-white p-8 shadow dark:bg-slate-800">
         <button
-          onClick={props.toggleModal}
-          className="absolute right-4 top-2 text-gray-600 hover:text-gray-800 focus:outline-none dark:hover:text-gray-200"
+          onClick={() => {
+            props.setAddClaimPhase(false);
+            props.toggleModal();
+          }}
+          className="absolute right-4 top-4 mb-4 text-gray-500 hover:text-gray-600 focus:outline-none dark:hover:text-gray-200"
         >
-          <p className="text-lg font-semibold">&times;</p>
+          <p className="font-semibold" style={{fontSize: 28}}>&times;</p>
         </button>
 
         <Tabs index={tabIndex} onChange={handleTabsChange}>
