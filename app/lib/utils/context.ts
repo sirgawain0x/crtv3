@@ -6594,19 +6594,7 @@ export const CONTRACT_ADDRESS = {
         },
       },
     },
-    DAI: {
-      chain: {
-        polygon: {
-          amoy: '0x542a0f0F599228A9A92932aAF110a2b69DbD2C11',
-          mainnet: '',
-        },
-        ethereum: {
-          sepolia: '',
-          mainnet: '0x6B175474E89094C44Da98b954EedeAC495271d0F',
-        },
-      },
-    },
-    MATIC: {
+    POL: {
       chain: {
         polygon: {
           amoy: '0x0000000000000000000000000000000000001010',
