@@ -9,9 +9,9 @@ export const videoContract = getContract({
   client,
 });
 
-export const erc20Contract = (address: string) =>
+export const erc20Contract = (address: string, chain = polygonAmoy) =>
   getContract({
     address,
-    chain: polygonAmoy,
+    chain,
     client,
   });
