@@ -177,7 +177,7 @@ export default function SetClaimConditions(props: SetClaimConditionsProps) {
   };
 
   return (
-    <div className="my-4 rounded-md border border-solid border-slate-500 p-8">
+    <div className="my-8 rounded-md border border-solid border-slate-500 p-8 mx-auto">
       <h4 className="py-4 text-xl font-medium text-slate-300">
         Set conditions for the sale/claim of your NFT(s)
       </h4>
