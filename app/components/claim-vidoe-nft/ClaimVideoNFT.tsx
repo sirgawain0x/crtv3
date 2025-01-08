@@ -8,6 +8,7 @@ import { useActiveAccount } from 'thirdweb/react';
 type TClaimVideoNFTProps = {
   videoContract: TVideoContract;
   usage: 'owner' | 'buyer'; // Who is using the component
+  tokenId: number;
 };
 
 type TClaimFormData = {
@@ -31,7 +32,7 @@ export default function ClaimVideoNFT(props: TClaimVideoNFTProps) {
     try {
       const txnHash = await handleClaim({
         quantity: data.quantity,
-        tokenId: 1,
+        tokenId: props.tokenId,
         to: data.receipient,
         videoContract: props.videoContract,
       });

@@ -164,7 +164,7 @@ export default function ConfigureMintedAsset(props: ConfigureMintedAssetProps) {
             <TabPanel>
               <div className="min-h-28">
                 {!noActiveClaim('Claim') ? (
-                  <ClaimVideoNFT videoContract={videoContract} usage="owner" />
+                  <ClaimVideoNFT videoContract={videoContract} usage="owner" tokenId={Number(props.nft.id)}/>
                 ) : (
                   <p className="my-16 text-lg text-slate-400">
                     <em>No active claim conditions</em>
