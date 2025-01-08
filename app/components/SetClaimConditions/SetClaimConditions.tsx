@@ -44,7 +44,6 @@ export default function SetClaimConditions(props: SetClaimConditionsProps) {
   const activeAccount = useActiveAccount();
   const [isSettingCC, setIsSettingCC] = useState(false);
   const [isErrorFree, setIsErrorFree] = useState(false);
-  const [ccError, SetCCError] = useState<Error>();
 
   const {
     handleSubmit,
@@ -89,8 +88,6 @@ export default function SetClaimConditions(props: SetClaimConditionsProps) {
         contract: videoContract,
         tokenId,
         phases: [
-          // TODO: At the moment; to add new claimCondition, you must batch the
-          // previous claimConditions with the new claimCondition
           ...updatedPreviousCCs,
           {
             startTime: new Date(formData.startTimestamp),
@@ -120,7 +117,11 @@ export default function SetClaimConditions(props: SetClaimConditionsProps) {
       return { transactionHash, receipt };
     } catch (err) {
       setIsSettingCC(false);
-      throw new Error((err as Error).message);
+      if (err instanceof Error) {
+        throw new Error((err as Error).message);
+      } else {
+        throw err;
+      }
     }
   };
 
@@ -164,7 +165,7 @@ export default function SetClaimConditions(props: SetClaimConditionsProps) {
       }
     } catch (err) {
       setIsSettingCC(false);
-      SetCCError(err as Error);
+
       toast.error('Set Claim Conditions', {
         description:
           err instanceof Error
@@ -302,8 +303,7 @@ export default function SetClaimConditions(props: SetClaimConditionsProps) {
             onClick={(e) => {
               e.preventDefault();
 
-              console.log('Close form');
-              props.setAddClaimPhase(false)
+              props.setAddClaimPhase(false);
             }}
           >
             Cancel
