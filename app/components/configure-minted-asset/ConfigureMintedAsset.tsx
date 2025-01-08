@@ -73,8 +73,14 @@ export default function ConfigureMintedAsset(props: ConfigureMintedAssetProps) {
     getClaimConditionsById(props.nft.id);
   }, [props.nft.id]);
 
+  const noActiveClaim = (label: string) => {
+    return (
+      label === tabList[tabList.length - 1] &&
+      activeClaimConditionId === undefined
+    );
+  };
   return (
-    <div className="fixed top-0 inset-0 h-screen bg-black bg-opacity-90 overflow-y-auto">
+    <div className="fixed inset-0 top-0 h-screen overflow-y-auto bg-black bg-opacity-90">
       <div className="relative top-44 mx-auto w-full max-w-2xl rounded-lg bg-white p-8 shadow dark:bg-slate-800">
         <button
           onClick={() => {
@@ -83,40 +89,32 @@ export default function ConfigureMintedAsset(props: ConfigureMintedAssetProps) {
           }}
           className="absolute right-4 top-4 mb-4 text-gray-500 hover:text-gray-600 focus:outline-none dark:hover:text-gray-200"
         >
-          <p className="font-semibold" style={{fontSize: 28}}>&times;</p>
+          <p className="font-semibold" style={{ fontSize: 28 }}>
+            &times;
+          </p>
         </button>
 
         <Tabs index={tabIndex} onChange={handleTabsChange}>
-          <TabList className="mb-8 gap-16">
+          <TabList className="my-2 gap-1">
             {tabList.length > 0 &&
               tabList.map((label, i) => (
                 <Tab
                   key={i}
-                  fontWeight={300}
                   name={label}
-                  className="text-slate-400"
-                  style={{
-                    padding: '2px 6px',
-                    backgroundColor:
-                      label === activeTab
-                        ? '#666'
-                        : label === tabList[tabList.length - 1] &&
-                            activeClaimConditionId === undefined
-                          ? '#1e1e1e'
-                          : '',
-                  }}
-                  _hover={{
-                    cursor:
-                      label === tabList[tabList.length - 1] &&
-                      activeClaimConditionId === undefined
-                        ? 'not-allowed'
-                        : 'pointer',
-                  }}
-                  onClick={() => {
-                    if (label != tabList[tabList.length - 1]) {
+                  // disabled={noActiveClaim(label)}
+                  className={`min-w-12 rounded-sm px-4 py-2 ${noActiveClaim(label) ? `` : `hover:bg-slate-400`} ${noActiveClaim(label) ? `` : ` hover:text-slate-800 `}${label === activeTab ? `text-slate-800` : `text-slate-500`} ${noActiveClaim(label) ? `hover:cursor-not-allowed` : `hover:cursor-pointer`} ${
+                    label === activeTab
+                      ? `bg-slate-400`
+                      : noActiveClaim(label)
+                        ? `bg-slate-600`
+                        : ``
+                  }`}
+                  onClick={(e) => {
+                    if (!noActiveClaim(label)) {
                       setActiveTab(label);
+                    } else {
+                      e.preventDefault();
                     }
-                    return;
                   }}
                 >
                   {label}
@@ -152,8 +150,10 @@ export default function ConfigureMintedAsset(props: ConfigureMintedAssetProps) {
                 </p>
               </div>
             </TabPanel>
+           
+           
             <TabPanel>
-              <VStack spacing={0} alignItems={'flex-start'} my={4}>
+              <VStack spacing={0} alignItems={'flex-start'}>
                 <ListClaimConditions
                   processingClaimConditions={processingClaimConditions}
                   nftContract={videoContract}
