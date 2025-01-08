@@ -269,7 +269,7 @@ export default function ListClaimConditions(props: ListClaimConditionsProps) {
           ))}
         </>
       ) : (
-        <div className="flex flex-col justify-center space-y-4">
+        <div className="mx-auto mb-20 flex flex-col space-y-4">
           <Alert
             status="error"
             variant="subtle"
@@ -295,24 +295,26 @@ export default function ListClaimConditions(props: ListClaimConditionsProps) {
             </AlertDescription>
           </Alert>
 
-          <Button
-            variant="outline"
-            className="bottom-1 rounded border border-slate-300 px-4 py-2 text-sm font-medium text-white"
-            colorScheme={props.addClaimPhase ? 'red' : ''}
-            leftIcon={
-              !props.addClaimPhase ? (
-                <AddIcon fontSize={10} />
-              ) : (
-                <CloseIcon fontSize={10} />
-              )
-            }
-            onClick={() => {
-              props.setAddClaimPhase &&
-                props.setAddClaimPhase(!props.addClaimPhase);
-            }}
-          >
-            {!props.addClaimPhase ? 'Add Claim Phase' : 'Cancel'}
-          </Button>
+          {!props.addClaimPhase && (
+            <Button
+              variant="outline"
+              className="bottom-1 rounded border border-slate-300 px-4 py-2 text-base font-medium text-white"
+              colorScheme={props.addClaimPhase ? 'red' : ''}
+              leftIcon={
+                !props.addClaimPhase ? (
+                  <AddIcon fontSize={10} />
+                ) : (
+                  <CloseIcon fontSize={10} />
+                )
+              }
+              onClick={() => {
+                props.setAddClaimPhase &&
+                  props.setAddClaimPhase(!props.addClaimPhase);
+              }}
+            >
+              {!props.addClaimPhase ? 'Add Claim Phase' : 'Cancel'}
+            </Button>
+          )}
         </div>
       )}
 
