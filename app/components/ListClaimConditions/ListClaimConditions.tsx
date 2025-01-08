@@ -268,6 +268,14 @@ export default function ListClaimConditions(props: ListClaimConditionsProps) {
               )}
             </div>
           ))}
+
+          {!props.addClaimPhase && (
+            <AddClaimPhaseButton
+              label={!props.addClaimPhase ? 'Add Claim Phase' : 'Cancel'}
+              addClaimPhase={props.addClaimPhase}
+              setAddClaimPhase={props.setAddClaimPhase}
+            />
+          )}
         </>
       ) : (
         <div className="mx-auto mb-20 flex flex-col space-y-4">
@@ -326,14 +334,6 @@ export default function ListClaimConditions(props: ListClaimConditionsProps) {
           claimConditions={claimConditions}
         />
       )}
-
-      {claimConditions.length > 0 && !props.addClaimPhase && (
-          <AddClaimPhaseButton
-            label={!props.addClaimPhase ? 'Add Claim Phase' : 'Cancel 1'}
-            addClaimPhase={props.addClaimPhase}
-            setAddClaimPhase={props.setAddClaimPhase}
-          />
-        )}
     </>
   );
 }
