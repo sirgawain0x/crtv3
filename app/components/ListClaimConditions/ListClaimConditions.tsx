@@ -24,6 +24,7 @@ import { GetCurrencyMetadataResult } from 'thirdweb/extensions/erc20';
 import { useContractEvents } from 'thirdweb/react';
 import AddClaimPhaseButton from '../AddClaimPhase/AddClaimPhaseButton';
 import EditClaimConditions from '../edit-claim-conditions/EditClaimConditions';
+import SetClaimConditions from '../SetClaimConditions/SetClaimConditions';
 
 type ListClaimConditionsProps = {
   nft: NFT;
@@ -150,7 +151,7 @@ export default function ListClaimConditions(props: ListClaimConditionsProps) {
 
   return (
     <>
-      <div className="mb-6 text-slate-300">
+      <div className="my-8 text-slate-300">
         <p className="mb-1 text-lg text-slate-200">Set Claim Conditions</p>
         <p className="mb-2 text-sm">
           <em> Condition how your NFTs can be claimed</em>
@@ -317,14 +318,22 @@ export default function ListClaimConditions(props: ListClaimConditionsProps) {
           )}
         </div>
       )}
-
-      {claimConditions.length > 0 && (
-        <AddClaimPhaseButton
-          label={!props.addClaimPhase ? 'Add Claim Phase' : 'Cancel'}
-          addClaimPhase={props.addClaimPhase}
+      {props.addClaimPhase && (
+        <SetClaimConditions
+          numberOfClaimsConditonsAvailable={claimConditions.length}
+          nft={props.nft}
           setAddClaimPhase={props.setAddClaimPhase}
+          claimConditions={claimConditions}
         />
       )}
+
+      {claimConditions.length > 0 && !props.addClaimPhase && (
+          <AddClaimPhaseButton
+            label={!props.addClaimPhase ? 'Add Claim Phase' : 'Cancel 1'}
+            addClaimPhase={props.addClaimPhase}
+            setAddClaimPhase={props.setAddClaimPhase}
+          />
+        )}
     </>
   );
 }
