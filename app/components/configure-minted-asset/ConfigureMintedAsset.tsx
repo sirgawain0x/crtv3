@@ -150,8 +150,7 @@ export default function ConfigureMintedAsset(props: ConfigureMintedAssetProps) {
                 </p>
               </div>
             </TabPanel>
-           
-           
+
             <TabPanel>
               <VStack spacing={0} alignItems={'flex-start'}>
                 <ListClaimConditions
@@ -163,15 +162,6 @@ export default function ConfigureMintedAsset(props: ConfigureMintedAssetProps) {
                   setAddClaimPhase={props.setAddClaimPhase}
                 />
               </VStack>
-
-              {props.addClaimPhase && (
-                <SetClaimConditions
-                  numberOfClaimsConditonsAvailable={claimConditions.length}
-                  nft={props.nft}
-                  setAddClaimPhase={props.setAddClaimPhase}
-                  claimConditions={claimConditions}
-                />
-              )}
             </TabPanel>
 
             <TabPanel>
