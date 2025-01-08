@@ -32,11 +32,13 @@ export default function LazyMintedAsset(props: LazyMintedProps) {
         </p>
       )}
 
-      {error && <p className="my-2 text-lg text-red-500">{error.message}</p>}
-
       {!isProcessing && nfts.length === 0 && (
         <p className="my-2  text-lg text-gray-400">
-          <span className=""></span> No minted nft yet!
+          {error ? (
+            <span className="text-red-400"> {error.message} </span>
+          ) : (
+            ' No minted nft yet!'
+          )}
         </p>
       )}
 
@@ -64,7 +66,11 @@ export default function LazyMintedAsset(props: LazyMintedProps) {
                 </td>
                 <td className="border border-slate-700 px-4 py-1">
                   <video
-                    src={nft.metadata.animation_url ? parseIpfsUri(nft.metadata.animation_url) : ''}
+                    src={
+                      nft.metadata.animation_url
+                        ? parseIpfsUri(nft.metadata.animation_url)
+                        : ''
+                    }
                     aria-label={`Preview of ${nft.metadata.name || 'NFT'}`}
                     playsInline
                     width={180}
