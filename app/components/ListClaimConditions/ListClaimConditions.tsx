@@ -36,7 +36,7 @@ type ListClaimConditionsProps = {
 
 const preparedClaimConditionsUpdatedEvent = prepareEvent({
   signature:
-    'event ClaimConditionsUpdated(uint256 indexed tokenId, (uint256 startTimestamp, uint256 maxClaimableSupply, uint256 supplyClaimed, uint256 quantityLimitPerWallet, bytes32 merkleRoot, uint256 pricePerToken, address currency, string metadata)[] claimConditions, bool resetEligibility)'
+    'event ClaimConditionsUpdated(uint256 indexed tokenId, (uint256 startTimestamp, uint256 maxClaimableSupply, uint256 supplyClaimed, uint256 quantityLimitPerWallet, bytes32 merkleRoot, uint256 pricePerToken, address currency, string metadata)[] claimConditions, bool resetEligibility)',
 });
 
 export default function ListClaimConditions(props: ListClaimConditionsProps) {
@@ -97,8 +97,6 @@ export default function ListClaimConditions(props: ListClaimConditionsProps) {
   }, [claimConditions, erc20Metadata]);
 
   useEffect(() => {
-    console.log({ claimConditions: props.claimConditions });
-
     setClaimConditions([...props.claimConditions]);
   }, [props.claimConditions]);
 
@@ -190,6 +188,7 @@ export default function ListClaimConditions(props: ListClaimConditionsProps) {
                     className="text-sm"
                     colorScheme=""
                     variant="ghost"
+                    disabled={true} // TODO: Need to visit when update claim condition function is resolved
                     leftIcon={
                       editStates[i] ? (
                         <CloseIcon boxSize={3} />
@@ -197,7 +196,10 @@ export default function ListClaimConditions(props: ListClaimConditionsProps) {
                         <EditIcon boxSize={3} />
                       )
                     }
-                    onClick={() => toggleEditClaim(i)}
+                    onClick={() => {
+                      return; // FIXME: Remove when update claim condition function is resolved
+                      toggleEditClaim(i);
+                    }}
                   >
                     {editStates[i] ? 'Cancel' : 'Edit'}
                   </Button>
