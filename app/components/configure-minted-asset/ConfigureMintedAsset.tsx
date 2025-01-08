@@ -12,7 +12,6 @@ import { useEffect, useState } from 'react';
 import { getClaimConditions } from 'thirdweb/extensions/erc1155';
 import { useReadContract } from 'thirdweb/react';
 import ListClaimConditions from '../ListClaimConditions/ListClaimConditions';
-import SetClaimConditions from '../SetClaimConditions/SetClaimConditions';
 import ClaimVideoNFT from '../claim-vidoe-nft/ClaimVideoNFT';
 
 type ConfigureMintedAssetProps = {
@@ -41,8 +40,6 @@ export default function ConfigureMintedAsset(props: ConfigureMintedAssetProps) {
         'function getActiveClaimConditionId(uint256 _tokenId) view returns (uint256)',
       params: [props.nft.id],
     });
-
-  // console.log({ activeClaimConditionId });
 
   const handleTabsChange = (idx: number) => {
     setTabIndex(idx);
@@ -101,7 +98,7 @@ export default function ConfigureMintedAsset(props: ConfigureMintedAssetProps) {
                 <Tab
                   key={i}
                   name={label}
-                  // disabled={noActiveClaim(label)}
+                  disabled={noActiveClaim(label)}
                   className={`min-w-12 rounded-sm px-4 py-2 ${noActiveClaim(label) ? `` : `hover:bg-slate-400`} ${noActiveClaim(label) ? `` : ` hover:text-slate-800 `}${label === activeTab ? `text-slate-800` : `text-slate-500`} ${noActiveClaim(label) ? `hover:cursor-not-allowed` : `hover:cursor-pointer`} ${
                     label === activeTab
                       ? `bg-slate-400`
@@ -165,7 +162,15 @@ export default function ConfigureMintedAsset(props: ConfigureMintedAssetProps) {
             </TabPanel>
 
             <TabPanel>
-              <ClaimVideoNFT videoContract={videoContract} usage="owner" />
+              <div className="min-h-28">
+                {!noActiveClaim('Claim') ? (
+                  <ClaimVideoNFT videoContract={videoContract} usage="owner" />
+                ) : (
+                  <p className="my-16 text-lg text-slate-400">
+                    <em>No active claim conditions</em>
+                  </p>
+                )}
+              </div>
             </TabPanel>
           </TabPanels>
         </Tabs>
