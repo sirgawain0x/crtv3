@@ -2,12 +2,21 @@ import {
   claimConditionsOptions,
   timestampToInputDateString,
 } from '@app/lib/helpers/helpers';
+import { client } from '@app/lib/sdk/thirdweb/client';
+import { videoContract } from '@app/lib/sdk/thirdweb/get-contract';
+import { EditonDropContractDeployedChain } from '@app/lib/utils/context';
+import type { TVideoContract } from '@app/types/nft';
 import { NFT, ResolvedReturnType } from '@app/types/nft';
 import { useState } from 'react';
 import { SubmitHandler, useForm } from 'react-hook-form';
 import { toast } from 'sonner';
-import { ContractOptions } from 'thirdweb';
-import { getClaimConditions } from 'thirdweb/extensions/erc1155';
+import { sendTransaction, waitForReceipt } from 'thirdweb';
+import {
+  getClaimConditionById,
+  getClaimConditions,
+} from 'thirdweb/extensions/erc1155';
+import { useActiveAccount } from 'thirdweb/react';
+import { ClaimableERC1155 } from 'thirdweb/modules';
 
 type EditClaimFormData = {
   currency: string;
@@ -17,46 +26,101 @@ type EditClaimFormData = {
   startTimestamp: string;
 };
 
+type TUpdateCCParams = {
+  tokenId: bigint;
+  ccIndex: number;
+  formData: EditClaimFormData;
+};
+
 type EditClaimConditionsProps = {
   nft: NFT;
   ccIndex: number;
   claimConditions: ResolvedReturnType<ReturnType<typeof getClaimConditions>>;
-  videoContract: Readonly<ContractOptions<[]>>;
+  videoContract: TVideoContract;
   setCanEditClaim: (arg: number) => void;
 };
 
 export default function EditClaimConditions(props: EditClaimConditionsProps) {
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isErrorFree, setIsErrorFree] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [isError, setIsError] = useState(false);
+  const activeAccount = useActiveAccount();
 
   const claimCondition = props.claimConditions[props.ccIndex];
 
-  const handleUpdateClaimCondition = async (
-    tokenId: bigint,
-    ccIndex: number,
-    formData: EditClaimFormData,
-  ): Promise<boolean | undefined> => {
+  const handleUpdateClaimCondition = async (args: TUpdateCCParams) => {
     // update an existing claimCondition by its id
-    console.log({ ccIndex, tokenId, ...formData });
+    console.log(args);
+
+    const fData = {
+      ccIndex: 0,
+      currency: '0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582',
+      maxClaimablePerWallet: '29',
+      startTimestamp: '1736256120000',
+      tokenId: 1n,
+    };
+
+    if (!activeAccount) {
+      throw new Error('No active Wallet connected');
+    }
 
     try {
-      // TODO: Revisit on how to use the new sdk for this
-      // await nftContract?.erc1155.claimConditions.update(tokenId, ccIndex, {
-      //   startTime: Number(formData.startTimestamp), // When the phase starts (i.e. when users can start claiming tokens)
-      //   maxClaimableSupply: formData.maxClaimableSupply, // limit how many mints for this presale
-      //   currencyAddress: formData.currency, // The address of the currency you want users to pay in
-      //   maxClaimablePerWallet: formData.maxClaimablePerWallet, // The maximum number of tokens a wallet can claim
-      //   metadata: {
-      //     name: formData.phaseName, // Name of the sale's phase
-      //   },
-      // });
+      const ccById = await getClaimConditionById({
+        contract: videoContract,
+        tokenId: args.tokenId,
+        conditionId: BigInt(args.ccIndex),
+      });
 
-      return true;
+      console.log({ ccById });
+      const ccByIdRes = {
+        currency: '0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582',
+        maxClaimableSupply: 3n,
+        merkleRoot:
+          '0x0000000000000000000000000000000000000000000000000000000000000000',
+        metadata: 'ipfs://QmVyP9aRxGNZx3ibsges5u6okk1LzBoGDSomMuejNqMEJK/0',
+        pricePerToken: 3250000n,
+        quantityLimitPerWallet: 302n,
+        startTimestamp: 1736256120n,
+        supplyClaimed: 0n,
+      };
+
+      // const newObj = {
+      //   startTime: formData.startTimestamp,
+      //   price: ccById.pricePerToken,
+      //   currency: formData.currency,
+      //   maxClaimablePerWallet: formData.maxClaimablePerWallet,
+      //   maxClaimableSupply: ccById.maxClaimableSupply,
+      //   supplyClaimed: 0n,
+      //   merkleRoot: `0x0000000000000000000000000000000000000000000000000000000000000000`,
+      //   metadata: {name: `Phase-${new Date().getTime()}`},
+      // };
+
+      const transaction = ClaimableERC1155.setClaimCondition({
+        contract: videoContract,
+        tokenId: args.tokenId,
+        startTime: new Date(args.formData.startTimestamp),
+        pricePerToken: ccById.pricePerToken.toString(),
+        currencyAddress: args.formData.currency,
+        maxClaimablePerWallet: args.formData.maxClaimablePerWallet,
+        maxClaimableSupply: Number(ccById.maxClaimableSupply),
+      });
+
+      const { transactionHash } = await sendTransaction({
+        transaction,
+        account: activeAccount,
+      });
+
+      const receipt = await waitForReceipt({
+        client,
+        chain: EditonDropContractDeployedChain,
+        transactionHash,
+      });
+
+      return receipt;
     } catch (err) {
       if (err instanceof Error) {
         throw new Error(err.message);
       } else {
-        throw new Error(String(err));
+        throw err;
       }
     }
   };
@@ -73,21 +137,30 @@ export default function EditClaimConditions(props: EditClaimConditionsProps) {
       return;
     }
 
-    setIsErrorFree(true);
-    setIsSubmitting(true);
+    setIsProcessing(true);
 
     try {
-      await handleUpdateClaimCondition(props.nft.id, props.ccIndex, {
-        ...data,
-        maxClaimablePerWallet: data.maxClaimablePerWallet,
-        startTimestamp: new Date(data.startTimestamp).getTime().toString(),
+      const receipt = await handleUpdateClaimCondition({
+        tokenId: props.nft.id,
+        ccIndex: props.ccIndex,
+        formData: {
+          ...data,
+          maxClaimablePerWallet: data.maxClaimablePerWallet,
+          startTimestamp: new Date(data.startTimestamp).getTime().toString(),
+        },
+      });
+
+      console.log({ receipt });
+      toast.success('Updating Claims status', {
+        description: `Updating successful with ${receipt.status}`,
+        duration: 3000,
       });
     } catch (err) {
-      setIsSubmitting(false);
+      setIsProcessing(false);
+      setIsError(true);
 
-      toast.error('Set Claim Conditions', {
-        description:
-          (err as Error).message || `Setting claim conditions failed!`,
+      toast.error('Updating Claim Conditions', {
+        description: (err as Error).message || `Updating failed!`,
         duration: 3000,
       });
     }
@@ -117,7 +190,7 @@ export default function EditClaimConditions(props: EditClaimConditionsProps) {
           {...register('startTimestamp', { required: true })}
           placeholder="Start time of Phase"
           className="w-full rounded-md border px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-200"
-          disabled={isErrorFree && isSubmitting}
+          disabled={isError && isProcessing}
         />
         {formState.errors.startTimestamp?.type === 'required' && (
           <span className="my-4 block text-sm text-red-500">
@@ -173,7 +246,7 @@ export default function EditClaimConditions(props: EditClaimConditionsProps) {
           aria-invalid={
             formState.errors.maxClaimablePerWallet ? 'true' : 'false'
           }
-          disabled={isErrorFree && isSubmitting}
+          disabled={isError && isProcessing}
         />
         {formState.errors.maxClaimablePerWallet?.type === 'required' && (
           <span className="my-4 block text-sm text-red-500">
@@ -185,12 +258,12 @@ export default function EditClaimConditions(props: EditClaimConditionsProps) {
       <div className="mt-4 space-x-8 space-y-3">
         <button
           className={`min-w-10 rounded bg-[--color-brand-red] px-4 py-2 text-white transition duration-300 hover:bg-[--color-brand-red-shade]
-                ${isErrorFree && isSubmitting && `hover: cursor-progress`}
+                ${isError && isProcessing && `hover: cursor-progress`}
               `}
           type="submit"
-          disabled={isErrorFree && isSubmitting}
+          disabled={isError && isProcessing}
         >
-          {isErrorFree && isSubmitting ? 'Updating...' : ' Update'}
+          {isError && isProcessing ? 'Updating...' : ' Update'}
         </button>
       </div>
     </form>
