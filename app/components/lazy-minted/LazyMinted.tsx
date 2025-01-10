@@ -59,6 +59,13 @@ export default function LazyMintedAsset(props: LazyMintedProps) {
               <tr
                 key={nft.metadata.name + '-' + nft.id}
                 onClick={() => handleViewMore(nft)}
+                onKeyDown={e => {
+                  if(e.key === 'Enter' || e.key === ' '){
+                    handleViewMore(nft)
+                  }
+                }}
+                tabIndex={0}
+                role='button'
                 className="hover:cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-900"
               >
                 <td className="border border-slate-700 px-4 py-1">
@@ -74,6 +81,9 @@ export default function LazyMintedAsset(props: LazyMintedProps) {
                     aria-label={`Preview of ${nft.metadata.name || 'NFT'}`}
                     playsInline
                     width={180}
+                    crossOrigin='anonymous'
+                    muted
+                    controls
                   ></video>
                   {/* TODO: Revisit Player */}
                   {/* <Player.Root src={nft.metadata.animation_url} /> */}
