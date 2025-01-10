@@ -49,16 +49,7 @@ export default function EditClaimConditions(props: EditClaimConditionsProps) {
 
   const handleUpdateClaimCondition = async (args: TUpdateCCParams) => {
     // update an existing claimCondition by its id
-    console.log(args);
-
-    const fData = {
-      ccIndex: 0,
-      currency: '0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582',
-      maxClaimablePerWallet: '29',
-      startTimestamp: '1736256120000',
-      tokenId: 1n,
-    };
-
+ 
     if (!activeAccount) {
       throw new Error('No active Wallet connected');
     }
@@ -69,30 +60,6 @@ export default function EditClaimConditions(props: EditClaimConditionsProps) {
         tokenId: args.tokenId,
         conditionId: BigInt(args.ccIndex),
       });
-
-      console.log({ ccById });
-      const ccByIdRes = {
-        currency: '0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582',
-        maxClaimableSupply: 3n,
-        merkleRoot:
-          '0x0000000000000000000000000000000000000000000000000000000000000000',
-        metadata: 'ipfs://QmVyP9aRxGNZx3ibsges5u6okk1LzBoGDSomMuejNqMEJK/0',
-        pricePerToken: 3250000n,
-        quantityLimitPerWallet: 302n,
-        startTimestamp: 1736256120n,
-        supplyClaimed: 0n,
-      };
-
-      // const newObj = {
-      //   startTime: formData.startTimestamp,
-      //   price: ccById.pricePerToken,
-      //   currency: formData.currency,
-      //   maxClaimablePerWallet: formData.maxClaimablePerWallet,
-      //   maxClaimableSupply: ccById.maxClaimableSupply,
-      //   supplyClaimed: 0n,
-      //   merkleRoot: `0x0000000000000000000000000000000000000000000000000000000000000000`,
-      //   metadata: {name: `Phase-${new Date().getTime()}`},
-      // };
 
       const transaction = ClaimableERC1155.setClaimCondition({
         contract: videoContract,
