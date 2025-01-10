@@ -20,6 +20,8 @@ export function useClaimConditions(props: ClaimConditionsParams) {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
+    let mounted = true;
+
     const getCC = async () => {
       try {
         setIsLoading(true);
@@ -28,15 +30,23 @@ export function useClaimConditions(props: ClaimConditionsParams) {
           tokenId: props.tokenId,
         });
 
-        setClaimConditions([...conditions]);
+        if (mounted) {
+          setClaimConditions([...conditions]);
+        }
       } catch (err) {
-        setError(err as Error);
+        if (mounted) {
+          setError(err as Error);
+        }
       } finally {
-        setIsLoading(false);
+        if (mounted) setIsLoading(false);
       }
     };
 
     getCC();
+
+    return () => {
+      mounted = false;
+    }
   }, [props.contract, props.tokenId]);
 
   return {
