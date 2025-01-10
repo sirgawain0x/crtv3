@@ -1,6 +1,6 @@
 import { titleCase } from '../helpers';
 
-describe('parseTimestampToDate', () => {
+describe('titleCase', () => {
   it('should throw on empty string', () => {
     expect(() => titleCase('')).toThrow('Can not parse empty string');
   });
