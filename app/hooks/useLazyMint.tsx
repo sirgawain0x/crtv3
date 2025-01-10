@@ -10,8 +10,6 @@ interface LazyMintError extends Error {
 }
 
 interface LazyMintArgs {
-  amount: string;
-  price: string;
   baseURIForTokens: string;
 }
 
@@ -28,8 +26,12 @@ function useLazyMint() {
         }
       });
 
+      if (!activeAccount) {
+        throw new Error('No Active Account connected');
+      }
+
       setIsProcessing(true);
-      
+
       try {
         const res = await fetch(args.baseURIForTokens);
         if (!res.ok) {
@@ -44,8 +46,6 @@ function useLazyMint() {
         const tknMetadata = {
           ...data,
           properties: {
-            amount: args.amount,
-            price: args.price,
             creatorAddress: activeAccount?.address || '',
             createdAt: new Date().getTime(),
           },
@@ -60,7 +60,7 @@ function useLazyMint() {
 
         const { transactionHash } = await sendTransaction({
           transaction,
-          account: activeAccount!,
+          account: activeAccount,
         });
 
         if (transactionHash) {
