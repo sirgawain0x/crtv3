@@ -96,8 +96,9 @@ export default function ConfigureMintedAsset(props: ConfigureMintedAssetProps) {
             {tabList.length > 0 &&
               tabList.map((label, i) => (
                 <Tab
-                  key={i}
+                  key={label}
                   name={label}
+                  aria-label={`${label} tab`}
                   disabled={noActiveClaim(label)}
                   className={`min-w-12 rounded-sm px-4 py-2 ${noActiveClaim(label) ? `` : `hover:bg-slate-400`} ${noActiveClaim(label) ? `` : ` hover:text-slate-800 `}${label === activeTab ? `text-slate-800` : `text-slate-500`} ${noActiveClaim(label) ? `hover:cursor-not-allowed` : `hover:cursor-pointer`} ${
                     label === activeTab
@@ -153,7 +154,7 @@ export default function ConfigureMintedAsset(props: ConfigureMintedAssetProps) {
                 <ListClaimConditions
                   processingClaimConditions={processingClaimConditions}
                   nftContract={videoContract}
-                  nft={props.nft!}
+                  nft={props.nft}
                   claimConditions={claimConditions}
                   addClaimPhase={props.addClaimPhase}
                   setAddClaimPhase={props.setAddClaimPhase}
