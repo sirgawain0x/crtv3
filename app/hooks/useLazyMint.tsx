@@ -46,7 +46,7 @@ function useLazyMint() {
         const tknMetadata = {
           ...data,
           properties: {
-            creatorAddress: activeAccount?.address || '',
+            creatorAddress: activeAccount.address,
             createdAt: new Date().getTime(),
           },
         };
