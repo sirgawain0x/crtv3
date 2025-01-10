@@ -27,6 +27,8 @@ export default function useLazyMinted() {
     } catch (err) {
       setIsProcessing(false);
       setError(err as Error);
+      setNFTs([]); // Reset NFTs on error
+      console.error('Failed to fetch NFTs:', err);
     }
   }, [activeAccount]);
 
