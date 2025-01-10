@@ -254,11 +254,6 @@ export function fetchMetadata(uri: string) {
       });
 }
 
-export function resolver() {
-  return new Promise((res, rej) => {
-    return res('Hello world');
-  });
-}
 export function parseIpfsUri(
   uri: string,
   baseURIGateway = 'https://ipfs.livepeer.studio/',
