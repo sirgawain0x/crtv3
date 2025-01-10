@@ -22,12 +22,12 @@ import { useActiveAccount } from 'thirdweb/react';
 import { decimals } from 'thirdweb/extensions/erc20';
 
 type ClaimFormData = {
-  price: bigint;
   currency: string;
   phaseName: string | undefined;
   maxClaimablePerWallet: string | number;
-  maxClaimableSupply: bigint | number;
+  numOfNFT: bigint | number; 
   startTimestamp: number;
+  pricePerNFT: number | string;
 };
 
 type SetClaimConditionsProps = {
@@ -84,6 +84,7 @@ export default function SetClaimConditions(props: SetClaimConditionsProps) {
         : [];
 
     try {
+      
       const transaction = setClaimConditions({
         contract: videoContract,
         tokenId,
@@ -91,10 +92,10 @@ export default function SetClaimConditions(props: SetClaimConditionsProps) {
           ...updatedPreviousCCs,
           {
             startTime: new Date(formData.startTimestamp),
-            price: props.nft.metadata.properties.price.toString(),
+            price: formData.pricePerNFT,
             currencyAddress: formData.currency,
             maxClaimablePerWallet: BigInt(formData.maxClaimablePerWallet),
-            maxClaimableSupply: BigInt(formData.maxClaimableSupply),
+            maxClaimableSupply: BigInt(formData.numOfNFT),
             metadata: {
               name: formData.phaseName,
             },
@@ -131,9 +132,10 @@ export default function SetClaimConditions(props: SetClaimConditionsProps) {
     const isRequiredFields =
       errors.maxClaimablePerWallet?.type === 'required' ||
       errors.currency?.type === 'required' ||
-      errors.maxClaimableSupply?.type === 'required' ||
       errors.phaseName?.type === 'required' ||
-      errors.startTimestamp?.type === 'required';
+      errors.startTimestamp?.type === 'required' ||
+      errors.pricePerNFT?.type === 'required' ||
+      errors.numOfNFT?.type === 'required';
 
     if (isRequiredFields) {
       return;
@@ -142,9 +144,9 @@ export default function SetClaimConditions(props: SetClaimConditionsProps) {
     const formatData: ClaimFormData = {
       ...data,
       startTimestamp: data.startTimestamp,
-      price: props.nft.metadata.properties.price,
+      pricePerNFT: data.pricePerNFT, 
+      numOfNFT: data.numOfNFT,  
       maxClaimablePerWallet: data.maxClaimablePerWallet,
-      maxClaimableSupply: props.nft.metadata.properties.amount,
     };
 
     setIsErrorFree(true);
@@ -177,7 +179,7 @@ export default function SetClaimConditions(props: SetClaimConditionsProps) {
   };
 
   return (
-    <div className="my-8 rounded-md border border-solid border-slate-500 p-8 mx-auto">
+    <div className="mx-auto my-8 rounded-md border border-solid border-slate-500 p-8">
       <h4 className="py-4 text-xl font-medium text-slate-300">
         Set conditions for the sale/claim of your NFT(s)
       </h4>
@@ -233,32 +235,90 @@ export default function SetClaimConditions(props: SetClaimConditionsProps) {
 
         <div className="flex flex-col space-y-1">
           <label
-            htmlFor="currency"
+            htmlFor="numOfNFT"
             className="my-2 font-medium dark:text-slate-400"
           >
-            Select Payment Currency
+            Number of NFT Claimable:
           </label>
-          <select
+          <input
+            type="number"
+            id="numOfNFT"
+            {...register('numOfNFT', {
+              required: true,
+              min: 1,
+              valueAsNumber: true,
+              value: 1,
+            })}
             className="w-full rounded-md border px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-200"
-            id="currency"
-            {...register('currency', { required: true })}
-            aria-invalid={formState.errors.currency ? 'true' : 'false'}
-          >
-            <option value="">-- Select Currency --</option>
-            {Object.keys(claimConditionsOptions.currency).map((k, i) => (
-              <option
-                key={i}
-                value={Object.values(claimConditionsOptions.currency)[i]}
-              >
-                {k}
-              </option>
-            ))}
-          </select>
-          {formState.errors.currency?.type === 'required' && (
+            disabled={isErrorFree}
+          />
+          {formState.errors.numOfNFT?.type === 'required' && (
             <span className="my-4 block text-sm text-red-500">
-              Select a purchasing currency
+              Number of NFT to mint is required.
             </span>
           )}
+          {formState.errors.numOfNFT?.type === 'min' && (
+            <span className="my-4 block text-sm text-red-500">
+              Number of NFT cannot be less than one.
+            </span>
+          )}
+        </div>
+
+        <div className="flex flex-row space-x-4">
+          <div className="flex flex-col space-y-1">
+            <label
+              htmlFor="pricePerNFT"
+              className="my-2 font-medium dark:text-slate-400"
+            >
+              Price per NFT (<span className="font-semibold">$</span>):
+            </label>
+            <input
+              id="pricePerNFT"
+              {...register('pricePerNFT', { required: true, min: 0 })}
+              placeholder="Price per NFT"
+              className="w-full rounded-md border px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-200"
+              disabled={isErrorFree}
+            />
+            {formState.errors.pricePerNFT?.type === 'required' && (
+              <span className="my-4 block text-sm text-red-500">
+                The price is required.
+              </span>
+            )}
+            {formState.errors.pricePerNFT?.type === 'min' && (
+              <span className="my-4 block text-sm text-red-500">
+                Must be greater than zero (0).
+              </span>
+            )}
+          </div>
+
+          <div className="flex flex-col space-y-1">
+            <label
+              htmlFor="currency"
+              className="my-2 font-medium dark:text-slate-400"
+            >
+              Select Payment Currency
+            </label>
+            <select
+              className="w-full rounded-md border px-3 py-2 text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-200"
+              id="currency"
+              {...register('currency', { required: true })}
+              aria-invalid={formState.errors.currency ? 'true' : 'false'}
+            >
+              <option value="">-- Select Currency --</option>
+              {Object.entries(claimConditionsOptions.currency).map(
+                ([key, value]) => (
+                  <option key={value} value={value}>
+                    {key}
+                  </option>
+                ),
+              )}
+            </select>
+            {formState.errors.currency?.type === 'required' && (
+              <span className="my-4 block text-sm text-red-500">
+                Select a purchasing currency
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="flex flex-col space-y-1">
@@ -281,8 +341,8 @@ export default function SetClaimConditions(props: SetClaimConditionsProps) {
             </span>
           )}
           {formState.errors.maxClaimablePerWallet?.type === 'min' && (
-            <span className="mt-4 block text-sm text-red-500">
-              The numbet to claim must be greater than zero (0).
+            <span className="my-4 block text-sm text-red-500">
+              The number to claim must be greater than zero (0).
             </span>
           )}
         </div>
