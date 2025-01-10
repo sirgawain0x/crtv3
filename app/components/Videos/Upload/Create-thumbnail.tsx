@@ -89,11 +89,10 @@ export default function CreateThumbnail({
       if (activeAccount) {
         router.push(`/profile/${activeAccount.address}#minted`);
       } else {
-        console.error('No activeAccount');
         toast.error('No active account found. Please connect your wallet.');
       }
     } else {
-      console.error('livepeerAssetData is undefined');
+      toast.error('Video data not found. Please try again.'); 
     }
   };
 
