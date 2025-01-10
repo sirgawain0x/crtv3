@@ -4,20 +4,20 @@ import { toast } from 'sonner';
 import type { TSwithButtonChildProps } from '../Button/ToggleSwitch';
 import { blockExplorer } from '@app/lib/utils/context';
 
-export type TLazyMintFormData = {
+export type TLazyMintData = {
   pricePerNFT: number;
   numOfNFT: number;
 };
 
-type TLazyMintFormProps = {
+type TLazyMintProps = {
   baseURIForToken: string;
 } & TSwithButtonChildProps;
 
-export default function LazyMintForm(props: TLazyMintFormProps) {
+export default function LazyMint(props: TLazyMintProps) {
   const { handleLazyMint, isProcessing, error } = useLazyMint();
-  const { handleSubmit, formState, register } = useForm<TLazyMintFormData>();
+  const { handleSubmit, formState, register } = useForm<TLazyMintData>();
 
-  const handleSubmitLazyMint: SubmitHandler<TLazyMintFormData> = async (
+  const handleSubmitLazyMint: SubmitHandler<TLazyMintData> = async (
     data,
   ) => {
     const { errors } = formState;
@@ -32,8 +32,6 @@ export default function LazyMintForm(props: TLazyMintFormProps) {
 
     try {
       const txnHash = await handleLazyMint({
-        amount: data.numOfNFT.toString(),
-        price: data.pricePerNFT.toString(),
         baseURIForTokens: props.baseURIForToken,
       });
 
@@ -72,7 +70,7 @@ export default function LazyMintForm(props: TLazyMintFormProps) {
     <div className="w-full rounded-lg">
       <h2 className="mb-8 text-xl font-bold">Enter Number of NFT and Price</h2>
       <form className="space-y-6" onSubmit={handleSubmit(handleSubmitLazyMint)}>
-        <div className="flex flex-col space-y-1">
+        {/* <div className="flex flex-col space-y-1">
           <label
             htmlFor="numOfNFT"
             className="my-2 font-medium dark:text-slate-400"
@@ -101,7 +99,7 @@ export default function LazyMintForm(props: TLazyMintFormProps) {
               Number of NFT cannot be less than one.
             </span>
           )}
-        </div>
+        </div> 
 
         <div className="flex flex-col space-y-1">
           <label
@@ -127,7 +125,7 @@ export default function LazyMintForm(props: TLazyMintFormProps) {
             </span>
           )}
         </div>
-
+*/}
         <div className="space-x-8 space-y-3">
           <button
             className={`min-w-10 rounded bg-[--color-brand-red] px-4 py-2 text-white transition duration-300 hover:bg-[--color-brand-red-shade]
@@ -139,6 +137,7 @@ export default function LazyMintForm(props: TLazyMintFormProps) {
             {isProcessing ? 'Minting...' : ' Lazy Mint'}
           </button>
           <button
+            type="button"
             onClick={(e) => {
               e.preventDefault();
               if (props.handleToggleSwitch) {
