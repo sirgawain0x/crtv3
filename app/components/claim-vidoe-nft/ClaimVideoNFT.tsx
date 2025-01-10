@@ -13,7 +13,7 @@ type TClaimVideoNFTProps = {
 
 type TClaimFormData = {
   quantity: number;
-  receipient: string;
+  recipient: string;
 };
 
 export default function ClaimVideoNFT(props: TClaimVideoNFTProps) {
@@ -24,16 +24,20 @@ export default function ClaimVideoNFT(props: TClaimVideoNFTProps) {
   });
 
   const onSubmitClaim: SubmitHandler<TClaimFormData> = async (data) => {
-    const isRequiredFields = formState.errors.quantity?.type === 'required';
-    if (isRequiredFields) {
-      return;
-    }
+  
+   if (Object.keys(formState.errors).length > 0) {
+     return;
+   }
+   if (!/^0x[a-fA-F0-9]{40}$/.test(data.recipient)) {
+     toast.error('Invalid recipient address format');
+     return;
+   }  
 
     try {
       const txnHash = await handleClaim({
         quantity: data.quantity,
         tokenId: props.tokenId,
-        to: data.receipient,
+        to: data.recipient,
         videoContract: props.videoContract,
       });
 
@@ -45,7 +49,7 @@ export default function ClaimVideoNFT(props: TClaimVideoNFTProps) {
             label: 'View Transaction',
             onClick: () =>
               window.open(
-                `${blockExplorer.polygon.amoy}/tx/${txnHash}}`,
+                `${blockExplorer.polygon.amoy}/tx/${txnHash}`,
                 '_blank',
               ),
           },
@@ -70,14 +74,14 @@ export default function ClaimVideoNFT(props: TClaimVideoNFTProps) {
       >
         <div className="flex flex-col space-y-1">
           <label
-            htmlFor="receipient"
+            htmlFor="recipient"
             className="my-2 font-medium dark:text-slate-400"
           >
             To Address:
           </label>
           <input
-            id="receipient"
-            {...register('receipient', {
+            id="recipient"
+            {...register('recipient', {
               required: true,
               value: props.usage === 'owner' ? activeAccount?.address : '',
             })}
@@ -91,7 +95,7 @@ export default function ClaimVideoNFT(props: TClaimVideoNFTProps) {
           />
           {formState.errors.quantity?.type === 'required' && (
             <span className="my-4 block text-sm text-red-500">
-              Receipient address to is required.
+              Recipient address to is required.
             </span>
           )}
         </div>
