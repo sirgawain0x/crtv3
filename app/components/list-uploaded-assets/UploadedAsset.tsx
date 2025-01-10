@@ -1,6 +1,6 @@
 import * as helpers from '@app/lib/helpers/helpers';
-import { Asset } from '@app/lib/types';
-import { Account } from 'thirdweb/wallets';
+import type { Asset } from '@app/lib/types';
+import type { Account } from 'thirdweb/wallets';
 
 type TUploadAssetProps = {
   idx: number;
@@ -23,7 +23,7 @@ export default function UploadAsset(props: TUploadAssetProps) {
         {helpers.parseTimestampToDate(Number(props.asset.createdAt))}
       </td>
       <td className="border border-slate-700 px-4 py-1">
-        {helpers.parseTimestampToDate(props.asset.status?.updatedAt)}
+        {helpers.parseTimestampToDate(props.asset.status?.updatedAt ?? 0)}
       </td>
     </tr>
   );
