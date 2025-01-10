@@ -171,7 +171,7 @@ export default function ListClaimConditions(props: ListClaimConditionsProps) {
 
           {claimConditions.map((cc, i) => (
             <div
-              key={i + '-' + cc.startTimestamp.toString()}
+              key={`claim-${cc.startTimestamp.toString()}`}
               className="mx-auto mb-4 w-full max-w-screen-xl rounded-lg border bg-slate-700 p-6"
             >
               <div className={`mb-5 flex flex-row justify-between`}>
@@ -199,7 +199,7 @@ export default function ListClaimConditions(props: ListClaimConditionsProps) {
                     }
                     onClick={() => {
                       return; // FIXME: Remove when update claim condition function is resolved
-                      toggleEditClaim(i);
+                      // toggleEditClaim(i);
                     }}
                   >
                     {editStates[i] ? 'Cancel' : 'Edit'}
