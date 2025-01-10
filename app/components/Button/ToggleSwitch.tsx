@@ -39,6 +39,9 @@ export default function ToggleSwitch(props: TSwithButtonProps) {
             checked={isOn}
             onChange={handleToggleSwitch}
             className="sr-only"
+            aria-checked={isOn}
+            role="switch"
+            aria-label={props.label}
           />
           <div
             className={`slider cursor-pointer rounded-full transition-all duration-300 ${
