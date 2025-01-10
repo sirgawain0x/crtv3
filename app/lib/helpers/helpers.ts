@@ -224,21 +224,34 @@ export async function parseMetadata2(arr: NFT[]) {
 
 export function fetchMetadata(uri: string) {
   const delimiter = '/';
-  let mtd: Partial<NFTMetadata> = {};
 
-  let cid = uri.split(delimiter)[2];
-  console.log({ cid });
+  const cid = uri.split(delimiter)[2];
 
-  if (cid != undefined) {
-    return fetch(`https://ipfs.livepeer.studio/ipfs/${cid}`)
-      .then((res) => res)
+  if (cid === undefined) {
+  throw new Error("Invalid URI format.")
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(()=>controller.abort(), 5000)
+
+    return fetch(`https://ipfs.livepeer.studio/ipfs/${cid}`, {
+      signal: controller.signal
+    })
+      .then((res) => {
+        if(!res.ok){
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+
+        return res.json();
+      })
       .then(async (data) => {
         return await data.json();
       })
       .catch((err) => {
-        throw new Error(err);
+        throw new Error(`Failed to fetch metadata: ${err.message}`);
+      }).finally(()=>{
+        clearTimeout(timeoutId)
       });
-  }
 }
 
 export function resolver() {
