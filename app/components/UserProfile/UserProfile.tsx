@@ -5,6 +5,7 @@ import {
   TabsList,
   TabsTrigger,
 } from '@app/components/ui/tabs';
+import { formatAddress, stack } from '@app/lib/sdk/stack/client';
 import { client } from '@app/lib/sdk/thirdweb/client';
 import { CREATIVE_ADDRESS } from '@app/lib/utils/context';
 import Unlock from '@app/lib/utils/Unlock.json';
@@ -33,11 +34,6 @@ import {
   CardHeader,
   CardTitle,
 } from '../ui/card';
-import {
-  stack,
-  ensureValidToken,
-  formatAddress,
-} from '@app/lib/sdk/stack/client';
 import MemberCard from './MemberCard';
 
 const ProfilePage: NextPage = () => {
@@ -128,12 +124,11 @@ const ProfilePage: NextPage = () => {
 
         setNftData(metadata);
       } catch (err) {
-        //TODO: Consider showing user-friendly error message
-        if (err instanceof Error) {
-          alert(`Failed to fetch NFT data ${err.message}`);
-        } else {
-          alert('Failed to fetch NFT data');
-        }
+        toast.error('NFT Data Error', {
+          description:
+            err instanceof Error ? err.message : 'Failed to fetch NFT data',
+          duration: 3000,
+        });
       }
     };
 
