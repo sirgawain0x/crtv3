@@ -3,8 +3,7 @@ import {
   getLivepeerAsset,
   getLivepeerPlaybackInfo,
 } from '@app/api/livepeer/livepeerActions';
-import ToggleSwitch from '@app/components/Button/ToggleSwitch';
-import LazyMintForm from '@app/components/forms/LazyMintForm';
+import LazyMint from '@app/components/lazy-mint/LazyMint';
 import { PlayerComponent } from '@app/components/Player/Player';
 import { Button } from '@app/components/ui/button';
 import { Spinner } from '@chakra-ui/react';
@@ -16,6 +15,7 @@ import { useEffect, useState } from 'react';
 import { useInterval } from 'react-use';
 import { useActiveAccount } from 'thirdweb/react';
 import CreateThumbnailForm from './CreateThumbnailForm';
+import { toast } from 'sonner';
 
 type CreateThumbnailProps = {
   livePeerAssetId: string | undefined;
@@ -35,7 +35,11 @@ export default function CreateThumbnail({
   const [livepeerAssetData, setLivepeerAssetData] = useState<Asset>();
   const [livepeerPlaybackData, setLivepeerPlaybackData] =
     useState<PlaybackInfo>();
+  const [isLazyMinted, setIsLazyMinted] = useState(false);
 
+  const onLazyMintSuccess = (txHash: string) => {
+    setIsLazyMinted(Boolean(txHash));
+  };
 
   useInterval(
     () => {
@@ -86,6 +90,7 @@ export default function CreateThumbnail({
         router.push(`/profile/${activeAccount.address}#minted`);
       } else {
         console.error('No activeAccount');
+        toast.error('No active account found. Please connect your wallet.');
       }
     } else {
       console.error('livepeerAssetData is undefined');
@@ -116,17 +121,6 @@ export default function CreateThumbnail({
           />
         </div>
       )}
-      
-      {/* TODO: possibly place Lazy Mint button
-      {livepeerAssetData?.status?.phase === 'ready' && livepeerPlaybackData && (
-        <div className="my-6">
-          <div className="mx-auto my-4">
-            <h3 className="text-xl font-bold">Lazy Mint Your Video</h3>
-          </div>
-          <button onClick={()=>{}}>Lazy Mint </button>
-        </div>
-      )}
-      */}
 
       <div className="my-5">
         <div className="mx-auto my-4">
@@ -141,13 +135,12 @@ export default function CreateThumbnail({
       </div>
       {livepeerAssetData?.status?.phase === 'ready' && (
         <div className="my-5">
-          <ToggleSwitch label="Lazy Mint Token">
-            <LazyMintForm
-              baseURIForToken={String(
-                livepeerAssetData?.storage?.ipfs?.nftMetadata?.gatewayUrl,
-              )}
-            />
-          </ToggleSwitch>
+          <LazyMint
+            baseURIForToken={String(
+              livepeerAssetData?.storage?.ipfs?.nftMetadata?.gatewayUrl,
+            )}
+            onSuccess={onLazyMintSuccess}
+          />
         </div>
       )}
 
@@ -159,10 +152,7 @@ export default function CreateThumbnail({
           Back
         </Button>
 
-        <Button
-          disabled={livepeerAssetData?.status?.phase !== 'ready'}
-          onClick={() => handleComplete('')}
-        >
+        <Button disabled={!isLazyMinted} onClick={() => handleComplete('')}>
           Complete
         </Button>
       </div>
