@@ -228,30 +228,31 @@ export function fetchMetadata(uri: string) {
   const cid = uri.split(delimiter)[2];
 
   if (cid === undefined) {
-  throw new Error("Invalid URI format.")
+    throw new Error('Invalid URI format.');
   }
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(()=>controller.abort(), 5000)
+  const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-    return fetch(`https://ipfs.livepeer.studio/ipfs/${cid}`, {
-      signal: controller.signal
+  return fetch(`https://ipfs.livepeer.studio/ipfs/${cid}`, {
+    signal: controller.signal,
+  })
+    .then((res) => {
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+
+      return res.json();
     })
-      .then((res) => {
-        if(!res.ok){
-          throw new Error(`HTTP error! status: ${res.status}`);
-        }
-
-        return res.json();
-      })
-      .then(async (data) => {
-        return await data.json();
-      })
-      .catch((err) => {
-        throw new Error(`Failed to fetch metadata: ${err.message}`);
-      }).finally(()=>{
-        clearTimeout(timeoutId)
-      });
+    .then(async (data) => {
+      return await data.json();
+    })
+    .catch((err) => {
+      throw new Error(`Failed to fetch metadata: ${err.message}`);
+    })
+    .finally(() => {
+      clearTimeout(timeoutId);
+    });
 }
 
 export function parseIpfsUri(
@@ -273,22 +274,11 @@ export function parseIpfsUri(
 export function getERC20Metadata(
   address: string,
 ): Promise<GetCurrencyMetadataResult> {
-  return new Promise((resolve, reject) => {
-    let currencyMetadata: GetCurrencyMetadataResult | null = null;
-
-    const contract = erc20Contract(address);
-
-    getCurrencyMetadata({
-      contract,
-    })
-      .then((data: GetCurrencyMetadataResult) => {
-        currencyMetadata = data;
-        resolve(currencyMetadata);
-      })
-      .catch((err) => {
-        console.error(err);
-        reject(new Error('Error fetching currency metadata', err.message));
-      });
+  return getCurrencyMetadata({
+    contract: erc20Contract(address),
+  }).catch((err) => {
+    console.error(err);
+    throw new Error(`Error fetching currency metatdat: ${err.message}`);
   });
 }
 
