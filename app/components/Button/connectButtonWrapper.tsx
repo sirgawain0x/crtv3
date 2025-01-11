@@ -1,22 +1,30 @@
 'use client';
-import { defineChain, base } from 'thirdweb/chains';
-import { createWallet, inAppWallet } from 'thirdweb/wallets';
 import {
-  generatePayload,
   authedOnly,
+  generatePayload,
   login,
   logout,
 } from '@app/api/auth/thirdweb/authentication';
-import { OrbisConnectResult } from '@useorbis/db-sdk';
-import { client } from '@app/lib/sdk/thirdweb/client';
 import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
+import { client } from '@app/lib/sdk/thirdweb/client';
 import { ConnectButton } from '@app/lib/sdk/thirdweb/components';
 import {
   GenerateLoginPayloadParams,
-  LoginPayload,
   VerifyLoginPayloadParams,
 } from 'thirdweb/auth';
-import { useActiveWallet, darkTheme } from 'thirdweb/react';
+import {
+  base,
+  baseSepolia,
+  defineChain,
+  optimism,
+  polygon,
+  polygonAmoy,
+  zora,
+  zoraSepolia,
+} from 'thirdweb/chains';
+import { useActiveWallet } from 'thirdweb/react';
+
+import { createWallet, inAppWallet } from 'thirdweb/wallets';
 
 export default function ConnectButtonWrapper() {
   const { isConnected, orbisLogin } = useOrbisContext();
@@ -84,35 +92,33 @@ export default function ConnectButtonWrapper() {
   return (
     <ConnectButton
       client={client}
-      wallets={wallets}
-      theme={darkTheme({
-        colors: {
-          accentText: 'hsl(340, 82%, 59%)',
-          separatorLine: 'hsl(0, 0%, 18%)',
-          modalBg: 'hsl(220, 26%, 14%)',
-          borderColor: 'hsl(223, 36%, 14%)',
-        },
-      })}
-      connectButton={{ label: 'Get Started' }}
-      connectModal={{
-        size: 'wide',
-        title: 'Sign In',
-        titleIcon:
-          'https://bafybeiesvinhgaqvr62rj77jbwkazg3w6bhcrsfyg6zyozasaud53nucnm.ipfs.w3s.link/Creative%20TV%20Logo.png',
-        termsOfServiceUrl:
-          'https://creativeplatform.xyz/docs/legal/terms-conditions',
-        privacyPolicyUrl:
-          'https://creativeplatform.xyz/docs/legal/privacy-policy',
-        welcomeScreen: {
-          img: {
-            width: 200,
-            height: 200,
-            src: 'https://bafybeifvsvranpnmujrpcry6lqssxtyfdvqz64gty4vpkhvcncuqd5uimi.ipfs.w3s.link/logo-tv.gif',
-          },
-          subtitle: 'The Stage is Yours',
-          title: 'Welcome to Creative TV',
+      chains={[
+        polygon,
+        polygonAmoy,
+        base,
+        baseSepolia,
+        optimism,
+        storyTestnet,
+        zora,
+        zoraSepolia,
+      ]}
+      connectButton={{
+        label: 'Get Started',
+        className: 'my-custom-class',
+        style: {
+          backgroundColor: '#EC407A',
+          color: 'white',
+          borderRadius: '10px',
         },
       }}
+      // TODO: uncomment when done
+      // accountAbstraction={{
+      //   chain: defineChain(base),
+      //   client: client,
+      //   sponsorGas: false,
+      //   factoryAddress: ACCOUNT_FACTORY_ADDRESS.polygon,
+      // }}
+      wallets={wallets}
       appMetadata={{
         name: 'Creative TV',
         url: 'https://tv.creativeplatform.xyz',
@@ -123,7 +129,6 @@ export default function ConnectButtonWrapper() {
       walletConnect={{
         projectId: process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID,
       }}
-      chains={[base]}
       supportedNFTs={{
         137: [
           '0xad597e5b24ad2a6032168c76f49f05d957223cd0',

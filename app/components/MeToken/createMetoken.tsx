@@ -80,35 +80,10 @@ export default function CreateMetoken() {
     params: [activeAccount?.address!],
   });
 
+  console.log({ isOwner, isPendingOwner });
+
   const [isGenerated, setIsGenerated] = useState(false);
   const { mutate: sendTransaction } = useSendTransaction();
-
-  // {
-  //   onSuccess: (result: any) => {
-  //     setIsGenerated(true);
-  //     setFormData(form.getValues());
-  //     toast.success('MeToken created successfully!', {
-  //       description: `Transaction hash: ${result.transactionHash}`,
-  //       action: {
-  //         label: 'View Transaction',
-  //         onClick: () =>
-  //           window.open(
-  //             `https://basescan.org/tx/${result.transactionHash}`,
-  //             '_blank',
-  //           ),
-  //       },
-  //     });
-  //     // Reset form
-  //     setActiveStep(1);
-  //     form.reset();
-  //   },
-  //   onError: (error: any) => {
-  //     setIsGenerated(false);
-  //     toast.error('Error generating MeToken', {
-  //       description: error?.message || 'Something went wrong',
-  //     });
-  //   },
-  // }
 
   // State variables to hold form inputs
   const [name, setName] = useState('');
@@ -137,7 +112,7 @@ export default function CreateMetoken() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
+
     const formValues = form.getValues();
 
     if (activeStep === 1) {
@@ -158,14 +133,42 @@ export default function CreateMetoken() {
         return;
       }
 
+      setIsLoading(true);
+
       try {
         const transaction = prepareContractCall({
           contract: metokenFactoryBase,
           method: 'create',
           params: [formValues.name, formValues.symbol, formValues.address],
         });
-        sendTransaction(transaction);
-        setIsLoading(false);
+
+        sendTransaction(transaction, {
+          onSuccess: (result: any) => {
+            setIsGenerated(true);
+            setFormData(form.getValues());
+            toast.success('MeToken created successfully!', {
+              description: `Transaction hash: ${result.transactionHash}`,
+              action: {
+                label: 'View Transaction',
+                onClick: () =>
+                  window.open(
+                    `https://basescan.org/tx/${result.transactionHash}`,
+                    '_blank',
+                  ),
+              },
+            });
+            // Reset form
+            setActiveStep(1);
+            form.reset();
+          },
+          onError: (error: any) => {
+            setIsLoading(false);
+            setIsGenerated(false);
+            toast.error('Error generating MeToken', {
+              description: error?.message || 'Something went wrong',
+            });
+          },
+        });
       } catch (error: unknown) {
         const errorMessage =
           error instanceof Error ? error.message : 'Something went wrong';
