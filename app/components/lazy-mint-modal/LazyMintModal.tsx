@@ -20,7 +20,7 @@ export default function LazyMintModal(props: LazyMintProps) {
 
         <LazyMintForm
           baseURIForToken={String(props.baseURIForToken)}
-          handleToggleSwitch={props.toggleModal}
+          onSuccess={props.toggleModal}
         />
       </div>
     </div>
