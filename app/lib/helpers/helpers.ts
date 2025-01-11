@@ -9,13 +9,16 @@ import { CONTRACT_ADDRESS } from '../utils/context';
 import { ethers } from 'ethers';
 
 /**
- * Function to parse `Date` string
- * @param dateString The date object to parse
- * @returns Form input date
- *
+ * Converts a timestamp to a form input date string.
+ * 
+ * @param timestamp - A bigint representing the timestamp to be parsed
+ * @returns A formatted date string in 'YYYY-MM-DDTHH:MM' format
+ * 
+ * @remarks
+ * Handles timestamp conversion, ensuring zero-padded month, date, hour, and minute values.
+ * 
  * @example
- * const date = parseDate('Tue Jan 16 2024 13:13:32')
- *  =>  // '2024-01-16T13:13'
+ * parseDate(1705420412000n) // Returns '2024-01-16T13:13'
  */
 export function parseDate(timestamp: bigint) {
   const d = new Date(Number(timestamp));
@@ -36,13 +39,18 @@ export function parseDate(timestamp: bigint) {
 }
 
 /**
- * Function to parse timestamp to readable date
- * @param ts The timestamp to parse
- * @returns Form input date
- *
+ * Converts a numeric timestamp to a human-readable date string.
+ * 
+ * @param ts - The timestamp in milliseconds since the Unix epoch
+ * @returns A formatted date string or 'Not available' for non-positive timestamps
+ * 
+ * @remarks
+ * Uses Intl.DateTimeFormat to create a localized date and time representation.
+ * Returns a string in the format 'MM/DD/YYYY HH:MM AM/PM'.
+ * 
  * @example
- * const date = parseTimestampToDate(1982736542)
- *  =>  16/01/2024 13:13
+ * parseTimestampToDate(1706025600000) // Returns "Jan 24, 2024 12:00 PM"
+ * parseTimestampToDate(0) // Returns "Not available"
  */
 export function parseTimestampToDate(ts: number) {
   if (ts <= 0) {
@@ -68,13 +76,18 @@ export function parseTimestampToDate(ts: number) {
 }
 
 /**
- * Function to parse timestamp to readable date
- * @param ts The timestamp is bigint format
- * @returns Locale Date
- *
+ * Converts a bigint timestamp to a formatted date string.
+ * 
+ * @param ts - The timestamp in bigint format representing the number of seconds since the Unix epoch
+ * @returns A formatted date string in the 'DD/MM/YYYY, HH:MM:SS' format
+ * 
+ * @remarks
+ * Uses the `dateObject` utility function to extract individual date components.
+ * Handles non-positive timestamps by returning default values through `dateObject`.
+ * 
  * @example
- * const date = timestampToDateString(1734801000)
- *  =>  12/22/2024, 09:59 AM
+ * const formattedDate = timestampToDateString(1734801000n);
+ * // Returns: "22/12/2024, 09:59:00"
  */
 export function timestampToDateString(ts: bigint) {
   const { day, hours, minutes, month, seconds, year } = dateObject(ts);
@@ -82,6 +95,16 @@ export function timestampToDateString(ts: bigint) {
   return `${day}/${month}/${year}, ${hours}:${minutes}:${seconds}`;
 }
 
+/**
+ * Converts a bigint timestamp to a formatted date string suitable for input fields.
+ * 
+ * @param ts - The timestamp in bigint format
+ * @returns A date string formatted as 'YYYY-MM-DDTHH:MM:SS'
+ * 
+ * @remarks
+ * Uses the `dateObject` function to extract date components from the timestamp.
+ * Useful for populating date input fields in forms or interfaces.
+ */
 export function timestampToInputDateString(ts: bigint) {
   const { day, hours, minutes, month, seconds, year } = dateObject(ts);
 
@@ -97,9 +120,25 @@ type DateObjectType = {
   seconds: string;
 };
 /**
- * Function to return the elements of a Date object
- * @param ts timestamp to be converted
- * @returns date object
+ * Converts a timestamp to a structured date object with formatted components.
+ *
+ * @param ts - A bigint timestamp representing seconds since the Unix epoch
+ * @returns An object containing formatted date and time components
+ *
+ * @remarks
+ * - Handles non-positive timestamps by returning default zero values
+ * - Converts timestamp to milliseconds by multiplying by 1000
+ * - Ensures two-digit formatting for day, month, hours, minutes, and seconds
+ * - Returns zero/padded values for invalid or zero timestamps
+ *
+ * @example
+ * ```typescript
+ * const dateInfo = dateObject(1672531200n);
+ * // Returns: { day: '01', month: '01', year: 2023, hours: '00', minutes: '00', seconds: '00' }
+ * 
+ * const invalidDate = dateObject(0n);
+ * // Returns: { day: '00', month: '00', year: 0, hours: '00', minutes: '00', seconds: '00' }
+ * ```
  */
 function dateObject(ts: bigint): DateObjectType {
   const tsNumber = Number(ts);
@@ -185,10 +224,38 @@ export const claimConditionsOptions = {
   },
 };
 
+/**
+ * Extracts the Content Identifier (CID) from an IPFS URI.
+ *
+ * @param ipfsUri - The IPFS URI from which to extract the CID
+ * @returns The CID portion of the IPFS URI
+ *
+ * @remarks
+ * This function assumes the IPFS URI follows the format 'ipfs://[CID]' and splits the URI to return the CID.
+ *
+ * @example
+ * ```typescript
+ * const cid = extractCID('ipfs://QmXYZ123456'); // Returns 'QmXYZ123456'
+ * ```
+ */
 function extractCID(ipfsUri: string) {
   return ipfsUri.split(/\/\//g)[1];
 }
 
+/**
+ * Processes an array of NFTs by fetching and transforming their metadata from IPFS.
+ *
+ * @remarks
+ * This function iterates through an array of NFTs, retrieves their metadata from an IPFS gateway,
+ * and updates the animation and image URLs to point to the full IPFS resource.
+ *
+ * @param arr - An array of NFT objects to process
+ * @returns A new array of NFTs with updated metadata
+ *
+ * @throws {Error} If metadata fetching or parsing fails
+ *
+ * @beta
+ */
 export async function parseMetadata2(arr: NFT[]) {
   const ast: NFT[] = [];
   const delimiter = 'ipfs/';
@@ -222,6 +289,18 @@ export async function parseMetadata2(arr: NFT[]) {
   return ast;
 }
 
+/**
+ * Fetches metadata from an IPFS URI with error handling and timeout.
+ *
+ * @param uri - The IPFS URI from which to fetch metadata
+ * @returns A promise resolving to the parsed metadata
+ * @throws {Error} If the URI is invalid, fetch fails, or metadata cannot be parsed
+ *
+ * @remarks
+ * - Uses Livepeer IPFS gateway for metadata retrieval
+ * - Implements a 5-second timeout for the fetch operation
+ * - Handles HTTP errors and network-related issues
+ */
 export function fetchMetadata(uri: string) {
   const delimiter = '/';
 
@@ -255,6 +334,23 @@ export function fetchMetadata(uri: string) {
     });
 }
 
+/**
+ * Converts an IPFS URI to a full gateway URL.
+ *
+ * @param uri - The IPFS URI to be converted
+ * @param baseURIGateway - The base IPFS gateway URL (defaults to Livepeer studio gateway)
+ * @returns A fully resolved IPFS gateway URL for the given URI
+ *
+ * @remarks
+ * This function transforms an IPFS URI from the compact 'ipfs://' format 
+ * to a full HTTP gateway URL that can be directly accessed.
+ *
+ * @example
+ * ```typescript
+ * const gatewayUrl = parseIpfsUri('ipfs://QmXYZ123...');
+ * // Returns 'https://ipfs.livepeer.studio/ipfs/QmXYZ123...'
+ * ```
+ */
 export function parseIpfsUri(
   uri: string,
   baseURIGateway = 'https://ipfs.livepeer.studio/',
@@ -267,9 +363,15 @@ export function parseIpfsUri(
 }
 
 /**
- * Function to fetch ERC20 token metadata
- * @param address contract address of the ERC20 token
- * @returns Promise<GetCurrencyMetadataResult>
+ * Retrieves metadata for an ERC20 token by its contract address.
+ *
+ * @param address - The contract address of the ERC20 token
+ * @returns A promise resolving to the token's metadata
+ * @throws {Error} If there is an issue fetching the token's metadata
+ *
+ * @remarks
+ * This function uses the `getCurrencyMetadata` method to fetch token details.
+ * Any errors during metadata retrieval are logged and re-thrown with a descriptive message.
  */
 export function getERC20Metadata(
   address: string,
