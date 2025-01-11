@@ -12,7 +12,7 @@ import { useEffect, useState } from 'react';
 import { getClaimConditions } from 'thirdweb/extensions/erc1155';
 import { useReadContract } from 'thirdweb/react';
 import ListClaimConditions from '../ListClaimConditions/ListClaimConditions';
-import ClaimVideoNFT from '../claim-vidoe-nft/ClaimVideoNFT';
+import ClaimVideoNFT from '../claim-video-nft/ClaimVideoNFT';
 
 type ConfigureMintedAssetProps = {
   nft: NFT;
