@@ -25,6 +25,8 @@ import Link from 'next/link';
 import { Src } from '@livepeer/react';
 import makeBlockie from 'ethereum-blockies-base64';
 import VideoViewMetrics from './VideoViewMetrics';
+import { useVideo } from '@app/context/VideoContext';
+import { useRef, useEffect } from 'react';
 
 interface VideoCardProps {
   asset: Asset;
@@ -32,6 +34,23 @@ interface VideoCardProps {
 }
 
 const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
+  const { currentPlayingId, setCurrentPlayingId } = useVideo();
+  const playerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // Stop playing if another video starts
+    if (currentPlayingId && currentPlayingId !== asset?.id) {
+      const videoElement = playerRef.current?.querySelector('video');
+      if (videoElement) {
+        videoElement.pause();
+      }
+    }
+  }, [currentPlayingId, asset?.id]);
+
+  const handlePlay = () => {
+    setCurrentPlayingId(asset?.id || null);
+  };
+
   console.log({ asset, playbackSources });
   // Only render the card if the asset is ready
   if (asset?.status?.phase !== 'ready') {
@@ -41,7 +60,7 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
   const address = asset?.creatorId?.value as string;
 
   return (
-    <div className="mx-auto">
+    <div className="mx-auto" ref={playerRef}>
       <Card key={asset?.id} className={cn('w-[360px]')}>
         <div className="mx-auto flex-1 flex-wrap">
           <CardHeader>
@@ -67,21 +86,8 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
                   }
                 />
                 <div className="flex flex-col">
-                  <AccountName
-                    className="text-left"
-                    loadingComponent={
-                      <AccountAddress
-                        formatFn={shortenAddress}
-                        className="text-left"
-                      />
-                    }
-                    fallbackComponent={
-                      <AccountAddress
-                        formatFn={shortenAddress}
-                        className="text-left"
-                      />
-                    }
-                  />
+                  <AccountName className="text-sm font-medium" />
+                  <AccountAddress className="text-xs text-gray-500" formatFn={shortenAddress} />
                 </div>
               </div>
             </AccountProvider>
@@ -91,6 +97,7 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
           src={playbackSources}
           assetId={asset?.id}
           title={asset?.name}
+          onPlay={handlePlay}
         />
         <CardContent>
           <div className="my-2 flex items-center justify-between">

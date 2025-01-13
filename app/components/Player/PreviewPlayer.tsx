@@ -46,17 +46,36 @@ export const PreviewPlayer: React.FC<{ src: Src[] | null; title: string }> = ({
   };
 
   return (
-    <Player.Root src={src}>
+    <Player.Root src={src} volume={1}>
       <Player.Container 
         className="player-container"
         onMouseMove={resetFadeTimeout}
+        onTouchStart={() => {
+          if (fadeTimeoutRef.current) {
+            clearTimeout(fadeTimeoutRef.current);
+          }
+          setControlsVisible(true);
+        }}
+        onTouchEnd={(e) => {
+          e.preventDefault();
+          resetFadeTimeout();
+        }}
       >
         <Player.Video title={title} poster={null} />
         <div 
           className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/50 to-transparent p-4 video-controls ${!controlsVisible ? 'fade-out' : ''}`}
         >
           <div className="flex flex-col gap-4">
-            {/* Seek bar at bottom */}
+            {/* Time display above seek bar */}
+            <div className="flex justify-end">
+              <Player.Time
+                className="text-sm text-white px-2 py-1 bg-black/40 rounded"
+                style={{
+                  fontVariant: "tabular-nums",
+                }}
+              />
+            </div>
+            {/* Seek bar */}
             <Player.Seek className="relative flex items-center gap-2">
               <Player.Track className="relative h-1 flex-grow rounded-full bg-white/70">
                 <Player.SeekBuffer className="absolute h-full rounded-full bg-black/50" />
@@ -75,13 +94,6 @@ export const PreviewPlayer: React.FC<{ src: Src[] | null; title: string }> = ({
                     <PauseIcon className="text-pink-500" />
                   </Player.PlayingIndicator>
                 </Player.PlayPauseTrigger>
-                
-                <Player.Time
-                  className="text-sm text-white"
-                  style={{
-                    fontVariant: "tabular-nums",
-                  }}
-                />
                 
                 <div className="flex items-center gap-2">
                   <Player.MuteTrigger className="h-6 w-6 text-pink-500">

@@ -116,7 +116,17 @@ function BroadcastWithControls({ streamKey }: BroadcastProps) {
               </div>
             </Broadcast.ErrorIndicator>
 
-            <Broadcast.Controls className="bg-gradient-to-b gap-1 px-2 py-1.5 flex-col-reverse flex from-black/20 via-80% via-black/30 duration-1000 to-black/60">
+            <Broadcast.Controls 
+              className="bg-gradient-to-b gap-1 px-2 py-1.5 flex-col-reverse flex from-black/20 via-80% via-black/30 duration-1000 to-black/60"
+              onTouchStart={(e) => {
+                e.preventDefault();
+                e.currentTarget.style.opacity = '1';
+              }}
+              onTouchEnd={(e) => {
+                e.preventDefault();
+              }}
+              style={{ opacity: 1 }}
+            >
               <div className="flex justify-between gap-2">
                 <div className="flex flex-1 items-center gap-2">
                   <Broadcast.VideoEnabledTrigger className="w-5 h-5 hover:scale-110 transition flex-shrink-0">
