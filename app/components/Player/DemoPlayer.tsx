@@ -36,14 +36,33 @@ export const DemoPlayer: React.FC<{ src: Src[] | null; title: string }> = ({
   };
 
   return (
-    <Player.Root src={src} autoPlay volume={0}>
+    <Player.Root src={src} autoPlay volume={1}>
       <Player.Container 
         className="player-container"
         onMouseMove={resetFadeTimeout}
         onMouseEnter={() => setControlsVisible(true)}
+        onTouchStart={() => {
+          if (fadeTimeoutRef.current) {
+            clearTimeout(fadeTimeoutRef.current);
+          }
+          setControlsVisible(true);
+        }}
+        onTouchEnd={(e) => {
+          e.preventDefault();
+          resetFadeTimeout();
+        }}
       >
         <Player.Video title={title} poster={null} />
         <Player.Controls className={`flex items-center justify-center ${controlsVisible ? 'opacity-100' : 'opacity-0'} transition-opacity duration-300`}>
+          {/* Time display above controls */}
+          <div className="absolute right-4 top-[-40px]">
+            <Player.Time
+              className="text-sm text-white px-2 py-1 bg-black/40 rounded"
+              style={{
+                fontVariant: "tabular-nums",
+              }}
+            />
+          </div>
           <Player.PlayPauseTrigger className="h-10 w-10">
             <Player.PlayingIndicator asChild matcher={false}>
               <PlayIcon style={{ color: '#EC407A' }} />

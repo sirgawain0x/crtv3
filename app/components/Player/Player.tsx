@@ -31,6 +31,7 @@ interface PlayerComponentProps {
   assetId: string;
   title: string;
   accessKey?: string;
+  onPlay?: () => void;
 }
 
 export const PlayerComponent: React.FC<PlayerComponentProps> = ({
@@ -38,6 +39,7 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
   assetId,
   title,
   accessKey,
+  onPlay,
 }) => {
   const [assetMetadata, setAssetMetadata] = useState<AssetMetadata | null>(
     null,
@@ -98,11 +100,30 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
 
   return (
     <>
-      <Player.Root src={src} {...conditionalProps}>
+      <Player.Root
+        src={src}
+        {...conditionalProps}
+        volume={1}
+        onPlay={() => {
+          if (onPlay) {
+            onPlay();
+          }
+        }}
+      >
         <Player.Container
           className="player-container relative aspect-video w-full overflow-hidden bg-gray-950"
           onMouseMove={resetFadeTimeout}
           onMouseEnter={resetFadeTimeout}
+          onTouchStart={() => {
+            if (fadeTimeoutRef.current) {
+              clearTimeout(fadeTimeoutRef.current);
+            }
+            setControlsVisible(true);
+          }}
+          onTouchEnd={(e) => {
+            e.preventDefault();
+            resetFadeTimeout();
+          }}
           onMouseLeave={() => {
             if (fadeTimeoutRef.current) {
               clearTimeout(fadeTimeoutRef.current);
@@ -111,19 +132,19 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
           }}
         >
           <SubtitlesProvider>
-            <Player.Video 
-              title={title} 
-              className="h-full w-full rounded-lg" 
+            <Player.Video
+              title={title}
+              className="h-full w-full rounded-lg"
               poster={null}
             />
-            <SubtitlesDisplay 
+            <SubtitlesDisplay
               style={{
                 position: 'absolute',
                 bottom: '10%',
                 width: '100%',
                 textAlign: 'center',
                 color: 'white',
-                textShadow: '2px 2px 4px rgba(0,0,0,0.8)'
+                textShadow: '2px 2px 4px rgba(0,0,0,0.8)',
               }}
             />
             <SubtitlesControl />
@@ -131,13 +152,13 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
 
           <Player.LoadingIndicator
             style={{
-              height: "100%",
-              width: "100%",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              backgroundColor: "black",
-              borderRadius: "0.5rem"
+              height: '100%',
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: 'black',
+              borderRadius: '0.5rem',
             }}
           >
             Loading...
@@ -146,25 +167,32 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
           <Player.ErrorIndicator
             matcher="all"
             style={{
-              position: "absolute",
+              position: 'absolute',
               inset: 0,
-              height: "100%",
-              width: "100%",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              backgroundColor: "black",
-              borderRadius: "0.5rem"
+              height: '100%',
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: 'black',
+              borderRadius: '0.5rem',
             }}
           >
             An error occurred. Trying to resume playback...
           </Player.ErrorIndicator>
 
-          <div 
+          <div
             className={`video-controls absolute bottom-0 left-0 right-0 w-full flex flex-col gap-2 md:gap-4 bg-gradient-to-t from-black/80 to-transparent p-2 md:p-4 transition-opacity duration-300 ${
               controlsVisible ? 'opacity-100' : 'opacity-0'
             }`}
           >
+            {/* Time display above seek bar */}
+            <div className="flex justify-end">
+              <Player.Time
+                className="text-xs md:text-sm text-white px-2 py-1 bg-black/40 rounded tabular-nums"
+              />
+            </div>
+
             <Player.Seek className="relative flex w-full items-center gap-2">
               <Player.Track className="relative h-1 w-full rounded-full bg-white/70">
                 <Player.SeekBuffer className="absolute h-full rounded-full bg-black/50" />
@@ -183,10 +211,6 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
                     <PauseIcon className="h-full w-full text-pink-500" />
                   </Player.PlayingIndicator>
                 </Player.PlayPauseTrigger>
-
-                <Player.Time
-                  className="hidden sm:block text-xs md:text-sm text-white tabular-nums"
-                />
 
                 <div className="flex items-center gap-1 md:gap-2">
                   <Player.MuteTrigger className="h-5 w-5 md:h-6 md:w-6 text-pink-500">
@@ -212,7 +236,7 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
                     <SubtitlesControl />
                   </div>
                 )}
-                
+
                 <Player.FullscreenTrigger className="h-5 w-5 md:h-6 md:w-6 text-pink-500 hover:text-pink-400">
                   <Player.FullscreenIndicator asChild>
                     <ExitFullscreenIcon className="h-full w-full" />
