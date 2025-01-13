@@ -41,8 +41,8 @@ const HeroSection: React.FC = () => {
 
   return (
     <div className="md:py-18 mx-auto max-w-7xl py-10">
-      <div className="flex flex-col items-center justify-between md:flex-row">
-        <div className="flex-1 space-y-5 md:space-y-10">
+      <div className="flex flex-col-reverse items-center justify-between md:flex-row">
+        <div className="flex-1 space-y-5 mt-8 md:mt-0 md:space-y-10">
           <h1 className="text-3xl font-bold leading-tight sm:text-4xl lg:text-6xl">
             <span className="relative inline-block">
               <span className="absolute inset-0 bottom-1 left-0 -z-10 h-1/3 w-full bg-orange-500"></span>
@@ -62,11 +62,11 @@ const HeroSection: React.FC = () => {
             </button>
           </div>
         </div>
-        <div className="relative mt-8 flex-1 md:ml-8 md:mt-0">
-          <div className="relative z-0 h-auto overflow-hidden rounded-2xl shadow-2xl">
+        <div className="w-full md:flex-1 md:ml-8">
+          <div className="relative z-0 w-full overflow-hidden rounded-2xl shadow-2xl bg-black">
             {loading ? (
-              <div className="flex flex-col space-y-3">
-                <Skeleton className="h-[340px] w-[450px] rounded-xl"></Skeleton>
+              <div className="flex aspect-video w-full items-center justify-center">
+                <Skeleton className="h-full w-full rounded-xl"></Skeleton>
               </div>
             ) : (
               <DemoPlayer src={src} title={HERO_VIDEO_TITLE} />
