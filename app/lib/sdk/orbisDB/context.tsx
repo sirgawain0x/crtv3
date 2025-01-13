@@ -168,48 +168,77 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
     console.log(updateStatement.runs);
   };
 
-  const getAssetMetadata = async (assetId: string): Promise<AssetMetadata> => {
-    validateDbOperation(assetId, true);
+  const getAssetMetadata = async (assetId: string): Promise<AssetMetadata | null> => {
+    try {
+      validateDbOperation(assetId, true);
 
-    const selectStatement = db
-      .select()
-      // SELECT * FROM "kjzl6hvfrbw6c8ff20kxk0v7j0an1rxjyzs0afesrbcv59fiknxzogtlhxxlr14" WHERE "assetId" = '84168a9c-6020-451a-83d1-7f32fbd352cf';
-      // .raw(`SELECT * FROM "${ASSET_METADATA_MODEL_ID}" WHERE "assetId" = '${assetId}';`)
-      .from(assetMetadataModelId)
-      .where({
-        assetId,
-      })
-      .context(crtvVideosContextId);
+      const selectStatement = db
+        .select()
+        .from(assetMetadataModelId)
+        .where({
+          assetId,
+        })
+        .context(crtvVideosContextId);
 
-    const [result, error] = await catchError(() => selectStatement.run());
+      // Build the query first to check it
+      const query = selectStatement.build();
+      console.log('Query that will be run:', query);
 
-    if (error) {
-      console.log('selectStatement runs', selectStatement.runs);
-      console.error(error);
+      const [result, error] = await catchError(() => selectStatement.run());
+
+      if (error) {
+        console.error('Select statement error:', error);
+        throw error;
+      }
+
+      const { rows } = result;
+      if (!rows?.length) return null;
+
+      // Convert the first row to a plain object with known shape
+      const metadata: AssetMetadata = {
+        assetId: rows[0].assetId,
+        playbackId: rows[0].playbackId,
+        title: rows[0].title,
+        description: rows[0].description,
+        location: rows[0].location,
+        category: rows[0].category,
+        thumbnailUri: rows[0].thumbnailUri,
+        subtitlesUri: rows[0].subtitlesUri,
+      };
+
+      // Handle subtitles if they exist
+      if (metadata.subtitlesUri) {
+        try {
+          const res = await download({
+            client,
+            uri: metadata.subtitlesUri,
+          });
+
+          if (res) {
+            // Ensure subtitles are in the correct format
+            const subtitlesData = res;
+            const plainSubtitles = Object.fromEntries(
+              Object.entries(subtitlesData).map(([lang, chunks]) => [
+                lang,
+                (Array.isArray(chunks) ? chunks : []).map(chunk => ({
+                  text: String(chunk.text || ''),
+                  timestamp: Array.isArray(chunk.timestamp) ? [...chunk.timestamp] : []
+                }))
+              ])
+            );
+            metadata.subtitles = plainSubtitles;
+          }
+        } catch (error) {
+          console.error('Failed to fetch subtitles:', error);
+          // Don't throw here, just log the error and continue without subtitles
+        }
+      }
+
+      return metadata;
+    } catch (error) {
+      console.error('Failed to fetch asset metadata:', error);
       throw error;
     }
-
-    const { columns, rows } = result;
-
-    const assetMetadata = rows[0] as AssetMetadata;
-
-    if (assetMetadata?.subtitlesUri) {
-      try {
-        const res = await download({
-          client,
-          uri: assetMetadata.subtitlesUri,
-        });
-        const data = await res.json();
-        assetMetadata.subtitles = data;
-      } catch (error) {
-        console.error('Failed to download subtitles', {
-          uri: assetMetadata.subtitlesUri,
-          error,
-        });
-      }
-    }
-
-    return assetMetadata;
   };
 
   const orbisLogin = async (

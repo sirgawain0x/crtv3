@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { Src } from '@livepeer/react';
 import { FEATURED_VIDEO_TITLE } from '@app/lib/utils/context';
 import { getFeaturedPlaybackSource } from '@app/lib/utils/hooks/useFeaturePlaybackSource';
-import { DemoPlayer } from '../Player/DemoPlayer';
+import { PreviewPlayer } from '../Player/PreviewPlayer';
 import Skeleton from '@app/components/ui/skeleton';
 
 const FeaturedVideo: React.FC = () => {
@@ -42,7 +42,7 @@ const FeaturedVideo: React.FC = () => {
               <Skeleton className="h-[340px] w-[450px] rounded-xl"></Skeleton>
             </div>
           ) : (
-            <DemoPlayer src={src} title={FEATURED_VIDEO_TITLE} />
+            <PreviewPlayer src={src} title={FEATURED_VIDEO_TITLE} />
           )}
 
           <div className="absolute inset-x-0 top-0 bg-gradient-to-b from-black/50 to-transparent p-4 text-lg text-white">
