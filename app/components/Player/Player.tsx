@@ -47,6 +47,7 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
   const [controlsVisible, setControlsVisible] = useState(true);
   const [conditionalProps, setConditionalProps] = useState<any>({});
   const fadeTimeoutRef = useRef<NodeJS.Timeout>();
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   const activeAccount = useActiveAccount();
 
@@ -124,6 +125,10 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
             e.preventDefault();
             resetFadeTimeout();
           }}
+          onClick={() => {
+            setControlsVisible(true);
+            resetFadeTimeout();
+          }}
           onMouseLeave={() => {
             if (fadeTimeoutRef.current) {
               clearTimeout(fadeTimeoutRef.current);
@@ -135,7 +140,13 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
             <Player.Video
               title={title}
               className="h-full w-full rounded-lg"
-              poster={null}
+              ref={videoRef}
+              onPlay={() => {
+                if (onPlay) onPlay();
+                setControlsVisible(true);
+                resetFadeTimeout();
+              }}
+              playsInline
             />
             <SubtitlesDisplay
               style={{
@@ -181,29 +192,26 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
             An error occurred. Trying to resume playback...
           </Player.ErrorIndicator>
 
-          <div
+          <Player.Controls
             className={`video-controls absolute bottom-0 left-0 right-0 w-full flex flex-col gap-2 md:gap-4 bg-gradient-to-t from-black/80 to-transparent p-2 md:p-4 transition-opacity duration-300 ${
               controlsVisible ? 'opacity-100' : 'opacity-0'
             }`}
           >
-            {/* Time display above seek bar */}
             <div className="flex justify-end">
-              <Player.Time
-                className="text-xs md:text-sm text-white px-2 py-1 bg-black/40 rounded tabular-nums"
-              />
+              <Player.Time className="text-xs md:text-sm text-white px-2 py-1 bg-black/40 rounded tabular-nums" />
             </div>
 
-            <Player.Seek className="relative flex w-full items-center gap-2">
-              <Player.Track className="relative h-1 w-full rounded-full bg-white/70">
+            <Player.Seek className="relative flex w-full items-center gap-2 touch-none">
+              <Player.Track className="relative h-1.5 w-full rounded-full bg-white/70">
                 <Player.SeekBuffer className="absolute h-full rounded-full bg-black/50" />
                 <Player.Range className="absolute h-full rounded-full bg-pink-500" />
               </Player.Track>
-              <Player.Thumb className="block h-2 md:h-3 w-2 md:w-3 rounded-full bg-white" />
+              <Player.Thumb className="block h-3 w-3 md:h-4 md:w-4 rounded-full bg-white touch-none" />
             </Player.Seek>
 
             <div className="flex w-full items-center justify-between">
               <div className="flex items-center gap-2 md:gap-4">
-                <Player.PlayPauseTrigger className="h-6 w-6 md:h-8 md:w-8">
+                <Player.PlayPauseTrigger className="h-8 w-8 md:h-10 md:w-10 touch-none">
                   <Player.PlayingIndicator asChild matcher={false}>
                     <PlayIcon className="h-full w-full text-pink-500" />
                   </Player.PlayingIndicator>
@@ -213,19 +221,19 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
                 </Player.PlayPauseTrigger>
 
                 <div className="flex items-center gap-1 md:gap-2">
-                  <Player.MuteTrigger className="h-5 w-5 md:h-6 md:w-6 text-pink-500">
+                  <Player.MuteTrigger className="h-6 w-6 md:h-8 md:w-8 touch-none">
                     <Player.VolumeIndicator asChild matcher={false}>
-                      <MuteIcon className="h-full w-full" />
+                      <MuteIcon className="h-full w-full text-pink-500" />
                     </Player.VolumeIndicator>
                     <Player.VolumeIndicator asChild matcher={true}>
-                      <UnmuteIcon className="h-full w-full" />
+                      <UnmuteIcon className="h-full w-full text-pink-500" />
                     </Player.VolumeIndicator>
                   </Player.MuteTrigger>
-                  <Player.Volume className="relative hidden sm:flex items-center gap-2 w-16 md:w-20">
-                    <Player.Track className="relative h-1 flex-grow rounded-full bg-white/70">
+                  <Player.Volume className="relative hidden sm:flex items-center gap-2 w-16 md:w-20 touch-none">
+                    <Player.Track className="relative h-1.5 flex-grow rounded-full bg-white/70">
                       <Player.Range className="absolute h-full rounded-full bg-pink-500" />
                     </Player.Track>
-                    <Player.Thumb className="block h-2 md:h-3 w-2 md:w-3 rounded-full bg-white" />
+                    <Player.Thumb className="block h-3 w-3 md:h-4 md:w-4 rounded-full bg-white" />
                   </Player.Volume>
                 </div>
               </div>
@@ -237,7 +245,7 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
                   </div>
                 )}
 
-                <Player.FullscreenTrigger className="h-5 w-5 md:h-6 md:w-6 text-pink-500 hover:text-pink-400">
+                <Player.FullscreenTrigger className="h-6 w-6 md:h-8 md:w-8 text-pink-500 hover:text-pink-400 touch-none">
                   <Player.FullscreenIndicator asChild>
                     <ExitFullscreenIcon className="h-full w-full" />
                   </Player.FullscreenIndicator>
@@ -247,7 +255,7 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
                 </Player.FullscreenTrigger>
               </div>
             </div>
-          </div>
+          </Player.Controls>
         </Player.Container>
       </Player.Root>
     </>
