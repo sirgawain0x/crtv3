@@ -110,20 +110,20 @@ export const PreviewPlayer: React.FC<{ src: Src[] | null; title: string }> = ({
               </div>
 
               {/* Right controls */}
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 md:gap-4">
                 <Player.RateSelect name="rateSelect">
                   <Player.SelectTrigger
-                    className="flex h-8 items-center gap-1 rounded border border-white/20 px-2 text-sm text-white hover:bg-white/10"
+                    className="flex h-6 md:h-8 items-center gap-1 rounded border border-white/20 px-1 md:px-2 text-xs md:text-sm text-white hover:bg-white/10"
                     aria-label="Playback speed"
                   >
-                    <Player.SelectValue placeholder="1x" />
+                    <Player.SelectValue placeholder="1x" className="min-w-[24px] md:min-w-[32px]" />
                     <Player.SelectIcon>
-                      <ChevronDownIcon className="h-4 w-4" />
+                      <ChevronDownIcon className="h-3 w-3 md:h-4 md:w-4" />
                     </Player.SelectIcon>
                   </Player.SelectTrigger>
                   <Player.SelectPortal>
                     <Player.SelectContent
-                      className="rounded-lg bg-gray-800 text-sm text-white/90 p-1"
+                      className="rounded-lg bg-gray-800 text-xs md:text-sm text-white/90 p-1"
                     >
                       <Player.SelectViewport>
                         <Player.SelectGroup>
@@ -137,16 +137,16 @@ export const PreviewPlayer: React.FC<{ src: Src[] | null; title: string }> = ({
                   </Player.SelectPortal>
                 </Player.RateSelect>
 
-                <Player.PictureInPictureTrigger className="h-6 w-6 text-white hover:text-white/80">
-                  <PictureInPictureIcon />
+                <Player.PictureInPictureTrigger className="hidden sm:block h-5 w-5 md:h-6 md:w-6 text-white hover:text-white/80">
+                  <PictureInPictureIcon className="h-full w-full" />
                 </Player.PictureInPictureTrigger>
 
-                <Player.FullscreenTrigger className="h-6 w-6 text-white hover:text-white/80">
+                <Player.FullscreenTrigger className="h-5 w-5 md:h-6 md:w-6 text-white hover:text-white/80">
                   <Player.FullscreenIndicator asChild matcher={false}>
-                    <EnterFullscreenIcon />
+                    <EnterFullscreenIcon className="h-full w-full" />
                   </Player.FullscreenIndicator>
                   <Player.FullscreenIndicator asChild>
-                    <ExitFullscreenIcon />
+                    <ExitFullscreenIcon className="h-full w-full" />
                   </Player.FullscreenIndicator>
                 </Player.FullscreenTrigger>
               </div>
@@ -162,34 +162,15 @@ const RateSelectItem = forwardRef<HTMLDivElement, Player.RateSelectItemProps>(
     ({ children, ...props }, forwardedRef) => {
       return (
         <Player.RateSelectItem
-          style={{
-            fontSize: '14px',
-            borderRadius: '8px',
-            display: "flex",
-            alignItems: "center",
-            paddingRight: 40,
-            paddingLeft: 32,
-            position: "relative",
-            userSelect: "none",
-            height: 36,
-            transition: 'background-color 0.2s ease',
-            cursor: 'pointer',
-          }}
+          className="flex items-center px-3 py-2 text-xs md:text-sm relative rounded-sm hover:bg-white/10 cursor-pointer select-none"
           {...props}
           ref={forwardedRef}
         >
           <Player.SelectItemText>{children}</Player.SelectItemText>
           <Player.SelectItemIndicator
-            style={{
-              position: "absolute",
-              left: 8,
-              width: 24,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
+            className="absolute left-1 flex items-center justify-center w-4 md:w-5"
           >
-            <CheckIcon style={{ width: 16, height: 16 }} />
+            <CheckIcon className="h-3 w-3 md:h-4 md:w-4" />
           </Player.SelectItemIndicator>
         </Player.RateSelectItem>
       );
