@@ -1,10 +1,11 @@
 .player-container {
   position: relative;
   width: 100%;
-  height: 100%;
+  aspect-ratio: 16/9;
   background-color: black;
   border-radius: 0.5rem;
   overflow: hidden;
+  touch-action: none;
   box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
 }
 
@@ -13,12 +14,27 @@
   transition: all 0.3s ease-in-out;
   z-index: 10;
   width: 100%;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(to top, rgba(0,0,0,0.7), transparent);
+  padding: 1rem;
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
-/* Show controls on hover and focus */
-.player-container:hover .video-controls,
-.player-container:focus-within .video-controls {
+/* Show controls on touch for mobile */
+.player-container:active .video-controls {
   opacity: 1;
+}
+
+/* Show controls on hover and focus for desktop */
+@media (hover: hover) {
+  .player-container:hover .video-controls,
+  .player-container:focus-within .video-controls {
+    opacity: 1;
+  }
 }
 
 /* Ensure controls are visible when interacting with them */
@@ -34,16 +50,27 @@
 /* Style improvements for interactive elements */
 button {
   transition: all 0.2s ease;
+  min-width: 24px; /* Minimum touch target size */
+  min-height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 button:hover {
   opacity: 0.8;
 }
 
-/* Ensure video has rounded corners */
+/* Ensure video has rounded corners and proper sizing */
 video {
-  border-radius: 0.5rem;
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 0.5rem;
+  -webkit-tap-highlight-color: transparent;
 }
 
 /* Ensure seek track spans full width */
@@ -54,4 +81,13 @@ video {
 /* Ensure proper spacing in controls */
 .video-controls > div {
   width: 100%;
+}
+
+/* Improve touch targets for mobile sliders */
+[data-part="thumb"] {
+  touch-action: none;
+  -webkit-tap-highlight-color: transparent;
+  min-width: 20px;
+  min-height: 20px;
+  cursor: pointer;
 }

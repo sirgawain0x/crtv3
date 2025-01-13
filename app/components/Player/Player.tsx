@@ -161,7 +161,7 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
           </Player.ErrorIndicator>
 
           <div 
-            className={`video-controls absolute bottom-0 left-0 right-0 w-full flex flex-col gap-4 bg-gradient-to-t from-black/80 to-transparent p-4 transition-opacity duration-300 ${
+            className={`video-controls absolute bottom-0 left-0 right-0 w-full flex flex-col gap-2 md:gap-4 bg-gradient-to-t from-black/80 to-transparent p-2 md:p-4 transition-opacity duration-300 ${
               controlsVisible ? 'opacity-100' : 'opacity-0'
             }`}
           >
@@ -170,12 +170,12 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
                 <Player.SeekBuffer className="absolute h-full rounded-full bg-black/50" />
                 <Player.Range className="absolute h-full rounded-full bg-pink-500" />
               </Player.Track>
-              <Player.Thumb className="block h-3 w-3 rounded-full bg-white" />
+              <Player.Thumb className="block h-2 md:h-3 w-2 md:w-3 rounded-full bg-white" />
             </Player.Seek>
 
             <div className="flex w-full items-center justify-between">
-              <div className="flex items-center gap-4">
-                <Player.PlayPauseTrigger className="h-8 w-8">
+              <div className="flex items-center gap-2 md:gap-4">
+                <Player.PlayPauseTrigger className="h-6 w-6 md:h-8 md:w-8">
                   <Player.PlayingIndicator asChild matcher={false}>
                     <PlayIcon className="h-full w-full text-pink-500" />
                   </Player.PlayingIndicator>
@@ -185,11 +185,11 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
                 </Player.PlayPauseTrigger>
 
                 <Player.Time
-                  className="text-sm text-white tabular-nums"
+                  className="hidden sm:block text-xs md:text-sm text-white tabular-nums"
                 />
 
-                <div className="flex items-center gap-2">
-                  <Player.MuteTrigger className="h-6 w-6 text-pink-500">
+                <div className="flex items-center gap-1 md:gap-2">
+                  <Player.MuteTrigger className="h-5 w-5 md:h-6 md:w-6 text-pink-500">
                     <Player.VolumeIndicator asChild matcher={false}>
                       <MuteIcon className="h-full w-full" />
                     </Player.VolumeIndicator>
@@ -197,19 +197,23 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
                       <UnmuteIcon className="h-full w-full" />
                     </Player.VolumeIndicator>
                   </Player.MuteTrigger>
-                  <Player.Volume className="relative flex items-center gap-2 w-20">
+                  <Player.Volume className="relative hidden sm:flex items-center gap-2 w-16 md:w-20">
                     <Player.Track className="relative h-1 flex-grow rounded-full bg-white/70">
                       <Player.Range className="absolute h-full rounded-full bg-pink-500" />
                     </Player.Track>
-                    <Player.Thumb className="block h-3 w-3 rounded-full bg-white" />
+                    <Player.Thumb className="block h-2 md:h-3 w-2 md:w-3 rounded-full bg-white" />
                   </Player.Volume>
                 </div>
               </div>
 
-              <div className="flex items-center gap-4">
-                {assetMetadata?.subtitles && <SubtitlesControl />}
+              <div className="flex items-center gap-2 md:gap-4">
+                {assetMetadata?.subtitles && (
+                  <div className="hidden sm:block">
+                    <SubtitlesControl />
+                  </div>
+                )}
                 
-                <Player.FullscreenTrigger className="h-6 w-6 text-pink-500 hover:text-pink-400">
+                <Player.FullscreenTrigger className="h-5 w-5 md:h-6 md:w-6 text-pink-500 hover:text-pink-400">
                   <Player.FullscreenIndicator asChild>
                     <ExitFullscreenIcon className="h-full w-full" />
                   </Player.FullscreenIndicator>
