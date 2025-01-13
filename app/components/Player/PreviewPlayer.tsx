@@ -56,6 +56,14 @@ export const PreviewPlayer: React.FC<{ src: Src[] | null; title: string }> = ({
           className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/50 to-transparent p-4 video-controls ${!controlsVisible ? 'fade-out' : ''}`}
         >
           <div className="flex flex-col gap-4">
+            {/* Seek bar at bottom */}
+            <Player.Seek className="relative flex items-center gap-2">
+              <Player.Track className="relative h-1 flex-grow rounded-full bg-white/70">
+                <Player.SeekBuffer className="absolute h-full rounded-full bg-black/50" />
+                <Player.Range className="absolute h-full rounded-full bg-pink-500" />
+              </Player.Track>
+              <Player.Thumb className="block h-3 w-3 rounded-full bg-white" />
+            </Player.Seek>
             <div className="flex items-center justify-between">
               {/* Left controls */}
               <div className="flex items-center gap-4">
@@ -143,15 +151,6 @@ export const PreviewPlayer: React.FC<{ src: Src[] | null; title: string }> = ({
                 </Player.FullscreenTrigger>
               </div>
             </div>
-
-            {/* Seek bar at bottom */}
-            <Player.Seek className="relative flex items-center gap-2">
-              <Player.Track className="relative h-1 flex-grow rounded-full bg-white/70">
-                <Player.SeekBuffer className="absolute h-full rounded-full bg-black/50" />
-                <Player.Range className="absolute h-full rounded-full bg-pink-500" />
-              </Player.Track>
-              <Player.Thumb className="block h-3 w-3 rounded-full bg-white" />
-            </Player.Seek>
           </div>
         </div>
       </Player.Container>
