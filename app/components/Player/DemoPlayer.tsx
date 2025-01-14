@@ -52,6 +52,21 @@ export const DemoPlayer: React.FC<{ src: Src[] | null; title: string }> = ({
           resetFadeTimeout();
         }}
       >
+        <Player.LoadingIndicator
+          style={{
+            height: "100%",
+            width: "100%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: "black",
+          }}
+        >
+          <div className="flex flex-col items-center space-y-4">
+            <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+            <div className="text-lg font-semibold text-white">Loading...</div>
+          </div>
+        </Player.LoadingIndicator>
         <Player.Video title={title} poster={null} />
         <Player.Controls className={`flex items-center justify-center ${controlsVisible ? 'opacity-100' : 'opacity-0'} transition-opacity duration-300`}>
           {/* Time display above controls */}

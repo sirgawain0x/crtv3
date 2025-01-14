@@ -48,11 +48,31 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
   const [conditionalProps, setConditionalProps] = useState<any>({});
   const fadeTimeoutRef = useRef<NodeJS.Timeout>();
   const videoRef = useRef<HTMLVideoElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const activeAccount = useActiveAccount();
 
   const { getAssetMetadata } = useOrbisContext();
   const { setSubtitles } = useSubtitles();
+
+  useEffect(() => {
+    const handleVideoMetadata = () => {
+      const video = videoRef.current;
+      const container = containerRef.current;
+      if (video && container) {
+        const isPortrait = video.videoHeight > video.videoWidth;
+        container.setAttribute('data-orientation', isPortrait ? 'portrait' : 'landscape');
+      }
+    };
+
+    const video = videoRef.current;
+    if (video) {
+      video.addEventListener('loadedmetadata', handleVideoMetadata);
+      return () => {
+        video.removeEventListener('loadedmetadata', handleVideoMetadata);
+      };
+    }
+  }, []);
 
   useEffect(() => {
     const fetchAssetDetails = async (id: string): Promise<void> => {
@@ -112,7 +132,12 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
         }}
       >
         <Player.Container
-          className="player-container relative aspect-video w-full overflow-hidden bg-gray-950"
+          ref={containerRef}
+          className="player-container relative w-full overflow-hidden bg-gray-950"
+          style={{
+            aspectRatio: 'auto',
+            maxHeight: '640px'
+          }}
           onMouseMove={resetFadeTimeout}
           onMouseEnter={resetFadeTimeout}
           onTouchStart={() => {
@@ -193,14 +218,10 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
           </Player.ErrorIndicator>
 
           <Player.Controls
-            className={`video-controls absolute bottom-0 left-0 right-0 w-full flex flex-col gap-2 md:gap-4 bg-gradient-to-t from-black/80 to-transparent p-2 md:p-4 transition-opacity duration-300 ${
+            className={`video-controls absolute bottom-0 left-0 right-0 w-full flex flex-col justify-end gap-2 md:gap-4 bg-gradient-to-t from-black/80 to-transparent p-2 md:p-4 transition-opacity duration-300 ${
               controlsVisible ? 'opacity-100' : 'opacity-0'
             }`}
           >
-            <div className="flex justify-end">
-              <Player.Time className="text-xs md:text-sm text-white px-2 py-1 bg-black/40 rounded tabular-nums" />
-            </div>
-
             <Player.Seek className="relative flex w-full items-center gap-2 touch-none">
               <Player.Track className="relative h-1.5 w-full rounded-full bg-white/70">
                 <Player.SeekBuffer className="absolute h-full rounded-full bg-black/50" />
@@ -221,12 +242,12 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
                 </Player.PlayPauseTrigger>
 
                 <div className="flex items-center gap-1 md:gap-2">
-                  <Player.MuteTrigger className="h-6 w-6 md:h-8 md:w-8 touch-none">
+                  <Player.MuteTrigger className="h-6 w-6 md:h-8 md:w-8 text-pink-500">
                     <Player.VolumeIndicator asChild matcher={false}>
-                      <MuteIcon className="h-full w-full text-pink-500" />
+                      <MuteIcon className="h-full w-full" />
                     </Player.VolumeIndicator>
                     <Player.VolumeIndicator asChild matcher={true}>
-                      <UnmuteIcon className="h-full w-full text-pink-500" />
+                      <UnmuteIcon className="h-full w-full" />
                     </Player.VolumeIndicator>
                   </Player.MuteTrigger>
                   <Player.Volume className="relative hidden sm:flex items-center gap-2 w-16 md:w-20 touch-none">
@@ -236,11 +257,13 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
                     <Player.Thumb className="block h-3 w-3 md:h-4 md:w-4 rounded-full bg-white" />
                   </Player.Volume>
                 </div>
+
+                <Player.Time className="text-xs md:text-sm text-white px-2 py-1 bg-black/40 rounded tabular-nums" />
               </div>
 
               <div className="flex items-center gap-2 md:gap-4">
                 {assetMetadata?.subtitles && (
-                  <div className="hidden sm:block">
+                  <div className="sm:block">
                     <SubtitlesControl />
                   </div>
                 )}

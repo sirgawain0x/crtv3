@@ -1,4 +1,7 @@
+'use client';
+
 import { Broadcast } from '@app/components/Live/Broadcast';
+import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -7,9 +10,27 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from '@app/components/ui/breadcrumb';
+import { Alert, AlertDescription, AlertTitle } from '@app/components/ui/alert';
 import { Slash, VideoIcon } from 'lucide-react';
+import { FaExclamationTriangle } from 'react-icons/fa';
 
 export default function BroadcastPage() {
+  const { isConnected } = useOrbisContext();
+
+  if (!isConnected) {
+    return (
+      <div className="min-h-screen p-6">
+        <Alert variant="destructive">
+          <FaExclamationTriangle className="h-4 w-4" />
+          <AlertTitle>Authentication Required</AlertTitle>
+          <AlertDescription>
+            Please connect your wallet to access the live streaming feature.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen p-6">
       <div className="mb-8 rounded-lg bg-white p-8 shadow-md">

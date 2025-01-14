@@ -35,8 +35,12 @@ import {
   CardTitle,
 } from '../ui/card';
 import MemberCard from './MemberCard';
+import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
+import { Alert, AlertDescription, AlertTitle } from '@app/components/ui/alert';
+import { FaExclamationTriangle } from 'react-icons/fa';
 
 const ProfilePage: NextPage = () => {
+  const { isConnected } = useOrbisContext();
   const { user } = useParams();
   const [transferAddress, setTransferAddress] = useState('');
   const [lendingAddress, setLendingAddress] = useState('');
@@ -144,148 +148,175 @@ const ProfilePage: NextPage = () => {
     }
   }, [activeAccount]);
 
+  if (!isConnected) {
+    return (
+      <div className="min-h-screen p-6">
+        <Alert variant="destructive">
+          <FaExclamationTriangle className="h-4 w-4" />
+          <AlertTitle>Authentication Required</AlertTitle>
+          <AlertDescription>
+            Please connect your wallet to access your profile.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
   return (
-    <div className="container mx-auto my-5 px-4">
-      <Tabs defaultValue="Membership" className="mx-auto w-full max-w-3xl">
-        <TabsList className="w-full justify-start overflow-x-auto">
-          <TabsTrigger id="members" value="Membership">
+    <div className="space-y-6">
+      <Tabs defaultValue="Membership" className="w-full">
+        <TabsList className="flex w-full space-x-1 overflow-x-auto border-b p-0 md:justify-start">
+          <TabsTrigger
+            id="members"
+            value="Membership"
+            className="flex-shrink-0 rounded-t-lg px-4 py-2 text-sm font-medium"
+          >
             Membership
           </TabsTrigger>
-          <TabsTrigger id="metoken" value="MeToken">
+          <TabsTrigger
+            id="metoken"
+            value="MeToken"
+            className="flex-shrink-0 rounded-t-lg px-4 py-2 text-sm font-medium"
+          >
             MeToken
           </TabsTrigger>
-          <TabsTrigger id="uploads" value="Uploads">
+          <TabsTrigger
+            id="uploads"
+            value="Uploads"
+            className="flex-shrink-0 rounded-t-lg px-4 py-2 text-sm font-medium"
+          >
             Uploads
           </TabsTrigger>
-          <TabsTrigger id="minted" value="Minted">
+          <TabsTrigger
+            id="minted"
+            value="Minted"
+            className="flex-shrink-0 rounded-t-lg px-4 py-2 text-sm font-medium"
+          >
             Minted
           </TabsTrigger>
-          <TabsTrigger id="revenue" value="Revenue">
+          <TabsTrigger
+            id="revenue"
+            value="Revenue"
+            className="flex-shrink-0 rounded-t-lg px-4 py-2 text-sm font-medium"
+          >
             Revenue
           </TabsTrigger>
         </TabsList>
-        <TabsContent value="Membership">
-          <Card className="w-full">
-            <CardHeader>
-              <CardTitle>Membership</CardTitle>
-              <CardDescription>
-                Make actions on your membership here.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="space-y-1">
+
+        <div className="mt-6">
+          <TabsContent value="Membership">
+            <Card>
+              <CardHeader className="space-y-1">
+                <CardTitle className="text-2xl">Membership</CardTitle>
+                <CardDescription>
+                  Manage your membership status and details
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
                 <MemberCard
                   member={memberData}
                   nft={nftData}
                   balance={balance}
                   points={points}
                 />
-              </div>
-            </CardContent>
-            <CardFooter className="space-x-2">
-              <TransactionButton
-                transaction={() =>
-                  prepareContractCall({
-                    contract: unlockContract,
-                    method: 'renewMembershipFor',
-                    params: [ownedIds, CREATIVE_ADDRESS],
-                  })
-                }
-                onClick={() => toast.success('Successful Membership Renewal!')}
-                onError={(error: Error) =>
-                  toast.error('Error Renewing Membership.')
-                }
-              >
-                Renew
-              </TransactionButton>
-              <TransactionButton
-                transaction={() =>
-                  prepareContractCall({
-                    contract: unlockContract,
-                    method: 'cancelAndRefund',
-                    params: [ownedIds],
-                  })
-                }
-                onClick={() =>
-                  toast.success('Cancelled Membership Successfully!')
-                }
-                onError={(error: Error) =>
-                  toast.error('Error Cancelling Your Membership.')
-                }
-              >
-                Cancel
-              </TransactionButton>
-            </CardFooter>
-          </Card>
-        </TabsContent>
-        <TabsContent value="Uploads">
-          <Card className="w-full">
-            <CardHeader>
-              <CardTitle>Upload</CardTitle>
-              <CardDescription>Pick a video to be uploaded.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="space-y-1">
-                <Link href={`/profile/${activeAccount?.address}/upload`}>
-                  Go to upload
+              </CardContent>
+              <CardFooter className="flex flex-wrap gap-2">
+                <TransactionButton
+                  className="flex items-center gap-2"
+                  transaction={() =>
+                    prepareContractCall({
+                      contract: unlockContract,
+                      method: 'renewMembershipFor',
+                      params: [ownedIds, CREATIVE_ADDRESS],
+                    })
+                  }
+                  onClick={() => toast.success('Successful Membership Renewal!')}
+                  onError={(error: Error) =>
+                    toast.error('Error Renewing Membership.')
+                  }
+                >
+                  Renew
+                </TransactionButton>
+                <TransactionButton
+                  className="flex items-center gap-2"
+                  transaction={() =>
+                    prepareContractCall({
+                      contract: unlockContract,
+                      method: 'cancelAndRefund',
+                      params: [ownedIds],
+                    })
+                  }
+                  onClick={() =>
+                    toast.success('Cancelled Membership Successfully!')
+                  }
+                  onError={(error: Error) =>
+                    toast.error('Error Cancelling Your Membership.')
+                  }
+                >
+                  Cancel
+                </TransactionButton>
+              </CardFooter>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="Uploads">
+            <Card>
+              <CardHeader className="space-y-1">
+                <CardTitle className="text-2xl">Upload Content</CardTitle>
+                <CardDescription>Share your videos with the community</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Link
+                  href={`/profile/${activeAccount?.address}/upload`}
+                  className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+                >
+                  Upload New Video
                 </Link>
-              </div>
-            </CardContent>
-            <CardFooter className="space-x-2"></CardFooter>
-          </Card>
-        </TabsContent>
-        <TabsContent value="Minted">
-          <Card className="w-full">
-            <CardHeader>
-              <CardTitle>Lazy minted nfts</CardTitle>
-              <CardDescription>
-                Here is the list of your lazy minted nfts
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {activeAccount && (
-                <LazyMintedAsset activeAccount={activeAccount as Account} />
-              )}
-            </CardContent>
-            <CardFooter className="space-x-2"></CardFooter>
-          </Card>
-        </TabsContent>
-        <TabsContent value="MeToken">
-          <Card className="w-full">
-            <CardHeader>
-              <CardTitle>Create A MeToken</CardTitle>
-              <CardDescription>
-                Generate your own creator token here.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <CreateMetoken />
-            </CardContent>
-          </Card>
-        </TabsContent>
-        <TabsContent value="Uploads">
-          <Card className="w-full">
-            <CardHeader>
-              <CardTitle>Upload History</CardTitle>
-              <CardDescription>Uploaded videos will show here.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {/* <AssetDetails /> */}
-              <ListUploadedAssets activeAccount={activeAccount as Account} />
-            </CardContent>
-          </Card>
-        </TabsContent>
-        <TabsContent value="Revenue">
-          <Card className="w-full">
-            <CardHeader>
-              <CardTitle>Revenue</CardTitle>
-              <CardDescription>Your revenue will show here.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p>Coming Soon</p>
-            </CardContent>
-          </Card>
-        </TabsContent>
+                <div className="mt-6">
+                  <ListUploadedAssets activeAccount={activeAccount as Account} />
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="Minted">
+            <Card>
+              <CardHeader className="space-y-1">
+                <CardTitle className="text-2xl">Minted NFTs</CardTitle>
+                <CardDescription>View your lazy minted NFT collection</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {activeAccount && (
+                  <LazyMintedAsset activeAccount={activeAccount as Account} />
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="MeToken">
+            <Card>
+              <CardHeader className="space-y-1">
+                <CardTitle className="text-2xl">Creator Token</CardTitle>
+                <CardDescription>Create and manage your personal token</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <CreateMetoken />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="Revenue">
+            <Card>
+              <CardHeader className="space-y-1">
+                <CardTitle className="text-2xl">Revenue Dashboard</CardTitle>
+                <CardDescription>Track your earnings and analytics</CardDescription>
+              </CardHeader>
+              <CardContent className="min-h-[200px] flex items-center justify-center">
+                <p className="text-muted-foreground">Coming Soon</p>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </div>
       </Tabs>
     </div>
   );

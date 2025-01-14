@@ -11,20 +11,20 @@ import ProfilePage from '@app/components/UserProfile/UserProfile';
 
 export default function Profile() {
   return (
-    <div className={'min-h-screen p-6'}>
-      <div className="my-5 p-4">
+    <div className="min-h-screen bg-background px-4 py-6 md:px-6 lg:px-8">
+      <div className="mb-6 md:mb-8">
         <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem>
-              <BreadcrumbLink href="/">
-                <span role="img" aria-label="home">
+              <BreadcrumbLink href="/" className="flex items-center hover:text-primary">
+                <span role="img" aria-label="home" className="mr-1">
                   🏠
                 </span>{' '}
                 Home
               </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator>
-              <Slash />
+              <Slash className="h-4 w-4" />
             </BreadcrumbSeparator>
             <BreadcrumbItem>
               <BreadcrumbLink>
@@ -34,7 +34,7 @@ export default function Profile() {
           </BreadcrumbList>
         </Breadcrumb>
       </div>
-      <div className="p-4">
+      <div className="mx-auto max-w-7xl">
         <ProfilePage />
       </div>
     </div>
