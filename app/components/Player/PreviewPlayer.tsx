@@ -8,7 +8,6 @@ import {
     EnterFullscreenIcon,
     ExitFullscreenIcon,
     PictureInPictureIcon,
-
 } from '@livepeer/react/assets';
 import './Player.css';
 import { useEffect, useState, useRef, forwardRef } from 'react';
@@ -21,6 +20,27 @@ export const PreviewPlayer: React.FC<{ src: Src[] | null; title: string }> = ({
 }) => {
   const [controlsVisible, setControlsVisible] = useState(true);
   const fadeTimeoutRef = useRef<NodeJS.Timeout>();
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleVideoMetadata = () => {
+      const video = videoRef.current;
+      const container = containerRef.current;
+      if (video && container) {
+        const isPortrait = video.videoHeight > video.videoWidth;
+        container.setAttribute('data-orientation', isPortrait ? 'portrait' : 'landscape');
+      }
+    };
+
+    const video = videoRef.current;
+    if (video) {
+      video.addEventListener('loadedmetadata', handleVideoMetadata);
+      return () => {
+        video.removeEventListener('loadedmetadata', handleVideoMetadata);
+      };
+    }
+  }, []);
 
   useEffect(() => {
     resetFadeTimeout();
@@ -49,6 +69,7 @@ export const PreviewPlayer: React.FC<{ src: Src[] | null; title: string }> = ({
     <Player.Root src={src} volume={1}>
       <Player.Container 
         className="player-container"
+        ref={containerRef}
         onMouseMove={resetFadeTimeout}
         onTouchStart={() => {
           if (fadeTimeoutRef.current) {
@@ -61,7 +82,11 @@ export const PreviewPlayer: React.FC<{ src: Src[] | null; title: string }> = ({
           resetFadeTimeout();
         }}
       >
-        <Player.Video title={title} poster={null} />
+        <Player.Video 
+          title={title} 
+          poster={null} 
+          ref={videoRef} 
+        />
         <div 
           className={`absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/50 to-transparent p-4 video-controls ${!controlsVisible ? 'fade-out' : ''}`}
         >
@@ -128,9 +153,9 @@ export const PreviewPlayer: React.FC<{ src: Src[] | null; title: string }> = ({
                     className="flex h-6 md:h-8 items-center gap-1 rounded border border-white/20 px-1 md:px-2 text-xs md:text-sm text-white hover:bg-white/10"
                     aria-label="Playback speed"
                   >
-                    <Player.SelectValue placeholder="1x" className="min-w-[24px] md:min-w-[32px]" />
+                    <Player.SelectValue placeholder="1x" className="min-w-[24px] md:min-w-[32px] mr-2" />
                     <Player.SelectIcon>
-                      <ChevronDownIcon className="h-3 w-3 md:h-4 md:w-4" />
+                      <ChevronDownIcon className="h-3 w-3 md:h-4 md:w-4 text-white" />
                     </Player.SelectIcon>
                   </Player.SelectTrigger>
                   <Player.SelectPortal>

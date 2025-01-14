@@ -68,9 +68,20 @@ video {
   left: 0;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   border-radius: 0.5rem;
   -webkit-tap-highlight-color: transparent;
+  background-color: black;
+}
+
+/* Portrait video container */
+.player-container[data-orientation="portrait"] {
+  aspect-ratio: 9/16;
+}
+
+/* Center portrait videos */
+.player-container[data-orientation="portrait"] video {
+  object-fit: contain;
 }
 
 /* Ensure seek track spans full width */
