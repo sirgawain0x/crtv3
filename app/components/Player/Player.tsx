@@ -25,6 +25,7 @@ import { generateAccessKey } from '@app/lib/access-key';
 import { WebhookContext } from '@app/api/livepeer/token-gate/route';
 import { useActiveAccount } from 'thirdweb/react';
 import { GetAssetResponse } from 'livepeer/models/operations';
+import { useVideo } from '@app/context/VideoContext';
 
 interface PlayerComponentProps {
   src: Src[] | null;
@@ -49,6 +50,8 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
   const fadeTimeoutRef = useRef<NodeJS.Timeout>();
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const { currentPlayingId, setCurrentPlayingId } = useVideo();
+  const playerId = useRef(Math.random().toString(36).substring(7)).current;
 
   const activeAccount = useActiveAccount();
 
@@ -109,6 +112,16 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
     };
   }, []);
 
+  useEffect(() => {
+    if (currentPlayingId && currentPlayingId !== playerId) {
+      // Another video started playing, pause this one
+      const video = containerRef.current?.querySelector('video');
+      if (video && !video.paused) {
+        video.pause();
+      }
+    }
+  }, [currentPlayingId, playerId]);
+
   const resetFadeTimeout = () => {
     if (fadeTimeoutRef.current) {
       clearTimeout(fadeTimeoutRef.current);
@@ -119,166 +132,172 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
     }, 2000);
   };
 
+  const handleControlInteraction = () => {
+    setControlsVisible(true);
+    resetFadeTimeout();
+  };
+
+  const handlePlay = () => {
+    setCurrentPlayingId(playerId);
+    if (onPlay) {
+      onPlay();
+    }
+  };
+
   return (
     <>
       <Player.Root
         src={src}
         {...conditionalProps}
         volume={1}
-        onPlay={() => {
-          if (onPlay) {
-            onPlay();
-          }
-        }}
+        onPlay={handlePlay}
       >
         <Player.Container
           ref={containerRef}
-          className="player-container relative w-full overflow-hidden bg-gray-950"
-          style={{
-            aspectRatio: 'auto',
-            maxHeight: '640px'
-          }}
+          className="player-container relative aspect-video touch-none"
           onMouseMove={resetFadeTimeout}
-          onMouseEnter={resetFadeTimeout}
-          onTouchStart={() => {
-            if (fadeTimeoutRef.current) {
-              clearTimeout(fadeTimeoutRef.current);
-            }
-            setControlsVisible(true);
-          }}
-          onTouchEnd={(e) => {
-            e.preventDefault();
-            resetFadeTimeout();
-          }}
-          onClick={() => {
-            setControlsVisible(true);
-            resetFadeTimeout();
-          }}
-          onMouseLeave={() => {
-            if (fadeTimeoutRef.current) {
-              clearTimeout(fadeTimeoutRef.current);
-            }
-            setControlsVisible(false);
-          }}
+          onMouseEnter={() => setControlsVisible(true)}
+          onTouchStart={handleControlInteraction}
         >
-          <SubtitlesProvider>
-            <Player.Video
-              title={title}
-              className="h-full w-full rounded-lg"
-              ref={videoRef}
-              onPlay={() => {
-                if (onPlay) onPlay();
-                setControlsVisible(true);
-                resetFadeTimeout();
-              }}
-              playsInline
-            />
-            <SubtitlesDisplay
-              style={{
-                position: 'absolute',
-                bottom: '10%',
-                width: '100%',
-                textAlign: 'center',
-                color: 'white',
-                textShadow: '2px 2px 4px rgba(0,0,0,0.8)',
-              }}
-            />
-            <SubtitlesControl />
-          </SubtitlesProvider>
+          <Player.Video
+            title={title}
+            className="h-full w-full"
+            playsInline
+            controls={false}
+          />
 
           <Player.LoadingIndicator
             style={{
-              height: '100%',
-              width: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: 'black',
-              borderRadius: '0.5rem',
+              height: "100%",
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              backgroundColor: "black",
+              position: "absolute",
+              top: 0,
+              left: 0,
+              zIndex: 20,
             }}
           >
-            Loading...
+            <div className="flex flex-col items-center space-y-4">
+              <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+              <div className="text-lg font-semibold text-white">Loading...</div>
+            </div>
           </Player.LoadingIndicator>
 
-          <Player.ErrorIndicator
-            matcher="all"
-            style={{
-              position: 'absolute',
-              inset: 0,
-              height: '100%',
-              width: '100%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: 'black',
-              borderRadius: '0.5rem',
-            }}
-          >
-            An error occurred. Trying to resume playback...
-          </Player.ErrorIndicator>
+          <div
+            className={`absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/60 pointer-events-none transition-opacity duration-300 ${
+              controlsVisible ? "opacity-100" : "opacity-0"
+            }`}
+          />
 
-          <Player.Controls
-            className={`video-controls absolute bottom-0 left-0 right-0 w-full flex flex-col justify-end gap-2 md:gap-4 bg-gradient-to-t from-black/80 to-transparent p-2 md:p-4 transition-opacity duration-300 ${
-              controlsVisible ? 'opacity-100' : 'opacity-0'
+          <div
+            className={`absolute inset-0 z-30 touch-none transition-opacity duration-300 ${
+              controlsVisible ? "opacity-100" : "opacity-0"
             }`}
           >
-            <Player.Seek className="relative flex w-full items-center gap-2 touch-none">
-              <Player.Track className="relative h-1.5 w-full rounded-full bg-white/70">
-                <Player.SeekBuffer className="absolute h-full rounded-full bg-black/50" />
-                <Player.Range className="absolute h-full rounded-full bg-pink-500" />
-              </Player.Track>
-              <Player.Thumb className="block h-3 w-3 md:h-4 md:w-4 rounded-full bg-white touch-none" />
-            </Player.Seek>
-
-            <div className="flex w-full items-center justify-between">
-              <div className="flex items-center gap-2 md:gap-4">
-                <Player.PlayPauseTrigger className="h-8 w-8 md:h-10 md:w-10 touch-none">
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="flex items-center gap-6">
+                <Player.PlayPauseTrigger
+                  className="group relative flex h-16 w-16 touch-none cursor-pointer items-center justify-center rounded-full bg-black/50 hover:bg-black/70"
+                  onClick={handleControlInteraction}
+                >
                   <Player.PlayingIndicator asChild matcher={false}>
-                    <PlayIcon className="h-full w-full text-pink-500" />
+                    <PlayIcon className="h-10 w-10 text-white" />
                   </Player.PlayingIndicator>
                   <Player.PlayingIndicator asChild>
-                    <PauseIcon className="h-full w-full text-pink-500" />
+                    <PauseIcon className="h-10 w-10 text-white" />
                   </Player.PlayingIndicator>
                 </Player.PlayPauseTrigger>
 
-                <div className="flex items-center gap-1 md:gap-2">
-                  <Player.MuteTrigger className="h-6 w-6 md:h-8 md:w-8 text-pink-500">
-                    <Player.VolumeIndicator asChild matcher={false}>
-                      <MuteIcon className="h-full w-full" />
-                    </Player.VolumeIndicator>
-                    <Player.VolumeIndicator asChild matcher={true}>
-                      <UnmuteIcon className="h-full w-full" />
-                    </Player.VolumeIndicator>
-                  </Player.MuteTrigger>
-                  <Player.Volume className="relative hidden sm:flex items-center gap-2 w-16 md:w-20 touch-none">
-                    <Player.Track className="relative h-1.5 flex-grow rounded-full bg-white/70">
-                      <Player.Range className="absolute h-full rounded-full bg-pink-500" />
-                    </Player.Track>
-                    <Player.Thumb className="block h-3 w-3 md:h-4 md:w-4 rounded-full bg-white" />
-                  </Player.Volume>
-                </div>
-
-                <Player.Time className="text-xs md:text-sm text-white px-2 py-1 bg-black/40 rounded tabular-nums" />
-              </div>
-
-              <div className="flex items-center gap-2 md:gap-4">
-                {assetMetadata?.subtitles && (
-                  <div className="sm:block">
-                    <SubtitlesControl />
-                  </div>
-                )}
-
-                <Player.FullscreenTrigger className="h-6 w-6 md:h-8 md:w-8 text-pink-500 hover:text-pink-400 touch-none">
-                  <Player.FullscreenIndicator asChild>
-                    <ExitFullscreenIcon className="h-full w-full" />
-                  </Player.FullscreenIndicator>
-                  <Player.FullscreenIndicator matcher={false} asChild>
-                    <EnterFullscreenIcon className="h-full w-full" />
-                  </Player.FullscreenIndicator>
-                </Player.FullscreenTrigger>
+                <Player.MuteTrigger
+                  className="group relative flex h-14 w-14 touch-none cursor-pointer items-center justify-center rounded-full bg-black/50 hover:bg-black/70"
+                  onClick={handleControlInteraction}
+                >
+                  <Player.VolumeIndicator asChild matcher={false}>
+                    <MuteIcon className="h-8 w-8 text-white" />
+                  </Player.VolumeIndicator>
+                  <Player.VolumeIndicator asChild matcher={true}>
+                    <UnmuteIcon className="h-8 w-8 text-white" />
+                  </Player.VolumeIndicator>
+                </Player.MuteTrigger>
               </div>
             </div>
-          </Player.Controls>
+
+            <div className="absolute bottom-0 left-0 right-0">
+              <div className="flex items-center justify-between px-5 pb-8">
+                <Player.Time 
+                  className="text-xs font-medium text-white/90 bg-black/40 px-2 py-0.5 rounded-full tabular-nums"
+                />
+
+                <div className="flex items-center gap-4">
+                  {assetMetadata?.subtitles && (
+                    <SubtitlesControl />
+                  )}
+                  <Player.FullscreenTrigger className="group relative flex h-10 w-10 touch-none cursor-pointer items-center justify-center rounded-full bg-black/50 hover:bg-black/70">
+                    <Player.FullscreenIndicator asChild matcher={false}>
+                      <EnterFullscreenIcon className="h-6 w-6 text-white" />
+                    </Player.FullscreenIndicator>
+                    <Player.FullscreenIndicator asChild>
+                      <ExitFullscreenIcon className="h-6 w-6 text-white" />
+                    </Player.FullscreenIndicator>
+                  </Player.FullscreenTrigger>
+                </div>
+              </div>
+
+              <Player.Seek
+                style={{
+                  position: "absolute",
+                  left: 20,
+                  right: 20,
+                  bottom: 20,
+                  height: 20,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  userSelect: "none",
+                  touchAction: "none",
+                }}
+              >
+                <Player.Track
+                  style={{
+                    backgroundColor: "rgba(255, 255, 255, 0.7)",
+                    position: "relative",
+                    flexGrow: 1,
+                    borderRadius: 9999,
+                    height: 2,
+                  }}
+                >
+                  <Player.SeekBuffer
+                    style={{
+                      position: "absolute",
+                      backgroundColor: "rgba(0, 0, 0, 0.5)",
+                      borderRadius: 9999,
+                      height: "100%",
+                    }}
+                  />
+                  <Player.Range
+                    style={{
+                      position: "absolute",
+                      backgroundColor: "white",
+                      borderRadius: 9999,
+                      height: "100%",
+                    }}
+                  />
+                </Player.Track>
+                <Player.Thumb
+                  style={{
+                    display: "block",
+                    width: 12,
+                    height: 12,
+                    backgroundColor: "white",
+                    borderRadius: 9999,
+                  }}
+                />
+              </Player.Seek>
+            </div>
+          </div>
         </Player.Container>
       </Player.Root>
     </>

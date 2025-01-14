@@ -1,16 +1,20 @@
+'use client';
 import * as Player from '@livepeer/react/player';
 import { Src } from '@livepeer/react';
 import { PlayIcon, PauseIcon, MuteIcon, UnmuteIcon } from '@livepeer/react/assets';
 import { useEffect, useState, useRef } from 'react';
+import { useVideo } from '@app/context/VideoContext';
 import './Player.css';
 
-// pass the parsed playback info Src[] into the player
 export const DemoPlayer: React.FC<{ src: Src[] | null; title: string }> = ({
   src,
   title,
 }) => {
   const [controlsVisible, setControlsVisible] = useState(true);
   const fadeTimeoutRef = useRef<NodeJS.Timeout>();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const { currentPlayingId, setCurrentPlayingId } = useVideo();
+  const playerId = useRef(Math.random().toString(36).substring(7)).current;
 
   useEffect(() => {
     resetFadeTimeout();
@@ -20,6 +24,16 @@ export const DemoPlayer: React.FC<{ src: Src[] | null; title: string }> = ({
       }
     };
   }, [src, title]);
+
+  useEffect(() => {
+    if (currentPlayingId && currentPlayingId !== playerId) {
+      // Another video started playing, pause this one
+      const video = containerRef.current?.querySelector('video');
+      if (video && !video.paused) {
+        video.pause();
+      }
+    }
+  }, [currentPlayingId, playerId]);
 
   if (!src || src.length === 0) {
     return <div>No video source available.</div>;
@@ -35,23 +49,32 @@ export const DemoPlayer: React.FC<{ src: Src[] | null; title: string }> = ({
     }, 2000);
   };
 
+  const handleControlInteraction = () => {
+    setControlsVisible(true);
+    resetFadeTimeout();
+  };
+
+  const handlePlay = () => {
+    setCurrentPlayingId(playerId);
+  };
+
   return (
     <Player.Root src={src} autoPlay volume={1}>
       <Player.Container 
-        className="player-container"
+        ref={containerRef}
+        className="player-container relative aspect-video touch-none"
         onMouseMove={resetFadeTimeout}
         onMouseEnter={() => setControlsVisible(true)}
-        onTouchStart={() => {
-          if (fadeTimeoutRef.current) {
-            clearTimeout(fadeTimeoutRef.current);
-          }
-          setControlsVisible(true);
-        }}
-        onTouchEnd={(e) => {
-          e.preventDefault();
-          resetFadeTimeout();
-        }}
+        onTouchStart={handleControlInteraction}
       >
+        <Player.Video 
+          title={title} 
+          onPlay={handlePlay}
+          className="h-full w-full"
+          playsInline
+          controls={false}
+        />
+        
         <Player.LoadingIndicator
           style={{
             height: "100%",
@@ -60,6 +83,10 @@ export const DemoPlayer: React.FC<{ src: Src[] | null; title: string }> = ({
             alignItems: "center",
             justifyContent: "center",
             backgroundColor: "black",
+            position: "absolute",
+            top: 0,
+            left: 0,
+            zIndex: 20
           }}
         >
           <div className="flex flex-col items-center space-y-4">
@@ -67,93 +94,46 @@ export const DemoPlayer: React.FC<{ src: Src[] | null; title: string }> = ({
             <div className="text-lg font-semibold text-white">Loading...</div>
           </div>
         </Player.LoadingIndicator>
-        <Player.Video title={title} poster={null} />
-        <Player.Controls className={`flex items-center justify-center ${controlsVisible ? 'opacity-100' : 'opacity-0'} transition-opacity duration-300`}>
-          {/* Time display above controls */}
-          <div className="absolute right-4 top-[-40px]">
-            <Player.Time
-              className="text-sm text-white px-2 py-1 bg-black/40 rounded"
-              style={{
-                fontVariant: "tabular-nums",
-              }}
-            />
-          </div>
-          <Player.PlayPauseTrigger className="h-10 w-10">
-            <Player.PlayingIndicator asChild matcher={false}>
-              <PlayIcon style={{ color: '#EC407A' }} />
-            </Player.PlayingIndicator>
-            <Player.PlayingIndicator asChild>
-              <PauseIcon style={{ color: '#EC407A' }} />
-            </Player.PlayingIndicator>
-          </Player.PlayPauseTrigger>
-          <div
-            style={{
-              position: "absolute",
-              left: 20,
-              bottom: 20,
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              width: "100%",
-            }}
-          >
-            <Player.MuteTrigger
-              style={{
-                width: 25,
-                height: 25,
-                color: '#EC407A'
-              }}
-            >
-              <Player.VolumeIndicator asChild matcher={false}>
-                <MuteIcon />
-              </Player.VolumeIndicator>
-              <Player.VolumeIndicator asChild matcher={true}>
-                <UnmuteIcon />
-              </Player.VolumeIndicator>
-            </Player.MuteTrigger>
-            <Player.Volume
-              style={{
-                position: "relative",
-                display: "flex",
-                flexGrow: 1,
-                height: 20,
-                alignItems: "center",
-                maxWidth: 60,
-                touchAction: "none",
-                userSelect: "none",
-                color: '#121212'
-              }}
-            >
-              <Player.Track
-                style={{
-                  backgroundColor: "rgba(255, 255, 255, 0.7)",
-                  position: "relative",
-                  flexGrow: 1,
-                  borderRadius: 9999,
-                  height: "2px",
-                }}
+
+        <div 
+          className={`absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/60 pointer-events-none transition-opacity duration-300 ${
+            controlsVisible ? 'opacity-100' : 'opacity-0'
+          }`}
+        />
+        
+        <div 
+          className={`absolute inset-0 z-30 touch-none transition-opacity duration-300 ${
+            controlsVisible ? 'opacity-100' : 'opacity-0'
+          }`}
+        >
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="flex items-center gap-6">
+              <Player.PlayPauseTrigger 
+                className="group relative flex h-16 w-16 touch-none cursor-pointer items-center justify-center rounded-full bg-black/50 hover:bg-black/70"
+                onClick={handleControlInteraction}
               >
-                <Player.Range
-                  style={{
-                    position: "absolute",
-                    backgroundColor: "white",
-                    borderRadius: 9999,
-                    height: "100%",
-                  }}
-                />
-              </Player.Track>
-              <Player.Thumb
-                style={{
-                  display: "block",
-                  width: 12,
-                  height: 12,
-                  backgroundColor: "white",
-                  borderRadius: 9999,
-                }}
-              />
-            </Player.Volume>
+                <Player.PlayingIndicator asChild matcher={false}>
+                  <PlayIcon className="h-10 w-10 text-white" />
+                </Player.PlayingIndicator>
+                <Player.PlayingIndicator asChild>
+                  <PauseIcon className="h-10 w-10 text-white" />
+                </Player.PlayingIndicator>
+              </Player.PlayPauseTrigger>
+
+              <Player.MuteTrigger 
+                className="group relative flex h-14 w-14 touch-none cursor-pointer items-center justify-center rounded-full bg-black/50 hover:bg-black/70"
+                onClick={handleControlInteraction}
+              >
+                <Player.VolumeIndicator asChild matcher={false}>
+                  <MuteIcon className="h-8 w-8 text-white" />
+                </Player.VolumeIndicator>
+                <Player.VolumeIndicator asChild matcher={true}>
+                  <UnmuteIcon className="h-8 w-8 text-white" />
+                </Player.VolumeIndicator>
+              </Player.MuteTrigger>
+            </div>
           </div>
-        </Player.Controls>
+        </div>
       </Player.Container>
     </Player.Root>
   );
