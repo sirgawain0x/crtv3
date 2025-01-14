@@ -63,13 +63,15 @@ const HeroSection: React.FC = () => {
           </div>
         </div>
         <div className="w-full md:flex-1 md:ml-8">
-          <div className="relative z-0 w-full overflow-hidden rounded-2xl shadow-2xl bg-black">
+          <div className="relative w-full overflow-hidden rounded-2xl shadow-2xl bg-black">
             {loading ? (
               <div className="flex aspect-video w-full items-center justify-center">
                 <Skeleton className="h-full w-full rounded-xl"></Skeleton>
               </div>
             ) : (
-              <DemoPlayer src={src} title={HERO_VIDEO_TITLE} />
+              <div className="relative touch-none">
+                <DemoPlayer src={src} title={HERO_VIDEO_TITLE} />
+              </div>
             )}
           </div>
         </div>
