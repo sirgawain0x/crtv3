@@ -61,7 +61,7 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
 
   return (
     <div className="mx-auto" ref={playerRef}>
-      <Card key={asset?.id} className={cn('w-[360px]')}>
+      <Card key={asset?.id} className={cn('w-[360px] overflow-hidden')}>
         <div className="mx-auto flex-1 flex-wrap">
           <CardHeader>
             <AccountProvider address={address} client={client}>
