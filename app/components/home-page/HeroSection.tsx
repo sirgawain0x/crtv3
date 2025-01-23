@@ -9,8 +9,8 @@ import {
 import { Src } from '@livepeer/react';
 import { PlayIcon } from '@livepeer/react/assets';
 import { DemoPlayer } from '../Player/DemoPlayer';
+import { PlayerLoading } from '../Player/Player';
 import { getHeroPlaybackSource } from '@app/lib/utils/hooks/useHeroPlaybackSource';
-import Skeleton from '@app/components/ui/skeleton';
 import { HERO_VIDEO_TITLE } from '../../lib/utils/context';
 
 const HeroSection: React.FC = () => {
@@ -42,7 +42,7 @@ const HeroSection: React.FC = () => {
   return (
     <div className="md:py-18 mx-auto max-w-7xl py-10">
       <div className="flex flex-col-reverse items-center justify-between md:flex-row">
-        <div className="flex-1 space-y-5 mt-8 md:mt-0 md:space-y-10">
+        <div className="mt-8 flex-1 space-y-5 md:mt-0 md:space-y-10">
           <h1 className="text-3xl font-bold leading-tight sm:text-4xl lg:text-6xl">
             <span className="relative inline-block">
               <span className="absolute inset-0 bottom-1 left-0 -z-10 h-1/3 w-full bg-orange-500"></span>
@@ -62,12 +62,10 @@ const HeroSection: React.FC = () => {
             </button>
           </div>
         </div>
-        <div className="w-full md:flex-1 md:ml-8">
-          <div className="relative w-full overflow-hidden rounded-2xl shadow-2xl bg-black">
+        <div className="w-full md:ml-8 md:flex-1">
+          <div className="relative w-full overflow-hidden rounded-2xl bg-black shadow-2xl">
             {loading ? (
-              <div className="flex aspect-video w-full items-center justify-center">
-                <Skeleton className="h-full w-full rounded-xl"></Skeleton>
-              </div>
+              <PlayerLoading title="Loading..." />
             ) : (
               <div className="relative touch-none">
                 <DemoPlayer src={src} title={HERO_VIDEO_TITLE} />

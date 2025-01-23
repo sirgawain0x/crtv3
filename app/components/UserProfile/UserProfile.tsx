@@ -230,7 +230,9 @@ const ProfilePage: NextPage = () => {
                       params: [ownedIds, CREATIVE_ADDRESS],
                     })
                   }
-                  onClick={() => toast.success('Successful Membership Renewal!')}
+                  onClick={() =>
+                    toast.success('Successful Membership Renewal!')
+                  }
                   onError={(error: Error) =>
                     toast.error('Error Renewing Membership.')
                   }
@@ -263,7 +265,9 @@ const ProfilePage: NextPage = () => {
             <Card>
               <CardHeader className="space-y-1">
                 <CardTitle className="text-2xl">Upload Content</CardTitle>
-                <CardDescription>Share your videos with the community</CardDescription>
+                <CardDescription>
+                  Share your videos with the community
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <Link
@@ -273,7 +277,9 @@ const ProfilePage: NextPage = () => {
                   Upload New Video
                 </Link>
                 <div className="mt-6">
-                  <ListUploadedAssets activeAccount={activeAccount as Account} />
+                  <ListUploadedAssets
+                    activeAccount={activeAccount as Account}
+                  />
                 </div>
               </CardContent>
             </Card>
@@ -283,7 +289,7 @@ const ProfilePage: NextPage = () => {
             <Card>
               <CardHeader className="space-y-1">
                 <CardTitle className="text-2xl">Minted NFTs</CardTitle>
-                <CardDescription>View your lazy minted NFT collection</CardDescription>
+                <CardDescription>View your ed NFT collection</CardDescription>
               </CardHeader>
               <CardContent>
                 {activeAccount && (
@@ -297,7 +303,9 @@ const ProfilePage: NextPage = () => {
             <Card>
               <CardHeader className="space-y-1">
                 <CardTitle className="text-2xl">Creator Token</CardTitle>
-                <CardDescription>Create and manage your personal token</CardDescription>
+                <CardDescription>
+                  Create and manage your personal token
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <CreateMetoken />
@@ -309,9 +317,11 @@ const ProfilePage: NextPage = () => {
             <Card>
               <CardHeader className="space-y-1">
                 <CardTitle className="text-2xl">Revenue Dashboard</CardTitle>
-                <CardDescription>Track your earnings and analytics</CardDescription>
+                <CardDescription>
+                  Track your earnings and analytics
+                </CardDescription>
               </CardHeader>
-              <CardContent className="min-h-[200px] flex items-center justify-center">
+              <CardContent className="flex min-h-[200px] items-center justify-center">
                 <p className="text-muted-foreground">Coming Soon</p>
               </CardContent>
             </Card>

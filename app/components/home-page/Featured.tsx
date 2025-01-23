@@ -4,6 +4,7 @@ import { Src } from '@livepeer/react';
 import { FEATURED_VIDEO_TITLE } from '@app/lib/utils/context';
 import { getFeaturedPlaybackSource } from '@app/lib/utils/hooks/useFeaturePlaybackSource';
 import { PreviewPlayer } from '../Player/PreviewPlayer';
+import { PlayerLoading } from '../Player/Player';
 import Skeleton from '@app/components/ui/skeleton';
 
 const FeaturedVideo: React.FC = () => {
@@ -27,7 +28,11 @@ const FeaturedVideo: React.FC = () => {
     fetchSource();
   }, []);
   if (loading) {
-    return <div>Loading...</div>;
+    return (
+      <div className="relative w-full overflow-hidden rounded-2xl bg-black shadow-2xl">
+        <PlayerLoading title="Loading..." />
+      </div>
+    );
   }
 
   if (error) {

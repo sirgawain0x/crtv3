@@ -148,6 +148,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
   const [uploadState, setUploadState] = useState<
     'idle' | 'loading' | 'complete'
   >('idle');
+  const [subtitleProcessingComplete, setSubtitleProcessingComplete] = useState<boolean>(false);
 
   const [livepeerAsset, setLivepeerAsset] = useState<any>();
 
@@ -200,41 +201,23 @@ const FileUpload: React.FC<FileUploadProps> = ({
         onSuccess() {
           console.log('Upload finished:', tusUpload.url);
           setUploadState('complete');
-          setError(null); // Clear any previous errors
+          setError(null);
           onFileUploaded(tusUpload?.url || '');
+          toast.success('Video uploaded successfully! Generating subtitles...', {
+            duration: 3000,
+          });
+
+          // Start audio-to-text processing after successful upload
+          handleAudioToText();
         },
       });
 
       const previousUploads = await tusUpload.findPreviousUploads();
-
       if (previousUploads.length > 0) {
         tusUpload.resumeFromPreviousUpload(previousUploads[0]);
       }
 
       tusUpload.start();
-
-      const formData = new FormData();
-
-      formData.append('audio', selectedFile);
-
-      const audioToTextResponse = await getLivepeerAudioToText({
-        formData,
-        modelId: 'openai/whisper-large-v3',
-        returnTimestamps: 'true',
-      });
-
-      console.log({ audioToTextResponse });
-
-      const subtitles = await translateSubtitles({
-        chunks: audioToTextResponse?.chunks,
-      });
-
-      const ipfsUri = await upload({
-        client,
-        files: [subtitles],
-      });
-
-      onSubtitlesUploaded(ipfsUri);
     } catch (error: any) {
       console.error('Error processing file:', error);
       if (uploadState !== 'complete') {
@@ -244,123 +227,188 @@ const FileUpload: React.FC<FileUploadProps> = ({
     }
   };
 
+  // Separate function to handle audio-to-text processing
+  const handleAudioToText = async () => {
+    if (!selectedFile) return;
+
+    try {
+      const formData = new FormData();
+      formData.append('audio', selectedFile);
+
+      const audioToTextResponse = await getLivepeerAudioToText({
+        formData,
+        modelId: 'openai/whisper-large-v3',
+        returnTimestamps: 'true',
+      });
+
+      if (audioToTextResponse?.chunks) {
+        const subtitles = await translateSubtitles({
+          chunks: audioToTextResponse.chunks,
+        });
+
+        const ipfsUri = await upload({
+          client,
+          files: [subtitles],
+        });
+
+        onSubtitlesUploaded(ipfsUri);
+        toast.success(
+          'Subtitles generated and translated successfully! You can now proceed to the next step.',
+          {
+            duration: 5000,
+          }
+        );
+      }
+    } catch (error) {
+      console.error('Error generating subtitles:', error);
+      toast.error(
+        'Video uploaded successfully, but there was an error generating subtitles. You can still proceed to the next step.',
+        {
+          duration: 5000,
+        }
+      );
+    } finally {
+      setSubtitleProcessingComplete(true);
+    }
+  };
+
   return (
-    <div>
-      <div className="flex items-center justify-center px-4 py-10">
-        <div className="w-full rounded-lg p-8 shadow-lg">
-          <h1 className="mb-4 text-2xl font-semibold">Upload A File</h1>
+    <div className="min-h-screen w-full bg-white">
+      <div className="mx-auto flex min-h-[calc(100vh-200px)] max-w-4xl flex-col px-4 py-8">
+        <div className="flex-1 rounded-lg bg-white p-6 shadow-lg sm:p-8">
+          <h1 className="mb-8 text-center text-2xl font-semibold text-gray-900">Upload A File</h1>
 
-          {/* File Input */}
-          <div className="mb-6">
-            <label
-              htmlFor="file-upload"
-              className="mb-2 block text-sm font-medium"
-            >
-              Choose A File To Upload:
-            </label>
-            <input
-              type="file"
-              id="file-upload"
-              accept="video/*"
-              className="file:border-1 block w-full text-sm text-[#EC407A] file:mr-4 file:cursor-pointer file:rounded-full file:bg-white file:px-4 file:py-2 file:text-sm file:font-semibold file:text-[#EC407A] hover:file:bg-gray-200"
-              data-testid="file-upload-input"
-              onChange={handleFileChange}
-            />
-            {/* Display selected file name */}
-            {selectedFile && (
-              <div>
-                <p className="mt-2 overflow-hidden text-ellipsis whitespace-nowrap text-lg text-gray-400">
-                  Selected File: {selectedFile.name}
-                </p>
-                <PreviewVideo video={selectedFile} />
-              </div>
-            )}
-          </div>
-
-          {/* Upload Button and Progress Bar */}
-          <div className="flex w-full flex-col items-start space-y-4">
-            {uploadState === 'idle' ? (
-              <button
-                onClick={handleFileUpload}
-                disabled={!selectedFile}
-                className={`${
-                  !selectedFile
-                    ? 'cursor-not-allowed bg-[#D63A6A]'
-                    : 'bg-[#EC407A] hover:bg-[#D63A6A]'
-                } cursor-pointer rounded-lg px-4 py-2 font-semibold text-white`}
-                data-testid="file-input-upload-button"
+          <div className="mx-auto max-w-2xl space-y-8">
+            {/* File Input */}
+            <div className="space-y-2">
+              <label
+                htmlFor="file-upload"
+                className="block text-sm font-medium text-gray-700"
               >
-                Upload File
-              </button>
-            ) : (
-              <div className="w-full">
-                <Progress
-                  value={progress}
-                  max={100}
-                  className="h-2 w-full overflow-hidden rounded-full bg-gray-200"
-                >
-                  <div
-                    className="h-full bg-[#EC407A] transition-all duration-500 ease-in-out"
-                    style={{ width: `${progress}%` }}
-                  />
-                </Progress>
-                <p className="mt-2 text-sm text-gray-400">
-                  {uploadState === 'complete'
-                    ? 'Upload Complete!'
-                    : `${progress}% uploaded`}
+                Choose A File To Upload:
+              </label>
+              <input
+                type="file"
+                id="file-upload"
+                accept="video/*"
+                className="file:border-1 block w-full rounded-lg border border-gray-200 text-sm text-[#EC407A] file:mr-4 file:cursor-pointer file:rounded-full file:border-0 file:bg-white file:px-4 file:py-2 file:text-sm file:font-semibold file:text-[#EC407A] hover:file:bg-gray-50"
+                data-testid="file-upload-input"
+                onChange={handleFileChange}
+              />
+            </div>
+
+            {/* Selected File Section */}
+            {selectedFile && (
+              <div className="space-y-8">
+                <div className="text-center">
+                  <p className="text-sm font-medium text-gray-500">Selected File</p>
+                  <p className="mt-1 text-base text-gray-900">{selectedFile.name}</p>
+                </div>
+                
+                {/* Video Preview */}
+                <div className="overflow-hidden rounded-lg border border-gray-200">
+                  <PreviewVideo video={selectedFile} />
+                </div>
+                
+                {/* Upload Controls */}
+                <div className="flex flex-col items-center space-y-4">
+                  {uploadState === 'idle' ? (
+                    <button
+                      onClick={handleFileUpload}
+                      disabled={!selectedFile}
+                      className={`${
+                        !selectedFile
+                          ? 'cursor-not-allowed bg-[#D63A6A] opacity-50'
+                          : 'bg-[#EC407A] hover:bg-[#D63A6A]'
+                      } w-full max-w-xs rounded-lg px-6 py-3 font-semibold text-white shadow-sm transition-colors sm:w-auto`}
+                      data-testid="file-input-upload-button"
+                    >
+                      Upload File
+                    </button>
+                  ) : (
+                    <div className="w-full max-w-md space-y-2">
+                      <Progress
+                        value={progress}
+                        max={100}
+                        className="h-2 w-full overflow-hidden rounded-full bg-gray-100"
+                      >
+                        <div
+                          className="h-full bg-[#EC407A] transition-all duration-500 ease-in-out"
+                          style={{ width: `${progress}%` }}
+                        />
+                      </Progress>
+                      <p className="text-center text-sm text-gray-600">
+                        {uploadState === 'complete'
+                          ? 'Upload Complete!'
+                          : `${progress}% uploaded`}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Error Message */}
+            {error && (
+              <div className="rounded-lg bg-red-50 p-4">
+                <p className="text-sm text-red-600">{error}</p>
+              </div>
+            )}
+
+            {/* Success Message */}
+            {uploadedUri && (
+              <div className="rounded-lg border border-green-200 bg-green-50 p-4">
+                <p className="flex items-center gap-2 text-sm text-green-700">
+                  <span>File uploaded successfully! IPFS URI:</span>
+                  <Link
+                    href={uploadedUri}
+                    target="_blank"
+                    className="text-green-600 underline hover:text-green-800"
+                  >
+                    {truncateUri(uploadedUri)}
+                  </Link>
+                  <button
+                    onClick={() => copyToClipboard(uploadedUri)}
+                    className="inline-flex items-center gap-1 rounded-md p-1 text-green-600 hover:bg-green-100 hover:text-green-800"
+                  >
+                    <CopyIcon className="h-4 w-4" />
+                    <span className="text-xs">Copy</span>
+                  </button>
                 </p>
               </div>
             )}
           </div>
+        </div>
 
-          {/* Error Message */}
-          {error && <p className="mt-4 text-red-500">{error}</p>}
-
-          {/* Success Message */}
-          {uploadedUri && (
-            <div className="mt-6 rounded-lg border border-green-200 bg-green-50 p-4">
-              <p className="text-green-700">
-                File uploaded successfully! IPFS URI:{' '}
-                <Link
-                  href={uploadedUri}
-                  target="_blank"
-                  className="overflow-hidden text-ellipsis whitespace-nowrap text-green-500 underline"
-                >
-                  {truncateUri(uploadedUri)}
-                </Link>
-                <button
-                  onClick={() => copyToClipboard(uploadedUri)}
-                  className="ml-2 text-sm text-green-600 hover:text-green-800"
-                >
-                  <CopyIcon className="h-5 w-5" />
-                  <span>Copy</span>
-                </button>
-              </p>
-            </div>
+        {/* Navigation Buttons */}
+        <div className="mt-6 flex items-center justify-center gap-3">
+          {onPressBack && (
+            <Button
+              variant="outline"
+              disabled={uploadState === 'loading'}
+              onClick={onPressBack}
+              className="min-w-[100px]"
+            >
+              Back
+            </Button>
+          )}
+          {onPressNext && (
+            <Button
+              disabled={uploadState !== 'complete' || !subtitleProcessingComplete}
+              onClick={() => {
+                if (livepeerAsset) {
+                  onPressNext(livepeerAsset);
+                } else {
+                  alert('Missing livepeer asset');
+                }
+              }}
+              data-testid="file-input-next"
+              className="min-w-[100px]"
+            >
+              Next
+            </Button>
           )}
         </div>
-      </div>
-      <div className="flex items-center justify-center gap-3">
-        {onPressBack && (
-          <Button disabled={uploadState === 'loading'} onClick={onPressBack}>
-            Back
-          </Button>
-        )}
-        {onPressNext && (
-          <Button
-            disabled={uploadState !== 'complete'}
-            onClick={() => {
-              if (livepeerAsset) {
-                onPressNext(livepeerAsset);
-              } else {
-                alert('Missing livepeer asset');
-              }
-            }}
-            data-testid="file-input-next"
-          >
-            Next
-          </Button>
-        )}
       </div>
     </div>
   );
