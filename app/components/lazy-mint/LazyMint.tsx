@@ -50,9 +50,9 @@ export default function LazyMint(props: TLazyMintProps) {
   return (
     <div className="my-24 w-full rounded-lg">
       <h2
-        className={`mb-6 text-xl font-bold ${txHash ? `text-slate-300` : 'text-slate-50'} ${Boolean(txHash) && `opacity-50`}`}
+        className={`mb-6 text-xl font-bold ${txHash ? `text-black` : 'text-slate-800'}`}
       >
-        Lazy mint your NFT so it is available for claiming
+        Distribute your video as an NFT
       </h2>
 
       <div className="space-x-8 space-y-3" aria-disabled={Boolean(txHash)}>
@@ -71,7 +71,7 @@ export default function LazyMint(props: TLazyMintProps) {
             handleSubmitLazyMint();
           }}
         >
-          {isProcessing ? 'Lazy Minting...' : ' Lazy Mint NFT'}
+          {isProcessing ? 'Lazy Minting...' : ' Mint NFT'}
         </button>
       </div>
     </div>
