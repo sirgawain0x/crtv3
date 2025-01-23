@@ -23,16 +23,17 @@ const PreviewVideo: FC<PreviewVideoProps> = ({ video }) => {
   }, [video]); // Dependency on video prop
 
   return (
-    <div className="flex w-full justify-center">
+    <div className="flex w-full items-center justify-center">
       {videoUrl && (
+        <div className="relative w-full pt-[56.25%]">
           <video
             controls
-            src={videoUrl} // Directly set src attribute
-            className="mt-2 max-h-96 max-w-full"
+            src={videoUrl}
+            className="absolute inset-0 h-full w-full object-contain"
           >
             Your browser does not support the video tag.
           </video>
-          // <PlayerComponent src={[videoUrl]} title={video ? video.name : ''}/> 
+        </div>
       )}
     </div>
   );
