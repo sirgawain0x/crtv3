@@ -30,6 +30,7 @@ const MemberCard = ({ member, nft, balance, points }: MemberCardProps) => {
               alt={nft.metadata.name || 'NFT Image'}
               height={250}
               width={200}
+              style={{ width: 'auto', height: '250px' }}
               className="mx-auto rounded-lg object-cover md:mx-0"
               unoptimized
             />

@@ -1,10 +1,16 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { fullLivepeer } from '@app/lib/sdk/livepeer/fullClient';
 import { Card } from '@app/components/ui/card';
 import Link from 'next/link';
-import { Stream } from 'livepeer/models/components';
+
+interface Stream {
+  id: string;
+  name?: string;
+  playbackId?: string;
+  createdAt?: string;
+  isActive?: boolean;
+}
 
 export default function LivestreamGrid() {
   const [streams, setStreams] = useState<Stream[]>([]);
@@ -13,8 +19,12 @@ export default function LivestreamGrid() {
   useEffect(() => {
     const fetchStreams = async () => {
       try {
-        const result = await fullLivepeer.stream.getAll();
-        const mappedStreams = result?.data?.map((stream) => ({
+        const response = await fetch('/api/livepeer/streams');
+        if (!response.ok) {
+          throw new Error('Failed to fetch streams');
+        }
+        const result = await response.json();
+        const mappedStreams = result?.data?.map((stream: Stream) => ({
           ...stream,
           name: stream.name || `Stream ${stream.id}`, // Provide a default name if none exists
         })) ?? [];

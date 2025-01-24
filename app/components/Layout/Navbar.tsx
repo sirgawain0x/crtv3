@@ -113,6 +113,10 @@ export function Navbar() {
       </Sheet>
       <Link href="/" className="mr-6 hidden lg:flex" passHref>
         <Image
+          style={{
+            width: '80px',
+            height: 'auto',
+          }}
           src={SITE_LOGO}
           alt={SITE_NAME}
           width={80}

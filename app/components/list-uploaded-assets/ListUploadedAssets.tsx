@@ -5,12 +5,10 @@ import { Box } from '@chakra-ui/react';
 import { useEffect, useMemo, useState } from 'react';
 import { Account } from 'thirdweb/wallets';
 import UploadAsset from './UploadedAsset';
+import { useActiveAccount } from 'thirdweb/react';
 
-type ListUploadedAssetsProps = {
-  activeAccount: Account;
-};
-
-export default function ListUploadedAssets(props: ListUploadedAssetsProps) {
+export default function ListUploadedAssets() {
+  const activeAccount = useActiveAccount();
   const [assets, setAssets] = useState<Asset[] | {}>();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error>();
@@ -33,16 +31,17 @@ export default function ListUploadedAssets(props: ListUploadedAssetsProps) {
   }, []);
 
   const filteredCreatorAssets: Asset[] = useMemo(() => {
+    if (!activeAccount?.address) return [];
+
     return Array.isArray(assets)
       ? assets.filter(
           (ast: Asset) =>
             ast.creatorId &&
-            ast.creatorId.value.toLowerCase() ===
-              props.activeAccount.address.toLowerCase(),
+            ast.creatorId.value.toLowerCase() === activeAccount.address.toLowerCase(),
         )
       : [];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [assets, props.activeAccount.address]);
+  }, [assets, activeAccount?.address]);
 
   if (error) {
     return (
@@ -92,7 +91,7 @@ export default function ListUploadedAssets(props: ListUploadedAssetsProps) {
             <tbody className="divide-y divide-border">
               {filteredCreatorAssets.map((video, i) => (
                 <UploadAsset
-                  activeAccount={props.activeAccount}
+                  activeAccount={activeAccount}
                   asset={video}
                   idx={i}
                   key={`${video.id}-${video.createdAt}`}

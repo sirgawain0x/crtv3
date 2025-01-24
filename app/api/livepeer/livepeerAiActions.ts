@@ -1,51 +1,109 @@
 'use server';
+import { Livepeer } from '@livepeer/ai';
 import { TextToImageParams } from 'livepeer/models/components';
+
+interface LivepeerAiResponse {
+  images: Array<{
+    url: string;
+    nsfw: boolean;
+    seed: number;
+  }>;
+}
+
+interface AiGenerationResult {
+  success: boolean;
+  result?: {
+    images: Array<{
+      url: string;
+      nsfw: boolean;
+      seed: number;
+    }>;
+  };
+  error?: {
+    message: string;
+    status: number;
+    details: any;
+  };
+}
+
+export type LivepeerAiModel =
+  | 'black-forest-labs/FLUX.1-dev'
+  | 'stable-diffusion-v1-5/stable-diffusion-v1-5';
+
+export async function getLivepeerAiModels() {
+  return {
+    FLUX: 'black-forest-labs/FLUX.1-dev' as const,
+    STABLE_DIFFUSION: 'stable-diffusion-v1-5/stable-diffusion-v1-5' as const,
+  };
+}
+
+export async function getDefaultAiModel() {
+  return 'black-forest-labs/FLUX.1-dev' as LivepeerAiModel;
+}
+
+const livepeerAi = new Livepeer({
+  httpBearer: process.env.LIVEPEER_FULL_API_KEY as string,
+});
 
 export const getLivepeerAiGeneratedImages = async ({
   prompt,
   modelId,
-  safetyCheck,
-  numImagesPerPrompt,
-}: TextToImageParams) => {
-  const myHeaders = new Headers();
-  myHeaders.append('Content-Type', 'application/json');
-  myHeaders.append(
-    'Authorization',
-    `Bearer ${process.env.LIVEPEER_FULL_API_KEY}`,
-  );
+  safetyCheck = true,
+  numImagesPerPrompt = 2,
+  width = 1024,
+  height = 576,
+  guidanceScale = 7.5,
+}: {
+  prompt: string;
+  modelId?: string;
+  safetyCheck?: boolean;
+  numImagesPerPrompt?: number;
+  width?: number;
+  height?: number;
+  guidanceScale?: number;
+}) => {
+  try {
+    const actualModelId = modelId || await getDefaultAiModel();
 
-  const raw = JSON.stringify({
-    prompt,
-    model_id: modelId,
-    num_images_per_prompt: numImagesPerPrompt,
-    safety_check: safetyCheck,
-  });
+    console.log('Generating AI images with params:', {
+      prompt,
+      modelId: actualModelId,
+      safetyCheck,
+    });
 
-  const requestOptions: RequestInit = {
-    method: 'POST',
-    headers: myHeaders,
-    body: raw,
-    redirect: 'follow',
-  };
+    const result = await livepeerAi.generate.textToImage({
+      modelId: actualModelId,
+      prompt: prompt,
+      numImagesPerPrompt: numImagesPerPrompt,
+      safetyCheck: safetyCheck,
+      width: width,
+      height: height,
+      guidanceScale: guidanceScale,
+      numInferenceSteps: 50,
+    });
 
-  console.log({ requestOptions });
+    console.log('AI generation result:', result);
 
-  const response = await fetch(
-    'https://livepeer.studio/api/beta/generate/text-to-image',
-    requestOptions,
-  );
-
-  console.log({ response });
-
-  if (response.ok) {
     return {
       success: true,
-      result: await response.json(),
+      result: {
+        images:
+          result?.imageResponse?.images?.map((img) => ({
+            url: img?.url,
+            nsfw: img?.nsfw,
+            seed: img?.seed,
+          })) || [],
+      },
     };
-  } else {
+  } catch (error: any) {
+    console.error('Error generating AI images:', error);
     return {
       success: false,
-      result: await response.json(),
+      error: {
+        message: error.message || 'Failed to generate images',
+        status: error.status || 500,
+        details: error.response?.data || error,
+      },
     };
   }
 };
