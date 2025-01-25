@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   EnterFullscreenIcon,
   ExitFullscreenIcon,
@@ -97,7 +97,7 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
         // Serialize the data to a plain object before setting in state
         const serializedData = JSON.parse(JSON.stringify(data));
         setAssetMetadata(serializedData);
-        
+
         // Set subtitles if they exist
         if (serializedData?.subtitles) {
           subtitlesRef.current = serializedData.subtitles;
@@ -108,8 +108,12 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
           try {
             const asset: GetAssetResponse = await fetchAssetId(id);
             if (asset?.asset?.playbackPolicy?.webhookContext) {
-              const webhookContext = asset.asset.playbackPolicy.webhookContext as WebhookContext;
-              const accessKey = await generateAccessKey(activeAccount.address, webhookContext);
+              const webhookContext = asset.asset.playbackPolicy
+                .webhookContext as WebhookContext;
+              const accessKey = await generateAccessKey(
+                activeAccount.address,
+                webhookContext,
+              );
               setConditionalProps({ accessKey });
             }
           } catch (policyError) {
@@ -130,7 +134,17 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
     if (assetId) {
       fetchAssetDetails(assetId);
     }
-  }, [activeAccount, assetId, getAssetMetadata]);
+  }, [activeAccount, assetId, assetMetadata, getAssetMetadata]);
+
+  const resetFadeTimeout = useCallback(() => {
+    if (fadeTimeoutRef.current) {
+      clearTimeout(fadeTimeoutRef.current);
+    }
+    setControlsVisible(true);
+    fadeTimeoutRef.current = setTimeout(() => {
+      setControlsVisible(false);
+    }, 2000);
+  }, []);
 
   useEffect(() => {
     resetFadeTimeout();
@@ -139,7 +153,7 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
         clearTimeout(fadeTimeoutRef.current);
       }
     };
-  }, []);
+  }, [resetFadeTimeout]);
 
   useEffect(() => {
     if (currentPlayingId && currentPlayingId !== playerId) {
@@ -150,16 +164,6 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
       }
     }
   }, [currentPlayingId, playerId]);
-
-  const resetFadeTimeout = () => {
-    if (fadeTimeoutRef.current) {
-      clearTimeout(fadeTimeoutRef.current);
-    }
-    setControlsVisible(true);
-    fadeTimeoutRef.current = setTimeout(() => {
-      setControlsVisible(false);
-    }, 2000);
-  };
 
   const handleFullscreenToggle = async () => {
     try {
@@ -175,7 +179,7 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
   };
 
   const subtitlesRef = useRef<AssetMetadata['subtitles']>();
-  
+
   useEffect(() => {
     if (assetMetadata?.subtitles) {
       subtitlesRef.current = assetMetadata.subtitles;
@@ -192,20 +196,22 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
     >
       {src && src.length > 0 && (
         <SubtitlesProvider initialSubtitles={subtitlesRef.current}>
-          <Player.Root src={src} autoPlay={false} volume={1}>
+          <Player.Root src={src} volume={1}>
             <Player.Container>
               <Player.Video
                 title={title}
                 style={{ height: '100%', width: '100%' }}
                 ref={videoRef}
                 {...conditionalProps}
+                playsInline
+                controls={false}
                 onPlay={() => {
                   setCurrentPlayingId(playerId);
                   onPlay?.();
                 }}
               />
               <SubtitlesDisplay />
-              <Player.Controls 
+              <Player.Controls
                 className={`absolute bottom-0 left-0 right-0 flex flex-col gap-2 bg-gradient-to-t from-black/80 via-black/40 to-transparent px-4 pb-4 pt-20 transition-opacity duration-300 ${
                   controlsVisible ? 'opacity-100' : 'opacity-0'
                 }`}
@@ -213,22 +219,22 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
                 {/* Progress bar */}
                 <Player.Seek
                   style={{
-                    position: "absolute",
+                    position: 'absolute',
                     left: 20,
                     right: 20,
                     bottom: 20,
                     height: 20,
-                    display: "flex",
-                    alignItems: "center",
+                    display: 'flex',
+                    alignItems: 'center',
                     gap: 10,
-                    userSelect: "none",
-                    touchAction: "none",
+                    userSelect: 'none',
+                    touchAction: 'none',
                   }}
                 >
                   <Player.Track
                     style={{
-                      backgroundColor: "rgba(255, 255, 255, 0.7)",
-                      position: "relative",
+                      backgroundColor: 'rgba(255, 255, 255, 0.7)',
+                      position: 'relative',
                       flexGrow: 1,
                       borderRadius: 9999,
                       height: 2,
@@ -236,27 +242,27 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
                   >
                     <Player.SeekBuffer
                       style={{
-                        position: "absolute",
-                        backgroundColor: "rgba(0, 0, 0, 0.5)",
+                        position: 'absolute',
+                        backgroundColor: 'rgba(0, 0, 0, 0.5)',
                         borderRadius: 9999,
-                        height: "100%",
+                        height: '100%',
                       }}
                     />
                     <Player.Range
                       style={{
-                        position: "absolute",
-                        backgroundColor: "white",
+                        position: 'absolute',
+                        backgroundColor: 'white',
                         borderRadius: 9999,
-                        height: "100%",
+                        height: '100%',
                       }}
                     />
                   </Player.Track>
                   <Player.Thumb
                     style={{
-                      display: "block",
+                      display: 'block',
                       width: 12,
                       height: 12,
-                      backgroundColor: "white",
+                      backgroundColor: 'white',
                       borderRadius: 9999,
                     }}
                   />
@@ -284,8 +290,12 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
                           <UnmuteIcon className="h-5 w-5 text-white" />
                         </Player.VolumeIndicator>
                       </Player.MuteTrigger>
-                      <Player.Time className="text-sm font-medium text-white" />
                     </div>
+                  </div>
+
+                  {/* Center controls group - Time */}
+                  <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+                    <Player.Time className="text-sm font-medium text-white" />
                   </div>
 
                   {/* Right controls group */}
