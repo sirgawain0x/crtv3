@@ -28,9 +28,14 @@ const MemberCard = ({ member, nft, balance, points }: MemberCardProps) => {
               priority
               src={nft.metadata.image}
               alt={nft.metadata.name || 'NFT Image'}
-              height={250}
               width={200}
-              className="mx-auto rounded-lg object-cover md:mx-0"
+              height={250}
+              style={{ 
+                width: '200px',
+                height: '250px',
+                objectFit: 'cover'
+              }}
+              className="mx-auto rounded-lg md:mx-0"
               unoptimized
             />
           </div>

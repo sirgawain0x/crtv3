@@ -92,16 +92,8 @@ export default function ConnectButtonWrapper() {
   return (
     <ConnectButton
       client={client}
-      chains={[
-        polygon,
-        polygonAmoy,
-        base,
-        baseSepolia,
-        optimism,
-        storyTestnet,
-        zora,
-        zoraSepolia,
-      ]}
+      chain={base}
+      chains={[polygon, polygonAmoy, base, baseSepolia, optimism]}
       connectButton={{
         label: 'Get Started',
         className: 'my-custom-class',
@@ -157,7 +149,10 @@ export default function ConnectButtonWrapper() {
             throw error;
           }
         },
-        isLoggedIn: async () => await authedOnly(),
+        isLoggedIn: async () => {
+          const authResult = await authedOnly();
+          return !!authResult;
+        },
         doLogout: async () => {
           try {
             await logout();

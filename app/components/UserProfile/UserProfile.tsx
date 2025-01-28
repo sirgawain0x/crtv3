@@ -7,7 +7,6 @@ import {
 } from '@app/components/ui/tabs';
 import { formatAddress, stack } from '@app/lib/sdk/stack/client';
 import { client } from '@app/lib/sdk/thirdweb/client';
-import { CREATIVE_ADDRESS } from '@app/lib/utils/context';
 import Unlock from '@app/lib/utils/Unlock.json';
 import { NextPage } from 'next';
 import Link from 'next/link';
@@ -25,7 +24,7 @@ import {
 import { Account } from 'thirdweb/wallets';
 import LazyMintedAsset from '../lazy-minted/LazyMinted';
 import ListUploadedAssets from '../list-uploaded-assets/ListUploadedAssets';
-import CreateMetoken from '../MeToken/createMetoken';
+import MetokenStepper from '../MeToken/MetokenStepper';
 import {
   Card,
   CardContent,
@@ -163,166 +162,132 @@ const ProfilePage: NextPage = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="container mx-auto space-y-6 px-4 py-6">
       <Tabs defaultValue="Membership" className="w-full">
-        <TabsList className="flex w-full space-x-1 overflow-x-auto border-b p-0 md:justify-start">
+        {/* Mobile Tab Select */}
+        <div className="block md:hidden">
+          <select
+            onChange={(e) => {
+              const trigger = document.getElementById(
+                e.target.value,
+              ) as HTMLButtonElement;
+              trigger?.click();
+            }}
+            className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
+          >
+            <option value="members">Membership</option>
+            <option value="metoken">MeToken</option>
+            <option value="uploads">Uploads</option>
+            <option value="minted">Minted</option>
+            <option value="revenue">Revenue</option>
+          </select>
+        </div>
+
+        {/* Desktop Tabs */}
+        <TabsList className="hidden w-full space-x-2 rounded-lg bg-muted p-1 md:flex">
           <TabsTrigger
             id="members"
             value="Membership"
-            className="flex-shrink-0 rounded-t-lg px-4 py-2 text-sm font-medium"
+            className="rounded-md px-3 py-1.5 text-sm font-medium transition-all hover:bg-background hover:text-foreground data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
           >
             Membership
           </TabsTrigger>
           <TabsTrigger
             id="metoken"
             value="MeToken"
-            className="flex-shrink-0 rounded-t-lg px-4 py-2 text-sm font-medium"
+            className="rounded-md px-3 py-1.5 text-sm font-medium transition-all hover:bg-background hover:text-foreground data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
           >
             MeToken
           </TabsTrigger>
           <TabsTrigger
             id="uploads"
             value="Uploads"
-            className="flex-shrink-0 rounded-t-lg px-4 py-2 text-sm font-medium"
+            className="rounded-md px-3 py-1.5 text-sm font-medium transition-all hover:bg-background hover:text-foreground data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
           >
             Uploads
           </TabsTrigger>
           <TabsTrigger
             id="minted"
             value="Minted"
-            className="flex-shrink-0 rounded-t-lg px-4 py-2 text-sm font-medium"
+            className="rounded-md px-3 py-1.5 text-sm font-medium transition-all hover:bg-background hover:text-foreground data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
           >
             Minted
           </TabsTrigger>
           <TabsTrigger
             id="revenue"
             value="Revenue"
-            className="flex-shrink-0 rounded-t-lg px-4 py-2 text-sm font-medium"
+            className="rounded-md px-3 py-1.5 text-sm font-medium transition-all hover:bg-background hover:text-foreground data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
           >
             Revenue
           </TabsTrigger>
         </TabsList>
 
         <div className="mt-6">
-          <TabsContent value="Membership">
-            <Card>
-              <CardHeader className="space-y-1">
-                <CardTitle className="text-2xl">Membership</CardTitle>
-                <CardDescription>
-                  Manage your membership status and details
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <MemberCard
-                  member={memberData}
-                  nft={nftData}
-                  balance={balance}
-                  points={points}
-                />
-              </CardContent>
-              <CardFooter className="flex flex-wrap gap-2">
-                <TransactionButton
-                  className="flex items-center gap-2"
-                  transaction={() =>
-                    prepareContractCall({
-                      contract: unlockContract,
-                      method: 'renewMembershipFor',
-                      params: [ownedIds, CREATIVE_ADDRESS],
-                    })
-                  }
-                  onClick={() =>
-                    toast.success('Successful Membership Renewal!')
-                  }
-                  onError={(error: Error) =>
-                    toast.error('Error Renewing Membership.')
-                  }
-                >
-                  Renew
-                </TransactionButton>
-                <TransactionButton
-                  className="flex items-center gap-2"
-                  transaction={() =>
-                    prepareContractCall({
-                      contract: unlockContract,
-                      method: 'cancelAndRefund',
-                      params: [ownedIds],
-                    })
-                  }
-                  onClick={() =>
-                    toast.success('Cancelled Membership Successfully!')
-                  }
-                  onError={(error: Error) =>
-                    toast.error('Error Cancelling Your Membership.')
-                  }
-                >
-                  Cancel
-                </TransactionButton>
-              </CardFooter>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="Uploads">
-            <Card>
-              <CardHeader className="space-y-1">
-                <CardTitle className="text-2xl">Upload Content</CardTitle>
-                <CardDescription>
-                  Share your videos with the community
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Link
-                  href={`/profile/${activeAccount?.address}/upload`}
-                  className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-                >
-                  Upload New Video
-                </Link>
-                <div className="mt-6">
-                  <ListUploadedAssets
-                    activeAccount={activeAccount as Account}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="Minted">
-            <Card>
-              <CardHeader className="space-y-1">
-                <CardTitle className="text-2xl">Minted NFTs</CardTitle>
-                <CardDescription>View your ed NFT collection</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {activeAccount && (
-                  <LazyMintedAsset activeAccount={activeAccount as Account} />
-                )}
-              </CardContent>
-            </Card>
+          <TabsContent value="Membership" className="space-y-4">
+            <div className="grid gap-6">
+              <MemberCard
+                member={memberData}
+                nft={nftData}
+                balance={balance}
+                points={points}
+              />
+              {!result && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Get Membership</CardTitle>
+                    <CardDescription>
+                      Get access to exclusive content and features
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Link
+                      href="/membership"
+                      className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+                    >
+                      Get Membership
+                    </Link>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
           </TabsContent>
 
           <TabsContent value="MeToken">
-            <Card>
-              <CardHeader className="space-y-1">
-                <CardTitle className="text-2xl">Creator Token</CardTitle>
-                <CardDescription>
-                  Create and manage your personal token
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <CreateMetoken />
-              </CardContent>
-            </Card>
+            <MetokenStepper />
+          </TabsContent>
+
+          <TabsContent value="Uploads">
+            <div className="space-y-4">
+              <div className="flex justify-end">
+                <Link
+                  href={`/profile/${activeAccount?.address}/upload`}
+                  className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+                >
+                  Upload New Video
+                </Link>
+              </div>
+              <ListUploadedAssets />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="Minted">
+            {activeAccount ? (
+              <LazyMintedAsset activeAccount={activeAccount} />
+            ) : (
+              <div>Please connect your wallet to view minted assets.</div>
+            )}
           </TabsContent>
 
           <TabsContent value="Revenue">
             <Card>
-              <CardHeader className="space-y-1">
-                <CardTitle className="text-2xl">Revenue Dashboard</CardTitle>
+              <CardHeader>
+                <CardTitle>Revenue Stats</CardTitle>
                 <CardDescription>
-                  Track your earnings and analytics
+                  View your revenue statistics and earnings
                 </CardDescription>
               </CardHeader>
-              <CardContent className="flex min-h-[200px] items-center justify-center">
-                <p className="text-muted-foreground">Coming Soon</p>
+              <CardContent>
+                <p>Coming Soon</p>
               </CardContent>
             </Card>
           </TabsContent>
