@@ -24,7 +24,7 @@ import {
 import { Account } from 'thirdweb/wallets';
 import LazyMintedAsset from '../lazy-minted/LazyMinted';
 import ListUploadedAssets from '../list-uploaded-assets/ListUploadedAssets';
-import CreateMetoken from '../MeToken/createMetoken';
+import MetokenStepper from '../MeToken/MetokenStepper';
 import {
   Card,
   CardContent,
@@ -253,7 +253,7 @@ const ProfilePage: NextPage = () => {
           </TabsContent>
 
           <TabsContent value="MeToken">
-            <CreateMetoken />
+            <MetokenStepper />
           </TabsContent>
 
           <TabsContent value="Uploads">

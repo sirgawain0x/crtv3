@@ -55,7 +55,8 @@ export function Navbar() {
               <Image
                 style={{
                   width: '80px',
-                  height: 'auto',
+                  height: '80px',
+                  objectFit: 'contain'
                 }}
                 src={SITE_LOGO}
                 alt="Creative Logo"
@@ -115,7 +116,8 @@ export function Navbar() {
         <Image
           style={{
             width: '80px',
-            height: 'auto',
+            height: '80px',
+            objectFit: 'contain'
           }}
           src={SITE_LOGO}
           alt={SITE_NAME}

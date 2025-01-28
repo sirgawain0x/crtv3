@@ -28,7 +28,7 @@ export default function ListUploadedAssets() {
     };
 
     fetchUploadedAssets();
-  }, []);
+  }, [activeAccount]);
 
   const filteredCreatorAssets: Asset[] = useMemo(() => {
     if (!activeAccount?.address) return [];
@@ -40,7 +40,6 @@ export default function ListUploadedAssets() {
             ast.creatorId.value.toLowerCase() === activeAccount.address.toLowerCase(),
         )
       : [];
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assets, activeAccount?.address]);
 
   if (error) {
@@ -89,14 +88,16 @@ export default function ListUploadedAssets() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {filteredCreatorAssets.map((video, i) => (
-                <UploadAsset
-                  activeAccount={activeAccount}
-                  asset={video}
-                  idx={i}
-                  key={`${video.id}-${video.createdAt}`}
-                />
-              ))}
+              {filteredCreatorAssets.map((video, i) =>
+                activeAccount ? (
+                  <UploadAsset
+                    activeAccount={activeAccount}
+                    asset={video}
+                    idx={i}
+                    key={`${video.id}-${video.createdAt}`}
+                  />
+                ) : null
+              )}
             </tbody>
           </table>
         </div>
