@@ -1,304 +1,135 @@
 'use client';
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Input } from '@app/components/ui/input';
 import { Textarea } from '@app/components/ui/textarea';
 import { Button } from '@app/components/ui/button';
 import { Loader2 } from 'lucide-react';
-import snapshot from '@snapshot-labs/snapshot.js';
-import { useActiveAccount } from 'thirdweb/react';
-import { FaWindowClose } from 'react-icons/fa';
 import { useRouter } from 'next/navigation';
-import { polygon } from 'thirdweb/chains';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@app/components/ui/select';
 import { toast } from 'sonner';
+import { getContract, prepareContractCall, encode } from 'thirdweb';
+import { defineChain } from 'thirdweb/chains';
+import {
+  useSendTransaction,
+  useReadContract,
+  useActiveAccount,
+} from 'thirdweb/react';
+import { client } from '@app/lib/sdk/thirdweb/client';
+import VoteABI from '@app/lib/utils/Vote.json';
+import CreativeTokenABI from '@app/lib/utils/CreativeToken.json';
+import { CREATIVE_ADDRESS } from '@app/lib/utils/context';
 
-const hub = 'https://hub.snapshot.org';
-const client = new snapshot.Client(hub);
+const votingContract = getContract({
+  client,
+  chain: defineChain(8453),
+  address: '0x24609A5CBe0f50b67E0E7D7494885a6eB19404BF',
+});
 
-const VOTING_TYPES = {
-  'single-choice': 'Single Choice',
-  weighted: 'Weighted',
-} as const;
-
-const VOTING_STRATEGIES = [
-  {
-    name: 'erc20-balance-of',
-    params: {
-      address: process.env.NEXT_PUBLIC_TOKEN_ADDRESS,
-      symbol: 'CRTV',
-      decimals: 18,
-    },
-  },
-];
-
-type VotingType = keyof typeof VOTING_TYPES;
+const creativeTokenContract = getContract({
+  client,
+  chain: defineChain(8453),
+  address: '0x4B62D9b3DE9FAB98659693c9ee488D2E4eE56c44',
+});
 
 export default function Create() {
+  const router = useRouter();
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
-  const [startDate, setStartDate] = useState(0);
-  const [startTime, setStartTime] = useState(new Date());
-  const [endDate, setEndDate] = useState(0);
-  const [endTime, setEndTime] = useState(new Date());
-  const [choices, setChoices] = useState(['yes', 'no']);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [votingType, setVotingType] = useState<VotingType>('single-choice');
-  const [votingPower, setVotingPower] = useState<number>(0);
-  const [minScore, setMinScore] = useState<number>(100); // Minimum score required to create proposal
-  const inputRef = useRef<HTMLInputElement>(null);
-  const router = useRouter();
   const activeAccount = useActiveAccount();
-  const chain = polygon;
 
-  useEffect(() => {
-    const checkVotingPower = async () => {
-      if (!activeAccount?.address) return;
-
-      try {
-        const provider = await snapshot.utils.getProvider(chain.id.toString());
-        const block = await snapshot.utils.getBlockNumber(provider);
-
-        const vp = await snapshot.utils.getVp(
-          activeAccount.address,
-          chain.id.toString(),
-          VOTING_STRATEGIES,
-          block,
-          'thecreative.eth',
-        );
-
-        setVotingPower(vp.vp);
-      } catch (error) {
-        console.error('Error checking voting power:', error);
-        toast.error('Failed to check voting power');
-      }
-    };
-
-    checkVotingPower();
-  }, [activeAccount?.address, chain.id]);
-
-  function handleChange(i: number, event: React.ChangeEvent<HTMLInputElement>) {
-    const values = [...choices];
-    values[i] = event.target.value;
-    setChoices(values);
-  }
-
-  function handleAdd() {
-    const values = [...choices];
-    values.push('');
-    setChoices(values);
-  }
-
-  function handleRemove(i: number) {
-    const values = [...choices];
-    values.splice(i, 1);
-    setChoices(values);
-  }
-
-  const validateProposal = () => {
-    if (!title.trim()) {
-      toast.error('Title is required');
-      return false;
-    }
-    if (!content.trim()) {
-      toast.error('Content is required');
-      return false;
-    }
-    if (choices.some((choice) => !choice.trim())) {
-      toast.error('All choices must have content');
-      return false;
-    }
-    if (startDate >= endDate) {
-      toast.error('End date must be after start date');
-      return false;
-    }
-    if (votingPower < minScore) {
-      toast.error(
-        `You need at least ${minScore} voting power to create a proposal`,
-      );
-      return false;
-    }
-    return true;
+  // Example function to create a token transfer transaction
+  const createTransferTransaction = () => {
+    return prepareContractCall({
+      contract: creativeTokenContract,
+      method: 'function transfer(address to, uint256 amount)',
+      params: [
+        `${activeAccount?.address}`, // Replace with actual address
+        100n, // Replace with actual amount
+      ],
+    });
   };
 
-  const submit = async () => {
-    if (!activeAccount) {
-      toast.error('Please connect your wallet');
-      return;
-    }
+  const { mutate: sendTx } = useSendTransaction();
 
-    if (!validateProposal()) {
+  const handleProposalSubmission = async () => {
+    if (!activeAccount) {
+      toast.error('You must be logged in to create a proposal.');
       return;
     }
 
     try {
-      setIsSubmitting(true);
-      const provider = await snapshot.utils.getProvider(chain.id.toString());
-      const block = await snapshot.utils.getBlockNumber(provider);
-      const space = 'thecreative.eth';
+      // 1. Prepare the external contract call
+      const transferTransaction = createTransferTransaction();
 
-      const receipt = await client.proposal(provider, activeAccount.address, {
-        space: space,
-        type: votingType,
-        title: title,
-        body: content,
-        choices: choices,
-        start: startDate,
-        end: endDate,
-        snapshot: block,
-        discussion: '',
-        plugins: JSON.stringify({
-          poap: {
-            enabled: true,
-            eventId: null, // This will be assigned by POAP after proposal creation
-            mintCondition: {
-              type: 'voted', // User must vote to claim POAP
-              choices: choices.map((_, index) => index + 1), // All voting choices are valid for POAP claim
-            },
-          },
-        }),
-        strategies: VOTING_STRATEGIES,
-        validation: {
-          name: 'basic',
-          params: {
-            minScore,
-          },
-        },
-        app: 'Creative TV',
+      // 2. Encode the transaction
+      const encodedCall = await encode(transferTransaction);
+
+      // 3. Prepare the governance proposal
+      const proposalTransaction = prepareContractCall({
+        contract: votingContract,
+        method:
+          'function propose(address[] targets, uint256[] values, bytes[] calldatas, string description)',
+        params: [
+          [creativeTokenContract.address], // Targets array
+          [0n], // Values array
+          [encodedCall], // Encoded calldata array
+          content, // Description
+        ],
       });
 
-      toast.success('Proposal created successfully!');
-      router.push('/vote');
+      // 4. Send the transaction
+      sendTx(proposalTransaction, {
+        onSuccess: () => {
+          toast.success('Proposal created successfully!');
+          router.push('/vote');
+        },
+        onError: (error) => {
+          console.error('Error creating proposal:', error);
+          toast.error(
+            error?.message || 'Failed to create proposal. Please try again.',
+          );
+        },
+      });
     } catch (error) {
-      console.error('Error creating proposal:', error);
-      toast.error('Failed to create proposal');
-    } finally {
-      setIsSubmitting(false);
+      console.error('Error preparing proposal:', error);
+      toast.error('Failed to prepare proposal. Please try again.');
     }
   };
 
   return (
     <div className="mx-auto max-w-2xl space-y-8 p-4">
       <div className="space-y-4">
-        <h1 className="text-2xl font-bold">Create Proposal</h1>
-
-        <div className="rounded-lg bg-blue-50 p-4 text-blue-700">
-          You need at least 100 CRTV tokens to create a proposal
-        </div>
-
-        {votingPower > 0 && (
-          <div className="rounded-lg bg-green-50 p-4 text-green-700">
-            Your voting power: {votingPower.toFixed(2)}
-            {votingPower < minScore && (
-              <div className="mt-2 text-red-600">
-                You need {(minScore - votingPower).toFixed(2)} more CRTV tokens to create proposals
-              </div>
-            )}
-          </div>
-        )}
-
-        <div className="space-y-2">
-          <label className="text-sm font-medium">Voting Type</label>
-          <Select
-            value={votingType}
-            onValueChange={(value: VotingType) => setVotingType(value)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select voting type" />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.entries(VOTING_TYPES).map(([key, label]) => (
-                <SelectItem key={key} value={key}>
-                  {label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        <div>
+          <h2 className="text-2xl font-bold">Create Proposal</h2>
+          <p className="text-muted-foreground">
+            Submit a new proposal for voting
+          </p>
         </div>
 
         <div className="space-y-2">
-          <label className="text-sm font-medium">Title</label>
           <Input
-            type="text"
-            placeholder="Enter proposal title"
+            placeholder="Proposal Title"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
           />
         </div>
 
         <div className="space-y-2">
-          <label className="text-sm font-medium">Content</label>
           <Textarea
-            placeholder="Enter proposal content"
+            placeholder="Proposal Description"
             value={content}
             onChange={(e) => setContent(e.target.value)}
-            rows={5}
+            rows={6}
           />
         </div>
-
-        <div className="space-y-4">
-          <label className="text-sm font-medium">Choices</label>
-          {choices.map((choice, index) => (
-            <div key={index} className="flex items-center gap-2">
-              <Input
-                type="text"
-                placeholder={`Choice ${index + 1}`}
-                value={choice}
-                onChange={(e) => handleChange(index, e)}
-              />
-              {choices.length > 2 && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => handleRemove(index)}
-                >
-                  <FaWindowClose className="h-4 w-4" />
-                </Button>
-              )}
-            </div>
-          ))}
-          <Button variant="outline" onClick={handleAdd}>
-            Add Choice
-          </Button>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <label className="text-sm font-medium">Start Date</label>
-            <Input
-              type="datetime-local"
-              onChange={(e) => setStartDate(new Date(e.target.value).getTime())}
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">End Date</label>
-            <Input
-              type="datetime-local"
-              onChange={(e) => setEndDate(new Date(e.target.value).getTime())}
-            />
-          </div>
-        </div>
-
-        <Button
-          className="w-full"
-          onClick={submit}
-          disabled={isSubmitting || votingPower < minScore}
-        >
-          {isSubmitting ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Creating Proposal...
-            </>
-          ) : (
-            'Create Proposal'
-          )}
-        </Button>
       </div>
+
+      <Button
+        onClick={handleProposalSubmission}
+        disabled={!title || !content}
+        className="w-full"
+      >
+        Create Proposal
+      </Button>
     </div>
   );
 }

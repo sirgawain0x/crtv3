@@ -128,6 +128,36 @@ export default function ConnectButtonWrapper() {
         ],
         8453: ['0xf7c4cd399395d80f9d61fde833849106775269c6'],
       }}
+      supportedTokens={{
+        137: [
+          {
+            address: '0x3dB8bb54D7BaE1D6CA091E662FABA8C1d1D61155',
+            icon: 'https://bafybeicp432kqwnbowayyeqzvbjgx5q3y7yfph2z255k3er3arnmwuebee.ipfs.dweb.link?filename=logo.png',
+            name: 'Creative Token',
+            symbol: 'CRTV',
+          },
+          {
+            address: '0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063',
+            icon: 'https://bafybeieuzwktu36qfl3a5u4em222zke4cpq57soudjuks2dgjzxmzeofta.ipfs.dweb.link?filename=multi-collateral-dai-dai-logo.svg',
+            name: 'Dai Stablecoin',
+            symbol: 'DAI',
+          },
+        ],
+        8453: [
+          {
+            address: '0x4B62D9b3DE9FAB98659693c9ee488D2E4eE56c44',
+            icon: 'https://bafybeicp432kqwnbowayyeqzvbjgx5q3y7yfph2z255k3er3arnmwuebee.ipfs.dweb.link?filename=logo.png',
+            name: 'Creative Token',
+            symbol: 'CRTV',
+          },
+          {
+            address: '0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb',
+            icon: 'https://bafybeieuzwktu36qfl3a5u4em222zke4cpq57soudjuks2dgjzxmzeofta.ipfs.dweb.link?filename=multi-collateral-dai-dai-logo.svg',
+            name: 'Dai Stablecoin',
+            symbol: 'DAI',
+          },
+        ],
+      }}
       auth={{
         getLoginPayload: async (params: GenerateLoginPayloadParams) =>
           await generatePayload(params),

@@ -6,7 +6,7 @@ function str2ab(str: string): ArrayBuffer {
   for (let i = 0; i < str.length; i++) {
     buf[i] = str.charCodeAt(i);
   }
-  return buf;
+  return buf.buffer;
 }
 
 // Helper function to convert ArrayBuffer to hex string
