@@ -1,4 +1,3 @@
-import { ResolvedReturnType } from '@app/types/nft';
 import { useEffect, useState } from 'react';
 import { ContractOptions } from 'thirdweb';
 import {
@@ -6,23 +5,19 @@ import {
   GetClaimConditionsParams,
 } from 'thirdweb/extensions/erc1155';
 
-type ClaimConditionsParams = {
-  contract: Readonly<ContractOptions<any>>;
+type ClaimConditionsProps = {
+  contract: Readonly<ContractOptions<any, `0x${string}`>>;
 } & GetClaimConditionsParams;
 
-type ClaimConditions = ResolvedReturnType<
-  ReturnType<typeof getClaimConditions>
->;
-
-export function useClaimConditions(props: ClaimConditionsParams) {
-  const [claimConditions, setClaimConditions] = useState<ClaimConditions>([]);
+export function useClaimConditions(props: ClaimConditionsProps) {
+  const [claimConditions, setClaimConditions] = useState<any[]>([]);
   const [error, setError] = useState<Error>();
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     let mounted = true;
 
-    const getCC = async () => {
+    const getConditions = async () => {
       try {
         setIsLoading(true);
         const conditions = await getClaimConditions({
@@ -31,22 +26,24 @@ export function useClaimConditions(props: ClaimConditionsParams) {
         });
 
         if (mounted) {
-          setClaimConditions([...conditions]);
+          setClaimConditions(conditions);
         }
       } catch (err) {
         if (mounted) {
-          setError(err as Error);
+          setError(err instanceof Error ? err : new Error(String(err)));
         }
       } finally {
-        if (mounted) setIsLoading(false);
+        if (mounted) {
+          setIsLoading(false);
+        }
       }
     };
 
-    getCC();
+    getConditions();
 
     return () => {
       mounted = false;
-    }
+    };
   }, [props.contract, props.tokenId]);
 
   return {

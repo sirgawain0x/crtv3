@@ -17,7 +17,7 @@ import { getLivepeerAudioToText } from '@app/api/livepeer/audioToText';
 import { upload } from 'thirdweb/storage';
 import { client } from '@app/lib/sdk/thirdweb/client';
 import Link from 'next/link';
-import { generateUUID } from '@app/lib/utils/crypto';
+import { cryptoUtils } from '@app/lib/utils/crypto';
 
 const truncateUri = (uri: string): string => {
   if (uri.length <= 30) return uri;
@@ -200,6 +200,8 @@ const FileUpload: React.FC<FileUploadProps> = ({
         metadata: {
           filename: selectedFile.name,
           filetype: selectedFile.type || 'video/mp4',
+          title: newAssetTitle || selectedFile.name,
+          uploadId: cryptoUtils.generateUUID(),
         },
         uploadSize: selectedFile.size,
         onError(err: any) {

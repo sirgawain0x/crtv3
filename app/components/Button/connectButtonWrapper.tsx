@@ -1,7 +1,7 @@
 'use client';
 import {
   authedOnly,
-  generatePayload,
+  generateAuthPayload,
   login,
   logout,
 } from '@app/api/auth/thirdweb/authentication';
@@ -160,7 +160,7 @@ export default function ConnectButtonWrapper() {
       }}
       auth={{
         getLoginPayload: async (params: GenerateLoginPayloadParams) =>
-          await generatePayload(params),
+          await generateAuthPayload(params),
         doLogin: async (params: VerifyLoginPayloadParams): Promise<void> => {
           try {
             const loginPayload = await login(params);

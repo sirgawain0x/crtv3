@@ -17,3 +17,15 @@ export interface MetokenFormData {
   owner: string;
   diamond: string;
 }
+
+export interface MetokenRegisterEntry {
+  id: string;
+  owner: string;
+  asset: string;
+  vault: string;
+  db_write_timestamp: string;
+}
+
+export interface CheckOwnerResponse {
+  Metokens_Register: MetokenRegisterEntry[];
+}

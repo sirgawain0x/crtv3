@@ -9,7 +9,10 @@ export type JwtContext = {
   address: string;
 }
 
-export const generatePayload = thirdwebAuth.generatePayload;
+// Convert to async function
+export async function generateAuthPayload(params: Parameters<typeof thirdwebAuth.generatePayload>[0]) {
+  return thirdwebAuth.generatePayload(params);
+}
 
 export async function login(payload: VerifyLoginPayloadParams) {
     try {
@@ -51,7 +54,8 @@ export const getJwtContext: () => Promise<JwtContext> = async () => {
         const decoded = await decodeJWT(jwtCookie.value);
         
         // Get address from ctx or sub field
-        const address = decoded?.payload?.ctx?.address || decoded?.payload?.sub;
+        const ctx = decoded?.payload?.ctx as { address?: string } || {};
+        const address = ctx.address || decoded?.payload?.sub;
 
         if (!address) {
             console.error('JWT missing address:', decoded);
@@ -74,7 +78,8 @@ export async function authedOnly() {
 
     try {
         const decoded = await decodeJWT(jwt.value);
-        const address = decoded?.payload?.ctx?.address || decoded?.payload?.sub;
+        const ctx = decoded?.payload?.ctx as { address?: string } || {};
+        const address = ctx.address || decoded?.payload?.sub;
 
         if (!address) {
             return null; // Return null instead of throwing
@@ -83,7 +88,7 @@ export async function authedOnly() {
         return { address };
     } catch (error) {
         console.error('Authentication check failed:', error);
-        return null; // Return null instead of throwing
+        return null;
     }
 }
 

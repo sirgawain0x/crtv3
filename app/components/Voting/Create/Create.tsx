@@ -6,94 +6,46 @@ import { Button } from '@app/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
-import { getContract, prepareContractCall, encode } from 'thirdweb';
+import {
+  getContract,
+  prepareContractCall,
+  encode,
+  sendTransaction,
+} from 'thirdweb';
 import { defineChain } from 'thirdweb/chains';
+import { propose } from 'thirdweb/extensions/vote';
+import { mintTo, transfer } from 'thirdweb/extensions/erc20';
 import {
   useSendTransaction,
   useReadContract,
   useActiveAccount,
+  TransactionButton,
 } from 'thirdweb/react';
 import { client } from '@app/lib/sdk/thirdweb/client';
 import VoteABI from '@app/lib/utils/Vote.json';
 import CreativeTokenABI from '@app/lib/utils/CreativeToken.json';
 import { CREATIVE_ADDRESS } from '@app/lib/utils/context';
+import { toTokens } from 'thirdweb';
 
 const votingContract = getContract({
   client,
-  chain: defineChain(8453),
-  address: '0x24609A5CBe0f50b67E0E7D7494885a6eB19404BF',
+  chain: defineChain(84532),
+  address: '0xEda7BF26C46372512df602e8C9Bd65226A1064f3',
 });
 
 const creativeTokenContract = getContract({
   client,
-  chain: defineChain(8453),
-  address: '0x4B62D9b3DE9FAB98659693c9ee488D2E4eE56c44',
+  chain: defineChain(84532),
+  address: '0x7A5A934BfeCA5a855550e314E7636efba345940e',
 });
 
 export default function Create() {
   const router = useRouter();
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
+  const [recipient, setRecipient] = useState('');
+  const [amount, setAmount] = useState('');
   const activeAccount = useActiveAccount();
-
-  // Example function to create a token transfer transaction
-  const createTransferTransaction = () => {
-    return prepareContractCall({
-      contract: creativeTokenContract,
-      method: 'function transfer(address to, uint256 amount)',
-      params: [
-        `${activeAccount?.address}`, // Replace with actual address
-        100n, // Replace with actual amount
-      ],
-    });
-  };
-
-  const { mutate: sendTx } = useSendTransaction();
-
-  const handleProposalSubmission = async () => {
-    if (!activeAccount) {
-      toast.error('You must be logged in to create a proposal.');
-      return;
-    }
-
-    try {
-      // 1. Prepare the external contract call
-      const transferTransaction = createTransferTransaction();
-
-      // 2. Encode the transaction
-      const encodedCall = await encode(transferTransaction);
-
-      // 3. Prepare the governance proposal
-      const proposalTransaction = prepareContractCall({
-        contract: votingContract,
-        method:
-          'function propose(address[] targets, uint256[] values, bytes[] calldatas, string description)',
-        params: [
-          [creativeTokenContract.address], // Targets array
-          [0n], // Values array
-          [encodedCall], // Encoded calldata array
-          content, // Description
-        ],
-      });
-
-      // 4. Send the transaction
-      sendTx(proposalTransaction, {
-        onSuccess: () => {
-          toast.success('Proposal created successfully!');
-          router.push('/vote');
-        },
-        onError: (error) => {
-          console.error('Error creating proposal:', error);
-          toast.error(
-            error?.message || 'Failed to create proposal. Please try again.',
-          );
-        },
-      });
-    } catch (error) {
-      console.error('Error preparing proposal:', error);
-      toast.error('Failed to prepare proposal. Please try again.');
-    }
-  };
 
   return (
     <div className="mx-auto max-w-2xl space-y-8 p-4">
@@ -123,13 +75,28 @@ export default function Create() {
         </div>
       </div>
 
-      <Button
-        onClick={handleProposalSubmission}
-        disabled={!title || !content}
-        className="w-full"
+      <TransactionButton
+        transaction={async () => {
+          return propose({
+            contract: votingContract,
+            targets: [creativeTokenContract.address],
+            calldatas: ['0x'],
+            values: [0n],
+            description: 'content',
+          });
+        }}
+        onTransactionSent={(result) => {
+          console.log('Transaction submitted', result.transactionHash);
+        }}
+        onTransactionConfirmed={(receipt) => {
+          console.log('Transaction confirmed', receipt.transactionHash);
+        }}
+        onError={(error) => {
+          console.error('Transaction error', error);
+        }}
       >
-        Create Proposal
-      </Button>
+        Confirm Transaction
+      </TransactionButton>
     </div>
   );
 }
