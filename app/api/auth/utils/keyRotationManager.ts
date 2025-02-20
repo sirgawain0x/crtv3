@@ -1,6 +1,6 @@
 import * as jose from 'jose';
 import crypto from 'crypto';
-import { createClient } from 'redis';
+import { Redis } from '@upstash/redis';
 
 interface KeyPair {
   privateKeyPem: string;
@@ -19,9 +19,21 @@ class KeyRotationManager {
   private readonly ROTATION_BUFFER = 7 * 24 * 60 * 60 * 1000; // 7 days buffer for rotation
   private readonly KEY_PREFIX = 'jwt_key:';
   private readonly ACTIVE_KEYS_SET = 'jwt_active_keys';
-  private redis: ReturnType<typeof createClient> | null = null;
+  private redis: Redis;
 
-  private constructor() {}
+  private constructor() {
+    const url = process.env.KV_REST_API_URL;
+    const token = process.env.KV_REST_API_TOKEN;
+    
+    if (!url || !token) {
+      throw new Error('KV_REST_API_URL or KV_REST_API_TOKEN environment variables are not set');
+    }
+
+    this.redis = new Redis({
+      url,
+      token,
+    });
+  }
 
   public static getInstance(): KeyRotationManager {
     if (!KeyRotationManager.instance) {
@@ -30,50 +42,35 @@ class KeyRotationManager {
     return KeyRotationManager.instance;
   }
 
-  private async getRedisClient() {
-    if (!this.redis) {
-      this.redis = createClient({ url: process.env.TV_REDIS_URL });
-      await this.redis.connect();
-    }
-    return this.redis;
-  }
-
   private async loadKeyPair(kid: string): Promise<KeyPair | null> {
-    const redis = await this.getRedisClient();
-    const key = await redis.get(`${this.KEY_PREFIX}${kid}`);
-    if (!key) return null;
-    const storedKey = JSON.parse(key) as StoredKeyPair;
-    if (!storedKey.isActive) return null;
-    return storedKey;
+    const key = await this.redis.get<StoredKeyPair>(`${this.KEY_PREFIX}${kid}`);
+    if (!key || !key.isActive) return null;
+    return key;
   }
 
   private async loadActiveKeys(): Promise<KeyPair[]> {
-    const redis = await this.getRedisClient();
-    const activeKids = await redis.sMembers(this.ACTIVE_KEYS_SET);
+    const activeKids = await this.redis.smembers(this.ACTIVE_KEYS_SET) as unknown as string[];
     const keys = await Promise.all(
-      activeKids.map((kid) => this.loadKeyPair(kid)),
+      activeKids.map((kid: string) => this.loadKeyPair(kid))
     );
     return keys.filter((k): k is KeyPair => k !== null);
   }
 
   private async storeKeyPair(keyPair: KeyPair) {
-    const redis = await this.getRedisClient();
     const storedKey: StoredKeyPair = {
       ...keyPair,
-      isActive: true,
+      isActive: true
     };
-    await redis.set(`${this.KEY_PREFIX}${keyPair.kid}`, JSON.stringify(storedKey));
-    await redis.sAdd(this.ACTIVE_KEYS_SET, keyPair.kid);
+    await this.redis.set(`${this.KEY_PREFIX}${keyPair.kid}`, storedKey);
+    await this.redis.sadd(this.ACTIVE_KEYS_SET, [keyPair.kid]);
   }
 
   private async deactivateKey(kid: string) {
-    const redis = await this.getRedisClient();
-    await redis.sRem(this.ACTIVE_KEYS_SET, kid);
-    const keyJson = await redis.get(`${this.KEY_PREFIX}${kid}`);
-    if (keyJson) {
-      const key = JSON.parse(keyJson) as StoredKeyPair;
+    await this.redis.srem(this.ACTIVE_KEYS_SET, [kid]);
+    const key = await this.redis.get<StoredKeyPair>(`${this.KEY_PREFIX}${kid}`);
+    if (key) {
       key.isActive = false;
-      await redis.set(`${this.KEY_PREFIX}${kid}`, JSON.stringify(key));
+      await this.redis.set(`${this.KEY_PREFIX}${kid}`, key);
     }
   }
 
@@ -89,10 +86,7 @@ class KeyRotationManager {
     const privateKeyPem = await jose.exportPKCS8(keyPair.privateKey);
     const publicKeyPem = await jose.exportSPKI(keyPair.publicKey);
     const jwk = await jose.exportJWK(keyPair.publicKey);
-    const kid = crypto
-      .createHash('sha256')
-      .update(JSON.stringify(jwk))
-      .digest('hex');
+    const kid = crypto.createHash('sha256').update(JSON.stringify(jwk)).digest('hex');
 
     const newKeyPair: KeyPair = {
       privateKeyPem,
@@ -105,26 +99,17 @@ class KeyRotationManager {
     return newKeyPair;
   }
 
-  public async getCurrentSigningKey(): Promise<{
-    privateKey: jose.KeyLike;
-    kid: string;
-  }> {
+  public async getCurrentSigningKey(): Promise<{ privateKey: jose.KeyLike; kid: string }> {
     const activeKeys = await this.loadActiveKeys();
     let currentKey = activeKeys[activeKeys.length - 1];
     const now = Date.now();
 
     // If the current key is approaching expiration, generate a new one
-    if (
-      !currentKey ||
-      now - currentKey.createdAt > this.KEY_LIFETIME - this.ROTATION_BUFFER
-    ) {
+    if (!currentKey || now - currentKey.createdAt > this.KEY_LIFETIME - this.ROTATION_BUFFER) {
       currentKey = await this.addNewKey();
     }
 
-    const privateKey = await jose.importPKCS8(
-      currentKey.privateKeyPem,
-      'RS256',
-    );
+    const privateKey = await jose.importPKCS8(currentKey.privateKeyPem, 'RS256');
     return { privateKey, kid: currentKey.kid };
   }
 
@@ -150,7 +135,7 @@ class KeyRotationManager {
           use: 'sig',
           alg: 'RS256',
         };
-      }),
+      })
     );
 
     return { keys: jwks };
@@ -158,7 +143,7 @@ class KeyRotationManager {
 
   public async verifyToken(token: string): Promise<jose.JWTVerifyResult> {
     const decoded = jose.decodeProtectedHeader(token);
-    const kid = decoded.kid;
+    const kid = decoded.kid as string | undefined;
     if (!kid) throw new Error('No key identifier in token');
 
     const keyPair = await this.loadKeyPair(kid);
@@ -173,11 +158,10 @@ class KeyRotationManager {
   }
 
   public async cleanup() {
-    if (this.redis) {
-      await this.redis.quit();
-      this.redis = null;
-    }
+    // No cleanup needed for Upstash Redis
   }
 }
+
+export { KeyRotationManager };
 
 export const keyRotationManager = KeyRotationManager.getInstance();

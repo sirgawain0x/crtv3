@@ -24,8 +24,5 @@ export async function GET() {
   } catch (error) {
     console.error('Failed to generate JWKS:', error);
     return NextResponse.json({ keys: [] });
-  } finally {
-    // Cleanup Redis connection after response
-    await keyRotationManager.cleanup();
   }
 }
