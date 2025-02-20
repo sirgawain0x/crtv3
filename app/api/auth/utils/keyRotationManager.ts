@@ -36,9 +36,9 @@ class KeyRotationManager {
   }
 
   private async loadActiveKeys(): Promise<KeyPair[]> {
-    const activeKids = await kv.smembers<string>(this.ACTIVE_KEYS_SET);
+    const activeKids = (await kv.smembers(this.ACTIVE_KEYS_SET)) as string[];
     const keys = await Promise.all(
-      activeKids.map(kid => this.loadKeyPair(kid))
+      activeKids.map((kid) => this.loadKeyPair(kid)),
     );
     return keys.filter((k): k is KeyPair => k !== null);
   }
@@ -46,7 +46,7 @@ class KeyRotationManager {
   private async storeKeyPair(keyPair: KeyPair) {
     const storedKey: StoredKeyPair = {
       ...keyPair,
-      isActive: true
+      isActive: true,
     };
     await kv.set(`${this.KEY_PREFIX}${keyPair.kid}`, storedKey);
     await kv.sadd(this.ACTIVE_KEYS_SET, keyPair.kid);
@@ -73,7 +73,10 @@ class KeyRotationManager {
     const privateKeyPem = await jose.exportPKCS8(keyPair.privateKey);
     const publicKeyPem = await jose.exportSPKI(keyPair.publicKey);
     const jwk = await jose.exportJWK(keyPair.publicKey);
-    const kid = crypto.createHash('sha256').update(JSON.stringify(jwk)).digest('hex');
+    const kid = crypto
+      .createHash('sha256')
+      .update(JSON.stringify(jwk))
+      .digest('hex');
 
     const newKeyPair: KeyPair = {
       privateKeyPem,
@@ -86,17 +89,26 @@ class KeyRotationManager {
     return newKeyPair;
   }
 
-  public async getCurrentSigningKey(): Promise<{ privateKey: jose.KeyLike; kid: string }> {
+  public async getCurrentSigningKey(): Promise<{
+    privateKey: jose.KeyLike;
+    kid: string;
+  }> {
     const activeKeys = await this.loadActiveKeys();
     let currentKey = activeKeys[activeKeys.length - 1];
     const now = Date.now();
 
     // If the current key is approaching expiration, generate a new one
-    if (!currentKey || now - currentKey.createdAt > this.KEY_LIFETIME - this.ROTATION_BUFFER) {
+    if (
+      !currentKey ||
+      now - currentKey.createdAt > this.KEY_LIFETIME - this.ROTATION_BUFFER
+    ) {
       currentKey = await this.addNewKey();
     }
 
-    const privateKey = await jose.importPKCS8(currentKey.privateKeyPem, 'RS256');
+    const privateKey = await jose.importPKCS8(
+      currentKey.privateKeyPem,
+      'RS256',
+    );
     return { privateKey, kid: currentKey.kid };
   }
 
@@ -122,7 +134,7 @@ class KeyRotationManager {
           use: 'sig',
           alg: 'RS256',
         };
-      })
+      }),
     );
 
     return { keys: jwks };
