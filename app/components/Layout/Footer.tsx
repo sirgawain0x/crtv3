@@ -15,7 +15,8 @@ export default function Component() {
             alt="Creative Logo"
             style={{
               width: '40px',
-              height: 'auto'
+              height: '40px',
+              objectFit: 'contain'
             }}
             width={40}
             height={40}

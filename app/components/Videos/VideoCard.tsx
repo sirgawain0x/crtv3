@@ -31,9 +31,14 @@ import { useRef, useEffect } from 'react';
 interface VideoCardProps {
   asset: Asset;
   playbackSources: Src[] | null;
+  metadata: any;
 }
 
-const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
+const VideoCard: React.FC<VideoCardProps> = ({
+  asset,
+  playbackSources,
+  metadata,
+}) => {
   const { currentPlayingId, setCurrentPlayingId } = useVideo();
   const playerRef = useRef<HTMLDivElement>(null);
 
@@ -87,7 +92,10 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
                 />
                 <div className="flex flex-col">
                   <AccountName className="text-sm font-medium" />
-                  <AccountAddress className="text-xs text-gray-500" formatFn={shortenAddress} />
+                  <AccountAddress
+                    className="text-xs text-gray-500"
+                    formatFn={shortenAddress}
+                  />
                 </div>
               </div>
             </AccountProvider>
@@ -108,17 +116,44 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
             </Badge>
             <VideoViewMetrics playbackId={asset.playbackId || ''} />
           </div>
+          <div className="p-4">
+            <h3 className="mb-2 text-lg font-semibold">
+              {metadata?.title || asset.name || 'Untitled Video'}
+            </h3>
+            {metadata?.description && (
+              <p className="mb-2 line-clamp-2 text-sm text-gray-600">
+                {metadata.description}
+              </p>
+            )}
+            {metadata?.category && (
+              <span className="inline-block rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-600">
+                {metadata.category}
+              </span>
+            )}
+            <div className="mt-2 flex items-center justify-between text-sm text-gray-500">
+              <span>
+                {asset.createdAt
+                  ? new Date(asset.createdAt).toLocaleDateString()
+                  : ''}
+              </span>
+              {metadata?.location && (
+                <span className="flex items-center gap-1">
+                  📍 {metadata.location}
+                </span>
+              )}
+            </div>
+          </div>
           <div className="mt-6 grid grid-flow-row auto-rows-max space-y-3 overflow-hidden">
-            <Link href={`/discover/${asset.id}`} passHref>
-              <h1 className="max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-xl font-bold hover:text-orange-500 focus:text-orange-500">
-                {asset?.name}
-              </h1>
-            </Link>
-            <div className="space-y-4" />
+            <div className="space-y-2" />
             <p className="text-xl" color={'brand.300'}>
               <span style={{ fontSize: 'sm' }}>{'USDC'}</span>
             </p>
           </div>
+          <Link href={`/discover/${asset.id}`} passHref>
+            <h1 className="max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-right text-xl font-bold hover:text-orange-500 focus:text-orange-500">
+              {'View More'}
+            </h1>
+          </Link>
         </CardContent>
         <hr className="mb-5" />
         <CardFooter className="mx-auto flex items-center justify-center">

@@ -1,7 +1,7 @@
 'use client';
 import React, { useState } from 'react';
 import { toast } from 'sonner';
-import { CopyIcon } from 'lucide-react';
+import { CopyIcon, Loader2 } from 'lucide-react';
 import { getLivepeerUploadUrl } from '@app/api/livepeer/livepeerActions';
 import * as tus from 'tus-js-client';
 import PreviewVideo from './PreviewVideo';
@@ -17,6 +17,7 @@ import { getLivepeerAudioToText } from '@app/api/livepeer/audioToText';
 import { upload } from 'thirdweb/storage';
 import { client } from '@app/lib/sdk/thirdweb/client';
 import Link from 'next/link';
+import { cryptoUtils } from '@app/lib/utils/crypto';
 
 const truncateUri = (uri: string): string => {
   if (uri.length <= 30) return uri;
@@ -149,6 +150,8 @@ const FileUpload: React.FC<FileUploadProps> = ({
     'idle' | 'loading' | 'complete'
   >('idle');
   const [subtitleProcessingComplete, setSubtitleProcessingComplete] = useState<boolean>(false);
+  const [isGeneratingSubtitles, setIsGeneratingSubtitles] = useState<boolean>(false);
+  const [subtitleError, setSubtitleError] = useState<string | null>(null);
 
   const [livepeerAsset, setLivepeerAsset] = useState<any>();
 
@@ -167,12 +170,23 @@ const FileUpload: React.FC<FileUploadProps> = ({
       return;
     }
 
+    // Disable preview while uploading
+    if (uploading) {
+      setError('Upload already in progress. Please wait.');
+      return;
+    }
+
     setError(null);
     setUploadState('loading');
     setProgress(0);
+    setUploading(true);
 
     try {
-      console.log('Start upload #1');
+      console.log('Starting upload for file:', {
+        name: selectedFile.name,
+        type: selectedFile.type,
+        size: selectedFile.size
+      });
 
       const uploadRequestResult = await getLivepeerUploadUrl(
         newAssetTitle || selectedFile.name || 'new file name',
@@ -185,12 +199,21 @@ const FileUpload: React.FC<FileUploadProps> = ({
         endpoint: uploadRequestResult?.tusEndpoint,
         metadata: {
           filename: selectedFile.name,
-          filetype: 'video/mp4',
+          filetype: selectedFile.type || 'video/mp4',
+          title: newAssetTitle || selectedFile.name,
+          uploadId: cryptoUtils.generateUUID(),
         },
         uploadSize: selectedFile.size,
         onError(err: any) {
-          console.error('Error uploading file:', err);
-          setError('Failed to upload file. Please try again.');
+          console.error('Error uploading file:', {
+            error: err,
+            file: {
+              name: selectedFile.name,
+              type: selectedFile.type,
+              size: selectedFile.size
+            }
+          });
+          setError(`Failed to upload file: ${err.message || 'Unknown error'}`);
           setUploadState('idle');
         },
         onProgress(bytesUploaded, bytesTotal) {
@@ -201,6 +224,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
         onSuccess() {
           console.log('Upload finished:', tusUpload.url);
           setUploadState('complete');
+          setUploading(false);
           setError(null);
           onFileUploaded(tusUpload?.url || '');
           toast.success('Video uploaded successfully! Generating subtitles...', {
@@ -231,6 +255,8 @@ const FileUpload: React.FC<FileUploadProps> = ({
   const handleAudioToText = async () => {
     if (!selectedFile) return;
 
+    setIsGeneratingSubtitles(true);
+    setSubtitleError(null);
     try {
       const formData = new FormData();
       formData.append('audio', selectedFile);
@@ -241,34 +267,65 @@ const FileUpload: React.FC<FileUploadProps> = ({
         returnTimestamps: 'true',
       });
 
-      if (audioToTextResponse?.chunks) {
-        const subtitles = await translateSubtitles({
-          chunks: audioToTextResponse.chunks,
-        });
-
-        const ipfsUri = await upload({
-          client,
-          files: [subtitles],
-        });
-
-        onSubtitlesUploaded(ipfsUri);
-        toast.success(
-          'Subtitles generated and translated successfully! You can now proceed to the next step.',
-          {
-            duration: 5000,
-          }
-        );
+      if (!audioToTextResponse?.chunks) {
+        throw new Error('No subtitle chunks received from the server');
       }
-    } catch (error) {
-      console.error('Error generating subtitles:', error);
-      toast.error(
-        'Video uploaded successfully, but there was an error generating subtitles. You can still proceed to the next step.',
+
+      const subtitles = await translateSubtitles({
+        chunks: audioToTextResponse.chunks,
+      });
+
+      const ipfsUri = await upload({
+        client,
+        files: [subtitles],
+      });
+
+      onSubtitlesUploaded(ipfsUri);
+      toast.success(
+        'Subtitles generated and translated successfully! You can now proceed to the next step.',
         {
           duration: 5000,
         }
       );
-    } finally {
       setSubtitleProcessingComplete(true);
+    } catch (error: any) {
+      console.error('Error generating subtitles:', error);
+      const errorMessage = error?.message || 'Failed to generate subtitles';
+      setSubtitleError(errorMessage);
+      toast.error(
+        'There was an error generating subtitles. You can try again or proceed without subtitles.',
+        {
+          duration: 5000,
+        }
+      );
+      setSubtitleProcessingComplete(false);
+    } finally {
+      setIsGeneratingSubtitles(false);
+    }
+  };
+
+  const handleFinalSubmission = async () => {
+    try {
+      if (!livepeerAsset) {
+        throw new Error('No asset data available');
+      }
+
+      // Create a serializable version of the asset
+      const serializedAsset = {
+        id: livepeerAsset.id,
+        name: livepeerAsset.name,
+        status: livepeerAsset.status,
+        playbackId: livepeerAsset.playbackId,
+        downloadUrl: livepeerAsset.downloadUrl,
+        createdAt: livepeerAsset.createdAt,
+      };
+
+      if (onPressNext) {
+        onPressNext(serializedAsset);
+      }
+    } catch (error: any) {
+      console.error('Error completing upload:', error);
+      toast.error('Failed to complete upload. Please try again.');
     }
   };
 
@@ -307,7 +364,13 @@ const FileUpload: React.FC<FileUploadProps> = ({
                 
                 {/* Video Preview */}
                 <div className="overflow-hidden rounded-lg border border-gray-200">
-                  <PreviewVideo video={selectedFile} />
+                  {uploading ? (
+                    <div className="flex h-full items-center justify-center">
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    </div>
+                  ) : (
+                    <PreviewVideo video={selectedFile} />
+                  )}
                 </div>
                 
                 {/* Upload Controls */}
@@ -348,6 +411,48 @@ const FileUpload: React.FC<FileUploadProps> = ({
               </div>
             )}
 
+            {/* Upload Status and Subtitles Generation */}
+            {(uploadState === 'complete' || isGeneratingSubtitles || subtitleError) && (
+              <div className={`mt-4 rounded-lg border p-4 ${
+                subtitleError 
+                  ? 'border-red-200 bg-red-50' 
+                  : 'border-gray-200 bg-gray-50'
+              }`}>
+                <div className="flex flex-col items-center space-y-3">
+                  {isGeneratingSubtitles ? (
+                    <>
+                      <div className="flex items-center space-x-2 text-blue-600">
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        <p className="text-sm font-medium">Generating subtitles...</p>
+                      </div>
+                      <p className="text-xs text-gray-500">This may take a few minutes depending on the video length</p>
+                    </>
+                  ) : subtitleError ? (
+                    <div className="flex flex-col items-center space-y-2">
+                      <p className="flex items-center space-x-2 text-sm font-medium text-red-600">
+                        <span>⚠️</span>
+                        <span>Failed to generate subtitles</span>
+                      </p>
+                      <p className="text-xs text-red-500">{subtitleError}</p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleAudioToText}
+                        className="mt-2"
+                      >
+                        Try Again
+                      </Button>
+                    </div>
+                  ) : subtitleProcessingComplete ? (
+                    <p className="flex items-center space-x-2 text-sm font-medium text-green-600">
+                      <span>✓</span>
+                      <span>Subtitles generated successfully!</span>
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+            )}
+
             {/* Error Message */}
             {error && (
               <div className="rounded-lg bg-red-50 p-4">
@@ -358,7 +463,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
             {/* Success Message */}
             {uploadedUri && (
               <div className="rounded-lg border border-green-200 bg-green-50 p-4">
-                <p className="flex items-center gap-2 text-sm text-green-700">
+                <p className="flex items-center gap-2 text-sm font-medium text-green-600">
                   <span>File uploaded successfully! IPFS URI:</span>
                   <Link
                     href={uploadedUri}
@@ -394,15 +499,8 @@ const FileUpload: React.FC<FileUploadProps> = ({
           )}
           {onPressNext && (
             <Button
-              disabled={uploadState !== 'complete' || !subtitleProcessingComplete}
-              onClick={() => {
-                if (livepeerAsset) {
-                  onPressNext(livepeerAsset);
-                } else {
-                  alert('Missing livepeer asset');
-                }
-              }}
-              data-testid="file-input-next"
+              disabled={uploadState !== 'complete' || (isGeneratingSubtitles && !subtitleError)}
+              onClick={handleFinalSubmission}
               className="min-w-[100px]"
             >
               Next

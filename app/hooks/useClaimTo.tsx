@@ -1,45 +1,52 @@
-// import { videoContract } from '@app/lib/sdk/thirdweb/get-contract';
-import type { TVideoContract } from '@app/types/nft';
-import { reject } from 'lodash';
 import { useState } from 'react';
-import { sendTransaction } from 'thirdweb';
+import { ContractOptions } from 'thirdweb';
 import { claimTo } from 'thirdweb/extensions/erc1155';
+import { sendAndConfirmTransaction } from 'thirdweb';
 import { useActiveAccount } from 'thirdweb/react';
 
-interface IClaimToError extends Error {
-  code?: string;
-  message: string;
-}
-
-interface IClaimToArgs {
-  quantity: number;
-  tokenId: number;
-  to: string;
-  videoContract: TVideoContract;
-}
-type TClaimProps = {
-  videoContract: TVideoContract;
+type ClaimToProps = {
+  videoContract: Readonly<ContractOptions<any, `0x${string}`>>;
 };
 
-function useClaimTo(props: TClaimProps) {
+type ClaimToArgs = {
+  to: string;
+  tokenId: string | number;
+  quantity: string | number;
+};
+
+interface ClaimToError extends Error {
+  code?: string;
+  reason?: string;
+}
+
+export function useClaimTo(props: ClaimToProps) {
+  const [error, setError] = useState<ClaimToError>();
+  const [isLoading, setIsLoading] = useState(false);
   const activeAccount = useActiveAccount();
-  const [error, setError] = useState<IClaimToError>();
-  const [isProcessing, setIsProcessing] = useState(false);
 
-  const handleClaim = async (args: IClaimToArgs) => {
-    const TRANSACTION_TIMEOUT = 30000;
-
-    (Object.keys(args) as (keyof IClaimToArgs)[]).forEach((key) => {
-      if (!args[key]) {
-        throw new Error(`${key} is required`);
-      }
-    });
-
-    setIsProcessing(true);
-
+  const claim = async (args: ClaimToArgs) => {
     if (!props.videoContract) {
-      throw new Error('NFT contract is undefined!');
+      throw new Error('No video contract provided');
     }
+
+    if (!activeAccount) {
+      throw new Error('No active account');
+    }
+
+    if (!args.to) {
+      throw new Error('No recipient address provided');
+    }
+
+    if (!args.tokenId) {
+      throw new Error('No token ID provided');
+    }
+
+    if (!args.quantity) {
+      throw new Error('No quantity provided');
+    }
+
+    setError(undefined);
+    setIsLoading(true);
 
     try {
       const transaction = claimTo({
@@ -49,45 +56,25 @@ function useClaimTo(props: TClaimProps) {
         tokenId: BigInt(args.tokenId),
       });
 
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(
-          () => reject(new Error('Transaction timeout')),
-          TRANSACTION_TIMEOUT,
-        );
+      const receipt = await sendAndConfirmTransaction({
+        transaction,
+        account: activeAccount,
       });
 
-      const result = await Promise.race([
-        sendTransaction({
-          transaction,
-          account: activeAccount!,
-        }),
-        timeoutPromise,
-      ]) as { transactionHash: string };
-
-      const { transactionHash } = result;
-
-      if (transactionHash) {
-        return transactionHash;
-      } else {
-        throw new Error('Transaction failed');
-      }
+      return receipt;
     } catch (err) {
-      const claimToError: IClaimToError = {
-        name: (err as Error).name,
-        message: (err as Error).message,
-        code: (err as IClaimToError).code,
-      };
-
-      setError(claimToError);
+      const error = err as ClaimToError;
+      setError(error);
+      throw error;
     } finally {
-      setIsProcessing(false);
+      setIsLoading(false);
     }
   };
 
   return {
-    handleClaim,
+    claim,
     error,
-    isProcessing,
+    isLoading,
   };
 }
 

@@ -5,17 +5,22 @@ import { fetchAllAssets } from '@app/api/livepeer/actions';
 import VideoCard from '@app/components/Videos/VideoCard';
 import { Src } from '@livepeer/react';
 import { getDetailPlaybackSource } from '@app/lib/utils/hooks/useDetailPlaybackSources';
+import { useOrbisVideos } from '@app/lib/utils/hooks/useOrbisVideos';
+import { AssetMetadata } from '@app/lib/sdk/orbisDB/models/AssetMetadata';
 
 type VideoCardProps = {
   asset: Asset;
+  playbackSources: Src[] | null;
+  metadata?: AssetMetadata;
 };
 
 const VideoCardGrid: React.FC = () => {
   const [playbackSources, setPlaybackSources] = useState<
-    (Asset & { detailedSrc: Src[] | null })[] | null
+    (Asset & { detailedSrc: Src[] | null; metadata?: AssetMetadata })[] | null
   >(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const { videos: orbisVideos, loading: orbisLoading, error: orbisError } = useOrbisVideos();
 
   useEffect(() => {
     const fetchSources = async () => {
@@ -29,56 +34,60 @@ const VideoCardGrid: React.FC = () => {
 
           // Fetch detailed playback sources for each ready asset
           const detailedPlaybackSources = await Promise.all(
-            readyAssets.map(async (asset: Asset) => {
-              try {
-                const detailedSrc = await getDetailPlaybackSource(
-                  `${asset.playbackId}`,
-                );
-                // console.log(asset.playbackId + ': ', detailedSrc);
-                return { ...asset, detailedSrc }; // Add detailedSrc to the asset object
-              } catch (err) {
-                console.error(
-                  `Error fetching playback source for asset ${asset.id}:`,
-                  err,
-                );
-                return { ...asset, detailedSrc: null }; // Handle errors for individual assets
-              }
+            readyAssets.map(async (asset) => {
+              const detailedSrc = await getDetailPlaybackSource(asset.playbackId);
+              // Find matching OrbisDB metadata
+              const metadata = orbisVideos.find(v => v.assetId === asset.id);
+              return {
+                ...asset,
+                detailedSrc,
+                metadata
+              };
             }),
           );
-          setPlaybackSources(detailedPlaybackSources); // Set the modified assets with detailed sources
-        } else {
-          setPlaybackSources([]);
+
+          setPlaybackSources(detailedPlaybackSources);
         }
       } catch (err) {
-        console.error('Error fetching playback sources: ', err);
-        setError('Failed to load videos.');
+        setError(err instanceof Error ? err.message : 'Failed to fetch assets');
       } finally {
         setLoading(false);
       }
     };
 
-    fetchSources();
-  }, []);
+    if (!orbisLoading) {
+      fetchSources();
+    }
+  }, [orbisLoading, orbisVideos]);
 
-  if (loading) {
-    return <p>Loading videos...</p>;
+  if (loading || orbisLoading) {
+    return <div className="text-center">Loading videos...</div>;
   }
 
-  if (error) {
-    return <p>{error}</p>;
+  if (error || orbisError) {
+    return (
+      <div className="text-center text-red-500">
+        Error: {error || orbisError}
+      </div>
+    );
   }
 
   if (!playbackSources || playbackSources.length === 0) {
-    return <p>No videos available.</p>;
+    return (
+      <div className="text-center">
+        No videos available at the moment.
+      </div>
+    );
   }
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-      {playbackSources.map((asset) => (
+    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      {playbackSources.map((source) => (
         <VideoCard
-          key={asset.id}
-          asset={asset}
-          playbackSources={asset.detailedSrc}
+          key={source.id}
+          asset={source}
+          playbackSources={source.detailedSrc}
+          metadata={source.metadata}
         />
       ))}
     </div>
