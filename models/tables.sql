@@ -15,7 +15,7 @@ table videos {
 table users {
     stream_id text [pk]
     controller text [not null]
-    address text [unique, not null] // Ethereum wallet address
+    address text [unique, not null]
     token_name text
     token_symbol text
     created_at timestamp [default: `now()`]

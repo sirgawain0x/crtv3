@@ -6,7 +6,7 @@ import {
 } from 'thirdweb/extensions/erc1155';
 
 type ActiveClaimCondition = {
-  contract: Readonly<ContractOptions<any>>;
+  contract: Readonly<ContractOptions<any, `0x${string}`>>;
 } & GetActiveClaimConditionParams;
 
 export function useActiveClaimCondition(props: ActiveClaimCondition) {
@@ -32,7 +32,7 @@ export function useActiveClaimCondition(props: ActiveClaimCondition) {
         }
       } catch (err) {
         if (mounted) {
-          setError(err instanceof Error ? err : new Error('Unknown error'));
+          setError(err instanceof Error ? err : new Error(String(err)));
         }
       } finally {
         if (mounted) {

@@ -1,106 +1,211 @@
 'use client';
-import { Suspense } from 'react';
-import { useActiveAccount } from 'thirdweb/react';
+import { useState } from 'react';
+import { client } from '@app/lib/sdk/thirdweb/client';
+import { base } from 'thirdweb/chains';
+import { prepareContractCall, sendTransaction, getContract } from 'thirdweb';
+import {
+  useActiveAccount,
+  useReadContract,
+  TransactionButton,
+} from 'thirdweb/react';
 import { shortenAddress } from 'thirdweb/utils';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Voting } from '@app/components/Voting/Voting';
-import ClaimPoap from '@app/components/Voting/ClaimPoap';
+import { Button } from '@app/components/ui/button';
+import { toast } from 'sonner';
+import Vote from '@app/lib/utils/Vote.json';
 
-/**
- * Renders the "More" component.
- *
- * @returns JSX.Element
- */
 export default function MoreOptions() {
   const router = useRouter();
   const activeAccount = useActiveAccount();
   const searchParams = useSearchParams();
+  const [selectedVote, setSelectedVote] = useState<number>(0);
 
-  // Correct use of searchParams
-  const end = searchParams.get('end');
-  const start = searchParams.get('start');
-  const title = searchParams.get('title');
-  const body = searchParams.get('body');
-  const choices = JSON.parse(searchParams.get('choices') || '[]');
-  const snapshot = searchParams.get('snapshot');
-  const creator = searchParams.get('creator');
-  const score = searchParams.get('score');
-  const scores = searchParams.get('scores') || '{}';
-  const identifier = searchParams.get('identifier');
+  const proposalId = searchParams.get('proposalId');
+  const description = searchParams.get('description');
+  const proposer = searchParams.get('proposer');
+  const startBlock = searchParams.get('startBlock');
+  const endBlock = searchParams.get('endBlock');
 
-  /**
-   * Opens a new browser window to display the details of a specific block on PolygonScan.
-   * @param id - The ID of the block to navigate to.
-   */
-  const goTo = (id: any) => {
-    let url = `https://polygonscan.com/block/${id}`;
-    window.open(url, '_blank');
+  const voteContract = getContract({
+    client: client,
+    chain: base,
+    address: '0x24609A5CBe0f50b67E0E7D7494885a6eB19404BF',
+    abi: Vote as any,
+  });
+
+  // Get proposal state and votes
+  const { data: proposalState } = useReadContract({
+    contract: voteContract,
+    method: 'state',
+    params: [proposalId],
+  });
+
+  const { data: proposalVotes } = useReadContract({
+    contract: voteContract,
+    method: 'proposalVotes',
+    params: [proposalId],
+  });
+
+  const getProposalState = (state: number) => {
+    switch (state) {
+      case 0:
+        return 'Pending';
+      case 1:
+        return 'Active';
+      case 2:
+        return 'Canceled';
+      case 3:
+        return 'Defeated';
+      case 4:
+        return 'Succeeded';
+      case 5:
+        return 'Queued';
+      case 6:
+        return 'Expired';
+      case 7:
+        return 'Executed';
+      default:
+        return 'Unknown';
+    }
   };
 
   return (
-    <Suspense fallback={<div>Loading...</div>}>
-      <div className="flex flex-col items-center justify-center p-4">
-        <div className="grid w-full grid-cols-1 gap-6 md:grid-cols-2">
-          <div className="col-span-1">
-            <div className="p-4">
-              <div>
-                <h1 className="text-2xl font-bold">{title}</h1>
-              </div>
-              <div className="break-words">
-                <p>{body}</p>
-              </div>
-            </div>
+    <div className="container mx-auto px-4 py-8">
+      <div className="grid gap-8 md:grid-cols-2">
+        <div className="space-y-6">
+          <div>
+            <h1 className="text-3xl font-bold">
+              {description?.split('\n')[0]}
+            </h1>
+            <p className="mt-4 whitespace-pre-wrap">
+              {description?.split('\n').slice(1).join('\n')}
+            </p>
           </div>
-          <div className="col-span-1">
-            <div className="mb-5 cursor-pointer">
-              <div className="flex rounded-t-lg bg-gradient-to-l from-yellow-300 via-red-600 to-pink-400 p-2">
-                <h2 className="text-md font-bold text-white">Details</h2>
-              </div>
-              <div className="rounded-b-lg border-2 border-pink-500 p-10">
-                <div className="p-2">
-                  <p>{`Creator: ${creator ? shortenAddress(creator) : 'Unknown'}`}</p>
-                  <p
-                    className="cursor-pointer"
-                    onClick={() => goTo(snapshot)}
-                  >{`Snapshot: ${snapshot}`}</p>
-                </div>
-                <div className="rounded-lg bg-black p-2">
-                  <div className="flex">
-                    <p className="text-white">{`Start Date: ${start}`}</p>
+
+          <div className="space-y-2">
+            <p>
+              <strong>Proposer:</strong> {shortenAddress(proposer || '')}
+            </p>
+            <p>
+              <strong>Start Block:</strong> {startBlock}
+            </p>
+            <p>
+              <strong>End Block:</strong> {endBlock}
+            </p>
+            <p>
+              <strong>Status:</strong> {getProposalState(proposalState)}
+            </p>
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <div className="rounded-lg border p-6">
+            <h2 className="mb-4 text-xl font-semibold">Current Results</h2>
+            {proposalVotes && (
+              <div className="space-y-4">
+                <div>
+                  <p>For: {proposalVotes.forVotes.toString()}</p>
+                  <div className="h-2 w-full bg-gray-200">
+                    <div
+                      className="h-full bg-green-500"
+                      style={{
+                        width: `${
+                          (Number(proposalVotes.forVotes) /
+                            (Number(proposalVotes.forVotes) +
+                              Number(proposalVotes.againstVotes) +
+                              Number(proposalVotes.abstainVotes))) *
+                          100
+                        }%`,
+                      }}
+                    />
                   </div>
-                  <div className="flex">
-                    <p className="text-white">{`End Date: ${end}`}</p>
+                </div>
+                <div>
+                  <p>Against: {proposalVotes.againstVotes.toString()}</p>
+                  <div className="h-2 w-full bg-gray-200">
+                    <div
+                      className="h-full bg-red-500"
+                      style={{
+                        width: `${
+                          (Number(proposalVotes.againstVotes) /
+                            (Number(proposalVotes.forVotes) +
+                              Number(proposalVotes.againstVotes) +
+                              Number(proposalVotes.abstainVotes))) *
+                          100
+                        }%`,
+                      }}
+                    />
                   </div>
                 </div>
-              </div>
-            </div>
-            <div className="mb-5 cursor-pointer">
-              <div className="flex rounded-t-lg bg-gradient-to-l from-yellow-300 via-red-600 to-pink-400 p-2">
-                <h2 className="text-md font-bold text-white">
-                  Current Results
-                </h2>
-              </div>
-              <div className="break-words rounded-b-lg border-2 border-pink-500 p-10">
-                <Voting choices={choices} score={score} scores={scores} />
-              </div>
-            </div>
-            {activeAccount && (
-              <div className="mb-5 cursor-pointer">
-                <div className="bg-brand-400 flex rounded-t-lg p-2">
-                  <h2 className="text-md font-bold text-white">I Voted POAP</h2>
-                </div>
-                <div className="rounded-b-lg border-2 border-pink-500 p-10">
-                  <ClaimPoap
-                    address={activeAccount?.address as string}
-                    proposalId={identifier as string}
-                    snapshot={snapshot as string}
-                  />
+                <div>
+                  <p>Abstain: {proposalVotes.abstainVotes.toString()}</p>
+                  <div className="h-2 w-full bg-gray-200">
+                    <div
+                      className="h-full bg-gray-500"
+                      style={{
+                        width: `${
+                          (Number(proposalVotes.abstainVotes) /
+                            (Number(proposalVotes.forVotes) +
+                              Number(proposalVotes.againstVotes) +
+                              Number(proposalVotes.abstainVotes))) *
+                          100
+                        }%`,
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
             )}
           </div>
+
+          {activeAccount && proposalState === 1 && (
+            <div className="rounded-lg border p-6">
+              <h2 className="mb-4 text-xl font-semibold">Cast Your Vote</h2>
+              <div className="space-y-4">
+                <div className="space-x-4">
+                  <Button
+                    onClick={() => setSelectedVote(1)}
+                    variant={selectedVote === 1 ? 'default' : 'outline'}
+                  >
+                    For
+                  </Button>
+                  <Button
+                    onClick={() => setSelectedVote(0)}
+                    variant={selectedVote === 0 ? 'default' : 'outline'}
+                  >
+                    Against
+                  </Button>
+                  <Button
+                    onClick={() => setSelectedVote(2)}
+                    variant={selectedVote === 2 ? 'default' : 'outline'}
+                  >
+                    Abstain
+                  </Button>
+                </div>
+                <TransactionButton
+                  transaction={() => {
+                    const tx = prepareContractCall({
+                      contract: voteContract,
+                      method: 'castVote',
+                      params: [proposalId, selectedVote],
+                    });
+                    return tx;
+                  }}
+                  onTransactionConfirmed={() => {
+                    toast.success('Vote cast successfully!');
+                  }}
+                  onError={(error) => {
+                    console.error('Error casting vote:', error);
+                    toast.error('Failed to cast vote');
+                  }}
+                >
+                  Cast Vote
+                </TransactionButton>
+              </div>
+            </div>
+          )}
         </div>
       </div>
-    </Suspense>
+    </div>
   );
 }
