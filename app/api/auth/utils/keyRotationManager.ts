@@ -1,6 +1,6 @@
 import * as jose from 'jose';
 import crypto from 'crypto';
-import { kv } from '@vercel/kv';
+import { createClient } from 'redis';
 
 interface KeyPair {
   privateKeyPem: string;
@@ -19,6 +19,7 @@ class KeyRotationManager {
   private readonly ROTATION_BUFFER = 7 * 24 * 60 * 60 * 1000; // 7 days buffer for rotation
   private readonly KEY_PREFIX = 'jwt_key:';
   private readonly ACTIVE_KEYS_SET = 'jwt_active_keys';
+  private redis: ReturnType<typeof createClient> | null = null;
 
   private constructor() {}
 
@@ -29,14 +30,26 @@ class KeyRotationManager {
     return KeyRotationManager.instance;
   }
 
+  private async getRedisClient() {
+    if (!this.redis) {
+      this.redis = createClient({ url: process.env.TV_REDIS_URL });
+      await this.redis.connect();
+    }
+    return this.redis;
+  }
+
   private async loadKeyPair(kid: string): Promise<KeyPair | null> {
-    const key = await kv.get<StoredKeyPair>(`${this.KEY_PREFIX}${kid}`);
-    if (!key || !key.isActive) return null;
-    return key;
+    const redis = await this.getRedisClient();
+    const key = await redis.get(`${this.KEY_PREFIX}${kid}`);
+    if (!key) return null;
+    const storedKey = JSON.parse(key) as StoredKeyPair;
+    if (!storedKey.isActive) return null;
+    return storedKey;
   }
 
   private async loadActiveKeys(): Promise<KeyPair[]> {
-    const activeKids = (await kv.smembers(this.ACTIVE_KEYS_SET)) as string[];
+    const redis = await this.getRedisClient();
+    const activeKids = await redis.sMembers(this.ACTIVE_KEYS_SET);
     const keys = await Promise.all(
       activeKids.map((kid) => this.loadKeyPair(kid)),
     );
@@ -44,20 +57,23 @@ class KeyRotationManager {
   }
 
   private async storeKeyPair(keyPair: KeyPair) {
+    const redis = await this.getRedisClient();
     const storedKey: StoredKeyPair = {
       ...keyPair,
       isActive: true,
     };
-    await kv.set(`${this.KEY_PREFIX}${keyPair.kid}`, storedKey);
-    await kv.sadd(this.ACTIVE_KEYS_SET, keyPair.kid);
+    await redis.set(`${this.KEY_PREFIX}${keyPair.kid}`, JSON.stringify(storedKey));
+    await redis.sAdd(this.ACTIVE_KEYS_SET, keyPair.kid);
   }
 
   private async deactivateKey(kid: string) {
-    await kv.srem(this.ACTIVE_KEYS_SET, kid);
-    const key = await kv.get<StoredKeyPair>(`${this.KEY_PREFIX}${kid}`);
-    if (key) {
+    const redis = await this.getRedisClient();
+    await redis.sRem(this.ACTIVE_KEYS_SET, kid);
+    const keyJson = await redis.get(`${this.KEY_PREFIX}${kid}`);
+    if (keyJson) {
+      const key = JSON.parse(keyJson) as StoredKeyPair;
       key.isActive = false;
-      await kv.set(`${this.KEY_PREFIX}${kid}`, key);
+      await redis.set(`${this.KEY_PREFIX}${kid}`, JSON.stringify(key));
     }
   }
 
@@ -154,6 +170,13 @@ class KeyRotationManager {
     return await jose.jwtVerify(token, publicKey, {
       algorithms: ['RS256'],
     });
+  }
+
+  public async cleanup() {
+    if (this.redis) {
+      await this.redis.quit();
+      this.redis = null;
+    }
   }
 }
 
