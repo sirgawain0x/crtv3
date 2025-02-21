@@ -109,23 +109,14 @@ class KeyRotationManager {
       currentKey = await this.addNewKey();
     }
 
+    // Convert PEM to KeyLike
     const privateKey = await jose.importPKCS8(currentKey.privateKeyPem, 'RS256');
     return { privateKey, kid: currentKey.kid };
   }
 
   public async getJWKS() {
     const activeKeys = await this.loadActiveKeys();
-    const now = Date.now();
-
-    // Remove expired keys (keep one old key for verification buffer)
-    for (const key of activeKeys.slice(0, -2)) {
-      if (now - key.createdAt > this.KEY_LIFETIME) {
-        await this.deactivateKey(key.kid);
-      }
-    }
-
-    // Convert all valid keys to JWKS format
-    const jwks = await Promise.all(
+    const keys = await Promise.all(
       activeKeys.map(async (key) => {
         const publicKey = await jose.importSPKI(key.publicKeyPem, 'RS256');
         const jwk = await jose.exportJWK(publicKey);
@@ -137,8 +128,7 @@ class KeyRotationManager {
         };
       })
     );
-
-    return { keys: jwks };
+    return { keys };
   }
 
   public async verifyToken(token: string): Promise<jose.JWTVerifyResult> {

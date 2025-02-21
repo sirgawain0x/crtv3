@@ -10,10 +10,11 @@ export async function publicKeyToJWKS() {
 export async function createJWT(payload: any) {
   const { privateKey, kid } = await keyRotationManager.getCurrentSigningKey();
   
-  const jwt = await new jose.SignJWT(payload)
+  const jwt = await new jose.SignJWT({ ...payload })
     .setProtectedHeader({ alg: 'RS256', kid })
     .setIssuedAt()
     .setExpirationTime('2h')
+    .setIssuer('crtv3')
     .setAudience('crtv3')
     .sign(privateKey);
   
