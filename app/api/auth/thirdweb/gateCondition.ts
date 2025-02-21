@@ -8,14 +8,13 @@ export async function hasAccess(address: string): Promise<{access: boolean, toke
   const hasNFTAccess = await hasNFT(address);
   
   if (hasNFTAccess) {
-    // Create JWT payload
+    // Create JWT payload with flattened structure
     const payload = {
       sub: address,
-      nft_holdings: {
-        contract: "0xf7c4cd399395d80f9d61fde833849106775269c6",
-        chain: "base",
-        balance: "1"
-      }
+      nft_contract: "0xf7c4cd399395d80f9d61fde833849106775269c6",
+      nft_chain: "base",
+      nft_balance: "1",
+      iat: Math.floor(Date.now() / 1000)
     };
     
     const token = await createJWT(payload);
