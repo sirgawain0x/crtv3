@@ -26,56 +26,85 @@ const VideoCardGrid: React.FC = () => {
     const fetchSources = async () => {
       try {
         const response = await fetchAllAssets();
-        if (response && Array.isArray(response)) {
-          // Only process assets that are ready for playback
-          const readyAssets = response.filter(
-            (asset) => asset.status?.phase === 'ready',
-          );
+        
+        if (!response || response.length === 0) {
+          setPlaybackSources([]);
+          return;
+        }
+        
+        // Only process assets that are ready for playback
+        const readyAssets = response.filter(
+          (asset) => asset.status?.phase === 'ready',
+        );
 
-          // Fetch detailed playback sources for each ready asset
-          const detailedPlaybackSources = await Promise.all(
-            readyAssets.map(async (asset) => {
-              const detailedSrc = await getDetailPlaybackSource(asset.playbackId);
-              // Find matching OrbisDB metadata
-              const metadata = orbisVideos.find(v => v.assetId === asset.id);
+        if (readyAssets.length === 0) {
+          setPlaybackSources([]);
+          return;
+        }
+
+        // Fetch detailed playback sources for each ready asset
+        const detailedPlaybackSourcesPromises = readyAssets.map(async (asset) => {
+          try {
+            // Check if playbackId exists before using it
+            if (!asset.playbackId) {
+              console.warn(`Asset ${asset.id} is missing playbackId`);
               return {
                 ...asset,
-                detailedSrc,
-                metadata
+                detailedSrc: null,
+                metadata: orbisVideos.find(v => v.assetId === asset.id)
               };
-            }),
-          );
+            }
+            
+            const detailedSrc = await getDetailPlaybackSource(asset.playbackId);
+            // Find matching OrbisDB metadata
+            const metadata = orbisVideos.find(v => v.assetId === asset.id);
+            return {
+              ...asset,
+              detailedSrc,
+              metadata
+            };
+          } catch (srcError) {
+            console.error(`Error fetching playback source for ${asset.id}:`, srcError);
+            return {
+              ...asset,
+              detailedSrc: null,
+              metadata: orbisVideos.find(v => v.assetId === asset.id)
+            };
+          }
+        });
 
-          setPlaybackSources(detailedPlaybackSources);
-        }
+        const detailedPlaybackSources = await Promise.all(detailedPlaybackSourcesPromises);
+        setPlaybackSources(detailedPlaybackSources);
       } catch (err) {
+        console.error('Error fetching video data:', err);
         setError(err instanceof Error ? err.message : 'Failed to fetch assets');
+        setPlaybackSources([]);
       } finally {
         setLoading(false);
       }
     };
 
-    if (!orbisLoading) {
-      fetchSources();
-    }
-  }, [orbisLoading, orbisVideos]);
+    // Don't wait for OrbisVideos to load since we modified that hook to be simpler
+    fetchSources();
+  }, [orbisVideos]);
 
-  if (loading || orbisLoading) {
-    return <div className="text-center">Loading videos...</div>;
+  if (loading) {
+    return <div className="text-center py-8">Loading videos...</div>;
   }
 
-  if (error || orbisError) {
+  if (error) {
     return (
-      <div className="text-center text-red-500">
-        Error: {error || orbisError}
+      <div className="text-center py-8 text-red-500">
+        Error loading videos: {error}
       </div>
     );
   }
 
   if (!playbackSources || playbackSources.length === 0) {
     return (
-      <div className="text-center">
-        No videos available at the moment.
+      <div className="text-center py-8 border border-gray-200 rounded-lg bg-gray-50">
+        <p className="text-lg text-gray-600">No videos available at the moment.</p>
+        <p className="mt-2 text-gray-500">Videos will appear here once they are uploaded and processed.</p>
       </div>
     );
   }
