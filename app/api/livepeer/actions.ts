@@ -7,13 +7,13 @@ import {
 } from 'livepeer/models/components';
 
 // FETCH ALL ASSETS
-export const fetchAllAssets = async (): Promise<Asset[] | {}> => {
+export const fetchAllAssets = async (): Promise<Asset[]> => {
   try {
-    const assets =  await fullLivepeer.asset.getAll();
+    const assets = await fullLivepeer.asset.getAll();
     return assets.data as Asset[];
   } catch (error) {
     console.error('Error fetching assets:', error);
-    return {};
+    return [];
   }
 };
 
