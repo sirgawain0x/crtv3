@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-//import { ROLES } from '@app/lib/utils/context';
+import { getAddress } from 'viem';
 
-// Middleware function to handle CORS, origin validation, and role-based access control
+// Middleware function to handle CORS and wallet-based authentication
 export function middleware(
   req: NextRequest,
 ): NextResponse | Promise<NextResponse> {
@@ -27,7 +27,7 @@ export function middleware(
   // Create the initial response and add CORS headers
   const res = NextResponse.next();
   res.headers.append('Access-Control-Allow-Credentials', 'true');
-  res.headers.append('Access-Control-Allow-Origin', origin || '*'); // Set to origin or allow all
+  res.headers.append('Access-Control-Allow-Origin', origin || '*');
   res.headers.append(
     'Access-Control-Allow-Methods',
     'GET,DELETE,PATCH,POST,PUT',
@@ -37,36 +37,44 @@ export function middleware(
     'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version',
   );
 
-  // TODO: Role-based access control logic
-  // const roleRequirements: { [key: string]: string[] } = {
-  //   '/discover/:path*': ['contributor', 'creator', 'supporter', 'brand', 'fan'],
-  //   '/profile/:path*': ['contributor', 'creator', 'supporter', 'brand', 'fan'],
-  // };
+  // Check if this is an upload request
+  if (req.nextUrl.pathname.startsWith('/api/upload')) {
+    const walletAddress = req.headers.get('x-wallet-address');
+    
+    if (!walletAddress) {
+      return new NextResponse(null, {
+        status: 401,
+        statusText: 'Unauthorized - Wallet address required',
+      });
+    }
 
-  // const path = req.nextUrl.pathname;
+    try {
+      // Validate the wallet address format
+      const formattedAddress = getAddress(walletAddress);
+      
+      // You can add additional checks here, such as:
+      // - Check if the wallet holds specific NFTs
+      // - Check if the wallet has enough tokens
+      // - Check if the wallet is whitelisted
+      
+      // For now, we'll just validate the address format
+      
+      // Add the validated wallet address to the request headers
+      res.headers.set('x-validated-address', formattedAddress);
+      return res;
+      
+    } catch (error) {
+      return new NextResponse(null, {
+        status: 401,
+        statusText: 'Unauthorized - Invalid wallet address',
+      });
+    }
+  }
 
-  // // Check if the path requires specific roles
-  // if (roleRequirements[path]) {
-  //   const userRoles = getUserRoles(req);
-
-  //   // Redirect to unauthorized page if the user doesn't have the required roles
-  //   if (!roleRequirements[path].some((role) => userRoles.includes(role))) {
-  //     return NextResponse.redirect(new URL('/unauthorized', req.url));
-  //   }
-  // }
-
-  // If no issues, proceed with the request
   return res;
 }
 
-// TODO: Mock function to simulate fetching user roles from a session or authentication system
-// function getUserRoles(req: NextRequest): string[] {
-//   // This is a placeholder. In a real-world scenario, you might retrieve this from cookies or a session store.
-//   const roleData = req.cookies.get(ROLES?.polygon.creator.roleId);
-//   return roleData ? JSON.parse(roleData) : [];
-// }
-
 // Middleware configuration to specify paths where the middleware should apply
 export const config = {
-  matcher: ['/api/:path*'], // Paths where the middleware should be active
+  matcher: ['/api/:path*'],
 };

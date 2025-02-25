@@ -8,7 +8,12 @@ if (!privateKey) {
   throw new Error("Missing THIRDWEB_ADMIN_PRIVATE_KEY in .env file.");
 }
 
+const domain = process.env.NEXT_PUBLIC_THIRDWEB_AUTH_DOMAIN;
+if (!domain) {
+  throw new Error("Missing NEXT_PUBLIC_THIRDWEB_AUTH_DOMAIN in .env file.");
+}
+
 export const thirdwebAuth = createAuth({
-  domain: process.env.NEXT_PUBLIC_THIRDWEB_AUTH_DOMAIN || "http://localhost:3000",
+  domain,
   adminAccount: privateKeyToAccount({ client, privateKey }),
 });
