@@ -14,9 +14,7 @@ import {
   StepperFormValues,
 } from '@app/types/hook-stepper';
 import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
-import { hasAccess } from '@app/api/auth/thirdweb/gateCondition';
 import StepperIndicator from '@app/components/Stepper-Indicator';
-import { authedOnly } from '@app/api/auth/thirdweb/authentication';
 import FileUpload from '@app/components/Videos/Upload/FileUpload';
 import CreateInfo from '@app/components/Videos/Upload/Create-info';
 import CreateThumbnail from '@app/components/Videos/Upload/Create-thumbnail';
@@ -64,35 +62,6 @@ const HookMultiStepForm = () => {
   const activeAccount = useActiveAccount();
 
   const router = useRouter();
-
-  useEffect(() => {
-    const tokenGate = async (address: string) => {
-      try {
-        const [isAuthed, hasUserAccess, isUserConnected] = await Promise.all([
-          authedOnly(),
-          hasAccess(address),
-          isConnected(address),
-        ]);
-
-        if (!isAuthed || !hasUserAccess || !isUserConnected) {
-          toast.error(
-            'Access denied. Please ensure you are connected and have an active Creator Pass in your wallet.',
-          );
-          router.push('/');
-        }
-      } catch (error) {
-        console.error('Authentication check failed:', error);
-        toast.error('Failed to verify access. Please try again.');
-        router.push('/');
-      }
-    };
-    if (!activeAccount?.address) {
-      toast.error('Please connect your wallet');
-      router.push('/');
-      return;
-    }
-    tokenGate(activeAccount.address);
-  }, [activeAccount, isConnected, router]);
 
   const {
     trigger,

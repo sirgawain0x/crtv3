@@ -1,10 +1,4 @@
 'use client';
-import {
-  authedOnly,
-  generateAuthPayload,
-  login,
-  logout,
-} from '@app/api/auth/thirdweb/authentication';
 import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
 import { client } from '@app/lib/sdk/thirdweb/client';
 import { ConnectButton } from '@app/lib/sdk/thirdweb/components';
@@ -31,20 +25,6 @@ export default function ConnectButtonWrapper() {
   const activeWallet = useActiveWallet();
 
   const wallets = [
-    inAppWallet({
-      auth: {
-        options: [
-          'google',
-          'discord',
-          'telegram',
-          'farcaster',
-          'email',
-          'phone',
-          'passkey',
-          'guest',
-        ],
-      },
-    }),
     createWallet('io.metamask'),
     createWallet('com.coinbase.wallet'),
   ];
@@ -158,43 +138,43 @@ export default function ConnectButtonWrapper() {
           },
         ],
       }}
-      auth={{
-        getLoginPayload: async (params: GenerateLoginPayloadParams) =>
-          await generateAuthPayload(params),
-        doLogin: async (params: VerifyLoginPayloadParams): Promise<void> => {
-          try {
-            const loginPayload = await login(params);
+      // auth={{
+      //   getLoginPayload: async (params: GenerateLoginPayloadParams) =>
+      //     await generateAuthPayload(params),
+      //   doLogin: async (params: VerifyLoginPayloadParams): Promise<void> => {
+      //     try {
+      //       const loginPayload = await login(params);
 
-            const orbisConntected = await isConnected(params?.payload?.address);
-            if (!orbisConntected) {
-              const orbisAuthResult = await orbisLogin();
-              if (!orbisAuthResult) {
-                throw new Error('Failed to connect to Orbis');
-              }
-            }
+      //       const orbisConntected = await isConnected(params?.payload?.address);
+      //       if (!orbisConntected) {
+      //         const orbisAuthResult = await orbisLogin();
+      //         if (!orbisAuthResult) {
+      //           throw new Error('Failed to connect to Orbis');
+      //         }
+      //       }
 
-            return loginPayload;
-          } catch (error) {
-            console.error('Login failed: ', error);
-            throw error;
-          }
-        },
-        isLoggedIn: async () => {
-          const authResult = await authedOnly();
-          return !!authResult;
-        },
-        doLogout: async () => {
-          try {
-            await logout();
-            activeWallet?.disconnect();
-          } catch (error) {
-            console.error('Logout failed: ', error);
-          }
-        },
-      }}
-      onDisconnect={(params: { account: any; wallet: any }) =>
-        params.wallet.disconnect()
-      }
+      //       return loginPayload;
+      //     } catch (error) {
+      //       console.error('Login failed: ', error);
+      //       throw error;
+      //     }
+      //   },
+      //   isLoggedIn: async () => {
+      //     const authResult = await authedOnly();
+      //     return !!authResult;
+      //   },
+      //   doLogout: async () => {
+      //     try {
+      //       await logout();
+      //       activeWallet?.disconnect();
+      //     } catch (error) {
+      //       console.error('Logout failed: ', error);
+      //     }
+      //   },
+      // }}
+      // onDisconnect={(params: { account: any; wallet: any }) =>
+      //   params.wallet.disconnect()
+      // }
     />
   );
 }
