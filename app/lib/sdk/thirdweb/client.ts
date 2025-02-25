@@ -12,5 +12,4 @@ if (!clientId) {
 
 export const client = createThirdwebClient({
   clientId: clientId,
-  supportedChains: [base],
 });
