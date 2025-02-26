@@ -8,7 +8,7 @@ import { FaExclamationTriangle } from 'react-icons/fa';
 import { toast } from 'sonner';
 import { useActiveAccount } from 'thirdweb/react';
 import { Asset } from 'livepeer/models/components';
-import Link from 'next/link';
+
 import {
   StepperFormKeysType,
   StepperFormValues,
@@ -26,27 +26,10 @@ import {
   createAssetMetadata,
 } from '@app/lib/sdk/orbisDB/models/AssetMetadata';
 import { stack } from '@app/lib/sdk/stack/client';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@app/components/ui/dialog';
-import { CheckCircle2 } from 'lucide-react';
-import { Button } from '@app/components/ui/button';
-import LazyMintModal from '@app/components/lazy-mint-modal/LazyMintModal';
 
 const HookMultiStepForm = () => {
   const [activeStep, setActiveStep] = useState(1);
   const [erroredInputName, setErroredInputName] = useState('');
-  const [isUploadComplete, setIsUploadComplete] = useState(false);
-  const [showMintModal, setShowMintModal] = useState(false);
-  const [uploadStats, setUploadStats] = useState<{
-    points: number;
-    videoTitle: string;
-  } | null>(null);
 
   const methods = useForm<StepperFormValues>({
     mode: 'onTouched',
@@ -85,69 +68,6 @@ const HookMultiStepForm = () => {
     setActiveStep((prevActiveStep) => prevActiveStep + 1);
   };
 
-  const handleFinalSubmission = async () => {
-    if (!livepeerAsset || !metadata) {
-      toast.error('Error saving asset: Missing asset metadata');
-      return;
-    }
-
-    try {
-      const assetMetadata: AssetMetadata = createAssetMetadata(
-        livepeerAsset,
-        metadata,
-        thumbnailUri,
-        subtitlesUri,
-      );
-
-      await insert(
-        process.env.NEXT_PUBLIC_ORBIS_ASSET_METADATA_MODEL_ID as string,
-        assetMetadata,
-      );
-
-      // Award points for uploading a video
-      await stack.track('video_upload', {
-        account: activeAccount?.address as string,
-        points: 10,
-      });
-
-      // Get updated points balance
-      const pointsResult = await stack.getPoints(
-        activeAccount?.address as string,
-      );
-
-      // Handle both possible return types from getPoints
-      const points = Array.isArray(pointsResult)
-        ? pointsResult.reduce((total, p) => total + p.amount, 0)
-        : pointsResult;
-
-      setUploadStats({
-        points,
-        videoTitle: metadata.title,
-      });
-      
-      // Make sure to set this to true to show the success dialog
-      setIsUploadComplete(true);
-    } catch (error) {
-      console.error('Error during final submission:', error);
-      toast.error('Failed to complete upload');
-    }
-  };
-
-  const handleViewVideo = () => {
-    router.push('/discover');
-  };
-
-  const handleUploadAnother = () => {
-    setIsUploadComplete(false);
-    setUploadStats(null);
-    // Reset form states
-    setActiveStep(1);
-    setMetadata(undefined);
-    setLivepeerAsset(undefined);
-    setSubtitlesUri(undefined);
-    setThumbnailUri(undefined);
-  };
-
   return (
     <>
       <StepperIndicator activeStep={activeStep} />
@@ -155,90 +75,80 @@ const HookMultiStepForm = () => {
         <Alert variant="destructive" className="mt-[28px]">
           <FaExclamationTriangle className="h-4 w-4" />
           <AlertTitle>Form Error</AlertTitle>
-          <AlertDescription>{errors.root.formError.message}</AlertDescription>
+          <AlertDescription>{errors.root?.formError?.message}</AlertDescription>
         </Alert>
       )}
-
-      <div className="mt-[28px] min-h-[60vh]">
-        {activeStep === 1 && (
-          <CreateInfo onPressNext={handleCreateInfoSubmit} />
-        )}
-        {activeStep === 2 && (
-          <FileUpload
-            newAssetTitle={metadata?.title}
-            metadata={metadata}
-            onFileSelect={(file) => {}}
-            onFileUploaded={(videoUrl: string) => {}}
-            onSubtitlesUploaded={(subtitlesUri?: string) => {
-              setSubtitlesUri(subtitlesUri);
-            }}
-            onPressBack={() =>
-              setActiveStep((prevActiveStep) => prevActiveStep - 1)
-            }
-            onPressNext={(livepeerAsset: any) => {
-              setLivepeerAsset(livepeerAsset);
-              setActiveStep((prevActiveStep) => prevActiveStep + 1);
-            }}
-          />
-        )}
-        {activeStep === 3 && (
-          <CreateThumbnail
-            livePeerAssetId={livepeerAsset?.id}
-            thumbnailUri={thumbnailUri}
-            onComplete={handleFinalSubmission}
-            onThumbnailSelect={(uri: string) => {
-              setThumbnailUri(uri);
-            }}
-          />
-        )}
+      <div className={activeStep === 1 ? 'block' : 'hidden'}>
+        <CreateInfo onPressNext={handleCreateInfoSubmit} />
       </div>
-
-      <Dialog open={isUploadComplete} onOpenChange={setIsUploadComplete}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <CheckCircle2 className="h-6 w-6 text-green-500" />
-              Upload Complete!
-            </DialogTitle>
-            <DialogDescription>
-              <div className="mt-4 space-y-2">
-                <p>{`Your video "${uploadStats?.videoTitle || ''}" has been successfully uploaded!`}</p>
-                <p className="font-semibold text-green-600">
-                  You earned 10 points! Your total balance is now{' '}
-                  {uploadStats?.points} points.
-                </p>
-              </div>
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="flex gap-2 sm:justify-start">
-            <Button onClick={() => setShowMintModal(true)} variant="secondary" className="flex-1">
-              Mint as NFT
-            </Button>
-            <Button onClick={handleViewVideo} className="flex-1">
-              View Your Video
-            </Button>
-            <Button variant="outline" onClick={handleUploadAnother} className="flex-1">
-              Upload Another Video
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {showMintModal && (
-        <LazyMintModal
-          baseURIForToken={livepeerAsset?.playbackId || ''}
-          toggleModal={() => setShowMintModal(false)}
+      <div className={activeStep === 2 ? 'block' : 'hidden'}>
+        <FileUpload
+          newAssetTitle={metadata?.title}
+          metadata={metadata}
+          onFileSelect={(file) => {}}
+          onFileUploaded={(videoUrl: string) => {}}
+          onSubtitlesUploaded={(subtitlesUri?: string) => {
+            setSubtitlesUri(subtitlesUri);
+          }}
+          onPressBack={() =>
+            setActiveStep((prevActiveStep) => prevActiveStep - 1)
+          }
+          onPressNext={(livepeerAsset: any) => {
+            setLivepeerAsset(livepeerAsset);
+            setActiveStep((prevActiveStep) => prevActiveStep + 1);
+          }}
         />
-      )}
-      {isUploadComplete && (
-        <div className="flex flex-col items-center justify-center space-y-4">
-          <CheckCircle2 className="h-16 w-16 text-green-500" />
-          <h2 className="text-2xl font-semibold">Upload Complete!</h2>
-          <p className="text-gray-600">
-            Your video is now being processed and will be available soon.
-          </p>
-        </div>
-      )}
+      </div>
+      <div className={activeStep === 3 ? 'block' : 'hidden'}>
+        <CreateThumbnail
+          livePeerAssetId={livepeerAsset?.id}
+          thumbnailUri={thumbnailUri}
+          onComplete={async (data) => {
+            setThumbnailUri(data.thumbnailUri);
+
+            if (!livepeerAsset || !metadata) {
+              throw new Error(
+                'Error saving assetMetadata: Missing asset metadata',
+              );
+            }
+
+            const assetMetadata: AssetMetadata = createAssetMetadata(
+              livepeerAsset,
+              metadata,
+              data.thumbnailUri,
+              subtitlesUri,
+            );
+
+            await insert(
+              process.env.NEXT_PUBLIC_ORBIS_ASSET_METADATA_MODEL_ID as string,
+              assetMetadata,
+            );
+
+            // Award points for uploading a video
+            try {
+              await stack.track('video_upload', {
+                account: activeAccount?.address as string,
+                points: 10,
+              });
+              // Get updated points balance
+              const points = await stack.getPoints(
+                activeAccount?.address as string,
+              );
+              toast.success('Video uploaded successfully!', {
+                description: `You earned 10 points! Your total balance is now ${points} points.`,
+              });
+            } catch (error) {
+              console.error('Failed to award points:', error);
+              toast.error('Failed to award points', {
+                description:
+                  "Your video was uploaded but we couldn't award points at this time.",
+              });
+              // Continue with navigation even if points failed
+            }
+            router.push('/discover');
+          }}
+        />
+      </div>
     </>
   );
 };

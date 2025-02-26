@@ -55,8 +55,7 @@ export function Navbar() {
               <Image
                 style={{
                   width: '80px',
-                  height: '80px',
-                  objectFit: 'contain'
+                  height: 'auto',
                 }}
                 src={SITE_LOGO}
                 alt="Creative Logo"
@@ -114,11 +113,6 @@ export function Navbar() {
       </Sheet>
       <Link href="/" className="mr-6 hidden lg:flex" passHref>
         <Image
-          style={{
-            width: '80px',
-            height: '80px',
-            objectFit: 'contain'
-          }}
           src={SITE_LOGO}
           alt={SITE_NAME}
           width={80}

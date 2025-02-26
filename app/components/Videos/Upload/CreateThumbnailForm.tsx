@@ -18,7 +18,6 @@ import { getLivepeerAiGeneratedImages } from '@app/api/livepeer/livepeerAiAction
 import { Media } from 'livepeer/models/components';
 import { RadioGroup, RadioGroupItem } from '@app/components/ui/radio-group';
 import Skeleton from '@app/components/ui/skeleton';
-import { toast } from 'sonner'; // Import toast from sonner instead
 
 interface FormValues {
   aiModel: string;
@@ -52,35 +51,27 @@ const CreateThumbnailForm = ({
 
   const onSubmit = async (data: FormValues) => {
     setLoading(true);
-    setImagesUrl([]);
-    setSelectedImage(undefined);
-
     try {
       const response = await getLivepeerAiGeneratedImages({
         prompt: data.prompt,
         modelId: data.aiModel,
         safetyCheck: true,
-        numImagesPerPrompt: 4,
-        width: 1024,
-        height: 576,
-        guidanceScale: 7.5,
+        numImagesPerPrompt: 1,
       });
-
-      if (!response.success || !response.result?.images) {
-        throw new Error(response.error?.message || 'Failed to generate images');
+      if (response.success) {
+        setImagesUrl((currentImages) => [
+          ...currentImages,
+          ...response.result.images,
+        ]);
+      } else {
+        throw new Error(response.result);
       }
-
-      // Ensure we're only passing serializable data
-      const serializedImages = response.result.images.map((img) => ({
-        url: img.url,
-        nsfw: img.nsfw,
-        seed: typeof img.seed === 'number' ? img.seed : Math.random(),
-      }));
-
-      setImagesUrl(serializedImages);
-    } catch (error: any) {
-      console.error('Error generating thumbnails:', error);
-      toast.error(error.message || 'Failed to generate thumbnails');
+    } catch (err) {
+      console.log('Error', JSON.stringify(err));
+      setError('root', {
+        message: 'Error generating AI images',
+      });
+      throw err;
     } finally {
       setLoading(false);
     }
@@ -96,13 +87,7 @@ const CreateThumbnailForm = ({
   };
 
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        handleSubmit(onSubmit)(e);
-      }}
-      className="space-y-4"
-    >
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
       <Controller
         name="aiModel"
         control={control}
@@ -110,7 +95,7 @@ const CreateThumbnailForm = ({
         render={({ field }) => (
           <Select onValueChange={field.onChange} value={field.value}>
             <SelectTrigger
-              className="w-full md:w-[280px] lg:w-[320px]"
+              className="w-[180px]"
               data-testid="create-thumbnail-select"
             >
               <SelectValue placeholder="Select A Model" />
@@ -118,15 +103,26 @@ const CreateThumbnailForm = ({
             <SelectContent>
               <SelectGroup>
                 <SelectLabel>Model</SelectLabel>
-                {/* Only include verified working models */}
                 <SelectItem value="SG161222/RealVisXL_V4.0_Lightning">
-                  RealVisXL V4.0
+                  RealVisXL
                 </SelectItem>
-                <SelectItem value="stabilityai/stable-diffusion-2">
-                  Stable Diffusion 2
+                <SelectItem value="black-forest-labs/FLUX.1-schnell">
+                  Black Forest
                 </SelectItem>
                 <SelectItem value="CompVis/stable-diffusion-v1-4">
-                  Stable Diffusion v1.4
+                  CompVis
+                </SelectItem>
+                <SelectItem value="stabilityai/stable-diffusion-2">
+                  Stability
+                </SelectItem>
+                <SelectItem value="Shakker-Labs/FLUX.1-dev-LoRA-One-Click-Creative-Template">
+                  Shakker
+                </SelectItem>
+                <SelectItem value="aleksa-codes/flux-ghibsky-illustration">
+                  Ghibsky
+                </SelectItem>
+                <SelectItem value="ByteDance/SDXL-Lightning">
+                  Bytedance
                 </SelectItem>
               </SelectGroup>
             </SelectContent>
@@ -146,7 +142,7 @@ const CreateThumbnailForm = ({
           <Textarea
             {...field}
             placeholder="Enter your prompt"
-            className="min-h-[100px] w-full rounded border p-2 text-sm md:text-base"
+            className="w-full rounded border p-2"
             data-testid="create-thumbnail-prompt"
             rows={4}
           />
@@ -165,44 +161,46 @@ const CreateThumbnailForm = ({
 
       {/* Render Skeletons while loading */}
       {loading ? (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
           {Array.from({ length: 4 }).map((_, idx) => (
             <Skeleton
               key={idx}
-              className="h-[200px] w-full rounded-md md:h-[250px]"
+              width="100%"
+              height="200px"
+              className="rounded-md"
             />
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-4">
-          {imagesUrl.map((image, index) => (
-            <div key={`${image.url}-${index}-${image.seed}`} className="relative">
-              {image.nsfw && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-white">
-                  NSFW Content
-                </div>
-              )}
-              <div
-                className={`relative aspect-video cursor-pointer overflow-hidden rounded-lg border-4 ${
-                  selectedImage === image.url
-                    ? 'border-[--color-brand-red-shade]'
-                    : 'border-transparent hover:border-gray-200'
-                }`}
-                onClick={() => {
-                  handleSelectionChange(image.url);
-                }}
-              >
+        <RadioGroup
+          onValueChange={handleSelectionChange}
+          value={selectedImage}
+          className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4"
+        >
+          {imagesUrl.length === 0 && (
+            <p className="col-span-full text-center text-gray-500">
+              No images generated yet.
+            </p>
+          )}
+          {imagesUrl.map((img, idx) => (
+            <div key={idx} className="flex flex-col items-center">
+              <RadioGroupItem
+                value={img.url}
+                id={`thumbnail_checkbox_${idx}`}
+                className="mb-2"
+              />
+              <Label htmlFor={`thumbnail_checkbox_${idx}`}>
                 <Image
-                  src={image.url}
-                  alt={`AI Generated Thumbnail ${index + 1}`}
-                  fill
-                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                  className="object-cover"
+                  src={img.url}
+                  alt={`Thumbnail ${idx + 1}`}
+                  width={200}
+                  height={200}
+                  className="rounded-md border object-cover"
                 />
-              </div>
+              </Label>
             </div>
           ))}
-        </div>
+        </RadioGroup>
       )}
     </form>
   );

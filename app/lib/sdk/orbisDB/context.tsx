@@ -7,9 +7,6 @@ import { OrbisConnectResult, OrbisDB } from '@useorbis/db-sdk';
 import createAssetMetadataModel, {
   AssetMetadata,
 } from './models/AssetMetadata';
-import createMetokenMetadataModel, {
-  MetokenMetadata,
-} from './models/MetokenMetadata';
 import { download } from 'thirdweb/storage';
 // import { ASSET_METADATA_MODEL_ID, CREATIVE_TV_CONTEXT_ID } from '@app/lib/utils/context';
 
@@ -28,7 +25,6 @@ interface OrbisContextProps {
   replace: (docId: string, newDoc: any) => Promise<void>;
   update: (docId: string, updates: any) => Promise<void>;
   getAssetMetadata: (assetId: string) => Promise<AssetMetadata | null>;
-  insertMetokenMetadata: (metadata: Omit<MetokenMetadata, 'created_at' | 'stream_id' | 'controller'>) => Promise<void>;
   orbisLogin: (privateKey?: string) => Promise<OrbisConnectResult | null>;
   isConnected: (address: string) => Promise<boolean>;
   getCurrentUser: () => Promise<any>;
@@ -41,7 +37,6 @@ const OrbisContext = createContext<OrbisContextProps | undefined>({
   replace: async () => {},
   update: async () => {},
   getAssetMetadata: async () => {},
-  insertMetokenMetadata: async () => {},
   orbisLogin: async () => {},
   isConnected: async () => false,
   getCurrentUser: async () => {},
@@ -77,11 +72,12 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
     ],
   });
 
-  const assetMetadataModelId: string = process.env.NEXT_PUBLIC_ORBIS_ASSET_METADATA_MODEL_ID || '';
-  const crtvContextId: string = process.env.NEXT_PUBLIC_ORBIS_CRTV_CONTEXT_ID || '';
-  const crtvVideosContextId: string = process.env.NEXT_PUBLIC_ORBIS_CRTV_VIDEO_CONTEXT_ID || '';
-  const metokenModelId: string = process.env.NEXT_PUBLIC_ORBIS_METOKEN_MODEL_ID || '';
-  const metokenContextId: string = process.env.NEXT_PUBLIC_ORBIS_METOKEN_CONTEXT_ID || '';
+  const assetMetadataModelId: string =
+    'kjzl6hvfrbw6c6hnahs60z0s1xenk7phux8abtx4ays1g44rpbqsrzpfutoaqug';
+  const crtvContextId: string =
+    'kjzl6kcym7w8ya3lzng3v4pruy19togu984dhu1tfyljwc5qdqjd6nugshi5kj0';
+  const crtvVideosContextId: string =
+    'kjzl6kcym7w8y5emmf4y5yxtrxeqecnhc7pg3vgzu6zxya8k9q1hcoxtn28ijuq';
 
   const validateDbOperation = (
     id: string,
@@ -245,38 +241,6 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const insertMetokenMetadata = async (metadata: Omit<MetokenMetadata, 'created_at' | 'stream_id' | 'controller'>): Promise<void> => {
-    try {
-      validateDbOperation(metokenModelId, metadata);
-
-      const insertStatement = db
-        .insert(metokenModelId)
-        .value({
-          ...metadata,
-          created_at: new Date().toISOString(),
-        })
-        .context(metokenContextId);
-
-      const validation = await insertStatement.validate();
-
-      if (!validation.valid) {
-        throw 'Error during validation: ' + validation.error;
-      }
-
-      const [result, error] = await catchError(() => insertStatement.run());
-
-      if (error) {
-        console.error('Failed to insert metoken metadata:', error);
-        throw error;
-      }
-
-      console.log('Metoken metadata inserted successfully:', result);
-    } catch (error) {
-      console.error('Error inserting metoken metadata:', error);
-      throw error;
-    }
-  };
-
   const orbisLogin = async (
     privateKey?: string,
   ): Promise<OrbisConnectResult> => {
@@ -336,7 +300,6 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
         replace,
         update,
         getAssetMetadata,
-        insertMetokenMetadata,
         orbisLogin,
         isConnected,
         getCurrentUser,

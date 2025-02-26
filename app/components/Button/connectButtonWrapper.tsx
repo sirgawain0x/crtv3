@@ -1,4 +1,10 @@
 'use client';
+import {
+  authedOnly,
+  generatePayload,
+  login,
+  logout,
+} from '@app/api/auth/thirdweb/authentication';
 import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
 import { client } from '@app/lib/sdk/thirdweb/client';
 import { ConnectButton } from '@app/lib/sdk/thirdweb/components';
@@ -25,6 +31,20 @@ export default function ConnectButtonWrapper() {
   const activeWallet = useActiveWallet();
 
   const wallets = [
+    inAppWallet({
+      auth: {
+        options: [
+          'google',
+          'discord',
+          'telegram',
+          'farcaster',
+          'email',
+          'phone',
+          'passkey',
+          'guest',
+        ],
+      },
+    }),
     createWallet('io.metamask'),
     createWallet('com.coinbase.wallet'),
   ];
@@ -72,8 +92,16 @@ export default function ConnectButtonWrapper() {
   return (
     <ConnectButton
       client={client}
-      chain={base}
-      chains={[polygon, polygonAmoy, base, baseSepolia, optimism]}
+      chains={[
+        polygon,
+        polygonAmoy,
+        base,
+        baseSepolia,
+        optimism,
+        storyTestnet,
+        zora,
+        zoraSepolia,
+      ]}
       connectButton={{
         label: 'Get Started',
         className: 'my-custom-class',
@@ -108,73 +136,40 @@ export default function ConnectButtonWrapper() {
         ],
         8453: ['0xf7c4cd399395d80f9d61fde833849106775269c6'],
       }}
-      supportedTokens={{
-        137: [
-          {
-            address: '0x3dB8bb54D7BaE1D6CA091E662FABA8C1d1D61155',
-            icon: 'https://bafybeicp432kqwnbowayyeqzvbjgx5q3y7yfph2z255k3er3arnmwuebee.ipfs.dweb.link?filename=logo.png',
-            name: 'Creative Token',
-            symbol: 'CRTV',
-          },
-          {
-            address: '0x8f3Cf7ad23Cd3CaDbD9735AFf958023239c6A063',
-            icon: 'https://bafybeieuzwktu36qfl3a5u4em222zke4cpq57soudjuks2dgjzxmzeofta.ipfs.dweb.link?filename=multi-collateral-dai-dai-logo.svg',
-            name: 'Dai Stablecoin',
-            symbol: 'DAI',
-          },
-        ],
-        8453: [
-          {
-            address: '0x4B62D9b3DE9FAB98659693c9ee488D2E4eE56c44',
-            icon: 'https://bafybeicp432kqwnbowayyeqzvbjgx5q3y7yfph2z255k3er3arnmwuebee.ipfs.dweb.link?filename=logo.png',
-            name: 'Creative Token',
-            symbol: 'CRTV',
-          },
-          {
-            address: '0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb',
-            icon: 'https://bafybeieuzwktu36qfl3a5u4em222zke4cpq57soudjuks2dgjzxmzeofta.ipfs.dweb.link?filename=multi-collateral-dai-dai-logo.svg',
-            name: 'Dai Stablecoin',
-            symbol: 'DAI',
-          },
-        ],
+      auth={{
+        getLoginPayload: async (params: GenerateLoginPayloadParams) =>
+          await generatePayload(params),
+        doLogin: async (params: VerifyLoginPayloadParams): Promise<void> => {
+          try {
+            const loginPayload = await login(params);
+
+            const orbisConntected = await isConnected(params?.payload?.address);
+            if (!orbisConntected) {
+              const orbisAuthResult = await orbisLogin();
+              if (!orbisAuthResult) {
+                throw new Error('Failed to connect to Orbis');
+              }
+            }
+
+            return loginPayload;
+          } catch (error) {
+            console.error('Login failed: ', error);
+            throw error;
+          }
+        },
+        isLoggedIn: async () => await authedOnly(),
+        doLogout: async () => {
+          try {
+            await logout();
+            activeWallet?.disconnect();
+          } catch (error) {
+            console.error('Logout failed: ', error);
+          }
+        },
       }}
-      // auth={{
-      //   getLoginPayload: async (params: GenerateLoginPayloadParams) =>
-      //     await generateAuthPayload(params),
-      //   doLogin: async (params: VerifyLoginPayloadParams): Promise<void> => {
-      //     try {
-      //       const loginPayload = await login(params);
-
-      //       const orbisConntected = await isConnected(params?.payload?.address);
-      //       if (!orbisConntected) {
-      //         const orbisAuthResult = await orbisLogin();
-      //         if (!orbisAuthResult) {
-      //           throw new Error('Failed to connect to Orbis');
-      //         }
-      //       }
-
-      //       return loginPayload;
-      //     } catch (error) {
-      //       console.error('Login failed: ', error);
-      //       throw error;
-      //     }
-      //   },
-      //   isLoggedIn: async () => {
-      //     const authResult = await authedOnly();
-      //     return !!authResult;
-      //   },
-      //   doLogout: async () => {
-      //     try {
-      //       await logout();
-      //       activeWallet?.disconnect();
-      //     } catch (error) {
-      //       console.error('Logout failed: ', error);
-      //     }
-      //   },
-      // }}
-      // onDisconnect={(params: { account: any; wallet: any }) =>
-      //   params.wallet.disconnect()
-      // }
+      onDisconnect={(params: { account: any; wallet: any }) =>
+        params.wallet.disconnect()
+      }
     />
   );
 }
