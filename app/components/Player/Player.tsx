@@ -44,6 +44,7 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
   title,
   onPlay,
 }) => {
+  // Initialize all state variables at the top level
   const [assetMetadata, setAssetMetadata] = useState<AssetMetadata | null>(
     null,
   );
@@ -51,14 +52,17 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
   const [conditionalProps, setConditionalProps] = useState<ConditionalProps>(
     {},
   );
-  const fadeTimeoutRef = useRef<NodeJS.Timeout>();
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+
+  const fadeTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const subtitlesRef = useRef<AssetMetadata['subtitles']>();
+
   const { currentPlayingId, setCurrentPlayingId } = useVideo();
+  // Generate a stable ID for this player instance
   const playerId = useRef(Math.random().toString(36).substring(7)).current;
 
   const activeAccount = useActiveAccount();
-
   const { getAssetMetadata } = useOrbisContext();
 
   useEffect(() => {
@@ -87,20 +91,24 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
     const fetchAssetDetails = async (id: string): Promise<void> => {
       try {
         // First fetch the asset metadata
-        const data = await getAssetMetadata(id);
+        const data = await getAssetMetadata?.(id);
         if (!data) {
           console.warn('No metadata found for asset:', id);
           setAssetMetadata(null);
           return;
         }
 
-        // Serialize the data to a plain object before setting in state
-        const serializedData = JSON.parse(JSON.stringify(data));
-        setAssetMetadata(serializedData);
+        // Safely serialize the data to a plain object before setting in state
+        try {
+          const serializedData = JSON.parse(JSON.stringify(data));
+          setAssetMetadata(serializedData);
 
-        // Set subtitles if they exist
-        if (serializedData?.subtitles) {
-          subtitlesRef.current = serializedData.subtitles;
+          // Set subtitles if they exist
+          if (serializedData?.subtitles) {
+            subtitlesRef.current = serializedData.subtitles;
+          }
+        } catch (serializeError) {
+          console.error('Error serializing asset metadata:', serializeError);
         }
 
         // Only fetch playback policy if we have an active account
@@ -118,7 +126,6 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
             }
           } catch (policyError) {
             console.error('Failed to fetch playback policy:', policyError);
-            // Don't show toast here since metadata loaded successfully
           }
         }
       } catch (error) {
@@ -132,7 +139,9 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
     };
 
     if (assetId) {
-      fetchAssetDetails(assetId);
+      fetchAssetDetails(assetId).catch((error) => {
+        console.error('Unhandled error in fetchAssetDetails:', error);
+      });
     }
   }, [activeAccount, assetId, assetMetadata, getAssetMetadata]);
 
@@ -165,7 +174,7 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
     }
   }, [currentPlayingId, playerId]);
 
-  const handleFullscreenToggle = async () => {
+  const handleFullscreenToggle = useCallback(async () => {
     try {
       if (document.fullscreenElement) {
         await document.exitFullscreen();
@@ -176,9 +185,7 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
       console.error('Fullscreen error:', error);
       toast.error('Failed to toggle fullscreen');
     }
-  };
-
-  const subtitlesRef = useRef<AssetMetadata['subtitles']>();
+  }, []);
 
   useEffect(() => {
     if (assetMetadata?.subtitles) {
@@ -186,139 +193,147 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
     }
   }, [assetMetadata]);
 
-  return (
-    <div
-      ref={containerRef}
-      className="relative aspect-video w-full overflow-hidden rounded-lg bg-black"
-      onMouseEnter={() => setControlsVisible(true)}
-      onMouseLeave={() => setControlsVisible(false)}
-      onMouseMove={resetFadeTimeout}
-    >
-      {src && src.length > 0 && (
-        <SubtitlesProvider initialSubtitles={subtitlesRef.current}>
-          <Player.Root src={src} volume={1}>
-            <Player.Container>
-              <Player.Video
-                title={title}
-                style={{ height: '100%', width: '100%' }}
-                ref={videoRef}
-                {...conditionalProps}
-                playsInline
-                controls={false}
-                onPlay={() => {
-                  setCurrentPlayingId(playerId);
-                  onPlay?.();
-                }}
-              />
-              <SubtitlesDisplay />
-              <Player.Controls
-                className={`absolute bottom-0 left-0 right-0 flex flex-col gap-2 bg-gradient-to-t from-black/80 via-black/40 to-transparent px-4 pb-4 pt-20 transition-opacity duration-300 ${
-                  controlsVisible ? 'opacity-100' : 'opacity-0'
-                }`}
-              >
-                {/* Progress bar */}
-                <Player.Seek
-                  style={{
-                    position: 'absolute',
-                    left: 20,
-                    right: 20,
-                    bottom: 20,
-                    height: 20,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 10,
-                    userSelect: 'none',
-                    touchAction: 'none',
+  try {
+    return (
+      <div
+        ref={containerRef}
+        className="relative aspect-video w-full overflow-hidden rounded-lg bg-black"
+        onMouseEnter={() => setControlsVisible(true)}
+        onMouseLeave={() => setControlsVisible(false)}
+        onMouseMove={resetFadeTimeout}
+      >
+        {src && Array.isArray(src) && src.length > 0 ? (
+          <SubtitlesProvider initialSubtitles={subtitlesRef.current}>
+            <Player.Root src={src} volume={1}>
+              <Player.Container>
+                <Player.Video
+                  title={title}
+                  style={{ height: '100%', width: '100%' }}
+                  ref={videoRef}
+                  playsInline
+                  controls={false}
+                  onPlay={() => {
+                    setCurrentPlayingId?.(playerId);
+                    if (typeof onPlay === 'function') {
+                      onPlay();
+                    }
                   }}
+                  {...conditionalProps}
+                />
+                <SubtitlesDisplay />
+                <Player.Controls
+                  className={`absolute bottom-0 left-0 right-0 flex flex-col gap-2 bg-gradient-to-t from-black/80 via-black/40 to-transparent px-4 pb-4 pt-20 transition-opacity duration-300 ${
+                    controlsVisible ? 'opacity-100' : 'opacity-0'
+                  }`}
                 >
-                  <Player.Track
+                  {/* Progress bar */}
+                  <Player.Seek
                     style={{
-                      backgroundColor: 'rgba(255, 255, 255, 0.7)',
-                      position: 'relative',
-                      flexGrow: 1,
-                      borderRadius: 9999,
-                      height: 2,
+                      position: 'absolute',
+                      left: 20,
+                      right: 20,
+                      bottom: 20,
+                      height: 20,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      userSelect: 'none',
+                      touchAction: 'none',
                     }}
                   >
-                    <Player.SeekBuffer
+                    <Player.Track
                       style={{
-                        position: 'absolute',
-                        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                        backgroundColor: 'rgba(255, 255, 255, 0.7)',
+                        position: 'relative',
+                        flexGrow: 1,
                         borderRadius: 9999,
-                        height: '100%',
+                        height: 2,
                       }}
-                    />
-                    <Player.Range
+                    >
+                      <Player.SeekBuffer
+                        style={{
+                          position: 'absolute',
+                          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                          borderRadius: 9999,
+                          height: '100%',
+                        }}
+                      />
+                      <Player.Range
+                        style={{
+                          position: 'absolute',
+                          backgroundColor: 'white',
+                          borderRadius: 9999,
+                          height: '100%',
+                        }}
+                      />
+                    </Player.Track>
+                    <Player.Thumb
                       style={{
-                        position: 'absolute',
+                        display: 'block',
+                        width: 12,
+                        height: 12,
                         backgroundColor: 'white',
                         borderRadius: 9999,
-                        height: '100%',
                       }}
                     />
-                  </Player.Track>
-                  <Player.Thumb
-                    style={{
-                      display: 'block',
-                      width: 12,
-                      height: 12,
-                      backgroundColor: 'white',
-                      borderRadius: 9999,
-                    }}
-                  />
-                </Player.Seek>
+                  </Player.Seek>
 
-                {/* Controls bar */}
-                <div className="flex items-center justify-between gap-4">
-                  {/* Left controls group */}
-                  <div className="flex items-center gap-3">
-                    <Player.PlayPauseTrigger className="flex h-10 w-10 items-center justify-center rounded-full bg-white/25 backdrop-blur-sm transition hover:bg-white/40">
-                      <Player.PlayingIndicator asChild matcher={false}>
-                        <PlayIcon className="h-5 w-5 text-white" />
-                      </Player.PlayingIndicator>
-                      <Player.PlayingIndicator asChild>
-                        <PauseIcon className="h-5 w-5 text-white" />
-                      </Player.PlayingIndicator>
-                    </Player.PlayPauseTrigger>
+                  {/* Controls bar */}
+                  <div className="flex items-center justify-between gap-4">
+                    {/* Left controls group */}
+                    <div className="flex items-center gap-3">
+                      <Player.PlayPauseTrigger className="flex h-10 w-10 items-center justify-center rounded-full bg-white/25 backdrop-blur-sm transition hover:bg-white/40">
+                        <Player.PlayingIndicator asChild matcher={false}>
+                          <PlayIcon className="h-5 w-5 text-white" />
+                        </Player.PlayingIndicator>
+                        <Player.PlayingIndicator asChild>
+                          <PauseIcon className="h-5 w-5 text-white" />
+                        </Player.PlayingIndicator>
+                      </Player.PlayPauseTrigger>
 
+                      <div className="flex items-center gap-2">
+                        <Player.MuteTrigger className="flex h-10 w-10 items-center justify-center rounded-full bg-white/25 backdrop-blur-sm transition hover:bg-white/40">
+                          <Player.VolumeIndicator asChild matcher={false}>
+                            <MuteIcon className="h-5 w-5 text-white" />
+                          </Player.VolumeIndicator>
+                          <Player.VolumeIndicator asChild matcher={true}>
+                            <UnmuteIcon className="h-5 w-5 text-white" />
+                          </Player.VolumeIndicator>
+                        </Player.MuteTrigger>
+                      </div>
+                    </div>
+
+                    {/* Center controls group - Time */}
+                    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+                      <Player.Time className="text-sm font-medium text-white" />
+                    </div>
+
+                    {/* Right controls group */}
                     <div className="flex items-center gap-2">
-                      <Player.MuteTrigger className="flex h-10 w-10 items-center justify-center rounded-full bg-white/25 backdrop-blur-sm transition hover:bg-white/40">
-                        <Player.VolumeIndicator asChild matcher={false}>
-                          <MuteIcon className="h-5 w-5 text-white" />
-                        </Player.VolumeIndicator>
-                        <Player.VolumeIndicator asChild matcher={true}>
-                          <UnmuteIcon className="h-5 w-5 text-white" />
-                        </Player.VolumeIndicator>
-                      </Player.MuteTrigger>
+                      <SubtitlesControl />
+                      <Player.FullscreenTrigger className="flex h-10 w-10 items-center justify-center rounded-full bg-white/25 backdrop-blur-sm transition hover:bg-white/40">
+                        <Player.FullscreenIndicator asChild>
+                          <ExitFullscreenIcon className="h-5 w-5 text-white" />
+                        </Player.FullscreenIndicator>
+                        <Player.FullscreenIndicator matcher={false} asChild>
+                          <EnterFullscreenIcon className="h-5 w-5 text-white" />
+                        </Player.FullscreenIndicator>
+                      </Player.FullscreenTrigger>
                     </div>
                   </div>
-
-                  {/* Center controls group - Time */}
-                  <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-                    <Player.Time className="text-sm font-medium text-white" />
-                  </div>
-
-                  {/* Right controls group */}
-                  <div className="flex items-center gap-2">
-                    <SubtitlesControl />
-                    <Player.FullscreenTrigger className="flex h-10 w-10 items-center justify-center rounded-full bg-white/25 backdrop-blur-sm transition hover:bg-white/40">
-                      <Player.FullscreenIndicator asChild>
-                        <ExitFullscreenIcon className="h-5 w-5 text-white" />
-                      </Player.FullscreenIndicator>
-                      <Player.FullscreenIndicator matcher={false} asChild>
-                        <EnterFullscreenIcon className="h-5 w-5 text-white" />
-                      </Player.FullscreenIndicator>
-                    </Player.FullscreenTrigger>
-                  </div>
-                </div>
-              </Player.Controls>
-            </Player.Container>
-          </Player.Root>
-        </SubtitlesProvider>
-      )}
-      {!src || src.length === 0 ? <PlayerLoading title={title} /> : null}
-    </div>
-  );
+                </Player.Controls>
+              </Player.Container>
+            </Player.Root>
+          </SubtitlesProvider>
+        ) : (
+          <PlayerLoading title={title} />
+        )}
+      </div>
+    );
+  } catch (error) {
+    console.error('Error rendering PlayerComponent:', error);
+    return <PlayerLoading title={title} description="Error loading player" />;
+  }
 };
 
 export const PlayerLoading = ({
