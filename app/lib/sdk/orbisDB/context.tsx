@@ -9,17 +9,33 @@ import {
 } from 'react';
 import { client } from '@app/lib/sdk/thirdweb/client';
 import { catchError } from '@useorbis/db-sdk/util';
-import { OrbisKeyDidAuth } from '@useorbis/db-sdk/auth';
+import { OrbisEVMAuth } from '@useorbis/db-sdk/auth';
 import { OrbisConnectResult } from '@useorbis/db-sdk';
 import { db } from './client';
-import createAssetMetadataModel, {
-  AssetMetadata,
-} from './models/AssetMetadata';
 import { download } from 'thirdweb/storage';
+import { AssetMetadata } from './models/AssetMetadata';
 
 declare global {
   interface Window {
     ethereum: any;
+  }
+}
+
+// Handle UUID generation for EventClient
+if (typeof window !== 'undefined') {
+  try {
+    // @ts-ignore - Ignore type checking for this workaround
+    const { EventClient } = require('@useorbis/db-sdk/events');
+    if (EventClient?.prototype) {
+      // @ts-ignore - Ignore type checking for this workaround
+      EventClient.prototype.generateEventUniqueId = function () {
+        const timestamp = Date.now().toString(36);
+        const randomStr = Math.random().toString(36).substring(2, 15);
+        return `${timestamp}-${randomStr}`;
+      };
+    }
+  } catch (error) {
+    console.warn('Failed to patch EventClient:', error);
   }
 }
 
@@ -37,8 +53,8 @@ interface OrbisContextProps {
   replace: (docId: string, newDoc: any) => Promise<void>;
   update: (docId: string, updates: any) => Promise<void>;
   getAssetMetadata: (assetId: string) => Promise<AssetMetadata | null>;
-  orbisLogin: (privateKey?: string) => Promise<OrbisConnectResult | null>;
-  isConnected: (address: string) => Promise<boolean>;
+  orbisLogin: () => Promise<OrbisConnectResult | null>;
+  isConnected: (address?: string) => Promise<boolean>;
   getCurrentUser: () => Promise<any>;
   insertMetokenMetadata: (metadata: {
     address: string;
@@ -48,21 +64,53 @@ interface OrbisContextProps {
   logout: () => Promise<void>;
 }
 
-const OrbisContext = createContext<OrbisContextProps | undefined>({
+const defaultContext: OrbisContextProps = {
   authResult: null,
   setAuthResult: () => {},
   insert: async () => {},
   replace: async () => {},
   update: async () => {},
-  getAssetMetadata: async () => {},
-  orbisLogin: async () => {},
+  getAssetMetadata: async () => null,
+  orbisLogin: async () => null,
   isConnected: async () => false,
   getCurrentUser: async () => {},
   insertMetokenMetadata: async () => {},
   logout: async () => {},
-} as unknown as OrbisContextProps);
+} as const;
 
-export const OrbisProvider = ({ children }: { children: ReactNode }) => {
+const OrbisContext = createContext<OrbisContextProps>(defaultContext);
+
+const validateDbOperation = (
+  id: string,
+  value?: any,
+  select: boolean = false,
+) => {
+  if (!id) throw new Error('No id provided');
+  if (!select && !value) throw new Error('No value provided');
+
+  const requiredEnvVars = {
+    NEXT_PUBLIC_ORBIS_ASSET_METADATA_MODEL_ID:
+      process.env.NEXT_PUBLIC_ORBIS_ASSET_METADATA_MODEL_ID,
+    NEXT_PUBLIC_ORBIS_CRTV_CONTEXT_ID:
+      process.env.NEXT_PUBLIC_ORBIS_CRTV_CONTEXT_ID,
+    NEXT_PUBLIC_ORBIS_CRTV_VIDEOS_CONTEXT_ID:
+      process.env.NEXT_PUBLIC_ORBIS_CRTV_VIDEOS_CONTEXT_ID,
+  };
+
+  const missingVars = Object.entries(requiredEnvVars)
+    .filter(([_, value]) => !value)
+    .map(([key]) => key);
+
+  if (missingVars.length > 0) {
+    throw new Error(
+      `Missing required environment variables: ${missingVars.join(', ')}`,
+    );
+  }
+
+  if (!db) throw new Error('OrbisDB client is not initialized');
+};
+
+export function OrbisProvider({ children }: { children: ReactNode }) {
   const [authResult, setAuthResult] = useState<SerializableAuthResult | null>(
     null,
   );
@@ -86,131 +134,73 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // Check for required environment variables
-  useEffect(() => {
-    const requiredEnvVars = {
-      NEXT_PUBLIC_ORBIS_ASSET_METADATA_MODEL_ID:
-        process.env.NEXT_PUBLIC_ORBIS_ASSET_METADATA_MODEL_ID,
-      NEXT_PUBLIC_ORBIS_CRTV_CONTEXT_ID:
-        process.env.NEXT_PUBLIC_ORBIS_CRTV_CONTEXT_ID,
-      NEXT_PUBLIC_ORBIS_CRTV_VIDEOS_CONTEXT_ID:
-        process.env.NEXT_PUBLIC_ORBIS_CRTV_VIDEOS_CONTEXT_ID,
-    };
-
-    const missingVars = Object.entries(requiredEnvVars)
-      .filter(([_, value]) => !value)
-      .map(([key]) => key);
-
-    if (missingVars.length > 0) {
-      console.error(
-        `Missing required environment variables: ${missingVars.join(', ')}`,
-      );
-    }
-  }, []);
-
-  const assetMetadataModelId: string = process.env
-    .NEXT_PUBLIC_ORBIS_ASSET_METADATA_MODEL_ID as string;
-  const crtvContextId: string = process.env
-    .NEXT_PUBLIC_ORBIS_CRTV_CONTEXT_ID as string;
-  const crtvVideosContextId: string = process.env
-    .NEXT_PUBLIC_ORBIS_CRTV_VIDEOS_CONTEXT_ID as string;
-
-  const validateDbOperation = (
-    id: string,
-    value?: any,
-    select: boolean = false,
-  ) => {
-    if (!id) throw new Error('No id provided');
-    if (!select) {
-      if (!value) throw new Error('No value provided');
-    }
-
-    // Check environment variables with more descriptive error messages
-    if (!assetMetadataModelId)
-      throw new Error(
-        'Environment variable NEXT_PUBLIC_ORBIS_ASSET_METADATA_MODEL_ID is missing',
-      );
-    if (!crtvContextId)
-      throw new Error(
-        'Environment variable NEXT_PUBLIC_ORBIS_CRTV_CONTEXT_ID is missing',
-      );
-    if (!crtvVideosContextId)
-      throw new Error(
-        'Environment variable NEXT_PUBLIC_ORBIS_CRTV_VIDEOS_CONTEXT_ID is missing',
-      );
-    if (!db) throw new Error('OrbisDB client is not initialized');
-  };
-
   const insert = async (modelId: string, value: any): Promise<void> => {
-    validateDbOperation(modelId, value);
+    try {
+      validateDbOperation(modelId, value);
 
-    const insertStatement: any = db
-      .insert(modelId)
-      .value(value)
-      .context(crtvVideosContextId);
+      const insertStatement = db
+        .insert(modelId)
+        .value(value)
+        .context(
+          process.env.NEXT_PUBLIC_ORBIS_CRTV_VIDEOS_CONTEXT_ID as string,
+        );
 
-    const validation = await insertStatement.validate();
+      const validation = await insertStatement.validate();
 
-    if (!validation.valid) {
-      throw 'Error during validation: ' + validation.error;
-    }
+      if (!validation.valid) {
+        throw new Error('Error during validation: ' + validation.error);
+      }
 
-    const [result, error] = await catchError(() => insertStatement.run());
+      const [result, error] = await catchError(() => insertStatement.run());
 
-    if (error) {
-      console.error(error);
+      if (error) {
+        console.error('Insert error:', error);
+        throw error;
+      }
+
+      console.log('Insert successful:', result);
+    } catch (error) {
+      console.error('Failed to insert:', error);
       throw error;
     }
-
-    // console.log('result', result);
-
-    console.log('insertStatement runs', insertStatement.runs);
   };
 
   const replace = async (docId: string, newDoc: any): Promise<void> => {
-    console.log('update', { docId, newDoc, db });
+    try {
+      validateDbOperation(docId, newDoc);
 
-    validateDbOperation(docId, newDoc);
+      const replaceStatement = db.update(docId).replace(newDoc);
+      const [result, error] = await catchError(() => replaceStatement.run());
 
-    const replaceStatement: any = db.update(docId).replace(newDoc);
+      if (error) {
+        console.error('Replace error:', error);
+        throw error;
+      }
 
-    const query = replaceStatement.build();
-
-    console.log('Query that will be run', query);
-
-    const [result, error] = await catchError(() => query.run());
-
-    if (error) {
-      console.error(error);
+      console.log('Replace successful:', result);
+    } catch (error) {
+      console.error('Failed to replace:', error);
       throw error;
     }
-
-    console.log('result', result);
-
-    console.log(replaceStatement.runs);
   };
 
   const update = async (docId: string, updates: any): Promise<void> => {
-    console.log('update', { docId, updates, db });
+    try {
+      validateDbOperation(docId, updates);
 
-    validateDbOperation(docId, updates);
+      const updateStatement = db.update(docId).set(updates);
+      const [result, error] = await catchError(() => updateStatement.run());
 
-    const updateStatement: any = db.update(docId).set(updates);
+      if (error) {
+        console.error('Update error:', error);
+        throw error;
+      }
 
-    const query = updateStatement.build();
-
-    console.log('Query that will be run', query);
-
-    const [result, error] = await catchError(() => query.run());
-
-    if (error) {
-      console.error(error);
+      console.log('Update successful:', result);
+    } catch (error) {
+      console.error('Failed to update:', error);
       throw error;
     }
-
-    console.log('result', result);
-
-    console.log(updateStatement.runs);
   };
 
   const getAssetMetadata = async (
@@ -221,9 +211,11 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
 
       const selectStatement = db
         .select()
-        .from(assetMetadataModelId)
+        .from(process.env.NEXT_PUBLIC_ORBIS_ASSET_METADATA_MODEL_ID as string)
         .where({ assetId })
-        .context(crtvVideosContextId);
+        .context(
+          process.env.NEXT_PUBLIC_ORBIS_CRTV_VIDEOS_CONTEXT_ID as string,
+        );
 
       const [result, error] = await catchError(() => selectStatement.run());
 
@@ -235,7 +227,6 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
       const { rows } = result;
       if (!rows?.length) return null;
 
-      // Create a plain serializable object
       const metadata: AssetMetadata = {
         assetId: rows[0].assetId,
         playbackId: rows[0].playbackId,
@@ -248,7 +239,6 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
         subtitles: undefined,
       };
 
-      // Handle subtitles if they exist
       if (metadata.subtitlesUri) {
         try {
           const res = await download({
@@ -257,7 +247,6 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
           });
 
           if (res) {
-            // Convert to plain object
             metadata.subtitles = Object.fromEntries(
               Object.entries(res).map(([lang, chunks]) => [
                 lang,
@@ -284,16 +273,19 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
 
   const orbisLogin = async (): Promise<OrbisConnectResult | null> => {
     try {
-      // Generate a new seed
-      const seed = await OrbisKeyDidAuth.generateSeed();
+      if (!window.ethereum) {
+        throw new Error(
+          'No Ethereum provider found. Please install MetaMask or another web3 wallet.',
+        );
+      }
 
-      // Create auth instance from seed
-      const auth = await OrbisKeyDidAuth.fromSeed(seed);
-
-      // Connect user - OrbisDB will handle session persistence automatically
+      const auth = new OrbisEVMAuth(window.ethereum);
       const result = await db.connectUser({ auth });
 
-      // Serialize the result before setting state
+      if (!result) {
+        throw new Error('Failed to connect to Orbis');
+      }
+
       setAuthResult({
         did: result.user.did,
         details: JSON.parse(JSON.stringify(result)),
@@ -317,7 +309,12 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const isConnected = async (address?: string): Promise<boolean> => {
-    return await db.isUserConnected(address);
+    try {
+      return await db.isUserConnected(address);
+    } catch (error) {
+      console.error('Connection check error:', error);
+      return false;
+    }
   };
 
   const getCurrentUser = async () => {
@@ -365,12 +362,12 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
       {children}
     </OrbisContext.Provider>
   );
-};
+}
 
-export const useOrbisContext = () => {
+export function useOrbisContext() {
   const context = useContext(OrbisContext);
-  if (context === undefined) {
-    throw new Error('useOrbisContext must be used within a OrbisProvider');
+  if (!context) {
+    throw new Error('useOrbisContext must be used within an OrbisProvider');
   }
   return context;
-};
+}
