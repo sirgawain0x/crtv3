@@ -5,7 +5,7 @@ import { hyperindexClient } from '../client';
 export const GET_USER_METOKEN = gql`
   query GetUserMetoken($owner: String!) {
     Metokens_Subscribe(
-      where: { owner: { _eq: $owner }}
+      where: { owner: { _eq: $owner } }
       order_by: { db_write_timestamp: desc }
       limit: 1
     ) {
@@ -27,7 +27,7 @@ export const GET_USER_METOKEN = gql`
 export const GET_METOKEN_BALANCES = gql`
   query GetMetokenBalances($tokenId: String!) {
     Metokens_UpdateBalances(
-      where: { id: { _eq: $tokenId }}
+      where: { id: { _eq: $tokenId } }
       order_by: { blockTimestamp: desc }
       limit: 1
     ) {
@@ -67,11 +67,17 @@ export interface MetokenBalancesResponse {
   Metokens_UpdateBalances: MetokenBalances[];
 }
 
-export async function getUserMetoken(owner: string): Promise<MetokenRegistration | null> {
+export async function getUserMetoken(
+  owner: string,
+): Promise<MetokenRegistration | null> {
   try {
-    const response = await hyperindexClient.request<MetokenRegistrationResponse>(GET_USER_METOKEN, {
-      owner: owner.toLowerCase(),
-    });
+    const response =
+      await hyperindexClient.request<MetokenRegistrationResponse>(
+        GET_USER_METOKEN,
+        {
+          owner: owner.toLowerCase(),
+        },
+      );
 
     return response.Metokens_Subscribe[0] || null;
   } catch (error) {
@@ -80,11 +86,16 @@ export async function getUserMetoken(owner: string): Promise<MetokenRegistration
   }
 }
 
-export async function getMetokenBalances(tokenId: string): Promise<MetokenBalances | null> {
+export async function getMetokenBalances(
+  tokenId: string,
+): Promise<MetokenBalances | null> {
   try {
-    const response = await hyperindexClient.request<MetokenBalancesResponse>(GET_METOKEN_BALANCES, {
-      tokenId,
-    });
+    const response = await hyperindexClient.request<MetokenBalancesResponse>(
+      GET_METOKEN_BALANCES,
+      {
+        tokenId,
+      },
+    );
 
     return response.Metokens_UpdateBalances[0] || null;
   } catch (error) {

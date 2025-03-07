@@ -35,14 +35,8 @@ interface SubtitlesContextType {
 
 const SubtitlesContext = createContext<SubtitlesContextType | undefined>(undefined);
 
-export function SubtitlesProvider({ 
-  children,
-  initialSubtitles
-}: { 
-  children: ReactNode;
-  initialSubtitles?: Subtitles;
-}) {
-  const [subtitles, setSubtitles] = useState<Subtitles | undefined>(initialSubtitles);
+export function SubtitlesProvider({ children }: { children: ReactNode }) {
+  const [subtitles, setSubtitles] = useState<Subtitles | undefined>(undefined);
   const [showSubtitles, setShowSubtitles] = useState<boolean>(false);
   const [language, setLanguage] = useState<string>('English');
 

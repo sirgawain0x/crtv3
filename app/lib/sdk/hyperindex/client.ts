@@ -1,6 +1,6 @@
 import { GraphQLClient } from 'graphql-request';
 
-const INDEXER_URL = 'https://indexer.dev.hyperindex.xyz/44a4cd8/v1/graphql';
+const INDEXER_URL = process.env.NEXT_PUBLIC_HYPERINDEX_ENDPOINT as string;
 
 export const hyperindexClient = new GraphQLClient(INDEXER_URL, {
   headers: {

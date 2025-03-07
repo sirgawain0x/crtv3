@@ -1,15 +1,6 @@
-import crypto from 'node:crypto';
-
 export function generateUUID(): string {
-  // Use crypto.randomUUID() if available (Node.js >= 15.6.0)
-  if (typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-
-  // Fallback to manual UUID v4 generation
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-    const r = crypto.randomBytes(1)[0] % 16 | 0;
-    const v = c === 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-  });
+  const hex = [...Array(32)]
+    .map(() => Math.floor(Math.random() * 16).toString(16))
+    .join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }

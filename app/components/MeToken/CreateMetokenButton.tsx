@@ -17,7 +17,7 @@ import {
 } from 'thirdweb/react';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { useMetoken } from '@app/hooks/useMetoken';
+import { useMetoken } from '@app/hooks/useMetokens';
 import { getUserMetoken } from '@app/lib/sdk/hyperindex/queries/metoken.new';
 import { gql } from 'graphql-request';
 import { hyperindexClient } from '@app/lib/sdk/hyperindex/client';

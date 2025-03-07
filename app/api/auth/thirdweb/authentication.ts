@@ -1,53 +1,62 @@
-"use server";
+'use server';
 
-import { cookies } from "next/headers";
-import { decodeJWT } from "thirdweb/utils";
+import { cookies } from 'next/headers';
+import { VerifyLoginPayloadParams } from 'thirdweb/auth';
+import { thirdwebAuth } from '@app/lib/sdk/thirdweb/auth';
+import { decodeJWT } from 'thirdweb/utils';
 
 export type JwtContext = {
   address: string;
+};
+export async function generatePayload(
+  ...args: Parameters<typeof thirdwebAuth.generatePayload>
+) {
+  return thirdwebAuth.generatePayload(...args);
 }
 
-// Simple authentication function that returns a dummy address for development
-export async function authedOnly() {
-  const jwt = cookies().get("jwt");
-  
-  if (!jwt?.value) {
-    return { address: '0x0000000000000000000000000000000000000000' }; // Return dummy address
-  }
+export async function login(payload: VerifyLoginPayloadParams) {
+  const verifiedPayload = await thirdwebAuth.verifyPayload(payload);
 
-  try {
-    const decoded = await decodeJWT(jwt.value);
-    const ctx = decoded?.payload?.ctx as { address?: string } || {};
-    const address = ctx.address || decoded?.payload?.sub || '0x0000000000000000000000000000000000000000';
-
-    return { address };
-  } catch (error) {
-    console.error('Authentication check failed:', error);
-    return { address: '0x0000000000000000000000000000000000000000' }; // Return dummy address
+  if (verifiedPayload.valid) {
+    const jwt = await thirdwebAuth.generateJWT({
+      payload: verifiedPayload.payload,
+      context: {
+        address: verifiedPayload.payload.address,
+      },
+    });
+    cookies().set('jwt', jwt);
   }
 }
 
-// Simple function to get the JWT context
 export async function getJwtContext(): Promise<JwtContext> {
-  const jwtCookie = cookies().get("jwt");
-  
-  if (!jwtCookie?.value) {
-    return { address: '0x0000000000000000000000000000000000000000' }; // Return dummy address
+  const jwt = cookies().get('jwt');
+
+  if (!jwt?.value) {
+    throw new Error(`Failed to fetch JWT context, jwt is not defined`);
   }
 
-  try {
-    const decoded = await decodeJWT(jwtCookie.value);
-    const ctx = decoded?.payload?.ctx as { address?: string } || {};
-    const address = ctx.address || decoded?.payload?.sub || '0x0000000000000000000000000000000000000000';
+  const { payload, signature } = decodeJWT(jwt.value);
 
-    return { address };
-  } catch (error) {
-    console.error('JWT context retrieval failed:', error);
-    return { address: '0x0000000000000000000000000000000000000000' }; // Return dummy address
+  if (!payload?.ctx) {
+    throw new Error(`Failed to fetch JWT context, payload.ctx is not defined`);
   }
+
+  return payload?.ctx as JwtContext;
 }
 
-// Logout function
+export async function authedOnly() {
+  const jwt = cookies().get('jwt');
+  if (!jwt?.value) {
+    return false;
+  }
+
+  const authResult = await thirdwebAuth.verifyJWT({ jwt: jwt.value });
+  if (!authResult.valid) {
+    return false;
+  }
+  return true;
+}
+
 export async function logout() {
-  cookies().delete("jwt");
+  cookies().delete('jwt');
 }

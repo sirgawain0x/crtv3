@@ -1,27 +1,16 @@
-import * as jose from 'jose';
-import { keyRotationManager } from './keyRotationManager';
+import { SignJWT } from 'jose';
+import { nanoid } from 'nanoid';
 
-// Convert public key to JWKS format
-export async function publicKeyToJWKS() {
-  return await keyRotationManager.getJWKS();
-}
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
-// Create a JWT
-export async function createJWT(payload: any) {
-  const { privateKey, kid } = await keyRotationManager.getCurrentSigningKey();
-  
-  const jwt = await new jose.SignJWT({ ...payload })
-    .setProtectedHeader({ alg: 'RS256', kid })
-    .setIssuedAt()
-    .setExpirationTime('2h')
-    .setIssuer('crtv3')
-    .setAudience('crtv3')
-    .sign(privateKey);
-  
-  return jwt;
-}
+export async function createJWT(payload: Record<string, any>) {
+  const iat = Math.floor(Date.now() / 1000);
+  const exp = iat + 60 * 60; // 1 hour
 
-// Verify a JWT
-export async function verifyJWT(token: string) {
-  return await keyRotationManager.verifyToken(token);
+  return new SignJWT({ ...payload })
+    .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
+    .setJti(nanoid())
+    .setIssuedAt(iat)
+    .setExpirationTime(exp)
+    .sign(new TextEncoder().encode(JWT_SECRET));
 }

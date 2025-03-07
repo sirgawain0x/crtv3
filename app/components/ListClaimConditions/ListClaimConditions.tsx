@@ -2,7 +2,7 @@ import {
   getERC20Metadata,
   priceInHumanReadable,
   timestampToDateString,
-} from '@app/lib/helpers/helpers';
+} from '@app/lib/helpers';
 import { videoContract } from '@app/lib/sdk/thirdweb/get-contract';
 import { NFT, ResolvedReturnType } from '@app/types/nft';
 import { AddIcon, CloseIcon, DeleteIcon, EditIcon } from '@chakra-ui/icons';
@@ -25,6 +25,7 @@ import { useContractEvents } from 'thirdweb/react';
 import AddClaimPhaseButton from '../AddClaimPhase/AddClaimPhaseButton';
 import EditClaimConditions from '../edit-claim-conditions/EditClaimConditions';
 import SetClaimConditions from '../SetClaimConditions/SetClaimConditions';
+import { formatNumber } from '@app/lib/helpers';
 
 type ListClaimConditionsProps = {
   nft: NFT;

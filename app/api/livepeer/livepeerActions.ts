@@ -11,62 +11,50 @@ export const getLivepeerUploadUrl = async (
   contractAddress?: string,
   tokenGated: boolean = false,
 ) => {
-  try {
-    const createAssetBody: {
-      name: string;
-      storage: {
-        ipfs: boolean;
-      };
-      creatorId: {
-        type: InputCreatorIdType;
-        value: string;
-      };
-      playbackPolicy?: {
-        type: Type;
-        webhookId: string;
-        webhookContext: WebhookContext;
-      };
-    } = {
-      name: fileName,
-      storage: {
-        ipfs: true,
-      },
-      creatorId: {
-        type: InputCreatorIdType?.Unverified,
-        value: creatorAddress,
-      },
+  const createAssetBody: {
+    name: string;
+    storage: {
+      ipfs: boolean;
     };
+    creatorId: {
+      type: InputCreatorIdType;
+      value: string;
+    };
+    playbackPolicy?: {
+      type: Type;
+      webhookId: string;
+      webhookContext: WebhookContext;
+    };
+  } = {
+    name: fileName,
+    storage: {
+      ipfs: true,
+    },
+    creatorId: {
+      type: InputCreatorIdType?.Unverified,
+      value: creatorAddress,
+    },
+  };
 
-    if (tokenGated) {
-      if (!creatorAddress) throw new Error('Creator address is required for token gated assets');
-      if (!tokenId) throw new Error('Token ID is required for token gated assets');
-      if (!contractAddress) throw new Error('Token contract address is required for token gated assets');
+  if (tokenGated) {
+    if (!creatorAddress) throw new Error('Creator address is required for token gated assets');
+    if (!tokenId) throw new Error('Token ID is required for token gated assets');
+    if (!contractAddress) throw new Error('Token contract address is required for token gated assets');
 
-      createAssetBody.playbackPolicy = {
-        type: Type.Webhook,
-        webhookId: process.env.LIVEPEER_WEBHOOK_ID as string,
-        webhookContext: {
-          creatorAddress,
-          tokenId,
-          contractAddress,
-        } as WebhookContext,
-      };
-    }
-
-    console.log('Creating Livepeer asset with:', { fileName, creatorAddress, tokenGated });
-    const result = await fullLivepeer.asset.create(createAssetBody);
-    console.log('Livepeer asset created:', result);
-
-    return result.data;
-  } catch (error: any) {
-    console.error('Error creating Livepeer asset:', {
-      error: error.message,
-      details: error.response?.data,
-      fileName,
-      creatorAddress
-    });
-    throw new Error(`Failed to create Livepeer asset: ${error.message}`);
+    createAssetBody.playbackPolicy = {
+      type: Type.Webhook,
+      webhookId: process.env.LIVEPEER_WEBHOOK_ID as string,
+      webhookContext: {
+        creatorAddress,
+        tokenId,
+        contractAddress,
+      } as WebhookContext,
+    };
   }
+
+  const result = await fullLivepeer.asset.create(createAssetBody);
+
+  return result.data;
 };
 
 export const getLivepeerAsset = async (livePeerAssetId: string) => {
