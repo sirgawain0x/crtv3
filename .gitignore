@@ -44,5 +44,5 @@ next-env.d.ts
 # Cursor
 .cursorrules
 
-# windsurf rules
-.windsurfrules
+# Windsurf
+.winsurfrules
