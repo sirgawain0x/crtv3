@@ -3,12 +3,12 @@
  * https://jestjs.io/docs/configuration
  */
 
-import type {Config} from 'jest';
-import nextJest from 'next/jest.js'
+import type { Config } from 'jest';
+import nextJest from 'next/jest.js';
 
-const createJestConfig = nextJest ({
-   dir: './'
-})
+const createJestConfig = nextJest({
+  dir: './',
+});
 
 const config: Config = {
   // All imported modules in your tests should be mocked automatically
@@ -30,15 +30,13 @@ const config: Config = {
   // collectCoverageFrom: undefined,
 
   // The directory where Jest should output its coverage files
-  coverageDirectory: "coverage",
+  coverageDirectory: 'coverage',
 
   // An array of regexp pattern strings used to skip coverage collection
-  coveragePathIgnorePatterns: [
-    "/node_modules/"
-  ],
+  coveragePathIgnorePatterns: ['/node_modules/'],
 
   // Indicates which provider should be used to instrument code for coverage
-  coverageProvider: "v8",
+  coverageProvider: 'v8',
 
   // A list of reporter names that Jest uses when writing coverage reports
   // coverageReporters: [
@@ -151,7 +149,7 @@ const config: Config = {
   // snapshotSerializers: [],
 
   // The test environment that will be used for testing
-  testEnvironment: "jsdom",
+  testEnvironment: 'jsdom',
 
   // Options that will be passed to the testEnvironment
   // testEnvironmentOptions: {},
@@ -160,10 +158,7 @@ const config: Config = {
   // testLocationInResults: false,
 
   // The glob patterns Jest uses to detect test files
-  testMatch: [
-    "**/__tests__/**/*.[jt]s?(x)",
-    "**/?(*.)+(spec|test).[tj]s?(x)"
-  ],
+  testMatch: ['**/?(*.)+(spec|test).[tj]s?(x)'],
 
   // An array of regexp pattern strings that are matched against all test paths, matched tests are skipped
   // testPathIgnorePatterns: [

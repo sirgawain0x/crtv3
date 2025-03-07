@@ -2,7 +2,7 @@ import {
   claimConditionsOptions,
   priceInHumanReadable,
   timestampToInputDateString,
-} from '@app/lib/helpers/helpers';
+} from '@app/lib/helpers';
 import { client } from '@app/lib/sdk/thirdweb/client';
 import {
   erc20Contract,
@@ -20,12 +20,13 @@ import {
 } from 'thirdweb/extensions/erc1155';
 import { useActiveAccount } from 'thirdweb/react';
 import { decimals } from 'thirdweb/extensions/erc20';
+import { formatNumber } from '@app/lib/helpers';
 
 type ClaimFormData = {
   currency: string;
   phaseName: string | undefined;
   maxClaimablePerWallet: string | number;
-  numOfNFT: bigint | number; 
+  numOfNFT: bigint | number;
   startTimestamp: number;
   pricePerNFT: number | string;
 };
@@ -84,7 +85,6 @@ export default function SetClaimConditions(props: SetClaimConditionsProps) {
         : [];
 
     try {
-      
       const transaction = setClaimConditions({
         contract: videoContract,
         tokenId,
@@ -144,8 +144,8 @@ export default function SetClaimConditions(props: SetClaimConditionsProps) {
     const formatData: ClaimFormData = {
       ...data,
       startTimestamp: data.startTimestamp,
-      pricePerNFT: data.pricePerNFT, 
-      numOfNFT: data.numOfNFT,  
+      pricePerNFT: data.pricePerNFT,
+      numOfNFT: data.numOfNFT,
       maxClaimablePerWallet: data.maxClaimablePerWallet,
     };
 

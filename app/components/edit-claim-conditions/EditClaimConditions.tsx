@@ -1,7 +1,8 @@
 import {
   claimConditionsOptions,
   timestampToInputDateString,
-} from '@app/lib/helpers/helpers';
+  formatNumber,
+} from '@app/lib/helpers';
 import { client } from '@app/lib/sdk/thirdweb/client';
 import { videoContract } from '@app/lib/sdk/thirdweb/get-contract';
 import { EditonDropContractDeployedChain } from '@app/lib/utils/context';
@@ -17,6 +18,7 @@ import {
 } from 'thirdweb/extensions/erc1155';
 import { useActiveAccount } from 'thirdweb/react';
 import { ClaimableERC1155 } from 'thirdweb/modules';
+import {} from '@app/lib/helpers';
 
 type EditClaimFormData = {
   currency: string;
@@ -49,7 +51,7 @@ export default function EditClaimConditions(props: EditClaimConditionsProps) {
 
   const handleUpdateClaimCondition = async (args: TUpdateCCParams) => {
     // update an existing claimCondition by its id
- 
+
     if (!activeAccount) {
       throw new Error('No active Wallet connected');
     }

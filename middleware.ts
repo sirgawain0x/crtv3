@@ -9,7 +9,7 @@ export function middleware(
   const allowedOrigins =
     process.env.NODE_ENV === 'production'
       ? ['https://tv.creativeplatform.xyz']
-      : ['https://localhost:3000'];
+      : ['http://localhost:3000'];
 
   const origin = req.headers.get('origin');
 
@@ -40,7 +40,7 @@ export function middleware(
   // Check if this is an upload request
   if (req.nextUrl.pathname.startsWith('/api/upload')) {
     const walletAddress = req.headers.get('x-wallet-address');
-    
+
     if (!walletAddress) {
       return new NextResponse(null, {
         status: 401,
@@ -51,18 +51,17 @@ export function middleware(
     try {
       // Validate the wallet address format
       const formattedAddress = getAddress(walletAddress);
-      
+
       // You can add additional checks here, such as:
       // - Check if the wallet holds specific NFTs
       // - Check if the wallet has enough tokens
       // - Check if the wallet is whitelisted
-      
+
       // For now, we'll just validate the address format
-      
+
       // Add the validated wallet address to the request headers
       res.headers.set('x-validated-address', formattedAddress);
       return res;
-      
     } catch (error) {
       return new NextResponse(null, {
         status: 401,
