@@ -28,6 +28,11 @@ interface OrbisContextProps {
   orbisLogin: (privateKey?: string) => Promise<OrbisConnectResult | null>;
   isConnected: (address: string) => Promise<boolean>;
   getCurrentUser: () => Promise<any>;
+  insertMetokenMetadata: (metadata: {
+    address: string;
+    token_name: string;
+    token_symbol: string;
+  }) => Promise<void>;
 }
 
 const OrbisContext = createContext<OrbisContextProps | undefined>({
@@ -40,15 +45,16 @@ const OrbisContext = createContext<OrbisContextProps | undefined>({
   orbisLogin: async () => {},
   isConnected: async () => false,
   getCurrentUser: async () => {},
+  insertMetokenMetadata: async () => {},
 } as unknown as OrbisContextProps);
 
 export const OrbisProvider = ({ children }: { children: ReactNode }) => {
   const [authResult, setAuthResult] = useState<OrbisConnectResult | null>(null);
 
-  const ceramicNodeUrl = 'https://ceramic-orbisdb-mainnet-direct.hirenodes.io/';
-  const orbisNodeUrl = 'https://studio.useorbis.com';
-  const orbisEnvironmentId =
-    'did:pkh:eip155:1:0x1fde40a4046eda0ca0539dd6c77abf8933b94260';
+  const ceramicNodeUrl = process.env.NEXT_PUBLIC_CERAMIC_NODE_URL as string;
+  const orbisNodeUrl = process.env.NEXT_PUBLIC_ORBIS_NODE_URL as string;
+  const orbisEnvironmentId = process.env
+    .NEXT_PUBLIC_ORBIS_ENVIRONMENT_ID as string;
 
   if (!ceramicNodeUrl) {
     throw new Error('CERAMIC_NODE_URL environment variable is required');
@@ -72,12 +78,12 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
     ],
   });
 
-  const assetMetadataModelId: string =
-    'kjzl6hvfrbw6c6hnahs60z0s1xenk7phux8abtx4ays1g44rpbqsrzpfutoaqug';
-  const crtvContextId: string =
-    'kjzl6kcym7w8ya3lzng3v4pruy19togu984dhu1tfyljwc5qdqjd6nugshi5kj0';
-  const crtvVideosContextId: string =
-    'kjzl6kcym7w8y5emmf4y5yxtrxeqecnhc7pg3vgzu6zxya8k9q1hcoxtn28ijuq';
+  const assetMetadataModelId: string = process.env
+    .NEXT_PUBLIC_ASSET_METADATA_MODEL_ID as string;
+  const crtvContextId: string = process.env
+    .NEXT_PUBLIC_ORBIS_CRTV_CONTEXT_ID as string;
+  const crtvVideosContextId: string = process.env
+    .NEXT_PUBLIC_ORBIS_CRTV_VIDEOS_CONTEXT_ID as string;
 
   const validateDbOperation = (
     id: string,
@@ -168,7 +174,9 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
     console.log(updateStatement.runs);
   };
 
-  const getAssetMetadata = async (assetId: string): Promise<AssetMetadata | null> => {
+  const getAssetMetadata = async (
+    assetId: string,
+  ): Promise<AssetMetadata | null> => {
     try {
       validateDbOperation(assetId, true);
 
@@ -220,11 +228,13 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
             const plainSubtitles = Object.fromEntries(
               Object.entries(subtitlesData).map(([lang, chunks]) => [
                 lang,
-                (Array.isArray(chunks) ? chunks : []).map(chunk => ({
+                (Array.isArray(chunks) ? chunks : []).map((chunk) => ({
                   text: String(chunk.text || ''),
-                  timestamp: Array.isArray(chunk.timestamp) ? [...chunk.timestamp] : []
-                }))
-              ])
+                  timestamp: Array.isArray(chunk.timestamp)
+                    ? [...chunk.timestamp]
+                    : [],
+                })),
+              ]),
             );
             metadata.subtitles = plainSubtitles;
           }
@@ -291,6 +301,22 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
     return currentUser;
   };
 
+  const insertMetokenMetadata = async (metadata: {
+    address: string;
+    token_name: string;
+    token_symbol: string;
+  }): Promise<void> => {
+    try {
+      await insert(
+        process.env.NEXT_PUBLIC_METOKEN_METADATA_MODEL_ID as string,
+        metadata,
+      );
+    } catch (error) {
+      console.error('Failed to insert metoken metadata:', error);
+      throw error;
+    }
+  };
+
   return (
     <OrbisContext.Provider
       value={{
@@ -303,6 +329,7 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
         orbisLogin,
         isConnected,
         getCurrentUser,
+        insertMetokenMetadata,
       }}
     >
       {children}
