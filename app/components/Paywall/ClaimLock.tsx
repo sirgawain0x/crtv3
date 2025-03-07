@@ -13,6 +13,8 @@ import {
   useActiveAccount,
   useReadContract,
 } from 'thirdweb/react';
+import { Button } from '../ui/button';
+import Link from 'next/link';
 
 interface UserMenuProps {
   closeMenu: () => void;
@@ -58,65 +60,9 @@ function ClaimLockButton({ closeMenu }: { closeMenu: () => void }) {
         {activeAccount && subscribed === true ? (
           <UserMenu />
         ) : (
-          <TransactionButton
-            payModal={{
-              metadata: {
-                name: 'Creator Pass',
-                image:
-                  'https://bafybeiemndtnhajevhwep7mrzx62slcp6nklpw4zwq3dcqvqugj7tqem44.ipfs.w3s.link/Creator%20Membership%20Pass_both.gif',
-              },
-              buyWithCrypto: {
-                testMode: false,
-              },
-              buyWithFiat: {
-                prefillSource: {
-                  currency: 'USD',
-                },
-              },
-              purchaseData: {},
-              supportedTokens: {
-                137: [
-                  {
-                    address: '0x3c499c542cef5e3811e1192ce70d8cc03d5c3359',
-                    name: 'USDC',
-                    symbol: 'USDC',
-                    icon: 'https://bafybeidzrdgq3vllhxcza6uvkvecxdumgsgkrq22pm3sqdviujttridkku.ipfs.w3s.link/usd-coin-usdc-logo.png',
-                  },
-                ],
-                8453: [
-                  {
-                    address: '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913',
-                    name: 'USDC',
-                    symbol: 'USDC',
-                    icon: 'https://bafybeidzrdgq3vllhxcza6uvkvecxdumgsgkrq22pm3sqdviujttridkku.ipfs.w3s.link/usd-coin-usdc-logo.png',
-                  },
-                ],
-              },
-            }}
-            transaction={() => {
-              const tx = prepareContractCall({
-                contract: unlockContract,
-                method: 'purchase',
-                params: [
-                  [30000000000000000000],
-                  [activeAccount?.address],
-                  [CREATIVE_ADDRESS],
-                  [CREATIVE_ADDRESS],
-                  ['0x'],
-                ],
-                value: toWei('30'),
-              });
-              return tx;
-            }}
-            onTransactionConfirmed={() => {
-              toast('Transaction Successful');
-            }}
-            onError={() => {
-              toast('Transaction Failed');
-            }}
-          >
-            Claim Pass
-          </TransactionButton>
+          <Link href={'https://memberships.creativeplatform.xyz'}>
+            <Button variant={'outline'}>Claim Pass</Button>
+          </Link>
         )}
       </div>
     </div>

@@ -21,22 +21,11 @@ declare global {
   }
 }
 
-// Handle UUID generation for EventClient
-if (typeof window !== 'undefined') {
-  try {
-    // @ts-ignore - Ignore type checking for this workaround
-    const { EventClient } = require('@useorbis/db-sdk/events');
-    if (EventClient?.prototype) {
-      // @ts-ignore - Ignore type checking for this workaround
-      EventClient.prototype.generateEventUniqueId = function () {
-        const timestamp = Date.now().toString(36);
-        const randomStr = Math.random().toString(36).substring(2, 15);
-        return `${timestamp}-${randomStr}`;
-      };
-    }
-  } catch (error) {
-    console.warn('Failed to patch EventClient:', error);
-  }
+// Generate a unique ID for events
+function generateEventUniqueId() {
+  const timestamp = Date.now().toString(36);
+  const randomStr = Math.random().toString(36).substring(2, 15);
+  return `${timestamp}-${randomStr}`;
 }
 
 interface SerializableAuthResult {
