@@ -36,6 +36,7 @@ export default function CreateThumbnail({
   const [livepeerPlaybackData, setLivepeerPlaybackData] =
     useState<PlaybackInfo>();
   const [isLazyMinted, setIsLazyMinted] = useState(false);
+  const [selectedThumbnail, setSelectedThumbnail] = useState<string>();
 
   const onLazyMintSuccess = (txHash: string) => {
     setIsLazyMinted(Boolean(txHash));
@@ -48,16 +49,17 @@ export default function CreateThumbnail({
           .then((data) => {
             console.log(data);
             setLivepeerAssetData(data);
+            if (data?.status?.phase === 'failed') {
+              toast.error(
+                'Video transcoding failed: ' + data.status.errorMessage,
+              );
+              return false;
+            }
           })
           .catch((e) => {
-            console.log(e);
-            alert(e?.message || 'Error retrieving livepeer asset');
+            console.error('Error retrieving livepeer asset:', e);
+            toast.error(e?.message || 'Error retrieving video status');
           });
-      }
-      if (livepeerAssetData?.status?.phase === 'failed') {
-        throw new Error(
-          'Error transcoding video: ' + livepeerAssetData?.status?.errorMessage,
-        );
       }
     },
     livepeerAssetData?.status?.phase !== 'ready' &&
@@ -85,14 +87,15 @@ export default function CreateThumbnail({
 
   const handleComplete = (thumbnailUri: string) => {
     if (livepeerAssetData) {
-      onComplete({ thumbnailUri });
-      if (activeAccount) {
-        router.push(`/profile/${activeAccount.address}#minted`);
-      } else {
-        toast.error('No active account found. Please connect your wallet.');
-      }
+      setSelectedThumbnail(thumbnailUri);
     } else {
-      toast.error('Video data not found. Please try again.'); 
+      toast.error('Video data not found. Please try again.');
+    }
+  };
+
+  const handleSubmit = () => {
+    if (selectedThumbnail) {
+      onComplete({ thumbnailUri: selectedThumbnail });
     }
   };
 
@@ -150,9 +153,13 @@ export default function CreateThumbnail({
         >
           Back
         </Button>
-
-        <Button disabled={!isLazyMinted} onClick={() => handleComplete('')}>
-          Complete
+        <Button
+          disabled={
+            !selectedThumbnail || livepeerAssetData?.status?.phase !== 'ready'
+          }
+          onClick={handleSubmit}
+        >
+          Submit
         </Button>
       </div>
     </div>

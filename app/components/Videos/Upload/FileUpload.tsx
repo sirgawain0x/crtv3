@@ -148,7 +148,8 @@ const FileUpload: React.FC<FileUploadProps> = ({
   const [uploadState, setUploadState] = useState<
     'idle' | 'loading' | 'complete'
   >('idle');
-  const [subtitleProcessingComplete, setSubtitleProcessingComplete] = useState<boolean>(false);
+  const [subtitleProcessingComplete, setSubtitleProcessingComplete] =
+    useState<boolean>(false);
 
   const [livepeerAsset, setLivepeerAsset] = useState<any>();
 
@@ -185,7 +186,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
         endpoint: uploadRequestResult?.tusEndpoint,
         metadata: {
           filename: selectedFile.name,
-          filetype: 'video/mp4',
+          filetype: 'video/*',
         },
         uploadSize: selectedFile.size,
         onError(err: any) {
@@ -203,9 +204,12 @@ const FileUpload: React.FC<FileUploadProps> = ({
           setUploadState('complete');
           setError(null);
           onFileUploaded(tusUpload?.url || '');
-          toast.success('Video uploaded successfully! Generating subtitles...', {
-            duration: 3000,
-          });
+          toast.success(
+            'Video uploaded successfully! Generating subtitles...',
+            {
+              duration: 3000,
+            },
+          );
 
           // Start audio-to-text processing after successful upload
           handleAudioToText();
@@ -241,9 +245,9 @@ const FileUpload: React.FC<FileUploadProps> = ({
         returnTimestamps: 'true',
       });
 
-      if (audioToTextResponse?.chunks) {
+      if (audioToTextResponse?.textResponse?.chunks) {
         const subtitles = await translateSubtitles({
-          chunks: audioToTextResponse.chunks,
+          chunks: audioToTextResponse.textResponse.chunks,
         });
 
         const ipfsUri = await upload({
@@ -256,7 +260,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
           'Subtitles generated and translated successfully! You can now proceed to the next step.',
           {
             duration: 5000,
-          }
+          },
         );
       }
     } catch (error) {
@@ -265,7 +269,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
         'Video uploaded successfully, but there was an error generating subtitles. You can still proceed to the next step.',
         {
           duration: 5000,
-        }
+        },
       );
     } finally {
       setSubtitleProcessingComplete(true);
@@ -276,7 +280,9 @@ const FileUpload: React.FC<FileUploadProps> = ({
     <div className="min-h-screen w-full bg-white">
       <div className="mx-auto flex min-h-[calc(100vh-200px)] max-w-4xl flex-col px-4 py-8">
         <div className="flex-1 rounded-lg bg-white p-6 shadow-lg sm:p-8">
-          <h1 className="mb-8 text-center text-2xl font-semibold text-gray-900">Upload A File</h1>
+          <h1 className="mb-8 text-center text-2xl font-semibold text-gray-900">
+            Upload A File
+          </h1>
 
           <div className="mx-auto max-w-2xl space-y-8">
             {/* File Input */}
@@ -301,15 +307,19 @@ const FileUpload: React.FC<FileUploadProps> = ({
             {selectedFile && (
               <div className="space-y-8">
                 <div className="text-center">
-                  <p className="text-sm font-medium text-gray-500">Selected File</p>
-                  <p className="mt-1 text-base text-gray-900">{selectedFile.name}</p>
+                  <p className="text-sm font-medium text-gray-500">
+                    Selected File
+                  </p>
+                  <p className="mt-1 text-base text-gray-900">
+                    {selectedFile.name}
+                  </p>
                 </div>
-                
+
                 {/* Video Preview */}
                 <div className="overflow-hidden rounded-lg border border-gray-200">
                   <PreviewVideo video={selectedFile} />
                 </div>
-                
+
                 {/* Upload Controls */}
                 <div className="flex flex-col items-center space-y-4">
                   {uploadState === 'idle' ? (
@@ -394,7 +404,9 @@ const FileUpload: React.FC<FileUploadProps> = ({
           )}
           {onPressNext && (
             <Button
-              disabled={uploadState !== 'complete' || !subtitleProcessingComplete}
+              disabled={
+                uploadState !== 'complete' || !subtitleProcessingComplete
+              }
               onClick={() => {
                 if (livepeerAsset) {
                   onPressNext(livepeerAsset);

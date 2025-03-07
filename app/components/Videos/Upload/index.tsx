@@ -17,7 +17,7 @@ import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
 import StepperIndicator from '@app/components/Stepper-Indicator';
 import FileUpload from '@app/components/Videos/Upload/FileUpload';
 import CreateInfo from '@app/components/Videos/Upload/Create-info';
-import CreateThumbnail from '@app/components/Videos/Upload/Create-thumbnail';
+import CreateThumbnailWrapper from '@app/components/Videos/Upload/CreateThumbnailWrapper';
 import { Alert, AlertDescription, AlertTitle } from '@app/components/ui/alert';
 import type { TVideoMetaForm } from '@app/components/Videos/Upload/Create-info';
 import { STEPPER_FORM_KEYS } from '@app/lib/utils/context';
@@ -100,10 +100,10 @@ const HookMultiStepForm = () => {
         />
       </div>
       <div className={activeStep === 3 ? 'block' : 'hidden'}>
-        <CreateThumbnail
+        <CreateThumbnailWrapper
           livePeerAssetId={livepeerAsset?.id}
           thumbnailUri={thumbnailUri}
-          onComplete={async (data) => {
+          onComplete={async (data: { thumbnailUri: string }) => {
             setThumbnailUri(data.thumbnailUri);
 
             if (!livepeerAsset || !metadata) {

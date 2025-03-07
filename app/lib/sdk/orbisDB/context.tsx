@@ -1,14 +1,21 @@
-import { createContext, ReactNode, useContext, useState } from 'react';
+'use client';
+
+import {
+  createContext,
+  ReactNode,
+  useContext,
+  useState,
+  useEffect,
+} from 'react';
 import { client } from '@app/lib/sdk/thirdweb/client';
 import { catchError } from '@useorbis/db-sdk/util';
-import { OrbisEVMAuth } from '@useorbis/db-sdk/auth';
-import { OrbisConnectResult, OrbisDB } from '@useorbis/db-sdk';
-// import { Wallet } from 'ethers';
+import { OrbisKeyDidAuth } from '@useorbis/db-sdk/auth';
+import { OrbisConnectResult } from '@useorbis/db-sdk';
+import { db } from './client';
 import createAssetMetadataModel, {
   AssetMetadata,
 } from './models/AssetMetadata';
 import { download } from 'thirdweb/storage';
-// import { ASSET_METADATA_MODEL_ID, CREATIVE_TV_CONTEXT_ID } from '@app/lib/utils/context';
 
 declare global {
   interface Window {
@@ -16,10 +23,15 @@ declare global {
   }
 }
 
+interface SerializableAuthResult {
+  did: string;
+  details: Record<string, any>;
+}
+
 interface OrbisContextProps {
-  authResult: OrbisConnectResult | null;
+  authResult: SerializableAuthResult | null;
   setAuthResult: React.Dispatch<
-    React.SetStateAction<OrbisConnectResult | null>
+    React.SetStateAction<SerializableAuthResult | null>
   >;
   insert: (modelId: string, value: any) => Promise<void>;
   replace: (docId: string, newDoc: any) => Promise<void>;
@@ -33,6 +45,7 @@ interface OrbisContextProps {
     token_name: string;
     token_symbol: string;
   }) => Promise<void>;
+  logout: () => Promise<void>;
 }
 
 const OrbisContext = createContext<OrbisContextProps | undefined>({
@@ -46,40 +59,57 @@ const OrbisContext = createContext<OrbisContextProps | undefined>({
   isConnected: async () => false,
   getCurrentUser: async () => {},
   insertMetokenMetadata: async () => {},
+  logout: async () => {},
 } as unknown as OrbisContextProps);
 
 export const OrbisProvider = ({ children }: { children: ReactNode }) => {
-  const [authResult, setAuthResult] = useState<OrbisConnectResult | null>(null);
+  const [authResult, setAuthResult] = useState<SerializableAuthResult | null>(
+    null,
+  );
 
-  const ceramicNodeUrl = process.env.NEXT_PUBLIC_CERAMIC_NODE_URL as string;
-  const orbisNodeUrl = process.env.NEXT_PUBLIC_ORBIS_NODE_URL as string;
-  const orbisEnvironmentId = process.env
-    .NEXT_PUBLIC_ORBIS_ENVIRONMENT_ID as string;
+  // Check for existing session on mount
+  useEffect(() => {
+    checkExistingSession();
+  }, []);
 
-  if (!ceramicNodeUrl) {
-    throw new Error('CERAMIC_NODE_URL environment variable is required');
-  }
-  if (!orbisNodeUrl) {
-    throw new Error('ORBIS_NODE_URL environment variable is required');
-  }
-  if (!orbisEnvironmentId) {
-    throw new Error('ORBIS_ENVIRONMENT_ID environment variable is required');
-  }
+  const checkExistingSession = async () => {
+    try {
+      const currentUser = await db.getConnectedUser();
+      if (currentUser) {
+        setAuthResult({
+          did: currentUser.user.did,
+          details: JSON.parse(JSON.stringify(currentUser)),
+        });
+      }
+    } catch (error) {
+      console.error('Failed to restore session:', error);
+    }
+  };
 
-  const db = new OrbisDB({
-    ceramic: {
-      gateway: ceramicNodeUrl,
-    },
-    nodes: [
-      {
-        gateway: orbisNodeUrl,
-        env: orbisEnvironmentId,
-      },
-    ],
-  });
+  // Check for required environment variables
+  useEffect(() => {
+    const requiredEnvVars = {
+      NEXT_PUBLIC_ORBIS_ASSET_METADATA_MODEL_ID:
+        process.env.NEXT_PUBLIC_ORBIS_ASSET_METADATA_MODEL_ID,
+      NEXT_PUBLIC_ORBIS_CRTV_CONTEXT_ID:
+        process.env.NEXT_PUBLIC_ORBIS_CRTV_CONTEXT_ID,
+      NEXT_PUBLIC_ORBIS_CRTV_VIDEOS_CONTEXT_ID:
+        process.env.NEXT_PUBLIC_ORBIS_CRTV_VIDEOS_CONTEXT_ID,
+    };
+
+    const missingVars = Object.entries(requiredEnvVars)
+      .filter(([_, value]) => !value)
+      .map(([key]) => key);
+
+    if (missingVars.length > 0) {
+      console.error(
+        `Missing required environment variables: ${missingVars.join(', ')}`,
+      );
+    }
+  }, []);
 
   const assetMetadataModelId: string = process.env
-    .NEXT_PUBLIC_ASSET_METADATA_MODEL_ID as string;
+    .NEXT_PUBLIC_ORBIS_ASSET_METADATA_MODEL_ID as string;
   const crtvContextId: string = process.env
     .NEXT_PUBLIC_ORBIS_CRTV_CONTEXT_ID as string;
   const crtvVideosContextId: string = process.env
@@ -94,12 +124,21 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
     if (!select) {
       if (!value) throw new Error('No value provided');
     }
+
+    // Check environment variables with more descriptive error messages
     if (!assetMetadataModelId)
-      throw new Error('No assetMetadataModelId provided');
-    if (!crtvContextId) throw new Error('No crtvContextId provided');
+      throw new Error(
+        'Environment variable NEXT_PUBLIC_ORBIS_ASSET_METADATA_MODEL_ID is missing',
+      );
+    if (!crtvContextId)
+      throw new Error(
+        'Environment variable NEXT_PUBLIC_ORBIS_CRTV_CONTEXT_ID is missing',
+      );
     if (!crtvVideosContextId)
-      throw new Error('No crtvVideosContextId provided');
-    if (!db) throw new Error('No db client found');
+      throw new Error(
+        'Environment variable NEXT_PUBLIC_ORBIS_CRTV_VIDEOS_CONTEXT_ID is missing',
+      );
+    if (!db) throw new Error('OrbisDB client is not initialized');
   };
 
   const insert = async (modelId: string, value: any): Promise<void> => {
@@ -183,14 +222,8 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
       const selectStatement = db
         .select()
         .from(assetMetadataModelId)
-        .where({
-          assetId,
-        })
+        .where({ assetId })
         .context(crtvVideosContextId);
-
-      // Build the query first to check it
-      const query = selectStatement.build();
-      console.log('Query that will be run:', query);
 
       const [result, error] = await catchError(() => selectStatement.run());
 
@@ -202,7 +235,7 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
       const { rows } = result;
       if (!rows?.length) return null;
 
-      // Convert the first row to a plain object with known shape
+      // Create a plain serializable object
       const metadata: AssetMetadata = {
         assetId: rows[0].assetId,
         playbackId: rows[0].playbackId,
@@ -212,6 +245,7 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
         category: rows[0].category,
         thumbnailUri: rows[0].thumbnailUri,
         subtitlesUri: rows[0].subtitlesUri,
+        subtitles: undefined,
       };
 
       // Handle subtitles if they exist
@@ -223,10 +257,9 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
           });
 
           if (res) {
-            // Ensure subtitles are in the correct format
-            const subtitlesData = res;
-            const plainSubtitles = Object.fromEntries(
-              Object.entries(subtitlesData).map(([lang, chunks]) => [
+            // Convert to plain object
+            metadata.subtitles = Object.fromEntries(
+              Object.entries(res).map(([lang, chunks]) => [
                 lang,
                 (Array.isArray(chunks) ? chunks : []).map((chunk) => ({
                   text: String(chunk.text || ''),
@@ -236,11 +269,9 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
                 })),
               ]),
             );
-            metadata.subtitles = plainSubtitles;
           }
         } catch (error) {
           console.error('Failed to fetch subtitles:', error);
-          // Don't throw here, just log the error and continue without subtitles
         }
       }
 
@@ -251,53 +282,51 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const orbisLogin = async (
-    privateKey?: string,
-  ): Promise<OrbisConnectResult> => {
-    let provider;
+  const orbisLogin = async (): Promise<OrbisConnectResult | null> => {
+    try {
+      // Generate a new seed
+      const seed = await OrbisKeyDidAuth.generateSeed();
 
-    if (typeof window !== 'undefined' && window.ethereum) {
-      provider = window.ethereum;
-    } else {
-      throw new Error(
-        'No Ethereum provider found. Please install MetaMask or another Web3 wallet.',
-      );
+      // Create auth instance from seed
+      const auth = await OrbisKeyDidAuth.fromSeed(seed);
+
+      // Connect user - OrbisDB will handle session persistence automatically
+      const result = await db.connectUser({ auth });
+
+      // Serialize the result before setting state
+      setAuthResult({
+        did: result.user.did,
+        details: JSON.parse(JSON.stringify(result)),
+      });
+
+      return result;
+    } catch (error) {
+      console.error('Orbis login error:', error);
+      throw error;
     }
-
-    const auth = new OrbisEVMAuth(provider);
-
-    const authResult: OrbisConnectResult = await db.connectUser({ auth });
-
-    const connected = await db.isUserConnected();
-
-    if (!connected) {
-      throw new Error('User is not connected.');
-    }
-
-    return authResult;
   };
 
-  const isConnected = async (address: string = ''): Promise<boolean> => {
-    let connected;
-
-    if (address !== '') {
-      connected = await db.isUserConnected(address);
-    } else {
-      connected = await db.isUserConnected();
+  const logout = async () => {
+    try {
+      await db.disconnectUser();
+      setAuthResult(null);
+    } catch (error) {
+      console.error('Logout error:', error);
+      throw error;
     }
-
-    return connected;
   };
 
-  const getCurrentUser = async (): Promise<any> => {
+  const isConnected = async (address?: string): Promise<boolean> => {
+    return await db.isUserConnected(address);
+  };
+
+  const getCurrentUser = async () => {
     const currentUser = await db.getConnectedUser();
-
     if (!currentUser) {
       throw new Error(
         'No active user session. Please connect your wallet and sign in first.',
       );
     }
-
     return currentUser;
   };
 
@@ -330,6 +359,7 @@ export const OrbisProvider = ({ children }: { children: ReactNode }) => {
         isConnected,
         getCurrentUser,
         insertMetokenMetadata,
+        logout,
       }}
     >
       {children}
