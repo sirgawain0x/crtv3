@@ -1,7 +1,7 @@
 import { ContractOptions } from 'thirdweb';
 import { Abi } from 'viem';
 
-import { polygonAmoy } from 'thirdweb/chains';
+import { base, polygonAmoy } from 'thirdweb/chains';
 
 export const SITE_LOGO = '/grant-logo.png';
 export const CREATIVE_LOGO_BLK = '/Blog-Logo_blk.png';
@@ -4312,7 +4312,8 @@ export const ROLES_ABI = [
   },
 ];
 
-export const EditonDropContractDeployedChain = polygonAmoy;
+export const EditonDropContractDeployedChain = base;
+
 // Contract Address object to encapsulate all contract related data
 export const CONTRACT_ADDRESS = {
   gateway: {
@@ -9234,7 +9235,7 @@ export const CONTRACT_ADDRESS = {
 export const blockExplorer = {
   base: {
     mainnet: 'https://basescan.org',
-    sepolia: '',
+    baseSepolia: 'https://sepolia.basescan.org',
   },
   polygon: {
     mainnet: 'https://polygonscan.com',
