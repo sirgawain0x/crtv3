@@ -87,7 +87,10 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
                 />
                 <div className="flex flex-col">
                   <AccountName className="text-sm font-medium" />
-                  <AccountAddress className="text-xs text-gray-500" formatFn={shortenAddress} />
+                  <AccountAddress
+                    className="text-xs text-gray-500"
+                    formatFn={shortenAddress}
+                  />
                 </div>
               </div>
             </AccountProvider>
@@ -109,15 +112,20 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
             <VideoViewMetrics playbackId={asset.playbackId || ''} />
           </div>
           <div className="mt-6 grid grid-flow-row auto-rows-max space-y-3 overflow-hidden">
-            <Link href={`/discover/${asset.id}`} passHref>
-              <h1 className="max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-xl font-bold hover:text-orange-500 focus:text-orange-500">
-                {asset?.name}
-              </h1>
-            </Link>
-            <div className="space-y-4" />
-            <p className="text-xl" color={'brand.300'}>
-              <span style={{ fontSize: 'sm' }}>{'USDC'}</span>
-            </p>
+            <CardTitle>
+              <Link href={`/discover/${asset.id}`} passHref>
+                <h1 className="max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-xl font-bold hover:text-orange-500 focus:text-orange-500">
+                  {asset?.name}
+                </h1>
+              </Link>
+            </CardTitle>
+            <CardDescription className="text-xl" color={'brand.300'}>
+              <span className="text-xs">
+                {asset?.createdAt
+                  ? new Date(asset.createdAt).toLocaleDateString()
+                  : ''}
+              </span>
+            </CardDescription>
           </div>
         </CardContent>
         <hr className="mb-5" />

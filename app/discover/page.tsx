@@ -1,5 +1,6 @@
 import VideoCardGrid from '@app/components/Videos/VideoCardGrid';
 import LivestreamGrid from '@app/components/Live/LivestreamGrid';
+import OrbisVideoCardGrid from '@app/components/Videos/Orbis/OrbisVideoCardGrid';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -53,8 +54,13 @@ const AllVideosContent: React.FC = () => {
 
       {/* Videos Section */}
       <div>
-        <h2 className="mb-4 text-2xl font-bold">Recent Videos</h2>
+        <h2 className="my-4 text-2xl font-bold">New Videos</h2>
         <VideoCardGrid />
+      </div>
+      {/*Orbis Videos Section */}
+      <div>
+        <h2 className="my-4 text-2xl font-bold">All Videos</h2>
+        <OrbisVideoCardGrid />
       </div>
     </div>
   );
