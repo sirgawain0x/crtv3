@@ -1,27 +1,30 @@
-'use client'
+'use client';
 
-import React, 
-  { 
-    createContext, 
-    useContext, 
-    useState, 
-    useEffect, 
-    ReactNode 
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
 } from 'react';
-import type { CSSProperties } from "react";
-import { FaClosedCaptioning } from "react-icons/fa";
-
-
+import type { CSSProperties } from 'react';
+import { FaClosedCaptioning } from 'react-icons/fa';
 
 import {
   MediaScopedProps,
   useMediaContext,
   useStore,
-} from "@livepeer/react/player";
+} from '@livepeer/react/player';
 import { Chunk } from 'livepeer/models/components';
 
 import { Subtitles } from '@app/lib/sdk/orbisDB/models/AssetMetadata';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../ui/select';
 import { FormControl } from '@chakra-ui/react';
 
 interface SubtitlesContextType {
@@ -33,7 +36,9 @@ interface SubtitlesContextType {
   setLanguage: (language: string) => void;
 }
 
-const SubtitlesContext = createContext<SubtitlesContextType | undefined>(undefined);
+const SubtitlesContext = createContext<SubtitlesContextType | undefined>(
+  undefined,
+);
 
 export function SubtitlesProvider({ children }: { children: ReactNode }) {
   const [subtitles, setSubtitles] = useState<Subtitles | undefined>(undefined);
@@ -42,20 +47,22 @@ export function SubtitlesProvider({ children }: { children: ReactNode }) {
 
   const toggleSubtitles = () => {
     setShowSubtitles((prev) => !prev);
-  }
+  };
 
   return (
-    <SubtitlesContext.Provider value={{ 
-      subtitles,
-      setSubtitles,
-      showSubtitles,
-      toggleSubtitles,
-      language,
-      setLanguage
-    }}>
+    <SubtitlesContext.Provider
+      value={{
+        subtitles,
+        setSubtitles,
+        showSubtitles,
+        toggleSubtitles,
+        language,
+        setLanguage,
+      }}
+    >
       {children}
     </SubtitlesContext.Provider>
-  )
+  );
 }
 
 export function useSubtitles() {
@@ -67,24 +74,26 @@ export function useSubtitles() {
 }
 
 export function SubtitlesControl() {
-  const { showSubtitles, toggleSubtitles } = useSubtitles()
+  const { showSubtitles, toggleSubtitles } = useSubtitles();
 
   return (
     <button
       onClick={toggleSubtitles}
       aria-label={showSubtitles ? 'Disable subtitles' : 'Enable subtitles'}
-      className={`w-8 h-8 flex items-center justify-center rounded-full ${
-        showSubtitles ? 'bg-background text-foreground' : 'bg-primary text-primary-foreground'
+      className={`flex h-8 w-8 items-center justify-center rounded-full ${
+        showSubtitles
+          ? 'bg-background text-foreground'
+          : 'bg-primary text-primary-foreground'
       }`}
     >
-      <FaClosedCaptioning className="w-4 h-4" />
+      <FaClosedCaptioning className="h-4 w-4" />
     </button>
-  )
+  );
 }
 
 export type LanguageSelectProps = {
-  subtitles:  Record<string, Chunk>;
-}
+  subtitles: Record<string, Chunk>;
+};
 
 export function SubtitlesLangaugeSelect() {
   const { subtitles, language, setLanguage } = useSubtitles();
@@ -97,50 +106,68 @@ export function SubtitlesLangaugeSelect() {
       >
         Subtitles Language
       </label>
-      <Select
-        onValueChange={(value) => setLanguage(value)}
-      >
+      <Select onValueChange={(value) => setLanguage(value)}>
         <FormControl>
-          <SelectTrigger
-            className="inline-flex h-7 items-center justify-between gap-1 rounded-sm bg-gray-400 px-1 text-xs leading-none outline-none outline-1 outline-transparent/50"
-          >
-            <SelectValue 
-              className="bg-gray-400 hover:bg-gray-300 active:bg-gray-300 px-1 text-xs leading-none outline-none" 
-              placeholder="English" 
+          <SelectTrigger className="inline-flex h-7 items-center justify-between gap-1 rounded-sm bg-gray-400 px-1 text-xs leading-none outline-none outline-1 outline-transparent/50">
+            <SelectValue
+              className="bg-gray-400 px-1 text-xs leading-none outline-none hover:bg-gray-300 active:bg-gray-300"
+              placeholder="English"
             />
           </SelectTrigger>
         </FormControl>
         <SelectContent className="overflow-hidden rounded-sm bg-gray-400 outline-none">
           {Object.keys(subtitles as Subtitles).map((language, i) => {
             return (
-              <SelectItem className="bg-gray-400 hover:bg-gray-300 active:bg-gray-300 px-1 text-xs leading-none outline-none" value={language} key={i}>{language}</SelectItem>
-            )
+              <SelectItem
+                className="bg-gray-400 px-1 text-xs leading-none outline-none hover:bg-gray-300 active:bg-gray-300"
+                value={language}
+                key={i}
+              >
+                {language}
+              </SelectItem>
+            );
           })}
         </SelectContent>
       </Select>
     </div>
-  )
+  );
 }
 
-export function SubtitlesDisplay({ __scopeMedia, style }: MediaScopedProps & { style?: CSSProperties }) {
+export function SubtitlesDisplay({
+  __scopeMedia,
+  style,
+}: MediaScopedProps & { style?: CSSProperties }) {
   const [currentSubtitle, setCurrentSubtitle] = useState<string>('');
 
   const { subtitles, language, showSubtitles } = useSubtitles();
 
-  const context = useMediaContext("CurrentSource", __scopeMedia);
-  const { progress, fullscreen } = useStore(context.store, ({ progress, fullscreen }) => ({
-    progress,
-    fullscreen
-  }));
+  const context = useMediaContext('CurrentSource', __scopeMedia);
+  const { progress, fullscreen } = useStore(
+    context.store,
+    ({ progress, fullscreen }) => ({
+      progress,
+      fullscreen,
+    }),
+  );
 
   useEffect(() => {
     const updateSubtitle = () => {
       const currentTime = progress ?? 0;
-      const activeSubtitle = subtitles && subtitles[language].find((subtitle: Chunk) => 
-        currentTime >= subtitle.timestamp[0] && currentTime < subtitle.timestamp[1]
+      const languageSubtitles = subtitles?.[language];
+
+      if (!languageSubtitles) {
+        setCurrentSubtitle('');
+        return;
+      }
+
+      const activeSubtitle = languageSubtitles.find(
+        (subtitle: Chunk) =>
+          currentTime >= subtitle.timestamp[0] &&
+          currentTime < subtitle.timestamp[1],
       );
-      setCurrentSubtitle(activeSubtitle ? activeSubtitle.text : '');
-    }
+
+      setCurrentSubtitle(activeSubtitle?.text ?? '');
+    };
     updateSubtitle();
   }, [progress, subtitles, language]);
 
@@ -162,5 +189,5 @@ export function SubtitlesDisplay({ __scopeMedia, style }: MediaScopedProps & { s
         {currentSubtitle}
       </div>
     </>
-  )
+  );
 }

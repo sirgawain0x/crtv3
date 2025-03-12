@@ -1,10 +1,4 @@
 'use client';
-// import {
-//   authedOnly,
-//   generatePayload,
-//   login,
-//   logout,
-// } from '@app/api/auth/thirdweb/authentication';
 import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
 import { client } from '@app/lib/sdk/thirdweb/client';
 import { ConnectButton } from '@app/lib/sdk/thirdweb/components';
@@ -14,8 +8,7 @@ import {
   authedOnly,
   logout,
 } from '@app/api/auth/thirdweb/authentication';
-import { base, baseSepolia, optimism, polygon } from 'thirdweb/chains';
-import { useActiveWallet } from 'thirdweb/react';
+import { base } from 'thirdweb/chains';
 import { VerifyLoginPayloadParams } from 'thirdweb/auth';
 import { createWallet, inAppWallet } from 'thirdweb/wallets';
 import { toast } from 'sonner';
@@ -23,8 +16,6 @@ import { db } from '@app/lib/sdk/orbisDB/client';
 
 export default function ConnectButtonWrapper() {
   const { orbisLogin } = useOrbisContext();
-  const activeWallet = useActiveWallet();
-
   const wallets = [
     inAppWallet({
       auth: {
@@ -85,7 +76,7 @@ export default function ConnectButtonWrapper() {
   return (
     <ConnectButton
       client={client}
-      chains={[base, baseSepolia, optimism, polygon]}
+      chain={base}
       connectButton={{
         label: 'Get Started',
         className: 'my-custom-class',
@@ -107,11 +98,27 @@ export default function ConnectButtonWrapper() {
         projectId: process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID,
       }}
       supportedNFTs={{
-        137: [
-          '0xad597e5b24ad2a6032168c76f49f05d957223cd0',
-          '0xb6b645c3e2025cf69983983266d16a0aa323e2b0',
+        8453: [
+          '0xf7c4cd399395d80f9d61fde833849106775269c6',
+          '0x13b818daf7016b302383737ba60c3a39fef231cf',
+          '0x9c3744c96200a52d05a630d4aec0db707d7509be',
         ],
-        8453: ['0xf7c4cd399395d80f9d61fde833849106775269c6'],
+      }}
+      supportedTokens={{
+        8453: [
+          {
+            address: '0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb',
+            name: 'Dai Stablecoin',
+            symbol: 'DAI',
+            icon: '/dai-logo.svg',
+          },
+          {
+            address: '0x4b62d9b3de9fab98659693c9ee488d2e4ee56c44',
+            name: 'Creative Token',
+            symbol: 'CRTV',
+            icon: '/CRTV-token_logo.png',
+          },
+        ],
       }}
       auth={{
         getLoginPayload: async ({ address }: { address: string }) =>
