@@ -2,9 +2,11 @@
 import React, { useEffect, useState } from 'react';
 import { Asset } from 'livepeer/models/components';
 import { fetchAllAssets } from '@app/api/livepeer/actions';
-import VideoCard from '@app/components/Videos/VideoCard';
 import { Src } from '@livepeer/react';
 import { getDetailPlaybackSource } from '@app/lib/utils/hooks/useDetailPlaybackSources';
+import OrbisVideoCard from './OrbisVideoCard';
+import { useOrbisVideos } from '@app/lib/utils/hooks/useOrbisVideos';
+import { AssetMetadata } from '@app/lib/sdk/orbisDB/models/AssetMetadata';
 
 const VideoCardGrid: React.FC = () => {
   const [playbackSources, setPlaybackSources] = useState<
@@ -12,6 +14,7 @@ const VideoCardGrid: React.FC = () => {
   >(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const { videos: orbisVideos, loading: orbisLoading } = useOrbisVideos();
 
   useEffect(() => {
     const fetchSources = async () => {
@@ -30,7 +33,6 @@ const VideoCardGrid: React.FC = () => {
                 const detailedSrc = await getDetailPlaybackSource(
                   `${asset.playbackId}`,
                 );
-                // console.log(asset.playbackId + ': ', detailedSrc);
                 return { ...asset, detailedSrc }; // Add detailedSrc to the asset object
               } catch (err) {
                 console.error(
@@ -56,7 +58,22 @@ const VideoCardGrid: React.FC = () => {
     fetchSources();
   }, []);
 
-  if (loading) {
+  // Filter assets to only include those that have metadata in OrbisDB
+  const filteredAssets = React.useMemo(() => {
+    if (!playbackSources || !orbisVideos || orbisLoading) return null;
+
+    // Create a map of assetIds from OrbisDB for quick lookup
+    const orbisAssetIds = new Set(
+      orbisVideos.map((video: AssetMetadata) => video.assetId),
+    );
+
+    // Filter Livepeer assets to only include those with metadata in OrbisDB
+    return playbackSources.filter(
+      (asset) => asset.id && orbisAssetIds.has(asset.id),
+    );
+  }, [playbackSources, orbisVideos, orbisLoading]);
+
+  if (loading || orbisLoading) {
     return <p>Loading videos...</p>;
   }
 
@@ -64,14 +81,16 @@ const VideoCardGrid: React.FC = () => {
     return <p>{error}</p>;
   }
 
-  if (!playbackSources || playbackSources.length === 0) {
-    return <p>No videos available.</p>;
+  if (!filteredAssets || filteredAssets.length === 0) {
+    return (
+      <p>No videos available. Make sure videos have metadata in OrbisDB.</p>
+    );
   }
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-      {playbackSources.map((asset) => (
-        <VideoCard
+      {filteredAssets.map((asset) => (
+        <OrbisVideoCard
           key={asset.id}
           asset={asset}
           playbackSources={asset.detailedSrc}

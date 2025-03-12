@@ -9,10 +9,7 @@ import { toast } from 'sonner';
 import { useActiveAccount } from 'thirdweb/react';
 import { Asset } from 'livepeer/models/components';
 
-import {
-  StepperFormKeysType,
-  StepperFormValues,
-} from '@app/types/hook-stepper';
+import { StepperFormValues } from '@app/types/hook-stepper';
 import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
 import StepperIndicator from '@app/components/Stepper-Indicator';
 import FileUpload from '@app/components/Videos/Upload/FileUpload';
