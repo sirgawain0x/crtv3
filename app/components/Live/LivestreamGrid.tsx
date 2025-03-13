@@ -5,6 +5,7 @@ import { fullLivepeer } from '@app/lib/sdk/livepeer/fullClient';
 import { Card } from '@app/components/ui/card';
 import Link from 'next/link';
 import { Stream } from 'livepeer/models/components';
+import { VideoCardSkeleton } from '../Videos/VideoCardSkeleton';
 
 export default function LivestreamGrid() {
   const [streams, setStreams] = useState<Stream[]>([]);
@@ -14,10 +15,11 @@ export default function LivestreamGrid() {
     const fetchStreams = async () => {
       try {
         const result = await fullLivepeer.stream.getAll();
-        const mappedStreams = result?.data?.map((stream) => ({
-          ...stream,
-          name: stream.name || `Stream ${stream.id}`, // Provide a default name if none exists
-        })) ?? [];
+        const mappedStreams =
+          result?.data?.map((stream) => ({
+            ...stream,
+            name: stream.name || `Stream ${stream.id}`, // Provide a default name if none exists
+          })) ?? [];
         setStreams(mappedStreams);
         setLoading(false);
       } catch (error) {
@@ -30,8 +32,10 @@ export default function LivestreamGrid() {
 
   if (loading) {
     return (
-      <div className="flex min-h-[200px] items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-gray-900"></div>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <VideoCardSkeleton key={index} />
+        ))}
       </div>
     );
   }

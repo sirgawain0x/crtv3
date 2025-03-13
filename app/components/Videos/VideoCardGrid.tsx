@@ -5,6 +5,7 @@ import { fetchAllAssets } from '@app/api/livepeer/actions';
 import VideoCard from '@app/components/Videos/VideoCard';
 import { Src } from '@livepeer/react';
 import { getDetailPlaybackSource } from '@app/lib/utils/hooks/useDetailPlaybackSources';
+import { VideoCardSkeleton } from './VideoCardSkeleton';
 
 const VideoCardGrid: React.FC = () => {
   const [playbackSources, setPlaybackSources] = useState<
@@ -57,7 +58,13 @@ const VideoCardGrid: React.FC = () => {
   }, []);
 
   if (loading) {
-    return <p>Loading videos...</p>;
+    return (
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+        {Array.from({ length: 8 }).map((_, index) => (
+          <VideoCardSkeleton key={index} />
+        ))}
+      </div>
+    );
   }
 
   if (error) {
