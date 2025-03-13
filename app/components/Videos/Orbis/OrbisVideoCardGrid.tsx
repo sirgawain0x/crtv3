@@ -7,6 +7,7 @@ import { getDetailPlaybackSource } from '@app/lib/utils/hooks/useDetailPlaybackS
 import OrbisVideoCard from './OrbisVideoCard';
 import { useOrbisVideos } from '@app/lib/utils/hooks/useOrbisVideos';
 import { AssetMetadata } from '@app/lib/sdk/orbisDB/models/AssetMetadata';
+import { VideoCardSkeleton } from '../VideoCardSkeleton';
 
 const VideoCardGrid: React.FC = () => {
   const [playbackSources, setPlaybackSources] = useState<
@@ -74,7 +75,13 @@ const VideoCardGrid: React.FC = () => {
   }, [playbackSources, orbisVideos, orbisLoading]);
 
   if (loading || orbisLoading) {
-    return <p>Loading videos...</p>;
+    return (
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+        {Array.from({ length: 8 }).map((_, index) => (
+          <VideoCardSkeleton key={index} />
+        ))}
+      </div>
+    );
   }
 
   if (error) {
