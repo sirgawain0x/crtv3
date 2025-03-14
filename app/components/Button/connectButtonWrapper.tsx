@@ -13,6 +13,8 @@ import { VerifyLoginPayloadParams } from 'thirdweb/auth';
 import { createWallet, inAppWallet } from 'thirdweb/wallets';
 import { toast } from 'sonner';
 import { db } from '@app/lib/sdk/orbisDB/client';
+import { decodeJWT } from 'thirdweb/utils';
+import { checkForBinaryData } from '@app/lib/utils/jwt-debug';
 
 export default function ConnectButtonWrapper() {
   const { orbisLogin } = useOrbisContext();
@@ -125,21 +127,59 @@ export default function ConnectButtonWrapper() {
           await generatePayload({ address }),
         doLogin: async (params: VerifyLoginPayloadParams) => {
           try {
+            console.log('Starting authentication process');
+
             // First authenticate with Thirdweb
+            console.log('Authenticating with Thirdweb');
             await login(params);
+            console.log('Thirdweb authentication successful');
+
+            // Get the JWT from cookies for debugging
+            try {
+              const cookies = document.cookie.split(';').reduce(
+                (acc, cookie) => {
+                  const [key, value] = cookie.trim().split('=');
+                  acc[key] = value;
+                  return acc;
+                },
+                {} as Record<string, string>,
+              );
+
+              if (cookies.jwt) {
+                console.log('JWT found in cookies, analyzing...');
+                const { payload, signature } = decodeJWT(cookies.jwt);
+                console.log('JWT payload:', payload);
+
+                // Check for binary data in the payload
+                const binaryCheck = checkForBinaryData(payload);
+                if (binaryCheck.hasBinaryData) {
+                  console.warn(
+                    'Binary data found in JWT payload:',
+                    binaryCheck.paths,
+                  );
+                }
+              }
+            } catch (jwtError) {
+              console.error('Error analyzing JWT:', jwtError);
+            }
 
             // Wait a bit for the Thirdweb auth to complete
             await new Promise((resolve) => setTimeout(resolve, 1000));
 
             // Then authenticate with Orbis using EVM auth
+            console.log('Starting Orbis authentication');
             const orbisResult = await orbisLogin();
             if (!orbisResult) {
+              console.error('Orbis login returned null result');
               throw new Error('Failed to login to Orbis');
             }
+            console.log('Orbis login successful, verifying connection');
 
             // Verify Orbis connection
             const isOrbisConnected = await db.isUserConnected();
+            console.log('Orbis connection status:', isOrbisConnected);
             if (!isOrbisConnected) {
+              console.error('Orbis connection verification failed');
               throw new Error('Orbis connection verification failed');
             }
 
@@ -149,6 +189,14 @@ export default function ConnectButtonWrapper() {
             toast.success('Successfully authenticated with Orbis');
           } catch (error) {
             console.error('Authentication error:', error);
+            // Log more details about the error
+            if (error instanceof Error) {
+              console.error('Error name:', error.name);
+              console.error('Error message:', error.message);
+              console.error('Error stack:', error.stack);
+            } else {
+              console.error('Unknown error type:', typeof error);
+            }
             toast.error('Failed to complete authentication. Please try again.');
             throw error;
           }
