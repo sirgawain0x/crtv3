@@ -66,6 +66,17 @@ export const UserMenu: React.FC = () => {
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={handleLinkClick}>
             <Link
+              href={`/profile/${activeAccount?.address}/daydream-clipz`}
+              className="flex items-center gap-2"
+              prefetch={false}
+              onClick={handleLinkClick}
+            >
+              <Bot className="h-4 w-4" />
+              <span>Daydream Clipz</span>
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={handleLinkClick}>
+            <Link
               href={`/profile/${activeAccount.address}/upload`}
               className="flex items-center gap-2"
               prefetch={false}
@@ -75,6 +86,7 @@ export const UserMenu: React.FC = () => {
               <span>Upload</span>
             </Link>
           </DropdownMenuItem>
+          <DropdownMenuSeparator />
           <DropdownMenuItem onClick={handleLinkClick}>
             <Link
               href={`/profile/${activeAccount?.address}/live`}
@@ -84,18 +96,6 @@ export const UserMenu: React.FC = () => {
             >
               <RadioTowerIcon className="h-4 w-4" />
               <span>Go Live</span>
-            </Link>
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={handleLinkClick}>
-            <Link
-              href={`/profile/${activeAccount?.address}/ai-clipz`}
-              className="flex items-center gap-2"
-              prefetch={false}
-              onClick={handleLinkClick}
-            >
-              <Bot className="h-4 w-4" />
-              <span>AI Clipz</span>
             </Link>
           </DropdownMenuItem>
         </DropdownMenuContent>

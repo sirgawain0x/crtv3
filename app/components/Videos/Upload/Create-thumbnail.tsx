@@ -47,7 +47,7 @@ export default function CreateThumbnail({
       if (livePeerAssetId) {
         getLivepeerAsset(livePeerAssetId)
           .then((data) => {
-            console.log(data);
+            //console.log(data);
             setLivepeerAssetData(data);
             if (data?.status?.phase === 'failed') {
               toast.error(
@@ -77,7 +77,7 @@ export default function CreateThumbnail({
         setLivepeerPlaybackData(data);
       });
     } else {
-      console.log('Not ready to get playback info');
+      //console.log('Not ready to get playback info');
     }
   }, [livepeerAssetData]);
 
@@ -130,7 +130,7 @@ export default function CreateThumbnail({
         </div>
         <CreateThumbnailForm
           onSelectThumbnailImages={(thumbnailUri: string) => {
-            console.log('Use selected image', thumbnailUri);
+            //console.log('Use selected image', thumbnailUri);
             handleComplete(thumbnailUri);
           }}
         />
