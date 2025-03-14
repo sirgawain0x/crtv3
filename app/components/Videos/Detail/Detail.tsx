@@ -34,7 +34,7 @@ export default function VideoDetailsPage({
     setAssetLoading(true);
     try {
       const assetData = await fullLivepeer?.asset.get(`${asset.id}`);
-      console.log('Asset By Id', assetData.asset?.id);
+      //console.log('Asset By Id', assetData.asset?.id);
       setAsset(assetData);
     } catch (err) {
       setError('Failed to load asset data');
@@ -55,7 +55,11 @@ export default function VideoDetailsPage({
         <div className="container max-w-md">
           <h1 className="md my-4">{asset}</h1>
           {asset && (
-            <PlayerComponent src={asset.playbackId} assetId={asset.id} title={asset?.name} />
+            <PlayerComponent
+              src={asset.playbackId}
+              assetId={asset.id}
+              title={asset?.name}
+            />
           )}
         </div>
       )}

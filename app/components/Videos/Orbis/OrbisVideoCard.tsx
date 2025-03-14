@@ -37,7 +37,7 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
         .context(process.env.NEXT_PUBLIC_ORBIS_CRTV_VIDEOS_CONTEXT_ID as string)
         .run();
 
-      console.log('All Orbis videos:', rows);
+      //console.log('All Orbis videos:', rows);
     };
 
     if (asset?.id) {
@@ -55,7 +55,7 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
     }
   }, [currentPlayingId, asset?.id]);
 
-  console.log({ asset, playbackSources });
+  //console.log({ asset, playbackSources });
   // Only render the card if the asset is ready and has a playbackId
   if (asset?.status?.phase !== 'ready' || !asset.playbackId) {
     return null;

@@ -8,13 +8,13 @@ import {
 } from '@app/components/ui/breadcrumb';
 import { Slash, Bot } from 'lucide-react';
 import DaydreamEmbed from '@app/components/Daydream/DaydreamEmbed';
-export default function AIClipzPage() {
+export default function DaydreamClipzPage() {
   return (
     <div className="min-h-screen p-6">
       <div className="mb-8 rounded-lg bg-white p-8 shadow-md">
         <h1 className="mb-6 flex items-center justify-center gap-2 text-center text-4xl font-bold text-red-600">
           <Bot className="h-10 w-10" />
-          <span>AI Clipz</span>
+          <span>Daydream Clipz</span>
         </h1>
         <p className="mb-8 text-center text-gray-600">
           Use your imagination to become anything or anyone you want.
@@ -36,7 +36,7 @@ export default function AIClipzPage() {
             </BreadcrumbSeparator>
             <BreadcrumbItem>
               <BreadcrumbLink>
-                <BreadcrumbPage>AI Clipz</BreadcrumbPage>
+                <BreadcrumbPage>Daydream Clipz</BreadcrumbPage>
               </BreadcrumbLink>
             </BreadcrumbItem>
           </BreadcrumbList>
