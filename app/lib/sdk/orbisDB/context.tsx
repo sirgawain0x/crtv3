@@ -14,6 +14,9 @@ import { OrbisConnectResult } from '@useorbis/db-sdk';
 import { db } from './client';
 import { download } from 'thirdweb/storage';
 import { AssetMetadata } from './models/AssetMetadata';
+import { applyOrbisAuthPatches } from './auth-patch';
+import { safeToBase64Url } from '@app/lib/utils/base64url';
+import { setupJwtDebugger } from '@app/lib/utils/jwt-debug';
 
 declare global {
   interface Window {
@@ -104,8 +107,17 @@ export function OrbisProvider({ children }: { children: ReactNode }) {
     null,
   );
 
-  // Check for existing session on mount
+  // Check for existing session on mount and apply patches
   useEffect(() => {
+    // Apply patches to fix Uint8Array encoding issues
+    applyOrbisAuthPatches();
+
+    // Set up JWT debugger in development
+    if (process.env.NODE_ENV === 'development') {
+      setupJwtDebugger();
+    }
+
+    // Check for existing session
     checkExistingSession();
   }, []);
 
@@ -268,23 +280,81 @@ export function OrbisProvider({ children }: { children: ReactNode }) {
         );
       }
 
+      console.log('Starting Orbis login with EVM auth');
       const auth = new OrbisEVMAuth(window.ethereum);
-      const result = await db.connectUser({ auth });
 
-      if (!result) {
-        throw new Error('Failed to connect to Orbis');
-      }
-
-      setAuthResult({
-        did: result.user.did,
-        details: JSON.parse(JSON.stringify(result)),
+      // Debug the auth object
+      console.log('OrbisEVMAuth object:', {
+        type: typeof auth,
+        constructor: auth.constructor?.name,
+        keys: Object.keys(auth),
+        hasSession: 'session' in (auth as any),
+        sessionType: (auth as any).session
+          ? typeof (auth as any).session
+          : 'none',
+        sessionKeys: (auth as any).session
+          ? Object.keys((auth as any).session)
+          : [],
+        prototype: Object.getPrototypeOf(auth),
       });
 
-      return result;
+      console.log('Connecting user to Orbis');
+
+      // Wrap the connection in a try-catch to handle any encoding issues
+      try {
+        const result = await db.connectUser({ auth });
+
+        if (!result) {
+          throw new Error('Failed to connect to Orbis');
+        }
+
+        // Process the result to ensure any binary data is properly encoded
+        const processedResult = processOrbisResult(result);
+
+        console.log('Orbis connection successful:', processedResult);
+        setAuthResult({
+          did: processedResult.user.did,
+          details: JSON.parse(JSON.stringify(processedResult)),
+        });
+
+        return processedResult;
+      } catch (error) {
+        console.error('Error during Orbis connection:', error);
+
+        // If the error is related to Uint8Array encoding, try a fallback approach
+        if (
+          error instanceof Error &&
+          (error.message.includes('Uint8Array') ||
+            error.message.includes('[object Object]'))
+        ) {
+          console.log('Attempting fallback authentication approach');
+          // Implement fallback if needed
+        }
+
+        throw error;
+      }
     } catch (error) {
       console.error('Orbis login error:', error);
       throw error;
     }
+  };
+
+  // Helper function to process Orbis result and ensure binary data is properly encoded
+  const processOrbisResult = (result: any): any => {
+    if (!result || typeof result !== 'object') return result;
+
+    // Create a deep copy to avoid modifying the original
+    const processed = JSON.parse(
+      JSON.stringify(result, (key, value) => {
+        // Handle any binary data that might not be properly serialized
+        if (value instanceof Uint8Array) {
+          return safeToBase64Url(value);
+        }
+        return value;
+      }),
+    );
+
+    return processed;
   };
 
   const logout = async () => {
