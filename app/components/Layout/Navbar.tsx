@@ -17,7 +17,6 @@ import {
   SITE_PRODUCT,
 } from '@app/lib/utils/context';
 import { Button } from '@app/components/ui/button';
-import { useActiveAccount } from 'thirdweb/react';
 import ClaimLockButton from '@app/components/Paywall/ClaimLock';
 import * as VisuallyHidden from '@radix-ui/react-visually-hidden';
 import ThemeToggleComponent from '../ThemeToggle/toggleComponent';
@@ -38,24 +37,27 @@ export function Navbar() {
   };
 
   const renderAuthButtons = () => {
+    if (!isConnected) {
+      return <ConnectButtonWrapper />;
+    }
+
+    if (!isAuthenticated) {
+      return (
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <ConnectButtonWrapper />
+          <LoginButton />
+        </div>
+      );
+    }
+
     return (
-      <div className="flex items-center gap-4">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <ConnectButtonWrapper />
-        {isConnected && !isLoading && (
-          <>
-            {!isAuthenticated ? (
-              <LoginButton />
-            ) : (
-              <>
-                <LogOutButton />
-                {hasAccess ? (
-                  <UserMenu />
-                ) : (
-                  <ClaimLockButton closeMenu={() => setIsMenuOpen(false)} />
-                )}
-              </>
-            )}
-          </>
+        <LogOutButton />
+        {hasAccess ? (
+          <UserMenu onNavigate={handleLinkClick} />
+        ) : (
+          <ClaimLockButton closeMenu={() => setIsMenuOpen(false)} />
         )}
       </div>
     );
@@ -135,7 +137,12 @@ export function Navbar() {
           </div>
         </SheetContent>
       </Sheet>
-      <Link href="/" className="mr-6 hidden lg:flex" passHref>
+      <Link
+        href="/"
+        className="mr-6 hidden lg:flex"
+        passHref
+        onClick={handleLinkClick}
+      >
         <Image
           src={SITE_LOGO}
           alt={SITE_NAME}
@@ -163,6 +170,7 @@ export function Navbar() {
           href="/discover"
           className="group inline-flex h-9 w-max items-center justify-center rounded-md bg-white px-4 py-2 text-sm font-medium transition-colors hover:bg-gray-100 hover:text-gray-900 focus:bg-gray-100 focus:text-gray-900 focus:outline-none disabled:pointer-events-none disabled:opacity-50 data-[active]:bg-gray-100/50 data-[state=open]:bg-gray-100/50 dark:bg-gray-950 dark:hover:bg-gray-800 dark:hover:text-gray-50 dark:focus:bg-gray-800 dark:focus:text-gray-50 dark:data-[active]:bg-gray-800/50 dark:data-[state=open]:bg-gray-800/50"
           prefetch={false}
+          onClick={handleLinkClick}
         >
           Discover
         </Link>
@@ -170,6 +178,7 @@ export function Navbar() {
           href="/vote"
           className="group inline-flex h-9 w-max items-center justify-center rounded-md bg-white px-4 py-2 text-sm font-medium transition-colors hover:bg-gray-100 hover:text-gray-900 focus:bg-gray-100 focus:text-gray-900 focus:outline-none disabled:pointer-events-none disabled:opacity-50 data-[active]:bg-gray-100/50 data-[state=open]:bg-gray-100/50 dark:bg-gray-950 dark:hover:bg-gray-800 dark:hover:text-gray-50 dark:focus:bg-gray-800 dark:focus:text-gray-50 dark:data-[active]:bg-gray-800/50 dark:data-[state=open]:bg-gray-800/50"
           prefetch={false}
+          onClick={handleLinkClick}
         >
           Vote
         </Link>
