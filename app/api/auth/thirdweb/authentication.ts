@@ -1,62 +1,81 @@
 'use server';
-
+import { VerifyLoginPayloadParams, createAuth } from 'thirdweb/auth';
+import { privateKeyToAccount } from 'thirdweb/wallets';
+import { client } from '@app/lib/sdk/thirdweb/client';
 import { cookies } from 'next/headers';
-import { VerifyLoginPayloadParams } from 'thirdweb/auth';
-import { thirdwebAuth } from '@app/lib/sdk/thirdweb/auth';
-import { decodeJWT } from 'thirdweb/utils';
 
-export type JwtContext = {
-  address: string;
-};
+const privateKey = process.env.THIRDWEB_ADMIN_PRIVATE_KEY || '';
+
+if (!privateKey) {
+  throw new Error('Missing THIRDWEB_ADMIN_PRIVATE_KEY in .env file.');
+}
+
+const thirdwebAuth = createAuth({
+  domain: process.env.NEXT_PUBLIC_THIRDWEB_AUTH_DOMAIN || '',
+  adminAccount: privateKeyToAccount({ client, privateKey }),
+  client,
+});
+
 export async function generatePayload(
-  ...args: Parameters<typeof thirdwebAuth.generatePayload>
+  params: Parameters<typeof thirdwebAuth.generatePayload>[0],
 ) {
-  return thirdwebAuth.generatePayload(...args);
+  return thirdwebAuth.generatePayload(params);
 }
 
 export async function login(payload: VerifyLoginPayloadParams) {
   const verifiedPayload = await thirdwebAuth.verifyPayload(payload);
-
   if (verifiedPayload.valid) {
     const jwt = await thirdwebAuth.generateJWT({
       payload: verifiedPayload.payload,
-      context: {
-        address: verifiedPayload.payload.address,
-      },
     });
     cookies().set('jwt', jwt);
+    return { success: true };
   }
-}
-
-export async function getJwtContext(): Promise<JwtContext> {
-  const jwt = cookies().get('jwt');
-
-  if (!jwt?.value) {
-    throw new Error(`Failed to fetch JWT context, jwt is not defined`);
-  }
-
-  const { payload, signature } = decodeJWT(jwt.value);
-
-  if (!payload?.ctx) {
-    throw new Error(`Failed to fetch JWT context, payload.ctx is not defined`);
-  }
-
-  return payload?.ctx as JwtContext;
+  return { success: false };
 }
 
 export async function authedOnly() {
   const jwt = cookies().get('jwt');
   if (!jwt?.value) {
-    return false;
+    throw new Error('Not authenticated');
   }
 
   const authResult = await thirdwebAuth.verifyJWT({ jwt: jwt.value });
   if (!authResult.valid) {
-    return false;
+    throw new Error('Invalid JWT');
   }
-  return true;
+  return authResult.parsedJWT;
 }
 
 export async function logout() {
   cookies().delete('jwt');
+}
+
+export async function getJwtContext() {
+  const jwt = cookies().get('jwt');
+  if (!jwt?.value) {
+    throw new Error('Not authenticated');
+  }
+
+  const authResult = await thirdwebAuth.verifyJWT({ jwt: jwt.value });
+  if (!authResult.valid) {
+    throw new Error('Invalid JWT');
+  }
+
+  return {
+    address: authResult.parsedJWT.sub,
+    ...authResult.parsedJWT,
+  };
+}
+
+export async function isLoggedIn() {
+  try {
+    const jwt = cookies().get('jwt');
+    if (!jwt?.value) return false;
+
+    const authResult = await thirdwebAuth.verifyJWT({ jwt: jwt.value });
+    return authResult.valid;
+  } catch (error) {
+    return false;
+  }
 }
