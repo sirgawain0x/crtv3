@@ -13,23 +13,29 @@ import { Button } from '@app/components/ui/button';
 import makeBlockie from 'ethereum-blockies-base64';
 import { RadioTowerIcon, Bot } from 'lucide-react';
 import { Avatar, AvatarImage, AvatarFallback } from '@app/components/ui/avatar';
+import { useRouter } from 'next/navigation';
 
-export const UserMenu: React.FC = () => {
+interface UserMenuProps {
+  onNavigate?: () => void;
+}
+
+export function UserMenu({ onNavigate }: UserMenuProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const activeAccount = useActiveAccount();
+  const router = useRouter();
 
   const handleOpenChange = (open: boolean) => {
     setIsMenuOpen(open);
   };
 
-  const handleLinkClick = () => {
+  const handleNavigation = (href: string) => {
     setIsMenuOpen(false);
+    if (onNavigate) onNavigate();
+    router.push(href);
   };
 
   // If no active account, don't render the menu
-  if (!activeAccount) {
-    return null;
-  }
+  if (!activeAccount) return null;
 
   return (
     <div className="my-auto">
@@ -38,9 +44,9 @@ export const UserMenu: React.FC = () => {
           <Button
             variant="ghost"
             size="icon"
-            className="flex h-auto w-auto items-center gap-2 rounded-full px-3 py-2"
+            className="flex h-auto w-auto items-center gap-2 rounded-full px-2 py-1 sm:px-3 sm:py-2"
           >
-            <Avatar className="h-8 w-8">
+            <Avatar className="h-6 w-6 sm:h-8 sm:w-8">
               <AvatarImage
                 src={makeBlockie(`${activeAccount.address}`)}
                 alt="User avatar"
@@ -48,61 +54,59 @@ export const UserMenu: React.FC = () => {
               <AvatarFallback>JD</AvatarFallback>
             </Avatar>
             <span className="hidden sm:inline">User Menu</span>
-            <ChevronDownIcon className="h-4 w-4" />
+            <ChevronDownIcon className="h-3 w-3 sm:h-4 sm:w-4" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={handleLinkClick}>
-            <Link
-              href={`/profile/${activeAccount?.address}`}
-              className="flex items-center gap-2"
-              prefetch={false}
-              onClick={handleLinkClick}
-            >
+          <DropdownMenuItem
+            onSelect={() =>
+              handleNavigation(`/profile/${activeAccount?.address}`)
+            }
+          >
+            <div className="flex items-center gap-2">
               <UserIcon className="h-4 w-4" />
               <span>Profile</span>
-            </Link>
+            </div>
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={handleLinkClick}>
-            <Link
-              href={`/profile/${activeAccount?.address}/daydream-clipz`}
-              className="flex items-center gap-2"
-              prefetch={false}
-              onClick={handleLinkClick}
-            >
+          <DropdownMenuItem
+            onSelect={() =>
+              handleNavigation(
+                `/profile/${activeAccount?.address}/daydream-clipz`,
+              )
+            }
+          >
+            <div className="flex items-center gap-2">
               <Bot className="h-4 w-4" />
               <span>Daydream Clipz</span>
-            </Link>
+            </div>
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={handleLinkClick}>
-            <Link
-              href={`/profile/${activeAccount.address}/upload`}
-              className="flex items-center gap-2"
-              prefetch={false}
-              onClick={handleLinkClick}
-            >
-              <UploadIcon className={`h-4 w-4`} />
+          <DropdownMenuItem
+            onSelect={() =>
+              handleNavigation(`/profile/${activeAccount.address}/upload`)
+            }
+          >
+            <div className="flex items-center gap-2">
+              <UploadIcon className="h-4 w-4" />
               <span>Upload</span>
-            </Link>
+            </div>
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={handleLinkClick}>
-            <Link
-              href={`/profile/${activeAccount?.address}/live`}
-              className="flex items-center gap-2"
-              prefetch={false}
-              onClick={handleLinkClick}
-            >
+          <DropdownMenuItem
+            onSelect={() =>
+              handleNavigation(`/profile/${activeAccount?.address}/live`)
+            }
+          >
+            <div className="flex items-center gap-2">
               <RadioTowerIcon className="h-4 w-4" />
               <span>Go Live</span>
-            </Link>
+            </div>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
   );
-};
+}
 
 function ChevronDownIcon(props: any) {
   return (
