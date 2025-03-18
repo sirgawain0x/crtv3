@@ -43,9 +43,7 @@ export const Providers: React.FC<{ children: React.ReactNode }> = ({
         <ApolloWrapper>
           <ThirdwebProvider>
             <QueryClientProvider client={queryClient}>
-              <OrbisProvider>
-                {children}
-              </OrbisProvider>
+              <OrbisProvider>{children}</OrbisProvider>
             </QueryClientProvider>
           </ThirdwebProvider>
         </ApolloWrapper>
