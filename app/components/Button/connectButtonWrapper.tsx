@@ -81,7 +81,8 @@ export default function ConnectButtonWrapper() {
       chain={base}
       connectButton={{
         label: 'Get Started',
-        className: 'my-custom-class',
+        className:
+          'my-custom-class text-sm sm:text-base px-3 py-1 sm:px-4 sm:py-2',
         style: {
           backgroundColor: '#EC407A',
           color: 'white',
