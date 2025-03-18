@@ -1,6 +1,6 @@
 'use client';
 
-import {
+import React, {
   createContext,
   ReactNode,
   useContext,
@@ -14,7 +14,7 @@ import { OrbisConnectResult } from '@useorbis/db-sdk';
 import { db } from './client';
 import { download } from 'thirdweb/storage';
 import { AssetMetadata } from './models/AssetMetadata';
-import { applyOrbisAuthPatches } from './auth-patch';
+import { applyOrbisAuthPatches, applyOrbisDBPatches } from './auth-patch';
 import { safeToBase64Url } from '@app/lib/utils/base64url';
 import { setupJwtDebugger } from '@app/lib/utils/jwt-debug';
 
@@ -54,6 +54,7 @@ interface OrbisContextProps {
     token_symbol: string;
   }) => Promise<void>;
   logout: () => Promise<void>;
+  user: any;
 }
 
 const defaultContext: OrbisContextProps = {
@@ -68,6 +69,7 @@ const defaultContext: OrbisContextProps = {
   getCurrentUser: async () => {},
   insertMetokenMetadata: async () => {},
   logout: async () => {},
+  user: null,
 } as const;
 
 const OrbisContext = createContext<OrbisContextProps>(defaultContext);
@@ -102,33 +104,125 @@ const validateDbOperation = (
   if (!db) throw new Error('OrbisDB client is not initialized');
 };
 
+// Import Orbis dynamically to avoid SSR issues
+let Orbis: any;
+if (typeof window !== 'undefined') {
+  import('@useorbis/db-sdk').then((orbisModule) => {
+    Orbis = orbisModule.OrbisDB;
+  });
+}
+
 export function OrbisProvider({ children }: { children: ReactNode }) {
   const [authResult, setAuthResult] = useState<SerializableAuthResult | null>(
     null,
   );
+  const [orbisInstance, setOrbisInstance] = useState<any>(null);
+  const [isUserConnected, setIsUserConnected] = useState(false);
+  const [user, setUser] = useState<any>(null);
+  const [address, setAddress] = useState<string | undefined>(undefined);
 
-  // Check for existing session on mount and apply patches
   useEffect(() => {
-    // Apply patches to fix Uint8Array encoding issues
+    // Apply patches to fix authentication issues
     applyOrbisAuthPatches();
 
-    // Set up JWT debugger in development
-    if (process.env.NODE_ENV === 'development') {
-      setupJwtDebugger();
-    }
+    // Setup JWT debugger
+    setupJwtDebugger();
 
     // Check for existing session
     checkExistingSession();
+
+    // Try to get the user's address from window.ethereum
+    if (typeof window !== 'undefined' && window.ethereum) {
+      window.ethereum
+        .request({ method: 'eth_accounts' })
+        .then((accounts: string[]) => {
+          if (accounts && accounts.length > 0) {
+            setAddress(accounts[0]);
+          }
+        })
+        .catch((err: any) => {
+          console.error('Failed to get accounts:', err);
+        });
+    }
+
+    const initOrbis = async () => {
+      try {
+        // Validate environment variables
+        if (!process.env.NEXT_PUBLIC_CERAMIC_NODE_URL) {
+          throw new Error('NEXT_PUBLIC_CERAMIC_NODE_URL is not defined');
+        }
+        if (!process.env.NEXT_PUBLIC_ORBIS_NODE_URL) {
+          throw new Error('NEXT_PUBLIC_ORBIS_NODE_URL is not defined');
+        }
+        if (!process.env.NEXT_PUBLIC_ORBIS_ENVIRONMENT_ID) {
+          throw new Error('NEXT_PUBLIC_ORBIS_ENVIRONMENT_ID is not defined');
+        }
+
+        // Wait for Orbis to be dynamically imported
+        if (!Orbis) {
+          console.log('Waiting for Orbis to be imported...');
+          const orbisModule = await import('@useorbis/db-sdk');
+          Orbis = orbisModule.OrbisDB;
+          console.log('Orbis imported successfully:', !!Orbis);
+        }
+
+        console.log('Initializing Orbis...');
+        const newOrbisInstance = new Orbis({
+          ceramic: {
+            gateway: process.env.NEXT_PUBLIC_CERAMIC_NODE_URL,
+          },
+          nodes: [
+            {
+              gateway: process.env.NEXT_PUBLIC_ORBIS_NODE_URL,
+              env: process.env.NEXT_PUBLIC_ORBIS_ENVIRONMENT_ID,
+            },
+          ],
+        });
+
+        // Apply client patches
+        if (newOrbisInstance) {
+          applyOrbisDBPatches(newOrbisInstance);
+        }
+
+        setOrbisInstance(newOrbisInstance);
+
+        // Check if user is already connected
+        try {
+          const connected = await db.isUserConnected();
+
+          if (connected) {
+            console.log('User already connected to Orbis:', connected);
+            setIsUserConnected(true);
+            const currentUser = await db.getConnectedUser();
+            setUser(currentUser);
+          }
+        } catch (error) {
+          console.error('Failed to check user connection:', error);
+        }
+      } catch (error) {
+        console.error('Error initializing Orbis:', error);
+      }
+    };
+
+    initOrbis();
   }, []);
 
   const checkExistingSession = async () => {
     try {
+      if (!db) {
+        console.error('OrbisDB client is not initialized');
+        return;
+      }
+
       const currentUser = await db.getConnectedUser();
       if (currentUser) {
+        console.log('Found existing user session:', currentUser.user.did);
         setAuthResult({
           did: currentUser.user.did,
           details: JSON.parse(JSON.stringify(currentUser)),
         });
+      } else {
+        console.log('No existing user session found');
       }
     } catch (error) {
       console.error('Failed to restore session:', error);
@@ -274,87 +368,28 @@ export function OrbisProvider({ children }: { children: ReactNode }) {
 
   const orbisLogin = async (): Promise<OrbisConnectResult | null> => {
     try {
-      if (!window.ethereum) {
-        throw new Error(
-          'No Ethereum provider found. Please install MetaMask or another web3 wallet.',
-        );
+      if (!orbisInstance) {
+        console.error('Orbis not initialized');
+        return null;
       }
 
-      console.log('Starting Orbis login with EVM auth');
+      console.log('Starting Orbis authentication...');
       const auth = new OrbisEVMAuth(window.ethereum);
+      const result = await db.connectUser({ auth });
 
-      // Debug the auth object
-      console.log('OrbisEVMAuth object:', {
-        type: typeof auth,
-        constructor: auth.constructor?.name,
-        keys: Object.keys(auth),
-        hasSession: 'session' in (auth as any),
-        sessionType: (auth as any).session
-          ? typeof (auth as any).session
-          : 'none',
-        sessionKeys: (auth as any).session
-          ? Object.keys((auth as any).session)
-          : [],
-        prototype: Object.getPrototypeOf(auth),
-      });
-
-      console.log('Connecting user to Orbis');
-
-      // Wrap the connection in a try-catch to handle any encoding issues
-      try {
-        const result = await db.connectUser({ auth });
-
-        if (!result) {
-          throw new Error('Failed to connect to Orbis');
-        }
-
-        // Process the result to ensure any binary data is properly encoded
-        const processedResult = processOrbisResult(result);
-
-        console.log('Orbis connection successful:', processedResult);
-        setAuthResult({
-          did: processedResult.user.did,
-          details: JSON.parse(JSON.stringify(processedResult)),
-        });
-
-        return processedResult;
-      } catch (error) {
-        console.error('Error during Orbis connection:', error);
-
-        // If the error is related to Uint8Array encoding, try a fallback approach
-        if (
-          error instanceof Error &&
-          (error.message.includes('Uint8Array') ||
-            error.message.includes('[object Object]'))
-        ) {
-          console.log('Attempting fallback authentication approach');
-          // Implement fallback if needed
-        }
-
-        throw error;
+      if (!result) {
+        console.error('Orbis login failed - no result returned');
+        return null;
       }
+
+      console.log('Orbis authentication successful:', result);
+      setIsUserConnected(true);
+      setUser(result);
+      return result;
     } catch (error) {
-      console.error('Orbis login error:', error);
-      throw error;
+      console.error('Error in Orbis login:', error);
+      return null;
     }
-  };
-
-  // Helper function to process Orbis result and ensure binary data is properly encoded
-  const processOrbisResult = (result: any): any => {
-    if (!result || typeof result !== 'object') return result;
-
-    // Create a deep copy to avoid modifying the original
-    const processed = JSON.parse(
-      JSON.stringify(result, (key, value) => {
-        // Handle any binary data that might not be properly serialized
-        if (value instanceof Uint8Array) {
-          return safeToBase64Url(value);
-        }
-        return value;
-      }),
-    );
-
-    return processed;
   };
 
   const logout = async () => {
@@ -367,7 +402,7 @@ export function OrbisProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const isConnected = async (address?: string): Promise<boolean> => {
+  const checkUserConnection = async (address?: string): Promise<boolean> => {
     try {
       return await db.isUserConnected(address);
     } catch (error) {
@@ -412,10 +447,11 @@ export function OrbisProvider({ children }: { children: ReactNode }) {
         update,
         getAssetMetadata,
         orbisLogin,
-        isConnected,
+        isConnected: checkUserConnection,
         getCurrentUser,
         insertMetokenMetadata,
         logout,
+        user,
       }}
     >
       {children}

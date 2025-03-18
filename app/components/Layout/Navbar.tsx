@@ -22,14 +22,43 @@ import ClaimLockButton from '@app/components/Paywall/ClaimLock';
 import * as VisuallyHidden from '@radix-ui/react-visually-hidden';
 import ThemeToggleComponent from '../ThemeToggle/toggleComponent';
 import ConnectButtonWrapper from '../Button/connectButtonWrapper';
+import { LoginButton } from '../Button/login-button';
+import { useAuth } from '@app/hooks/useAuth';
+import { LogOutButton } from '../Button/logout-button';
+import { UserMenu } from './userMenu';
+import { useUnlockAccess } from '@app/hooks/useUnlockAccess';
 
 export function Navbar() {
-  const activeAccount = useActiveAccount();
-
+  const { isConnected, isAuthenticated } = useAuth();
+  const { hasAccess, isLoading } = useUnlockAccess();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   const handleLinkClick = () => {
     setIsMenuOpen(false);
+  };
+
+  const renderAuthButtons = () => {
+    return (
+      <div className="flex items-center gap-4">
+        <ConnectButtonWrapper />
+        {isConnected && !isLoading && (
+          <>
+            {!isAuthenticated ? (
+              <LoginButton />
+            ) : (
+              <>
+                <LogOutButton />
+                {hasAccess ? (
+                  <UserMenu />
+                ) : (
+                  <ClaimLockButton closeMenu={() => setIsMenuOpen(false)} />
+                )}
+              </>
+            )}
+          </>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -102,12 +131,7 @@ export function Navbar() {
             <div>
               <ThemeToggleComponent />
             </div>
-            <ConnectButtonWrapper />
-            {activeAccount && (
-              <div className="mt-5">
-                <ClaimLockButton closeMenu={() => setIsMenuOpen(false)} />
-              </div>
-            )}
+            {renderAuthButtons()}
           </div>
         </SheetContent>
       </Sheet>
@@ -150,16 +174,11 @@ export function Navbar() {
           Vote
         </Link>
       </nav>
-      <div className=" ml-auto hidden lg:flex">
+      <div className="ml-auto hidden lg:flex">
         <div className="my-auto mr-4">
           <ThemeToggleComponent />
         </div>
-        <div className="mr-5">
-          <ConnectButtonWrapper />
-        </div>
-        {activeAccount && (
-          <ClaimLockButton closeMenu={() => setIsMenuOpen(false)} />
-        )}
+        {renderAuthButtons()}
       </div>
     </header>
   );
