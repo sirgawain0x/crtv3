@@ -1,7 +1,7 @@
 import { ContractOptions } from 'thirdweb';
 import { Abi } from 'viem';
 
-import { base, polygonAmoy } from 'thirdweb/chains';
+import { base, baseSepolia } from 'thirdweb/chains';
 
 export const SITE_LOGO = '/grant-logo.png';
 export const CREATIVE_LOGO_BLK = '/Blog-Logo_blk.png';
@@ -15,6 +15,7 @@ export const STEPPER_FORM_KEYS = {
   1: ['title', 'description', 'location', 'category'],
   2: ['video'],
   3: ['thumbnail'],
+  4: ['sell'],
 } as const;
 
 export const CREATIVE_ADDRESS = '0x1Fde40a4046Eda0cA0539Dd6c77ABF8933B94260';
@@ -4314,21 +4315,24 @@ export const ROLES_ABI = [
 
 export const EditonDropContractDeployedChain = base;
 
+export const MARKETPLACE_ADDRESS = {
+  base: '0x6b69543bD0D96041ecB3affECFE1E5d5C9e8DFeC',
+};
+
 // Contract Address object to encapsulate all contract related data
 export const CONTRACT_ADDRESS = {
   gateway: {
     base: {
-      erc20: '',
+      erc20: '0x4B62D9b3DE9FAB98659693c9ee488D2E4eE56c44',
       erc721: '0xf7c4cd399395D80f9d61FDe833849106775269c6',
-      erc1155: '',
+      erc1155: '0xef5D46A44E24abC76ec1D9fF0C6A57A7BCC29cE0',
     },
     abi: ROLES_ABI,
   },
   account: {
     factory: {
       address: {
-        sepolia: ACCOUNT_FACTORY_ADDRESS.sepolia,
-        polygon: ACCOUNT_FACTORY_ADDRESS.polygon,
+        base: ACCOUNT_FACTORY_ADDRESS.base,
       },
       abi: ACCOUNT_FACTORY_ABI,
     },
@@ -6844,6 +6848,7 @@ export const CONTRACT_ADDRESS = {
     erc1155: {
       baseSepolia: '0xbbC0bC56f44B744aC159311D9b46a819545F735B',
       amoy: '0xF054c2257dE5Aa336CadA58f13aab1415EEC8266',
+      base: '0xef5D46A44E24abC76ec1D9fF0C6A57A7BCC29cE0',
       abi: [
         {
           inputs: [],
@@ -9085,6 +9090,10 @@ export const CONTRACT_ADDRESS = {
         ethereum: {
           mainnet: '',
           sepolia: '',
+        },
+        base: {
+          baseSepolia: '',
+          mainnet: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
         },
       },
     },
