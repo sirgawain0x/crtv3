@@ -35,6 +35,9 @@ export function applyOrbisAuthPatches() {
     // Patch the global fetch to intercept JWT-related requests
     patchFetchForJWT();
 
+    // Add retry mechanism for failed auth requests
+    patchFetchWithRetry();
+
     console.log('Orbis auth patches applied successfully');
   } catch (error) {
     console.error('Error applying Orbis auth patches:', error);
@@ -209,6 +212,74 @@ function patchFetchForJWT() {
 }
 
 /**
+ * Patches the fetch function to add retry mechanism for failed requests
+ */
+function patchFetchWithRetry() {
+  const originalFetch = window.fetch;
+  window.fetch = async function (...args) {
+    const [resource, config] = args;
+
+    // Only apply retry logic to Orbis/Ceramic requests
+    const isOrbisRequest =
+      typeof resource === 'string' &&
+      (resource.includes(process.env.NEXT_PUBLIC_ORBIS_NODE_URL || '') ||
+        resource.includes(process.env.NEXT_PUBLIC_CERAMIC_NODE_URL || ''));
+
+    if (!isOrbisRequest) {
+      return originalFetch.apply(this, args);
+    }
+
+    let retries = 3;
+    let lastError;
+
+    while (retries > 0) {
+      try {
+        const response = await originalFetch.apply(this, args);
+
+        // Check if the response is ok
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        // Clone the response before reading it
+        const clonedResponse = response.clone();
+
+        try {
+          // Try to parse the response as JSON
+          const data = await clonedResponse.json();
+
+          // Check for specific error conditions in the response
+          if (data.error) {
+            throw new Error(data.error);
+          }
+
+          // If we get here, the request was successful
+          return response;
+        } catch (parseError) {
+          // If we can't parse as JSON, return the original response
+          return response;
+        }
+      } catch (error) {
+        lastError = error;
+        retries--;
+
+        if (retries > 0) {
+          // Wait before retrying (exponential backoff)
+          await new Promise((resolve) =>
+            setTimeout(resolve, Math.pow(2, 3 - retries) * 1000),
+          );
+          console.warn(`Retrying Orbis request, ${retries} attempts remaining`);
+        }
+      }
+    }
+
+    // If we get here, all retries failed
+    console.error('All retry attempts failed for Orbis request:', lastError);
+    throw lastError;
+  };
+}
+
+/**
  * Recursively processes an object to convert any binary data (Uint8Array, ArrayBuffer)
  * to base64url strings.
  *
@@ -266,71 +337,57 @@ export function applyOrbisDBPatches(orbis: any): void {
     // Store the original connectUser method
     const originalConnectUser = orbis.connectUser;
 
-    // Override the connectUser method
+    // Override the connectUser method with retry mechanism
     orbis.connectUser = async function (params: any) {
       console.log('Patched connectUser method called');
 
-      try {
-        // Process the auth object to ensure it doesn't contain any binary data
-        if (params && typeof params === 'object' && 'auth' in params) {
-          const authObj = params.auth;
-          console.log('Processing auth object:', typeof authObj);
+      let retries = 3;
+      let lastError;
 
-          // If the auth object has methods that might return binary data, wrap them
-          if (authObj && typeof authObj === 'object') {
-            // Wrap any methods that might return binary data
-            const methodsToWrap = [
-              'authenticate',
-              'authenticateDid',
-              'verifyJWS',
-            ];
+      while (retries > 0) {
+        try {
+          // Process the auth object to ensure it doesn't contain any binary data
+          if (params && typeof params === 'object' && 'auth' in params) {
+            // Ensure the auth object is properly structured
+            if (!params.auth || typeof params.auth !== 'object') {
+              throw new Error('Invalid auth object provided');
+            }
 
-            methodsToWrap.forEach((methodName) => {
-              if (
-                methodName in authObj &&
-                typeof authObj[methodName] === 'function'
-              ) {
-                console.log(`Wrapping ${methodName} method`);
-                const originalMethod = authObj[methodName];
+            // Clean the auth object
+            params.auth = JSON.parse(JSON.stringify(params.auth));
+          }
 
-                authObj[methodName] = async function (...methodArgs: any[]) {
-                  try {
-                    // Call the original method
-                    const result = await originalMethod.apply(this, methodArgs);
+          // Call the original method
+          const result = await originalConnectUser.call(this, params);
 
-                    // Process the result to handle any binary data
-                    if (result && typeof result === 'object') {
-                      console.log(`Processing ${methodName} result`);
-                      return processObjectForBinaryData(result);
-                    }
+          // Verify the connection was successful
+          if (!result || !result.did) {
+            throw new Error('Connection failed: Invalid response');
+          }
 
-                    return result;
-                  } catch (error) {
-                    console.error(`Error in wrapped ${methodName}:`, error);
+          return result;
+        } catch (error) {
+          lastError = error;
+          retries--;
 
-                    // For critical methods, provide a fallback result
-                    if (
-                      methodName === 'authenticate' ||
-                      methodName === 'authenticateDid'
-                    ) {
-                      console.log(`Using fallback result for ${methodName}`);
-                      return { authenticated: true };
-                    }
-
-                    throw error;
-                  }
-                };
-              }
-            });
+          if (retries > 0) {
+            // Wait before retrying (exponential backoff)
+            await new Promise((resolve) =>
+              setTimeout(resolve, Math.pow(2, 3 - retries) * 1000),
+            );
+            console.warn(
+              `Retrying Orbis connection, ${retries} attempts remaining`,
+            );
           }
         }
-
-        // Call the original method
-        return await originalConnectUser.call(this, params);
-      } catch (error) {
-        console.error('Error in patched connectUser:', error);
-        throw error;
       }
+
+      // If we get here, all retries failed
+      console.error(
+        'All retry attempts failed for Orbis connection:',
+        lastError,
+      );
+      throw lastError;
     };
 
     // Store the original isUserConnected method

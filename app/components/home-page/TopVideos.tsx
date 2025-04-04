@@ -159,11 +159,11 @@ export function TopVideos() {
         <div className="mb-8 text-center">
           <h1 className="mb-4 text-3xl font-bold">TRENDING VIDEOS</h1>
         </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-          {Array.from({ length: 10 }).map((_, index) => (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, index) => (
             <div
               key={index}
-              className="h-64 animate-pulse rounded-lg bg-gray-200"
+              className="h-[300px] animate-pulse rounded-lg bg-gray-200"
             />
           ))}
         </div>
@@ -184,26 +184,26 @@ export function TopVideos() {
                 key={video.playbackId}
                 className="basis-full pl-0 sm:basis-1/2 sm:pl-1 md:basis-1/2 lg:basis-1/3 xl:basis-1/3"
               >
-                <Link
-                  href={`/discover/${video.assetId}`}
-                  className="block h-full"
-                >
-                  <div className="group h-full p-1">
-                    <Card className="relative h-[300px] w-full overflow-hidden transition-transform duration-200 ease-in-out group-hover:scale-[1.02]">
-                      <CardContent className="absolute inset-0 p-0">
-                        <TrendingPlayer
-                          src={playbackSources[video.playbackId]}
-                          title={video.title}
-                        />
-                        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-4">
+                <div className="group h-full p-1">
+                  <Card className="relative h-[300px] w-full overflow-hidden transition-transform duration-200 ease-in-out group-hover:scale-[1.02]">
+                    <CardContent className="absolute inset-0 p-0">
+                      <TrendingPlayer
+                        src={playbackSources[video.playbackId]}
+                        title={video.title}
+                      />
+                      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-4">
+                        <Link
+                          href={`/discover/${video.assetId}`}
+                          className="block hover:underline"
+                        >
                           <h3 className="line-clamp-2 text-sm font-medium text-white">
                             {video.title}
                           </h3>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-                </Link>
+                        </Link>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
               </CarouselItem>
             ))}
           </CarouselContent>

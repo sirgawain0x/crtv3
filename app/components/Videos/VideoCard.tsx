@@ -42,22 +42,59 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
     if (currentPlayingId && currentPlayingId !== asset?.id) {
       const videoElement = playerRef.current?.querySelector('video');
       if (videoElement) {
-        videoElement.pause();
+        try {
+          videoElement.pause();
+        } catch (error) {
+          console.error('Error pausing video:', error);
+        }
       }
     }
-  }, [currentPlayingId, asset?.id]);
+
+    // Cleanup function to pause video when component unmounts
+    return () => {
+      const videoElement = playerRef.current?.querySelector('video');
+      if (videoElement && !videoElement.paused) {
+        try {
+          videoElement.pause();
+          if (currentPlayingId === asset?.id) {
+            setCurrentPlayingId(null);
+          }
+        } catch (error) {
+          console.error('Error cleaning up video:', error);
+        }
+      }
+    };
+  }, [currentPlayingId, asset?.id, setCurrentPlayingId]);
 
   const handlePlay = () => {
-    setCurrentPlayingId(asset?.id || null);
+    try {
+      setCurrentPlayingId(asset?.id || null);
+    } catch (error) {
+      console.error('Error setting current playing ID:', error);
+    }
   };
 
-  console.log({ asset, playbackSources });
-  // Only render the card if the asset is ready
-  if (asset?.status?.phase !== 'ready') {
+  // Early return if asset is not provided or invalid
+  if (!asset) {
+    console.warn('VideoCard: No asset provided');
     return null;
   }
 
-  const address = asset?.creatorId?.value as string;
+  // Early return if asset is not ready
+  if (asset.status?.phase !== 'ready') {
+    console.debug(
+      `VideoCard: Asset ${asset.id} not ready, status: ${asset.status?.phase}`,
+    );
+    return null;
+  }
+
+  const address = asset.creatorId?.value as string;
+  if (!address) {
+    console.warn(`VideoCard: No creator address for asset ${asset.id}`);
+    return null;
+  }
+
+  console.log({ asset, playbackSources });
 
   return (
     <div className="mx-auto" ref={playerRef}>
@@ -139,7 +176,10 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
               >
                 Buy
               </Button>
-              <Link href={`discover/${encodeURIComponent(asset?.id)}`} passHref>
+              <Link
+                href={`/discover/${encodeURIComponent(asset?.id)}`}
+                passHref
+              >
                 <Button
                   className="flex-1 cursor-pointer hover:scale-125"
                   aria-label={`Comment on ${asset?.name}`}
