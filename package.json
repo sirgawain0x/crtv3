@@ -56,6 +56,7 @@
     "formidable": "^3.5.2",
     "formik": "^2.4.5",
     "framer-motion": "^11.0.25",
+    "graphql": "^16.10.0",
     "graphql-request": "^7.1.2",
     "graphql-tag": "^2.12.6",
     "jose": "^6.0.8",
