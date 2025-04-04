@@ -51,9 +51,21 @@ export function applyOrbisAuthPatches(options: AuthPatchOptions = {}) {
   ) {
     try {
       const payload = await originalPreparePayload.call(this, message);
+
+      // Handle different payload types properly
+      if (payload === null || payload === undefined) {
+        throw new Error('Authentication payload is null or undefined');
+      }
+
       if (payload instanceof Uint8Array) {
         return safeToBase64Url(payload);
       }
+
+      // Handle object payloads that aren't properly serialized
+      if (typeof payload === 'object' && !(payload instanceof Uint8Array)) {
+        return safeToBase64Url(payload);
+      }
+
       return payload;
     } catch (error) {
       throw new OrbisError(
@@ -68,6 +80,14 @@ export function applyOrbisAuthPatches(options: AuthPatchOptions = {}) {
   const originalCreateJWT = (OrbisEVMAuth as any).prototype.createJWT;
   (OrbisEVMAuth as any).prototype.createJWT = async function (payload: any) {
     try {
+      // Ensure payload is properly formatted before creating JWT
+      if (typeof payload === 'object' && payload !== null) {
+        // Make sure we have the required fields
+        if (!payload.sub) {
+          payload.sub = this.address || 'anonymous';
+        }
+      }
+
       const jwt = await originalCreateJWT.call(this, payload);
       // Verify JWT structure before returning
       const decoded = decodeJWT(jwt) as { payload: JWTPayload };

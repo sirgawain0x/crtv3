@@ -40,7 +40,7 @@ export function safeToBase64Url(value: any): string {
     return '';
   }
 
-  // Handle string directly
+  // Handle string directly - if it's already a base64url string, return it
   if (typeof value === 'string') {
     return value;
   }
@@ -62,35 +62,41 @@ export function safeToBase64Url(value: any): string {
 
   // Handle object with special properties
   if (typeof value === 'object') {
-    // Check for _bytes property (common in some crypto libraries)
-    if ('_bytes' in value && Array.isArray(value._bytes)) {
-      return uint8ArrayToBase64Url(new Uint8Array(value._bytes));
-    }
-
-    // Check for data property
-    if ('data' in value && value.data) {
-      if (value.data instanceof Uint8Array) {
-        return uint8ArrayToBase64Url(value.data);
+    try {
+      // Check for _bytes property (common in some crypto libraries)
+      if ('_bytes' in value && Array.isArray(value._bytes)) {
+        return uint8ArrayToBase64Url(new Uint8Array(value._bytes));
       }
-      if (Array.isArray(value.data)) {
-        return uint8ArrayToBase64Url(new Uint8Array(value.data));
-      }
-    }
 
-    // Check for array-like objects
-    if (
-      Array.isArray(value) ||
-      ('length' in value && typeof value.length === 'number')
-    ) {
-      try {
-        return uint8ArrayToBase64Url(new Uint8Array(value));
-      } catch (e) {
-        // If conversion fails, continue to default handling
+      // Check for data property
+      if ('data' in value && value.data) {
+        if (value.data instanceof Uint8Array) {
+          return uint8ArrayToBase64Url(value.data);
+        }
+        if (Array.isArray(value.data)) {
+          return uint8ArrayToBase64Url(new Uint8Array(value.data));
+        }
       }
-    }
 
-    // For other objects, stringify and encode
-    return stringToBase64Url(JSON.stringify(value));
+      // Check for array-like objects
+      if (
+        Array.isArray(value) ||
+        ('length' in value && typeof value.length === 'number')
+      ) {
+        try {
+          return uint8ArrayToBase64Url(new Uint8Array(value));
+        } catch (e) {
+          // If conversion fails, continue to default handling
+        }
+      }
+
+      // For other objects, stringify and encode
+      return stringToBase64Url(JSON.stringify(value));
+    } catch (error) {
+      // If any of the above conversions fail, stringify the object directly
+      // This ensures we don't return [object Object] as a string
+      return stringToBase64Url(JSON.stringify(value));
+    }
   }
 
   // For other types, convert to string
