@@ -1,14 +1,12 @@
 'use client';
 
 import { useActiveAccount } from 'thirdweb/react';
-import { generatePayload, login } from '@app/api/auth/thirdweb/authentication';
-import { signLoginPayload } from 'thirdweb/auth';
-import { base } from 'thirdweb/chains';
 import { Button } from '../ui/button';
 import { Loader2 } from 'lucide-react';
 import { useState } from 'react';
-import { useAuth } from '@app/hooks/useAuth';
 import { useRouter } from 'next/navigation';
+import { AuthService } from '@app/lib/services/auth';
+import { toast } from 'sonner';
 
 export function LoginButton() {
   const account = useActiveAccount();
@@ -17,32 +15,41 @@ export function LoginButton() {
 
   async function handleClick() {
     if (!account) {
-      return alert('Please connect your wallet first');
+      toast.error('Please connect your wallet first');
+      return;
     }
 
     try {
       setIsLoading(true);
-      // Step 1: Generate the payload
-      const payload = await generatePayload({
-        address: account.address,
-        chainId: base.id,
-      });
-      // Step 2: Sign the payload
-      const signatureResult = await signLoginPayload({ account, payload });
-      // Step 3: Call the login function we defined in the auth actions file
-      await login(signatureResult);
-      // Step 4: Force a router refresh to update the UI
+
+      // Connect with Orbis first
+      const orbisResult = await AuthService.connectWithOrbis();
+      if (!orbisResult) {
+        throw new Error('Failed to connect with Orbis');
+      }
+
+      // Then perform login
+      const loginResult = await AuthService.login();
+      if (!loginResult.success) {
+        throw new Error(loginResult.message || 'Login failed');
+      }
+
+      toast.success('Successfully logged in');
       router.refresh();
     } catch (error) {
       console.error('Login failed:', error);
-      alert('Failed to login. Please try again.');
+      toast.error(error instanceof Error ? error.message : 'Failed to login');
     } finally {
       setIsLoading(false);
     }
   }
 
   return (
-    <Button disabled={!account || isLoading} onClick={handleClick}>
+    <Button
+      disabled={!account || isLoading}
+      onClick={handleClick}
+      className="min-w-[100px]"
+    >
       {isLoading ? (
         <>
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />

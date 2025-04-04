@@ -19,77 +19,96 @@ interface UseOrbisAuthReturn {
 }
 
 export function useOrbisAuth(): UseOrbisAuthReturn {
-  const { address, isConnected: isWalletConnected } = useAccount();
+  const { address } = useAccount();
   const { data: walletClient } = useWalletClient();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
   const [authResult, setAuthResult] = useState<OrbisConnectResult | null>(null);
+  const [error, setError] = useState<Error | null>(null);
 
-  // Check if user is already connected
   useEffect(() => {
-    async function checkConnection() {
+    const checkConnection = async () => {
       try {
+        setIsLoading(true);
         const connected = await isUserConnected(address);
         setIsAuthenticated(connected);
+
         if (connected) {
-          const user = await getConnectedUser();
-          setAuthResult(user);
+          const result = await getConnectedUser();
+          if (
+            result &&
+            typeof result === 'object' &&
+            !Array.isArray(result) &&
+            'did' in result
+          ) {
+            setAuthResult(result as OrbisConnectResult);
+          } else {
+            setAuthResult(null);
+          }
+        } else {
+          setAuthResult(null);
         }
       } catch (err) {
         console.error('Error checking Orbis connection:', err);
         setError(
           err instanceof Error ? err : new Error('Failed to check connection'),
         );
+        setAuthResult(null);
       } finally {
         setIsLoading(false);
       }
-    }
+    };
 
-    if (isWalletConnected && address) {
+    if (address && walletClient) {
       checkConnection();
     } else {
-      setIsAuthenticated(false);
       setAuthResult(null);
+      setIsAuthenticated(false);
       setIsLoading(false);
     }
-  }, [address, isWalletConnected]);
+  }, [address, walletClient]);
 
   const connect = useCallback(async () => {
-    if (!isWalletConnected || !walletClient) {
-      throw new Error('Please connect your wallet first');
-    }
-
-    setIsLoading(true);
-    setError(null);
-
     try {
-      // Pass the walletClient's provider which has been authenticated by Thirdweb
-      const result = await connectUser(walletClient.transport.request);
-      setAuthResult(result);
+      setIsLoading(true);
+      setError(null);
+
+      if (!walletClient) {
+        throw new Error('No wallet client available');
+      }
+
+      const result = await connectUser(walletClient);
+      if (!result || typeof result !== 'object' || !('did' in result)) {
+        throw new Error('Invalid connection result');
+      }
+
+      const orbisResult = result as OrbisConnectResult;
+      setAuthResult(orbisResult);
       setIsAuthenticated(true);
-      return result;
+      return orbisResult;
     } catch (err) {
-      console.error('Error connecting to Orbis:', err);
-      setError(err instanceof Error ? err : new Error('Failed to connect'));
+      const error = err instanceof Error ? err : new Error('Failed to connect');
+      setError(error);
+      setAuthResult(null);
       setIsAuthenticated(false);
-      throw err;
+      throw error;
     } finally {
       setIsLoading(false);
     }
-  }, [isWalletConnected, walletClient]);
+  }, [walletClient]);
 
   const disconnect = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-
     try {
+      setIsLoading(true);
+      setError(null);
       await disconnectUser();
-      setIsAuthenticated(false);
       setAuthResult(null);
+      setIsAuthenticated(false);
     } catch (err) {
-      console.error('Error disconnecting from Orbis:', err);
-      setError(err instanceof Error ? err : new Error('Failed to disconnect'));
+      const error =
+        err instanceof Error ? err : new Error('Failed to disconnect');
+      setError(error);
+      throw error;
     } finally {
       setIsLoading(false);
     }

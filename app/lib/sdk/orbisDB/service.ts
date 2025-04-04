@@ -1,5 +1,12 @@
 import { db } from './client';
 import { OrbisAuth } from '@app/api/auth/orbisdb/auth';
+import {
+  VideoFormData,
+  VideoData,
+  UserFormData,
+  UserData,
+  OrbisResponse,
+} from './types';
 
 export class OrbisService {
   private static readonly VIDEO_MODEL = 'videos';

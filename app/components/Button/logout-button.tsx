@@ -1,31 +1,42 @@
 'use client';
 
-import { useAuth } from '@app/hooks/useAuth';
 import { Button } from '../ui/button';
 import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { AuthService } from '@app/lib/services/auth';
+import { toast } from 'sonner';
 
 export const LogOutButton: React.FC = () => {
-  const { logout } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
   async function handleClick() {
     try {
       setIsLoading(true);
-      await logout();
-      // Force a router refresh to update the UI
+
+      const result = await AuthService.logout();
+      if (!result.success) {
+        throw new Error(result.message || 'Logout failed');
+      }
+
+      toast.success('Successfully logged out');
       router.refresh();
     } catch (error) {
       console.error('Logout failed:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to logout');
     } finally {
       setIsLoading(false);
     }
   }
 
   return (
-    <Button onClick={handleClick} disabled={isLoading} variant="destructive">
+    <Button
+      onClick={handleClick}
+      disabled={isLoading}
+      variant="destructive"
+      className="min-w-[100px]"
+    >
       {isLoading ? (
         <>
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />

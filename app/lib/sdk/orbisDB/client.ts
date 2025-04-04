@@ -2,80 +2,96 @@ import { OrbisDB } from '@useorbis/db-sdk';
 import { OrbisEVMAuth } from '@useorbis/db-sdk/auth';
 import { catchError } from '@useorbis/db-sdk/util';
 import type { OrbisConnectResult } from '@useorbis/db-sdk';
+import { executeOrbisOperation } from './error-handler';
+import { OrbisError, OrbisErrorType } from './types';
 
-if (!process.env.NEXT_PUBLIC_CERAMIC_NODE_URL) {
-  throw new Error('NEXT_PUBLIC_CERAMIC_NODE_URL is not defined');
-}
+// Validate required environment variables
+const requiredEnvVars = {
+  NEXT_PUBLIC_CERAMIC_NODE_URL: process.env.NEXT_PUBLIC_CERAMIC_NODE_URL ?? '',
+  NEXT_PUBLIC_ORBIS_NODE_URL: process.env.NEXT_PUBLIC_ORBIS_NODE_URL ?? '',
+  NEXT_PUBLIC_ORBIS_ENVIRONMENT_ID:
+    process.env.NEXT_PUBLIC_ORBIS_ENVIRONMENT_ID ?? '',
+};
 
-if (!process.env.NEXT_PUBLIC_ORBIS_NODE_URL) {
-  throw new Error('NEXT_PUBLIC_ORBIS_NODE_URL is not defined');
-}
+// Check for missing environment variables
+const missingVars = Object.entries(requiredEnvVars)
+  .filter(([_, value]) => !value)
+  .map(([key]) => key);
 
-if (!process.env.NEXT_PUBLIC_ORBIS_ENVIRONMENT_ID) {
-  throw new Error('NEXT_PUBLIC_ORBIS_ENVIRONMENT_ID is not defined');
+if (missingVars.length > 0) {
+  throw new OrbisError(
+    `Missing required environment variables: ${missingVars.join(', ')}`,
+    OrbisErrorType.VALIDATION_ERROR,
+  );
 }
 
 // Initialize OrbisDB instance
 export const db = new OrbisDB({
   ceramic: {
-    gateway: process.env.NEXT_PUBLIC_CERAMIC_NODE_URL,
+    gateway: requiredEnvVars.NEXT_PUBLIC_CERAMIC_NODE_URL,
   },
   nodes: [
     {
-      gateway: process.env.NEXT_PUBLIC_ORBIS_NODE_URL,
-      env: process.env.NEXT_PUBLIC_ORBIS_ENVIRONMENT_ID,
+      gateway: requiredEnvVars.NEXT_PUBLIC_ORBIS_NODE_URL,
+      env: requiredEnvVars.NEXT_PUBLIC_ORBIS_ENVIRONMENT_ID,
     },
   ],
 });
 
-export type { OrbisConnectResult };
-
-export async function connectUser(provider: any): Promise<OrbisConnectResult> {
-  try {
+/**
+ * Connects a user to OrbisDB using EVM authentication
+ * @param provider - The EVM provider (e.g., window.ethereum)
+ * @param saveSession - Whether to save the session in localStorage
+ * @returns The connection result
+ */
+export async function connectUser(
+  provider: any,
+  saveSession = true,
+): Promise<OrbisConnectResult> {
+  return executeOrbisOperation(async () => {
     const auth = new OrbisEVMAuth(provider);
-    const [result, error] = await catchError(() => db.connectUser({ auth }));
+    const result = await db.connectUser({ auth, saveSession });
 
-    if (error) {
-      console.error('Error connecting user:', error);
-      throw error;
-    }
-
-    const connected = await db.isUserConnected();
-    if (!connected) {
-      throw new Error('Failed to connect user');
+    if (!result || typeof result !== 'object' || !('did' in result)) {
+      throw new OrbisError(
+        'Failed to connect user: Invalid response',
+        OrbisErrorType.AUTH_ERROR,
+      );
     }
 
     return result;
-  } catch (error) {
-    console.error('Error in connectUser:', error);
-    throw error;
-  }
+  }, 'connectUser');
 }
 
+/**
+ * Checks if a user is connected to OrbisDB
+ * @param address - Optional address to check
+ * @returns Whether the user is connected
+ */
 export async function isUserConnected(address?: string): Promise<boolean> {
-  try {
-    return await db.isUserConnected(address);
-  } catch (error) {
-    console.error('Error checking user connection:', error);
-    return false;
-  }
+  return executeOrbisOperation(async () => {
+    return db.isUserConnected(address);
+  }, 'isUserConnected');
 }
 
-export async function getConnectedUser(): Promise<OrbisConnectResult | null> {
-  try {
-    const user = await db.getConnectedUser();
-    return user || null;
-  } catch (error) {
-    console.error('Error getting connected user:', error);
-    return null;
-  }
+/**
+ * Gets the currently connected user
+ * @returns The connected user's information or false if not connected
+ */
+export async function getConnectedUser(): Promise<OrbisConnectResult | false> {
+  return executeOrbisOperation(async () => {
+    return db.getConnectedUser();
+  }, 'getConnectedUser');
 }
 
+/**
+ * Disconnects the current user
+ */
 export async function disconnectUser(): Promise<void> {
-  try {
-    await db.disconnectUser();
-  } catch (error) {
-    console.error('Error disconnecting user:', error);
-    throw error;
-  }
+  return executeOrbisOperation(async () => {
+    localStorage.removeItem('orbis_session');
+    // Additional cleanup if needed
+  }, 'disconnectUser');
 }
+
+export type { OrbisConnectResult };

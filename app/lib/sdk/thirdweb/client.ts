@@ -6,16 +6,11 @@ import { createThirdwebClient } from 'thirdweb';
 const clientId = process.env.NEXT_PUBLIC_TEMPLATE_CLIENT_ID;
 const secretKey = process.env.THIRDWEB_SECRET_KEY;
 // const clientId = process.env.NEXT_PUBLIC_TEMPLATE_CLIENT_ID || process.env.TEMPLATE_CLIENT_ID
-if (!clientId) {
-  throw new Error('No client ID provided');
+if (!clientId && !secretKey) {
+  throw new Error('Either clientId or secretKey must be provided');
 }
 
-export const client = createThirdwebClient(
-  secretKey
-    ? {
-        secretKey,
-      }
-    : {
-        clientId,
-      },
-);
+export const client = createThirdwebClient({
+  clientId: clientId || '',
+  secretKey: secretKey || undefined,
+});
