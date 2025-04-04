@@ -4,6 +4,7 @@ import { catchError } from '@useorbis/db-sdk/util';
 import type { OrbisConnectResult } from '@useorbis/db-sdk';
 import { executeOrbisOperation } from './error-handler';
 import { OrbisError, OrbisErrorType } from './types';
+import { applyOrbisAuthPatches, applyOrbisDBPatches } from './auth-patch';
 
 // Validate required environment variables
 const requiredEnvVars = {
@@ -38,6 +39,11 @@ export const db = new OrbisDB({
   ],
 });
 
+// Apply patches to the OrbisDB instance
+applyOrbisDBPatches(db);
+// Apply auth patches globally
+applyOrbisAuthPatches();
+
 /**
  * Connects a user to OrbisDB using EVM authentication
  * @param provider - The EVM provider (e.g., window.ethereum)
@@ -49,17 +55,52 @@ export async function connectUser(
   saveSession = true,
 ): Promise<OrbisConnectResult> {
   return executeOrbisOperation(async () => {
-    const auth = new OrbisEVMAuth(provider);
-    const result = await db.connectUser({ auth, saveSession });
+    try {
+      // Create and patch the auth instance
+      const auth = new OrbisEVMAuth(provider);
 
-    if (!result || typeof result !== 'object' || !('did' in result)) {
+      // Connect user with proper error handling
+      const result = await db.connectUser({ auth, saveSession });
+
+      if (!result || typeof result !== 'object' || !('did' in result)) {
+        throw new OrbisError(
+          'Failed to connect user: Invalid response',
+          OrbisErrorType.AUTH_ERROR,
+        );
+      }
+
+      // Store additional session info if needed
+      if (saveSession && result.did) {
+        try {
+          // Extract address from provider if available, or use a placeholder
+          const walletAddress =
+            typeof provider.getAddress === 'function'
+              ? await provider.getAddress()
+              : provider.address || 'unknown';
+
+          const sessionData = {
+            did: result.did,
+            timestamp: Date.now(),
+            wallet: walletAddress,
+          };
+          localStorage.setItem(
+            'orbis_session_data',
+            JSON.stringify(sessionData),
+          );
+        } catch (e) {
+          console.warn('Failed to save additional session data:', e);
+        }
+      }
+
+      return result;
+    } catch (error) {
+      console.error('Orbis connection error:', error);
       throw new OrbisError(
-        'Failed to connect user: Invalid response',
+        'Failed to connect to OrbisDB',
         OrbisErrorType.AUTH_ERROR,
+        error instanceof Error ? error : new Error(String(error)),
       );
     }
-
-    return result;
   }, 'connectUser');
 }
 
@@ -90,7 +131,8 @@ export async function getConnectedUser(): Promise<OrbisConnectResult | false> {
 export async function disconnectUser(): Promise<void> {
   return executeOrbisOperation(async () => {
     localStorage.removeItem('orbis_session');
-    // Additional cleanup if needed
+    localStorage.removeItem('orbis_session_data');
+    return db.disconnectUser();
   }, 'disconnectUser');
 }
 
