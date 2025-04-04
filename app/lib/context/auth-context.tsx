@@ -79,6 +79,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           orbisData: null,
           lastChecked: now,
         }));
+
+        // Only redirect on first load
+        if (!authState.lastChecked) {
+          router.push('/login');
+        }
         return;
       }
 
@@ -157,7 +162,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Set up periodic check
     const interval = setInterval(() => {
-      if (!authState.isLoading) {
+      // Only poll if user is authenticated or we're still loading
+      if (authState.isAuthenticated || authState.isLoading) {
         debouncedAuthCheck();
       }
     }, AUTH_CHECK_INTERVAL);
@@ -165,7 +171,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       clearInterval(interval);
     };
-  }, [debouncedAuthCheck, authState.isLoading]);
+  }, [debouncedAuthCheck, authState.isLoading, authState.isAuthenticated]);
 
   return (
     <AuthContext.Provider value={authState}>{children}</AuthContext.Provider>
