@@ -80,7 +80,7 @@ export function TopChart() {
     <div className="mx-auto w-full max-w-6xl py-8">
       <div className="mb-8 text-center">
         <h2 className="flex items-center justify-center gap-2 text-3xl font-bold">
-          <TrophyIcon className="h-6 w-6 text-yellow-500" />
+          <TrophyIcon className="h-10 w-10 text-yellow-500" />
           TOP CREATIVES
         </h2>
       </div>

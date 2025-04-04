@@ -17,38 +17,85 @@ const VideoCardGrid: React.FC = () => {
   useEffect(() => {
     const fetchSources = async () => {
       try {
-        const response = await fetchAllAssets();
-        if (response && Array.isArray(response)) {
-          // Only process assets that are ready for playback
-          const readyAssets = response.filter(
-            (asset) => asset.status?.phase === 'ready',
-          );
+        setLoading(true);
+        setError(null);
 
-          // Fetch detailed playback sources for each ready asset
-          const detailedPlaybackSources = await Promise.all(
-            readyAssets.map(async (asset: Asset) => {
-              try {
-                const detailedSrc = await getDetailPlaybackSource(
-                  `${asset.playbackId}`,
-                );
-                // console.log(asset.playbackId + ': ', detailedSrc);
-                return { ...asset, detailedSrc }; // Add detailedSrc to the asset object
-              } catch (err) {
-                console.error(
-                  `Error fetching playback source for asset ${asset.id}:`,
-                  err,
-                );
-                return { ...asset, detailedSrc: null }; // Handle errors for individual assets
-              }
-            }),
-          );
-          setPlaybackSources(detailedPlaybackSources); // Set the modified assets with detailed sources
-        } else {
-          setPlaybackSources([]);
+        // Function to fetch assets with retries
+        const fetchAssetsWithRetry = async (retries = 3): Promise<Asset[]> => {
+          try {
+            const response = await fetchAllAssets();
+            if (!response || !Array.isArray(response)) {
+              throw new Error('Invalid response format');
+            }
+            return response;
+          } catch (err) {
+            if (retries > 0) {
+              console.warn(
+                `Retrying asset fetch. Attempts remaining: ${retries - 1}`,
+              );
+              await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait 1 second before retry
+              return fetchAssetsWithRetry(retries - 1);
+            }
+            throw err;
+          }
+        };
+
+        // Function to fetch playback source with retries
+        const fetchPlaybackSourceWithRetry = async (
+          playbackId: string,
+          retries = 3,
+        ): Promise<Src[] | null> => {
+          try {
+            const detailedSrc = await getDetailPlaybackSource(playbackId);
+            return detailedSrc;
+          } catch (err) {
+            if (retries > 0) {
+              console.warn(
+                `Retrying playback source fetch for ${playbackId}. Attempts remaining: ${retries - 1}`,
+              );
+              await new Promise((resolve) => setTimeout(resolve, 1000)); // Wait 1 second before retry
+              return fetchPlaybackSourceWithRetry(playbackId, retries - 1);
+            }
+            console.error(
+              `Failed to fetch playback source for ${playbackId} after all retries:`,
+              err,
+            );
+            return null;
+          }
+        };
+
+        // Fetch all assets with retry mechanism
+        const assets = await fetchAssetsWithRetry();
+
+        // Only process assets that are ready for playback
+        const readyAssets = assets.filter(
+          (asset) => asset.status?.phase === 'ready' && asset.playbackId,
+        );
+
+        // Fetch detailed playback sources for each ready asset
+        const detailedPlaybackSources = await Promise.all(
+          readyAssets.map(async (asset: Asset) => {
+            const detailedSrc = await fetchPlaybackSourceWithRetry(
+              asset.playbackId!,
+            );
+            return { ...asset, detailedSrc };
+          }),
+        );
+
+        // Filter out assets with failed playback sources
+        const validPlaybackSources = detailedPlaybackSources.filter(
+          (source) => source.detailedSrc !== null,
+        );
+
+        if (validPlaybackSources.length === 0) {
+          setError('No valid videos available at the moment.');
+          return;
         }
+
+        setPlaybackSources(validPlaybackSources);
       } catch (err) {
-        console.error('Error fetching playback sources: ', err);
-        setError('Failed to load videos.');
+        console.error('Error fetching playback sources:', err);
+        setError('Failed to load videos. Please try again later.');
       } finally {
         setLoading(false);
       }
@@ -68,11 +115,19 @@ const VideoCardGrid: React.FC = () => {
   }
 
   if (error) {
-    return <p>{error}</p>;
+    return (
+      <div className="flex min-h-[200px] items-center justify-center rounded-lg bg-red-50 p-4 text-red-800">
+        <p>{error}</p>
+      </div>
+    );
   }
 
   if (!playbackSources || playbackSources.length === 0) {
-    return <p>No videos available.</p>;
+    return (
+      <div className="flex min-h-[200px] items-center justify-center rounded-lg bg-gray-50 p-4">
+        <p>No videos available at the moment. Please check back later.</p>
+      </div>
+    );
   }
 
   return (
