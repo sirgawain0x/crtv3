@@ -38,21 +38,22 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
   const playerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Stop playing if another video starts
-    if (currentPlayingId && currentPlayingId !== asset?.id) {
-      const videoElement = playerRef.current?.querySelector('video');
-      if (videoElement) {
-        try {
-          videoElement.pause();
-        } catch (error) {
-          console.error('Error pausing video:', error);
-        }
+    const player = playerRef.current;
+    const videoElement = player?.querySelector('video');
+    if (
+      videoElement &&
+      !videoElement.paused &&
+      currentPlayingId !== asset?.id
+    ) {
+      try {
+        videoElement.pause();
+      } catch (error) {
+        console.error('Error pausing video:', error);
       }
     }
 
-    // Cleanup function to pause video when component unmounts
     return () => {
-      const videoElement = playerRef.current?.querySelector('video');
+      const videoElement = player?.querySelector('video');
       if (videoElement && !videoElement.paused) {
         try {
           videoElement.pause();

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAddress } from 'viem';
+import { Ratelimit } from '@upstash/ratelimit';
+import { Redis } from '@upstash/redis';
 
 // Define protected routes that require authentication
 const protectedRoutes = [
@@ -12,6 +14,13 @@ const protectedRoutes = [
 
 // Define public routes that don't require authentication
 const publicRoutes = ['/', '/login', '/register', '/api/auth'];
+
+// Create a new ratelimiter that allows 10 requests per 10 seconds
+const ratelimit = new Ratelimit({
+  redis: Redis.fromEnv(),
+  limiter: Ratelimit.slidingWindow(10, '10 s'),
+  analytics: true,
+});
 
 // Middleware function to handle CORS and wallet-based authentication
 export async function middleware(req: NextRequest) {
@@ -111,7 +120,39 @@ export async function middleware(req: NextRequest) {
     }
   }
 
-  return NextResponse.next();
+  // Add security headers
+  const response = NextResponse.next();
+  const headers = response.headers;
+  headers.set('X-DNS-Prefetch-Control', 'on');
+  headers.set(
+    'Strict-Transport-Security',
+    'max-age=31536000; includeSubDomains',
+  );
+  headers.set('X-Frame-Options', 'SAMEORIGIN');
+  headers.set('X-Content-Type-Options', 'nosniff');
+  headers.set('Referrer-Policy', 'origin-when-cross-origin');
+  headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+
+  // Only apply rate limiting to auth endpoints
+  if (pathname.startsWith('/api/auth')) {
+    const ip = req.ip ?? '127.0.0.1';
+    const { success, pending, limit, reset, remaining } = await ratelimit.limit(
+      `ratelimit_${ip}`,
+    );
+
+    headers.set('X-RateLimit-Limit', limit.toString());
+    headers.set('X-RateLimit-Remaining', remaining.toString());
+    headers.set('X-RateLimit-Reset', reset.toString());
+
+    if (!success) {
+      return NextResponse.json(
+        { error: 'Too many requests' },
+        { status: 429, headers },
+      );
+    }
+  }
+
+  return response;
 }
 
 // Middleware configuration to specify paths where the middleware should apply

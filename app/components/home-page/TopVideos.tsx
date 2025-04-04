@@ -13,6 +13,7 @@ import { Src } from '@livepeer/react';
 import { fullLivepeer } from '@app/lib/sdk/livepeer/fullClient';
 import { toast } from 'sonner';
 import Link from 'next/link';
+import { TrendingUpIcon } from 'lucide-react';
 
 interface Video {
   playbackId: string;
@@ -146,7 +147,12 @@ export function TopVideos() {
     return (
       <div className="mx-auto w-full max-w-7xl py-8">
         <div className="mb-8 text-center">
-          <h1 className="mb-4 text-3xl font-bold">TRENDING VIDEOS</h1>
+          <h1 className="mb-4 text-3xl font-bold">
+            <span className="animate-pulse">
+              <TrendingUpIcon className="inline-block h-10 w-10 text-green-700" />
+            </span>
+            TRENDING VIDEOS
+          </h1>
           <div className="text-red-500">{error}</div>
         </div>
       </div>
@@ -157,7 +163,12 @@ export function TopVideos() {
     return (
       <div className="mx-auto w-full max-w-7xl py-8">
         <div className="mb-8 text-center">
-          <h1 className="mb-4 text-3xl font-bold">TRENDING VIDEOS</h1>
+          <h1 className="mb-4 text-3xl font-bold">
+            <span className="animate-pulse">
+              <TrendingUpIcon className="inline-block h-10 w-10 text-green-700" />
+            </span>
+            TRENDING VIDEOS
+          </h1>
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 3 }).map((_, index) => (
@@ -174,7 +185,12 @@ export function TopVideos() {
   return (
     <div className="mx-auto w-full max-w-7xl py-8">
       <div className="mb-8 text-center">
-        <h1 className="mb-4 text-3xl font-bold">TRENDING VIDEOS</h1>
+        <h1 className="mb-4 text-3xl font-bold">
+          <span className="animate-pulse">
+            <TrendingUpIcon className="inline-block h-10 w-10 text-green-700" />
+          </span>{' '}
+          TRENDING VIDEOS
+        </h1>
       </div>
       <div className="relative mx-auto w-full max-w-7xl">
         <Carousel className="min-w-sm mx-auto w-full max-w-7xl">
