@@ -19,13 +19,18 @@ type VideoDetailsPageProps = {
 };
 
 const fetchAssetData = async (id: string): Promise<Asset | null> => {
-  const response: GetAssetResponse | null = await fetchAssetId(id);
+  try {
+    const response = await fetchAssetId(id);
 
-  if (response) {
-    return response.asset?.id === id ? response.asset : null;
+    if (response?.asset) {
+      return response.asset;
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Error fetching asset:', error);
+    return null;
   }
-
-  return null; // Return null if the response doesn't match the expected structure
 };
 
 export default async function VideoDetailsPage({
