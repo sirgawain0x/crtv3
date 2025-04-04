@@ -342,13 +342,21 @@ export function applyOrbisDBPatches(orbis: any): void {
 
       try {
         // Call the original method
-        return await originalIsUserConnected.call(this, address);
+        const result = await originalIsUserConnected.call(this, address);
+        console.log('isUserConnected result:', result);
+        return result;
       } catch (error) {
         console.error('Error in patched isUserConnected:', error);
 
-        // Return true as a fallback to prevent authentication failures
-        console.log('Using fallback result for isUserConnected');
-        return true;
+        // Check if we have a valid session
+        if (this.session && this.session.did) {
+          console.log('Found valid session, checking DID:', this.session.did);
+          return true;
+        }
+
+        // If no valid session, return false
+        console.log('No valid session found, returning false');
+        return false;
       }
     };
 

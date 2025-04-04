@@ -2,22 +2,19 @@
 import { useOrbis } from '@app/lib/sdk/orbisDB/simplified-provider';
 import { client } from '@app/lib/sdk/thirdweb/client';
 import { ConnectButton } from '@app/lib/sdk/thirdweb/components';
-// import {
-//   generatePayload,
-//   login,
-//   isLoggedIn,
-//   logout,
-// } from '@app/api/auth/thirdweb/authentication';
 import { base } from 'thirdweb/chains';
-import { VerifyLoginPayloadParams, signLoginPayload } from 'thirdweb/auth';
 import { createWallet, inAppWallet } from 'thirdweb/wallets';
 import { toast } from 'sonner';
-import { db } from '@app/lib/sdk/orbisDB/client';
-import { decodeJWT } from 'thirdweb/utils';
-import { checkForBinaryData } from '@app/lib/utils/jwt-debug';
+import { AuthService } from '@app/lib/services/auth';
+import { useRouter } from 'next/navigation';
+import type { LoginPayload } from 'thirdweb/auth';
+import { useAuth } from '@app/hooks/useAuth';
 
 export default function ConnectButtonWrapper() {
   const { orbisLogin } = useOrbis();
+  const router = useRouter();
+  const { isAuthenticated, checkAuth } = useAuth();
+
   const wallets = [
     inAppWallet({
       auth: {
@@ -27,14 +24,14 @@ export default function ConnectButtonWrapper() {
           'telegram',
           'farcaster',
           'email',
+          'x',
           'phone',
           'passkey',
           'guest',
         ],
       },
     }),
-    createWallet('io.metamask'),
-    createWallet('com.coinbase.wallet'),
+    createWallet('walletConnect'),
   ];
 
   // const paywallConfig = {
@@ -80,7 +77,7 @@ export default function ConnectButtonWrapper() {
       client={client}
       chain={base}
       connectButton={{
-        label: 'Get Started',
+        label: isAuthenticated ? undefined : 'Get Started',
         className:
           'my-custom-class text-sm sm:text-base px-3 py-1 sm:px-4 sm:py-2',
         style: {
@@ -90,6 +87,11 @@ export default function ConnectButtonWrapper() {
         },
       }}
       wallets={wallets}
+      connectModal={{ size: 'wide' }}
+      accountAbstraction={{
+        chain: base,
+        sponsorGas: false,
+      }}
       appMetadata={{
         name: 'Creative TV',
         url: 'https://tv.creativeplatform.xyz',
@@ -123,127 +125,89 @@ export default function ConnectButtonWrapper() {
           },
         ],
       }}
-      // auth={{
-      //   getLoginPayload: async ({
-      //     address,
-      //   }: {
-      //     address: string;
-      //     chainId: number;
-      //   }) => await generatePayload({ address, chainId: 8453 }),
-      //   doLogin: async (params: VerifyLoginPayloadParams) => {
-      //     try {
-      //       console.log('Starting authentication process');
+      auth={{
+        async doLogin(params) {
+          try {
+            // First connect with Orbis
+            const orbisResult = await AuthService.connectWithOrbis();
+            if (!orbisResult) {
+              throw new Error('Failed to connect with Orbis');
+            }
 
-      //       // First authenticate with Thirdweb
-      //       console.log('Authenticating with Thirdweb');
-      //       await login(params);
-      //       console.log('Thirdweb authentication successful');
+            // Then perform login
+            const loginResult = await AuthService.login();
+            if (!loginResult.success) {
+              throw new Error(loginResult.message || 'Login failed');
+            }
 
-      //       // Get the JWT from cookies for debugging
-      //       try {
-      //         const cookies = document.cookie.split(';').reduce(
-      //           (acc, cookie) => {
-      //             const [key, value] = cookie.trim().split('=');
-      //             acc[key] = value;
-      //             return acc;
-      //           },
-      //           {} as Record<string, string>,
-      //         );
+            await checkAuth();
+            toast.success('Successfully logged in');
+            router.refresh();
+          } catch (error) {
+            console.error('Login error:', error);
+            toast.error(
+              error instanceof Error ? error.message : 'Login failed',
+            );
+            throw error;
+          }
+        },
+        async doLogout() {
+          try {
+            const result = await AuthService.logout();
+            if (!result.success) {
+              throw new Error(result.message || 'Logout failed');
+            }
 
-      //         if (cookies.jwt) {
-      //           console.log('JWT found in cookies, analyzing...');
-      //           const { payload, signature } = decodeJWT(cookies.jwt);
-      //           console.log('JWT payload:', payload);
+            await checkAuth();
+            toast.success('Successfully logged out');
+            router.refresh();
+          } catch (error) {
+            console.error('Logout error:', error);
+            toast.error(
+              error instanceof Error ? error.message : 'Logout failed',
+            );
+            throw error;
+          }
+        },
+        async getLoginPayload({ address, chainId }): Promise<LoginPayload> {
+          try {
+            const domain = window.location.host;
+            const nonce = Date.now().toString();
+            const statement =
+              'Welcome to Creative TV! Sign this message to authenticate.';
+            const now = new Date();
+            const issuedAt = now.toISOString();
 
-      //           // Check for binary data in the payload
-      //           const binaryCheck = checkForBinaryData(payload);
-      //           if (binaryCheck.hasBinaryData) {
-      //             console.warn(
-      //               'Binary data found in JWT payload:',
-      //               binaryCheck.paths,
-      //             );
-      //           }
-      //         }
-      //       } catch (jwtError) {
-      //         console.error('Error analyzing JWT:', jwtError);
-      //       }
-
-      //       // Wait a bit for the Thirdweb auth to complete
-      //       await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      //       // Then authenticate with Orbis using EVM auth
-      //       console.log('Starting Orbis authentication');
-      //       const orbisResult = await orbisLogin();
-      //       if (!orbisResult) {
-      //         console.error('Orbis login returned null result');
-      //         throw new Error('Failed to login to Orbis');
-      //       }
-
-      //       // Check if the login was successful based on status
-      //       if (orbisResult.status !== 200) {
-      //         console.error(
-      //           'Orbis login failed with status:',
-      //           orbisResult.status,
-      //         );
-      //         if (orbisResult.error) {
-      //           console.error('Orbis login error:', orbisResult.error);
-      //         }
-      //         throw new Error(
-      //           'Failed to login to Orbis: ' +
-      //             (orbisResult.error || 'Unknown error'),
-      //         );
-      //       }
-
-      //       console.log('Orbis login successful, verifying connection');
-
-      //       // Verify Orbis connection
-      //       try {
-      //         const isOrbisConnected = await db.isUserConnected();
-      //         console.log('Orbis connection status:', isOrbisConnected);
-      //         if (!isOrbisConnected) {
-      //           console.warn(
-      //             'Orbis connection verification returned false, but continuing anyway',
-      //           );
-      //         }
-      //       } catch (connectionError) {
-      //         console.error(
-      //           'Error verifying Orbis connection:',
-      //           connectionError,
-      //         );
-      //         console.warn(
-      //           'Continuing despite Orbis connection verification error',
-      //         );
-      //       }
-
-      //       try {
-      //         const currentUser = await db.getConnectedUser();
-      //         console.log('Connected Orbis User:', currentUser);
-      //       } catch (userError) {
-      //         console.error('Error getting connected Orbis user:', userError);
-      //       }
-
-      //       toast.success('Successfully authenticated with Orbis');
-      //     } catch (error) {
-      //       console.error('Authentication error:', error);
-      //       // Log more details about the error
-      //       if (error instanceof Error) {
-      //         console.error('Error name:', error.name);
-      //         console.error('Error message:', error.message);
-      //         console.error('Error stack:', error.stack);
-      //       } else {
-      //         console.error('Unknown error type:', typeof error);
-      //       }
-      //       toast.error('Failed to complete authentication. Please try again.');
-      //       throw error;
-      //     }
-      //   },
-      //   isLoggedIn: async () => {
-      //     return await isLoggedIn();
-      //   },
-      //   doLogout: async () => {
-      //     await logout();
-      //   },
-      // }}
+            return {
+              domain,
+              address,
+              statement,
+              uri: window.location.origin,
+              version: '1',
+              chain_id: chainId.toString(),
+              nonce,
+              issued_at: issuedAt,
+              invalid_before: issuedAt,
+              expiration_time: new Date(
+                now.getTime() + 1000 * 60 * 60 * 24,
+              ).toISOString(), // 24 hours
+              resources: [`${window.location.origin}/*`],
+            };
+          } catch (error) {
+            console.error('Error generating login payload:', error);
+            throw error;
+          }
+        },
+        async isLoggedIn(address) {
+          try {
+            const authStatus = await AuthService.checkAuthStatus();
+            return authStatus.success && authStatus.data?.isAuthenticated;
+          } catch (error) {
+            console.error('Error checking login status:', error);
+            return false;
+          }
+        },
+      }}
     />
   );
 }
