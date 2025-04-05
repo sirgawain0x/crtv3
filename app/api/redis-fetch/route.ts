@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 
 // Initialize Redis
 const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_KV_URL,
+  url: process.env.UPSTASH_REDIS_REST_KV_REST_API_URL,
   token: process.env.UPSTASH_REDIS_REST_KV_REST_API_TOKEN,
 });
 
