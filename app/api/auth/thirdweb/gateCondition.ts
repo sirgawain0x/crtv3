@@ -1,14 +1,22 @@
-import { createJWT } from '../utils/jwt';
+import signJwt from '../utils/jwt';
 import { getContract } from "thirdweb";
 import { base } from "thirdweb/chains";
-import { client } from "../../../lib/sdk/thirdweb/client";
-import { balanceOf as balanceOfERC721 } from "thirdweb/extensions/erc721";
+import { createThirdwebClient } from "thirdweb";
+import dotenv from 'dotenv';
+
+// Load environment variables from .env file
+dotenv.config();
+
+// Initialize the client using createThirdwebClient
+const client = createThirdwebClient({
+  clientId: process.env.THIRDWEB_ADMIN_PRIVATE_KEY!,  // Use non-null assertion or proper env validation
+  secretKey: process.env.THIRDWEB_SECRET_KEY!,
+});
 
 export async function hasAccess(address: string): Promise<{access: boolean, token?: string}> {
   const hasNFTAccess = await hasNFT(address);
   
   if (hasNFTAccess) {
-    // Create JWT payload
     const payload = {
       sub: address,
       nft_holdings: {
@@ -18,14 +26,14 @@ export async function hasAccess(address: string): Promise<{access: boolean, toke
       }
     };
     
-    const token = await createJWT(payload);
+    const token = await signJwt(payload);
     return { access: true, token };
   }
   
   return { access: false };
 }
 
-async function hasNFT(address: string) {
+async function hasNFT(address: string): Promise<boolean> {
   const requiredQuantity = 1n;
 
   const creatorPassAnnual = getContract({
@@ -34,12 +42,18 @@ async function hasNFT(address: string) {
     client,
   });
 
-  const creatorPassAnnualBalance = await balanceOfERC721({
-    contract: creatorPassAnnual,
-    owner: address,
-  });
-
-  const hasPass: boolean = creatorPassAnnualBalance >= requiredQuantity;
+  try {
+    // Import balanceOf directly from the ERC721 extensions
+    const { balanceOf } = await import("thirdweb/extensions/erc721");
+    
+    const creatorPassAnnualBalance = await balanceOf({
+      contract: creatorPassAnnual,
+      owner: address,
+    });
   
-  return hasPass;
+    return creatorPassAnnualBalance >= requiredQuantity;
+  } catch (error) {
+    console.error('Error checking NFT balance:', error);
+    throw new Error('Error checking NFT balance');
+  }
 }

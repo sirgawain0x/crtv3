@@ -1,9 +1,10 @@
+// crtv3/app/layout.tsx (1-38)
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
-import { Providers } from './providers';
-import Layout from './components/Layout/Layout';
-import { VideoProvider } from './context/VideoContext';
+import { Providers } from './providers'; // Ensure this component accepts children
+import Layout from './components/Layout/Layout'; // Ensure this component accepts children
+import { VideoProvider } from './context/VideoContext'; // Ensure this component accepts children
 
 const inter = Inter({
   subsets: ['latin'],
