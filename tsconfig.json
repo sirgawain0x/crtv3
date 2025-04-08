@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "types": ["react", "node"],
     "baseUrl": ".",
     "target": "ESNext",
     "lib": ["dom", "dom.iterable", "esnext"],
@@ -25,7 +26,11 @@
     "paths": {
       "@app/*": ["./app/*"],
       "@public/*": ["./public/*"]
-    }
+    },
+    "typeRoots": [
+      "./node_modules/@types",
+      "./app/types"
+    ]
   },
   "include": [
     "next-env.d.ts",

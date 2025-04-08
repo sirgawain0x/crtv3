@@ -34,7 +34,7 @@ import {
   SubtitlesDisplay,
   SubtitlesControl,
   SubtitlesProvider,
-  SubtitlesLangaugeSelect,
+  SubtitlesLanguageSelect,
   useSubtitles,
 } from '@app/components/Player/Subtitles';
 import { getDetailPlaybackSource } from '@app/lib/utils/hooks/useDetailPlaybackSources';
@@ -243,7 +243,7 @@ export default function VideoDetails({ asset }: VideoDetailsProps) {
                   </Player.VideoQualitySelect>
                 </div>
                 <div className="flex flex-col gap-2">
-                  {subtitles && <SubtitlesLangaugeSelect />}
+                  {subtitles && <SubtitlesLanguageSelect />}
                 </div>
               </div>
               <Popover.Close

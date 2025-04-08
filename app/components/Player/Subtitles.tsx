@@ -1,3 +1,4 @@
+// Subtitles.tsx
 'use client';
 
 import React, {
@@ -7,8 +8,10 @@ import React, {
   useEffect,
   ReactNode,
 } from 'react';
-import type { CSSProperties } from 'react';
+import type { CSSProperties } from 'react'; // Use named import with `type`
 import { FaClosedCaptioning } from 'react-icons/fa';
+
+// Rest of your code...
 
 import {
   MediaScopedProps,
@@ -95,7 +98,7 @@ export type LanguageSelectProps = {
   subtitles: Record<string, Chunk>;
 };
 
-export function SubtitlesLangaugeSelect() {
+export function SubtitlesLanguageSelect() {
   const { subtitles, language, setLanguage } = useSubtitles();
 
   return (
