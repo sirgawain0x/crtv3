@@ -5,7 +5,6 @@ import { createContext, useContext, useState, useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { OrbisProvider } from '@app/lib/sdk/orbisDB/context';
 import { SubtitlesProvider } from './components/Player/Subtitles';
-
 interface ThemeContextType {
   theme: string;
   toggleTheme: () => void;
