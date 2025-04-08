@@ -26,7 +26,7 @@ This script converts specific environment variables into 32-byte hex strings usi
    ```sh
    npm install -g typescript
    tsc --init
-   tsc app/api/auth/utils/hexChecker.ts
+   tsc app/api/auth/utils/hexConverter.ts
 
    node app/api/auth/utils/hexConverter.js
    ```
@@ -45,4 +45,7 @@ Feel free to contribute to this project by submitting pull requests or issues on
 ## License
 
 This project is licensed under the MIT License. See the `LICENSE` file for more information.
+
+```
+
 ```
