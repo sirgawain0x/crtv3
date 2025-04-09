@@ -1,10 +1,8 @@
-import { createHash } from 'crypto';
+import { Buffer } from 'buffer';
 
-// Function to convert string to 32-byte hex
-function stringToHex(input: string): string {
-  const hash = createHash('sha256');
-  hash.update(input);
-  return hash.digest('hex').slice(0, 64);
+// Function to convert string to Base64
+function stringToBase64(input: string): string {
+  return Buffer.from(input).toString('base64');
 }
 
 // Environment variables
@@ -16,14 +14,14 @@ if (!thirdWebSecretKey || !thirdWebAdminPrivateKey || !livepeerFullApiKey) {
   throw new Error('Environment variables are missing');
 }
 
-// Convert to 32-byte hex
-const secretKeyHex = stringToHex(thirdWebSecretKey);
-const adminPrivateKeyHex = stringToHex(thirdWebAdminPrivateKey);
-const livepeerFullApiKeyHex = stringToHex(livepeerFullApiKey);
+// Convert to Base64
+const secretKeyBase64 = stringToBase64(thirdWebSecretKey);
+const adminPrivateKeyBase64 = stringToBase64(thirdWebAdminPrivateKey);
+const livepeerFullApiKeyBase64 = stringToBase64(livepeerFullApiKey);
 
 // Update environment variables
-process.env.THIRDWEB_SECRET_KEY = secretKeyHex;
-process.env.THIRDWEB_ADMIN_PRIVATE_KEY = adminPrivateKeyHex;
-process.env.LIVEPEER_FULL_API_KEY = livepeerFullApiKeyHex;
+process.env.THIRDWEB_SECRET_KEY = secretKeyBase64;
+process.env.THIRDWEB_ADMIN_PRIVATE_KEY = adminPrivateKeyBase64;
+process.env.LIVEPEER_FULL_API_KEY = livepeerFullApiKeyBase64;
 
 console.log('Environment variables updated');
