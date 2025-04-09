@@ -1,4 +1,4 @@
-import { Buffer } from 'buffer';
+import { Buffer } from 'node:buffer';
 
 // Function to convert string to Base64
 function stringToBase64(input: string): string {
