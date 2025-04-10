@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import styles from '../styles/createPostForm.module.scss';
-
 import { useCeramicContext } from '../context';
 
 interface CreatePostFormProps {
@@ -11,6 +10,15 @@ interface CreatePostFormProps {
 interface Profile {
   id: string;
   name: string;
+}
+
+interface ViewerData {
+  data?: {
+    viewer?: {
+      basicProfile?: Profile;
+    };
+  };
+  errors?: Array<{ message: string }>;
 }
 
 export const CreatePostForm = ({ refreshPosts }: CreatePostFormProps) => {
@@ -55,7 +63,7 @@ export const CreatePostForm = ({ refreshPosts }: CreatePostFormProps) => {
 
   useEffect(() => {
     const fetchProfile = async () => {
-      const profile = await composeClient.executeQuery(`
+      const response = (await composeClient.executeQuery(`
         query {
           viewer {
             basicProfile {
@@ -64,8 +72,8 @@ export const CreatePostForm = ({ refreshPosts }: CreatePostFormProps) => {
             }
           }
         }
-      `);
-      setProfile(profile.data?.viewer?.basicProfile);
+      `)) as ViewerData;
+      setProfile(response.data?.viewer?.basicProfile || null);
     };
 
     fetchProfile();

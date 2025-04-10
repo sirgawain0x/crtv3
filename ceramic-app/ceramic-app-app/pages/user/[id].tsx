@@ -1,14 +1,37 @@
-import type { NextPage } from "next";
-import { useRouter } from "next/router";
-import { useEffect, useState } from "react";
+import type { NextPage } from 'next';
+import { useRouter } from 'next/router';
+import { useEffect, useState } from 'react';
 
-import { useCeramicContext } from "../../context";
-import { Author, Posts } from "../../types";
+import { useCeramicContext } from '../../context';
+import { Author, Posts, Profile } from '../../types';
 
-import Head from "next/head";
-import Post from "../../components/post.component";
-import styles from "../../styles/postsFeed.module.scss";
-import userStyles from "../../styles/user.module.scss";
+import Head from 'next/head';
+import Post from '../../components/post.component';
+import styles from '../../styles/postsFeed.module.scss';
+import userStyles from '../../styles/user.module.scss';
+
+interface UserProfileResponse {
+  data?: {
+    node?: {
+      id: string;
+      name?: string;
+      username?: string;
+      description?: string;
+      gender?: string;
+      emoji?: string;
+      posts?: {
+        edges: Array<{
+          node: {
+            id: string;
+            body?: string;
+            created?: string;
+          };
+        }>;
+      };
+    };
+  };
+  errors?: Array<{ message: string }>;
+}
 
 const UserProfile: NextPage = () => {
   const router = useRouter();
@@ -16,47 +39,65 @@ const UserProfile: NextPage = () => {
 
   const clients = useCeramicContext();
   const { ceramic, composeClient } = clients;
-  const [profile, setProfile] = useState<Author | {}>({});
-  const [posts, setPosts] = useState<Posts[] | []>([]);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [posts, setPosts] = useState<Posts[]>([]);
 
-  const getData = async () => {
-    const data = await composeClient.executeQuery(`
-      query {
-        node (id: "${id}") {
-          ... on BasicProfile {
-            id
-            username
-            name
-            description
-            emoji
-            posts (last:300) {
-              edges {
-                node {
-                  id
-                  body
-                  created
+  useEffect(() => {
+    const getProfile = async () => {
+      if (!id) return;
+
+      const data = (await composeClient.executeQuery(`
+        query {
+          node(id: "${id}") {
+            ... on BasicProfile {
+              id
+              name
+              username
+              description
+              gender
+              emoji
+              posts(last: 300) {
+                edges {
+                  node {
+                    id
+                    body
+                    created
+                  }
                 }
               }
             }
           }
         }
+      `)) as UserProfileResponse;
+
+      console.log(data);
+
+      if (data?.data?.node) {
+        setProfile({
+          id: data.data.node.id,
+          name: data.data.node.name,
+          username: data.data.node.username,
+          description: data.data.node.description,
+          gender: data.data.node.gender,
+          emoji: data.data.node.emoji,
+        });
+
+        if (data.data.node.posts?.edges) {
+          setPosts([
+            {
+              edges: data.data.node.posts.edges,
+            },
+          ]);
+        }
       }
-    `);
-    console.log(data);
-    setProfile({
-      name: data.data.node.name,
-      username: data.data.node.username,
-      description: data.data.node.description,
-      id: data.data.node.id,
-      emoji: data.data.node.emoji,
-    });
+    };
 
-    setPosts(data.data.node.posts);
-  };
+    getProfile();
+  }, [id, composeClient]);
 
-  // TODO: Add check to see if viewer is already following this account to
-  //       prevent dupes
   const follow = async () => {
+    if (!profile?.id) return;
+
     const follow = await composeClient.executeQuery(`
       mutation {
         createFollowing(input: {
@@ -66,7 +107,7 @@ const UserProfile: NextPage = () => {
         }) 
         {
           document {
-            profileId
+            id
           }
         }
       }
@@ -75,56 +116,56 @@ const UserProfile: NextPage = () => {
     alert(`Followed ${profile.name}.`);
   };
 
-  useEffect(() => {
-    getData();
-  }, []);
+  if (!profile) return null;
 
   return (
     <>
       <Head>
-        <title>{profile !== undefined ? `${profile?.username}'s Profile` : "No profile"}</title>
+        <title>
+          {profile.username ? `${profile.username}'s Profile` : 'No profile'}
+        </title>
       </Head>
-      {profile !== undefined ? (
-        <div className='content'>
-          <div className={userStyles.details}>
-            <div className={userStyles.user}>
-              <div className={userStyles.emoji}>{profile.emoji}</div>
-              <div>
-                <h2 className={userStyles.names} style={{ marginBottom: "5px" }}>
-                  {profile.name}
-                </h2>
-                &nbsp;&nbsp;
-                <div className={userStyles.names} style={{ color: "#eb4a27", marginBottom: "5px" }}>
-                  @{profile.username}
-                </div>
-                <div>{profile.description}</div>
-              </div>
-            </div>
-            <div className={userStyles.follow}>
-              <button
-                onClick={() => {
-                  follow();
-                }}
+      <div className="content">
+        <div className={userStyles.details}>
+          <div className={userStyles.user}>
+            <div className={userStyles.emoji}>{profile.emoji}</div>
+            <div>
+              <h2 className={userStyles.names} style={{ marginBottom: '5px' }}>
+                {profile.name}
+              </h2>
+              &nbsp;&nbsp;
+              <div
+                className={userStyles.names}
+                style={{ color: '#eb4a27', marginBottom: '5px' }}
               >
-                Follow {`${profile.username}`}
-              </button>
+                @{profile.username}
+              </div>
+              <div>{profile.description}</div>
             </div>
           </div>
-          {posts?.edges !== undefined ? (
-            <div className={styles.postContainer}>
-              {posts.edges
-                .filter((post) => post.node !== null)
-                .map((post) => (
-                  <Post author={profile} post={post.node} key={post.node.id} />
-                ))}
-            </div>
-          ) : (
-            <></>
-          )}
+          <div className={userStyles.follow}>
+            <button onClick={follow}>Follow {profile.username}</button>
+          </div>
         </div>
-      ) : (
-        <div className='content'></div>
-      )}
+        {posts[0]?.edges && (
+          <div className={styles.postContainer}>
+            {posts[0].edges
+              .filter((post) => post.node !== null)
+              .map((post) => (
+                <Post
+                  key={post.node.id}
+                  author={{
+                    id: profile.id || '',
+                    name: profile.name || '',
+                    username: profile.username || '',
+                    emoji: profile.emoji || '',
+                  }}
+                  post={post.node}
+                />
+              ))}
+          </div>
+        )}
+      </div>
     </>
   );
 };

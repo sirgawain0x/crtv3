@@ -1,84 +1,92 @@
-import Post from "../components/post.component";
-import styles from "../styles/postsFeed.module.scss";
+import { useEffect, useState } from 'react';
+import { useCeramicContext } from '../context';
+import { Author, Post, PostProps } from '../types';
+import styles from '../styles/postsFeed.module.scss';
+import PostComponent from '../components/post.component';
 
-import type { NextPage } from "next";
+interface ExploreResponse {
+  data?: {
+    postsIndex?: {
+      edges: Array<{
+        node: {
+          id: string;
+          body?: string;
+          created?: string;
+          profile: {
+            id: string;
+            name?: string;
+            username?: string;
+            emoji?: string;
+          };
+        };
+      }>;
+    };
+  };
+  errors?: Array<{ message: string }>;
+}
 
-import { useEffect, useState } from "react";
-import { useCeramicContext } from "../context";
-import { PostProps } from "../types";
-
-const ExplorePage: NextPage = () => {
+export default function Explore() {
   const clients = useCeramicContext();
   const { ceramic, composeClient } = clients;
-  let alerted = false;
+  const [posts, setPosts] = useState<PostProps[]>([]);
 
-  const [posts, setPosts] = useState<PostProps[] | []>([]);
-
-  const explorePosts = async () => {
-    const res = await composeClient.executeQuery(`
-      query {
-        postsIndex (last:300) {
-          edges {
-            node {
-              id
-              body
-              created
-              profile {
+  useEffect(() => {
+    const getPosts = async () => {
+      const data = (await composeClient.executeQuery(`
+        query {
+          postsIndex(first: 100) {
+            edges {
+              node {
                 id
-                name
-                username 
-                emoji
+                body
+                created
+                profile {
+                  id
+                  name
+                  username
+                  emoji
+                }
               }
             }
           }
         }
-      }
-    `);
-    const posts: PostProps[] = [];
+      `)) as ExploreResponse;
 
-    res.data.postsIndex.edges.map((post) => {
-      if (post.node) {
-        posts.push({
-          author: {
-            id: post.node.profile.id,
-            name: post.node.profile.name,
-            username: post.node.profile.username,
-            emoji: post.node.profile.emoji,
-          },
-          post: {
-            body: post.node.body,
-            created: post.node.created,
-            id: post.node.id,
-          },
-        });
-      }
-    });
-    posts.sort((a, b) => new Date(b.post.created).getTime() - new Date(a.post.created).getTime());
-    if (posts.length == 0) {
-      if (!alerted) {
-        alert(
-          "There's nothing here! Try posting with a registered profile or see the README to upgrade to claynet to see other developer's posts."
-        );
-        alerted = true;
-      }
-    }
-    setPosts(posts);
-  };
+      console.log(data);
 
-  useEffect(() => {
-    explorePosts();
-  }, []);
+      if (data?.data?.postsIndex?.edges) {
+        const formattedPosts = data.data.postsIndex.edges
+          .filter((post) => post.node !== null)
+          .map((post) => ({
+            author: {
+              id: post.node.profile.id,
+              name: post.node.profile.name || '',
+              username: post.node.profile.username || '',
+              emoji: post.node.profile.emoji || '',
+            },
+            post: {
+              id: post.node.id,
+              body: post.node.body || '',
+              created: post.node.created,
+            },
+          }));
+
+        setPosts(formattedPosts);
+      }
+    };
+
+    getPosts();
+  }, [composeClient]);
 
   return (
-    <div className='content'>
-      <div className={styles.postContainer}>
-        <h1>Explore</h1>
-        {posts?.map((post) => (
-          <Post author={post.author} post={post.post} key={post.post.id} />
-        ))}
-      </div>
+    <div className={styles.postContainer}>
+      {posts.map((post) => (
+        <PostComponent
+          key={post.post.id}
+          author={post.author}
+          post={post.post}
+        />
+      ))}
     </div>
   );
-};
-
-export default ExplorePage;
+}

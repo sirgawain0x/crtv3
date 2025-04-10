@@ -1,87 +1,87 @@
-import { NextPage } from "next";
-import { useRouter } from "next/router";
-import { useEffect, useState } from "react";
-import Post from "../../components/post.component";
-import { useCeramicContext } from "../../context";
+import { NextPage } from 'next';
+import { useRouter } from 'next/router';
+import { useEffect, useState } from 'react';
+import Post from '../../components/post.component';
+import { useCeramicContext } from '../../context';
+import { PostProps } from '../../types';
 
+interface PostDetailsResponse {
+  data?: {
+    node?: {
+      author: {
+        basicProfile: {
+          id: string;
+          body?: string;
+          created?: string;
+          name?: string;
+          username?: string;
+          emoji?: string;
+        };
+      };
+    };
+  };
+  errors?: Array<{ message: string }>;
+}
 
 const PostDetails: NextPage = () => {
-  const router = useRouter()
-  const { id } = router.query
+  const router = useRouter();
+  const { id } = router.query;
 
-  const clients = useCeramicContext() 
-  const {ceramic, composeClient} = clients
+  const clients = useCeramicContext();
+  const { ceramic, composeClient } = clients;
 
-  const [postDetails, setPostDetails ] = useState({})
+  const [postDetails, setPostDetails] = useState<PostDetailsResponse | null>(
+    null,
+  );
 
   const getPost = async () => {
-    const postDetails = await composeClient.executeQuery(`
+    if (!id) return;
+
+    const response = (await composeClient.executeQuery(`
       query {
-        node(id:"$${id}"){
-          ...on Posts{
-            body
-            id
-            created
+        node(id: "${id}") {
+          ... on Post {
             author {
               basicProfile {
-                username
-                name
                 id
-              }
-            }
-            comments(last:30){
-              edges {
-                node {
-                  id
-                  author {
-                    basicProfile {
-                      username
-                      name
-                      id
-                    }
-                  }
-                }
+                body
+                created
+                name
+                username
+                emoji
               }
             }
           }
         }
       }
-    `)
-    console.log(postDetails.data)
+    `)) as PostDetailsResponse;
 
-    setPostDetails({
-      author: {
-        id: postDetails.data?.node.author.basicProfile.id,
-        body: postDetails.data?.node.author.basicProfile.body,
-        created: postDetails.data?.node.author.basicProfile.created
-      },
-      post: {
-        id: postDetails.data?.node.id,
-        body: postDetails.data?.node.body,
-        created: postDetails.data?.node.created
-      }
-    })
-  }
+    setPostDetails(response);
+  };
 
   useEffect(() => {
-    getPost()
-  }, [])
+    getPost();
+  }, [id, composeClient]);
+
+  if (!postDetails?.data?.node) return null;
 
   return (
-    <div className = "content">
-      {postDetails.id !== undefined
-      ?
-      <>
-        {postDetails.id}
-      </>
-        // <Post author = {postDetails.author} post = {postDetails.post} /> 
-      :
-      <>
-        n/a
-      </>
-    }
+    <div className="content">
+      <h1>Post Details</h1>
+      <div>
+        <h2>Author</h2>
+        <p>ID: {postDetails.data.node.author.basicProfile.id}</p>
+        <p>Name: {postDetails.data.node.author.basicProfile.name}</p>
+        <p>Username: {postDetails.data.node.author.basicProfile.username}</p>
+        <p>Emoji: {postDetails.data.node.author.basicProfile.emoji}</p>
+      </div>
+      <div>
+        <h2>Post</h2>
+        <p>Body: {postDetails.data.node.author.basicProfile.body}</p>
+        <p>Created: {postDetails.data.node.author.basicProfile.created}</p>
+      </div>
     </div>
-  )
-}
+  );
+};
 
-export default PostDetails
+export default PostDetails;
