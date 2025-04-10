@@ -46,3 +46,5 @@ next-env.d.ts
 
 # Windsurf
 .winsurfrules
+
+ceramic-app
