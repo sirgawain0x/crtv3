@@ -1,20 +1,25 @@
-import React, { useState, useEffect } from "react";
-import Link from "next/link";
-import styles from "../styles/createPostForm.module.scss";
+import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
+import styles from '../styles/createPostForm.module.scss';
 
-import { useCeramicContext } from "../context";
+import { useCeramicContext } from '../context';
 
 interface CreatePostFormProps {
   refreshPosts: () => Promise<void>;
 }
 
-export const CreatePostForm = ({ refreshPosts }) => {
+interface Profile {
+  id: string;
+  name: string;
+}
+
+export const CreatePostForm = ({ refreshPosts }: CreatePostFormProps) => {
   const clients = useCeramicContext();
   const { ceramic, composeClient } = clients;
 
-  const [profile, setProfile] = useState(null);
-  const [newPost, setNewPost] = useState("");
-  const [tag, setTag] = useState("");
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [newPost, setNewPost] = useState('');
+  const [tag, setTag] = useState('');
 
   const createPost = async () => {
     if (ceramic.did !== undefined && profile && profile.name) {
@@ -23,7 +28,7 @@ export const CreatePostForm = ({ refreshPosts }) => {
             createPosts(input: {
               content: {
                 body: "${newPost}"
-                tag: "${tag || "general"}"
+                tag: "${tag || 'general'}"
                 created: "${new Date().toISOString()}"
                 profileId: "${profile.id}"
               }
@@ -36,11 +41,13 @@ export const CreatePostForm = ({ refreshPosts }) => {
           }
         `);
       // getPosts();
-      setNewPost("");
-      setTag("");
-      alert("Created post.");
+      setNewPost('');
+      setTag('');
+      alert('Created post.');
     } else {
-      alert("Failed to fetch profile for authenticated user. Please register a profile.");
+      alert(
+        'Failed to fetch profile for authenticated user. Please register a profile.',
+      );
     }
     // After creating the post, refresh the posts
     await refreshPosts();
@@ -69,7 +76,7 @@ export const CreatePostForm = ({ refreshPosts }) => {
       <textarea
         value={newPost}
         maxLength={200}
-        placeholder='What are you thinking about?'
+        placeholder="What are you thinking about?"
         className={styles.postInput}
         onChange={(e) => {
           setNewPost(e.target.value);
@@ -78,7 +85,7 @@ export const CreatePostForm = ({ refreshPosts }) => {
       <textarea
         value={tag}
         maxLength={50}
-        placeholder='Enter a Category Tag'
+        placeholder="Enter a Category Tag"
         className={styles.postInput}
         onChange={(e) => {
           setTag(e.target.value);
