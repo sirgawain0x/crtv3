@@ -1,8 +1,6 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { FaHome } from 'react-icons/fa/index.js';
-import { FaUser } from 'react-icons/fa/index.js';
-import { FaHashtag } from 'react-icons/fa/index.js';
+import { Home, User, Hash } from 'lucide-react';
 import { SidebarProps } from '../types';
 
 export const Sidebar = ({ name, username, id }: SidebarProps) => {
@@ -19,17 +17,17 @@ export const Sidebar = ({ name, username, id }: SidebarProps) => {
         </div>
         <Link href="/">
           <a>
-            <FaHome /> Home
+            <Home className="h-4 w-4" /> Home
           </a>
         </Link>
         <Link href={`/profile`}>
           <a>
-            <FaUser /> Profile
+            <User className="h-4 w-4" /> Profile
           </a>
         </Link>
         <Link href="/explore">
           <a>
-            <FaHashtag /> Explore
+            <Hash className="h-4 w-4" /> Explore
           </a>
         </Link>
       </div>
