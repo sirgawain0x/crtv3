@@ -1,29 +1,32 @@
-import "../styles/globals.scss";
-import { Sidebar } from "../components/sidebar.component";
-import { Footer } from "../components/footer.component";
+import '../styles/globals.scss';
+import { Sidebar } from '../components/sidebar.component';
+import { Footer } from '../components/footer.component';
 
-import { CeramicWrapper } from "../context";
-import type { AppProps } from "next/app";
+import { CeramicWrapper } from '../context';
+import { AppProps } from 'next/app';
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from 'react';
 
-import { useCeramicContext } from "../context";
-import { authenticateCeramic } from "../utils";
-import AuthPrompt from "./did-select-popup";
+import { useCeramicContext } from '../context';
+import { authenticateCeramic } from '../utils';
+import AuthPrompt from './did-select-popup';
+import { Profile } from '../types';
+import { FaGithub } from 'react-icons/fa/index.js';
 
-type Profile = {
-  id?: any;
-  name?: string;
-  username?: string;
-  description?: string;
-  gender?: string;
-  emoji?: string;
-};
+interface ViewerResponse {
+  data?: {
+    viewer?: {
+      id?: string;
+      basicProfile?: Profile;
+    };
+  };
+  errors?: Array<{ message: string }>;
+}
 
 const MyApp = ({ Component, pageProps }: AppProps) => {
   const clients = useCeramicContext();
   const { ceramic, composeClient } = clients;
-  const [profile, setProfile] = useState<Profile | undefined>();
+  const [profile, setProfile] = useState<Profile | null>(null);
 
   const handleLogin = async () => {
     await authenticateCeramic(ceramic, composeClient);
@@ -31,27 +34,23 @@ const MyApp = ({ Component, pageProps }: AppProps) => {
   };
 
   const getProfile = async () => {
-    if (ceramic.did !== undefined) {
-      const profile = await composeClient.executeQuery(`
-        query {
-          viewer {
+    const result = (await composeClient.executeQuery(`
+      query {
+        viewer {
+          id
+          basicProfile {
             id
-            basicProfile {
-              id
-              name
-              username
-            }
+            name
           }
         }
-      `);
-      localStorage.setItem("viewer", profile?.data?.viewer?.id);
-
-      setProfile(profile?.data?.viewer?.basicProfile);
-    }
+      }
+    `)) as ViewerResponse;
+    localStorage.setItem('viewer', result.data?.viewer?.id || '');
+    setProfile(result.data?.viewer?.basicProfile || null);
   };
-  // Update to include refresh on auth
+
   useEffect(() => {
-    if (localStorage.getItem("logged_in")) {
+    if (localStorage.getItem('logged_in')) {
       handleLogin();
       getProfile();
     }
@@ -60,10 +59,14 @@ const MyApp = ({ Component, pageProps }: AppProps) => {
   return (
     <div>
       <AuthPrompt />
-      <div className='container'>
+      <div className="container">
         <CeramicWrapper>
-          <Sidebar name={profile?.name} username={profile?.username} id={profile?.id} />
-          <div className='body'>
+          <Sidebar
+            name={profile?.name}
+            username={profile?.username}
+            id={profile?.id}
+          />
+          <div className="body">
             <Component {...pageProps} ceramic />
             <Footer />
           </div>

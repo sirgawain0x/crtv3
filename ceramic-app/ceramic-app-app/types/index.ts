@@ -10,8 +10,9 @@ export type Profile = {
 export type Posts = {
   edges: Array<{
     node: {
-      body: string;
       id: string;
+      body?: string;
+      created?: string;
     };
   }>;
 };
@@ -31,13 +32,11 @@ export type Author = {
   id: string;
   name: string;
   username: string;
-
   emoji: string;
 };
 
 export type Post = {
-  body: string;
   id: string;
-  tag: string;
+  body?: string;
   created?: string;
 };
