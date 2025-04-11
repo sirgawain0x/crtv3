@@ -1,6 +1,6 @@
 'use client';
 
-import { getContract } from 'thirdweb';
+import { getContract } from 'thirdweb/contract';
 import { base } from 'thirdweb/chains';
 import { client } from '@app/lib/sdk/thirdweb/client';
 import { CONTRACT_ADDRESS } from '@app/lib/utils/context';
@@ -9,7 +9,7 @@ import { useActiveAccount, useReadContract } from 'thirdweb/react';
 
 export function useUnlockAccess() {
   const activeAccount = useActiveAccount();
-  
+
   const unlockContract = getContract({
     address: CONTRACT_ADDRESS.gateway.base.erc721,
     chain: base,
@@ -26,6 +26,6 @@ export function useUnlockAccess() {
   return {
     hasAccess: hasValidKey,
     isLoading,
-    address: activeAccount?.address
+    address: activeAccount?.address,
   };
 }

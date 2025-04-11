@@ -2,12 +2,12 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 
-import { getContract } from 'thirdweb';
+import { getContract } from 'thirdweb/contract';
 import { balanceOf as balanceOfERC1155 } from 'thirdweb/extensions/erc1155';
 
 import { generateAccessKey, validateAccessKey } from '@app/lib/access-key';
 import { getJwtContext } from '@app/api/auth/thirdweb/authentication';
-import { defineChain } from 'thirdweb';
+import { defineChain } from 'thirdweb/chains';
 import { client } from '@app/lib/sdk/thirdweb/client';
 
 export interface WebhookPayload {

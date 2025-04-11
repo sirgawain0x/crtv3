@@ -1,5 +1,5 @@
 import { CONTRACT_ADDRESS } from '@app/lib/utils/context';
-import { getContract } from 'thirdweb';
+import { getContract } from 'thirdweb/contract';
 import { base } from 'thirdweb/chains';
 import { client } from './client';
 

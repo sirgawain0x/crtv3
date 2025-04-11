@@ -5,6 +5,8 @@ import { createContext, useContext, useState, useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { OrbisProvider } from '@app/lib/sdk/orbisDB/context';
 import { SubtitlesProvider } from './components/Player/Subtitles';
+import { ThemeProvider } from 'next-themes';
+
 interface ThemeContextType {
   theme: string;
   toggleTheme: () => void;
@@ -14,9 +16,11 @@ const queryClient = new QueryClient();
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-export const Providers: React.FC<{ children: React.ReactNode }> = ({
-  children,
-}) => {
+interface ProvidersProps {
+  children: React.ReactNode;
+}
+
+export function Providers({ children }: ProvidersProps) {
   const [theme, setTheme] = useState('light');
 
   useEffect(() => {
@@ -38,18 +42,25 @@ export const Providers: React.FC<{ children: React.ReactNode }> = ({
 
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme }}>
-      <SubtitlesProvider>
-        <ApolloWrapper>
-          <ThirdwebProvider>
-            <QueryClientProvider client={queryClient}>
-              <OrbisProvider>{children}</OrbisProvider>
-            </QueryClientProvider>
-          </ThirdwebProvider>
-        </ApolloWrapper>
-      </SubtitlesProvider>
+      <ThemeProvider
+        attribute="class"
+        defaultTheme="system"
+        enableSystem
+        disableTransitionOnChange
+      >
+        <SubtitlesProvider>
+          <ApolloWrapper>
+            <ThirdwebProvider>
+              <QueryClientProvider client={queryClient}>
+                <OrbisProvider>{children}</OrbisProvider>
+              </QueryClientProvider>
+            </ThirdwebProvider>
+          </ApolloWrapper>
+        </SubtitlesProvider>
+      </ThemeProvider>
     </ThemeContext.Provider>
   );
-};
+}
 
 export const useTheme = () => {
   const context = useContext(ThemeContext);

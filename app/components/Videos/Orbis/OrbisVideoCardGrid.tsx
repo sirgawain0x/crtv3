@@ -68,10 +68,15 @@ const VideoCardGrid: React.FC = () => {
       orbisVideos.map((video: AssetMetadata) => video.assetId),
     );
 
-    // Filter Livepeer assets to only include those with metadata in OrbisDB
-    return playbackSources.filter(
-      (asset) => asset.id && orbisAssetIds.has(asset.id),
-    );
+    // Filter and serialize Livepeer assets to only include those with metadata in OrbisDB
+    return playbackSources
+      .filter((asset) => asset.id && orbisAssetIds.has(asset.id))
+      .map((asset) => ({
+        ...JSON.parse(JSON.stringify(asset)), // Serialize the asset to remove any non-serializable data
+        detailedSrc: asset.detailedSrc
+          ? JSON.parse(JSON.stringify(asset.detailedSrc))
+          : null,
+      }));
   }, [playbackSources, orbisVideos, orbisLoading]);
 
   if (loading || orbisLoading) {

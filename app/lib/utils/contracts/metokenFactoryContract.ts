@@ -1,4 +1,5 @@
-import { getContract, defineChain } from 'thirdweb';
+import { getContract } from 'thirdweb/contract';
+import { defineChain } from 'thirdweb/chains';
 import { client } from '@app/lib/sdk/thirdweb/client';
 import metokenFactoryABI from './metokenFactoryABI.json';
 

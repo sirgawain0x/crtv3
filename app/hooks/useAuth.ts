@@ -16,39 +16,30 @@ export function useAuth() {
         credentials: 'include',
       });
 
-      const isAuthed = response.ok;
-      if (isAuthed !== isAuthenticated) {
-        console.log(
-          'Auth status changed:',
-          isAuthed ? 'authenticated' : 'not authenticated',
-        );
-        setIsAuthenticated(isAuthed);
-      }
+      setIsAuthenticated(response.ok);
     } catch (error) {
       console.error('Error checking auth status:', error);
       setIsAuthenticated(false);
     } finally {
       setIsChecking(false);
     }
-  }, [isChecking, isAuthenticated]);
+  }, []);
 
   // Check auth status when account changes
   useEffect(() => {
-    if (activeAccount) {
-      checkAuth();
-    } else {
+    if (!activeAccount) {
       setIsAuthenticated(false);
+      return;
     }
+
+    checkAuth();
   }, [activeAccount, checkAuth]);
 
   // Poll auth status every 5 seconds when connected
   useEffect(() => {
     if (!activeAccount) return;
 
-    const interval = setInterval(() => {
-      checkAuth();
-    }, 5000);
-
+    const interval = setInterval(checkAuth, 5000);
     return () => clearInterval(interval);
   }, [activeAccount, checkAuth]);
 

@@ -21,9 +21,7 @@ import ClaimLockButton from '@app/components/Paywall/ClaimLock';
 import * as VisuallyHidden from '@radix-ui/react-visually-hidden';
 import ThemeToggleComponent from '../ThemeToggle/toggleComponent';
 import ConnectButtonWrapper from '../Button/connectButtonWrapper';
-import { LoginButton } from '../Button/login-button';
 import { useAuth } from '@app/hooks/useAuth';
-import { LogOutButton } from '../Button/logout-button';
 import { UserMenu } from './userMenu';
 import { useUnlockAccess } from '@app/hooks/useUnlockAccess';
 
@@ -41,19 +39,9 @@ export function Navbar() {
       return <ConnectButtonWrapper />;
     }
 
-    if (!isAuthenticated) {
-      return (
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <ConnectButtonWrapper />
-          <LoginButton />
-        </div>
-      );
-    }
-
     return (
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <ConnectButtonWrapper />
-        <LogOutButton />
         {hasAccess ? (
           <UserMenu onNavigate={handleLinkClick} />
         ) : (

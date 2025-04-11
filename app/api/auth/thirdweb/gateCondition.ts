@@ -1,5 +1,5 @@
 import signJwt from '../utils/jwt';
-import { getContract } from 'thirdweb';
+import { getContract } from 'thirdweb/contract';
 import { base } from 'thirdweb/chains';
 import { client } from '@app/lib/sdk/thirdweb/client';
 import dotenv from 'dotenv';

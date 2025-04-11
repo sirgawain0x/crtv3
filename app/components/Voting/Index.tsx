@@ -7,7 +7,7 @@ import { client } from '@app/lib/sdk/thirdweb/client';
 import { base } from 'thirdweb/chains';
 import { FaUsers, FaCertificate } from 'react-icons/fa';
 import { useActiveAccount, useReadContract } from 'thirdweb/react';
-import { getContract } from 'thirdweb';
+import { getContract } from 'thirdweb/contract';
 import { Label } from '../ui/label';
 import { ROLES, CREATIVE_ADDRESS } from '@app/lib/utils/context';
 import { Card } from '@app/components/Voting/Card';

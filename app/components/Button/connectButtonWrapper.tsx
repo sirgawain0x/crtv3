@@ -4,7 +4,6 @@ import { client } from '@app/lib/sdk/thirdweb/client';
 import { ConnectButton } from '@app/lib/sdk/thirdweb/components';
 import { base } from 'thirdweb/chains';
 import { createWallet, inAppWallet } from 'thirdweb/wallets';
-import { toast } from 'sonner';
 import { AuthService } from '@app/lib/services/auth';
 import { useRouter } from 'next/navigation';
 import type { LoginPayload } from 'thirdweb/auth';
@@ -15,62 +14,41 @@ export default function ConnectButtonWrapper() {
   const router = useRouter();
   const { isAuthenticated, checkAuth } = useAuth();
 
-  const wallets = [
-    inAppWallet({
-      auth: {
-        options: [
-          'google',
-          'discord',
-          'telegram',
-          'farcaster',
-          'email',
-          'x',
-          'phone',
-          'passkey',
-          'guest',
-        ],
+  // Configure inAppWallet with SIWE and other auth methods
+  const inAppWalletConfig = inAppWallet({
+    auth: {
+      options: [
+        'google',
+        'discord',
+        'telegram',
+        'farcaster',
+        'email',
+        'x',
+        'phone',
+        'passkey',
+        'guest',
+        'wallet',
+      ],
+      mode: 'popup',
+    },
+    metadata: {
+      image: {
+        src: 'https://bafybeiesvinhgaqvr62rj77jbwkazg3w6bhcrsfyg6zyozasaud53nucnm.ipfs.w3s.link/Creative%20TV%20Logo.png',
+        alt: 'Creative TV Logo',
+        width: 100,
+        height: 100,
       },
-    }),
-    createWallet('walletConnect'),
-  ];
+    },
+    hidePrivateKeyExport: true,
+  });
 
-  // const paywallConfig = {
-  //   icon: 'https://storage.unlock-protocol.com/7b2b45eb-ed97-4a1a-b460-b31ce79d087d',
-  //   locks: {
-  //     '0xad597e5b24ad2a6032168c76f49f05d957223cd0': {
-  //       name: 'Annual Creator Pass',
-  //       order: 2,
-  //       network: 137,
-  //       recipient: '',
-  //       dataBuilder: '',
-  //       emailRequired: true,
-  //       maxRecipients: 1,
-  //       skipRecipient: true,
-  //       recurringPayments: 'forever',
-  //     },
-  //     '0xb6b645c3e2025cf69983983266d16a0aa323e2b0': {
-  //       name: 'Creator Pass (3 months)',
-  //       order: 2,
-  //       network: 137,
-  //       recipient: '',
-  //       dataBuilder: '',
-  //       emailRequired: true,
-  //       maxRecipients: 1,
-  //       recurringPayments: 'forever',
-  //     },
-  //   },
-  //   title: 'The Creative Membership',
-  //   referrer: '0x1Fde40a4046Eda0cA0539Dd6c77ABF8933B94260',
-  //   skipSelect: false,
-  //   hideSoldOut: false,
-  //   pessimistic: true,
-  //   redirectUri: 'https://tv.creativeplatform.xyz',
-  //   messageToSign:
-  //     "Welcome to The Creative, Where Creativity Meets Opportunity!\n\n🌟 Your Creative Space Awaits!\nDive into a world where your art transforms into opportunity. By joining our platform, you're not just accessing tools; you're amplifying your creative voice and reaching audiences who value your work.\n\n🔗 Connect & Collaborate\nEngage with a network of fellow creatives. Share, collaborate, and grow together. Our community thrives on the diversity of its members and the strength of its connections.\n\n💡 Tools for Every Creator\nFrom seamless transactions to intuitive marketing tools, everything you need is right here. Focus on creating—we handle the rest, ensuring your creations are protected and your earnings are secure.\n\n✨ Support on Your Creative Journey\nOur dedicated support team is just a message away, ready to assist you with any questions or to provide guidance as you navigate your creative path.\n\nThank You for Choosing The Creative\nTogether, we're building a thriving economy of artists, by artists. Let's create and inspire!",
-  //   skipRecipient: false,
-  //   endingCallToAction: 'Complete Checkout',
-  //   persistentCheckout: false,
-  // };
+  // Configure additional wallets for SIWE
+  const wallets = [
+    inAppWalletConfig,
+    createWallet('walletConnect'),
+    createWallet('io.metamask'),
+    createWallet('com.coinbase.wallet'),
+  ];
 
   return (
     <ConnectButton
@@ -141,13 +119,9 @@ export default function ConnectButtonWrapper() {
             }
 
             await checkAuth();
-            toast.success('Successfully logged in');
             router.refresh();
           } catch (error) {
             console.error('Login error:', error);
-            toast.error(
-              error instanceof Error ? error.message : 'Login failed',
-            );
             throw error;
           }
         },
@@ -159,13 +133,9 @@ export default function ConnectButtonWrapper() {
             }
 
             await checkAuth();
-            toast.success('Successfully logged out');
             router.refresh();
           } catch (error) {
             console.error('Logout error:', error);
-            toast.error(
-              error instanceof Error ? error.message : 'Logout failed',
-            );
             throw error;
           }
         },
@@ -190,7 +160,7 @@ export default function ConnectButtonWrapper() {
               invalid_before: issuedAt,
               expiration_time: new Date(
                 now.getTime() + 1000 * 60 * 60 * 24,
-              ).toISOString(), // 24 hours
+              ).toISOString(),
               resources: [`${window.location.origin}/*`],
             };
           } catch (error) {

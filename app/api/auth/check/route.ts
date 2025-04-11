@@ -43,12 +43,21 @@ class AuthError extends Error {
 export async function GET(): Promise<
   NextResponse<AuthResponse | ErrorResponse>
 > {
+  console.log('Starting auth check...');
+
   try {
     // Get and verify JWT
+    console.log('Verifying JWT...');
     const jwt = await verifyJWT();
+    console.log('JWT verified successfully:', {
+      sub: jwt.parsedJWT.sub,
+      exp: jwt.parsedJWT.exp,
+    });
 
     // Verify Orbis connection
+    console.log('Verifying Orbis connection...');
     await verifyOrbisConnection();
+    console.log('Orbis connection verified successfully');
 
     // Create response with caching headers
     const response = NextResponse.json({
@@ -62,9 +71,16 @@ export async function GET(): Promise<
     response.headers.set('Cache-Control', 'private, max-age=300');
     response.headers.set('ETag', generateETag(jwt.parsedJWT));
 
+    console.log('Auth check completed successfully');
     return response;
   } catch (error) {
     if (error instanceof AuthError) {
+      console.log('Auth check failed with AuthError:', {
+        message: error.message,
+        statusCode: error.statusCode,
+        details: error.details,
+      });
+
       const response = NextResponse.json(
         {
           error: error.message,
@@ -76,7 +92,12 @@ export async function GET(): Promise<
       return response;
     }
 
-    console.error('Unhandled auth check error:', error);
+    console.error('Unhandled auth check error:', {
+      error,
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+
     const response = NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 },
@@ -88,19 +109,30 @@ export async function GET(): Promise<
 
 // Helper functions for better separation of concerns
 async function verifyJWT() {
+  console.log('Getting JWT from cookies...');
   const jwt = cookies().get('jwt')?.value;
 
   if (!jwt) {
+    console.log('No JWT found in cookies');
     throw new AuthError('No JWT found', 401, 'Please log in to continue');
   }
 
   try {
+    console.log('Verifying JWT token...');
     // Add a small delay before verification to ensure proper initialization
     await new Promise((resolve) => setTimeout(resolve, 500));
 
     const authResult = await thirdwebAuth.verifyJWT({ jwt });
+    console.log('JWT verification result:', {
+      valid: authResult.valid,
+      hasError: !authResult.valid,
+      hasPayload: authResult.valid ? !!authResult.parsedJWT : false,
+    });
 
     if (!authResult.valid) {
+      console.error('Invalid JWT:', {
+        error: authResult.error,
+      });
       throw new AuthError(
         'Invalid JWT',
         401,
@@ -110,7 +142,11 @@ async function verifyJWT() {
 
     return authResult;
   } catch (error) {
-    console.error('JWT verification error:', error);
+    console.error('JWT verification error:', {
+      error,
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     throw new AuthError(
       'JWT verification failed',
       401,
@@ -121,15 +157,20 @@ async function verifyJWT() {
 
 async function verifyOrbisConnection() {
   try {
+    console.log('Checking Orbis connection status...');
     const isConnected = await db.isUserConnected();
+    console.log('Orbis connection status:', isConnected);
 
     if (!isConnected) {
+      console.log('Orbis not connected, checking for user...');
       const currentUser = await db.getConnectedUser();
+      console.log('Current Orbis user:', currentUser);
 
       if (
         !currentUser ||
         (typeof currentUser === 'object' && !('did' in currentUser))
       ) {
+        console.error('No valid Orbis user found');
         throw new AuthError(
           'Orbis not connected',
           401,
@@ -138,6 +179,10 @@ async function verifyOrbisConnection() {
       }
     }
   } catch (error) {
+    console.error('Orbis connection verification error:', {
+      error,
+      message: error instanceof Error ? error.message : String(error),
+    });
     throw new AuthError(
       'Orbis connection error',
       401,
@@ -149,6 +194,6 @@ async function verifyOrbisConnection() {
 }
 
 // Helper function to generate ETag
-function generateETag(data: any): string {
-  return Buffer.from(JSON.stringify(data)).toString('base64');
+function generateETag(payload: any): string {
+  return `W/"${Buffer.from(JSON.stringify(payload)).toString('base64')}"`;
 }

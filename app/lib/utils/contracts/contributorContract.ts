@@ -1,4 +1,4 @@
-import { getContract } from 'thirdweb';
+import { getContract } from 'thirdweb/contract';
 import { polygon } from 'thirdweb/chains';
 import { client } from '@app/lib/sdk/thirdweb/client';
 import { ROLES } from '@app/lib/utils/context';

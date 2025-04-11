@@ -9,6 +9,7 @@ import { useActiveAccount } from 'thirdweb/react';
 import { FaWindowClose } from 'react-icons/fa';
 import { useRouter } from 'next/navigation';
 import { polygon } from 'thirdweb/chains';
+import { ProtectedRoute } from '@app/components/Auth/ProtectedRoute';
 //import { SNAPSHOT_SUBGRAPH_URL } from '@snapshot-labs/snapshot.js/dist/utils';
 
 const hub = 'https://hub.snapshot.org';
@@ -124,128 +125,130 @@ export default function Create() {
   };
 
   return (
-    <div className="flex flex-wrap items-start justify-center p-2">
-      <div className="w-full p-5 md:w-2/5">
-        <div className="mb-4 cursor-pointer">
-          <div className="rounded-t-3xl bg-gradient-to-l from-yellow-300 via-red-600 to-pink-400 p-4">
-            <h2 className="text-md font-bold text-white">Title</h2>
-          </div>
-          <div className="bg-brand-100 rounded-b-3xl border border-pink-400 p-4">
-            <Input
-              className="w-full font-bold"
-              placeholder="[#BrandName] Campaign Voting"
-              onChange={(event) => {
-                changeInput(event, 'title');
-              }}
-            />
-          </div>
-        </div>
-        <div className="mb-4 cursor-pointer">
-          <div className="rounded-t-3xl bg-gradient-to-l from-yellow-300 via-red-600 to-pink-400 p-4">
-            <h2 className="text-md font-bold text-white">Content</h2>
-          </div>
-          <div className="bg-brand-100 rounded-b-3xl border border-pink-400 p-4">
-            <Textarea
-              className="w-full"
-              placeholder="Here is a sample placeholder"
-              onChange={(event) => {
-                changeInput(event, 'content');
-              }}
-            />
-          </div>
-        </div>
-        <div className="mb-4 cursor-pointer">
-          <div className='className="p-4 to-pink-400" rounded-t-3xl bg-gradient-to-l from-yellow-300 via-red-600'>
-            <h2 className="text-md font-bold text-white">Choices</h2>
-          </div>
-          <div className="bg-brand-100 rounded-b-3xl border border-pink-400 p-4">
-            <div className="space-y-4">
-              <form>
-                {choices.map((field, index) => {
-                  return (
-                    <div className="relative mb-5" key={index}>
-                      <Input
-                        className="choices w-full"
-                        placeholder="Enter Choice"
-                        value={field || ''}
-                        onChange={(e) => handleChange(index, e)}
-                      />
-                      <div
-                        className="absolute right-0 top-0 cursor-pointer p-2"
-                        onClick={() => handleRemove(index)}
-                      >
-                        <FaWindowClose />
-                      </div>
-                    </div>
-                  );
-                })}
-              </form>
+    <ProtectedRoute>
+      <div className="flex flex-wrap items-start justify-center p-2">
+        <div className="w-full p-5 md:w-2/5">
+          <div className="mb-4 cursor-pointer">
+            <div className="rounded-t-3xl bg-gradient-to-l from-yellow-300 via-red-600 to-pink-400 p-4">
+              <h2 className="text-md font-bold text-white">Title</h2>
             </div>
+            <div className="bg-brand-100 rounded-b-3xl border border-pink-400 p-4">
+              <Input
+                className="w-full font-bold"
+                placeholder="[#BrandName] Campaign Voting"
+                onChange={(event) => {
+                  changeInput(event, 'title');
+                }}
+              />
+            </div>
+          </div>
+          <div className="mb-4 cursor-pointer">
+            <div className="rounded-t-3xl bg-gradient-to-l from-yellow-300 via-red-600 to-pink-400 p-4">
+              <h2 className="text-md font-bold text-white">Content</h2>
+            </div>
+            <div className="bg-brand-100 rounded-b-3xl border border-pink-400 p-4">
+              <Textarea
+                className="w-full"
+                placeholder="Here is a sample placeholder"
+                onChange={(event) => {
+                  changeInput(event, 'content');
+                }}
+              />
+            </div>
+          </div>
+          <div className="mb-4 cursor-pointer">
+            <div className='className="p-4 to-pink-400" rounded-t-3xl bg-gradient-to-l from-yellow-300 via-red-600'>
+              <h2 className="text-md font-bold text-white">Choices</h2>
+            </div>
+            <div className="bg-brand-100 rounded-b-3xl border border-pink-400 p-4">
+              <div className="space-y-4">
+                <form>
+                  {choices.map((field, index) => {
+                    return (
+                      <div className="relative mb-5" key={index}>
+                        <Input
+                          className="choices w-full"
+                          placeholder="Enter Choice"
+                          value={field || ''}
+                          onChange={(e) => handleChange(index, e)}
+                        />
+                        <div
+                          className="absolute right-0 top-0 cursor-pointer p-2"
+                          onClick={() => handleRemove(index)}
+                        >
+                          <FaWindowClose />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </form>
+              </div>
 
-            <Button
-              className="mt-4 w-full rounded bg-pink-400 p-2 text-white hover:bg-pink-600 focus:bg-pink-600"
-              onClick={() => handleAdd()}
-            >
-              <h2 className="text-sm font-bold text-white">Add</h2>
-            </Button>
+              <Button
+                className="mt-4 w-full rounded bg-pink-400 p-2 text-white hover:bg-pink-600 focus:bg-pink-600"
+                onClick={() => handleAdd()}
+              >
+                <h2 className="text-sm font-bold text-white">Add</h2>
+              </Button>
+            </div>
+          </div>
+        </div>
+        <div className="mt-10 w-full p-5 md:w-2/5">
+          <div className="cursor-pointer rounded-t-3xl bg-gradient-to-l from-yellow-300 via-red-600 to-pink-400 p-4">
+            <h2 className="text-md font-bold text-white">Actions</h2>
+          </div>
+          <div className="bg-brand-100 rounded-b-3xl border border-pink-400 p-4">
+            <h3 className="text-sm font-bold text-white">Start Date</h3>
+            <Input
+              type="date"
+              className="mt-2 w-full"
+              onChange={(event) => {
+                changeInput(event, 'start date');
+              }}
+            />
+            <h3 className="text-sm font-bold text-white">Start time</h3>
+            <Input
+              type="time"
+              className="mt-2 w-full"
+              onChange={(event) => {
+                changeInput(event, 'start time');
+              }}
+            />
+            <h3 className="mt-4 text-sm font-bold text-white">End date</h3>
+            <Input
+              type="date"
+              className="mt-2 w-full"
+              onChange={(event) => {
+                changeInput(event, 'end date');
+              }}
+            />
+            <h3 className="mt-4 text-sm font-bold text-white">End time</h3>
+            <Input
+              type="time"
+              className="mt-2 w-full"
+              onChange={(event) => {
+                changeInput(event, 'end time');
+              }}
+            />
+            {isSubmitting ? (
+              <Button
+                disabled
+                className="mt-4 w-full rounded bg-pink-400 p-2 text-white hover:bg-pink-600 focus:bg-pink-600"
+              >
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Submitting...
+              </Button>
+            ) : (
+              <Button
+                className="mt-4 w-full rounded bg-pink-400 p-2 text-white hover:bg-pink-600 focus:bg-pink-600"
+                onClick={() => submit()}
+              >
+                Submit
+              </Button>
+            )}
           </div>
         </div>
       </div>
-      <div className="mt-10 w-full p-5 md:w-2/5">
-        <div className="cursor-pointer rounded-t-3xl bg-gradient-to-l from-yellow-300 via-red-600 to-pink-400 p-4">
-          <h2 className="text-md font-bold text-white">Actions</h2>
-        </div>
-        <div className="bg-brand-100 rounded-b-3xl border border-pink-400 p-4">
-          <h3 className="text-sm font-bold text-white">Start Date</h3>
-          <Input
-            type="date"
-            className="mt-2 w-full"
-            onChange={(event) => {
-              changeInput(event, 'start date');
-            }}
-          />
-          <h3 className="text-sm font-bold text-white">Start time</h3>
-          <Input
-            type="time"
-            className="mt-2 w-full"
-            onChange={(event) => {
-              changeInput(event, 'start time');
-            }}
-          />
-          <h3 className="mt-4 text-sm font-bold text-white">End date</h3>
-          <Input
-            type="date"
-            className="mt-2 w-full"
-            onChange={(event) => {
-              changeInput(event, 'end date');
-            }}
-          />
-          <h3 className="mt-4 text-sm font-bold text-white">End time</h3>
-          <Input
-            type="time"
-            className="mt-2 w-full"
-            onChange={(event) => {
-              changeInput(event, 'end time');
-            }}
-          />
-          {isSubmitting ? (
-            <Button
-              disabled
-              className="mt-4 w-full rounded bg-pink-400 p-2 text-white hover:bg-pink-600 focus:bg-pink-600"
-            >
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Submitting...
-            </Button>
-          ) : (
-            <Button
-              className="mt-4 w-full rounded bg-pink-400 p-2 text-white hover:bg-pink-600 focus:bg-pink-600"
-              onClick={() => submit()}
-            >
-              Submit
-            </Button>
-          )}
-        </div>
-      </div>
-    </div>
+    </ProtectedRoute>
   );
 }

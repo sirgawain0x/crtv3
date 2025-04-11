@@ -1,6 +1,10 @@
 import { OrbisEVMAuth } from '@useorbis/db-sdk/auth';
 import { db } from '@app/lib/sdk/orbisDB/client';
-import type { OrbisConnectResult } from '@useorbis/db-sdk';
+import {
+  OrbisConnectResult,
+  isValidOrbisResult,
+  normalizeOrbisResult,
+} from '@app/types/orbis';
 
 export interface AuthResponse {
   success: boolean;
@@ -9,23 +13,134 @@ export interface AuthResponse {
 }
 
 export class AuthService {
+  private static authCheckCache: {
+    timestamp: number;
+    result: AuthResponse;
+  } | null = null;
+
+  private static authCheckPromise: Promise<AuthResponse> | null = null;
+
   static async connectWithOrbis(): Promise<OrbisConnectResult> {
     try {
-      if (!window.ethereum) {
-        throw new Error('No Web3 provider found');
+      // First check if wallet is connected
+      if (!window.ethereum?.selectedAddress) {
+        throw new Error(
+          'No wallet connected. Please connect your wallet first.',
+        );
       }
 
+      // Create auth instance
       const auth = new OrbisEVMAuth(window.ethereum);
-      const result = await db.connectUser({ auth });
 
-      if (!result) {
-        throw new Error('Failed to connect with Orbis');
-      }
+      // Connect with proper error handling and retries
+      const connectWithRetry = async (
+        retries = 2,
+      ): Promise<OrbisConnectResult> => {
+        for (let i = 0; i <= retries; i++) {
+          try {
+            console.log(`Attempting Orbis connection (attempt ${i + 1})...`);
+
+            // First check if we're already connected
+            const existingUser = await db.getConnectedUser();
+            if (existingUser) {
+              console.log('Found existing Orbis connection');
+              return normalizeOrbisResult(existingUser);
+            }
+
+            const rawResult = await db.connectUser({ auth });
+            console.log('Raw Orbis connection result:', rawResult);
+
+            if (!rawResult) {
+              throw new Error('Null response from Orbis connection');
+            }
+
+            // Wait for DID to be available (max 5 seconds)
+            const waitForDID = async (maxAttempts = 5) => {
+              let lastResult = rawResult;
+
+              for (let j = 0; j < maxAttempts; j++) {
+                const rawDID =
+                  (lastResult as any).did ||
+                  (lastResult as any).user?.did ||
+                  (lastResult as any).auth?.did;
+
+                if (rawDID) {
+                  return lastResult;
+                }
+
+                // Wait with exponential backoff
+                await new Promise((resolve) =>
+                  setTimeout(resolve, Math.min(1000 * Math.pow(1.5, j), 5000)),
+                );
+
+                // Check both getConnectedUser and the original result
+                const [updatedUser, verifyConnection] = await Promise.all([
+                  db.getConnectedUser(),
+                  db.isUserConnected(),
+                ]);
+
+                if (!verifyConnection) {
+                  throw new Error('Lost connection while waiting for DID');
+                }
+
+                if (updatedUser) {
+                  lastResult = updatedUser;
+                }
+              }
+              throw new Error('DID not available after waiting');
+            };
+
+            const finalResult = await waitForDID();
+            const result = normalizeOrbisResult(finalResult);
+
+            if (!isValidOrbisResult(result)) {
+              console.error('Invalid Orbis result structure:', result);
+              throw new Error(
+                'Invalid Orbis connection result: Response format does not match expected structure',
+              );
+            }
+
+            return result;
+          } catch (error) {
+            console.error(`Connection attempt ${i + 1} failed:`, {
+              error,
+              message: error instanceof Error ? error.message : String(error),
+            });
+
+            if (i === retries) throw error;
+
+            // Exponential backoff for retries
+            await new Promise((resolve) =>
+              setTimeout(resolve, Math.min(1000 * Math.pow(2, i), 5000)),
+            );
+          }
+        }
+        throw new Error('Failed to connect after retries');
+      };
+
+      const result = await connectWithRetry();
+
+      // Log successful connection with DID details
+      console.log('Successfully connected to Orbis:', {
+        status: result.status,
+        result: result.result,
+        did: result.did,
+        user: result.user,
+      });
 
       return result;
     } catch (error) {
-      console.error('Orbis connection error:', error);
-      throw error;
+      console.error('Orbis connection error:', {
+        error,
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+
+      throw new Error(
+        error instanceof Error
+          ? `Orbis connection failed: ${error.message}`
+          : 'Failed to connect with Orbis. Please try again.',
+      );
     }
   }
 
@@ -50,8 +165,12 @@ export class AuthService {
 
   static async getOrbisUser(): Promise<OrbisConnectResult | null> {
     try {
-      const user = await db.getConnectedUser();
-      return user || null;
+      const rawUser = await db.getConnectedUser();
+
+      if (!rawUser) return null;
+
+      // Convert the SDK response to our normalized format
+      return normalizeOrbisResult(rawUser);
     } catch (error) {
       console.error('Get Orbis user error:', error);
       return null;
@@ -60,22 +179,60 @@ export class AuthService {
 
   static async checkAuthStatus(): Promise<AuthResponse> {
     try {
-      // Check JWT token
-      const response = await fetch('/api/auth/check', {
-        credentials: 'include',
-      });
+      // Return cached result if less than 5 seconds old
+      if (
+        this.authCheckCache &&
+        Date.now() - this.authCheckCache.timestamp < 5000
+      ) {
+        return this.authCheckCache.result;
+      }
 
-      // Check Orbis connection
-      const orbisConnected = await this.isOrbisConnected();
-      const orbisUser = orbisConnected ? await this.getOrbisUser() : null;
+      // If there's an ongoing check, return its promise
+      if (this.authCheckPromise) {
+        return this.authCheckPromise;
+      }
 
-      return {
-        success: response.ok && orbisConnected,
-        data: {
-          orbisUser,
-          isAuthenticated: response.ok && orbisConnected,
-        },
-      };
+      // Create new promise for this check
+      this.authCheckPromise = (async () => {
+        try {
+          // Check JWT token
+          const response = await fetch('/api/auth/check', {
+            credentials: 'include',
+          });
+
+          // Check Orbis connection with timeout
+          const orbisCheckPromise = Promise.race([
+            this.isOrbisConnected(),
+            new Promise<boolean>((_, reject) =>
+              setTimeout(() => reject(new Error('Orbis check timeout')), 5000),
+            ),
+          ]);
+
+          const [orbisConnected] = await Promise.all([orbisCheckPromise]);
+          const orbisUser = orbisConnected ? await this.getOrbisUser() : null;
+
+          const result = {
+            success: response.ok && orbisConnected,
+            data: {
+              orbisUser,
+              isAuthenticated: response.ok && orbisConnected,
+            },
+          };
+
+          // Cache the result
+          this.authCheckCache = {
+            timestamp: Date.now(),
+            result,
+          };
+
+          return result;
+        } finally {
+          // Clear the promise reference
+          this.authCheckPromise = null;
+        }
+      })();
+
+      return this.authCheckPromise;
     } catch (error) {
       console.error('Auth status check error:', error);
       return {
@@ -85,7 +242,7 @@ export class AuthService {
     }
   }
 
-  static async login() {
+  static async login(): Promise<AuthResponse> {
     try {
       // First ensure we have a connected wallet
       const account = window.ethereum?.selectedAddress;
@@ -99,33 +256,52 @@ export class AuthService {
         throw new Error('Failed to connect with Orbis');
       }
 
-      // Generate login payload
-      const domain = window.location.origin;
-      const statement =
-        'Welcome to Creative TV! Sign this message to authenticate.';
-      const nonce = Date.now().toString();
+      // Generate login payload with proper SIWE formatting
+      const domain = window.location.host;
+      const origin = window.location.origin;
+      const chainId = parseInt(window.ethereum.chainId, 16);
+      const nonce = `${Date.now()}-${Math.random().toString(36).substring(2)}`;
       const now = new Date();
+      const expiration = new Date(now.getTime() + 1000 * 60 * 60 * 24);
 
       const payload = {
         domain,
-        address: account,
-        statement,
-        uri: window.location.origin,
+        address: account.toLowerCase(),
+        statement: 'Welcome to Creative TV! Sign this message to authenticate.',
+        uri: origin,
         version: '1',
-        chain_id: window.ethereum.chainId,
+        chainId,
         nonce,
-        issued_at: now.toISOString(),
-        expiration_time: new Date(
-          now.getTime() + 1000 * 60 * 60 * 24,
-        ).toISOString(),
-        resources: [`${window.location.origin}/*`],
+        issuedAt: now.toISOString(),
+        expirationTime: expiration.toISOString(),
+        resources: [`${origin}/*`],
       };
 
-      // Get signature from wallet
-      const signature = await window.ethereum.request({
-        method: 'personal_sign',
-        params: [JSON.stringify(payload), account],
-      });
+      // Get signature from wallet with proper error handling
+      let signature;
+      try {
+        signature = await window.ethereum.request({
+          method: 'personal_sign',
+          params: [JSON.stringify(payload), account.toLowerCase()],
+        });
+
+        if (!signature || typeof signature !== 'string') {
+          throw new Error('Invalid signature format received from wallet');
+        }
+
+        console.log('Signature received:', {
+          type: typeof signature,
+          length: signature.length,
+          prefix: signature.substring(0, 10),
+        });
+      } catch (signError) {
+        console.error('Signature error:', signError);
+        throw new Error(
+          signError instanceof Error
+            ? `Failed to sign message: ${signError.message}`
+            : 'Failed to sign authentication message',
+        );
+      }
 
       // Send to backend for verification
       const response = await fetch('/api/auth/login', {
@@ -134,7 +310,10 @@ export class AuthService {
           'Content-Type': 'application/json',
         },
         credentials: 'include',
-        body: JSON.stringify({ payload, signature }),
+        body: JSON.stringify({
+          payload,
+          signature: signature.trim(), // Ensure clean signature
+        }),
       });
 
       if (!response.ok) {

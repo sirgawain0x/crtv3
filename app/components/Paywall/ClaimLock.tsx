@@ -6,7 +6,9 @@ import Unlock from '@app/lib/utils/Unlock.json';
 import { CREATIVE_ADDRESS } from '@app/lib/utils/context';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
-import { getContract, prepareContractCall, toWei } from 'thirdweb';
+import { getContract } from 'thirdweb/contract';
+import { prepareContractCall } from 'thirdweb/transaction';
+import { toWei } from 'thirdweb/utils';
 import { base } from 'thirdweb/chains';
 import {
   TransactionButton,
