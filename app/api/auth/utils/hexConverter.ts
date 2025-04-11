@@ -11,7 +11,7 @@ const thirdWebAdminPrivateKey = process.env.THIRDWEB_ADMIN_PRIVATE_KEY;
 const livepeerFullApiKey = process.env.LIVEPEER_FULL_API_KEY;
 
 if (!thirdWebSecretKey || !thirdWebAdminPrivateKey || !livepeerFullApiKey) {
-  throw new Error('Environment variables are missing');
+  // throw new Error('Environment variables are missing');
 }
 
 // Convert to Base64

@@ -76,25 +76,25 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate JWT
-    const jwt = await thirdwebAuth.generateJWT({
-      payload: {
-        address: signerAddress,
-        ...payload,
-      },
-    });
+    // const jwt = await thirdwebAuth.generateJWT({
+    //   payload: {
+    //     address: signerAddress,
+    //     ...payload,
+    //   },
+    // });
 
-    console.log('JWT generated:', jwt ? 'success' : 'failed');
+    // console.log('JWT generated:', jwt ? 'success' : 'failed');
 
-    // Set the JWT in an HTTP-only cookie
-    cookies().set('jwt', jwt, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      path: '/',
-      maxAge: 60 * 60 * 24, // 24 hours
-    });
+    // // Set the JWT in an HTTP-only cookie
+    // cookies().set('jwt', jwt, {
+    //   httpOnly: true,
+    //   secure: process.env.NODE_ENV === 'production',
+    //   sameSite: 'strict',
+    //   path: '/',
+    //   maxAge: 60 * 60 * 24, // 24 hours
+    // });
 
-    console.log('JWT cookie set');
+    // console.log('JWT cookie set');
 
     return NextResponse.json({ success: true });
   } catch (error) {
