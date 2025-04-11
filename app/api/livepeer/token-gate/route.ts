@@ -1,49 +1,246 @@
 'use server';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createPublicClient, http } from 'viem';
-import { base } from 'viem/chains';
-import { getAddress } from 'viem';
-import { verifyJWT } from '@app/lib/auth/jwt';
 
-const publicClient = createPublicClient({
-  chain: base,
-  transport: http(),
-});
+import { getContract } from 'thirdweb/contract';
+import { balanceOf as balanceOfERC1155 } from 'thirdweb/extensions/erc1155';
+
+import { generateAccessKey, validateAccessKey } from '@app/lib/access-key';
+import { getJwtContext } from '@app/api/auth/thirdweb/authentication';
+import { defineChain } from 'thirdweb/chains';
+import { client } from '@app/lib/sdk/thirdweb/client';
+
+export interface WebhookPayload {
+  accessKey: string;
+  context: WebhookContext;
+  timestamp: number;
+}
+
+export interface WebhookContext {
+  creatorAddress: string;
+  tokenId: string;
+  contractAddress: string;
+  chain: number;
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const payload: WebhookPayload = await request.json();
+
+    console.log({ payload });
+
+    if (
+      !payload.accessKey ||
+      !payload.context.creatorAddress ||
+      !payload.context.tokenId ||
+      !payload.context.contractAddress ||
+      !payload.context.chain ||
+      !payload.timestamp
+    ) {
+      return NextResponse.json(
+        {
+          allowed: false,
+          message: 'Bad request, missing required fields',
+        },
+        { status: 400 },
+      );
+    }
+
+    // Validate timestamp age < 5 minutes
+    const MAX_TIMESTAMP_AGE = 5 * 60 * 1000;
+    const now = Date.now();
+
+    if (Math.abs(now - payload.timestamp) > MAX_TIMESTAMP_AGE) {
+      return NextResponse.json(
+        {
+          allowed: false,
+          message: 'Request timestamp too old or from future',
+        },
+        { status: 400 },
+      );
+    }
+
+    // Implement custom access control logic here
+    const isAccessAllowed = await validateAccess(payload);
+
+    console.log({ isAccessAllowed });
+
+    if (isAccessAllowed) {
+      return NextResponse.json(
+        {
+          allowed: true,
+          message: 'Access granted',
+        },
+        { status: 200 },
+      );
+    } else {
+      return NextResponse.json(
+        {
+          allowed: false,
+          message: 'Access denied',
+        },
+        { status: 403 },
+      );
+    }
+  } catch (error) {
+    console.error('Access control error:', error);
+    return NextResponse.json(
+      {
+        allowed: false,
+        message: 'Internal server error',
+      },
+      { status: 500 },
+    );
+  }
+}
 
 export async function GET(request: NextRequest) {
   try {
-    const jwt = request.cookies.get('jwt');
-    if (!jwt) {
-      return new NextResponse('Unauthorized', { status: 401 });
-    }
+    const address = request.nextUrl.searchParams.get('address') as string;
+    const creatorAddress = request.nextUrl.searchParams.get(
+      'creatorAddress',
+    ) as string;
+    const tokenId = request.nextUrl.searchParams.get('tokenId') as string;
+    const contractAddress = request.nextUrl.searchParams.get(
+      'contractAddress',
+    ) as string;
+    const chain = parseInt(request.nextUrl.searchParams.get('chain') as string);
 
-    const payload = await verifyJWT(jwt.value);
-    const address = getAddress(payload.address);
-
-    // Check NFT balance
-    const balance = await publicClient.readContract({
-      address: '0x13b818daf7016b302383737ba60c3a39fef231cf',
-      abi: [
-        {
-          name: 'balanceOf',
-          type: 'function',
-          stateMutability: 'view',
-          inputs: [{ name: 'account', type: 'address' }],
-          outputs: [{ name: 'balance', type: 'uint256' }],
-        },
-      ],
-      functionName: 'balanceOf',
-      args: [address],
+    console.log({
+      address,
+      creatorAddress,
+      tokenId,
+      contractAddress,
+      chain,
     });
 
-    if (balance === 0n) {
-      return new NextResponse('Unauthorized - No NFT', { status: 401 });
+    if (!address /* || !context */) {
+      return NextResponse.json(
+        {
+          allowed: false,
+          message: 'Bad request, missing required fields',
+        },
+        { status: 400 },
+      );
     }
 
-    return new NextResponse('OK', { status: 200 });
+    const accessKey = generateAccessKey(address, {
+      creatorAddress,
+      tokenId,
+      contractAddress,
+      chain,
+    });
+
+    console.log({ accessKey });
+
+    if (accessKey) {
+      return NextResponse.json(
+        {
+          allowed: true,
+          accessKey: accessKey,
+        },
+        { status: 200 },
+      );
+    } else {
+      return NextResponse.json(
+        {
+          allowed: false,
+          message: 'Failed to generate access key.',
+        },
+        { status: 400 },
+      );
+    }
   } catch (error) {
-    console.error('Token gate error:', error);
-    return new NextResponse('Internal Server Error', { status: 500 });
+    console.error('Generate access key error:', error);
+    return NextResponse.json(
+      {
+        allowed: false,
+        message: 'Internal server error',
+      },
+      { status: 500 },
+    );
   }
+}
+
+async function validateAccess(payload: WebhookPayload): Promise<boolean> {
+  const { accessKey, context, timestamp } = payload;
+
+  const { address } = await getJwtContext();
+
+  console.log({ address });
+
+  // 1. Validate WebhookContext
+  if (
+    !address ||
+    !context.creatorAddress ||
+    !context.tokenId ||
+    !context.contractAddress ||
+    !context.chain
+  ) {
+    console.error({ address, context });
+    return false;
+  }
+
+  // 2. Validate access key
+  const isAccessKeyValid = validateAccessKey(accessKey, address, context);
+  console.log({ isAccessKeyValid });
+  if (!isAccessKeyValid) {
+    return false;
+  }
+
+  // 3. Check user-specific conditions
+  const userHasToken = await checkUserTokenBalances(address, context);
+  console.log({ userHasToken });
+  if (!userHasToken) {
+    return false;
+  }
+
+  // 4. Asset or stream-specific checks
+  // const isAssetAccessible = await checkAssetAccessibility(context);
+  // console.log({ isAssetAccessible });
+  // if (!isAssetAccessible) {
+  //   return false;
+  // }
+
+  return true;
+}
+
+async function checkUserTokenBalances(
+  address: string,
+  context: WebhookContext,
+): Promise<boolean> {
+  try {
+    const clientId = process.env.NEXT_PUBLIC_TEMPLATE_CLIENT_ID;
+
+    if (!clientId) {
+      throw new Error('No client ID provided');
+    }
+
+    const videoTokenContract = getContract({
+      address: context.contractAddress,
+      chain: defineChain(context.chain),
+      client,
+    });
+
+    const videoTokenBalance = await balanceOfERC1155({
+      contract: videoTokenContract,
+      tokenId: BigInt(context.tokenId),
+      owner: address,
+    });
+
+    console.log({ videoTokenBalance });
+
+    return videoTokenBalance > 0n;
+  } catch (error) {
+    console.error('Error checking token balances...', error);
+    return false;
+  }
+}
+
+async function checkAssetAccessibility(
+  context: WebhookContext,
+): Promise<boolean> {
+  // Implement actual asset accessibility checking logic
+  // For example, check if asset is published or not restricted
+  return true;
 }

@@ -1,35 +1,31 @@
 'use client';
 
-import { useUser } from '@account-kit/react';
-import { useEffect, useState } from 'react';
-import { checkUnlockAccess } from '@app/lib/services/unlock';
+import { getContract } from 'thirdweb/contract';
+import { base } from 'thirdweb/chains';
+import { client } from '@app/lib/sdk/thirdweb/client';
+import { CONTRACT_ADDRESS } from '@app/lib/utils/context';
+import unlockAbi from '@app/lib/utils/Unlock.json';
+import { useActiveAccount, useReadContract } from 'thirdweb/react';
 
 export function useUnlockAccess() {
-  const user = useUser();
-  const [hasAccess, setHasAccess] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const activeAccount = useActiveAccount();
 
-  useEffect(() => {
-    async function checkAccess() {
-      if (!user?.address) {
-        setHasAccess(false);
-        return;
-      }
+  const unlockContract = getContract({
+    address: CONTRACT_ADDRESS.gateway.base.erc721,
+    chain: base,
+    client,
+    abi: unlockAbi.abi as any,
+  });
 
-      setIsLoading(true);
-      try {
-        const access = await checkUnlockAccess(user.address);
-        setHasAccess(access);
-      } catch (error) {
-        console.error('Error checking Unlock access:', error);
-        setHasAccess(false);
-      } finally {
-        setIsLoading(false);
-      }
-    }
+  const { data: hasValidKey, isLoading } = useReadContract({
+    contract: unlockContract,
+    method: 'getHasValidKey',
+    params: [activeAccount?.address],
+  });
 
-    checkAccess();
-  }, [user?.address]);
-
-  return { hasAccess, isLoading };
+  return {
+    hasAccess: hasValidKey,
+    isLoading,
+    address: activeAccount?.address,
+  };
 }

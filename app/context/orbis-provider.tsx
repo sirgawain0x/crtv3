@@ -2,8 +2,8 @@
 
 import { createContext, useContext, useEffect, useState } from 'react';
 import { OrbisDB } from '@useorbis/db-sdk';
-import { OrbisKeyDidAuth } from '@useorbis/db-sdk/auth';
-import type { OrbisConnectResult as SDKOrbisConnectResult } from '@useorbis/db-sdk';
+import { OrbisEVMAuth } from '@useorbis/db-sdk/auth';
+import { inAppWallet } from 'thirdweb/wallets';
 import {
   type OrbisContextType,
   type OrbisConnectResult,
@@ -14,20 +14,12 @@ const OrbisContext = createContext<OrbisContextType>({
   orbis: null,
   isConnected: false,
   session: null,
-  connect: async () => undefined,
+  connect: async () => {},
   disconnect: async () => {},
 });
 
 export function useOrbis() {
   return useContext(OrbisContext);
-}
-
-// Helper to convert SDK result to our app's format
-function convertOrbisResult(result: SDKOrbisConnectResult): OrbisConnectResult {
-  return {
-    success: true,
-    did: result.user.did,
-  };
 }
 
 export function OrbisProvider({ children }: OrbisProviderProps) {
@@ -37,38 +29,18 @@ export function OrbisProvider({ children }: OrbisProviderProps) {
 
   useEffect(() => {
     const initOrbis = async () => {
-      if (
-        !process.env.NEXT_PUBLIC_CERAMIC_NODE_URL ||
-        !process.env.NEXT_PUBLIC_ORBIS_NODE_URL ||
-        !process.env.NEXT_PUBLIC_ORBIS_ENVIRONMENT_ID
-      ) {
-        console.error('Missing required environment variables for Orbis');
-        return;
-      }
-
-      // Initialize Orbis
       const orbisInstance = new OrbisDB({
-        ceramic: {
-          gateway: process.env.NEXT_PUBLIC_CERAMIC_NODE_URL,
-        },
-        nodes: [
-          {
-            gateway: process.env.NEXT_PUBLIC_ORBIS_NODE_URL,
-            env: process.env.NEXT_PUBLIC_ORBIS_ENVIRONMENT_ID,
-          },
-        ],
+        nodes: [{ url: 'https://node1.orbisdb.xyz' }],
+        ceramic: { url: 'https://ceramic.orbisdb.xyz' },
       });
       setOrbis(orbisInstance);
 
-      // Check for existing connection
       const connected = await orbisInstance.isUserConnected();
       setIsConnected(!!connected);
 
       if (connected) {
         const currentSession = await orbisInstance.getConnectedUser();
-        if (currentSession) {
-          setSession(convertOrbisResult(currentSession));
-        }
+        setSession(currentSession as OrbisConnectResult);
       }
     };
 
@@ -79,33 +51,16 @@ export function OrbisProvider({ children }: OrbisProviderProps) {
     if (!orbis) return;
 
     try {
-      // Generate a deterministic seed based on timestamp and random value
-      const seedBase = `${Date.now()}-${Math.random()}`;
-      const encoder = new TextEncoder();
-      const seedData = encoder.encode(seedBase);
-      const seedBuffer = await crypto.subtle.digest('SHA-256', seedData);
-      const seed = Array.from(new Uint8Array(seedBuffer))
-        .map((b) => b.toString(16).padStart(2, '0'))
-        .join('');
-
-      // Create KeyDID auth
-      const auth = await OrbisKeyDidAuth.fromSeed(seed);
-
-      // Connect to Orbis
+      const wallet = await inAppWallet().connect();
+      const auth = new OrbisEVMAuth({
+        signer: wallet,
+        chainId: 1,
+        provider: wallet.provider,
+      });
       const authResult = await orbis.connectUser({ auth });
 
-      if (!authResult) {
-        throw new Error('Failed to connect to Orbis');
-      }
-
-      const formattedResult = convertOrbisResult(authResult);
       setIsConnected(true);
-      setSession(formattedResult);
-
-      // Store the seed for future use
-      localStorage.setItem('orbis_seed', seed);
-
-      return formattedResult;
+      setSession(authResult as OrbisConnectResult);
     } catch (error) {
       console.error('Failed to connect to OrbisDB:', error);
       throw error;
@@ -117,7 +72,6 @@ export function OrbisProvider({ children }: OrbisProviderProps) {
 
     try {
       await orbis.disconnectUser();
-      localStorage.removeItem('orbis_seed');
       setIsConnected(false);
       setSession(null);
     } catch (error) {

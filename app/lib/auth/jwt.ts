@@ -1,42 +1,27 @@
-import jwt from 'jsonwebtoken';
+import { thirdwebAuth } from './thirdweb';
 
-const JWT_SECRET = process.env.JWT_SECRET;
-
-if (!JWT_SECRET) {
-  throw new Error('JWT_SECRET is not defined');
-}
-
-export interface JWTPayload {
+interface JWTPayload {
   address: string;
-  exp?: number;
+  did?: string;
+  [key: string]: unknown;
 }
 
 export async function generateJWT(payload: JWTPayload): Promise<string> {
-  return new Promise((resolve, reject) => {
-    jwt.sign(
-      payload,
-      JWT_SECRET!,
-      {
-        expiresIn: '24h',
-      },
-      (err, token) => {
-        if (err) reject(err);
-        else if (token) resolve(token);
-        else reject(new Error('Failed to generate token'));
-      },
-    );
-  });
+  try {
+    return await thirdwebAuth.generateJWT({ payload });
+  } catch (error) {
+    console.error('JWT generation error:', error);
+    throw new Error('Failed to generate JWT');
+  }
 }
 
-export async function verifyJWT(token: string): Promise<JWTPayload> {
-  return new Promise((resolve, reject) => {
-    jwt.verify(token, JWT_SECRET!, (err, decoded) => {
-      if (err) reject(err);
-      else if (decoded && typeof decoded === 'object')
-        resolve(decoded as JWTPayload);
-      else reject(new Error('Invalid token payload'));
-    });
-  });
+export async function verifyJWT(jwt: string): Promise<JWTPayload> {
+  try {
+    return await thirdwebAuth.verifyJWT(jwt);
+  } catch (error) {
+    console.error('JWT verification error:', error);
+    throw new Error('Failed to verify JWT');
+  }
 }
 
 export function parseJWT(jwt: string): JWTPayload {

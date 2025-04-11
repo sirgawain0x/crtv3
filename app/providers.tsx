@@ -1,29 +1,26 @@
 'use client';
 import { ApolloWrapper } from './lib/utils/ApolloWrapper';
+import { ThirdwebProvider } from '@app/lib/sdk/thirdweb/components';
 import { createContext, useContext, useState, useEffect } from 'react';
-import { QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { OrbisProvider } from '@app/lib/sdk/orbisDB/context';
 import { SubtitlesProvider } from './components/Player/Subtitles';
 import { ThemeProvider } from 'next-themes';
-import { AlchemyClientState } from '@account-kit/core';
-import { AlchemyAccountProvider } from '@account-kit/react';
-import { config as accountKitConfig, queryClient } from './config/account-kit';
-import { config as wagmiConfig } from './config/wagmi';
-import { WagmiProvider } from 'wagmi';
-import { PropsWithChildren } from 'react';
 
 interface ThemeContextType {
   theme: string;
   toggleTheme: () => void;
 }
 
+const queryClient = new QueryClient();
+
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-interface ProvidersProps extends PropsWithChildren {
-  initialState?: AlchemyClientState;
+interface ProvidersProps {
+  children: React.ReactNode;
 }
 
-export function Providers({ children, initialState }: ProvidersProps) {
+export function Providers({ children }: ProvidersProps) {
   const [theme, setTheme] = useState('light');
 
   useEffect(() => {
@@ -51,21 +48,15 @@ export function Providers({ children, initialState }: ProvidersProps) {
         enableSystem
         disableTransitionOnChange
       >
-        <QueryClientProvider client={queryClient}>
-          <AlchemyAccountProvider
-            config={accountKitConfig}
-            queryClient={queryClient}
-            initialState={initialState}
-          >
-            <WagmiProvider config={wagmiConfig}>
-              <SubtitlesProvider>
-                <ApolloWrapper>
-                  <OrbisProvider>{children}</OrbisProvider>
-                </ApolloWrapper>
-              </SubtitlesProvider>
-            </WagmiProvider>
-          </AlchemyAccountProvider>
-        </QueryClientProvider>
+        <SubtitlesProvider>
+          <ApolloWrapper>
+            <ThirdwebProvider>
+              <QueryClientProvider client={queryClient}>
+                <OrbisProvider>{children}</OrbisProvider>
+              </QueryClientProvider>
+            </ThirdwebProvider>
+          </ApolloWrapper>
+        </SubtitlesProvider>
       </ThemeProvider>
     </ThemeContext.Provider>
   );

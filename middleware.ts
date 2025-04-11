@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAddress } from 'viem';
-import { rateLimit } from '@/app/lib/database/edge-redis';
+import { checkRateLimit } from '@/lib/edge-redis';
 
 // Define protected routes that require authentication
 const protectedRoutes = [
@@ -129,7 +129,7 @@ export async function middleware(req: NextRequest) {
   // Only apply rate limiting to auth endpoints
   if (pathname.startsWith('/api/auth')) {
     const ip = req.ip ?? '127.0.0.1';
-    const { success, limit, remaining, reset } = await rateLimit(ip);
+    const { success, limit, remaining, reset } = await checkRateLimit(ip);
 
     // Create a new response with the original response's data
     const newResponse = NextResponse.next();

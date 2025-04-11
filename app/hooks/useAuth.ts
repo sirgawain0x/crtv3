@@ -1,46 +1,47 @@
-'use client';
-
 import { useEffect, useState, useCallback } from 'react';
-import { useUser } from '@account-kit/react';
-import { logout, checkAuth } from '@app/api/auth/authentication';
+import { useActiveAccount } from 'thirdweb/react';
+import { logout } from '@app/api/auth/thirdweb/authentication';
 
 export function useAuth() {
-  const user = useUser();
+  const activeAccount = useActiveAccount();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
 
-  const checkAuthStatus = useCallback(async () => {
+  const checkAuth = useCallback(async () => {
     if (isChecking) return;
 
     try {
       setIsChecking(true);
-      const isAuthed = await checkAuth();
-      setIsAuthenticated(isAuthed);
+      const response = await fetch('/api/auth/check', {
+        credentials: 'include',
+      });
+
+      setIsAuthenticated(response.ok);
     } catch (error) {
       console.error('Error checking auth status:', error);
       setIsAuthenticated(false);
     } finally {
       setIsChecking(false);
     }
-  }, [isChecking]);
+  }, []);
 
   // Check auth status when account changes
   useEffect(() => {
-    if (!user) {
+    if (!activeAccount) {
       setIsAuthenticated(false);
       return;
     }
 
-    checkAuthStatus();
-  }, [user, checkAuthStatus]);
+    checkAuth();
+  }, [activeAccount, checkAuth]);
 
   // Poll auth status every 5 seconds when connected
   useEffect(() => {
-    if (!user) return;
+    if (!activeAccount) return;
 
-    const interval = setInterval(checkAuthStatus, 5000);
+    const interval = setInterval(checkAuth, 5000);
     return () => clearInterval(interval);
-  }, [user, checkAuthStatus]);
+  }, [activeAccount, checkAuth]);
 
   const handleLogout = async () => {
     try {
@@ -53,10 +54,10 @@ export function useAuth() {
   };
 
   return {
-    isConnected: !!user,
+    isConnected: !!activeAccount,
     isAuthenticated,
-    address: user?.address,
+    address: activeAccount?.address,
     logout: handleLogout,
-    checkAuth: checkAuthStatus,
+    checkAuth,
   };
 }
