@@ -48,3 +48,7 @@ next-env.d.ts
 .winsurfrules
 
 ceramic-app
+
+scripts
+    /ceramic-app/ceramic-app-*.js
+    /ceramic-app/ceramic-app-*.js.map
