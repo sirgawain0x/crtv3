@@ -1,4 +1,0 @@
-
-#!/usr/bin/env sh
-
-node /Users/jeldonmusic/Documents/matrixblend_com/Creativ/crtv3/ceramic-app/node_modules/.bin/ceramic "$@"

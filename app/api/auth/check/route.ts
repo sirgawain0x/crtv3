@@ -4,8 +4,11 @@ import { thirdwebAuth } from '@app/lib/sdk/thirdweb/auth';
 import { db } from '@app/lib/sdk/orbisDB/client';
 import { z } from 'zod';
 
+// Mark route as dynamic
+export const dynamic = 'force-dynamic';
+
 // Configure caching
-export const revalidate = 300; // 5 minutes
+export const revalidate = 0;
 
 // Define response types
 const AuthResponseSchema = z.object({
