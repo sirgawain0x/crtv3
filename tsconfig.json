@@ -24,13 +24,11 @@
       }
     ],
     "paths": {
+      "@/*": ["./*"],
       "@app/*": ["./app/*"],
       "@public/*": ["./public/*"]
     },
-    "typeRoots": [
-      "./node_modules/@types",
-      "./app/types"
-    ]
+    "typeRoots": ["./node_modules/@types", "./app/types"]
   },
   "include": [
     "next-env.d.ts",
