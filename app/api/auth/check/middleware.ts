@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAddress } from 'viem';
-import { Ratelimit } from '@upstash/ratelimit';
-import { Redis } from '@upstash/redis';
+import { checkRateLimit } from '@/lib/redis';
 
 // Define protected routes that require authentication
 const protectedRoutes = [
@@ -14,13 +13,6 @@ const protectedRoutes = [
 
 // Define public routes that don't require authentication
 const publicRoutes = ['/', '/login', '/register', '/api/auth'];
-
-// Create a new ratelimiter that allows 10 requests per 10 seconds
-const ratelimit = new Ratelimit({
-  redis: Redis.fromEnv(),
-  limiter: Ratelimit.slidingWindow(10, '10 s'),
-  analytics: true,
-});
 
 // Middleware function to handle CORS and wallet-based authentication
 export async function middleware(req: NextRequest) {
@@ -136,20 +128,32 @@ export async function middleware(req: NextRequest) {
   // Only apply rate limiting to auth endpoints
   if (pathname.startsWith('/api/auth')) {
     const ip = req.ip ?? '127.0.0.1';
-    const { success, pending, limit, reset, remaining } = await ratelimit.limit(
-      `ratelimit_${ip}`,
-    );
+    const { success, limit, remaining, reset } = await checkRateLimit(ip);
 
-    headers.set('X-RateLimit-Limit', limit.toString());
-    headers.set('X-RateLimit-Remaining', remaining.toString());
-    headers.set('X-RateLimit-Reset', reset.toString());
+    // Create a new response with the original response's data
+    const newResponse = NextResponse.next();
+
+    // Copy all existing headers
+    response.headers.forEach((value, key) => {
+      newResponse.headers.set(key, value);
+    });
+
+    // Add rate limit headers
+    newResponse.headers.set('X-RateLimit-Limit', limit.toString());
+    newResponse.headers.set('X-RateLimit-Remaining', remaining.toString());
+    newResponse.headers.set('X-RateLimit-Reset', reset.toString());
 
     if (!success) {
       return NextResponse.json(
         { error: 'Too many requests' },
-        { status: 429, headers },
+        {
+          status: 429,
+          headers: newResponse.headers,
+        },
       );
     }
+
+    return newResponse;
   }
 
   return response;
