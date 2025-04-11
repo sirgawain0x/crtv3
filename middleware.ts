@@ -8,6 +8,7 @@ const protectedRoutes = [
   '/profile',
   '/upload',
   '/settings',
+  '/profile/*',
   '/api/protected',
 ];
 
