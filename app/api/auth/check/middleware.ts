@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAddress } from 'viem';
 import { Ratelimit } from '@upstash/ratelimit';
 import { Redis } from '@upstash/redis';
+import { RateLimiter } from 'limiter';
 
 // Define protected routes that require authentication
 const protectedRoutes = [
@@ -16,10 +17,10 @@ const protectedRoutes = [
 const publicRoutes = ['/', '/login', '/register', '/api/auth'];
 
 // Create a new ratelimiter that allows 10 requests per 10 seconds
-const ratelimit = new Ratelimit({
-  redis: Redis.fromEnv(),
-  limiter: Ratelimit.slidingWindow(10, '10 s'),
-  analytics: true,
+const limiter = new RateLimiter({
+  tokensPerInterval: 10,
+  interval: 10000, // 10 seconds in milliseconds
+  fireImmediately: true,
 });
 
 // Middleware function to handle CORS and wallet-based authentication
@@ -136,15 +137,13 @@ export async function middleware(req: NextRequest) {
   // Only apply rate limiting to auth endpoints
   if (pathname.startsWith('/api/auth')) {
     const ip = req.ip ?? '127.0.0.1';
-    const { success, pending, limit, reset, remaining } = await ratelimit.limit(
-      `ratelimit_${ip}`,
-    );
+    const remaining = await limiter.removeTokens(1);
 
-    headers.set('X-RateLimit-Limit', limit.toString());
+    headers.set('X-RateLimit-Limit', '10');
     headers.set('X-RateLimit-Remaining', remaining.toString());
-    headers.set('X-RateLimit-Reset', reset.toString());
+    headers.set('X-RateLimit-Reset', (Date.now() + 10000).toString());
 
-    if (!success) {
+    if (remaining < 0) {
       return NextResponse.json(
         { error: 'Too many requests' },
         { status: 429, headers },

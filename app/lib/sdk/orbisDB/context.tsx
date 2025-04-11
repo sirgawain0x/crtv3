@@ -112,14 +112,52 @@ if (typeof window !== 'undefined') {
   });
 }
 
+const CACHE_KEY = 'orbis_session_cache';
+const SESSION_EXPIRY = 24 * 60 * 60 * 1000; // 24 hours
+
+interface CachedSession {
+  timestamp: number;
+  data: SerializableAuthResult;
+}
+
 export function OrbisProvider({ children }: { children: ReactNode }) {
   const [authResult, setAuthResult] = useState<SerializableAuthResult | null>(
     null,
   );
-  const [orbisInstance, setOrbisInstance] = useState<any>(null);
   const [isUserConnected, setIsUserConnected] = useState(false);
   const [user, setUser] = useState<any>(null);
-  const [address, setAddress] = useState<string | undefined>(undefined);
+  const [orbisInstance, setOrbisInstance] = useState<any>(null);
+
+  // Cache management functions
+  const saveToCache = (data: SerializableAuthResult) => {
+    try {
+      const cache: CachedSession = {
+        timestamp: Date.now(),
+        data,
+      };
+      localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
+    } catch (error) {
+      console.warn('Failed to save to cache:', error);
+    }
+  };
+
+  const loadFromCache = (): SerializableAuthResult | null => {
+    try {
+      const cached = localStorage.getItem(CACHE_KEY);
+      if (!cached) return null;
+
+      const { timestamp, data }: CachedSession = JSON.parse(cached);
+      if (Date.now() - timestamp > SESSION_EXPIRY) {
+        localStorage.removeItem(CACHE_KEY);
+        return null;
+      }
+
+      return data;
+    } catch (error) {
+      console.warn('Failed to load from cache:', error);
+      return null;
+    }
+  };
 
   useEffect(() => {
     // Apply patches to fix authentication issues
@@ -137,7 +175,12 @@ export function OrbisProvider({ children }: { children: ReactNode }) {
         .request({ method: 'eth_accounts' })
         .then((accounts: string[]) => {
           if (accounts && accounts.length > 0) {
-            setAddress(accounts[0]);
+            setAuthResult({
+              did: accounts[0],
+              details: { address: accounts[0] },
+            });
+            setIsUserConnected(true);
+            setUser({ address: accounts[0] });
           }
         })
         .catch((err: any) => {
@@ -186,6 +229,14 @@ export function OrbisProvider({ children }: { children: ReactNode }) {
 
         setOrbisInstance(newOrbisInstance);
 
+        // Check cache first
+        const cachedSession = loadFromCache();
+        if (cachedSession) {
+          setAuthResult(cachedSession);
+          setIsUserConnected(true);
+          setUser(cachedSession.details);
+        }
+
         // Check if user is already connected
         try {
           const connected = await db.isUserConnected();
@@ -194,10 +245,24 @@ export function OrbisProvider({ children }: { children: ReactNode }) {
             console.log('User already connected to Orbis:', connected);
             setIsUserConnected(true);
             const currentUser = await db.getConnectedUser();
-            setUser(currentUser);
+            if (currentUser) {
+              setUser(currentUser);
+              // Update cache
+              saveToCache({
+                did: currentUser.user.did,
+                details: JSON.parse(JSON.stringify(currentUser)),
+              });
+            }
           }
         } catch (error) {
           console.error('Failed to check user connection:', error);
+          // If connection check fails, fall back to cache
+          const cachedSession = loadFromCache();
+          if (cachedSession) {
+            setAuthResult(cachedSession);
+            setIsUserConnected(true);
+            setUser(cachedSession.details);
+          }
         }
       } catch (error) {
         console.error('Error initializing Orbis:', error);
