@@ -7,6 +7,7 @@ import KubernetesDashboard from "./pages/KubernetesDashboard";
 import KubernetesCreate from "./pages/KubernetesCreate";
 import "./App.css";
 
+
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <BrowserRouter>
