@@ -2,6 +2,8 @@
   "private": true,
   "scripts": {
     "build": "next build",
+    "build:ui": "tsc && vite build",
+    "lint:fix": "eslint --fix .",
     "dev": "next dev",
     "lint": "next lint",
     "prettier": "prettier --write --ignore-unknown .",

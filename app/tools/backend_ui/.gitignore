@@ -22,3 +22,13 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+
+# Rust
+Cargo.lock
+target/debug
+
+
+
+# Local env files   
+.env

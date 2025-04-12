@@ -40,6 +40,8 @@ next-env.d.ts
 # Env vars
 .env
 .env.test
+.env.development
+.env.production
 
 # Cursor
 .cursorrules
@@ -47,8 +49,32 @@ next-env.d.ts
 # Windsurf
 .winsurfrules
 
-ceramic-app
+
 
 scripts
     /ceramic-app/ceramic-app-*.js
     /ceramic-app/ceramic-app-*.js.map
+
+
+.devcontainer
+.vscode
+.Cursor
+
+
+# pnpm
+.pnpm-debug.log
+*.tgz
+*.tgz.lock
+pnpm-lock.yaml
+pnpm-lock.yaml.versions
+pnpm-lock.yaml.versions.lock
+
+
+
+
+# rust
+# Cargo.lock
+target/debug
+
+
+
