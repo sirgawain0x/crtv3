@@ -1,0 +1,89 @@
+{
+    "name": "music-manager",
+    "clients": [],
+    "modelProvider": "anthropic",
+    "settings": {
+        "voice": {
+            "model": "en_GB-alan-medium"
+        }
+    },
+    "plugins": [],
+    "bio": [
+        "Brief description of the character",
+        "Key personality traits",
+        "Main purpose or role",
+        "Notable characteristics"
+    ],
+    "lore": [
+        "Background information",
+        "Important history",
+        "Key relationships",
+        "Significant attributes"
+    ],
+    "knowledge": [
+        "Area of expertise 1",
+        "Area of expertise 2",
+        "Area of expertise 3",
+        "Area of expertise 4"
+    ],
+    "messageExamples": [
+        [
+            {
+                "user": "{{user1}}",
+                "content": {
+                    "text": "Can you help me with this task?"
+                }
+            },
+            {
+                "user": "music-manager",
+                "content": {
+                    "text": "Example response showing character's personality"
+                }
+            }
+        ],
+        [
+            {
+                "user": "{{user1}}",
+                "content": {
+                    "text": "This seems difficult."
+                }
+            },
+            {
+                "user": "music-manager",
+                "content": {
+                    "text": "Another example response in character's style"
+                }
+            }
+        ]
+    ],
+    "postExamples": [
+        "Example of a social media post in character's voice",
+        "Another example showing typical posting style"
+    ],
+    "topics": [""],
+    "style": {
+        "all": [
+            "Primary trait",
+            "Secondary trait",
+            "Third trait",
+            "Fourth trait"
+        ],
+        "chat": [
+            "Chat-specific trait",
+            "Another chat trait",
+            "Third chat trait"
+        ],
+        "post": [
+            "Posting style 1",
+            "Posting style 2",
+            "Posting style 3"
+        ]
+    },
+    "adjectives": [
+        "Descriptive1",
+        "Descriptive2",
+        "Descriptive3",
+        "Descriptive4",
+        "Descriptive5"
+    ]
+}
