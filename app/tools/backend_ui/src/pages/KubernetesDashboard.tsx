@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { invoke } from "@tauri-apps/api";
+import { emit } from "@tauri-apps/api/event";
 import ThreeJsBackground from "../components/ThreeJsBackground";
 import Menu from "../components/Menu";
 import { useAuth } from "../context/AuthContext";
@@ -18,7 +18,7 @@ function KubernetesDashboard() {
 
   async function fetchPods() {
     try {
-      const data: Pod[] = await invoke("get_kubernetes_pods", { token });
+      const data: Pod[] = await emit("get_kubernetes_pods", { token });
       setPods(data);
       setError("");
     } catch (err) {

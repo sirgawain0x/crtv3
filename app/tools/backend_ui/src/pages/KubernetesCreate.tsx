@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { invoke } from "@tauri-apps/api";
+import { emit } from "@tauri-apps/api/event";
 import ThreeJsBackground from "../components/ThreeJsBackground";
 import Menu from "../components/Menu";
 import { useAuth } from "../context/AuthContext";
@@ -14,7 +14,7 @@ function KubernetesCreate() {
   async function createResource(e: React.FormEvent) {
     e.preventDefault();
     try {
-      const result: string = await invoke("create_kubernetes_resource", { token, resourceType });
+      const result: string = await emit("create_kubernetes_resource", { token, resourceType });
       setResponse(result);
       setError("");
     } catch (err) {

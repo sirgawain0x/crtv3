@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { invoke, listen } from "@tauri-apps/api";
+import { emit, listen } from "@tauri-apps/api/event";
 import ThreeJsBackground from "../components/ThreeJsBackground";
 import Menu from "../components/Menu";
 import { useAuth } from "../context/AuthContext";
@@ -8,6 +8,9 @@ import "../App.css";
 interface Transfer {
   action: string;
   cid: string;
+  data: string;
+  error: string;
+  id: string;
   size: number;
   timestamp: string;
 }
@@ -19,10 +22,12 @@ function DataTransfers() {
 
   async function updateTransfers() {
     try {
-      const data: Transfer[] = await invoke("get_transfers", { token });
+      const data: Transfer[] = await emit("get_transfers", { token });
+      console.log("Fetched transfers:", data); // Debug log
       setTransfers(data);
       setError("");
     } catch (err) {
+      console.error("emit error:", err); // Debug log
       setError(`Failed to fetch transfers: ${String(err)}`);
     }
   }
@@ -31,8 +36,13 @@ function DataTransfers() {
     if (token) {
       updateTransfers();
       let unlisten: (() => void) | null = null;
-      listen("transfer-updated", updateTransfers).then((fn) => {
+      listen("transfer-updated", () => {
+        console.log("Transfer-updated event received"); // Debug log
+        return updateTransfers();
+      }).then((fn) => {
         unlisten = fn;
+      }).catch((err) => {
+        console.error("Listen error:", err); // Debug log
       });
       return () => {
         if (unlisten) unlisten();
