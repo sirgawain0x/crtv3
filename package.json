@@ -3,6 +3,7 @@
   "scripts": {
     "build": " next build; cd package/pnpm run tauri dev;",
     "build:ui": "tsc && vite build",
+    "build:run":"cd package/pnpm run tauri "
     "lint:fix": "eslint --fix .",
     "dev": "next dev",
     "lint": "next lint",
