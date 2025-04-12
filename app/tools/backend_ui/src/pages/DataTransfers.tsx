@@ -22,9 +22,9 @@ function DataTransfers() {
 
   async function updateTransfers() {
     try {
-      const data: Transfer[] = await emit("get_transfers", { token });
-      console.log("Fetched transfers:", data); // Debug log
-      setTransfers(data);
+      const dataFile: Transfer[] = await emit("get_transfers", { token });
+      console.log("Fetched transfers:", dataFile); // Debug log
+      setTransfers(dataFile);
       setError("");
     } catch (err) {
       console.error("emit error:", err); // Debug log

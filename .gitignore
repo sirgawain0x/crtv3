@@ -74,8 +74,13 @@ pnpm-lock.yaml.versions.lock
 
 
 # rust
-# Cargo.lock
+Cargo.lock
 target/debug
+
++*.rs.bk
++*.rs.old
++*.rs.swp
+
 
 
 
