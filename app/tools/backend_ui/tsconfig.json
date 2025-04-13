@@ -1,33 +1,45 @@
 {
+  "extends": "./tsconfig.base.json",
+  "display": "Backend UI",
+  "typeAcquisition": {
+    "include": ["node", "jest", "vitest"]
+  },
+  "types": ["node", "jest", "vitest"],
+  "baseUrl": "./",
+  "paths": {
+    "@ceramic/*": ["lib/ceramic-app/*"],
+    "@ceramic/*/*": ["lib/ceramic-app/*/*"],
+    "@ceramic/*/*/*": ["lib/ceramic-app/*/*/*"],
+    "@ceramic/*/*/*/*": ["lib/ceramic-app/*/*/*/*"],
+    "@ceramic-app-lib-react-legacy-vite": ["lib/ceramic-app/ceramic-app-lib-react-legacy-vite/src/index.ts"]
+  },
   "compilerOptions": {
     "target": "ES2020",
     "useDefineForClassFields": true,
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "skipLibCheck": true,
-
-
-    /* Bundler mode */
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
-
-    /* Linting */
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src"],
+  "include": ["src", "./lib/ceramic-app/ceramic-app-app"],
   "references": [
-    { "path": "./tsconfig.node.json" }
-    // { "path": "./tsconfig.esm.json" },
-    // { "path": "./tsconfig.vite.json" }
+    { "path": "./tsconfig.node.json" },
+    { "path": "./lib/ceramic-app/ceramic-app-app" },
+    { "path": "./lib/ceramic-app/ceramic-app-lib" },
+    { "path": "./lib/ceramic-app/ceramic-app-lib-react" },
+    { "path": "./lib/ceramic-app/ceramic-app-lib-react-legacy" },
+    { "path": "./lib/ceramic-app/ceramic-app-lib-react-legacy-vite" },
+    { "path": "./tsconfig.base.json" },
   ],
-  "extends": "./tsconfig.base.json",
   "exclude": [
     "node_modules",
     "dist",

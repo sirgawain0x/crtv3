@@ -1,13 +1,17 @@
 import React, { createContext, useContext, useState, ReactNode, useMemo } from 'react';
-import {PostContext} from 'lib/ceramic-app/ceramic-app-app/types';
-
 
 interface PostContextType {
+  /**
+   * The post content
+   * @type {string}
+   * @example "This is a sample post content"
+   * @default ""
+   */
   post: string;
   setPost: (post: string) => void;
 }
 
-const PostContext = createContext<PostContextType | undefined>(undefined);
+export const PostContext = createContext<PostContextType | undefined>(undefined);
 
 export const usePostContext = () => {
   const context = useContext(PostContext);
@@ -23,7 +27,6 @@ interface PostProviderProps {
 
 export const PostProvider: React.FC<PostProviderProps> = ({ children }) => {
   const [post, setPost] = useState<string>('');
-
   const contextValue = useMemo(() => ({ post, setPost }), [post]);
 
   return (
