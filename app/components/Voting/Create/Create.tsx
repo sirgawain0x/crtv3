@@ -5,10 +5,10 @@ import { Textarea } from '@app/components/ui/textarea';
 import { Button } from '@app/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import snapshot from '@snapshot-labs/snapshot.js';
-import { useActiveAccount } from 'thirdweb/react';
+import { useUser } from '@account-kit/react';
 import { FaWindowClose } from 'react-icons/fa';
 import { useRouter } from 'next/navigation';
-import { polygon } from 'thirdweb/chains';
+import { polygon, base } from 'viem/chains';
 import { ProtectedRoute } from '@app/components/Auth/ProtectedRoute';
 //import { SNAPSHOT_SUBGRAPH_URL } from '@snapshot-labs/snapshot.js/dist/utils';
 
@@ -31,7 +31,7 @@ export default function Create() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const inputRef = useRef();
   const router = useRouter();
-  const activeAccount = useActiveAccount();
+  const user = useUser();
   const chain = polygon;
 
   /**
@@ -72,39 +72,33 @@ export default function Create() {
    * @returns {Promise<void>} A promise that resolves when the proposal is created.
    */
   const submit = async () => {
-    if (activeAccount) {
-      try {
-        setIsSubmitting(true);
-        // get current block of Polygon network
-        const provider = await snapshot.utils.getProvider(chain.id.toString());
-        const block = await snapshot.utils.getBlockNumber(provider);
-        const space = 'thecreative.eth';
-        const receipt = (await client.proposal(
-          provider,
-          activeAccount?.address,
-          {
-            space: space,
-            type: 'weighted',
-            title: title,
-            body: content,
-            choices: choices,
-            start: startDate,
-            end: endDate,
-            snapshot: block,
-            discussion: 'max',
-            plugins: JSON.stringify({
-              poap: {},
-            }),
-          },
-        )) as any;
-        console.log(`created proposal ${receipt.id}`);
-        router.push('/vote');
-      } catch (error) {
-        console.log(error);
-        setIsSubmitting(false);
-      }
-    } else {
-      console.log('Please connect your wallet to create a proposal.');
+    if (!user?.address) return;
+
+    try {
+      setIsSubmitting(true);
+      // get current block of Polygon network
+      const provider = await snapshot.utils.getProvider(chain.id.toString());
+      const block = await snapshot.utils.getBlockNumber(provider);
+      const space = 'thecreative.eth';
+      const receipt = (await client.proposal(provider, user?.address, {
+        space: space,
+        type: 'weighted',
+        title: title,
+        body: content,
+        choices: choices,
+        start: startDate,
+        end: endDate,
+        snapshot: block,
+        discussion: 'max',
+        plugins: JSON.stringify({
+          poap: {},
+        }),
+      })) as any;
+      console.log(`created proposal ${receipt.id}`);
+      router.push('/vote');
+    } catch (error) {
+      console.log(error);
+      setIsSubmitting(false);
     }
   };
 

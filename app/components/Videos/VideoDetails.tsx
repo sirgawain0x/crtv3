@@ -11,7 +11,8 @@ import { toast } from 'sonner';
 import { Src } from '@livepeer/react';
 import * as Popover from '@radix-ui/react-popover';
 
-import { useActiveAccount } from 'thirdweb/react';
+import { useUser } from '@account-kit/react';
+import { userToAccount } from '@app/lib/types/account';
 
 import {
   PauseIcon,
@@ -52,7 +53,8 @@ export default function VideoDetails({ asset }: VideoDetailsProps) {
   );
   const [conditionalProps, setConditionalProps] = useState<any>({});
 
-  const activeAccount = useActiveAccount();
+  const user = useUser();
+  const account = userToAccount(user);
 
   const { getAssetMetadata } = useOrbisContext();
   const { setSubtitles } = useSubtitles();
@@ -77,13 +79,13 @@ export default function VideoDetails({ asset }: VideoDetailsProps) {
     const conProps = {
       ...(asset.playbackPolicy && {
         accessKey: generateAccessKey(
-          activeAccount!.address,
+          account.address,
           asset.playbackPolicy.webhookContext as WebhookContext,
         ),
       }),
     };
     setConditionalProps(conProps);
-  }, [activeAccount, asset, getAssetMetadata, setSubtitles]);
+  }, [account, asset, getAssetMetadata, setSubtitles]);
 
   const Seek = forwardRef<HTMLButtonElement, Player.SeekProps>(
     ({ children, ...props }, forwardedRef) => (

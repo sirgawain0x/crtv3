@@ -1,6 +1,6 @@
 'use client';
 
-import { useActiveAccount } from 'thirdweb/react';
+import { useUser } from '@account-kit/react';
 import { Button } from '../ui/button';
 import { Loader2 } from 'lucide-react';
 import { useState } from 'react';
@@ -9,12 +9,12 @@ import { AuthService } from '@app/lib/services/auth';
 import { toast } from 'sonner';
 
 export function LoginButton() {
-  const account = useActiveAccount();
+  const user = useUser();
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
   async function handleClick() {
-    if (!account) {
+    if (!user) {
       toast.error('Please connect your wallet first');
       return;
     }
@@ -90,7 +90,7 @@ export function LoginButton() {
 
   return (
     <Button
-      disabled={!account || isLoading}
+      disabled={!user || isLoading}
       onClick={handleClick}
       className="min-w-[100px]"
     >

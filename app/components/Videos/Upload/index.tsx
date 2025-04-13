@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { FaExclamationTriangle } from 'react-icons/fa';
 
 import { toast } from 'sonner';
-import { useActiveAccount } from 'thirdweb/react';
+import { useAccount } from '@/lib/hooks/useAccount';
 import { Asset } from 'livepeer/models/components';
 
 import { StepperFormValues } from '@app/types/hook-stepper';
@@ -39,7 +39,7 @@ const HookMultiStepForm = () => {
 
   const { insert, isConnected } = useOrbisContext();
 
-  const activeAccount = useActiveAccount();
+  const { address } = useAccount();
 
   const router = useRouter();
 
@@ -124,13 +124,11 @@ const HookMultiStepForm = () => {
             // Award points for uploading a video
             try {
               await stack.track('video_upload', {
-                account: activeAccount?.address as string,
+                account: address as string,
                 points: 10,
               });
               // Get updated points balance
-              const points = await stack.getPoints(
-                activeAccount?.address as string,
-              );
+              const points = await stack.getPoints(address as string);
               toast.success('Video uploaded successfully!', {
                 description: `You earned 10 points! Your total balance is now ${points} points.`,
               });

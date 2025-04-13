@@ -1,18 +1,19 @@
 'use client';
 import { ApolloWrapper } from './lib/utils/ApolloWrapper';
-import { ThirdwebProvider } from '@app/lib/sdk/thirdweb/components';
 import { createContext, useContext, useState, useEffect } from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { OrbisProvider } from '@app/lib/sdk/orbisDB/context';
 import { SubtitlesProvider } from './components/Player/Subtitles';
 import { ThemeProvider } from 'next-themes';
+import { AlchemyClientState } from '@account-kit/core';
+import { AlchemyAccountProvider } from '@account-kit/react';
+import { config, queryClient } from './config/account-kit';
+import { PropsWithChildren } from 'react';
 
 interface ThemeContextType {
   theme: string;
   toggleTheme: () => void;
 }
-
-const queryClient = new QueryClient();
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
@@ -50,11 +51,15 @@ export function Providers({ children }: ProvidersProps) {
       >
         <SubtitlesProvider>
           <ApolloWrapper>
-            <ThirdwebProvider>
-              <QueryClientProvider client={queryClient}>
+            <QueryClientProvider client={queryClient}>
+              <AlchemyAccountProvider
+                config={config}
+                queryClient={queryClient}
+                initialState={undefined}
+              >
                 <OrbisProvider>{children}</OrbisProvider>
-              </QueryClientProvider>
-            </ThirdwebProvider>
+              </AlchemyAccountProvider>
+            </QueryClientProvider>
           </ApolloWrapper>
         </SubtitlesProvider>
       </ThemeProvider>

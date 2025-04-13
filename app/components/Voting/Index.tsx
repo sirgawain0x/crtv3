@@ -6,12 +6,14 @@ import Link from 'next/link';
 import { client } from '@app/lib/sdk/thirdweb/client';
 import { base } from 'thirdweb/chains';
 import { FaUsers, FaCertificate } from 'react-icons/fa';
-import { useActiveAccount, useReadContract } from 'thirdweb/react';
+import { useReadContract } from 'thirdweb/react';
 import { getContract } from 'thirdweb/contract';
 import { Label } from '../ui/label';
 import { ROLES, CREATIVE_ADDRESS } from '@app/lib/utils/context';
 import { Card } from '@app/components/Voting/Card';
 import VoteABI from '@app/lib/utils/Vote.json';
+import { useUser } from '@account-kit/react';
+import { userToAccount } from '@app/lib/types/account';
 
 // Interface for proposal data from smart contract
 interface Proposal {
@@ -28,7 +30,8 @@ interface Proposal {
 
 const Vote = () => {
   const [selectedValue, setSelectedValue] = useState('active');
-  const activeAccount = useActiveAccount();
+  const user = useUser();
+  const account = userToAccount(user);
 
   const voteContract = getContract({
     client: client,
@@ -54,6 +57,14 @@ const Vote = () => {
     }
     return true;
   });
+
+  if (!account) {
+    return (
+      <div className="p-4 text-center">
+        <p>Please connect your wallet to access voting features</p>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -106,13 +117,11 @@ const Vote = () => {
         </div>
       )}
 
-      {activeAccount && (
-        <div className="mt-8 flex justify-end">
-          <Link href="/vote/create">
-            <Button>Create Proposal</Button>
-          </Link>
-        </div>
-      )}
+      <div className="mt-8 flex justify-end">
+        <Link href="/vote/create">
+          <Button>Create Proposal</Button>
+        </Link>
+      </div>
     </div>
   );
 };

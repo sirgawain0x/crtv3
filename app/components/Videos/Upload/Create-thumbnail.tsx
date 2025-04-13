@@ -3,7 +3,6 @@ import {
   getLivepeerAsset,
   getLivepeerPlaybackInfo,
 } from '@app/api/livepeer/livepeerActions';
-import LazyMint from '@app/components/lazy-mint/LazyMint';
 import { PlayerComponent } from '@app/components/Player/Player';
 import { Button } from '@app/components/ui/button';
 import { Spinner } from '@chakra-ui/react';
@@ -13,7 +12,7 @@ import { Asset, PlaybackInfo } from 'livepeer/models/components';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useInterval } from 'react-use';
-import { useActiveAccount } from 'thirdweb/react';
+import { useUser } from '@account-kit/react';
 import CreateThumbnailForm from './CreateThumbnailForm';
 import { toast } from 'sonner';
 
@@ -29,25 +28,19 @@ export default function CreateThumbnail({
   onComplete,
 }: CreateThumbnailProps) {
   const router = useRouter();
-  const activeAccount = useActiveAccount();
+  const user = useUser();
 
   const [progress, setProgress] = useState<number>(0);
   const [livepeerAssetData, setLivepeerAssetData] = useState<Asset>();
   const [livepeerPlaybackData, setLivepeerPlaybackData] =
     useState<PlaybackInfo>();
-  const [isLazyMinted, setIsLazyMinted] = useState(false);
   const [selectedThumbnail, setSelectedThumbnail] = useState<string>();
-
-  const onLazyMintSuccess = (txHash: string) => {
-    setIsLazyMinted(Boolean(txHash));
-  };
 
   useInterval(
     () => {
       if (livePeerAssetId) {
         getLivepeerAsset(livePeerAssetId)
           .then((data) => {
-            //console.log(data);
             setLivepeerAssetData(data);
             if (data?.status?.phase === 'failed') {
               toast.error(
@@ -76,8 +69,6 @@ export default function CreateThumbnail({
       getLivepeerPlaybackInfo(livepeerAssetData.playbackId).then((data) => {
         setLivepeerPlaybackData(data);
       });
-    } else {
-      //console.log('Not ready to get playback info');
     }
   }, [livepeerAssetData]);
 
@@ -130,21 +121,10 @@ export default function CreateThumbnail({
         </div>
         <CreateThumbnailForm
           onSelectThumbnailImages={(thumbnailUri: string) => {
-            //console.log('Use selected image', thumbnailUri);
             handleComplete(thumbnailUri);
           }}
         />
       </div>
-      {livepeerAssetData?.status?.phase === 'ready' && (
-        <div className="my-5">
-          <LazyMint
-            baseURIForToken={String(
-              livepeerAssetData?.storage?.ipfs?.nftMetadata?.gatewayUrl,
-            )}
-            onSuccess={onLazyMintSuccess}
-          />
-        </div>
-      )}
 
       <div className="flex items-center justify-center gap-3">
         <Button

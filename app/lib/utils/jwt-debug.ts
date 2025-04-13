@@ -1,8 +1,7 @@
 /**
  * Utility functions for debugging JWT issues
  */
-import { decodeJWT } from 'thirdweb/utils';
-import { safeToBase64Url } from './base64url';
+import { stringToHex, hexToString } from 'viem';
 
 /**
  * Safely decodes a JWT and returns its parts for debugging
@@ -27,33 +26,20 @@ export function debugJWT(jwt: string): {
       };
     }
 
-    // Decode the header and payload
-    const headerStr = Buffer.from(parts[0], 'base64url').toString();
-    const payloadStr = Buffer.from(parts[1], 'base64url').toString();
+    // Decode the header and payload using viem's utilities
+    const headerStr = hexToString(stringToHex(atob(parts[0])));
+    const payloadStr = hexToString(stringToHex(atob(parts[1])));
 
     // Parse the JSON
     const header = JSON.parse(headerStr);
     const payload = JSON.parse(payloadStr);
 
-    // Use thirdweb's decodeJWT for additional validation
-    try {
-      const decoded = decodeJWT(jwt);
-      return {
-        header,
-        payload,
-        signature: decoded.signature,
-        valid: true,
-      };
-    } catch (e) {
-      // If thirdweb's decodeJWT fails, still return what we parsed
-      return {
-        header,
-        payload,
-        signature: parts[2],
-        valid: false,
-        error: e instanceof Error ? e.message : 'Unknown error decoding JWT',
-      };
-    }
+    return {
+      header,
+      payload,
+      signature: parts[2],
+      valid: true,
+    };
   } catch (error) {
     return {
       header: null,

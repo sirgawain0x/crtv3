@@ -1,18 +1,13 @@
-import { getContract } from 'thirdweb/contract';
-import { defineChain } from 'thirdweb/chains';
-import { client } from '@app/lib/sdk/thirdweb/client';
-import metokenFactoryABI from './metokenFactoryABI.json';
+import { createPublicClient, http } from 'viem';
+import { base } from 'viem/chains';
 
-export const metokenFactoryOptimism = getContract({
-  client,
-  chain: defineChain(10),
-  address: '0x7BE650f4AA109377c1bBbEE0851CF72A8e7E915C',
-  abi: metokenFactoryABI.abi as any,
+const publicClient = createPublicClient({
+  chain: base,
+  transport: http(),
 });
 
-export const metokenFactoryBase = getContract({
-  client,
-  chain: defineChain(8453),
-  address: '0xb31Ae2583d983faa7D8C8304e6A16E414e721A0B',
-  abi: metokenFactoryABI.abi as any,
-});
+export const metokenFactoryContract = {
+  address: '0x4b62d9b3de9fab98659693c9ee488d2e4ee56c44',
+  abi: [], // Add your contract ABI here
+  publicClient,
+};

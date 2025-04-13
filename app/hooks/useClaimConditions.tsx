@@ -1,32 +1,52 @@
 import { useEffect, useState } from 'react';
-import { ContractOptions } from 'thirdweb';
-import {
-  getClaimConditions,
-  GetClaimConditionsParams,
-} from 'thirdweb/extensions/erc1155';
+import { type Address, parseAbi, PublicClient } from 'viem';
+import { usePublicClient } from 'wagmi';
+
+export type ClaimCondition = {
+  startTime: bigint;
+  maxClaimableSupply: bigint;
+  supplyClaimed: bigint;
+  quantityLimitPerWallet: bigint;
+  merkleRoot: `0x${string}`;
+  pricePerToken: bigint;
+  currency: Address;
+  metadata: string;
+};
 
 type ClaimConditionsProps = {
-  contract: Readonly<ContractOptions<any, `0x${string}`>>;
-} & GetClaimConditionsParams;
+  contractAddress: Address;
+  tokenId: bigint;
+};
 
-export function useClaimConditions(props: ClaimConditionsProps) {
-  const [claimConditions, setClaimConditions] = useState<any[]>([]);
+export function useClaimConditions({
+  contractAddress,
+  tokenId,
+}: ClaimConditionsProps) {
+  const [claimConditions, setClaimConditions] = useState<ClaimCondition[]>([]);
   const [error, setError] = useState<Error>();
   const [isLoading, setIsLoading] = useState(false);
+
+  const publicClient = usePublicClient();
 
   useEffect(() => {
     let mounted = true;
 
     const getConditions = async () => {
+      if (!publicClient) return;
+
       try {
         setIsLoading(true);
-        const conditions = await getClaimConditions({
-          contract: props.contract,
-          tokenId: props.tokenId,
-        });
+        const data = (await publicClient.readContract({
+          address: contractAddress,
+          abi: parseAbi([
+            'function getClaimConditions(uint256 tokenId) view returns (tuple(uint256 startTime, uint256 maxClaimableSupply, uint256 supplyClaimed, uint256 quantityLimitPerWallet, bytes32 merkleRoot, uint256 pricePerToken, address currency, string metadata)[])',
+          ]),
+          functionName: 'getClaimConditions',
+          args: [tokenId],
+        })) as ClaimCondition[];
 
         if (mounted) {
-          setClaimConditions(conditions);
+          setClaimConditions(data);
         }
       } catch (err) {
         if (mounted) {
@@ -44,7 +64,7 @@ export function useClaimConditions(props: ClaimConditionsProps) {
     return () => {
       mounted = false;
     };
-  }, [props.contract, props.tokenId]);
+  }, [publicClient, contractAddress, tokenId]);
 
   return {
     data: claimConditions,

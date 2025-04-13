@@ -2,21 +2,12 @@
 import { useState, useEffect } from 'react';
 import { Avatar, AvatarImage } from '../ui/avatar';
 import makeBlockie from 'ethereum-blockies-base64';
-import {
-  AccountProvider,
-  AccountAvatar,
-  AccountName,
-  AccountBalance,
-  AccountAddress,
-  AccountBlobbie,
-} from 'thirdweb/react';
-import { shortenAddress } from 'thirdweb/utils';
 import { stack } from '@app/lib/sdk/stack/client';
-import { client } from '@app/lib/sdk/thirdweb/client';
-import { resolveName } from 'thirdweb/extensions/ens';
-import { Button } from '../ui/button'; // Assuming you have a Button component
+import { shortenAddress, resolveEnsName } from '@app/lib/sdk/web3/client';
+import { Button } from '../ui/button';
 import { FaSpinner } from 'react-icons/fa';
 import Link from 'next/link';
+import { useUser } from '@account-kit/react';
 
 interface LeaderboardItem {
   uniqueId: number;
@@ -26,6 +17,43 @@ interface LeaderboardItem {
   bannerUrl?: string;
   name?: string;
   description?: string;
+}
+
+function AccountDisplay({ address }: { address: string }) {
+  const [ensName, setEnsName] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchEnsName() {
+      try {
+        const name = await resolveEnsName(address);
+        setEnsName(name);
+      } catch (error) {
+        console.error('Error resolving ENS name:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    fetchEnsName();
+  }, [address]);
+
+  return (
+    <div className="flex items-center space-x-2">
+      <Avatar>
+        <AvatarImage
+          src={makeBlockie(address)}
+          className="h-10 w-10 rounded-full"
+        />
+      </Avatar>
+      <div className="flex flex-col">
+        <span className="text-left">
+          {isLoading
+            ? shortenAddress(address)
+            : ensName || shortenAddress(address)}
+        </span>
+      </div>
+    </div>
+  );
 }
 
 export function TopChart() {
@@ -38,10 +66,7 @@ export function TopChart() {
       setIsLoading(true);
       setErrorMessage(null);
       try {
-        // Construct the leaderboard query with a limit of 20
         const query = stack.leaderboardQuery().limit(20).build();
-
-        // Fetch the leaderboard with the constructed query
         const leaderboard = await stack.getLeaderboard({ query });
 
         if (!leaderboard || !leaderboard.leaderboard) {
@@ -51,7 +76,6 @@ export function TopChart() {
           return;
         }
 
-        // Set leaderboard data directly without mapping
         setData(
           Array.isArray(leaderboard.leaderboard) ? leaderboard.leaderboard : [],
         );
@@ -68,9 +92,9 @@ export function TopChart() {
   }, []);
 
   // Split data into columns
-  const columns: LeaderboardItem[][] = [[], [], [], []]; // Adjust this if you want more or fewer columns
+  const columns: LeaderboardItem[][] = [[], [], [], []];
   data.forEach((item, index) => {
-    const columnIndex = Math.floor(index / 5); // Divide items into groups of 5
+    const columnIndex = Math.floor(index / 5);
     if (columns[columnIndex]) {
       columns[columnIndex].push(item);
     }
@@ -87,8 +111,7 @@ export function TopChart() {
 
       {isLoading ? (
         <div className="flex justify-center">
-          <FaSpinner className="mr-3 h-5 w-5 animate-spin" />{' '}
-          {/* Replace with your actual Spinner component */}
+          <FaSpinner className="mr-3 h-5 w-5 animate-spin" />
         </div>
       ) : errorMessage ? (
         <div className="text-center">
@@ -111,54 +134,13 @@ export function TopChart() {
               } ${colIndex === 2 ? 'hidden md:block' : ''} `}
             >
               {column.map(({ address, points }, index) => (
-                <AccountProvider
-                  key={address}
-                  address={address}
-                  client={client}
-                >
-                  <div className="flex items-center space-x-2">
-                    <span className="min-w-[24px] text-right font-medium">
-                      {colIndex * Math.ceil(data.length / 4) + index + 1}.
-                    </span>
-                    <AccountAvatar
-                      className="h-10 w-10 rounded-full"
-                      loadingComponent={
-                        <Avatar>
-                          <AvatarImage
-                            src={makeBlockie(address)}
-                            className="h-10 w-10 rounded-full"
-                          />
-                        </Avatar>
-                      }
-                      fallbackComponent={
-                        <Avatar>
-                          <AvatarImage
-                            src={makeBlockie(address)}
-                            className="h-10 w-10 rounded-full"
-                          />
-                        </Avatar>
-                      }
-                    />
-                    <div className="flex flex-col">
-                      <AccountName
-                        className="text-left"
-                        loadingComponent={
-                          <AccountAddress
-                            formatFn={shortenAddress}
-                            className="text-left"
-                          />
-                        }
-                        fallbackComponent={
-                          <AccountAddress
-                            formatFn={shortenAddress}
-                            className="text-left"
-                          />
-                        }
-                      />
-                      <span className="text-gray-500">{points} points</span>
-                    </div>
-                  </div>
-                </AccountProvider>
+                <div key={address} className="flex items-center space-x-2">
+                  <span className="min-w-[24px] text-right font-medium">
+                    {colIndex * Math.ceil(data.length / 4) + index + 1}.
+                  </span>
+                  <AccountDisplay address={address} />
+                  <span className="text-gray-500">{points} points</span>
+                </div>
               ))}
             </div>
           ))}

@@ -23,7 +23,7 @@ import { toast } from 'sonner';
 import { fetchAssetId } from '@app/api/livepeer/actions';
 import { generateAccessKey } from '@app/lib/access-key';
 import { WebhookContext } from '@app/api/livepeer/token-gate/route';
-import { useActiveAccount } from 'thirdweb/react';
+import { useUser } from '@account-kit/react';
 import { GetAssetResponse } from 'livepeer/models/operations';
 import { useVideo } from '@app/context/VideoContext';
 
@@ -53,7 +53,7 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
   const { currentPlayingId, setCurrentPlayingId } = useVideo();
   const playerId = useRef(Math.random().toString(36).substring(7)).current;
 
-  const activeAccount = useActiveAccount();
+  const user = useUser();
 
   const { getAssetMetadata } = useOrbisContext();
   const { setSubtitles } = useSubtitles();
@@ -64,7 +64,10 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
       const container = containerRef.current;
       if (video && container) {
         const isPortrait = video.videoHeight > video.videoWidth;
-        container.setAttribute('data-orientation', isPortrait ? 'portrait' : 'landscape');
+        container.setAttribute(
+          'data-orientation',
+          isPortrait ? 'portrait' : 'landscape',
+        );
       }
     };
 
@@ -89,7 +92,7 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
         const conProps = {
           ...(asset?.asset?.playbackPolicy && {
             accessKey: generateAccessKey(
-              activeAccount?.address!,
+              user?.address!,
               asset?.asset?.playbackPolicy?.webhookContext as WebhookContext,
             ),
           }),
@@ -101,7 +104,7 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
       }
     };
     fetchAssetDetails(assetId);
-  }, [activeAccount, assetId, getAssetMetadata, setSubtitles]);
+  }, [user, assetId, getAssetMetadata, setSubtitles]);
 
   useEffect(() => {
     resetFadeTimeout();
@@ -168,13 +171,13 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
 
           <Player.LoadingIndicator
             style={{
-              height: "100%",
-              width: "100%",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              backgroundColor: "black",
-              position: "absolute",
+              height: '100%',
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: 'black',
+              position: 'absolute',
               top: 0,
               left: 0,
               zIndex: 20,
@@ -187,20 +190,20 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
           </Player.LoadingIndicator>
 
           <div
-            className={`absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/60 pointer-events-none transition-opacity duration-300 ${
-              controlsVisible ? "opacity-100" : "opacity-0"
+            className={`pointer-events-none absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/60 transition-opacity duration-300 ${
+              controlsVisible ? 'opacity-100' : 'opacity-0'
             }`}
           />
 
           <div
             className={`absolute inset-0 z-30 touch-none transition-opacity duration-300 ${
-              controlsVisible ? "opacity-100" : "opacity-0"
+              controlsVisible ? 'opacity-100' : 'opacity-0'
             }`}
           >
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="flex items-center gap-6">
                 <Player.PlayPauseTrigger
-                  className="group relative flex h-16 w-16 touch-none cursor-pointer items-center justify-center rounded-full bg-black/50 hover:bg-black/70"
+                  className="group relative flex h-16 w-16 cursor-pointer touch-none items-center justify-center rounded-full bg-black/50 hover:bg-black/70"
                   onClick={handleControlInteraction}
                 >
                   <Player.PlayingIndicator asChild matcher={false}>
@@ -212,7 +215,7 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
                 </Player.PlayPauseTrigger>
 
                 <Player.MuteTrigger
-                  className="group relative flex h-14 w-14 touch-none cursor-pointer items-center justify-center rounded-full bg-black/50 hover:bg-black/70"
+                  className="group relative flex h-14 w-14 cursor-pointer touch-none items-center justify-center rounded-full bg-black/50 hover:bg-black/70"
                   onClick={handleControlInteraction}
                 >
                   <Player.VolumeIndicator asChild matcher={false}>
@@ -227,15 +230,11 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
 
             <div className="absolute bottom-0 left-0 right-0">
               <div className="flex items-center justify-between px-5 pb-8">
-                <Player.Time 
-                  className="text-xs font-medium text-white/90 bg-black/40 px-2 py-0.5 rounded-full tabular-nums"
-                />
+                <Player.Time className="rounded-full bg-black/40 px-2 py-0.5 text-xs font-medium tabular-nums text-white/90" />
 
                 <div className="flex items-center gap-4">
-                  {assetMetadata?.subtitles && (
-                    <SubtitlesControl />
-                  )}
-                  <Player.FullscreenTrigger className="group relative flex h-10 w-10 touch-none cursor-pointer items-center justify-center rounded-full bg-black/50 hover:bg-black/70">
+                  {assetMetadata?.subtitles && <SubtitlesControl />}
+                  <Player.FullscreenTrigger className="group relative flex h-10 w-10 cursor-pointer touch-none items-center justify-center rounded-full bg-black/50 hover:bg-black/70">
                     <Player.FullscreenIndicator asChild matcher={false}>
                       <EnterFullscreenIcon className="h-6 w-6 text-white" />
                     </Player.FullscreenIndicator>
@@ -248,22 +247,22 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
 
               <Player.Seek
                 style={{
-                  position: "absolute",
+                  position: 'absolute',
                   left: 20,
                   right: 20,
                   bottom: 20,
                   height: 20,
-                  display: "flex",
-                  alignItems: "center",
+                  display: 'flex',
+                  alignItems: 'center',
                   gap: 10,
-                  userSelect: "none",
-                  touchAction: "none",
+                  userSelect: 'none',
+                  touchAction: 'none',
                 }}
               >
                 <Player.Track
                   style={{
-                    backgroundColor: "rgba(255, 255, 255, 0.7)",
-                    position: "relative",
+                    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+                    position: 'relative',
                     flexGrow: 1,
                     borderRadius: 9999,
                     height: 2,
@@ -271,27 +270,27 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
                 >
                   <Player.SeekBuffer
                     style={{
-                      position: "absolute",
-                      backgroundColor: "rgba(0, 0, 0, 0.5)",
+                      position: 'absolute',
+                      backgroundColor: 'rgba(0, 0, 0, 0.5)',
                       borderRadius: 9999,
-                      height: "100%",
+                      height: '100%',
                     }}
                   />
                   <Player.Range
                     style={{
-                      position: "absolute",
-                      backgroundColor: "white",
+                      position: 'absolute',
+                      backgroundColor: 'white',
                       borderRadius: 9999,
-                      height: "100%",
+                      height: '100%',
                     }}
                   />
                 </Player.Track>
                 <Player.Thumb
                   style={{
-                    display: "block",
+                    display: 'block',
                     width: 12,
                     height: 12,
-                    backgroundColor: "white",
+                    backgroundColor: 'white',
                     borderRadius: 9999,
                   }}
                 />

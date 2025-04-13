@@ -68,14 +68,28 @@ async function ensureInitialized() {
         try {
           const session = JSON.parse(storedSession);
           if (session && session.did) {
-            await db.connectUser({ serializedSession: storedSession });
-            console.log(
-              'Successfully restored Orbis session for DID:',
-              session.did,
-            );
+            const connectionResult = await db.connectUser({
+              serializedSession: storedSession,
+            });
+            if (
+              connectionResult &&
+              'status' in connectionResult &&
+              connectionResult.status === 200
+            ) {
+              console.log(
+                'Successfully restored Orbis session for DID:',
+                session.did,
+              );
+            } else {
+              throw new Error(
+                'Failed to restore session: Invalid connection result',
+              );
+            }
+          } else {
+            throw new Error('Invalid session structure');
           }
         } catch (error) {
-          console.warn('Invalid session data, clearing:', error);
+          console.warn('Invalid or expired Orbis session, clearing:', error);
           localStorage.removeItem('orbis_session');
           localStorage.removeItem('orbis_session_data');
         }
@@ -112,6 +126,35 @@ export async function connectUser(
         );
       }
 
+      // Check if already connected with same wallet
+      const isConnected = await db.isUserConnected();
+      if (isConnected) {
+        try {
+          const accounts = await provider.request({ method: 'eth_accounts' });
+          const currentWalletAddress = accounts?.[0]?.toLowerCase() || '';
+
+          // Get current session data
+          const sessionDataStr = localStorage.getItem('orbis_session_data');
+          if (sessionDataStr) {
+            const sessionData = JSON.parse(sessionDataStr);
+            // If connected with same wallet, return current session
+            if (
+              sessionData?.wallet === currentWalletAddress &&
+              currentWalletAddress
+            ) {
+              const user = await db.getConnectedUser();
+              if (user) {
+                console.log('Already connected with the same wallet');
+                return user;
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to check existing session:', e);
+          // Continue with fresh connection
+        }
+      }
+
       // Clear any existing session before connecting
       try {
         localStorage.removeItem('orbis_session');
@@ -132,7 +175,7 @@ export async function connectUser(
       // Connect user with proper error handling
       const result = await db.connectUser({ auth, saveSession });
 
-      if (!result || typeof result !== 'object' || !('did' in result)) {
+      if (!result || typeof result !== 'object') {
         throw new OrbisError(
           'Failed to connect user: Invalid response',
           OrbisErrorType.AUTH_ERROR,
@@ -140,13 +183,16 @@ export async function connectUser(
       }
 
       // Store additional session info if needed
-      if (saveSession && result.did) {
+      if (saveSession) {
         try {
           const accounts = await provider.request({ method: 'eth_accounts' });
           const walletAddress = accounts?.[0]?.toLowerCase() || 'unknown';
 
           const sessionData = {
-            did: result.did,
+            did:
+              (result as any).did || (result as any).status === 200
+                ? 'connected'
+                : 'error',
             timestamp: Date.now(),
             wallet: walletAddress,
           };
@@ -155,7 +201,10 @@ export async function connectUser(
             JSON.stringify(sessionData),
           );
 
-          console.log('Successfully connected user with DID:', result.did);
+          console.log(
+            'Successfully connected user with wallet:',
+            walletAddress,
+          );
         } catch (e) {
           console.warn('Failed to save additional session data:', e);
         }
@@ -175,6 +224,54 @@ export async function connectUser(
       );
     }
   }, 'connectUser');
+}
+
+/**
+ * Attempts to reconnect a user if they have a valid session
+ * @returns Connection result or false if reconnection failed
+ */
+export async function reconnectUser(): Promise<OrbisConnectResult | false> {
+  await ensureInitialized();
+
+  return executeOrbisOperation(async () => {
+    try {
+      // Check if already connected
+      const isConnected = await db.isUserConnected();
+      if (isConnected) {
+        const user = await db.getConnectedUser();
+        if (user) return user;
+      }
+
+      // Try to reconnect from stored session
+      const storedSession = localStorage.getItem('orbis_session');
+      if (storedSession) {
+        try {
+          const session = JSON.parse(storedSession);
+          if (
+            session &&
+            ((session as any).did || (session as any).status === 200)
+          ) {
+            const connectionResult = await db.connectUser({
+              serializedSession: storedSession,
+            });
+            if (connectionResult) {
+              console.log('Successfully reconnected user from stored session');
+              return connectionResult;
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to reconnect from stored session:', e);
+          localStorage.removeItem('orbis_session');
+          localStorage.removeItem('orbis_session_data');
+        }
+      }
+
+      return false;
+    } catch (error) {
+      console.error('Orbis reconnection error:', error);
+      return false;
+    }
+  }, 'reconnectUser');
 }
 
 /**
@@ -230,6 +327,58 @@ export async function disconnectUser(): Promise<void> {
       throw error;
     }
   }, 'disconnectUser');
+}
+
+/**
+ * Verifies authentication by checking both JWT and Orbis connection status
+ * For use in API routes and server components to validate auth state
+ * @param jwtValid - Whether the JWT is valid (from external JWT verification)
+ * @returns Object containing auth status and details
+ */
+export async function verifyAuthentication(jwtValid: boolean): Promise<{
+  authenticated: boolean;
+  orbisConnected: boolean;
+  details: string;
+}> {
+  await ensureInitialized();
+
+  return executeOrbisOperation(async () => {
+    // First check if JWT is valid
+    if (!jwtValid) {
+      return {
+        authenticated: false,
+        orbisConnected: false,
+        details: 'Invalid or missing JWT',
+      };
+    }
+
+    // Then check Orbis connection
+    try {
+      const orbisConnected = await db.isUserConnected();
+      const user = await db.getConnectedUser();
+
+      if (!orbisConnected || !user) {
+        return {
+          authenticated: false,
+          orbisConnected: false,
+          details: 'Orbis session expired or invalid',
+        };
+      }
+
+      return {
+        authenticated: true,
+        orbisConnected: true,
+        details: 'Authentication verified',
+      };
+    } catch (error) {
+      console.error('Orbis authentication verification error:', error);
+      return {
+        authenticated: false,
+        orbisConnected: false,
+        details: error instanceof Error ? error.message : 'Unknown Orbis error',
+      };
+    }
+  }, 'verifyAuthentication');
 }
 
 export type { OrbisConnectResult };
