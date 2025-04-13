@@ -94,9 +94,14 @@ build/
 .vscode
 .Cursor
 
+.swm
+.vscode/
+
+
+build.log
+
 # Ceramic scripts
 /ceramic-app/ceramic-app-*.js
 /ceramic-app/ceramic-app-*.js.map
 
 .env
-.env.local

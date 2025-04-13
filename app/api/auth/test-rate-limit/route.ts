@@ -9,7 +9,7 @@ const redisClient = createClient({
   url: process.env.REDIS_URL || 'redis://localhost:6379',
 });
 
-redisClient.on('error', (err) => console.error('Redis Client Error', err));
+redisClient.on('error', (err: Error) => console.error('Redis Client Error', err));
 
 // Initialize RateLimiterRedis
 const rateLimiter = new RateLimiterRedis({
@@ -19,21 +19,27 @@ const rateLimiter = new RateLimiterRedis({
   keyPrefix: 'ratelimit',
 });
 
+// Monitor Redis connection status
+redisClient.on('ready', () => {
+  console.log('Redis client connected');
+});
+
+redisClient.on('end', () => {
+  console.log('Redis client disconnected');
+});
+
+// No explicit connect needed for older redis versions
+
 export async function GET(req: NextRequest) {
   const ip = req.ip ?? '127.0.0.1';
 
   try {
-    // Connect to Redis if not already connected
-    if (!redisClient.isOpen) {
-      await redisClient.connect();
-    }
-
     // Consume rate limit points for the IP
     const result = await rateLimiter.consume(ip);
 
     const headers = new Headers({
       'Cache-Control': 'no-store',
-      'X-RateLimit-Limit': result.points.toString(),
+      'X-RateLimit-Limit': rateLimiter.points.toString(),
       'X-RateLimit-Remaining': result.remainingPoints.toString(),
       'X-RateLimit-Reset': Math.ceil(result.msBeforeNext / 1000).toString(),
     });
@@ -46,7 +52,7 @@ export async function GET(req: NextRequest) {
     if (error instanceof Error && error.message.includes('Rate limit exceeded')) {
       const headers = new Headers({
         'Cache-Control': 'no-store',
-        'X-RateLimit-Limit': '100',
+        'X-RateLimit-Limit': rateLimiter.points.toString(),
         'X-RateLimit-Remaining': '0',
         'X-RateLimit-Reset': Math.ceil(Date.now() / 1000 + 60).toString(),
       });
@@ -67,6 +73,8 @@ export async function GET(req: NextRequest) {
 }
 
 // Optional: Disconnect Redis client on process exit
-process.on('SIGTERM', async () => {
-  await redisClient.quit();
+process.on('SIGTERM', () => {
+  redisClient.quit((err: Error | null) => {
+    if (err) console.error('Error closing Redis connection:', err);
+  });
 });
