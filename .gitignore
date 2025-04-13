@@ -91,7 +91,7 @@ build/
 
 # Project-specific
 /devcontainer
-.vscode
+/.vscode
 .Cursor
 
 .swm

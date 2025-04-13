@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAddress } from 'viem';
-import { checkRateLimit } from '@lib/redis';
+import { checkRateLimit } from '@/types/redis';
 
 // Define protected routes that require authentication
 const protectedRoutes = [
