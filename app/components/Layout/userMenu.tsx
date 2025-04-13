@@ -16,22 +16,13 @@ import { RadioTowerIcon, Bot } from 'lucide-react';
 import { Avatar, AvatarImage, AvatarFallback } from '@app/components/ui/avatar';
 import { useRouter } from 'next/navigation';
 
-interface UserMenuProps {
-  onNavigate?: () => void;
-}
-
-export function UserMenu({ onNavigate }: UserMenuProps) {
+export function UserMenu() {
   const user = useUser();
   const router = useRouter();
 
   if (!user) return null;
 
   const shortAddress = `${user.address.slice(0, 6)}...${user.address.slice(-4)}`;
-
-  const handleNavigation = (path: string) => {
-    router.push(path);
-    onNavigate?.();
-  };
 
   return (
     <DropdownMenu>
@@ -52,10 +43,10 @@ export function UserMenu({ onNavigate }: UserMenuProps) {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => handleNavigation('/profile')}>
+        <DropdownMenuItem onClick={() => router.push('/profile')}>
           Profile
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => handleNavigation('/settings')}>
+        <DropdownMenuItem onClick={() => router.push('/settings')}>
           Settings
         </DropdownMenuItem>
       </DropdownMenuContent>

@@ -1,6 +1,6 @@
 import { createPublicClient, http } from 'viem';
 import { createConfig } from '@account-kit/react';
-import { alchemy, base } from '@account-kit/infra';
+import { alchemy, base, baseSepolia } from '@account-kit/infra';
 import type { AlchemyAccountsUIConfig } from '@account-kit/react';
 
 export const publicClient = createPublicClient({

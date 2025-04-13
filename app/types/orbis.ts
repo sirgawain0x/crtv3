@@ -1,5 +1,8 @@
 import { OrbisAuthResult, OrbisUserProfile } from '@app/lib/sdk/orbisDB/types';
-import { type OrbisDB } from '@useorbis/db-sdk';
+import type {
+  OrbisDB,
+  OrbisConnectResult as SDKOrbisConnectResult,
+} from '@useorbis/db-sdk';
 
 // SDK types
 export interface OrbisSDKConnectResult {
@@ -11,21 +14,14 @@ export interface OrbisSDKConnectResult {
 }
 
 // Our application types
-export interface OrbisConnectResult {
+export type OrbisConnectResult = {
   success: boolean;
   did: string;
   details?: {
     did: string;
-    profile?: any;
+    profile: any | null;
   };
-  user?: {
-    did: string;
-    address?: string;
-    profile?: any;
-  };
-  status?: number;
-  result?: any;
-}
+};
 
 export function isValidOrbisResult(
   result: unknown,
@@ -59,7 +55,7 @@ export interface OrbisContextType {
   orbis: OrbisDB | null;
   isConnected: boolean;
   session: OrbisConnectResult | null;
-  connect: () => Promise<void>;
+  connect: () => Promise<OrbisConnectResult | undefined>;
   disconnect: () => Promise<void>;
 }
 
