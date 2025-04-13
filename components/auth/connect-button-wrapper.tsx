@@ -1,7 +1,7 @@
 'use client';
-import { AccountKitConnectButton } from './AccountKitConnectButton';
+import { AccountKitConnectButton } from './account-kit-connect-button';
 
-export default function ConnectButtonWrapper() {
+export function ConnectButtonWrapper() {
   return (
     <AccountKitConnectButton
       className="my-custom-class px-3 py-1 text-sm sm:px-4 sm:py-2 sm:text-base"

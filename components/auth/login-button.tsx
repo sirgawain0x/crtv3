@@ -1,12 +1,17 @@
 'use client';
 
 import { useUser } from '@account-kit/react';
-import { Button } from '../ui/button';
+import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AuthService } from '@app/lib/services/auth';
 import { toast } from 'sonner';
+
+interface OrbisError {
+  message: string;
+  status?: number;
+}
 
 export function LoginButton() {
   const user = useUser();
@@ -31,34 +36,24 @@ export function LoginButton() {
 
       // Connect with Orbis first with error handling
       const orbisResult = await AuthService.connectWithOrbis().catch(
-        (error) => {
+        (error: OrbisError) => {
           console.error('Orbis connection error:', error);
-          throw new Error(
-            error instanceof Error
-              ? `Failed to connect: ${error.message}`
-              : 'Failed to connect to Orbis. Please try again.',
-          );
+          throw new Error(error.message || 'Failed to connect to Orbis');
         },
       );
 
       if (!orbisResult) {
-        throw new Error('Failed to connect with Orbis. Please try again.');
+        throw new Error('Failed to connect with Orbis');
       }
 
       // Then perform login with error handling
-      const loginResult = await AuthService.login().catch((error) => {
+      const loginResult = await AuthService.login().catch((error: Error) => {
         console.error('Login error:', error);
-        throw new Error(
-          error instanceof Error
-            ? `Login failed: ${error.message}`
-            : 'Failed to login. Please try again.',
-        );
+        throw error;
       });
 
       if (!loginResult.success) {
-        throw new Error(
-          loginResult.message || 'Login failed. Please try again.',
-        );
+        throw new Error(loginResult.message || 'Login failed');
       }
 
       toast.success('Successfully logged in');
@@ -71,11 +66,7 @@ export function LoginButton() {
       });
 
       // Show user-friendly error message
-      toast.error(
-        error instanceof Error
-          ? error.message
-          : 'Failed to login. Please try again.',
-      );
+      toast.error(error instanceof Error ? error.message : 'Failed to login');
 
       // Try to clean up on error
       try {

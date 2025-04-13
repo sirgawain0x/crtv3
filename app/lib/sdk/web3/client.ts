@@ -42,6 +42,13 @@ export function shortenAddress(address: string): string {
  */
 export async function resolveEnsName(address: string): Promise<string> {
   try {
+    // Check if we're on Base chain
+    const chainId = await publicClient.getChainId();
+    if (chainId === 8453) {
+      // Base chain ID
+      return shortenAddress(address);
+    }
+
     const ensName = await publicClient.getEnsName({
       address: address as `0x${string}`,
     });

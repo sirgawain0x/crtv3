@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import '../../styles/toggleable.css';
+import '@/app/styles/toggleable.css';
 import React from 'react';
 
 type TSwithButtonProps = {
@@ -11,7 +11,7 @@ export type TSwithButtonChildProps = {
   handleToggleSwitch?: () => void;
 };
 
-export default function ToggleSwitch(props: TSwithButtonProps) {
+export function ToggleSwitch(props: TSwithButtonProps) {
   const [isOn, setIsOn] = useState(false);
 
   const handleToggleSwitch = () => {

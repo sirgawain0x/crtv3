@@ -7,7 +7,8 @@ import { SubtitlesProvider } from './components/Player/Subtitles';
 import { ThemeProvider } from 'next-themes';
 import { AlchemyClientState } from '@account-kit/core';
 import { AlchemyAccountProvider } from '@account-kit/react';
-import { config, queryClient } from './config/account-kit';
+import { config } from './config';
+import { queryClient } from './config/query-client';
 import { PropsWithChildren } from 'react';
 
 interface ThemeContextType {
@@ -15,13 +16,12 @@ interface ThemeContextType {
   toggleTheme: () => void;
 }
 
-const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
+const ThemeContext = createContext<ThemeContextType>({
+  theme: 'light',
+  toggleTheme: () => {},
+});
 
-interface ProvidersProps {
-  children: React.ReactNode;
-}
-
-export function Providers({ children }: ProvidersProps) {
+export function Providers({ children }: PropsWithChildren) {
   const [theme, setTheme] = useState('light');
 
   useEffect(() => {
@@ -52,13 +52,7 @@ export function Providers({ children }: ProvidersProps) {
         <SubtitlesProvider>
           <ApolloWrapper>
             <QueryClientProvider client={queryClient}>
-              <AlchemyAccountProvider
-                config={config}
-                queryClient={queryClient}
-                initialState={undefined}
-              >
-                <OrbisProvider>{children}</OrbisProvider>
-              </AlchemyAccountProvider>
+              <OrbisProvider>{children}</OrbisProvider>
             </QueryClientProvider>
           </ApolloWrapper>
         </SubtitlesProvider>
