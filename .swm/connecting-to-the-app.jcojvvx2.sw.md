@@ -1,6 +1,7 @@
 ---
 title: Connecting to the app
 ---
+
 **Initiate Connection**:
 
 - Click the **"Connect Wallet"** button in the upper-right corner.

@@ -47,8 +47,8 @@
 
   "remoteUser": "vscode",
 
-"postCreateCommand": "pnpm install-completion zsh",
-"features": {
-	"ghcr.io/devcontainers-extra/features/ts-node:1": {}
-}
+  "postCreateCommand": "pnpm install-completion zsh",
+  "features": {
+    "ghcr.io/devcontainers-extra/features/ts-node:1": {}
+  }
 }

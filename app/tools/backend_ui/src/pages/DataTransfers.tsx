@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
-import { emit, listen } from "@tauri-apps/api/event";
-import ThreeJsBackground from "../components/ThreeJsBackground";
-import Menu from "../components/Menu";
-import { useAuth } from "../context/AuthContext";
-import "../App.css";
+import { useState, useEffect } from 'react';
+import { emit, listen } from '@tauri-apps/api/event';
+import ThreeJsBackground from '../components/ThreeJsBackground';
+import Menu from '../components/Menu';
+import { useAuth } from '../context/AuthContext';
+import '../App.css';
 
 interface Transfer {
   action: string;
@@ -18,16 +18,16 @@ interface Transfer {
 function DataTransfers() {
   const { token } = useAuth();
   const [transfers, setTransfers] = useState<Transfer[]>([]);
-  const [error, setError] = useState<string>("");
+  const [error, setError] = useState<string>('');
 
   async function updateTransfers() {
     try {
-      const dataFile: Transfer[] = await emit("get_transfers", { token });
-      console.log("Fetched transfers:", dataFile); // Debug log
+      const dataFile: Transfer[] = await emit('get_transfers', { token });
+      console.log('Fetched transfers:', dataFile); // Debug log
       setTransfers(dataFile);
-      setError("");
+      setError('');
     } catch (err) {
-      console.error("emit error:", err); // Debug log
+      console.error('emit error:', err); // Debug log
       setError(`Failed to fetch transfers: ${String(err)}`);
     }
   }
@@ -36,14 +36,16 @@ function DataTransfers() {
     if (token) {
       updateTransfers();
       let unlisten: (() => void) | null = null;
-      listen("transfer-updated", () => {
-        console.log("Transfer-updated event received"); // Debug log
+      listen('transfer-updated', () => {
+        console.log('Transfer-updated event received'); // Debug log
         return updateTransfers();
-      }).then((fn) => {
-        unlisten = fn;
-      }).catch((err) => {
-        console.error("Listen error:", err); // Debug log
-      });
+      })
+        .then((fn) => {
+          unlisten = fn;
+        })
+        .catch((err) => {
+          console.error('Listen error:', err); // Debug log
+        });
       return () => {
         if (unlisten) unlisten();
       };

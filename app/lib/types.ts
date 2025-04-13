@@ -358,4 +358,4 @@ export type CreateAssetType = z.infer<typeof createAssetSchema>;
 export type SubtitleResponse = {
   text: string;
   chunks?: Chunk[];
-}
+};

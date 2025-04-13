@@ -8,7 +8,11 @@ const packages = glob.sync('packages/*/package.json');
 for (const packageJsonPath of packages) {
   const packageJson = require(path.resolve(packageJsonPath));
 
-  if (packageJson.name.startsWith('@elizaos/') && !packageJson.private && !packageJson.publishConfig) {
+  if (
+    packageJson.name.startsWith('@elizaos/') &&
+    !packageJson.private &&
+    !packageJson.publishConfig
+  ) {
     packageJson.publishConfig = { access: 'public' };
 
     fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2));

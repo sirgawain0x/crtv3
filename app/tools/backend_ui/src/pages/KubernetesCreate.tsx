@@ -1,22 +1,25 @@
-import { useState } from "react";
-import { emit } from "@tauri-apps/api/event";
-import ThreeJsBackground from "../components/ThreeJsBackground";
-import Menu from "../components/Menu";
-import { useAuth } from "../context/AuthContext";
-import "../App.css";
+import { useState } from 'react';
+import { emit } from '@tauri-apps/api/event';
+import ThreeJsBackground from '../components/ThreeJsBackground';
+import Menu from '../components/Menu';
+import { useAuth } from '../context/AuthContext';
+import '../App.css';
 
 function KubernetesCreate() {
   const { token } = useAuth();
-  const [resourceType, setResourceType] = useState<string>("wordpress");
-  const [response, setResponse] = useState<string>("");
-  const [error, setError] = useState<string>("");
+  const [resourceType, setResourceType] = useState<string>('wordpress');
+  const [response, setResponse] = useState<string>('');
+  const [error, setError] = useState<string>('');
 
   async function createResource(e: React.FormEvent) {
     e.preventDefault();
     try {
-      const result: string = await emit("create_kubernetes_resource", { token, resourceType });
+      const result: string = await emit('create_kubernetes_resource', {
+        token,
+        resourceType,
+      });
       setResponse(result);
-      setError("");
+      setError('');
     } catch (err) {
       setError(`Failed to create resource: ${String(err)}`);
     }
@@ -43,7 +46,10 @@ function KubernetesCreate() {
       <Menu token={token} />
       <section className="form-container">
         <form className="row" onSubmit={createResource}>
-          <select value={resourceType} onChange={(e) => setResourceType(e.target.value)}>
+          <select
+            value={resourceType}
+            onChange={(e) => setResourceType(e.target.value)}
+          >
             <option value="wordpress">WordPress</option>
             <option value="static-site">Static Site</option>
           </select>

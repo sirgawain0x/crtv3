@@ -1,0 +1,51 @@
+{
+  "extends": "./tsconfig.base.json",
+  "display": "Backend UI",
+  "typeAcquisition": {
+    "include": ["node", "jest", "vitest"]
+  },
+  "types": ["node", "jest", "vitest"],
+  "baseUrl": "./",
+  "paths": {
+    "@ceramic/*": ["lib/ceramic-app/*"],
+    "@ceramic/*/*": ["lib/ceramic-app/*/*"],
+    "@ceramic/*/*/*": ["lib/ceramic-app/*/*/*"],
+    "@ceramic/*/*/*/*": ["lib/ceramic-app/*/*/*/*"],
+    "@ceramic-app-lib-react-legacy-vite": [
+      "lib/ceramic-app/ceramic-app-lib-react-legacy-vite/src/index.ts"
+    ]
+  },
+  "compilerOptions": {
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["src", "./lib/ceramic-app/ceramic-app-app"],
+  "references": [
+    { "path": "./tsconfig.node.json" },
+    { "path": "./lib/ceramic-app/ceramic-app-app" },
+    { "path": "./lib/ceramic-app/ceramic-app-lib" },
+    { "path": "./lib/ceramic-app/ceramic-app-lib-react" },
+    { "path": "./lib/ceramic-app/ceramic-app-lib-react-legacy" },
+    { "path": "./lib/ceramic-app/ceramic-app-lib-react-legacy-vite" }
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "build",
+    "out-tsc",
+    "out-tsc-esm",
+    "out-tsc-cjs",
+    "**/*.spec.ts",
+    "**/*.test.ts",
+    "**/*.test.js",
+    "**/*.stories.tsx",
+    "**/*.stories.js",
+    "app/tools/backend_ui/src/utils/three.js/utils/docs/template/static/scripts/page.js"
+  ]
+}

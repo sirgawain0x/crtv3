@@ -33,13 +33,17 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
   // If no access, show error message
   if (!hasAccess) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-4">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md w-full text-center">
-          <h2 className="text-red-800 text-xl font-semibold mb-2">Access Denied</h2>
-          <p className="text-red-600">{error || 'You do not have access to this page'}</p>
+      <div className="flex min-h-screen flex-col items-center justify-center p-4">
+        <div className="w-full max-w-md rounded-lg border border-red-200 bg-red-50 p-6 text-center">
+          <h2 className="mb-2 text-xl font-semibold text-red-800">
+            Access Denied
+          </h2>
+          <p className="text-red-600">
+            {error || 'You do not have access to this page'}
+          </p>
           <button
             onClick={() => router.push('/')}
-            className="mt-4 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+            className="mt-4 rounded bg-red-600 px-4 py-2 text-white transition-colors hover:bg-red-700"
           >
             Return Home
           </button>

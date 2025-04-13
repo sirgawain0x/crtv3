@@ -1,4 +1,10 @@
-import React, { createContext, useContext, useState, ReactNode, useMemo } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  ReactNode,
+  useMemo,
+} from 'react';
 
 interface PostContextType {
   /**
@@ -11,7 +17,9 @@ interface PostContextType {
   setPost: (post: string) => void;
 }
 
-export const PostContext = createContext<PostContextType | undefined>(undefined);
+export const PostContext = createContext<PostContextType | undefined>(
+  undefined,
+);
 
 export const usePostContext = () => {
   const context = useContext(PostContext);
@@ -30,8 +38,6 @@ export const PostProvider: React.FC<PostProviderProps> = ({ children }) => {
   const contextValue = useMemo(() => ({ post, setPost }), [post]);
 
   return (
-    <PostContext.Provider value={contextValue}>
-      {children}
-    </PostContext.Provider>
+    <PostContext.Provider value={contextValue}>{children}</PostContext.Provider>
   );
 };

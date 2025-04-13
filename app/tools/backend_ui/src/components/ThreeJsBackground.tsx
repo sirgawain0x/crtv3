@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
-import * as THREE from "three";
+import { useEffect, useRef } from 'react';
+import * as THREE from 'three';
 
 interface ThreeJsBackgroundProps {}
 
@@ -14,7 +14,7 @@ function ThreeJsBackground(_props: ThreeJsBackgroundProps) {
       75,
       window.innerWidth / window.innerHeight,
       0.1,
-      1000
+      1000,
     );
     const renderer: THREE.WebGLRenderer = new THREE.WebGLRenderer({
       antialias: true,
@@ -50,11 +50,11 @@ function ThreeJsBackground(_props: ThreeJsBackgroundProps) {
         renderer.setSize(window.innerWidth, window.innerHeight);
       }
     };
-    window.addEventListener("resize", handleResize);
+    window.addEventListener('resize', handleResize);
 
     return () => {
       cancelAnimationFrame(animationFrameId);
-      window.removeEventListener("resize", handleResize);
+      window.removeEventListener('resize', handleResize);
       if (containerRef.current && renderer.domElement) {
         containerRef.current.removeChild(renderer.domElement);
       }

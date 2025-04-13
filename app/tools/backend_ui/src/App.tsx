@@ -1,23 +1,23 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { invoke } from "@tauri-apps/api/core";
-import Menu from "./components/Menu";
-import ThreeJsBackground from "./components/ThreeJsBackground";
-import { AuthProvider } from "./context/AuthContext";
-import "./App.css";
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { invoke } from '@tauri-apps/api/core';
+import Menu from './components/Menu';
+import ThreeJsBackground from './components/ThreeJsBackground';
+import { AuthProvider } from './context/AuthContext';
+import './App.css';
 
 function App() {
-  const [cid, setCid] = useState<string>("");
-  const [token, setToken] = useState<string>("");
-  const [authError, setAuthError] = useState<string>("");
+  const [cid, setCid] = useState<string>('');
+  const [token, setToken] = useState<string>('');
+  const [authError, setAuthError] = useState<string>('');
   const navigate = useNavigate();
 
   async function authenticate() {
     try {
-      const authToken: string = await invoke("authenticate", { cid });
+      const authToken: string = await invoke('authenticate', { cid });
       setToken(authToken);
-      setAuthError("");
-      navigate("/data-transfers");
+      setAuthError('');
+      navigate('/data-transfers');
     } catch (error) {
       setAuthError(`Authentication failed: ${String(error)}`);
     }

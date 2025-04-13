@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { usePostContext } from "../context";
+import React, { useState, useEffect } from 'react';
+import { usePostContext } from '../context';
 
 const CreatePostForm: React.FC = () => {
   const { post, setPost } = usePostContext();

@@ -1,13 +1,13 @@
-[
-    {
-        "resource": "/Users/jeldonmusic/Documents/matrixblend_com/Creativ/crtv3/app/tools/backend_ui/tsconfig.json",
-        "owner": "typescript",
-        "severity": 8,
-        "message": "Cannot read file '/Users/jeldonmusic/Documents/matrixblend_com/Creativ/crtv3/app/tools/backend_ui/tsconfig.base.json'.",
-        "source": "ts",
-        "startLineNumber": 1,
-        "startColumn": 1,
-        "endLineNumber": 1,
-        "endColumn": 2
-    }
-]
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "jsx": "react-jsx",
+    "strict": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "useDefineForClassFields": true
+  }
+}

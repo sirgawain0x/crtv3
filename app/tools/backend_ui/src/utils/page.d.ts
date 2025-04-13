@@ -1,9 +1,9 @@
 export const prettyPrint = () => {
-    // implementation here
+  // implementation here
 };
 export const search = (term: string) => {
-    // implementation here
+  // implementation here
 };
 export const hideSearch = () => {
-    // implementation here
+  // implementation here
 };

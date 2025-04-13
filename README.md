@@ -1,15 +1,16 @@
 # Creative TV
 
 ## Project Overview
-Creative TV is a web application for The Creative platform.  It's built with React, TypeScript, and utilizes the thirdweb SDK.
+
+Creative TV is a web application for The Creative platform. It's built with React, TypeScript, and utilizes the thirdweb SDK.
 
 ## Contribution Guidelines
 
 We welcome contributions! To get started:
 
-* Check out our open issues on the **Issues** tab.
-* Follow our coding conventions (enforced by ESLint and Prettier).
-* Read up on our development process in CONTRIBUTING.md
+- Check out our open issues on the **Issues** tab.
+- Follow our coding conventions (enforced by ESLint and Prettier).
+- Read up on our development process in CONTRIBUTING.md
 
 ## Setup client id
 
@@ -58,15 +59,16 @@ npm run prettier
 ```
 
 ## Check for formatting issues:
+
 ```bash
 npm run prettier:check
 ```
 
 ## Testing
 
-We use Jest for unit testing.  Run tests with:
+We use Jest for unit testing. Run tests with:
 
-```bash 
+```bash
 npm run test
 ```
 

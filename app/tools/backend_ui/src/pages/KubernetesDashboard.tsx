@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
-import { emit } from "@tauri-apps/api/event";
-import ThreeJsBackground from "../components/ThreeJsBackground";
-import Menu from "../components/Menu";
-import { useAuth } from "../context/AuthContext";
-import "../App.css";
+import { useState, useEffect } from 'react';
+import { emit } from '@tauri-apps/api/event';
+import ThreeJsBackground from '../components/ThreeJsBackground';
+import Menu from '../components/Menu';
+import { useAuth } from '../context/AuthContext';
+import '../App.css';
 
 interface Pod {
   name: string;
@@ -14,13 +14,13 @@ interface Pod {
 function KubernetesDashboard() {
   const { token } = useAuth();
   const [pods, setPods] = useState<Pod[]>([]);
-  const [error, setError] = useState<string>("");
+  const [error, setError] = useState<string>('');
 
   async function fetchPods() {
     try {
-      const data: Pod[] = await emit("get_kubernetes_pods", { token });
+      const data: Pod[] = await emit('get_kubernetes_pods', { token });
       setPods(data);
-      setError("");
+      setError('');
     } catch (err) {
       setError(`Failed to fetch pods: ${String(err)}`);
     }
@@ -37,7 +37,9 @@ function KubernetesDashboard() {
         <header className="game-title">
           <h1>Kubernetes Dashboard</h1>
         </header>
-        <p className="error">Please authenticate to view Kubernetes resources.</p>
+        <p className="error">
+          Please authenticate to view Kubernetes resources.
+        </p>
       </main>
     );
   }

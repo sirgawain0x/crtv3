@@ -1,24 +1,24 @@
-import fs from "fs";
+import fs from 'fs';
 
 // Replace agent values
-const agentName = "Dobby";
+const agentName = 'Dobby';
 const agentRole =
-    "a free assistant who chooses to help because of his enormous heart.";
-const agentPersonality = "loyal, enthusiastic, and creative";
+  'a free assistant who chooses to help because of his enormous heart.';
+const agentPersonality = 'loyal, enthusiastic, and creative';
 
 function convertToOneLine(text) {
-    return text
-        .replace(/\r\n|\r|\n/g, "\\n")
-        .replace(/"/g, '\\"')
-        .replace(/\s+/g, " ")
-        .trim();
+  return text
+    .replace(/\r\n|\r|\n/g, '\\n')
+    .replace(/"/g, '\\"')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function replaceAgentValues(text, agentName, agentRole, agentPersonality) {
-    return text
-        .replace(/{{AGENT_NAME}}/g, agentName)
-        .replace(/{{AGENT_ROLE}}/g, agentRole)
-        .replace(/{{AGENT_PERSONALITY}}/g, agentPersonality);
+  return text
+    .replace(/{{AGENT_NAME}}/g, agentName)
+    .replace(/{{AGENT_ROLE}}/g, agentRole)
+    .replace(/{{AGENT_PERSONALITY}}/g, agentPersonality);
 }
 
 const systemPrompt = `You are an AI agent named {{AGENT_NAME}}, designed to interact with users on Discord and Twitter. Your role is {{AGENT_ROLE}}, and your personality can be described as {{AGENT_PERSONALITY}}.
@@ -198,14 +198,14 @@ Response format should be formatted in a JSON block like this:
 
 // Define the lc function to convert a string to lowercase
 function lc(str) {
-    return str.toLowerCase();
+  return str.toLowerCase();
 }
 
 const replacedSystemPrompt = replaceAgentValues(
-    systemPrompt,
-    agentName,
-    agentRole,
-    agentPersonality
+  systemPrompt,
+  agentName,
+  agentRole,
+  agentPersonality,
 );
 
 // Convert to one line to insert into the character.json file
@@ -217,48 +217,48 @@ const twitterPostOneLine = convertToOneLine(twitterPostTemplate);
 const twitterActionOneLine = convertToOneLine(twitterActionTemplate);
 // Discord should respond template for the agent
 const discordShouldRespondOneLine = convertToOneLine(
-    discordShouldRespondTemplate
+  discordShouldRespondTemplate,
 );
 // Discord voice handler template for the agent
 const discordVoiceOneLine = convertToOneLine(discordVoiceHandlerTemplate);
 
 // Create or update JSON object
 function createOrUpdateJsonFile(filePath, newData) {
-    let existingData = {};
-    if (fs.existsSync(filePath)) {
-        const fileContent = fs.readFileSync(filePath, "utf-8");
-        existingData = JSON.parse(fileContent);
-        console.log("Existing file found. Updating...");
-    } else {
-        console.log("No existing file found. Creating new file...");
-    }
+  let existingData = {};
+  if (fs.existsSync(filePath)) {
+    const fileContent = fs.readFileSync(filePath, 'utf-8');
+    existingData = JSON.parse(fileContent);
+    console.log('Existing file found. Updating...');
+  } else {
+    console.log('No existing file found. Creating new file...');
+  }
 
-    // Merge existing data with new data
-    const updatedData = {
-        ...existingData,
-        ...newData,
-        template: {
-            ...existingData.template,
-            ...newData.template,
-        },
-    };
+  // Merge existing data with new data
+  const updatedData = {
+    ...existingData,
+    ...newData,
+    template: {
+      ...existingData.template,
+      ...newData.template,
+    },
+  };
 
-    // Convert JSON object to string
-    const jsonString = JSON.stringify(updatedData, null, 2);
+  // Convert JSON object to string
+  const jsonString = JSON.stringify(updatedData, null, 2);
 
-    // Write to file
-    fs.writeFileSync(filePath, jsonString);
+  // Write to file
+  fs.writeFileSync(filePath, jsonString);
 
-    console.log(
-        `JSON file '${filePath}' has been ${fs.existsSync(filePath) ? "updated" : "created"} successfully.`
-    );
+  console.log(
+    `JSON file '${filePath}' has been ${fs.existsSync(filePath) ? 'updated' : 'created'} successfully.`,
+  );
 }
 
 // Create JSON object
 const newData = {
-    name: agentName,
-    system: systemPromptOneLine,
-    /*
+  name: agentName,
+  system: systemPromptOneLine,
+  /*
     modelProvider: "",
     clients: [""],
     plugins: [""],
@@ -335,32 +335,32 @@ const newData = {
         prompt: "",
     },
     */
-    template: {
-        // goalsTemplate: "",
-        // factsTemplate: "",
-        // messageHandlerTemplate: "",
-        // shouldRespondTemplate: "",
-        // continueMessageHandlerTemplate: "",
-        // evaluationTemplate: "",
-        // twitterSearchTemplate: "",
-        twitterPostTemplate: twitterPostOneLine,
-        twitterActionTemplate: twitterActionOneLine,
-        // twitterMessageHandlerTemplate: "",
-        // twitterShouldRespondTemplate: "",
-        // telegramMessageHandlerTemplate: "",
-        // telegramShouldRespondTemplate: "",
-        // farcasterPostTemplate: "",
-        // farcasterMessageHandlerTemplate: "",
-        // farcasterShouldRespondTemplate: "",
-        // lensPostTemplate: "",
-        // lensMessageHandlerTemplate: "",
-        // lensShouldRespondTemplate: "",
-        // discordMessageHandlerTemplate: "",
-        discordShouldRespondTemplate: discordShouldRespondOneLine,
-        discordVoiceHandlerTemplate: discordVoiceOneLine,
-        // slackMessageHandlerTemplate: "",
-        // slackShouldRespondTemplate: "",
-    },
+  template: {
+    // goalsTemplate: "",
+    // factsTemplate: "",
+    // messageHandlerTemplate: "",
+    // shouldRespondTemplate: "",
+    // continueMessageHandlerTemplate: "",
+    // evaluationTemplate: "",
+    // twitterSearchTemplate: "",
+    twitterPostTemplate: twitterPostOneLine,
+    twitterActionTemplate: twitterActionOneLine,
+    // twitterMessageHandlerTemplate: "",
+    // twitterShouldRespondTemplate: "",
+    // telegramMessageHandlerTemplate: "",
+    // telegramShouldRespondTemplate: "",
+    // farcasterPostTemplate: "",
+    // farcasterMessageHandlerTemplate: "",
+    // farcasterShouldRespondTemplate: "",
+    // lensPostTemplate: "",
+    // lensMessageHandlerTemplate: "",
+    // lensShouldRespondTemplate: "",
+    // discordMessageHandlerTemplate: "",
+    discordShouldRespondTemplate: discordShouldRespondOneLine,
+    discordVoiceHandlerTemplate: discordVoiceOneLine,
+    // slackMessageHandlerTemplate: "",
+    // slackShouldRespondTemplate: "",
+  },
 };
 
 const filePath = `./characters/${lc(agentName)}.character.json`;

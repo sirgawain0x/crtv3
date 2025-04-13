@@ -1,86 +1,102 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-# dependencies
+# Dependencies
 /node_modules
-node_modules
-/node_modules_delete
-/.pnp
+.pnp
 .pnp.js
 .yarn/install-state.gz
-
-# testing
-/coverage
-
-# next.js
-/.next/
-/out/
-
-# production
-/build
-
-# misc
-.DS_Store
-.idea
-*.pem
-
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# local env files
-.env*.local
-
-# vercel
-.vercel
-
-# typescript
-*.tsbuildinfo
-next-env.d.ts
-
-# Env vars
-.env
-.env.test
-.env.development
-.env.production
-
-# Cursor
-.cursorrules
-
-# Windsurf
-.winsurfrules
-
-
-
-scripts
-    /ceramic-app/ceramic-app-*.js
-    /ceramic-app/ceramic-app-*.js.map
-
-
-.devcontainer
-.vscode
-.Cursor
-
-
-# pnpm
-.pnpm-debug.log
 *.tgz
 *.tgz.lock
 pnpm-lock.yaml
 pnpm-lock.yaml.versions
 pnpm-lock.yaml.versions.lock
 
+# Testing
+/coverage
 
+# Next.js
+/.next/
+/out/
 
+# Production
+/build
 
-# rust
+# Misc
+.DS_Store
+.idea
+*.pem
+.cursorrules
+.winsurfrules
+
+# Debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log
+
+# Local env files
+.env
+.env*.local
+.env.test
+.env.development
+.env.production
+
+# Vercel
+.vercel
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Rust
 Cargo.lock
-target/debug
+target/
+*.rlib
+*.rs.bk
+*.rs.old
+*.rs.swp
 
-+*.rs.bk
-+*.rs.old
-+*.rs.swp
+# WebAssembly
+*.wasm
+*.wasm.map
+*.wat
 
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.pip
+.pipenv
+Pipfile
+Pipfile.lock
+.venv/
+venv/
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+*.pyo
+*.pyd
+*.pyi
+.mypy_cache/
+.pytest_cache/
+.tox/
+.coverage
+.coverage.*
+*.cover
+.hypothesis/
 
+# Project-specific
+/devcontainer
+.vscode
+.Cursor
 
+# Ceramic scripts
+/ceramic-app/ceramic-app-*.js
+/ceramic-app/ceramic-app-*.js.map
 
+.env
+.env.local

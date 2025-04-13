@@ -1,6 +1,7 @@
 ---
 title: Claiming Your Creative Pass
 ---
+
 To access the app's features, you'll need a **Creative Pass**.
 
 1. **Claim Pass**:
@@ -14,7 +15,6 @@ To access the app's features, you'll need a **Creative Pass**.
 3. **Select Payment Option**:
 
    - **Pay With Another Wallet**: Connect a supported wallet to complete payment.
-
 
    - **Pay With a Credit Card**:
 

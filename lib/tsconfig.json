@@ -1,22 +1,20 @@
 {
   "extends": "./tsconfig.base.json",
-  "include": ["src", "./lib/ceramic-app/ceramic-app-app"],
-  "references": [
-    { "path": "./tsconfig.node.json" },
-    { "path": "./lib/ceramic-app/ceramic-app-app" },
-    { "path": "./lib/ceramic-app/ceramic-app-lib" },
-    { "path": "./lib/ceramic-app/ceramic-app-lib-react" },
-    { "path": "./lib/ceramic-app/ceramic-app-lib-react-legacy" },
-    { "path": "./lib/ceramic-app/ceramic-app-lib-react-legacy-vite" },
-    { "path": "./tsconfig.base.json" }
-  ],
   "display": "Backend UI",
   "typeAcquisition": {
     "include": ["node", "jest", "vitest"]
   },
-  "types": ["node", "jest", "vitest", "@types/react", "@types/react-dom"],
+  "types": ["node", "jest", "vitest"],
   "baseUrl": "./",
-
+  "paths": {
+    "@ceramic/*": ["lib/ceramic-app/*"],
+    "@ceramic/*/*": ["lib/ceramic-app/*/*"],
+    "@ceramic/*/*/*": ["lib/ceramic-app/*/*/*"],
+    "@ceramic/*/*/*/*": ["lib/ceramic-app/*/*/*/*"],
+    "@ceramic-app-lib-react-legacy-vite": [
+      "lib/ceramic-app/ceramic-app-lib-react-legacy-vite/src/index.ts"
+    ]
+  },
   "compilerOptions": {
     "target": "ES2020",
     "useDefineForClassFields": true,
@@ -34,7 +32,16 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-
+  "include": ["src", "./lib/ceramic-app/ceramic-app-app"],
+  "references": [
+    { "path": "./tsconfig.node.json" },
+    { "path": "./lib/ceramic-app/ceramic-app-app" },
+    { "path": "./lib/ceramic-app/ceramic-app-lib" },
+    { "path": "./lib/ceramic-app/ceramic-app-lib-react" },
+    { "path": "./lib/ceramic-app/ceramic-app-lib-react-legacy" },
+    { "path": "./lib/ceramic-app/ceramic-app-lib-react-legacy-vite" },
+    { "path": "./tsconfig.base.json" }
+  ],
   "exclude": [
     "node_modules",
     "dist",
