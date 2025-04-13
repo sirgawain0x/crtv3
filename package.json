@@ -1,7 +1,7 @@
 {
   "private": true,
   "scripts": {
-    "build": " next build; cd package/pnpm run tauri run;",
+    "build": " next build && cd app/tools/backend_ui/ && pnpm run build:ui",
     "build:run": "next build && pnpm start && cd app/tools/backend_ui/ && pnpm run build:ui",
     "build:ui": "tsc && vite build",
     "dev": "next dev",
