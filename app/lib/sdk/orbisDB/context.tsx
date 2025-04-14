@@ -7,12 +7,11 @@ import React, {
   useState,
   useEffect,
 } from 'react';
-import { client } from '@app/lib/sdk/thirdweb/client';
+import { useUser, useAuthenticate } from '@account-kit/react';
 import { catchError } from '@useorbis/db-sdk/util';
 import { OrbisEVMAuth } from '@useorbis/db-sdk/auth';
 import { OrbisConnectResult } from '@useorbis/db-sdk';
 import { db } from './client';
-import { download } from 'thirdweb/storage';
 import { AssetMetadata } from './models/AssetMetadata';
 import { applyOrbisAuthPatches, applyOrbisDBPatches } from './auth-patch';
 import { safeToBase64Url } from '@app/lib/utils/base64url';
@@ -20,7 +19,7 @@ import { setupJwtDebugger } from '@app/lib/utils/jwt-debug';
 
 declare global {
   interface Window {
-    ethereum: any;
+    ethereum?: any;
   }
 }
 
@@ -127,6 +126,54 @@ export function OrbisProvider({ children }: { children: ReactNode }) {
   const [isUserConnected, setIsUserConnected] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [orbisInstance, setOrbisInstance] = useState<any>(null);
+  const accountKitUser = useUser();
+
+  const {
+    authenticate,
+    authenticateAsync,
+    isPending,
+    error: authError,
+  } = useAuthenticate({
+    onSuccess: async () => {
+      // On successful Account Kit authentication, connect to Orbis
+      if (accountKitUser) {
+        try {
+          const auth = new OrbisEVMAuth({
+            request: async ({ method, params }) => {
+              const provider = await accountKitUser.getProvider();
+              return provider.request({ method, params });
+            },
+          });
+          const result = await db.connectUser({ auth });
+
+          if (result) {
+            setAuthResult({
+              did: accountKitUser.address,
+              details: { address: accountKitUser.address },
+            });
+            setIsUserConnected(true);
+            setUser(result);
+            // Update cache
+            saveToCache({
+              did: accountKitUser.address,
+              details: JSON.parse(JSON.stringify(result)),
+            });
+          }
+        } catch (error) {
+          console.error(
+            'Failed to connect to Orbis after authentication:',
+            error,
+          );
+        }
+      }
+    },
+    onError: (error) => {
+      console.error('Authentication error:', error);
+      setIsUserConnected(false);
+      setAuthResult(null);
+      setUser(null);
+    },
+  });
 
   // Cache management functions
   const saveToCache = (data: SerializableAuthResult) => {
@@ -169,23 +216,14 @@ export function OrbisProvider({ children }: { children: ReactNode }) {
     // Check for existing session
     checkExistingSession();
 
-    // Try to get the user's address from window.ethereum
-    if (typeof window !== 'undefined' && window.ethereum) {
-      window.ethereum
-        .request({ method: 'eth_accounts' })
-        .then((accounts: string[]) => {
-          if (accounts && accounts.length > 0) {
-            setAuthResult({
-              did: accounts[0],
-              details: { address: accounts[0] },
-            });
-            setIsUserConnected(true);
-            setUser({ address: accounts[0] });
-          }
-        })
-        .catch((err: any) => {
-          console.error('Failed to get accounts:', err);
-        });
+    // Use Account Kit user instead of window.ethereum
+    if (accountKitUser) {
+      setAuthResult({
+        did: accountKitUser.address,
+        details: { address: accountKitUser.address },
+      });
+      setIsUserConnected(true);
+      setUser({ address: accountKitUser.address });
     }
 
     const initOrbis = async () => {
@@ -270,7 +308,7 @@ export function OrbisProvider({ children }: { children: ReactNode }) {
     };
 
     initOrbis();
-  }, []);
+  }, [accountKitUser]);
 
   const checkExistingSession = async () => {
     try {
@@ -401,11 +439,10 @@ export function OrbisProvider({ children }: { children: ReactNode }) {
 
       if (metadata.subtitlesUri) {
         try {
-          const res = await download({
-            client,
-            uri: metadata.subtitlesUri,
-          });
+          const response = await fetch(metadata.subtitlesUri);
+          if (!response.ok) throw new Error('Failed to fetch subtitles');
 
+          const res = await response.json();
           if (res) {
             metadata.subtitles = Object.fromEntries(
               Object.entries(res).map(([lang, chunks]) => [
@@ -438,21 +475,17 @@ export function OrbisProvider({ children }: { children: ReactNode }) {
         return null;
       }
 
-      console.log('Starting Orbis authentication...');
-      const auth = new OrbisEVMAuth(window.ethereum);
-      const result = await db.connectUser({ auth });
+      console.log('Starting Account Kit authentication...');
+      // Pass authentication params with optional chain ID
+      await authenticateAsync({
+        signMessage: 'Sign this message to authenticate with Orbis',
+      });
 
-      if (!result) {
-        console.error('Orbis login failed - no result returned');
-        return null;
-      }
-
-      console.log('Orbis authentication successful:', result);
-      setIsUserConnected(true);
-      setUser(result);
-      return result;
+      // The onSuccess callback will handle Orbis connection
+      // Return the current user if authentication was successful
+      return user;
     } catch (error) {
-      console.error('Error in Orbis login:', error);
+      console.error('Error in authentication:', error);
       return null;
     }
   };

@@ -1,56 +1,29 @@
-import { videoContract } from '@app/lib/sdk/thirdweb/get-contract';
-import { NFT } from '@app/types/nft';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { getNFTs } from 'thirdweb/extensions/erc1155';
-import { useActiveAccount } from 'thirdweb/react';
+import { useUser } from '@account-kit/react';
+import { useEffect, useState } from 'react';
+import { getLazyMintedNFTs } from '@app/lib/services/nft';
 
-export default function useLazyMinted() {
-  const activeAccount = useActiveAccount();
-
-  const [nfts, setNFTs] = useState<NFT[]>([]);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [error, setError] = useState<Error>();
-
-  const fetchLazyMintedNFTs = useCallback(async () => {
-    if (!activeAccount) return;
-
-    setIsProcessing(true);
-
-    try {
-      const data = (await getNFTs({
-        contract: videoContract,
-        start: 0,
-      })) as NFT[];
-
-      setIsProcessing(false);
-      setNFTs(data);
-    } catch (err) {
-      setIsProcessing(false);
-      setError(err as Error);
-      setNFTs([]); // Reset NFTs on error
-      console.error('Failed to fetch NFTs:', err);
-    }
-  }, [activeAccount]);
+export function useLazyMinted() {
+  const user = useUser();
+  const [nfts, setNfts] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    fetchLazyMintedNFTs();
-  }, [activeAccount, fetchLazyMintedNFTs]);
+    async function fetchNFTs() {
+      if (!user?.address) return;
 
-  const activeAccountNFTs = useMemo(() => {
-    return nfts
-      .filter(
-        (nft) =>
-          nft.metadata?.properties?.creatorAddress === activeAccount?.address,
-      )
-      .sort(
-        (a, b) =>
-          a.metadata.properties.createdAt - b.metadata.properties.createdAt,
-      );
-  }, [nfts, activeAccount]);
+      setIsLoading(true);
+      try {
+        const fetchedNfts = await getLazyMintedNFTs(user.address);
+        setNfts(fetchedNfts);
+      } catch (error) {
+        console.error('Error fetching lazy minted NFTs:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
 
-  return {
-    nfts: activeAccountNFTs,
-    isProcessing,
-    error,
-  };
+    fetchNFTs();
+  }, [user?.address]);
+
+  return { nfts, isLoading };
 }

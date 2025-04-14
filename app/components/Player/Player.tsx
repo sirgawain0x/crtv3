@@ -23,7 +23,7 @@ import { toast } from 'sonner';
 import { fetchAssetId } from '@app/api/livepeer/actions';
 import { generateAccessKey } from '@app/lib/access-key';
 import { WebhookContext } from '@app/api/livepeer/token-gate/route';
-import { useActiveAccount } from 'thirdweb/react';
+import { useUser } from '@account-kit/react';
 import { GetAssetResponse } from 'livepeer/models/operations';
 import { useVideo } from '@app/context/VideoContext';
 
@@ -53,7 +53,7 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
   const { currentPlayingId, setCurrentPlayingId } = useVideo();
   const playerId = useRef(Math.random().toString(36).substring(7)).current;
 
-  const activeAccount = useActiveAccount();
+  const user = useUser();
 
   const { getAssetMetadata } = useOrbisContext();
   const { setSubtitles } = useSubtitles();
@@ -92,7 +92,7 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
         const conProps = {
           ...(asset?.asset?.playbackPolicy && {
             accessKey: generateAccessKey(
-              activeAccount?.address!,
+              user?.address!,
               asset?.asset?.playbackPolicy?.webhookContext as WebhookContext,
             ),
           }),
@@ -104,7 +104,7 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
       }
     };
     fetchAssetDetails(assetId);
-  }, [activeAccount, assetId, getAssetMetadata, setSubtitles]);
+  }, [user, assetId, getAssetMetadata, setSubtitles]);
 
   useEffect(() => {
     resetFadeTimeout();

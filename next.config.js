@@ -28,6 +28,32 @@ const nextConfig = {
       },
     ],
   },
+  // Configure webpack
+  webpack: (config, { dev, isServer }) => {
+    // Add optimization for large strings
+    config.optimization = {
+      ...config.optimization,
+      moduleIds: 'deterministic',
+      chunkIds: 'deterministic',
+      splitChunks: {
+        ...config.optimization.splitChunks,
+        chunks: 'all',
+        minSize: 20000,
+        maxSize: 100000,
+        cacheGroups: {
+          ...config.optimization.splitChunks.cacheGroups,
+          largeStrings: {
+            test: /[\\/]node_modules[\\/]/,
+            priority: -10,
+            reuseExistingChunk: true,
+            enforce: true,
+          },
+        },
+      },
+    };
+
+    return config;
+  },
 };
 
 module.exports = nextConfig;

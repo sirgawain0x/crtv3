@@ -1,11 +1,13 @@
 import type { Config } from 'tailwindcss';
+import { withAccountKitUi } from '@account-kit/react/tailwind';
 
 const config: Config = {
   darkMode: ['class'],
   content: [
     './pages/**/*.{js,ts,jsx,tsx,mdx}',
     './components/**/*.{js,ts,jsx,tsx,mdx}',
-    './app/**/*.{ts,tsx}',
+    './app/**/*.{js,ts,jsx,tsx,mdx}',
+    './node_modules/@account-kit/react/dist/**/*.{js,ts,jsx,tsx}',
   ],
   prefix: '',
   theme: {
@@ -80,4 +82,19 @@ const config: Config = {
   },
   plugins: [require('tailwindcss-animate')],
 };
-export default config;
+
+export default withAccountKitUi(config, {
+  colors: {
+    primary: '#3B82F6', // Blue
+    secondary: '#6B7280', // Gray
+  },
+  borderRadius: 'md',
+  illustrations: {
+    light: {
+      logoUrl: '/images/logo.png', // Update with your logo path
+    },
+    dark: {
+      logoUrl: '/images/logo-dark.png', // Update with your dark mode logo path
+    },
+  },
+});

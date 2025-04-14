@@ -5,10 +5,11 @@ import {
   DropdownMenuContent,
   DropdownMenuSeparator,
   DropdownMenuItem,
+  DropdownMenuLabel,
 } from '@app/components/ui/dropdown-menu';
 import Link from 'next/link';
 import { useState } from 'react';
-import { useActiveAccount } from 'thirdweb/react';
+import { useUser } from '@account-kit/react';
 import { Button } from '@app/components/ui/button';
 import makeBlockie from 'ethereum-blockies-base64';
 import { RadioTowerIcon, Bot } from 'lucide-react';
@@ -20,91 +21,45 @@ interface UserMenuProps {
 }
 
 export function UserMenu({ onNavigate }: UserMenuProps) {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const activeAccount = useActiveAccount();
+  const user = useUser();
   const router = useRouter();
 
-  const handleOpenChange = (open: boolean) => {
-    setIsMenuOpen(open);
-  };
+  if (!user) return null;
 
-  const handleNavigation = (href: string) => {
-    setIsMenuOpen(false);
-    if (onNavigate) onNavigate();
-    router.push(href);
-  };
+  const shortAddress = `${user.address.slice(0, 6)}...${user.address.slice(-4)}`;
 
-  // If no active account, don't render the menu
-  if (!activeAccount) return null;
+  const handleNavigation = (path: string) => {
+    router.push(path);
+    onNavigate?.();
+  };
 
   return (
-    <div className="my-auto">
-      <DropdownMenu open={isMenuOpen} onOpenChange={handleOpenChange}>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="flex h-auto w-auto items-center gap-2 rounded-full px-2 py-1 sm:px-3 sm:py-2"
-          >
-            <Avatar className="h-6 w-6 sm:h-8 sm:w-8">
-              <AvatarImage
-                src={makeBlockie(`${activeAccount.address}`)}
-                alt="User avatar"
-              />
-              <AvatarFallback>JD</AvatarFallback>
-            </Avatar>
-            <span className="hidden sm:inline">User Menu</span>
-            <ChevronDownIcon className="h-3 w-3 sm:h-4 sm:w-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem
-            onSelect={() =>
-              handleNavigation(`/profile/${activeAccount?.address}`)
-            }
-          >
-            <div className="flex items-center gap-2">
-              <UserIcon className="h-4 w-4" />
-              <span>Profile</span>
-            </div>
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            onSelect={() =>
-              handleNavigation(
-                `/profile/${activeAccount?.address}/daydream-clipz`,
-              )
-            }
-          >
-            <div className="flex items-center gap-2">
-              <Bot className="h-4 w-4" />
-              <span>Daydream Clipz</span>
-            </div>
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            onSelect={() =>
-              handleNavigation(`/profile/${activeAccount.address}/upload`)
-            }
-          >
-            <div className="flex items-center gap-2">
-              <UploadIcon className="h-4 w-4" />
-              <span>Upload</span>
-            </div>
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            onSelect={() =>
-              handleNavigation(`/profile/${activeAccount?.address}/live`)
-            }
-          >
-            <div className="flex items-center gap-2">
-              <RadioTowerIcon className="h-4 w-4" />
-              <span>Go Live</span>
-            </div>
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+          <Avatar className="h-8 w-8">
+            <AvatarFallback>{shortAddress.slice(0, 2)}</AvatarFallback>
+          </Avatar>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="w-56" align="end" forceMount>
+        <DropdownMenuLabel className="font-normal">
+          <div className="flex flex-col space-y-1">
+            <p className="text-sm font-medium leading-none">{shortAddress}</p>
+            <p className="text-xs leading-none text-muted-foreground">
+              {user.type === 'sca' ? 'Smart Account' : 'EOA'}
+            </p>
+          </div>
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => handleNavigation('/profile')}>
+          Profile
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => handleNavigation('/settings')}>
+          Settings
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

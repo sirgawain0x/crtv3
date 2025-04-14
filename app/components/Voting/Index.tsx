@@ -1,16 +1,17 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useClient, useReadContract, useWriteContract } from 'wagmi';
 import { Button } from '../ui/button';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import Link from 'next/link';
-import { client } from '@app/lib/sdk/thirdweb/client';
-import { base } from 'thirdweb/chains';
 import { FaUsers, FaCertificate } from 'react-icons/fa';
-import { useActiveAccount, useReadContract } from 'thirdweb/react';
-import { getContract } from 'thirdweb';
+import { Abi } from 'viem';
 import { Label } from '../ui/label';
 import { ROLES, CREATIVE_ADDRESS } from '@app/lib/utils/context';
-import { Card } from '@app/components/Voting/Card';
+import { Card } from './Card';
+import { useUser } from '@account-kit/react';
+import { userToAccount } from '@app/lib/types/account';
+import { VOTE_CONTRACT_ADDRESS } from '@app/lib/constants/contracts';
 import VoteABI from '@app/lib/utils/Vote.json';
 
 // Interface for proposal data from smart contract
@@ -28,20 +29,14 @@ interface Proposal {
 
 const Vote = () => {
   const [selectedValue, setSelectedValue] = useState('active');
-  const activeAccount = useActiveAccount();
-
-  const voteContract = getContract({
-    client: client,
-    chain: base,
-    address: '0x24609A5CBe0f50b67E0E7D7494885a6eB19404BF',
-    abi: VoteABI as any,
-  });
+  const user = useUser();
+  const account = userToAccount(user);
 
   const { data: proposals = [], isLoading } = useReadContract({
-    contract: voteContract,
-    method: 'getAllProposals',
-    params: [],
-  });
+    address: VOTE_CONTRACT_ADDRESS,
+    abi: VoteABI.abi as Abi,
+    functionName: 'getAllProposals',
+  }) as { data: Proposal[]; isLoading: boolean };
 
   const filteredProposals = proposals.filter((proposal: Proposal) => {
     const currentBlock = BigInt(Date.now()); // This should be replaced with actual block number
@@ -54,6 +49,14 @@ const Vote = () => {
     }
     return true;
   });
+
+  if (!account) {
+    return (
+      <div className="p-4 text-center">
+        <p>Please connect your wallet to access voting features</p>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -106,14 +109,13 @@ const Vote = () => {
         </div>
       )}
 
-      {activeAccount && (
-        <div className="mt-8 flex justify-end">
-          <Link href="/vote/create">
-            <Button>Create Proposal</Button>
-          </Link>
-        </div>
-      )}
+      <div className="mt-8 flex justify-end">
+        <Link href="/vote/create">
+          <Button>Create Proposal</Button>
+        </Link>
+      </div>
     </div>
   );
 };
+
 export default Vote;

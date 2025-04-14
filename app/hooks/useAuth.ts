@@ -1,56 +1,46 @@
+'use client';
+
 import { useEffect, useState, useCallback } from 'react';
-import { useActiveAccount } from 'thirdweb/react';
-import { logout } from '@app/api/auth/thirdweb/authentication';
+import { useUser } from '@account-kit/react';
+import { logout, checkAuth } from '@app/api/auth/authentication';
 
 export function useAuth() {
-  const activeAccount = useActiveAccount();
+  const user = useUser();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isChecking, setIsChecking] = useState(false);
 
-  const checkAuth = useCallback(async () => {
+  const checkAuthStatus = useCallback(async () => {
     if (isChecking) return;
 
     try {
       setIsChecking(true);
-      const response = await fetch('/api/auth/check', {
-        credentials: 'include',
-      });
-
-      const isAuthed = response.ok;
-      if (isAuthed !== isAuthenticated) {
-        console.log(
-          'Auth status changed:',
-          isAuthed ? 'authenticated' : 'not authenticated',
-        );
-        setIsAuthenticated(isAuthed);
-      }
+      const isAuthed = await checkAuth();
+      setIsAuthenticated(isAuthed);
     } catch (error) {
       console.error('Error checking auth status:', error);
       setIsAuthenticated(false);
     } finally {
       setIsChecking(false);
     }
-  }, [isChecking, isAuthenticated]);
+  }, [isChecking]);
 
   // Check auth status when account changes
   useEffect(() => {
-    if (activeAccount) {
-      checkAuth();
-    } else {
+    if (!user) {
       setIsAuthenticated(false);
+      return;
     }
-  }, [activeAccount, checkAuth]);
+
+    checkAuthStatus();
+  }, [user, checkAuthStatus]);
 
   // Poll auth status every 5 seconds when connected
   useEffect(() => {
-    if (!activeAccount) return;
+    if (!user) return;
 
-    const interval = setInterval(() => {
-      checkAuth();
-    }, 5000);
-
+    const interval = setInterval(checkAuthStatus, 5000);
     return () => clearInterval(interval);
-  }, [activeAccount, checkAuth]);
+  }, [user, checkAuthStatus]);
 
   const handleLogout = async () => {
     try {
@@ -63,10 +53,10 @@ export function useAuth() {
   };
 
   return {
-    isConnected: !!activeAccount,
+    isConnected: !!user,
     isAuthenticated,
-    address: activeAccount?.address,
+    address: user?.address,
     logout: handleLogout,
-    checkAuth,
+    checkAuth: checkAuthStatus,
   };
 }

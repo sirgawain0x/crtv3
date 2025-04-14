@@ -9,16 +9,8 @@ import {
   CardTitle,
 } from '../ui/card';
 import { Avatar, AvatarImage } from '../ui/avatar';
-import {
-  AccountProvider,
-  AccountAvatar,
-  AccountName,
-  AccountAddress,
-} from 'thirdweb/react';
-import { client } from '@app/lib/sdk/thirdweb/client';
 import { Badge } from '../ui/badge';
 import { cn } from '../../lib/utils';
-import { shortenAddress } from 'thirdweb/utils';
 import { PlayerComponent } from '../Player/Player';
 import { Asset } from 'livepeer/models/components';
 import Link from 'next/link';
@@ -95,43 +87,32 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
     return null;
   }
 
-  console.log({ asset, playbackSources });
+  const shortenAddress = (addr: string) => {
+    if (!addr) return '';
+    return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+  };
 
   return (
     <div className="mx-auto" ref={playerRef}>
       <Card key={asset?.id} className={cn('w-[360px] overflow-hidden')}>
         <div className="mx-auto flex-1 flex-wrap">
           <CardHeader>
-            <AccountProvider address={address} client={client}>
-              <div className="flex items-center space-x-2">
-                <AccountAvatar
+            <div className="flex items-center space-x-2">
+              <Avatar>
+                <AvatarImage
+                  src={makeBlockie(address)}
                   className="h-10 w-10 rounded-full"
-                  loadingComponent={
-                    <Avatar>
-                      <AvatarImage
-                        src={makeBlockie(address)}
-                        className="h-10 w-10 rounded-full"
-                      />
-                    </Avatar>
-                  }
-                  fallbackComponent={
-                    <Avatar>
-                      <AvatarImage
-                        src={makeBlockie(address)}
-                        className="h-10 w-10 rounded-full"
-                      />
-                    </Avatar>
-                  }
                 />
-                <div className="flex flex-col">
-                  <AccountName className="text-sm font-medium" />
-                  <AccountAddress
-                    className="text-xs text-gray-500"
-                    formatFn={shortenAddress}
-                  />
-                </div>
+              </Avatar>
+              <div className="flex flex-col">
+                <span className="text-sm font-medium">
+                  {shortenAddress(address)}
+                </span>
+                <span className="text-xs text-gray-500">
+                  {shortenAddress(address)}
+                </span>
               </div>
-            </AccountProvider>
+            </div>
           </CardHeader>
         </div>
         <PlayerComponent

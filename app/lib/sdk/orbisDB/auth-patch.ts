@@ -13,8 +13,74 @@
 
 import { OrbisEVMAuth } from '@useorbis/db-sdk/auth';
 import { safeToBase64Url } from '@app/lib/utils/base64url';
-import { decodeJWT, encodeJWT } from 'thirdweb/utils';
+import {
+  encodeAbiParameters,
+  decodeAbiParameters,
+  keccak256,
+  toHex,
+} from 'viem';
 import { OrbisError, OrbisErrorType } from './types';
+
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+
+interface JWTPayload {
+  exp: number;
+  iat: number;
+  sub?: string;
+  [key: string]: unknown;
+}
+
+async function decodeJWT(token: string): Promise<JWTPayload> {
+  try {
+    const [headerB64, payloadB64, signature] = token.split('.');
+    const payload = JSON.parse(
+      Buffer.from(payloadB64, 'base64').toString(),
+    ) as JWTPayload;
+
+    // Verify signature
+    const message = `${headerB64}.${payloadB64}`;
+    const expectedHash = keccak256(toHex(message));
+    const actualHash = keccak256(toHex(signature));
+
+    if (expectedHash !== actualHash) {
+      throw new Error('Invalid signature');
+    }
+
+    return payload;
+  } catch (error) {
+    throw new OrbisError('JWT verification failed', OrbisErrorType.AUTH_ERROR);
+  }
+}
+
+async function encodeJWT(payload: Record<string, unknown>): Promise<string> {
+  try {
+    const header = {
+      alg: 'HS256',
+      typ: 'JWT',
+    };
+
+    const now = Math.floor(Date.now() / 1000);
+    const exp = now + 24 * 60 * 60; // 24 hours
+
+    const fullPayload = {
+      ...payload,
+      iat: now,
+      exp,
+    };
+
+    const headerB64 = Buffer.from(JSON.stringify(header)).toString('base64');
+    const payloadB64 = Buffer.from(JSON.stringify(fullPayload)).toString(
+      'base64',
+    );
+
+    const message = `${headerB64}.${payloadB64}`;
+    const signature = keccak256(toHex(message + JWT_SECRET));
+
+    return `${headerB64}.${payloadB64}.${signature.slice(2)}`;
+  } catch (error) {
+    throw new OrbisError('JWT encoding failed', OrbisErrorType.AUTH_ERROR);
+  }
+}
 
 // Add production error reporting
 function reportProductionError(
@@ -47,16 +113,6 @@ interface AuthPatchOptions {
   };
   /** Provider-specific configuration */
   providerOptions?: Record<string, unknown>;
-}
-
-/**
- * JWT payload structure
- */
-interface JWTPayload {
-  exp: number;
-  iat: number;
-  sub: string;
-  [key: string]: unknown;
 }
 
 /**
@@ -179,8 +235,8 @@ export function applyOrbisAuthPatches(options: AuthPatchOptions = {}) {
       const jwt = await originalCreateJWT.call(this, payload);
 
       // Verify JWT structure before returning
-      const decoded = decodeJWT(jwt) as { payload: JWTPayload };
-      if (!decoded?.payload?.exp) {
+      const decoded = await decodeJWT(jwt);
+      if (!decoded?.exp) {
         const error = new Error('Invalid JWT structure');
         reportProductionError(error, { jwt, decoded });
         throw error;
@@ -189,8 +245,8 @@ export function applyOrbisAuthPatches(options: AuthPatchOptions = {}) {
       // Log successful JWT creation in production
       if (process.env.NODE_ENV === 'production') {
         console.log('[Production Debug] JWT Created:', {
-          hasPayload: !!decoded.payload,
-          expiresIn: decoded.payload.exp - Date.now() / 1000,
+          hasPayload: !!decoded,
+          expiresIn: decoded.exp - Date.now() / 1000,
           timestamp: new Date().toISOString(),
         });
       }
@@ -277,13 +333,13 @@ export function applyOrbisDBPatches(orbisInstance: any) {
  * @param jwt - The JWT to debug
  * @returns Decoded JWT information
  */
-export function debugJWT(jwt: string) {
+export async function debugJWT(jwt: string) {
   try {
-    const decoded = decodeJWT(jwt) as { payload: JWTPayload };
+    const decoded = await decodeJWT(jwt);
     console.log('JWT Debug Info:', {
       decoded,
-      expiresAt: new Date(decoded.payload.exp * 1000).toISOString(),
-      isExpired: Date.now() > decoded.payload.exp * 1000,
+      expiresAt: new Date(decoded.exp * 1000).toISOString(),
+      isExpired: Date.now() > decoded.exp * 1000,
     });
     return decoded;
   } catch (error) {
