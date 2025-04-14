@@ -15,7 +15,7 @@ export default function Component() {
             alt="Creative Logo"
             style={{
               width: '40px',
-              height: 'auto'
+              height: 'auto',
             }}
             width={40}
             height={40}

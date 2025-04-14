@@ -1,6 +1,7 @@
 ---
 title: Setting Up MeTokens
 ---
+
 1. **Access Profile**:
 
    - Click on your profile picture in the top-right corner to open the **"Account Menu"**. Select **"Profile"**.

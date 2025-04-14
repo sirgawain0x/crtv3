@@ -1,7 +1,12 @@
 'use client';
 import * as Player from '@livepeer/react/player';
 import { Src } from '@livepeer/react';
-import { PlayIcon, PauseIcon, MuteIcon, UnmuteIcon } from '@livepeer/react/assets';
+import {
+  PlayIcon,
+  PauseIcon,
+  MuteIcon,
+  UnmuteIcon,
+} from '@livepeer/react/assets';
 import { useEffect, useState, useRef } from 'react';
 import { useVideo } from '@app/context/VideoContext';
 import './Player.css';
@@ -60,33 +65,33 @@ export const DemoPlayer: React.FC<{ src: Src[] | null; title: string }> = ({
 
   return (
     <Player.Root src={src} autoPlay volume={1}>
-      <Player.Container 
+      <Player.Container
         ref={containerRef}
         className="player-container relative aspect-video touch-none"
         onMouseMove={resetFadeTimeout}
         onMouseEnter={() => setControlsVisible(true)}
         onTouchStart={handleControlInteraction}
       >
-        <Player.Video 
-          title={title} 
+        <Player.Video
+          title={title}
           onPlay={handlePlay}
           className="h-full w-full"
           playsInline
           controls={false}
         />
-        
+
         <Player.LoadingIndicator
           style={{
-            height: "100%",
-            width: "100%",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            backgroundColor: "black",
-            position: "absolute",
+            height: '100%',
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: 'black',
+            position: 'absolute',
             top: 0,
             left: 0,
-            zIndex: 20
+            zIndex: 20,
           }}
         >
           <div className="flex flex-col items-center space-y-4">
@@ -95,21 +100,21 @@ export const DemoPlayer: React.FC<{ src: Src[] | null; title: string }> = ({
           </div>
         </Player.LoadingIndicator>
 
-        <div 
-          className={`absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/60 pointer-events-none transition-opacity duration-300 ${
+        <div
+          className={`pointer-events-none absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/60 transition-opacity duration-300 ${
             controlsVisible ? 'opacity-100' : 'opacity-0'
           }`}
         />
-        
-        <div 
+
+        <div
           className={`absolute inset-0 z-30 touch-none transition-opacity duration-300 ${
             controlsVisible ? 'opacity-100' : 'opacity-0'
           }`}
         >
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="flex items-center gap-6">
-              <Player.PlayPauseTrigger 
-                className="group relative flex h-16 w-16 touch-none cursor-pointer items-center justify-center rounded-full bg-black/50 hover:bg-black/70"
+              <Player.PlayPauseTrigger
+                className="group relative flex h-16 w-16 cursor-pointer touch-none items-center justify-center rounded-full bg-black/50 hover:bg-black/70"
                 onClick={handleControlInteraction}
               >
                 <Player.PlayingIndicator asChild matcher={false}>
@@ -120,8 +125,8 @@ export const DemoPlayer: React.FC<{ src: Src[] | null; title: string }> = ({
                 </Player.PlayingIndicator>
               </Player.PlayPauseTrigger>
 
-              <Player.MuteTrigger 
-                className="group relative flex h-14 w-14 touch-none cursor-pointer items-center justify-center rounded-full bg-black/50 hover:bg-black/70"
+              <Player.MuteTrigger
+                className="group relative flex h-14 w-14 cursor-pointer touch-none items-center justify-center rounded-full bg-black/50 hover:bg-black/70"
                 onClick={handleControlInteraction}
               >
                 <Player.VolumeIndicator asChild matcher={false}>

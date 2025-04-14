@@ -43,7 +43,9 @@ const MemberCard = ({ member, nft, balance, points }: MemberCardProps) => {
               {nft.metadata?.name}
             </h1>
             <div className="flex flex-col space-y-2">
-              <p className="text-sm font-medium text-muted-foreground">Points Balance</p>
+              <p className="text-sm font-medium text-muted-foreground">
+                Points Balance
+              </p>
               <div className="flex items-baseline gap-2">
                 <p className="text-3xl font-bold text-primary">{points}</p>
                 <p className="text-sm text-muted-foreground">points</p>
@@ -54,8 +56,12 @@ const MemberCard = ({ member, nft, balance, points }: MemberCardProps) => {
           {/* Additional Info */}
           <div className="space-y-2 rounded-lg bg-muted/50 p-4">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Member Address</span>
-              <span className="font-mono text-sm">{member?.address?.slice(0, 6)}...{member?.address?.slice(-4)}</span>
+              <span className="text-sm text-muted-foreground">
+                Member Address
+              </span>
+              <span className="font-mono text-sm">
+                {member?.address?.slice(0, 6)}...{member?.address?.slice(-4)}
+              </span>
             </div>
             {/* Uncomment when ready to use
             <div className="flex items-center justify-between">
