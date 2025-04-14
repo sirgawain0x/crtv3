@@ -1,6 +1,6 @@
 import { Abi } from 'viem';
 import { getDefaultLightAccountFactoryAddress } from '@account-kit/core';
-import { sepolia, polygon, base, optimism } from '@account-kit/infra';
+import { base, polygon, optimism } from '@account-kit/infra';
 
 import { getDefaultMAV2FactoryAddress } from '@account-kit/smart-contracts';
 
@@ -106,7 +106,7 @@ export const ANNUAL_PRICES = [
 ];
 
 export const ROLES = {
-  sepolia: {
+  base: {
     test: {
       type: 'ERC721',
       chainId: 11155111,
@@ -3953,13 +3953,6 @@ export const CONTRACT_ADDRESS = {
           type: 'function',
         },
         {
-          inputs: [],
-          name: 'cancelTransferMeTokenOwnership',
-          outputs: [],
-          stateMutability: 'nonpayable',
-          type: 'function',
-        },
-        {
           inputs: [
             {
               internalType: 'address',
@@ -4992,8 +4985,6 @@ export const CONTRACT_ADDRESS = {
   },
   editionDrop: {
     erc1155: {
-      baseSepolia: '0xbbC0bC56f44B744aC159311D9b46a819545F735B',
-      amoy: '0xF054c2257dE5Aa336CadA58f13aab1415EEC8266',
       base: '0xef5D46A44E24abC76ec1D9fF0C6A57A7BCC29cE0',
       abi: [
         {
@@ -5742,43 +5733,6 @@ export const CONTRACT_ADDRESS = {
             },
           ],
           name: 'TokensLazyMinted',
-          type: 'event',
-        },
-        {
-          anonymous: false,
-          inputs: [
-            {
-              indexed: true,
-              internalType: 'address',
-              name: 'operator',
-              type: 'address',
-            },
-            {
-              indexed: true,
-              internalType: 'address',
-              name: 'from',
-              type: 'address',
-            },
-            {
-              indexed: true,
-              internalType: 'address',
-              name: 'to',
-              type: 'address',
-            },
-            {
-              indexed: false,
-              internalType: 'uint256[]',
-              name: 'ids',
-              type: 'uint256[]',
-            },
-            {
-              indexed: false,
-              internalType: 'uint256[]',
-              name: 'values',
-              type: 'uint256[]',
-            },
-          ],
-          name: 'TransferBatch',
           type: 'event',
         },
         {
@@ -7238,8 +7192,7 @@ export const CONTRACT_ADDRESS = {
           sepolia: '',
         },
         base: {
-          baseSepolia: '',
-          mainnet: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
+          base: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',
         },
       },
     },
@@ -7390,7 +7343,7 @@ export const CONTRACT_ADDRESS = {
 export const blockExplorer = {
   base: {
     mainnet: 'https://basescan.org',
-    baseSepolia: 'https://sepolia.basescan.org',
+    base: 'https://basescan.org',
   },
   polygon: {
     mainnet: 'https://polygonscan.com',
@@ -7537,8 +7490,7 @@ export const STATES: States = {
 };
 
 export const ACCOUNT_FACTORY_ADDRESS = {
-  sepolia: '0x9406Cc6185a346906296840746125a0E44976454',
-  polygon: '0x9406Cc6185a346906296840746125a0E44976454',
-  base: '0x9406Cc6185a346906296840746125a0E44976454',
-  optimism: '0x9406Cc6185a346906296840746125a0E44976454',
+  base: '0xE90DebFD907F5B655f22bfC16083E45994d708bE',
+  polygon: '0xE90DebFD907F5B655f22bfC16083E45994d708bE',
+  optimism: '0xE90DebFD907F5B655f22bfC16083E45994d708bE',
 };

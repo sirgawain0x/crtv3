@@ -1,7 +1,7 @@
 import { createModularAccountV2Client } from '@account-kit/smart-contracts';
 import { LocalAccountSigner } from '@aa-sdk/core';
 import {
-  sepolia,
+  base,
   alchemy,
   createAlchemyPublicRpcClient,
 } from '@account-kit/infra';
@@ -15,16 +15,16 @@ export interface SmartAccountConfig {
   alchemyApiKey: string;
 }
 
-const sepoliaWithAlchemyUrls = {
-  ...sepolia,
+const baseWithAlchemyUrls = {
+  ...base,
   rpcUrls: {
-    ...sepolia.rpcUrls,
-    alchemy: {
+    ...base.rpcUrls,
+    default: {
       http: [
-        `https://eth-sepolia.g.alchemy.com/v2/${process.env.NEXT_PUBLIC_ALCHEMY_API_KEY}`,
+        `https://base-mainnet.g.alchemy.com/v2/${process.env.NEXT_PUBLIC_ALCHEMY_API_KEY}`,
       ],
       webSocket: [
-        `wss://eth-sepolia.g.alchemy.com/v2/${process.env.NEXT_PUBLIC_ALCHEMY_API_KEY}`,
+        `wss://base-mainnet.g.alchemy.com/v2/${process.env.NEXT_PUBLIC_ALCHEMY_API_KEY}`,
       ],
     },
   },
@@ -70,7 +70,7 @@ export class SmartAccountService {
     try {
       this.client = await createModularAccountV2Client({
         mode: this.config.mode || 'default',
-        chain: sepoliaWithAlchemyUrls,
+        chain: baseWithAlchemyUrls,
         transport: alchemy({ apiKey: this.config.alchemyApiKey }),
         signer:
           LocalAccountSigner.privateKeyToAccountSigner(generatePrivateKey()),

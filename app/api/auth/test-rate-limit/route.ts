@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { checkRateLimit } from '@/lib/redis';
+import { checkRateLimit } from '@/app/lib/database/redis';
 
 export const dynamic = 'force-dynamic';
 

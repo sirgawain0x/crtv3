@@ -16,7 +16,6 @@ import { AssetMetadata } from './models/AssetMetadata';
 import { applyOrbisAuthPatches, applyOrbisDBPatches } from './auth-patch';
 import { safeToBase64Url } from '@app/lib/utils/base64url';
 import { setupJwtDebugger } from '@app/lib/utils/jwt-debug';
-import type { MetaMaskInpageProvider } from '@metamask/providers';
 
 declare global {
   interface Window {

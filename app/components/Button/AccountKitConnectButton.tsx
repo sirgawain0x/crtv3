@@ -1,17 +1,10 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import { createModularAccountV2Client } from '@account-kit/smart-contracts';
-import { LocalAccountSigner } from '@aa-sdk/core';
-import { alchemy } from '@account-kit/infra';
-import { generatePrivateKey } from 'viem/accounts';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@app/components/ui/button';
 import { useToast } from '@app/hooks/use-toast';
-import { AuthService } from '@app/lib/services/auth';
-import { useAuth } from '@app/hooks/useAuth';
-import { useChain } from '@account-kit/react';
-import { ACCOUNT_KIT_CONFIG } from '@app/config/account-kit';
+import { useAuthModal, useLogout, useUser } from '@account-kit/react';
 
 interface AccountKitConnectButtonProps {
   className?: string;
@@ -30,54 +23,16 @@ export function AccountKitConnectButton({
 }: AccountKitConnectButtonProps) {
   const { toast } = useToast();
   const router = useRouter();
-  const { isAuthenticated, checkAuth } = useAuth();
-  const { chain, setChain, isSettingChain } = useChain();
+  const { openAuthModal } = useAuthModal();
+  const { logout } = useLogout();
+  const user = useUser();
   const [isLoading, setIsLoading] = useState(false);
-  const [accountClient, setAccountClient] = useState<Awaited<
-    ReturnType<typeof createModularAccountV2Client>
-  > | null>(null);
-
-  const initializeClient = useCallback(async () => {
-    try {
-      const client = await createModularAccountV2Client({
-        mode: ACCOUNT_KIT_CONFIG.mode,
-        chain,
-        transport: alchemy({ apiKey: ACCOUNT_KIT_CONFIG.alchemyApiKey }),
-        signer:
-          LocalAccountSigner.privateKeyToAccountSigner(generatePrivateKey()),
-      });
-      setAccountClient(client);
-      return client;
-    } catch (error) {
-      console.error('Failed to initialize account client:', error);
-      throw error;
-    }
-  }, [chain]);
 
   const handleConnect = async () => {
     try {
       setIsLoading(true);
-
-      // Initialize Account Kit client if not already done
-      const client = accountClient || (await initializeClient());
-
-      // Get the smart account address
-      const accountAddress = client.account.address;
-
-      // Perform login with the smart account address
-      const loginResult = await AuthService.login();
-      if (!loginResult.success) {
-        throw new Error(loginResult.message || 'Login failed');
-      }
-
-      // Update auth state and refresh
-      await checkAuth();
+      await openAuthModal();
       router.refresh();
-
-      toast({
-        title: 'Connected Successfully',
-        description: `Smart Account Address: ${accountAddress} on chain ${chain.name}`,
-      });
     } catch (error) {
       console.error('Connection error:', error);
       toast({
@@ -94,15 +49,8 @@ export function AccountKitConnectButton({
   const handleDisconnect = async () => {
     try {
       setIsLoading(true);
-      const result = await AuthService.logout();
-      if (!result.success) {
-        throw new Error(result.message || 'Logout failed');
-      }
-
-      setAccountClient(null);
-      await checkAuth();
+      await logout();
       router.refresh();
-
       toast({
         title: 'Disconnected Successfully',
         description: 'Your wallet has been disconnected',
@@ -124,17 +72,17 @@ export function AccountKitConnectButton({
 
   return (
     <Button
-      onClick={isAuthenticated ? handleDisconnect : handleConnect}
-      disabled={isLoading || isSettingChain}
+      onClick={user ? handleDisconnect : handleConnect}
+      disabled={isLoading}
       className={className}
       style={style}
     >
-      {isLoading || isSettingChain ? (
+      {isLoading ? (
         <span className="flex items-center gap-2">
           <span className="animate-spin">⚡</span>
-          {isAuthenticated ? 'Disconnecting...' : 'Connecting...'}
+          {user ? 'Disconnecting...' : 'Connecting...'}
         </span>
-      ) : isAuthenticated ? (
+      ) : user ? (
         'Disconnect'
       ) : (
         label

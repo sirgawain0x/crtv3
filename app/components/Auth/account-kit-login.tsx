@@ -1,8 +1,8 @@
 import { useState, type ChangeEvent } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { useAccountKit } from '@/components/providers/account-kit-provider';
-import { useToast } from '@/components/ui/use-toast';
+import { Button } from '@app/components/ui/button';
+import { Input } from '@app/components/ui/input';
+import { useAccountKit } from '@app/components/providers/account-kit-provider';
+import { useToast } from '@app/components/ui/use-toast';
 
 export function AccountKitLogin() {
   const { connect, disconnect, isConnected, address } = useAccountKit();

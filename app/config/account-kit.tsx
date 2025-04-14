@@ -1,6 +1,7 @@
 import { AlchemyAccountsUIConfig, createConfig } from '@account-kit/react';
-import { sepolia, alchemy } from '@account-kit/infra';
+import { base, alchemy, optimism } from '@account-kit/infra';
 import { QueryClient } from '@tanstack/react-query';
+import Image from 'next/image';
 
 if (!process.env.NEXT_PUBLIC_ALCHEMY_API_KEY)
   throw new Error('NEXT_PUBLIC_ALCHEMY_API_KEY is required');
@@ -30,25 +31,6 @@ const uiConfig: AlchemyAccountsUIConfig = {
           authProviderId: 'twitch',
           mode: 'popup',
         },
-        {
-          type: 'social',
-          authProviderId: 'auth0',
-          mode: 'popup',
-          auth0Connection: 'discord',
-          displayName: 'Discord',
-          logoUrl: '/images/discord.svg',
-          scope: 'openid profile',
-        },
-        {
-          type: 'social',
-          authProviderId: 'auth0',
-          mode: 'popup',
-          auth0Connection: 'twitter',
-          displayName: 'Twitter',
-          logoUrl: '/images/twitter.svg',
-          logoUrlDark: '/images/twitter-dark.svg',
-          scope: 'openid profile',
-        },
       ],
       [
         {
@@ -61,9 +43,12 @@ const uiConfig: AlchemyAccountsUIConfig = {
     ],
     addPasskeyOnSignup: false,
     header: (
-      <img
+      <Image
         src="https://bafybeigvjlcfxxp6hyv2533txic3ymhitpnut7l4nwqe2aue3bit43g5iq.ipfs.w3s.link/kc7zcnjn8ljld0qmsk3.svg"
         alt="Logo"
+        width={50}
+        height={50}
+        priority
       />
     ),
   },
@@ -75,9 +60,17 @@ export const config = createConfig(
     transport: alchemy({
       apiKey: process.env.NEXT_PUBLIC_ALCHEMY_API_KEY,
     }),
-    chain: sepolia,
+    chain: base,
     ssr: true,
     enablePopupOauth: true,
+    chains: [
+      {
+        chain: optimism,
+      },
+      {
+        chain: base,
+      },
+    ],
   },
   uiConfig,
 );

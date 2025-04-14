@@ -1,23 +1,18 @@
 'use client';
 import { useState } from 'react';
-import { client } from '@app/lib/sdk/thirdweb/client';
-import { base } from 'thirdweb/chains';
-import { getContract } from 'thirdweb/contract';
-import { prepareContractCall } from 'thirdweb/transaction';
-import {
-  useActiveAccount,
-  useReadContract,
-  TransactionButton,
-} from 'thirdweb/react';
-import { shortenAddress } from 'thirdweb/utils';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@app/components/ui/button';
 import { toast } from 'sonner';
-import Vote from '@app/lib/utils/Vote.json';
+import VoteABI from '@app/lib/utils/Vote.json';
+import { useReadContract, useWriteContract } from 'wagmi';
+import type { Abi } from 'viem';
+import { useUser } from '@account-kit/react';
+import { userToAccount } from '@app/lib/types/account';
 
 export default function MoreOptions() {
   const router = useRouter();
-  const activeAccount = useActiveAccount();
+  const user = useUser();
+  const account = userToAccount(user);
   const searchParams = useSearchParams();
   const [selectedVote, setSelectedVote] = useState<number>(0);
 
@@ -27,25 +22,24 @@ export default function MoreOptions() {
   const startBlock = searchParams.get('startBlock');
   const endBlock = searchParams.get('endBlock');
 
-  const voteContract = getContract({
-    client: client,
-    chain: base,
-    address: '0x24609A5CBe0f50b67E0E7D7494885a6eB19404BF',
-    abi: Vote as any,
-  });
-
   // Get proposal state and votes
   const { data: proposalState } = useReadContract({
-    contract: voteContract,
-    method: 'state',
-    params: [proposalId],
-  });
+    address: '0x24609A5CBe0f50b67E0E7D7494885a6eB19404BF',
+    abi: VoteABI[0].abi as unknown as Abi,
+    functionName: 'state',
+    args: [proposalId],
+  }) as { data: number };
 
   const { data: proposalVotes } = useReadContract({
-    contract: voteContract,
-    method: 'proposalVotes',
-    params: [proposalId],
-  });
+    address: '0x24609A5CBe0f50b67E0E7D7494885a6eB19404BF',
+    abi: VoteABI[0].abi as unknown as Abi,
+    functionName: 'proposalVotes',
+    args: [proposalId],
+  }) as {
+    data: { forVotes: bigint; againstVotes: bigint; abstainVotes: bigint };
+  };
+
+  const { writeContract, isPending } = useWriteContract();
 
   const getProposalState = (state: number) => {
     switch (state) {
@@ -68,6 +62,27 @@ export default function MoreOptions() {
       default:
         return 'Unknown';
     }
+  };
+
+  const handleVote = async () => {
+    try {
+      if (!writeContract) return;
+      await writeContract({
+        address: '0x24609A5CBe0f50b67E0E7D7494885a6eB19404BF',
+        abi: VoteABI[0].abi as unknown as Abi,
+        functionName: 'castVote',
+        args: [proposalId, selectedVote],
+      });
+      toast.success('Vote cast successfully');
+    } catch (error) {
+      toast.error('Failed to cast vote');
+      console.error(error);
+    }
+  };
+
+  const shortenAddress = (address: string) => {
+    if (!address) return '';
+    return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
 
   return (
@@ -159,7 +174,7 @@ export default function MoreOptions() {
             )}
           </div>
 
-          {activeAccount && proposalState === 1 && (
+          {account && proposalState === 1 && (
             <div className="rounded-lg border p-6">
               <h2 className="mb-4 text-xl font-semibold">Cast Your Vote</h2>
               <div className="space-y-4">
@@ -183,25 +198,9 @@ export default function MoreOptions() {
                     Abstain
                   </Button>
                 </div>
-                <TransactionButton
-                  transaction={() => {
-                    const tx = prepareContractCall({
-                      contract: voteContract,
-                      method: 'castVote',
-                      params: [proposalId, selectedVote],
-                    });
-                    return tx;
-                  }}
-                  onTransactionConfirmed={() => {
-                    toast.success('Vote cast successfully!');
-                  }}
-                  onError={(error) => {
-                    console.error('Error casting vote:', error);
-                    toast.error('Failed to cast vote');
-                  }}
-                >
+                <Button onClick={handleVote} disabled={isPending}>
                   Cast Vote
-                </TransactionButton>
+                </Button>
               </div>
             </div>
           )}

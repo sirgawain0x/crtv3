@@ -13,7 +13,7 @@ import {
   createSmartAccount,
   type AccountState,
   chain,
-} from '@/lib/account-kit';
+} from '@app/lib/blockchain/account-kit';
 
 interface AccountKitContextType extends AccountState {
   connect: (email: string) => Promise<void>;

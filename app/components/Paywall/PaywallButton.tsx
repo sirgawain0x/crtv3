@@ -1,24 +1,19 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Button } from '@app/components/ui/button';
 import { setupCheckout } from '@app/lib/utils/checkout';
 import { Paywall } from '@unlock-protocol/paywall';
-import { ethers6Adapter } from 'thirdweb/adapters/ethers6';
-import { polygon, base, optimism, sepolia } from 'thirdweb/chains';
-import {
-  useActiveAccount,
-  useActiveWalletChain,
-  useSwitchActiveWalletChain,
-} from 'thirdweb/react';
+import { useUser } from '@account-kit/react';
+import { polygon, base, optimism } from '@account-kit/infra';
 import { toast } from 'sonner';
-import { client } from '@app/lib/sdk/thirdweb/client';
+import { client } from '@app/lib/sdk/account-kit/client';
+import SwitchChain from '@app/components/Button/SwitchChain';
+import { chain } from '@/app/lib/blockchain/account-kit';
 
 // Setting global paywall config in React component lifecycle
 const PaywallButton: React.FC = () => {
   const buttonRef = useRef<HTMLButtonElement | null>(null);
-  const activeAccount = useActiveAccount();
-  const walletChain = useActiveWalletChain();
-  const switchChain = useSwitchActiveWalletChain();
+  const user = useUser();
   const [isLoading, setIsLoading] = useState(false);
 
   const paywallConfig = {
@@ -53,11 +48,11 @@ const PaywallButton: React.FC = () => {
     pessimistic: true,
     redirectUri: `${process.env.NEXT_PUBLIC_THIRDWEB_AUTH_DOMAIN}`,
     messageToSign:
-      "Welcome to The Creative, Where Creativity Meets Opportunity!\n\n🌟 Your Creative Space Awaits!\nDive into a world where your art transforms into opportunity. By joining our platform, you're not just accessing tools; you're amplifying your creative voice and reaching audiences who value your work.\n\n🔗 Connect & Collaborate\nEngage with a network of fellow creatives. Share, collaborate, and grow together. Our community thrives on the diversity of its members and the strength of its connections.\n\n💡 Tools for Every Creator\nFrom seamless transactions to intuitive marketing tools, everything you need is right here. Focus on creating—we handle the rest, ensuring your creations are protected and your earnings are secure.\n\n✨ Support on Your Creative Journey\nOur dedicated support team is just a message away, ready to assist you with any questions or to provide guidance as you navigate your creative path.\n\nThank You for Choosing The Creative\nTogether, we’re building a thriving economy of artists, by artists. Let’s create and inspire!",
+      "Welcome to The Creative, Where Creativity Meets Opportunity!\n\n🌟 Your Creative Space Awaits!\nDive into a world where your art transforms into opportunity. By joining our platform, you're not just accessing tools; you're amplifying your creative voice and reaching audiences who value your work.\n\n🔗 Connect & Collaborate\nEngage with a network of fellow creatives. Share, collaborate, and grow together. Our community thrives on the diversity of its members and the strength of its connections.\n\n💡 Tools for Every Creator\nFrom seamless transactions to intuitive marketing tools, everything you need is right here. Focus on creating—we handle the rest, ensuring your creations are protected and your earnings are secure.\n\n✨ Support on Your Creative Journey\nOur dedicated support team is just a message away, ready to assist you with any questions or to provide guidance as you navigate your creative path.\n\nThank You for Choosing The Creative\nTogether, we're building a thriving economy of artists, by artists. Let's create and inspire!",
     skipRecipient: false,
     endingCallToAction: 'Complete Checkout',
     persistentCheckout: false,
-    recipient: `${activeAccount?.address}`,
+    recipient: `${user?.address}`,
   };
 
   const networkConfigs = {
@@ -113,11 +108,11 @@ const PaywallButton: React.FC = () => {
       pessimistic: true,
       redirectUri: 'https://tv.creativeplatform.xyz',
       messageToSign:
-        "Welcome to The Creative, Where Creativity Meets Opportunity!\n\n🌟 Your Creative Space Awaits!\nDive into a world where your art transforms into opportunity. By joining our platform, you're not just accessing tools; you're amplifying your creative voice and reaching audiences who value your work.\n\n🔗 Connect & Collaborate\nEngage with a network of fellow creatives. Share, collaborate, and grow together. Our community thrives on the diversity of its members and the strength of its connections.\n\n💡 Tools for Every Creator\nFrom seamless transactions to intuitive marketing tools, everything you need is right here. Focus on creating—we handle the rest, ensuring your creations are protected and your earnings are secure.\n\n✨ Support on Your Creative Journey\nOur dedicated support team is just a message away, ready to assist you with any questions or to provide guidance as you navigate your creative path.\n\nThank You for Choosing The Creative\nTogether, we’re building a thriving economy of artists, by artists. Let’s create and inspire!",
+        "Welcome to The Creative, Where Creativity Meets Opportunity!\n\n🌟 Your Creative Space Awaits!\nDive into a world where your art transforms into opportunity. By joining our platform, you're not just accessing tools; you're amplifying your creative voice and reaching audiences who value your work.\n\n🔗 Connect & Collaborate\nEngage with a network of fellow creatives. Share, collaborate, and grow together. Our community thrives on the diversity of its members and the strength of its connections.\n\n💡 Tools for Every Creator\nFrom seamless transactions to intuitive marketing tools, everything you need is right here. Focus on creating—we handle the rest, ensuring your creations are protected and your earnings are secure.\n\n✨ Support on Your Creative Journey\nOur dedicated support team is just a message away, ready to assist you with any questions or to provide guidance as you navigate your creative path.\n\nThank You for Choosing The Creative\nTogether, we're building a thriving economy of artists, by artists. Let's create and inspire!",
       skipRecipient: false,
       endingCallToAction: 'Complete Checkout',
       persistentCheckout: false,
-      recipient: `${activeAccount?.address}`,
+      recipient: `${user?.address}`,
     };
 
     // Load Unlock Protocol script if it hasn't been loaded already
@@ -132,16 +127,14 @@ const PaywallButton: React.FC = () => {
         document.body.removeChild(script);
       }
     };
-  }, [activeAccount]);
+  }, [user]);
 
   const claimPass = async () => {
     setIsLoading(true);
-    if (walletChain?.id !== polygon.id) await switchChain(polygon);
+    if (chain?.id !== base.id) SwitchChain();
     const paywall = new Paywall(networkConfigs);
     console.log('paywall', paywall);
-    const provider = await paywall.getProvider(
-      ethers6Adapter.provider.toEthers({ client: client, chain: polygon }),
-    );
+    const provider = user?.getProvider();
     console.log('provider', provider);
     await paywall.connect(provider);
     const response = await paywall.loadCheckoutModal(paywallConfig);

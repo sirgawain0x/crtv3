@@ -1,4 +1,4 @@
-import { env } from '@/lib/env';
+import { env } from '@app/lib/env';
 
 export const ROUTES = {
   HOME: '/',
@@ -24,7 +24,7 @@ export const API = {
 
 export const THIRDWEB = {
   AUTH_CONFIG: {
-    domain: env.THIRDWEB_AUTH_DOMAIN,
+    domain: env.NEXT_PUBLIC_AUTH_DOMAIN,
     authUrl: '/api/auth',
   },
 } as const;

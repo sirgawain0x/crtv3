@@ -5,9 +5,12 @@ const envSchema = z.object({
   NEXT_PUBLIC_APP_URL: z.string().url(),
   NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID: z.string().min(1),
   NEXT_PUBLIC_ALCHEMY_API_KEY: z.string().min(1),
+  NEXT_PUBLIC_AUTH_DOMAIN: z.string().min(1),
 
   // Private Environment Variables
   DATABASE_URL: z.string().url(),
+  UPSTASH_REDIS_REST_KV_REST_API_URL: z.string().url(),
+  UPSTASH_REDIS_REST_KV_REST_API_TOKEN: z.string().min(1),
 
   // Development Settings
   NODE_ENV: z
