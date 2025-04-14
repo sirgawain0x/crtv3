@@ -38,10 +38,9 @@ export function BroadcastWithControls({
           const { stream } = await fullLivepeer.stream.create({
             name: `Broadcast-${Date.now()}`,
           });
-          
+
           console.log('Created stream:', stream);
           // Handle the new stream data here
-          
         } catch (error) {
           console.error('Error creating stream:', error);
           toast.error('Failed to create stream. Please try again.');

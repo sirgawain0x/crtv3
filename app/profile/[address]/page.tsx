@@ -16,7 +16,10 @@ export default function Profile() {
         <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem>
-              <BreadcrumbLink href="/" className="flex items-center hover:text-primary">
+              <BreadcrumbLink
+                href="/"
+                className="flex items-center hover:text-primary"
+              >
                 <span role="img" aria-label="home" className="mr-1">
                   🏠
                 </span>{' '}

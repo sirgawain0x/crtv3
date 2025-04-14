@@ -23,7 +23,7 @@ export const fetchAssetId = async (
 ) => {
   try {
     let assetId: string;
-    
+
     if (typeof id === 'string') {
       // Handle the case where `id` is a string
       assetId = id;
@@ -32,12 +32,15 @@ export const fetchAssetId = async (
       const [, { assetId: queryAssetId }] = id.queryKey;
       assetId = queryAssetId;
     }
-    
+
     const asset = await fullLivepeer?.asset.get(assetId);
-    
+
     return asset;
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Fetch asset by ID failed, unknown error occurred';
+    const errorMessage =
+      error instanceof Error
+        ? error.message
+        : 'Fetch asset by ID failed, unknown error occurred';
     throw new Error(`Failed to fetch asset by ID: ${errorMessage}`);
   }
 };
@@ -49,7 +52,7 @@ export const updateAsset = async (
 ) => {
   try {
     let assetId: string;
-  
+
     if (typeof id === 'string') {
       // Handle the case where `id` is a string
       assetId = id;
@@ -58,12 +61,15 @@ export const updateAsset = async (
       const [, { assetId: queryAssetId }] = id.queryKey;
       assetId = queryAssetId;
     }
-    
+
     const asset = await fullLivepeer?.asset.update(data, assetId);
 
     return asset;
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Update asset ailed, unknown error occurred';
+    const errorMessage =
+      error instanceof Error
+        ? error.message
+        : 'Update asset ailed, unknown error occurred';
     throw new Error(`Failed to update asset: ${errorMessage}`);
   }
 };
@@ -74,7 +80,8 @@ export const createAsset = async (data: NewAssetPayload) => {
     const asset = await fullLivepeer?.asset.create(data);
     return [asset];
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error occurred';
     throw new Error(`Failed to create asset: ${errorMessage}`);
   }
 };
@@ -85,7 +92,8 @@ export const createViaUrl = async (data: NewAssetFromUrlPayload) => {
     const asset = await fullLivepeer?.asset?.createViaUrl(data);
     return [asset];
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error occurred';
     throw new Error(`Error creating url: ${errorMessage}`);
   }
 };
@@ -107,12 +115,15 @@ export const deleteAsset = async (
     }
 
     const response = await fullLivepeer?.asset.delete(assetId);
-    
+
     const asset = response;
-    
+
     return asset;
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Delete asset failed, unknown error occurred';
+    const errorMessage =
+      error instanceof Error
+        ? error.message
+        : 'Delete asset failed, unknown error occurred';
     throw new Error(`Failed to delete asset: ${errorMessage}`);
   }
 };

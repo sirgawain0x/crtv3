@@ -1,9 +1,9 @@
 .slider {
-  @apply relative inline-block w-16 h-8 bg-gray-500 rounded-full transition-all duration-300;
+  @apply relative inline-block h-8 w-16 rounded-full bg-gray-500 transition-all duration-300;
 }
 
 .slider .dot {
-  @apply absolute left-1 top-1 w-6 h-6 bg-white rounded-full transition-all duration-300;
+  @apply absolute left-1 top-1 h-6 w-6 rounded-full bg-white transition-all duration-300;
 }
 
 input:checked + .slider {
@@ -11,5 +11,5 @@ input:checked + .slider {
 }
 
 input:checked + .slider .dot {
-  @apply transform translate-x-8;
+  @apply translate-x-8 transform;
 }

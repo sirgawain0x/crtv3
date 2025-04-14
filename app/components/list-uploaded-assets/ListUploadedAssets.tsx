@@ -75,16 +75,28 @@ export default function ListUploadedAssets(props: ListUploadedAssetsProps) {
           >
             <thead>
               <tr className="bg-muted/50">
-                <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
+                <th
+                  scope="col"
+                  className="px-4 py-3 text-left text-sm font-medium text-muted-foreground"
+                >
                   S/No.
                 </th>
-                <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
+                <th
+                  scope="col"
+                  className="px-4 py-3 text-left text-sm font-medium text-muted-foreground"
+                >
                   Name
                 </th>
-                <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
+                <th
+                  scope="col"
+                  className="px-4 py-3 text-left text-sm font-medium text-muted-foreground"
+                >
                   Created
                 </th>
-                <th scope="col" className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
+                <th
+                  scope="col"
+                  className="px-4 py-3 text-left text-sm font-medium text-muted-foreground"
+                >
                   Updated
                 </th>
               </tr>
