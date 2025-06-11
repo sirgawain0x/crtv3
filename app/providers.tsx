@@ -1,70 +1,56 @@
-'use client';
-import { ApolloWrapper } from './lib/utils/ApolloWrapper';
-import { createContext, useContext, useState, useEffect } from 'react';
-import { QueryClientProvider } from '@tanstack/react-query';
-import { OrbisProvider } from '@app/lib/sdk/orbisDB/context';
-import { SubtitlesProvider } from './components/Player/Subtitles';
-import { ThemeProvider } from 'next-themes';
-import { AlchemyClientState } from '@account-kit/core';
-import { AlchemyAccountProvider } from '@account-kit/react';
-import { config } from './config';
-import { queryClient } from './config/query-client';
-import { PropsWithChildren } from 'react';
+"use client";
+import { config, queryClient } from "@/config";
+import { AlchemyAccountProvider } from "@account-kit/react";
+import { AlchemyClientState } from "@account-kit/core";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { PropsWithChildren, useMemo, Suspense } from "react";
+import { ThemeProvider } from "next-themes";
+import { Toaster } from "sonner";
+import { VideoProvider } from "../context/VideoContext";
+import { ErrorBoundary } from "next/dist/client/components/error-boundary";
+import { ApolloNextAppProvider } from "@apollo/client-integration-nextjs";
+import { makeClient } from "./apolloWrapper";
 
-interface ThemeContextType {
-  theme: string;
-  toggleTheme: () => void;
-}
-
-const ThemeContext = createContext<ThemeContextType>({
-  theme: 'light',
-  toggleTheme: () => {},
-});
-
-export function Providers({ children }: PropsWithChildren) {
-  const [theme, setTheme] = useState('light');
-
-  useEffect(() => {
-    const root = window.document.documentElement;
-    const initialTheme = root.classList.contains('dark') ? 'dark' : 'light';
-    setTheme(initialTheme);
-  }, []);
-
-  const toggleTheme = () => {
-    const root = window.document.documentElement;
-    if (theme === 'light') {
-      root.classList.add('dark');
-      setTheme('dark');
-    } else {
-      root.classList.remove('dark');
-      setTheme('light');
-    }
-  };
-
+function ErrorFallback({ error }: { error: Error }) {
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme }}>
-      <ThemeProvider
-        attribute="class"
-        defaultTheme="system"
-        enableSystem
-        disableTransitionOnChange
-      >
-        <SubtitlesProvider>
-          <ApolloWrapper>
-            <QueryClientProvider client={queryClient}>
-              <OrbisProvider>{children}</OrbisProvider>
-            </QueryClientProvider>
-          </ApolloWrapper>
-        </SubtitlesProvider>
-      </ThemeProvider>
-    </ThemeContext.Provider>
+    <div className="flex min-h-screen items-center justify-center">
+      <div className="text-center">
+        <h2 className="text-lg font-semibold">Something went wrong</h2>
+        <p className="mt-2 text-sm text-gray-500">{error.message}</p>
+      </div>
+    </div>
   );
 }
 
-export const useTheme = () => {
-  const context = useContext(ThemeContext);
-  if (!context) {
-    throw new Error('useTheme must be used within a ThemeProvider');
-  }
-  return context;
+export const Providers = (
+  props: PropsWithChildren<{ initialState?: AlchemyClientState }>
+) => {
+  return (
+    <ErrorBoundary errorComponent={ErrorFallback}>
+      <Suspense
+        fallback={
+          <div className="flex min-h-screen items-center justify-center">
+            Loading...
+          </div>
+        }
+      >
+        <QueryClientProvider client={queryClient}>
+          <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+            <ApolloNextAppProvider makeClient={makeClient}>
+              <AlchemyAccountProvider
+                config={config}
+                queryClient={queryClient}
+                initialState={props.initialState}
+              >
+                <VideoProvider>
+                  {props.children}
+                  <Toaster position="top-right" richColors />
+                </VideoProvider>
+              </AlchemyAccountProvider>
+            </ApolloNextAppProvider>
+          </ThemeProvider>
+        </QueryClientProvider>
+      </Suspense>
+    </ErrorBoundary>
+  );
 };
