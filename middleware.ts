@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAddress } from 'viem';
-import { rateLimit } from '@/app/lib/database/edge-redis';
 
 // Define protected routes that require authentication
 const protectedRoutes = [
@@ -125,37 +124,6 @@ export async function middleware(req: NextRequest) {
   headers.set('X-Content-Type-Options', 'nosniff');
   headers.set('Referrer-Policy', 'origin-when-cross-origin');
   headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
-
-  // Only apply rate limiting to auth endpoints
-  if (pathname.startsWith('/api/auth')) {
-    const ip = req.ip ?? '127.0.0.1';
-    const { success, limit, remaining, reset } = await rateLimit(ip);
-
-    // Create a new response with the original response's data
-    const newResponse = NextResponse.next();
-
-    // Copy all existing headers
-    response.headers.forEach((value, key) => {
-      newResponse.headers.set(key, value);
-    });
-
-    // Add rate limit headers
-    newResponse.headers.set('X-RateLimit-Limit', limit.toString());
-    newResponse.headers.set('X-RateLimit-Remaining', remaining.toString());
-    newResponse.headers.set('X-RateLimit-Reset', reset.toString());
-
-    if (!success) {
-      return NextResponse.json(
-        { error: 'Too many requests' },
-        {
-          status: 429,
-          headers: newResponse.headers,
-        },
-      );
-    }
-
-    return newResponse;
-  }
 
   return response;
 }
