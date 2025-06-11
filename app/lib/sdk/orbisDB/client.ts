@@ -17,35 +17,27 @@ applyOrbisAuthPatches({
   },
 });
 
-// Validate required environment variables
-const requiredEnvVars = {
-  NEXT_PUBLIC_CERAMIC_NODE_URL: process.env.NEXT_PUBLIC_CERAMIC_NODE_URL ?? '',
-  NEXT_PUBLIC_ORBIS_NODE_URL: process.env.NEXT_PUBLIC_ORBIS_NODE_URL ?? '',
-  NEXT_PUBLIC_ORBIS_ENVIRONMENT_ID:
-    process.env.NEXT_PUBLIC_ORBIS_ENVIRONMENT_ID ?? '',
-};
+if (!process.env.NEXT_PUBLIC_CERAMIC_NODE_URL) {
+  throw new Error('NEXT_PUBLIC_CERAMIC_NODE_URL is not defined');
+}
 
-// Check for missing environment variables
-const missingVars = Object.entries(requiredEnvVars)
-  .filter(([_, value]) => !value)
-  .map(([key]) => key);
+if (!process.env.NEXT_PUBLIC_ORBIS_NODE_URL) {
+  throw new Error('NEXT_PUBLIC_ORBIS_NODE_URL is not defined');
+}
 
-if (missingVars.length > 0) {
-  throw new OrbisError(
-    `Missing required environment variables: ${missingVars.join(', ')}`,
-    OrbisErrorType.VALIDATION_ERROR,
-  );
+if (!process.env.NEXT_PUBLIC_ORBIS_ENVIRONMENT_ID) {
+  throw new Error('NEXT_PUBLIC_ORBIS_ENVIRONMENT_ID is not defined');
 }
 
 // Initialize OrbisDB instance
 export const db = new OrbisDB({
   ceramic: {
-    gateway: requiredEnvVars.NEXT_PUBLIC_CERAMIC_NODE_URL,
+    gateway: process.env.NEXT_PUBLIC_CERAMIC_NODE_URL as string,
   },
   nodes: [
     {
-      gateway: requiredEnvVars.NEXT_PUBLIC_ORBIS_NODE_URL,
-      env: requiredEnvVars.NEXT_PUBLIC_ORBIS_ENVIRONMENT_ID,
+      gateway: process.env.NEXT_PUBLIC_ORBIS_NODE_URL as string,
+      env: process.env.NEXT_PUBLIC_ORBIS_ENVIRONMENT_ID as string,
     },
   ],
 });

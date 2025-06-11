@@ -1,18 +1,19 @@
 'use client';
-import { useState } from 'react';
-import { useClient, useReadContract, useWriteContract } from 'wagmi';
+import { useState, useEffect } from 'react';
 import { Button } from '../ui/button';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import Link from 'next/link';
+import { client } from '@app/lib/sdk/thirdweb/client';
+import { base } from 'thirdweb/chains';
 import { FaUsers, FaCertificate } from 'react-icons/fa';
-import { Abi } from 'viem';
+import { useReadContract } from 'thirdweb/react';
+import { getContract } from 'thirdweb/contract';
 import { Label } from '../ui/label';
 import { ROLES, CREATIVE_ADDRESS } from '@app/lib/utils/context';
-import { Card } from './Card';
+import { Card } from '@app/components/Voting/Card';
+import VoteABI from '@app/lib/utils/Vote.json';
 import { useUser } from '@account-kit/react';
 import { userToAccount } from '@app/lib/types/account';
-import { VOTE_CONTRACT_ADDRESS } from '@app/lib/constants/contracts';
-import VoteABI from '@app/lib/utils/Vote.json';
 
 // Interface for proposal data from smart contract
 interface Proposal {
@@ -32,11 +33,18 @@ const Vote = () => {
   const user = useUser();
   const account = userToAccount(user);
 
+  const voteContract = getContract({
+    client: client,
+    chain: base,
+    address: '0x24609A5CBe0f50b67E0E7D7494885a6eB19404BF',
+    abi: VoteABI as any,
+  });
+
   const { data: proposals = [], isLoading } = useReadContract({
-    address: VOTE_CONTRACT_ADDRESS,
-    abi: VoteABI.abi as Abi,
-    functionName: 'getAllProposals',
-  }) as { data: Proposal[]; isLoading: boolean };
+    contract: voteContract,
+    method: 'getAllProposals',
+    params: [],
+  });
 
   const filteredProposals = proposals.filter((proposal: Proposal) => {
     const currentBlock = BigInt(Date.now()); // This should be replaced with actual block number
@@ -117,5 +125,4 @@ const Vote = () => {
     </div>
   );
 };
-
 export default Vote;

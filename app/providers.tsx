@@ -7,9 +7,8 @@ import { SubtitlesProvider } from './components/Player/Subtitles';
 import { ThemeProvider } from 'next-themes';
 import { AlchemyClientState } from '@account-kit/core';
 import { AlchemyAccountProvider } from '@account-kit/react';
-import { config as accountKitConfig, queryClient } from './config/account-kit';
-import { config as wagmiConfig } from './config/wagmi';
-import { WagmiProvider } from 'wagmi';
+import { config } from './config';
+import { queryClient } from './config/query-client';
 import { PropsWithChildren } from 'react';
 
 interface ThemeContextType {
@@ -17,13 +16,12 @@ interface ThemeContextType {
   toggleTheme: () => void;
 }
 
-const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
+const ThemeContext = createContext<ThemeContextType>({
+  theme: 'light',
+  toggleTheme: () => {},
+});
 
-interface ProvidersProps extends PropsWithChildren {
-  initialState?: AlchemyClientState;
-}
-
-export function Providers({ children, initialState }: ProvidersProps) {
+export function Providers({ children }: PropsWithChildren) {
   const [theme, setTheme] = useState('light');
 
   useEffect(() => {
@@ -51,21 +49,13 @@ export function Providers({ children, initialState }: ProvidersProps) {
         enableSystem
         disableTransitionOnChange
       >
-        <QueryClientProvider client={queryClient}>
-          <AlchemyAccountProvider
-            config={accountKitConfig}
-            queryClient={queryClient}
-            initialState={initialState}
-          >
-            <WagmiProvider config={wagmiConfig}>
-              <SubtitlesProvider>
-                <ApolloWrapper>
-                  <OrbisProvider>{children}</OrbisProvider>
-                </ApolloWrapper>
-              </SubtitlesProvider>
-            </WagmiProvider>
-          </AlchemyAccountProvider>
-        </QueryClientProvider>
+        <SubtitlesProvider>
+          <ApolloWrapper>
+            <QueryClientProvider client={queryClient}>
+              <OrbisProvider>{children}</OrbisProvider>
+            </QueryClientProvider>
+          </ApolloWrapper>
+        </SubtitlesProvider>
       </ThemeProvider>
     </ThemeContext.Provider>
   );

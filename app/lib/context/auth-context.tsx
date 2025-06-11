@@ -6,17 +6,24 @@ import React, {
   useEffect,
   useState,
   useCallback,
+  useMemo,
 } from 'react';
 import { useRouter } from 'next/navigation';
 import { OrbisConnectResult } from '@useorbis/db-sdk';
-import { db } from '@app/lib/sdk/orbisDB/client';
-import { OrbisEVMAuth } from '@useorbis/db-sdk/auth';
 import { useDebounce } from '@app/hooks/useDebounce';
+import { checkAuth } from '@app/lib/actions/auth';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface OrbisUserProfile {
   username?: string;
   description?: string;
   pfp?: string;
+}
+
+interface AuthUserInformation {
+  did: string;
+  address?: string;
+  profile?: OrbisUserProfile;
 }
 
 interface OrbisUser {
@@ -52,10 +59,21 @@ const AuthContext = createContext<AuthState>(initialState);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [authState, setAuthState] = useState<AuthState>(initialState);
   const router = useRouter();
+  const queryClient = useQueryClient();
 
-  // Debounce the auth check to prevent too many requests
+  const updateAuthState = useCallback(
+    (updates: Partial<AuthState>) => {
+      setAuthState((prev) => ({
+        ...prev,
+        ...updates,
+      }));
+      // Invalidate relevant queries when auth state changes
+      queryClient.invalidateQueries({ queryKey: ['auth'] });
+    },
+    [queryClient],
+  );
+
   const debouncedAuthCheck = useDebounce(async () => {
-    // Skip if we checked recently
     const now = Date.now();
     if (
       authState.lastChecked &&
@@ -65,104 +83,73 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const response = await fetch('/api/auth/check', {
-        credentials: 'include',
-      });
+      const authResponse = await checkAuth();
 
-      // If we get a 401, just update the state and return
-      if (response.status === 401) {
-        setAuthState((prev) => ({
-          ...prev,
+      if (!authResponse.ok) {
+        updateAuthState({
           isAuthenticated: false,
           isLoading: false,
           user: null,
           orbisData: null,
           lastChecked: now,
-        }));
+        });
 
-        // Only redirect on first load
         if (!authState.lastChecked) {
           router.push('/login');
         }
         return;
       }
 
-      const orbisConnected = await db.isUserConnected();
-      const orbisResult = orbisConnected ? await db.getConnectedUser() : null;
-
-      // Convert the orbis result to our expected types
-      let orbisData: OrbisConnectResult | null = null;
       let user: OrbisUserData | null = null;
-
-      if (
-        orbisResult &&
-        typeof orbisResult === 'object' &&
-        !Array.isArray(orbisResult) &&
-        'did' in orbisResult
-      ) {
-        orbisData = orbisResult as OrbisConnectResult;
-
-        // Only try to construct user if we have valid orbisData
-        if (
-          orbisData.user &&
-          typeof orbisData.user === 'object' &&
-          'did' in orbisData.user
-        ) {
-          const userObj = orbisData.user as OrbisUser;
-          const didString = userObj.did.split('did:')[1];
+      if (authResponse.orbisData && 'did' in authResponse.orbisData) {
+        const orbisUser = authResponse.orbisData.user as OrbisUser;
+        if (orbisUser && 'did' in orbisUser) {
+          const didString = orbisUser.did.split('did:')[1];
           if (didString) {
             user = {
-              address: userObj.address || '',
+              address: orbisUser.address || '',
               did: `did:${didString}` as const,
               details: {
-                did: userObj.did,
-                address: userObj.address,
-                profile: userObj.profile,
+                did: orbisUser.did,
+                address: orbisUser.address,
+                profile: orbisUser.profile,
               },
             };
           }
         }
       }
 
-      // Update auth state with proper type checking
-      setAuthState((prev) => ({
-        ...prev,
-        isAuthenticated: response.ok && orbisConnected,
+      updateAuthState({
+        isAuthenticated: authResponse.ok && authResponse.orbisConnected,
         isLoading: false,
         user,
-        orbisData,
+        orbisData: authResponse.orbisData,
         lastChecked: now,
-      }));
+      });
 
-      // Only redirect on first load or explicit auth failures
-      if (!response.ok && !authState.lastChecked) {
+      if (!authResponse.ok && !authState.lastChecked) {
         router.push('/login');
       }
     } catch (error) {
       console.error('Error checking authentication:', error);
-      setAuthState((prev) => ({
-        ...prev,
+      updateAuthState({
         isAuthenticated: false,
         isLoading: false,
         user: null,
         orbisData: null,
-        lastChecked: Date.now(),
-      }));
+        lastChecked: now,
+      });
 
-      // Only redirect on first load
       if (!authState.lastChecked) {
         router.push('/login');
       }
     }
-  }, 1000); // 1 second debounce
+  }, 1000);
 
-  // Run auth check on mount and periodically
   useEffect(() => {
     debouncedAuthCheck();
 
-    // Set up periodic check
     const interval = setInterval(() => {
-      // Only poll if user is authenticated or we're still loading
       if (authState.isAuthenticated || authState.isLoading) {
         debouncedAuthCheck();
       }
@@ -173,8 +160,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [debouncedAuthCheck, authState.isLoading, authState.isAuthenticated]);
 
+  const contextValue = useMemo(
+    () => ({
+      ...authState,
+    }),
+    [authState],
+  );
+
   return (
-    <AuthContext.Provider value={authState}>{children}</AuthContext.Provider>
+    <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
   );
 }
 

@@ -1,16 +1,16 @@
 // crtv3/app/layout.tsx (1-38)
-import { config } from '@/app/config';
+import { config } from '@app/config';
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
-import { headers } from 'next/headers';
 import './globals.css';
 import { Providers } from './providers';
 import Layout from './components/Layout/Layout'; // Ensure this component accepts children
 import { VideoProvider } from './context/VideoContext'; // Ensure this component accepts children
-import { Toaster } from '@app/components/ui/toaster';
-import { validateEnv } from '@/app/lib/env';
-import { cookieToInitialState } from '@account-kit/core';
-import { config as accountKitConfig } from './config/account-kit';
+import { Toaster } from '@/components/ui/toaster';
+import { validateEnv } from '@/lib/env';
+import { AuthProvider } from '@/lib/context/auth-context';
+import { AlchemyAccountProvider } from '@account-kit/react';
+import { queryClient } from './config/query-client';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -27,21 +27,19 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // Persist state across pages
-  const initialState = cookieToInitialState(
-    accountKitConfig,
-    headers().get('cookie') ?? undefined,
-  );
-
   return (
     <html lang="en">
       <body className={inter.className}>
-        <Providers initialState={initialState}>
-          <VideoProvider>
-            <Layout>{children}</Layout>
-            <Toaster />
-          </VideoProvider>
-        </Providers>
+        <AlchemyAccountProvider config={config} queryClient={queryClient}>
+          <AuthProvider>
+            <Providers>
+              <VideoProvider>
+                <Layout>{children}</Layout>
+                <Toaster />
+              </VideoProvider>
+            </Providers>
+          </AuthProvider>
+        </AlchemyAccountProvider>
       </body>
     </html>
   );

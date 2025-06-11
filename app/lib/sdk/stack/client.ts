@@ -45,3 +45,41 @@ export const formatAddress = (
 
   return address;
 };
+
+// Server actions for Stack operations
+async function getLeaderboard(query: any) {
+  'use server';
+  try {
+    return await stack.getLeaderboard({ query });
+  } catch (error) {
+    console.error('Error fetching leaderboard:', error);
+    throw new Error('Failed to fetch leaderboard data');
+  }
+}
+
+async function getPoints(address: string) {
+  'use server';
+  try {
+    const formattedAddress = formatAddress(address);
+    return await stack.getPoints(formattedAddress);
+  } catch (error) {
+    console.error('Error fetching points:', error);
+    throw new Error('Failed to fetch points');
+  }
+}
+
+async function track(event: string, data: any) {
+  'use server';
+  try {
+    return await stack.track(event, data);
+  } catch (error) {
+    console.error('Error tracking event:', error);
+    throw new Error('Failed to track event');
+  }
+}
+
+export const stackActions = {
+  getLeaderboard,
+  getPoints,
+  track,
+};

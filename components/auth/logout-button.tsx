@@ -1,13 +1,13 @@
 'use client';
 
-import { Button } from '../ui/button';
+import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { AuthService } from '@app/lib/services/auth';
 import { toast } from 'sonner';
 
-export const LogOutButton: React.FC = () => {
+export function LogoutButton() {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
@@ -47,4 +47,4 @@ export const LogOutButton: React.FC = () => {
       )}
     </Button>
   );
-};
+}

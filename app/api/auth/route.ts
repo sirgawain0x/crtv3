@@ -1,19 +1,27 @@
 import { NextResponse } from 'next/server';
-import { type User } from '@account-kit/react';
-import { getAuthCookie, setAuthCookie, deleteAuthCookie } from './server';
+import { SiweMessage } from 'siwe';
+import { setAuthCookie, deleteAuthCookie, getAuthCookie } from './server';
+
+const domain = process.env.NEXT_PUBLIC_AUTH_DOMAIN || 'localhost';
 
 export async function POST(request: Request) {
-  try {
-    const { user } = await request.json();
+  const { message, signature } = await request.json();
 
-    if (!user || !user.address) {
-      return NextResponse.json({ error: 'Invalid user data' }, { status: 400 });
+  try {
+    const siweMessage = new SiweMessage(message);
+    const fields = await siweMessage.verify({ signature });
+
+    if (!fields.success) {
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
     }
 
-    // Set cookie with secure options
-    setAuthCookie(user.address);
+    // Here you would typically create a session/token
+    const token = 'your-jwt-token'; // Replace with actual JWT generation
 
-    return NextResponse.json({ success: true });
+    // Set cookie with secure options
+    setAuthCookie(token);
+
+    return NextResponse.json({ token });
   } catch (error) {
     console.error('Error during authentication:', error);
     return NextResponse.json(
@@ -29,9 +37,9 @@ export async function DELETE() {
 }
 
 export async function GET() {
-  const address = getAuthCookie();
-  if (!address) {
+  const token = getAuthCookie();
+  if (!token) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }
-  return NextResponse.json({ authenticated: true, address });
+  return NextResponse.json({ authenticated: true });
 }
