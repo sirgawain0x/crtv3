@@ -22,7 +22,7 @@ import { AssetMetadata } from '@app/lib/sdk/orbisDB/models/AssetMetadata';
 import { toast } from 'sonner';
 import { fetchAssetId } from '@app/api/livepeer/actions';
 import { generateAccessKey } from '@app/lib/access-key';
-import { WebhookContext } from '@app/api/livepeer/token-gate/route';
+import type { WebhookContext } from '@app/lib/types';
 import { useUser } from '@account-kit/react';
 import { GetAssetResponse } from 'livepeer/models/operations';
 import { useVideo } from '@app/context/VideoContext';
@@ -47,7 +47,7 @@ export const PlayerComponent: React.FC<PlayerComponentProps> = ({
   );
   const [controlsVisible, setControlsVisible] = useState(true);
   const [conditionalProps, setConditionalProps] = useState<any>({});
-  const fadeTimeoutRef = useRef<NodeJS.Timeout>();
+  const fadeTimeoutRef = useRef<number>();
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const { currentPlayingId, setCurrentPlayingId } = useVideo();

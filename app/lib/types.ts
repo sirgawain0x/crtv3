@@ -359,3 +359,7 @@ export type SubtitleResponse = {
   text: string;
   chunks?: Chunk[];
 };
+
+export type WebhookContext = {
+  streamerId: string;
+};
