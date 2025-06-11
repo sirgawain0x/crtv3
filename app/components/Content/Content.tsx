@@ -1,21 +1,16 @@
 'use client';
-import React, { useEffect, useState } from 'react';
-import { useActiveAccount } from 'thirdweb/react';
+
+import React from 'react';
+import { useUser } from '@account-kit/react';
 import NonLoggedInView from './NonLoggedInView/NonLoggedInView';
 
-const Content = () => {
-  const activeAccount = useActiveAccount();
-  const [showChild, setShowChild] = useState(false);
-  useEffect(() => {
-    setShowChild(true);
-  }, []);
+export default function Content() {
+  const user = useUser();
 
-  if (!showChild) {
-    return null;
-  }
-
-  // return <>{activeAccount ? <Member /> : <NonLoggedInView />}</>;
-  return <>{<NonLoggedInView />}</>;
-};
-
-export default Content;
+  // For now, we'll just show NonLoggedInView until we implement the Member view
+  return (
+    <div className="container mx-auto">
+      <NonLoggedInView />
+    </div>
+  );
+}

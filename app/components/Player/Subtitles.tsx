@@ -28,7 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../ui/select';
-import { FormControl } from '@chakra-ui/react';
+import { FormControl } from '../ui/form';
 
 interface SubtitlesContextType {
   subtitles: Subtitles | undefined;

@@ -1,14 +1,6 @@
 'use server';
 import { NextRequest, NextResponse } from 'next/server';
-import { verifySignature, VerifySignatureParams } from 'thirdweb/auth';
-import {
-  decodeJWT,
-  encodeJWT,
-  RefreshJWTParams,
-  refreshJWT,
-  JWTPayload,
-  getAddress,
-} from 'thirdweb/utils';
+import { getAddress, verifyMessage } from 'viem';
 
 /**
  * Required query parameters:
@@ -47,67 +39,58 @@ import {
  */
 
 export async function GET(request: NextRequest) {
-  const searchParams = request.nextUrl.searchParams; // Extract the search parameters from the request URL
-
-  // Check for error or code in the query parameters
-  const error = searchParams.get('error'); // Get the error parameter if it exists
-  const code = searchParams.get('code'); // Get the code parameter if it exists
-  const address = searchParams.get('address'); // Assuming address is passed as a query parameter
+  const searchParams = request.nextUrl.searchParams;
+  const error = searchParams.get('error');
+  const code = searchParams.get('code');
 
   if (error) {
-    // If there is an error in the query string, log it and return a 400 status response
     console.log('Error:', error);
     return new NextResponse('User refused to sign the message', {
-      status: 400, // Bad Request response
+      status: 400,
     });
   } else if (code) {
     try {
-      // Decode the base64-encoded `code` parameter, which contains the signed message and signature
       const decoded = JSON.parse(atob(code));
-      console.log(decoded); // Log the decoded object for debugging
+      console.log(decoded);
 
-      // Extract the Ethereum address from the decoded message
-      const addressIndex = String(decoded.d).indexOf('0x'); // Find the index of the address in the message
+      const addressIndex = String(decoded.d).indexOf('0x');
       const rawAddress = String(decoded.d).substring(
         addressIndex,
-        42 + addressIndex, // Extract the address by slicing the message
+        42 + addressIndex,
       );
-      const addy = getAddress(rawAddress); // Normalize the address
-      console.log({ addy }); // Log the extracted address
+      const address = getAddress(rawAddress);
+      console.log({ address });
 
-      // Prepare the signature verification parameters
-      const verifyParams: VerifySignatureParams = {
-        message: decoded.d, // The signed message
-        signature: decoded.s, // The signature
-        address: addy, // The user's Ethereum address
-      };
+      // Verify the signature using viem
+      const isValid = await verifyMessage({
+        message: decoded.d,
+        signature: decoded.s,
+        address: address,
+      });
 
-      // Verify the signature and recover the signer's address
-      const verifiedAddress = await verifySignature(verifyParams);
-      console.log('Recovered address:', verifiedAddress); // Log the recovered address
+      if (!isValid) {
+        throw new Error('Invalid signature');
+      }
 
-      // Redirect the user back to the original origin URL
       const response = NextResponse.redirect(new URL(request.nextUrl.origin));
-
-      // Set a session cookie with the signed message and address
       response.cookies.set(
         'session',
         JSON.stringify({
           message: decoded.d,
-          address: addy,
+          address: address,
         }),
       );
+
+      return response;
     } catch (error) {
-      // If there's an error during signature verification, log it and return a 500 status response
-      console.log('Failed to verify signature:', error);
+      console.error('Failed to verify signature:', error);
       return new NextResponse('Failed to process the signature', {
-        status: 500, // Internal Server Error response
+        status: 500,
       });
     }
   } else {
-    // If no valid query parameters are provided, return a 400 status response
     return new NextResponse('No valid query parameters provided', {
-      status: 400, // Bad Request response
+      status: 400,
     });
   }
 }

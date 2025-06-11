@@ -1,107 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifySignature } from 'thirdweb/auth';
-import { thirdwebAuth } from '@app/lib/sdk/thirdweb/auth';
-import { cookies } from 'next/headers';
-import { getAddress } from 'viem';
-import { db } from '@app/lib/sdk/orbisDB/client';
-import { OrbisKeyDidAuth } from '@useorbis/db-sdk/auth';
+import { verifySignature } from '@app/api/auth/authentication';
+import { SignJWT } from 'jose';
+import { nanoid } from 'nanoid';
+
+const JWT_SECRET = new TextEncoder().encode(
+  process.env.JWT_SECRET || 'your-secret-key',
+);
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { payload, signature } = body;
+    const { message, signature } = await request.json();
 
-    console.log('Login attempt:', {
-      payloadType: typeof payload,
-      payloadKeys: Object.keys(payload),
-      signatureType: typeof signature,
-    });
-
-    // Verify the signature
-    const isValid = await verifySignature({
-      message: JSON.stringify(payload),
-      signature,
-      address: payload.address,
-    });
-
-    console.log('Signature verification:', {
-      isValid,
-      address: payload.address,
-      messageType: typeof JSON.stringify(payload),
-    });
-
-    if (!isValid) {
+    const fields = await verifySignature({ message, signature });
+    if (!fields) {
       return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
     }
 
-    // Normalize addresses for comparison
-    const signerAddress = getAddress(payload.address);
-    console.log('Normalized signer address:', signerAddress);
+    const token = await new SignJWT({ address: fields.address })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setJti(nanoid())
+      .setIssuedAt()
+      .setExpirationTime('24h')
+      .sign(JWT_SECRET);
 
-    // Connect to Orbis using KeyDidAuth
-    try {
-      console.log('Connecting to Orbis...');
-      const seed = await OrbisKeyDidAuth.generateSeed();
-      console.log('Seed generated:', !!seed);
-
-      const auth = await OrbisKeyDidAuth.fromSeed(seed);
-      console.log('Auth created:', !!auth);
-
-      const orbisResult = await db.connectUser({ auth });
-      console.log('Orbis connection result:', {
-        success: !!orbisResult,
-        resultType: typeof orbisResult,
-      });
-
-      if (!orbisResult) {
-        console.error('Failed to connect to Orbis');
-        return NextResponse.json(
-          { error: 'Failed to connect to Orbis' },
-          { status: 401 },
-        );
-      }
-
-      console.log('Successfully connected to Orbis');
-    } catch (orbisError) {
-      console.error('Orbis connection error:', {
-        error: orbisError,
-        message:
-          orbisError instanceof Error ? orbisError.message : String(orbisError),
-        stack: orbisError instanceof Error ? orbisError.stack : undefined,
-      });
-      return NextResponse.json(
-        { error: 'Failed to connect to Orbis' },
-        { status: 401 },
-      );
-    }
-
-    // Generate JWT
-    const jwt = await thirdwebAuth.generateJWT({
-      payload: {
-        address: signerAddress,
-        ...payload,
-      },
-    });
-
-    console.log('JWT generated:', jwt ? 'success' : 'failed');
-
-    // Set the JWT in an HTTP-only cookie
-    cookies().set('jwt', jwt, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      path: '/',
-      maxAge: 60 * 60 * 24, // 24 hours
-    });
-
-    console.log('JWT cookie set');
-
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ token });
   } catch (error) {
-    console.error('Login error:', error);
+    console.error('Error in login route:', error);
     return NextResponse.json(
-      { error: 'Authentication failed' },
-      { status: 401 },
+      { error: 'Internal server error' },
+      { status: 500 },
     );
   }
 }

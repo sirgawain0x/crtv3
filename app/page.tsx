@@ -1,35 +1,17 @@
-import { Metadata } from 'next';
-import Content from '@app/components/Content/Content';
- 
+'use client';
 
-export const metadata: Metadata = {
-  title: 'Creative TV',
-  description: 'The way content should be',
-  metadataBase: new URL('https://creativeplatform.xyz'),
-  openGraph: {
-    title: 'Creative TV',
-    description: 'The way content should be',
-    type: 'website',
-    url: 'https://tv.creativeplatform.xyz',
-    images: [
-      {
-        url: 'https://bafkreicsmowyquojavdt6lyq7a6mgub3ae7fseprt3dcwqk2asqth4nm6y.ipfs.nftstorage.link/',
-        width: 875,
-        height: 875,
-        alt: 'Creative Membership',
-      },
-    ],
-    locale: 'en_US',
-  },
-};
+import { GetStartedButton } from '@/components/auth/get-started-button';
 
 export default function Home() {
   return (
-    <div className={'container mx-auto max-w-7xl'}>
-      <div className={'py-10'}>
-        <Content />
-        
+    <main className="flex min-h-screen flex-col items-center justify-center p-24">
+      <div className="z-10 w-full max-w-5xl items-center justify-between font-mono text-sm lg:flex">
+        <h1 className="mb-8 text-4xl font-bold">Welcome to Our App</h1>
+        <p className="mb-8 text-xl">
+          Get started with smart accounts, SIWE, OrbisDB, and Unlock Protocol
+        </p>
+        <GetStartedButton />
       </div>
-    </div>
+    </main>
   );
 }

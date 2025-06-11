@@ -1,11 +1,11 @@
 import { useOrbisContext } from '@app/lib/sdk/orbisDB/context';
+import { getContract } from 'thirdweb/contract';
 import {
-  getContract,
   prepareContractCall,
   sendTransaction,
   waitForReceipt,
   sendAndConfirmTransaction,
-} from 'thirdweb';
+} from 'thirdweb/transaction';
 import Image from 'next/image';
 import { client } from '@app/lib/sdk/thirdweb/client';
 import { Abi, Log, parseEther, getAddress, formatEther, isAddress } from 'viem';

@@ -1,22 +1,27 @@
 'use client';
 import { ApolloWrapper } from './lib/utils/ApolloWrapper';
-import { ThirdwebProvider } from '@app/lib/sdk/thirdweb/components';
 import { createContext, useContext, useState, useEffect } from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { OrbisProvider } from '@app/lib/sdk/orbisDB/context';
 import { SubtitlesProvider } from './components/Player/Subtitles';
+import { ThemeProvider } from 'next-themes';
+import { AlchemyClientState } from '@account-kit/core';
+import { AlchemyAccountProvider } from '@account-kit/react';
+import { config } from './config';
+import { queryClient } from './config/query-client';
+import { PropsWithChildren } from 'react';
+
 interface ThemeContextType {
   theme: string;
   toggleTheme: () => void;
 }
 
-const queryClient = new QueryClient();
+const ThemeContext = createContext<ThemeContextType>({
+  theme: 'light',
+  toggleTheme: () => {},
+});
 
-const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
-
-export const Providers: React.FC<{ children: React.ReactNode }> = ({
-  children,
-}) => {
+export function Providers({ children }: PropsWithChildren) {
   const [theme, setTheme] = useState('light');
 
   useEffect(() => {
@@ -38,18 +43,23 @@ export const Providers: React.FC<{ children: React.ReactNode }> = ({
 
   return (
     <ThemeContext.Provider value={{ theme, toggleTheme }}>
-      <SubtitlesProvider>
-        <ApolloWrapper>
-          <ThirdwebProvider>
+      <ThemeProvider
+        attribute="class"
+        defaultTheme="system"
+        enableSystem
+        disableTransitionOnChange
+      >
+        <SubtitlesProvider>
+          <ApolloWrapper>
             <QueryClientProvider client={queryClient}>
               <OrbisProvider>{children}</OrbisProvider>
             </QueryClientProvider>
-          </ThirdwebProvider>
-        </ApolloWrapper>
-      </SubtitlesProvider>
+          </ApolloWrapper>
+        </SubtitlesProvider>
+      </ThemeProvider>
     </ThemeContext.Provider>
   );
-};
+}
 
 export const useTheme = () => {
   const context = useContext(ThemeContext);

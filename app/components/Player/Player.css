@@ -6,7 +6,9 @@
   border-radius: 0.5rem;
   overflow: hidden;
   touch-action: none;
-  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  box-shadow:
+    0 4px 6px -1px rgb(0 0 0 / 0.1),
+    0 2px 4px -2px rgb(0 0 0 / 0.1);
 }
 
 .video-controls {
@@ -18,7 +20,7 @@
   bottom: 0;
   left: 0;
   right: 0;
-  background: linear-gradient(to top, rgba(0,0,0,0.7), transparent);
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.7), transparent);
   padding: 1rem;
   touch-action: none;
   -webkit-tap-highlight-color: transparent;
@@ -44,7 +46,7 @@
 }
 
 .volume-slider > div:first-of-type {
-  background-color: #EC407A;
+  background-color: #ec407a;
 }
 
 /* Style improvements for interactive elements */
@@ -75,17 +77,17 @@ video {
 }
 
 /* Portrait video container */
-.player-container[data-orientation="portrait"] {
+.player-container[data-orientation='portrait'] {
   aspect-ratio: 9/16;
 }
 
 /* Center portrait videos */
-.player-container[data-orientation="portrait"] video {
+.player-container[data-orientation='portrait'] video {
   object-fit: contain;
 }
 
 /* Ensure seek track spans full width */
-[data-part="track"] {
+[data-part='track'] {
   width: 100%;
 }
 
@@ -95,7 +97,7 @@ video {
 }
 
 /* Improve touch targets for mobile sliders */
-[data-part="thumb"] {
+[data-part='thumb'] {
   touch-action: none;
   -webkit-tap-highlight-color: transparent;
   min-width: 20px;

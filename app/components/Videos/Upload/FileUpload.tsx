@@ -5,7 +5,8 @@ import { CopyIcon } from 'lucide-react';
 import { getLivepeerUploadUrl } from '@app/api/livepeer/livepeerActions';
 import * as tus from 'tus-js-client';
 import PreviewVideo from './PreviewVideo';
-import { useActiveAccount } from 'thirdweb/react';
+import { useUser } from '@account-kit/react';
+import { userToAccount } from '@app/lib/types/account';
 import { Progress } from '@app/components/ui/progress';
 import { Button } from '@app/components/ui/button';
 import {
@@ -14,8 +15,6 @@ import {
 } from '../../../lib/sdk/orbisDB/models/AssetMetadata';
 import JsGoogleTranslateFree from '@kreisler/js-google-translate-free';
 import { getLivepeerAudioToText } from '@app/api/livepeer/audioToText';
-import { upload } from 'thirdweb/storage';
-import { client } from '@app/lib/sdk/thirdweb/client';
 import Link from 'next/link';
 
 const truncateUri = (uri: string): string => {
@@ -153,7 +152,8 @@ const FileUpload: React.FC<FileUploadProps> = ({
 
   const [livepeerAsset, setLivepeerAsset] = useState<any>();
 
-  const activeAccount = useActiveAccount();
+  const user = useUser();
+  const account = userToAccount(user);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] || null;
@@ -177,7 +177,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
 
       const uploadRequestResult = await getLivepeerUploadUrl(
         newAssetTitle || selectedFile.name || 'new file name',
-        activeAccount?.address || 'anonymous',
+        account?.address || 'anonymous',
       );
 
       setLivepeerAsset(uploadRequestResult?.asset);
@@ -196,85 +196,78 @@ const FileUpload: React.FC<FileUploadProps> = ({
         },
         onProgress(bytesUploaded, bytesTotal) {
           const percentage = Math.round((bytesUploaded / bytesTotal) * 100);
-          console.log('Uploaded ' + percentage + '%');
           setProgress(percentage);
         },
         onSuccess() {
-          console.log('Upload finished:', tusUpload.url);
+          console.log('Upload completed');
+          setUploadComplete(true);
           setUploadState('complete');
-          setError(null);
-          onFileUploaded(tusUpload?.url || '');
-          toast.success(
-            'Video uploaded successfully! Generating subtitles...',
-            {
-              duration: 3000,
-            },
-          );
-
-          // Start audio-to-text processing after successful upload
-          handleAudioToText();
+          onFileUploaded(uploadRequestResult?.asset?.id);
         },
       });
-
-      const previousUploads = await tusUpload.findPreviousUploads();
-      if (previousUploads.length > 0) {
-        tusUpload.resumeFromPreviousUpload(previousUploads[0]);
-      }
 
       tusUpload.start();
-    } catch (error: any) {
-      console.error('Error processing file:', error);
-      if (uploadState !== 'complete') {
-        setError('Failed to process file. Please try again.');
-        setUploadState('idle');
-      }
+    } catch (err) {
+      console.error('Error uploading file:', err);
+      setError('Failed to upload file. Please try again.');
+      setUploadState('idle');
     }
   };
 
-  // Separate function to handle audio-to-text processing
   const handleAudioToText = async () => {
-    if (!selectedFile) return;
+    if (!livepeerAsset?.id) {
+      console.error('No asset ID available');
+      return;
+    }
 
     try {
-      const formData = new FormData();
-      formData.append('audio', selectedFile);
+      const data = await getLivepeerAudioToText(livepeerAsset.id);
+      console.log('Audio to text data:', data);
 
-      const audioToTextResponse = await getLivepeerAudioToText({
-        formData,
-        modelId: 'openai/whisper-large-v3',
-        returnTimestamps: 'true',
-      });
+      if (data?.chunks) {
+        const subtitles = await translateSubtitles(data);
+        console.log('Translated subtitles:', subtitles);
 
-      if (audioToTextResponse?.textResponse?.chunks) {
-        const subtitles = await translateSubtitles({
-          chunks: audioToTextResponse.textResponse.chunks,
+        // Store subtitles in IPFS
+        const subtitlesBlob = new Blob([JSON.stringify(subtitles)], {
+          type: 'application/json',
+        });
+        const subtitlesFile = new File([subtitlesBlob], 'subtitles.json', {
+          type: 'application/json',
         });
 
-        const ipfsUri = await upload({
-          client,
-          files: [subtitles],
+        // Upload to IPFS using Livepeer's API
+        const formData = new FormData();
+        formData.append('file', subtitlesFile);
+
+        const response = await fetch('/api/livepeer/upload', {
+          method: 'POST',
+          body: formData,
         });
 
-        onSubtitlesUploaded(ipfsUri);
-        toast.success(
-          'Subtitles generated and translated successfully! You can now proceed to the next step.',
-          {
-            duration: 5000,
-          },
-        );
+        if (!response.ok) {
+          throw new Error('Failed to upload subtitles to IPFS');
+        }
+
+        const { ipfsHash } = await response.json();
+        const subtitlesUri = `ipfs://${ipfsHash}`;
+
+        onSubtitlesUploaded(subtitlesUri);
+        setSubtitleProcessingComplete(true);
       }
     } catch (error) {
-      console.error('Error generating subtitles:', error);
-      toast.error(
-        'Video uploaded successfully, but there was an error generating subtitles. You can still proceed to the next step.',
-        {
-          duration: 5000,
-        },
-      );
-    } finally {
-      setSubtitleProcessingComplete(true);
+      console.error('Error processing audio to text:', error);
+      toast.error('Failed to process audio to text');
     }
   };
+
+  if (!account) {
+    return (
+      <div className="text-center">
+        <p>Please connect your wallet to upload videos</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen w-full bg-white">
@@ -421,6 +414,18 @@ const FileUpload: React.FC<FileUploadProps> = ({
             </Button>
           )}
         </div>
+
+        {uploadComplete && !subtitleProcessingComplete && (
+          <div className="mt-4">
+            <Button
+              onClick={handleAudioToText}
+              disabled={uploadState === 'loading'}
+              className="w-full"
+            >
+              Process Subtitles
+            </Button>
+          </div>
+        )}
       </div>
     </div>
   );

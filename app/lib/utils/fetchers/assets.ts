@@ -8,7 +8,7 @@ export type AssetData = {
 };
 
 export type Video = {
-  id?: string ;
+  id?: string;
   name: string;
   status: {
     phase: string | null;

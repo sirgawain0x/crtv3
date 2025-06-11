@@ -1,7 +1,7 @@
-import { loadEnvConfig } from "@next/env"
-import { defineConfig } from 'vitest/config'
-import react from '@vitejs/plugin-react'
-import { resolve } from 'path'
+import { loadEnvConfig } from '@next/env';
+import { defineConfig } from 'vitest/config';
+import react from '@vitejs/plugin-react-swc';
+import { resolve } from 'path';
 
 loadEnvConfig(process.cwd());
 
@@ -14,5 +14,11 @@ export default defineConfig({
     alias: {
       '@app': resolve(__dirname, './app'),
     },
+    include: ['**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
   },
-})
+  resolve: {
+    alias: {
+      '@app': resolve(__dirname, './app'),
+    },
+  },
+});

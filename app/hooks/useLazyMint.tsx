@@ -1,8 +1,8 @@
-import { videoContract } from '@app/lib/sdk/thirdweb/get-contract';
 import { useCallback, useState } from 'react';
-import { sendTransaction } from 'thirdweb';
-import { lazyMint } from 'thirdweb/extensions/erc1155';
-import { useActiveAccount } from 'thirdweb/react';
+import { type Address, parseAbi } from 'viem';
+import { usePublicClient, useWalletClient } from 'wagmi';
+import { useUser } from '@account-kit/react';
+import { userToAccount } from '@app/lib/types/account';
 
 interface LazyMintError extends Error {
   code?: string;
@@ -11,28 +11,52 @@ interface LazyMintError extends Error {
 
 interface LazyMintArgs {
   baseURIForTokens: string;
+  contractAddress: Address;
 }
 
-function useLazyMint() {
-  const activeAccount = useActiveAccount();
+interface TokenMetadata {
+  name: string;
+  description: string;
+  image: string;
+  properties: {
+    creatorAddress: string;
+    createdAt: number;
+  };
+}
+
+export function useLazyMint() {
+  const user = useUser();
+  const account = userToAccount(user);
+  const publicClient = usePublicClient();
+  const { data: walletClient } = useWalletClient();
+
   const [error, setError] = useState<LazyMintError>();
   const [isProcessing, setIsProcessing] = useState(false);
 
   const handleLazyMint = useCallback(
     async (args: LazyMintArgs) => {
-      (Object.keys(args) as (keyof LazyMintArgs)[]).forEach((key) => {
-        if (!args[key]) {
-          throw new Error(`${key} is required`);
-        }
-      });
+      // Validate arguments
+      if (!args.baseURIForTokens || !args.contractAddress) {
+        throw new Error('baseURIForTokens and contractAddress are required');
+      }
 
-      if (!activeAccount) {
-        throw new Error('No Active Account connected');
+      if (!account) {
+        throw new Error('No active account');
+      }
+
+      if (!walletClient) {
+        throw new Error('No wallet client');
+      }
+
+      if (!publicClient) {
+        throw new Error('No public client');
       }
 
       setIsProcessing(true);
+      setError(undefined);
 
       try {
+        // Fetch metadata from URI
         const res = await fetch(args.baseURIForTokens);
         if (!res.ok) {
           throw new Error(`Failed to fetch metadata: ${res.statusText}`);
@@ -43,31 +67,35 @@ function useLazyMint() {
           throw new Error('Invalid metadata format');
         }
 
-        const tknMetadata = {
+        const tokenMetadata: TokenMetadata = {
           ...data,
           properties: {
-            creatorAddress: activeAccount.address,
+            creatorAddress: account.address,
             createdAt: new Date().getTime(),
           },
         };
 
-        console.log({ tknMetadata });
-
-        const transaction = lazyMint({
-          contract: videoContract,
-          nfts: [tknMetadata],
+        // Prepare contract interaction
+        const { request } = await publicClient.simulateContract({
+          address: args.contractAddress,
+          abi: parseAbi([
+            'function lazyMint(uint256 amount, string baseURIForTokens, bytes extraData) returns (uint256 batchId)',
+          ]),
+          functionName: 'lazyMint',
+          args: [BigInt(1), args.baseURIForTokens, '0x'],
+          account: account.address as Address,
         });
 
-        const { transactionHash } = await sendTransaction({
-          transaction,
-          account: activeAccount,
-        });
+        // Send transaction
+        const hash = await walletClient.writeContract(request);
 
-        if (transactionHash) {
-          return transactionHash;
-        } else {
-          throw new Error('Transaction failed');
-        }
+        // Wait for transaction
+        const receipt = await publicClient.waitForTransactionReceipt({ hash });
+
+        return {
+          hash,
+          receipt,
+        };
       } catch (err) {
         if (err instanceof Error) {
           const lazyMintError: LazyMintError = {
@@ -75,21 +103,20 @@ function useLazyMint() {
             message: err.message,
             code: (err as LazyMintError).code,
           };
-
           setError(lazyMintError);
+          throw lazyMintError;
         }
+        throw err;
       } finally {
         setIsProcessing(false);
       }
     },
-    [activeAccount],
+    [account, publicClient, walletClient],
   );
 
   return {
-    handleLazyMint,
+    lazyMint: handleLazyMint,
     error,
     isProcessing,
   };
 }
-
-export default useLazyMint;

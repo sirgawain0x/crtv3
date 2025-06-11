@@ -2,7 +2,8 @@
 import { useState } from 'react';
 import { client } from '@app/lib/sdk/thirdweb/client';
 import { base } from 'thirdweb/chains';
-import { prepareContractCall, sendTransaction, getContract } from 'thirdweb';
+import { getContract } from 'thirdweb/contract';
+import { prepareContractCall } from 'thirdweb/transaction';
 import {
   useActiveAccount,
   useReadContract,
