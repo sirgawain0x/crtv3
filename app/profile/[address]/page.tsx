@@ -5,9 +5,9 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
-} from '@app/components/ui/breadcrumb';
-import { Slash } from 'lucide-react';
-import ProfilePage from '@app/components/UserProfile/UserProfile';
+} from "@/components/ui/breadcrumb";
+import { Slash } from "lucide-react";
+import ProfilePage from "@/components/UserProfile/UserProfile";
 
 export default function Profile() {
   return (
@@ -22,7 +22,7 @@ export default function Profile() {
               >
                 <span role="img" aria-label="home" className="mr-1">
                   🏠
-                </span>{' '}
+                </span>{" "}
                 Home
               </BreadcrumbLink>
             </BreadcrumbItem>

@@ -1,7 +1,6 @@
-import { Asset } from 'livepeer/models/components';
-import { GetAssetResponse } from 'livepeer/models/operations';
-import VideoDetails from '@app/components/Videos/VideoDetails';
-import { fetchAssetId } from '@app/api/livepeer/actions';
+import { Asset } from "livepeer/models/components";
+import VideoDetails from "@/components/Videos/VideoDetails";
+import { fetchAssetId } from "@/app/api/livepeer/actions";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -9,8 +8,11 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
-} from '@app/components/ui/breadcrumb';
-import { Slash } from 'lucide-react';
+} from "@/components/ui/breadcrumb";
+import { Slash } from "lucide-react";
+// import { ViewsComponent } from "@/components/Player/ViewsComponent";
+import VideoViewMetrics from "@/components/Videos/VideoViewMetrics";
+import { Metadata } from "next";
 
 type VideoDetailsPageProps = {
   params: {
@@ -28,7 +30,7 @@ const fetchAssetData = async (id: string): Promise<Asset | null> => {
 
     return null;
   } catch (error) {
-    console.error('Error fetching asset:', error);
+    console.error("Error fetching asset:", error);
     return null;
   }
 };
@@ -51,7 +53,7 @@ export default async function VideoDetailsPage({
               <BreadcrumbLink href="/">
                 <span role="img" aria-label="home">
                   🏠
-                </span>{' '}
+                </span>{" "}
                 Home
               </BreadcrumbLink>
             </BreadcrumbItem>
@@ -74,7 +76,41 @@ export default async function VideoDetailsPage({
       </div>
       <div className="py-10">
         <VideoDetails asset={assetData} />
+        {/* Metrics components */}
+        {assetData.playbackId && (
+          <div className="flex gap-4 items-center mb-6">
+            {/* <ViewsComponent playbackId={assetData.playbackId} /> */}
+            <VideoViewMetrics playbackId={assetData.playbackId} />
+          </div>
+        )}
       </div>
     </div>
   );
+}
+
+export async function generateMetadata({
+  params,
+}: {
+  params: { id: string };
+}): Promise<Metadata> {
+  const asset = await fetchAssetId(params.id);
+  if (!asset?.asset) return {};
+
+  return {
+    title: asset.asset.name ?? "Watch Video",
+    openGraph: {
+      title: asset.asset.name,
+      images: [(asset.asset as any).thumbnailUri || "/default-thumbnail.webp"],
+      videos: asset.asset.playbackUrl
+        ? [
+            {
+              url: asset.asset.playbackUrl,
+              type: "video/mp4",
+              width: 1280,
+              height: 720,
+            },
+          ]
+        : [],
+    },
+  };
 }

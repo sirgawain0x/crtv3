@@ -4,10 +4,30 @@
 
 /* In your global CSS file, e.g., App.css or index.css */
 @font-face {
-  font-family: 'ConthraxSb-Regular'; /* Name of your font */
-  src: url('/fonts/ConthraxSb-Regular.otf') format('opentype');
+  font-family: "ConthraxSb-Regular"; /* Name of your font */
+  src: url("/fonts/ConthraxSb-Regular.otf") format("opentype");
   font-weight: normal;
   font-style: normal;
+}
+
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-start-rgb: 214, 219, 220;
+  --background-end-rgb: 255, 255, 255;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --foreground-rgb: 255, 255, 255;
+    --background-start-rgb: 0, 0, 0;
+    --background-end-rgb: 0, 0, 0;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
 }
 
 @layer base {
@@ -31,16 +51,15 @@
     --border: 0 0% 89.8%;
     --input: 0 0% 89.8%;
     --ring: 0 0% 3.9%;
-    --radius: 0.5rem;
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
     --chart-3: 197 37% 24%;
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
+    --radius: 0.5rem;
   }
-
   .dark {
-    --background: 26 32 44;
+    --background: 0 0% 3.9%;
     --foreground: 0 0% 98%;
     --card: 0 0% 3.9%;
     --card-foreground: 0 0% 98%;
@@ -65,21 +84,13 @@
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
   }
-  .transition-opacity {
-    transition: opacity 0.5s ease-in-out;
-  }
 }
 
 @layer base {
   * {
-    @apply border-border;
+    @apply border-border outline-ring/50;
   }
   body {
     @apply bg-background text-foreground;
   }
-}
-
-:root {
-  --color-brand-red: #ec407a;
-  --color-brand-red-shade: #d8366c;
 }

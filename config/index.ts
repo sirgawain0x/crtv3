@@ -1,31 +1,17 @@
-import { type Chain } from 'viem';
-import { cookieStorage } from '@account-kit/core';
-import { alchemy, base } from '@account-kit/infra';
-import { type AlchemyAccountsUIConfig, createConfig } from '@account-kit/react';
+import { z } from "zod";
 
-if (!process.env.NEXT_PUBLIC_ALCHEMY_API_KEY) {
-  throw new Error('NEXT_PUBLIC_ALCHEMY_API_KEY is required');
-}
+const configSchema = z.object({
+  alchemyApiKey: z.string().min(1, "Alchemy API key is required"),
+  // ... any other config values
+});
 
-const uiConfig: AlchemyAccountsUIConfig = {
-  illustrationStyle: 'flat',
-  auth: {
-    sections: [[{ type: 'email' }], [{ type: 'passkey' }]],
-    addPasskeyOnSignup: true,
-    hideSignInText: false,
-  },
+export type Config = z.infer<typeof configSchema>;
+
+// Load config from environment variables
+export const config: Config = {
+  alchemyApiKey: process.env.NEXT_PUBLIC_ALCHEMY_API_KEY || "",
+  // ... any other config values
 };
 
-export const config = createConfig(
-  {
-    transport: alchemy({ apiKey: process.env.NEXT_PUBLIC_ALCHEMY_API_KEY }),
-    chain: base,
-    ssr: true,
-    storage: () => cookieStorage(),
-    enablePopupOauth: true,
-    sessionConfig: {
-      expirationTimeMs: 1000 * 60 * 60, // 1 hour
-    },
-  },
-  uiConfig,
-);
+// Validate config
+configSchema.parse(config);

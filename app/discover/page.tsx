@@ -1,6 +1,6 @@
-import VideoCardGrid from '@app/components/Videos/VideoCardGrid';
-import LivestreamGrid from '@app/components/Live/LivestreamGrid';
-import OrbisVideoCardGrid from '@app/components/Videos/Orbis/OrbisVideoCardGrid';
+import VideoCardGrid from "@/components/Videos/VideoCardGrid";
+import LivestreamGrid from "@/components/Live/LivestreamGrid";
+import OrbisVideoCardGrid from "@/components/Live/LivestreamGrid";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -8,8 +8,8 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
-} from '@app/components/ui/breadcrumb';
-import { Slash } from 'lucide-react';
+} from "@/components/ui/breadcrumb";
+import { Slash } from "lucide-react";
 
 const AllVideosContent: React.FC = () => {
   return (
@@ -30,7 +30,7 @@ const AllVideosContent: React.FC = () => {
               <BreadcrumbLink href="/">
                 <span role="img" aria-label="home">
                   🏠
-                </span>{' '}
+                </span>{" "}
                 Home
               </BreadcrumbLink>
             </BreadcrumbItem>
@@ -58,10 +58,10 @@ const AllVideosContent: React.FC = () => {
         <VideoCardGrid />
       </div>
       {/*Orbis Videos Section */}
-      <div>
+      {/* <div>
         <h2 className="my-4 text-2xl font-bold">All Videos</h2>
         <OrbisVideoCardGrid />
-      </div>
+      </div> */}
     </div>
   );
 };

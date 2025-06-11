@@ -1,4 +1,4 @@
-import AssetDetails from '@app/components/UserProfile/AssetDetails';
+import AssetDetails from "@/components/UserProfile/AssetDetails";
 
 export default function AssetDetailsPage() {
   return <AssetDetails />;

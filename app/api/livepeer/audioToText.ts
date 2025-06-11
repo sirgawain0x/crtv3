@@ -1,5 +1,4 @@
 'use server';
-import { aiClient } from '@app/lib/sdk/livepeer/aiClient';
 
 type AudioToTextParams = {
   formData: FormData;
@@ -20,25 +19,46 @@ export const getLivepeerAudioToText = async (params: AudioToTextParams) => {
     }
 
     // if (params.modelId) params.formData.append('model_id', params.modelId as string);
-    // Convert File to ArrayBuffer and then to Blob
-    const arrayBuffer = await file.arrayBuffer();
-    const blob = new Blob([arrayBuffer], { type: file.type });
 
-    const result = await aiClient?.generate?.audioToText({
-      audio: blob,
-      modelId: 'openai/whisper-large-v3',
-      returnTimestamps: 'true',
-    });
+    const options = {
+      method: 'POST',
+      body: params.formData,
+      headers: {
+        Authorization: `Bearer ${process.env.LIVEPEER_FULL_API_KEY}`,
+        Accept: 'application/json',
+      },
+      signal: controller.signal,
+    };
+
+    const result = await fetch(
+      `https://livepeer.studio/api/beta/generate/audio-to-text`,
+      options,
+    );
 
     clearTimeout(timeout);
 
-    if (!result) {
-      throw new Error('Failed to generate text from audio');
+    if (!result.ok) {
+      console.error('Livepeer API Error:', {
+        status: result.status,
+        statusText: result.statusText,
+      });
+      throw new Error(
+        `API request failed: ${result.status} ${result.statusText}`,
+      );
     }
 
-    console.log({ audioToTextResponse: result });
+    const contentType = result.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      const text = await result.text();
+      console.error('Unexpected response type:', contentType, text);
+      throw new Error('API returned non-JSON response');
+    }
 
-    return result;
+    const data = await result.json();
+
+    console.log({ audioToTextResponse: data });
+
+    return data;
   } catch (error: any) {
     clearTimeout(timeout);
     console.error('Error generating text from audio:', error);
