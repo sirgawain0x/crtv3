@@ -52,6 +52,7 @@ import {
   LogOut,
   Wallet,
   Send,
+  ArrowUpRight,
   ArrowUpDown,
   ArrowBigDown,
   ArrowBigUp,
@@ -62,6 +63,7 @@ import {
   Bot,
   ShieldUser,
   Plus,
+  ArrowRight,
 } from "lucide-react";
 import { CheckIcon } from "@radix-ui/react-icons";
 import Image from "next/image";
@@ -913,13 +915,13 @@ export function AccountDropdown() {
               onClick={() => handleActionClick("send")}
               className="w-full flex items-center cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors p-3 md:p-2"
             >
-              <ArrowUpDown className="mr-2 h-4 w-4 text-blue-500" /> Send
+              <ArrowUpRight className="mr-2 h-4 w-4 text-blue-500" /> Send
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => handleActionClick("swap")}
               className="w-full flex items-center cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors p-3 md:p-2"
             >
-              <ArrowBigUp className="mr-2 h-4 w-4 text-purple-500" /> Swap
+              <ArrowUpDown className="mr-2 h-4 w-4 text-purple-500" /> Swap
             </DropdownMenuItem>
           </div>
 
