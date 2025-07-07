@@ -676,8 +676,8 @@ export default function Navbar() {
                         }
                         onClick={handleLinkClick}
                       >
-                        <Plus className="mr-2 h-4 w-4 text-green-500" /> Create
-                        Proposal
+                        <Plus className="mr-2 h-4 w-4 text-green-500" /> Start A
+                        Vote
                       </Link>
                     </>
                   )}
