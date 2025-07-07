@@ -23,16 +23,6 @@ export async function POST(req: NextRequest) {
         wallet_address: walletAddress,
         commodity: "USDC",
         network: "base",
-        commodities: JSON.stringify([
-          {
-            commodity: "USDC",
-            network: "base",
-          },
-          {
-            commodity: "ETH",
-            network: "base",
-          },
-        ]),
         commodity_amount: Number(amount),
         ...(email ? { email } : {}),
         currency: "USD",
