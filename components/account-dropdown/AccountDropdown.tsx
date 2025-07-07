@@ -52,6 +52,7 @@ import {
   LogOut,
   Wallet,
   Send,
+  ArrowUpRight,
   ArrowUpDown,
   ArrowBigDown,
   ArrowBigUp,
@@ -62,6 +63,7 @@ import {
   Bot,
   ShieldUser,
   Plus,
+  ArrowRight,
 } from "lucide-react";
 import { CheckIcon } from "@radix-ui/react-icons";
 import Image from "next/image";
@@ -857,7 +859,10 @@ export function AccountDropdown() {
             </span>
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent className="w-[320px] md:w-80" align="end">
+        <DropdownMenuContent
+          className="w-[320px] md:w-80 max-h-[80vh] overflow-y-auto"
+          align="end"
+        >
           <DropdownMenuLabel className="font-normal">
             <div
               className={`flex items-center justify-between cursor-pointer 
@@ -900,125 +905,148 @@ export function AccountDropdown() {
 
           <DropdownMenuSeparator />
 
-          {/* Wallet Actions Section */}
+          {/* Wallet Actions Section - Grid Layout */}
           <div className="px-2 py-2 w-full">
-            <p className="text-xs text-muted-foreground mb-2">Wallet Actions</p>
-            <DropdownMenuItem
-              onClick={() => handleActionClick("buy")}
-              className="w-full flex items-center cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors p-3 md:p-2"
-            >
-              <Plus className="mr-2 h-4 w-4 text-green-500" /> Buy
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => handleActionClick("send")}
-              className="w-full flex items-center cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors p-3 md:p-2"
-            >
-              <ArrowUpDown className="mr-2 h-4 w-4 text-blue-500" /> Send
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => handleActionClick("swap")}
-              className="w-full flex items-center cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors p-3 md:p-2"
-            >
-              <ArrowBigUp className="mr-2 h-4 w-4 text-purple-500" /> Swap
-            </DropdownMenuItem>
+            <p className="text-xs text-muted-foreground mb-2">Actions</p>
+            <div className="grid grid-cols-3 gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleActionClick("buy")}
+                className="flex flex-col items-center justify-center p-3 h-16 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              >
+                <Plus className="h-4 w-4 text-green-500 mb-1" />
+                <span className="text-xs">Buy</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleActionClick("send")}
+                className="flex flex-col items-center justify-center p-3 h-16 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              >
+                <ArrowUpRight className="h-4 w-4 text-blue-500 mb-1" />
+                <span className="text-xs">Send</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleActionClick("swap")}
+                className="flex flex-col items-center justify-center p-3 h-16 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              >
+                <ArrowUpDown className="h-4 w-4 text-purple-500 mb-1" />
+                <span className="text-xs">Swap</span>
+              </Button>
+            </div>
           </div>
 
           <DropdownMenuSeparator />
 
-          {/* Member Access Links */}
+          {/* Member Access Links - Compact Grid */}
           {isVerified && hasMembership && (
             <>
-              <DropdownMenuSeparator />
               <div className="px-2 py-2 w-full">
                 <p className="text-xs text-muted-foreground mb-2">
                   Member Access
                 </p>
                 {isLinksLoading ? (
-                  <div className="space-y-2">
-                    <Skeleton className="h-10 w-full" />
-                    <Skeleton className="h-10 w-full" />
-                    <Skeleton className="h-10 w-full" />
-                    <Skeleton className="h-10 w-full" />
+                  <div className="grid grid-cols-2 gap-2">
+                    <Skeleton className="h-12 w-full" />
+                    <Skeleton className="h-12 w-full" />
+                    <Skeleton className="h-12 w-full" />
+                    <Skeleton className="h-12 w-full" />
                   </div>
                 ) : (
-                  <>
+                  <div className="grid grid-cols-2 gap-2">
                     <Link href="/upload" passHref legacyBehavior>
-                      <DropdownMenuItem
-                        className="w-full flex items-center cursor-pointer hover:bg-gray-100 
-                      dark:hover:bg-gray-800 transition-colors p-3 md:p-2"
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex flex-col items-center justify-center p-2 h-12 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                       >
-                        <CloudUpload className="mr-2 h-4 w-4" /> Upload
-                      </DropdownMenuItem>
+                        <CloudUpload className="h-3 w-3 mb-1" />
+                        <span className="text-xs">Upload</span>
+                      </Button>
                     </Link>
                     <Link href="/live" passHref legacyBehavior>
-                      <DropdownMenuItem
-                        className="w-full flex items-center cursor-pointer hover:bg-gray-100 
-                      dark:hover:bg-gray-800 transition-colors p-3 md:p-2"
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex flex-col items-center justify-center p-2 h-12 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                       >
-                        <RadioTower className="mr-2 h-4 w-4" /> Live
-                      </DropdownMenuItem>
+                        <RadioTower className="h-3 w-3 mb-1" />
+                        <span className="text-xs">Live</span>
+                      </Button>
                     </Link>
                     <Link href="/clips" passHref legacyBehavior>
-                      <DropdownMenuItem
-                        className="w-full flex items-center cursor-pointer hover:bg-gray-100 
-                      dark:hover:bg-gray-800 transition-colors p-3 md:p-2"
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex flex-col items-center justify-center p-2 h-12 hover:bg-gray-50 
+                          dark:hover:bg-gray-800 transition-colors relative"
                       >
-                        <Bot className="mr-2 h-4 w-4" /> Daydream
-                        <span className="ml-2 px-2 py-0.5 rounded bg-muted-foreground/10 text-xs text-muted-foreground">
+                        <Bot className="h-3 w-3 mb-1" />
+                        <span className="text-xs">Daydream</span>
+                        <span className="absolute -top-1 -right-1 px-1 py-0.5 rounded bg-blue-500 text-white text-[8px]">
                           Beta
                         </span>
-                      </DropdownMenuItem>
+                      </Button>
                     </Link>
                     <Link href="/profile" passHref legacyBehavior>
-                      <DropdownMenuItem
-                        className="w-full flex items-center cursor-pointer hover:bg-gray-100 
-                      dark:hover:bg-gray-800 transition-colors p-3 md:p-2"
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="flex flex-col items-center justify-center p-2 h-12 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                       >
-                        <ShieldUser className="mr-2 h-4 w-4" /> Profile
-                      </DropdownMenuItem>
+                        <ShieldUser className="h-3 w-3 mb-1" />
+                        <span className="text-xs">Profile</span>
+                      </Button>
                     </Link>
-                    {/* Create Proposal Link */}
-                    <Link href="/vote/create" passHref legacyBehavior>
-                      <DropdownMenuItem
-                        className="w-full flex items-center cursor-pointer hover:bg-green-50 \
-                          dark:hover:bg-green-900 transition-colors p-3 md:p-2 text-green-600 \
-                          dark:text-green-400 font-semibold border-t border-gray-200 \
-                          dark:border-gray-700 mt-2"
-                      >
-                        <Plus className="mr-2 h-4 w-4 text-green-500" /> Start A
-                        Vote
-                      </DropdownMenuItem>
-                    </Link>
-                  </>
+                  </div>
                 )}
+
+                {/* Create Proposal - Full width important action */}
+                <Link href="/vote/create" passHref legacyBehavior>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="w-full mt-2 flex items-center justify-center p-2 h-10 hover:bg-green-50 
+                      dark:hover:bg-green-900 transition-colors text-green-600 dark:text-green-400 
+                      font-medium border-green-200 dark:border-green-800"
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    <span className="text-sm">Start A Vote</span>
+                  </Button>
+                </Link>
               </div>
+              <DropdownMenuSeparator />
             </>
           )}
 
-          {/* Session Keys Section */}
+          {/* Session Keys Section - Compact */}
           {user?.type !== "eoa" && (
             <>
-              <DropdownMenuSeparator />
-              <div className="px-2 py-2 w-full">
-                <p className="text-xs text-gray-500 mb-2">Advanced Settings</p>
+              <div className="px-2 py-1 w-full">
                 <DropdownMenuItem
                   onClick={() => handleActionClick("session-keys")}
-                  className="w-full flex items-center cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors p-3 md:p-2"
+                  className="w-full flex items-center cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors p-2 rounded"
                 >
-                  <Key className="mr-2 h-4 w-4 text-yellow-500" /> Session Keys
+                  <Key className="mr-2 h-4 w-4 text-yellow-500" />
+                  <span className="text-sm">Session Keys</span>
+                  <ArrowRight className="ml-auto h-3 w-3" />
                 </DropdownMenuItem>
               </div>
+              <DropdownMenuSeparator />
             </>
           )}
 
           {/* Logout */}
-          <DropdownMenuSeparator />
-          <div className="px-2 py-2 w-full">
+          <div className="px-2 py-1 w-full">
             <DropdownMenuItem
               onClick={() => logout()}
-              className="w-full flex items-center cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors p-3 md:p-2 text-red-500"
+              className="w-full flex items-center cursor-pointer hover:bg-red-50 dark:hover:bg-red-900 transition-colors p-2 text-red-500 rounded"
             >
-              <LogOut className="mr-2 h-4 w-4" /> Logout
+              <LogOut className="mr-2 h-4 w-4" />
+              <span className="text-sm">Logout</span>
             </DropdownMenuItem>
           </div>
         </DropdownMenuContent>
