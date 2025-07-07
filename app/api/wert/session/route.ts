@@ -3,7 +3,7 @@ import { signWertSession, WertSessionPayload } from "@/lib/sdk/wert/sign";
 
 export async function POST(req: NextRequest) {
   try {
-    const { address, email } = await req.json();
+    const { address, email, extra } = await req.json();
     if (!address) {
       return NextResponse.json({ error: "Missing address" }, { status: 400 });
     }
@@ -11,6 +11,7 @@ export async function POST(req: NextRequest) {
       partner_id: process.env.WERT_PARTNER_ID || "",
       address,
       email,
+      ...(extra ? { extra } : {}),
       // Add any other required fields here
     };
     if (!payload.partner_id) {
