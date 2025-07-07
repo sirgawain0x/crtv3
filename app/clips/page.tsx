@@ -10,7 +10,7 @@ export default function ClipsPage() {
       <MembershipGuard>
         <div className="container mx-auto py-8">
           <h1 className="text-3xl font-bold mb-6">
-            Daydream
+            Daydream AI
             <span className="ml-2 text-xs bg-primary/10 text-primary px-2 py-1 rounded-full align-middle">
               Beta
             </span>
