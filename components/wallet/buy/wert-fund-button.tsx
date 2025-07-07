@@ -1,20 +1,8 @@
-import { useState } from "react";
-import { useWertWidget } from "@wert-io/module-react-component";
-import type {
-  GeneralOptions,
-  ReactiveOptions,
-} from "@wert-io/module-react-component";
-import {
-  useSigner,
-  useBundlerClient,
-  useSmartAccountClient,
-  useUser,
-  useSignerStatus,
-  useAuthenticate,
-} from "@account-kit/react";
-import { AlchemyWebSigner } from "@account-kit/signer";
-import { Button } from "@/components/ui/button";
+import { useRef, useState } from "react";
+import WertWidget from "@wert-io/widget-initializer";
 import { v4 as uuidv4 } from "uuid";
+import { Button } from "@/components/ui/button";
+import { useUser, useSmartAccountClient } from "@account-kit/react";
 
 /*
   In this example we initialize a simple crypto purchase.
@@ -23,65 +11,73 @@ import { v4 as uuidv4 } from "uuid";
 */
 
 function WertFundButton() {
-  const signer: AlchemyWebSigner | null = useSigner();
-  const bundlerClient = useBundlerClient();
+  const wertWidgetRef = useRef<any>(null);
   const user = useUser();
   const { address } = useSmartAccountClient({});
-  const [reactiveOptions] = useState<ReactiveOptions>({
-    theme: "dark",
-    listeners: {
-      loaded: () => console.log("loaded"),
-    },
-  });
-  const { open: openWertWidget, isWidgetOpen } = useWertWidget(reactiveOptions);
-  const signerStatus = useSignerStatus();
-  const { authenticateAsync, isPending: isAuthPending } = useAuthenticate();
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   async function handleDeposit() {
     setError(null);
-    if (!address) return;
-
-    // Prepare wallets array for ETH and USDC on Base
-    const wallets = [
-      {
-        name: "ETH",
-        network: "base",
-        address,
-      },
-      {
-        name: "USDC",
-        network: "base",
-        address,
-      },
-    ];
-
+    setLoading(true);
+    if (!address) {
+      setError("No wallet address found");
+      setLoading(false);
+      return;
+    }
     try {
-      const res = await fetch("/api/wert/session", {
+      // For demo, use a default amount (e.g., 10 USD)
+      const amount = 10;
+      const res = await fetch("/api/wert/hpp-session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          address,
+          walletAddress: address,
+          amount,
           email: user?.email,
-          extra: { wallets },
         }),
       });
       const data = await res.json();
       if (!res.ok) {
         setError(data.error || "Failed to create Wert session");
+        setLoading(false);
         return;
       }
-      openWertWidget({ options: data.session });
-      console.log(isWidgetOpen);
+      const partnerId = process.env.NEXT_PUBLIC_WERT_PARTNER_ID;
+      if (!partnerId) {
+        setError("WERT partner ID is not set in environment");
+        setLoading(false);
+        return;
+      }
+      const options = {
+        partner_id: partnerId,
+        session_id: data.sessionId,
+        origin: "https://widget.wert.io",
+        click_id: uuidv4(),
+        theme: "dark" as const,
+        network: "base",
+        commodity: "USDC",
+        listeners: {
+          loaded: () => {},
+          close: () => {},
+          "payment-status": (data: any) => {},
+        },
+      };
+      if (!wertWidgetRef.current) {
+        wertWidgetRef.current = new WertWidget(options);
+      }
+      wertWidgetRef.current.open();
     } catch (err) {
-      setError("Failed to connect to Wert backend");
+      setError("Failed to start Wert session. Please try again.");
+    } finally {
+      setLoading(false);
     }
   }
 
   return (
     <div className="flex flex-col gap-2">
-      <Button onClick={handleDeposit} disabled={isAuthPending}>
-        Deposit Funds
+      <Button onClick={handleDeposit} disabled={loading}>
+        {loading ? "Loading..." : "Deposit Funds"}
       </Button>
       {error && <span className="text-red-500 text-sm">{error}</span>}
     </div>

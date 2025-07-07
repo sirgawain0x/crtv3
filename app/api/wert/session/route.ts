@@ -23,8 +23,17 @@ export async function POST(req: NextRequest) {
     const session = signWertSession(payload);
     return NextResponse.json({ session });
   } catch (err) {
+    // Log the error for debugging
+    console.error("Wert session error:", err);
+    // In development, return the error message for easier debugging
+    const isDev = process.env.NODE_ENV !== "production";
+    const errorMsg = err instanceof Error ? err.message : String(err);
     return NextResponse.json(
-      { error: "Failed to create Wert session" },
+      {
+        error: isDev
+          ? `Failed to create Wert session: ${errorMsg}`
+          : "Failed to create Wert session",
+      },
       { status: 500 }
     );
   }
