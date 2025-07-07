@@ -1,6 +1,6 @@
-# CRTV4 - Decentralized Video Platform
+# CRTV v4 - Decentralized Video Platform
 
-CRTV4 is a modern, decentralized video platform built with Next.js that combines Web3 technologies to provide a secure, permissionless, and feature-rich experience for creators and viewers.
+CRTV v4 is a modern, decentralized video platform built with Next.js that combines Web3 technologies to provide a secure, permissionless, and feature-rich experience for creators and viewers.
 
 ![Creative Banner](public/images/creative-banner.png)
 
