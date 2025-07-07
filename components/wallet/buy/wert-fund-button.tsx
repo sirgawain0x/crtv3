@@ -1,3 +1,5 @@
+"use client";
+
 import { useRef, useState } from "react";
 import WertWidget from "@wert-io/widget-initializer";
 import { v4 as uuidv4 } from "uuid";
@@ -43,7 +45,8 @@ function WertFundButton() {
         setLoading(false);
         return;
       }
-      const partnerId = process.env.WERT_PARTNER_ID;
+      const partnerId = process.env.NEXT_PUBLIC_WERT_PARTNER_ID;
+      console.log("DEBUG: NEXT_PUBLIC_WERT_PARTNER_ID =", partnerId);
       if (!partnerId) {
         setError("WERT partner ID is not set in environment");
         setLoading(false);
