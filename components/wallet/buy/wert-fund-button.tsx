@@ -43,7 +43,7 @@ function WertFundButton() {
         setLoading(false);
         return;
       }
-      const partnerId = process.env.NEXT_PUBLIC_WERT_PARTNER_ID;
+      const partnerId = process.env.WERT_PARTNER_ID;
       if (!partnerId) {
         setError("WERT partner ID is not set in environment");
         setLoading(false);
@@ -57,6 +57,16 @@ function WertFundButton() {
         theme: "dark" as const,
         network: "base",
         commodity: "USDC",
+        commodities: JSON.stringify([
+          {
+            commodity: "USDC",
+            network: "base",
+          },
+          {
+            commodity: "ETH",
+            network: "base",
+          },
+        ]),
         listeners: {
           loaded: () => {},
           close: () => {},
