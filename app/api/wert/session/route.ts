@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing address" }, { status: 400 });
     }
     const payload: WertSessionPayload = {
-      partner_id: process.env.WERT_PARTNER_ID || "",
+      partner_id: process.env.NEXT_PUBLIC_WERT_PARTNER_ID || "",
       address,
       email,
       ...(extra ? { extra } : {}),
