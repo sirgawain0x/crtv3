@@ -42,11 +42,29 @@ function WertFundButton() {
     setError(null);
     if (!address) return;
 
+    // Prepare wallets array for ETH and USDC on Base
+    const wallets = [
+      {
+        name: "ETH",
+        network: "base",
+        address,
+      },
+      {
+        name: "USDC",
+        network: "base",
+        address,
+      },
+    ];
+
     try {
       const res = await fetch("/api/wert/session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ address, email: user?.email }),
+        body: JSON.stringify({
+          address,
+          email: user?.email,
+          extra: { wallets },
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
