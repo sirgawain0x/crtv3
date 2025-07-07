@@ -40,64 +40,24 @@ function WertFundButton() {
 
   async function handleDeposit() {
     setError(null);
-    if (!signer || !address) return;
+    if (!address) return;
 
-    // Check authentication status
-    if (!signerStatus.isConnected) {
-      try {
-        await authenticateAsync({
-          type: "oauth",
-          authProviderId: "email",
-          isCustomProvider: true,
-          mode: "popup",
-        });
-      } catch (err) {
-        setError("Authentication failed. Please try again.");
+    try {
+      const res = await fetch("/api/wert/session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ address, email: user?.email }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Failed to create Wert session");
         return;
       }
-      // Optionally, re-check isConnected here if needed
-      if (!signerStatus.isConnected) {
-        setError("Authentication failed. Please try again.");
-        return;
-      }
+      openWertWidget({ options: data.session });
+      console.log(isWidgetOpen);
+    } catch (err) {
+      setError("Failed to connect to Wert backend");
     }
-
-    const chainId = 8453;
-    const nonce = await bundlerClient.getTransactionCount({ address });
-
-    const signed = await signer.signAuthorization({
-      address,
-      chainId,
-      nonce,
-    });
-
-    // Concatenate r, s, v to form the signature string
-    // v is a bigint, so convert to hex and pad if needed
-    const vHex = Number(signed.v).toString(16).padStart(2, "0");
-    const signature = `${signed.r}${signed.s}${vHex}`;
-
-    const options: GeneralOptions = {
-      partner_id: "01HSD48HCYJH2SNT65S5A0JYPP",
-      address,
-      network: "base",
-      commodity: "usdc",
-      commodities: JSON.stringify([
-        {
-          commodity: "USDC",
-          network: "base",
-        },
-        {
-          commodity: "ETH",
-          network: "base",
-        },
-      ]),
-      click_id: uuidv4(),
-      email: user?.email,
-      origin: "https://widget.wert.io",
-      signature,
-    };
-    openWertWidget({ options });
-    console.log(isWidgetOpen);
   }
 
   return (
