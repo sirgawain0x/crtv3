@@ -206,6 +206,7 @@ export function AccountDropdown() {
   const [copySuccess, setCopySuccess] = useState(false);
   const [isArrowUp, setIsArrowUp] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState<boolean>(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
   const [dialogAction, setDialogAction] = useState<
     "buy" | "send" | "swap" | "session-keys"
   >("buy");
@@ -324,6 +325,8 @@ export function AccountDropdown() {
         await navigator.clipboard.writeText(addressToCopy);
         setCopySuccess(true);
         setTimeout(() => setCopySuccess(false), 2000);
+        // Optionally close dropdown after copying
+        // setIsDropdownOpen(false);
       } catch {}
     }
   };
@@ -333,6 +336,7 @@ export function AccountDropdown() {
   ) => {
     setDialogAction(action);
     setIsDialogOpen(true);
+    setIsDropdownOpen(false); // Close dropdown when action is clicked
   };
 
   const handleChainSwitch = async (newChain: any) => {
@@ -842,7 +846,7 @@ export function AccountDropdown() {
       </TooltipProvider>
 
       {/* Desktop Dropdown */}
-      <DropdownMenu>
+      <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
         <DropdownMenuTrigger asChild>
           <Button
             variant="outline"
@@ -962,6 +966,7 @@ export function AccountDropdown() {
                         variant="outline"
                         size="sm"
                         className="flex flex-col items-center justify-center p-2 h-12 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                        onClick={() => setIsDropdownOpen(false)}
                       >
                         <CloudUpload className="h-3 w-3 mb-1" />
                         <span className="text-xs">Upload</span>
@@ -972,6 +977,7 @@ export function AccountDropdown() {
                         variant="outline"
                         size="sm"
                         className="flex flex-col items-center justify-center p-2 h-12 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                        onClick={() => setIsDropdownOpen(false)}
                       >
                         <RadioTower className="h-3 w-3 mb-1" />
                         <span className="text-xs">Live</span>
@@ -983,6 +989,7 @@ export function AccountDropdown() {
                         size="sm"
                         className="flex flex-col items-center justify-center p-2 h-12 hover:bg-gray-50 
                           dark:hover:bg-gray-800 transition-colors relative"
+                        onClick={() => setIsDropdownOpen(false)}
                       >
                         <Bot className="h-3 w-3 mb-1" />
                         <span className="text-xs">Daydream</span>
@@ -996,6 +1003,7 @@ export function AccountDropdown() {
                         variant="outline"
                         size="sm"
                         className="flex flex-col items-center justify-center p-2 h-12 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                        onClick={() => setIsDropdownOpen(false)}
                       >
                         <ShieldUser className="h-3 w-3 mb-1" />
                         <span className="text-xs">Profile</span>
@@ -1012,6 +1020,7 @@ export function AccountDropdown() {
                     className="w-full mt-2 flex items-center justify-center p-2 h-10 hover:bg-green-50 
                       dark:hover:bg-green-900 transition-colors text-green-600 dark:text-green-400 
                       font-medium border-green-200 dark:border-green-800"
+                    onClick={() => setIsDropdownOpen(false)}
                   >
                     <Plus className="mr-2 h-4 w-4" />
                     <span className="text-sm">Start A Vote</span>
@@ -1042,7 +1051,10 @@ export function AccountDropdown() {
           {/* Logout */}
           <div className="px-2 py-1 w-full">
             <DropdownMenuItem
-              onClick={() => logout()}
+              onClick={() => {
+                logout();
+                setIsDropdownOpen(false);
+              }}
               className="w-full flex items-center cursor-pointer hover:bg-red-50 dark:hover:bg-red-900 transition-colors p-2 text-red-500 rounded"
             >
               <LogOut className="mr-2 h-4 w-4" />
