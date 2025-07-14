@@ -90,7 +90,7 @@ export function MembershipSection({ className }: MembershipSectionProps) {
         <Button
           className="w-full bg-black hover:bg-gray-900 text-white"
           onClick={() => {
-            window.open("https://memberships.creativeplatform.xyz", "_blank");
+            window.open("https://join.creativeplatform.xyz", "_blank");
           }}
         >
           Get Membership
