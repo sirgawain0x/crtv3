@@ -39,6 +39,8 @@ import {
 import { getDetailPlaybackSource } from "@/lib/hooks/livepeer/useDetailPlaybackSources";
 import { generateAccessKey, WebhookContext } from "@/lib/access-key";
 import { Skeleton } from "../ui/skeleton";
+import { Badge } from "../ui/badge";
+import { getVideoAssetByPlaybackId } from "@/services/video-assets";
 
 type VideoDetailsProps = {
   asset: Asset;
@@ -50,6 +52,7 @@ export default function VideoDetails({ asset }: VideoDetailsProps) {
     null
   );
   const [conditionalProps, setConditionalProps] = useState<any>({});
+  const [dbStatus, setDbStatus] = useState<"draft" | "published" | "minted" | "archived" | null>(null);
 
   const user = useUser();
   const account = userToAccount(user);
@@ -70,8 +73,16 @@ export default function VideoDetails({ asset }: VideoDetailsProps) {
         setAssetMetadata(null);
       }
     };
+    const fetchDbStatus = async () => {
+      try {
+        if (!asset?.playbackId) return;
+        const row = await getVideoAssetByPlaybackId(asset.playbackId);
+        if (row?.status) setDbStatus(row.status);
+      } catch {}
+    };
     fetchPlaybackSources();
     fetchAssetMetadata();
+    fetchDbStatus();
     const conProps: Record<string, unknown> = {
       ...(asset.playbackPolicy && {
         accessKey: generateAccessKey(
@@ -332,6 +343,12 @@ export default function VideoDetails({ asset }: VideoDetailsProps) {
       <div className="mx-auto w-full max-w-screen-2xl px-4 py-8">
         <div className="mx-auto w-full max-w-[1200px] space-y-6">
           <h1 className="text-2xl font-bold">{asset?.name}</h1>
+          <div className="flex items-center gap-2">
+            {asset?.status?.phase && (
+              <Badge>{asset.status.phase}</Badge>
+            )}
+            {dbStatus && <Badge variant="secondary">{dbStatus}</Badge>}
+          </div>
           {/* Render other asset details */}
           {playbackSources ? (
             <>

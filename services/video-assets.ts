@@ -30,6 +30,13 @@ export async function getVideoAssetById(id: number) {
   return result[0];
 }
 
+export async function getVideoAssetByPlaybackId(playbackId: string) {
+  const result = await sql`
+    SELECT id, status FROM video_assets WHERE playback_id = ${playbackId} LIMIT 1
+  `;
+  return result[0];
+}
+
 export async function updateVideoAssetMintingStatus(
   id: number,
   mintingData: {
@@ -67,7 +74,7 @@ export async function updateVideoAsset(
   const result = await sql`
     UPDATE video_assets
     SET 
-      thumbnailUri = ${data.thumbnailUri},
+      thumbnail_url = ${data.thumbnailUri},
       status = ${data.status},
       max_supply = ${data.max_supply},
       price = ${data.price},
