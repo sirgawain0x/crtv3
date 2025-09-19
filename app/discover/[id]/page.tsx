@@ -1,6 +1,7 @@
 import { Asset } from "livepeer/models/components";
 import VideoDetails from "@/components/Videos/VideoDetails";
 import { fetchAssetId } from "@/app/api/livepeer/actions";
+import { getVideoAssetByAssetId } from "@/services/video-assets";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -22,7 +23,16 @@ type VideoDetailsPageProps = {
 
 const fetchAssetData = async (id: string): Promise<Asset | null> => {
   try {
-    const response = await fetchAssetId(id);
+    // First, get the video asset from NeonDB using the asset_id
+    const videoAsset = await getVideoAssetByAssetId(id);
+    
+    if (!videoAsset) {
+      console.error("Video asset not found in database");
+      return null;
+    }
+
+    // Then, fetch the Livepeer asset using the asset_id from the database
+    const response = await fetchAssetId(videoAsset.asset_id);
 
     if (response?.asset) {
       return response.asset;
@@ -93,24 +103,38 @@ export async function generateMetadata({
 }: {
   params: { id: string };
 }): Promise<Metadata> {
-  const asset = await fetchAssetId(params.id);
-  if (!asset?.asset) return {};
+  try {
+    // First, get the video asset from NeonDB using the asset_id
+    const videoAsset = await getVideoAssetByAssetId(params.id);
+    
+    if (!videoAsset) {
+      return { title: "Video Not Found" };
+    }
 
-  return {
-    title: asset.asset.name ?? "Watch Video",
-    openGraph: {
-      title: asset.asset.name,
-      images: [(asset.asset as any).thumbnailUri || "/default-thumbnail.webp"],
-      videos: asset.asset.playbackUrl
-        ? [
-            {
-              url: asset.asset.playbackUrl,
-              type: "video/mp4",
-              width: 1280,
-              height: 720,
-            },
-          ]
-        : [],
-    },
-  };
+    // Then, fetch the Livepeer asset using the asset_id from the database
+    const asset = await fetchAssetId(videoAsset.asset_id);
+    
+    if (!asset?.asset) return { title: "Video Not Found" };
+
+    return {
+      title: asset.asset.name ?? "Watch Video",
+      openGraph: {
+        title: asset.asset.name,
+        images: [(asset.asset as any).thumbnailUri || "/default-thumbnail.webp"],
+        videos: asset.asset.playbackUrl
+          ? [
+              {
+                url: asset.asset.playbackUrl,
+                type: "video/mp4",
+                width: 1280,
+                height: 720,
+              },
+            ]
+          : [],
+      },
+    };
+  } catch (error) {
+    console.error("Error generating metadata:", error);
+    return { title: "Video Not Found" };
+  }
 }

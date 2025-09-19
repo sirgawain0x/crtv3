@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { Broadcast, createStreamViaProxy } from "@/components/Live/Broadcast";
-import { useOrbisContext } from "@/context/OrbisContext";
+import { useUser } from "@account-kit/react";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -27,7 +27,8 @@ import { LivestreamThumbnail } from "@/components/Live/LivestreamThumbnail";
 import { getThumbnailUrl } from "@/services/livepeer-thumbnails";
 
 export default function LivePage() {
-  const { isConnected } = useOrbisContext();
+  const user = useUser();
+  const isConnected = !!user?.address;
   const [multistreamTargets, setMultistreamTargets] = useState<
     MultistreamTarget[]
   >([]);

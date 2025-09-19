@@ -27,8 +27,6 @@ import * as Player from "@livepeer/react/player";
 import { Asset } from "livepeer/models/components";
 
 import { cn } from "@/lib/utils";
-import { useOrbisContext } from "@/context/OrbisContext";
-import { AssetMetadata } from "@/lib/sdk/orbisDB/models/AssetMetadata";
 import {
   SubtitlesDisplay,
   SubtitlesControl,
@@ -48,30 +46,16 @@ type VideoDetailsProps = {
 
 export default function VideoDetails({ asset }: VideoDetailsProps) {
   const [playbackSources, setPlaybackSources] = useState<Src[] | null>(null);
-  const [assetMetadata, setAssetMetadata] = useState<AssetMetadata | null>(
-    null
-  );
   const [conditionalProps, setConditionalProps] = useState<any>({});
   const [dbStatus, setDbStatus] = useState<"draft" | "published" | "minted" | "archived" | null>(null);
 
   const user = useUser();
   const account = userToAccount(user);
 
-  const { getAssetMetadata } = useOrbisContext();
-
   useEffect(() => {
     const fetchPlaybackSources = async () => {
       const sources = await getDetailPlaybackSource(asset?.playbackId || "");
       setPlaybackSources(sources);
-    };
-    const fetchAssetMetadata = async () => {
-      try {
-        const assetMetadata = await getAssetMetadata(asset?.id);
-        setAssetMetadata(assetMetadata);
-      } catch (error) {
-        console.error("Error fetching asset metadata", error);
-        setAssetMetadata(null);
-      }
     };
     const fetchDbStatus = async () => {
       try {
@@ -81,7 +65,6 @@ export default function VideoDetails({ asset }: VideoDetailsProps) {
       } catch {}
     };
     fetchPlaybackSources();
-    fetchAssetMetadata();
     fetchDbStatus();
     const conProps: Record<string, unknown> = {
       ...(asset.playbackPolicy && {
@@ -99,7 +82,7 @@ export default function VideoDetails({ asset }: VideoDetailsProps) {
         return prev;
       return conProps;
     });
-  }, [account, asset, getAssetMetadata]);
+  }, [account, asset]);
 
   const Seek = forwardRef<HTMLButtonElement, Player.SeekProps>(
     ({ children, ...props }, forwardedRef) => (
@@ -339,7 +322,7 @@ export default function VideoDetails({ asset }: VideoDetailsProps) {
 
   return (
     <SubtitlesProvider>
-      <SubtitlesInitializer assetMetadata={assetMetadata} />
+      <SubtitlesInitializer assetMetadata={null} />
       <div className="mx-auto w-full max-w-screen-2xl px-4 py-8">
         <div className="mx-auto w-full max-w-[1200px] space-y-6">
           <h1 className="text-2xl font-bold">{asset?.name}</h1>
@@ -355,14 +338,6 @@ export default function VideoDetails({ asset }: VideoDetailsProps) {
               <Player.Root src={playbackSources} {...conditionalProps}>
                 <Player.Container className="aspect-video w-full overflow-hidden rounded-lg bg-gray-800">
                   <Player.Video title={asset?.name} className="h-full w-full" />
-                  {assetMetadata?.subtitles && (
-                    <SubtitlesDisplay
-                      style={{
-                        color: "#EC407A",
-                        textShadow: "0 0 10px rgba(236, 64, 122, 0.5)",
-                      }}
-                    />
-                  )}
                   <Player.LoadingIndicator
                     className="relative h-full w-full bg-black/50 backdrop-blur data-[visible=true]:animate-in 
                   data-[visible=false]:animate-out data-[visible=false]:fade-out-0 data-[visible=true]:fade-in-0"
@@ -484,7 +459,6 @@ export default function VideoDetails({ asset }: VideoDetailsProps) {
                         </Player.Volume>
                       </div>
                       <div className="flex items-center justify-end gap-2.5 sm:flex-1 md:flex-[1.5]">
-                        {assetMetadata?.subtitles && <SubtitlesControl />}
                         <Player.FullscreenIndicator matcher={false} asChild>
                           <Settings className="h-6 w-6 flex-shrink-0 text-gray-300 transition" />
                         </Player.FullscreenIndicator>
@@ -566,7 +540,7 @@ export const PlayerLoading = ({
 function SubtitlesInitializer({
   assetMetadata,
 }: {
-  assetMetadata: AssetMetadata | null;
+  assetMetadata: any;
 }) {
   const { setSubtitles } = useSubtitles();
 

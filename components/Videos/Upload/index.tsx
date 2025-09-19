@@ -26,11 +26,13 @@ import {
 } from "@/services/video-assets";
 import { createVideoAsset } from "@/services/video-assets";
 import type { VideoAsset } from "@/lib/types/video-asset";
-// import { useUniversalAccount } from "@/lib/hooks/accountkit/useUniversalAccount";
+
 import { useSmartAccountClient } from "@account-kit/react";
+import { useUniversalAccount } from "@/lib/hooks/accountkit/useUniversalAccount";
 import { getLivepeerAsset } from "@/app/api/livepeer/assetUploadActions";
-import { useSendUserOperation } from "@account-kit/react";
-import { encodeFunctionData } from "viem";
+import { useSendUserOperation, useWalletClient } from "@account-kit/react";
+import { encodeFunctionData, createPublicClient, http } from "viem";
+import { base } from "@account-kit/infra";
 import { creativeTv1155Abi } from "@/lib/contracts/CreativeTV1155";
 
 const HookMultiStepForm = () => {
@@ -48,9 +50,9 @@ const HookMultiStepForm = () => {
   const [dbAssetId, setDbAssetId] = useState<number | null>(null);
   const [videoAsset, setVideoAsset] = useState<VideoAsset | null>(null);
 
-  // const { address, type, loading } = useUniversalAccount();
-  const { address } = useSmartAccountClient({});
+  const { address, type, loading } = useUniversalAccount();
   const { client } = useSmartAccountClient({});
+  const { data: walletClient } = useWalletClient();
   const {
     sendUserOperation: sendMintUo,
     isSendingUserOperation: isMinting,
@@ -187,7 +189,7 @@ const HookMultiStepForm = () => {
                   .NEXT_PUBLIC_ERC1155_ADDRESS_BASE || "") as `0x${string}`;
                 if (!erc1155Address) {
                   toast.error("ERC1155 address not configured");
-                } else if (!client?.account?.address) {
+                } else if (!address) {
                   toast.error("Wallet not connected");
                 } else {
                   const tokenId = BigInt(videoAsset?.id || 0);
@@ -197,19 +199,37 @@ const HookMultiStepForm = () => {
                   const dataCalldata = encodeFunctionData({
                     abi: creativeTv1155Abi,
                     functionName: "mint",
-                    args: [client.account.address as `0x${string}`, tokenId, amount, dataBytes],
+                    args: [address as `0x${string}`, tokenId, amount, dataBytes],
                   });
 
                   try {
-                    const result = await sendMintUo({
-                      uo: {
-                        target: erc1155Address,
-                        data: dataCalldata,
-                        value: BigInt(0),
-                      },
-                    });
+                    let result;
+                    if (type === "SCA" && client) {
+                      // Use smart account for minting
+                      result = await sendMintUo({
+                        uo: {
+                          target: erc1155Address,
+                          data: dataCalldata,
+                          value: BigInt(0),
+                        },
+                      });
+                    } else {
+                      // Use regular wallet (MetaMask) for minting
+                      if (!walletClient) {
+                        toast.error("Wallet client not available. Please ensure your wallet is connected.");
+                        return;
+                      }
 
-                    const txHash = result?.hash || "";
+                      result = await walletClient.writeContract({
+                        address: erc1155Address,
+                        abi: creativeTv1155Abi,
+                        functionName: "mint",
+                        args: [address as `0x${string}`, tokenId, amount, dataBytes],
+                        value: BigInt(0),
+                      });
+                    }
+
+                    const txHash = result?.hash || result || "";
                     if (txHash) {
                       await updateVideoAssetMintingStatus(videoAsset?.id as number, {
                         token_id: tokenId.toString(),
