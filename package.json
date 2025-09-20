@@ -64,6 +64,7 @@
     "alchemy-sdk": "^3.5.8",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "dotenv": "^17.2.2",
     "embla-carousel-react": "^8.6.0",
     "encoding": "^0.1.13",
     "ethereum-blockies-base64": "^1.0.2",
@@ -104,6 +105,7 @@
     "eslint-config-next": "^15.5.3",
     "postcss": "^8",
     "tailwindcss": "^3.4.4",
+    "tsx": "^4.20.5",
     "typescript": "^5.8.3"
   }
 }

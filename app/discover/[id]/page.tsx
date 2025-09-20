@@ -1,7 +1,7 @@
 import { Asset } from "livepeer/models/components";
 import VideoDetails from "@/components/Videos/VideoDetails";
 import { fetchAssetId } from "@/app/api/livepeer/actions";
-import { getVideoAssetById } from "@/services/video-assets";
+import { getVideoAssetByAssetId } from "@/services/video-assets";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -23,16 +23,24 @@ type VideoDetailsPageProps = {
 
 const fetchAssetData = async (id: string): Promise<Asset | null> => {
   try {
-    // First, get the video asset from NeonDB using the asset_id
-    const videoAsset = await getVideoAssetById(parseInt(id));
+    // Validate UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    
+    if (!uuidRegex.test(id)) {
+      console.error("Invalid video asset ID format:", id);
+      return null;
+    }
+
+    // First, get the video asset from NeonDB using the asset_id (UUID)
+    const videoAsset = await getVideoAssetByAssetId(id);
     
     if (!videoAsset) {
       console.error("Video asset not found in database");
       return null;
     }
 
-    // Then, fetch the Livepeer asset using the asset_id from the database
-    const response = await fetchAssetId(videoAsset.asset_id);
+    // Then, fetch the Livepeer asset using the same asset_id
+    const response = await fetchAssetId(id);
 
     if (response?.asset) {
       return response.asset;
@@ -106,15 +114,24 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   try {
     const { id } = await params;
-    // First, get the video asset from NeonDB using the asset_id
-    const videoAsset = await getVideoAssetById(parseInt(id));
+    
+    // Validate UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    
+    if (!uuidRegex.test(id)) {
+      console.error("Invalid video asset ID format for metadata:", id);
+      return { title: "Video Not Found" };
+    }
+    
+    // First, get the video asset from NeonDB using the asset_id (UUID)
+    const videoAsset = await getVideoAssetByAssetId(id);
     
     if (!videoAsset) {
       return { title: "Video Not Found" };
     }
 
-    // Then, fetch the Livepeer asset using the asset_id from the database
-    const asset = await fetchAssetId(videoAsset.asset_id);
+    // Then, fetch the Livepeer asset using the same asset_id
+    const asset = await fetchAssetId(id);
     
     if (!asset?.asset) return { title: "Video Not Found" };
 

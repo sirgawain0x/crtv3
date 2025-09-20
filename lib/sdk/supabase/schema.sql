@@ -48,10 +48,46 @@ CREATE TABLE IF NOT EXISTS metoken_transactions (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Video Assets table
+CREATE TABLE IF NOT EXISTS video_assets (
+  id SERIAL PRIMARY KEY,
+  title TEXT NOT NULL,
+  asset_id TEXT UNIQUE NOT NULL, -- Livepeer asset ID (UUID)
+  category TEXT NOT NULL DEFAULT '',
+  location TEXT NOT NULL DEFAULT '',
+  playback_id TEXT NOT NULL,
+  description TEXT,
+  creator_id TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'published', 'minted', 'archived')),
+  thumbnail_url TEXT NOT NULL DEFAULT '',
+  duration INTEGER, -- Duration in seconds
+  views_count INTEGER NOT NULL DEFAULT 0,
+  likes_count INTEGER NOT NULL DEFAULT 0,
+  is_minted BOOLEAN NOT NULL DEFAULT FALSE,
+  token_id TEXT,
+  contract_address TEXT,
+  minted_at TIMESTAMP WITH TIME ZONE,
+  mint_transaction_hash TEXT,
+  royalty_percentage NUMERIC,
+  price NUMERIC,
+  max_supply INTEGER,
+  current_supply INTEGER NOT NULL DEFAULT 0,
+  metadata_uri TEXT,
+  attributes JSONB,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Indexes for performance
 CREATE INDEX IF NOT EXISTS idx_metokens_owner ON metokens(owner_address);
 CREATE INDEX IF NOT EXISTS idx_metokens_address ON metokens(address);
 CREATE INDEX IF NOT EXISTS idx_metokens_tvl ON metokens(tvl DESC);
+
+-- Video assets indexes
+CREATE INDEX IF NOT EXISTS idx_video_assets_creator ON video_assets(creator_id);
+CREATE INDEX IF NOT EXISTS idx_video_assets_status ON video_assets(status);
+CREATE INDEX IF NOT EXISTS idx_video_assets_asset_id ON video_assets(asset_id);
+CREATE INDEX IF NOT EXISTS idx_video_assets_playback_id ON video_assets(playback_id);
 CREATE INDEX IF NOT EXISTS idx_metokens_created_at ON metokens(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_metoken_balances_user ON metoken_balances(user_address);
 CREATE INDEX IF NOT EXISTS idx_metoken_balances_metoken ON metoken_balances(metoken_id);
