@@ -20,21 +20,21 @@ export async function createVideoAsset(
     )
     RETURNING *
   `;
-  return result[0];
+  return (result as any)[0];
 }
 
 export async function getVideoAssetById(id: number) {
   const result = await sql`
     SELECT * FROM video_assets WHERE id = ${id}
   `;
-  return result[0];
+  return (result as any)[0];
 }
 
 export async function getVideoAssetByPlaybackId(playbackId: string) {
   const result = await sql`
     SELECT id, status FROM video_assets WHERE playback_id = ${playbackId} LIMIT 1
   `;
-  return result[0];
+  return (result as any)[0];
 }
 
 export async function updateVideoAssetMintingStatus(
@@ -57,7 +57,7 @@ export async function updateVideoAssetMintingStatus(
     WHERE id = ${id}
     RETURNING *
   `;
-  return result[0];
+  return (result as any)[0];
 }
 
 export async function updateVideoAsset(
@@ -83,7 +83,7 @@ export async function updateVideoAsset(
     WHERE id = ${id}
     RETURNING *
   `;
-  return result[0];
+  return (result as any)[0];
 }
 
 export interface MultistreamTarget {

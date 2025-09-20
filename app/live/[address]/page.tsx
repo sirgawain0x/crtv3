@@ -224,7 +224,7 @@ export default function LivePage() {
             <div className="mt-4 border-t border-white/20 pt-3 max-w-[576px] mx-auto">
               <p className="mb-2 text-sm font-semibold">Multistream Targets</p>
               <MultistreamTargetsForm
-                streamId={Array.isArray(streamId) ? streamId[0] : streamId}
+                streamId={Array.isArray(streamId) ? streamId[0] : streamId || ""}
                 onTargetAdded={handleTargetAdded}
               />
               {isLoadingTargets ? (

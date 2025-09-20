@@ -1,7 +1,7 @@
 import { Asset } from "livepeer/models/components";
 import VideoDetails from "@/components/Videos/VideoDetails";
 import { fetchAssetId } from "@/app/api/livepeer/actions";
-import { getVideoAssetByAssetId } from "@/services/video-assets";
+import { getVideoAssetById } from "@/services/video-assets";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -16,15 +16,15 @@ import VideoViewMetrics from "@/components/Videos/VideoViewMetrics";
 import { Metadata } from "next";
 
 type VideoDetailsPageProps = {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 };
 
 const fetchAssetData = async (id: string): Promise<Asset | null> => {
   try {
     // First, get the video asset from NeonDB using the asset_id
-    const videoAsset = await getVideoAssetByAssetId(id);
+    const videoAsset = await getVideoAssetById(parseInt(id));
     
     if (!videoAsset) {
       console.error("Video asset not found in database");
@@ -48,7 +48,8 @@ const fetchAssetData = async (id: string): Promise<Asset | null> => {
 export default async function VideoDetailsPage({
   params,
 }: VideoDetailsPageProps) {
-  const assetData: Asset | null = await fetchAssetData(params.id);
+  const { id } = await params;
+  const assetData: Asset | null = await fetchAssetData(id);
 
   if (!assetData) {
     return <div>Asset not found</div>;
@@ -101,11 +102,12 @@ export default async function VideoDetailsPage({
 export async function generateMetadata({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   try {
+    const { id } = await params;
     // First, get the video asset from NeonDB using the asset_id
-    const videoAsset = await getVideoAssetByAssetId(params.id);
+    const videoAsset = await getVideoAssetById(parseInt(id));
     
     if (!videoAsset) {
       return { title: "Video Not Found" };

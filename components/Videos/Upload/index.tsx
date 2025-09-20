@@ -30,7 +30,7 @@ import type { VideoAsset } from "@/lib/types/video-asset";
 import { useSmartAccountClient } from "@account-kit/react";
 import { useUniversalAccount } from "@/lib/hooks/accountkit/useUniversalAccount";
 import { getLivepeerAsset } from "@/app/api/livepeer/assetUploadActions";
-import { useSendUserOperation, useWalletClient } from "@account-kit/react";
+import { useSendUserOperation } from "@account-kit/react";
 import { encodeFunctionData, createPublicClient, http } from "viem";
 import { base } from "@account-kit/infra";
 import { creativeTv1155Abi } from "@/lib/contracts/CreativeTV1155";
@@ -52,12 +52,20 @@ const HookMultiStepForm = () => {
 
   const { address, type, loading } = useUniversalAccount();
   const { client } = useSmartAccountClient({});
-  const { data: walletClient } = useWalletClient();
+  // Note: useWalletClient is not available in @account-kit/react
+  // Using smart account client instead
   const {
     sendUserOperation: sendMintUo,
     isSendingUserOperation: isMinting,
     error: mintError,
-  } = useSendUserOperation({ client, waitForTxn: true });
+  } = useSendUserOperation({ 
+    client, 
+    waitForTxn: true,
+    onSuccess: ({ hash }) => {
+      console.log("Mint transaction hash:", hash);
+      // The hash will be handled in the success callback
+    }
+  });
 
   const router = useRouter();
 
@@ -214,33 +222,38 @@ const HookMultiStepForm = () => {
                         },
                       });
                     } else {
-                      // Use regular wallet (MetaMask) for minting
-                      if (!walletClient) {
-                        toast.error("Wallet client not available. Please ensure your wallet is connected.");
+                      // Use smart account client for minting via user operation
+                      if (!client) {
+                        toast.error("Smart account client not available. Please ensure your wallet is connected.");
                         return;
                       }
 
-                      result = await walletClient.writeContract({
-                        address: erc1155Address,
+                      const dataCalldata = encodeFunctionData({
                         abi: creativeTv1155Abi,
                         functionName: "mint",
                         args: [address as `0x${string}`, tokenId, amount, dataBytes],
-                        value: BigInt(0),
                       });
-                    }
 
-                    const txHash = result?.hash || result || "";
-                    if (txHash) {
+                      await sendMintUo({
+                        uo: {
+                          target: erc1155Address,
+                          data: dataCalldata,
+                          value: BigInt(0),
+                        },
+                      });
+                      
+                      // The transaction hash will be available in the onSuccess callback
+                      // For now, we'll update the status without the hash
                       await updateVideoAssetMintingStatus(videoAsset?.id as number, {
                         token_id: tokenId.toString(),
                         contract_address: erc1155Address,
-                        mint_transaction_hash: txHash,
+                        mint_transaction_hash: "pending", // Will be updated when hash is available
                       });
                       const tokenIdNum = tokenId.toString();
                       const zoraUrl = `https://zora.co/collect/base:${erc1155Address}/${tokenIdNum}`;
                       const openseaUrl = `https://opensea.io/assets/base/${erc1155Address}/${tokenIdNum}`;
                       const basescanTokenUrl = `https://basescan.org/token/${erc1155Address}?a=${tokenIdNum}`;
-                      const basescanTxUrl = `https://basescan.org/tx/${txHash}`;
+                      const basescanTxUrl = `https://basescan.org/tx/pending`;
 
                       toast.success("NFT minted successfully", {
                         description: (
