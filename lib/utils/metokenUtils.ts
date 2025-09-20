@@ -49,7 +49,6 @@ export async function extractMeTokenAddressFromTransaction(transactionHash: stri
         const result = await publicClient.call({
           to: transaction.to,
           data: transaction.input,
-          from: transaction.from,
           blockNumber: receipt.blockNumber
         });
 
