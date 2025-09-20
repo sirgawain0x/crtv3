@@ -91,11 +91,11 @@ export async function POST(request: NextRequest) {
       hub_id: protocolInfo.hubId,
       balance_pooled: Number(protocolInfo.balancePooled) / 1e18,
       balance_locked: Number(protocolInfo.balanceLocked) / 1e18,
-      start_time: protocolInfo.startTime > 0 ? new Date(protocolInfo.startTime * 1000).toISOString() : null,
-      end_time: protocolInfo.endTime > 0 ? new Date(protocolInfo.endTime * 1000).toISOString() : null,
-      end_cooldown: protocolInfo.endCooldown > 0 ? new Date(protocolInfo.endCooldown * 1000).toISOString() : null,
-      target_hub_id: protocolInfo.targetHubId > 0 ? protocolInfo.targetHubId : null,
-      migration_address: protocolInfo.migration !== '0x0000000000000000000000000000000000000000' ? protocolInfo.migration : null,
+      start_time: protocolInfo.startTime > 0 ? new Date(protocolInfo.startTime * 1000).toISOString() : undefined,
+      end_time: protocolInfo.endTime > 0 ? new Date(protocolInfo.endTime * 1000).toISOString() : undefined,
+      end_cooldown: protocolInfo.endCooldown > 0 ? new Date(protocolInfo.endCooldown * 1000).toISOString() : undefined,
+      target_hub_id: protocolInfo.targetHubId > 0 ? protocolInfo.targetHubId : undefined,
+      migration_address: protocolInfo.migration !== '0x0000000000000000000000000000000000000000' ? protocolInfo.migration : undefined,
     };
 
     // Create the MeToken in the database
