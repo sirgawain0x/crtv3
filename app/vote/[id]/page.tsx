@@ -29,18 +29,19 @@ const GET_PROPOSAL = gql`
 `;
 
 interface ProposalDetailsPageProps {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
 export default async function ProposalDetailsPage({
   params,
 }: ProposalDetailsPageProps) {
+  const { id } = await params;
   const client = makeServerClient();
   const { data } = await client.query<{
     proposal: Proposal & { author: string };
   }>({
     query: GET_PROPOSAL,
-    variables: { id: params.id },
+    variables: { id },
     fetchPolicy: "no-cache",
   });
 

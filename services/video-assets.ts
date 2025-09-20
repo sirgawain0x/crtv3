@@ -1,33 +1,105 @@
 "use server";
 // services/video-assets.ts
 
-import sql from "@/lib/sdk/neon/neonClient";
+import { createClient } from "@/lib/sdk/supabase/server";
 import type { VideoAsset } from "@/lib/types/video-asset";
 import { fullLivepeer } from "@/lib/sdk/livepeer/fullClient";
 
 export async function createVideoAsset(
   data: Omit<VideoAsset, "id" | "created_at" | "updated_at">
 ) {
-  const result = await sql`
-    INSERT INTO video_assets (
-      title, asset_id, category, location, playback_id, description,
-      creator_id, status, thumbnail_url, duration, price, max_supply
-    ) VALUES (
-      ${data.title}, ${data.asset_id}, ${data.category}, ${data.location},
-      ${data.playback_id}, ${data.description},
-      ${data.creator_id}, ${data.status}, ${data.thumbnailUri},
-      ${data.duration}, ${data.price}, ${data.max_supply}
-    )
-    RETURNING *
-  `;
-  return result[0];
+  const supabase = await createClient();
+  
+  const { data: result, error } = await supabase
+    .from('video_assets')
+    .insert({
+      title: data.title,
+      asset_id: data.asset_id,
+      category: data.category,
+      location: data.location,
+      playback_id: data.playback_id,
+      description: data.description,
+      creator_id: data.creator_id,
+      status: data.status,
+      thumbnail_url: data.thumbnailUri,
+      duration: data.duration,
+      price: data.price,
+      max_supply: data.max_supply,
+      views_count: data.views_count || 0,
+      likes_count: data.likes_count || 0,
+      is_minted: data.is_minted || false,
+      token_id: data.token_id,
+      contract_address: data.contract_address,
+      minted_at: data.minted_at,
+      mint_transaction_hash: data.mint_transaction_hash,
+      royalty_percentage: data.royalty_percentage,
+      current_supply: data.current_supply || 0,
+      metadata_uri: data.metadata_uri,
+      attributes: data.attributes,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to create video asset: ${error.message}`);
+  }
+
+  return result;
 }
 
 export async function getVideoAssetById(id: number) {
-  const result = await sql`
-    SELECT * FROM video_assets WHERE id = ${id}
-  `;
-  return result[0];
+  const supabase = await createClient();
+  
+  const { data: result, error } = await supabase
+    .from('video_assets')
+    .select('*')
+    .eq('id', id)
+    .maybeSingle(); // Use maybeSingle() instead of single()
+
+  if (error) {
+    throw new Error(`Failed to get video asset: ${error.message}`);
+  }
+
+  return result; // This will be null if no record found
+}
+
+export async function getVideoAssetByPlaybackId(playbackId: string) {
+  const supabase = await createClient();
+  
+  const { data: result, error } = await supabase
+    .from('video_assets')
+    .select('id, status')
+    .eq('playback_id', playbackId)
+    .maybeSingle(); // Use maybeSingle() instead of single()
+
+  if (error) {
+    throw new Error(`Failed to get video asset by playback ID: ${error.message}`);
+  }
+
+  return result; // This will be null if no record found, or the single record if found
+}
+
+export async function getVideoAssetByAssetId(assetId: string) {
+  // Validate UUID format
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  
+  if (!uuidRegex.test(assetId)) {
+    throw new Error(`Invalid asset ID: ${assetId}. Asset ID must be a valid UUID.`);
+  }
+  
+  const supabase = await createClient();
+  
+  const { data: result, error } = await supabase
+    .from('video_assets')
+    .select('*')
+    .eq('asset_id', assetId)
+    .maybeSingle(); // Use maybeSingle() instead of single()
+
+  if (error) {
+    throw new Error(`Failed to get video asset by asset ID: ${error.message}`);
+  }
+
+  return result; // This will be null if no record found
 }
 
 export async function updateVideoAssetMintingStatus(
@@ -38,19 +110,28 @@ export async function updateVideoAssetMintingStatus(
     mint_transaction_hash: string;
   }
 ) {
-  const result = await sql`
-    UPDATE video_assets
-    SET 
-      is_minted = true,
-      token_id = ${mintingData.token_id},
-      contract_address = ${mintingData.contract_address},
-      mint_transaction_hash = ${mintingData.mint_transaction_hash},
-      minted_at = CURRENT_TIMESTAMP,
-      status = 'minted'
-    WHERE id = ${id}
-    RETURNING *
-  `;
-  return result[0];
+  const supabase = await createClient();
+  
+  const { data: result, error } = await supabase
+    .from('video_assets')
+    .update({
+      is_minted: true,
+      token_id: mintingData.token_id,
+      contract_address: mintingData.contract_address,
+      mint_transaction_hash: mintingData.mint_transaction_hash,
+      minted_at: new Date().toISOString(),
+      status: 'minted',
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to update video asset minting status: ${error.message}`);
+  }
+
+  return result;
 }
 
 export async function updateVideoAsset(
@@ -64,19 +145,28 @@ export async function updateVideoAsset(
     metadata_uri?: string | null;
   }
 ) {
-  const result = await sql`
-    UPDATE video_assets
-    SET 
-      thumbnailUri = ${data.thumbnailUri},
-      status = ${data.status},
-      max_supply = ${data.max_supply},
-      price = ${data.price},
-      royalty_percentage = ${data.royalty_percentage},
-      metadata_uri = ${data.metadata_uri}
-    WHERE id = ${id}
-    RETURNING *
-  `;
-  return result[0];
+  const supabase = await createClient();
+  
+  const { data: result, error } = await supabase
+    .from('video_assets')
+    .update({
+      thumbnail_url: data.thumbnailUri,
+      status: data.status,
+      max_supply: data.max_supply,
+      price: data.price,
+      royalty_percentage: data.royalty_percentage,
+      metadata_uri: data.metadata_uri,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to update video asset: ${error.message}`);
+  }
+
+  return result;
 }
 
 export interface MultistreamTarget {
@@ -162,3 +252,4 @@ export async function deleteMultistreamTarget({
     return { success: false, error: "Failed to delete multistream target" };
   }
 }
+

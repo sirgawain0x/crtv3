@@ -23,6 +23,7 @@ import {
   MembershipContext,
 } from "@/components/auth/MembershipGuard";
 import type { MembershipDetails } from "@/lib/hooks/unlock/useMembershipVerification";
+import { MeTokensSection } from "./MeTokensSection";
 
 function useServerMembership(address?: string) {
   const [data, setData] = useState<any>(null);
@@ -62,7 +63,11 @@ function ProfilePageGuard({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-const ProfilePage: NextPage = () => {
+interface ProfilePageProps {
+  targetAddress?: string;
+}
+
+const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
   const membership = useContext(MembershipContext);
   const {
     isLoading: membershipLoading,
@@ -72,11 +77,14 @@ const ProfilePage: NextPage = () => {
     walletType,
   } = membership || {};
 
+  // Use targetAddress if provided, otherwise use the membership walletAddress
+  const displayAddress = targetAddress || walletAddress;
+
   const {
     data: memberships,
     loading,
     error: serverMembershipError,
-  } = useServerMembership(walletAddress);
+  } = useServerMembership(displayAddress);
 
   // Find the first valid membership
   const validMembership = (
@@ -94,10 +102,10 @@ const ProfilePage: NextPage = () => {
           <Tabs defaultValue="Membership" className="w-full">
             <TabsList className="flex h-10 items-center justify-start space-x-1 rounded-lg bg-muted p-1">
               <TabsTrigger
-                value="Membership"
+                value="MeTokens"
                 className="flex-shrink-0 rounded-t-lg px-4 py-2 text-sm font-medium"
               >
-                Membership
+                MeTokens
               </TabsTrigger>
               <TabsTrigger
                 value="Uploads"
@@ -114,38 +122,8 @@ const ProfilePage: NextPage = () => {
             </TabsList>
 
             <div className="mt-6">
-              <TabsContent value="Membership">
-                <Card>
-                  <CardHeader className="space-y-1">
-                    <CardTitle className="text-2xl">Membership</CardTitle>
-                    <CardDescription>
-                      Manage your membership status and details
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {membershipLoading && <div>Loading membership...</div>}
-                    {membershipError && (
-                      <div className="text-destructive">
-                        {membershipError.message}
-                      </div>
-                    )}
-                    {!membershipLoading &&
-                      !membershipError &&
-                      (memberships && memberships.length > 0 ? (
-                        <MemberCard
-                          member={{ address: walletAddress }}
-                          nft={validMembership?.lock}
-                          balance={"0"}
-                          points={0}
-                        />
-                      ) : (
-                        <div>No membership data</div>
-                      ))}
-                  </CardContent>
-                  <CardFooter className="flex flex-wrap gap-2">
-                    {/* Add membership actions here if needed */}
-                  </CardFooter>
-                </Card>
+              <TabsContent value="MeTokens">
+                <MeTokensSection walletAddress={displayAddress} />
               </TabsContent>
 
               <TabsContent value="Uploads">
@@ -158,17 +136,17 @@ const ProfilePage: NextPage = () => {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <Link
-                      href={`/profile/${walletAddress}/upload`}
+                      href={`/profile/${displayAddress}/upload`}
                       className={`inline-flex items-center rounded-md bg-primary px-4 py-2 
                       text-sm font-medium text-primary-foreground hover:bg-primary/90`}
                     >
                       Upload New Video
                     </Link>
                     <div className="mt-6">
-                      {walletAddress && (
+                      {displayAddress && (
                         <ListUploadedAssets
                           activeAccount={{
-                            address: walletAddress,
+                            address: displayAddress,
                             type: walletType ?? "eoa",
                           }}
                         />
