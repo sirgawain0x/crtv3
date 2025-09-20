@@ -26,9 +26,14 @@ import {
 } from "@/services/video-assets";
 import { createVideoAsset } from "@/services/video-assets";
 import type { VideoAsset } from "@/lib/types/video-asset";
-// import { useUniversalAccount } from "@/lib/hooks/accountkit/useUniversalAccount";
+
 import { useSmartAccountClient } from "@account-kit/react";
+import { useUniversalAccount } from "@/lib/hooks/accountkit/useUniversalAccount";
 import { getLivepeerAsset } from "@/app/api/livepeer/assetUploadActions";
+import { useSendUserOperation } from "@account-kit/react";
+import { encodeFunctionData, createPublicClient, http } from "viem";
+import { base } from "@account-kit/infra";
+import { creativeTv1155Abi } from "@/lib/contracts/CreativeTV1155";
 
 const HookMultiStepForm = () => {
   const [activeStep, setActiveStep] = useState(1);
@@ -45,8 +50,22 @@ const HookMultiStepForm = () => {
   const [dbAssetId, setDbAssetId] = useState<number | null>(null);
   const [videoAsset, setVideoAsset] = useState<VideoAsset | null>(null);
 
-  // const { address, type, loading } = useUniversalAccount();
-  const { address } = useSmartAccountClient({});
+  const { address, type, loading } = useUniversalAccount();
+  const { client } = useSmartAccountClient({});
+  // Note: useWalletClient is not available in @account-kit/react
+  // Using smart account client instead
+  const {
+    sendUserOperation: sendMintUo,
+    isSendingUserOperation: isMinting,
+    error: mintError,
+  } = useSendUserOperation({ 
+    client, 
+    waitForTxn: true,
+    onSuccess: ({ hash }) => {
+      console.log("Mint transaction hash:", hash);
+      // The hash will be handled in the success callback
+    }
+  });
 
   const router = useRouter();
 
@@ -161,16 +180,126 @@ const HookMultiStepForm = () => {
               // Fetch the latest Livepeer asset to get the most up-to-date metadata_uri
               const latestAsset = await getLivepeerAsset(livepeerAsset.id);
               // --- PUBLISH LOGIC ---
-              // This will set the video asset status to 'published' (or 'mintable' if NFT minting is enabled)
+              // Set status to 'published'. If minting occurs, it will later be set to 'minted'.
               await updateVideoAsset(videoAsset?.id as number, {
                 thumbnailUri: data.thumbnailUri,
-                status: data.nftConfig?.isMintable ? "mintable" : "published",
+                status: "published",
                 max_supply: data.nftConfig?.maxSupply || null,
                 price: data.nftConfig?.price || null,
                 royalty_percentage: data.nftConfig?.royaltyPercentage || null,
                 metadata_uri:
                   latestAsset?.storage?.ipfs?.nftMetadata?.url || null,
               });
+
+              // If minting is enabled, trigger on-chain mint on Base
+              if (data.nftConfig?.isMintable) {
+                const erc1155Address = (process.env
+                  .NEXT_PUBLIC_ERC1155_ADDRESS_BASE || "") as `0x${string}`;
+                if (!erc1155Address) {
+                  toast.error("ERC1155 address not configured");
+                } else if (!address) {
+                  toast.error("Wallet not connected");
+                } else {
+                  const tokenId = BigInt(videoAsset?.id || 0);
+                  const amount = BigInt(1);
+                  const dataBytes = "0x" as `0x${string}`;
+
+                  const dataCalldata = encodeFunctionData({
+                    abi: creativeTv1155Abi,
+                    functionName: "mint",
+                    args: [address as `0x${string}`, tokenId, amount, dataBytes],
+                  });
+
+                  try {
+                    let result;
+                    if (type === "SCA" && client) {
+                      // Use smart account for minting
+                      result = await sendMintUo({
+                        uo: {
+                          target: erc1155Address,
+                          data: dataCalldata,
+                          value: BigInt(0),
+                        },
+                      });
+                    } else {
+                      // Use smart account client for minting via user operation
+                      if (!client) {
+                        toast.error("Smart account client not available. Please ensure your wallet is connected.");
+                        return;
+                      }
+
+                      const dataCalldata = encodeFunctionData({
+                        abi: creativeTv1155Abi,
+                        functionName: "mint",
+                        args: [address as `0x${string}`, tokenId, amount, dataBytes],
+                      });
+
+                      await sendMintUo({
+                        uo: {
+                          target: erc1155Address,
+                          data: dataCalldata,
+                          value: BigInt(0),
+                        },
+                      });
+                      
+                      // The transaction hash will be available in the onSuccess callback
+                      // For now, we'll update the status without the hash
+                      await updateVideoAssetMintingStatus(videoAsset?.id as number, {
+                        token_id: tokenId.toString(),
+                        contract_address: erc1155Address,
+                        mint_transaction_hash: "pending", // Will be updated when hash is available
+                      });
+                      const tokenIdNum = tokenId.toString();
+                      const zoraUrl = `https://zora.co/collect/base:${erc1155Address}/${tokenIdNum}`;
+                      const openseaUrl = `https://opensea.io/assets/base/${erc1155Address}/${tokenIdNum}`;
+                      const basescanTokenUrl = `https://basescan.org/token/${erc1155Address}?a=${tokenIdNum}`;
+                      const basescanTxUrl = `https://basescan.org/tx/pending`;
+
+                      toast.success("NFT minted successfully", {
+                        description: (
+                          <div className="space-y-1">
+                            <a
+                              href={openseaUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="underline"
+                            >
+                              View on OpenSea
+                            </a>
+                            <span className="mx-2">•</span>
+                            <a
+                              href={basescanTokenUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="underline"
+                            >
+                              View token on BaseScan
+                            </a>
+                            <span className="mx-2">•</span>
+                            <a
+                              href={basescanTxUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="underline"
+                            >
+                              View mint tx
+                            </a>
+                          </div>
+                        ),
+                        action: {
+                          label: "List on Zora",
+                          onClick: () => window.open(zoraUrl, "_blank"),
+                        },
+                      });
+                    }
+                  } catch (e: any) {
+                    console.error("Mint failed", e);
+                    toast.error("Mint failed", {
+                      description: e?.message || "Could not mint NFT",
+                    });
+                  }
+                }
+              }
 
               // Award points for uploading a video
               // await stack.track("video_upload", {

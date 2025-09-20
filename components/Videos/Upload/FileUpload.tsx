@@ -289,7 +289,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
       await updateVideoAsset(dbAssetId, {
         metadata_uri: metadataUri,
         thumbnailUri: "", // update as needed
-        status: "ready",
+        status: "draft",
         max_supply: null,
         price: null,
         royalty_percentage: null,

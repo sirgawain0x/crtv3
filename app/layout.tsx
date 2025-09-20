@@ -43,7 +43,7 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   // Persist state across pages
-  const headersList = headers();
+  const headersList = await headers();
   const initialState = cookieToInitialState(
     config,
     headersList.get("cookie") ?? undefined

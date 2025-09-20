@@ -1,13 +1,13 @@
 import { ApolloClient, InMemoryCache, HttpLink } from "@apollo/client";
 
 export function makeServerClient() {
-  if (!process.env.NEXT_PUBLIC_SNAPSHOT_API_URL)
-    throw new Error("Snapshot URL is not defined");
+  const snapshotApiUrl =
+    process.env.NEXT_PUBLIC_SNAPSHOT_API_URL || "https://hub.snapshot.org";
 
   return new ApolloClient({
     ssrMode: true,
     link: new HttpLink({
-      uri: `${process.env.NEXT_PUBLIC_SNAPSHOT_API_URL}/graphql`,
+      uri: `${snapshotApiUrl}/graphql`,
       fetch,
     }),
     cache: new InMemoryCache(),

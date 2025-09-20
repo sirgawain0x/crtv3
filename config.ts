@@ -74,7 +74,7 @@ export const config = createConfig(
         factoryAddresses: modularAccountFactoryAddresses,
       },
       gasManagerConfig: {
-        policyId: process.env.NEXT_PUBLIC_GAS_POLICY_ID,
+        policyId: process.env.POLICY_ID,
         sponsorUserOperations: true,
       },
     },
