@@ -49,7 +49,6 @@ export async function extractMeTokenAddressFromTransaction(transactionHash: stri
         const result = await publicClient.call({
           to: transaction.to,
           data: transaction.input,
-          from: transaction.from,
           blockNumber: receipt.blockNumber
         });
 
@@ -163,7 +162,9 @@ export async function getMeTokenProtocolInfo(meTokenAddress: string): Promise<{
   try {
     // Diamond contract ABI for MeToken protocol info
     const DIAMOND_ABI = parseAbi([
-      'function getMeTokenInfo(address meToken) view returns (address owner, uint256 hubId, uint256 balancePooled, uint256 balanceLocked, uint256 startTime, uint256 endTime, uint256 endCooldown, uint256 targetHubId, address migration)'
+      'function getMeTokenInfo(address meToken) view returns (' +
+        'address owner, uint256 hubId, uint256 balancePooled, uint256 balanceLocked, ' +
+        'uint256 startTime, uint256 endTime, uint256 endCooldown, uint256 targetHubId, address migration)'
     ]);
 
     const DIAMOND_ADDRESS = '0xba5502db2aC2cBff189965e991C07109B14eB3f5'; // Base mainnet diamond
@@ -175,7 +176,17 @@ export async function getMeTokenProtocolInfo(meTokenAddress: string): Promise<{
       args: [meTokenAddress as `0x${string}`]
     });
 
-    const [owner, hubId, balancePooled, balanceLocked, startTime, endTime, endCooldown, targetHubId, migration] = result as [string, bigint, bigint, bigint, bigint, bigint, bigint, bigint, string];
+    const [
+      owner,
+      hubId,
+      balancePooled,
+      balanceLocked,
+      startTime,
+      endTime,
+      endCooldown,
+      targetHubId,
+      migration
+    ] = result as [string, bigint, bigint, bigint, bigint, bigint, bigint, bigint, string];
 
     return {
       hubId: Number(hubId),
