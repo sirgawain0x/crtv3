@@ -1,0 +1,10 @@
+{
+  "buildCommand": "yarn install --network-timeout 300000 && yarn build",
+  "installCommand": "yarn install --network-timeout 300000 --network-concurrency 1",
+  "framework": "nextjs",
+  "build": {
+    "env": {
+      "NODE_ENV": "production"
+    }
+  }
+}

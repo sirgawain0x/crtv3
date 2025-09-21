@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "knip": "knip"
+    "knip": "knip",
+    "postinstall": "yarn install --check-files || (echo 'Retrying install...' && yarn install --check-files)"
   },
   "dependencies": {
     "@aa-sdk/core": "^4.35.0",
