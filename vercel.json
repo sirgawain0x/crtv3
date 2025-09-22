@@ -1,6 +1,4 @@
 {
-  "buildCommand": "yarn install --network-timeout 300000 --retry 5 || (echo 'Yarn failed, trying npm...' && npm install && npm run build)",
-  "installCommand": "yarn install --network-timeout 300000 --network-concurrency 1 --retry 5 || npm install",
   "framework": "nextjs",
   "build": {
     "env": {
