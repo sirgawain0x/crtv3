@@ -3,6 +3,8 @@ import createPWA from "next-pwa";
 const withPWA = createPWA({
   dest: "public",
   disable: process.env.NODE_ENV === "development",
+  // Disable PWA for Vercel builds to avoid routes-manifest.json issues
+  disable: process.env.NODE_ENV === "development" || process.env.VERCEL === "1",
 });
 
 /** @type {import('next').NextConfig} */

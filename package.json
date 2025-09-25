@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "knip": "knip"
+    "knip": "knip",
+    "postinstall": "echo 'Postinstall completed successfully'"
   },
   "dependencies": {
     "@aa-sdk/core": "^4.35.0",
