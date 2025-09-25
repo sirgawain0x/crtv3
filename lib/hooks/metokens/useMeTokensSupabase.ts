@@ -3,6 +3,7 @@ import { useUser, useSendUserOperation, useSmartAccountClient } from '@account-k
 import { parseEther, formatEther, encodeFunctionData } from 'viem';
 import { meTokenSupabaseService, MeToken, MeTokenBalance } from '@/lib/sdk/supabase/metokens';
 import { CreateMeTokenData, UpdateMeTokenData } from '@/lib/sdk/supabase/client';
+import { getDaiTokenContract } from '@/lib/contracts/DAIToken';
 
 // MeTokens contract addresses on Base
 const METOKEN_FACTORY = '0xb31Ae2583d983faa7D8C8304e6A16E414e721A0B';
@@ -213,6 +214,37 @@ const DIAMOND_ABI = [
       }
     ],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "hubId",
+        "type": "uint256"
+      }
+    ],
+    "name": "getHubInfo",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "address",
+            "name": "vault",
+            "type": "address"
+          },
+          {
+            "internalType": "address",
+            "name": "asset",
+            "type": "address"
+          }
+        ],
+        "internalType": "struct HubInfo",
+        "name": "",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   }
 ] as const;
@@ -503,11 +535,15 @@ export function useMeTokensSupabase(targetAddress?: string) {
     }
   };
 
-  // Buy MeTokens
+  // Buy MeTokens with DAI approval handling
   const buyMeTokens = async (meTokenAddress: string, collateralAmount: string) => {
     if (!address || !user) throw new Error('No wallet connected');
     
     try {
+      // First, ensure DAI approval
+      await ensureDaiApproval(meTokenAddress, collateralAmount);
+      
+      // Then proceed with the mint transaction
       const result = await sendUserOperation({
         uo: {
           target: DIAMOND,
@@ -550,6 +586,62 @@ export function useMeTokensSupabase(targetAddress?: string) {
       }
     } catch (err) {
       throw new Error(err instanceof Error ? err.message : 'Failed to buy MeTokens');
+    }
+  };
+
+  // Ensure DAI approval for the meTokens vault
+  const ensureDaiApproval = async (meTokenAddress: string, collateralAmount: string) => {
+    if (!client || !address) throw new Error('Client or address not available');
+
+    try {
+      // Get the vault address from the meToken info
+      const meTokenInfo = await client.readContract({
+        address: DIAMOND,
+        abi: DIAMOND_ABI,
+        functionName: 'getMeTokenInfo',
+        args: [meTokenAddress as `0x${string}`],
+      });
+
+      const hubId = (meTokenInfo as any).hubId;
+      
+      // Get hub info to find the vault address
+      const hubInfo = await client.readContract({
+        address: DIAMOND,
+        abi: DIAMOND_ABI,
+        functionName: 'getHubInfo',
+        args: [hubId],
+      });
+
+      const vaultAddress = (hubInfo as any).vault;
+      const daiContract = getDaiTokenContract('base');
+      
+      // Check current allowance
+      const currentAllowance = await client.readContract({
+        address: daiContract.address as `0x${string}`,
+        abi: daiContract.abi,
+        functionName: 'allowance',
+        args: [address as `0x${string}`, vaultAddress as `0x${string}`],
+      });
+
+      const requiredAmount = parseEther(collateralAmount);
+      
+      // If allowance is insufficient, approve the vault to spend DAI
+      if (currentAllowance < requiredAmount) {
+        await sendUserOperation({
+          uo: {
+            target: daiContract.address as `0x${string}`,
+            data: encodeFunctionData({
+              abi: daiContract.abi,
+              functionName: 'approve',
+              args: [vaultAddress as `0x${string}`, BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff')], // Max approval
+            }),
+            value: BigInt(0),
+          },
+        });
+      }
+    } catch (err) {
+      console.error('Failed to ensure DAI approval:', err);
+      throw new Error('Failed to approve DAI spending');
     }
   };
 
