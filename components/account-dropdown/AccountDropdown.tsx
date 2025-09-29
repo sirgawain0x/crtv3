@@ -77,6 +77,7 @@ import {
 } from "@/components/ui/dialog";
 import WertFundButton from "@/components/wallet/buy/wert-fund-button";
 import { LoginButton } from "@/components/auth/LoginButton";
+import { AlchemySwapWidget } from "@/components/wallet/swap/AlchemySwapWidget";
 import useModularAccount from "@/lib/hooks/accountkit/useModularAccount";
 import { TokenBalance } from "@/components/wallet/balance/TokenBalance";
 import makeBlockie from "ethereum-blockies-base64";
@@ -595,46 +596,19 @@ export function AccountDropdown() {
         return (
           <div className="space-y-4">
             <p className="text-sm text-gray-500">
-              Swap between different cryptocurrencies.
+              Swap between different cryptocurrencies using Alchemy Smart Wallets.
             </p>
-            <div className="flex flex-col gap-4">
-              <div className="flex items-center gap-2">
-                <select className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600">
-                  <option>ETH</option>
-                  <option>USDC</option>
-                  <option>DAI</option>
-                </select>
-                <input
-                  type="number"
-                  placeholder="Amount"
-                  className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
-                />
-              </div>
-              <div className="flex justify-center">
-                <button
-                  onClick={() => setIsArrowUp(!isArrowUp)}
-                  className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                >
-                  {isArrowUp ? (
-                    <ArrowBigUp className="h-6 w-6" />
-                  ) : (
-                    <ArrowBigDown className="h-6 w-6" />
-                  )}
-                </button>
-              </div>
-              <div className="flex items-center gap-2">
-                <select className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600">
-                  <option>USDC</option>
-                  <option>ETH</option>
-                  <option>DAI</option>
-                </select>
-                <input
-                  type="number"
-                  placeholder="Amount"
-                  className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
-                />
-              </div>
-              <Button className="w-full">Swap</Button>
+            <div className="space-y-4">
+              <AlchemySwapWidget 
+                onSwapSuccess={() => {
+                  setIsDialogOpen(false);
+                  toast({
+                    title: "Swap Completed",
+                    description: "Your token swap was successful!",
+                  });
+                }}
+                className="border-0 shadow-none bg-transparent"
+              />
             </div>
           </div>
         );
@@ -1003,33 +977,37 @@ export function AccountDropdown() {
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-2">
-                    <Link href="/upload" passHref legacyBehavior>
+                    <Link href="/upload" className="w-full">
                       <Button
                         variant="outline"
                         size="sm"
-                        className="flex flex-col items-center justify-center p-2 h-12 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                        className={
+                          "w-full flex flex-col items-center justify-center p-2 h-12 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                        }
                         onClick={() => setIsDropdownOpen(false)}
                       >
                         <CloudUpload className="h-3 w-3 mb-1" />
                         <span className="text-xs">Upload</span>
                       </Button>
                     </Link>
-                    <Link href="/live" passHref legacyBehavior>
+                    <Link href="/live" className="w-full">
                       <Button
                         variant="outline"
                         size="sm"
-                        className="flex flex-col items-center justify-center p-2 h-12 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                        className={
+                          "w-full flex flex-col items-center justify-center p-2 h-12 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                        }
                         onClick={() => setIsDropdownOpen(false)}
                       >
                         <RadioTower className="h-3 w-3 mb-1" />
                         <span className="text-xs">Live</span>
                       </Button>
                     </Link>
-                    <Link href="/clips" passHref legacyBehavior>
+                    <Link href="/clips" className="w-full">
                       <Button
                         variant="outline"
                         size="sm"
-                        className="flex flex-col items-center justify-center p-2 h-12 hover:bg-gray-50 
+                        className="w-full flex flex-col items-center justify-center p-2 h-12 hover:bg-gray-50 
                           dark:hover:bg-gray-800 transition-colors relative"
                         onClick={() => setIsDropdownOpen(false)}
                       >
@@ -1040,11 +1018,13 @@ export function AccountDropdown() {
                         </span>
                       </Button>
                     </Link>
-                    <Link href="/profile" passHref legacyBehavior>
+                    <Link href="/profile" className="w-full">
                       <Button
                         variant="outline"
                         size="sm"
-                        className="flex flex-col items-center justify-center p-2 h-12 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                        className={
+                          "w-full flex flex-col items-center justify-center p-2 h-12 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                        }
                         onClick={() => setIsDropdownOpen(false)}
                       >
                         <ShieldUser className="h-3 w-3 mb-1" />
@@ -1055,7 +1035,7 @@ export function AccountDropdown() {
                 )}
 
                 {/* Create Proposal - Full width important action */}
-                <Link href="/vote/create" passHref legacyBehavior>
+                <Link href="/vote/create">
                   <Button
                     variant="outline"
                     size="sm"

@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -7,8 +7,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useMeTokensSupabase, MeTokenData } from '@/lib/hooks/metokens/useMeTokensSupabase';
-import { Loader2, TrendingUp, TrendingDown, AlertCircle, CheckCircle } from 'lucide-react';
-import { formatEther, parseEther } from 'viem';
+import { Loader2, TrendingUp, TrendingDown, AlertCircle, CheckCircle, Lock } from 'lucide-react';
+import { formatEther, parseEther, encodeFunctionData } from 'viem';
+import { useSmartAccountClient, useChain } from '@account-kit/react';
+import { DAI_TOKEN_ADDRESSES, getDaiTokenContract } from '@/lib/contracts/DAIToken';
+import { erc20Abi } from 'viem';
+import { MeTokenSubscription } from './MeTokenSubscription';
+import { DaiFundingOptions } from '@/components/wallet/funding/DaiFundingOptions';
 
 interface MeTokenTradingProps {
   meToken: MeTokenData;
@@ -21,7 +26,13 @@ export function MeTokenTrading({ meToken }: MeTokenTradingProps) {
   const [sellPreview, setSellPreview] = useState('0');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [isSubscribed, setIsSubscribed] = useState<boolean | null>(null);
+  const [daiAllowance, setDaiAllowance] = useState<bigint>(BigInt(0));
+  const [daiBalance, setDaiBalance] = useState<bigint>(BigInt(0));
+  const [isCheckingSubscription, setIsCheckingSubscription] = useState(false);
 
+  const { client } = useSmartAccountClient({});
+  const { chain } = useChain();
   const { 
     buyMeTokens, 
     sellMeTokens, 
@@ -32,6 +43,102 @@ export function MeTokenTrading({ meToken }: MeTokenTradingProps) {
     isConfirmed,
     transactionError
   } = useMeTokensSupabase();
+
+  // Check if MeToken is subscribed
+  const checkSubscriptionStatus = useCallback(async () => {
+    if (!client) return;
+    
+    setIsCheckingSubscription(true);
+    try {
+      // A MeToken is considered subscribed if it has balancePooled > 0 or balanceLocked > 0
+      // This indicates it has been subscribed to a hub
+      const isSubscribed = meToken.balancePooled > BigInt(0) || meToken.balanceLocked > BigInt(0);
+      setIsSubscribed(isSubscribed);
+    } catch (err) {
+      console.error('Failed to check subscription status:', err);
+      setIsSubscribed(false);
+    } finally {
+      setIsCheckingSubscription(false);
+    }
+  }, [client, meToken.balancePooled, meToken.balanceLocked]);
+
+  // Check DAI balance
+  const checkDaiBalance = useCallback(async () => {
+    if (!client) return;
+    
+    try {
+      const daiContract = getDaiTokenContract('base');
+      
+      const balance = await client.readContract({
+        address: daiContract.address as `0x${string}`,
+        abi: erc20Abi,
+        functionName: 'balanceOf',
+        args: [client.account?.address as `0x${string}`],
+      }) as bigint;
+      
+      setDaiBalance(balance);
+    } catch (err) {
+      console.error('Failed to check DAI balance:', err);
+      setDaiBalance(BigInt(0));
+    }
+  }, [client]);
+
+  // Check DAI allowance
+  const checkDaiAllowance = useCallback(async () => {
+    if (!client) return;
+    
+    try {
+      const daiContract = getDaiTokenContract('base');
+      const diamondAddress = '0xba5502db2aC2cBff189965e991C07109B14eB3f5'; // Diamond contract address
+      
+      const allowance = await client.readContract({
+        address: daiContract.address as `0x${string}`,
+        abi: erc20Abi,
+        functionName: 'allowance',
+        args: [client.account?.address as `0x${string}`, diamondAddress as `0x${string}`],
+      }) as bigint;
+      
+      setDaiAllowance(allowance);
+    } catch (err) {
+      console.error('Failed to check DAI allowance:', err);
+      setDaiAllowance(BigInt(0));
+    }
+  }, [client]);
+
+  // Approve DAI for Diamond contract
+  const approveDai = async (amount: string) => {
+    if (!client) return;
+    
+    try {
+      const daiContract = getDaiTokenContract('base');
+      const diamondAddress = '0xba5502db2aC2cBff189965e991C07109B14eB3f5';
+      
+      const result = await client.sendTransaction({
+        chain,
+        to: daiContract.address as `0x${string}`,
+        data: encodeFunctionData({
+          abi: erc20Abi,
+          functionName: 'approve',
+          args: [diamondAddress as `0x${string}`, parseEther(amount)],
+        }),
+        value: BigInt(0),
+      });
+      
+      if (result) {
+        await client.waitForTransactionReceipt({ hash: result });
+        await checkDaiAllowance(); // Refresh allowance
+      }
+    } catch (err) {
+      throw new Error(err instanceof Error ? err.message : 'Failed to approve DAI');
+    }
+  };
+
+  // Check subscription status on mount
+  useEffect(() => {
+    checkSubscriptionStatus();
+    checkDaiBalance();
+    checkDaiAllowance();
+  }, [meToken.address, checkSubscriptionStatus, checkDaiBalance, checkDaiAllowance]);
 
   // Calculate buy preview when amount changes
   useEffect(() => {
@@ -79,6 +186,15 @@ export function MeTokenTrading({ meToken }: MeTokenTradingProps) {
     setSuccess(null);
 
     try {
+      const buyAmountWei = parseEther(buyAmount);
+      
+      // Check if we need to approve DAI
+      if (daiAllowance < buyAmountWei) {
+        setSuccess('Approving DAI...');
+        await approveDai(buyAmount);
+        setSuccess('DAI approved! Proceeding with purchase...');
+      }
+      
       await buyMeTokens(meToken.address, buyAmount);
       setSuccess('Buy order submitted!');
       setBuyAmount('');
@@ -111,6 +227,115 @@ export function MeTokenTrading({ meToken }: MeTokenTradingProps) {
   };
 
   const isLoading = isPending || isConfirming;
+
+  // Show loading state while checking subscription
+  if (isCheckingSubscription) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <span>Trade {meToken.symbol}</span>
+            <Loader2 className="h-4 w-4 animate-spin" />
+          </CardTitle>
+          <CardDescription>Checking subscription status...</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Show subscription component if MeToken is not subscribed
+  if (isSubscribed === false) {
+    return (
+      <div className="space-y-4">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <span>Trade {meToken.symbol}</span>
+              <Lock className="h-5 w-5 text-orange-500" />
+            </CardTitle>
+            <CardDescription>
+              This MeToken is not subscribed to any hub yet.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Alert>
+              <Lock className="h-4 w-4" />
+              <AlertDescription>
+                Trading is not available for unsubscribed MeTokens. Please subscribe your MeToken to a hub first to enable trading.
+              </AlertDescription>
+            </Alert>
+            
+            <div className="text-sm text-muted-foreground space-y-2">
+              <p><strong>MeToken Info:</strong></p>
+              <ul className="list-disc list-inside space-y-1 ml-4">
+                <li>Total Supply: {formatEther(meToken.totalSupply)} {meToken.symbol}</li>
+                <li>TVL: ${meToken.tvl.toFixed(2)}</li>
+                <li>Your Balance: {formatEther(meToken.balance)} {meToken.symbol}</li>
+                <li>Status: Not Subscribed</li>
+              </ul>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <MeTokenSubscription 
+          meToken={meToken} 
+          onSubscriptionSuccess={() => {
+            // Refresh subscription status after successful subscription
+            checkSubscriptionStatus();
+          }}
+        />
+      </div>
+    );
+  }
+
+  // Show DAI funding options first if user has no DAI
+  if (daiBalance === BigInt(0)) {
+    return (
+      <div className="space-y-4">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <span>Trade {meToken.symbol}</span>
+              <AlertCircle className="h-5 w-5 text-orange-500" />
+            </CardTitle>
+            <CardDescription>
+              You need DAI to trade {meToken.name} tokens.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Trading requires DAI. Please get DAI first to enable trading.
+              </AlertDescription>
+            </Alert>
+            
+            <div className="text-sm text-muted-foreground space-y-2">
+              <p><strong>MeToken Info:</strong></p>
+              <ul className="list-disc list-inside space-y-1 ml-4">
+                <li>Total Supply: {formatEther(meToken.totalSupply)} {meToken.symbol}</li>
+                <li>TVL: ${meToken.tvl.toFixed(2)}</li>
+                <li>Your Balance: {formatEther(meToken.balance)} {meToken.symbol}</li>
+                <li>Your DAI Balance: {formatEther(daiBalance)} DAI</li>
+              </ul>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <DaiFundingOptions
+          onBalanceUpdate={(newBalance) => {
+            setDaiBalance(newBalance);
+            // If user gets DAI, we'll automatically show the trading interface
+          }}
+        />
+      </div>
+    );
+  }
 
   return (
     <Card>
@@ -175,11 +400,37 @@ export function MeTokenTrading({ meToken }: MeTokenTradingProps) {
               <p className="text-sm text-muted-foreground">
                 You will receive approximately {buyPreview} {meToken.symbol} tokens
               </p>
+              {buyAmount && parseFloat(buyAmount) > 0 && (
+                <div className="text-sm space-y-1">
+                  <div>
+                    {daiBalance >= parseEther(buyAmount) ? (
+                      <span className="text-green-600">✓ DAI balance sufficient</span>
+                    ) : (
+                      <span className="text-red-600">⚠ Insufficient DAI balance</span>
+                    )}
+                  </div>
+                  <div>
+                    {daiAllowance >= parseEther(buyAmount) ? (
+                      <span className="text-green-600">✓ DAI allowance sufficient</span>
+                    ) : (
+                      <span className="text-orange-600">⚠ DAI approval required</span>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
+
+            {buyAmount && parseFloat(buyAmount) > 0 && daiBalance < parseEther(buyAmount) && (
+              <DaiFundingOptions
+                requiredAmount={parseEther(buyAmount).toString()}
+                onBalanceUpdate={setDaiBalance}
+                className="mb-4"
+              />
+            )}
 
             <Button 
               onClick={handleBuy}
-              disabled={isLoading || !buyAmount || parseFloat(buyAmount) <= 0}
+              disabled={isLoading || !buyAmount || parseFloat(buyAmount) <= 0 || daiBalance < parseEther(buyAmount || '0')}
               className="w-full"
             >
               {isLoading ? (
