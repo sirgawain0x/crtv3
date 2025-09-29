@@ -1003,33 +1003,33 @@ export function AccountDropdown() {
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-2">
-                    <Link href="/upload" passHref legacyBehavior>
+                    <Link href="/upload" className="w-full">
                       <Button
                         variant="outline"
                         size="sm"
-                        className="flex flex-col items-center justify-center p-2 h-12 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                        className="w-full flex flex-col items-center justify-center p-2 h-12 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                         onClick={() => setIsDropdownOpen(false)}
                       >
                         <CloudUpload className="h-3 w-3 mb-1" />
                         <span className="text-xs">Upload</span>
                       </Button>
                     </Link>
-                    <Link href="/live" passHref legacyBehavior>
+                    <Link href="/live" className="w-full">
                       <Button
                         variant="outline"
                         size="sm"
-                        className="flex flex-col items-center justify-center p-2 h-12 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                        className="w-full flex flex-col items-center justify-center p-2 h-12 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                         onClick={() => setIsDropdownOpen(false)}
                       >
                         <RadioTower className="h-3 w-3 mb-1" />
                         <span className="text-xs">Live</span>
                       </Button>
                     </Link>
-                    <Link href="/clips" passHref legacyBehavior>
+                    <Link href="/clips" className="w-full">
                       <Button
                         variant="outline"
                         size="sm"
-                        className="flex flex-col items-center justify-center p-2 h-12 hover:bg-gray-50 
+                        className="w-full flex flex-col items-center justify-center p-2 h-12 hover:bg-gray-50 
                           dark:hover:bg-gray-800 transition-colors relative"
                         onClick={() => setIsDropdownOpen(false)}
                       >
@@ -1040,11 +1040,11 @@ export function AccountDropdown() {
                         </span>
                       </Button>
                     </Link>
-                    <Link href="/profile" passHref legacyBehavior>
+                    <Link href="/profile" className="w-full">
                       <Button
                         variant="outline"
                         size="sm"
-                        className="flex flex-col items-center justify-center p-2 h-12 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                        className="w-full flex flex-col items-center justify-center p-2 h-12 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                         onClick={() => setIsDropdownOpen(false)}
                       >
                         <ShieldUser className="h-3 w-3 mb-1" />
@@ -1055,7 +1055,7 @@ export function AccountDropdown() {
                 )}
 
                 {/* Create Proposal - Full width important action */}
-                <Link href="/vote/create" passHref legacyBehavior>
+                <Link href="/vote/create">
                   <Button
                     variant="outline"
                     size="sm"
