@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -29,7 +29,7 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
   const { isPending, isConfirming, isConfirmed, transactionError } = useMeTokensSupabase();
 
   // Check DAI balance
-  const checkDaiBalance = async () => {
+  const checkDaiBalance = useCallback(async () => {
     if (!client) return;
     
     try {
@@ -58,7 +58,7 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
       console.error('Failed to check DAI balance:', err);
       setDaiBalance(BigInt(0));
     }
-  };
+  }, [client]);
 
   // Subscribe MeToken to hub
   const subscribeToHub = async () => {
@@ -150,7 +150,7 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
   // Check DAI balance on mount
   useEffect(() => {
     checkDaiBalance();
-  }, []);
+  }, [checkDaiBalance]);
 
   const isLoading = isPending || isConfirming || isSubscribing;
   const hasEnoughDai = daiBalance >= parseEther(assetsDeposited || '0');

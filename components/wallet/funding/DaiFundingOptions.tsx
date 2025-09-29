@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -24,7 +24,7 @@ export function DaiFundingOptions({ requiredAmount, onBalanceUpdate, className }
 
   const { client } = useSmartAccountClient({});
 
-  const checkDaiBalance = async () => {
+  const checkDaiBalance = useCallback(async () => {
     if (!client) return;
     
     setIsLoading(true);
@@ -51,13 +51,13 @@ export function DaiFundingOptions({ requiredAmount, onBalanceUpdate, className }
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [client, onBalanceUpdate]);
 
   useEffect(() => {
     if (client) {
       checkDaiBalance();
     }
-  }, [client]);
+  }, [client, checkDaiBalance]);
 
   const hasEnoughDai = requiredAmount ? daiBalance >= BigInt(requiredAmount) : daiBalance > BigInt(0);
   const hasAnyDai = daiBalance > BigInt(0);

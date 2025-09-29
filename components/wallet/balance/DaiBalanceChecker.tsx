@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSmartAccountClient } from '@account-kit/react';
 import { formatEther } from 'viem';
 import { erc20Abi } from 'viem';
@@ -17,7 +17,7 @@ export function DaiBalanceChecker({ onBalanceUpdate, className }: DaiBalanceChec
 
   const { client } = useSmartAccountClient({});
 
-  const checkDaiBalance = async () => {
+  const checkDaiBalance = useCallback(async () => {
     if (!client) return;
     
     setIsLoading(true);
@@ -44,13 +44,13 @@ export function DaiBalanceChecker({ onBalanceUpdate, className }: DaiBalanceChec
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [client, onBalanceUpdate]);
 
   useEffect(() => {
     if (client) {
       checkDaiBalance();
     }
-  }, [client]);
+  }, [client, checkDaiBalance]);
 
   return {
     daiBalance,

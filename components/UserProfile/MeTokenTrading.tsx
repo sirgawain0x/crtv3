@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -45,7 +45,7 @@ export function MeTokenTrading({ meToken }: MeTokenTradingProps) {
   } = useMeTokensSupabase();
 
   // Check if MeToken is subscribed
-  const checkSubscriptionStatus = async () => {
+  const checkSubscriptionStatus = useCallback(async () => {
     if (!client) return;
     
     setIsCheckingSubscription(true);
@@ -60,10 +60,10 @@ export function MeTokenTrading({ meToken }: MeTokenTradingProps) {
     } finally {
       setIsCheckingSubscription(false);
     }
-  };
+  }, [client, meToken.balancePooled, meToken.balanceLocked]);
 
   // Check DAI balance
-  const checkDaiBalance = async () => {
+  const checkDaiBalance = useCallback(async () => {
     if (!client) return;
     
     try {
@@ -81,10 +81,10 @@ export function MeTokenTrading({ meToken }: MeTokenTradingProps) {
       console.error('Failed to check DAI balance:', err);
       setDaiBalance(BigInt(0));
     }
-  };
+  }, [client]);
 
   // Check DAI allowance
-  const checkDaiAllowance = async () => {
+  const checkDaiAllowance = useCallback(async () => {
     if (!client) return;
     
     try {
@@ -103,7 +103,7 @@ export function MeTokenTrading({ meToken }: MeTokenTradingProps) {
       console.error('Failed to check DAI allowance:', err);
       setDaiAllowance(BigInt(0));
     }
-  };
+  }, [client]);
 
   // Approve DAI for Diamond contract
   const approveDai = async (amount: string) => {
@@ -138,7 +138,7 @@ export function MeTokenTrading({ meToken }: MeTokenTradingProps) {
     checkSubscriptionStatus();
     checkDaiBalance();
     checkDaiAllowance();
-  }, [meToken.address]);
+  }, [meToken.address, checkSubscriptionStatus, checkDaiBalance, checkDaiAllowance]);
 
   // Calculate buy preview when amount changes
   useEffect(() => {

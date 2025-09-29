@@ -165,41 +165,38 @@ export function AlchemySwapWidget({ onSwapSuccess, className }: AlchemySwapWidge
         signatureRequest: swapState.quote.signatureRequest,
       };
 
-      // TODO: Fix swap implementation - methods not available on current client
-      // const signedCalls = await client.signPreparedCalls(signInput as any);
-      // const sendResult = await client.sendPreparedCalls(signedCalls);
+      // Use the Alchemy Swap Service for the swap functionality
+      // The signPreparedCalls and sendPreparedCalls methods are not available on the React client
+      // We'll use the swap service to handle the API calls directly
+      const { alchemySwapService } = await import('@/lib/sdk/alchemy/swap-service');
       
-      // Temporary placeholder - replace with proper swap implementation
-      throw new Error('Swap functionality temporarily disabled - needs implementation');
+      // Send the prepared calls using the swap service
+      const sendResult = await alchemySwapService.sendPreparedCalls({
+        type: swapState.quote.type,
+        data: swapState.quote.data,
+        chainId: "0x2105", // Base mainnet
+        signature: swapState.quote.signatureRequest.data.raw,
+      });
 
-      // TODO: Restore this code once swap methods are properly implemented
-      /*
-      if (sendResult.preparedCallIds.length === 0) {
+      if (sendResult.result.preparedCallIds.length === 0) {
         throw new Error('No prepared call IDs returned');
       }
 
-      // Wait for transaction completion
-      const callStatusResult = await client.waitForCallsStatus({
-        id: sendResult.preparedCallIds[0]!,
-      });
+      // Wait for transaction completion using the swap service
+      const callStatusResult = await alchemySwapService.waitForCallCompletion(
+        sendResult.result.preparedCallIds[0]!
+      );
 
-      if (
-        callStatusResult.status !== 'success' ||
-        !callStatusResult.receipts ||
-        !callStatusResult.receipts[0]
-      ) {
-        throw new Error(
-          `Transaction failed with status ${callStatusResult.status}`
-        );
+      if (!callStatusResult.result.receipts || callStatusResult.result.receipts.length === 0) {
+        throw new Error('No transaction receipts found');
       }
 
-      const transactionHash = callStatusResult.receipts[0].transactionHash;
+      const transactionHash = callStatusResult.result.receipts[0].transactionHash;
       
       setSwapState(prev => ({
         ...prev,
         transactionHash,
       }));
-      */
 
       // Call success callback
       onSwapSuccess?.();

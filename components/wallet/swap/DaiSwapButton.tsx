@@ -78,43 +78,36 @@ export function DaiSwapButton({ onSwapSuccess, className }: DaiSwapButtonProps) 
         signatureRequest: quote.signatureRequest,
       };
 
-      // TODO: Fix swap implementation - methods not available on current client
-      // const signedCalls = await client.signPreparedCalls(signInput as any);
-      // const sendResult = await client.sendPreparedCalls(signedCalls);
+      // Use the Alchemy Swap Service for the swap functionality
+      // The signPreparedCalls and sendPreparedCalls methods are not available on the React client
+      const { alchemySwapService } = await import('@/lib/sdk/alchemy/swap-service');
       
-      // Temporary placeholder - replace with proper swap implementation
-      throw new Error('Swap functionality temporarily disabled - needs implementation');
+      // Send the prepared calls using the swap service
+      const sendResult = await alchemySwapService.sendPreparedCalls({
+        type: quote.type,
+        data: quote.data,
+        chainId: "0x2105", // Base mainnet
+        signature: quote.signatureRequest.data.raw,
+      });
 
-      // TODO: Restore this code once swap methods are properly implemented
-      /*
-      if (sendResult.preparedCallIds.length === 0) {
+      if (sendResult.result.preparedCallIds.length === 0) {
         throw new Error('No prepared call IDs returned');
       }
 
-      // Wait for transaction completion
-      const callStatusResult = await client.waitForCallsStatus({
-        id: sendResult.preparedCallIds[0]!,
-      });
+      // Wait for transaction completion using the swap service
+      const callStatusResult = await alchemySwapService.waitForCallCompletion(
+        sendResult.result.preparedCallIds[0]!
+      );
 
-      if (
-        callStatusResult.status !== 'success' ||
-        !callStatusResult.receipts ||
-        !callStatusResult.receipts[0]
-      ) {
-        throw new Error(
-          `Transaction failed with status ${callStatusResult.status}`
-        );
+      if (!callStatusResult.result.receipts || callStatusResult.result.receipts.length === 0) {
+        throw new Error('No transaction receipts found');
       }
-      */
 
-      // TODO: Restore this code once swap methods are properly implemented
-      /*
-      const txHash = callStatusResult.receipts[0].transactionHash;
+      const txHash = callStatusResult.result.receipts[0].transactionHash;
       setTransactionHash(txHash);
 
       // Call success callback
       onSwapSuccess?.();
-      */
 
     } catch (err) {
       console.error('Swap execution failed:', err);
