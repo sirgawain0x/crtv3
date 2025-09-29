@@ -99,19 +99,19 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
     <ProfilePageGuard>
       <MembershipGuard>
         <div className="container mx-auto px-4 py-8">
-          <Tabs defaultValue="Membership" className="w-full">
+          <Tabs defaultValue="Uploads" className="w-full">
             <TabsList className="flex h-10 items-center justify-start space-x-1 rounded-lg bg-muted p-1">
-              <TabsTrigger
-                value="MeTokens"
-                className="flex-shrink-0 rounded-t-lg px-4 py-2 text-sm font-medium"
-              >
-                MeTokens
-              </TabsTrigger>
               <TabsTrigger
                 value="Uploads"
                 className="flex-shrink-0 rounded-t-lg px-4 py-2 text-sm font-medium"
               >
                 Uploads
+              </TabsTrigger>
+              <TabsTrigger
+                value="MeTokens"
+                className="flex-shrink-0 rounded-t-lg px-4 py-2 text-sm font-medium"
+              >
+                MeTokens
               </TabsTrigger>
               <TabsTrigger
                 value="Revenue"
@@ -122,10 +122,6 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
             </TabsList>
 
             <div className="mt-6">
-              <TabsContent value="MeTokens">
-                <MeTokensSection walletAddress={displayAddress} />
-              </TabsContent>
-
               <TabsContent value="Uploads">
                 <Card>
                   <CardHeader className="space-y-1">
@@ -154,6 +150,10 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
                     </div>
                   </CardContent>
                 </Card>
+              </TabsContent>
+
+              <TabsContent value="MeTokens">
+                <MeTokensSection walletAddress={displayAddress} />
               </TabsContent>
 
               <TabsContent value="Revenue">
