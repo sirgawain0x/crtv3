@@ -3,219 +3,13 @@ import { useUser, useSendUserOperation, useSmartAccountClient } from '@account-k
 import { parseEther, formatEther, encodeFunctionData } from 'viem';
 import { meTokenSupabaseService, MeToken, MeTokenBalance } from '@/lib/sdk/supabase/metokens';
 import { CreateMeTokenData, UpdateMeTokenData } from '@/lib/sdk/supabase/client';
+import { getMeTokenFactoryContract, METOKEN_FACTORY_ADDRESSES } from '@/lib/contracts/MeTokenFactory';
+import { METOKEN_ABI } from '@/lib/contracts/MeToken';
 
 // MeTokens contract addresses on Base
 const METOKEN_FACTORY = '0xb31Ae2583d983faa7D8C8304e6A16E414e721A0B';
 const DIAMOND = '0xba5502db2aC2cBff189965e991C07109B14eB3f5';
 
-// ABI for MeToken Factory
-const METOKEN_FACTORY_ABI = [
-  {
-    "inputs": [
-      {
-        "internalType": "string",
-        "name": "name",
-        "type": "string"
-      },
-      {
-        "internalType": "string",
-        "name": "symbol",
-        "type": "string"
-      },
-      {
-        "internalType": "address",
-        "name": "diamond",
-        "type": "address"
-      }
-    ],
-    "name": "create",
-    "outputs": [
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  }
-] as const;
-
-// ABI for Diamond contract (key functions for MeTokens)
-const DIAMOND_ABI = [
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "meToken",
-        "type": "address"
-      }
-    ],
-    "name": "getMeTokenInfo",
-    "outputs": [
-      {
-        "components": [
-          {
-            "internalType": "address",
-            "name": "owner",
-            "type": "address"
-          },
-          {
-            "internalType": "uint256",
-            "name": "hubId",
-            "type": "uint256"
-          },
-          {
-            "internalType": "uint256",
-            "name": "balancePooled",
-            "type": "uint256"
-          },
-          {
-            "internalType": "uint256",
-            "name": "balanceLocked",
-            "type": "uint256"
-          },
-          {
-            "internalType": "uint256",
-            "name": "startTime",
-            "type": "uint256"
-          },
-          {
-            "internalType": "uint256",
-            "name": "endTime",
-            "type": "uint256"
-          },
-          {
-            "internalType": "uint256",
-            "name": "targetHubId",
-            "type": "uint256"
-          },
-          {
-            "internalType": "address",
-            "name": "migration",
-            "type": "address"
-          }
-        ],
-        "internalType": "struct MeTokenInfo",
-        "name": "",
-        "type": "tuple"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "meToken",
-        "type": "address"
-      },
-      {
-        "internalType": "uint256",
-        "name": "assetsDeposited",
-        "type": "uint256"
-      }
-    ],
-    "name": "calculateMeTokensMinted",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "meTokensMinted",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "meToken",
-        "type": "address"
-      },
-      {
-        "internalType": "uint256",
-        "name": "meTokensBurned",
-        "type": "uint256"
-      },
-      {
-        "internalType": "address",
-        "name": "sender",
-        "type": "address"
-      }
-    ],
-    "name": "calculateAssetsReturned",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "assetsReturned",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "meToken",
-        "type": "address"
-      },
-      {
-        "internalType": "uint256",
-        "name": "assetsDeposited",
-        "type": "uint256"
-      },
-      {
-        "internalType": "address",
-        "name": "recipient",
-        "type": "address"
-      }
-    ],
-    "name": "mint",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "meTokensMinted",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "meToken",
-        "type": "address"
-      },
-      {
-        "internalType": "uint256",
-        "name": "meTokensBurned",
-        "type": "uint256"
-      },
-      {
-        "internalType": "address",
-        "name": "recipient",
-        "type": "address"
-      }
-    ],
-    "name": "burn",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "assetsReturned",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  }
-] as const;
 
 // ERC20 ABI for MeToken
 const ERC20_ABI = [
@@ -405,15 +199,16 @@ export function useMeTokensSupabase(targetAddress?: string) {
     
     try {
       // Step 1: Create the MeToken contract using the factory
+      const factoryContract = getMeTokenFactoryContract('base');
       const createData = encodeFunctionData({
-        abi: METOKEN_FACTORY_ABI,
+        abi: factoryContract.abi,
         functionName: 'create',
         args: [name, symbol, DIAMOND],
       });
 
       const result = await sendUserOperation({
         uo: {
-          target: METOKEN_FACTORY,
+          target: factoryContract.address,
           data: createData,
           value: BigInt(0),
         },
@@ -512,7 +307,7 @@ export function useMeTokensSupabase(targetAddress?: string) {
         uo: {
           target: DIAMOND,
           data: encodeFunctionData({
-            abi: DIAMOND_ABI,
+            abi: METOKEN_ABI,
             functionName: 'mint',
             args: [meTokenAddress as `0x${string}`, parseEther(collateralAmount), address as `0x${string}`],
           }),
@@ -562,7 +357,7 @@ export function useMeTokensSupabase(targetAddress?: string) {
         uo: {
           target: DIAMOND,
           data: encodeFunctionData({
-            abi: DIAMOND_ABI,
+            abi: METOKEN_ABI,
             functionName: 'burn',
             args: [meTokenAddress as `0x${string}`, parseEther(meTokenAmount), address as `0x${string}`],
           }),
@@ -609,7 +404,7 @@ export function useMeTokensSupabase(targetAddress?: string) {
       
       const result = await client.readContract({
         address: DIAMOND,
-        abi: DIAMOND_ABI,
+        abi: METOKEN_ABI,
         functionName: 'calculateMeTokensMinted',
         args: [meTokenAddress as `0x${string}`, parseEther(collateralAmount)],
       });
@@ -628,7 +423,7 @@ export function useMeTokensSupabase(targetAddress?: string) {
       
       const result = await client.readContract({
         address: DIAMOND,
-        abi: DIAMOND_ABI,
+        abi: METOKEN_ABI,
         functionName: 'calculateAssetsReturned',
         args: [meTokenAddress as `0x${string}`, parseEther(meTokenAmount), address as `0x${string}`],
       });

@@ -122,7 +122,7 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
           </div>
           <div className="mt-6 grid grid-flow-row auto-rows-max space-y-3 overflow-hidden">
             <CardTitle>
-              <Link href={`/discover/${asset.id}`} passHref>
+              <Link href={`/discover/${asset.id}`}>
                 <h1
                   className="max-w-full overflow-hidden text-ellipsis 
                 whitespace-nowrap text-xl font-bold hover:text-orange-500 focus:text-orange-500"
@@ -153,7 +153,6 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
               </Button>
               <Link
                 href={`/discover/${encodeURIComponent(asset?.id)}`}
-                passHref
               >
                 <Button
                   className="flex-1 cursor-pointer hover:scale-125"

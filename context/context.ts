@@ -18,7 +18,7 @@
 // Site branding constants
 export const SITE_LOGO = "/creative.svg"; // Using the SVG logo
 export const SITE_TOPIC_LOGO =
-  "https://bafybeiesvinhgaqvr62rj77jbwkazg3w6bhcrsfyg6zyozasaud53nucnm.ipfs.w3s.link/Creative%20TV%20Logo.png";
+  "/images/Creative_TV_Logo.png";
 export const SITE_NAME = "Creative TV";
 export const SITE_ORG = "CREATIVE";
 export const SITE_PRODUCT = "TV";
