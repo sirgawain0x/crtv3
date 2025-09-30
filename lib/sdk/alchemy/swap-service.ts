@@ -126,8 +126,21 @@ export class AlchemySwapService {
   }): Promise<SwapQuoteResponse> {
     const { from, fromToken, toToken, fromAmount, minimumToAmount, slippage = 50 } = params;
 
+    if (!this.apiKey) {
+      throw new Error("Alchemy API key is not configured. Please check your environment variables.");
+    }
+
     if (fromToken === toToken) {
       throw new Error("Cannot swap token to itself");
+    }
+
+    // Validate that the amount is reasonable (not too small)
+    if (fromAmount) {
+      const amount = BigInt(fromAmount);
+      const minAmount = BigInt(1000); // Minimum 1000 wei equivalent
+      if (amount < minAmount) {
+        throw new Error(`Amount too small. Minimum amount is ${minAmount} wei.`);
+      }
     }
 
     const quoteRequest: SwapQuoteRequest = {
@@ -152,6 +165,14 @@ export class AlchemySwapService {
       throw new Error("Either fromAmount or minimumToAmount must be provided");
     }
 
+    console.log('Making swap quote request with:', {
+      apiKey: this.apiKey ? `${this.apiKey.slice(0, 10)}...` : 'MISSING',
+      quoteRequest: {
+        ...quoteRequest,
+        capabilities: quoteRequest.capabilities ? 'PRESENT' : 'MISSING'
+      }
+    });
+
     const response = await fetch(`https://api.g.alchemy.com/v2/${this.apiKey}`, {
       method: "POST",
       headers: {
@@ -166,13 +187,56 @@ export class AlchemySwapService {
     });
 
     if (!response.ok) {
-      throw new Error(`Swap quote request failed: ${response.status} ${response.statusText}`);
+      let errorMessage = `Swap quote request failed: ${response.status} ${response.statusText}`;
+      try {
+        const errorData = await response.json();
+        if (errorData.error) {
+          errorMessage = `API Error: ${errorData.error.message || errorData.error}`;
+        }
+      } catch (jsonError) {
+        // Response is not JSON, use the default error message
+      }
+      throw new Error(errorMessage);
     }
 
     const result = await response.json() as SwapQuoteResponse;
     
+    console.log('Swap quote response:', {
+      hasResult: !!result.result,
+      hasError: !!result.error,
+      error: result.error,
+      result: result.result ? 'PRESENT' : 'MISSING'
+    });
+    
     if (result.error) {
-      throw new Error(`RPC Error: ${result.error.message}`);
+      console.error('Swap quote error details:', {
+        code: result.error.code,
+        message: result.error.message,
+        fullError: result.error
+      });
+      
+      // Provide more specific error messages based on the error type
+      let specificMessage = result.error.message;
+      
+      if (result.error.message?.includes('Multicall3: call failed')) {
+        specificMessage = `Swap failed: Multicall3 call failed. This usually means:
+1. The account doesn't have sufficient ${fromToken} balance
+2. The smart account isn't properly deployed on Base
+3. The account needs ETH for gas fees
+4. The token addresses are invalid
+
+Please ensure your account has enough ${fromToken} and ETH for gas fees.
+
+Original error: ${result.error.message}`;
+      } else if (result.error.message?.includes('insufficient funds')) {
+        specificMessage = `Insufficient balance: You don't have enough ${fromToken} to perform this swap.`;
+      } else if (result.error.message?.includes('invalid token')) {
+        specificMessage = `Invalid token: The ${fromToken} or ${toToken} token address is not valid on Base network.`;
+      } else if (result.error.message?.includes('account not deployed')) {
+        specificMessage = `Smart account not deployed: Your smart account needs to be deployed on Base network before you can perform swaps. Try sending a small amount of ETH to your account first.`;
+      }
+      
+      throw new Error(specificMessage);
     }
 
     return result;
