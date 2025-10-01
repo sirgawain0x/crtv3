@@ -1,5 +1,8 @@
 import lighthouse from '@lighthouse-web3/sdk';
 
+// Debug: Log the lighthouse object to understand available methods
+console.log('Lighthouse SDK methods:', Object.keys(lighthouse));
+
 export interface IPFSUploadResult {
   success: boolean;
   url?: string;
@@ -19,6 +22,11 @@ export class IPFSService {
   constructor(config: IPFSConfig) {
     this.apiKey = config.apiKey;
     this.gateway = config.gateway || 'https://gateway.lighthouse.storage/ipfs';
+    
+    // Validate API key
+    if (!this.apiKey) {
+      console.warn('Lighthouse API key is not configured. Avatar uploads will fail.');
+    }
   }
 
   // Upload file to IPFS using Lighthouse
@@ -27,6 +35,14 @@ export class IPFSService {
     wrapWithDirectory?: boolean;
   } = {}): Promise<IPFSUploadResult> {
     try {
+      // Check if API key is configured
+      if (!this.apiKey) {
+        return {
+          success: false,
+          error: 'Lighthouse API key is not configured. Please set NEXT_PUBLIC_LIGHTHOUSE_API_KEY environment variable.',
+        };
+      }
+
       // Validate file
       if (!this.isValidImageFile(file)) {
         return {
@@ -36,23 +52,65 @@ export class IPFSService {
       }
 
       // Upload to Lighthouse IPFS
-      const uploadResponse = await lighthouse.upload(file, this.apiKey);
+      // Try different approaches based on SDK version
+      let uploadResponse;
       
+      try {
+        // Method 1: Try single file (newer SDK versions)
+        uploadResponse = await lighthouse.upload(file, this.apiKey);
+      } catch (error) {
+        console.log('Single file upload failed, trying array approach:', error);
+        try {
+          // Method 2: Try array of files (older SDK versions)
+          uploadResponse = await lighthouse.upload([file], this.apiKey);
+        } catch (arrayError) {
+          console.log('Array upload also failed, trying uploadText method:', arrayError);
+          try {
+            // Method 3: Convert file to buffer and use uploadText (fallback)
+            const arrayBuffer = await file.arrayBuffer();
+            const buffer = Buffer.from(arrayBuffer);
+            uploadResponse = await lighthouse.uploadText(buffer.toString('base64'), this.apiKey, file.name);
+          } catch (textError) {
+            console.log('All upload methods failed:', textError);
+            throw textError;
+          }
+        }
+      }
+      
+      // Debug: Log the response structure to understand the format
+      console.log('Lighthouse upload response:', JSON.stringify(uploadResponse, null, 2));
+      
+      // Handle different possible response structures
+      let hash = null;
+      
+      // Method 1: Direct data.Hash (single file response)
       if (uploadResponse.data && uploadResponse.data.Hash) {
-        const hash = uploadResponse.data.Hash;
+        hash = uploadResponse.data.Hash;
+      }
+      // Method 2: Array of results (multiple files response)
+      else if (uploadResponse.data && Array.isArray(uploadResponse.data) && uploadResponse.data.length > 0) {
+        const firstResult = uploadResponse.data[0];
+        hash = firstResult.Hash || firstResult.hash;
+      }
+      // Method 3: Direct hash property
+      else if ((uploadResponse as any).Hash || (uploadResponse as any).hash) {
+        hash = (uploadResponse as any).Hash || (uploadResponse as any).hash;
+      }
+      
+      if (hash) {
         const url = `${this.gateway}/${hash}`;
-
         return {
           success: true,
           url,
           hash,
         };
-      } else {
-        return {
-          success: false,
-          error: 'Upload failed: No hash returned from Lighthouse',
-        };
       }
+      
+      // If no hash found, return detailed error with response structure
+      return {
+        success: false,
+        error: `Upload failed: No hash returned from Lighthouse. Response structure: ${JSON.stringify(uploadResponse)}`,
+      };
     } catch (error) {
       console.error('Lighthouse IPFS upload error:', error);
       return {
@@ -69,6 +127,8 @@ export class IPFSService {
   } = {}): Promise<IPFSUploadResult[]> {
     const results: IPFSUploadResult[] = [];
     
+    // According to Lighthouse docs, for multiple files we can pass true as third parameter
+    // But for now, let's upload files individually for better error handling
     for (const file of files) {
       const result = await this.uploadFile(file, options);
       results.push(result);

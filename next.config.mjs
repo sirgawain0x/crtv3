@@ -43,6 +43,16 @@ const nextConfig = {
       },
       {
         protocol: "https",
+        hostname: "gateway.lighthouse.storage",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "*.lighthouse.storage",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
         hostname: "*.googleapis.com",
         pathname: "/**",
       },
@@ -52,6 +62,24 @@ const nextConfig = {
         pathname: "/**",
       },
     ],
+  },
+  async headers() {
+    return [
+      {
+        // Apply to all routes
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'Cross-Origin-Opener-Policy',
+            value: 'unsafe-none',
+          },
+          {
+            key: 'Cross-Origin-Embedder-Policy',
+            value: 'unsafe-none',
+          },
+        ],
+      },
+    ];
   },
 };
 

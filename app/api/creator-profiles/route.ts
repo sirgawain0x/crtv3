@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { creatorProfileSupabaseService } from '@/lib/sdk/supabase/creator-profiles';
+import { supabaseService } from '@/lib/sdk/supabase/service';
+import { createClient } from '@/lib/sdk/supabase/server';
 
 export async function GET(request: NextRequest) {
   try {
@@ -11,27 +12,104 @@ export async function GET(request: NextRequest) {
 
     if (owner) {
       // Get specific creator profile by owner address
-      const profile = await creatorProfileSupabaseService.getCreatorProfileByOwner(owner);
+      let data, error;
+      
+      if (supabaseService) {
+        const result = await supabaseService
+          .from('creator_profiles')
+          .select('*')
+          .eq('owner_address', owner.toLowerCase())
+          .single();
+        data = result.data;
+        error = result.error;
+      } else {
+        const supabase = await createClient();
+        const result = await supabase
+          .from('creator_profiles')
+          .select('*')
+          .eq('owner_address', owner.toLowerCase())
+          .single();
+        data = result.data;
+        error = result.error;
+      }
+      
+      if (error) {
+        if (error.code === 'PGRST116') {
+          return NextResponse.json({ 
+            success: true, 
+            data: null 
+          });
+        }
+        throw new Error(`Failed to fetch creator profile: ${error.message}`);
+      }
+      
       return NextResponse.json({ 
         success: true, 
-        data: profile 
+        data: data 
       });
     } else if (search) {
       // Search creator profiles
-      const profiles = await creatorProfileSupabaseService.searchCreatorProfiles(search, limit);
+      let data, error;
+      
+      if (supabaseService) {
+        const result = await supabaseService
+          .from('creator_profiles')
+          .select('*')
+          .or(`username.ilike.%${search}%,bio.ilike.%${search}%`)
+          .limit(limit)
+          .order('created_at', { ascending: false });
+        data = result.data;
+        error = result.error;
+      } else {
+        const supabase = await createClient();
+        const result = await supabase
+          .from('creator_profiles')
+          .select('*')
+          .or(`username.ilike.%${search}%,bio.ilike.%${search}%`)
+          .limit(limit)
+          .order('created_at', { ascending: false });
+        data = result.data;
+        error = result.error;
+      }
+      
+      if (error) {
+        throw new Error(`Failed to search creator profiles: ${error.message}`);
+      }
+      
       return NextResponse.json({ 
         success: true, 
-        data: profiles 
+        data: data || [] 
       });
     } else {
       // Get all creator profiles with pagination
-      const profiles = await creatorProfileSupabaseService.getAllCreatorProfiles({
-        limit,
-        offset,
-      });
+      let data, error;
+      
+      if (supabaseService) {
+        const result = await supabaseService
+          .from('creator_profiles')
+          .select('*')
+          .range(offset, offset + limit - 1)
+          .order('created_at', { ascending: false });
+        data = result.data;
+        error = result.error;
+      } else {
+        const supabase = await createClient();
+        const result = await supabase
+          .from('creator_profiles')
+          .select('*')
+          .range(offset, offset + limit - 1)
+          .order('created_at', { ascending: false });
+        data = result.data;
+        error = result.error;
+      }
+      
+      if (error) {
+        throw new Error(`Failed to fetch creator profiles: ${error.message}`);
+      }
+      
       return NextResponse.json({ 
         success: true, 
-        data: profiles 
+        data: data || [] 
       });
     }
   } catch (error) {
@@ -58,16 +136,46 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const profile = await creatorProfileSupabaseService.createCreatorProfile({
-      owner_address,
-      username,
-      bio,
-      avatar_url,
-    });
+    let data, error;
+    
+    if (supabaseService) {
+      const result = await supabaseService
+        .from('creator_profiles')
+        .insert({
+          owner_address: owner_address.toLowerCase(),
+          username,
+          bio,
+          avatar_url,
+        })
+        .select();
+      data = result.data;
+      error = result.error;
+    } else {
+      const supabase = await createClient();
+      const result = await supabase
+        .from('creator_profiles')
+        .insert({
+          owner_address: owner_address.toLowerCase(),
+          username,
+          bio,
+          avatar_url,
+        })
+        .select();
+      data = result.data;
+      error = result.error;
+    }
+
+    if (error) {
+      throw new Error(`Failed to create creator profile: ${error.message}`);
+    }
+
+    if (!data || data.length === 0) {
+      throw new Error('No data returned from create operation');
+    }
 
     return NextResponse.json({ 
       success: true, 
-      data: profile 
+      data: data[0] 
     });
   } catch (error) {
     console.error('Error creating creator profile:', error);
@@ -93,15 +201,52 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const profile = await creatorProfileSupabaseService.updateCreatorProfile(owner_address, {
-      username,
-      bio,
-      avatar_url,
-    });
+    let data, error;
+    
+    if (supabaseService) {
+      const result = await supabaseService
+        .from('creator_profiles')
+        .upsert({
+          owner_address: owner_address.toLowerCase(),
+          username,
+          bio,
+          avatar_url,
+          updated_at: new Date().toISOString(),
+        }, {
+          onConflict: 'owner_address'
+        })
+        .select();
+      data = result.data;
+      error = result.error;
+    } else {
+      const supabase = await createClient();
+      const result = await supabase
+        .from('creator_profiles')
+        .upsert({
+          owner_address: owner_address.toLowerCase(),
+          username,
+          bio,
+          avatar_url,
+          updated_at: new Date().toISOString(),
+        }, {
+          onConflict: 'owner_address'
+        })
+        .select();
+      data = result.data;
+      error = result.error;
+    }
+
+    if (error) {
+      throw new Error(`Failed to update creator profile: ${error.message}`);
+    }
+
+    if (!data || data.length === 0) {
+      throw new Error('No data returned from update operation');
+    }
 
     return NextResponse.json({ 
       success: true, 
-      data: profile 
+      data: data[0] 
     });
   } catch (error) {
     console.error('Error updating creator profile:', error);

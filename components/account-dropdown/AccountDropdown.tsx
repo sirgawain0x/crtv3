@@ -80,6 +80,7 @@ import { LoginButton } from "@/components/auth/LoginButton";
 import { AlchemySwapWidget } from "@/components/wallet/swap/AlchemySwapWidget";
 import useModularAccount from "@/lib/hooks/accountkit/useModularAccount";
 import { TokenBalance } from "@/components/wallet/balance/TokenBalance";
+import { MeTokenBalances } from "@/components/wallet/balance/MeTokenBalances";
 import makeBlockie from "ethereum-blockies-base64";
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
 import { useSessionKey } from "@/lib/hooks/accountkit/useSessionKey";
@@ -1066,6 +1067,13 @@ export function AccountDropdown() {
           <div className="px-2 py-2">
             <p className="text-sm font-medium mb-2">Balances</p>
             <TokenBalance />
+          </div>
+
+          <DropdownMenuSeparator />
+
+          {/* MeToken Balances Section */}
+          <div className="px-2 py-2">
+            <MeTokenBalances />
           </div>
 
           <DropdownMenuSeparator />

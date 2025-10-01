@@ -23,6 +23,14 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [isSubscribing, setIsSubscribing] = useState(false);
+  const [realSubscriptionStatus, setRealSubscriptionStatus] = useState<{
+    isSubscribed: boolean;
+    balancePooled: string;
+    balanceLocked: string;
+    hubId: string;
+    totalLocked: string;
+  } | null>(null);
+  const [isCheckingStatus, setIsCheckingStatus] = useState(false);
 
   const { client } = useSmartAccountClient({});
   const { chain } = useChain();
@@ -67,11 +75,35 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
       return;
     }
 
+    // Check if already subscribed before attempting subscription
+    if (realSubscriptionStatus?.isSubscribed) {
+      setError(`This MeToken is already subscribed to Hub ${realSubscriptionStatus.hubId}. No need to subscribe again.`);
+      return;
+    }
+    
+    // If we have an error checking status but not subscribed, warn but continue
+    if (realSubscriptionStatus?.error && !realSubscriptionStatus.isSubscribed) {
+      console.warn('⚠️ Subscription status check failed, but proceeding with subscription attempt:', realSubscriptionStatus.error);
+    }
+
     setIsSubscribing(true);
     setError(null);
     setSuccess(null);
 
     try {
+      // Double-check subscription status before proceeding
+      console.log('🔍 Double-checking subscription status before subscription...');
+      const { checkMeTokenSubscriptionFromBlockchain } = await import('@/lib/utils/metokenSubscriptionUtils');
+      const currentStatus = await checkMeTokenSubscriptionFromBlockchain(meToken.address);
+      
+      if (currentStatus.isSubscribed) {
+        setError(`This MeToken is already subscribed to Hub ${currentStatus.hubId}. Please refresh the page to see the current status.`);
+        setIsSubscribing(false);
+        return;
+      }
+      
+      console.log('✅ Confirmed not subscribed, proceeding with subscription...');
+
       const diamondAddress = '0xba5502db2aC2cBff189965e991C07109B14eB3f5';
       
       // First, approve DAI for the Diamond contract
@@ -138,6 +170,10 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
         await client.waitForTransactionReceipt({ hash: subscribeResult });
         setSuccess('Successfully subscribed to hub!');
         setAssetsDeposited('');
+        
+        // Refresh subscription status after successful subscription
+        await checkRealSubscriptionStatus();
+        
         onSubscriptionSuccess?.();
       }
     } catch (err) {
@@ -147,13 +183,112 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
     }
   };
 
+  // Check real subscription status from blockchain
+  const checkRealSubscriptionStatus = useCallback(async () => {
+    if (!meToken.address) return;
+    
+    setIsCheckingStatus(true);
+    try {
+      console.log('🔍 Checking real subscription status for:', meToken.address);
+      const { checkMeTokenSubscriptionFromBlockchain } = await import('@/lib/utils/metokenSubscriptionUtils');
+      const status = await checkMeTokenSubscriptionFromBlockchain(meToken.address);
+      
+      console.log('✅ Real subscription status:', status);
+      setRealSubscriptionStatus({
+        isSubscribed: status.isSubscribed,
+        balancePooled: status.balancePooled,
+        balanceLocked: status.balanceLocked,
+        hubId: status.hubId,
+        totalLocked: status.totalLocked
+      });
+      
+      // If already subscribed, show appropriate message
+      if (status.isSubscribed) {
+        setError(`This MeToken is already subscribed to Hub ${status.hubId}. No need to subscribe again.`);
+      } else if (status.error) {
+        // Show error message but don't prevent subscription attempt
+        console.warn('⚠️ Subscription status check had issues:', status.error);
+        setError(null); // Don't show error to user, just log it
+      } else {
+        setError(null);
+      }
+    } catch (err) {
+      console.error('❌ Failed to check real subscription status:', err);
+      setRealSubscriptionStatus(null);
+    } finally {
+      setIsCheckingStatus(false);
+    }
+  }, [meToken.address]);
+
   // Check DAI balance on mount
   useEffect(() => {
     checkDaiBalance();
   }, [checkDaiBalance]);
 
-  const isLoading = isPending || isConfirming || isSubscribing;
+  // Check real subscription status on mount
+  useEffect(() => {
+    checkRealSubscriptionStatus();
+  }, [checkRealSubscriptionStatus]);
+
+  const isLoading = isPending || isConfirming || isSubscribing || isCheckingStatus;
   const hasEnoughDai = daiBalance >= parseEther(assetsDeposited || '0');
+
+  // If already subscribed, show success state instead of subscription form
+  if (realSubscriptionStatus?.isSubscribed) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CheckCircle className="h-5 w-5 text-green-500" />
+            MeToken Already Subscribed
+          </CardTitle>
+          <CardDescription>
+            {meToken.name} ({meToken.symbol}) is already subscribed and ready for trading.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <span className="text-muted-foreground">Hub ID:</span>
+              <span className="ml-2 font-mono">Hub {realSubscriptionStatus.hubId}</span>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Status:</span>
+              <span className="ml-2 text-green-600 font-medium">Subscribed</span>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Pooled:</span>
+              <span className="ml-2 font-mono">{formatEther(BigInt(realSubscriptionStatus.balancePooled))} DAI</span>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Locked:</span>
+              <span className="ml-2 font-mono">{formatEther(BigInt(realSubscriptionStatus.balanceLocked))} DAI</span>
+            </div>
+          </div>
+          
+          <div className="text-sm text-muted-foreground">
+            <p>Your MeToken is subscribed and ready for trading. You can add more liquidity or trade your tokens.</p>
+          </div>
+          
+          <Button 
+            onClick={checkRealSubscriptionStatus}
+            variant="outline"
+            className="w-full"
+            disabled={isCheckingStatus}
+          >
+            {isCheckingStatus ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Refreshing...
+              </>
+            ) : (
+              'Refresh Status'
+            )}
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
@@ -261,7 +396,7 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
           <ul className="list-disc list-inside space-y-1 ml-4">
             <li>MeToken: {meToken.name} ({meToken.symbol})</li>
             <li>Current TVL: ${meToken.tvl.toFixed(2)}</li>
-            <li>Status: {meToken.balancePooled > BigInt(0) || meToken.balanceLocked > BigInt(0) ? 'Subscribed' : 'Not Subscribed'}</li>
+            <li>Status: {isCheckingStatus ? 'Checking...' : realSubscriptionStatus ? (realSubscriptionStatus.isSubscribed ? 'Subscribed' : 'Not Subscribed') : 'Unknown'}</li>
           </ul>
           <p className="text-xs">
             Note: Subscribing to a hub will lock your DAI and enable trading for your MeToken.

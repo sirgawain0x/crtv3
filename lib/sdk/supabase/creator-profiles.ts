@@ -7,18 +7,22 @@ export class CreatorProfileSupabaseService {
   // Get creator profile by owner address
   async getCreatorProfileByOwner(ownerAddress: string): Promise<CreatorProfile | null> {
     try {
-      const { data, error } = await supabase
-        .from('creator_profiles')
-        .select('*')
-        .eq('owner_address', ownerAddress.toLowerCase())
-        .single();
-
-      if (error) {
-        if (error.code === 'PGRST116') return null; // Not found
-        throw new Error(`Failed to fetch creator profile: ${error.message}`);
+      // Use API route to bypass RLS issues
+      const response = await fetch(`/api/creator-profiles?owner=${encodeURIComponent(ownerAddress)}`);
+      
+      if (!response.ok) {
+        if (response.status === 404) return null;
+        throw new Error(`Failed to fetch creator profile: ${response.statusText}`);
       }
 
-      return data;
+      const result = await response.json();
+      
+      if (!result.success) {
+        if (result.error?.includes('not found')) return null;
+        throw new Error(result.error || 'Failed to fetch creator profile');
+      }
+
+      return result.data;
     } catch (error) {
       // Handle case where creator_profiles table doesn't exist
       if (error instanceof Error && error.message.includes('relation "public.creator_profiles" does not exist')) {
@@ -85,40 +89,47 @@ export class CreatorProfileSupabaseService {
     ownerAddress: string, 
     updateData: UpdateCreatorProfileData
   ): Promise<CreatorProfile> {
-    const { data, error } = await supabase
-      .from('creator_profiles')
-      .update({
+    try {
+      // Use upsert to handle both create and update cases
+      return await this.upsertCreatorProfile({
+        owner_address: ownerAddress,
         ...updateData,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('owner_address', ownerAddress.toLowerCase())
-      .select()
-      .single();
-
-    if (error) {
-      throw new Error(`Failed to update creator profile: ${error.message}`);
+      });
+    } catch (error) {
+      // Handle case where creator_profiles table doesn't exist
+      if (error instanceof Error && error.message.includes('relation "public.creator_profiles" does not exist')) {
+        throw new Error('Creator profiles table does not exist. Please run the database migration to create the table.');
+      }
+      throw error;
     }
-
-    return data;
   }
 
   // Upsert creator profile (create or update)
   async upsertCreatorProfile(profileData: CreateCreatorProfileData): Promise<CreatorProfile> {
-    const { data, error } = await supabase
-      .from('creator_profiles')
-      .upsert({
-        ...profileData,
-        owner_address: profileData.owner_address.toLowerCase(),
-        updated_at: new Date().toISOString(),
-      })
-      .select()
-      .single();
+    try {
+      // Use API route to bypass RLS issues
+      const response = await fetch('/api/creator-profiles/upsert', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(profileData),
+      });
 
-    if (error) {
-      throw new Error(`Failed to upsert creator profile: ${error.message}`);
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to upsert creator profile');
+      }
+
+      return result.data;
+    } catch (error) {
+      // Handle case where creator_profiles table doesn't exist
+      if (error instanceof Error && error.message.includes('relation "public.creator_profiles" does not exist')) {
+        throw new Error('Creator profiles table does not exist. Please run the database migration to create the table.');
+      }
+      throw error;
     }
-
-    return data;
   }
 
   // Delete creator profile

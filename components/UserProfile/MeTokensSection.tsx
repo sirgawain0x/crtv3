@@ -61,6 +61,52 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
     }
   };
 
+  const handleSyncExistingMeToken = async () => {
+    try {
+      console.log('🔄 Attempting to sync existing MeToken from subgraph...');
+      
+      // Import the subgraph client
+      const { meTokensSubgraph } = await import('@/lib/sdk/metokens/subgraph');
+      
+      // Get recent MeTokens from subgraph
+      const allMeTokens = await meTokensSubgraph.getAllMeTokens(50, 0);
+      console.log(`📋 Found ${allMeTokens.length} recent MeTokens in subgraph`);
+      
+      if (allMeTokens.length > 0) {
+        // Try to sync the most recent ones to database
+        for (const meToken of allMeTokens.slice(0, 10)) {
+          try {
+            console.log('💾 Attempting to sync MeToken:', meToken.id);
+            const syncResponse = await fetch('/api/metokens/sync', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ meTokenAddress: meToken.id })
+            });
+            
+            if (syncResponse.ok) {
+              const syncData = await syncResponse.json();
+              console.log('✅ Synced MeToken:', syncData);
+              
+              // Check if this one belongs to our user
+              if (syncData.data?.owner_address?.toLowerCase() === walletAddress?.toLowerCase()) {
+                console.log('🎯 Found our MeToken!');
+                await handleRefresh(); // Refresh to show the synced MeToken
+                return;
+              }
+            }
+          } catch (syncErr) {
+            console.warn('Failed to sync MeToken:', meToken.id, syncErr);
+          }
+        }
+      }
+      
+      alert('No existing MeToken found in the subgraph. If you recently created a MeToken, please wait a few minutes for the subgraph to sync, then try again.');
+    } catch (err) {
+      console.error('Failed to sync existing MeToken:', err);
+      alert('Failed to sync existing MeToken. Please try again or contact support.');
+    }
+  };
+
   const handleCheckManualMeToken = async () => {
     if (!manualMeTokenAddress.trim()) return;
     
@@ -360,6 +406,51 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
                       )}
                       Check MeToken
                     </Button>
+                  </div>
+                  
+                  {/* Auto-sync section */}
+                  <div className="border-t pt-4 mt-4">
+                    <h4 className="font-semibold mb-3 flex items-center gap-2">
+                      <RefreshCw className="h-4 w-4" />
+                      Auto-Sync from Subgraph
+                    </h4>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      If you recently created a MeToken but it&apos;s not showing up, try syncing from the subgraph.
+                    </p>
+                    <Button 
+                      onClick={handleSyncExistingMeToken}
+                      variant="secondary"
+                      size="sm"
+                      className="flex items-center gap-2"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                      Sync Existing MeToken
+                    </Button>
+                  </div>
+                  
+                  {/* Error recovery section */}
+                  <div className="border-t pt-4 mt-4">
+                    <h4 className="font-semibold mb-3 flex items-center gap-2 text-orange-600">
+                      <AlertCircle className="h-4 w-4" />
+                      Getting "Already Owns MeToken" Error?
+                    </h4>
+                    <Alert className="mb-4">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        <strong>This error means you already have a MeToken!</strong><br/>
+                        The system detected that your wallet address already owns a MeToken. 
+                        Try the "Sync Existing MeToken" button above, or if that doesn't work, 
+                        you can manually enter your MeToken contract address.
+                      </AlertDescription>
+                    </Alert>
+                    <div className="space-y-2">
+                      <p className="text-sm text-muted-foreground">
+                        <strong>Quick Fix:</strong> Use the "Sync Existing MeToken" button above to automatically find and load your MeToken.
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        <strong>Manual Fix:</strong> If auto-sync doesn't work, find your MeToken contract address from your creation transaction and enter it above.
+                      </p>
+                    </div>
                   </div>
                 </div>
               </CardContent>

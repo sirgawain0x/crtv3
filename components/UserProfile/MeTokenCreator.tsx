@@ -22,7 +22,7 @@ export function MeTokenCreator({ onMeTokenCreated }: MeTokenCreatorProps) {
   
   const user = useUser();
   const { toast } = useToast();
-  const { createMeToken, isPending, isConfirming, isConfirmed, transactionError } = useMeTokensSupabase();
+  const { createMeToken, isPending, isConfirming, isConfirmed, transactionError, checkUserMeToken, userMeToken } = useMeTokensSupabase();
   
   // Debug: Log user state
   useEffect(() => {
@@ -93,13 +93,62 @@ export function MeTokenCreator({ onMeTokenCreated }: MeTokenCreatorProps) {
     setLocalError(null);
 
     try {
+      // First check if user already has a MeToken
+      console.log('🔍 Checking for existing MeToken before creation...');
+      try {
+        await checkUserMeToken();
+        if (userMeToken) {
+          setLocalError('You already have a MeToken. Please use the existing one or contact support if you need to create a new one.');
+          return;
+        }
+        
+        // Also check subgraph for any MeTokens that might not be in database yet
+        console.log('🔍 Checking subgraph for existing MeTokens...');
+        const { meTokensSubgraph } = await import('@/lib/sdk/metokens/subgraph');
+        const allMeTokens = await meTokensSubgraph.getAllMeTokens(20, 0);
+        console.log(`📋 Found ${allMeTokens.length} recent MeTokens in subgraph`);
+        
+        // Check if any of these MeTokens belong to our user
+        for (const meToken of allMeTokens.slice(0, 5)) {
+          try {
+            const { getMeTokenInfoFromBlockchain } = await import('@/lib/utils/metokenUtils');
+            const meTokenInfo = await getMeTokenInfoFromBlockchain(meToken.id);
+            if (meTokenInfo && meTokenInfo.owner.toLowerCase() === user?.address?.toLowerCase()) {
+              setLocalError('You already have a MeToken. Please use the "Sync Existing MeToken" button to load it.');
+              return;
+            }
+          } catch (err) {
+            console.warn('Failed to check MeToken ownership:', meToken.id, err);
+          }
+        }
+      } catch (checkErr) {
+        console.log('ℹ️ No existing MeToken found, proceeding with creation...');
+      }
+
       console.log('📝 Calling createMeToken with:', name.trim(), symbol.trim().toUpperCase(), daiAmount);
       await createMeToken(name.trim(), symbol.trim().toUpperCase(), 1, daiAmount);
       console.log('✅ createMeToken completed successfully');
       // Don't set success here - let the hook handle the state
     } catch (err) {
       console.error('❌ Error in createMeToken:', err);
-      setLocalError(err instanceof Error ? err.message : 'Failed to create MeToken');
+      
+      // Handle specific error cases with user-friendly messages
+      let errorMessage = 'Failed to create MeToken';
+      if (err instanceof Error) {
+        if (err.message.includes('already have a MeToken') || err.message.includes('already owns')) {
+          errorMessage = 'You already have a MeToken! Please use the "Sync Existing MeToken" button to load it, or contact support if you need to create a new one.';
+        } else if (err.message.includes('User denied') || err.message.includes('User rejected')) {
+          errorMessage = 'Transaction was cancelled by user.';
+        } else if (err.message.includes('insufficient funds')) {
+          errorMessage = 'Insufficient funds to complete the transaction.';
+        } else if (err.message.includes('gas')) {
+          errorMessage = 'Transaction failed due to gas issues. Please try again.';
+        } else {
+          errorMessage = err.message;
+        }
+      }
+      
+      setLocalError(errorMessage);
     }
   };
 

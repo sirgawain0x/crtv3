@@ -662,6 +662,13 @@ export default function Navbar() {
                         </span>
                       </Link>
                       <Link
+                        href="/portfolio"
+                        className={mobileMemberNavLinkClass}
+                        onClick={handleLinkClick}
+                      >
+                        <User className="mr-2 h-4 w-4" /> Portfolio
+                      </Link>
+                      <Link
                         href="/profile"
                         className={mobileMemberNavLinkClass}
                         onClick={handleLinkClick}

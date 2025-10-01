@@ -18,7 +18,7 @@ export interface UseAvatarUploadResult {
 export function useAvatarUpload(targetAddress?: string): UseAvatarUploadResult {
   const user = useUser();
   const { toast } = useToast();
-  const { updateProfile } = useCreatorProfile(targetAddress);
+  const { updateProfile, upsertProfile } = useCreatorProfile(targetAddress);
   
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -57,7 +57,11 @@ export function useAvatarUpload(targetAddress?: string): UseAvatarUploadResult {
 
       if (result.success && result.url) {
         // Update creator profile with new avatar URL
-        await updateProfile({ avatar_url: result.url });
+        // Use upsertProfile to handle cases where profile doesn't exist yet
+        await upsertProfile({ 
+          owner_address: address,
+          avatar_url: result.url 
+        });
         
         toast({
           title: "Avatar Updated",
@@ -101,7 +105,10 @@ export function useAvatarUpload(targetAddress?: string): UseAvatarUploadResult {
     try {
       // For IPFS, we can't actually delete the content, but we can remove the reference
       // Update creator profile to remove avatar URL
-      await updateProfile({ avatar_url: '' });
+      await upsertProfile({ 
+        owner_address: address,
+        avatar_url: '' 
+      });
       
       toast({
         title: "Avatar Removed",
