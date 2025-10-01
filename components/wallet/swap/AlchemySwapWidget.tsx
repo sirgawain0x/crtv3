@@ -129,10 +129,48 @@ export function AlchemySwapWidget({ onSwapSuccess, className }: AlchemySwapWidge
         
         console.log('ETH balance (wei):', ethBalance.toString());
         
+        // Get USDC balance (ERC20)
+        let usdcBalance = 0n;
+        try {
+          usdcBalance = await client.readContract({
+            address: BASE_TOKENS.USDC as Address,
+            abi: [{
+              name: 'balanceOf',
+              type: 'function',
+              stateMutability: 'view',
+              inputs: [{ name: 'account', type: 'address' }],
+              outputs: [{ name: 'balance', type: 'uint256' }],
+            }],
+            functionName: 'balanceOf',
+            args: [address as Address],
+          }) as bigint;
+        } catch (e) {
+          console.warn('Failed to fetch USDC balance:', e);
+        }
+
+        // Get DAI balance (ERC20)
+        let daiBalance = 0n;
+        try {
+          daiBalance = await client.readContract({
+            address: BASE_TOKENS.DAI as Address,
+            abi: [{
+              name: 'balanceOf',
+              type: 'function',
+              stateMutability: 'view',
+              inputs: [{ name: 'account', type: 'address' }],
+              outputs: [{ name: 'balance', type: 'uint256' }],
+            }],
+            functionName: 'balanceOf',
+            args: [address as Address],
+          }) as bigint;
+        } catch (e) {
+          console.warn('Failed to fetch DAI balance:', e);
+        }
+        
         const newBalances: Record<TokenSymbol, string> = {
           ETH: AlchemySwapService.parseAmount(`0x${ethBalance.toString(16)}` as Hex, 'ETH'),
-          USDC: '0', // TODO: Fetch ERC20 balances
-          DAI: '0',  // TODO: Fetch ERC20 balances
+          USDC: AlchemySwapService.parseAmount(`0x${usdcBalance.toString(16)}` as Hex, 'USDC'),
+          DAI: AlchemySwapService.parseAmount(`0x${daiBalance.toString(16)}` as Hex, 'DAI'),
         };
 
         console.log('Parsed balances:', newBalances);
@@ -201,7 +239,8 @@ export function AlchemySwapWidget({ onSwapSuccess, className }: AlchemySwapWidge
       if (requestedAmount > availableBalance) {
         setSwapState(prev => ({
           ...prev,
-          error: `Insufficient balance. You have ${availableBalance} ${swapState.fromToken}, but trying to swap ${requestedAmount} ${swapState.fromToken}`,
+          error: `Insufficient balance. You have ${availableBalance} ${swapState.fromToken}, ` +
+            `but trying to swap ${requestedAmount} ${swapState.fromToken}`,
         }));
         return;
       }
@@ -418,7 +457,8 @@ export function AlchemySwapWidget({ onSwapSuccess, className }: AlchemySwapWidge
       const minGasEth = parseEther('0.001');
       if (ethBalance < minGasEth) {
         throw new Error(
-          `Insufficient ETH for gas fees. You need at least 0.001 ETH, but you have ${formatEther(ethBalance)} ETH. Please add more ETH to your account.`
+          `Insufficient ETH for gas fees. You need at least 0.001 ETH, ` +
+            `but you have ${formatEther(ethBalance)} ETH. Please add more ETH to your account.`
         );
       }
 
@@ -803,7 +843,11 @@ export function AlchemySwapWidget({ onSwapSuccess, className }: AlchemySwapWidge
               </div>
               {address && balances[swapState.fromToken] && parseFloat(balances[swapState.fromToken]) > 0 && (
                 <div className="text-xs text-muted-foreground text-right">
-                  Max: ~{PriceService.formatUSD(usdValues.fromAmount > 0 ? parseFloat(balances[swapState.fromToken]) * prices[swapState.fromToken] : 0)}
+                  Max: ~{PriceService.formatUSD(
+                    usdValues.fromAmount > 0 
+                      ? parseFloat(balances[swapState.fromToken]) * prices[swapState.fromToken] 
+                      : 0
+                  )}
                 </div>
               )}
             </div>
@@ -866,7 +910,9 @@ export function AlchemySwapWidget({ onSwapSuccess, className }: AlchemySwapWidge
             <div className="space-y-1">
               <div className="flex justify-between text-xs">
                 <span className="text-muted-foreground">Exchange Rate</span>
-                <span>1 {swapState.fromToken} = {(parseFloat(swapState.toAmount) / parseFloat(swapState.fromAmount)).toFixed(6)} {swapState.toToken}</span>
+                <span>1 {swapState.fromToken} = {
+                  (parseFloat(swapState.toAmount) / parseFloat(swapState.fromAmount)).toFixed(6)
+                } {swapState.toToken}</span>
               </div>
               <div className="flex justify-between text-xs">
                 <span className="text-muted-foreground">You Pay</span>

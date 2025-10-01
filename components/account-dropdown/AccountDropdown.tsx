@@ -95,9 +95,11 @@ import {
   AllowlistModule,
   installValidationActions,
 } from "@account-kit/smart-contracts/experimental";
-import { parseEther } from "viem";
+import { parseEther, type Address, type Hex, encodeFunctionData, parseAbi, parseUnits, formatUnits, erc20Abi } from "viem";
 import { useToast } from "@/components/ui/use-toast";
 import { ToastAction } from "@/components/ui/toast";
+import { USDC_TOKEN_ADDRESSES, USDC_TOKEN_DECIMALS } from "@/lib/contracts/USDCToken";
+import { DAI_TOKEN_ADDRESSES, DAI_TOKEN_DECIMALS } from "@/lib/contracts/DAIToken";
 import { useSessionKeyStorage } from "@/lib/hooks/accountkit/useSessionKeyStorage";
 import { MembershipSection } from "./MembershipSection";
 import { shortenAddress } from "@/lib/utils/utils";
@@ -167,6 +169,27 @@ interface SessionKeyConfig {
   };
 }
 
+// Token configuration for send modal
+type TokenSymbol = 'ETH' | 'USDC' | 'DAI';
+
+const TOKEN_INFO = {
+  ETH: { 
+    decimals: 18, 
+    symbol: "ETH",
+    address: null, // Native token
+  },
+  USDC: { 
+    decimals: USDC_TOKEN_DECIMALS, 
+    symbol: "USDC",
+    address: USDC_TOKEN_ADDRESSES.base,
+  },
+  DAI: { 
+    decimals: DAI_TOKEN_DECIMALS, 
+    symbol: "DAI",
+    address: DAI_TOKEN_ADDRESSES.base,
+  },
+} as const;
+
 const SESSION_KEY_TYPES: SessionKeyConfig[] = [
   {
     type: "global",
@@ -223,6 +246,12 @@ export function AccountDropdown() {
   const [recipientAddress, setRecipientAddress] = useState<string>("");
   const [sendAmount, setSendAmount] = useState<string>("");
   const [isSending, setIsSending] = useState(false);
+  const [selectedToken, setSelectedToken] = useState<TokenSymbol>('ETH');
+  const [tokenBalances, setTokenBalances] = useState<Record<TokenSymbol, string>>({
+    ETH: '0',
+    USDC: '0',
+    DAI: '0',
+  });
   const { toast } = useToast();
   const [isLinksLoading, setIsLinksLoading] = useState(false);
 
@@ -318,6 +347,46 @@ export function AccountDropdown() {
   useEffect(() => {
     setIsDialogOpen(false);
   }, [user]);
+
+  // Fetch token balances when dialog opens with send action
+  useEffect(() => {
+    const fetchTokenBalances = async () => {
+      if (!client || !account?.address || dialogAction !== 'send' || !isDialogOpen) return;
+
+      try {
+        // Get ETH balance
+        const ethBalance = await client.getBalance({
+          address: account.address as Address,
+        });
+        
+        // Get USDC balance
+        const usdcBalance = await client.readContract({
+          address: USDC_TOKEN_ADDRESSES.base as Address,
+          abi: erc20Abi,
+          functionName: 'balanceOf',
+          args: [account.address as Address],
+        }) as bigint;
+        
+        // Get DAI balance
+        const daiBalance = await client.readContract({
+          address: DAI_TOKEN_ADDRESSES.base as Address,
+          abi: erc20Abi,
+          functionName: 'balanceOf',
+          args: [account.address as Address],
+        }) as bigint;
+
+        setTokenBalances({
+          ETH: formatUnits(ethBalance, 18),
+          USDC: formatUnits(usdcBalance, USDC_TOKEN_DECIMALS),
+          DAI: formatUnits(daiBalance, DAI_TOKEN_DECIMALS),
+        });
+      } catch (error) {
+        console.error('Error fetching token balances:', error);
+      }
+    };
+
+    fetchTokenBalances();
+  }, [client, account?.address, dialogAction, isDialogOpen]);
 
   const copyToClipboard = async () => {
     const addressToCopy =
@@ -453,20 +522,65 @@ export function AccountDropdown() {
   const handleSend = async () => {
     if (!client || !recipientAddress || !sendAmount) return;
 
+    // Check balance
+    const availableBalance = parseFloat(tokenBalances[selectedToken]);
+    const requestedAmount = parseFloat(sendAmount);
+    
+    if (requestedAmount > availableBalance) {
+      toast({
+        variant: "destructive",
+        title: "Insufficient Balance",
+        description: `You have ${availableBalance} ${selectedToken}, but trying to send ${requestedAmount} ${selectedToken}`,
+      });
+      return;
+    }
+
     try {
       setIsSending(true);
       toast({
         title: "Transaction Initiated",
-        description: "Please confirm the transaction in your wallet...",
+        description: `Sending ${sendAmount} ${selectedToken}...`,
       });
 
-      sendUserOperation({
-        uo: {
-          target: recipientAddress as `0x${string}`,
-          data: "0x",
-          value: parseEther(sendAmount.toString()),
-        },
-      });
+      const tokenInfo = TOKEN_INFO[selectedToken];
+
+      if (selectedToken === 'ETH') {
+        // Send native ETH
+        const valueInWei = parseUnits(sendAmount, tokenInfo.decimals);
+
+        sendUserOperation({
+          uo: {
+            target: recipientAddress as `0x${string}`,
+            data: "0x" as Hex,
+            value: valueInWei,
+          },
+        });
+      } else {
+        // Send ERC-20 token (USDC or DAI)
+        const tokenAmount = parseUnits(sendAmount, tokenInfo.decimals);
+        
+        // Encode the transfer calldata
+        const transferCalldata = encodeFunctionData({
+          abi: parseAbi(["function transfer(address,uint256) returns (bool)"]),
+          functionName: "transfer",
+          args: [recipientAddress as Address, tokenAmount],
+        });
+
+        console.log('Sending ERC-20 transfer:', {
+          token: selectedToken,
+          tokenAddress: tokenInfo.address,
+          recipient: recipientAddress,
+          amount: tokenAmount.toString(),
+        });
+
+        sendUserOperation({
+          uo: {
+            target: tokenInfo.address as Address,
+            data: transferCalldata as Hex,
+            value: BigInt(0), // No native value for ERC-20 transfers
+          },
+        });
+      }
     } catch (error: unknown) {
       console.error("Error sending transaction:", error);
       toast({
@@ -553,23 +667,58 @@ export function AccountDropdown() {
         return (
           <div className="space-y-4">
             <p className="text-sm text-gray-500">
-              Send crypto to another address.
+              Send ETH, USDC, or DAI to another wallet address.
             </p>
             <div className="flex flex-col gap-4">
-              <input
-                type="text"
-                placeholder="Recipient Address"
-                className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
-                value={recipientAddress}
-                onChange={(e) => setRecipientAddress(e.target.value)}
-              />
-              <input
-                type="number"
-                placeholder="Amount"
-                className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
-                value={sendAmount}
-                onChange={(e) => setSendAmount(e.target.value)}
-              />
+              {/* Token Selection */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Token</label>
+                <select
+                  className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
+                  value={selectedToken}
+                  onChange={(e) => setSelectedToken(e.target.value as TokenSymbol)}
+                >
+                  <option value="ETH">ETH</option>
+                  <option value="USDC">USDC</option>
+                  <option value="DAI">DAI</option>
+                </select>
+                <div className="flex justify-between text-xs text-gray-500">
+                  <span>Balance: {parseFloat(tokenBalances[selectedToken]).toFixed(6)} {selectedToken}</span>
+                  <button
+                    type="button"
+                    onClick={() => setSendAmount(tokenBalances[selectedToken])}
+                    className="text-blue-600 hover:text-blue-700 dark:text-blue-400"
+                  >
+                    MAX
+                  </button>
+                </div>
+              </div>
+
+              {/* Recipient Address */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Recipient Address</label>
+                <input
+                  type="text"
+                  placeholder="0x..."
+                  className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
+                  value={recipientAddress}
+                  onChange={(e) => setRecipientAddress(e.target.value)}
+                />
+              </div>
+
+              {/* Amount */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Amount ({selectedToken})</label>
+                <input
+                  type="number"
+                  placeholder="0.0"
+                  step="any"
+                  className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
+                  value={sendAmount}
+                  onChange={(e) => setSendAmount(e.target.value)}
+                />
+              </div>
+
               <Button
                 className="w-full"
                 onClick={handleSend}
@@ -583,10 +732,13 @@ export function AccountDropdown() {
                 {isSending || isSendingUserOperation ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Sending...
+                    Sending {selectedToken}...
                   </>
                 ) : (
-                  "Send"
+                  <>
+                    <Send className="mr-2 h-4 w-4" />
+                    Send {selectedToken}
+                  </>
                 )}
               </Button>
             </div>

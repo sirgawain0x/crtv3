@@ -233,7 +233,8 @@ Original error: ${result.error.message}`;
       } else if (result.error.message?.includes('invalid token')) {
         specificMessage = `Invalid token: The ${fromToken} or ${toToken} token address is not valid on Base network.`;
       } else if (result.error.message?.includes('account not deployed')) {
-        specificMessage = `Smart account not deployed: Your smart account needs to be deployed on Base network before you can perform swaps. Try sending a small amount of ETH to your account first.`;
+        specificMessage = `Smart account not deployed: Your smart account needs to be deployed on Base network ` +
+          `before you can perform swaps. Try sending a small amount of ETH to your account first.`;
       }
       
       throw new Error(specificMessage);

@@ -48,6 +48,17 @@ CREATE TABLE IF NOT EXISTS metoken_transactions (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Creator Profiles table (replacing OrbisDB metadata)
+CREATE TABLE IF NOT EXISTS creator_profiles (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  owner_address TEXT UNIQUE NOT NULL, -- Creator's wallet address (primary key)
+  username TEXT,
+  bio TEXT,
+  avatar_url TEXT, -- URL to avatar image in Supabase Storage
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Video Assets table
 CREATE TABLE IF NOT EXISTS video_assets (
   id SERIAL PRIMARY KEY,
@@ -83,6 +94,10 @@ CREATE INDEX IF NOT EXISTS idx_metokens_owner ON metokens(owner_address);
 CREATE INDEX IF NOT EXISTS idx_metokens_address ON metokens(address);
 CREATE INDEX IF NOT EXISTS idx_metokens_tvl ON metokens(tvl DESC);
 
+-- Creator profiles indexes
+CREATE INDEX IF NOT EXISTS idx_creator_profiles_owner ON creator_profiles(owner_address);
+CREATE INDEX IF NOT EXISTS idx_creator_profiles_username ON creator_profiles(username);
+
 -- Video assets indexes
 CREATE INDEX IF NOT EXISTS idx_video_assets_creator ON video_assets(creator_id);
 CREATE INDEX IF NOT EXISTS idx_video_assets_status ON video_assets(status);
@@ -103,6 +118,7 @@ CREATE INDEX IF NOT EXISTS idx_metokens_search ON metokens USING gin(to_tsvector
 ALTER TABLE metokens ENABLE ROW LEVEL SECURITY;
 ALTER TABLE metoken_balances ENABLE ROW LEVEL SECURITY;
 ALTER TABLE metoken_transactions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE creator_profiles ENABLE ROW LEVEL SECURITY;
 
 -- Policies for metokens table
 CREATE POLICY "Anyone can view metokens" ON metokens
@@ -131,6 +147,19 @@ CREATE POLICY "Users can view all transactions" ON metoken_transactions
 CREATE POLICY "Users can insert their own transactions" ON metoken_transactions
   FOR INSERT WITH CHECK (auth.jwt() ->> 'address' = user_address);
 
+-- Policies for creator_profiles table
+CREATE POLICY "Anyone can view creator profiles" ON creator_profiles
+  FOR SELECT USING (true);
+
+CREATE POLICY "Users can insert their own profile" ON creator_profiles
+  FOR INSERT WITH CHECK (auth.jwt() ->> 'address' = owner_address);
+
+CREATE POLICY "Users can update their own profile" ON creator_profiles
+  FOR UPDATE USING (auth.jwt() ->> 'address' = owner_address);
+
+CREATE POLICY "Users can delete their own profile" ON creator_profiles
+  FOR DELETE USING (auth.jwt() ->> 'address' = owner_address);
+
 -- Functions for updating timestamps
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
@@ -147,6 +176,10 @@ CREATE TRIGGER update_metokens_updated_at
 
 CREATE TRIGGER update_metoken_balances_updated_at 
   BEFORE UPDATE ON metoken_balances 
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_creator_profiles_updated_at 
+  BEFORE UPDATE ON creator_profiles 
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Function to get MeToken statistics

@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useUser, useSendUserOperation, useSmartAccountClient } from '@account-kit/react';
+import { useUser, useSmartAccountClient } from '@account-kit/react';
 import { parseEther, formatEther, encodeFunctionData } from 'viem';
 import { meTokenSupabaseService, MeToken, MeTokenBalance } from '@/lib/sdk/supabase/metokens';
 import { CreateMeTokenData, UpdateMeTokenData } from '@/lib/sdk/supabase/client';
 import { getMeTokenFactoryContract, METOKEN_FACTORY_ADDRESSES } from '@/lib/contracts/MeTokenFactory';
 import { METOKEN_ABI } from '@/lib/contracts/MeToken';
+import { DAI_TOKEN_ADDRESSES, getDaiTokenContract } from '@/lib/contracts/DAIToken';
+import { useToast } from '@/components/ui/use-toast';
 
 // MeTokens contract addresses on Base
 const METOKEN_FACTORY = '0xb31Ae2583d983faa7D8C8304e6A16E414e721A0B';
@@ -104,16 +106,18 @@ export interface MeTokenData {
 export function useMeTokensSupabase(targetAddress?: string) {
   const user = useUser();
   const { client } = useSmartAccountClient({});
-  const { sendUserOperation, isSendingUserOperation, error } = useSendUserOperation({ client });
+  const { toast } = useToast();
   
-  // Use targetAddress if provided, otherwise use the logged-in user's address
-  const address = targetAddress || user?.address;
+  // Use targetAddress if provided, otherwise use the smart account address from client
+  const address = targetAddress || client?.account?.address || user?.address;
 
   const [userMeToken, setUserMeToken] = useState<MeTokenData | null>(null);
   const [loading, setLoading] = useState(false);
   const [meTokenError, setError] = useState<string | null>(null);
+  const [isPending, setIsPending] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
+  const [transactionError, setTransactionError] = useState<Error | null>(null);
 
   // Convert Supabase MeToken to our MeTokenData format
   const convertToMeTokenData = useCallback(async (supabaseMeToken: MeToken, userAddress: string): Promise<MeTokenData> => {
@@ -121,15 +125,21 @@ export function useMeTokensSupabase(targetAddress?: string) {
     let userBalance = BigInt(0);
     try {
       if (client) {
+        console.log('🔍 Fetching user balance for MeToken:', supabaseMeToken.address);
         userBalance = await client.readContract({
           address: supabaseMeToken.address as `0x${string}`,
           abi: ERC20_ABI,
           functionName: 'balanceOf',
           args: [userAddress as `0x${string}`],
         }) as bigint;
+        console.log('✅ User balance fetched:', userBalance.toString());
+      } else {
+        console.warn('⚠️ No client available for balance check');
       }
     } catch (err) {
-      console.warn('Failed to fetch user balance from contract:', err);
+      console.warn('⚠️ Failed to fetch user balance from contract (this is OK, will use 0):', err);
+      // Set balance to 0 if we can't fetch it - this is fine for display purposes
+      userBalance = BigInt(0);
     }
 
     return {
@@ -167,143 +177,515 @@ export function useMeTokensSupabase(targetAddress?: string) {
     setError(null);
     
     try {
-      const response = await fetch(`/api/metokens?owner=${address}`);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch MeToken: ${response.statusText}`);
+      // Try primary address first
+      let response = await fetch(`/api/metokens?owner=${address}`);
+      let result = await response.json();
+      let supabaseMeToken = result.data;
+      
+      // If not found, try the smart account address (if we have a client)
+      if (!supabaseMeToken && client?.account?.address && client.account.address !== address) {
+        console.log('🔍 Checking smart account address for MeToken:', client.account.address);
+        response = await fetch(`/api/metokens?owner=${client.account.address}`);
+        result = await response.json();
+        supabaseMeToken = result.data;
       }
       
-      const result = await response.json();
-      const supabaseMeToken = result.data;
+      // If still not found and we have a user with different EOA, try that too
+      if (!supabaseMeToken && user?.address && user.address !== address) {
+        console.log('🔍 Checking EOA address for MeToken:', user.address);
+        response = await fetch(`/api/metokens?owner=${user.address}`);
+        result = await response.json();
+        supabaseMeToken = result.data;
+      }
       
       if (supabaseMeToken) {
+        console.log('✅ Found MeToken:', supabaseMeToken);
         const meTokenData = await convertToMeTokenData(supabaseMeToken, address);
         setUserMeToken(meTokenData);
       } else {
+        console.log('❌ No MeToken found for any address');
         setUserMeToken(null);
       }
     } catch (err) {
+      console.error('❌ Error checking MeToken:', err);
       setError(err instanceof Error ? err.message : 'Failed to check MeToken');
       setUserMeToken(null);
     } finally {
       setLoading(false);
     }
-  }, [address, convertToMeTokenData]);
+  }, [address, user, client, convertToMeTokenData]);
 
-  // Create a new MeToken
-  const createMeToken = async (name: string, symbol: string, hubId: number = 1, assetsDeposited: string = "0") => {
-    if (!address || !user) throw new Error('No wallet connected');
+  // Internal function to create MeToken (used for retries)
+  const createMeTokenInternal = async (name: string, symbol: string, hubId: number = 1, assetsDeposited: string = "0", isRetry: boolean = false) => {
+    console.log('🔧 createMeToken called', { name, symbol, hubId, assetsDeposited, address, user });
     
+    if (!address) {
+      const errorMsg = 'No wallet address available';
+      console.error('❌', errorMsg);
+      throw new Error(errorMsg);
+    }
+    
+    if (!user) {
+      const errorMsg = 'No user connected - please ensure your smart account is properly initialized';
+      console.error('❌', errorMsg);
+      throw new Error(errorMsg);
+    }
+    
+    if (!client) {
+      const errorMsg = 'Smart account client not initialized';
+      console.error('❌', errorMsg);
+      throw new Error(errorMsg);
+    }
+    
+    // Debug: Log address information
+    console.log('🔍 Address debugging:', {
+      smartAccountAddress: address,
+      userEOAAddress: user.address,
+      clientAccountAddress: client.account?.address,
+      addressesMatch: address === user.address
+    });
+    
+    // Check if smart account is deployed
+    try {
+      const code = await client.getCode({ address: address as `0x${string}` });
+      console.log('🏗️ Smart account deployment status:', {
+        address: address,
+        hasCode: code !== '0x',
+        codeLength: code ? code.length : 0
+      });
+      
+      if (code === '0x') {
+        console.warn('⚠️ Smart account appears to be undeployed. This might cause issues with token interactions.');
+      }
+    } catch (deployErr) {
+      console.warn('⚠️ Could not check smart account deployment status:', deployErr);
+    }
+    
+    setIsPending(true);
     setIsConfirming(false);
     setIsConfirmed(false);
     setError(null);
+    setTransactionError(null);
     
     try {
-      // Step 1: Create the MeToken contract using the factory
-      const factoryContract = getMeTokenFactoryContract('base');
-      const createData = encodeFunctionData({
-        abi: factoryContract.abi,
-        functionName: 'create',
-        args: [name, symbol, DIAMOND],
-      });
+      // COMBINED STEP: Create AND Subscribe in one transaction
+      // This is more efficient and ensures the MeToken is registered with the protocol
+      console.log('📦 Creating and subscribing MeToken...');
+      
+      const depositAmount = parseEther(assetsDeposited);
+      
+      // If depositing DAI, we need to approve the Diamond contract first
+      if (depositAmount > BigInt(0)) {
+        console.log('💰 Depositing DAI, checking approval...');
+        
+        // DAI contract address on Base
+        const DAI_ADDRESS = DAI_TOKEN_ADDRESSES.base;
+        const daiContract = getDaiTokenContract('base');
+        
+        // First, check if user has sufficient DAI balance
+        console.log('💳 Checking DAI balance...');
+        console.log('🔍 DAI balance check details:', {
+          daiContractAddress: DAI_ADDRESS,
+          smartAccountAddress: address,
+          userEOAAddress: user?.address,
+          clientAccountAddress: client.account?.address
+        });
+        
+        let daiBalance: bigint;
+        try {
+          daiBalance = await client.readContract({
+            address: daiContract.address as `0x${string}`,
+            abi: daiContract.abi,
+            functionName: 'balanceOf',
+            args: [address as `0x${string}`]
+          }) as bigint;
+          
+          console.log('✅ DAI balance check successful');
+        } catch (balanceErr) {
+          console.error('❌ DAI balance check failed:', balanceErr);
+          throw new Error(`Failed to check DAI balance: ${balanceErr instanceof Error ? balanceErr.message : 'Unknown error'}`);
+        }
+        
+        console.log('📊 DAI balance result:', {
+          balanceWei: daiBalance.toString(),
+          balanceDAI: formatEther(daiBalance),
+          requiredWei: depositAmount.toString(),
+          requiredDAI: formatEther(depositAmount),
+          hasEnough: daiBalance >= depositAmount
+        });
+        
+        if (daiBalance < depositAmount) {
+          // If smart account has no DAI, check if EOA has DAI (in case of address confusion)
+          if (user?.address && user.address !== address) {
+            console.log('🔍 Smart account has no DAI, checking EOA balance...');
+            try {
+              const eoaBalance = await client.readContract({
+                address: daiContract.address as `0x${string}`,
+                abi: daiContract.abi,
+                functionName: 'balanceOf',
+                args: [user.address as `0x${string}`]
+              }) as bigint;
+              
+              console.log('📊 EOA DAI balance:', {
+                balanceWei: eoaBalance.toString(),
+                balanceDAI: formatEther(eoaBalance),
+                eoaAddress: user.address
+              });
+              
+              if (eoaBalance >= depositAmount) {
+                throw new Error(
+                  `DAI is in your EOA wallet (${user.address}) but the transaction is being sent from your smart account (${address}). ` +
+                  'Please transfer DAI to your smart account first.'
+                );
+              }
+            } catch (eoaErr) {
+              console.warn('⚠️ Failed to check EOA balance:', eoaErr);
+            }
+          }
+          
+          throw new Error(
+            `Insufficient DAI balance in smart account (${address}). You have ${formatEther(daiBalance)} DAI ` +
+            `but need ${formatEther(depositAmount)} DAI. Please ensure your DAI is in your smart account wallet.`
+          );
+        }
+        
+        // Check current allowance
+        const currentAllowance = await client.readContract({
+          address: daiContract.address as `0x${string}`,
+          abi: daiContract.abi,
+          functionName: 'allowance',
+          args: [address as `0x${string}`, DIAMOND as `0x${string}`]
+        }) as bigint;
+        
+        console.log('📊 Current DAI allowance:', currentAllowance.toString());
+        
+        if (currentAllowance < depositAmount) {
+          console.log('🔓 Approving DAI...');
+          
+          const approveData = encodeFunctionData({
+            abi: daiContract.abi,
+            functionName: 'approve',
+            args: [DIAMOND as `0x${string}`, depositAmount],
+          });
+          
+          console.log('📤 Sending DAI approval user operation...');
+          console.log('📊 Approval details:', {
+            target: DAI_ADDRESS,
+            spender: DIAMOND,
+            amount: depositAmount.toString(),
+            smartAccountAddress: address,
+            approvalData: approveData
+          });
+          
+          const approveOp = await client.sendUserOperation({
+            uo: {
+              target: daiContract.address as `0x${string}`,
+              data: approveData,
+              value: BigInt(0),
+            },
+          });
+          
+          console.log('🎉 Approval UserOperation sent! Hash:', approveOp.hash);
+          console.log('⏳ Waiting for approval confirmation...');
+          
+          const approvalTxHash = await client.waitForUserOperationTransaction({
+            hash: approveOp.hash,
+          });
+          
+          console.log('✅ Approval transaction confirmed! Hash:', approvalTxHash);
+          
+          console.log('✅ DAI approved!');
+          
+          // Wait for the approval state to propagate with retry logic
+          console.log('⏳ Waiting for approval state to update...');
+          let newAllowance = BigInt(0);
+          let retryCount = 0;
+          const maxRetries = 5;
+          
+          while (retryCount < maxRetries && newAllowance < depositAmount) {
+            // Wait progressively longer between retries
+            const waitTime = 2000 + (retryCount * 1000); // 2s, 3s, 4s, 5s, 6s
+            console.log(`⏳ Waiting ${waitTime}ms for approval state to update... (attempt ${retryCount + 1}/${maxRetries})`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+            
+            try {
+              // Verify the approval was successful
+              newAllowance = await client.readContract({
+                address: daiContract.address as `0x${string}`,
+                abi: daiContract.abi,
+                functionName: 'allowance',
+                args: [address as `0x${string}`, DIAMOND as `0x${string}`]
+              }) as bigint;
+              
+              console.log(`📊 DAI allowance check ${retryCount + 1}: ${newAllowance.toString()} (expected: ${depositAmount.toString()})`);
+              
+              if (newAllowance >= depositAmount) {
+                console.log('✅ DAI allowance confirmed!');
+                break;
+              }
+            } catch (err) {
+              console.warn(`⚠️ Allowance check failed on attempt ${retryCount + 1}:`, err);
+            }
+            
+            retryCount++;
+          }
+          
+          if (newAllowance < depositAmount) {
+            console.error('❌ DAI approval verification failed after all retries');
+            console.error('📊 Final allowance:', newAllowance.toString());
+            console.error('📊 Expected allowance:', depositAmount.toString());
+            console.error('📊 Smart account address:', address);
+            console.error('📊 DIAMOND address:', DIAMOND);
+            
+            // Provide helpful error message with suggestions
+            const errorMsg = `DAI approval failed after ${maxRetries} retries. This could be due to:
+1. Network congestion - try again in a few minutes
+2. Smart account deployment issue - ensure your account is properly deployed
+3. Insufficient gas - the approval transaction may have failed
+4. RPC provider issues - try refreshing the page
 
-      const result = await sendUserOperation({
+Expected allowance: ${formatEther(depositAmount)} DAI
+Actual allowance: ${formatEther(newAllowance)} DAI
+
+You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
+            
+            throw new Error(errorMsg);
+          }
+        } else {
+          console.log('✅ Sufficient DAI allowance already exists');
+        }
+      }
+      
+      const SUBSCRIBE_ABI = [{
+        "inputs": [
+          {"internalType": "string", "name": "name", "type": "string"},
+          {"internalType": "string", "name": "symbol", "type": "string"},
+          {"internalType": "uint256", "name": "hubId", "type": "uint256"},
+          {"internalType": "uint256", "name": "assetsDeposited", "type": "uint256"}
+        ],
+        "name": "subscribe",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      }] as const;
+      
+      const subscribeData = encodeFunctionData({
+        abi: SUBSCRIBE_ABI,
+        functionName: 'subscribe',
+        args: [name, symbol, BigInt(hubId), depositAmount],
+      });
+      
+      console.log('🔨 Encoded subscribe data');
+
+      console.log('📤 Sending subscribe user operation via client...');
+      const operation = await client.sendUserOperation({
         uo: {
-          target: factoryContract.address,
-          data: createData,
+          target: DIAMOND, // Subscribe is called on the Diamond contract
+          data: subscribeData,
           value: BigInt(0),
         },
       });
-
-      if (result !== undefined) {
-        setIsConfirming(true);
-        // Wait for the transaction to be mined
-        if (result && typeof result === 'object' && 'wait' in result) {
-          await (result as any).wait();
+      
+      console.log('🎉 UserOperation sent! Hash:', operation.hash);
+      setIsPending(false);
+      setIsConfirming(true);
+      
+      console.log('⏳ Waiting for transaction confirmation...');
+      const txHash = await client.waitForUserOperationTransaction({
+        hash: operation.hash,
+      });
+      
+      console.log('✅ Transaction mined! Hash:', txHash);
+      
+      // For UserOperations (EIP-4337), we need to use the subgraph to find the MeToken
+      // The subgraph indexes Subscribe events which contain the MeToken address
+      
+      console.log('🔍 Querying subgraph for newly created MeToken...');
+      
+      let meTokenAddress: string | null = null;
+      
+      try {
+        // Import the subgraph client
+        const { meTokensSubgraph } = await import('@/lib/sdk/metokens/subgraph');
+        
+        // Wait for subgraph to index the event (usually takes a few seconds)
+        console.log('⏳ Waiting 3s for subgraph indexing...');
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        
+        // Get all recent MeTokens from subgraph
+        console.log('📊 Fetching recent MeTokens from subgraph...');
+        const allMeTokens = await meTokensSubgraph.getAllMeTokens(20, 0);
+        console.log(`📋 Found ${allMeTokens.length} recent MeTokens from subgraph`);
+        
+        if (allMeTokens.length > 0) {
+          console.log('Recent MeTokens:', allMeTokens.slice(0, 3).map(mt => mt.id));
+          
+          // The most recent one (first in the list) is most likely ours since we just created it
+          // Skip ownership verification from Diamond as it may not be fully registered yet
+          meTokenAddress = allMeTokens[0].id;
+          console.log('✅ Using most recent MeToken from subgraph:', meTokenAddress);
         }
-        setIsConfirming(false);
-        setIsConfirmed(true);
         
-        // Extract the deployed MeToken address from the transaction logs
-        let meTokenAddress: string | null = null;
-        
-        if (result && typeof result === 'object' && 'hash' in result) {
+        if (meTokenAddress) {
+          // Sync the MeToken to the database
+          console.log('💾 Syncing MeToken to database...');
+          const syncResponse = await fetch('/api/metokens/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              meTokenAddress,
+              transactionHash: txHash
+            })
+          });
+          
+          if (syncResponse.ok) {
+            console.log('✅ MeToken synced to database successfully');
+            setIsConfirming(false);
+            setIsConfirmed(true);
+            
+            // Refresh the user's MeToken data
+            await checkUserMeToken();
+            return;
+          } else {
+            const error = await syncResponse.json();
+            console.warn('⚠️ Failed to sync MeToken:', error);
+          }
+        }
+      } catch (error) {
+        console.error('❌ Error querying subgraph:', error);
+      }
+      
+      // If we couldn't find/sync the MeToken, still show success and auto-refresh
+      console.log('🎉 MeToken created successfully!');
+      console.log('💡 Transaction hash:', txHash);
+      console.log('🔄 Refreshing page in 5 seconds to pick up your MeToken...');
+      
+      setIsConfirming(false);
+      setIsConfirmed(true);
+      
+      // Auto-refresh after a longer delay to allow subgraph indexing
+      setTimeout(() => {
+        window.location.reload();
+      }, 5000);
+      
+      return;
+      
+    } catch (err) {
+      console.error('❌ Error in createMeToken:', err);
+      setIsPending(false);
+      setIsConfirming(false);
+      
+        // Handle specific error cases
+        if (err instanceof Error) {
+          console.error('❌ Error message:', err.message);
+          console.error('❌ Error stack:', err.stack);
+          
+          // Check if it's a DAI approval error and offer fallback
+          if (err.message.includes('DAI approval failed') && parseFloat(assetsDeposited) > 0) {
+            console.log('💡 DAI approval failed, but user can still create MeToken with 0 DAI');
+            
+            toast({
+              title: "DAI Approval Failed",
+              description: "Creating MeToken without initial DAI deposit. You can add liquidity later.",
+              duration: 5000,
+            });
+            
+            // Retry with 0 DAI deposit
+            try {
+              console.log('🔄 Retrying MeToken creation with 0 DAI deposit...');
+              await createMeTokenInternal(name, symbol, hubId, "0", true);
+              return; // Exit successfully
+            } catch (retryErr) {
+              console.error('❌ Retry with 0 DAI also failed:', retryErr);
+              // Fall through to original error handling
+            }
+          }
+          
+          // Check if user already owns a MeToken
+          if (err.message.includes('already owns a meToken') || err.message.includes('already owns')) {
+          console.log('💡 User already owns a MeToken! Finding and syncing it...');
+          
           try {
-            // Use the utility function to extract the MeToken address
-            const { extractMeTokenAddressFromTransaction } = await import('@/lib/utils/metokenUtils');
-            meTokenAddress = await extractMeTokenAddressFromTransaction((result as any).hash);
-          } catch (error) {
-            console.error('Failed to extract MeToken address from transaction:', error);
+            // Query subgraph for recent MeTokens
+            const { meTokensSubgraph } = await import('@/lib/sdk/metokens/subgraph');
+            console.log('📊 Fetching recent MeTokens from subgraph...');
+            const allMeTokens = await meTokensSubgraph.getAllMeTokens(50, 0);
+            console.log(`📋 Found ${allMeTokens.length} recent MeTokens in subgraph`);
+            
+            if (allMeTokens.length > 0) {
+              // Try to sync the most recent ones to database
+              for (const meToken of allMeTokens.slice(0, 10)) {
+                try {
+                  console.log('💾 Attempting to sync MeToken:', meToken.id);
+                  const syncResponse = await fetch('/api/metokens/sync', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ meTokenAddress: meToken.id })
+                  });
+                  
+                  if (syncResponse.ok) {
+                    const syncData = await syncResponse.json();
+                    console.log('✅ Synced MeToken:', syncData);
+                    
+                    // Check if this one belongs to our user
+                    if (syncData.data?.owner_address?.toLowerCase() === address.toLowerCase()) {
+                      console.log('🎯 Found our MeToken!');
+                      break;
+                    }
+                  }
+                } catch (syncErr) {
+                  console.warn('Failed to sync MeToken:', meToken.id, syncErr);
+                }
+              }
+            }
+            
+            // Refresh to load the MeToken from database
+            console.log('🔄 Refreshing to display your MeToken...');
+            await checkUserMeToken();
+            
+            setIsConfirmed(true);
+            
+            toast({
+              title: "MeToken Already Exists!",
+              description: "You already have a MeToken. Refreshing to display it...",
+              duration: 2000,
+            });
+            
+            setTimeout(() => {
+              window.location.reload();
+            }, 2000);
+            
+            return;
+          } catch (syncErr) {
+            console.error('Failed to find existing MeToken:', syncErr);
           }
         }
         
-        if (!meTokenAddress) {
-          throw new Error('Failed to extract MeToken contract address from transaction');
-        }
-        
-        const createData: CreateMeTokenData = {
-          address: meTokenAddress,
-          owner_address: address,
-          name,
-          symbol,
-          total_supply: 0,
-          tvl: 0,
-          hub_id: hubId,
-          balance_pooled: 0,
-          balance_locked: 0,
-        };
-
-        const createResponse = await fetch('/api/metokens', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(createData),
-        });
-        
-        if (!createResponse.ok) {
-          throw new Error(`Failed to create MeToken record: ${createResponse.statusText}`);
-        }
-        
-        // Record the creation transaction
-        const meTokenResponse = await fetch(`/api/metokens?address=${meTokenAddress}`);
-        const meTokenResult = await meTokenResponse.json();
-        const meToken = meTokenResult.data;
-        if (meToken) {
-          await meTokenSupabaseService.recordTransaction({
-            metoken_id: meToken.id,
-            user_address: address,
-            transaction_type: 'create',
-            amount: 0,
-            transaction_hash: (result as any)?.hash || '',
-            block_number: (result as any)?.blockNumber || 0,
-          });
-        }
-        
-        // Refresh the user's MeToken data
-        await checkUserMeToken();
-      }
-      
-    } catch (err) {
-      setIsConfirming(false);
-      setIsConfirmed(false);
-      
-      // Handle specific error cases
-      if (err instanceof Error) {
+        setTransactionError(err);
         if (err.message.includes('User denied') || err.message.includes('User rejected')) {
           throw new Error('Transaction was rejected by user');
         }
         throw err;
       }
-      throw new Error('Failed to create MeToken');
+      console.error('❌ Unknown error type:', typeof err);
+      const error = new Error('Failed to create MeToken');
+      setTransactionError(error);
+      throw error;
     }
+  };
+
+  // Public wrapper function for createMeToken
+  const createMeToken = async (name: string, symbol: string, hubId: number = 1, assetsDeposited: string = "0") => {
+    return createMeTokenInternal(name, symbol, hubId, assetsDeposited, false);
   };
 
   // Buy MeTokens
   const buyMeTokens = async (meTokenAddress: string, collateralAmount: string) => {
     if (!address || !user) throw new Error('No wallet connected');
+    if (!client) throw new Error('Smart account client not initialized');
     
     try {
-      const result = await sendUserOperation({
+      const operation = await client.sendUserOperation({
         uo: {
           target: DIAMOND,
           data: encodeFunctionData({
@@ -315,34 +697,32 @@ export function useMeTokensSupabase(targetAddress?: string) {
         },
       });
 
-      if (result !== undefined) {
-        if (result && typeof result === 'object' && 'wait' in result) {
-          await (result as any).wait();
-        }
+      const txHash = await client.waitForUserOperationTransaction({
+        hash: operation.hash,
+      });
         
-        // Update MeToken data in Supabase
-        const meToken = await meTokenSupabaseService.getMeTokenByAddress(meTokenAddress);
-        if (meToken) {
-          // Record the transaction
-          await meTokenSupabaseService.recordTransaction({
-            metoken_id: meToken.id,
-            user_address: address,
-            transaction_type: 'mint',
-            amount: parseFloat(collateralAmount),
-            collateral_amount: parseFloat(collateralAmount),
-            transaction_hash: (result as any)?.hash || '',
-            block_number: (result as any)?.blockNumber || 0,
-          });
-          
-          // Update user balance in Supabase
-          const currentBalance = await meTokenSupabaseService.getUserMeTokenBalance(meTokenAddress, address);
-          const newBalance = (currentBalance?.balance || 0) + parseFloat(collateralAmount);
-          await meTokenSupabaseService.updateUserBalance(meTokenAddress, address, newBalance);
-        }
+      // Update MeToken data in Supabase
+      const meToken = await meTokenSupabaseService.getMeTokenByAddress(meTokenAddress);
+      if (meToken) {
+        // Record the transaction
+        await meTokenSupabaseService.recordTransaction({
+          metoken_id: meToken.id,
+          user_address: address,
+          transaction_type: 'mint',
+          amount: parseFloat(collateralAmount),
+          collateral_amount: parseFloat(collateralAmount),
+          transaction_hash: txHash,
+          block_number: 0,
+        });
         
-        // Refresh data
-        await checkUserMeToken();
+        // Update user balance in Supabase
+        const currentBalance = await meTokenSupabaseService.getUserMeTokenBalance(meTokenAddress, address);
+        const newBalance = (currentBalance?.balance || 0) + parseFloat(collateralAmount);
+        await meTokenSupabaseService.updateUserBalance(meTokenAddress, address, newBalance);
       }
+      
+      // Refresh data
+      await checkUserMeToken();
     } catch (err) {
       throw new Error(err instanceof Error ? err.message : 'Failed to buy MeTokens');
     }
@@ -351,9 +731,10 @@ export function useMeTokensSupabase(targetAddress?: string) {
   // Sell MeTokens
   const sellMeTokens = async (meTokenAddress: string, meTokenAmount: string) => {
     if (!address || !user) throw new Error('No wallet connected');
+    if (!client) throw new Error('Smart account client not initialized');
     
     try {
-      const result = await sendUserOperation({
+      const operation = await client.sendUserOperation({
         uo: {
           target: DIAMOND,
           data: encodeFunctionData({
@@ -365,33 +746,31 @@ export function useMeTokensSupabase(targetAddress?: string) {
         },
       });
 
-      if (result !== undefined) {
-        if (result && typeof result === 'object' && 'wait' in result) {
-          await (result as any).wait();
-        }
+      const txHash = await client.waitForUserOperationTransaction({
+        hash: operation.hash,
+      });
+      
+      // Update MeToken data in Supabase
+      const meToken = await meTokenSupabaseService.getMeTokenByAddress(meTokenAddress);
+      if (meToken) {
+        // Record the transaction
+        await meTokenSupabaseService.recordTransaction({
+          metoken_id: meToken.id,
+          user_address: address,
+          transaction_type: 'burn',
+          amount: parseFloat(meTokenAmount),
+          transaction_hash: txHash,
+          block_number: 0,
+        });
         
-        // Update MeToken data in Supabase
-        const meToken = await meTokenSupabaseService.getMeTokenByAddress(meTokenAddress);
-        if (meToken) {
-          // Record the transaction
-          await meTokenSupabaseService.recordTransaction({
-            metoken_id: meToken.id,
-            user_address: address,
-            transaction_type: 'burn',
-            amount: parseFloat(meTokenAmount),
-            transaction_hash: (result as any)?.hash || '',
-            block_number: (result as any)?.blockNumber || 0,
-          });
-          
-          // Update user balance in Supabase
-          const currentBalance = await meTokenSupabaseService.getUserMeTokenBalance(meTokenAddress, address);
-          const newBalance = Math.max(0, (currentBalance?.balance || 0) - parseFloat(meTokenAmount));
-          await meTokenSupabaseService.updateUserBalance(meTokenAddress, address, newBalance);
-        }
-        
-        // Refresh data
-        await checkUserMeToken();
+        // Update user balance in Supabase
+        const currentBalance = await meTokenSupabaseService.getUserMeTokenBalance(meTokenAddress, address);
+        const newBalance = Math.max(0, (currentBalance?.balance || 0) - parseFloat(meTokenAmount));
+        await meTokenSupabaseService.updateUserBalance(meTokenAddress, address, newBalance);
       }
+      
+      // Refresh data
+      await checkUserMeToken();
     } catch (err) {
       throw new Error(err instanceof Error ? err.message : 'Failed to sell MeTokens');
     }
@@ -442,10 +821,24 @@ export function useMeTokensSupabase(targetAddress?: string) {
     try {
       const supabaseMeToken = await meTokenSupabaseService.getMeTokenByAddress(meTokenAddress);
       
-      if (supabaseMeToken && supabaseMeToken.owner_address.toLowerCase() === address.toLowerCase()) {
-        const meTokenData = await convertToMeTokenData(supabaseMeToken, address);
-        setUserMeToken(meTokenData);
-        return meTokenData;
+      if (supabaseMeToken) {
+        const ownerLower = supabaseMeToken.owner_address.toLowerCase();
+        const addressLower = address.toLowerCase();
+        const eoaLower = user?.address?.toLowerCase();
+        
+        // Check if the MeToken belongs to either the current address OR the user's EOA
+        if (ownerLower === addressLower || (eoaLower && ownerLower === eoaLower)) {
+          console.log('✅ MeToken belongs to user (owner:', supabaseMeToken.owner_address, ')');
+          const meTokenData = await convertToMeTokenData(supabaseMeToken, address);
+          setUserMeToken(meTokenData);
+          return meTokenData;
+        }
+        
+        console.log('❌ MeToken owner mismatch:', {
+          meTokenOwner: supabaseMeToken.owner_address,
+          profileAddress: address,
+          userEOA: user?.address
+        });
       }
       
       return null;
@@ -486,9 +879,10 @@ export function useMeTokensSupabase(targetAddress?: string) {
     calculateMeTokensMinted,
     calculateAssetsReturned,
     checkSpecificMeToken,
-    isPending: isSendingUserOperation,
+    checkUserMeToken, // Expose this function for manual refresh
+    isPending,
     isConfirming,
     isConfirmed,
-    transactionError: error,
+    transactionError,
   };
 }

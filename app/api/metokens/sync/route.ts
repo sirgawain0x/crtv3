@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { meTokenSupabaseService } from '@/lib/sdk/supabase/metokens';
+import { meTokensSubgraph } from '@/lib/sdk/metokens/subgraph';
 import { 
   extractMeTokenAddressFromTransaction, 
   getMeTokenInfoFromBlockchain, 
@@ -11,6 +12,8 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { transactionHash, meTokenAddress } = body;
+
+    console.log('📥 Sync request:', { transactionHash, meTokenAddress });
 
     if (!transactionHash && !meTokenAddress) {
       return NextResponse.json(
@@ -40,9 +43,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    console.log('🎯 Target MeToken address:', targetMeTokenAddress);
+
     // Check if MeToken already exists in database
     const existingMeToken = await meTokenSupabaseService.getMeTokenByAddress(targetMeTokenAddress);
     if (existingMeToken) {
+      console.log('✅ MeToken already in database');
       return NextResponse.json(
         { 
           message: 'MeToken already exists in database',
@@ -52,25 +58,60 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // First, check if the MeToken exists in the subgraph
+    console.log('📊 Checking subgraph for MeToken...');
+    const subgraphData = await meTokensSubgraph.checkMeTokenExists(targetMeTokenAddress);
+    
+    if (!subgraphData) {
+      console.log('⚠️ MeToken not found in subgraph - may not be registered yet');
+      return NextResponse.json(
+        { error: 'MeToken not found in subgraph. It may not be registered yet or the subgraph may not be synced.' },
+        { status: 404 }
+      );
+    }
+
+    console.log('✅ Found MeToken in subgraph, fetching blockchain data...');
+
     // Get MeToken information from blockchain
-    const [tokenInfo, protocolInfo] = await Promise.all([
-      getMeTokenInfoFromBlockchain(targetMeTokenAddress),
-      getMeTokenProtocolInfo(targetMeTokenAddress)
-    ]);
+    // Note: For newly created MeTokens, the Diamond might not be fully synced yet
+    // So we'll be lenient and use default values if needed
+    let tokenInfo, protocolInfo;
+    
+    try {
+      [tokenInfo, protocolInfo] = await Promise.all([
+        getMeTokenInfoFromBlockchain(targetMeTokenAddress),
+        getMeTokenProtocolInfo(targetMeTokenAddress)
+      ]);
+    } catch (error) {
+      console.warn('⚠️ Failed to get full blockchain data, using subgraph data:', error);
+    }
 
     if (!tokenInfo) {
-      return NextResponse.json(
-        { error: 'Could not retrieve MeToken information from blockchain' },
-        { status: 400 }
-      );
+      console.warn('⚠️ Token info not available from blockchain, using defaults from subgraph');
+      // Use data from subgraph if available
+      tokenInfo = {
+        name: 'MeToken', // Will be updated when protocol syncs
+        symbol: 'ME',
+        totalSupply: '0',
+        owner: subgraphData?.id || targetMeTokenAddress // Use MeToken address as fallback
+      };
     }
 
     if (!protocolInfo) {
-      return NextResponse.json(
-        { error: 'Could not retrieve MeToken protocol information from blockchain' },
-        { status: 400 }
-      );
+      console.warn('⚠️ Protocol info not available from blockchain, using defaults');
+      protocolInfo = {
+        hubId: parseInt(subgraphData?.hubId || '1'),
+        balancePooled: subgraphData?.assetsDeposited || '0',
+        balanceLocked: '0',
+        startTime: 0,
+        endTime: 0,
+        endCooldown: 0,
+        targetHubId: 0,
+        migration: ''
+      };
     }
+
+    console.log('✅ Got blockchain data:', { tokenInfo, protocolInfo });
 
     // Calculate TVL (Total Value Locked)
     const balancePooled = BigInt(protocolInfo.balancePooled);

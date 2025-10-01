@@ -8,15 +8,29 @@ export const config = {
   policyId: process.env.NEXT_PUBLIC_ALCHEMY_PAYMASTER_POLICY_ID!,
 };
 
-const clientParams = {
-  transport: alchemy({
-    apiKey: process.env.NEXT_PUBLIC_ALCHEMY_API_KEY!,
-  }),
-  chain: base, // Using Base mainnet instead of Sepolia
-  signer: LocalAccountSigner.privateKeyToAccountSigner(
-    process.env.ALCHEMY_SWAP_PRIVATE_KEY! as Hex,
-  ),
-};
+// Client params will be created dynamically to avoid build-time errors
+function getClientParams() {
+  const apiKey = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY;
+  const privateKey = process.env.ALCHEMY_SWAP_PRIVATE_KEY;
+  
+  if (!apiKey) {
+    throw new Error('NEXT_PUBLIC_ALCHEMY_API_KEY is not configured');
+  }
+  
+  if (!privateKey) {
+    throw new Error('ALCHEMY_SWAP_PRIVATE_KEY is not configured');
+  }
+  
+  return {
+    transport: alchemy({
+      apiKey,
+    }),
+    chain: base, // Using Base mainnet instead of Sepolia
+    signer: LocalAccountSigner.privateKeyToAccountSigner(
+      privateKey as Hex,
+    ),
+  };
+}
 
 let clientWithoutAccount: any = null;
 let account: any = null;
@@ -30,6 +44,7 @@ export async function initializeSwapClient() {
   if (client) return client;
 
   try {
+    const clientParams = getClientParams();
     console.log('Initializing swap client with params:', {
       hasApiKey: !!clientParams.transport,
       hasPrivateKey: !!clientParams.signer,
@@ -51,11 +66,16 @@ export async function initializeSwapClient() {
     return client;
   } catch (error) {
     console.error("Failed to initialize swap client:", error);
-    console.error("Client params:", {
-      transport: !!clientParams.transport,
-      chain: clientParams.chain.name,
-      hasSigner: !!clientParams.signer,
-    });
+    try {
+      const clientParams = getClientParams();
+      console.error("Client params:", {
+        transport: !!clientParams.transport,
+        chain: clientParams.chain.name,
+        hasSigner: !!clientParams.signer,
+      });
+    } catch (paramError) {
+      console.error("Failed to get client params:", paramError);
+    }
     throw error;
   }
 }

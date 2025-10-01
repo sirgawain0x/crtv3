@@ -75,6 +75,21 @@ const GET_SUBSCRIBE_BY_METOKEN = gql`
   }
 `;
 
+// GraphQL query to check if a specific MeToken exists with full details
+const CHECK_METOKEN_EXISTS = gql`
+  query CheckMeTokenExists($meToken: String!) {
+    subscribes(where: { meToken: $meToken }, first: 1) {
+      id
+      meToken
+      hubId
+      assetsDeposited
+      blockTimestamp
+      blockNumber
+      transactionHash
+    }
+  }
+`;
+
 // GraphQL query to get all MeToken addresses from Subscribe events
 const GET_ALL_METOKEN_ADDRESSES = gql`
   query GetAllMeTokenAddresses($first: Int = 100, $skip: Int = 0) {
@@ -290,6 +305,33 @@ export class MeTokensSubgraphClient {
     } catch (error) {
       console.error('Failed to fetch MeToken with Hub:', error);
       throw new Error('Failed to fetch MeToken with Hub from subgraph');
+    }
+  }
+
+  async checkMeTokenExists(meTokenAddress: string): Promise<SubscribeEvent | null> {
+    if (typeof window === 'undefined') {
+      return null;
+    }
+    
+    try {
+      console.log('🔍 Checking if MeToken exists in subgraph:', meTokenAddress);
+      const data = await request(this.getEndpoint(), CHECK_METOKEN_EXISTS, { 
+        meToken: meTokenAddress.toLowerCase() 
+      }) as any;
+      
+      const subscribes = data.subscribes || [];
+      console.log('📊 Subgraph found', subscribes.length, 'Subscribe events for this address');
+      
+      if (subscribes.length > 0) {
+        console.log('✅ MeToken found in subgraph:', subscribes[0]);
+        return subscribes[0];
+      }
+      
+      console.log('⚠️ MeToken not found in subgraph');
+      return null;
+    } catch (error) {
+      console.error('Failed to check MeToken existence:', error);
+      return null;
     }
   }
 }

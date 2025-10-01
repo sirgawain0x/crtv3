@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { executeSwap } from '@/lib/sdk/alchemy/swap-client';
-import { BASE_TOKENS } from '@/lib/sdk/alchemy/swap-service';
+import { BASE_TOKENS, type TokenSymbol } from '@/lib/sdk/alchemy/swap-service';
 
 export async function POST(request: NextRequest) {
   try {
@@ -64,15 +64,15 @@ export async function POST(request: NextRequest) {
 
     // Execute the swap
     console.log('Executing swap with params:', {
-      fromToken: BASE_TOKENS[fromToken],
-      toToken: BASE_TOKENS[toToken],
+      fromToken: BASE_TOKENS[fromToken as TokenSymbol],
+      toToken: BASE_TOKENS[toToken as TokenSymbol],
       fromAmount,
       minimumToAmount,
     });
 
     const result = await executeSwap({
-      fromToken: BASE_TOKENS[fromToken],
-      toToken: BASE_TOKENS[toToken],
+      fromToken: BASE_TOKENS[fromToken as TokenSymbol],
+      toToken: BASE_TOKENS[toToken as TokenSymbol],
       fromAmount,
       minimumToAmount,
     });
