@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { MeTokenData } from './useMeTokensSupabase';
 import { 
   isMeTokenSubscribed, 
@@ -88,10 +88,18 @@ export function useMeTokenSubscription(meToken: MeTokenData | null) {
     }
   }, [meToken]);
 
-  // Check subscription status when meToken changes
+  // Keep a stable reference to avoid infinite re-renders
+  const checkSubscriptionStatusRef = useRef(checkSubscriptionStatus);
+  
   useEffect(() => {
-    checkSubscriptionStatus();
+    checkSubscriptionStatusRef.current = checkSubscriptionStatus;
   }, [checkSubscriptionStatus]);
+
+  // Check subscription status when meToken changes (only meToken.address as dependency)
+  useEffect(() => {
+    checkSubscriptionStatusRef.current();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [meToken?.address]); // Only re-run when the meToken address changes
 
   return {
     subscriptionState,

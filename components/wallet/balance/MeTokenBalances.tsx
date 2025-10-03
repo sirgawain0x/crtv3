@@ -114,7 +114,7 @@ export function MeTokenBalances() {
   }
 
   // Show no MeTokens state
-  if (holdings.length === 0) {
+  if (holdings.length === 0 && !userMeToken) {
     return (
       <div className="space-y-2">
         <div className="flex items-center justify-between">
@@ -122,6 +122,52 @@ export function MeTokenBalances() {
         </div>
         <div className="text-xs text-gray-500">
           No MeTokens found
+        </div>
+      </div>
+    );
+  }
+
+  // If user has their own MeToken but no holdings (0 balance), show the MeToken
+  if (holdings.length === 0 && userMeToken) {
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-medium text-gray-500">MeTokens</span>
+        </div>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
+                <Coins className="h-3 w-3 text-blue-500" />
+                <span className="text-sm font-medium">{userMeToken.symbol}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <Badge variant="default" className="text-xs px-1 py-0 bg-primary">
+                  <Crown className="h-2 w-2 mr-1" />
+                  Yours
+                </Badge>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-sm font-medium">
+                {formatBalance(userMeToken.balance || "0", userMeToken.symbol)}
+              </div>
+              <div className="text-xs text-gray-500">
+                TVL: {formatTVL(userMeToken.tvl)}
+              </div>
+            </div>
+          </div>
+          
+          {/* Link to profile for MeToken management */}
+          <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
+            <Link 
+              href={`/profile/${user?.address}`}
+              className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+            >
+              <ExternalLink className="h-3 w-3" />
+              Manage MeToken
+            </Link>
+          </div>
         </div>
       </div>
     );

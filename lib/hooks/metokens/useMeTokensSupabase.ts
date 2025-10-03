@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useUser, useSmartAccountClient } from '@account-kit/react';
 import { parseEther, formatEther, encodeFunctionData } from 'viem';
 import { meTokenSupabaseService, MeToken, MeTokenBalance } from '@/lib/sdk/supabase/metokens';
@@ -943,26 +943,35 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
     }
   };
 
-  // Subscribe to real-time updates
+  // Keep a stable reference to checkUserMeToken to avoid infinite re-subscriptions
+  const checkUserMeTokenRef = useRef(checkUserMeToken);
+  
+  useEffect(() => {
+    checkUserMeTokenRef.current = checkUserMeToken;
+  }, [checkUserMeToken]);
+
+  // Subscribe to real-time updates (only re-subscribe when address changes)
   useEffect(() => {
     if (!address) return;
 
     const subscription = meTokenSupabaseService.subscribeToBalanceUpdates(address, (payload) => {
       console.log('Balance update received:', payload);
-      // Refresh data when balance changes
-      checkUserMeToken();
+      // Use the ref to call the latest version without causing re-subscriptions
+      checkUserMeTokenRef.current();
     });
 
     return () => {
       subscription.unsubscribe();
     };
-  }, [address, checkUserMeToken]);
+  }, [address]); // Only depend on address, not checkUserMeToken
 
+  // Initial fetch when address changes
   useEffect(() => {
     if (address) {
       checkUserMeToken();
     }
-  }, [address, checkUserMeToken]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [address]); // Only run when address changes, not when checkUserMeToken changes
 
   return {
     userMeToken,

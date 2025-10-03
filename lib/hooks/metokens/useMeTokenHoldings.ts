@@ -196,6 +196,14 @@ export function useMeTokenHoldings(targetAddress?: string): UseMeTokenHoldingsRe
       // Check each MeToken for user's balance
       for (const meToken of allMeTokens) {
         try {
+          // Get MeToken info from Diamond contract first
+          const info = await client.readContract({
+            address: DIAMOND,
+            abi: DIAMOND_ABI,
+            functionName: 'getMeTokenInfo',
+            args: [meToken.id as `0x${string}`],
+          }) as any;
+
           // Get user's balance for this MeToken
           const balance = await client.readContract({
             address: meToken.id as `0x${string}`,
@@ -204,17 +212,11 @@ export function useMeTokenHoldings(targetAddress?: string): UseMeTokenHoldingsRe
             args: [address as `0x${string}`],
           }) as bigint;
 
-          // Only include MeTokens where user has a balance
-          if (balance > 0) {
-            console.log(`💰 Found balance for ${meToken.id}:`, balance.toString());
-
-            // Get MeToken info from Diamond contract
-            const info = await client.readContract({
-              address: DIAMOND,
-              abi: DIAMOND_ABI,
-              functionName: 'getMeTokenInfo',
-              args: [meToken.id as `0x${string}`],
-            }) as any;
+          // Include MeTokens where user has a balance OR if it's their own MeToken
+          const isOwnMeToken = info.owner.toLowerCase() === address.toLowerCase();
+          
+          if (balance > 0 || isOwnMeToken) {
+            console.log(`💰 Found ${isOwnMeToken ? 'own MeToken' : 'balance'} for ${meToken.id}:`, balance.toString());
 
             // Get ERC20 token details
             const [name, symbol, totalSupply] = await Promise.all([
@@ -237,9 +239,6 @@ export function useMeTokenHoldings(targetAddress?: string): UseMeTokenHoldingsRe
 
             // Calculate TVL
             const tvl = calculateTVL(info);
-
-            // Check if this is the user's own MeToken
-            const isOwnMeToken = info.owner.toLowerCase() === address.toLowerCase();
 
             // Fetch creator profile
             let creatorProfile: CreatorProfile | null = null;
@@ -303,10 +302,11 @@ export function useMeTokenHoldings(targetAddress?: string): UseMeTokenHoldingsRe
     return sum + (Number(holding.balance) * (holding.tvl / 1000000)); // Rough estimate
   }, 0);
 
-  // Initial fetch
+  // Initial fetch (only run once on mount)
   useEffect(() => {
     fetchHoldings();
-  }, [fetchHoldings]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targetAddress]); // Only re-run when targetAddress changes
 
   return {
     holdings,
