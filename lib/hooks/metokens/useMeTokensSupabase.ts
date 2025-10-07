@@ -745,14 +745,16 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
               } else {
                 // If we couldn't find the user's MeToken, provide helpful instructions
                 console.log('⚠️ Could not find user MeToken in subgraph');
-                throw new Error('You already have a MeToken, but we could not locate it automatically. Please use the "Sync Existing MeToken" button or contact support for assistance.');
+                throw new Error('You already have a MeToken, but we could not locate it automatically. ' +
+                  'Please use the "Sync Existing MeToken" button or contact support for assistance.');
               }
             } catch (syncErr) {
               console.error('Failed to find existing MeToken:', syncErr);
               if (syncErr instanceof Error && syncErr.message.includes('already have a MeToken')) {
                 throw syncErr; // Re-throw our custom error
               }
-              throw new Error('You already have a MeToken, but we could not load it. Please use the "Sync Existing MeToken" button or contact support.');
+              throw new Error('You already have a MeToken, but we could not load it. ' +
+                'Please use the "Sync Existing MeToken" button or contact support.');
             }
           }
         

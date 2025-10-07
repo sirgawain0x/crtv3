@@ -100,7 +100,8 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
         }
       }
       
-      alert('No existing MeToken found in the subgraph. If you recently created a MeToken, please wait a few minutes for the subgraph to sync, then try again.');
+      alert('No existing MeToken found in the subgraph. If you recently created a MeToken, ' +
+        'please wait a few minutes for the subgraph to sync, then try again.');
     } catch (err) {
       console.error('Failed to sync existing MeToken:', err);
       alert('Failed to sync existing MeToken. Please try again or contact support.');
@@ -432,23 +433,23 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
                   <div className="border-t pt-4 mt-4">
                     <h4 className="font-semibold mb-3 flex items-center gap-2 text-orange-600">
                       <AlertCircle className="h-4 w-4" />
-                      Getting "Already Owns MeToken" Error?
+                      Getting &quot;Already Owns MeToken&quot; Error?
                     </h4>
                     <Alert className="mb-4">
                       <AlertCircle className="h-4 w-4" />
                       <AlertDescription>
                         <strong>This error means you already have a MeToken!</strong><br/>
                         The system detected that your wallet address already owns a MeToken. 
-                        Try the "Sync Existing MeToken" button above, or if that doesn't work, 
+                        Try the &quot;Sync Existing MeToken&quot; button above, or if that doesn&apos;t work, 
                         you can manually enter your MeToken contract address.
                       </AlertDescription>
                     </Alert>
                     <div className="space-y-2">
                       <p className="text-sm text-muted-foreground">
-                        <strong>Quick Fix:</strong> Use the "Sync Existing MeToken" button above to automatically find and load your MeToken.
+                        <strong>Quick Fix:</strong> Use the &quot;Sync Existing MeToken&quot; button above to automatically find and load your MeToken.
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        <strong>Manual Fix:</strong> If auto-sync doesn't work, find your MeToken contract address from your creation transaction and enter it above.
+                        <strong>Manual Fix:</strong> If auto-sync doesn&apos;t work, find your MeToken contract address from your creation transaction and enter it above.
                       </p>
                     </div>
                   </div>

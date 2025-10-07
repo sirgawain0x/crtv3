@@ -1,8 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/sdk/supabase/server';
-import { alchemyMeTokenService, MeTokenCreationParams } from '@/lib/sdk/alchemy/metoken-service';
+import { MeTokenCreationParams } from '@/lib/sdk/alchemy/metoken-service';
+
+// Force dynamic route to avoid build-time evaluation
+export const dynamic = 'force-dynamic';
+
+async function getAllchemyService() {
+  const { alchemyMeTokenService } = await import('@/lib/sdk/alchemy/metoken-service');
+  return alchemyMeTokenService.instance;
+}
 
 export async function POST(request: NextRequest) {
+  const alchemyMeTokenService = await getAllchemyService();
   try {
     const supabase = await createClient();
     const body = await request.json();
@@ -186,6 +195,8 @@ export async function POST(request: NextRequest) {
 async function waitForMeTokenCreation(transactionHash: string): Promise<string | null> {
   try {
     console.log('⏳ Waiting for transaction confirmation:', transactionHash);
+    
+    const alchemyMeTokenService = await getAllchemyService();
     
     // Use Alchemy SDK to get transaction receipt
     const receipt = await alchemyMeTokenService['alchemy'].core.getTransactionReceipt(transactionHash);

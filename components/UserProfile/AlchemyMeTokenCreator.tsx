@@ -498,7 +498,7 @@ export function AlchemyMeTokenCreator({ onMeTokenCreated }: AlchemyMeTokenCreato
               <p><strong>How it works:</strong></p>
               <ul className="list-disc list-inside space-y-1 ml-4">
                 <li>Uses Alchemy SDK for reliable blockchain interactions</li>
-                <li>Calls the Diamond contract's subscribe function</li>
+                <li>Calls the Diamond contract&apos;s subscribe function</li>
                 <li>Automatically approves DAI if needed</li>
                 <li>Stores MeToken data in Supabase for fast queries</li>
                 <li>Enables trading and liquidity provision</li>

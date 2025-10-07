@@ -68,7 +68,7 @@ export function useMeTokenSubscription(meToken: MeTokenData | null) {
         const state: MeTokenSubscriptionState = {
           isSubscribed: details.isSubscribed,
           isNotSubscribed: !details.isSubscribed,
-          status: details.status,
+          status: details.status as 'subscribed' | 'not-subscribed',
           canTrade: details.canTrade,
           requiresSubscription: details.requiresSubscription,
           balancePooled: details.balancePooled,

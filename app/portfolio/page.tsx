@@ -89,7 +89,7 @@ export default function PortfolioPage() {
               <div>
                 <h3 className="font-semibold mb-2">What are MeToken Holdings?</h3>
                 <p className="text-sm text-muted-foreground">
-                  MeToken holdings represent your investment in creators' personal tokens. 
+                  MeToken holdings represent your investment in creators&apos; personal tokens. 
                   These tokens can appreciate in value as creators grow their audience and success.
                 </p>
               </div>

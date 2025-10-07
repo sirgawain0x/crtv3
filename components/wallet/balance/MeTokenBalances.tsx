@@ -79,8 +79,8 @@ export function MeTokenBalances() {
     return <MeTokenPortfolio />;
   }
 
-  // Show loading state
-  if (isLoading || meTokenLoading || holdingsLoading) {
+  // Show loading state only on initial load
+  if ((isLoading || meTokenLoading || holdingsLoading) && holdings.length === 0 && !userMeToken) {
     return (
       <div className="space-y-2">
         <div className="flex items-center justify-between">
@@ -113,8 +113,8 @@ export function MeTokenBalances() {
     );
   }
 
-  // Show no MeTokens state
-  if (holdings.length === 0 && !userMeToken) {
+  // Show no MeTokens state - only show this if we're not loading and have no holdings or user MeToken
+  if (!isLoading && !meTokenLoading && !holdingsLoading && holdings.length === 0 && !userMeToken) {
     return (
       <div className="space-y-2">
         <div className="flex items-center justify-between">
@@ -128,7 +128,7 @@ export function MeTokenBalances() {
   }
 
   // If user has their own MeToken but no holdings (0 balance), show the MeToken
-  if (holdings.length === 0 && userMeToken) {
+  if (!isLoading && !meTokenLoading && !holdingsLoading && holdings.length === 0 && userMeToken) {
     return (
       <div className="space-y-2">
         <div className="flex items-center justify-between">
@@ -150,7 +150,12 @@ export function MeTokenBalances() {
             </div>
             <div className="text-right">
               <div className="text-sm font-medium">
-                {formatBalance(userMeToken.balance || "0", userMeToken.symbol)}
+                {formatBalance(
+                  typeof userMeToken.balance === 'bigint' 
+                    ? formatEther(userMeToken.balance) 
+                    : (userMeToken.balance || "0"), 
+                  userMeToken.symbol
+                )}
               </div>
               <div className="text-xs text-gray-500">
                 TVL: {formatTVL(userMeToken.tvl)}
@@ -162,7 +167,7 @@ export function MeTokenBalances() {
           <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
             <Link 
               href={`/profile/${user?.address}`}
-              className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+              className={`flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors`}
             >
               <ExternalLink className="h-3 w-3" />
               Manage MeToken
@@ -175,6 +180,20 @@ export function MeTokenBalances() {
 
   // Show single MeToken balance (simple view)
   const singleHolding = holdings[0];
+  
+  // Safety check - if no holdings, return empty state
+  if (!singleHolding) {
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-medium text-gray-500">MeTokens</span>
+        </div>
+        <div className="text-xs text-gray-500">
+          No MeTokens found
+        </div>
+      </div>
+    );
+  }
   
   return (
     <div className="space-y-2">
@@ -227,7 +246,7 @@ export function MeTokenBalances() {
         <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
           <Link 
             href={`/profile/${singleHolding.isOwnMeToken ? user?.address : singleHolding.ownerAddress}`}
-            className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
+            className={`flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors`}
           >
             <ExternalLink className="h-3 w-3" />
             {singleHolding.isOwnMeToken ? 'Manage MeToken' : 'View Creator Profile'}

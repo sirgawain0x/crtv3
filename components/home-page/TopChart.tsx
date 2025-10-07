@@ -91,22 +91,58 @@ export function TopChart() {
 
   // Fetch user's rank if they are logged in
   useEffect(() => {
+    let isMounted = true;
+    let abortController: AbortController | null = null;
+
     const fetchUserRank = async () => {
-      if (!userInfo?.address) return;
+      if (!userInfo?.address || !isMounted) return;
+
+      abortController = new AbortController();
+      const signal = abortController.signal;
 
       try {
         const rankData = await stack.getLeaderboardRank(userInfo.address);
+        
+        if (!isMounted || signal.aborted) return;
+        
         setUserRank(rankData as unknown as UserRank);
       } catch (err) {
+        if (!isMounted || signal.aborted) return;
+        
+        // Check if it's an abort error
+        if (err instanceof Error && (
+          err.name === 'AbortError' || 
+          err.message.includes('aborted') ||
+          err.message.includes('signal is aborted')
+        )) {
+          console.warn('User rank fetch was aborted:', err.message);
+          return;
+        }
+        
         console.error("Failed to fetch user rank:", err);
       }
     };
 
     fetchUserRank();
+
+    return () => {
+      isMounted = false;
+      if (abortController) {
+        abortController.abort("Component unmounted");
+      }
+    };
   }, [userInfo?.address]);
 
   useEffect(() => {
+    let isMounted = true;
+    let abortController: AbortController | null = null;
+
     const fetchData = async () => {
+      if (!isMounted) return;
+      
+      abortController = new AbortController();
+      const signal = abortController.signal;
+      
       setIsLoading(true);
       setErrorMessage(null);
       try {
@@ -115,6 +151,8 @@ export function TopChart() {
 
         // Fetch the leaderboard with the constructed query
         const leaderboard = await stack.getLeaderboard({ query });
+
+        if (!isMounted || signal.aborted) return;
 
         if (!leaderboard || !leaderboard.leaderboard) {
           console.warn("Leaderboard data is missing or empty.");
@@ -133,15 +171,34 @@ export function TopChart() {
           setMetadata(leaderboard.metadatad as unknown as LeaderboardMetadata);
         }
       } catch (error: any) {
+        if (!isMounted || signal.aborted) return;
+        
+        // Check if it's an abort error
+        if (error.name === 'AbortError' || 
+            error.message?.includes('aborted') ||
+            error.message?.includes('signal is aborted')) {
+          console.warn('Leaderboard fetch was aborted:', error.message);
+          return;
+        }
+        
         console.error("Error fetching leaderboard data:", error);
         setErrorMessage("Failed to load leaderboard. Please try again later.");
         setData([]);
       } finally {
-        setIsLoading(false);
+        if (isMounted && !signal.aborted) {
+          setIsLoading(false);
+        }
       }
     };
 
     fetchData();
+
+    return () => {
+      isMounted = false;
+      if (abortController) {
+        abortController.abort("Component unmounted");
+      }
+    };
   }, []);
 
   // Split data into columns

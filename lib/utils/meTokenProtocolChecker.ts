@@ -124,7 +124,9 @@ export async function checkMeTokenSubscriptionStatus(
       console.log(`   TVL: $${formatEther(totalLocked)} (assuming 1 DAI = $1)`);
     }
 
-    console.log(`\n${isSubscribed ? '✅ MeToken is subscribed and ready for trading!' : '❌ MeToken needs to be subscribed before trading is enabled.'}`);
+    console.log(`\n${isSubscribed ? 
+      '✅ MeToken is subscribed and ready for trading!' : 
+      '❌ MeToken needs to be subscribed before trading is enabled.'}`);
     
     return {
       isSubscribed,

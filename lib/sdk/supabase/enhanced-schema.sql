@@ -193,6 +193,7 @@ ALTER TABLE metokens ENABLE ROW LEVEL SECURITY;
 ALTER TABLE metoken_balances ENABLE ROW LEVEL SECURITY;
 ALTER TABLE metoken_transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE creator_profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE video_assets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE metoken_analytics ENABLE ROW LEVEL SECURITY;
 ALTER TABLE alchemy_integrations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE gas_optimizations ENABLE ROW LEVEL SECURITY;
@@ -246,6 +247,22 @@ CREATE POLICY "Users can manage their own alchemy integrations" ON alchemy_integ
 CREATE POLICY "Public read access for gas_optimizations" ON gas_optimizations
   FOR SELECT USING (true);
 
+-- Video assets policies
+CREATE POLICY "Public read access for published video assets" ON video_assets
+  FOR SELECT USING (status = 'published');
+
+CREATE POLICY "Creators can view their own video assets" ON video_assets
+  FOR SELECT USING (auth.jwt() ->> 'sub' = creator_id);
+
+CREATE POLICY "Creators can insert their own video assets" ON video_assets
+  FOR INSERT WITH CHECK (auth.jwt() ->> 'sub' = creator_id);
+
+CREATE POLICY "Creators can update their own video assets" ON video_assets
+  FOR UPDATE USING (auth.jwt() ->> 'sub' = creator_id);
+
+CREATE POLICY "Creators can delete their own video assets" ON video_assets
+  FOR DELETE USING (auth.jwt() ->> 'sub' = creator_id);
+
 -- Functions for automatic updates
 
 -- Function to update updated_at timestamp
@@ -268,6 +285,9 @@ CREATE TRIGGER update_creator_profiles_updated_at BEFORE UPDATE ON creator_profi
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 CREATE TRIGGER update_alchemy_integrations_updated_at BEFORE UPDATE ON alchemy_integrations
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_video_assets_updated_at BEFORE UPDATE ON video_assets
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Function to sync MeToken data from blockchain
@@ -333,21 +353,22 @@ $$ LANGUAGE plpgsql;
 -- Views for common queries
 
 -- View for MeToken overview with creator info
-CREATE OR REPLACE VIEW metoken_overview AS
+CREATE OR REPLACE VIEW metoken_overview 
+WITH (security_invoker=true) AS
 SELECT 
   m.*,
   cp.username as creator_username,
   cp.avatar_url as creator_avatar,
-  cp.is_verified as creator_verified,
   (m.balance_pooled + m.balance_locked) as total_liquidity,
   COUNT(DISTINCT mb.user_address) as holder_count
 FROM metokens m
 LEFT JOIN creator_profiles cp ON m.owner_address = cp.owner_address
 LEFT JOIN metoken_balances mb ON m.id = mb.metoken_id
-GROUP BY m.id, cp.username, cp.avatar_url, cp.is_verified;
+GROUP BY m.id, cp.username, cp.avatar_url;
 
 -- View for MeToken trading activity
-CREATE OR REPLACE VIEW metoken_trading_activity AS
+CREATE OR REPLACE VIEW metoken_trading_activity 
+WITH (security_invoker=true) AS
 SELECT 
   m.address as metoken_address,
   m.name as metoken_name,
@@ -368,6 +389,7 @@ GRANT INSERT, UPDATE, DELETE ON metokens TO authenticated;
 GRANT INSERT, UPDATE, DELETE ON metoken_balances TO authenticated;
 GRANT INSERT ON metoken_transactions TO authenticated;
 GRANT INSERT, UPDATE, DELETE ON creator_profiles TO authenticated;
+GRANT INSERT, UPDATE, DELETE ON video_assets TO authenticated;
 GRANT INSERT, UPDATE, DELETE ON alchemy_integrations TO authenticated;
 
 -- Grant access to views

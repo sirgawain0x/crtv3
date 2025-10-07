@@ -61,7 +61,8 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           { 
             success: false, 
-            error: 'RLS policy violation. Please configure SUPABASE_SERVICE_ROLE_KEY environment variable or update RLS policies. See SUPABASE_RLS_SOLUTION.md for details.' 
+            error: 'RLS policy violation. Please configure SUPABASE_SERVICE_ROLE_KEY environment variable or update RLS policies. ' +
+              'See SUPABASE_RLS_SOLUTION.md for details.' 
           },
           { status: 500 }
         );

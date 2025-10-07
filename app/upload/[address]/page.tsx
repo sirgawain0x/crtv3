@@ -1,4 +1,3 @@
-import { MembershipGuard } from "@/components/auth/MembershipGuard";
 import { ProfilePageGuard } from "@/components/UserProfile/UserProfile";
 import HookMultiStepForm from "@/components/Videos/Upload";
 import {
@@ -14,8 +13,7 @@ import { Slash } from "lucide-react";
 export default function UploadPage() {
   return (
     <ProfilePageGuard>
-      <MembershipGuard>
-        <div className="min-h-screen p-2 sm:p-6">
+      <div className="min-h-screen p-2 sm:p-6">
           <div className="mb-6 rounded-lg bg-white p-4 shadow-md sm:mb-8 sm:p-8">
             <h1 className="mb-4 text-center text-2xl font-bold text-gray-800 sm:mb-6 sm:text-4xl">
               Upload Your Music Video
@@ -50,7 +48,6 @@ export default function UploadPage() {
             <HookMultiStepForm />
           </div>
         </div>
-      </MembershipGuard>
     </ProfilePageGuard>
   );
 }

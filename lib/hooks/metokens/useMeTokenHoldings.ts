@@ -215,7 +215,8 @@ export function useMeTokenHoldings(targetAddress?: string): UseMeTokenHoldingsRe
           // Include MeTokens where user has a balance OR if it's their own MeToken
           const isOwnMeToken = info.owner.toLowerCase() === address.toLowerCase();
           
-          if (balance > 0 || isOwnMeToken) {
+          // Only include if user has a balance > 0 OR if it's their own MeToken with some activity
+          if (balance > 0 || (isOwnMeToken && (info.balancePooled > 0 || info.balanceLocked > 0))) {
             console.log(`💰 Found ${isOwnMeToken ? 'own MeToken' : 'balance'} for ${meToken.id}:`, balance.toString());
 
             // Get ERC20 token details
@@ -224,17 +225,17 @@ export function useMeTokenHoldings(targetAddress?: string): UseMeTokenHoldingsRe
                 address: meToken.id as `0x${string}`,
                 abi: ERC20_ABI,
                 functionName: 'name',
-              }) as string,
+              }),
               client.readContract({
                 address: meToken.id as `0x${string}`,
                 abi: ERC20_ABI,
                 functionName: 'symbol',
-              }) as string,
+              }),
               client.readContract({
                 address: meToken.id as `0x${string}`,
                 abi: ERC20_ABI,
                 functionName: 'totalSupply',
-              }) as bigint,
+              }),
             ]);
 
             // Calculate TVL
@@ -285,6 +286,9 @@ export function useMeTokenHoldings(targetAddress?: string): UseMeTokenHoldingsRe
       });
 
       console.log(`✅ Found ${userHoldings.length} MeToken holdings`);
+      if (userHoldings.length === 0) {
+        console.log('📭 No MeToken holdings found for user');
+      }
       setHoldings(userHoldings);
     } catch (err) {
       console.error('Error fetching MeToken holdings:', err);

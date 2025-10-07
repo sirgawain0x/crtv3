@@ -119,6 +119,7 @@ ALTER TABLE metokens ENABLE ROW LEVEL SECURITY;
 ALTER TABLE metoken_balances ENABLE ROW LEVEL SECURITY;
 ALTER TABLE metoken_transactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE creator_profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE video_assets ENABLE ROW LEVEL SECURITY;
 
 -- Policies for metokens table
 CREATE POLICY "Anyone can view metokens" ON metokens
@@ -160,6 +161,22 @@ CREATE POLICY "Users can update their own profile" ON creator_profiles
 CREATE POLICY "Users can delete their own profile" ON creator_profiles
   FOR DELETE USING (auth.jwt() ->> 'address' = owner_address);
 
+-- Policies for video_assets table
+CREATE POLICY "Anyone can view published video assets" ON video_assets
+  FOR SELECT USING (status = 'published');
+
+CREATE POLICY "Creators can view their own video assets" ON video_assets
+  FOR SELECT USING (auth.jwt() ->> 'address' = creator_id);
+
+CREATE POLICY "Creators can insert their own video assets" ON video_assets
+  FOR INSERT WITH CHECK (auth.jwt() ->> 'address' = creator_id);
+
+CREATE POLICY "Creators can update their own video assets" ON video_assets
+  FOR UPDATE USING (auth.jwt() ->> 'address' = creator_id);
+
+CREATE POLICY "Creators can delete their own video assets" ON video_assets
+  FOR DELETE USING (auth.jwt() ->> 'address' = creator_id);
+
 -- Functions for updating timestamps
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
@@ -182,6 +199,10 @@ CREATE TRIGGER update_creator_profiles_updated_at
   BEFORE UPDATE ON creator_profiles 
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+CREATE TRIGGER update_video_assets_updated_at 
+  BEFORE UPDATE ON video_assets 
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
 -- Function to get MeToken statistics
 CREATE OR REPLACE FUNCTION get_metoken_stats(metoken_addr TEXT)
 RETURNS TABLE (
@@ -189,7 +210,9 @@ RETURNS TABLE (
   unique_holders BIGINT,
   total_volume NUMERIC,
   avg_transaction_size NUMERIC
-) AS $$
+) 
+SECURITY INVOKER
+AS $$
 BEGIN
   RETURN QUERY
   SELECT 
@@ -211,7 +234,7 @@ BEGIN
   LEFT JOIN metoken_balances mb ON mb.metoken_id = mt.metoken_id
   WHERE mt.metoken_id = (SELECT id FROM metokens WHERE address = metoken_addr);
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql;
 
 -- Function to search MeTokens
 CREATE OR REPLACE FUNCTION search_metokens(search_query TEXT, result_limit INTEGER DEFAULT 20)
@@ -234,7 +257,9 @@ RETURNS TABLE (
   created_at TIMESTAMP WITH TIME ZONE,
   updated_at TIMESTAMP WITH TIME ZONE,
   rank REAL
-) AS $$
+) 
+SECURITY INVOKER
+AS $$
 BEGIN
   RETURN QUERY
   SELECT 
@@ -245,10 +270,11 @@ BEGIN
   ORDER BY rank DESC, m.tvl DESC
   LIMIT result_limit;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql;
 
 -- View for MeToken analytics
-CREATE OR REPLACE VIEW metoken_analytics AS
+CREATE OR REPLACE VIEW metoken_analytics 
+WITH (security_invoker=true) AS
 SELECT 
   m.id,
   m.address,

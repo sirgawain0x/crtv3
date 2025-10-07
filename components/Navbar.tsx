@@ -631,12 +631,17 @@ export default function Navbar() {
                   >
                     Vote
                   </Link>
-                  {/* Member Access Links (mobile) */}
-                  {isVerified && hasMembership && (
-                    <>
-                      <div className="mt-4 mb-1 text-xs text-muted-foreground font-semibold">
-                        Member Access
-                      </div>
+                  {/* Profile & Upload Access (mobile) */}
+                  <div className="mt-4 mb-1 text-xs text-muted-foreground font-semibold">
+                    Profile & Upload Access
+                  </div>
+                      <Link
+                        href="/profile"
+                        className={mobileMemberNavLinkClass}
+                        onClick={handleLinkClick}
+                      >
+                        <ShieldUser className="mr-2 h-4 w-4" /> Profile
+                      </Link>
                       <Link
                         href="/upload"
                         className={mobileMemberNavLinkClass}
@@ -644,6 +649,13 @@ export default function Navbar() {
                       >
                         <CloudUpload className="mr-2 h-4 w-4" /> Upload
                       </Link>
+
+                  {/* Member Access Links (mobile) */}
+                  {isVerified && hasMembership && (
+                    <>
+                      <div className="mt-4 mb-1 text-xs text-muted-foreground font-semibold">
+                        Member Access
+                      </div>
                       <Link
                         href="/live"
                         className={mobileMemberNavLinkClass}
@@ -667,13 +679,6 @@ export default function Navbar() {
                         onClick={handleLinkClick}
                       >
                         <User className="mr-2 h-4 w-4" /> Portfolio
-                      </Link>
-                      <Link
-                        href="/profile"
-                        className={mobileMemberNavLinkClass}
-                        onClick={handleLinkClick}
-                      >
-                        <ShieldUser className="mr-2 h-4 w-4" /> Profile
                       </Link>
                       <Link
                         href="/vote/create"

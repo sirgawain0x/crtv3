@@ -272,7 +272,18 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    await creatorProfileSupabaseService.deleteCreatorProfile(owner);
+    if (supabaseService) {
+      await supabaseService
+        .from('creator_profiles')
+        .delete()
+        .eq('owner_address', owner.toLowerCase());
+    } else {
+      const supabase = await createClient();
+      await supabase
+        .from('creator_profiles')
+        .delete()
+        .eq('owner_address', owner.toLowerCase());
+    }
 
     return NextResponse.json({ 
       success: true, 

@@ -98,7 +98,8 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
     
     // If we have an error checking status but not subscribed, warn but continue
     if (realSubscriptionStatus?.error && !realSubscriptionStatus.isSubscribed) {
-      console.warn('⚠️ Subscription status check failed, but proceeding with subscription attempt:', realSubscriptionStatus.error);
+      console.warn('⚠️ Subscription status check failed, but proceeding with subscription attempt:', 
+        realSubscriptionStatus.error);
     }
 
     setIsSubscribing(true);
@@ -112,7 +113,8 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
       const currentStatus = await checkMeTokenSubscriptionFromBlockchain(meToken.address);
       
       if (currentStatus.isSubscribed) {
-        setError(`This MeToken is already subscribed to Hub ${currentStatus.hubId}. Please refresh the page to see the current status.`);
+        setError(`This MeToken is already subscribed to Hub ${currentStatus.hubId}. ` +
+          'Please refresh the page to see the current status.');
         setIsSubscribing(false);
         return;
       }
@@ -225,7 +227,8 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
             args: [client.account?.address as `0x${string}`, diamondAddress],
           }) as bigint;
           
-          console.log(`📊 Verified allowance attempt ${verifyAttempts + 1}: ${verifiedAllowance.toString()} (need at least ${depositAmount.toString()})`);
+          console.log(`📊 Verified allowance attempt ${verifyAttempts + 1}: ${verifiedAllowance.toString()} ` +
+            `(need at least ${depositAmount.toString()})`);
           
           if (verifiedAllowance >= depositAmount) {
             console.log('✅ Allowance verified successfully! Approved amount:', verifiedAllowance.toString());
@@ -384,9 +387,11 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
         } else if (err.message.includes('rejected') || err.message.includes('denied')) {
           setError('Transaction was rejected. Please approve the transaction to continue.');
         } else if (err.message.includes('insufficient allowance')) {
-          setError(`Blockchain sync issue: Network nodes haven't synced the approval yet. Please wait 30 seconds and try again. (Error: ${err.message.substring(0, 100)})`);
+          setError(`Blockchain sync issue: Network nodes haven't synced the approval yet. ` +
+            `Please wait 30 seconds and try again. (Error: ${err.message.substring(0, 100)})`);
         } else if (err.message.includes('insufficient balance')) {
-          setError(`Insufficient DAI balance in smart account ${client.account?.address?.substring(0, 10)}... You have ${formatEther(daiBalance)} DAI but need ${assetsDeposited} DAI.`);
+          setError(`Insufficient DAI balance in smart account ${client.account?.address?.substring(0, 10)}... ` +
+            `You have ${formatEther(daiBalance)} DAI but need ${assetsDeposited} DAI.`);
         } else if (err.message.includes('insufficient')) {
           setError(`Transaction failed: ${err.message.substring(0, 150)}`);
         } else {
@@ -622,7 +627,10 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
           <ul className="list-disc list-inside space-y-1 ml-4">
             <li>MeToken: {meToken.name} ({meToken.symbol})</li>
             <li>Current TVL: ${meToken.tvl.toFixed(2)}</li>
-            <li>Status: {isCheckingStatus ? 'Checking...' : realSubscriptionStatus ? (realSubscriptionStatus.isSubscribed ? 'Subscribed' : 'Not Subscribed') : 'Unknown'}</li>
+            <li>Status: {isCheckingStatus ? 'Checking...' : 
+              realSubscriptionStatus ? 
+                (realSubscriptionStatus.isSubscribed ? 'Subscribed' : 'Not Subscribed') : 
+                'Unknown'}</li>
           </ul>
           <p className="text-xs">
             Note: Subscribing to a hub will lock your DAI and enable trading for your MeToken.

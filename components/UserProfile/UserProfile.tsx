@@ -19,7 +19,6 @@ import MemberCard from "./MemberCard";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { FaExclamationTriangle } from "react-icons/fa";
 import {
-  MembershipGuard,
   MembershipContext,
 } from "@/components/auth/MembershipGuard";
 import type { MembershipDetails } from "@/lib/hooks/unlock/useMembershipVerification";
@@ -97,8 +96,7 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
 
   return (
     <ProfilePageGuard>
-      <MembershipGuard>
-        <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-8">
           <Tabs defaultValue="Uploads" className="w-full">
             <TabsList className="flex h-10 items-center justify-start space-x-1 rounded-lg bg-muted p-1">
               <TabsTrigger
@@ -179,7 +177,6 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
             </div>
           </Tabs>
         </div>
-      </MembershipGuard>
     </ProfilePageGuard>
   );
 };

@@ -35,22 +35,54 @@ const HeroSection: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let isMounted = true;
+    let abortController: AbortController | null = null;
+
     const fetchSource = async () => {
+      if (!isMounted) return;
+      
+      abortController = new AbortController();
+      const signal = abortController.signal;
+      
       try {
         const playbackSource = await getHeroPlaybackSource();
+        
+        if (!isMounted || signal.aborted) return;
+        
         setSrc(playbackSource);
         if (!playbackSource) {
           setError("No video source available.");
         }
       } catch (err) {
+        if (!isMounted || signal.aborted) return;
+        
+        // Check if it's an abort error
+        if (err instanceof Error && (
+          err.name === 'AbortError' || 
+          err.message.includes('aborted') ||
+          err.message.includes('signal is aborted')
+        )) {
+          console.warn('Hero video fetch was aborted:', err.message);
+          return; // Don't set error for abort signals
+        }
+        
         console.error("Error fetching playback source:", err);
         setError("Failed to load video.");
       } finally {
-        setLoading(false);
+        if (isMounted && !signal.aborted) {
+          setLoading(false);
+        }
       }
     };
 
     fetchSource();
+
+    return () => {
+      isMounted = false;
+      if (abortController) {
+        abortController.abort("Component unmounted");
+      }
+    };
   }, []);
 
   if (error) {

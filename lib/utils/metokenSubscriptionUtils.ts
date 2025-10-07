@@ -231,7 +231,8 @@ export async function checkMeTokenSubscriptionFromBlockchain(meTokenAddress: str
         totalLocked: '0',
         canTrade: false,
         requiresSubscription: true,
-        error: 'MeToken exists but subscription status could not be determined. The Diamond contract function may not be available or the MeToken may not be properly registered.'
+        error: 'MeToken exists but subscription status could not be determined. ' +
+          'The Diamond contract function may not be available or the MeToken may not be properly registered.'
       };
     }
 

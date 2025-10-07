@@ -136,7 +136,8 @@ export function MeTokenCreator({ onMeTokenCreated }: MeTokenCreatorProps) {
       let errorMessage = 'Failed to create MeToken';
       if (err instanceof Error) {
         if (err.message.includes('already have a MeToken') || err.message.includes('already owns')) {
-          errorMessage = 'You already have a MeToken! Please use the "Sync Existing MeToken" button to load it, or contact support if you need to create a new one.';
+          errorMessage = 'You already have a MeToken! Please use the "Sync Existing MeToken" button to load it, ' +
+            'or contact support if you need to create a new one.';
         } else if (err.message.includes('User denied') || err.message.includes('User rejected')) {
           errorMessage = 'Transaction was cancelled by user.';
         } else if (err.message.includes('insufficient funds')) {

@@ -119,7 +119,7 @@ export function MeTokenPortfolio({ targetAddress, className }: MeTokenPortfolioP
           <div className="text-center py-8">
             <Wallet className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <p className="text-muted-foreground mb-4">
-              You don't have any MeToken holdings yet.
+              You don&apos;t have any MeToken holdings yet.
             </p>
             <Button asChild>
               <Link href="/explore">

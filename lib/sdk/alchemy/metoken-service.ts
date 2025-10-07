@@ -315,9 +315,9 @@ export class AlchemyMeTokenService {
       const feeData = await this.alchemy.core.getFeeData();
       
       return {
-        slow: formatEther(feeData.gasPrice || BigInt(0)),
-        standard: formatEther(feeData.gasPrice || BigInt(0)),
-        fast: formatEther(feeData.maxFeePerGas || BigInt(0)),
+        slow: formatEther(feeData.gasPrice ? BigInt(feeData.gasPrice.toString()) : BigInt(0)),
+        standard: formatEther(feeData.gasPrice ? BigInt(feeData.gasPrice.toString()) : BigInt(0)),
+        fast: formatEther(feeData.maxFeePerGas ? BigInt(feeData.maxFeePerGas.toString()) : BigInt(0)),
       };
     } catch (error) {
       console.error('Failed to get gas prices:', error);
@@ -446,5 +446,13 @@ export class AlchemyMeTokenService {
   }
 }
 
-// Export singleton instance
-export const alchemyMeTokenService = new AlchemyMeTokenService();
+// Export singleton instance (lazy-loaded to avoid build-time initialization errors)
+let _alchemyMeTokenServiceInstance: AlchemyMeTokenService | null = null;
+export const alchemyMeTokenService = {
+  get instance(): AlchemyMeTokenService {
+    if (!_alchemyMeTokenServiceInstance) {
+      _alchemyMeTokenServiceInstance = new AlchemyMeTokenService();
+    }
+    return _alchemyMeTokenServiceInstance;
+  }
+} as { instance: AlchemyMeTokenService };

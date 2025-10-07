@@ -90,7 +90,7 @@ export function useAvatarUpload(targetAddress?: string): UseAvatarUploadResult {
       setIsUploading(false);
       setUploadProgress(0);
     }
-  }, [address, updateProfile, toast]);
+  }, [address, toast, upsertProfile]);
 
   const deleteAvatar = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
     if (!address) {
@@ -128,7 +128,7 @@ export function useAvatarUpload(targetAddress?: string): UseAvatarUploadResult {
     } finally {
       setIsUploading(false);
     }
-  }, [address, updateProfile, toast]);
+  }, [address, toast, upsertProfile]);
 
   const getAvatarUrl = useCallback((ownerAddress: string): string => {
     // This method is no longer needed since we store the full IPFS URL in the database

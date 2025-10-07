@@ -1065,7 +1065,6 @@ export function AccountDropdown() {
 
           {/* Balances Section */}
           <div className="px-2 py-2">
-            <p className="text-sm font-medium mb-2">Balances</p>
             <TokenBalance />
           </div>
 
@@ -1074,13 +1073,6 @@ export function AccountDropdown() {
           {/* MeToken Balances Section */}
           <div className="px-2 py-2">
             <MeTokenBalances />
-          </div>
-
-          <DropdownMenuSeparator />
-
-          {/* Membership Section */}
-          <div className="px-2 py-2 w-full">
-            <MembershipSection />
           </div>
 
           <DropdownMenuSeparator />
@@ -1096,7 +1088,7 @@ export function AccountDropdown() {
                 className="flex flex-col items-center justify-center p-3 h-16 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
               >
                 <Plus className="h-4 w-4 text-green-500 mb-1" />
-                <span className="text-xs">Buy</span>
+                <span className="text-xs">Add</span>
               </Button>
               <Button
                 variant="outline"
@@ -1120,10 +1112,52 @@ export function AccountDropdown() {
           </div>
 
           <DropdownMenuSeparator />
+          
 
-          {/* Member Access Links - Compact Grid */}
+          {/* Profile & Upload Access - Always Available */}
+          <div className="px-2 py-2 w-full">
+            <p className="text-xs text-muted-foreground mb-2">
+              Options
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <Link href="/profile" className="w-full">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={
+                    "w-full flex flex-col items-center justify-center p-2 h-12 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                  }
+                  onClick={() => setIsDropdownOpen(false)}
+                >
+                  <ShieldUser className="h-3 w-3 mb-1" />
+                  <span className="text-xs">Profile</span>
+                </Button>
+              </Link>
+              <Link href="/upload" className="w-full">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={
+                    "w-full flex flex-col items-center justify-center p-2 h-12 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                  }
+                  onClick={() => setIsDropdownOpen(false)}
+                >
+                  <CloudUpload className="h-3 w-3 mb-1" />
+                  <span className="text-xs">Upload</span>
+                </Button>
+              </Link>
+            </div>
+          </div>
+          <DropdownMenuSeparator />
+          {/* Membership Section */}
+          <div className="px-2 py-2 w-full">
+            <MembershipSection />
+          </div>
+
+          {/* Member Access Links - Only for Members */}
           {isVerified && hasMembership && (
             <>
+              
               <div className="px-2 py-2 w-full">
                 <p className="text-xs text-muted-foreground mb-2">
                   Member Access
@@ -1137,19 +1171,6 @@ export function AccountDropdown() {
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-2">
-                    <Link href="/upload" className="w-full">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className={
-                          "w-full flex flex-col items-center justify-center p-2 h-12 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                        }
-                        onClick={() => setIsDropdownOpen(false)}
-                      >
-                        <CloudUpload className="h-3 w-3 mb-1" />
-                        <span className="text-xs">Upload</span>
-                      </Button>
-                    </Link>
                     <Link href="/live" className="w-full">
                       <Button
                         variant="outline"
@@ -1178,40 +1199,25 @@ export function AccountDropdown() {
                         </span>
                       </Button>
                     </Link>
-                    <Link href="/profile" className="w-full">
+                    <Link href="/vote/create" className="w-full">
                       <Button
                         variant="outline"
                         size="sm"
-                        className={
-                          "w-full flex flex-col items-center justify-center p-2 h-12 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                        }
+                        className="w-full flex flex-col items-center justify-center p-2 h-12 hover:bg-green-50 
+                          dark:hover:bg-green-900 transition-colors text-green-600 dark:text-green-400 
+                          font-medium border-green-200 dark:border-green-800"
                         onClick={() => setIsDropdownOpen(false)}
                       >
-                        <ShieldUser className="h-3 w-3 mb-1" />
-                        <span className="text-xs">Profile</span>
+                        <Plus className="h-3 w-3 mb-1" />
+                        <span className="text-xs">Start Vote</span>
                       </Button>
                     </Link>
                   </div>
                 )}
-
-                {/* Create Proposal - Full width important action */}
-                <Link href="/vote/create">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full mt-2 flex items-center justify-center p-2 h-10 hover:bg-green-50 
-                      dark:hover:bg-green-900 transition-colors text-green-600 dark:text-green-400 
-                      font-medium border-green-200 dark:border-green-800"
-                    onClick={() => setIsDropdownOpen(false)}
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    <span className="text-sm">Start A Vote</span>
-                  </Button>
-                </Link>
               </div>
-              <DropdownMenuSeparator />
             </>
           )}
+              <DropdownMenuSeparator />
 
           {/* Session Keys Section - Compact */}
           {user?.type !== "eoa" && (

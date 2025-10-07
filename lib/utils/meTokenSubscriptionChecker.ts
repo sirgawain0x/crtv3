@@ -1,5 +1,5 @@
 import { formatEther } from 'viem';
-import { getMeTokenSubscriptionInfo, formatSubscriptionStatus } from './checkMeTokenSubscription';
+import { getMeTokenSubscriptionDetails, formatSubscriptionStatus } from './checkMeTokenSubscription';
 
 /**
  * Check and display MeToken subscription status
@@ -11,7 +11,7 @@ export async function checkMeTokenSubscriptionStatus(meTokenAddress: string) {
   console.log(`⏳ Querying blockchain...\n`);
 
   try {
-    const info = await getMeTokenSubscriptionInfo(meTokenAddress);
+    const info = await getMeTokenSubscriptionDetails(meTokenAddress);
     
     if (info.error) {
       console.error(`❌ Error: ${info.error}`);
@@ -40,7 +40,9 @@ export async function checkMeTokenSubscriptionStatus(meTokenAddress: string) {
       console.log(`   💡 To enable trading, the MeToken must be subscribed to a hub with DAI deposits`);
     }
 
-    console.log(`\n${info.subscriptionStatus.isSubscribed ? '✅ MeToken is subscribed and ready for trading!' : '❌ MeToken needs to be subscribed before trading is enabled.'}`);
+    console.log(`\n${info.subscriptionStatus.isSubscribed ? 
+      '✅ MeToken is subscribed and ready for trading!' : 
+      '❌ MeToken needs to be subscribed before trading is enabled.'}`);
     
     return info.subscriptionStatus.isSubscribed;
   } catch (error) {
@@ -56,7 +58,7 @@ export async function checkMeTokenSubscriptionStatus(meTokenAddress: string) {
  */
 export async function quickSubscriptionCheck(meTokenAddress: string): Promise<boolean> {
   try {
-    const info = await getMeTokenSubscriptionInfo(meTokenAddress);
+    const info = await getMeTokenSubscriptionDetails(meTokenAddress);
     return info.subscriptionStatus.isSubscribed;
   } catch (error) {
     console.error('Quick subscription check failed:', error);
@@ -74,7 +76,7 @@ export async function batchCheckMeTokenSubscriptions(meTokenAddresses: string[])
   for (const [index, address] of meTokenAddresses.entries()) {
     console.log(`[${index + 1}/${meTokenAddresses.length}] Checking ${address}`);
     try {
-      const info = await getMeTokenSubscriptionInfo(address);
+      const info = await getMeTokenSubscriptionDetails(address);
       const status = info.subscriptionStatus.isSubscribed ? '✅ Subscribed' : '❌ Not Subscribed';
       console.log(`   ${status} - Hub: ${info.subscriptionStatus.hubId}`);
       if (info.basicInfo) {

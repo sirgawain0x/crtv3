@@ -33,10 +33,7 @@ export async function checkMultipleMeTokenSubscriptions(meTokenAddresses: string
   const results = await Promise.allSettled(
     meTokenAddresses.map(async (address) => {
       const info = await getMeTokenSubscriptionInfo(address);
-      return {
-        address,
-        ...info
-      };
+      return info;
     })
   );
 
