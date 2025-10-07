@@ -44,23 +44,25 @@ export function MeTokenTrading({ meToken }: MeTokenTradingProps) {
     transactionError
   } = useMeTokensSupabase();
 
-  // Check if MeToken is subscribed
+  // Check if MeToken is subscribed using the blockchain utility function
   const checkSubscriptionStatus = useCallback(async () => {
-    if (!client) return;
+    if (!client || !meToken.address) return;
     
     setIsCheckingSubscription(true);
     try {
-      // A MeToken is considered subscribed if it has balancePooled > 0 or balanceLocked > 0
-      // This indicates it has been subscribed to a hub
-      const isSubscribed = meToken.balancePooled > BigInt(0) || meToken.balanceLocked > BigInt(0);
-      setIsSubscribed(isSubscribed);
+      console.log('🔍 Checking real subscription status for trading component:', meToken.address);
+      // Use the blockchain utility function to check real subscription status
+      const { checkMeTokenSubscriptionFromBlockchain } = await import('@/lib/utils/metokenSubscriptionUtils');
+      const status = await checkMeTokenSubscriptionFromBlockchain(meToken.address);
+      console.log('✅ Real subscription status for trading:', status);
+      setIsSubscribed(status.isSubscribed);
     } catch (err) {
       console.error('Failed to check subscription status:', err);
       setIsSubscribed(false);
     } finally {
       setIsCheckingSubscription(false);
     }
-  }, [client, meToken.balancePooled, meToken.balanceLocked]);
+  }, [client, meToken.address]);
 
   // Check DAI balance
   const checkDaiBalance = useCallback(async () => {

@@ -1,15 +1,16 @@
 /**
  * @file SendTransaction.tsx
- * @description Provides a UI component for sending transactions using Account Kit's smart account functionality
+ * @description Enhanced send component supporting ETH, USDC, and DAI transfers
  * 
- * This component enables users to send transactions with their modular smart account using AccountKit.
- * It supports ETH transfers as well as custom contract interactions through data parameters.
+ * This component enables users to send tokens with their modular smart account using AccountKit.
+ * It supports ETH transfers and ERC-20 tokens (USDC, DAI) with proper encoding.
  * 
  * Key features:
- * - Send ETH to any Ethereum address
- * - Execute custom contract calls with data parameter
+ * - Send ETH, USDC, or DAI to any address
+ * - Token selection dropdown
+ * - Balance display for each token
+ * - Automatic calldata encoding for ERC-20 transfers
  * - Uses ERC-4337 User Operations for transaction processing
- * - Integrated with AccountKit for smart account capabilities
  * - Full transaction status tracking and error handling
  * 
  * Usage:
@@ -17,7 +18,7 @@
  * <SendTransaction />
  * ```
  * 
- * @dev Uses BigInt to handle ETH amounts and convert to wei
+ * @dev Uses encodeFunctionData for ERC-20 transfers
  * @dev Validates recipient address and transaction parameters before submission
  * @dev Provides real-time user feedback through toast notifications
  * @dev Requires a connected wallet to function
@@ -25,114 +26,308 @@
 
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { useSendUserOperation } from "@account-kit/react";
+import React, { useState, useEffect, useCallback } from "react";
+import { useSendUserOperation, useSmartAccountClient } from "@account-kit/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Loader2, Send, CheckCircle, XCircle, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
-import useModularAccount from "@/lib/hooks/accountkit/useModularAccount";
+import { type Address, type Hex, encodeFunctionData, parseAbi, parseUnits, formatUnits, erc20Abi } from "viem";
+import { USDC_TOKEN_ADDRESSES, USDC_TOKEN_DECIMALS } from "@/lib/contracts/USDCToken";
+import { DAI_TOKEN_ADDRESSES, DAI_TOKEN_DECIMALS } from "@/lib/contracts/DAIToken";
+
+// Token configuration
+type TokenSymbol = 'ETH' | 'USDC' | 'DAI';
+
+const TOKEN_INFO = {
+  ETH: { 
+    decimals: 18, 
+    symbol: "ETH",
+    address: null, // Native token
+  },
+  USDC: { 
+    decimals: USDC_TOKEN_DECIMALS, 
+    symbol: "USDC",
+    address: USDC_TOKEN_ADDRESSES.base,
+  },
+  DAI: { 
+    decimals: DAI_TOKEN_DECIMALS, 
+    symbol: "DAI",
+    address: DAI_TOKEN_ADDRESSES.base,
+  },
+} as const;
 
 /**
- * Component for sending transactions using Account Kit smart account
+ * Component for sending tokens using Account Kit smart account
  */
 export default function SendTransaction() {
+  const [selectedToken, setSelectedToken] = useState<TokenSymbol>('ETH');
   const [recipient, setRecipient] = useState<string>("");
   const [amount, setAmount] = useState<string>("");
-  const [data, setData] = useState<string>("0x");
-  const [address, setAddress] = useState<string | null>(null);
+  const [transactionHash, setTransactionHash] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  
+  const [balances, setBalances] = useState<Record<TokenSymbol, string>>({
+    ETH: '0',
+    USDC: '0',
+    DAI: '0',
+  });
 
-  // Get the smart account client using our custom hook
-  const {
-    smartAccountClient: client,
-    loading: isLoadingClient,
-    getAddress,
-  } = useModularAccount();
-
-  // Get the account address
-  useEffect(() => {
-    if (client) {
-      getAddress().then((addr) => setAddress(addr));
-    }
-  }, [client, getAddress]);
+  const { address, client } = useSmartAccountClient({});
 
   // Set up the hook for sending user operations
-  const { sendUserOperation, isSendingUserOperation, error } =
-    useSendUserOperation({
-      client,
-      waitForTxn: true, // Wait for the transaction to be mined
-      onSuccess: ({ hash, request }) => {
-        toast.success("Transaction sent successfully!");
-        console.log("Transaction hash:", hash);
-        console.log("Request:", request);
-        setRecipient("");
-        setAmount("");
-        setData("0x");
-      },
-      onError: (error) => {
-        toast.error(`Transaction failed: ${error.message}`);
-        console.error("Transaction error:", error);
-      },
-    });
+  const { sendUserOperation, isSendingUserOperation } = useSendUserOperation({
+    client,
+    waitForTxn: true,
+    onSuccess: ({ hash }) => {
+      toast.success("Transaction sent successfully!");
+      console.log("Transaction hash:", hash);
+      setTransactionHash(hash);
+      setRecipient("");
+      setAmount("");
+      // Refresh balances
+      fetchBalances();
+    },
+    onError: (error) => {
+      const errorMsg = `Transaction failed: ${error.message}`;
+      toast.error(errorMsg);
+      setError(errorMsg);
+      console.error("Transaction error:", error);
+    },
+  });
+
+  // Fetch token balances
+  const fetchBalances = useCallback(async () => {
+    if (!address || !client) return;
+
+    try {
+      console.log('Fetching balances for address:', address);
+      
+      // Get ETH balance
+      const ethBalance = await client.getBalance({
+        address: address as Address,
+      });
+      
+      // Get USDC balance
+      const usdcBalance = await client.readContract({
+        address: USDC_TOKEN_ADDRESSES.base as Address,
+        abi: erc20Abi,
+        functionName: 'balanceOf',
+        args: [address as Address],
+      }) as bigint;
+      
+      // Get DAI balance
+      const daiBalance = await client.readContract({
+        address: DAI_TOKEN_ADDRESSES.base as Address,
+        abi: erc20Abi,
+        functionName: 'balanceOf',
+        args: [address as Address],
+      }) as bigint;
+
+      const newBalances: Record<TokenSymbol, string> = {
+        ETH: formatUnits(ethBalance, 18),
+        USDC: formatUnits(usdcBalance, USDC_TOKEN_DECIMALS),
+        DAI: formatUnits(daiBalance, DAI_TOKEN_DECIMALS),
+      };
+
+      console.log('Fetched balances:', newBalances);
+      setBalances(newBalances);
+      
+    } catch (error) {
+      console.error('Error fetching balances:', error);
+    }
+  }, [address, client]);
+
+  // Fetch balances on mount and when address changes
+  useEffect(() => {
+    fetchBalances();
+  }, [address, client, fetchBalances]);
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
+    setTransactionHash(null);
 
     if (!recipient) {
-      toast.error("Please enter a recipient address");
+      const errorMsg = "Please enter a recipient address";
+      toast.error(errorMsg);
+      setError(errorMsg);
       return;
     }
 
-    if (!amount && !data) {
-      toast.error("Please enter an amount or transaction data");
+    if (!amount || parseFloat(amount) <= 0) {
+      const errorMsg = "Please enter a valid amount";
+      toast.error(errorMsg);
+      setError(errorMsg);
+      return;
+    }
+
+    // Check balance
+    const availableBalance = parseFloat(balances[selectedToken]);
+    const requestedAmount = parseFloat(amount);
+    
+    if (requestedAmount > availableBalance) {
+      const errorMsg = `Insufficient balance. You have ${availableBalance} ${selectedToken}, but trying to send ${requestedAmount} ${selectedToken}`;
+      toast.error(errorMsg);
+      setError(errorMsg);
       return;
     }
 
     try {
-      // Convert amount to BigInt (in wei)
-      const valueInWei = amount
-        ? BigInt(Math.floor(parseFloat(amount) * 10 ** 18))
-        : BigInt(0);
+      const tokenInfo = TOKEN_INFO[selectedToken];
+      
+      if (selectedToken === 'ETH') {
+        // Send native ETH
+        const valueInWei = parseUnits(amount, tokenInfo.decimals);
 
-      // Send the transaction
-      sendUserOperation({
-        uo: {
-          target: recipient as `0x${string}`,
-          data: data.startsWith("0x")
-            ? (data as `0x${string}`)
-            : ("0x" as `0x${string}`),
-          value: valueInWei,
-        },
-      });
+        sendUserOperation({
+          uo: {
+            target: recipient as Address,
+            data: "0x" as Hex,
+            value: valueInWei,
+          },
+        });
+      } else {
+        // Send ERC-20 token (USDC or DAI)
+        const tokenAmount = parseUnits(amount, tokenInfo.decimals);
+        
+        // Encode the transfer calldata
+        const transferCalldata = encodeFunctionData({
+          abi: parseAbi(["function transfer(address,uint256) returns (bool)"]),
+          functionName: "transfer",
+          args: [recipient as Address, tokenAmount],
+        });
+
+        console.log('Sending ERC-20 transfer:', {
+          token: selectedToken,
+          tokenAddress: tokenInfo.address,
+          recipient,
+          amount: tokenAmount.toString(),
+        });
+
+        sendUserOperation({
+          uo: {
+            target: tokenInfo.address as Address,
+            data: transferCalldata as Hex,
+            value: BigInt(0), // No native value for ERC-20 transfers
+          },
+        });
+      }
     } catch (error) {
       console.error("Error preparing transaction:", error);
-      toast.error("Error preparing transaction");
+      const errorMsg = `Error preparing transaction: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      toast.error(errorMsg);
+      setError(errorMsg);
     }
   };
 
-  if (isLoadingClient) {
-    return <div className="p-4 text-center">Loading smart account...</div>;
-  }
+  const handleMaxAmount = () => {
+    const balance = balances[selectedToken];
+    if (parseFloat(balance) > 0) {
+      // For ETH, leave a small buffer for gas
+      if (selectedToken === 'ETH') {
+        const bufferAmount = parseFloat(balance) - 0.001; // Leave 0.001 ETH for gas
+        setAmount(bufferAmount > 0 ? bufferAmount.toFixed(6) : '0');
+      } else {
+        setAmount(balance);
+      }
+    }
+  };
 
-  if (!client || !address) {
+  if (!address || !client) {
     return (
-      <div className="p-4 text-center">
-        Please connect your wallet to use this feature
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Send className="h-5 w-5" />
+            Send Tokens
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center py-8 text-muted-foreground">
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            Connecting wallet...
+          </div>
+        </CardContent>
+      </Card>
     );
   }
 
   return (
-    <div className="max-w-md mx-auto p-4">
-      <h2 className="text-2xl font-bold mb-4">Send Transaction</h2>
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Send className="h-5 w-5" />
+          Send Tokens
+        </CardTitle>
+        <CardDescription>
+          Send ETH, USDC, or DAI to any wallet address
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {error && !transactionHash && (
+          <Alert variant="destructive">
+            <XCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
 
-      <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-md">
-        <p className="text-sm">
-          Smart Account: <span className="font-mono">{address}</span>
-        </p>
-      </div>
+        {transactionHash && (
+          <Alert className="bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800">
+            <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+            <AlertDescription className="flex items-center gap-2">
+              <span className="text-green-800 dark:text-green-200">Transfer completed successfully!</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.open(`https://basescan.org/tx/${transactionHash}`, '_blank')}
+              >
+                <ExternalLink className="h-3 w-3 mr-1" />
+                View on BaseScan
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
 
-      <form onSubmit={handleSend} className="space-y-4">
+        {/* Smart Account Address */}
+        <div className="p-3 bg-muted rounded-lg">
+          <p className="text-xs text-muted-foreground mb-1">From Account</p>
+          <p className="text-sm font-mono break-all">{address}</p>
+        </div>
+
+        {/* Token Selection */}
+        <div className="space-y-2">
+          <Label htmlFor="token">Token</Label>
+          <Select value={selectedToken} onValueChange={(value) => setSelectedToken(value as TokenSymbol)}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ETH">ETH</SelectItem>
+              <SelectItem value="USDC">USDC</SelectItem>
+              <SelectItem value="DAI">DAI</SelectItem>
+            </SelectContent>
+          </Select>
+          <div className="flex justify-between text-xs text-muted-foreground">
+            <span>Balance: {parseFloat(balances[selectedToken]).toFixed(6)} {selectedToken}</span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={handleMaxAmount}
+              className="h-5 px-2 text-xs"
+              disabled={isSendingUserOperation}
+            >
+              MAX
+            </Button>
+          </div>
+        </div>
+
+        {/* Recipient Address */}
         <div className="space-y-2">
           <Label htmlFor="recipient">Recipient Address</Label>
           <Input
@@ -140,52 +335,53 @@ export default function SendTransaction() {
             placeholder="0x..."
             value={recipient}
             onChange={(e) => setRecipient(e.target.value)}
+            disabled={isSendingUserOperation}
           />
         </div>
 
+        {/* Amount */}
         <div className="space-y-2">
-          <Label htmlFor="amount">Amount (ETH)</Label>
+          <Label htmlFor="amount">Amount ({selectedToken})</Label>
           <Input
             id="amount"
             type="number"
-            step="0.000001"
+            step="any"
             min="0"
             placeholder="0.0"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
+            disabled={isSendingUserOperation}
           />
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="data">
-            Data (Optional)
-            <span className="text-xs text-gray-500 ml-2">
-              Leave as 0x for simple transfers
-            </span>
-          </Label>
-          <Input
-            id="data"
-            placeholder="0x"
-            value={data}
-            onChange={(e) => setData(e.target.value)}
-          />
-        </div>
-
+        {/* Send Button */}
         <Button
-          type="submit"
+          onClick={handleSend}
           className="w-full"
-          disabled={isSendingUserOperation}
+          disabled={isSendingUserOperation || !recipient || !amount}
         >
-          {isSendingUserOperation ? "Sending..." : "Send Transaction"}
+          {isSendingUserOperation ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Sending {selectedToken}...
+            </>
+          ) : (
+            <>
+              <Send className="mr-2 h-4 w-4" />
+              Send {selectedToken}
+            </>
+          )}
         </Button>
-      </form>
 
-      {error && (
-        <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 rounded-md">
-          <p className="text-sm font-medium">Error:</p>
-          <p className="text-xs">{error.message}</p>
+        {/* Info */}
+        <div className="text-xs text-muted-foreground space-y-1">
+          <p>• Supported tokens on Base: ETH, USDC, DAI</p>
+          <p>• Transactions are powered by Alchemy Smart Wallets</p>
+          {selectedToken === 'ETH' && (
+            <p>• A small amount of ETH will be reserved for gas fees</p>
+          )}
         </div>
-      )}
-    </div>
+      </CardContent>
+    </Card>
   );
 }

@@ -82,12 +82,22 @@ export function TopVideos() {
   const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
+    let isMounted = true;
+    let abortController: AbortController | null = null;
+
     const fetchPlaybackSources = async () => {
+      if (!isMounted) return;
+      
+      abortController = new AbortController();
+      const signal = abortController.signal;
+      
       try {
         const sources: Record<string, Src[] | null> = {};
         console.log("Starting to fetch playback sources...");
 
         for (const video of videos) {
+          if (!isMounted || signal.aborted) return;
+          
           try {
             console.log(
               `Fetching playback source for video ${video.playbackId}...`
@@ -97,6 +107,9 @@ export function TopVideos() {
             const playbackInfo = await fullLivepeer.playback.get(
               video.playbackId
             );
+            
+            if (!isMounted || signal.aborted) return;
+            
             console.log("Playback info:", playbackInfo);
 
             if (!playbackInfo?.playbackInfo) {
@@ -109,6 +122,9 @@ export function TopVideos() {
 
             // Then get the playback source
             const src = await getDetailPlaybackSource(video.playbackId);
+            
+            if (!isMounted || signal.aborted) return;
+            
             console.log(`Playback source for ${video.playbackId}:`, src);
 
             if (!src || src.length === 0) {
@@ -121,6 +137,18 @@ export function TopVideos() {
 
             sources[video.playbackId] = src;
           } catch (error) {
+            if (!isMounted || signal.aborted) return;
+            
+            // Check if it's an abort error
+            if (error instanceof Error && (
+              error.name === 'AbortError' || 
+              error.message.includes('aborted') ||
+              error.message.includes('signal is aborted')
+            )) {
+              console.warn(`Video ${video.playbackId} fetch was aborted:`, error.message);
+              return; // Exit the entire function if aborted
+            }
+            
             console.error(
               `Error fetching playback source for video ${video.playbackId}:`,
               error
@@ -129,18 +157,41 @@ export function TopVideos() {
           }
         }
 
+        if (!isMounted || signal.aborted) return;
+        
         console.log("Final playback sources:", sources);
         setPlaybackSources(sources);
       } catch (error) {
+        if (!isMounted || signal.aborted) return;
+        
+        // Check if it's an abort error
+        if (error instanceof Error && (
+          error.name === 'AbortError' || 
+          error.message.includes('aborted') ||
+          error.message.includes('signal is aborted')
+        )) {
+          console.warn('TopVideos fetch was aborted:', error.message);
+          return; // Don't set error for abort signals
+        }
+        
         console.error("Error in fetchPlaybackSources:", error);
         setError("Failed to load videos");
         toast.error("Failed to load videos");
       } finally {
-        setLoading(false);
+        if (isMounted && !signal.aborted) {
+          setLoading(false);
+        }
       }
     };
 
     fetchPlaybackSources();
+
+    return () => {
+      isMounted = false;
+      if (abortController) {
+        abortController.abort("Component unmounted");
+      }
+    };
   }, []);
 
   if (error) {

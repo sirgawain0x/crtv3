@@ -78,33 +78,39 @@ export function DaiSwapButton({ onSwapSuccess, className }: DaiSwapButtonProps) 
         signatureRequest: quote.signatureRequest,
       };
 
-      // Use the Alchemy Swap Service for the swap functionality
-      // The signPreparedCalls and sendPreparedCalls methods are not available on the React client
-      const { alchemySwapService } = await import('@/lib/sdk/alchemy/swap-service');
-      
-      // Send the prepared calls using the swap service
-      const sendResult = await alchemySwapService.sendPreparedCalls({
-        type: quote.type,
-        data: quote.data,
-        chainId: "0x2105", // Base mainnet
-        signature: quote.signatureRequest.data.raw,
+      // Execute swap via API route using backend client
+      const response = await fetch('/api/swap/execute', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          fromToken,
+          toToken: 'DAI',
+          fromAmount: AlchemySwapService.formatAmount(fromAmount, fromToken),
+        }),
       });
 
-      if (sendResult.result.preparedCallIds.length === 0) {
-        throw new Error('No prepared call IDs returned');
+      if (!response.ok) {
+        let errorMessage = 'Swap execution failed';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch (jsonError) {
+          // If response is not JSON (e.g., HTML error page), use status text
+          errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        }
+        throw new Error(errorMessage);
       }
 
-      // Wait for transaction completion using the swap service
-      const callStatusResult = await alchemySwapService.waitForCallCompletion(
-        sendResult.result.preparedCallIds[0]!
-      );
-
-      if (!callStatusResult.result.receipts || callStatusResult.result.receipts.length === 0) {
-        throw new Error('No transaction receipts found');
-      }
-
-      const txHash = callStatusResult.result.receipts[0].transactionHash;
+      const result = await response.json();
+      const txHash = result.transactionHash;
       setTransactionHash(txHash);
+
+      // Show message if this is a mock response
+      if (result.message) {
+        console.log('Swap result message:', result.message);
+      }
 
       // Call success callback
       onSwapSuccess?.();
