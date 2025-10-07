@@ -289,7 +289,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
       await updateVideoAsset(dbAssetId, {
         metadata_uri: metadataUri,
         thumbnailUri: "", // update as needed
-        status: "ready",
+        status: "draft",
         max_supply: null,
         price: null,
         royalty_percentage: null,
@@ -313,13 +313,13 @@ const FileUpload: React.FC<FileUploadProps> = ({
 
   return (
     <div className="min-h-screen w-full bg-white">
-      <div className="mx-auto flex min-h-[calc(100vh-200px)] max-w-4xl flex-col px-4 py-8">
-        <div className="flex-1 rounded-lg bg-white p-6 shadow-lg sm:p-8">
-          <h1 className="mb-8 text-center text-2xl font-semibold text-gray-900">
+      <div className="mx-auto flex min-h-[calc(100vh-200px)] max-w-4xl flex-col px-2 py-4 sm:px-4 sm:py-8">
+        <div className="flex-1 rounded-lg bg-white p-4 shadow-lg sm:p-8">
+          <h1 className="mb-6 text-center text-xl font-semibold text-gray-900 sm:mb-8 sm:text-2xl">
             Upload A File
           </h1>
 
-          <div className="mx-auto max-w-2xl space-y-8">
+          <div className="mx-auto max-w-2xl space-y-6 sm:space-y-8">
             {/* File Input */}
             <div className="space-y-2">
               <label
@@ -333,8 +333,8 @@ const FileUpload: React.FC<FileUploadProps> = ({
                 id="file-upload"
                 accept="video/*"
                 className="file:border-1 block w-full rounded-lg border border-gray-200 text-sm text-[#EC407A] 
-                file:mr-4 file:cursor-pointer file:rounded-full file:border-0 file:bg-white file:px-4 file:py-2 file:text-sm 
-                file:font-semibold file:text-[#EC407A] hover:file:bg-gray-50"
+                file:mr-2 file:cursor-pointer file:rounded-full file:border-0 file:bg-white file:px-3 file:py-2 file:text-xs 
+                sm:file:mr-4 sm:file:px-4 sm:file:text-sm file:font-semibold file:text-[#EC407A] hover:file:bg-gray-50"
                 data-testid="file-upload-input"
                 onChange={handleFileChange}
               />
@@ -342,12 +342,12 @@ const FileUpload: React.FC<FileUploadProps> = ({
 
             {/* Selected File Section */}
             {selectedFile && (
-              <div className="space-y-8">
+              <div className="space-y-6 sm:space-y-8">
                 <div className="text-center">
                   <p className="text-sm font-medium text-gray-500">
                     Selected File
                   </p>
-                  <p className="mt-1 text-base text-gray-900">
+                  <p className="mt-1 text-sm text-gray-900 break-words sm:text-base">
                     {selectedFile.name}
                   </p>
                 </div>
@@ -367,7 +367,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
                         !selectedFile
                           ? "cursor-not-allowed bg-[#D63A6A] opacity-50"
                           : "bg-[#EC407A] hover:bg-[#D63A6A]"
-                      } w-full max-w-xs rounded-lg px-6 py-3 font-semibold text-white shadow-sm transition-colors sm:w-auto`}
+                      } w-full max-w-xs rounded-lg px-4 py-3 text-sm font-semibold text-white shadow-sm transition-colors sm:px-6 sm:text-base`}
                       data-testid="file-input-upload-button"
                     >
                       Upload File
@@ -384,7 +384,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
                           style={{ width: `${progress}%` }}
                         />
                       </Progress>
-                      <p className="text-center text-sm text-gray-600">
+                      <p className="text-center text-xs text-gray-600 sm:text-sm">
                         {uploadState === "complete"
                           ? "Upload Complete!"
                           : `${progress}% uploaded`}
@@ -433,14 +433,14 @@ const FileUpload: React.FC<FileUploadProps> = ({
             <Button
               onClick={handleAudioToText}
               disabled={uploadState === "loading" || subtitleProcessingComplete}
-              className="w-full max-w-xs"
+              className="w-full max-w-xs text-sm sm:text-base"
             >
               {subtitleProcessingComplete
                 ? "Subtitles Processed"
                 : "Process Subtitles"}
             </Button>
             {subtitleProcessingComplete && (
-              <span className="text-green-600 text-sm">
+              <span className="text-green-600 text-xs sm:text-sm">
                 Subtitles processed and uploaded.
               </span>
             )}
@@ -453,13 +453,13 @@ const FileUpload: React.FC<FileUploadProps> = ({
         )}
 
         {/* Navigation Buttons */}
-        <div className="mt-6 flex items-center justify-center gap-3">
+        <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
           {onPressBack && (
             <Button
               variant="outline"
               disabled={uploadState === "loading"}
               onClick={onPressBack}
-              className="min-w-[100px]"
+              className="w-full min-w-[100px] text-sm sm:w-auto sm:text-base"
             >
               Back
             </Button>
@@ -475,7 +475,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
                 }
               }}
               data-testid="file-input-next"
-              className="min-w-[100px]"
+              className="w-full min-w-[100px] text-sm sm:w-auto sm:text-base"
             >
               Next
             </Button>

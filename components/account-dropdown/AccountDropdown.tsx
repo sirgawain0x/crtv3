@@ -77,8 +77,10 @@ import {
 } from "@/components/ui/dialog";
 import WertFundButton from "@/components/wallet/buy/wert-fund-button";
 import { LoginButton } from "@/components/auth/LoginButton";
+import { AlchemySwapWidget } from "@/components/wallet/swap/AlchemySwapWidget";
 import useModularAccount from "@/lib/hooks/accountkit/useModularAccount";
 import { TokenBalance } from "@/components/wallet/balance/TokenBalance";
+import { MeTokenBalances } from "@/components/wallet/balance/MeTokenBalances";
 import makeBlockie from "ethereum-blockies-base64";
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
 import { useSessionKey } from "@/lib/hooks/accountkit/useSessionKey";
@@ -94,9 +96,11 @@ import {
   AllowlistModule,
   installValidationActions,
 } from "@account-kit/smart-contracts/experimental";
-import { parseEther } from "viem";
+import { parseEther, type Address, type Hex, encodeFunctionData, parseAbi, parseUnits, formatUnits, erc20Abi } from "viem";
 import { useToast } from "@/components/ui/use-toast";
 import { ToastAction } from "@/components/ui/toast";
+import { USDC_TOKEN_ADDRESSES, USDC_TOKEN_DECIMALS } from "@/lib/contracts/USDCToken";
+import { DAI_TOKEN_ADDRESSES, DAI_TOKEN_DECIMALS } from "@/lib/contracts/DAIToken";
 import { useSessionKeyStorage } from "@/lib/hooks/accountkit/useSessionKeyStorage";
 import { MembershipSection } from "./MembershipSection";
 import { shortenAddress } from "@/lib/utils/utils";
@@ -104,6 +108,7 @@ import Link from "next/link";
 import { useMembershipVerification } from "@/lib/hooks/unlock/useMembershipVerification";
 import { Skeleton } from "@/components/ui/skeleton";
 import { chains } from "@/config";
+import { HydrationSafe } from "@/components/ui/hydration-safe";
 
 const chainIconMap: Record<number, string> = {
   [base.id]: "/images/chains/base.svg",
@@ -165,6 +170,27 @@ interface SessionKeyConfig {
   };
 }
 
+// Token configuration for send modal
+type TokenSymbol = 'ETH' | 'USDC' | 'DAI';
+
+const TOKEN_INFO = {
+  ETH: { 
+    decimals: 18, 
+    symbol: "ETH",
+    address: null, // Native token
+  },
+  USDC: { 
+    decimals: USDC_TOKEN_DECIMALS, 
+    symbol: "USDC",
+    address: USDC_TOKEN_ADDRESSES.base,
+  },
+  DAI: { 
+    decimals: DAI_TOKEN_DECIMALS, 
+    symbol: "DAI",
+    address: DAI_TOKEN_ADDRESSES.base,
+  },
+} as const;
+
 const SESSION_KEY_TYPES: SessionKeyConfig[] = [
   {
     type: "global",
@@ -221,6 +247,12 @@ export function AccountDropdown() {
   const [recipientAddress, setRecipientAddress] = useState<string>("");
   const [sendAmount, setSendAmount] = useState<string>("");
   const [isSending, setIsSending] = useState(false);
+  const [selectedToken, setSelectedToken] = useState<TokenSymbol>('ETH');
+  const [tokenBalances, setTokenBalances] = useState<Record<TokenSymbol, string>>({
+    ETH: '0',
+    USDC: '0',
+    DAI: '0',
+  });
   const { toast } = useToast();
   const [isLinksLoading, setIsLinksLoading] = useState(false);
 
@@ -316,6 +348,46 @@ export function AccountDropdown() {
   useEffect(() => {
     setIsDialogOpen(false);
   }, [user]);
+
+  // Fetch token balances when dialog opens with send action
+  useEffect(() => {
+    const fetchTokenBalances = async () => {
+      if (!client || !account?.address || dialogAction !== 'send' || !isDialogOpen) return;
+
+      try {
+        // Get ETH balance
+        const ethBalance = await client.getBalance({
+          address: account.address as Address,
+        });
+        
+        // Get USDC balance
+        const usdcBalance = await client.readContract({
+          address: USDC_TOKEN_ADDRESSES.base as Address,
+          abi: erc20Abi,
+          functionName: 'balanceOf',
+          args: [account.address as Address],
+        }) as bigint;
+        
+        // Get DAI balance
+        const daiBalance = await client.readContract({
+          address: DAI_TOKEN_ADDRESSES.base as Address,
+          abi: erc20Abi,
+          functionName: 'balanceOf',
+          args: [account.address as Address],
+        }) as bigint;
+
+        setTokenBalances({
+          ETH: formatUnits(ethBalance, 18),
+          USDC: formatUnits(usdcBalance, USDC_TOKEN_DECIMALS),
+          DAI: formatUnits(daiBalance, DAI_TOKEN_DECIMALS),
+        });
+      } catch (error) {
+        console.error('Error fetching token balances:', error);
+      }
+    };
+
+    fetchTokenBalances();
+  }, [client, account?.address, dialogAction, isDialogOpen]);
 
   const copyToClipboard = async () => {
     const addressToCopy =
@@ -451,20 +523,65 @@ export function AccountDropdown() {
   const handleSend = async () => {
     if (!client || !recipientAddress || !sendAmount) return;
 
+    // Check balance
+    const availableBalance = parseFloat(tokenBalances[selectedToken]);
+    const requestedAmount = parseFloat(sendAmount);
+    
+    if (requestedAmount > availableBalance) {
+      toast({
+        variant: "destructive",
+        title: "Insufficient Balance",
+        description: `You have ${availableBalance} ${selectedToken}, but trying to send ${requestedAmount} ${selectedToken}`,
+      });
+      return;
+    }
+
     try {
       setIsSending(true);
       toast({
         title: "Transaction Initiated",
-        description: "Please confirm the transaction in your wallet...",
+        description: `Sending ${sendAmount} ${selectedToken}...`,
       });
 
-      sendUserOperation({
-        uo: {
-          target: recipientAddress as `0x${string}`,
-          data: "0x",
-          value: parseEther(sendAmount.toString()),
-        },
-      });
+      const tokenInfo = TOKEN_INFO[selectedToken];
+
+      if (selectedToken === 'ETH') {
+        // Send native ETH
+        const valueInWei = parseUnits(sendAmount, tokenInfo.decimals);
+
+        sendUserOperation({
+          uo: {
+            target: recipientAddress as `0x${string}`,
+            data: "0x" as Hex,
+            value: valueInWei,
+          },
+        });
+      } else {
+        // Send ERC-20 token (USDC or DAI)
+        const tokenAmount = parseUnits(sendAmount, tokenInfo.decimals);
+        
+        // Encode the transfer calldata
+        const transferCalldata = encodeFunctionData({
+          abi: parseAbi(["function transfer(address,uint256) returns (bool)"]),
+          functionName: "transfer",
+          args: [recipientAddress as Address, tokenAmount],
+        });
+
+        console.log('Sending ERC-20 transfer:', {
+          token: selectedToken,
+          tokenAddress: tokenInfo.address,
+          recipient: recipientAddress,
+          amount: tokenAmount.toString(),
+        });
+
+        sendUserOperation({
+          uo: {
+            target: tokenInfo.address as Address,
+            data: transferCalldata as Hex,
+            value: BigInt(0), // No native value for ERC-20 transfers
+          },
+        });
+      }
     } catch (error: unknown) {
       console.error("Error sending transaction:", error);
       toast({
@@ -551,23 +668,58 @@ export function AccountDropdown() {
         return (
           <div className="space-y-4">
             <p className="text-sm text-gray-500">
-              Send crypto to another address.
+              Send ETH, USDC, or DAI to another wallet address.
             </p>
             <div className="flex flex-col gap-4">
-              <input
-                type="text"
-                placeholder="Recipient Address"
-                className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
-                value={recipientAddress}
-                onChange={(e) => setRecipientAddress(e.target.value)}
-              />
-              <input
-                type="number"
-                placeholder="Amount"
-                className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
-                value={sendAmount}
-                onChange={(e) => setSendAmount(e.target.value)}
-              />
+              {/* Token Selection */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Token</label>
+                <select
+                  className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
+                  value={selectedToken}
+                  onChange={(e) => setSelectedToken(e.target.value as TokenSymbol)}
+                >
+                  <option value="ETH">ETH</option>
+                  <option value="USDC">USDC</option>
+                  <option value="DAI">DAI</option>
+                </select>
+                <div className="flex justify-between text-xs text-gray-500">
+                  <span>Balance: {parseFloat(tokenBalances[selectedToken]).toFixed(6)} {selectedToken}</span>
+                  <button
+                    type="button"
+                    onClick={() => setSendAmount(tokenBalances[selectedToken])}
+                    className="text-blue-600 hover:text-blue-700 dark:text-blue-400"
+                  >
+                    MAX
+                  </button>
+                </div>
+              </div>
+
+              {/* Recipient Address */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Recipient Address</label>
+                <input
+                  type="text"
+                  placeholder="0x..."
+                  className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
+                  value={recipientAddress}
+                  onChange={(e) => setRecipientAddress(e.target.value)}
+                />
+              </div>
+
+              {/* Amount */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Amount ({selectedToken})</label>
+                <input
+                  type="number"
+                  placeholder="0.0"
+                  step="any"
+                  className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
+                  value={sendAmount}
+                  onChange={(e) => setSendAmount(e.target.value)}
+                />
+              </div>
+
               <Button
                 className="w-full"
                 onClick={handleSend}
@@ -581,10 +733,13 @@ export function AccountDropdown() {
                 {isSending || isSendingUserOperation ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Sending...
+                    Sending {selectedToken}...
                   </>
                 ) : (
-                  "Send"
+                  <>
+                    <Send className="mr-2 h-4 w-4" />
+                    Send {selectedToken}
+                  </>
                 )}
               </Button>
             </div>
@@ -594,46 +749,19 @@ export function AccountDropdown() {
         return (
           <div className="space-y-4">
             <p className="text-sm text-gray-500">
-              Swap between different cryptocurrencies.
+              Swap between different cryptocurrencies using Alchemy Smart Wallets.
             </p>
-            <div className="flex flex-col gap-4">
-              <div className="flex items-center gap-2">
-                <select className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600">
-                  <option>ETH</option>
-                  <option>USDC</option>
-                  <option>DAI</option>
-                </select>
-                <input
-                  type="number"
-                  placeholder="Amount"
-                  className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
-                />
-              </div>
-              <div className="flex justify-center">
-                <button
-                  onClick={() => setIsArrowUp(!isArrowUp)}
-                  className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                >
-                  {isArrowUp ? (
-                    <ArrowBigUp className="h-6 w-6" />
-                  ) : (
-                    <ArrowBigDown className="h-6 w-6" />
-                  )}
-                </button>
-              </div>
-              <div className="flex items-center gap-2">
-                <select className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600">
-                  <option>USDC</option>
-                  <option>ETH</option>
-                  <option>DAI</option>
-                </select>
-                <input
-                  type="number"
-                  placeholder="Amount"
-                  className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
-                />
-              </div>
-              <Button className="w-full">Swap</Button>
+            <div className="space-y-4">
+              <AlchemySwapWidget 
+                onSwapSuccess={() => {
+                  setIsDialogOpen(false);
+                  toast({
+                    title: "Swap Completed",
+                    description: "Your token swap was successful!",
+                  });
+                }}
+                className="border-0 shadow-none bg-transparent"
+              />
             </div>
           </div>
         );
@@ -777,76 +905,117 @@ export function AccountDropdown() {
 
   return (
     <div className="flex items-center gap-2">
-      <TooltipProvider>
-        <DropdownMenu>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="gap-2 items-center transition-all hover:bg-gray-100 dark:hover:bg-gray-800 hover:border-blue-500 hidden md:flex"
-                >
-                  <div className="relative">
-                    <Image
-                      src={getChainIcon(chain)}
-                      alt={`${chain.name} network icon`}
-                      width={32}
-                      height={32}
-                      className="rounded-full"
-                    />
-                    <div className="absolute -bottom-1 -right-1">
-                      <NetworkStatus isConnected={isNetworkConnected} />
-                    </div>
-                  </div>
-                  <span>{chain.name}</span>
-                </Button>
-              </DropdownMenuTrigger>
-            </TooltipTrigger>
-            <TooltipContent>
-              <pre className="text-xs">{chain.name}</pre>
-            </TooltipContent>
-          </Tooltip>
-          <DropdownMenuContent
-            align="end"
-            className="animate-in fade-in-80 slide-in-from-top-5"
+      <HydrationSafe
+        fallback={
+          <Button
+            variant="outline"
+            className="gap-2 items-center transition-all hover:bg-gray-100 dark:hover:bg-gray-800 hover:border-blue-500 hidden md:flex"
           >
-            <DropdownMenuLabel className="font-semibold text-sm text-gray-500 dark:text-gray-400">
-              Switch Network
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            {chains.map((dropdownChain) => (
-              <Tooltip key={dropdownChain.id}>
-                <TooltipTrigger asChild>
-                  <DropdownMenuItem
-                    onClick={() => handleChainSwitch(dropdownChain)}
-                    disabled={isSettingChain || chain.id === dropdownChain.id}
-                    className={`
-                      flex items-center cursor-pointer
-                      hover:bg-gray-100 dark:hover:bg-gray-800
-                      transition-colors
-                    `}
+            <div className="relative">
+              <Image
+                src={getChainIcon(chain)}
+                alt={`${chain.name} network icon`}
+                width={32}
+                height={32}
+                className="rounded-full"
+              />
+              <div className="absolute -bottom-1 -right-1">
+                <NetworkStatus isConnected={isNetworkConnected} />
+              </div>
+            </div>
+            <span>{chain.name}</span>
+          </Button>
+        }
+      >
+        <TooltipProvider>
+          <DropdownMenu>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="gap-2 items-center transition-all hover:bg-gray-100 dark:hover:bg-gray-800 hover:border-blue-500 hidden md:flex"
                   >
-                    <Image
-                      src={getChainIcon(dropdownChain)}
-                      alt={`${dropdownChain.name} network icon`}
-                      width={32}
-                      height={32}
-                      className="mr-2 rounded-full"
-                    />
-                    {dropdownChain.name}
-                  </DropdownMenuItem>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <pre className="text-xs">{dropdownChain.name}</pre>
-                </TooltipContent>
-              </Tooltip>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </TooltipProvider>
+                    <div className="relative">
+                      <Image
+                        src={getChainIcon(chain)}
+                        alt={`${chain.name} network icon`}
+                        width={32}
+                        height={32}
+                        className="rounded-full"
+                      />
+                      <div className="absolute -bottom-1 -right-1">
+                        <NetworkStatus isConnected={isNetworkConnected} />
+                      </div>
+                    </div>
+                    <span>{chain.name}</span>
+                  </Button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent>
+                <pre className="text-xs">{chain.name}</pre>
+              </TooltipContent>
+            </Tooltip>
+            <DropdownMenuContent
+              align="end"
+              className="animate-in fade-in-80 slide-in-from-top-5"
+            >
+              <DropdownMenuLabel className="font-semibold text-sm text-gray-500 dark:text-gray-400">
+                Switch Network
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {chains.map((dropdownChain) => (
+                <Tooltip key={dropdownChain.id}>
+                  <TooltipTrigger asChild>
+                    <DropdownMenuItem
+                      onClick={() => handleChainSwitch(dropdownChain)}
+                      disabled={isSettingChain || chain.id === dropdownChain.id}
+                      className={`
+                        flex items-center cursor-pointer
+                        hover:bg-gray-100 dark:hover:bg-gray-800
+                        transition-colors
+                      `}
+                    >
+                      <Image
+                        src={getChainIcon(dropdownChain)}
+                        alt={`${dropdownChain.name} network icon`}
+                        width={32}
+                        height={32}
+                        className="mr-2 rounded-full"
+                      />
+                      {dropdownChain.name}
+                    </DropdownMenuItem>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <pre className="text-xs">{dropdownChain.name}</pre>
+                  </TooltipContent>
+                </Tooltip>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </TooltipProvider>
+      </HydrationSafe>
 
       {/* Desktop Dropdown */}
-      <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
+      <HydrationSafe
+        fallback={
+          <Button
+            variant="outline"
+            className="hidden md:flex items-center gap-2 transition-all hover:bg-gray-100 dark:hover:bg-gray-800 hover:border-blue-500"
+          >
+            <Avatar className="h-8 w-8">
+              <AvatarImage
+                src={makeBlockie(account?.address || user?.address || "0x")}
+                alt="Wallet avatar"
+              />
+            </Avatar>
+            <span className="max-w-[100px] truncate">
+              {displayAddress || "Loading..."}
+            </span>
+          </Button>
+        }
+      >
+        <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
         <DropdownMenuTrigger asChild>
           <Button
             variant="outline"
@@ -896,15 +1065,14 @@ export function AccountDropdown() {
 
           {/* Balances Section */}
           <div className="px-2 py-2">
-            <p className="text-sm font-medium mb-2">Balances</p>
             <TokenBalance />
           </div>
 
           <DropdownMenuSeparator />
 
-          {/* Membership Section */}
-          <div className="px-2 py-2 w-full">
-            <MembershipSection />
+          {/* MeToken Balances Section */}
+          <div className="px-2 py-2">
+            <MeTokenBalances />
           </div>
 
           <DropdownMenuSeparator />
@@ -920,7 +1088,7 @@ export function AccountDropdown() {
                 className="flex flex-col items-center justify-center p-3 h-16 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
               >
                 <Plus className="h-4 w-4 text-green-500 mb-1" />
-                <span className="text-xs">Buy</span>
+                <span className="text-xs">Add</span>
               </Button>
               <Button
                 variant="outline"
@@ -944,10 +1112,52 @@ export function AccountDropdown() {
           </div>
 
           <DropdownMenuSeparator />
+          
 
-          {/* Member Access Links - Compact Grid */}
+          {/* Profile & Upload Access - Always Available */}
+          <div className="px-2 py-2 w-full">
+            <p className="text-xs text-muted-foreground mb-2">
+              Options
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <Link href="/profile" className="w-full">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={
+                    "w-full flex flex-col items-center justify-center p-2 h-12 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                  }
+                  onClick={() => setIsDropdownOpen(false)}
+                >
+                  <ShieldUser className="h-3 w-3 mb-1" />
+                  <span className="text-xs">Profile</span>
+                </Button>
+              </Link>
+              <Link href="/upload" className="w-full">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={
+                    "w-full flex flex-col items-center justify-center p-2 h-12 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                  }
+                  onClick={() => setIsDropdownOpen(false)}
+                >
+                  <CloudUpload className="h-3 w-3 mb-1" />
+                  <span className="text-xs">Upload</span>
+                </Button>
+              </Link>
+            </div>
+          </div>
+          <DropdownMenuSeparator />
+          {/* Membership Section */}
+          <div className="px-2 py-2 w-full">
+            <MembershipSection />
+          </div>
+
+          {/* Member Access Links - Only for Members */}
           {isVerified && hasMembership && (
             <>
+              
               <div className="px-2 py-2 w-full">
                 <p className="text-xs text-muted-foreground mb-2">
                   Member Access
@@ -961,33 +1171,24 @@ export function AccountDropdown() {
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-2">
-                    <Link href="/upload" passHref legacyBehavior>
+                    <Link href="/live" className="w-full">
                       <Button
                         variant="outline"
                         size="sm"
-                        className="flex flex-col items-center justify-center p-2 h-12 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                        onClick={() => setIsDropdownOpen(false)}
-                      >
-                        <CloudUpload className="h-3 w-3 mb-1" />
-                        <span className="text-xs">Upload</span>
-                      </Button>
-                    </Link>
-                    <Link href="/live" passHref legacyBehavior>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex flex-col items-center justify-center p-2 h-12 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                        className={
+                          "w-full flex flex-col items-center justify-center p-2 h-12 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                        }
                         onClick={() => setIsDropdownOpen(false)}
                       >
                         <RadioTower className="h-3 w-3 mb-1" />
                         <span className="text-xs">Live</span>
                       </Button>
                     </Link>
-                    <Link href="/clips" passHref legacyBehavior>
+                    <Link href="/clips" className="w-full">
                       <Button
                         variant="outline"
                         size="sm"
-                        className="flex flex-col items-center justify-center p-2 h-12 hover:bg-gray-50 
+                        className="w-full flex flex-col items-center justify-center p-2 h-12 hover:bg-gray-50 
                           dark:hover:bg-gray-800 transition-colors relative"
                         onClick={() => setIsDropdownOpen(false)}
                       >
@@ -998,38 +1199,25 @@ export function AccountDropdown() {
                         </span>
                       </Button>
                     </Link>
-                    <Link href="/profile" passHref legacyBehavior>
+                    <Link href="/vote/create" className="w-full">
                       <Button
                         variant="outline"
                         size="sm"
-                        className="flex flex-col items-center justify-center p-2 h-12 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                        className="w-full flex flex-col items-center justify-center p-2 h-12 hover:bg-green-50 
+                          dark:hover:bg-green-900 transition-colors text-green-600 dark:text-green-400 
+                          font-medium border-green-200 dark:border-green-800"
                         onClick={() => setIsDropdownOpen(false)}
                       >
-                        <ShieldUser className="h-3 w-3 mb-1" />
-                        <span className="text-xs">Profile</span>
+                        <Plus className="h-3 w-3 mb-1" />
+                        <span className="text-xs">Start Vote</span>
                       </Button>
                     </Link>
                   </div>
                 )}
-
-                {/* Create Proposal - Full width important action */}
-                <Link href="/vote/create" passHref legacyBehavior>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="w-full mt-2 flex items-center justify-center p-2 h-10 hover:bg-green-50 
-                      dark:hover:bg-green-900 transition-colors text-green-600 dark:text-green-400 
-                      font-medium border-green-200 dark:border-green-800"
-                    onClick={() => setIsDropdownOpen(false)}
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    <span className="text-sm">Start A Vote</span>
-                  </Button>
-                </Link>
               </div>
-              <DropdownMenuSeparator />
             </>
           )}
+              <DropdownMenuSeparator />
 
           {/* Session Keys Section - Compact */}
           {user?.type !== "eoa" && (
@@ -1062,7 +1250,8 @@ export function AccountDropdown() {
             </DropdownMenuItem>
           </div>
         </DropdownMenuContent>
-      </DropdownMenu>
+        </DropdownMenu>
+      </HydrationSafe>
 
       <Dialog
         open={isDialogOpen}

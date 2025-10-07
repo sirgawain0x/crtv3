@@ -9,6 +9,7 @@ import Navbar from "@/components/Navbar";
 import { cn } from "@/lib/utils/utils";
 import { Toaster } from "@/components/ui/toaster";
 import Footer from "@/components/Footer";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -43,7 +44,7 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   // Persist state across pages
-  const headersList = headers();
+  const headersList = await headers();
   const initialState = cookieToInitialState(
     config,
     headersList.get("cookie") ?? undefined
@@ -73,11 +74,13 @@ export default async function RootLayout({
         <div id="alchemy-signer-iframe-container" style={{ display: "none" }} />{" "}
         {/* Alchemy signer iframe container for modular account functionality */}
         <Providers initialState={initialState}>
-          <Navbar />
-          <div className="min-h-screen flex flex-col">
-            <main className="flex-1">{children}</main>
-            <Footer />
-          </div>
+          <ErrorBoundary>
+            <Navbar />
+            <div className="min-h-screen flex flex-col">
+              <main className="flex-1">{children}</main>
+              <Footer />
+            </div>
+          </ErrorBoundary>
         </Providers>
         <Toaster />
       </body>

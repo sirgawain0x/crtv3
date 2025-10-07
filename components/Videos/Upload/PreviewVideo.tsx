@@ -29,6 +29,9 @@ const PreviewVideo: FC<PreviewVideoProps> = ({ video }) => {
             controls
             src={videoUrl}
             className="absolute inset-0 h-full w-full object-contain"
+            preload="metadata"
+            playsInline
+            controlsList="nodownload"
           >
             Your browser does not support the video tag.
           </video>

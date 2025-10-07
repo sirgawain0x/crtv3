@@ -9,7 +9,13 @@ import {
 import { Slash } from "lucide-react";
 import ProfilePage from "@/components/UserProfile/UserProfile";
 
-export default function Profile() {
+interface ProfilePageProps {
+  params: Promise<{ address: string }>;
+}
+
+export default async function Profile({ params }: ProfilePageProps) {
+  const { address } = await params;
+  
   return (
     <div className="min-h-screen bg-background px-4 py-6 md:px-6 lg:px-8">
       <div className="mb-6 md:mb-8">
@@ -38,7 +44,7 @@ export default function Profile() {
         </Breadcrumb>
       </div>
       <div className="mx-auto max-w-7xl">
-        <ProfilePage />
+        <ProfilePage targetAddress={address} />
       </div>
     </div>
   );

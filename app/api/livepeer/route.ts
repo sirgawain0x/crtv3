@@ -3,7 +3,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(request: NextRequest) {
-  const livepeerUrl = `${process.env.LIVEPEER_FULL_API_URL}/api/stream`;
+  const baseUrl = process.env.LIVEPEER_FULL_API_URL ?? "https://livepeer.studio";
+  const livepeerUrl = `${baseUrl}/api/stream`;
 
   if (!process.env.LIVEPEER_FULL_API_KEY)
     return NextResponse.json(
@@ -29,7 +30,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const livepeerUpload = `${process.env.LIVEPEER_FULL_API_URL}/api/asset/request-upload`;
+  const baseUrl = process.env.LIVEPEER_FULL_API_URL ?? "https://livepeer.studio";
+  const livepeerUpload = `${baseUrl}/api/asset/request-upload`;
 
   if (!process.env.LIVEPEER_FULL_API_KEY)
     return NextResponse.json(

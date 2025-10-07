@@ -18,7 +18,8 @@ import { Src } from "@livepeer/react";
 import makeBlockie from "ethereum-blockies-base64";
 import VideoViewMetrics from "./VideoViewMetrics";
 import { useVideo } from "@/context/VideoContext";
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { getVideoAssetByPlaybackId } from "@/services/video-assets";
 
 interface VideoCardProps {
   asset: Asset;
@@ -27,6 +28,7 @@ interface VideoCardProps {
 
 const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
   const { currentPlayingId, setCurrentPlayingId } = useVideo();
+  const [dbStatus, setDbStatus] = useState<"draft" | "published" | "minted" | "archived" | null>(null);
   const playerRef = useRef<HTMLDivElement>(null);
 
   const handlePlay = () => {
@@ -36,6 +38,19 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
       console.error("Error setting current playing ID:", error);
     }
   };
+
+  useEffect(() => {
+    async function fetchStatus() {
+      try {
+        if (!asset?.playbackId) return;
+        const row = await getVideoAssetByPlaybackId(asset.playbackId);
+        if (row?.status) setDbStatus(row.status);
+      } catch (e) {
+        // no-op
+      }
+    }
+    fetchStatus();
+  }, [asset?.playbackId]);
 
   // Early return if asset is not provided or invalid
   if (!asset) {
@@ -93,16 +108,21 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
         />
         <CardContent>
           <div className="my-2 flex items-center justify-between">
-            <Badge
-              className={asset.status?.phase === "ready" ? "black" : "white"}
-            >
-              {asset?.status?.phase}
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Badge className={asset.status?.phase === "ready" ? "black" : "white"}>
+                {asset?.status?.phase}
+              </Badge>
+              {dbStatus && (
+                <Badge variant="secondary">
+                  {dbStatus}
+                </Badge>
+              )}
+            </div>
             <VideoViewMetrics playbackId={asset.playbackId || ""} />
           </div>
           <div className="mt-6 grid grid-flow-row auto-rows-max space-y-3 overflow-hidden">
             <CardTitle>
-              <Link href={`/discover/${asset.id}`} passHref>
+              <Link href={`/discover/${asset.id}`}>
                 <h1
                   className="max-w-full overflow-hidden text-ellipsis 
                 whitespace-nowrap text-xl font-bold hover:text-orange-500 focus:text-orange-500"
@@ -133,7 +153,6 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
               </Button>
               <Link
                 href={`/discover/${encodeURIComponent(asset?.id)}`}
-                passHref
               >
                 <Button
                   className="flex-1 cursor-pointer hover:scale-125"

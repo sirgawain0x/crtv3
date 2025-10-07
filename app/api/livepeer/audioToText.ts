@@ -8,7 +8,10 @@ type AudioToTextParams = {
 
 export const getLivepeerAudioToText = async (params: AudioToTextParams) => {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 60000);
+  const timeout = setTimeout(() => {
+    controller.abort('Request timeout after 60 seconds');
+  }, 60000);
+  
   try {
     const file = params.formData.get('audio') as File;
 
@@ -61,6 +64,13 @@ export const getLivepeerAudioToText = async (params: AudioToTextParams) => {
     return data;
   } catch (error: any) {
     clearTimeout(timeout);
+    
+    // Handle AbortError specifically - don't throw for abort signals
+    if (error.name === 'AbortError' || error.message?.includes('aborted')) {
+      console.warn('Request was aborted:', error.message);
+      throw new Error('Request timed out after 60 seconds');
+    }
+    
     console.error('Error generating text from audio:', error);
     throw new Error(error.message || 'Failed to generate text from audio');
   }

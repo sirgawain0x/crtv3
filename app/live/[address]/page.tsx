@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { Broadcast, createStreamViaProxy } from "@/components/Live/Broadcast";
-import { useOrbisContext } from "@/context/OrbisContext";
+import { useUser } from "@account-kit/react";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -27,7 +27,8 @@ import { LivestreamThumbnail } from "@/components/Live/LivestreamThumbnail";
 import { getThumbnailUrl } from "@/services/livepeer-thumbnails";
 
 export default function LivePage() {
-  const { isConnected } = useOrbisContext();
+  const user = useUser();
+  const isConnected = !!user?.address;
   const [multistreamTargets, setMultistreamTargets] = useState<
     MultistreamTarget[]
   >([]);
@@ -223,7 +224,7 @@ export default function LivePage() {
             <div className="mt-4 border-t border-white/20 pt-3 max-w-[576px] mx-auto">
               <p className="mb-2 text-sm font-semibold">Multistream Targets</p>
               <MultistreamTargetsForm
-                streamId={Array.isArray(streamId) ? streamId[0] : streamId}
+                streamId={Array.isArray(streamId) ? streamId[0] : streamId || ""}
                 onTargetAdded={handleTargetAdded}
               />
               {isLoadingTargets ? (
