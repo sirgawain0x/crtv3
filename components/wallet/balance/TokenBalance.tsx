@@ -61,6 +61,7 @@ export function TokenBalance() {
       
       // Create a new AbortController for this effect
       abortController = new AbortController();
+      const signal = abortController.signal;
       
       setIsLoading(true);
       setError(null);
@@ -68,10 +69,11 @@ export function TokenBalance() {
       try {
         const address = client?.account?.address || user?.address;
         if (!address || !chain) {
-          if (isMounted) {
+          if (isMounted && !signal.aborted) {
             setEthBalance(null);
             setUsdcBalance(null);
             setDaiBalance(null);
+            setIsLoading(false);
           }
           return;
         }
@@ -82,10 +84,11 @@ export function TokenBalance() {
         else if (chain.id === 10) chainKey = "optimism";
         else {
           console.warn(`Unsupported chain ID: ${chain.id}`);
-          if (isMounted) {
+          if (isMounted && !signal.aborted) {
             setEthBalance(null);
             setUsdcBalance(null);
             setDaiBalance(null);
+            setIsLoading(false);
           }
           return;
         }
@@ -97,16 +100,16 @@ export function TokenBalance() {
 
         // Get ETH balance
         try {
-          if (!isMounted || abortController?.signal.aborted) return;
+          if (!isMounted || signal.aborted) return;
           
           const ethBalance = await publicClient.getBalance({
             address: address as `0x${string}`,
           });
-          if (isMounted && !abortController?.signal.aborted) {
+          if (isMounted && !signal.aborted) {
             setEthBalance(ethBalance);
           }
         } catch (error) {
-          if (isMounted && !abortController?.signal.aborted) {
+          if (isMounted && !signal.aborted) {
             console.error("Error fetching ETH balance:", error);
             setEthBalance(null);
           }
@@ -114,7 +117,7 @@ export function TokenBalance() {
 
         // Get USDC balance
         try {
-          if (!isMounted || abortController?.signal.aborted) return;
+          if (!isMounted || signal.aborted) return;
           
           const usdcTokenContract = getUsdcTokenContract(chainKey);
           const usdcBalance = (await publicClient.readContract({
@@ -123,11 +126,11 @@ export function TokenBalance() {
             functionName: "balanceOf",
             args: [address as `0x${string}`],
           })) as bigint;
-          if (isMounted && !abortController?.signal.aborted) {
+          if (isMounted && !signal.aborted) {
             setUsdcBalance(usdcBalance);
           }
         } catch (error) {
-          if (isMounted && !abortController?.signal.aborted) {
+          if (isMounted && !signal.aborted) {
             console.error("Error fetching USDC balance:", error);
             setUsdcBalance(null);
           }
@@ -135,7 +138,7 @@ export function TokenBalance() {
 
         // Get DAI balance
         try {
-          if (!isMounted || abortController?.signal.aborted) return;
+          if (!isMounted || signal.aborted) return;
           
           const daiTokenContract = getDaiTokenContract(chainKey);
           const daiBalance = (await publicClient.readContract({
@@ -144,17 +147,17 @@ export function TokenBalance() {
             functionName: "balanceOf",
             args: [address as `0x${string}`],
           })) as bigint;
-          if (isMounted && !abortController?.signal.aborted) {
+          if (isMounted && !signal.aborted) {
             setDaiBalance(daiBalance);
           }
         } catch (error) {
-          if (isMounted && !abortController?.signal.aborted) {
+          if (isMounted && !signal.aborted) {
             console.error("Error fetching DAI balance:", error);
             setDaiBalance(null);
           }
         }
       } catch (error) {
-        if (isMounted && !abortController?.signal.aborted) {
+        if (isMounted && !signal.aborted) {
           console.error("Error fetching balances:", error);
           setError(error instanceof Error ? error.message : "Unknown error");
           setEthBalance(null);
@@ -162,7 +165,7 @@ export function TokenBalance() {
           setDaiBalance(null);
         }
       } finally {
-        if (isMounted && !abortController?.signal.aborted) {
+        if (isMounted && !signal.aborted) {
           setIsLoading(false);
         }
       }

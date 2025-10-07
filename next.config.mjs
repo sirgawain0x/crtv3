@@ -2,9 +2,10 @@ import createPWA from "next-pwa";
 
 const withPWA = createPWA({
   dest: "public",
-  disable: process.env.NODE_ENV === "development",
+  disable: true, // Temporarily disable PWA to test if service worker is causing abort signal issues
+  // disable: process.env.NODE_ENV === "development",
   // Disable PWA for Vercel builds to avoid routes-manifest.json issues
-  disable: process.env.NODE_ENV === "development" || process.env.VERCEL === "1",
+  // disable: process.env.NODE_ENV === "development" || process.env.VERCEL === "1",
 });
 
 /** @type {import('next').NextConfig} */
@@ -43,6 +44,16 @@ const nextConfig = {
       },
       {
         protocol: "https",
+        hostname: "gateway.lighthouse.storage",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "*.lighthouse.storage",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
         hostname: "*.googleapis.com",
         pathname: "/**",
       },
@@ -52,6 +63,24 @@ const nextConfig = {
         pathname: "/**",
       },
     ],
+  },
+  async headers() {
+    return [
+      {
+        // Apply to all routes
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'Cross-Origin-Opener-Policy',
+            value: 'unsafe-none',
+          },
+          {
+            key: 'Cross-Origin-Embedder-Policy',
+            value: 'unsafe-none',
+          },
+        ],
+      },
+    ];
   },
 };
 

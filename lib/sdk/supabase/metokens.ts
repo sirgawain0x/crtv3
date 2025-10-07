@@ -6,34 +6,52 @@ export type { MeToken, MeTokenBalance, MeTokenTransaction, CreateMeTokenData, Up
 export class MeTokenSupabaseService {
   // Get MeToken by address
   async getMeTokenByAddress(address: string): Promise<MeToken | null> {
-    const { data, error } = await supabase
-      .from('metokens')
-      .select('*')
-      .eq('address', address.toLowerCase())
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from('metokens')
+        .select('*')
+        .eq('address', address.toLowerCase())
+        .single();
 
-    if (error) {
-      if (error.code === 'PGRST116') return null; // Not found
-      throw new Error(`Failed to fetch MeToken: ${error.message}`);
+      if (error) {
+        if (error.code === 'PGRST116') return null; // Not found
+        console.error('Supabase error fetching MeToken by address:', error);
+        throw new Error(`Failed to fetch MeToken: ${error.message}`);
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error in getMeTokenByAddress:', error);
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error('Unknown error occurred while fetching MeToken');
     }
-
-    return data;
   }
 
   // Get MeToken by owner address
   async getMeTokenByOwner(ownerAddress: string): Promise<MeToken | null> {
-    const { data, error } = await supabase
-      .from('metokens')
-      .select('*')
-      .eq('owner_address', ownerAddress.toLowerCase())
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from('metokens')
+        .select('*')
+        .eq('owner_address', ownerAddress.toLowerCase())
+        .single();
 
-    if (error) {
-      if (error.code === 'PGRST116') return null; // Not found
-      throw new Error(`Failed to fetch MeToken by owner: ${error.message}`);
+      if (error) {
+        if (error.code === 'PGRST116') return null; // Not found
+        console.error('Supabase error fetching MeToken by owner:', error);
+        throw new Error(`Failed to fetch MeToken by owner: ${error.message}`);
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error in getMeTokenByOwner:', error);
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error('Unknown error occurred while fetching MeToken by owner');
     }
-
-    return data;
   }
 
   // Get all MeTokens with pagination and sorting

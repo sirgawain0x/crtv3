@@ -41,6 +41,17 @@ export async function GET(request: NextRequest) {
     }
   } catch (error) {
     console.error('Error fetching MeTokens:', error);
+    
+    // Handle specific error cases
+    if (error instanceof Error) {
+      if (error.message.includes('Failed to fetch MeToken')) {
+        return NextResponse.json(
+          { error: 'MeToken not found', data: null },
+          { status: 404 }
+        );
+      }
+    }
+    
     return NextResponse.json(
       { error: 'Failed to fetch MeTokens' },
       { status: 500 }
