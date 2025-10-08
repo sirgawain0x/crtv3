@@ -166,7 +166,13 @@ export class AlchemyMeTokenService {
     // Create Viem clients for blockchain interactions
     this.publicClient = createPublicClient({
       chain: base,
-      transport: http(`https://base-mainnet.g.alchemy.com/v2/${process.env.NEXT_PUBLIC_ALCHEMY_API_KEY}`),
+      transport: http(`https://base-mainnet.g.alchemy.com/v2/${process.env.NEXT_PUBLIC_ALCHEMY_API_KEY}`, {
+        fetchOptions: {
+          headers: {
+            "Accept-Encoding": "gzip",
+          },
+        },
+      }),
     });
 
     // Note: For production, you should use a secure way to handle private keys
@@ -176,7 +182,13 @@ export class AlchemyMeTokenService {
       this.walletClient = createWalletClient({
         account,
         chain: base,
-        transport: http(`https://base-mainnet.g.alchemy.com/v2/${process.env.NEXT_PUBLIC_ALCHEMY_API_KEY}`),
+        transport: http(`https://base-mainnet.g.alchemy.com/v2/${process.env.NEXT_PUBLIC_ALCHEMY_API_KEY}`, {
+          fetchOptions: {
+            headers: {
+              "Accept-Encoding": "gzip",
+            },
+          },
+        }),
       });
     }
   }
