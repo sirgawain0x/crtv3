@@ -185,13 +185,16 @@ export default function Navbar() {
   // Update display address when user changes
   useEffect(() => {
     async function updateDisplayAddress() {
-      if (user?.address) {
-        const resolved = await truncateAddress(user.address, publicClient);
+      // Prioritize Smart Account address, fallback to EOA
+      const addressToDisplay = modularAccount?.address || user?.address;
+      
+      if (addressToDisplay) {
+        const resolved = await truncateAddress(addressToDisplay, publicClient);
         setDisplayAddress(resolved);
       }
     }
     updateDisplayAddress();
-  }, [user?.address, publicClient]);
+  }, [modularAccount?.address, user?.address, publicClient]);
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -257,17 +260,20 @@ export default function Navbar() {
   };
 
   const copyToClipboard = async () => {
-    if (user?.address) {
+    // Prioritize Smart Account address, fallback to EOA
+    const addressToCopy = modularAccount?.address || user?.address;
+    
+    if (addressToCopy) {
       try {
         // Try to get ENS name first
         const ensName = await publicClient.getEnsName({
-          address: user.address as `0x${string}`,
+          address: addressToCopy as `0x${string}`,
           universalResolverAddress:
             "0x74E20Bd2A1fE0cdbe45b9A1d89cb7e0a45b36376",
         });
 
         // Copy ENS name if available, otherwise copy address
-        const textToCopy = ensName || user.address;
+        const textToCopy = ensName || addressToCopy;
         await navigator.clipboard.writeText(textToCopy);
 
         setCopySuccess(true);
@@ -604,7 +610,7 @@ export default function Navbar() {
                       setIsMenuOpen(false);
                     }}
                   >
-                    Login
+                    Get Started
                   </Button>
                 )}
 
@@ -631,10 +637,12 @@ export default function Navbar() {
                   >
                     Vote
                   </Link>
-                  {/* Profile & Upload Access (mobile) */}
-                  <div className="mt-4 mb-1 text-xs text-muted-foreground font-semibold">
-                    Profile & Upload Access
-                  </div>
+                  {/* Profile & Upload Access (mobile) - Only show when user is connected */}
+                  {user && (
+                    <>
+                      <div className="mt-4 mb-1 text-xs text-muted-foreground font-semibold">
+                        Options
+                      </div>
                       <Link
                         href="/profile"
                         className={mobileMemberNavLinkClass}
@@ -649,6 +657,8 @@ export default function Navbar() {
                       >
                         <CloudUpload className="mr-2 h-4 w-4" /> Upload
                       </Link>
+                    </>
+                  )}
 
                   {/* Member Access Links (mobile) */}
                   {isVerified && hasMembership && (
