@@ -36,7 +36,7 @@ export async function createModularAccountClient({
     transport: alchemy({
       apiKey,
     }),
-    signer,
+    signer: signer.instance,
   });
 
   return accountClient;

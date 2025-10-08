@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, ArrowRightLeft, CheckCircle, XCircle, ExternalLink, DollarSign } from 'lucide-react';
+import Image from 'next/image';
 import { useSmartAccountClient } from '@account-kit/react';
 import { type Hex, type Address, parseEther, formatEther, encodeFunctionData, erc20Abi, parseUnits, maxUint256 } from 'viem';
 import { alchemySwapService, AlchemySwapService, type TokenSymbol, BASE_TOKENS, TOKEN_INFO } from '@/lib/sdk/alchemy/swap-service';
@@ -692,9 +693,6 @@ export function AlchemySwapWidget({ onSwapSuccess, className }: AlchemySwapWidge
           <ArrowRightLeft className="h-5 w-5" />
           Token Swap
         </CardTitle>
-        <CardDescription>
-          Swap tokens instantly using Alchemy&apos;s smart wallet integration
-        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {swapState.error && (
@@ -776,16 +774,25 @@ export function AlchemySwapWidget({ onSwapSuccess, className }: AlchemySwapWidge
             </div>
           </div>
           <div className="flex gap-2">
-            <Select value={swapState.fromToken} onValueChange={handleFromTokenChange}>
-              <SelectTrigger className="w-32">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ETH">ETH</SelectItem>
-                <SelectItem value="USDC">USDC</SelectItem>
-                <SelectItem value="DAI">DAI</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex items-center space-x-2 p-2 border rounded bg-background w-32">
+              <Image
+                src={`/images/tokens/${swapState.fromToken.toLowerCase()}-logo.svg`}
+                alt={swapState.fromToken}
+                width={20}
+                height={20}
+                className="w-5 h-5"
+              />
+              <Select value={swapState.fromToken} onValueChange={handleFromTokenChange}>
+                <SelectTrigger className="w-full bg-transparent border-none outline-none p-0 h-auto">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ETH">ETH</SelectItem>
+                  <SelectItem value="USDC">USDC</SelectItem>
+                  <SelectItem value="DAI">DAI</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div className="flex-1 relative">
               <Input
                 type="number"
@@ -817,7 +824,16 @@ export function AlchemySwapWidget({ onSwapSuccess, className }: AlchemySwapWidge
             </div>
           </div>
           <div className="flex justify-between text-xs text-muted-foreground">
-            <span>Balance: {balances[swapState.fromToken]} {swapState.fromToken}</span>
+            <div className="flex items-center space-x-1">
+              <Image
+                src={`/images/tokens/${swapState.fromToken.toLowerCase()}-logo.svg`}
+                alt={swapState.fromToken}
+                width={12}
+                height={12}
+                className="w-3 h-3"
+              />
+              <span>Balance: {balances[swapState.fromToken]}</span>
+            </div>
             {prices[swapState.fromToken] > 0 && (
               <span>@ {PriceService.formatUSD(prices[swapState.fromToken])}</span>
             )}
@@ -870,16 +886,25 @@ export function AlchemySwapWidget({ onSwapSuccess, className }: AlchemySwapWidge
         <div className="space-y-2">
           <label className="text-sm font-medium">You Receive</label>
           <div className="flex gap-2">
-            <Select value={swapState.toToken} onValueChange={handleToTokenChange}>
-              <SelectTrigger className="w-32">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ETH">ETH</SelectItem>
-                <SelectItem value="USDC">USDC</SelectItem>
-                <SelectItem value="DAI">DAI</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex items-center space-x-2 p-2 border rounded bg-background w-32">
+              <Image
+                src={`/images/tokens/${swapState.toToken.toLowerCase()}-logo.svg`}
+                alt={swapState.toToken}
+                width={20}
+                height={20}
+                className="w-5 h-5"
+              />
+              <Select value={swapState.toToken} onValueChange={handleToTokenChange}>
+                <SelectTrigger className="w-full bg-transparent border-none outline-none p-0 h-auto">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ETH">ETH</SelectItem>
+                  <SelectItem value="USDC">USDC</SelectItem>
+                  <SelectItem value="DAI">DAI</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <div className="flex-1 relative">
               <Input
                 type="number"
@@ -896,7 +921,16 @@ export function AlchemySwapWidget({ onSwapSuccess, className }: AlchemySwapWidge
             </div>
           </div>
           <div className="flex justify-between text-xs text-muted-foreground">
-            <span>Balance: {balances[swapState.toToken]} {swapState.toToken}</span>
+            <div className="flex items-center space-x-1">
+              <Image
+                src={`/images/tokens/${swapState.toToken.toLowerCase()}-logo.svg`}
+                alt={swapState.toToken}
+                width={12}
+                height={12}
+                className="w-3 h-3"
+              />
+              <span>Balance: {balances[swapState.toToken]}</span>
+            </div>
             {prices[swapState.toToken] > 0 && (
               <span>@ {PriceService.formatUSD(prices[swapState.toToken])}</span>
             )}
