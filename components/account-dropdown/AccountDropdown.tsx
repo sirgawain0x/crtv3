@@ -270,38 +270,6 @@ export function AccountDropdown() {
   const validationClient = chain
     ? (client?.extend(installValidationActions as any) as any)
     : undefined;
-  const { sendUserOperation, isSendingUserOperation } = useSendUserOperation({
-    client,
-    waitForTxn: true,
-    onSuccess: ({ hash, request }) => {
-      const explorerUrl = `${chain.blockExplorers?.default.url}/tx/${hash}`;
-      console.log("Transaction hash:", hash);
-      toast({
-        title: "Transaction Successful!",
-        description: "Your transaction has been confirmed.",
-        action: (
-          <ToastAction
-            altText="View on Explorer"
-            onClick={() => window.open(explorerUrl, "_blank")}
-          >
-            View on Explorer
-          </ToastAction>
-        ),
-      });
-      setIsDialogOpen(false);
-      setRecipientAddress("");
-      setSendAmount("");
-    },
-    onError: (error: Error) => {
-      console.error("Error sending transaction:", error);
-      toast({
-        variant: "destructive",
-        title: "Transaction Failed",
-        description:
-          error.message || "Something went wrong with your transaction.",
-      });
-    },
-  });
 
   const { isVerified, hasMembership } = useMembershipVerification();
 
@@ -545,11 +513,13 @@ export function AccountDropdown() {
 
       const tokenInfo = TOKEN_INFO[selectedToken];
 
+      let operation;
+      
       if (selectedToken === 'ETH') {
         // Send native ETH
         const valueInWei = parseUnits(sendAmount, tokenInfo.decimals);
 
-        sendUserOperation({
+        operation = await client!.sendUserOperation({
           uo: {
             target: recipientAddress as `0x${string}`,
             data: "0x" as Hex,
@@ -574,7 +544,7 @@ export function AccountDropdown() {
           amount: tokenAmount.toString(),
         });
 
-        sendUserOperation({
+        operation = await client!.sendUserOperation({
           uo: {
             target: tokenInfo.address as Address,
             data: transferCalldata as Hex,
@@ -582,6 +552,35 @@ export function AccountDropdown() {
           },
         });
       }
+
+      // Wait for transaction to be mined
+      const txHash = await client!.waitForUserOperationTransaction({
+        hash: operation.hash,
+      });
+
+      // Success handling
+      const explorerUrl = `${chain.blockExplorers?.default.url}/tx/${txHash}`;
+      console.log("Transaction hash:", txHash);
+      toast({
+        title: "Transaction Successful!",
+        description: "Your transaction has been confirmed.",
+        action: (
+          <ToastAction
+            altText="View on Explorer"
+            onClick={() => window.open(explorerUrl, "_blank")}
+          >
+            View on Explorer
+          </ToastAction>
+        ),
+      });
+      
+      // Reset form
+      setIsDialogOpen(false);
+      setRecipientAddress("");
+      setSendAmount("");
+      
+      // Refresh balances - refetch on next render
+      // Token balances will be refreshed on next component update
     } catch (error: unknown) {
       console.error("Error sending transaction:", error);
       toast({
@@ -725,12 +724,11 @@ export function AccountDropdown() {
                 onClick={handleSend}
                 disabled={
                   isSending ||
-                  isSendingUserOperation ||
                   !recipientAddress ||
                   !sendAmount
                 }
               >
-                {isSending || isSendingUserOperation ? (
+                {isSending ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Sending {selectedToken}...

@@ -6,7 +6,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useVideo } from '../../context/VideoContext';
 import './Player.css';
 
-export const DemoPlayer: React.FC<{ src: Src[] | null; title: string }> = ({
+export const HeroPlayer: React.FC<{ src: Src[] | null; title: string }> = ({
   src,
   title,
 }) => {
@@ -63,7 +63,7 @@ export const DemoPlayer: React.FC<{ src: Src[] | null; title: string }> = ({
     <Player.Root src={src} autoPlay volume={1}>
       <Player.Container 
         ref={containerRef}
-        className="player-container relative aspect-video touch-none"
+        className="hero-player-container relative aspect-video touch-none"
         onMouseMove={resetFadeTimeout}
         onMouseEnter={() => setControlsVisible(true)}
         onTouchStart={handleControlInteraction}

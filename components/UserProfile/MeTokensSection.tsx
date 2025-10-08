@@ -222,17 +222,17 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
                 <div><strong>Understanding Your Addresses:</strong></div>
                 <div className="space-y-1">
                   <div className="flex items-start gap-2">
-                    <div className="font-semibold min-w-[110px]">Profile URL:</div>
+                    <div className="font-semibold min-w-[110px]">Smart Account:</div>
                     <div className="font-mono text-[10px] break-all">{walletAddress}</div>
                   </div>
                   <div className="flex items-start gap-2">
-                    <div className="font-semibold min-w-[110px]">Smart Account:</div>
+                    <div className="font-semibold min-w-[110px]">Controller:</div>
                     <div className="font-mono text-[10px] break-all">{user.address}</div>
                   </div>
                 </div>
                 <div className="text-muted-foreground pt-2 border-t">
                   💡 <strong>Note:</strong> When you create a MeToken, it will be owned by your{' '}
-                  <strong>Smart Account</strong> address ({user.address?.slice(0,6)}...{user.address?.slice(-4)}).
+                  <strong>Smart Account</strong> address ({walletAddress?.slice(0,6)}...{walletAddress?.slice(-4)}).
                 </div>
               </AlertDescription>
             </Alert>

@@ -35,14 +35,6 @@ const uiConfig: AlchemyAccountsUIConfig = {
         { type: "social", authProviderId: "google", mode: "popup" },
         { type: "social", authProviderId: "facebook", mode: "popup" },
       ],
-      [
-        {
-          type: "external_wallets",
-          walletConnect: {
-            projectId: process.env.NEXT_PUBLIC_REOWN_PROJECT_ID as string,
-          },
-        },
-      ],
     ],
     addPasskeyOnSignup: true,
     header: React.createElement(Image, {
