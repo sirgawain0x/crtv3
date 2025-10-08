@@ -48,6 +48,7 @@ import { AccountDropdown } from "@/components/account-dropdown/AccountDropdown";
 import { useMembershipVerification } from "@/lib/hooks/unlock/useMembershipVerification";
 import { MembershipSection } from "./account-dropdown/MembershipSection";
 import { ChainSelect } from "@/components/ui/select";
+import { TokenSelect } from "@/components/ui/token-select";
 
 type UseUserResult = (AccountUser & { type: "eoa" | "sca" }) | null;
 
@@ -173,6 +174,8 @@ export default function Navbar() {
   const [isNetworkConnected, setIsNetworkConnected] = useState(true);
   const [isSessionSigsModalOpen, setIsSessionSigsModalOpen] = useState(false);
   const { isVerified, hasMembership } = useMembershipVerification();
+  const [fromToken, setFromToken] = useState("ETH");
+  const [toToken, setToToken] = useState("USDC");
 
   // Initialize Viem public client for ENS resolution
   const publicClient = createPublicClient({
@@ -356,11 +359,11 @@ export default function Navbar() {
             <p className="mb-4">Swap between different cryptocurrencies.</p>
             <div className="flex flex-col gap-4">
               <div className="flex items-center gap-2">
-                <select className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600">
-                  <option>ETH</option>
-                  <option>USDC</option>
-                  <option>DAI</option>
-                </select>
+                <TokenSelect
+                  value={fromToken}
+                  onChange={setFromToken}
+                  className="w-full"
+                />
                 <input
                   type="number"
                   placeholder="Amount"
@@ -369,7 +372,13 @@ export default function Navbar() {
               </div>
               <div className="flex justify-center">
                 <button
-                  onClick={() => setIsArrowUp(!isArrowUp)}
+                  onClick={() => {
+                    setIsArrowUp(!isArrowUp);
+                    // Swap the tokens
+                    const temp = fromToken;
+                    setFromToken(toToken);
+                    setToToken(temp);
+                  }}
                   className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                 >
                   {isArrowUp ? (
@@ -380,11 +389,11 @@ export default function Navbar() {
                 </button>
               </div>
               <div className="flex items-center gap-2">
-                <select className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600">
-                  <option>USDC</option>
-                  <option>ETH</option>
-                  <option>DAI</option>
-                </select>
+                <TokenSelect
+                  value={toToken}
+                  onChange={setToToken}
+                  className="w-full"
+                />
                 <input
                   type="number"
                   placeholder="Amount"

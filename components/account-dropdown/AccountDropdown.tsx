@@ -673,17 +673,35 @@ export function AccountDropdown() {
               {/* Token Selection */}
               <div className="space-y-2">
                 <label className="text-sm font-medium">Token</label>
-                <select
-                  className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
-                  value={selectedToken}
-                  onChange={(e) => setSelectedToken(e.target.value as TokenSymbol)}
-                >
-                  <option value="ETH">ETH</option>
-                  <option value="USDC">USDC</option>
-                  <option value="DAI">DAI</option>
-                </select>
+                <div className="flex items-center space-x-2 p-2 border rounded dark:bg-gray-700 dark:border-gray-600">
+                  <Image
+                    src={`/images/tokens/${selectedToken.toLowerCase()}-logo.svg`}
+                    alt={selectedToken}
+                    width={20}
+                    height={20}
+                    className="w-5 h-5"
+                  />
+                  <select
+                    className="w-full bg-transparent border-none outline-none dark:text-white"
+                    value={selectedToken}
+                    onChange={(e) => setSelectedToken(e.target.value as TokenSymbol)}
+                  >
+                    <option value="ETH">ETH</option>
+                    <option value="USDC">USDC</option>
+                    <option value="DAI">DAI</option>
+                  </select>
+                </div>
                 <div className="flex justify-between text-xs text-gray-500">
-                  <span>Balance: {parseFloat(tokenBalances[selectedToken]).toFixed(6)} {selectedToken}</span>
+                  <div className="flex items-center space-x-1">
+                    <Image
+                      src={`/images/tokens/${selectedToken.toLowerCase()}-logo.svg`}
+                      alt={selectedToken}
+                      width={12}
+                      height={12}
+                      className="w-3 h-3"
+                    />
+                    <span>Balance: {parseFloat(tokenBalances[selectedToken]).toFixed(6)}</span>
+                  </div>
                   <button
                     type="button"
                     onClick={() => setSendAmount(tokenBalances[selectedToken])}
@@ -746,9 +764,6 @@ export function AccountDropdown() {
       case "swap":
         return (
           <div className="space-y-4">
-            <p className="text-sm text-gray-500">
-              Swap between different cryptocurrencies using Alchemy Smart Wallets.
-            </p>
             <div className="space-y-4">
               <AlchemySwapWidget 
                 onSwapSuccess={() => {
@@ -1233,6 +1248,24 @@ export function AccountDropdown() {
               <DropdownMenuSeparator />
             </>
           )}
+
+          {/* Feedback Link */}
+          <div className="px-2 py-1 w-full">
+            <DropdownMenuItem asChild>
+              <Link
+                href="https://feedback.creativeplatform.xyz/crtv"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full flex items-center cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors p-2 rounded"
+                onClick={() => setIsDropdownOpen(false)}
+              >
+                <ArrowUpRight className="mr-2 h-4 w-4" />
+                <span className="text-sm">Feedback</span>
+              </Link>
+            </DropdownMenuItem>
+          </div>
+
+          <DropdownMenuSeparator />
 
           {/* Logout */}
           <div className="px-2 py-1 w-full">
