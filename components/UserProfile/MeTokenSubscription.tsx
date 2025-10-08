@@ -351,7 +351,7 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
           target: diamondAddress,
           data: mintCalldata,
           value: BigInt(0),
-        }
+        },
       });
       
       console.log('⏳ Waiting for mint confirmation...');

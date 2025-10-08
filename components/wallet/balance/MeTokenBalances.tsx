@@ -58,7 +58,7 @@ function formatTVL(tvl: number): string {
 }
 
 export function MeTokenBalances() {
-  const { client } = useSmartAccountClient({});
+  const { client, address: scaAddress } = useSmartAccountClient({});
   const user = useUser();
   const [meTokenBalances, setMeTokenBalances] = useState<MeTokenBalanceData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -166,7 +166,7 @@ export function MeTokenBalances() {
           {/* Link to profile for MeToken management */}
           <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
             <Link 
-              href={`/profile/${user?.address}`}
+              href={`/profile/${scaAddress || user?.address}`}
               className={`flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors`}
             >
               <ExternalLink className="h-3 w-3" />
@@ -245,7 +245,7 @@ export function MeTokenBalances() {
         {/* Link to profile for MeToken management */}
         <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
           <Link 
-            href={`/profile/${singleHolding.isOwnMeToken ? user?.address : singleHolding.ownerAddress}`}
+            href={`/profile/${singleHolding.isOwnMeToken ? (scaAddress || user?.address) : singleHolding.ownerAddress}`}
             className={`flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors`}
           >
             <ExternalLink className="h-3 w-3" />

@@ -8,7 +8,7 @@ import {
   HERO_VIDEO_TITLE,
 } from "../../context/context";
 import { Src } from "@livepeer/react";
-import { DemoPlayer } from "../Player/DemoPlayer";
+import { HeroPlayer } from "../Player/HeroPlayer";
 import { PlayerLoading } from "../Player/Player";
 import { getHeroPlaybackSource } from "../../lib/hooks/livepeer/useHeroPlaybackSource";
 
@@ -80,7 +80,7 @@ const HeroSection: React.FC = () => {
     return () => {
       isMounted = false;
       if (abortController) {
-        abortController.abort("Component unmounted");
+        abortController.abort();
       }
     };
   }, []);
@@ -122,7 +122,7 @@ const HeroSection: React.FC = () => {
             ) : (
               <div className="relative touch-none">
                 {src ? (
-                  <DemoPlayer src={src} title={HERO_VIDEO_TITLE} />
+                  <HeroPlayer src={src} title={HERO_VIDEO_TITLE} />
                 ) : (
                   <div className="text-center p-4 bg-red-100 rounded-lg">
                     No video source available.

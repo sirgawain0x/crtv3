@@ -27,7 +27,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { useSendUserOperation, useSmartAccountClient } from "@account-kit/react";
+import { useSmartAccountClient } from "@account-kit/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -70,6 +70,7 @@ export default function SendTransaction() {
   const [amount, setAmount] = useState<string>("");
   const [transactionHash, setTransactionHash] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isSendingUserOperation, setIsSendingUserOperation] = useState<boolean>(false);
   
   const [balances, setBalances] = useState<Record<TokenSymbol, string>>({
     ETH: '0',
@@ -78,27 +79,6 @@ export default function SendTransaction() {
   });
 
   const { address, client } = useSmartAccountClient({});
-
-  // Set up the hook for sending user operations
-  const { sendUserOperation, isSendingUserOperation } = useSendUserOperation({
-    client,
-    waitForTxn: true,
-    onSuccess: ({ hash }) => {
-      toast.success("Transaction sent successfully!");
-      console.log("Transaction hash:", hash);
-      setTransactionHash(hash);
-      setRecipient("");
-      setAmount("");
-      // Refresh balances
-      fetchBalances();
-    },
-    onError: (error) => {
-      const errorMsg = `Transaction failed: ${error.message}`;
-      toast.error(errorMsg);
-      setError(errorMsg);
-      console.error("Transaction error:", error);
-    },
-  });
 
   // Fetch token balances
   const fetchBalances = useCallback(async () => {
@@ -177,14 +157,17 @@ export default function SendTransaction() {
       return;
     }
 
+    setIsSendingUserOperation(true);
     try {
       const tokenInfo = TOKEN_INFO[selectedToken];
+      
+      let operation;
       
       if (selectedToken === 'ETH') {
         // Send native ETH
         const valueInWei = parseUnits(amount, tokenInfo.decimals);
 
-        sendUserOperation({
+        operation = await client!.sendUserOperation({
           uo: {
             target: recipient as Address,
             data: "0x" as Hex,
@@ -209,7 +192,7 @@ export default function SendTransaction() {
           amount: tokenAmount.toString(),
         });
 
-        sendUserOperation({
+        operation = await client!.sendUserOperation({
           uo: {
             target: tokenInfo.address as Address,
             data: transferCalldata as Hex,
@@ -217,11 +200,27 @@ export default function SendTransaction() {
           },
         });
       }
+
+      // Wait for transaction to be mined
+      const txHash = await client!.waitForUserOperationTransaction({
+        hash: operation.hash,
+      });
+
+      // Success handling
+      toast.success("Transaction sent successfully!");
+      console.log("Transaction hash:", txHash);
+      setTransactionHash(txHash);
+      setRecipient("");
+      setAmount("");
+      // Refresh balances
+      fetchBalances();
     } catch (error) {
       console.error("Error preparing transaction:", error);
       const errorMsg = `Error preparing transaction: ${error instanceof Error ? error.message : 'Unknown error'}`;
       toast.error(errorMsg);
       setError(errorMsg);
+    } finally {
+      setIsSendingUserOperation(false);
     }
   };
 

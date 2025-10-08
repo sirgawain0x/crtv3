@@ -187,6 +187,7 @@ export async function executeSwap(params: {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Accept-Encoding": "gzip",
         },
         body: JSON.stringify({
           id: 1,

@@ -30,7 +30,6 @@ import type { VideoAsset } from "@/lib/types/video-asset";
 import { useSmartAccountClient } from "@account-kit/react";
 import { useUniversalAccount } from "@/lib/hooks/accountkit/useUniversalAccount";
 import { getLivepeerAsset } from "@/app/api/livepeer/assetUploadActions";
-import { useSendUserOperation } from "@account-kit/react";
 import { encodeFunctionData, createPublicClient, http } from "viem";
 import { base } from "@account-kit/infra";
 import { creativeTv1155Abi } from "@/lib/contracts/CreativeTV1155";
@@ -52,20 +51,8 @@ const HookMultiStepForm = () => {
 
   const { address, type, loading } = useUniversalAccount();
   const { client } = useSmartAccountClient({});
-  // Note: useWalletClient is not available in @account-kit/react
-  // Using smart account client instead
-  const {
-    sendUserOperation: sendMintUo,
-    isSendingUserOperation: isMinting,
-    error: mintError,
-  } = useSendUserOperation({ 
-    client, 
-    waitForTxn: true,
-    onSuccess: ({ hash }) => {
-      console.log("Mint transaction hash:", hash);
-      // The hash will be handled in the success callback
-    }
-  });
+  const [isMinting, setIsMinting] = useState(false);
+  const [mintError, setMintError] = useState<Error | null>(null);
 
   const router = useRouter();
 
@@ -210,80 +197,73 @@ const HookMultiStepForm = () => {
                     args: [address as `0x${string}`, tokenId, amount, dataBytes],
                   });
 
+                  setIsMinting(true);
+                  setMintError(null);
+                  
                   try {
-                    let result;
-                    if (type === "SCA" && client) {
-                      // Use smart account for minting
-                      result = await sendMintUo({
-                        uo: {
-                          target: erc1155Address,
-                          data: dataCalldata,
-                          value: BigInt(0),
-                        },
-                      });
-                    } else {
-                      // Use smart account client for minting via user operation
-                      if (!client) {
-                        toast.error("Smart account client not available. Please ensure your wallet is connected.");
-                        return;
-                      }
+                    if (!client) {
+                      toast.error("Smart account client not available. Please ensure your wallet is connected.");
+                      return;
+                    }
 
-                      const dataCalldata = encodeFunctionData({
-                        abi: creativeTv1155Abi,
-                        functionName: "mint",
-                        args: [address as `0x${string}`, tokenId, amount, dataBytes],
-                      });
-
-                      await sendMintUo({
-                        uo: {
-                          target: erc1155Address,
-                          data: dataCalldata,
-                          value: BigInt(0),
-                        },
-                      });
+                    // Use smart account client for minting via user operation
+                    const operation = await client.sendUserOperation({
+                      uo: {
+                        target: erc1155Address,
+                        data: dataCalldata,
+                        value: BigInt(0),
+                      },
+                    });
+                    
+                    // Wait for the transaction to be mined
+                    const txHash = await client.waitForUserOperationTransaction({
+                      hash: operation.hash,
+                    });
+                    
+                    console.log("Mint transaction hash:", txHash);
                       
-                      // The transaction hash will be available in the onSuccess callback
-                      // For now, we'll update the status without the hash
-                      await updateVideoAssetMintingStatus(videoAsset?.id as number, {
-                        token_id: tokenId.toString(),
-                        contract_address: erc1155Address,
-                        mint_transaction_hash: "pending", // Will be updated when hash is available
-                      });
-                      const tokenIdNum = tokenId.toString();
-                      const zoraUrl = `https://zora.co/collect/base:${erc1155Address}/${tokenIdNum}`;
-                      const openseaUrl = `https://opensea.io/assets/base/${erc1155Address}/${tokenIdNum}`;
-                      const basescanTokenUrl = `https://basescan.org/token/${erc1155Address}?a=${tokenIdNum}`;
-                      const basescanTxUrl = `https://basescan.org/tx/pending`;
+                    // Update the status with the transaction hash
+                    await updateVideoAssetMintingStatus(videoAsset?.id as number, {
+                      token_id: tokenId.toString(),
+                      contract_address: erc1155Address,
+                      mint_transaction_hash: txHash,
+                    });
+                    
+                    const tokenIdNum = tokenId.toString();
+                    const zoraUrl = `https://zora.co/collect/base:${erc1155Address}/${tokenIdNum}`;
+                    const openseaUrl = `https://opensea.io/assets/base/${erc1155Address}/${tokenIdNum}`;
+                    const basescanTokenUrl = `https://basescan.org/token/${erc1155Address}?a=${tokenIdNum}`;
+                    const basescanTxUrl = `https://basescan.org/tx/${txHash}`;
 
-                      toast.success("NFT minted successfully", {
-                        description: (
-                          <div className="space-y-1">
-                            <a
-                              href={openseaUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="underline"
-                            >
-                              View on OpenSea
-                            </a>
-                            <span className="mx-2">•</span>
-                            <a
-                              href={basescanTokenUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="underline"
-                            >
-                              View token on BaseScan
-                            </a>
-                            <span className="mx-2">•</span>
-                            <a
-                              href={basescanTxUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="underline"
-                            >
-                              View mint tx
-                            </a>
+                    toast.success("NFT minted successfully", {
+                      description: (
+                        <div className="space-y-1">
+                          <a
+                            href={openseaUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="underline"
+                          >
+                            View on OpenSea
+                          </a>
+                          <span className="mx-2">•</span>
+                          <a
+                            href={basescanTokenUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="underline"
+                          >
+                            View token on BaseScan
+                          </a>
+                          <span className="mx-2">•</span>
+                          <a
+                            href={basescanTxUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="underline"
+                          >
+                            View mint tx
+                          </a>
                           </div>
                         ),
                         action: {
@@ -291,12 +271,15 @@ const HookMultiStepForm = () => {
                           onClick: () => window.open(zoraUrl, "_blank"),
                         },
                       });
-                    }
                   } catch (e: any) {
                     console.error("Mint failed", e);
+                    const err = e instanceof Error ? e : new Error(e?.message || "Could not mint NFT");
+                    setMintError(err);
                     toast.error("Mint failed", {
-                      description: e?.message || "Could not mint NFT",
+                      description: err.message,
                     });
+                  } finally {
+                    setIsMinting(false);
                   }
                 }
               }
