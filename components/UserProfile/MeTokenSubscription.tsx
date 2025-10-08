@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, AlertCircle, CheckCircle, ExternalLink } from 'lucide-react';
+import Image from 'next/image';
 import { formatEther, parseEther, encodeFunctionData, maxUint256 } from 'viem';
 import { useSmartAccountClient, useChain, useSendCalls } from '@account-kit/react';
 import { useMeTokensSupabase, MeTokenData } from '@/lib/hooks/metokens/useMeTokensSupabase';
@@ -480,13 +481,31 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
               <span className="text-muted-foreground">Status:</span>
               <span className="ml-2 text-green-600 font-medium">Subscribed</span>
             </div>
-            <div>
+            <div className="flex items-center">
               <span className="text-muted-foreground">Pooled:</span>
-              <span className="ml-2 font-mono">{formatEther(BigInt(realSubscriptionStatus.balancePooled))} DAI</span>
+              <div className="ml-2 flex items-center space-x-1">
+                <Image
+                  src="/images/tokens/dai-logo.svg"
+                  alt="DAI"
+                  width={12}
+                  height={12}
+                  className="w-3 h-3"
+                />
+                <span className="font-mono">{formatEther(BigInt(realSubscriptionStatus.balancePooled))}</span>
+              </div>
             </div>
-            <div>
+            <div className="flex items-center">
               <span className="text-muted-foreground">Locked:</span>
-              <span className="ml-2 font-mono">{formatEther(BigInt(realSubscriptionStatus.balanceLocked))} DAI</span>
+              <div className="ml-2 flex items-center space-x-1">
+                <Image
+                  src="/images/tokens/dai-logo.svg"
+                  alt="DAI"
+                  width={12}
+                  height={12}
+                  className="w-3 h-3"
+                />
+                <span className="font-mono">{formatEther(BigInt(realSubscriptionStatus.balanceLocked))}</span>
+              </div>
             </div>
           </div>
           
@@ -574,7 +593,16 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="assetsDeposited">DAI Amount to Deposit</Label>
+            <Label htmlFor="assetsDeposited" className="flex items-center space-x-2">
+              <Image
+                src="/images/tokens/dai-logo.svg"
+                alt="DAI"
+                width={16}
+                height={16}
+                className="w-4 h-4"
+              />
+              <span>DAI Amount to Deposit</span>
+            </Label>
             <Input
               id="assetsDeposited"
               type="number"
@@ -585,8 +613,15 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
               step="0.01"
               min="0"
             />
-            <p className="text-sm text-muted-foreground">
-              Your DAI balance: {formatEther(daiBalance)} DAI
+            <p className="text-sm text-muted-foreground flex items-center space-x-1">
+              <Image
+                src="/images/tokens/dai-logo.svg"
+                alt="DAI"
+                width={12}
+                height={12}
+                className="w-3 h-3"
+              />
+              <span>Your DAI balance: {formatEther(daiBalance)}</span>
             </p>
             {assetsDeposited && parseFloat(assetsDeposited) > 0 && (
               <div className="text-sm">
