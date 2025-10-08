@@ -23,9 +23,9 @@ const createProposalSchema = z.object({
 // Adapter for Snapshot.js that mimics an ethers.js Wallet using Account Kit signer
 function createSnapshotEoaAdapter() {
   return {
-    getAddress: async () => signer.getAddress(),
+    getAddress: async () => signer.instance.getAddress(),
     signMessage: async (message: string | Uint8Array) =>
-      signer.signMessage({
+      signer.instance.signMessage({
         raw: typeof message === "string" ? stringToHex(message) : message,
       }),
   };

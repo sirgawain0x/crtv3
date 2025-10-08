@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAvatarUpload } from '@/lib/hooks/metokens/useAvatarUpload';
 import { useCreatorProfile } from '@/lib/hooks/metokens/useCreatorProfile';
 import { useUser } from '@account-kit/react';
+import { useWalletStatus } from '@/lib/hooks/accountkit/useWalletStatus';
 import { Upload, X, User, AlertCircle, CheckCircle } from 'lucide-react';
 
 interface AvatarUploadProps {
@@ -24,12 +25,13 @@ export function AvatarUpload({
   onUploadComplete 
 }: AvatarUploadProps) {
   const user = useUser();
+  const { smartAccountAddress } = useWalletStatus();
   const { profile } = useCreatorProfile(targetAddress);
   const { isUploading, uploadProgress, error, uploadAvatar, deleteAvatar } = useAvatarUpload(targetAddress);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
 
-  const isOwner = !targetAddress || targetAddress === user?.address;
+  const isOwner = !targetAddress || targetAddress === user?.address || targetAddress === smartAccountAddress;
   const currentAvatarUrl = profile?.avatar_url;
 
   const sizeClasses = {
@@ -184,7 +186,7 @@ export function AvatarUpload({
 
       {!isOwner && (
         <p className="text-sm text-muted-foreground">
-          You can only edit your own avatar
+          Add an avatar
         </p>
       )}
     </div>

@@ -11,6 +11,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useCreatorProfile } from '@/lib/hooks/metokens/useCreatorProfile';
 import { useUser } from '@account-kit/react';
 import { useToast } from '@/components/ui/use-toast';
+import { useWalletStatus } from '@/lib/hooks/accountkit/useWalletStatus';
 import { AvatarUpload } from './AvatarUpload';
 import { Loader2, CheckCircle, AlertCircle, User, Save, Edit3 } from 'lucide-react';
 
@@ -22,6 +23,7 @@ interface CreatorProfileManagerProps {
 export function CreatorProfileManager({ targetAddress, onProfileUpdated }: CreatorProfileManagerProps) {
   const user = useUser();
   const { toast } = useToast();
+  const { smartAccountAddress } = useWalletStatus();
   const { profile, loading, error, updateProfile, upsertProfile } = useCreatorProfile(targetAddress);
   
   const [isEditing, setIsEditing] = useState(false);
@@ -97,7 +99,7 @@ export function CreatorProfileManager({ targetAddress, onProfileUpdated }: Creat
     setIsEditing(false);
   };
 
-  const isOwner = !targetAddress || targetAddress === user?.address;
+  const isOwner = !targetAddress || targetAddress === user?.address || targetAddress === smartAccountAddress;
 
   if (loading) {
     return (
