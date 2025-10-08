@@ -177,6 +177,7 @@ export class AlchemySwapService {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "Accept-Encoding": "gzip",
       },
       body: JSON.stringify({
         id: 1,
@@ -268,6 +269,7 @@ Original error: ${result.error.message}`;
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "Accept-Encoding": "gzip",
       },
       body: JSON.stringify({
         id: 1,
@@ -298,6 +300,7 @@ Original error: ${result.error.message}`;
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "Accept-Encoding": "gzip",
       },
       body: JSON.stringify({
         id: 1,
