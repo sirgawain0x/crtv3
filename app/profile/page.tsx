@@ -24,7 +24,7 @@ function ProfileRedirect() {
       console.log('Redirecting to EOA profile:', eoaAddress);
       router.replace(`/profile/${eoaAddress}`);
     }
-  }, [eoaAddress, smartAccountAddress, router]);
+  }, [eoaAddress, smartAccountAddress, router, account?.address, scaAddress]);
 
   return (
     <div className="flex flex-col items-center justify-center h-screen gap-4">

@@ -3,7 +3,6 @@
 import { useState } from "react";
 import {
   useSmartAccountClient,
-  useSendUserOperation,
 } from "@account-kit/react";
 import { toast } from "sonner";
 
@@ -18,24 +17,11 @@ export type Transaction = {
  */
 export function useBatchTransactions() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [isSendingUserOperation, setIsSendingUserOperation] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
 
   // Get smart account client
   const { client, address, isLoadingClient } = useSmartAccountClient({});
-
-  // Set up hook for sending user operations
-  const { sendUserOperation, isSendingUserOperation, error } =
-    useSendUserOperation({
-      client,
-      waitForTxn: true,
-      onSuccess: ({ hash }) => {
-        toast.success("Batch transactions sent successfully!");
-        // Clear transactions after successful execution
-        setTransactions([]);
-      },
-      onError: (error) => {
-        toast.error(`Transaction failed: ${error.message}`);
-      },
-    });
 
   // Add a transaction to the batch
   const addTransaction = (transaction: Transaction) => {
@@ -67,6 +53,9 @@ export function useBatchTransactions() {
       return;
     }
 
+    setIsSendingUserOperation(true);
+    setError(null);
+
     try {
       // Convert transactions to the format expected by sendUserOperation
       const userOperationTransactions = transactions.map((tx) => ({
@@ -78,12 +67,25 @@ export function useBatchTransactions() {
       }));
 
       // Send the batch transaction
-      sendUserOperation({
+      const operation = await client.sendUserOperation({
         uo: userOperationTransactions,
       });
-    } catch (error) {
-      console.error("Error sending batch transactions:", error);
-      toast.error("Failed to send batch transactions");
+
+      // Wait for the transaction to be mined
+      await client.waitForUserOperationTransaction({
+        hash: operation.hash,
+      });
+
+      toast.success("Batch transactions sent successfully!");
+      // Clear transactions after successful execution
+      setTransactions([]);
+    } catch (err) {
+      console.error("Error sending batch transactions:", err);
+      const errorMessage = err instanceof Error ? err.message : "Failed to send batch transactions";
+      toast.error(errorMessage);
+      setError(err instanceof Error ? err : new Error(errorMessage));
+    } finally {
+      setIsSendingUserOperation(false);
     }
   };
 
