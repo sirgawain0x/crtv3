@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 /**
  * Creates a Supabase client with service role privileges
@@ -30,3 +30,31 @@ export const createServiceClient = () => {
     },
   });
 };
+
+/**
+ * Singleton instance of the Supabase service client
+ * Returns null if the service role key is not available
+ */
+function initializeServiceClient(): SupabaseClient | null {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  // Return null if environment variables are not set
+  if (!supabaseUrl || !supabaseServiceKey) {
+    return null;
+  }
+
+  try {
+    return createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    });
+  } catch (error) {
+    console.error('Failed to create supabase service client:', error);
+    return null;
+  }
+}
+
+export const supabaseService = initializeServiceClient();

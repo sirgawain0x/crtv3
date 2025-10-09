@@ -145,9 +145,9 @@ export async function updateVideoAsset(
   data: {
     thumbnailUri: string;
     status: string;
-    max_supply: number | null;
-    price: number | null;
-    royalty_percentage: number | null;
+    max_supply?: number | null;
+    price?: number | null;
+    royalty_percentage?: number | null;
     metadata_uri?: string | null;
     requires_metoken?: boolean;
     metoken_price?: number | null;
@@ -159,14 +159,22 @@ export async function updateVideoAsset(
   const updateData: any = {
     thumbnail_url: data.thumbnailUri,
     status: data.status,
-    max_supply: data.max_supply,
-    price: data.price,
-    royalty_percentage: data.royalty_percentage,
-    metadata_uri: data.metadata_uri,
     updated_at: new Date().toISOString(),
   };
 
-  // Only include metoken fields if they are provided
+  // Only include fields if they are provided
+  if (data.max_supply !== undefined) {
+    updateData.max_supply = data.max_supply;
+  }
+  if (data.price !== undefined) {
+    updateData.price = data.price;
+  }
+  if (data.royalty_percentage !== undefined) {
+    updateData.royalty_percentage = data.royalty_percentage;
+  }
+  if (data.metadata_uri !== undefined) {
+    updateData.metadata_uri = data.metadata_uri;
+  }
   if (data.requires_metoken !== undefined) {
     updateData.requires_metoken = data.requires_metoken;
   }
