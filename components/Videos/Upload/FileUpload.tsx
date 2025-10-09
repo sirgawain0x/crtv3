@@ -173,13 +173,83 @@ const FileUpload: React.FC<FileUploadProps> = ({
   // Use Universal Account to get smart account address (SCA), not controller wallet
   const { address, type, loading } = useUniversalAccount();
 
+  // Livepeer supported video formats
+  // Containers: MP4, MOV, MKV, WebM, FLV, TS
+  // Video codecs: H.264, H.265 (HEVC), VP8, VP9, AV1
+  const SUPPORTED_VIDEO_FORMATS = [
+    'video/mp4',
+    'video/quicktime', // .mov
+    'video/x-matroska', // .mkv
+    'video/webm',
+    'video/x-flv',
+    'video/mp2t', // .ts
+    'video/mpeg',
+  ];
+
+  const SUPPORTED_VIDEO_EXTENSIONS = [
+    '.mp4',
+    '.mov',
+    '.mkv',
+    '.webm',
+    '.flv',
+    '.ts',
+    '.mpeg',
+    '.mpg',
+  ];
+
+  const validateVideoFile = (file: File): { valid: boolean; error?: string } => {
+    // Check file extension
+    const fileExtension = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
+    const isValidExtension = SUPPORTED_VIDEO_EXTENSIONS.includes(fileExtension);
+    
+    // Check MIME type
+    const isValidMimeType = SUPPORTED_VIDEO_FORMATS.includes(file.type);
+    
+    if (!isValidExtension && !isValidMimeType) {
+      return {
+        valid: false,
+        error: `Unsupported video format: ${fileExtension}. Please use MP4, MOV, MKV, WebM, FLV, or TS format with H.264/H.265 codec.`,
+      };
+    }
+
+    // Check file size (optional: 5GB limit)
+    const maxSize = 5 * 1024 * 1024 * 1024; // 5GB
+    if (file.size > maxSize) {
+      return {
+        valid: false,
+        error: 'File size exceeds 5GB limit. Please compress your video or use a smaller file.',
+      };
+    }
+
+    return { valid: true };
+  };
+
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] || null;
-    setSelectedFile(file);
-    setUploadState("idle"); // Reset upload state when a new file is selected
+    
+    // Reset state
+    setUploadState("idle");
     setProgress(0);
     setUploadComplete(false);
     setError(null);
+    
+    if (!file) {
+      setSelectedFile(null);
+      onFileSelect(null);
+      return;
+    }
+
+    // Validate video file
+    const validation = validateVideoFile(file);
+    if (!validation.valid) {
+      setError(validation.error || 'Invalid video file');
+      setSelectedFile(null);
+      onFileSelect(null);
+      toast.error(validation.error || 'Invalid video file');
+      return;
+    }
+
+    setSelectedFile(file);
     onFileSelect(file);
     console.log("Selected file:", file?.name, "Address:", address, "Type:", type);
   };
@@ -213,7 +283,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
         endpoint: uploadRequestResult?.tusEndpoint,
         metadata: {
           filename: selectedFile.name,
-          filetype: "video/*",
+          filetype: selectedFile.type || "video/mp4", // Use actual file MIME type
         },
         uploadSize: selectedFile.size,
         onError(err: any) {
@@ -348,13 +418,16 @@ const FileUpload: React.FC<FileUploadProps> = ({
               <input
                 type="file"
                 id="file-upload"
-                accept="video/*"
+                accept="video/mp4,video/quicktime,video/x-matroska,video/webm,video/x-flv,video/mp2t,.mp4,.mov,.mkv,.webm,.flv,.ts"
                 className="file:border-1 block w-full rounded-lg border border-gray-200 text-sm text-[#EC407A] 
                 file:mr-2 file:cursor-pointer file:rounded-full file:border-0 file:bg-white file:px-3 file:py-2 file:text-xs 
                 sm:file:mr-4 sm:file:px-4 sm:file:text-sm file:font-semibold file:text-[#EC407A] hover:file:bg-gray-50"
                 data-testid="file-upload-input"
                 onChange={handleFileChange}
               />
+              <p className="mt-2 text-xs text-gray-500">
+                Supported formats: MP4, MOV, MKV, WebM, FLV, TS (H.264/H.265 codec recommended). Max size: 5GB
+              </p>
             </div>
 
             {/* Selected File Section */}

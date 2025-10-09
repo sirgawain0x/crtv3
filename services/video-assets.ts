@@ -2,13 +2,16 @@
 // services/video-assets.ts
 
 import { createClient } from "@/lib/sdk/supabase/server";
+import { createServiceClient } from "@/lib/sdk/supabase/service";
 import type { VideoAsset } from "@/lib/types/video-asset";
 import { fullLivepeer } from "@/lib/sdk/livepeer/fullClient";
 
 export async function createVideoAsset(
   data: Omit<VideoAsset, "id" | "created_at" | "updated_at">
 ) {
-  const supabase = await createClient();
+  // Use service client to bypass RLS since we're using smart account addresses
+  // which don't match Supabase JWT authentication
+  const supabase = createServiceClient();
   
   const { data: result, error } = await supabase
     .from('video_assets')
@@ -112,7 +115,8 @@ export async function updateVideoAssetMintingStatus(
     mint_transaction_hash: string;
   }
 ) {
-  const supabase = await createClient();
+  // Use service client to bypass RLS
+  const supabase = createServiceClient();
   
   const { data: result, error } = await supabase
     .from('video_assets')
@@ -149,7 +153,8 @@ export async function updateVideoAsset(
     metoken_price?: number | null;
   }
 ) {
-  const supabase = await createClient();
+  // Use service client to bypass RLS
+  const supabase = createServiceClient();
   
   const updateData: any = {
     thumbnail_url: data.thumbnailUri,
