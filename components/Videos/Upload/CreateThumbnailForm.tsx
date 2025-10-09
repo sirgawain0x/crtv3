@@ -28,12 +28,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 interface FormValues {
   aiModel: string;
   prompt: string;
-  nftConfig: {
-    isMintable: boolean;
-    maxSupply: number;
-    price: number;
-    royaltyPercentage: number;
-  };
   meTokenConfig: {
     requireMeToken: boolean;
     priceInMeToken: number;
@@ -43,12 +37,6 @@ interface FormValues {
 
 interface CreateThumbnailFormProps {
   onSelectThumbnailImages: (imageUrl: string) => void;
-  onNFTConfigChange?: (nftConfig: {
-    isMintable: boolean;
-    maxSupply: number;
-    price: number;
-    royaltyPercentage: number;
-  }) => void;
   onMeTokenConfigChange?: (meTokenConfig: {
     requireMeToken: boolean;
     priceInMeToken: number;
@@ -57,7 +45,6 @@ interface CreateThumbnailFormProps {
 
 const CreateThumbnailForm = ({
   onSelectThumbnailImages,
-  onNFTConfigChange,
   onMeTokenConfigChange,
 }: CreateThumbnailFormProps) => {
   const {
@@ -71,12 +58,6 @@ const CreateThumbnailForm = ({
     defaultValues: {
       aiModel: "SG161222/RealVisXL_V4.0_Lightning",
       prompt: "",
-      nftConfig: {
-        isMintable: false,
-        maxSupply: 1,
-        price: 0,
-        royaltyPercentage: 5,
-      },
       meTokenConfig: {
         requireMeToken: false,
         priceInMeToken: 0,
@@ -93,7 +74,6 @@ const CreateThumbnailForm = ({
   const [showMeTokenCreator, setShowMeTokenCreator] = useState(false);
 
   const { userMeToken, loading: meTokenLoading, checkUserMeToken } = useMeTokensSupabase();
-  const isMintable = watch("nftConfig.isMintable");
   const requireMeToken = watch("meTokenConfig.requireMeToken");
   
   // Check for user's MeToken on mount
@@ -143,29 +123,6 @@ const CreateThumbnailForm = ({
   useEffect(() => {
     console.log("Updated imagesUrl state:", imagesUrl);
   }, [imagesUrl]);
-
-  // Watch NFT config and notify parent on change
-  useEffect(() => {
-    if (!onNFTConfigChange) return;
-    const subscription = watch((value, { name }) => {
-      const config = value.nftConfig;
-      if (
-        (name === "nftConfig" || name?.startsWith("nftConfig.")) &&
-        config &&
-        typeof config.isMintable === "boolean" &&
-        typeof config.maxSupply === "number" &&
-        typeof config.price === "number" &&
-        typeof config.royaltyPercentage === "number"
-      )
-        onNFTConfigChange({
-          isMintable: config.isMintable,
-          maxSupply: config.maxSupply,
-          price: config.price,
-          royaltyPercentage: config.royaltyPercentage,
-        });
-    });
-    return () => subscription.unsubscribe();
-  }, [onNFTConfigChange, watch]);
 
   // Watch MeToken config and notify parent on change
   useEffect(() => {
@@ -420,102 +377,6 @@ const CreateThumbnailForm = ({
               <p className="text-xs text-gray-500">
                 Users will need to hold at least this amount of your MeToken to access this content
               </p>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* NFT Configuration section */}
-      <div className="mt-8 space-y-4 border-t pt-4">
-        <h3 className="text-lg font-semibold">NFT Configuration (Optional)</h3>
-
-        <div className="flex items-center space-x-2">
-          <Controller
-            name="nftConfig.isMintable"
-            control={control}
-            render={({ field }) => (
-              <Switch checked={field.value} onCheckedChange={field.onChange} />
-            )}
-          />
-          <Label>Enable NFT Minting</Label>
-        </div>
-
-        {isMintable && (
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Max Supply</Label>
-                <Controller
-                  name="nftConfig.maxSupply"
-                  control={control}
-                  rules={{
-                    required: "Max supply is required",
-                    min: { value: 1, message: "Minimum supply is 1" },
-                  }}
-                  render={({ field }) => (
-                    <Input
-                      type="number"
-                      {...field}
-                      onChange={(e) => field.onChange(Number(e.target.value))}
-                    />
-                  )}
-                />
-                {errors.nftConfig?.maxSupply && (
-                  <p className="text-sm text-red-500">
-                    {errors.nftConfig.maxSupply.message}
-                  </p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label>Price (ETH)</Label>
-                <Controller
-                  name="nftConfig.price"
-                  control={control}
-                  rules={{
-                    required: "Price is required",
-                    min: { value: 0, message: "Price must be 0 or greater" },
-                  }}
-                  render={({ field }) => (
-                    <Input
-                      type="number"
-                      step="0.001"
-                      {...field}
-                      onChange={(e) => field.onChange(Number(e.target.value))}
-                    />
-                  )}
-                />
-                {errors.nftConfig?.price && (
-                  <p className="text-sm text-red-500">
-                    {errors.nftConfig.price.message}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Royalty Percentage</Label>
-              <Controller
-                name="nftConfig.royaltyPercentage"
-                control={control}
-                rules={{
-                  required: "Royalty percentage is required",
-                  min: { value: 0, message: "Minimum royalty is 0%" },
-                  max: { value: 100, message: "Maximum royalty is 100%" },
-                }}
-                render={({ field }) => (
-                  <Input
-                    type="number"
-                    {...field}
-                    onChange={(e) => field.onChange(Number(e.target.value))}
-                  />
-                )}
-              />
-              {errors.nftConfig?.royaltyPercentage && (
-                <p className="text-sm text-red-500">
-                  {errors.nftConfig.royaltyPercentage.message}
-                </p>
-              )}
             </div>
           </div>
         )}

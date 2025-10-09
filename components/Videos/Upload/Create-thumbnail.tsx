@@ -13,7 +13,6 @@ import { useEffect, useState } from "react";
 import { useInterval } from "@/lib/hooks/useInterval";
 import CreateThumbnailForm from "./CreateThumbnailForm";
 import { toast } from "sonner";
-import { NFTConfig } from "@/lib/types/video-asset";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 
@@ -22,11 +21,9 @@ type CreateThumbnailProps = {
   thumbnailUri?: string;
   onComplete: (data: {
     thumbnailUri: string;
-    nftConfig?: {
-      isMintable: boolean;
-      maxSupply: number;
-      price: number;
-      royaltyPercentage: number;
+    meTokenConfig?: {
+      requireMeToken: boolean;
+      priceInMeToken: number;
     };
   }) => void;
 };
@@ -41,7 +38,6 @@ export default function CreateThumbnail({
   const [livepeerPlaybackData, setLivepeerPlaybackData] =
     useState<PlaybackInfo>();
   const [selectedThumbnail, setSelectedThumbnail] = useState<string>();
-  const [nftConfig, setNFTConfig] = useState<NFTConfig | undefined>(undefined);
   const [meTokenConfig, setMeTokenConfig] = useState<{
     requireMeToken: boolean;
     priceInMeToken: number;
@@ -87,12 +83,11 @@ export default function CreateThumbnail({
     router.back();
   };
 
-  const handleComplete = (thumbnailUri: string, nftConfig?: NFTConfig) => {
+  const handleComplete = (thumbnailUri: string) => {
     if (livepeerAssetData) {
       setSelectedThumbnail(thumbnailUri);
       onComplete({
         thumbnailUri: selectedThumbnail as string,
-        nftConfig: nftConfig,
         meTokenConfig: meTokenConfig,
       });
     } else {
@@ -104,7 +99,6 @@ export default function CreateThumbnail({
     if (selectedThumbnail) {
       onComplete({
         thumbnailUri: selectedThumbnail,
-        nftConfig: nftConfig,
         meTokenConfig: meTokenConfig,
       });
     } else {
@@ -165,9 +159,6 @@ export default function CreateThumbnail({
         <CreateThumbnailForm
           onSelectThumbnailImages={(thumbnailUri: string) => {
             setSelectedThumbnail(thumbnailUri);
-          }}
-          onNFTConfigChange={(config: NFTConfig) => {
-            setNFTConfig(config);
           }}
           onMeTokenConfigChange={(config) => {
             setMeTokenConfig(config);

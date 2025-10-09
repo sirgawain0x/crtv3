@@ -8,8 +8,6 @@ import {
 } from "@/app/api/livepeer/assetUploadActions";
 import * as tus from "tus-js-client";
 import PreviewVideo from "./PreviewVideo";
-import { useUser } from "@account-kit/react";
-import { userToAccount } from "@/lib/types/account";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,6 +18,7 @@ import JsGoogleTranslateFree from "@kreisler/js-google-translate-free";
 import { getLivepeerAudioToText } from "@/app/api/livepeer/audioToText";
 import Link from "next/link";
 import { updateVideoAsset } from "@/services/video-assets";
+import { useUniversalAccount } from "@/lib/hooks/accountkit/useUniversalAccount";
 
 const truncateUri = (uri: string): string => {
   if (uri.length <= 30) return uri;
@@ -171,14 +170,18 @@ const FileUpload: React.FC<FileUploadProps> = ({
   const [livepeerAsset, setLivepeerAsset] = useState<any>();
   const [isPolling, setIsPolling] = useState(false);
 
-  const user = useUser();
-  const account = userToAccount(user);
+  // Use Universal Account to get smart account address (SCA), not controller wallet
+  const { address, type, loading } = useUniversalAccount();
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] || null;
     setSelectedFile(file);
+    setUploadState("idle"); // Reset upload state when a new file is selected
+    setProgress(0);
+    setUploadComplete(false);
+    setError(null);
     onFileSelect(file);
-    console.log("Selected file:", file?.name);
+    console.log("Selected file:", file?.name, "Address:", address, "Type:", type);
   };
 
   const handleFileUpload = async () => {
@@ -187,16 +190,21 @@ const FileUpload: React.FC<FileUploadProps> = ({
       return;
     }
 
+    if (!address) {
+      setError("Please connect your wallet to upload videos.");
+      return;
+    }
+
     setError(null);
     setUploadState("loading");
     setProgress(0);
 
     try {
-      console.log("Start upload #1");
+      console.log("Start upload - using smart account address:", address, "type:", type);
 
       const uploadRequestResult = await getLivepeerUploadUrl(
         newAssetTitle || selectedFile.name || "new file name",
-        account?.address || "anonymous"
+        address
       );
 
       setLivepeerAsset(uploadRequestResult?.asset);
@@ -303,9 +311,18 @@ const FileUpload: React.FC<FileUploadProps> = ({
     }
   }
 
-  if (!account) {
+  // Show loading state while fetching account
+  if (loading) {
     return (
-      <div className="text-center">
+      <div className="text-center p-8">
+        <p>Loading your wallet...</p>
+      </div>
+    );
+  }
+
+  if (!address) {
+    return (
+      <div className="text-center p-8">
         <p>Please connect your wallet to upload videos</p>
       </div>
     );

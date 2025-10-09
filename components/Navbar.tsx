@@ -502,9 +502,11 @@ export default function Navbar() {
               <Link href="/leaderboard" className={navLinkClass}>
                 Leaderboard
               </Link>
-              <Link href="/vote" prefetch={false} className={navLinkClass}>
-                Vote
-              </Link>
+              {isVerified && hasMembership && (
+                <Link href="/vote" prefetch={false} className={navLinkClass}>
+                  Vote
+                </Link>
+              )}
             </nav>
           </div>
 
@@ -669,13 +671,15 @@ export default function Navbar() {
                   >
                     Leaderboard
                   </Link>
-                  <Link
-                    href="/vote"
-                    className={mobileNavLinkClass}
-                    onClick={handleLinkClick}
-                  >
-                    Vote
-                  </Link>
+                  {isVerified && hasMembership && (
+                    <Link
+                      href="/vote"
+                      className={mobileNavLinkClass}
+                      onClick={handleLinkClick}
+                    >
+                      Vote
+                    </Link>
+                  )}
                   {/* Profile & Upload Access (mobile) - Only show when user is connected */}
                   {user && (
                     <>
@@ -722,13 +726,13 @@ export default function Navbar() {
                           Beta
                         </span>
                       </Link>
-                      <Link
+                      {/* <Link
                         href="/portfolio"
                         className={mobileMemberNavLinkClass}
                         onClick={handleLinkClick}
                       >
                         <User className="mr-2 h-4 w-4" /> Portfolio
-                      </Link>
+                      </Link> */}
                       <Link
                         href="/vote/create"
                         className="flex w-full items-center rounded-md p-2 text-sm font-medium
@@ -739,6 +743,22 @@ export default function Navbar() {
                         <Plus className="mr-2 h-4 w-4 text-green-500" /> Start A Vote
                       </Link>
                     </>
+                  )}
+
+                  {/* Feedback Link - Only show when wallet is connected */}
+                  {user && (
+                    <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                      <Link
+                        href="https://feedback.creativeplatform.xyz/crtv"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={mobileNavLinkClass}
+                        onClick={handleLinkClick}
+                      >
+                        <ArrowUpRight className="mr-2 h-4 w-4" />
+                        Feedback
+                      </Link>
+                    </div>
                   )}
 
                   {/* Logout Button - Always at the bottom */}
