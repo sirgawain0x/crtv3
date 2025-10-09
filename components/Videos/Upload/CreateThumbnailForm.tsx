@@ -10,7 +10,7 @@ import {
   SelectItem,
 } from "../../ui/select"; // Adjust the import path as needed
 import { Button } from "../../ui/button"; // Adjust the import path as needed
-import { SparklesIcon } from "lucide-react";
+import { SparklesIcon, AlertCircle } from "lucide-react";
 import Image from "next/image";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -20,6 +20,10 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
+import { useMeTokensSupabase } from "@/lib/hooks/metokens/useMeTokensSupabase";
+import { AlchemyMeTokenCreator } from "@/components/UserProfile/AlchemyMeTokenCreator";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface FormValues {
   aiModel: string;
@@ -29,6 +33,10 @@ interface FormValues {
     maxSupply: number;
     price: number;
     royaltyPercentage: number;
+  };
+  meTokenConfig: {
+    requireMeToken: boolean;
+    priceInMeToken: number;
   };
   selectedImage: string;
 }
@@ -41,11 +49,16 @@ interface CreateThumbnailFormProps {
     price: number;
     royaltyPercentage: number;
   }) => void;
+  onMeTokenConfigChange?: (meTokenConfig: {
+    requireMeToken: boolean;
+    priceInMeToken: number;
+  }) => void;
 }
 
 const CreateThumbnailForm = ({
   onSelectThumbnailImages,
   onNFTConfigChange,
+  onMeTokenConfigChange,
 }: CreateThumbnailFormProps) => {
   const {
     handleSubmit,
@@ -64,6 +77,10 @@ const CreateThumbnailForm = ({
         price: 0,
         royaltyPercentage: 5,
       },
+      meTokenConfig: {
+        requireMeToken: false,
+        priceInMeToken: 0,
+      },
       selectedImage: "",
     },
   });
@@ -73,8 +90,16 @@ const CreateThumbnailForm = ({
     undefined
   );
   const [loading, setLoading] = useState<boolean>(false);
+  const [showMeTokenCreator, setShowMeTokenCreator] = useState(false);
 
+  const { userMeToken, loading: meTokenLoading, checkUserMeToken } = useMeTokensSupabase();
   const isMintable = watch("nftConfig.isMintable");
+  const requireMeToken = watch("meTokenConfig.requireMeToken");
+  
+  // Check for user's MeToken on mount
+  useEffect(() => {
+    checkUserMeToken();
+  }, [checkUserMeToken]);
 
   const onSubmit = async (data: FormValues) => {
     setLoading(true);
@@ -141,6 +166,25 @@ const CreateThumbnailForm = ({
     });
     return () => subscription.unsubscribe();
   }, [onNFTConfigChange, watch]);
+
+  // Watch MeToken config and notify parent on change
+  useEffect(() => {
+    if (!onMeTokenConfigChange) return;
+    const subscription = watch((value, { name }) => {
+      const config = value.meTokenConfig;
+      if (
+        (name === "meTokenConfig" || name?.startsWith("meTokenConfig.")) &&
+        config &&
+        typeof config.requireMeToken === "boolean" &&
+        typeof config.priceInMeToken === "number"
+      )
+        onMeTokenConfigChange({
+          requireMeToken: config.requireMeToken,
+          priceInMeToken: config.priceInMeToken,
+        });
+    });
+    return () => subscription.unsubscribe();
+  }, [onMeTokenConfigChange, watch]);
 
   const handleSelectionChange = (value: string) => {
     setSelectedImage(value);
@@ -268,9 +312,122 @@ const CreateThumbnailForm = ({
         </RadioGroup>
       )}
 
-      {/* NFT Configuration section moved below */}
+      {/* MeToken Configuration section */}
       <div className="mt-8 space-y-4 border-t pt-4">
-        <h3 className="text-lg font-semibold">NFT Configuration</h3>
+        <h3 className="text-lg font-semibold">Content Access Control</h3>
+        
+        {/* MeToken Status */}
+        {meTokenLoading ? (
+          <Skeleton className="h-20 w-full" />
+        ) : userMeToken ? (
+          <Alert className="bg-green-50 border-green-200">
+            <AlertCircle className="h-4 w-4 text-green-600" />
+            <AlertTitle className="text-green-800">MeToken Active</AlertTitle>
+            <AlertDescription className="text-green-700">
+              Your MeToken: {userMeToken.name} ({userMeToken.symbol})
+            </AlertDescription>
+          </Alert>
+        ) : (
+          <Alert className="bg-amber-50 border-amber-200">
+            <AlertCircle className="h-4 w-4 text-amber-600" />
+            <AlertTitle className="text-amber-800">No MeToken Found</AlertTitle>
+            <AlertDescription className="text-amber-700">
+              You need a MeToken to set access controls for your content.
+              <Button 
+                type="button"
+                variant="outline" 
+                size="sm" 
+                className="ml-2 mt-2"
+                onClick={() => setShowMeTokenCreator(true)}
+              >
+                Create MeToken
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* MeToken Creator Dialog */}
+        {showMeTokenCreator && !userMeToken && (
+          <Card className="mt-4">
+            <CardHeader>
+              <CardTitle>Create Your MeToken</CardTitle>
+              <CardDescription>
+                Create a MeToken to enable premium content access for your subscribers
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <AlchemyMeTokenCreator 
+                onMeTokenCreated={(meToken) => {
+                  setShowMeTokenCreator(false);
+                  checkUserMeToken();
+                }}
+              />
+            </CardContent>
+          </Card>
+        )}
+
+        {/* MeToken Gating Option */}
+        <div className="flex items-center space-x-2">
+          <Controller
+            name="meTokenConfig.requireMeToken"
+            control={control}
+            render={({ field }) => (
+              <Switch 
+                checked={field.value} 
+                onCheckedChange={field.onChange}
+                disabled={!userMeToken}
+              />
+            )}
+          />
+          <Label className={!userMeToken ? "text-gray-400" : ""}>
+            Require MeToken for Access
+            {!userMeToken && " (Create a MeToken first)"}
+          </Label>
+        </div>
+
+        {requireMeToken && userMeToken && (
+          <div className="space-y-4 pl-6">
+            <div className="space-y-2">
+              <Label>Minimum MeToken Balance Required</Label>
+              <Controller
+                name="meTokenConfig.priceInMeToken"
+                control={control}
+                rules={{
+                  required: "MeToken price is required",
+                  min: { value: 0, message: "Price must be 0 or greater" },
+                }}
+                render={({ field }) => (
+                  <div className="relative">
+                    <Input
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      {...field}
+                      onChange={(e) => field.onChange(Number(e.target.value))}
+                      className="pr-20"
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">
+                      {userMeToken.symbol}
+                    </span>
+                  </div>
+                )}
+              />
+              {errors.meTokenConfig?.priceInMeToken && (
+                <p className="text-sm text-red-500">
+                  {errors.meTokenConfig.priceInMeToken.message}
+                </p>
+              )}
+              <p className="text-xs text-gray-500">
+                Users will need to hold at least this amount of your MeToken to access this content
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* NFT Configuration section */}
+      <div className="mt-8 space-y-4 border-t pt-4">
+        <h3 className="text-lg font-semibold">NFT Configuration (Optional)</h3>
 
         <div className="flex items-center space-x-2">
           <Controller
@@ -285,7 +442,7 @@ const CreateThumbnailForm = ({
 
         {isMintable && (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Max Supply</Label>
                 <Controller

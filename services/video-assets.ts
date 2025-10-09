@@ -36,6 +36,8 @@ export async function createVideoAsset(
       current_supply: data.current_supply || 0,
       metadata_uri: data.metadata_uri,
       attributes: data.attributes,
+      requires_metoken: data.requires_metoken || false,
+      metoken_price: data.metoken_price || null,
     })
     .select()
     .single();
@@ -143,21 +145,33 @@ export async function updateVideoAsset(
     price: number | null;
     royalty_percentage: number | null;
     metadata_uri?: string | null;
+    requires_metoken?: boolean;
+    metoken_price?: number | null;
   }
 ) {
   const supabase = await createClient();
   
+  const updateData: any = {
+    thumbnail_url: data.thumbnailUri,
+    status: data.status,
+    max_supply: data.max_supply,
+    price: data.price,
+    royalty_percentage: data.royalty_percentage,
+    metadata_uri: data.metadata_uri,
+    updated_at: new Date().toISOString(),
+  };
+
+  // Only include metoken fields if they are provided
+  if (data.requires_metoken !== undefined) {
+    updateData.requires_metoken = data.requires_metoken;
+  }
+  if (data.metoken_price !== undefined) {
+    updateData.metoken_price = data.metoken_price;
+  }
+  
   const { data: result, error } = await supabase
     .from('video_assets')
-    .update({
-      thumbnail_url: data.thumbnailUri,
-      status: data.status,
-      max_supply: data.max_supply,
-      price: data.price,
-      royalty_percentage: data.royalty_percentage,
-      metadata_uri: data.metadata_uri,
-      updated_at: new Date().toISOString(),
-    })
+    .update(updateData)
     .eq('id', id)
     .select()
     .single();

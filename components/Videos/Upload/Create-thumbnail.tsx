@@ -42,6 +42,10 @@ export default function CreateThumbnail({
     useState<PlaybackInfo>();
   const [selectedThumbnail, setSelectedThumbnail] = useState<string>();
   const [nftConfig, setNFTConfig] = useState<NFTConfig | undefined>(undefined);
+  const [meTokenConfig, setMeTokenConfig] = useState<{
+    requireMeToken: boolean;
+    priceInMeToken: number;
+  } | undefined>(undefined);
 
   useInterval(
     () => {
@@ -89,6 +93,7 @@ export default function CreateThumbnail({
       onComplete({
         thumbnailUri: selectedThumbnail as string,
         nftConfig: nftConfig,
+        meTokenConfig: meTokenConfig,
       });
     } else {
       toast.error("Video data not found. Please try again.");
@@ -100,6 +105,7 @@ export default function CreateThumbnail({
       onComplete({
         thumbnailUri: selectedThumbnail,
         nftConfig: nftConfig,
+        meTokenConfig: meTokenConfig,
       });
     } else {
       toast.error("Please select a thumbnail before submitting.");
@@ -163,13 +169,19 @@ export default function CreateThumbnail({
           onNFTConfigChange={(config: NFTConfig) => {
             setNFTConfig(config);
           }}
+          onMeTokenConfigChange={(config) => {
+            setMeTokenConfig(config);
+          }}
         />
       </div>
 
-      <div className="flex items-center justify-center gap-3">
+      <div className="flex flex-col sm:flex-row items-center justify-center gap-3 w-full px-4">
         <Button
           disabled={livepeerAssetData?.status?.phase === "processing"}
           onClick={handleBack}
+          variant="outline"
+          className="w-full sm:w-auto min-w-[120px] touch-manipulation"
+          style={{ WebkitTapHighlightColor: 'transparent' }}
         >
           Back
         </Button>
@@ -178,8 +190,10 @@ export default function CreateThumbnail({
             !selectedThumbnail || livepeerAssetData?.status?.phase !== "ready"
           }
           onClick={handleSubmit}
+          className="w-full sm:w-auto min-w-[120px] touch-manipulation"
+          style={{ WebkitTapHighlightColor: 'transparent' }}
         >
-          Submit
+          Publish
         </Button>
       </div>
     </div>

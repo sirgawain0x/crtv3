@@ -366,9 +366,10 @@ const FileUpload: React.FC<FileUploadProps> = ({
                       className={`${
                         !selectedFile
                           ? "cursor-not-allowed bg-[#D63A6A] opacity-50"
-                          : "bg-[#EC407A] hover:bg-[#D63A6A]"
-                      } w-full max-w-xs rounded-lg px-4 py-3 text-sm font-semibold text-white shadow-sm transition-colors sm:px-6 sm:text-base`}
+                          : "bg-[#EC407A] hover:bg-[#D63A6A] active:bg-[#C62C5A]"
+                      } w-full max-w-xs rounded-lg px-4 py-3 text-sm font-semibold text-white shadow-sm transition-colors sm:px-6 sm:text-base touch-manipulation`}
                       data-testid="file-input-upload-button"
+                      style={{ WebkitTapHighlightColor: 'transparent' }}
                     >
                       Upload File
                     </button>
@@ -433,7 +434,8 @@ const FileUpload: React.FC<FileUploadProps> = ({
             <Button
               onClick={handleAudioToText}
               disabled={uploadState === "loading" || subtitleProcessingComplete}
-              className="w-full max-w-xs text-sm sm:text-base"
+              className="w-full max-w-xs text-sm sm:text-base touch-manipulation"
+              style={{ WebkitTapHighlightColor: 'transparent' }}
             >
               {subtitleProcessingComplete
                 ? "Subtitles Processed"
@@ -445,8 +447,8 @@ const FileUpload: React.FC<FileUploadProps> = ({
               </span>
             )}
             {!subtitleProcessingComplete && (
-              <span className="text-gray-500 text-xs">
-                You can process subtitles now or later.
+              <span className="text-gray-500 text-xs text-center px-4">
+                You can process subtitles now or skip and continue to the next step.
               </span>
             )}
           </div>
@@ -459,7 +461,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
               variant="outline"
               disabled={uploadState === "loading"}
               onClick={onPressBack}
-              className="w-full min-w-[100px] text-sm sm:w-auto sm:text-base"
+              className="w-full min-w-[120px] text-sm sm:w-auto sm:text-base touch-manipulation"
             >
               Back
             </Button>
@@ -475,7 +477,8 @@ const FileUpload: React.FC<FileUploadProps> = ({
                 }
               }}
               data-testid="file-input-next"
-              className="w-full min-w-[100px] text-sm sm:w-auto sm:text-base"
+              className="w-full min-w-[120px] text-sm sm:w-auto sm:text-base touch-manipulation"
+              style={{ WebkitTapHighlightColor: 'transparent' }}
             >
               Next
             </Button>

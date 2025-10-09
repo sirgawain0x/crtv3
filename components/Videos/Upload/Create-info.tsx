@@ -137,9 +137,10 @@ const CreateInfo = ({ onPressNext }: TCreateInfoProps) => {
         <div className="mt-4 flex justify-center sm:mt-6">
           <Button
             type="submit"
-            className="w-full min-w-[100px] text-sm sm:w-auto sm:text-base"
+            className="w-full min-w-[120px] text-sm sm:w-auto sm:text-base touch-manipulation"
             disabled={!form.formState.isValid}
             data-testid="create-info-next"
+            style={{ WebkitTapHighlightColor: 'transparent' }}
           >
             Next
           </Button>

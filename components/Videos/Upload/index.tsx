@@ -130,6 +130,8 @@ const HookMultiStepForm = () => {
               current_supply: 0,
               metadata_uri: null,
               attributes: null,
+              requires_metoken: false,
+              metoken_price: null,
             }).then((dbAsset) => {
               setVideoAsset(dbAsset as VideoAsset);
               setActiveStep((prevActiveStep) => prevActiveStep + 1);
@@ -148,6 +150,10 @@ const HookMultiStepForm = () => {
               maxSupply: number;
               price: number;
               royaltyPercentage: number;
+            };
+            meTokenConfig?: {
+              requireMeToken: boolean;
+              priceInMeToken: number;
             };
           }) => {
             setThumbnailUri(data.thumbnailUri);
@@ -176,6 +182,8 @@ const HookMultiStepForm = () => {
                 royalty_percentage: data.nftConfig?.royaltyPercentage || null,
                 metadata_uri:
                   latestAsset?.storage?.ipfs?.nftMetadata?.url || null,
+                requires_metoken: data.meTokenConfig?.requireMeToken || false,
+                metoken_price: data.meTokenConfig?.priceInMeToken || null,
               });
 
               // If minting is enabled, trigger on-chain mint on Base

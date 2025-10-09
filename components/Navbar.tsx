@@ -49,6 +49,8 @@ import { useMembershipVerification } from "@/lib/hooks/unlock/useMembershipVerif
 import { MembershipSection } from "./account-dropdown/MembershipSection";
 import { ChainSelect } from "@/components/ui/select";
 import { TokenSelect } from "@/components/ui/token-select";
+import makeBlockie from "ethereum-blockies-base64";
+import { Avatar, AvatarImage } from "@/components/ui/avatar";
 
 type UseUserResult = (AccountUser & { type: "eoa" | "sca" }) | null;
 
@@ -176,6 +178,7 @@ export default function Navbar() {
   const { isVerified, hasMembership } = useMembershipVerification();
   const [fromToken, setFromToken] = useState("ETH");
   const [toToken, setToToken] = useState("USDC");
+  const [selectedToken, setSelectedToken] = useState<"ETH" | "USDC" | "DAI">("ETH");
 
   // Initialize Viem public client for ENS resolution
   const publicClient = createPublicClient({
@@ -328,26 +331,67 @@ export default function Navbar() {
         return (
           <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
             <h2 className="text-xl font-bold mb-4">Send Crypto</h2>
-            <p className="mb-4">Send crypto to another address.</p>
+            <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">Send crypto to another address.</p>
             <div className="flex flex-col gap-4">
-              <input
-                type="text"
-                placeholder="Recipient Address"
-                className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
-              />
-              <input
-                type="number"
-                placeholder="Amount"
-                className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
-              />
-              <div className="flex justify-end gap-2">
+              {/* Token Selection */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-900 dark:text-gray-100">Token</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['ETH', 'USDC', 'DAI'] as const).map((token) => (
+                    <button
+                      key={token}
+                      type="button"
+                      onClick={() => setSelectedToken(token)}
+                      className={`flex items-center justify-center space-x-2 p-2 border rounded-lg transition-colors ${
+                        selectedToken === token
+                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-400'
+                          : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
+                      }`}
+                    >
+                      <Image
+                        src={`/images/tokens/${token.toLowerCase()}-logo.svg`}
+                        alt={token}
+                        width={16}
+                        height={16}
+                        className="w-4 h-4 flex-shrink-0"
+                      />
+                      <span className={`text-sm font-medium ${
+                        selectedToken === token
+                          ? 'text-blue-700 dark:text-blue-300'
+                          : 'text-gray-900 dark:text-gray-100'
+                      }`}>
+                        {token}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-900 dark:text-gray-100">Recipient Address</label>
+                <input
+                  type="text"
+                  placeholder="0x..."
+                  className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 bg-white border-gray-200 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-900 dark:text-gray-100">Amount ({selectedToken})</label>
+                <input
+                  type="number"
+                  placeholder="0.0"
+                  step="any"
+                  className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 bg-white border-gray-200 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+                />
+              </div>
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
                 <Button
                   variant="outline"
+                  className="w-full sm:w-auto sm:order-2"
                   onClick={() => setIsDialogOpen(false)}
                 >
                   Cancel
                 </Button>
-                <Button>Send</Button>
+                <Button className="w-full sm:flex-1 sm:order-1">Send</Button>
               </div>
             </div>
           </div>
@@ -511,14 +555,12 @@ export default function Navbar() {
                   <div className="space-y-4 border-b border-gray-200 dark:border-gray-700 pb-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-2">
-                        <div
-                          className={`
-                            h-8 w-8 rounded-full flex items-center justify-center text-white
-                            bg-gradient-to-r from-blue-500 to-purple-500
-                          `}
-                        >
-                          <User className="h-5 w-5" />
-                        </div>
+                        <Avatar className="h-8 w-8">
+                          <AvatarImage
+                            src={makeBlockie(modularAccount?.address || user?.address || "0x")}
+                            alt="Wallet avatar"
+                          />
+                        </Avatar>
                         <div>
                           <p className="text-sm font-medium">
                             {displayAddress}
@@ -558,7 +600,7 @@ export default function Navbar() {
                       <ChainSelect className="w-full" />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-3 gap-2">
                       <Button
                         variant="outline"
                         size="sm"
@@ -594,18 +636,6 @@ export default function Navbar() {
                       >
                         <ArrowUpDown className="mr-2 h-4 w-4 text-purple-500" />
                         Swap
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          logout();
-                          setIsMenuOpen(false);
-                        }}
-                        className="flex items-center justify-center text-red-500"
-                      >
-                        <LogOut className="mr-2 h-4 w-4" />
-                        Logout
                       </Button>
                     </div>
                   </div>
@@ -683,11 +713,11 @@ export default function Navbar() {
                         <RadioTower className="mr-2 h-4 w-4" /> Live
                       </Link>
                       <Link
-                        href="/clips"
+                        href="https://create.creativeplatform.xyz"
                         className={mobileMemberNavLinkClass}
                         onClick={handleLinkClick}
                       >
-                        <Bot className="mr-2 h-4 w-4" /> Daydream
+                        <Bot className="mr-2 h-4 w-4" /> Pixels
                         <span className="ml-2 px-2 py-0.5 rounded bg-muted-foreground/10 text-xs text-muted-foreground">
                           Beta
                         </span>
@@ -701,16 +731,31 @@ export default function Navbar() {
                       </Link>
                       <Link
                         href="/vote/create"
-                        className={
-                          mobileMemberNavLinkClass +
-                          " text-green-600 font-semibold border-t border-gray-200 dark:border-gray-700 mt-2"
-                        }
+                        className="flex w-full items-center rounded-md p-2 text-sm font-medium
+                          hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors
+                          text-green-600 dark:text-green-400"
                         onClick={handleLinkClick}
                       >
-                        <Plus className="mr-2 h-4 w-4 text-green-500" /> Start A
-                        Vote
+                        <Plus className="mr-2 h-4 w-4 text-green-500" /> Start A Vote
                       </Link>
                     </>
+                  )}
+
+                  {/* Logout Button - Always at the bottom */}
+                  {user && (
+                    <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                      <button
+                        onClick={() => {
+                          logout();
+                          setIsMenuOpen(false);
+                        }}
+                        className="flex w-full items-center rounded-md p-2 text-sm font-medium
+                          hover:bg-red-50 dark:hover:bg-red-900 transition-colors text-red-500"
+                      >
+                        <LogOut className="mr-2 h-4 w-4" />
+                        Logout
+                      </button>
+                    </div>
                   )}
                 </nav>
               </div>

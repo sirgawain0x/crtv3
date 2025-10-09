@@ -23,6 +23,8 @@ export interface VideoAsset {
   current_supply: number;
   metadata_uri: string | null;
   attributes: Record<string, any> | null;
+  requires_metoken: boolean;
+  metoken_price: number | null;
   created_at: Date;
   updated_at: Date;
 }
