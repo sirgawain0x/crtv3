@@ -80,7 +80,6 @@ export function TokenBalance() {
         // Map chain.id to key for token contracts
         let chainKey: keyof typeof import("@/lib/contracts/USDCToken").USDC_TOKEN_ADDRESSES;
         if (chain.id === 8453) chainKey = "base";
-        else if (chain.id === 10) chainKey = "optimism";
         else {
           console.warn(`Unsupported chain ID: ${chain.id}`);
           if (isMounted && !signal.aborted) {

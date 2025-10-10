@@ -4,5 +4,11 @@
     "env": {
       "NODE_ENV": "production"
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/video-assets/sync-views/cron",
+      "schedule": "0 2 * * *"
+    }
+  ]
 }

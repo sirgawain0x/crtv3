@@ -31,7 +31,7 @@ import {
   useSmartAccountClient,
   useSendUserOperation,
 } from "@account-kit/react";
-import { base, optimism } from "@account-kit/infra";
+import { base } from "@account-kit/infra";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -112,7 +112,6 @@ import { HydrationSafe } from "@/components/ui/hydration-safe";
 
 const chainIconMap: Record<number, string> = {
   [base.id]: "/images/chains/base.svg",
-  [optimism.id]: "/images/chains/optimism.svg",
 };
 
 function getChainIcon(chain: { id: number }) {

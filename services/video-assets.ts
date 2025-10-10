@@ -196,6 +196,69 @@ export async function updateVideoAsset(
   return result;
 }
 
+export interface GetPublishedVideoAssetsOptions {
+  limit?: number;
+  offset?: number;
+  orderBy?: 'created_at' | 'views_count' | 'likes_count' | 'updated_at';
+  order?: 'asc' | 'desc';
+  creatorId?: string;
+  category?: string;
+  search?: string;
+}
+
+/**
+ * Fetch published video assets from Supabase with advanced filtering and search
+ * This is the primary function for retrieving videos at scale
+ */
+export async function getPublishedVideoAssets(options: GetPublishedVideoAssetsOptions = {}) {
+  const supabase = await createClient();
+  
+  let query = supabase
+    .from('video_assets')
+    .select('*', { count: 'exact' })
+    .eq('status', 'published');
+  
+  // Add creator filter if specified
+  if (options.creatorId) {
+    query = query.eq('creator_id', options.creatorId);
+  }
+  
+  // Add category filter if specified
+  if (options.category) {
+    query = query.eq('category', options.category);
+  }
+  
+  // Add full-text search if specified (searches title and description)
+  if (options.search && options.search.trim()) {
+    // Use text search across title and description
+    const searchTerm = options.search.trim();
+    query = query.or(`title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`);
+  }
+  
+  // Add ordering
+  const orderBy = options.orderBy || 'created_at';
+  const order = options.order || 'desc';
+  query = query.order(orderBy, { ascending: order === 'asc' });
+  
+  // Add pagination
+  if (options.limit) {
+    const offset = options.offset || 0;
+    query = query.range(offset, offset + options.limit - 1);
+  }
+  
+  const { data, error, count } = await query;
+  
+  if (error) {
+    throw new Error(`Failed to fetch published videos: ${error.message}`);
+  }
+  
+  return { 
+    data: data || [], 
+    total: count || 0,
+    hasMore: options.limit ? (count || 0) > (options.offset || 0) + (options.limit || 0) : false
+  };
+}
+
 export interface MultistreamTarget {
   id?: string;
   name?: string;

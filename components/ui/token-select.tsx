@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import { ChevronDown } from "lucide-react";
 
@@ -31,6 +31,14 @@ export function TokenSelect({
   const [selectedToken, setSelectedToken] = useState(
     TOKENS.find(t => t.symbol === value) || TOKENS[0]
   );
+
+  // Sync internal state when value prop changes
+  useEffect(() => {
+    const token = TOKENS.find(t => t.symbol === value);
+    if (token) {
+      setSelectedToken(token);
+    }
+  }, [value]);
 
   const handleSelect = (token: Token) => {
     setSelectedToken(token);
