@@ -8,18 +8,11 @@ import {
 } from "@/app/api/livepeer/assetUploadActions";
 import * as tus from "tus-js-client";
 import PreviewVideo from "./PreviewVideo";
-import { useUser } from "@account-kit/react";
-import { userToAccount } from "@/lib/types/account";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import {
-  Subtitles,
-  Chunk,
-} from "../../../lib/sdk/orbisDB/models/AssetMetadata";
-import JsGoogleTranslateFree from "@kreisler/js-google-translate-free";
-import { getLivepeerAudioToText } from "@/app/api/livepeer/audioToText";
 import Link from "next/link";
 import { updateVideoAsset } from "@/services/video-assets";
+import { useUniversalAccount } from "@/lib/hooks/accountkit/useUniversalAccount";
 
 const truncateUri = (uri: string): string => {
   if (uri.length <= 30) return uri;
@@ -35,101 +28,10 @@ const copyToClipboard = (text: string) => {
 interface FileUploadProps {
   onFileSelect: (file: File | null) => void;
   onFileUploaded: (fileUrl: string) => void;
-  onSubtitlesUploaded: (subtitlesUri?: string) => void;
   onPressNext?: (livepeerAsset: any) => void;
   onPressBack?: () => void;
   metadata?: any;
   newAssetTitle?: string;
-}
-
-const translateText = async (
-  text: string,
-  language: string
-): Promise<string> => {
-  try {
-    const baseUrl = process.env.NEXT_PUBLIC_URL || "http://localhost:3000";
-    const res = await fetch(`${baseUrl}/api/livepeer/subtitles/translation`, {
-      method: "POST",
-      body: JSON.stringify({
-        text: text,
-        source: "English",
-        target: language,
-      }),
-    });
-
-    const data = await res.json();
-
-    console.log("Translation response:", data);
-
-    return data.response;
-  } catch (error) {
-    console.error("Translation error:", error);
-    return text; // Fallback to original text if translation fails
-  }
-};
-
-async function translateSubtitles(data: {
-  chunks: Chunk[];
-}): Promise<Subtitles> {
-  const subtitles: Subtitles = {
-    English: data.chunks,
-  };
-
-  const languages = ["Chinese", "German", "Spanish"];
-
-  // Create a single Promise.all for all language translations to reduce nested mapping
-  const translationPromises = languages.map(async (language) => {
-    try {
-      // Skip translation for English
-      if (language === "English") return null;
-      console.log("Translating to:", language);
-      // Perform translations concurrently for each chunk
-      const translatedChunks = await Promise.all(
-        data.chunks.map(async (chunk, i) => {
-          const to =
-            language === "Chinese" ? "zh" : language === "German" ? "de" : "es";
-          const translation = await JsGoogleTranslateFree.translate({
-            to,
-            text: chunk.text,
-          }); // a
-          const arr = {
-            text: translation,
-            timestamp: chunk.timestamp,
-          };
-          console.log("Translated chunk " + i + ":", arr);
-          return arr;
-        })
-      );
-
-      console.log("Translated chunks:", translatedChunks);
-
-      return { [language]: translatedChunks };
-    } catch (error) {
-      console.error("Error translating subtitles:", error);
-      return {};
-    }
-  });
-
-  // Filter out null results and combine translations
-  const translations = await Promise.all(translationPromises);
-  const languageTranslations = translations.filter(Boolean);
-
-  console.log("translations:", translations);
-  console.log("Language translations:", languageTranslations);
-
-  // Merge translations efficiently
-  return languageTranslations
-    .filter(
-      (translation): translation is { [key: string]: Chunk[] } =>
-        translation !== null
-    )
-    .reduce(
-      (acc, curr) => ({
-        ...acc,
-        ...curr,
-      }),
-      subtitles
-    );
 }
 
 async function pollForMetadataUri(
@@ -150,7 +52,6 @@ async function pollForMetadataUri(
 const FileUpload: React.FC<FileUploadProps> = ({
   onFileSelect,
   onFileUploaded,
-  onSubtitlesUploaded,
   onPressNext,
   onPressBack,
   metadata,
@@ -165,20 +66,92 @@ const FileUpload: React.FC<FileUploadProps> = ({
   const [uploadState, setUploadState] = useState<
     "idle" | "loading" | "complete"
   >("idle");
-  const [subtitleProcessingComplete, setSubtitleProcessingComplete] =
-    useState<boolean>(false);
 
   const [livepeerAsset, setLivepeerAsset] = useState<any>();
   const [isPolling, setIsPolling] = useState(false);
 
-  const user = useUser();
-  const account = userToAccount(user);
+  // Use Universal Account to get smart account address (SCA), not controller wallet
+  const { address, type, loading } = useUniversalAccount();
+
+  // Livepeer supported video formats
+  // Containers: MP4, MOV, MKV, WebM, FLV, TS
+  // Video codecs: H.264, H.265 (HEVC), VP8, VP9, AV1
+  const SUPPORTED_VIDEO_FORMATS = [
+    'video/mp4',
+    'video/quicktime', // .mov
+    'video/x-matroska', // .mkv
+    'video/webm',
+    'video/x-flv',
+    'video/mp2t', // .ts
+    'video/mpeg',
+  ];
+
+  const SUPPORTED_VIDEO_EXTENSIONS = [
+    '.mp4',
+    '.mov',
+    '.mkv',
+    '.webm',
+    '.flv',
+    '.ts',
+    '.mpeg',
+    '.mpg',
+  ];
+
+  const validateVideoFile = (file: File): { valid: boolean; error?: string } => {
+    // Check file extension
+    const fileExtension = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
+    const isValidExtension = SUPPORTED_VIDEO_EXTENSIONS.includes(fileExtension);
+    
+    // Check MIME type
+    const isValidMimeType = SUPPORTED_VIDEO_FORMATS.includes(file.type);
+    
+    if (!isValidExtension && !isValidMimeType) {
+      return {
+        valid: false,
+        error: `Unsupported video format: ${fileExtension}. Please use MP4, MOV, MKV, WebM, FLV, or TS format with H.264/H.265 codec.`,
+      };
+    }
+
+    // Check file size (optional: 5GB limit)
+    const maxSize = 5 * 1024 * 1024 * 1024; // 5GB
+    if (file.size > maxSize) {
+      return {
+        valid: false,
+        error: 'File size exceeds 5GB limit. Please compress your video or use a smaller file.',
+      };
+    }
+
+    return { valid: true };
+  };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] || null;
+    
+    // Reset state
+    setUploadState("idle");
+    setProgress(0);
+    setUploadComplete(false);
+    setError(null);
+    
+    if (!file) {
+      setSelectedFile(null);
+      onFileSelect(null);
+      return;
+    }
+
+    // Validate video file
+    const validation = validateVideoFile(file);
+    if (!validation.valid) {
+      setError(validation.error || 'Invalid video file');
+      setSelectedFile(null);
+      onFileSelect(null);
+      toast.error(validation.error || 'Invalid video file');
+      return;
+    }
+
     setSelectedFile(file);
     onFileSelect(file);
-    console.log("Selected file:", file?.name);
+    console.log("Selected file:", file?.name, "Address:", address, "Type:", type);
   };
 
   const handleFileUpload = async () => {
@@ -187,16 +160,21 @@ const FileUpload: React.FC<FileUploadProps> = ({
       return;
     }
 
+    if (!address) {
+      setError("Please connect your wallet to upload videos.");
+      return;
+    }
+
     setError(null);
     setUploadState("loading");
     setProgress(0);
 
     try {
-      console.log("Start upload #1");
+      console.log("Start upload - using smart account address:", address, "type:", type);
 
       const uploadRequestResult = await getLivepeerUploadUrl(
         newAssetTitle || selectedFile.name || "new file name",
-        account?.address || "anonymous"
+        address
       );
 
       setLivepeerAsset(uploadRequestResult?.asset);
@@ -205,7 +183,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
         endpoint: uploadRequestResult?.tusEndpoint,
         metadata: {
           filename: selectedFile.name,
-          filetype: "video/*",
+          filetype: selectedFile.type || "video/mp4", // Use actual file MIME type
         },
         uploadSize: selectedFile.size,
         onError(err: any) {
@@ -235,53 +213,6 @@ const FileUpload: React.FC<FileUploadProps> = ({
     }
   };
 
-  const handleAudioToText = async () => {
-    if (!livepeerAsset?.id) {
-      console.error("No asset ID available");
-      return;
-    }
-
-    try {
-      const data = await getLivepeerAudioToText(livepeerAsset.id);
-      console.log("Audio to text data:", data);
-
-      if (data?.chunks) {
-        const subtitles = await translateSubtitles(data);
-        console.log("Translated subtitles:", subtitles);
-
-        // Store subtitles in IPFS
-        const subtitlesBlob = new Blob([JSON.stringify(subtitles)], {
-          type: "application/json",
-        });
-        const subtitlesFile = new File([subtitlesBlob], "subtitles.json", {
-          type: "application/json",
-        });
-
-        // Upload to IPFS using Livepeer's API
-        const formData = new FormData();
-        formData.append("file", subtitlesFile);
-
-        const response = await fetch("/api/livepeer/upload", {
-          method: "POST",
-          body: formData,
-        });
-
-        if (!response.ok) {
-          throw new Error("Failed to upload subtitles to IPFS");
-        }
-
-        const { ipfsHash } = await response.json();
-        const subtitlesUri = `ipfs://${ipfsHash}`;
-
-        onSubtitlesUploaded(subtitlesUri);
-        setSubtitleProcessingComplete(true);
-      }
-    } catch (error) {
-      console.error("Error processing audio to text:", error);
-      toast.error("Failed to process audio to text");
-    }
-  };
-
   async function handlePostUploadDbUpdate(assetId: string, dbAssetId: number) {
     setIsPolling(true);
     try {
@@ -303,9 +234,18 @@ const FileUpload: React.FC<FileUploadProps> = ({
     }
   }
 
-  if (!account) {
+  // Show loading state while fetching account
+  if (loading) {
     return (
-      <div className="text-center">
+      <div className="text-center p-8">
+        <p>Loading your wallet...</p>
+      </div>
+    );
+  }
+
+  if (!address) {
+    return (
+      <div className="text-center p-8">
         <p>Please connect your wallet to upload videos</p>
       </div>
     );
@@ -331,13 +271,24 @@ const FileUpload: React.FC<FileUploadProps> = ({
               <input
                 type="file"
                 id="file-upload"
-                accept="video/*"
+                accept="video/mp4,video/quicktime,video/x-matroska,video/webm,video/x-flv,video/mp2t,.mp4,.mov,.mkv,.webm,.flv,.ts"
                 className="file:border-1 block w-full rounded-lg border border-gray-200 text-sm text-[#EC407A] 
                 file:mr-2 file:cursor-pointer file:rounded-full file:border-0 file:bg-white file:px-3 file:py-2 file:text-xs 
                 sm:file:mr-4 sm:file:px-4 sm:file:text-sm file:font-semibold file:text-[#EC407A] hover:file:bg-gray-50"
                 data-testid="file-upload-input"
                 onChange={handleFileChange}
               />
+              <div className="mt-2 space-y-1">
+                <p className="text-xs text-gray-600 font-medium">
+                  📹 Supported formats: MP4, MOV, MKV, WebM, FLV, TS
+                </p>
+                <p className="text-xs text-gray-500">
+                  ✅ <strong>Required codecs:</strong> H.264 or H.265 (HEVC) • Max size: 5GB
+                </p>
+                <p className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded">
+                  ⚠️ <strong>Important:</strong> Your video must use H.264 or H.265 codec. If upload fails, convert your video using <a href="https://handbrake.fr/" target="_blank" rel="noopener noreferrer" className="underline hover:text-amber-800">HandBrake</a> or FFmpeg.
+                </p>
+              </div>
             </div>
 
             {/* Selected File Section */}
@@ -366,9 +317,10 @@ const FileUpload: React.FC<FileUploadProps> = ({
                       className={`${
                         !selectedFile
                           ? "cursor-not-allowed bg-[#D63A6A] opacity-50"
-                          : "bg-[#EC407A] hover:bg-[#D63A6A]"
-                      } w-full max-w-xs rounded-lg px-4 py-3 text-sm font-semibold text-white shadow-sm transition-colors sm:px-6 sm:text-base`}
+                          : "bg-[#EC407A] hover:bg-[#D63A6A] active:bg-[#C62C5A]"
+                      } w-full max-w-xs rounded-lg px-4 py-3 text-sm font-semibold text-white shadow-sm transition-colors sm:px-6 sm:text-base touch-manipulation`}
                       data-testid="file-input-upload-button"
+                      style={{ WebkitTapHighlightColor: 'transparent' }}
                     >
                       Upload File
                     </button>
@@ -427,31 +379,6 @@ const FileUpload: React.FC<FileUploadProps> = ({
           </div>
         </div>
 
-        {/* Process Subtitles Button & Status */}
-        {uploadComplete && (
-          <div className="mt-4 flex flex-col items-center gap-2">
-            <Button
-              onClick={handleAudioToText}
-              disabled={uploadState === "loading" || subtitleProcessingComplete}
-              className="w-full max-w-xs text-sm sm:text-base"
-            >
-              {subtitleProcessingComplete
-                ? "Subtitles Processed"
-                : "Process Subtitles"}
-            </Button>
-            {subtitleProcessingComplete && (
-              <span className="text-green-600 text-xs sm:text-sm">
-                Subtitles processed and uploaded.
-              </span>
-            )}
-            {!subtitleProcessingComplete && (
-              <span className="text-gray-500 text-xs">
-                You can process subtitles now or later.
-              </span>
-            )}
-          </div>
-        )}
-
         {/* Navigation Buttons */}
         <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
           {onPressBack && (
@@ -459,7 +386,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
               variant="outline"
               disabled={uploadState === "loading"}
               onClick={onPressBack}
-              className="w-full min-w-[100px] text-sm sm:w-auto sm:text-base"
+              className="w-full min-w-[120px] text-sm sm:w-auto sm:text-base touch-manipulation"
             >
               Back
             </Button>
@@ -475,7 +402,8 @@ const FileUpload: React.FC<FileUploadProps> = ({
                 }
               }}
               data-testid="file-input-next"
-              className="w-full min-w-[100px] text-sm sm:w-auto sm:text-base"
+              className="w-full min-w-[120px] text-sm sm:w-auto sm:text-base touch-manipulation"
+              style={{ WebkitTapHighlightColor: 'transparent' }}
             >
               Next
             </Button>

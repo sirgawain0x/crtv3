@@ -62,6 +62,26 @@ const nextConfig = {
         hostname: "snapshotsplugin.s3.us-west-2.amazonaws.com",
         pathname: "/**",
       },
+      {
+        protocol: "https",
+        hostname: "*.livepeer.studio",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "*.livepeer.com",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "*.livepeercdn.studio",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "*.livepeercdn.com",
+        pathname: "/**",
+      },
     ],
   },
   async headers() {

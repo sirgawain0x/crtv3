@@ -38,7 +38,7 @@ import { getDetailPlaybackSource } from "@/lib/hooks/livepeer/useDetailPlaybackS
 import { generateAccessKey, WebhookContext } from "@/lib/access-key";
 import { Skeleton } from "../ui/skeleton";
 import { Badge } from "../ui/badge";
-import { getVideoAssetByPlaybackId } from "@/services/video-assets";
+import { fetchVideoAssetByPlaybackId } from "@/lib/utils/video-assets-client";
 
 type VideoDetailsProps = {
   asset: Asset;
@@ -60,8 +60,13 @@ export default function VideoDetails({ asset }: VideoDetailsProps) {
     const fetchDbStatus = async () => {
       try {
         if (!asset?.playbackId) return;
-        const row = await getVideoAssetByPlaybackId(asset.playbackId);
-        if (row?.status) setDbStatus(row.status);
+        const row = await fetchVideoAssetByPlaybackId(asset.playbackId);
+        if (row?.status) {
+          const validStatuses = ["draft", "published", "minted", "archived"] as const;
+          if (validStatuses.includes(row.status as any)) {
+            setDbStatus(row.status as "draft" | "published" | "minted" | "archived");
+          }
+        }
       } catch {}
     };
     fetchPlaybackSources();

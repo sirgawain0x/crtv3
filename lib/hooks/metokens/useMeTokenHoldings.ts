@@ -187,9 +187,18 @@ export function useMeTokenHoldings(targetAddress?: string): UseMeTokenHoldingsRe
     try {
       console.log('🔍 Fetching MeToken holdings for address:', address);
       
-      // Get all MeTokens from subgraph
-      const allMeTokens = await meTokensSubgraph.getAllMeTokens(100, 0);
-      console.log(`📋 Found ${allMeTokens.length} MeTokens in subgraph`);
+      // Get all MeTokens from subgraph with error handling
+      let allMeTokens;
+      try {
+        allMeTokens = await meTokensSubgraph.getAllMeTokens(100, 0);
+        console.log(`📋 Found ${allMeTokens.length} MeTokens in subgraph`);
+      } catch (subgraphError) {
+        console.warn('⚠️ Subgraph query failed, this is non-critical:', subgraphError);
+        // Return empty holdings but don't throw - subgraph is optional
+        setHoldings([]);
+        setLoading(false);
+        return;
+      }
 
       const userHoldings: MeTokenHolding[] = [];
 
