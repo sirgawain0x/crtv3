@@ -111,12 +111,12 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
               >
                 MeTokens
               </TabsTrigger>
-              <TabsTrigger
+              {/* <TabsTrigger
                 value="Revenue"
                 className="flex-shrink-0 rounded-t-lg px-4 py-2 text-sm font-medium"
               >
                 Revenue
-              </TabsTrigger>
+              </TabsTrigger> */}
             </TabsList>
 
             <div className="mt-6">
@@ -154,7 +154,8 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
                 <MeTokensSection walletAddress={displayAddress} />
               </TabsContent>
 
-              <TabsContent value="Revenue">
+              {/* Revenue content will be implemented later */}
+              {/* <TabsContent value="Revenue">
                 <Card>
                   <CardHeader className="space-y-1">
                     <CardTitle className="text-2xl">Revenue</CardTitle>
@@ -163,7 +164,6 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    {/* Revenue content will be implemented later */}
                     <Alert>
                       <FaExclamationTriangle className="h-4 w-4" />
                       <AlertTitle>Coming Soon</AlertTitle>
@@ -173,7 +173,7 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
                     </Alert>
                   </CardContent>
                 </Card>
-              </TabsContent>
+              </TabsContent> */}
             </div>
           </Tabs>
         </div>

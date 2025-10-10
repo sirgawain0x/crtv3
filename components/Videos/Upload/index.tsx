@@ -20,19 +20,12 @@ import {
   AssetMetadata,
   createAssetMetadata,
 } from "@/lib/sdk/orbisDB/models/AssetMetadata";
-import {
-  updateVideoAssetMintingStatus,
-  updateVideoAsset,
-} from "@/services/video-assets";
+import { updateVideoAsset } from "@/services/video-assets";
 import { createVideoAsset } from "@/services/video-assets";
 import type { VideoAsset } from "@/lib/types/video-asset";
 
-import { useSmartAccountClient } from "@account-kit/react";
 import { useUniversalAccount } from "@/lib/hooks/accountkit/useUniversalAccount";
 import { getLivepeerAsset } from "@/app/api/livepeer/assetUploadActions";
-import { encodeFunctionData, createPublicClient, http } from "viem";
-import { base } from "@account-kit/infra";
-import { creativeTv1155Abi } from "@/lib/contracts/CreativeTV1155";
 
 const HookMultiStepForm = () => {
   const [activeStep, setActiveStep] = useState(1);
@@ -44,15 +37,11 @@ const HookMultiStepForm = () => {
 
   const [metadata, setMetadata] = useState<TVideoMetaForm>();
   const [livepeerAsset, setLivepeerAsset] = useState<Asset>();
-  const [subtitlesUri, setSubtitlesUri] = useState<string>();
   const [thumbnailUri, setThumbnailUri] = useState<string>();
   const [dbAssetId, setDbAssetId] = useState<number | null>(null);
   const [videoAsset, setVideoAsset] = useState<VideoAsset | null>(null);
 
   const { address, type, loading } = useUniversalAccount();
-  const { client } = useSmartAccountClient({});
-  const [isMinting, setIsMinting] = useState(false);
-  const [mintError, setMintError] = useState<Error | null>(null);
 
   const router = useRouter();
 
@@ -88,23 +77,38 @@ const HookMultiStepForm = () => {
           <AlertDescription>{errors.root?.formError?.message}</AlertDescription>
         </Alert>
       )}
-      <div className={activeStep === 1 ? "block" : "hidden"}>
+      
+      {/* Step 1: Create Info */}
+      {activeStep === 1 && (
         <CreateInfo onPressNext={handleCreateInfoSubmit} />
-      </div>
-      <div className={activeStep === 2 ? "block" : "hidden"}>
+      )}
+      
+      {/* Step 2: File Upload */}
+      {activeStep === 2 && (
         <FileUpload
           newAssetTitle={metadata?.title}
           metadata={metadata}
           onFileSelect={(file) => {}}
           onFileUploaded={(videoUrl: string) => {}}
-          onSubtitlesUploaded={(subtitlesUri?: string) => {
-            setSubtitlesUri(subtitlesUri);
-          }}
           onPressBack={() =>
             setActiveStep((prevActiveStep) => prevActiveStep - 1)
           }
           onPressNext={(livepeerAsset: any) => {
+            console.log('🎬 FileUpload onPressNext called with asset:', {
+              id: livepeerAsset?.id,
+              playbackId: livepeerAsset?.playbackId,
+              hasAsset: !!livepeerAsset,
+            });
+
+            if (!livepeerAsset || !livepeerAsset.id) {
+              console.error('❌ No valid livepeerAsset provided to onPressNext');
+              toast.error("Failed to upload video. Please try again.");
+              return;
+            }
+
+            // Set the asset FIRST
             setLivepeerAsset(livepeerAsset);
+            
             // Create the video asset in the database and store its ID
             createVideoAsset({
               title: metadata?.title || "",
@@ -130,24 +134,32 @@ const HookMultiStepForm = () => {
               current_supply: 0,
               metadata_uri: null,
               attributes: null,
+              requires_metoken: false,
+              metoken_price: null,
+              subtitles_uri: null,
+              subtitles: null,
             }).then((dbAsset) => {
+              console.log('✅ Video asset created in DB:', dbAsset);
               setVideoAsset(dbAsset as VideoAsset);
               setActiveStep((prevActiveStep) => prevActiveStep + 1);
+            }).catch((error) => {
+              console.error('❌ Failed to create video asset in DB:', error);
+              toast.error("Failed to save video data. Please try again.");
             });
           }}
         />
-      </div>
-      <div className={activeStep === 3 ? "block" : "hidden"}>
+      )}
+      
+      {/* Step 3: Create Thumbnail - Only render when we reach this step */}
+      {activeStep === 3 && livepeerAsset?.id && (
         <CreateThumbnailWrapper
-          livePeerAssetId={livepeerAsset?.id}
+          livePeerAssetId={livepeerAsset.id}
           thumbnailUri={thumbnailUri}
           onComplete={async (data: {
             thumbnailUri: string;
-            nftConfig?: {
-              isMintable: boolean;
-              maxSupply: number;
-              price: number;
-              royaltyPercentage: number;
+            meTokenConfig?: {
+              requireMeToken: boolean;
+              priceInMeToken: number;
             };
           }) => {
             setThumbnailUri(data.thumbnailUri);
@@ -166,123 +178,20 @@ const HookMultiStepForm = () => {
             try {
               // Fetch the latest Livepeer asset to get the most up-to-date metadata_uri
               const latestAsset = await getLivepeerAsset(livepeerAsset.id);
+              
               // --- PUBLISH LOGIC ---
-              // Set status to 'published'. If minting occurs, it will later be set to 'minted'.
+              // Update video asset with thumbnail, metadata, and MeToken configuration
               await updateVideoAsset(videoAsset?.id as number, {
                 thumbnailUri: data.thumbnailUri,
                 status: "published",
-                max_supply: data.nftConfig?.maxSupply || null,
-                price: data.nftConfig?.price || null,
-                royalty_percentage: data.nftConfig?.royaltyPercentage || null,
                 metadata_uri:
                   latestAsset?.storage?.ipfs?.nftMetadata?.url || null,
+                requires_metoken: data.meTokenConfig?.requireMeToken || false,
+                metoken_price: data.meTokenConfig?.priceInMeToken || null,
               });
 
-              // If minting is enabled, trigger on-chain mint on Base
-              if (data.nftConfig?.isMintable) {
-                const erc1155Address = (process.env
-                  .NEXT_PUBLIC_ERC1155_ADDRESS_BASE || "") as `0x${string}`;
-                if (!erc1155Address) {
-                  toast.error("ERC1155 address not configured");
-                } else if (!address) {
-                  toast.error("Wallet not connected");
-                } else {
-                  const tokenId = BigInt(videoAsset?.id || 0);
-                  const amount = BigInt(1);
-                  const dataBytes = "0x" as `0x${string}`;
-
-                  const dataCalldata = encodeFunctionData({
-                    abi: creativeTv1155Abi,
-                    functionName: "mint",
-                    args: [address as `0x${string}`, tokenId, amount, dataBytes],
-                  });
-
-                  setIsMinting(true);
-                  setMintError(null);
-                  
-                  try {
-                    if (!client) {
-                      toast.error("Smart account client not available. Please ensure your wallet is connected.");
-                      return;
-                    }
-
-                    // Use smart account client for minting via user operation
-                    const operation = await client.sendUserOperation({
-                      uo: {
-                        target: erc1155Address,
-                        data: dataCalldata,
-                        value: BigInt(0),
-                      },
-                    });
-                    
-                    // Wait for the transaction to be mined
-                    const txHash = await client.waitForUserOperationTransaction({
-                      hash: operation.hash,
-                    });
-                    
-                    console.log("Mint transaction hash:", txHash);
-                      
-                    // Update the status with the transaction hash
-                    await updateVideoAssetMintingStatus(videoAsset?.id as number, {
-                      token_id: tokenId.toString(),
-                      contract_address: erc1155Address,
-                      mint_transaction_hash: txHash,
-                    });
-                    
-                    const tokenIdNum = tokenId.toString();
-                    const zoraUrl = `https://zora.co/collect/base:${erc1155Address}/${tokenIdNum}`;
-                    const openseaUrl = `https://opensea.io/assets/base/${erc1155Address}/${tokenIdNum}`;
-                    const basescanTokenUrl = `https://basescan.org/token/${erc1155Address}?a=${tokenIdNum}`;
-                    const basescanTxUrl = `https://basescan.org/tx/${txHash}`;
-
-                    toast.success("NFT minted successfully", {
-                      description: (
-                        <div className="space-y-1">
-                          <a
-                            href={openseaUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="underline"
-                          >
-                            View on OpenSea
-                          </a>
-                          <span className="mx-2">•</span>
-                          <a
-                            href={basescanTokenUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="underline"
-                          >
-                            View token on BaseScan
-                          </a>
-                          <span className="mx-2">•</span>
-                          <a
-                            href={basescanTxUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="underline"
-                          >
-                            View mint tx
-                          </a>
-                          </div>
-                        ),
-                        action: {
-                          label: "List on Zora",
-                          onClick: () => window.open(zoraUrl, "_blank"),
-                        },
-                      });
-                  } catch (e: any) {
-                    console.error("Mint failed", e);
-                    const err = e instanceof Error ? e : new Error(e?.message || "Could not mint NFT");
-                    setMintError(err);
-                    toast.error("Mint failed", {
-                      description: err.message,
-                    });
-                  } finally {
-                    setIsMinting(false);
-                  }
-                }
-              }
+              // Video published successfully with MeToken configuration
+              toast.success("Video uploaded and published successfully!");
 
               // Award points for uploading a video
               // await stack.track("video_upload", {
@@ -305,7 +214,7 @@ const HookMultiStepForm = () => {
             }
           }}
         />
-      </div>
+      )}
     </>
   );
 };

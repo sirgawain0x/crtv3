@@ -150,8 +150,19 @@ export class MeTokensSubgraphClient {
     }
     
     try {
-      const data = await request(this.getEndpoint(), GET_ALL_SUBSCRIBES, { first, skip }) as any;
+      const endpoint = this.getEndpoint();
+      console.log('🔗 Querying subgraph at:', endpoint);
+      
+      const data = await request(endpoint, GET_ALL_SUBSCRIBES, { first, skip }) as any;
+      
+      // Check for GraphQL errors
+      if (data.errors) {
+        console.error('GraphQL errors:', data.errors);
+        throw new Error(`GraphQL error: ${JSON.stringify(data.errors)}`);
+      }
+      
       const subscribeEvents = data.subscribes || [];
+      console.log(`✅ Successfully fetched ${subscribeEvents.length} subscribe events`);
       
       // Convert Subscribe events to MeToken format
       // Note: This is a simplified conversion - in practice, you'd need to fetch
@@ -169,7 +180,19 @@ export class MeTokensSubgraphClient {
         migration: '',
       }));
     } catch (error) {
-      console.error('Failed to fetch MeTokens:', error);
+      console.error('❌ Failed to fetch MeTokens from subgraph:', error);
+      
+      // Provide more helpful error messages
+      if (error instanceof Error) {
+        if (error.message.includes('500')) {
+          throw new Error('Subgraph server error (500). This may be due to: missing SUBGRAPH_QUERY_KEY, subgraph indexing issues, or server downtime.');
+        }
+        if (error.message.includes('ECONNREFUSED')) {
+          throw new Error('Cannot connect to subgraph endpoint. Check your network connection.');
+        }
+        throw error;
+      }
+      
       throw new Error('Failed to fetch MeTokens from subgraph');
     }
   }
