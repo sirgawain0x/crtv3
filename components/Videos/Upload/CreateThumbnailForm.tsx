@@ -1,33 +1,26 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useForm, Controller } from "react-hook-form";
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectGroup,
-  SelectLabel,
-  SelectItem,
-} from "../../ui/select"; // Adjust the import path as needed
-import { Button } from "../../ui/button"; // Adjust the import path as needed
-import { SparklesIcon, AlertCircle } from "lucide-react";
-import Image from "next/image";
+import { Button } from "../../ui/button";
+import { SparklesIcon, AlertCircle, Upload, CreditCard } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { getLivepeerAiGeneratedImages } from "@/app/api/livepeer/livepeerAiActions";
-import { Media } from "livepeer/models/components";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { useMeTokensSupabase } from "@/lib/hooks/metokens/useMeTokensSupabase";
+import { uploadThumbnailToIPFS, uploadThumbnailFromBlob } from "@/lib/services/thumbnail-upload";
 import { AlchemyMeTokenCreator } from "@/components/UserProfile/AlchemyMeTokenCreator";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toast } from "sonner";
+import Image from "next/image";
 
 interface FormValues {
-  aiModel: string;
-  prompt: string;
+  thumbnailType: "custom" | "ai";
+  customImage: File | null;
+  aiPrompt: string;
   meTokenConfig: {
     requireMeToken: boolean;
     priceInMeToken: number;
@@ -36,6 +29,8 @@ interface FormValues {
 }
 
 interface CreateThumbnailFormProps {
+  livepeerAssetId?: string;
+  assetReady?: boolean;
   onSelectThumbnailImages: (imageUrl: string) => void;
   onMeTokenConfigChange?: (meTokenConfig: {
     requireMeToken: boolean;
@@ -44,20 +39,23 @@ interface CreateThumbnailFormProps {
 }
 
 const CreateThumbnailForm = ({
+  livepeerAssetId,
+  assetReady = false,
   onSelectThumbnailImages,
   onMeTokenConfigChange,
 }: CreateThumbnailFormProps) => {
   const {
-    handleSubmit,
     control,
     watch,
     formState: { errors, isSubmitting },
     setError,
     setValue,
+    register,
   } = useForm<FormValues>({
     defaultValues: {
-      aiModel: "SG161222/RealVisXL_V4.0_Lightning",
-      prompt: "",
+      thumbnailType: "custom",
+      customImage: null,
+      aiPrompt: "",
       meTokenConfig: {
         requireMeToken: false,
         priceInMeToken: 0,
@@ -66,65 +64,67 @@ const CreateThumbnailForm = ({
     },
   });
 
-  const [imagesUrl, setImagesUrl] = useState<Media[]>([]);
-  const [selectedImage, setSelectedImage] = useState<string | undefined>(
-    undefined
-  );
-  const [loading, setLoading] = useState<boolean>(false);
+  const [customPreviewUrl, setCustomPreviewUrl] = useState<string | null>(null);
+  const [aiImages, setAiImages] = useState<any[]>([]);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [thumbnailUploading, setThumbnailUploading] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | undefined>();
   const [showMeTokenCreator, setShowMeTokenCreator] = useState(false);
 
   const { userMeToken, loading: meTokenLoading, checkUserMeToken } = useMeTokensSupabase();
   const requireMeToken = watch("meTokenConfig.requireMeToken");
-  
-  // Check for user's MeToken on mount
+  const thumbnailType = watch("thumbnailType");
+  const customImage = watch("customImage");
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     checkUserMeToken();
-  }, [checkUserMeToken]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const onSubmit = async (data: FormValues) => {
-    setLoading(true);
-    try {
-      const response = await getLivepeerAiGeneratedImages({
-        prompt: data.prompt,
-        modelId: data.aiModel,
-        safetyCheck: true,
-        numImagesPerPrompt: 1,
-      });
-      if (response.success) {
-        setImagesUrl((currentImages) => [
-          ...currentImages,
-          ...response.result.images,
-        ]);
-      } else {
-        const errorMsg =
-          typeof response.result === "string"
-            ? response.result
-            : JSON.stringify(response.result);
-        setError("root", {
-          message: errorMsg || "Error generating AI images",
-        });
-        return;
-      }
-    } catch (err) {
-      const errorMsg =
-        err instanceof Error
-          ? err.message
-          : typeof err === "string"
-          ? err
-          : JSON.stringify(err);
-      setError("root", {
-        message: errorMsg || "Error generating AI images",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // Handle custom image upload
   useEffect(() => {
-    console.log("Updated imagesUrl state:", imagesUrl);
-  }, [imagesUrl]);
+    if (customImage && thumbnailType === "custom") {
+      // Upload thumbnail to IPFS immediately for persistence
+      setThumbnailUploading(true);
+      uploadThumbnailToIPFS(customImage, livepeerAssetId || 'unknown')
+        .then((result) => {
+          if (result.success && result.thumbnailUrl) {
+            // Use the IPFS URL
+            setCustomPreviewUrl(result.thumbnailUrl);
+            setSelectedImage(result.thumbnailUrl);
+            onSelectThumbnailImages(result.thumbnailUrl);
+            toast.success("Custom thumbnail uploaded successfully!");
+          } else {
+            toast.error(result.error || "Failed to upload thumbnail");
+            // Create temporary preview URL for display only
+            const url = URL.createObjectURL(customImage);
+            setCustomPreviewUrl(url);
+            setSelectedImage(url);
+            onSelectThumbnailImages(url);
+            return () => URL.revokeObjectURL(url);
+          }
+        })
+        .catch((error) => {
+          console.error("Error uploading thumbnail:", error);
+          toast.error("Failed to upload thumbnail");
+          // Create temporary preview URL for display only
+          const url = URL.createObjectURL(customImage);
+          setCustomPreviewUrl(url);
+          setSelectedImage(url);
+          onSelectThumbnailImages(url);
+          return () => URL.revokeObjectURL(url);
+        })
+        .finally(() => {
+          setThumbnailUploading(false);
+        });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [customImage, thumbnailType, livepeerAssetId]);
 
-  // Watch MeToken config and notify parent on change
+  // Watch MeToken config changes
   useEffect(() => {
     if (!onMeTokenConfigChange) return;
     const subscription = watch((value, { name }) => {
@@ -141,135 +141,317 @@ const CreateThumbnailForm = ({
         });
     });
     return () => subscription.unsubscribe();
-  }, [onMeTokenConfigChange, watch]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const handleSelectionChange = (value: string) => {
-    setSelectedImage(value);
-    onSelectThumbnailImages(value); // Only update selection, do not trigger navigation
+  const handleCustomImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        setError("customImage", { message: "Please select an image file" });
+        return;
+      }
+      
+      // Validate file size (5MB limit)
+      if (file.size > 5 * 1024 * 1024) {
+        setError("customImage", { message: "File size must be less than 5MB" });
+        return;
+      }
+
+      setValue("customImage", file);
+    }
   };
 
-  const radioValue = watch("selectedImage") ?? "";
+  const makeX402Payment = async () => {
+    try {
+      const response = await fetch('/api/x402/pay-for-ai-thumbnail', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          service: 'ai-thumbnail-generation',
+          amount: '1000000', // 1 USDC (6 decimals) on Base
+        }),
+      });
+
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Payment failed",
+      };
+    }
+  };
+
+  const generateAiImage = async (prompt: string) => {
+    try {
+      const response = await fetch('/api/ai/generate-thumbnail', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          prompt: prompt,
+          service: 'gemini-2.5-flash',
+        }),
+      });
+
+      const result = await response.json();
+      
+      if (result.success && result.images && result.images.length > 0) {
+        return {
+          success: true,
+          images: result.images,
+        };
+      }
+      
+      return {
+        success: false,
+        error: result.error || "Gemini AI generation failed",
+      };
+      
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "AI generation failed",
+      };
+    }
+  };
+
+  const handleAiGenerateWithPayment = async (prompt: string) => {
+    setPaymentLoading(true);
+    setAiLoading(true);
+    
+    try {
+      // Step 1: Make x402 payment
+      const paymentResult = await makeX402Payment();
+      
+      if (!paymentResult.success) {
+        throw new Error(paymentResult.error || "Payment failed");
+      }
+
+      // Step 2: Generate AI image with Gemini after successful payment
+      const aiResult = await generateAiImage(prompt);
+      
+      if (aiResult.success) {
+        setAiImages(aiResult.images);
+        toast.success(`Generated ${aiResult.images.length} AI thumbnail${aiResult.images.length > 1 ? 's' : ''} with Gemini!`);
+      } else {
+        throw new Error(aiResult.error || "Gemini AI generation failed");
+      }
+
+    } catch (error) {
+      console.error('AI Generation Error:', error);
+      setError("root", {
+        message: error instanceof Error ? error.message : "Failed to generate AI thumbnail with Gemini",
+      });
+    } finally {
+      setPaymentLoading(false);
+      setAiLoading(false);
+    }
+  };
+
+  const handleImageSelection = async (imageUrl: string) => {
+    setSelectedImage(imageUrl);
+    
+    // If it's a blob URL (AI-generated image), upload to IPFS first
+    if (imageUrl.startsWith('blob:')) {
+      setThumbnailUploading(true);
+      try {
+        const result = await uploadThumbnailFromBlob(imageUrl, livepeerAssetId || 'unknown');
+        if (result.success && result.thumbnailUrl) {
+          // Use the IPFS URL instead of blob URL
+          onSelectThumbnailImages(result.thumbnailUrl);
+          setSelectedImage(result.thumbnailUrl);
+          toast.success("AI thumbnail uploaded successfully!");
+        } else {
+          toast.error(result.error || "Failed to upload AI thumbnail");
+          // Fallback to blob URL
+          onSelectThumbnailImages(imageUrl);
+        }
+      } catch (error) {
+        console.error("Error uploading AI thumbnail:", error);
+        toast.error("Failed to upload AI thumbnail");
+        // Fallback to blob URL
+        onSelectThumbnailImages(imageUrl);
+      } finally {
+        setThumbnailUploading(false);
+      }
+    } else {
+      // It's already a persistent URL (IPFS or other), use it directly
+      onSelectThumbnailImages(imageUrl);
+    }
+  };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-      <Controller
-        name="aiModel"
-        control={control}
-        rules={{ required: "AI Model is required" }}
-        render={({ field }) => (
-          <Select onValueChange={field.onChange} value={field.value}>
-            <SelectTrigger
-              className="w-[180px]"
-              data-testid="create-thumbnail-select"
-            >
-              <SelectValue placeholder="Select A Model" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectLabel>Model</SelectLabel>
-                <SelectItem value="SG161222/RealVisXL_V4.0_Lightning">
-                  RealVisXL
-                </SelectItem>
-                <SelectItem value="black-forest-labs/FLUX.1-schnell">
-                  Black Forest
-                </SelectItem>
-                <SelectItem value="CompVis/stable-diffusion-v1-4">
-                  CompVis
-                </SelectItem>
-                <SelectItem value="stabilityai/stable-diffusion-2">
-                  Stability
-                </SelectItem>
-                <SelectItem value="Shakker-Labs/FLUX.1-dev-LoRA-One-Click-Creative-Template">
-                  Shakker
-                </SelectItem>
-                <SelectItem value="aleksa-codes/flux-ghibsky-illustration">
-                  Ghibsky
-                </SelectItem>
-                <SelectItem value="ByteDance/SDXL-Lightning">
-                  Bytedance
-                </SelectItem>
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        )}
-      />
-      {errors.aiModel && (
-        <p className="text-red-500">{errors.aiModel.message}</p>
-      )}
+    <div className="space-y-6">
+      {/* Thumbnail Type Selection */}
+      <Tabs value={thumbnailType} onValueChange={(value) => setValue("thumbnailType", value as "custom" | "ai")}>
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="custom" className="flex items-center gap-2">
+            <Upload className="h-4 w-4" />
+            Upload Custom
+          </TabsTrigger>
+          <TabsTrigger value="ai" className="flex items-center gap-2">
+            <SparklesIcon className="h-4 w-4" />
+            AI Generate
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Add a prompt input field */}
-      <Controller
-        name="prompt"
-        control={control}
-        rules={{ required: "Prompt is required" }}
-        render={({ field }) => (
-          <Textarea
-            {...field}
-            placeholder="Enter your prompt"
-            className="w-full rounded border p-2"
-            data-testid="create-thumbnail-prompt"
-            rows={4}
-          />
-        )}
-      />
-      {errors.prompt && <p className="text-red-500">{errors.prompt.message}</p>}
-
-      {/* Move Generate button and image results here */}
-      <Button type="submit" disabled={isSubmitting}>
-        <SparklesIcon className="mr-1 h-4 w-4" />
-        {isSubmitting ? "Generating..." : "Generate"}
-      </Button>
-
-      {errors["root"] && (
-        <p className="text-red-500">
-          Sorry, we couldn&rsquo;t generate your image from text. Please try
-          again.
-        </p>
-      )}
-
-      {/* Render Skeletons while loading */}
-      {loading ? (
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, idx) => (
-            <Skeleton key={idx} className="rounded-md w-full h-[200px]" />
-          ))}
-        </div>
-      ) : (
-        <RadioGroup
-          value={radioValue}
-          onValueChange={(value) => {
-            setValue("selectedImage", value);
-            handleSelectionChange(value);
-          }}
-          className="mt-4 grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4"
-        >
-          {imagesUrl.length === 0 && (
-            <p className="col-span-full text-center text-gray-500">
-              No images generated yet.
-            </p>
-          )}
-          {imagesUrl.map((img, idx) => (
-            <div key={idx} className="flex flex-col items-center">
-              <RadioGroupItem
-                value={img.url}
-                id={`thumbnail_checkbox_${idx}`}
-                className="mb-2"
+        {/* Custom Upload Tab */}
+        <TabsContent value="custom" className="space-y-4">
+          <div className="space-y-4">
+            <Label>Upload Thumbnail Image</Label>
+            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleCustomImageChange}
+                className="hidden"
               />
-              <Label htmlFor={`thumbnail_checkbox_${idx}`}>
-                <Image
-                  src={img.url}
-                  alt={`Thumbnail ${idx + 1}`}
-                  width={200}
-                  height={200}
-                  className="rounded-md border object-cover"
-                />
-              </Label>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => fileInputRef.current?.click()}
+                className="mb-2"
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Choose Image
+              </Button>
+              <p className="text-sm text-gray-500">
+                JPG, PNG, WebP up to 5MB
+              </p>
+              {errors.customImage && (
+                <p className="text-red-500 text-sm mt-2">{errors.customImage.message}</p>
+              )}
             </div>
-          ))}
-        </RadioGroup>
+
+            {/* Custom Image Preview */}
+            {customPreviewUrl && (
+              <div className="space-y-2">
+                <Label>Preview</Label>
+                <div className="relative w-full aspect-video rounded-lg overflow-hidden border">
+                  <Image
+                    src={customPreviewUrl}
+                    alt="Custom thumbnail preview"
+                    fill
+                    className="object-cover"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        </TabsContent>
+
+        {/* AI Generation Tab */}
+        <TabsContent value="ai" className="space-y-4">
+          <div className="space-y-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <CreditCard className="h-5 w-5 text-blue-600" />
+                <Label className="text-blue-800 font-semibold">Paid AI Generation with Gemini</Label>
+              </div>
+              <p className="text-sm text-blue-700">
+                Powered by Google&apos;s Gemini 2.5 Flash model. 
+                Generate high-quality, photorealistic thumbnails for 1 USDC on Base.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label>AI Prompt</Label>
+              <Textarea
+                {...register("aiPrompt", { required: "Prompt is required for AI generation" })}
+                placeholder="Describe the thumbnail you want to generate... (e.g., 'A cyberpunk cityscape with neon lights', 'A person riding a camel in the desert')"
+                rows={4}
+                className="w-full"
+              />
+              <p className="text-xs text-gray-500">
+                Tip: Be descriptive! Gemini works best with detailed scene descriptions rather than just keywords.
+              </p>
+              {errors.aiPrompt && (
+                <p className="text-red-500 text-sm">{errors.aiPrompt.message}</p>
+              )}
+            </div>
+
+            <Button
+              type="button"
+              onClick={() => handleAiGenerateWithPayment(watch("aiPrompt"))}
+              disabled={aiLoading || paymentLoading || !watch("aiPrompt")}
+              className="w-full"
+            >
+              {paymentLoading ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Processing Payment...
+                </>
+              ) : aiLoading ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Generating with Gemini AI...
+                </>
+              ) : (
+                <>
+                  <SparklesIcon className="h-4 w-4 mr-2" />
+                  Generate AI Thumbnail with Gemini (1 USDC)
+                </>
+              )}
+            </Button>
+
+            {/* AI Generated Images */}
+            {aiImages.length > 0 && (
+              <div className="space-y-2">
+                <Label>Generated Thumbnails</Label>
+                <p className="text-xs text-gray-500">
+                  Generated with Google Gemini 2.5 Flash (16:9 aspect ratio)
+                </p>
+                <RadioGroup
+                  value={selectedImage}
+                  onValueChange={handleImageSelection}
+                  className="grid grid-cols-2 gap-4"
+                >
+                  {aiImages.map((image, index) => (
+                    <div key={image.id || index} className="flex flex-col items-center">
+                      <RadioGroupItem
+                        value={image.url}
+                        id={`ai-image-${index}`}
+                        className="mb-2"
+                      />
+                      <Label htmlFor={`ai-image-${index}`} className="cursor-pointer">
+                        <div className="relative w-full aspect-video rounded-lg overflow-hidden border hover:border-blue-300 transition-colors">
+                          <Image
+                            src={image.url}
+                            alt={`AI Generated Thumbnail ${index + 1}`}
+                            fill
+                            className="object-cover"
+                          />
+                          <div className="absolute top-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
+                            Gemini
+                          </div>
+                        </div>
+                      </Label>
+                    </div>
+                  ))}
+                </RadioGroup>
+              </div>
+            )}
+          </div>
+        </TabsContent>
+      </Tabs>
+
+      {/* Error Messages */}
+      {errors.root && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Generation Error</AlertTitle>
+          <AlertDescription>{errors.root.message}</AlertDescription>
+        </Alert>
       )}
 
-      {/* MeToken Configuration section */}
+      {/* MeToken Configuration Section */}
       <div className="mt-8 space-y-4 border-t pt-4">
         <h3 className="text-lg font-semibold">Content Access Control</h3>
         
@@ -381,7 +563,7 @@ const CreateThumbnailForm = ({
           </div>
         )}
       </div>
-    </form>
+    </div>
   );
 };
 

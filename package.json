@@ -22,6 +22,7 @@
     "@apollo/client": "^3.13.8",
     "@apollo/client-integration-nextjs": "^0.12.2",
     "@coinbase/onchainkit": "^0.38.13",
+    "@google/genai": "^1.23.0",
     "@hookform/resolvers": "^5.0.1",
     "@kreisler/js-google-translate-free": "^4.0.2",
     "@lighthouse-web3/sdk": "^0.4.3",
@@ -97,6 +98,7 @@
     "uuid": "^11.1.0",
     "viem": "^2.23.5",
     "wagmi": "^2.15.3",
+    "x402-fetch": "^0.6.6",
     "zod": "^3.24.3"
   },
   "devDependencies": {

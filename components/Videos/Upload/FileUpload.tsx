@@ -10,12 +10,6 @@ import * as tus from "tus-js-client";
 import PreviewVideo from "./PreviewVideo";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import {
-  Subtitles,
-  Chunk,
-} from "../../../lib/sdk/orbisDB/models/AssetMetadata";
-import JsGoogleTranslateFree from "@kreisler/js-google-translate-free";
-import { getLivepeerAudioToText } from "@/app/api/livepeer/audioToText";
 import Link from "next/link";
 import { updateVideoAsset } from "@/services/video-assets";
 import { useUniversalAccount } from "@/lib/hooks/accountkit/useUniversalAccount";
@@ -34,101 +28,10 @@ const copyToClipboard = (text: string) => {
 interface FileUploadProps {
   onFileSelect: (file: File | null) => void;
   onFileUploaded: (fileUrl: string) => void;
-  onSubtitlesUploaded: (subtitlesUri?: string) => void;
   onPressNext?: (livepeerAsset: any) => void;
   onPressBack?: () => void;
   metadata?: any;
   newAssetTitle?: string;
-}
-
-const translateText = async (
-  text: string,
-  language: string
-): Promise<string> => {
-  try {
-    const baseUrl = process.env.NEXT_PUBLIC_URL || "http://localhost:3000";
-    const res = await fetch(`${baseUrl}/api/livepeer/subtitles/translation`, {
-      method: "POST",
-      body: JSON.stringify({
-        text: text,
-        source: "English",
-        target: language,
-      }),
-    });
-
-    const data = await res.json();
-
-    console.log("Translation response:", data);
-
-    return data.response;
-  } catch (error) {
-    console.error("Translation error:", error);
-    return text; // Fallback to original text if translation fails
-  }
-};
-
-async function translateSubtitles(data: {
-  chunks: Chunk[];
-}): Promise<Subtitles> {
-  const subtitles: Subtitles = {
-    English: data.chunks,
-  };
-
-  const languages = ["Chinese", "German", "Spanish"];
-
-  // Create a single Promise.all for all language translations to reduce nested mapping
-  const translationPromises = languages.map(async (language) => {
-    try {
-      // Skip translation for English
-      if (language === "English") return null;
-      console.log("Translating to:", language);
-      // Perform translations concurrently for each chunk
-      const translatedChunks = await Promise.all(
-        data.chunks.map(async (chunk, i) => {
-          const to =
-            language === "Chinese" ? "zh" : language === "German" ? "de" : "es";
-          const translation = await JsGoogleTranslateFree.translate({
-            to,
-            text: chunk.text,
-          }); // a
-          const arr = {
-            text: translation,
-            timestamp: chunk.timestamp,
-          };
-          console.log("Translated chunk " + i + ":", arr);
-          return arr;
-        })
-      );
-
-      console.log("Translated chunks:", translatedChunks);
-
-      return { [language]: translatedChunks };
-    } catch (error) {
-      console.error("Error translating subtitles:", error);
-      return {};
-    }
-  });
-
-  // Filter out null results and combine translations
-  const translations = await Promise.all(translationPromises);
-  const languageTranslations = translations.filter(Boolean);
-
-  console.log("translations:", translations);
-  console.log("Language translations:", languageTranslations);
-
-  // Merge translations efficiently
-  return languageTranslations
-    .filter(
-      (translation): translation is { [key: string]: Chunk[] } =>
-        translation !== null
-    )
-    .reduce(
-      (acc, curr) => ({
-        ...acc,
-        ...curr,
-      }),
-      subtitles
-    );
 }
 
 async function pollForMetadataUri(
@@ -149,7 +52,6 @@ async function pollForMetadataUri(
 const FileUpload: React.FC<FileUploadProps> = ({
   onFileSelect,
   onFileUploaded,
-  onSubtitlesUploaded,
   onPressNext,
   onPressBack,
   metadata,
@@ -164,8 +66,6 @@ const FileUpload: React.FC<FileUploadProps> = ({
   const [uploadState, setUploadState] = useState<
     "idle" | "loading" | "complete"
   >("idle");
-  const [subtitleProcessingComplete, setSubtitleProcessingComplete] =
-    useState<boolean>(false);
 
   const [livepeerAsset, setLivepeerAsset] = useState<any>();
   const [isPolling, setIsPolling] = useState(false);
@@ -313,53 +213,6 @@ const FileUpload: React.FC<FileUploadProps> = ({
     }
   };
 
-  const handleAudioToText = async () => {
-    if (!livepeerAsset?.id) {
-      console.error("No asset ID available");
-      return;
-    }
-
-    try {
-      const data = await getLivepeerAudioToText(livepeerAsset.id);
-      console.log("Audio to text data:", data);
-
-      if (data?.chunks) {
-        const subtitles = await translateSubtitles(data);
-        console.log("Translated subtitles:", subtitles);
-
-        // Store subtitles in IPFS
-        const subtitlesBlob = new Blob([JSON.stringify(subtitles)], {
-          type: "application/json",
-        });
-        const subtitlesFile = new File([subtitlesBlob], "subtitles.json", {
-          type: "application/json",
-        });
-
-        // Upload to IPFS using Livepeer's API
-        const formData = new FormData();
-        formData.append("file", subtitlesFile);
-
-        const response = await fetch("/api/livepeer/upload", {
-          method: "POST",
-          body: formData,
-        });
-
-        if (!response.ok) {
-          throw new Error("Failed to upload subtitles to IPFS");
-        }
-
-        const { ipfsHash } = await response.json();
-        const subtitlesUri = `ipfs://${ipfsHash}`;
-
-        onSubtitlesUploaded(subtitlesUri);
-        setSubtitleProcessingComplete(true);
-      }
-    } catch (error) {
-      console.error("Error processing audio to text:", error);
-      toast.error("Failed to process audio to text");
-    }
-  };
-
   async function handlePostUploadDbUpdate(assetId: string, dbAssetId: number) {
     setIsPolling(true);
     try {
@@ -425,9 +278,17 @@ const FileUpload: React.FC<FileUploadProps> = ({
                 data-testid="file-upload-input"
                 onChange={handleFileChange}
               />
-              <p className="mt-2 text-xs text-gray-500">
-                Supported formats: MP4, MOV, MKV, WebM, FLV, TS (H.264/H.265 codec recommended). Max size: 5GB
-              </p>
+              <div className="mt-2 space-y-1">
+                <p className="text-xs text-gray-600 font-medium">
+                  📹 Supported formats: MP4, MOV, MKV, WebM, FLV, TS
+                </p>
+                <p className="text-xs text-gray-500">
+                  ✅ <strong>Required codecs:</strong> H.264 or H.265 (HEVC) • Max size: 5GB
+                </p>
+                <p className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded">
+                  ⚠️ <strong>Important:</strong> Your video must use H.264 or H.265 codec. If upload fails, convert your video using <a href="https://handbrake.fr/" target="_blank" rel="noopener noreferrer" className="underline hover:text-amber-800">HandBrake</a> or FFmpeg.
+                </p>
+              </div>
             </div>
 
             {/* Selected File Section */}
@@ -517,32 +378,6 @@ const FileUpload: React.FC<FileUploadProps> = ({
             )}
           </div>
         </div>
-
-        {/* Process Subtitles Button & Status */}
-        {uploadComplete && (
-          <div className="mt-4 flex flex-col items-center gap-2">
-            <Button
-              onClick={handleAudioToText}
-              disabled={uploadState === "loading" || subtitleProcessingComplete}
-              className="w-full max-w-xs text-sm sm:text-base touch-manipulation"
-              style={{ WebkitTapHighlightColor: 'transparent' }}
-            >
-              {subtitleProcessingComplete
-                ? "Subtitles Processed"
-                : "Process Subtitles"}
-            </Button>
-            {subtitleProcessingComplete && (
-              <span className="text-green-600 text-xs sm:text-sm">
-                Subtitles processed and uploaded.
-              </span>
-            )}
-            {!subtitleProcessingComplete && (
-              <span className="text-gray-500 text-xs text-center px-4">
-                You can process subtitles now or skip and continue to the next step.
-              </span>
-            )}
-          </div>
-        )}
 
         {/* Navigation Buttons */}
         <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">

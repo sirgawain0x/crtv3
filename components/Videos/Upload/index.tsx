@@ -37,7 +37,6 @@ const HookMultiStepForm = () => {
 
   const [metadata, setMetadata] = useState<TVideoMetaForm>();
   const [livepeerAsset, setLivepeerAsset] = useState<Asset>();
-  const [subtitlesUri, setSubtitlesUri] = useState<string>();
   const [thumbnailUri, setThumbnailUri] = useState<string>();
   const [dbAssetId, setDbAssetId] = useState<number | null>(null);
   const [videoAsset, setVideoAsset] = useState<VideoAsset | null>(null);
@@ -78,23 +77,38 @@ const HookMultiStepForm = () => {
           <AlertDescription>{errors.root?.formError?.message}</AlertDescription>
         </Alert>
       )}
-      <div className={activeStep === 1 ? "block" : "hidden"}>
+      
+      {/* Step 1: Create Info */}
+      {activeStep === 1 && (
         <CreateInfo onPressNext={handleCreateInfoSubmit} />
-      </div>
-      <div className={activeStep === 2 ? "block" : "hidden"}>
+      )}
+      
+      {/* Step 2: File Upload */}
+      {activeStep === 2 && (
         <FileUpload
           newAssetTitle={metadata?.title}
           metadata={metadata}
           onFileSelect={(file) => {}}
           onFileUploaded={(videoUrl: string) => {}}
-          onSubtitlesUploaded={(subtitlesUri?: string) => {
-            setSubtitlesUri(subtitlesUri);
-          }}
           onPressBack={() =>
             setActiveStep((prevActiveStep) => prevActiveStep - 1)
           }
           onPressNext={(livepeerAsset: any) => {
+            console.log('🎬 FileUpload onPressNext called with asset:', {
+              id: livepeerAsset?.id,
+              playbackId: livepeerAsset?.playbackId,
+              hasAsset: !!livepeerAsset,
+            });
+
+            if (!livepeerAsset || !livepeerAsset.id) {
+              console.error('❌ No valid livepeerAsset provided to onPressNext');
+              toast.error("Failed to upload video. Please try again.");
+              return;
+            }
+
+            // Set the asset FIRST
             setLivepeerAsset(livepeerAsset);
+            
             // Create the video asset in the database and store its ID
             createVideoAsset({
               title: metadata?.title || "",
@@ -123,15 +137,21 @@ const HookMultiStepForm = () => {
               requires_metoken: false,
               metoken_price: null,
             }).then((dbAsset) => {
+              console.log('✅ Video asset created in DB:', dbAsset);
               setVideoAsset(dbAsset as VideoAsset);
               setActiveStep((prevActiveStep) => prevActiveStep + 1);
+            }).catch((error) => {
+              console.error('❌ Failed to create video asset in DB:', error);
+              toast.error("Failed to save video data. Please try again.");
             });
           }}
         />
-      </div>
-      <div className={activeStep === 3 ? "block" : "hidden"}>
+      )}
+      
+      {/* Step 3: Create Thumbnail - Only render when we reach this step */}
+      {activeStep === 3 && livepeerAsset?.id && (
         <CreateThumbnailWrapper
-          livePeerAssetId={livepeerAsset?.id}
+          livePeerAssetId={livepeerAsset.id}
           thumbnailUri={thumbnailUri}
           onComplete={async (data: {
             thumbnailUri: string;
@@ -192,7 +212,7 @@ const HookMultiStepForm = () => {
             }
           }}
         />
-      </div>
+      )}
     </>
   );
 };

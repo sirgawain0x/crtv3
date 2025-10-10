@@ -20,6 +20,7 @@ import VideoViewMetrics from "./VideoViewMetrics";
 import { useVideo } from "@/context/VideoContext";
 import { useEffect, useRef, useState } from "react";
 import { getVideoAssetByPlaybackId } from "@/services/video-assets";
+import VideoThumbnail from './VideoThumbnail';
 
 interface VideoCardProps {
   asset: Asset;
@@ -100,7 +101,8 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
             </div>
           </CardHeader>
         </div>
-        <Player
+        <VideoThumbnail
+          playbackId={asset.playbackId!}
           src={playbackSources}
           assetId={asset?.id}
           title={asset?.name}
