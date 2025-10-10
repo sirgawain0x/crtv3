@@ -36,9 +36,7 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
 
   // Update local state when hook data changes
   useEffect(() => {
-    if (hookMeToken) {
-      setUserMeToken(hookMeToken);
-    }
+    setUserMeToken(hookMeToken || null);
   }, [hookMeToken]);
 
   // Reset to overview tab when MeToken is created
@@ -292,7 +290,11 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Price</p>
                     <p className="text-2xl font-bold">
-                      ${(userMeToken.tvl / (parseFloat(userMeToken.totalSupply.toString()) / 1e18)).toFixed(4)}
+                      {
+                        (parseFloat(userMeToken.totalSupply.toString()) > 0)
+                          ? `$${(userMeToken.tvl / (parseFloat(userMeToken.totalSupply.toString()) / 1e18)).toFixed(4)}`
+                          : '-'
+                      }
                     </p>
                   </div>
                 </div>

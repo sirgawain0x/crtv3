@@ -175,7 +175,7 @@ SelectSeparator.displayName = SelectPrimitive.Separator.displayName;
 
 function ChainSelect({ className }: { className?: string }) {
   const { chain, setChain, isSettingChain } = useChain();
-  const supportedChains = [base, optimism];
+  const supportedChains = [base];
 
   function handleChange(chainId: string) {
     const selected = supportedChains.find((c) => c.id.toString() === chainId);

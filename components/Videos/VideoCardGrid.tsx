@@ -1,25 +1,44 @@
 "use client";
 import React, { useEffect, useState, useCallback } from "react";
 import { Asset } from "livepeer/models/components";
-import { fetchAllAssets } from "@/app/api/livepeer/actions";
 import VideoCard from "@/components/Videos/VideoCard";
 import { Src } from "@livepeer/react";
 import { getDetailPlaybackSource } from "@/lib/hooks/livepeer/useDetailPlaybackSources";
 import { VideoCardSkeleton } from "./VideoCardSkeleton";
 import { Pagination } from "@/components/ui/pagination";
-import { fetchVideoAssetByPlaybackId } from "@/lib/utils/video-assets-client";
+import { fetchPublishedVideos } from "@/lib/utils/published-videos-client";
+import type { VideoAsset } from "@/lib/types/video-asset";
 
 const ITEMS_PER_PAGE = 12; // Number of videos per page
 
-const VideoCardGrid: React.FC = () => {
+interface VideoCardGridProps {
+  searchQuery?: string;
+  category?: string;
+  creatorId?: string;
+  orderBy?: 'created_at' | 'views_count' | 'likes_count' | 'updated_at';
+}
+
+const VideoCardGrid: React.FC<VideoCardGridProps> = ({ 
+  searchQuery, 
+  category, 
+  creatorId,
+  orderBy = 'created_at'
+}) => {
   const [playbackSources, setPlaybackSources] = useState<
-    (Asset & { detailedSrc: Src[] | null })[] | null
+    (VideoAsset & { 
+      detailedSrc: Src[] | null;
+      id: string;
+      playbackId: string;
+      name: string;
+      status: { phase: "ready" };
+      creatorId: { value: string };
+      createdAt: Date;
+    })[] | null
   >(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [totalAssets, setTotalAssets] = useState<number>(0);
-  const [totalPublishedAssets, setTotalPublishedAssets] = useState<number>(0);
   const [hasNextPage, setHasNextPage] = useState<boolean>(false);
 
   const fetchSources = useCallback(async (page: number) => {
@@ -29,31 +48,6 @@ const VideoCardGrid: React.FC = () => {
 
       // Calculate offset based on current page
       const offset = (page - 1) * ITEMS_PER_PAGE;
-
-      // Function to fetch assets with retries
-      const fetchAssetsWithRetry = async (
-        retries = 3
-      ): Promise<{ data: Asset[]; total: number }> => {
-        try {
-          const response = await fetchAllAssets({
-            limit: ITEMS_PER_PAGE,
-            offset,
-          });
-          if (!response || !Array.isArray(response.data)) {
-            throw new Error("Invalid response format");
-          }
-          return response;
-        } catch (err) {
-          if (retries > 0) {
-            console.warn(
-              `Retrying asset fetch. Attempts remaining: ${retries - 1}`
-            );
-            await new Promise((resolve) => setTimeout(resolve, 1000));
-            return fetchAssetsWithRetry(retries - 1);
-          }
-          throw err;
-        }
-      };
 
       // Function to fetch playback source with retries
       const fetchPlaybackSourceWithRetry = async (
@@ -81,68 +75,75 @@ const VideoCardGrid: React.FC = () => {
         }
       };
 
-      // Fetch assets with pagination
-      const { data: assets, total } = await fetchAssetsWithRetry();
+      // 1. Fetch published videos from Supabase (single efficient query!)
+      const { data: videos, total, hasMore } = await fetchPublishedVideos({
+        limit: ITEMS_PER_PAGE,
+        offset,
+        orderBy,
+        order: 'desc',
+        creatorId,
+        category,
+        search: searchQuery,
+      });
+
       
-      // Update total assets state
+      // Update total and pagination state
       setTotalAssets(total);
+      setHasNextPage(hasMore);
 
-      // Only process assets that are ready for playback AND published in database
-      const readyAndPublishedAssets = await Promise.all(
-        assets
-          .filter((asset) => asset.status?.phase === "ready" && asset.playbackId)
-          .map(async (asset) => {
-            // Check database status
-            try {
-              const dbAsset = await fetchVideoAssetByPlaybackId(asset.playbackId!);
-              return dbAsset?.status === "published" ? asset : null;
-            } catch (error) {
-              console.error(`Failed to fetch DB status for ${asset.playbackId}:`, error);
-              return null;
-            }
-          })
-      );
+      if (videos.length === 0 && currentPage === 1) {
+        setError(searchQuery ? "No videos found matching your search." : "No videos available at the moment.");
+        setPlaybackSources([]);
+        return;
+      }
 
-      // Filter out null values (non-published videos)
-      const publishedAssets = readyAndPublishedAssets.filter(Boolean) as Asset[];
-      
-      // Update published assets count and pagination state
-      setTotalPublishedAssets(publishedAssets.length);
-      setHasNextPage((page * ITEMS_PER_PAGE) < total);
-
-      // Fetch detailed playback sources for each published asset
-      const detailedPlaybackSources = await Promise.all(
-        publishedAssets.map(async (asset: Asset) => {
-          const detailedSrc = await fetchPlaybackSourceWithRetry(
-            asset.playbackId!
-          );
-          return { ...asset, detailedSrc };
+      // 2. Fetch playback sources from Livepeer only for the videos we need
+      const videosWithPlayback = await Promise.all(
+        videos.map(async (video) => {
+          const detailedSrc = await fetchPlaybackSourceWithRetry(video.playback_id);
+          return {
+            ...video,
+            // Map to Asset-like structure for compatibility with VideoCard
+            id: video.asset_id,
+            playbackId: video.playback_id,
+            name: video.title,
+            // Add required Asset fields for VideoCard compatibility
+            status: {
+              phase: "ready" as const,
+            },
+            creatorId: {
+              value: video.creator_id,
+            },
+            createdAt: video.created_at,
+            detailedSrc,
+          };
         })
       );
 
-      // Filter out assets with failed playback sources
-      const validPlaybackSources = detailedPlaybackSources.filter(
-        (source) => source.detailedSrc !== null
+      // Filter out videos with failed playback sources
+      const validPlaybackSources = videosWithPlayback.filter(
+        (video) => video.detailedSrc !== null
       );
 
-      console.log(
-        "[VideoCardGrid] Valid playback sources:",
-        validPlaybackSources
-      );
 
       if (validPlaybackSources.length === 0 && currentPage === 1) {
-        setError("No valid videos available at the moment.");
+        setError("Unable to load video playback. Please try again later.");
         return;
       }
 
       setPlaybackSources(validPlaybackSources);
     } catch (err) {
-      console.error("Error fetching playback sources:", err);
+      console.error("Error fetching videos:", err);
       setError("Failed to load videos. Please try again later.");
     } finally {
       setLoading(false);
     }
-  }, [currentPage]);
+  }, [currentPage, searchQuery, category, creatorId, orderBy]);
+
+  // Reset to page 1 when search/filter parameters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, category, creatorId, orderBy]);
 
   useEffect(() => {
     fetchSources(currentPage);
@@ -169,15 +170,16 @@ const VideoCardGrid: React.FC = () => {
   // Helper function to determine if pagination should be shown
   const shouldShowPagination = useCallback(() => {
     // Show pagination if:
-    // 1. We have more than one page worth of published assets, OR
-    // 2. We're on a page > 1 (to allow navigation back)
-    return totalPublishedAssets > ITEMS_PER_PAGE || currentPage > 1;
-  }, [totalPublishedAssets, currentPage]);
+    // 1. We have more than one page worth of assets, OR
+    // 2. We're on a page > 1 (to allow navigation back), OR
+    // 3. There's a next page available
+    return totalAssets > ITEMS_PER_PAGE || currentPage > 1 || hasNextPage;
+  }, [totalAssets, currentPage, hasNextPage]);
 
   if (loading) {
     return (
       <div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-1 sm:gap-4 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           {Array.from({ length: ITEMS_PER_PAGE }).map((_, index) => (
             <VideoCardSkeleton key={index} />
           ))}
@@ -234,12 +236,12 @@ const VideoCardGrid: React.FC = () => {
 
   return (
     <div>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-        {playbackSources.map((asset) => (
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-1 sm:gap-4 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+        {playbackSources.map((video) => (
           <VideoCard
-            key={asset.id}
-            asset={asset}
-            playbackSources={asset.detailedSrc}
+            key={video.id}
+            asset={video as any} // Type assertion needed due to Asset interface mismatch
+            playbackSources={video.detailedSrc}
           />
         ))}
       </div>

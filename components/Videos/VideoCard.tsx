@@ -18,6 +18,7 @@ import { Src } from "@livepeer/react";
 import makeBlockie from "ethereum-blockies-base64";
 import VideoViewMetrics from "./VideoViewMetrics";
 import { useVideo } from "@/context/VideoContext";
+import { fetchAllViews } from "@/app/api/livepeer/views";
 import { useEffect, useRef, useState } from "react";
 import { fetchVideoAssetByPlaybackId } from "@/lib/utils/video-assets-client";
 import VideoThumbnail from './VideoThumbnail';
@@ -31,6 +32,7 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
   const { currentPlayingId, setCurrentPlayingId } = useVideo();
   const [dbStatus, setDbStatus] = useState<"draft" | "published" | "minted" | "archived" | null>(null);
   const playerRef = useRef<HTMLDivElement>(null);
+
 
   const handlePlay = () => {
     try {
@@ -58,6 +60,53 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
     fetchStatus();
   }, [asset?.playbackId]);
 
+  // Smart rate-limited view count syncing from Livepeer to database
+  useEffect(() => {
+    async function syncViewCount() {
+      if (!asset?.playbackId || dbStatus !== 'published') return;
+      
+      // Check last sync time from localStorage to avoid excessive API calls
+      const lastSyncKey = `view-sync-${asset.playbackId}`;
+      const lastSyncStr = localStorage.getItem(lastSyncKey);
+      const now = Date.now();
+      
+      // Only sync if more than 1 hour has passed since last sync for this video
+      if (lastSyncStr) {
+        const lastSync = parseInt(lastSyncStr);
+        const hoursSinceSync = (now - lastSync) / (1000 * 60 * 60);
+        if (hoursSinceSync < 1) {
+          return; // Skip sync, too soon
+        }
+      }
+      
+      try {
+        const metrics = await fetchAllViews(asset.playbackId);
+        if (metrics && (metrics.viewCount > 0 || metrics.legacyViewCount > 0)) {
+          // Call API to update database
+          await fetch(`/api/video-assets/sync-views/${asset.playbackId}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ 
+              viewCount: metrics.viewCount + metrics.legacyViewCount 
+            })
+          });
+          
+          // Update last sync time in localStorage
+          localStorage.setItem(lastSyncKey, now.toString());
+        }
+      } catch (error) {
+        console.error('Failed to sync view count:', error);
+      }
+    }
+    
+    // Only sync if the video is published
+    if (dbStatus === 'published') {
+      syncViewCount();
+    }
+  }, [asset?.playbackId, dbStatus]);
+
   // Early return if asset is not provided or invalid
   if (!asset) {
     console.warn("VideoCard: No asset provided");
@@ -74,7 +123,7 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
 
   const address = asset.creatorId?.value as string;
   if (!address) {
-    console.warn(`VideoCard: No creator address for asset ${asset.id}`);
+    console.warn(`VideoCard: No creator address for asset ${asset.id}`, asset);
     return null;
   }
 
@@ -84,8 +133,8 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
   };
 
   return (
-    <div className="mx-auto" ref={playerRef}>
-      <Card key={asset?.id} className={cn("w-[360px] overflow-hidden")}>
+    <div className="w-full" ref={playerRef}>
+      <Card key={asset?.id} className={cn("w-full max-w-[360px] mx-auto overflow-hidden")}>
         <div className="mx-auto flex-1 flex-wrap">
           <CardHeader>
             <div className="flex items-center space-x-2">
