@@ -136,6 +136,8 @@ const HookMultiStepForm = () => {
               attributes: null,
               requires_metoken: false,
               metoken_price: null,
+              subtitles_uri: null,
+              subtitles: null,
             }).then((dbAsset) => {
               console.log('✅ Video asset created in DB:', dbAsset);
               setVideoAsset(dbAsset as VideoAsset);

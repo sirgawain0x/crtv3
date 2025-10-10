@@ -6,24 +6,26 @@ import {
   NewAssetPayload,
 } from "livepeer/models/components";
 
-// FETCH ALL ASSETS with pagination
+// FETCH ALL ASSETS
 export const fetchAllAssets = async (options?: {
   limit?: number;
-  cursor?: string;
-}): Promise<{ data: Asset[]; cursor?: string }> => {
+  offset?: number;
+}): Promise<{ data: Asset[]; total: number }> => {
   try {
     const limit = options?.limit || 20; // Default to 20 items per page
-    const cursor = options?.cursor;
+    const offset = options?.offset || 0;
     
-    // The Livepeer SDK's getAll() method supports pagination
-    const response = await fullLivepeer.asset.getAll({
-      limit,
-      cursor,
-    });
+    // The Livepeer SDK's getAll() method retrieves all assets
+    const response = await fullLivepeer.asset.getAll();
+    
+    const allAssets = (response.data as Asset[]) || [];
+    
+    // Implement client-side pagination
+    const paginatedData = allAssets.slice(offset, offset + limit);
     
     return {
-      data: response.data as Asset[],
-      cursor: response.page?.nextCursor,
+      data: paginatedData,
+      total: allAssets.length,
     };
   } catch (error) {
     console.error("Error fetching assets:", error);

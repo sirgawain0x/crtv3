@@ -17,23 +17,25 @@ const VideoCardGrid: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const [cursors, setCursors] = useState<(string | undefined)[]>([undefined]); // Stack of cursors for navigation (index = page - 1)
-  const [nextCursor, setNextCursor] = useState<string | undefined>();
+  const [totalAssets, setTotalAssets] = useState<number>(0);
   const [hasNextPage, setHasNextPage] = useState<boolean>(false);
 
-  const fetchSources = useCallback(async (cursor?: string) => {
+  const fetchSources = useCallback(async (page: number) => {
     try {
       setLoading(true);
       setError(null);
 
+      // Calculate offset based on current page
+      const offset = (page - 1) * ITEMS_PER_PAGE;
+
       // Function to fetch assets with retries
       const fetchAssetsWithRetry = async (
         retries = 3
-      ): Promise<{ data: Asset[]; cursor?: string }> => {
+      ): Promise<{ data: Asset[]; total: number }> => {
         try {
           const response = await fetchAllAssets({
             limit: ITEMS_PER_PAGE,
-            cursor,
+            offset,
           });
           if (!response || !Array.isArray(response.data)) {
             throw new Error("Invalid response format");
@@ -78,11 +80,11 @@ const VideoCardGrid: React.FC = () => {
       };
 
       // Fetch assets with pagination
-      const { data: assets, cursor: newNextCursor } = await fetchAssetsWithRetry();
+      const { data: assets, total } = await fetchAssetsWithRetry();
       
       // Update pagination state
-      setNextCursor(newNextCursor);
-      setHasNextPage(!!newNextCursor);
+      setTotalAssets(total);
+      setHasNextPage((page * ITEMS_PER_PAGE) < total);
 
       // Only process assets that are ready for playback
       const readyAssets = assets.filter(
@@ -124,38 +126,26 @@ const VideoCardGrid: React.FC = () => {
   }, [currentPage]);
 
   useEffect(() => {
-    fetchSources();
-  }, [fetchSources]);
+    fetchSources(currentPage);
+  }, [currentPage, fetchSources]);
 
   const handleNextPage = useCallback(() => {
-    if (!hasNextPage || loading || !nextCursor) return;
+    if (!hasNextPage || loading) return;
     
-    // Store the cursor for the next page
-    setCursors([...cursors, nextCursor]);
     setCurrentPage((prev) => prev + 1);
-    
-    // Fetch next page using the next cursor
-    fetchSources(nextCursor);
     
     // Scroll to top
     window.scrollTo({ top: 0, behavior: "smooth" });
-  }, [hasNextPage, loading, nextCursor, cursors, fetchSources]);
+  }, [hasNextPage, loading]);
 
   const handlePrevPage = useCallback(() => {
     if (currentPage === 1 || loading) return;
     
-    // Remove last cursor from the stack
-    const newCursors = cursors.slice(0, -1);
-    setCursors(newCursors);
     setCurrentPage((prev) => prev - 1);
-    
-    // Fetch previous page using the cursor at the new position
-    const prevCursor = newCursors[newCursors.length - 1];
-    fetchSources(prevCursor);
     
     // Scroll to top
     window.scrollTo({ top: 0, behavior: "smooth" });
-  }, [currentPage, loading, cursors, fetchSources]);
+  }, [currentPage, loading]);
 
   if (loading) {
     return (
