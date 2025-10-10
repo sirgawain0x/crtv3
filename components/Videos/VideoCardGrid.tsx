@@ -125,7 +125,7 @@ const VideoCardGrid: React.FC = () => {
 
   useEffect(() => {
     fetchSources();
-  }, []);
+  }, [fetchSources]);
 
   const handleNextPage = useCallback(() => {
     if (!hasNextPage || loading || !nextCursor) return;

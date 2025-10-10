@@ -237,7 +237,7 @@ export default function CreateThumbnail({
                   </ol>
                   <div className="mt-3 p-3 bg-blue-50 rounded border border-blue-200">
                     <p className="text-xs text-blue-800">
-                      💡 <strong>Quick HandBrake settings:</strong> Use the "Fast 1080p30" preset with H.264 codec
+                      💡 <strong>Quick HandBrake settings:</strong> Use the &quot;Fast 1080p30&quot; preset with H.264 codec
                     </p>
                   </div>
                 </div>

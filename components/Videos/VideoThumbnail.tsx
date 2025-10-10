@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect } from 'react';
+import Image from 'next/image';
 import { getThumbnailUrl } from '@/lib/utils/thumbnail';
 import { getVideoAssetByPlaybackId } from '@/services/video-assets';
 import { Player } from '@/components/Player/Player';
@@ -84,11 +85,13 @@ const VideoThumbnail: React.FC<VideoThumbnailProps> = ({
       className={`relative aspect-video cursor-pointer group ${className}`}
       onClick={handleThumbnailClick}
     >
-      <img
+      <Image
         src={thumbnailUrl}
         alt={title}
-        className="w-full h-full object-cover rounded-lg"
+        fill
+        className="object-cover rounded-lg"
         loading="lazy"
+        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
       />
       
       {/* Play button overlay */}
