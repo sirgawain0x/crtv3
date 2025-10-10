@@ -659,40 +659,48 @@ export function AccountDropdown() {
               Purchase crypto directly to your wallet.
             </p>
             <div className="flex flex-col gap-4">
-              <WertFundButton />
+              <WertFundButton onClose={() => setIsDialogOpen(false)} />
             </div>
           </div>
         );
       case "send":
         return (
           <div className="space-y-4">
-            <p className="text-sm text-gray-500">
-              Send ETH, USDC, or DAI to another wallet address.
-            </p>
             <div className="flex flex-col gap-4">
               {/* Token Selection */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Token</label>
-                <div className="flex items-center space-x-2 p-2 border rounded dark:bg-gray-700 dark:border-gray-600">
-                  <Image
-                    src={`/images/tokens/${selectedToken.toLowerCase()}-logo.svg`}
-                    alt={selectedToken}
-                    width={20}
-                    height={20}
-                    className="w-5 h-5"
-                  />
-                  <select
-                    className="w-full bg-transparent border-none outline-none dark:text-white"
-                    value={selectedToken}
-                    onChange={(e) => setSelectedToken(e.target.value as TokenSymbol)}
-                  >
-                    <option value="ETH">ETH</option>
-                    <option value="USDC">USDC</option>
-                    <option value="DAI">DAI</option>
-                  </select>
+              <div className="space-y-3">
+                <label className="text-sm font-medium text-gray-900 dark:text-gray-100">Token</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['ETH', 'USDC', 'DAI'] as TokenSymbol[]).map((token) => (
+                    <button
+                      key={token}
+                      type="button"
+                      onClick={() => setSelectedToken(token)}
+                      className={`flex items-center justify-center space-x-2 p-3 border rounded-lg transition-colors ${
+                        selectedToken === token
+                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-400'
+                          : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
+                      }`}
+                    >
+                      <Image
+                        src={`/images/tokens/${token.toLowerCase()}-logo.svg`}
+                        alt={token}
+                        width={20}
+                        height={20}
+                        className="w-5 h-5 flex-shrink-0"
+                      />
+                      <span className={`text-sm font-medium ${
+                        selectedToken === token
+                          ? 'text-blue-700 dark:text-blue-300'
+                          : 'text-gray-900 dark:text-gray-100'
+                      }`}>
+                        {token}
+                      </span>
+                    </button>
+                  ))}
                 </div>
-                <div className="flex justify-between text-xs text-gray-500">
-                  <div className="flex items-center space-x-1">
+                <div className="flex justify-between items-center text-xs text-gray-500 dark:text-gray-400">
+                  <div className="flex items-center space-x-2">
                     <Image
                       src={`/images/tokens/${selectedToken.toLowerCase()}-logo.svg`}
                       alt={selectedToken}
@@ -705,7 +713,7 @@ export function AccountDropdown() {
                   <button
                     type="button"
                     onClick={() => setSendAmount(tokenBalances[selectedToken])}
-                    className="text-blue-600 hover:text-blue-700 dark:text-blue-400"
+                    className="text-blue-600 hover:text-blue-700 dark:text-blue-400 font-medium px-2 py-1 rounded text-xs"
                   >
                     MAX
                   </button>
@@ -713,51 +721,61 @@ export function AccountDropdown() {
               </div>
 
               {/* Recipient Address */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Recipient Address</label>
+              <div className="space-y-3">
+                <label className="text-sm font-medium text-gray-900 dark:text-gray-100">Recipient Address</label>
                 <input
                   type="text"
                   placeholder="0x..."
-                  className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
+                  className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 bg-white border-gray-200 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
                   value={recipientAddress}
                   onChange={(e) => setRecipientAddress(e.target.value)}
                 />
               </div>
 
               {/* Amount */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Amount ({selectedToken})</label>
+              <div className="space-y-3">
+                <label className="text-sm font-medium text-gray-900 dark:text-gray-100">Amount ({selectedToken})</label>
                 <input
                   type="number"
                   placeholder="0.0"
                   step="any"
-                  className="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600"
+                  className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 bg-white border-gray-200 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
                   value={sendAmount}
                   onChange={(e) => setSendAmount(e.target.value)}
                 />
               </div>
 
-              <Button
-                className="w-full"
-                onClick={handleSend}
-                disabled={
-                  isSending ||
-                  !recipientAddress ||
-                  !sendAmount
-                }
-              >
-                {isSending ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Sending {selectedToken}...
-                  </>
-                ) : (
-                  <>
-                    <Send className="mr-2 h-4 w-4" />
-                    Send {selectedToken}
-                  </>
-                )}
-              </Button>
+              {/* Action Buttons */}
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                <Button
+                  variant="outline"
+                  className="w-full sm:w-auto sm:order-2"
+                  onClick={() => setIsDialogOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  className="w-full sm:flex-1 sm:order-1"
+                  onClick={handleSend}
+                  disabled={
+                    isSending ||
+                    !recipientAddress ||
+                    !sendAmount
+                  }
+                >
+                  {isSending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Sending {selectedToken}...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="mr-2 h-4 w-4" />
+                      Send {selectedToken}
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
         );
@@ -1197,7 +1215,7 @@ export function AccountDropdown() {
                         <span className="text-xs">Live</span>
                       </Button>
                     </Link>
-                    <Link href="/clips" className="w-full">
+                    <Link href="https://create.creativeplatform.xyz" className="w-full">
                       <Button
                         variant="outline"
                         size="sm"
@@ -1206,7 +1224,7 @@ export function AccountDropdown() {
                         onClick={() => setIsDropdownOpen(false)}
                       >
                         <Bot className="h-3 w-3 mb-1" />
-                        <span className="text-xs">Daydream</span>
+                        <span className="text-xs">Pixels</span>
                         <span className="absolute -top-1 -right-1 px-1 py-0.5 rounded bg-blue-500 text-white text-[8px]">
                           Beta
                         </span>
@@ -1293,23 +1311,23 @@ export function AccountDropdown() {
           }
         }}
       >
-        <DialogContent className="sm:max-w-[425px] w-[95%] md:w-auto">
-          <DialogHeader>
-            <DialogTitle>
+        <DialogContent className="sm:max-w-[425px] w-[95%] md:w-auto max-h-[90vh] overflow-hidden">
+          <DialogHeader className="pb-4 pr-12">
+            <DialogTitle className="text-lg sm:text-xl">
               {dialogAction.charAt(0).toUpperCase() + dialogAction.slice(1)}
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-sm">
               {dialogAction === "buy" &&
                 "Purchase cryptocurrency directly to your wallet using your preferred payment method."}
               {dialogAction === "send" &&
-                "Transfer cryptocurrency to another wallet address securely."}
+                "Send crypto to another address."}
               {dialogAction === "swap" &&
                 "Exchange one cryptocurrency for another at the best available rates."}
             </DialogDescription>
             <DialogClose asChild className="absolute right-4 top-4" />
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="space-y-4 max-h-[70vh] overflow-y-auto">
+          <div className="flex flex-col overflow-hidden">
+            <div className="space-y-4 overflow-y-auto flex-1 pr-2">
               {getDialogContent()}
             </div>
           </div>

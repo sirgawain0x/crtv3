@@ -12,7 +12,11 @@ import { useUser, useSmartAccountClient } from "@account-kit/react";
   please refer to https://www.npmjs.com/package/@wert-io/module-react-component
 */
 
-function WertFundButton() {
+interface WertFundButtonProps {
+  onClose?: () => void;
+}
+
+function WertFundButton({ onClose }: WertFundButtonProps) {
   const wertWidgetRef = useRef<any>(null);
   const user = useUser();
   const { address } = useSmartAccountClient({});
@@ -71,7 +75,10 @@ function WertFundButton() {
           },
         ]),
         listeners: {
-          loaded: () => {},
+          loaded: () => {
+            // Close the dialog when the Wert widget is loaded
+            onClose?.();
+          },
           close: () => {},
           "payment-status": (data: any) => {},
         },
@@ -89,7 +96,7 @@ function WertFundButton() {
 
   return (
     <div className="flex flex-col gap-2">
-      <Button onClick={handleDeposit} disabled={loading}>
+      <Button onClick={handleDeposit} disabled={loading} className="w-full mb-4">
         {loading ? "Loading..." : "Deposit Funds"}
       </Button>
       {error && <span className="text-red-500 text-sm">{error}</span>}

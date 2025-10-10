@@ -1,3 +1,6 @@
+// Import subtitle types from OrbisDB models (we reuse these types)
+import type { Subtitles } from "@/lib/sdk/orbisDB/models/AssetMetadata";
+
 export interface VideoAsset {
   id: number;
   title: string;
@@ -23,6 +26,11 @@ export interface VideoAsset {
   current_supply: number;
   metadata_uri: string | null;
   attributes: Record<string, any> | null;
+  requires_metoken: boolean;
+  metoken_price: number | null;
+  // Subtitle fields (matching OrbisDB implementation)
+  subtitles_uri: string | null;  // IPFS URI for decentralized storage
+  subtitles: Subtitles | null;    // Cached JSONB data for fast access
   created_at: Date;
   updated_at: Date;
 }

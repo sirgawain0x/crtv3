@@ -2,13 +2,16 @@
 // services/video-assets.ts
 
 import { createClient } from "@/lib/sdk/supabase/server";
+import { createServiceClient } from "@/lib/sdk/supabase/service";
 import type { VideoAsset } from "@/lib/types/video-asset";
 import { fullLivepeer } from "@/lib/sdk/livepeer/fullClient";
 
 export async function createVideoAsset(
   data: Omit<VideoAsset, "id" | "created_at" | "updated_at">
 ) {
-  const supabase = await createClient();
+  // Use service client to bypass RLS since we're using smart account addresses
+  // which don't match Supabase JWT authentication
+  const supabase = createServiceClient();
   
   const { data: result, error } = await supabase
     .from('video_assets')
@@ -36,6 +39,8 @@ export async function createVideoAsset(
       current_supply: data.current_supply || 0,
       metadata_uri: data.metadata_uri,
       attributes: data.attributes,
+      requires_metoken: data.requires_metoken || false,
+      metoken_price: data.metoken_price || null,
     })
     .select()
     .single();
@@ -68,7 +73,7 @@ export async function getVideoAssetByPlaybackId(playbackId: string) {
   
   const { data: result, error } = await supabase
     .from('video_assets')
-    .select('id, status')
+    .select('id, status, thumbnail_url')
     .eq('playback_id', playbackId)
     .maybeSingle(); // Use maybeSingle() instead of single()
 
@@ -110,7 +115,8 @@ export async function updateVideoAssetMintingStatus(
     mint_transaction_hash: string;
   }
 ) {
-  const supabase = await createClient();
+  // Use service client to bypass RLS
+  const supabase = createServiceClient();
   
   const { data: result, error } = await supabase
     .from('video_assets')
@@ -139,25 +145,46 @@ export async function updateVideoAsset(
   data: {
     thumbnailUri: string;
     status: string;
-    max_supply: number | null;
-    price: number | null;
-    royalty_percentage: number | null;
+    max_supply?: number | null;
+    price?: number | null;
+    royalty_percentage?: number | null;
     metadata_uri?: string | null;
+    requires_metoken?: boolean;
+    metoken_price?: number | null;
   }
 ) {
-  const supabase = await createClient();
+  // Use service client to bypass RLS
+  const supabase = createServiceClient();
+  
+  const updateData: any = {
+    thumbnail_url: data.thumbnailUri,
+    status: data.status,
+    updated_at: new Date().toISOString(),
+  };
+
+  // Only include fields if they are provided
+  if (data.max_supply !== undefined) {
+    updateData.max_supply = data.max_supply;
+  }
+  if (data.price !== undefined) {
+    updateData.price = data.price;
+  }
+  if (data.royalty_percentage !== undefined) {
+    updateData.royalty_percentage = data.royalty_percentage;
+  }
+  if (data.metadata_uri !== undefined) {
+    updateData.metadata_uri = data.metadata_uri;
+  }
+  if (data.requires_metoken !== undefined) {
+    updateData.requires_metoken = data.requires_metoken;
+  }
+  if (data.metoken_price !== undefined) {
+    updateData.metoken_price = data.metoken_price;
+  }
   
   const { data: result, error } = await supabase
     .from('video_assets')
-    .update({
-      thumbnail_url: data.thumbnailUri,
-      status: data.status,
-      max_supply: data.max_supply,
-      price: data.price,
-      royalty_percentage: data.royalty_percentage,
-      metadata_uri: data.metadata_uri,
-      updated_at: new Date().toISOString(),
-    })
+    .update(updateData)
     .eq('id', id)
     .select()
     .single();
