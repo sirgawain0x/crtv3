@@ -825,6 +825,66 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
     }
   };
 
+  // Ensure DAI approval for the meTokens vault
+  const ensureDaiApproval = async (meTokenAddress: string, collateralAmount: string) => {
+    if (!client || !address) throw new Error('Client or address not available');
+
+    try {
+      // Get the vault address from the meToken info
+      const meTokenInfo = await client.readContract({
+        address: DIAMOND,
+        abi: METOKEN_ABI,
+        functionName: 'getMeTokenInfo',
+        args: [meTokenAddress as `0x${string}`],
+      });
+
+      const hubId = (meTokenInfo as any).hubId;
+      
+      // Get hub info to find the vault address
+      const hubInfo = await client.readContract({
+        address: DIAMOND,
+        abi: METOKEN_ABI,
+        functionName: 'getHubInfo',
+        args: [hubId],
+      });
+
+      const vaultAddress = (hubInfo as any).vault;
+      const daiContract = getDaiTokenContract('base');
+      
+      // Check current allowance
+      const currentAllowance = await client.readContract({
+        address: daiContract.address as `0x${string}`,
+        abi: daiContract.abi,
+        functionName: 'allowance',
+        args: [address as `0x${string}`, vaultAddress as `0x${string}`],
+      });
+
+      const requiredAmount = parseEther(collateralAmount);
+      
+      // If allowance is insufficient, approve the vault to spend DAI
+      if (currentAllowance < requiredAmount) {
+        const operation = await client.sendUserOperation({
+          uo: {
+            target: daiContract.address as `0x${string}`,
+            data: encodeFunctionData({
+              abi: daiContract.abi,
+              functionName: 'approve',
+              args: [vaultAddress as `0x${string}`, BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff')], // Max approval
+            }),
+            value: BigInt(0),
+          },
+        });
+
+        await client.waitForUserOperationTransaction({
+          hash: operation.hash,
+        });
+      }
+    } catch (err) {
+      console.error('Failed to ensure DAI approval:', err);
+      throw new Error('Failed to approve DAI spending');
+    }
+  };
+
   // Sell MeTokens
   const sellMeTokens = async (meTokenAddress: string, meTokenAmount: string) => {
     if (!address || !user) throw new Error('No wallet connected');

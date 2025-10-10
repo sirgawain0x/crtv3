@@ -39,7 +39,7 @@ import {
 import type { User as AccountUser } from "@account-kit/signer";
 import useModularAccount from "@/lib/hooks/accountkit/useModularAccount";
 import { createPublicClient, http } from "viem";
-import { alchemy, mainnet, base, optimism } from "@account-kit/infra";
+import { alchemy, mainnet, base } from "@account-kit/infra";
 import { ArrowBigDown, ArrowBigUp } from "lucide-react";
 import WertFundButton from "./wallet/buy/wert-fund-button";
 import { TokenBalance } from "./wallet/balance/TokenBalance";
@@ -115,8 +115,6 @@ const getChainGradient = (chain: ViemChain) => {
   switch (chain.id) {
     case base.id:
       return "from-[#0052FF] to-[#0052FF]";
-    case optimism.id:
-      return "from-[#FF0420] to-[#FF0420]";
     default:
       return "from-gray-400 to-gray-600";
   }
@@ -126,8 +124,6 @@ const getChainName = (chain: ViemChain) => {
   switch (chain.id) {
     case base.id:
       return "Base";
-    case optimism.id:
-      return "Optimism";
     default:
       return chain.name;
   }
@@ -138,8 +134,6 @@ const getChainLogo = (chain: ViemChain) => {
   switch (chain.id) {
     case base.id:
       return "/images/chains/base.svg";
-    case optimism.id:
-      return "/images/chains/optimism.svg";
     default:
       return "/images/chains/default-chain.svg";
   }
@@ -295,15 +289,13 @@ export default function Navbar() {
   // Chain information
   const chainNames: Record<number, string> = {
     8453: "Base",
-    10: "Optimism",
     84532: "Base Sepolia",
   };
 
   // Chain icons mapping
   const chainIcons: Record<number, string> = {
-    8453: "/images/base.svg", // Replace with actual path to Base icon
-    10: "/images/optimism.svg", // Replace with actual path to Optimism icon
-    84532: "/images/base-sepolia.svg", // Replace with actual path to Base Sepolia icon
+    8453: "/images/base.svg", // Base icon
+    84532: "/images/base-sepolia.svg", // Base Sepolia icon
   };
 
   // Create header className to avoid line length issues

@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import VideoCardGrid from "@/components/Videos/VideoCardGrid";
+import { VideoSearch } from "@/components/Videos/VideoSearch";
 import LivestreamGrid from "@/components/Live/LivestreamGrid";
 import OrbisVideoCardGrid from "@/components/Live/LivestreamGrid";
 import {
@@ -17,9 +19,12 @@ import Link from "next/link";
 
 const AllVideosContent: React.FC = () => {
   const { hasMembership, isLoading } = useMembershipVerification();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [category, setCategory] = useState("");
+  const [sortBy, setSortBy] = useState<'created_at' | 'views_count' | 'likes_count' | 'updated_at'>('created_at');
 
   return (
-    <div className="min-h-screen p-6">
+    <div className="min-h-screen px-4 py-6 sm:p-6">
       <div className="mb-8 rounded-lg bg-white p-8 shadow-md">
         <h1 className="mb-6 text-center text-4xl font-bold text-gray-800">
           Discover Amazing Music Videos
@@ -76,7 +81,8 @@ const AllVideosContent: React.FC = () => {
               Access to live streams is exclusive to NFT membership holders.
             </p>
             <Link
-              href="/portfolio"
+              href="https://join.creativeplatform.xyz"
+              target="_blank"
               className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors"
             >
               Get Membership
@@ -87,8 +93,24 @@ const AllVideosContent: React.FC = () => {
 
       {/* Videos Section */}
       <div>
-        <h2 className="my-4 text-2xl font-bold">New Videos</h2>
-        <VideoCardGrid />
+        <h2 className="my-4 text-2xl font-bold">Discover Videos</h2>
+        
+        {/* Search and Filter Controls */}
+        <VideoSearch
+          onSearchChange={setSearchQuery}
+          onCategoryChange={setCategory}
+          onSortChange={setSortBy}
+          initialSearch={searchQuery}
+          initialCategory={category}
+          initialSort={sortBy}
+        />
+        
+        {/* Video Grid */}
+        <VideoCardGrid 
+          searchQuery={searchQuery}
+          category={category}
+          orderBy={sortBy}
+        />
       </div>
       {/*Orbis Videos Section */}
       {/* <div>

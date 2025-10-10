@@ -99,8 +99,8 @@ const isSubscribed = await alchemyMeTokenService.isMeTokenSubscribed(meTokenAddr
 1. User enters MeToken details (name, symbol, hub ID, DAI amount)
 2. Component checks DAI balance and allowance
 3. If needed, approves DAI for Diamond contract
-4. Creates MeToken using Diamond contract's `subscribe` function
-5. Tracks transaction and stores data in Supabase
+4. Deploys MeToken via METOKEN_FACTORY.create contract call
+5. Tracks create transaction and calls DIAMOND.mint to mint tokens (with Supabase storage of both create and mint tx data)
 6. Shows success confirmation with transaction links
 
 ### 4. Enhanced Database Schema (`lib/sdk/supabase/enhanced-schema.sql`)
@@ -180,8 +180,9 @@ function MyPage() {
 
 ### Step 2: Blockchain Interaction
 1. **DAI Approval**: If needed, approves DAI for Diamond contract
-2. **MeToken Creation**: Calls Diamond contract's `subscribe` function
-3. **Transaction Confirmation**: Waits for blockchain confirmation
+2. **MeToken Deployment**: Calls METOKEN_FACTORY.create to deploy the MeToken contract
+3. **Token Minting**: Calls DIAMOND.mint to mint initial tokens
+4. **Transaction Confirmation**: Waits for blockchain confirmation
 
 ### Step 3: Data Storage
 1. **Transaction Tracking**: Records transaction in Supabase

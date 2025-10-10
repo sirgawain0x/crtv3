@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/sdk/supabase/client';
+import { createClient } from '@supabase/supabase-js';
 
 /**
  * API endpoint to fix creator profile addresses
@@ -21,6 +21,13 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(`🔄 Fixing profile address: ${controllerAddress} -> ${smartAccountAddress}`);
+
+    // Create server-side Supabase client with service role key
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { auth: { persistSession: false } }
+    );
 
     // Get the existing profile with controller address (case-insensitive)
     const { data: existingProfiles, error: fetchError } = await supabase
@@ -106,12 +113,7 @@ export async function POST(request: NextRequest) {
     console.error('Error fixing profile address:', error);
     console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     return NextResponse.json(
-      { 
-        error: 'Failed to fix profile address',
-        details: error instanceof Error ? error.message : 'Unknown error',
-        errorType: error instanceof Error ? error.constructor.name : typeof error,
-        fullError: JSON.stringify(error, Object.getOwnPropertyNames(error))
-      },
+      { error: 'Failed to fix profile address' },
       { status: 500 }
     );
   }
