@@ -833,7 +833,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
       // Get the vault address from the meToken info
       const meTokenInfo = await client.readContract({
         address: DIAMOND,
-        abi: DIAMOND_ABI,
+        abi: METOKEN_ABI,
         functionName: 'getMeTokenInfo',
         args: [meTokenAddress as `0x${string}`],
       });
@@ -843,7 +843,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
       // Get hub info to find the vault address
       const hubInfo = await client.readContract({
         address: DIAMOND,
-        abi: DIAMOND_ABI,
+        abi: METOKEN_ABI,
         functionName: 'getHubInfo',
         args: [hubId],
       });
@@ -863,7 +863,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
       
       // If allowance is insufficient, approve the vault to spend DAI
       if (currentAllowance < requiredAmount) {
-        await sendUserOperation({
+        const operation = await client.sendUserOperation({
           uo: {
             target: daiContract.address as `0x${string}`,
             data: encodeFunctionData({
@@ -873,6 +873,10 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
             }),
             value: BigInt(0),
           },
+        });
+
+        await client.waitForUserOperationTransaction({
+          hash: operation.hash,
         });
       }
     } catch (err) {
