@@ -57,7 +57,6 @@
     "@unlock-protocol/contracts": "^0.0.35",
     "@unlock-protocol/paywall": "^0.8.1",
     "@unlock-protocol/unlock-js": "^0.51.2",
-    "@useorbis/db-sdk": "^0.0.60-alpha",
     "@wagmi/connectors": "^5.8.2",
     "@wagmi/core": "^2.17.2",
     "@wert-io/module-react-component": "^2.1.5",

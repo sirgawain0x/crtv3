@@ -1287,9 +1287,18 @@ export function AccountDropdown() {
           {/* Logout */}
           <div className="px-2 py-1 w-full">
             <DropdownMenuItem
-              onClick={() => {
-                logout();
-                setIsDropdownOpen(false);
+              onClick={async () => {
+                try {
+                  await logout();
+                  console.log('Logged out successfully');
+                  // Small delay to ensure logout completes
+                  setTimeout(() => {
+                    setIsDropdownOpen(false);
+                  }, 100);
+                } catch (error) {
+                  console.error('Logout error:', error);
+                  setIsDropdownOpen(false);
+                }
               }}
               className="w-full flex items-center cursor-pointer hover:bg-red-50 dark:hover:bg-red-900 transition-colors p-2 text-red-500 rounded"
             >
