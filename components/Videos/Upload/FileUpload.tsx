@@ -199,9 +199,20 @@ const FileUpload: React.FC<FileUploadProps> = ({
           console.log("Upload completed");
           setUploadComplete(true);
           setUploadState("complete");
-          if (uploadRequestResult?.asset?.id)
+          if (uploadRequestResult?.asset?.id) {
             onFileUploaded(uploadRequestResult.asset.id);
-          else setError("Upload succeeded but asset ID is missing.");
+            
+            void (async () => {
+              try {
+                const metadataUri = await pollForMetadataUri(uploadRequestResult.asset.id);
+                setUploadedUri(metadataUri);
+              } catch (pollErr) {
+                console.warn("Failed to resolve metadata URI:", pollErr);
+              }
+            })();
+          } else {
+            setError("Upload succeeded but asset ID is missing.");
+          }
         },
       });
 

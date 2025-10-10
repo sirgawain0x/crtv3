@@ -2,7 +2,6 @@ import { erc20Abi } from "viem";
 
 export const DAI_TOKEN_ADDRESSES = {
   base: "0x50c5725949a6f0c72e6c4a641f24049a917db0cb",
-  optimism: "0xda10009cbd5d07dd0cecc66161fc93d7c9000da1",
   // Add more chains as needed
 } as const;
 

@@ -2,7 +2,6 @@ import { erc20Abi } from "viem";
 
 export const USDC_TOKEN_ADDRESSES = {
   base: "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
-  optimism: "0x0b2c639c533813f4aa9d7837caf62653d097ff85",
   // Add more chains as needed
 } as const;
 
