@@ -25,7 +25,7 @@ const VideoCardGrid: React.FC<VideoCardGridProps> = ({
   orderBy = 'created_at'
 }) => {
   const [playbackSources, setPlaybackSources] = useState<
-    (VideoAsset & { 
+    (Omit<VideoAsset, 'id' | 'status' | 'created_at'> & { 
       detailedSrc: Src[] | null;
       id: string;
       playbackId: string;
@@ -33,6 +33,7 @@ const VideoCardGrid: React.FC<VideoCardGridProps> = ({
       status: { phase: "ready" };
       creatorId: { value: string };
       createdAt: Date;
+      created_at: Date;
     })[] | null
   >(null);
   const [loading, setLoading] = useState<boolean>(true);
