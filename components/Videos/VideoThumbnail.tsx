@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { getThumbnailUrl } from '@/lib/utils/thumbnail';
-import { getVideoAssetByPlaybackId } from '@/services/video-assets';
+import { fetchVideoAssetByPlaybackId } from '@/lib/utils/video-assets-client';
 import { Player } from '@/components/Player/Player';
 import { PlayIcon } from 'lucide-react';
 import { Src } from '@livepeer/react';
@@ -39,7 +39,7 @@ const VideoThumbnail: React.FC<VideoThumbnailProps> = ({
         setIsLoading(true);
         
         // First, try to get thumbnail from database
-        const dbAsset = await getVideoAssetByPlaybackId(playbackId);
+        const dbAsset = await fetchVideoAssetByPlaybackId(playbackId);
         if (dbAsset && (dbAsset as any).thumbnail_url) {
           console.log('Found database thumbnail:', (dbAsset as any).thumbnail_url);
           setThumbnailUrl((dbAsset as any).thumbnail_url);

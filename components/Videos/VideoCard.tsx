@@ -19,7 +19,7 @@ import makeBlockie from "ethereum-blockies-base64";
 import VideoViewMetrics from "./VideoViewMetrics";
 import { useVideo } from "@/context/VideoContext";
 import { useEffect, useRef, useState } from "react";
-import { getVideoAssetByPlaybackId } from "@/services/video-assets";
+import { fetchVideoAssetByPlaybackId } from "@/lib/utils/video-assets-client";
 import VideoThumbnail from './VideoThumbnail';
 
 interface VideoCardProps {
@@ -44,8 +44,13 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
     async function fetchStatus() {
       try {
         if (!asset?.playbackId) return;
-        const row = await getVideoAssetByPlaybackId(asset.playbackId);
-        if (row?.status) setDbStatus(row.status);
+        const row = await fetchVideoAssetByPlaybackId(asset.playbackId);
+        if (row?.status) {
+          const validStatuses = ["draft", "published", "minted", "archived"] as const;
+          if (validStatuses.includes(row.status as any)) {
+            setDbStatus(row.status as "draft" | "published" | "minted" | "archived");
+          }
+        }
       } catch (e) {
         // no-op
       }

@@ -7,6 +7,7 @@ import { Src } from "@livepeer/react";
 import { getDetailPlaybackSource } from "@/lib/hooks/livepeer/useDetailPlaybackSources";
 import { VideoCardSkeleton } from "./VideoCardSkeleton";
 import { Pagination } from "@/components/ui/pagination";
+import { fetchVideoAssetByPlaybackId } from "@/lib/utils/video-assets-client";
 
 const ITEMS_PER_PAGE = 12; // Number of videos per page
 
@@ -18,6 +19,7 @@ const VideoCardGrid: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [totalAssets, setTotalAssets] = useState<number>(0);
+  const [totalPublishedAssets, setTotalPublishedAssets] = useState<number>(0);
   const [hasNextPage, setHasNextPage] = useState<boolean>(false);
 
   const fetchSources = useCallback(async (page: number) => {
@@ -82,18 +84,35 @@ const VideoCardGrid: React.FC = () => {
       // Fetch assets with pagination
       const { data: assets, total } = await fetchAssetsWithRetry();
       
-      // Update pagination state
+      // Update total assets state
       setTotalAssets(total);
-      setHasNextPage((page * ITEMS_PER_PAGE) < total);
 
-      // Only process assets that are ready for playback
-      const readyAssets = assets.filter(
-        (asset) => asset.status?.phase === "ready" && asset.playbackId
+      // Only process assets that are ready for playback AND published in database
+      const readyAndPublishedAssets = await Promise.all(
+        assets
+          .filter((asset) => asset.status?.phase === "ready" && asset.playbackId)
+          .map(async (asset) => {
+            // Check database status
+            try {
+              const dbAsset = await fetchVideoAssetByPlaybackId(asset.playbackId!);
+              return dbAsset?.status === "published" ? asset : null;
+            } catch (error) {
+              console.error(`Failed to fetch DB status for ${asset.playbackId}:`, error);
+              return null;
+            }
+          })
       );
 
-      // Fetch detailed playback sources for each ready asset
+      // Filter out null values (non-published videos)
+      const publishedAssets = readyAndPublishedAssets.filter(Boolean) as Asset[];
+      
+      // Update published assets count and pagination state
+      setTotalPublishedAssets(publishedAssets.length);
+      setHasNextPage((page * ITEMS_PER_PAGE) < total);
+
+      // Fetch detailed playback sources for each published asset
       const detailedPlaybackSources = await Promise.all(
-        readyAssets.map(async (asset: Asset) => {
+        publishedAssets.map(async (asset: Asset) => {
           const detailedSrc = await fetchPlaybackSourceWithRetry(
             asset.playbackId!
           );
@@ -147,6 +166,14 @@ const VideoCardGrid: React.FC = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [currentPage, loading]);
 
+  // Helper function to determine if pagination should be shown
+  const shouldShowPagination = useCallback(() => {
+    // Show pagination if:
+    // 1. We have more than one page worth of published assets, OR
+    // 2. We're on a page > 1 (to allow navigation back)
+    return totalPublishedAssets > ITEMS_PER_PAGE || currentPage > 1;
+  }, [totalPublishedAssets, currentPage]);
+
   if (loading) {
     return (
       <div>
@@ -161,16 +188,46 @@ const VideoCardGrid: React.FC = () => {
 
   if (error) {
     return (
-      <div className="flex min-h-[200px] items-center justify-center rounded-lg bg-red-50 p-4 text-red-800">
-        <p>{error}</p>
+      <div>
+        <div className="flex min-h-[200px] items-center justify-center rounded-lg bg-red-50 p-4 text-red-800">
+          <p>{error}</p>
+        </div>
+        
+        {/* Show pagination controls if appropriate */}
+        {shouldShowPagination() && (
+          <Pagination
+            hasNextPage={hasNextPage}
+            hasPrevPage={currentPage > 1}
+            currentPage={currentPage}
+            onNextPage={handleNextPage}
+            onPrevPage={handlePrevPage}
+            isLoading={loading}
+            totalDisplayed={0}
+          />
+        )}
       </div>
     );
   }
 
   if (!playbackSources || playbackSources.length === 0) {
     return (
-      <div className="flex min-h-[200px] items-center justify-center rounded-lg bg-gray-50 p-4">
-        <p>No videos available at the moment. Please check back later.</p>
+      <div>
+        <div className="flex min-h-[200px] items-center justify-center rounded-lg bg-gray-50 p-4">
+          <p>No videos available at the moment. Please check back later.</p>
+        </div>
+        
+        {/* Show pagination controls if appropriate */}
+        {shouldShowPagination() && (
+          <Pagination
+            hasNextPage={hasNextPage}
+            hasPrevPage={currentPage > 1}
+            currentPage={currentPage}
+            onNextPage={handleNextPage}
+            onPrevPage={handlePrevPage}
+            isLoading={loading}
+            totalDisplayed={0}
+          />
+        )}
       </div>
     );
   }
@@ -187,15 +244,17 @@ const VideoCardGrid: React.FC = () => {
         ))}
       </div>
       
-      <Pagination
-        hasNextPage={hasNextPage}
-        hasPrevPage={currentPage > 1}
-        currentPage={currentPage}
-        onNextPage={handleNextPage}
-        onPrevPage={handlePrevPage}
-        isLoading={loading}
-        totalDisplayed={playbackSources.length}
-      />
+      {shouldShowPagination() && (
+        <Pagination
+          hasNextPage={hasNextPage}
+          hasPrevPage={currentPage > 1}
+          currentPage={currentPage}
+          onNextPage={handleNextPage}
+          onPrevPage={handlePrevPage}
+          isLoading={loading}
+          totalDisplayed={playbackSources.length}
+        />
+      )}
     </div>
   );
 };
