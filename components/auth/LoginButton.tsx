@@ -24,7 +24,6 @@ export function LoginButton({
   const { openAuthModal } = useAuthModal();
   const user = useUser();
   const { client: smartAccountClient } = useSmartAccountClient({});
-  const [isLoading, setIsLoading] = useState(false);
   const [isDeploying, setIsDeploying] = useState(false);
 
   // Check if the smart account needs deployment
@@ -44,26 +43,28 @@ export function LoginButton({
     checkDeployment();
   }, [smartAccountClient]);
 
-  const handleLogin = async () => {
+  // Reset states when user logs out
+  useEffect(() => {
+    if (!user) {
+      setIsDeploying(false);
+    }
+  }, [user]);
+
+  const handleLogin = () => {
+    console.log('Opening auth modal...', { hasUser: !!user });
     try {
-      setIsLoading(true);
       openAuthModal();
     } catch (error) {
-      toast.error(
-        `Authentication failed: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`
-      );
-    } finally {
-      setIsLoading(false);
+      console.error('Failed to open auth modal:', error);
+      toast.error('Failed to open login. Please refresh the page.');
     }
   };
 
-  if (isLoading || isDeploying) {
+  if (isDeploying) {
     return (
       <Button className={className} variant={variant} size={size} disabled>
         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-        {isDeploying ? "Deploying Account..." : "Connecting..."}
+        Deploying Account...
       </Button>
     );
   }

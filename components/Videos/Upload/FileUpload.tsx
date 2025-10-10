@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { toast } from "sonner";
 import { CopyIcon } from "lucide-react";
 import {
@@ -69,6 +69,9 @@ const FileUpload: React.FC<FileUploadProps> = ({
 
   const [livepeerAsset, setLivepeerAsset] = useState<any>();
   const [isPolling, setIsPolling] = useState(false);
+  
+  // Use ref to persist asset data across re-renders
+  const livepeerAssetRef = useRef<any>(null);
 
   // Use Universal Account to get smart account address (SCA), not controller wallet
   const { address, type, loading } = useUniversalAccount();
@@ -177,7 +180,17 @@ const FileUpload: React.FC<FileUploadProps> = ({
         address
       );
 
-      setLivepeerAsset(uploadRequestResult?.asset);
+      // Store asset in both state and ref for persistence
+      if (uploadRequestResult?.asset) {
+        console.log("Setting livepeer asset:", uploadRequestResult.asset);
+        setLivepeerAsset(uploadRequestResult.asset);
+        livepeerAssetRef.current = uploadRequestResult.asset;
+      } else {
+        console.error("No asset in upload request result");
+        setError("Failed to get asset information");
+        setUploadState("idle");
+        return;
+      }
 
       const tusUpload = new tus.Upload(selectedFile, {
         endpoint: uploadRequestResult?.tusEndpoint,
@@ -199,6 +212,12 @@ const FileUpload: React.FC<FileUploadProps> = ({
           console.log("Upload completed");
           setUploadComplete(true);
           setUploadState("complete");
+          
+          // Ensure asset is still in ref
+          if (uploadRequestResult?.asset) {
+            livepeerAssetRef.current = uploadRequestResult.asset;
+          }
+          
           if (uploadRequestResult?.asset?.id) {
             onFileUploaded(uploadRequestResult.asset.id);
             
@@ -406,10 +425,22 @@ const FileUpload: React.FC<FileUploadProps> = ({
             <Button
               disabled={uploadState !== "complete"}
               onClick={() => {
-                if (livepeerAsset) {
-                  onPressNext(livepeerAsset);
+                // Use ref as fallback if state is lost
+                const asset = livepeerAsset || livepeerAssetRef.current;
+                console.log('Next clicked - Asset data:', { 
+                  hasState: !!livepeerAsset, 
+                  hasRef: !!livepeerAssetRef.current,
+                  assetId: asset?.id
+                });
+                
+                if (asset?.id) {
+                  onPressNext(asset);
                 } else {
-                  alert("Missing livepeer asset");
+                  console.error('Missing asset data:', { 
+                    state: livepeerAsset, 
+                    ref: livepeerAssetRef.current 
+                  });
+                  toast.error("Video data is missing. Please try uploading again.");
                 }
               }}
               data-testid="file-input-next"

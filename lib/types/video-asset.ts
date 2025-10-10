@@ -1,5 +1,16 @@
-// Import subtitle types from OrbisDB models (we reuse these types)
-import type { Subtitles } from "@/lib/sdk/orbisDB/models/AssetMetadata";
+/**
+ * Subtitle chunk type - represents a single subtitle entry with text and timing
+ */
+export type Chunk = {
+  text: string;
+  timestamp: number[];
+};
+
+/**
+ * Subtitles type - maps language codes to arrays of subtitle chunks
+ * Example: { "English": [{text: "Hello", timestamp: [0, 2]}], "Spanish": [...] }
+ */
+export type Subtitles = Record<string, Chunk[]>;
 
 export interface VideoAsset {
   id: number;
@@ -28,7 +39,7 @@ export interface VideoAsset {
   attributes: Record<string, any> | null;
   requires_metoken: boolean;
   metoken_price: number | null;
-  // Subtitle fields (matching OrbisDB implementation)
+  // Subtitle fields
   subtitles_uri: string | null;  // IPFS URI for decentralized storage
   subtitles: Subtitles | null;    // Cached JSONB data for fast access
   created_at: Date;

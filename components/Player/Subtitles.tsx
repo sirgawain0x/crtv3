@@ -17,7 +17,7 @@ import {
 } from "@livepeer/react/player";
 import { Chunk } from "livepeer/models/components";
 
-import { Subtitles } from "@/lib/sdk/orbisDB/models/AssetMetadata";
+import { Subtitles } from "@/lib/types/video-asset";
 import {
   Select,
   SelectContent,
