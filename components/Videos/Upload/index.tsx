@@ -9,17 +9,12 @@ import { toast } from "sonner";
 import { Asset } from "livepeer/models/components";
 
 import { StepperFormValues } from "@/lib/types/hook-stepper";
-// import { useOrbisContext } from "@/lib/sdk/orbisDB/context";
 import StepperIndicator from "@/components/Videos/Upload/Stepper-Indicator";
 import FileUpload from "@/components/Videos/Upload/FileUpload";
 import CreateInfo from "@/components/Videos/Upload/Create-info";
 import CreateThumbnailWrapper from "@/components/Videos/Upload/CreateThumbnailWrapper";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import type { TVideoMetaForm } from "@/components/Videos/Upload/Create-info";
-import {
-  AssetMetadata,
-  createAssetMetadata,
-} from "@/lib/sdk/orbisDB/models/AssetMetadata";
 import { updateVideoAsset } from "@/services/video-assets";
 import { createVideoAsset } from "@/services/video-assets";
 import type { VideoAsset } from "@/lib/types/video-asset";
@@ -100,9 +95,9 @@ const HookMultiStepForm = () => {
               hasAsset: !!livepeerAsset,
             });
 
-            if (!livepeerAsset || !livepeerAsset.id) {
-              console.error('❌ No valid livepeerAsset provided to onPressNext');
-              toast.error("Failed to upload video. Please try again.");
+            if (!livepeerAsset?.id || !livepeerAsset?.playbackId) {
+              console.error('❌ Invalid asset data:', livepeerAsset);
+              toast.error("Video upload incomplete. Please try again.");
               return;
             }
 

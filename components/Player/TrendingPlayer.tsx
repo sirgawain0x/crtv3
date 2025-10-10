@@ -18,8 +18,23 @@ import {
 } from "@/components/Player/Subtitles";
 import { useEffect, useState, useRef } from "react";
 import { useVideo } from "@/context/VideoContext";
-import { AssetMetadata } from "@/lib/sdk/orbisDB/models/AssetMetadata";
+import { Subtitles } from "@/lib/types/video-asset";
 import "./Player.css";
+
+/**
+ * Asset metadata for video playback
+ */
+export interface AssetMetadata {
+  assetId: string;
+  playbackId: string;
+  title: string;
+  description?: string;
+  location?: string;
+  category?: string;
+  thumbnailUri?: string;
+  subtitlesUri?: string;
+  subtitles?: Subtitles;
+}
 import { CheckIcon, ChevronDownIcon } from "lucide-react";
 import { forwardRef } from "react";
 import { ViewsComponent } from "./ViewsComponent";

@@ -261,6 +261,7 @@ export function TopVideos() {
                         src={playbackSources[video.playbackId]}
                         title={video.title}
                         assetMetadata={{
+                          assetId: video.assetId,
                           playbackId: video.playbackId,
                           title: video.title,
                           description: "",

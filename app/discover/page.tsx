@@ -4,7 +4,6 @@ import { useState } from "react";
 import VideoCardGrid from "@/components/Videos/VideoCardGrid";
 import { VideoSearch } from "@/components/Videos/VideoSearch";
 import LivestreamGrid from "@/components/Live/LivestreamGrid";
-import OrbisVideoCardGrid from "@/components/Live/LivestreamGrid";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -112,10 +111,10 @@ const AllVideosContent: React.FC = () => {
           orderBy={sortBy}
         />
       </div>
-      {/*Orbis Videos Section */}
+      {/* Livestream Section - Commented out */}
       {/* <div>
         <h2 className="my-4 text-2xl font-bold">All Videos</h2>
-        <OrbisVideoCardGrid />
+        <LivestreamGrid />
       </div> */}
     </div>
   );
