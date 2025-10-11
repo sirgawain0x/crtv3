@@ -54,6 +54,27 @@ export default async function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        {/* Unregister any existing service workers to prevent forced reloads */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                  for(let registration of registrations) {
+                    registration.unregister();
+                    console.log('Service Worker unregistered');
+                  }
+                });
+                // Clear all caches
+                caches.keys().then(function(names) {
+                  for (let name of names) {
+                    caches.delete(name);
+                  }
+                });
+              }
+            `,
+          }}
+        />
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#000000" />
         <link

@@ -76,6 +76,73 @@ const FileUpload: React.FC<FileUploadProps> = ({
   // Use Universal Account to get smart account address (SCA), not controller wallet
   const { address, type, loading } = useUniversalAccount();
 
+  // Persist upload state to recover from page reloads
+  useEffect(() => {
+    if (uploadState === 'loading' && livepeerAsset?.id) {
+      const uploadData = {
+        assetId: livepeerAsset.id,
+        progress,
+        timestamp: Date.now(),
+        metadata: metadata,
+        address,
+      };
+      localStorage.setItem('upload-in-progress', JSON.stringify(uploadData));
+      console.log('Upload state saved:', uploadData);
+    } else if (uploadState === 'complete' && livepeerAsset?.id) {
+      localStorage.removeItem('upload-in-progress');
+      console.log('Upload completed, state cleared');
+    }
+  }, [uploadState, livepeerAsset, progress, metadata, address]);
+
+  // Check for interrupted upload on mount and attempt recovery
+  useEffect(() => {
+    const checkInterruptedUpload = async () => {
+      const savedUpload = localStorage.getItem('upload-in-progress');
+      if (savedUpload && address) {
+        try {
+          const { assetId, timestamp, address: savedAddress } = JSON.parse(savedUpload);
+          
+          // Only recover if same user and upload was within last 30 minutes
+          if (savedAddress === address && Date.now() - timestamp < 30 * 60 * 1000) {
+            console.log('Attempting to recover interrupted upload:', assetId);
+            toast.info('Checking previous upload status...');
+            
+            const asset = await getLivepeerAsset(assetId);
+            if (asset) {
+              console.log('Recovered asset:', asset);
+              setLivepeerAsset(asset);
+              
+              if (asset.status?.phase === 'ready') {
+                setUploadState('complete');
+                setUploadComplete(true);
+                setProgress(100);
+                toast.success('Previous upload recovered successfully!');
+                localStorage.removeItem('upload-in-progress');
+              } else if (asset.status?.phase === 'processing') {
+                setUploadState('loading');
+                setProgress(75);
+                toast.info('Upload is still processing...');
+              } else if (asset.status?.phase === 'failed') {
+                toast.error('Previous upload failed. Please try again.');
+                localStorage.removeItem('upload-in-progress');
+              }
+            }
+          } else {
+            // Clear stale upload data
+            localStorage.removeItem('upload-in-progress');
+          }
+        } catch (error) {
+          console.error('Failed to recover upload:', error);
+          localStorage.removeItem('upload-in-progress');
+        }
+      }
+    };
+    
+    if (!loading && address) {
+      checkInterruptedUpload();
+    }
+  }, [loading, address]);
+
   // Livepeer supported video formats
   // Containers: MP4, MOV, MKV, WebM, FLV, TS
   // Video codecs: H.264, H.265 (HEVC), VP8, VP9, AV1
