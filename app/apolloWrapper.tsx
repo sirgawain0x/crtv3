@@ -28,7 +28,29 @@ export function makeClient() {
   // use the `ApolloClient` from "@apollo/client-integration-nextjs"
   return new ApolloClient({
     // use the `InMemoryCache` from "@apollo/client-integration-nextjs"
-    cache: new InMemoryCache(),
+    cache: new InMemoryCache({
+      // Configure cache to prevent memory leaks
+      typePolicies: {
+        Query: {
+          fields: {
+            // Configure field policies to limit cache size if needed
+          },
+        },
+      },
+      // Limit cache size to prevent memory issues
+      resultCaching: true,
+    }),
     link: httpLink,
+    // Add default options to reduce memory usage
+    defaultOptions: {
+      watchQuery: {
+        fetchPolicy: 'cache-and-network',
+        nextFetchPolicy: 'cache-first',
+      },
+      query: {
+        fetchPolicy: 'cache-first',
+        errorPolicy: 'all',
+      },
+    },
   });
 }

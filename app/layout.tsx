@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils/utils";
 import { Toaster } from "@/components/ui/toaster";
 import Footer from "@/components/Footer";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { IframeCleanup } from "@/components/IframeCleanup";
+// import { IframeCleanup } from "@/components/IframeCleanup";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -54,27 +54,6 @@ export default async function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* Unregister any existing service workers to prevent forced reloads */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.getRegistrations().then(function(registrations) {
-                  for(let registration of registrations) {
-                    registration.unregister();
-                    console.log('Service Worker unregistered');
-                  }
-                });
-                // Clear all caches
-                caches.keys().then(function(names) {
-                  for (let name of names) {
-                    caches.delete(name);
-                  }
-                });
-              }
-            `,
-          }}
-        />
         <link rel="manifest" href="/manifest.json" />
         <meta name="theme-color" content="#000000" />
         <link
@@ -92,10 +71,43 @@ export default async function RootLayout({
           inter.className,
           "min-h-screen bg-background antialiased"
         )}
+        suppressHydrationWarning
       >
         <div id="alchemy-signer-iframe-container" style={{ display: "none" }} />
-        {/* Alchemy signer iframe container for modular account functionality */}
-        <IframeCleanup />
+        {/* Simple iframe cleanup script to avoid chunk loading issues */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  // Clean up container
+                  const container = document.getElementById("alchemy-signer-iframe-container");
+                  if (container) {
+                    container.innerHTML = "";
+                  }
+                  
+                  // Remove all existing Turnkey iframes by ID
+                  const iframeById = document.getElementById("turnkey-iframe");
+                  if (iframeById) {
+                    iframeById.remove();
+                  }
+                  
+                  // Remove all iframes with turnkey in the ID
+                  const existingIframes = document.querySelectorAll('[id*="turnkey-iframe"], iframe[id="turnkey-iframe"]');
+                  existingIframes.forEach(iframe => {
+                    try {
+                      iframe.remove();
+                    } catch (error) {
+                      // Silently fail
+                    }
+                  });
+                } catch (error) {
+                  console.warn("Error during iframe cleanup:", error);
+                }
+              })();
+            `,
+          }}
+        />
         <Providers initialState={initialState}>
           <ErrorBoundary>
             <Navbar />
