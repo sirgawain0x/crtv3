@@ -10,7 +10,6 @@ import {
 import { TrendingPlayer } from "@/components/Player/TrendingPlayer";
 import { getDetailPlaybackSource } from "@/lib/hooks/livepeer/useDetailPlaybackSources";
 import { Src } from "@livepeer/react";
-import { fullLivepeer } from "@/lib/sdk/livepeer/fullClient";
 import { toast } from "sonner";
 import Link from "next/link";
 import { TrendingUpIcon } from "lucide-react";
@@ -103,25 +102,10 @@ export function TopVideos() {
               `Fetching playback source for video ${video.playbackId}...`
             );
 
-            // First verify the playback ID exists
-            const playbackInfo = await fullLivepeer.playback.get(
-              video.playbackId
-            );
-            
-            if (!isMounted || signal.aborted) return;
-            
-            console.log("Playback info:", playbackInfo);
-
-            if (!playbackInfo?.playbackInfo) {
-              console.error(
-                `No playback info found for video ${video.playbackId}`
-              );
-              sources[video.playbackId] = null;
-              continue;
-            }
-
-            // Then get the playback source
-            const src = await getDetailPlaybackSource(video.playbackId);
+            // Get the playback source with abort signal support
+            const src = await getDetailPlaybackSource(video.playbackId, { 
+              signal 
+            });
             
             if (!isMounted || signal.aborted) return;
             

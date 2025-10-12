@@ -87,14 +87,11 @@ export async function POST(request: NextRequest) {
     }
 
     if (!tokenInfo) {
-      console.warn('⚠️ Token info not available from blockchain, using defaults from subgraph');
-      // Use data from subgraph if available
-      tokenInfo = {
-        name: 'MeToken', // Will be updated when protocol syncs
-        symbol: 'ME',
-        totalSupply: '0',
-        owner: subgraphData?.id || targetMeTokenAddress // Use MeToken address as fallback
-      };
+      console.error('❌ Token info not available from blockchain - cannot proceed');
+      return NextResponse.json(
+        { error: 'Unable to fetch token information from blockchain. The MeToken may not be fully registered yet. Please try again in a few moments.' },
+        { status: 503 }
+      );
     }
 
     if (!protocolInfo) {

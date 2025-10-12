@@ -18,7 +18,6 @@ import { Src } from "@livepeer/react";
 import makeBlockie from "ethereum-blockies-base64";
 import VideoViewMetrics from "./VideoViewMetrics";
 import { useVideo } from "@/context/VideoContext";
-import { fetchAllViews } from "@/app/api/livepeer/views";
 import { useEffect, useRef, useState } from "react";
 import { fetchVideoAssetByPlaybackId } from "@/lib/utils/video-assets-client";
 import VideoThumbnail from './VideoThumbnail';
@@ -80,21 +79,17 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
       }
       
       try {
-        const metrics = await fetchAllViews(asset.playbackId);
-        if (metrics && (metrics.viewCount > 0 || metrics.legacyViewCount > 0)) {
-          // Call API to update database
-          await fetch(`/api/video-assets/sync-views/${asset.playbackId}`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ 
-              viewCount: metrics.viewCount + metrics.legacyViewCount 
-            })
-          });
-          
-          // Update last sync time in localStorage
-          localStorage.setItem(lastSyncKey, now.toString());
+        // Call server endpoint that fetches from Livepeer and updates database
+        const response = await fetch(`/api/video-assets/sync-views/${asset.playbackId}`, {
+          method: 'GET',
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          // Update last sync time in localStorage only on success
+          if (result.success) {
+            localStorage.setItem(lastSyncKey, now.toString());
+          }
         }
       } catch (error) {
         console.error('Failed to sync view count:', error);

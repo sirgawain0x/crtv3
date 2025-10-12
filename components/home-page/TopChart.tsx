@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Avatar, AvatarImage } from "../ui/avatar";
 import makeBlockie from "ethereum-blockies-base64";
 import { shortenAddress, formatNumber } from "@/lib/utils/utils";
@@ -8,8 +8,7 @@ import { Button } from "../ui/button";
 import { FaSpinner, FaTrophy } from "react-icons/fa";
 import Link from "next/link";
 import { useUser } from "@account-kit/react";
-import { Address, createPublicClient, getAddress } from "viem";
-import { alchemy, mainnet } from "@account-kit/infra";
+import { Address, getAddress } from "viem";
 
 interface LeaderboardItem {
   uniqueId: number;
@@ -34,35 +33,65 @@ interface UserRank {
   points: number;
 }
 
+// Helper function to implement retry with exponential backoff
+async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  maxRetries: number = 2,
+  baseDelay: number = 1000
+): Promise<T> {
+  let lastError: Error | undefined;
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error as Error;
+      
+      // Don't retry on timeout errors - fail fast
+      if (
+        error instanceof Error &&
+        (error.message.includes("timed out") ||
+          error.message.includes("timeout") ||
+          error.message.includes("took too long"))
+      ) {
+        throw error;
+      }
+      
+      // If this was the last attempt, throw
+      if (attempt === maxRetries) {
+        throw error;
+      }
+      
+      // Wait with exponential backoff
+      const delay = baseDelay * Math.pow(2, attempt);
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+  
+  throw lastError;
+}
+
+// Helper function disabled - ENS resolution disabled to prevent webpack CCIP chunk loading errors
+// Returns null immediately to prevent Viem from attempting to load CCIP utilities
+async function resolveEnsNameWithTimeout(
+  address: Address,
+  timeoutMs: number = 3000
+): Promise<string | null> {
+  // ENS resolution disabled to prevent CCIP chunk loading errors
+  // This prevents webpack from failing to load _app-pages-browser_node_modules_viem__esm_utils_ccip_js
+  return null;
+}
+
 export const AddressDisplay = ({ address }: { address: Address }) => {
   const [displayName, setDisplayName] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-
+  const [isLoading, setIsLoading] = useState(false);
+  
+  // ENS resolution disabled - simply show truncated address
+  // This prevents webpack CCIP chunk loading errors
   useEffect(() => {
-    const resolveEnsName = async () => {
-      try {
-        const publicClient = createPublicClient({
-          chain: mainnet,
-          transport: alchemy({
-            apiKey: process.env.NEXT_PUBLIC_ALCHEMY_API_KEY as string,
-          }),
-        });
-
-        const ensName = await publicClient.getEnsName({
-          address,
-          universalResolverAddress:
-            "0x74E20Bd2A1fE0cdbe45b9A1d89cb7e0a45b36376",
-        });
-
-        setDisplayName(ensName);
-      } catch (error) {
-        console.error("Error resolving ENS name:", error);
-        setDisplayName(null);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    resolveEnsName();
+    // No ENS resolution, just use null to display truncated address
+    setDisplayName(null);
+    setIsLoading(false);
   }, [address]);
 
   if (isLoading)

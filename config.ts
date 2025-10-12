@@ -22,8 +22,18 @@ const transport = alchemy({
   apiKey: process.env.NEXT_PUBLIC_ALCHEMY_API_KEY as string,
 });
 
-// Create query client
-export const queryClient = new QueryClient();
+// Create query client with optimized settings for memory management
+export const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Reduce memory usage by limiting cache time in development
+      gcTime: 1000 * 60 * 5, // 5 minutes (previously cacheTime)
+      staleTime: 1000 * 60, // 1 minute
+      refetchOnWindowFocus: false, // Reduce unnecessary refetches
+      retry: 1, // Reduce retry attempts in dev
+    },
+  },
+});
 
 const uiConfig: AlchemyAccountsUIConfig = {
   illustrationStyle: "linear",

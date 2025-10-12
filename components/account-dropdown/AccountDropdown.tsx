@@ -50,12 +50,9 @@ import {
 import {
   Copy,
   LogOut,
-  Wallet,
   Send,
   ArrowUpRight,
   ArrowUpDown,
-  ArrowBigDown,
-  ArrowBigUp,
   Key,
   Loader2,
   CloudUpload,
@@ -64,6 +61,7 @@ import {
   ShieldUser,
   Plus,
   ArrowRight,
+  AlertTriangle,
 } from "lucide-react";
 import { CheckIcon } from "@radix-ui/react-icons";
 import Image from "next/image";
@@ -75,6 +73,7 @@ import {
   DialogClose,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import WertFundButton from "@/components/wallet/buy/wert-fund-button";
 import { LoginButton } from "@/components/auth/LoginButton";
 import { AlchemySwapWidget } from "@/components/wallet/swap/AlchemySwapWidget";
@@ -172,23 +171,28 @@ interface SessionKeyConfig {
 // Token configuration for send modal
 type TokenSymbol = 'ETH' | 'USDC' | 'DAI';
 
-const TOKEN_INFO = {
-  ETH: { 
-    decimals: 18, 
-    symbol: "ETH",
-    address: null, // Native token
-  },
-  USDC: { 
-    decimals: USDC_TOKEN_DECIMALS, 
-    symbol: "USDC",
-    address: USDC_TOKEN_ADDRESSES.base,
-  },
-  DAI: { 
-    decimals: DAI_TOKEN_DECIMALS, 
-    symbol: "DAI",
-    address: DAI_TOKEN_ADDRESSES.base,
-  },
-} as const;
+// Helper function to get token info for the current chain
+const getTokenInfo = (chainId?: number) => {
+  const chainKey = chainId === base.id ? "base" : undefined;
+  
+  return {
+    ETH: { 
+      decimals: 18, 
+      symbol: "ETH",
+      address: null, // Native token
+    },
+    USDC: { 
+      decimals: USDC_TOKEN_DECIMALS, 
+      symbol: "USDC",
+      address: chainKey ? (USDC_TOKEN_ADDRESSES as any)[chainKey] : undefined,
+    },
+    DAI: { 
+      decimals: DAI_TOKEN_DECIMALS, 
+      symbol: "DAI",
+      address: chainKey ? (DAI_TOKEN_ADDRESSES as any)[chainKey] : undefined,
+    },
+  } as const;
+};
 
 const SESSION_KEY_TYPES: SessionKeyConfig[] = [
   {
@@ -270,7 +274,7 @@ export function AccountDropdown() {
     ? (client?.extend(installValidationActions as any) as any)
     : undefined;
 
-  const { isVerified, hasMembership } = useMembershipVerification();
+  const { isVerified, hasMembership, isLoading: isMembershipLoading, error: membershipError } = useMembershipVerification();
 
   useEffect(() => {
     console.log({
@@ -327,26 +331,38 @@ export function AccountDropdown() {
           address: account.address as Address,
         });
         
-        // Get USDC balance
-        const usdcBalance = await client.readContract({
-          address: USDC_TOKEN_ADDRESSES.base as Address,
-          abi: erc20Abi,
-          functionName: 'balanceOf',
-          args: [account.address as Address],
-        }) as bigint;
+        // Resolve per-chain ERC-20 addresses (Base only for now)
+        const chainKey = chain?.id === base.id ? "base" : undefined;
+        let usdc = 0n;
+        let dai = 0n;
         
-        // Get DAI balance
-        const daiBalance = await client.readContract({
-          address: DAI_TOKEN_ADDRESSES.base as Address,
-          abi: erc20Abi,
-          functionName: 'balanceOf',
-          args: [account.address as Address],
-        }) as bigint;
+        if (chainKey) {
+          const usdcAddr = (USDC_TOKEN_ADDRESSES as any)[chainKey] as Address | undefined;
+          const daiAddr = (DAI_TOKEN_ADDRESSES as any)[chainKey] as Address | undefined;
+          
+          if (usdcAddr) {
+            usdc = await client.readContract({
+              address: usdcAddr,
+              abi: erc20Abi,
+              functionName: 'balanceOf',
+              args: [account.address as Address],
+            }) as bigint;
+          }
+          
+          if (daiAddr) {
+            dai = await client.readContract({
+              address: daiAddr,
+              abi: erc20Abi,
+              functionName: 'balanceOf',
+              args: [account.address as Address],
+            }) as bigint;
+          }
+        }
 
         setTokenBalances({
           ETH: formatUnits(ethBalance, 18),
-          USDC: formatUnits(usdcBalance, USDC_TOKEN_DECIMALS),
-          DAI: formatUnits(daiBalance, DAI_TOKEN_DECIMALS),
+          USDC: formatUnits(usdc, USDC_TOKEN_DECIMALS),
+          DAI: formatUnits(dai, DAI_TOKEN_DECIMALS),
         });
       } catch (error) {
         console.error('Error fetching token balances:', error);
@@ -354,7 +370,7 @@ export function AccountDropdown() {
     };
 
     fetchTokenBalances();
-  }, [client, account?.address, dialogAction, isDialogOpen]);
+  }, [client, account?.address, dialogAction, isDialogOpen, chain?.id]);
 
   const copyToClipboard = async () => {
     const addressToCopy =
@@ -510,7 +526,7 @@ export function AccountDropdown() {
         description: `Sending ${sendAmount} ${selectedToken}...`,
       });
 
-      const tokenInfo = TOKEN_INFO[selectedToken];
+      const tokenInfo = getTokenInfo(chain?.id)[selectedToken];
 
       let operation;
       
@@ -527,6 +543,17 @@ export function AccountDropdown() {
         });
       } else {
         // Send ERC-20 token (USDC or DAI)
+        // Check if token is supported on current chain
+        if (!tokenInfo.address) {
+          toast({
+            title: "Unsupported Network",
+            description: `${selectedToken} is not available on the current network. Please switch to Base.`,
+            variant: "destructive",
+          });
+          setIsSending(false);
+          return;
+        }
+        
         const tokenAmount = parseUnits(sendAmount, tokenInfo.decimals);
         
         // Encode the transfer calldata
@@ -1184,8 +1211,27 @@ export function AccountDropdown() {
             <MembershipSection />
           </div>
 
-          {/* Member Access Links - Only for Members */}
-          {isVerified && hasMembership && (
+          {/* Membership Error Handling */}
+          {membershipError && (
+            <div className="px-2 py-2 w-full">
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  {membershipError.code === 'LOCK_NOT_FOUND' && 'Unable to verify membership. Please try again later.'}
+                  {membershipError.code === 'BALANCE_CHECK_ERROR' && 'Unable to check membership status. Please try again later.'}
+                  {membershipError.code === 'MEMBERSHIP_CHECK_ERROR' && 'Error verifying membership. Please try again later.'}
+                  {membershipError.code === 'INVALID_ADDRESS' && 'Invalid wallet address. Please reconnect your wallet.'}
+                  {membershipError.code === 'NO_VALID_ADDRESS' && 'Please connect your wallet to verify membership.'}
+                  {membershipError.code === 'PROVIDER_ERROR' && 'Network connection error. Please try again later.'}
+                  {membershipError.code === 'LOCK_FETCH_ERROR' && 'Unable to fetch membership details. Basic verification will continue.'}
+                  {!membershipError.code && 'An error occurred while verifying membership.'}
+                </AlertDescription>
+              </Alert>
+            </div>
+          )}
+
+          {/* Member Access Links - Only for Members (hide if error or loading) */}
+          {!membershipError && !isMembershipLoading && isVerified && hasMembership && (
             <>
               
               <div className="px-2 py-2 w-full">
@@ -1332,7 +1378,14 @@ export function AccountDropdown() {
               {dialogAction === "swap" &&
                 "Exchange one cryptocurrency for another at the best available rates."}
             </DialogDescription>
-            <DialogClose asChild className="absolute right-4 top-4" />
+            <DialogClose asChild>
+              <button
+                // className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
+                aria-label="Close"
+              >
+                <span className="sr-only">Close</span>
+              </button>
+            </DialogClose>
           </DialogHeader>
           <div className="flex flex-col overflow-hidden">
             <div className="space-y-4 overflow-y-auto flex-1 pr-2">

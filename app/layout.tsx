@@ -71,6 +71,7 @@ export default async function RootLayout({
           inter.className,
           "min-h-screen bg-background antialiased"
         )}
+        suppressHydrationWarning
       >
         <div id="alchemy-signer-iframe-container" style={{ display: "none" }} />
         {/* Alchemy signer iframe container for modular account functionality */}

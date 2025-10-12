@@ -12,12 +12,12 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { Slash, Lock, Loader2 } from "lucide-react";
+import { Slash, Lock, Loader2, AlertTriangle } from "lucide-react";
 import { useMembershipVerification } from "@/lib/hooks/unlock/useMembershipVerification";
 import Link from "next/link";
 
 const AllVideosContent: React.FC = () => {
-  const { hasMembership, isLoading } = useMembershipVerification();
+  const { hasMembership, isLoading, error } = useMembershipVerification();
   const [searchQuery, setSearchQuery] = useState("");
   const [category, setCategory] = useState("");
   const [sortBy, setSortBy] = useState<'created_at' | 'views_count' | 'likes_count' | 'updated_at'>('created_at');
@@ -67,6 +67,16 @@ const AllVideosContent: React.FC = () => {
         {isLoading ? (
           <div className="flex items-center justify-center p-8">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : error ? (
+          <div className="rounded-lg border-2 border-red-300 bg-red-50 p-8 text-center">
+            <AlertTriangle className="mx-auto h-12 w-12 text-red-400 mb-4" />
+            <h3 className="text-lg font-semibold text-red-700 mb-2">
+              Verification Error
+            </h3>
+            <p className="text-red-600 mb-4">
+              Unable to verify membership status. Please try again later.
+            </p>
           </div>
         ) : hasMembership ? (
           <LivestreamGrid />

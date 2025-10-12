@@ -10,6 +10,18 @@ const withPWA = createPWA({
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Optimize memory usage in development
+  experimental: {
+    // Reduce memory usage by optimizing compilation
+    optimizePackageImports: ['@account-kit/react', '@account-kit/core', '@apollo/client', 'lucide-react', 'framer-motion'],
+  },
+  // Reduce unnecessary rebuilds
+  onDemandEntries: {
+    // period (in ms) where the server will keep pages in the buffer
+    maxInactiveAge: 60 * 1000,
+    // number of pages that should be kept simultaneously without being disposed
+    pagesBufferLength: 2,
+  },
   images: {
     remotePatterns: [
       {

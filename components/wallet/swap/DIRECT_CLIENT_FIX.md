@@ -28,14 +28,20 @@ await sendUserOperation({
 ```typescript
 const { client } = useSmartAccountClient({});
 
+// Step 1: Send the user operation
+// Returns: { hash: string } (UserOperation hash)
 const operation = await client.sendUserOperation({
   uo: { target, data, value }
 });
 // ↑ This uses traditional EIP-4337 UserOperations
 
+// Step 2: Wait for transaction to be mined
+// Returns: string (the transaction hash)
 const txHash = await client.waitForUserOperationTransaction({
   hash: operation.hash,
 });
+// txHash is a string like "0x1234...abcd", NOT an object
+// It's the actual transaction hash you can look up on explorers
 ```
 
 ## Changes Made
@@ -60,13 +66,16 @@ const txHash = await client.waitForUserOperationTransaction({
 -   uo: { target, data, value }
 - });
 
++ // sendUserOperation returns { hash: string }
 + const operation = await client.sendUserOperation({
 +   uo: { target, data, value }
 + });
 + 
++ // waitForUserOperationTransaction returns string (the tx hash directly)
 + const txHash = await client.waitForUserOperationTransaction({
 +   hash: operation.hash,
 + });
++ // txHash is a string: "0x1234...abcd"
 ```
 
 ### 3. Manual Error Handling
@@ -77,8 +86,10 @@ const txHash = await client.waitForUserOperationTransaction({
 
 + try {
 +   const operation = await client.sendUserOperation(...);
++   // waitForUserOperationTransaction returns a string (transaction hash)
 +   const txHash = await client.waitForUserOperationTransaction(...);
-+   // Handle success
++   // txHash is just a string: "0x1234...abcd"
++   console.log('Transaction hash:', txHash);
 + } catch (error) {
 +   // Handle errors manually
 + }
@@ -88,6 +99,7 @@ const txHash = await client.waitForUserOperationTransaction({
 
 **Approval:**
 ```typescript
+// Step 1: Send approval operation
 const approvalOp = await client.sendUserOperation({
   uo: {
     target: tokenAddress,
@@ -95,14 +107,18 @@ const approvalOp = await client.sendUserOperation({
     value: BigInt(0),
   },
 });
+// approvalOp is { hash: string }
 
+// Step 2: Wait for confirmation - returns string, not object
 const approvalTxHash = await client.waitForUserOperationTransaction({
   hash: approvalOp.hash,
 });
+// approvalTxHash is a string: "0x..." (direct transaction hash)
 ```
 
 **Swap:**
 ```typescript
+// Step 1: Send swap operation
 const operation = await client.sendUserOperation({
   uo: {
     target,
@@ -110,11 +126,37 @@ const operation = await client.sendUserOperation({
     value: BigInt(quoteData.value || '0x0'),
   },
 });
+// operation is { hash: string }
 
+// Step 2: Wait for confirmation - returns string, not object
 const txHash = await client.waitForUserOperationTransaction({
   hash: operation.hash,
 });
+// txHash is a string: "0x..." (direct transaction hash)
 ```
+
+## API Return Types
+
+### client.sendUserOperation()
+```typescript
+// Returns: { hash: string }
+// This is the UserOperation hash (bundle hash), not the transaction hash yet
+const operation = await client.sendUserOperation({ uo: { ... } });
+console.log(operation.hash); // "0xUserOpHash..."
+```
+
+### client.waitForUserOperationTransaction()
+```typescript
+// Returns: string (the actual transaction hash)
+// NOT an object like { status, transactionHash } - just a plain string!
+const txHash = await client.waitForUserOperationTransaction({ 
+  hash: operation.hash 
+});
+console.log(txHash); // "0x1234...abcd" - this is the actual tx hash
+console.log(typeof txHash); // "string"
+```
+
+**Critical:** `waitForUserOperationTransaction()` returns a **plain string** containing the transaction hash. It does NOT return an object. You can use this string directly with block explorers or other tools.
 
 ## Benefits
 

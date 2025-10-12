@@ -8,7 +8,7 @@ This application uses **Account Kit (EIP-4337 Smart Accounts)** for user authent
 
 ### Two-Tier Authentication System
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │                     User Authentication                       │
 ├─────────────────────────────────────────────────────────────┤
@@ -95,7 +95,7 @@ CREATE POLICY "Service role can insert" ON video_assets
 
 ### Video Upload Flow
 
-```
+```text
 1. User (Smart Account) uploads video
    ↓
 2. Frontend calls server action
@@ -111,7 +111,7 @@ CREATE POLICY "Service role can insert" ON video_assets
 
 ### Video Read Flow
 
-```
+```text
 1. Anyone visits discover page
    ↓
 2. Frontend queries Supabase

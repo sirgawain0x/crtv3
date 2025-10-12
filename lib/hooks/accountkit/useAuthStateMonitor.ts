@@ -28,14 +28,17 @@ export function useAuthStateMonitor() {
       
       // Clear any stale auth state from localStorage
       try {
-        const keysToRemove = [];
+        const keysToRemove: string[] = [];
         for (let i = 0; i < localStorage.length; i++) {
           const key = localStorage.key(i);
-          if (key?.includes('auth') || key?.includes('session')) {
+          if (key && (key.includes('auth') || key.includes('session') || key.includes('upload-in-progress'))) {
             keysToRemove.push(key);
           }
         }
-        keysToRemove.forEach(key => localStorage.removeItem(key));
+        keysToRemove.forEach(key => {
+          localStorage.removeItem(key);
+          console.log('Cleared stale state:', key);
+        });
       } catch (e) {
         console.warn('Could not clear auth localStorage:', e);
       }
@@ -52,4 +55,3 @@ export function useAuthStateMonitor() {
 
   return { currentUser: user, previousUser: previousUserRef.current };
 }
-
