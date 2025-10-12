@@ -168,6 +168,14 @@ const FileUpload: React.FC<FileUploadProps> = ({
   ];
 
   const validateVideoFile = (file: File): { valid: boolean; error?: string } => {
+    // Check MIME type presence first - reject files with empty/unknown MIME types
+    if (!file.type || file.type.trim() === '') {
+      return {
+        valid: false,
+        error: 'Unable to determine file type. Please ensure you are uploading a valid video file with a recognized format (MP4, MOV, MKV, WebM, FLV, or TS).',
+      };
+    }
+
     // Check file extension
     const fileExtension = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
     const isValidExtension = SUPPORTED_VIDEO_EXTENSIONS.includes(fileExtension);
@@ -175,10 +183,31 @@ const FileUpload: React.FC<FileUploadProps> = ({
     // Check MIME type
     const isValidMimeType = SUPPORTED_VIDEO_FORMATS.includes(file.type);
     
-    if (!isValidExtension && !isValidMimeType) {
+    // Log warning if extension and MIME type disagree (mismatch detected)
+    if (isValidExtension !== isValidMimeType) {
+      console.warn('File validation mismatch detected:', {
+        filename: file.name,
+        extension: fileExtension,
+        mimeType: file.type,
+        extensionValid: isValidExtension,
+        mimeTypeValid: isValidMimeType,
+        timestamp: new Date().toISOString(),
+      });
+    }
+    
+    // Require BOTH valid extension AND valid MIME type
+    if (!isValidExtension || !isValidMimeType) {
+      const errors = [];
+      if (!isValidExtension) {
+        errors.push(`invalid extension (${fileExtension})`);
+      }
+      if (!isValidMimeType) {
+        errors.push(`invalid MIME type (${file.type})`);
+      }
+      
       return {
         valid: false,
-        error: `Unsupported video format: ${fileExtension}. Please use MP4, MOV, MKV, WebM, FLV, or TS format with H.264/H.265 codec.`,
+        error: `Unsupported video format - ${errors.join(' and ')}. Please use a valid video file with both a supported extension (MP4, MOV, MKV, WebM, FLV, or TS) and valid MIME type. Required codec: H.264/H.265.`,
       };
     }
 
@@ -263,7 +292,8 @@ const FileUpload: React.FC<FileUploadProps> = ({
         endpoint: uploadRequestResult?.tusEndpoint,
         metadata: {
           filename: selectedFile.name,
-          filetype: selectedFile.type || "video/mp4", // Use actual file MIME type
+          // Validation should ensure type is always present, but use safe fallback as defensive measure
+          filetype: selectedFile.type || "application/octet-stream",
         },
         uploadSize: selectedFile.size,
         onError(err: any) {

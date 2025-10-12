@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { useMeTokensSupabase } from "@/lib/hooks/metokens/useMeTokensSupabase";
 import { uploadThumbnailToIPFS, uploadThumbnailFromBlob } from "@/lib/services/thumbnail-upload";
 import { AlchemyMeTokenCreator } from "@/components/UserProfile/AlchemyMeTokenCreator";
+import { useX402Payment } from "@/lib/hooks/payments/useX402Payment";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -73,6 +74,7 @@ const CreateThumbnailForm = ({
   const [showMeTokenCreator, setShowMeTokenCreator] = useState(false);
 
   const { userMeToken, loading: meTokenLoading, checkUserMeToken } = useMeTokensSupabase();
+  const { makePayment, isProcessing: isPaymentProcessing, isConnected } = useX402Payment();
   const requireMeToken = watch("meTokenConfig.requireMeToken");
   const thumbnailType = watch("thumbnailType");
   const customImage = watch("customImage");
@@ -163,20 +165,24 @@ const CreateThumbnailForm = ({
     }
   };
 
-  const makeX402Payment = async () => {
+  /**
+   * Make x402 payment using the user's connected smart account
+   * This is a client-side payment that requires wallet access
+   */
+  const makeX402PaymentWithWallet = async () => {
     try {
-      const response = await fetch('/api/x402/pay-for-ai-thumbnail', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          service: 'ai-thumbnail-generation',
-          amount: '1000000', // 1 USDC (6 decimals) on Base
-        }),
+      // Check if wallet is connected
+      if (!isConnected) {
+        throw new Error('Please connect your wallet to make payments');
+      }
+
+      // Make the payment using the client-side hook
+      const result = await makePayment({
+        service: 'ai-thumbnail-generation',
+        amount: '1000000', // 1 USDC (6 decimals) on Base
+        endpoint: 'https://x402.payai.network/api/base/paid-content',
       });
 
-      const result = await response.json();
       return result;
     } catch (error) {
       return {
@@ -226,14 +232,23 @@ const CreateThumbnailForm = ({
     setAiLoading(true);
     
     try {
-      // Step 1: Make x402 payment
-      const paymentResult = await makeX402Payment();
+      // Check wallet connection first
+      if (!isConnected) {
+        throw new Error('Please connect your wallet to use AI generation');
+      }
+
+      // Step 1: Make x402 payment using client-side wallet
+      toast.info('Processing payment...');
+      const paymentResult = await makeX402PaymentWithWallet();
       
       if (!paymentResult.success) {
         throw new Error(paymentResult.error || "Payment failed");
       }
 
+      toast.success('Payment successful!');
+
       // Step 2: Generate AI image with Gemini after successful payment
+      toast.info('Generating AI thumbnail...');
       const aiResult = await generateAiImage(prompt);
       
       if (aiResult.success) {
@@ -245,6 +260,7 @@ const CreateThumbnailForm = ({
 
     } catch (error) {
       console.error('AI Generation Error:', error);
+      toast.error(error instanceof Error ? error.message : "Failed to generate AI thumbnail");
       setError("root", {
         message: error instanceof Error ? error.message : "Failed to generate AI thumbnail with Gemini",
       });

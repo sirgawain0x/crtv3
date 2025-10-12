@@ -19,8 +19,16 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key_here
 
 The service role key bypasses RLS policies and allows server-side operations.
 
-### Option 2: Update RLS Policies (If you have database access)
-If you can modify the database, update the RLS policies to be more permissive:
+### Option 2: Update RLS Policies (Not Recommended for Production)
+
+⚠️ **SECURITY WARNING**: The policies shown below are effectively unrestricted and allow any user to insert, update, or delete any data in the creator_profiles table. This approach is **NOT suitable for production environments** as it exposes your database to potential abuse and data manipulation.
+
+**Recommended alternatives:**
+- **Use Option 1** (service role key) for secure server-side operations
+- Implement narrowly scoped RLS policies that validate user identity and permissions
+- Use proper authentication checks within your RLS policies
+
+If you can modify the database, update the RLS policies to be more permissive (for development/testing only):
 
 ```sql
 -- Drop existing restrictive policies
@@ -28,7 +36,7 @@ DROP POLICY IF EXISTS "Users can insert their own profile" ON creator_profiles;
 DROP POLICY IF EXISTS "Users can update their own profile" ON creator_profiles;
 DROP POLICY IF EXISTS "Users can delete their own profile" ON creator_profiles;
 
--- Create more permissive policies
+-- Create more permissive policies (DEVELOPMENT/TESTING ONLY)
 CREATE POLICY "Allow public insert" ON creator_profiles
   FOR INSERT WITH CHECK (true);
 

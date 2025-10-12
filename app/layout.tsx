@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils/utils";
 import { Toaster } from "@/components/ui/toaster";
 import Footer from "@/components/Footer";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-// import { IframeCleanup } from "@/components/IframeCleanup";
+import { IframeCleanup } from "@/components/IframeCleanup";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -74,40 +74,8 @@ export default async function RootLayout({
         suppressHydrationWarning
       >
         <div id="alchemy-signer-iframe-container" style={{ display: "none" }} />
-        {/* Simple iframe cleanup script to avoid chunk loading issues */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                try {
-                  // Clean up container
-                  const container = document.getElementById("alchemy-signer-iframe-container");
-                  if (container) {
-                    container.innerHTML = "";
-                  }
-                  
-                  // Remove all existing Turnkey iframes by ID
-                  const iframeById = document.getElementById("turnkey-iframe");
-                  if (iframeById) {
-                    iframeById.remove();
-                  }
-                  
-                  // Remove all iframes with turnkey in the ID
-                  const existingIframes = document.querySelectorAll('[id*="turnkey-iframe"], iframe[id="turnkey-iframe"]');
-                  existingIframes.forEach(iframe => {
-                    try {
-                      iframe.remove();
-                    } catch (error) {
-                      // Silently fail
-                    }
-                  });
-                } catch (error) {
-                  console.warn("Error during iframe cleanup:", error);
-                }
-              })();
-            `,
-          }}
-        />
+        {/* Alchemy signer iframe container for modular account functionality */}
+        <IframeCleanup />
         <Providers initialState={initialState}>
           <ErrorBoundary>
             <Navbar />

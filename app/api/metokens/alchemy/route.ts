@@ -215,11 +215,19 @@ async function waitForMeTokenCreation(transactionHash: string): Promise<string |
       if (log.address.toLowerCase() === diamondAddress.toLowerCase()) {
         // Look for the Subscribe event
         // The Subscribe event has the MeToken address as the first indexed parameter
-        if (log.topics && log.topics.length > 0) {
-          // The MeToken address is in the first topic (indexed parameter)
-          const meTokenAddress = '0x' + log.topics[1].slice(26); // Remove the 0x and first 24 characters
-          console.log('🎯 Extracted MeToken address:', meTokenAddress);
-          return meTokenAddress;
+        if (log.topics && log.topics.length > 1) {
+          const topic = log.topics[1];
+          
+          // Validate topic format: should start with '0x' and be 66 chars (32 bytes hex)
+          if (typeof topic === 'string' && topic.startsWith('0x') && topic.length === 66) {
+            // The MeToken address is in the second topic (first indexed parameter)
+            // Remove '0x' prefix and first 24 characters (12 bytes of padding)
+            const meTokenAddress = '0x' + topic.slice(26);
+            console.log('🎯 Extracted MeToken address:', meTokenAddress);
+            return meTokenAddress;
+          } else {
+            console.warn('⚠️ Invalid topic format, skipping log:', { topic, length: topic?.length });
+          }
         }
       }
     }

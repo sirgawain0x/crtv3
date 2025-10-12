@@ -11,7 +11,7 @@ import { ErrorBoundary } from "next/dist/client/components/error-boundary";
 import { ApolloNextAppProvider } from "@apollo/client-integration-nextjs";
 import { makeClient } from "./apolloWrapper";
 import { RadixProvider } from "@/components/ui/radix-provider";
-// import { cleanupExistingIframes } from "@/components/IframeCleanup";
+import { cleanupExistingIframes } from "@/components/IframeCleanup";
 
 function ErrorFallback({ error }: { error: Error }) {
   return (
@@ -31,7 +31,7 @@ export const Providers = (
 
   useEffect(() => {
     // Clean up any existing iframes before initializing providers
-    // cleanupExistingIframes();
+    cleanupExistingIframes();
     setIsReady(true);
   }, []);
 

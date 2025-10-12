@@ -92,7 +92,7 @@ const VideoCardGrid: React.FC<VideoCardGridProps> = ({
       setTotalAssets(total);
       setHasNextPage(hasMore);
 
-      if (videos.length === 0 && currentPage === 1) {
+      if (videos.length === 0 && page === 1) {
         setError(searchQuery ? "No videos found matching your search." : "No videos available at the moment.");
         setPlaybackSources([]);
         return;
@@ -127,7 +127,7 @@ const VideoCardGrid: React.FC<VideoCardGridProps> = ({
       );
 
 
-      if (validPlaybackSources.length === 0 && currentPage === 1) {
+      if (validPlaybackSources.length === 0 && page === 1) {
         setError("Unable to load video playback. Please try again later.");
         return;
       }
@@ -139,7 +139,7 @@ const VideoCardGrid: React.FC<VideoCardGridProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [currentPage, searchQuery, category, creatorId, orderBy]);
+  }, [searchQuery, category, creatorId, orderBy]);
 
   // Reset to page 1 when search/filter parameters change
   useEffect(() => {
