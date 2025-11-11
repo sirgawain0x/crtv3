@@ -27,6 +27,70 @@ export function DaiFundButton({ onSuccess, presetAmount = 50, className }: DaiFu
     },
   });
 
+  /**
+   * Fallback method to detect popup closure when COOP blocks window.closed access
+   * Uses focus detection, window reference checking, and timeout as alternatives
+   */
+  function handlePopupCloseFallback(
+    popupWindow: Window,
+    baseCleanup: () => void,
+    onSuccess?: () => void
+  ) {
+    let focusTimeoutId: NodeJS.Timeout | null = null;
+    let maxWaitTimeoutId: NodeJS.Timeout | null = null;
+    let wasFocused = false;
+
+    const fullCleanup = () => {
+      baseCleanup();
+      if (focusTimeoutId) {
+        clearTimeout(focusTimeoutId);
+        focusTimeoutId = null;
+      }
+      if (maxWaitTimeoutId) {
+        clearTimeout(maxWaitTimeoutId);
+        maxWaitTimeoutId = null;
+      }
+      window.removeEventListener("focus", handleFocus);
+    };
+
+    const triggerSuccess = () => {
+      fullCleanup();
+      setTimeout(() => {
+        onSuccess?.();
+      }, 2000);
+    };
+
+    // Note: We can't reliably poll window.closed or window.location for cross-origin popups
+    // due to COOP restrictions. We rely on focus detection and postMessage instead.
+
+    // Track when main window regains focus (indicates popup may have closed)
+    const handleFocus = () => {
+      if (!wasFocused) {
+        wasFocused = true;
+        // Wait a bit to see if popup is still open
+        focusTimeoutId = setTimeout(() => {
+          try {
+            // Try to access popup - if it throws, it's likely closed
+            popupWindow.focus();
+            // If we can focus it, it's still open, reset the flag
+            wasFocused = false;
+          } catch (error) {
+            // Popup is likely closed or inaccessible
+            triggerSuccess();
+          }
+        }, 1000);
+      }
+    };
+
+    window.addEventListener("focus", handleFocus);
+
+    // Set a maximum wait time (5 minutes) - cleanup after timeout
+    maxWaitTimeoutId = setTimeout(() => {
+      fullCleanup();
+      // Don't call onSuccess automatically after timeout - user may have cancelled
+    }, 5 * 60 * 1000);
+  }
+
   async function handleFund() {
     if (!address || !client) return;
 
@@ -80,15 +144,65 @@ export function DaiFundButton({ onSuccess, presetAmount = 50, className }: DaiFu
       
       // Listen for the window to close (user completed or cancelled)
       if (newWindow) {
-        const checkClosed = setInterval(() => {
-          if (newWindow.closed) {
-            clearInterval(checkClosed);
-            // Call success callback after a short delay to allow for transaction processing
-            setTimeout(() => {
-              onSuccess?.();
-            }, 2000);
+        let checkClosedIntervalId: NodeJS.Timeout | null = null;
+        let messageListener: ((event: MessageEvent) => void) | null = null;
+        
+        // Cleanup function
+        const cleanup = () => {
+          if (checkClosedIntervalId) {
+            clearInterval(checkClosedIntervalId);
+            checkClosedIntervalId = null;
           }
-        }, 1000);
+          if (messageListener) {
+            window.removeEventListener("message", messageListener);
+            messageListener = null;
+          }
+        };
+        
+        // Method 1: Try to use window.closed (may be blocked by COOP)
+        try {
+          checkClosedIntervalId = setInterval(() => {
+            try {
+              // Check if window is closed
+              if (newWindow.closed) {
+                cleanup();
+                // Call success callback after a short delay to allow for transaction processing
+                setTimeout(() => {
+                  onSuccess?.();
+                }, 2000);
+              }
+            } catch (error) {
+              // COOP policy blocked access to window.closed
+              // Fall back to alternative detection methods
+              console.warn("Cannot access window.closed due to COOP policy, using alternative detection");
+              cleanup();
+              // Use focus-based detection as fallback
+              handlePopupCloseFallback(newWindow, cleanup, onSuccess);
+            }
+          }, 1000);
+        } catch (error) {
+          console.warn("Cannot set up window.closed check due to COOP policy, using alternative detection");
+          // Use focus-based detection as fallback
+          handlePopupCloseFallback(newWindow, cleanup, onSuccess);
+        }
+        
+        // Method 2: Listen for postMessage events (if Coinbase sends them)
+        messageListener = (event: MessageEvent) => {
+          // Verify origin for security
+          if (event.origin === "https://pay.coinbase.com" || 
+              event.origin === window.location.origin) {
+            // Handle any messages from Coinbase (if they send completion messages)
+            if (event.data === "payment-complete" || 
+                event.data === "popup-closed" ||
+                event.type === "payment-success") {
+              cleanup();
+              setTimeout(() => {
+                onSuccess?.();
+              }, 2000);
+            }
+          }
+        };
+        window.addEventListener("message", messageListener);
       }
     } catch (error) {
       console.error('Failed to fund DAI:', error);

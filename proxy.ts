@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 // CORS middleware for API routes
-export function middleware(req: NextRequest) {
+export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // Only handle CORS for /api routes

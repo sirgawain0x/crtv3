@@ -51,6 +51,8 @@ import { TokenSelect } from "@/components/ui/token-select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import makeBlockie from "ethereum-blockies-base64";
+import { type Address, erc20Abi, formatUnits } from 'viem';
+import { BASE_TOKENS, TOKEN_INFO, type TokenSymbol, alchemySwapService, AlchemySwapService } from '@/lib/sdk/alchemy/swap-service';
 
 type UseUserResult = (AccountUser & { type: "eoa" | "sca" }) | null;
 
@@ -163,6 +165,15 @@ export default function Navbar() {
   const [fromToken, setFromToken] = useState("ETH");
   const [toToken, setToToken] = useState("USDC");
   const [selectedToken, setSelectedToken] = useState<"ETH" | "USDC" | "DAI">("ETH");
+  const [balances, setBalances] = useState<Record<string, string>>({
+    ETH: '0',
+    USDC: '0',
+    DAI: '0',
+  });
+  const [fromAmount, setFromAmount] = useState("");
+  const [toAmount, setToAmount] = useState("");
+  const [isLoadingQuote, setIsLoadingQuote] = useState(false);
+  const [swapError, setSwapError] = useState<string | null>(null);
 
   // Mobile-responsive token selector component
   const MobileTokenSelector = ({ 
@@ -380,6 +391,172 @@ export default function Navbar() {
     setCurrentChainName(getChainName(currentChain) || "Unknown Chain");
   }, [currentChain]);
 
+  // Handle from amount change and fetch quote
+  const handleFromAmountChange = async (value: string) => {
+    setFromAmount(value);
+    setToAmount("");
+    setSwapError(null);
+    
+    if (!value || parseFloat(value) <= 0) {
+      return;
+    }
+
+    const address = (modularAccount?.address || user?.address);
+    if (!address || !smartAccountClient) return;
+
+    try {
+      setIsLoadingQuote(true);
+      
+      // Check if the amount is greater than the available balance
+      const availableBalance = parseFloat(balances[fromToken] || '0');
+      const requestedAmount = parseFloat(value);
+      
+      if (requestedAmount > availableBalance) {
+        setSwapError(`Insufficient balance. You have ${availableBalance.toFixed(4)} ${fromToken}`);
+        setIsLoadingQuote(false);
+        return;
+      }
+      
+      const fromAmountHex = AlchemySwapService.formatAmount(value, fromToken as TokenSymbol);
+      
+      const quoteResponse = await alchemySwapService.requestSwapQuote({
+        from: address as Address,
+        fromToken: fromToken as TokenSymbol,
+        toToken: toToken as TokenSymbol,
+        fromAmount: fromAmountHex,
+      });
+
+      if (quoteResponse.result?.quote) {
+        const convertedAmount = AlchemySwapService.parseAmount(
+          quoteResponse.result.quote.minimumToAmount,
+          toToken as TokenSymbol
+        );
+        setToAmount(convertedAmount);
+      }
+    } catch (error) {
+      console.error('Error getting quote:', error);
+      setSwapError(error instanceof Error ? error.message : 'Failed to get quote');
+    } finally {
+      setIsLoadingQuote(false);
+    }
+  };
+
+  // Reset amounts when tokens change (unless we're swapping with pending amount)
+  const [pendingFromAmount, setPendingFromAmount] = useState<string | null>(null);
+  
+  useEffect(() => {
+    // If we have a pending amount, don't reset - let the pending amount handler set the values
+    if (pendingFromAmount) {
+      return;
+    }
+    setFromAmount("");
+    setToAmount("");
+    setSwapError(null);
+  }, [fromToken, toToken, pendingFromAmount]);
+
+  // Refetch quote when tokens change if there's a pending fromAmount
+  useEffect(() => {
+    if (!pendingFromAmount || !fromToken || !toToken) return;
+    
+    const fetchQuoteForPendingAmount = async () => {
+      const value = pendingFromAmount;
+      setPendingFromAmount(null);
+      
+      if (!value || parseFloat(value) <= 0) return;
+
+      const address = (modularAccount?.address || user?.address);
+      if (!address || !smartAccountClient) return;
+
+      try {
+        setIsLoadingQuote(true);
+        setFromAmount(value);
+        
+        const availableBalance = parseFloat(balances[fromToken] || '0');
+        const requestedAmount = parseFloat(value);
+        
+        if (requestedAmount > availableBalance) {
+          setSwapError(`Insufficient balance. You have ${availableBalance.toFixed(4)} ${fromToken}`);
+          setIsLoadingQuote(false);
+          return;
+        }
+        
+        const fromAmountHex = AlchemySwapService.formatAmount(value, fromToken as TokenSymbol);
+        
+        const quoteResponse = await alchemySwapService.requestSwapQuote({
+          from: address as Address,
+          fromToken: fromToken as TokenSymbol,
+          toToken: toToken as TokenSymbol,
+          fromAmount: fromAmountHex,
+        });
+
+        if (quoteResponse.result?.quote) {
+          const convertedAmount = AlchemySwapService.parseAmount(
+            quoteResponse.result.quote.minimumToAmount,
+            toToken as TokenSymbol
+          );
+          setToAmount(convertedAmount);
+        }
+      } catch (error) {
+        console.error('Error getting quote:', error);
+        setSwapError(error instanceof Error ? error.message : 'Failed to get quote');
+      } finally {
+        setIsLoadingQuote(false);
+      }
+    };
+
+    fetchQuoteForPendingAmount();
+  }, [fromToken, toToken, pendingFromAmount, balances, modularAccount?.address ?? null, user?.address ?? null, smartAccountClient]);
+
+  // Fetch token balances when swap dialog is open
+  useEffect(() => {
+    if (!smartAccountClient || !user?.address || dialogAction !== 'swap' || !isDialogOpen) return;
+
+    const fetchBalances = async () => {
+      try {
+        const address = (modularAccount?.address || user.address) as Address;
+        
+        // Get ETH balance
+        const ethBalance = await smartAccountClient.getBalance({ address });
+        
+        // Get USDC balance (ERC20)
+        let usdcBalance = 0n;
+        try {
+          usdcBalance = await smartAccountClient.readContract({
+            address: BASE_TOKENS.USDC as Address,
+            abi: erc20Abi,
+            functionName: 'balanceOf',
+            args: [address],
+          }) as bigint;
+        } catch (e) {
+          console.warn('Failed to fetch USDC balance:', e);
+        }
+
+        // Get DAI balance (ERC20)
+        let daiBalance = 0n;
+        try {
+          daiBalance = await smartAccountClient.readContract({
+            address: BASE_TOKENS.DAI as Address,
+            abi: erc20Abi,
+            functionName: 'balanceOf',
+            args: [address],
+          }) as bigint;
+        } catch (e) {
+          console.warn('Failed to fetch DAI balance:', e);
+        }
+
+        setBalances({
+          ETH: formatUnits(ethBalance, 18),
+          USDC: formatUnits(usdcBalance, TOKEN_INFO.USDC.decimals),
+          DAI: formatUnits(daiBalance, TOKEN_INFO.DAI.decimals),
+        });
+      } catch (error) {
+        console.error('Error fetching balances:', error);
+      }
+    };
+
+    fetchBalances();
+  }, [smartAccountClient, user?.address ?? null, modularAccount?.address ?? null, dialogAction, isDialogOpen]);
+
   const handleLinkClick = () => {
     setIsMenuOpen(false);
   };
@@ -527,11 +704,18 @@ export default function Navbar() {
                       onTokenSelect={setFromToken}
                     />
                   </div>
-                  <input
-                    type="number"
-                    placeholder="Amount"
-                    className="flex-1 p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 touch-manipulation"
-                  />
+                  <div className="flex-1 relative">
+                    <input
+                      type="number"
+                      placeholder="Amount"
+                      value={fromAmount}
+                      onChange={(e) => handleFromAmountChange(e.target.value)}
+                      className="w-full p-3 pr-20 border rounded-lg dark:bg-gray-700 dark:border-gray-600 touch-manipulation"
+                    />
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                      Balance: {parseFloat(balances[fromToken] || '0').toFixed(4)}
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -542,8 +726,13 @@ export default function Navbar() {
                     setIsArrowUp(!isArrowUp);
                     // Swap the tokens
                     const temp = fromToken;
+                    const currentFromAmount = fromAmount;
                     setFromToken(toToken);
                     setToToken(temp);
+                    // If there's a fromAmount, save it to refetch quote after token swap
+                    if (currentFromAmount) {
+                      setPendingFromAmount(currentFromAmount);
+                    }
                   }}
                   className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                 >
@@ -565,13 +754,27 @@ export default function Navbar() {
                       onTokenSelect={setToToken}
                     />
                   </div>
-                  <input
-                    type="number"
-                    placeholder="Amount"
-                    className="flex-1 p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 touch-manipulation"
-                  />
+                  <div className="flex-1 relative">
+                    <input
+                      type="number"
+                      placeholder={isLoadingQuote ? "Calculating..." : "Amount"}
+                      value={toAmount}
+                      readOnly
+                      className="w-full p-3 pr-20 border rounded-lg dark:bg-gray-700 dark:border-gray-600 touch-manipulation bg-gray-50 dark:bg-gray-800"
+                    />
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                      Balance: {parseFloat(balances[toToken] || '0').toFixed(4)}
+                    </div>
+                  </div>
                 </div>
               </div>
+
+              {/* Error Message */}
+              {swapError && (
+                <div className="text-sm text-red-500 dark:text-red-400">
+                  {swapError}
+                </div>
+              )}
 
               {/* Action Buttons */}
               <div className="flex flex-col sm:flex-row gap-2 pt-2">
@@ -582,7 +785,12 @@ export default function Navbar() {
                 >
                   Cancel
                 </Button>
-                <Button className="w-full sm:flex-1 h-12 touch-manipulation">Swap</Button>
+                <Button 
+                  className="w-full sm:flex-1 h-12 touch-manipulation"
+                  disabled={!toAmount || isLoadingQuote || !!swapError}
+                >
+                  {isLoadingQuote ? "Getting Quote..." : "Swap"}
+                </Button>
               </div>
             </div>
           </div>
