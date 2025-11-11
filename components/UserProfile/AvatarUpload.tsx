@@ -10,6 +10,7 @@ import { useCreatorProfile } from '@/lib/hooks/metokens/useCreatorProfile';
 import { useUser } from '@account-kit/react';
 import { useWalletStatus } from '@/lib/hooks/accountkit/useWalletStatus';
 import { Upload, X, User, AlertCircle, CheckCircle } from 'lucide-react';
+import { convertFailingGateway } from '@/lib/utils/image-gateway';
 
 interface AvatarUploadProps {
   targetAddress?: string;
@@ -32,7 +33,7 @@ export function AvatarUpload({
   const [dragOver, setDragOver] = useState(false);
 
   const isOwner = !targetAddress || targetAddress === user?.address || targetAddress === smartAccountAddress;
-  const currentAvatarUrl = profile?.avatar_url;
+  const currentAvatarUrl = profile?.avatar_url ? convertFailingGateway(profile.avatar_url) : undefined;
 
   const sizeClasses = {
     sm: 'h-16 w-16',

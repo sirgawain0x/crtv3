@@ -2,6 +2,7 @@
 import Image from "next/image";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Ban, Repeat2 } from "lucide-react";
+import { convertFailingGateway, isIpfsUrl } from '@/lib/utils/image-gateway';
 
 export type MemberCardProps = {
   member: any;
@@ -33,12 +34,12 @@ const MemberCard = ({ member, nft, points }: MemberCardProps) => {
           <div className="relative w-full md:w-auto">
             <Image
               priority
-              src={nft.metadata.image}
+              src={convertFailingGateway(nft.metadata.image)}
               alt={nft.metadata.name || "NFT Image"}
               height={250}
               width={200}
               className="mx-auto rounded-lg object-cover md:mx-0"
-              unoptimized
+              unoptimized={isIpfsUrl(nft.metadata.image)}
             />
           </div>
         )}

@@ -131,7 +131,7 @@ export async function fetchMultiple<T>(urls: string[]): Promise<T[]> {
 
   const results = await Promise.all(requests);
   // Filter out null values (aborted/timed out requests)
-  return results.filter((result): result is T => result !== null);
+  return results.filter((result): result is Awaited<T> => result !== null) as T[];
 }
 
 /**

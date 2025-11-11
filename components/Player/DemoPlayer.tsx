@@ -60,7 +60,7 @@ export const DemoPlayer: React.FC<{ src: Src[] | null; title: string }> = ({
   };
 
   return (
-    <Player.Root src={src} autoPlay volume={1}>
+    <Player.Root src={src} autoPlay volume={0}>
       <Player.Container 
         ref={containerRef}
         className="player-container relative aspect-video touch-none"

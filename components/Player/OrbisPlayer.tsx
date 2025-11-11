@@ -110,7 +110,7 @@ export function OrbisPlayer({
   }
 
   return (
-    <Player.Root src={playbackSources}>
+    <Player.Root src={playbackSources} volume={0}>
       <Player.Container
         ref={containerRef}
         className="player-container relative aspect-video touch-none"

@@ -33,6 +33,11 @@ const nextConfig = {
       },
       {
         protocol: "https",
+        hostname: "w3s.link",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
         hostname: "ipfs.io",
         pathname: "/**",
       },
@@ -43,7 +48,12 @@ const nextConfig = {
       },
       {
         protocol: "https",
-        hostname: "*.ipfs.cf-ipfs.com",
+        hostname: "dweb.link",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "4everland.io",
         pathname: "/**",
       },
       {

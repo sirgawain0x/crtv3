@@ -195,7 +195,7 @@ export const PreviewPlayer: React.FC<{ src: Src[]; title: string }> = ({
       <Player.Root
         src={src}
         autoPlay={false}
-        volume={0.5}
+        volume={0}
         aspectRatio={16 / 9}
         onError={(error) => {
           console.error("Player error:", error);

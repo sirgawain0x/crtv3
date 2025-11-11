@@ -127,7 +127,7 @@ export function Player(props: {
     <LivepeerPlayer.Root
       src={src}
       autoPlay={false}
-      volume={0.5}
+      volume={0}
       aspectRatio={16 / 9}
     >
       <LivepeerPlayer.Container
