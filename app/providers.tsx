@@ -12,6 +12,8 @@ import { ApolloNextAppProvider } from "@apollo/client-integration-nextjs";
 import { makeClient } from "./apolloWrapper";
 import { RadixProvider } from "@/components/ui/radix-provider";
 import { cleanupExistingIframes } from "@/components/IframeCleanup";
+// Import dev warning suppression (only active in development)
+import "@/lib/utils/suppressDevWarnings";
 
 function ErrorFallback({ error }: { error: Error }) {
   return (

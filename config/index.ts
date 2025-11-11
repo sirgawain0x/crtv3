@@ -2,7 +2,7 @@ import { z } from "zod";
 
 const configSchema = z.object({
   alchemyApiKey: z.string().optional(),
-  subgraphQueryKey: z.string().optional(),
+  // subgraphQueryKey no longer needed - now using Goldsky public endpoints
   // ... any other config values
 });
 
@@ -11,7 +11,6 @@ export type Config = z.infer<typeof configSchema>;
 // Load config from environment variables
 export const config: Config = {
   alchemyApiKey: process.env.NEXT_PUBLIC_ALCHEMY_API_KEY || "",
-  subgraphQueryKey: process.env.SUBGRAPH_QUERY_KEY,
   // ... any other config values
 };
 

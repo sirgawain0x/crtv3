@@ -1,19 +1,19 @@
-# Verification Guide - Subgraph Configuration
+# Verification Guide - Goldsky Subgraph Configuration
 
 ## ✅ Configuration Status
 
-Your `SUBGRAPH_QUERY_KEY` is set in `.env.local`. Now let's verify everything is working.
+The application now uses **Goldsky** public endpoints for subgraph access. No authentication keys are required!
+
+**Subgraph Endpoints:**
+- **MeTokens**: `https://api.goldsky.com/api/public/project_cmh0iv6s500dbw2p22vsxcfo6/subgraphs/metokens/v0.0.1/gn`
+- **Creative TV**: `https://api.goldsky.com/api/public/project_cmh0iv6s500dbw2p22vsxcfo6/subgraphs/creative_tv/0.1/gn`
 
 ---
 
-## 🔄 Step 1: Restart Development Server
+## 🔄 Step 1: Start Development Server
 
-**IMPORTANT**: Environment variables are only loaded when the server starts.
-
-If your dev server is currently running:
 ```bash
-# Stop the server (Ctrl+C)
-# Then restart it
+# Start or restart your dev server
 yarn dev
 ```
 
@@ -21,21 +21,21 @@ yarn dev
 
 ## 🧪 Step 2: Check Server Logs
 
-After restarting, look for these messages in your terminal:
+After starting, look for these messages in your terminal:
 
 ### ✅ Success Indicators
 ```
-✅ Query key available
-🔗 Forwarding to subgraph endpoint: https://subgraph.satsuma-prod.com/***/...
+🔗 Forwarding to Goldsky subgraph endpoint: https://api.goldsky.com/...
+✅ Goldsky subgraph query successful
 ```
 
 ### ❌ Failure Indicators
 ```
-❌ SUBGRAPH_QUERY_KEY environment variable is not set
-💡 Please set SUBGRAPH_QUERY_KEY in your environment variables
+❌ Goldsky subgraph request failed
+💥 Error proxying Goldsky subgraph request
 ```
 
-If you see failure indicators AFTER restarting, the environment variable might not be loaded correctly.
+If you see failure indicators, check your internet connection and the Goldsky service status.
 
 ---
 
@@ -94,78 +94,52 @@ You can test the API route directly:
 
 ## 🚨 Troubleshooting
 
-### Problem: Still getting "SUBGRAPH_QUERY_KEY not set" error
-
-**Solution 1: Verify .env.local location**
-```bash
-# From project root
-ls -la .env.local
-# Should show the file exists
-```
-
-**Solution 2: Check file format**
-```bash
-# View the file
-cat .env.local | grep SUBGRAPH_QUERY_KEY
-# Should show: SUBGRAPH_QUERY_KEY=81c207136f1d
-```
-
-**Solution 3: Restart server properly**
-```bash
-# Make sure to kill all Next.js processes
-pkill -f "next dev"
-# Then start fresh
-yarn dev
-```
-
----
-
-### Problem: Getting 401 (Unauthorized) error
-
-**Possible Causes**:
-- API key is invalid or expired
-- API key doesn't have access to this subgraph
-
-**Solution**:
-1. Visit https://app.satsuma.xyz/
-2. Verify your API key is active
-3. Check if key has access to the MeTokens subgraph
-4. Generate a new key if needed
-5. Update `.env.local` with new key
-6. Restart dev server
-
----
-
 ### Problem: Getting 404 (Not Found) error
 
 **Possible Causes**:
-- Subgraph name or deployment is incorrect
-- Subgraph has been unpublished or moved
+- Goldsky subgraph endpoint URL is incorrect
+- Subgraph deployment ID is wrong
+- Subgraph has been removed or renamed
 
 **Current Configuration**:
-```
-https://subgraph.satsuma-prod.com/{KEY}/creative-organization-dao--378139/metokens/api
-```
+- MeTokens: `https://api.goldsky.com/api/public/project_cmh0iv6s500dbw2p22vsxcfo6/subgraphs/metokens/v0.0.1/gn`
+- Deployment ID: `QmVaWYhk4HKhk9rNQi11RKujTVS4KHF1uHGNVUF4f7xJ53`
 
 **Solution**:
-1. Verify the subgraph exists at Satsuma
-2. Check if the URL path is correct
-3. Contact subgraph maintainer if needed
+1. Verify the endpoint URL in `/app/api/metokens-subgraph/route.ts`
+2. Check Goldsky documentation for correct URL format
+3. Contact subgraph maintainer for updated deployment info
+
+---
+
+### Problem: Getting 429 (Rate Limited) error
+
+**Possible Causes**:
+- Too many requests to Goldsky public endpoint
+- Exceeded free tier rate limits
+
+**Solution**:
+1. Implement request throttling/debouncing
+2. Add caching for subgraph responses
+3. Contact Goldsky for higher rate limits
+4. Consider upgrading to a paid Goldsky plan
 
 ---
 
 ### Problem: Getting 500 (Server Error)
 
 **Possible Causes**:
-- Subgraph is experiencing issues
+- Goldsky subgraph is experiencing issues
 - Subgraph is still syncing/indexing
 - Invalid GraphQL query
+- Network connectivity issues
 
 **Solution**:
-1. Check Satsuma status page
+1. Check Goldsky status page
 2. Wait a few minutes and try again
 3. Check server logs for more details
 4. Verify GraphQL query syntax
+5. Test the endpoint directly with curl
 
 ---
 
@@ -203,29 +177,33 @@ Your setup is working correctly when:
 
 ## 📝 Quick Test Script
 
-Create a test file to verify subgraph access:
+Test the Goldsky endpoint directly with curl:
 
-```typescript
-// test-subgraph.ts
-import { meTokensSubgraph } from './lib/sdk/metokens/subgraph';
-
-async function testSubgraph() {
-  try {
-    console.log('🧪 Testing subgraph connection...');
-    const meTokens = await meTokensSubgraph.getAllMeTokens(5, 0);
-    console.log('✅ Success! Found', meTokens.length, 'MeTokens');
-    console.log('MeTokens:', meTokens);
-  } catch (error) {
-    console.error('❌ Test failed:', error);
-  }
-}
-
-testSubgraph();
+```bash
+curl -X POST https://api.goldsky.com/api/public/project_cmh0iv6s500dbw2p22vsxcfo6/subgraphs/metokens/v0.0.1/gn \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "{ subscribes(first: 1) { id meToken hubId blockTimestamp } }"
+  }'
 ```
 
-Run with:
+Or test through your API proxy:
+
 ```bash
-npx tsx test-subgraph.ts
+curl -X POST http://localhost:3000/api/metokens-subgraph \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "{ subscribes(first: 1) { id meToken hubId blockTimestamp } }"
+  }'
+```
+
+Expected response:
+```json
+{
+  "data": {
+    "subscribes": [...]
+  }
+}
 ```
 
 ---
@@ -255,12 +233,16 @@ If you're still experiencing problems after following this guide:
 
 ## 📞 Support Resources
 
-- **Satsuma Dashboard**: https://app.satsuma.xyz/
-- **Subgraph Documentation**: Check the MeTokens subgraph docs
-- **Next.js Environment Variables**: https://nextjs.org/docs/basic-features/environment-variables
+- **Goldsky Documentation**: https://docs.goldsky.com/
+- **Goldsky Status**: Check Goldsky status page for service availability
+- **MeTokens Subgraph**: Check the MeTokens documentation for query schemas
+- **Next.js Documentation**: https://nextjs.org/docs
 
 ---
 
-**Last Updated**: 2025-01-10
-**Status**: Configuration verified ✅
+**Last Updated**: 2025-01-11
+**Status**: Migrated to Goldsky ✅
+**Deployment IDs:**
+- MeTokens: `QmVaWYhk4HKhk9rNQi11RKujTVS4KHF1uHGNVUF4f7xJ53`
+- Creative TV: `QmbDp8Wfy82g8L7Mv6RCAZHRcYUQB4prQfqchvexfZR8yZ`
 

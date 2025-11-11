@@ -10,6 +10,8 @@ const withPWA = createPWA({
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Turbopack configuration (Next.js 16 uses Turbopack by default)
+  turbopack: {},
   // Optimize memory usage in development
   experimental: {
     // Reduce memory usage by optimizing compilation

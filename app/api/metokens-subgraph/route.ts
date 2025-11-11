@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { config } from '@/config';
 
-// MeTokens subgraph endpoint - using the correct URL format with query key in path
-const getSubgraphEndpoint = (queryKey: string) => 
-  `https://subgraph.satsuma-prod.com/${queryKey}/creative-organization-dao--378139/metokens/api`;
+// MeTokens subgraph endpoint - now using Goldsky
+// Deployment ID: QmVaWYhk4HKhk9rNQi11RKujTVS4KHF1uHGNVUF4f7xJ53
+const METOKENS_SUBGRAPH_URL = 
+  'https://api.goldsky.com/api/public/project_cmh0iv6s500dbw2p22vsxcfo6/subgraphs/metokens/v0.0.1/gn';
+
+// Creative TV subgraph endpoint - now using Goldsky
+// Deployment ID: QmbDp8Wfy82g8L7Mv6RCAZHRcYUQB4prQfqchvexfZR8yZ
+const CREATIVE_TV_SUBGRAPH_URL = 
+  'https://api.goldsky.com/api/public/project_cmh0iv6s500dbw2p22vsxcfo6/subgraphs/creative_tv/0.1/gn';
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,29 +17,10 @@ export async function POST(request: NextRequest) {
       query: body.query?.substring(0, 100) + '...',
       variables: body.variables,
     });
-    
-    // Get the query key directly from environment variable
-    const queryKey = process.env.SUBGRAPH_QUERY_KEY;
-    
-    if (!queryKey) {
-      console.error('❌ SUBGRAPH_QUERY_KEY environment variable is not set');
-      console.error('💡 Please set SUBGRAPH_QUERY_KEY in your environment variables');
-      console.error('💡 You can get a query key from https://app.satsuma.xyz/');
-      return NextResponse.json(
-        { 
-          error: 'Configuration Error',
-          message: 'SUBGRAPH_QUERY_KEY environment variable is not set',
-          hint: 'Please set SUBGRAPH_QUERY_KEY in your .env.local file. Get your key from https://app.satsuma.xyz/',
-        },
-        { status: 500 }
-      );
-    }
 
-    console.log('✅ Query key available');
-
-    // Construct the correct subgraph endpoint with query key in the path
-    const subgraphEndpoint = getSubgraphEndpoint(queryKey);
-    console.log('🔗 Forwarding to subgraph endpoint:', subgraphEndpoint.replace(queryKey, '***'));
+    // Use the Goldsky endpoint (no query key needed)
+    const subgraphEndpoint = METOKENS_SUBGRAPH_URL;
+    console.log('🔗 Forwarding to Goldsky subgraph endpoint:', subgraphEndpoint);
 
     // Prepare headers
     const headers: Record<string, string> = {
@@ -52,7 +38,7 @@ export async function POST(request: NextRequest) {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('❌ Subgraph request failed:', {
+      console.error('❌ Goldsky subgraph request failed:', {
         status: response.status,
         statusText: response.statusText,
         error: errorText,
@@ -63,11 +49,11 @@ export async function POST(request: NextRequest) {
           error: 'Subgraph Query Failed', 
           details: errorText, 
           status: response.status,
-          hint: response.status === 401 
-            ? 'Authentication failed. Check if your SUBGRAPH_QUERY_KEY is valid.'
-            : response.status === 404
-            ? 'Subgraph not found. Verify the subgraph name and deployment.'
-            : 'Subgraph server error. The subgraph may be down or experiencing issues.',
+          hint: response.status === 404
+            ? 'Subgraph not found. Verify the Goldsky deployment ID and subgraph name.'
+            : response.status === 429
+            ? 'Rate limit exceeded. Please try again later.'
+            : 'Subgraph server error. The Goldsky subgraph may be down or experiencing issues.',
         },
         { status: response.status }
       );
@@ -81,7 +67,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(data); // Return errors to client
     }
     
-    console.log('✅ Subgraph query successful:', {
+    console.log('✅ Goldsky subgraph query successful:', {
       hasData: !!data.data,
       dataKeys: data.data ? Object.keys(data.data) : [],
     });
@@ -89,12 +75,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(data);
 
   } catch (error) {
-    console.error('💥 Error proxying subgraph request:', error);
+    console.error('💥 Error proxying Goldsky subgraph request:', error);
     return NextResponse.json(
       { 
         error: 'Internal Server Error',
         message: error instanceof Error ? error.message : 'Unknown error',
-        hint: 'Check server logs for more details',
+        hint: 'Check server logs for more details. Deployment ID: QmVaWYhk4HKhk9rNQi11RKujTVS4KHF1uHGNVUF4f7xJ53',
       },
       { status: 500 }
     );
