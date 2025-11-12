@@ -8,7 +8,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, AlertCircle, CheckCircle, ExternalLink } from 'lucide-react';
 import Image from 'next/image';
 import { formatEther, parseEther, encodeFunctionData, maxUint256 } from 'viem';
-import { useSmartAccountClient, useChain, useSendCalls } from '@account-kit/react';
+import { useSmartAccountClient, useChain } from '@account-kit/react';
 import { useMeTokensSupabase, MeTokenData } from '@/lib/hooks/metokens/useMeTokensSupabase';
 import { DaiFundingOptions } from '@/components/wallet/funding/DaiFundingOptions';
 
@@ -42,7 +42,6 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
   const { client } = useSmartAccountClient({});
   const { chain } = useChain();
   const { isPending, isConfirming, isConfirmed, transactionError } = useMeTokensSupabase();
-  const { sendCallsAsync } = useSendCalls({ client });
 
   // Helper function to wait with countdown
   const waitWithCountdown = async (seconds: number) => {
@@ -304,12 +303,6 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
       return;
     }
 
-    // Verify approval is complete
-    if (!approvalComplete) {
-      setError('Please approve DAI first before minting');
-      return;
-    }
-
     setIsMinting(true);
     setError(null);
     setSuccess(null);
@@ -329,8 +322,56 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
       
       console.log('✅ Confirmed not subscribed, proceeding with mint...');
 
-      const diamondAddress = '0xba5502db2aC2cBff189965e991C07109B14eB3f5';
+      const diamondAddress = '0xba5502db2aC2cBff189965e991C07109B14eB3f5' as `0x${string}`;
+      const daiAddress = '0x50c5725949a6f0c72e6c4a641f24049a917db0cb' as `0x${string}`;
       const depositAmount = parseEther(assetsDeposited);
+      
+      // CRITICAL: Refresh and verify smart account has DAI balance BEFORE attempting transaction
+      console.log('🔍 Verifying smart account DAI balance...');
+      await checkDaiBalance(); // Refresh balance first to get latest state
+      
+      console.log('📊 Balance check:', {
+        smartAccount: client.account?.address,
+        daiBalance: formatEther(daiBalance),
+        required: formatEther(depositAmount),
+        hasEnough: daiBalance >= depositAmount,
+      });
+      
+      if (daiBalance < depositAmount) {
+        const errorMsg = `Insufficient DAI balance in your smart account. ` +
+          `You have ${formatEther(daiBalance)} DAI but need ${formatEther(depositAmount)} DAI. ` +
+          `Please transfer DAI to your smart account (${client.account?.address}) first. ` +
+          `DAI must be in your smart account, not your EOA wallet.`;
+        console.error('❌', errorMsg);
+        setError(errorMsg);
+        setIsMinting(false);
+        return;
+      }
+      
+      console.log('✅ Smart account has sufficient DAI balance');
+      
+      // Try batched operations with client.sendUserOperation first
+      // This bypasses wallet_prepareCalls and uses eth_estimateUserOperationGas directly
+      console.log('📝 Attempting batched approve + mint with client.sendUserOperation...');
+      setSuccess('Batching approval and mint in single transaction... Please sign in your wallet.');
+      
+      // Build approve operation
+      const approveData = encodeFunctionData({
+        abi: [
+          {
+            "inputs": [
+              {"internalType": "address", "name": "spender", "type": "address"},
+              {"internalType": "uint256", "name": "amount", "type": "uint256"}
+            ],
+            "name": "approve",
+            "outputs": [{"internalType": "bool", "name": "", "type": "bool"}],
+            "stateMutability": "nonpayable",
+            "type": "function"
+          }
+        ] as const,
+        functionName: 'approve',
+        args: [diamondAddress, maxUint256],
+      });
       
       // Build mint calldata
       const mintCalldata = encodeFunctionData({
@@ -351,90 +392,423 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
         args: [meToken.address as `0x${string}`, depositAmount, client.account?.address as `0x${string}`],
       });
       
-      // Mint with retry logic
-      console.log('📝 Step 2: Minting MeTokens with retry logic...');
-      setSuccess('Minting MeTokens... Please sign in your wallet.');
-      
-      let mintSuccess = false;
-      let mintAttempts = 0;
-      const maxMintAttempts = 3;
-      const mintRetryDelay = 5000; // 5 seconds between retries
-      
-      while (!mintSuccess && mintAttempts < maxMintAttempts) {
-        mintAttempts++;
+      // STRATEGY: Try batched operations first, fallback to separate transactions
+      // 
+      // Why this approach?
+      // 1. Batched operations (if successful) = one signature, faster, better UX
+      // 2. However, gas estimation for batched operations may fail with "insufficient allowance"
+      //    because eth_estimateUserOperationGas doesn't properly simulate state changes
+      // 3. Fallback to separate transactions ensures it works even if batching fails
+      //    - Step 1: Approve DAI (confirmed on-chain)
+      //    - Step 2: Mint MeTokens (uses confirmed allowance)
+      //
+      // This gives us best of both worlds: fast batching when possible, reliable fallback when needed
+      try {
+        console.log('🔄 Attempt 1: Batched operations with sendUserOperation...');
+        console.log('💡 Using client.sendUserOperation directly (bypasses wallet_prepareCalls)');
         
-        try {
-          console.log(`🪙 Mint attempt ${mintAttempts}/${maxMintAttempts}...`);
-          setSuccess(`Minting MeTokens (attempt ${mintAttempts}/${maxMintAttempts})... Please sign in your wallet.`);
-          
-          console.log('🔍 Mint operation details:', {
+        const batchedOperations = [
+          {
+            target: daiAddress,
+            data: approveData,
+            value: BigInt(0),
+          },
+          {
             target: diamondAddress,
-            dataLength: mintCalldata.length,
-            value: '0',
-          });
-          
-          // Add timeout wrapper
-          const mintPromise = client.sendUserOperation({
-            uo: {
-              target: diamondAddress,
-              data: mintCalldata,
-              value: BigInt(0),
-            },
-          });
-          
-          const mintTimeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => {
-              reject(new Error('Mint transaction signature timeout. Please check your wallet and approve the transaction, or try again.'));
-            }, 120000); // 2 minutes timeout
-          });
-          
-          const mintOperation = await Promise.race([mintPromise, mintTimeoutPromise]) as Awaited<ReturnType<typeof client.sendUserOperation>>;
-          
-          console.log('✅ Mint UserOperation sent:', mintOperation.hash);
-          console.log('⏳ Waiting for confirmation...');
-          setSuccess('Mint transaction sent! Waiting for confirmation...');
-          
-          const finalTxHash = await client.waitForUserOperationTransaction({
-            hash: mintOperation.hash,
-          });
-          
-          console.log('✅ Mint transaction completed:', finalTxHash);
-          mintSuccess = true;
-          
-          console.log('🎉 MeToken subscription completed! Transaction ID:', finalTxHash);
-          setSuccess('Successfully added liquidity to your MeToken!');
-          setAssetsDeposited('');
-          
-          // Refresh subscription status
-          await checkRealSubscriptionStatus();
-          
-          onSubscriptionSuccess?.();
-          
-        } catch (mintError) {
-          const errorMessage = mintError instanceof Error ? mintError.message : String(mintError);
-          const isAllowanceError = errorMessage.includes('insufficient allowance') || 
-                                 errorMessage.includes('ERC20') ||
-                                 errorMessage.includes('-32500');
-          
-          if (isAllowanceError && mintAttempts < maxMintAttempts) {
-            console.log(`❌ Mint attempt ${mintAttempts} failed: ${errorMessage}`);
-            console.log(`💡 This likely hit an un-synced node. Retrying in ${mintRetryDelay/1000}s...`);
-            setSuccess(`Mint attempt ${mintAttempts} hit un-synced node, retrying...`);
-            
-            await new Promise(resolve => setTimeout(resolve, mintRetryDelay));
-            continue; // Retry
-          } else {
-            console.error('❌ Mint transaction failed:', mintError);
-            if (mintAttempts >= maxMintAttempts) {
-              throw new Error(
-                `Mint failed after ${maxMintAttempts} attempts. ` +
-                `This suggests Alchemy's bundler infrastructure is experiencing sync delays. ` +
-                `Please try again in a few minutes or contact Alchemy support. ` +
-                `Error: ${errorMessage}`
-              );
-            }
-            throw mintError;
+            data: mintCalldata,
+            value: BigInt(0),
           }
+        ];
+        
+        console.log('📞 Sending batched UserOperation:', {
+          operations: batchedOperations.length,
+          approve: { target: daiAddress, dataLength: approveData.length },
+          mint: { target: diamondAddress, dataLength: mintCalldata.length },
+          smartAccount: client.account?.address,
+        });
+        
+        const batchOperation = await client.sendUserOperation({
+          uo: batchedOperations,
+        });
+        
+        console.log('✅ Batched UserOperation sent:', batchOperation.hash);
+        setSuccess('Batched transaction sent! Waiting for confirmation...');
+        
+        const batchTxHash = await client.waitForUserOperationTransaction({
+          hash: batchOperation.hash,
+        });
+        
+        console.log('✅ Batched transaction completed:', batchTxHash);
+        console.log('🎉 MeToken subscription completed! Transaction ID:', batchTxHash);
+        setSuccess('Successfully added liquidity to your MeToken!');
+        setAssetsDeposited('');
+        setApprovalComplete(true);
+        
+        // Refresh subscription status
+        await checkRealSubscriptionStatus();
+        
+        onSubscriptionSuccess?.();
+        return; // Success - exit early
+        
+      } catch (batchError) {
+        const batchErrorMessage = batchError instanceof Error ? batchError.message : String(batchError);
+        console.warn('⚠️ Batched operation failed, falling back to separate transactions:', batchErrorMessage);
+        
+        // Check if it's an allowance error - if so, use separate transactions
+        const isAllowanceError = batchErrorMessage.includes('insufficient allowance') || 
+                                 batchErrorMessage.includes('ERC20');
+        
+        if (!isAllowanceError) {
+          // If it's not an allowance error, throw it - might be a different issue
+          throw batchError;
+        }
+        
+        // Fallback: Use separate transactions
+        console.log('📝 Fallback: Using separate transactions (approve first, then mint)');
+        
+        // CRITICAL: Check current allowance first - if sufficient, skip approval
+        console.log('🔍 Checking current allowance before attempting approval...');
+        let currentAllowance: bigint;
+        try {
+          currentAllowance = await client.readContract({
+            address: daiAddress,
+            abi: [
+              {
+                "inputs": [
+                  {"internalType": "address", "name": "owner", "type": "address"},
+                  {"internalType": "address", "name": "spender", "type": "address"}
+                ],
+                "name": "allowance",
+                "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+                "stateMutability": "view",
+                "type": "function"
+              }
+            ] as const,
+            functionName: 'allowance',
+            args: [client.account?.address as `0x${string}`, diamondAddress as `0x${string}`] as const,
+          }) as bigint;
+          
+          console.log('📊 Current allowance check:', {
+            allowance: currentAllowance.toString(),
+            formatted: formatEther(currentAllowance),
+            required: depositAmount.toString(),
+            hasUnlimited: currentAllowance >= (maxUint256 / BigInt(2)),
+            hasSufficient: currentAllowance >= depositAmount,
+          });
+        } catch (allowanceCheckError) {
+          console.warn('⚠️ Failed to check allowance, proceeding with approval:', allowanceCheckError);
+          currentAllowance = BigInt(0);
+        }
+        
+        const hasUnlimitedAllowance = currentAllowance >= (maxUint256 / BigInt(2));
+        const hasSufficientAllowance = currentAllowance >= depositAmount;
+        
+        let approveTxHash: string | null = null;
+        
+        // Only approve if allowance is insufficient
+        if (!hasUnlimitedAllowance && !hasSufficientAllowance) {
+          console.log('📝 Allowance insufficient, sending approve transaction...');
+          setSuccess('Step 1: Approving DAI... Please sign in your wallet.');
+          
+          console.log('📋 Approve transaction details:', {
+            target: daiAddress,
+            dataLength: approveData.length,
+            data: approveData,
+            smartAccount: client.account?.address,
+            currentAllowance: currentAllowance.toString(),
+            required: depositAmount.toString(),
+          });
+          
+          let approveOperation;
+          try {
+            // Add timeout wrapper to prevent hanging
+            console.log('⏳ Sending approve UserOperation (this may require wallet signature)...');
+            const approvePromise = client.sendUserOperation({
+              uo: {
+                target: daiAddress,
+                data: approveData,
+                value: BigInt(0),
+              },
+            });
+            
+            const timeoutPromise = new Promise<never>((_, reject) => {
+              setTimeout(() => {
+                reject(new Error('Approval transaction timeout after 2 minutes. Please check your wallet and approve the transaction, or try again.'));
+              }, 120000); // 2 minutes timeout
+            });
+            
+            approveOperation = await Promise.race([approvePromise, timeoutPromise]);
+            
+            console.log('✅ Approve UserOperation sent:', approveOperation.hash);
+            setSuccess('Approval sent! Waiting for confirmation...');
+          } catch (approveSendError) {
+            const approveSendErrorMessage = approveSendError instanceof Error ? approveSendError.message : String(approveSendError);
+            console.error('❌ Failed to send approve UserOperation:', approveSendErrorMessage);
+            console.error('❌ Full error details:', approveSendError);
+            console.error('❌ Error stack:', approveSendError instanceof Error ? approveSendError.stack : 'No stack trace');
+            
+            // Re-throw with more context
+            throw new Error(
+              `Failed to send approval transaction: ${approveSendErrorMessage}. ` +
+              `Please check your wallet and ensure you approve the transaction. ` +
+              `If the issue persists, try refreshing the page and trying again.`
+            );
+          }
+          
+          try {
+            console.log('⏳ Waiting for approve transaction confirmation...');
+            approveTxHash = await client.waitForUserOperationTransaction({
+              hash: approveOperation.hash,
+            });
+          } catch (approveWaitError) {
+            const approveWaitErrorMessage = approveWaitError instanceof Error ? approveWaitError.message : String(approveWaitError);
+            console.error('❌ Failed to wait for approve transaction:', approveWaitErrorMessage);
+            throw new Error(
+              `Approval transaction was sent (${approveOperation.hash}) but failed to confirm: ${approveWaitErrorMessage}. ` +
+              `Please check the transaction on a block explorer.`
+            );
+          }
+          
+          console.log('✅ Approve transaction confirmed:', approveTxHash);
+          setApprovalTxHash(approveTxHash);
+          setSuccess('Approval confirmed! Waiting for state propagation...');
+        } else {
+          console.log('✅ Sufficient allowance already exists, skipping approval');
+          console.log('📊 Allowance details:', {
+            allowance: currentAllowance.toString(),
+            formatted: formatEther(currentAllowance),
+            hasUnlimited: hasUnlimitedAllowance,
+            hasSufficient: hasSufficientAllowance,
+          });
+          setSuccess('Allowance verified! Proceeding to mint...');
+        }
+        
+        // Only wait for state propagation if we actually sent an approval transaction
+        if (approveTxHash) {
+          // CRITICAL: Wait for transaction to be included in multiple blocks
+          // Base has ~2 second block time, so 5 blocks = ~10 seconds
+          // This ensures the transaction is fully propagated across all nodes
+          console.log('⏳ Waiting for approval transaction to be included in multiple blocks (10 seconds)...');
+          await new Promise(resolve => setTimeout(resolve, 10000));
+          
+          // CRITICAL: Poll allowance on-chain until it's actually set
+          // This ensures the bundler sees the updated state before attempting mint
+          console.log('🔍 Polling allowance on-chain until set...');
+          setSuccess('Verifying allowance on-chain...');
+          const maxAttempts = 15; // Increased from 10 to 15
+          const initialDelay = 3000; // Start with 3 seconds (increased from 2)
+          let allowanceSet = false;
+          
+          for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+              const polledAllowance = await client.readContract({
+                address: daiAddress,
+                abi: [
+                  {
+                    "inputs": [
+                      {"internalType": "address", "name": "owner", "type": "address"},
+                      {"internalType": "address", "name": "spender", "type": "address"}
+                    ],
+                    "name": "allowance",
+                    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+                    "stateMutability": "view",
+                    "type": "function"
+                  }
+                ] as const,
+                functionName: 'allowance',
+                args: [client.account?.address as `0x${string}`, diamondAddress as `0x${string}`] as const,
+              }) as bigint;
+              
+              const hasUnlimitedAllowance = polledAllowance >= (maxUint256 / BigInt(2));
+              const hasSufficientAllowance = polledAllowance >= depositAmount;
+              
+              console.log(`📊 Allowance check attempt ${attempt}/${maxAttempts}:`, {
+                allowance: polledAllowance.toString(),
+                formatted: formatEther(polledAllowance),
+                hasUnlimited: hasUnlimitedAllowance,
+                hasSufficient: hasSufficientAllowance,
+                required: depositAmount.toString(),
+              });
+              
+              if (hasUnlimitedAllowance || hasSufficientAllowance) {
+                allowanceSet = true;
+                console.log('✅ Allowance verified on-chain!');
+                break;
+              }
+              
+              // Exponential backoff: wait longer each attempt (capped at 15 seconds)
+              const delay = Math.min(initialDelay * Math.pow(2, attempt - 1), 15000);
+              console.log(`⏳ Allowance not yet set, waiting ${delay}ms before retry...`);
+              setSuccess(`Verifying allowance... (attempt ${attempt}/${maxAttempts})`);
+              await new Promise(resolve => setTimeout(resolve, delay));
+              
+            } catch (allowanceError) {
+              console.warn(`⚠️ Error checking allowance (attempt ${attempt}):`, allowanceError);
+              // Continue to next attempt with exponential backoff (capped at 15 seconds)
+              const delay = Math.min(initialDelay * Math.pow(2, attempt - 1), 15000);
+              await new Promise(resolve => setTimeout(resolve, delay));
+            }
+          }
+          
+          if (!allowanceSet) {
+            throw new Error(
+              `Allowance not set after ${maxAttempts} attempts. ` +
+              `The approval transaction was confirmed (${approveTxHash}), but the allowance is not yet visible on-chain. ` +
+              `Please wait a few moments and try again, or check the transaction on a block explorer.`
+            );
+          }
+          
+          // CRITICAL: Additional delay to ensure bundler state is fully updated
+          // The bundler might be using a different RPC node that needs more time to sync
+          // Waiting 15 seconds ensures all nodes in Alchemy's load balancer have synced
+          console.log('⏳ Waiting additional 15 seconds for bundler state propagation...');
+          setSuccess('Allowance verified! Waiting for bundler state update (this may take up to 15 seconds)...');
+          await new Promise(resolve => setTimeout(resolve, 15000));
+        } else {
+          // If we skipped approval, we still need to wait a bit for bundler state sync
+          // The allowance exists but bundler might need time to see it
+          console.log('⏳ Allowance already exists, waiting 5 seconds for bundler state sync...');
+          setSuccess('Allowance verified! Waiting for bundler state update...');
+          await new Promise(resolve => setTimeout(resolve, 5000));
+        }
+        
+        // Step 2: Mint MeTokens (with retry logic)
+        console.log('📝 Sending mint transaction...');
+        setSuccess('Step 2: Minting MeTokens... Please sign in your wallet.');
+        
+        const maxMintRetries = 3;
+        let mintSuccess = false;
+        let lastMintError: Error | null = null;
+        let hasSentFreshApproval = false; // Track if we've sent a fresh approval for bundler sync
+        
+        for (let mintAttempt = 1; mintAttempt <= maxMintRetries; mintAttempt++) {
+          try {
+            console.log(`🔄 Mint attempt ${mintAttempt}/${maxMintRetries}...`);
+            const mintOperation = await client.sendUserOperation({
+              uo: {
+                target: diamondAddress,
+                data: mintCalldata,
+                value: BigInt(0),
+              },
+            });
+            
+            console.log('✅ Mint UserOperation sent:', mintOperation.hash);
+            setSuccess('Mint sent! Waiting for confirmation...');
+            
+            const mintTxHash = await client.waitForUserOperationTransaction({
+              hash: mintOperation.hash,
+            });
+            
+            console.log('✅ Mint transaction completed:', mintTxHash);
+            console.log('🎉 MeToken subscription completed! Transaction ID:', mintTxHash);
+            setSuccess('Successfully added liquidity to your MeToken!');
+            setAssetsDeposited('');
+            setApprovalComplete(true);
+            mintSuccess = true;
+            
+            // Refresh subscription status
+            await checkRealSubscriptionStatus();
+            
+            onSubscriptionSuccess?.();
+            break; // Success - exit retry loop
+            
+          } catch (mintError) {
+            const mintErrorMessage = mintError instanceof Error ? mintError.message : String(mintError);
+            lastMintError = mintError instanceof Error ? mintError : new Error(String(mintError));
+            
+            const isAllowanceError = mintErrorMessage.includes('insufficient allowance') || 
+                                   mintErrorMessage.includes('ERC20');
+            
+            if (!isAllowanceError || mintAttempt === maxMintRetries) {
+              // If it's not an allowance error, or we've exhausted retries, throw it
+              throw mintError;
+            }
+            
+            // CRITICAL: If bundler doesn't see allowance, send a fresh approval to force bundler's node to see it
+            // This is necessary because the bundler uses a different RPC node that may not have synced
+            if (isAllowanceError && !hasSentFreshApproval && mintAttempt === 1) {
+              console.warn('⚠️ Bundler doesn\'t see allowance even though it exists. Sending fresh approval to force bundler sync...');
+              setSuccess('Bundler state sync issue detected. Sending fresh approval to sync bundler...');
+              
+              try {
+                // Send a fresh approval transaction to force the bundler's node to see the allowance
+                console.log('📝 Sending fresh approval to sync bundler state...');
+                const freshApproveOperation = await client.sendUserOperation({
+                  uo: {
+                    target: daiAddress,
+                    data: approveData,
+                    value: BigInt(0),
+                  },
+                });
+                
+                console.log('✅ Fresh approve UserOperation sent:', freshApproveOperation.hash);
+                setSuccess('Fresh approval sent! Waiting for confirmation...');
+                
+                const freshApproveTxHash = await client.waitForUserOperationTransaction({
+                  hash: freshApproveOperation.hash,
+                });
+                
+                console.log('✅ Fresh approve transaction confirmed:', freshApproveTxHash);
+                setApprovalTxHash(freshApproveTxHash);
+                setSuccess('Fresh approval confirmed! Waiting for bundler state sync...');
+                
+                // Wait for bundler state to sync after fresh approval
+                console.log('⏳ Waiting 15 seconds for bundler state sync after fresh approval...');
+                await new Promise(resolve => setTimeout(resolve, 15000));
+                
+                hasSentFreshApproval = true;
+                // Continue to next mint attempt (don't increment retry delay since we just sent approval)
+                continue;
+              } catch (freshApproveError) {
+                console.error('❌ Failed to send fresh approval:', freshApproveError);
+                // Continue with retry logic below
+              }
+            }
+            
+            // If it's an allowance error and we have retries left, wait and retry
+            // Increase retry delays to give bundler more time to sync
+            const retryDelay = 10000 * Math.pow(2, mintAttempt - 1); // Exponential backoff: 10s, 20s, 40s
+            console.warn(`⚠️ Mint failed with allowance error (attempt ${mintAttempt}/${maxMintRetries}):`, mintErrorMessage);
+            console.log(`⏳ Waiting ${retryDelay}ms before retry (bundler may need more time to sync)...`);
+            setSuccess(`Mint failed, retrying... (attempt ${mintAttempt}/${maxMintRetries}, waiting ${retryDelay/1000}s for bundler sync)`);
+            await new Promise(resolve => setTimeout(resolve, retryDelay));
+            
+            // Re-verify allowance before retry
+            console.log('🔍 Re-verifying allowance before retry...');
+            try {
+              const retryAllowance = await client.readContract({
+                address: daiAddress,
+                abi: [
+                  {
+                    "inputs": [
+                      {"internalType": "address", "name": "owner", "type": "address"},
+                      {"internalType": "address", "name": "spender", "type": "address"}
+                    ],
+                    "name": "allowance",
+                    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+                    "stateMutability": "view",
+                    "type": "function"
+                  }
+                ] as const,
+                functionName: 'allowance',
+                args: [client.account?.address as `0x${string}`, diamondAddress as `0x${string}`] as const,
+              }) as bigint;
+              
+              console.log('📊 Allowance before retry:', {
+                allowance: retryAllowance.toString(),
+                formatted: formatEther(retryAllowance),
+                required: depositAmount.toString(),
+                hasUnlimited: retryAllowance >= (maxUint256 / BigInt(2)),
+                hasSufficient: retryAllowance >= depositAmount,
+              });
+            } catch (retryAllowanceError) {
+              console.warn('⚠️ Error checking allowance before retry:', retryAllowanceError);
+            }
+          }
+        }
+        
+        if (!mintSuccess && lastMintError) {
+          throw lastMintError;
         }
       }
       
@@ -446,12 +820,9 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
     }
   };
 
-  // Legacy subscribeToHub function (kept for backwards compatibility, but now just calls both)
+  // Legacy subscribeToHub function (kept for backwards compatibility, but now just calls handleMint which batches approve + mint)
   const subscribeToHub = async () => {
-    if (!approvalComplete) {
-      await handleApprove();
-    }
-    await handleMint();
+    await handleMint(); // handleMint now always batches approve + mint
   };
 
   // Check real subscription status from blockchain
@@ -612,11 +983,28 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
                 {daiBalance >= parseEther(assetsDeposited) ? (
                   <span className="text-green-600">✓ Sufficient DAI balance</span>
                 ) : (
-                  <span className="text-orange-600">⚠ Insufficient DAI balance</span>
+                  <div className="space-y-2">
+                    <span className="text-orange-600 block">⚠ Insufficient DAI balance</span>
+                    <p className="text-xs text-muted-foreground">
+                      Your smart account ({client?.account?.address}) needs DAI tokens. 
+                      DAI must be in your smart account, not your EOA wallet.
+                    </p>
+                  </div>
                 )}
               </div>
             )}
           </div>
+
+          {/* Show funding options if insufficient DAI */}
+          {assetsDeposited && parseFloat(assetsDeposited) > 0 && daiBalance < parseEther(assetsDeposited) && (
+            <DaiFundingOptions
+              requiredAmount={parseEther(assetsDeposited).toString()}
+              onBalanceUpdate={(balance) => {
+                setDaiBalance(balance);
+                checkDaiBalance(); // Refresh balance
+              }}
+            />
+          )}
 
           <div className="flex gap-2">
             <Button 
@@ -642,7 +1030,7 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
 
             <Button 
               onClick={handleMint}
-              disabled={!client || isApproving || isMinting || !approvalComplete || !assetsDeposited || parseFloat(assetsDeposited) <= 0 || daiBalance < parseEther(assetsDeposited)}
+              disabled={!client || isApproving || isMinting || !assetsDeposited || parseFloat(assetsDeposited) <= 0 || daiBalance < parseEther(assetsDeposited)}
               className="flex-1"
             >
               {isMinting ? (
