@@ -12,7 +12,11 @@ import Footer from "@/components/Footer";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { IframeCleanup } from "@/components/IframeCleanup";
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ 
+  subsets: ["latin"],
+  // Next.js automatically handles font-display: swap and preloading
+  // The font is applied to body via inter.className, ensuring immediate use
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://tv.creativeplatform.xyz"),

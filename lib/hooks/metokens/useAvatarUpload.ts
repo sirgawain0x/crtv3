@@ -38,7 +38,7 @@ export function useAvatarUpload(targetAddress?: string): UseAvatarUploadResult {
     setUploadProgress(0);
 
     try {
-      // Simulate upload progress (Lighthouse doesn't provide real progress)
+      // Simulate upload progress (Storacha doesn't provide real progress)
       const progressInterval = setInterval(() => {
         setUploadProgress(prev => {
           if (prev >= 90) {
@@ -49,7 +49,7 @@ export function useAvatarUpload(targetAddress?: string): UseAvatarUploadResult {
         });
       }, 100);
 
-      // Upload to IPFS via Lighthouse
+      // Upload to IPFS via Storacha
       const result = await ipfsService.uploadFile(file);
 
       clearInterval(progressInterval);

@@ -268,7 +268,7 @@ export function AccountDropdown() {
     },
   });
 
-  const { account } = useModularAccount();
+  const { account, address: smartAccountAddress } = useModularAccount();
   const { client } = useSmartAccountClient({});
   const validationClient = chain
     ? (client?.extend(installValidationActions as any) as any)
@@ -279,9 +279,9 @@ export function AccountDropdown() {
   useEffect(() => {
     console.log({
       "EOA Address (user.address)": user?.address,
-      "Smart Contract Account Address": account?.address,
+      "Smart Contract Account Address": smartAccountAddress,
     });
-  }, [account, user]);
+  }, [smartAccountAddress, user]);
 
   useEffect(() => {
     let newDisplayAddress = "";
@@ -289,15 +289,15 @@ export function AccountDropdown() {
       newDisplayAddress = `${user.address.slice(0, 6)}...${user.address.slice(
         -4
       )}`;
-    else if (account?.address)
-      newDisplayAddress = `${account.address.slice(
+    else if (smartAccountAddress)
+      newDisplayAddress = `${smartAccountAddress.slice(
         0,
         6
-      )}...${account.address.slice(-4)}`;
+      )}...${smartAccountAddress.slice(-4)}`;
     // Only update if value actually changes
     if (displayAddress !== newDisplayAddress)
       setDisplayAddress(newDisplayAddress);
-  }, [user, account, displayAddress]);
+  }, [user, smartAccountAddress, displayAddress]);
 
   useEffect(() => {
     const checkNetworkStatus = async () => {
@@ -323,12 +323,12 @@ export function AccountDropdown() {
   // Fetch token balances when dialog opens with send action
   useEffect(() => {
     const fetchTokenBalances = async () => {
-      if (!client || !account?.address || dialogAction !== 'send' || !isDialogOpen) return;
+      if (!client || !smartAccountAddress || dialogAction !== 'send' || !isDialogOpen) return;
 
       try {
         // Get ETH balance
         const ethBalance = await client.getBalance({
-          address: account.address as Address,
+          address: smartAccountAddress as Address,
         });
         
         // Resolve per-chain ERC-20 addresses (Base only for now)
@@ -345,7 +345,7 @@ export function AccountDropdown() {
               address: usdcAddr,
               abi: erc20Abi,
               functionName: 'balanceOf',
-              args: [account.address as Address],
+              args: [smartAccountAddress as Address],
             }) as bigint;
           }
           
@@ -354,7 +354,7 @@ export function AccountDropdown() {
               address: daiAddr,
               abi: erc20Abi,
               functionName: 'balanceOf',
-              args: [account.address as Address],
+              args: [smartAccountAddress as Address],
             }) as bigint;
           }
         }
@@ -370,11 +370,11 @@ export function AccountDropdown() {
     };
 
     fetchTokenBalances();
-  }, [client, account?.address, dialogAction, isDialogOpen, chain?.id]);
+  }, [client, smartAccountAddress, dialogAction, isDialogOpen, chain?.id]);
 
   const copyToClipboard = async () => {
     const addressToCopy =
-      user?.type === "eoa" ? user?.address : account?.address;
+      user?.type === "eoa" ? user?.address : smartAccountAddress;
     if (addressToCopy) {
       try {
         await navigator.clipboard.writeText(addressToCopy);
@@ -401,7 +401,7 @@ export function AccountDropdown() {
   };
 
   const handleCreateSessionKey = async () => {
-    if (!account?.address) return;
+    if (!smartAccountAddress) return;
 
     try {
       const sessionKeyEntityId = sessionKeys.length + 1;
@@ -623,7 +623,7 @@ export function AccountDropdown() {
   };
 
   const handleRemoveSessionKey = async (sessionKey: any) => {
-    if (!validationClient || !account?.address || !chain) return;
+    if (!validationClient || !smartAccountAddress || !chain) return;
 
     try {
       const sessionKeyEntityId = sessionKeys.indexOf(sessionKey) + 1;
@@ -1062,7 +1062,7 @@ export function AccountDropdown() {
           >
             <Avatar className="h-8 w-8">
               <AvatarImage
-                src={makeBlockie(account?.address || user?.address || "0x")}
+                src={makeBlockie(smartAccountAddress || user?.address || "0x")}
                 alt="Wallet avatar"
               />
             </Avatar>
@@ -1080,7 +1080,7 @@ export function AccountDropdown() {
           >
             <Avatar className="h-8 w-8">
               <AvatarImage
-                src={makeBlockie(account?.address || user?.address || "0x")}
+                src={makeBlockie(smartAccountAddress || user?.address || "0x")}
                 alt="Wallet avatar"
               />
             </Avatar>

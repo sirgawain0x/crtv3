@@ -16,10 +16,11 @@ import {
   SubtitlesProvider,
   useSubtitles,
 } from "@/components/Player/Subtitles";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useVideo } from "@/context/VideoContext";
 import { Subtitles } from "@/lib/types/video-asset";
 import "./Player.css";
+import { safelyPauseVideo } from "@/lib/utils/video-controls";
 
 /**
  * Asset metadata for video playback
@@ -88,15 +89,22 @@ export const TrendingPlayer: React.FC<{
     };
   }, [src, title]);
 
+  const safelyPauseCurrentVideo = useCallback(async () => {
+    const video = containerRef.current?.querySelector("video");
+    if (video) {
+      await safelyPauseVideo(video);
+    }
+  }, []);
+
   useEffect(() => {
     if (currentPlayingId && currentPlayingId !== playerId) {
       // Another video started playing, pause this one
       const video = containerRef.current?.querySelector("video");
       if (video && !video.paused) {
-        video.pause();
+        safelyPauseCurrentVideo();
       }
     }
-  }, [currentPlayingId, playerId]);
+  }, [currentPlayingId, playerId, safelyPauseCurrentVideo]);
 
   if (!src || src.length === 0) {
     return <div>No video source available.</div>;

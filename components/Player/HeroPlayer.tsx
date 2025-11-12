@@ -2,9 +2,10 @@
 import * as Player from '@livepeer/react/player';
 import { Src } from '@livepeer/react';
 import { PlayIcon, PauseIcon, MuteIcon, UnmuteIcon } from '@livepeer/react/assets';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useVideo } from '../../context/VideoContext';
 import './Player.css';
+import { safelyPauseVideo } from '@/lib/utils/video-controls';
 
 export const HeroPlayer: React.FC<{ src: Src[] | null; title: string }> = ({
   src,
@@ -25,15 +26,22 @@ export const HeroPlayer: React.FC<{ src: Src[] | null; title: string }> = ({
     };
   }, [src, title]);
 
+  const safelyPauseCurrentVideo = useCallback(async () => {
+    const video = containerRef.current?.querySelector('video');
+    if (video) {
+      await safelyPauseVideo(video);
+    }
+  }, []);
+
   useEffect(() => {
     if (currentPlayingId && currentPlayingId !== playerId) {
       // Another video started playing, pause this one
       const video = containerRef.current?.querySelector('video');
       if (video && !video.paused) {
-        video.pause();
+        safelyPauseCurrentVideo();
       }
     }
-  }, [currentPlayingId, playerId]);
+  }, [currentPlayingId, playerId, safelyPauseCurrentVideo]);
 
 
   if (!src || src.length === 0) {
