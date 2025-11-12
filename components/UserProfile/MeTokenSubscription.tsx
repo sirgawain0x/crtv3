@@ -114,7 +114,7 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
           }
         ] as const,
         functionName: 'allowance',
-        args: [client.account?.address as `0x${string}`, diamondAddress],
+        args: [client.account?.address as `0x${string}`, diamondAddress as `0x${string}`] as const,
       }) as bigint;
       
       const hasUnlimitedAllowance = currentAllowance >= (maxUint256 / BigInt(2));
@@ -225,7 +225,7 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
         address: daiAddress,
         abi: allowanceAbi,
         functionName: 'allowance' as const,
-        args: [client.account?.address as `0x${string}`, diamondAddress],
+        args: [client.account?.address as `0x${string}`, diamondAddress as `0x${string}`] as const,
       };
       
       let validated = false;

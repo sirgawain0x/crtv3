@@ -48,23 +48,14 @@ export class IPFSService {
 
         // Add proof that this agent has been delegated capabilities on the space
         // The proof from CLI with --base64 flag is base64-encoded
-        // Proof.parse should handle it, but we'll try both formats if needed
+        // Proof.parse should handle it directly
         let proof;
         try {
           // Try parsing directly (handles base64 strings)
           proof = await Proof.parse(this.proof);
         } catch (error: any) {
-          // If direct parse fails, try decoding base64 first
-          if (error.message?.includes('Invalid') || error.message?.includes('parse')) {
-            try {
-              const decoded = Buffer.from(this.proof, 'base64');
-              proof = await Proof.parse(new Uint8Array(decoded));
-            } catch (decodeError) {
-              throw new Error(`Failed to parse Storacha proof: ${error.message}. Make sure STORACHA_PROOF is set correctly.`);
-            }
-          } else {
-            throw error;
-          }
+          // If direct parse fails, the proof format is likely incorrect
+          throw new Error(`Failed to parse Storacha proof: ${error.message}. Make sure STORACHA_PROOF is set correctly and is a valid base64-encoded proof string.`);
         }
         const space = await this.client.addSpace(proof);
         await this.client.setCurrentSpace(space.did());
