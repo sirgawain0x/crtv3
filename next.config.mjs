@@ -17,6 +17,51 @@ const nextConfig = {
     // Reduce memory usage by optimizing compilation
     optimizePackageImports: ['@account-kit/react', '@account-kit/core', '@apollo/client', 'lucide-react', 'framer-motion'],
   },
+  // Webpack configuration for WebAssembly support
+  webpack: (config, { isServer, webpack }) => {
+    // Enable async WebAssembly loading (required for XMTP WASM bindings)
+    config.experiments = {
+      ...config.experiments,
+      asyncWebAssembly: true,
+    };
+
+    // Handle .wasm files as asset resources
+    // Place them in static/media/ to match Next.js default behavior
+    config.module.rules.push({
+      test: /\.wasm$/,
+      type: 'asset/resource',
+      generator: {
+        filename: 'static/media/[name].[contenthash][ext]',
+        publicPath: '/_next/static/media/',
+      },
+    });
+
+    // Ensure proper public path resolution for WASM files
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+      };
+
+      // Note: Webpack plugins may not work with Turbopack
+      // The runtime patch in wasm-patch.ts should handle this
+      // But we can try to add the plugin for non-Turbopack builds
+      try {
+        const WasmWorkerPlugin = require('./lib/webpack/wasm-worker-plugin.js');
+        config.plugins.push(new WasmWorkerPlugin());
+      } catch (e) {
+        // Plugin not available or not needed (Turbopack mode)
+        console.warn('WasmWorkerPlugin not loaded (may be using Turbopack):', e.message);
+      }
+
+      // Set publicPath to ensure WASM files are served correctly
+      // This helps with resolving paths in workers
+      if (!config.output.publicPath) {
+        config.output.publicPath = '/_next/';
+      }
+    }
+
+    return config;
+  },
   // Reduce unnecessary rebuilds
   onDemandEntries: {
     // period (in ms) where the server will keep pages in the buffer

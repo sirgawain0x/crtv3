@@ -2451,6 +2451,11 @@
     jose "^5.2.3"
     zod "^3.25.1"
 
+"@fastify/busboy@^2.0.0":
+  version "2.1.1"
+  resolved "https://registry.npmjs.org/@fastify/busboy/-/busboy-2.1.1.tgz#b9da6a878a371829a0502c9b6c1c143ef6663f4d"
+  integrity sha512-vBZP4NlzfOlerQTnba4aqZoMhE/a9HY7HRqoOPaETQcSQuWEIyZMHGfVu6w9wGtGK5fED5qRs2DteVCjOH60sA==
+
 "@fastify/cookie@^9.3.1":
   version "9.4.0"
   resolved "https://registry.yarnpkg.com/@fastify/cookie/-/cookie-9.4.0.tgz#1be3bff03dbe746d3bbddbf31a37354076a190c1"
@@ -9745,6 +9750,54 @@
   dependencies:
     tslib "^2.3.0"
 
+"@xmtp/browser-sdk@^5.0.1":
+  version "5.0.1"
+  resolved "https://registry.npmjs.org/@xmtp/browser-sdk/-/browser-sdk-5.0.1.tgz#ad84fecf18cceaefcaac4fa86cdcb5fd0e7c14b3"
+  integrity sha512-BMxiTUFOFQ6CX4w3rLXyC/hHr0T4craeEP7gXWST+G/AZp64/GcImXgLN2tcLRs20U/ZDo+yGnMlAkiOdQ+u4Q==
+  dependencies:
+    "@xmtp/content-type-group-updated" "^2.0.2"
+    "@xmtp/content-type-primitives" "^2.0.2"
+    "@xmtp/content-type-text" "^2.0.2"
+    "@xmtp/wasm-bindings" "1.5.4"
+    uuid "^11.1.0"
+
+"@xmtp/content-type-group-updated@^2.0.2":
+  version "2.0.2"
+  resolved "https://registry.npmjs.org/@xmtp/content-type-group-updated/-/content-type-group-updated-2.0.2.tgz#b664fd096a14245c3164bd35a5db77240de6c7d4"
+  integrity sha512-ZUGLtzWALo5jimk5hYBVXjbdaKT6zP6a9wK0Urzl9H+Xv2w+H3fYDhwAidU0PXTcLL81qlUM6joxKVlsF5udvA==
+  dependencies:
+    "@xmtp/content-type-primitives" "^2.0.2"
+    "@xmtp/proto" "^3.78.0"
+
+"@xmtp/content-type-primitives@^2.0.2":
+  version "2.0.2"
+  resolved "https://registry.npmjs.org/@xmtp/content-type-primitives/-/content-type-primitives-2.0.2.tgz#cfd6f9fc2b7d7ba1cb0d21325cb0e99458988602"
+  integrity sha512-OTUsCD48sO2Eg69dfre32OSnXSkmefbSZA4L0S58LqYK6+hMymFRRjEH4fvPzXc9WCw5FmCYEG7DFAaB680HiQ==
+  dependencies:
+    "@xmtp/proto" "^3.78.0"
+
+"@xmtp/content-type-text@^2.0.2":
+  version "2.0.2"
+  resolved "https://registry.npmjs.org/@xmtp/content-type-text/-/content-type-text-2.0.2.tgz#dbfde0e5840cd178a18b7ca618b10813e4175820"
+  integrity sha512-nlRufOYPrG5sNbruNPCsb6Qk9/jmJ5lMooPsZEo4Dbwda/2S4bSvrrIncT6if7M2SCha3hxtlgJlFGeTtHy4gQ==
+  dependencies:
+    "@xmtp/content-type-primitives" "^2.0.2"
+
+"@xmtp/proto@^3.78.0":
+  version "3.87.0"
+  resolved "https://registry.npmjs.org/@xmtp/proto/-/proto-3.87.0.tgz#9681babb090434c5fe6090ba835a3747a80be9cb"
+  integrity sha512-aWXaWcsCGlWCD3iQNMqCOHVckili+mUu3y1hQuQmHnIQUVfIV/5o+zMmZ1sP6t2GSWo/GnDr3XBjI7nZh9V9QA==
+  dependencies:
+    long "^5.2.0"
+    protobufjs "^7.0.0"
+    rxjs "^7.8.0"
+    undici "^5.8.1"
+
+"@xmtp/wasm-bindings@1.5.4":
+  version "1.5.4"
+  resolved "https://registry.npmjs.org/@xmtp/wasm-bindings/-/wasm-bindings-1.5.4.tgz#f54dfa0a970b1278048870429b8aa1896bce8394"
+  integrity sha512-4A3ERdZjWjOCQJ6jfoqXsN0uaYn/xa8PY9HRw2nrNsAx7jR6dBaDm4bD19uNE3PEcJiWn+lr/G7Cu93D+uQ9TQ==
+
 "@xrplf/isomorphic@^1.0.0", "@xrplf/isomorphic@^1.0.1":
   version "1.0.1"
   resolved "https://registry.npmjs.org/@xrplf/isomorphic/-/isomorphic-1.0.1.tgz#d7676e0ec0e55a39f37ddc1f3cc30eeab52e0739"
@@ -15485,7 +15538,7 @@ long@^4.0.0:
   resolved "https://registry.npmjs.org/long/-/long-4.0.0.tgz#9a7b71cfb7d361a194ea555241c92f7468d5bf28"
   integrity sha512-XsP+KhQif4bjX1kbuSiySJFNAehNxgLb6hPRGJ9QsUr8ajHkuXGdrHmFUTUUXhDwVX2R5bY4JNZEwbUiMhV+MA==
 
-long@^5.0.0:
+long@^5.0.0, long@^5.2.0:
   version "5.3.2"
   resolved "https://registry.yarnpkg.com/long/-/long-5.3.2.tgz#1d84463095999262d7d7b7f8bfd4a8cc55167f83"
   integrity sha512-mNAgZ1GmyNhD7AuqnTG3/VQ26o760+ZYBPKjPvugO8+nLbYfX6TVpJPseBvopbdY+qpZ/lKUnmEc1LeZYS3QAA==
@@ -16961,7 +17014,7 @@ protobufjs@^6.10.2:
     "@types/node" ">=13.7.0"
     long "^4.0.0"
 
-protobufjs@^7.1.2:
+protobufjs@^7.0.0, protobufjs@^7.1.2:
   version "7.5.4"
   resolved "https://registry.npmjs.org/protobufjs/-/protobufjs-7.5.4.tgz#885d31fe9c4b37f25d1bb600da30b1c5b37d286a"
   integrity sha512-CvexbZtbov6jW2eXAvLukXjXUW1TzFaivC46BpWc/3BpcCysb5Vffu+B3XHMm8lVEuy2Mm4XGex8hBSg1yapPg==
@@ -17675,7 +17728,7 @@ rxjs@^6.6.3:
   dependencies:
     tslib "^1.9.0"
 
-rxjs@^7.8.1:
+rxjs@^7.8.0, rxjs@^7.8.1:
   version "7.8.2"
   resolved "https://registry.yarnpkg.com/rxjs/-/rxjs-7.8.2.tgz#955bc473ed8af11a002a2be52071bf475638607b"
   integrity sha512-dhKf903U/PQZY6boNNtAGdWbG85WAbjT/1xYoZIC7FAY0yWapOBQVsVrDl58W86//e1VpMNBtRV4MaXfdMySFA==
@@ -19209,6 +19262,13 @@ undici-types@~6.21.0:
   version "6.21.0"
   resolved "https://registry.npmjs.org/undici-types/-/undici-types-6.21.0.tgz#691d00af3909be93a7faa13be61b3a5b50ef12cb"
   integrity sha512-iwDZqg0QAGrg9Rav5H4n0M64c3mkR59cJ6wQp+7C4nI0gsmExaedaYLNO44eT4AtBBwjbTiGPMlt2Md0T9H9JQ==
+
+undici@^5.8.1:
+  version "5.29.0"
+  resolved "https://registry.npmjs.org/undici/-/undici-5.29.0.tgz#419595449ae3f2cdcba3580a2e8903399bd1f5a3"
+  integrity sha512-raqeBD6NQK4SkWhQzeYKd1KmIG6dllBOTt55Rmkt4HtI9mwdWtJljnrXjAFUBLTSN67HWrOIZ3EPF4kjUw80Bg==
+  dependencies:
+    "@fastify/busboy" "^2.0.0"
 
 undici@^6.21.2:
   version "6.21.3"

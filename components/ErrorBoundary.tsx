@@ -4,7 +4,7 @@ import React, { Component, ErrorInfo, ReactNode } from 'react';
 
 interface Props {
   children: ReactNode;
-  fallback?: ReactNode;
+  fallback?: ReactNode | ((error: Error) => ReactNode);
 }
 
 interface State {
@@ -36,15 +36,24 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   public render() {
-    if (this.state.hasError) {
-      return this.props.fallback || (
+    if (this.state.hasError && this.state.error) {
+      const { fallback } = this.props;
+      if (fallback) {
+        // Support both function and ReactNode fallbacks
+        if (typeof fallback === 'function') {
+          return fallback(this.state.error);
+        }
+        return fallback;
+      }
+      // Default fallback UI
+      return (
         <div className="flex items-center justify-center p-8">
           <div className="text-center">
             <h2 className="text-lg font-semibold text-red-600 mb-2">
               Something went wrong
             </h2>
             <p className="text-gray-600 mb-4">
-              {this.state.error?.message || 'An unexpected error occurred'}
+              {this.state.error.message || 'An unexpected error occurred'}
             </p>
             <button
               onClick={() => this.setState({ hasError: false, error: undefined })}
