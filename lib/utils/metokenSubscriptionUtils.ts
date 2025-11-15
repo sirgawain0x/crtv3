@@ -221,7 +221,7 @@ export async function checkMeTokenSubscriptionFromBlockchain(meTokenAddress: str
     const isFallbackResult = meTokenInfo[1] === BigInt(0) && meTokenInfo[2] === BigInt(0) && meTokenInfo[3] === BigInt(0);
     
     if (isFallbackResult) {
-      console.log('⚠️ Using fallback result - MeToken exists but subscription info not available');
+      console.debug('ℹ️ Using fallback result - MeToken exists but subscription info not available via Diamond contract');
       return {
         isSubscribed: false,
         status: 'not-subscribed',

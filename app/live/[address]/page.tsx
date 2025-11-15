@@ -22,7 +22,6 @@ import {
   MultistreamTarget,
 } from "@/services/video-assets";
 import { useParams } from "next/navigation";
-import { ClipCreator } from "@/components/Live/ClipCreator";
 import { LivestreamThumbnail } from "@/components/Live/LivestreamThumbnail";
 import { getThumbnailUrl } from "@/services/livepeer-thumbnails";
 
@@ -33,33 +32,57 @@ export default function LivePage() {
     MultistreamTarget[]
   >([]);
   const [isLoadingTargets, setIsLoadingTargets] = useState(false);
-  const { address: streamId } = useParams();
+  const { address: addressParam } = useParams();
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
   const [thumbnailError, setThumbnailError] = useState<string | null>(null);
   const [thumbnailLoading, setThumbnailLoading] = useState(false);
   const [streamKey, setStreamKey] = useState<string | null>(null);
+  const [streamId, setStreamId] = useState<string | null>(null);
   const [isCreatingStream, setIsCreatingStream] = useState(false);
   const [streamCreateError, setStreamCreateError] = useState<string | null>(
     null
   );
 
+  // Fetch multistream targets only after stream is created
   useEffect(() => {
     async function fetchTargets() {
+      if (!streamId) {
+        // Clear targets if no stream exists
+        setMultistreamTargets([]);
+        return;
+      }
+      
       setIsLoadingTargets(true);
-      const result = await listMultistreamTargets();
+      const result = await listMultistreamTargets({ streamId });
       setIsLoadingTargets(false);
-      if (result.targets) setMultistreamTargets(result.targets);
+      if (result.targets) {
+        setMultistreamTargets(result.targets);
+      } else if (result.error) {
+        console.error("Error fetching multistream targets:", result.error);
+      }
     }
     fetchTargets();
-  }, []);
+  }, [streamId]);
 
   useEffect(() => {
     async function fetchThumbnail() {
-      if (!streamId) return;
+      if (!addressParam) return;
+      
+      const id = Array.isArray(addressParam) ? addressParam[0] : addressParam;
+      
+      // Skip thumbnail fetch if streamId is an Ethereum address
+      // Livepeer playback IDs don't start with 0x
+      if (id.startsWith('0x')) {
+        setThumbnailLoading(false);
+        setThumbnailError(null);
+        setThumbnailUrl(null);
+        return;
+      }
+      
       setThumbnailLoading(true);
       setThumbnailError(null);
       const res = (await getThumbnailUrl({
-        playbackId: Array.isArray(streamId) ? streamId[0] : streamId,
+        playbackId: id,
       })) as import("@/lib/types/actions").ActionResponse<{
         thumbnailUrl: string;
       }>;
@@ -69,7 +92,7 @@ export default function LivePage() {
       setThumbnailLoading(false);
     }
     fetchThumbnail();
-  }, [streamId]);
+  }, [addressParam]);
 
   function handleTargetAdded(target: MultistreamTarget) {
     setMultistreamTargets((prev) => [...prev, target]);
@@ -122,15 +145,33 @@ export default function LivePage() {
         ],
         record: false,
         playbackPolicy: { type: "jwt" },
-        multistream: {
-          targets: multistreamTargets
-            .filter((t) => t.id)
-            .map((t) => ({ id: t.id, profile: "source" })),
-        },
+        // Only include multistream config if we have targets
+        // Targets are typically added after stream creation
+        // But we support inline creation if targets are provided
+        ...(multistreamTargets.length > 0 && multistreamTargets.some(t => t.id) ? {
+          multistream: {
+            targets: multistreamTargets
+              .filter((t) => t.id)
+              .map((t) => ({ id: t.id, profile: "source" })),
+          }
+        } : {}),
       });
-      if (result.streamKey) setStreamKey(result.streamKey);
-      else if (result.stream?.streamKey) setStreamKey(result.stream.streamKey);
-      else setStreamCreateError("Stream key not found in response");
+      
+      // Extract stream key and stream ID from response
+      // Livepeer API can return data in different formats:
+      // 1. Direct property: result.streamKey, result.id
+      // 2. Nested in stream object: result.stream.streamKey, result.stream.id
+      const streamKeyValue = result.streamKey || result.stream?.streamKey;
+      const streamIdValue = result.id || result.stream?.id;
+      
+      if (streamKeyValue) {
+        setStreamKey(streamKeyValue);
+        if (streamIdValue) {
+          setStreamId(streamIdValue);
+        }
+      } else {
+        setStreamCreateError("Stream key not found in response");
+      }
     } catch (e) {
       setStreamCreateError("Failed to create stream");
     } finally {
@@ -215,33 +256,40 @@ export default function LivePage() {
                 )}
               </div>
             ) : (
-              <Broadcast streamKey={streamKey} />
+              <>
+                <Broadcast streamKey={streamKey} />
+              </>
             )}
-            <ClipCreator
-              playbackId={process.env.NEXT_PUBLIC_PLAYBACK_ID as string}
-              sessionId={process.env.NEXT_PUBLIC_SESSION_ID as string}
-            />
             <div className="mt-4 border-t border-white/20 pt-3 max-w-[576px] mx-auto">
               <p className="mb-2 text-sm font-semibold">Multistream Targets</p>
-              <MultistreamTargetsForm
-                streamId={Array.isArray(streamId) ? streamId[0] : streamId || ""}
-                onTargetAdded={handleTargetAdded}
-              />
-              {isLoadingTargets ? (
-                <div className="text-xs mt-2">Loading targets...</div>
-              ) : (
+              {streamId ? (
                 <>
-                  <MultistreamTargetsList
-                    targets={multistreamTargets}
-                    onTargetRemoved={handleTargetRemoved}
+                  <MultistreamTargetsForm
+                    streamId={streamId}
+                    onTargetAdded={handleTargetAdded}
+                    isStreamActive={!!streamKey}
                   />
-                  {multistreamTargets.length === 0 && (
-                    <div className="text-xs text-gray-400 mt-2">
-                      No multistream targets configured. Your stream will only
-                      be available on this platform.
-                    </div>
+                  {isLoadingTargets ? (
+                    <div className="text-xs mt-2">Loading targets...</div>
+                  ) : (
+                    <>
+                      <MultistreamTargetsList
+                        targets={multistreamTargets}
+                        onTargetRemoved={handleTargetRemoved}
+                      />
+                      {multistreamTargets.length === 0 && (
+                        <div className="text-xs text-gray-400 mt-2">
+                          No multistream targets configured. Your stream will only
+                          be available on this platform.
+                        </div>
+                      )}
+                    </>
                   )}
                 </>
+              ) : (
+                <div className="text-xs text-gray-400 mt-2">
+                  Create a stream first to configure multistream targets.
+                </div>
               )}
             </div>
           </div>

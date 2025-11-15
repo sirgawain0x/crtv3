@@ -13,6 +13,7 @@ import {
 import { Slash } from "lucide-react";
 // import { ViewsComponent } from "@/components/Player/ViewsComponent";
 import VideoViewMetrics from "@/components/Videos/VideoViewMetrics";
+import { VideoCommentsWrapper } from "@/components/Videos/VideoCommentsWrapper";
 import { Metadata } from "next";
 
 type VideoDetailsPageProps = {
@@ -63,9 +64,13 @@ export default async function VideoDetailsPage({
     return <div>Asset not found</div>;
   }
 
+  // Get video asset from database to access creator_id
+  const videoAsset = await getVideoAssetByAssetId(id);
+  const creatorAddress = videoAsset?.creator_id || null;
+
   return (
-    <div className="container max-w-7xl content-center">
-      <div className="my-5 p-4">
+    <div className="container max-w-7xl mx-auto px-4">
+      <div className="my-5">
         <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem>
@@ -94,14 +99,30 @@ export default async function VideoDetailsPage({
         </Breadcrumb>
       </div>
       <div className="py-10">
-        <VideoDetails asset={assetData} />
-        {/* Metrics components */}
-        {assetData.playbackId && (
-          <div className="flex gap-4 items-center mb-6">
-            {/* <ViewsComponent playbackId={assetData.playbackId} /> */}
-            <VideoViewMetrics playbackId={assetData.playbackId} />
+        <div className="max-w-4xl mx-auto space-y-6">
+          {/* Video Player */}
+          <div>
+            <VideoDetails asset={assetData} />
+            {/* Metrics components */}
+            {assetData.playbackId && (
+              <div className="flex gap-4 items-center mt-4">
+                {/* <ViewsComponent playbackId={assetData.playbackId} /> */}
+                <VideoViewMetrics playbackId={assetData.playbackId} />
+              </div>
+            )}
           </div>
-        )}
+
+          {/* Comments Section - Below video like YouTube */}
+          {videoAsset && (
+            <div className="mt-8">
+              <VideoCommentsWrapper 
+                videoAssetId={videoAsset.id}
+                videoName={assetData?.name || videoAsset.title || "this video"}
+                creatorAddress={creatorAddress}
+              />
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -288,21 +288,33 @@ export async function createMultistreamTarget({
   profile = "720p0",
   videoOnly = false,
 }: CreateMultistreamTargetParams): Promise<CreateMultistreamTargetResult> {
-  if (!streamId || !name || !url)
-    return { error: "Missing streamId, name, or URL" };
+  if (!streamId || !url) {
+    return { error: "Missing streamId or URL" };
+  }
+  
+  // Name is optional - provide default if not given
+  const targetName = name || `Target ${Date.now()}`;
+  
   try {
     const target = await fullLivepeer.stream.addMultistreamTarget(
       {
         profile,
         videoOnly,
-        spec: { name, url },
+        spec: { name: targetName, url },
       },
       streamId
     );
-    if (!target) return { error: "Failed to create multistream target" };
-    return { target: { ...target, url } };
-  } catch (e) {
-    return { error: "Failed to create multistream target" };
+    
+    if (!target) {
+      return { error: "Failed to create multistream target" };
+    }
+    
+    return { target: { ...target, url, name: targetName } };
+  } catch (e: any) {
+    console.error("Error creating multistream target:", e);
+    return { 
+      error: e?.message || "Failed to create multistream target" 
+    };
   }
 }
 
@@ -311,14 +323,46 @@ export interface ListMultistreamTargetsResult {
   error?: string;
 }
 
-export async function listMultistreamTargets(): Promise<ListMultistreamTargetsResult> {
+export interface ListMultistreamTargetsParams {
+  streamId: string;
+}
+
+/**
+ * Lists multistream targets for a specific stream.
+ * According to Livepeer docs, multistream targets are stream-specific.
+ * 
+ * @param streamId - The Livepeer stream ID to fetch targets for
+ * @returns List of multistream targets for the specified stream
+ */
+export async function listMultistreamTargets(
+  { streamId }: ListMultistreamTargetsParams
+): Promise<ListMultistreamTargetsResult> {
+  if (!streamId) {
+    return { error: "Stream ID is required" };
+  }
+  
   try {
-    const targets = await fullLivepeer.multistream.getAll();
-    if (!Array.isArray(targets))
-      return { error: "Failed to fetch multistream targets" };
+    // Fetch the stream to get its multistream targets
+    const stream = await fullLivepeer.stream.get(streamId);
+    
+    if (!stream || !stream.stream) {
+      return { error: "Stream not found" };
+    }
+    
+    // Extract multistream targets from the stream object
+    // Livepeer API returns targets in stream.multistream.targets
+    const targets = stream.stream.multistream?.targets || [];
+    
+    if (!Array.isArray(targets)) {
+      return { error: "Invalid multistream targets format" };
+    }
+    
     return { targets: targets as MultistreamTarget[] };
-  } catch (e) {
-    return { error: "Failed to fetch multistream targets" };
+  } catch (e: any) {
+    console.error("Error fetching multistream targets:", e);
+    return { 
+      error: e?.message || "Failed to fetch multistream targets" 
+    };
   }
 }
 

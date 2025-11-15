@@ -328,8 +328,8 @@ export default function VideoDetails({ asset }: VideoDetailsProps) {
   return (
     <SubtitlesProvider>
       <SubtitlesInitializer assetMetadata={null} />
-      <div className="mx-auto w-full max-w-screen-2xl px-4 py-8">
-        <div className="mx-auto w-full max-w-[1200px] space-y-6">
+      <div className="w-full">
+        <div className="w-full space-y-6">
           <h1 className="text-2xl font-bold">{asset?.name}</h1>
           <div className="flex items-center gap-2">
             {asset?.status?.phase && (

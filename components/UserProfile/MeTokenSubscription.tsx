@@ -11,6 +11,7 @@ import { formatEther, parseEther, encodeFunctionData, maxUint256 } from 'viem';
 import { useSmartAccountClient, useChain } from '@account-kit/react';
 import { useMeTokensSupabase, MeTokenData } from '@/lib/hooks/metokens/useMeTokensSupabase';
 import { DaiFundingOptions } from '@/components/wallet/funding/DaiFundingOptions';
+import { parseBundlerError, shouldRetryError } from '@/lib/utils/bundlerErrorParser';
 
 interface MeTokenSubscriptionProps {
   meToken: MeTokenData;
@@ -392,82 +393,23 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
         args: [meToken.address as `0x${string}`, depositAmount, client.account?.address as `0x${string}`],
       });
       
-      // STRATEGY: Try batched operations first, fallback to separate transactions
+      // STRATEGY: Use separate transactions (approve first, then mint)
       // 
-      // Why this approach?
-      // 1. Batched operations (if successful) = one signature, faster, better UX
-      // 2. However, gas estimation for batched operations may fail with "insufficient allowance"
-      //    because eth_estimateUserOperationGas doesn't properly simulate state changes
-      // 3. Fallback to separate transactions ensures it works even if batching fails
-      //    - Step 1: Approve DAI (confirmed on-chain)
+      // Why separate transactions instead of batching?
+      // 1. Both EIP-4337 (sendUserOperation) and EIP-5792 (sendCallsAsync) fail with "insufficient allowance"
+      //    because the bundler's RPC node doesn't see the allowance during gas estimation
+      // 2. wallet_prepareCalls (used by sendCallsAsync) checks allowance BEFORE simulating approve
+      // 3. The bundler uses a different RPC node than the one used for reading, causing state sync delays
+      // 4. Separate transactions ensure the approve is confirmed on-chain before attempting mint
+      //    - Step 1: Approve DAI (confirmed on-chain, visible to all nodes)
       //    - Step 2: Mint MeTokens (uses confirmed allowance)
       //
-      // This gives us best of both worlds: fast batching when possible, reliable fallback when needed
-      try {
-        console.log('🔄 Attempt 1: Batched operations with sendUserOperation...');
-        console.log('💡 Using client.sendUserOperation directly (bypasses wallet_prepareCalls)');
-        
-        const batchedOperations = [
-          {
-            target: daiAddress,
-            data: approveData,
-            value: BigInt(0),
-          },
-          {
-            target: diamondAddress,
-            data: mintCalldata,
-            value: BigInt(0),
-          }
-        ];
-        
-        console.log('📞 Sending batched UserOperation:', {
-          operations: batchedOperations.length,
-          approve: { target: daiAddress, dataLength: approveData.length },
-          mint: { target: diamondAddress, dataLength: mintCalldata.length },
-          smartAccount: client.account?.address,
-        });
-        
-        const batchOperation = await client.sendUserOperation({
-          uo: batchedOperations,
-        });
-        
-        console.log('✅ Batched UserOperation sent:', batchOperation.hash);
-        setSuccess('Batched transaction sent! Waiting for confirmation...');
-        
-        const batchTxHash = await client.waitForUserOperationTransaction({
-          hash: batchOperation.hash,
-        });
-        
-        console.log('✅ Batched transaction completed:', batchTxHash);
-        console.log('🎉 MeToken subscription completed! Transaction ID:', batchTxHash);
-        setSuccess('Successfully added liquidity to your MeToken!');
-        setAssetsDeposited('');
-        setApprovalComplete(true);
-        
-        // Refresh subscription status
-        await checkRealSubscriptionStatus();
-        
-        onSubscriptionSuccess?.();
-        return; // Success - exit early
-        
-      } catch (batchError) {
-        const batchErrorMessage = batchError instanceof Error ? batchError.message : String(batchError);
-        console.warn('⚠️ Batched operation failed, falling back to separate transactions:', batchErrorMessage);
-        
-        // Check if it's an allowance error - if so, use separate transactions
-        const isAllowanceError = batchErrorMessage.includes('insufficient allowance') || 
-                                 batchErrorMessage.includes('ERC20');
-        
-        if (!isAllowanceError) {
-          // If it's not an allowance error, throw it - might be a different issue
-          throw batchError;
-        }
-        
-        // Fallback: Use separate transactions
-        console.log('📝 Fallback: Using separate transactions (approve first, then mint)');
-        
-        // CRITICAL: Check current allowance first - if sufficient, skip approval
-        console.log('🔍 Checking current allowance before attempting approval...');
+      // This approach is more reliable than batching when dealing with RPC node state sync issues
+      console.log('📝 Using separate transactions (approve first, then mint)');
+      console.log('💡 This approach avoids bundler RPC node state sync issues');
+      
+      // CRITICAL: Check current allowance first - if sufficient, skip approval
+      console.log('🔍 Checking current allowance before attempting approval...');
         let currentAllowance: bigint;
         try {
           currentAllowance = await client.readContract({
@@ -716,13 +658,50 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
             const mintErrorMessage = mintError instanceof Error ? mintError.message : String(mintError);
             lastMintError = mintError instanceof Error ? mintError : new Error(String(mintError));
             
+            // Parse the error to determine if it's a contract error or RPC/infrastructure error
+            const parsedMintError = parseBundlerError(mintError instanceof Error ? mintError : new Error(mintErrorMessage));
+            
+            console.log('🔍 Mint Error Analysis:', {
+              code: parsedMintError.code,
+              message: parsedMintError.message,
+              isContractError: parsedMintError.code?.startsWith('AA') && ['AA23', 'AA24'].includes(parsedMintError.code),
+              isRpcError: !parsedMintError.code || parsedMintError.message.includes('allowance') || parsedMintError.message.includes('estimation'),
+            });
+            
+            // If it's a contract error (AA23: validation reverted, AA24: invalid signature), throw it immediately
+            // These are actual contract issues, not infrastructure
+            if (parsedMintError.code === 'AA23' || parsedMintError.code === 'AA24') {
+              console.error('❌ Contract Error Detected during mint:', parsedMintError);
+              throw new Error(
+                `Contract Error [${parsedMintError.code}]: ${parsedMintError.message}\n\n` +
+                `💡 ${parsedMintError.suggestion}\n\n` +
+                `This is a contract-level error, not an RPC issue. Please check your contract logic.`
+              );
+            }
+            
             const isAllowanceError = mintErrorMessage.includes('insufficient allowance') || 
-                                   mintErrorMessage.includes('ERC20');
+                                   mintErrorMessage.includes('ERC20') ||
+                                   parsedMintError.message.includes('allowance');
             
             if (!isAllowanceError || mintAttempt === maxMintRetries) {
-              // If it's not an allowance error, or we've exhausted retries, throw it
+              // If it's not an allowance/RPC error, or we've exhausted retries, show the parsed error
+              if (!isAllowanceError) {
+                console.warn('⚠️ Non-allowance error during mint:', parsedMintError);
+                setError(
+                  `Error [${parsedMintError.code || 'Unknown'}]: ${parsedMintError.message}\n\n` +
+                  `💡 ${parsedMintError.suggestion}\n\n` +
+                  `This may be an infrastructure issue. The error is NOT from your contract.`
+                );
+              }
               throw mintError;
             }
+            
+            // Log that this is an RPC/infrastructure error, NOT a contract error
+            console.log('ℹ️ RPC/Infrastructure Error Detected during mint (NOT contract error):', {
+              message: parsedMintError.message,
+              explanation: 'This error is caused by RPC node state synchronization issues, not your contract.',
+              attempt: `${mintAttempt}/${maxMintRetries}`,
+            });
             
             // CRITICAL: If bundler doesn't see allowance, send a fresh approval to force bundler's node to see it
             // This is necessary because the bundler uses a different RPC node that may not have synced
@@ -810,11 +789,46 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
         if (!mintSuccess && lastMintError) {
           throw lastMintError;
         }
-      }
       
     } catch (err) {
       console.error('❌ Mint error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to mint MeTokens');
+      
+      // Parse the error to provide better error messages
+      const parsedError = parseBundlerError(err instanceof Error ? err : new Error(String(err)));
+      
+      // Determine if this is a contract error or RPC/infrastructure error
+      const isContractError = parsedError.code?.startsWith('AA') && ['AA23', 'AA24', 'AA25'].includes(parsedError.code);
+      const isRpcError = !parsedError.code || parsedError.message.includes('allowance') || parsedError.message.includes('estimation') || parsedError.message.includes('simulation');
+      
+      // Build user-friendly error message
+      let errorMessage = '';
+      
+      if (isContractError) {
+        // Contract error - actual issue with contract logic
+        errorMessage = `Contract Error [${parsedError.code}]: ${parsedError.message}\n\n` +
+          `💡 ${parsedError.suggestion}\n\n` +
+          `⚠️ This is a contract-level error. Please check your contract logic and parameters.`;
+      } else if (isRpcError) {
+        // RPC/Infrastructure error - NOT a contract issue
+        errorMessage = `RPC/Infrastructure Error: ${parsedError.message}\n\n` +
+          `💡 ${parsedError.suggestion}\n\n` +
+          `ℹ️ This error is NOT from your contract. It's caused by RPC node state synchronization issues.\n` +
+          `The bundler's RPC node may not have synced the latest blockchain state yet.\n` +
+          `This is a known limitation of distributed RPC infrastructure.`;
+      } else {
+        // Generic error
+        errorMessage = `Error [${parsedError.code || 'Unknown'}]: ${parsedError.message}\n\n` +
+          `💡 ${parsedError.suggestion}`;
+      }
+      
+      console.log('📊 Error Summary:', {
+        code: parsedError.code,
+        isContractError,
+        isRpcError,
+        message: parsedError.message,
+      });
+      
+      setError(errorMessage);
     } finally {
       setIsMinting(false);
     }
@@ -848,8 +862,9 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
       if (status.isSubscribed) {
         setError(`This MeToken is already subscribed to Hub ${status.hubId}. No need to subscribe again.`);
       } else if (status.error) {
-        // Show error message but don't prevent subscription attempt
-        console.warn('⚠️ Subscription status check had issues:', status.error);
+        // Log as debug info (not warning) - this is expected for some MeTokens
+        // The Diamond contract function may not be available or the MeToken may not be registered yet
+        console.debug('ℹ️ Subscription status check:', status.error);
         setError(null); // Don't show error to user, just log it
       } else {
         setError(null);
