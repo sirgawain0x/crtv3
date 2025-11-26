@@ -42,7 +42,7 @@ function CoinbaseFundButton({
   function handlePopupCloseFallback(
     popupWindow: Window,
     baseCleanup: () => void,
-    onClose?: () => void
+    onSuccess?: () => void
   ) {
     let focusTimeoutId: NodeJS.Timeout | null = null;
     let maxWaitTimeoutId: NodeJS.Timeout | null = null;
@@ -61,10 +61,10 @@ function CoinbaseFundButton({
       window.removeEventListener("focus", handleFocus);
     };
 
-    const triggerClose = () => {
+    const triggerSuccess = () => {
       fullCleanup();
       setTimeout(() => {
-        onClose?.();
+        onSuccess?.();
       }, 2000);
     };
 
@@ -81,7 +81,7 @@ function CoinbaseFundButton({
             wasFocused = false;
           } catch (error) {
             // Popup is likely closed or inaccessible
-            triggerClose();
+            triggerSuccess();
           }
         }, 1000);
       }
@@ -89,9 +89,10 @@ function CoinbaseFundButton({
 
     window.addEventListener("focus", handleFocus);
 
-    // Set a maximum wait time (5 minutes) - cleanup after timeout
+    // Set a maximum wait time (5 minutes) - cleanup and reset state after timeout
+    // This ensures loading state is reset even if popup closure wasn't detected
     maxWaitTimeoutId = setTimeout(() => {
-      fullCleanup();
+      triggerSuccess();
     }, 5 * 60 * 1000);
   }
 
@@ -148,14 +149,20 @@ function CoinbaseFundButton({
       // Open in new tab/popup
       const newWindow = window.open(onrampBuyUrl, "_blank");
 
-      // Close the dialog when the onramp window opens
-      onClose?.();
+      // If popup was blocked, reset loading state
+      if (!newWindow) {
+        setError("Popup was blocked. Please allow popups for this site and try again.");
+        setLoading(false);
+        return;
+      }
 
       // Listen for the window to close (user completed or cancelled)
+      // Note: Loading state remains true until popup closes (handled in invokeSuccess)
       if (newWindow) {
         let checkClosedIntervalId: NodeJS.Timeout | null = null;
         let messageListener: ((event: MessageEvent) => void) | null = null;
         let fallbackActive = false; // Track if fallback detection is active
+        let successCallbackInvoked = false; // Guard against duplicate onClose calls
 
         // Cleanup function
         const cleanup = () => {
@@ -169,24 +176,43 @@ function CoinbaseFundButton({
           }
         };
 
+        // Safe success callback wrapper - ensures onClose is only called once
+        const invokeSuccess = () => {
+          if (!successCallbackInvoked) {
+            successCallbackInvoked = true;
+            cleanup();
+            setLoading(false); // Set loading to false when popup closes
+            setTimeout(() => {
+              onClose?.();
+            }, 2000);
+          }
+        };
+
         // Method 1: Try to use window.closed (may be blocked by COOP)
         try {
           checkClosedIntervalId = setInterval(() => {
             try {
               // Check if window is closed
               if (newWindow.closed) {
-                cleanup();
+                invokeSuccess();
               }
             } catch (error) {
               // COOP policy blocked access to window.closed
               // Fall back to alternative detection methods
-              console.warn(
-                "Cannot access window.closed due to COOP policy, using alternative detection"
-              );
-              cleanup();
-              // Use focus-based detection as fallback
-              fallbackActive = true;
-              handlePopupCloseFallback(newWindow, cleanup, onClose);
+              // Clear the interval immediately to prevent repeated errors
+              if (checkClosedIntervalId) {
+                clearInterval(checkClosedIntervalId);
+                checkClosedIntervalId = null;
+              }
+              
+              // Only set up fallback if not already active to prevent duplicate handlers
+              if (!fallbackActive) {
+                console.warn(
+                  "Cannot access window.closed due to COOP policy, using alternative detection"
+                );
+                fallbackActive = true;
+                handlePopupCloseFallback(newWindow, cleanup, invokeSuccess);
+              }
             }
           }, 1000);
         } catch (error) {
@@ -194,8 +220,10 @@ function CoinbaseFundButton({
             "Cannot set up window.closed check due to COOP policy, using alternative detection"
           );
           // Use focus-based detection as fallback
-          fallbackActive = true;
-          handlePopupCloseFallback(newWindow, cleanup, onClose);
+          if (!fallbackActive) {
+            fallbackActive = true;
+            handlePopupCloseFallback(newWindow, cleanup, invokeSuccess);
+          }
         }
 
         // Method 2: Listen for postMessage events (if Coinbase sends them)
@@ -213,7 +241,7 @@ function CoinbaseFundButton({
                 event.data === "popup-closed" ||
                 event.data === "payment-success"
               ) {
-                cleanup();
+                invokeSuccess();
               }
             }
           };
@@ -223,9 +251,10 @@ function CoinbaseFundButton({
     } catch (err) {
       console.error("Failed to start Coinbase onramp:", err);
       setError("Failed to start Coinbase onramp. Please try again.");
-    } finally {
-      setLoading(false);
+      setLoading(false); // Set loading to false on error
     }
+    // Note: Don't set loading to false in finally block - it should remain true
+    // until the popup closes (handled in invokeSuccess callback)
   }
 
   return (
