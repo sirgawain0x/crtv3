@@ -80,7 +80,37 @@ The application uses **Goldsky** for blockchain indexing. No configuration is re
 
 **Note:** These endpoints are accessed via the API proxy at `/api/metokens-subgraph` to handle CORS.
 
-### 5. Optional Configuration
+### 5. Coinbase CDP Configuration (Onramp/Offramp)
+
+#### `COINBASE_CDP_API_KEY_ID`
+Your Coinbase Developer Platform (CDP) API Key ID for generating session tokens.
+
+#### `COINBASE_CDP_API_KEY_SECRET`
+Your Coinbase Developer Platform (CDP) Secret API Key for JWT authentication.
+
+**How to get them:**
+1. Go to [Coinbase Developer Platform Portal](https://portal.cdp.coinbase.com/)
+2. Log in or create an account
+3. Create a new project or select an existing one
+4. Navigate to **API Keys** tab
+5. Select **Secret API Keys** section
+6. Click **Create API key**
+7. Configure your key settings (IP allowlist recommended for security)
+8. Download and securely store your API key
+   - The API Key ID is displayed in the portal
+   - The Secret API Key is only shown once during creation - save it securely
+
+**Important Notes:**
+- These keys are required for Coinbase Onramp/Offramp integration
+- Session tokens are generated server-side using these credentials
+- The Secret API Key must never be exposed to the client
+- Session tokens expire after 5 minutes and are single-use
+
+**Documentation:**
+- [CDP API Key Authentication](https://docs.cdp.coinbase.com/api-reference/v2/authentication)
+- [Session Token Authentication](https://docs.cdp.coinbase.com/onramp-&-offramp/session-token-authentication)
+
+### 6. Optional Configuration
 
 #### `NEXT_PUBLIC_SUPPORT_URL`
 Your application's support URL.
@@ -110,6 +140,10 @@ LIVEPEER_WEBHOOK_ID=your_livepeer_webhook_id
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+
+# Coinbase CDP Configuration (Onramp/Offramp)
+COINBASE_CDP_API_KEY_ID=your_cdp_api_key_id
+COINBASE_CDP_API_KEY_SECRET=your_cdp_api_key_secret
 
 # Optional
 NEXT_PUBLIC_SUPPORT_URL=https://your-support-url.com

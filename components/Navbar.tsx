@@ -40,7 +40,7 @@ import type { User as AccountUser } from "@account-kit/signer";
 import useModularAccount from "@/lib/hooks/accountkit/useModularAccount";
 import { base } from "@account-kit/infra";
 import { ArrowBigDown, ArrowBigUp, ChevronDown, Search, X } from "lucide-react";
-import WertFundButton from "./wallet/buy/wert-fund-button";
+import CoinbaseFundButton from "./wallet/buy/coinbase-fund-button";
 import { TokenBalance } from "./wallet/balance/TokenBalance";
 import type { Chain as ViemChain } from "viem/chains";
 import { AccountDropdown } from "@/components/account-dropdown/AccountDropdown";
@@ -613,7 +613,7 @@ export default function Navbar() {
           <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
             <h2 className="text-xl font-bold mb-4">Buy Crypto</h2>
             <p className="mb-4">Purchase crypto directly to your wallet.</p>
-            <WertFundButton />
+            <CoinbaseFundButton />
             <div className="flex justify-end">
               <Button onClick={() => setIsDialogOpen(false)}>Close</Button>
             </div>

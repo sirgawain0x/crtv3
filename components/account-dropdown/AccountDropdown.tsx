@@ -74,7 +74,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import WertFundButton from "@/components/wallet/buy/wert-fund-button";
+import CoinbaseFundButton from "@/components/wallet/buy/coinbase-fund-button";
 import { LoginButton } from "@/components/auth/LoginButton";
 import { AlchemySwapWidget } from "@/components/wallet/swap/AlchemySwapWidget";
 import useModularAccount from "@/lib/hooks/accountkit/useModularAccount";
@@ -685,7 +685,7 @@ export function AccountDropdown() {
               Purchase crypto directly to your wallet.
             </p>
             <div className="flex flex-col gap-4">
-              <WertFundButton onClose={() => setIsDialogOpen(false)} />
+              <CoinbaseFundButton onClose={() => setIsDialogOpen(false)} />
             </div>
           </div>
         );
