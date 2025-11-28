@@ -163,26 +163,36 @@ export default function CreateThumbnail({
   };
 
   const handleComplete = (thumbnailUri: string) => {
-    if (livepeerAssetData) {
-      setSelectedThumbnail(thumbnailUri);
-      onComplete({
-        thumbnailUri: selectedThumbnail as string,
-        meTokenConfig: meTokenConfig,
-      });
-    } else {
+    if (!livepeerAssetData) {
       toast.error("Video data not found. Please try again.");
+      return;
     }
+    
+    // Validate thumbnail URI is not empty
+    if (!thumbnailUri || thumbnailUri.trim() === "") {
+      toast.error("Please select a thumbnail before publishing.");
+      return;
+    }
+    
+    setSelectedThumbnail(thumbnailUri);
+    // Use the parameter directly instead of state to avoid stale state issues
+    onComplete({
+      thumbnailUri: thumbnailUri,
+      meTokenConfig: meTokenConfig,
+    });
   };
 
   const handleSubmit = () => {
-    if (selectedThumbnail) {
-      onComplete({
-        thumbnailUri: selectedThumbnail,
-        meTokenConfig: meTokenConfig,
-      });
-    } else {
-      toast.error("Please select a thumbnail before submitting.");
+    // Require thumbnail selection for better UX and to avoid breaking downstream code
+    if (!selectedThumbnail) {
+      toast.error("Please select a thumbnail before publishing.");
+      return;
     }
+    
+    onComplete({
+      thumbnailUri: selectedThumbnail,
+      meTokenConfig: meTokenConfig,
+    });
   };
 
   // Memoize callbacks to prevent infinite loops in child component

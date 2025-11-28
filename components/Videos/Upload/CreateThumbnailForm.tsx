@@ -50,6 +50,7 @@ const CreateThumbnailForm = ({
     watch,
     formState: { errors, isSubmitting },
     setError,
+    clearErrors,
     setValue,
     register,
   } = useForm<FormValues>({
@@ -148,21 +149,54 @@ const CreateThumbnailForm = ({
 
   const handleCustomImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      // Validate file type
-      if (!file.type.startsWith('image/')) {
-        setError("customImage", { message: "Please select an image file" });
-        return;
+    
+    // Clear any previous errors first
+    clearErrors("customImage");
+    
+    if (!file) {
+      // Reset the file input value to allow re-selecting the same file
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
       }
-      
-      // Validate file size (5MB limit)
-      if (file.size > 5 * 1024 * 1024) {
-        setError("customImage", { message: "File size must be less than 5MB" });
-        return;
-      }
-
-      setValue("customImage", file);
+      setValue("customImage", null);
+      setCustomPreviewUrl(null);
+      setSelectedImage(undefined);
+      // Explicitly clear errors when user cancels selection
+      clearErrors("customImage");
+      return;
     }
+    
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setError("customImage", { message: "Please select an image file" });
+      // Reset the file input to allow selecting a new file
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      setValue("customImage", null);
+      // Clear preview state to avoid showing stale preview
+      setCustomPreviewUrl(null);
+      setSelectedImage(undefined);
+      return;
+    }
+    
+    // Validate file size (5MB limit)
+    if (file.size > 5 * 1024 * 1024) {
+      setError("customImage", { message: "File size must be less than 5MB" });
+      // Reset the file input to allow selecting a new file
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      setValue("customImage", null);
+      // Clear preview state to avoid showing stale preview
+      setCustomPreviewUrl(null);
+      setSelectedImage(undefined);
+      return;
+    }
+
+    // File is valid - clear any errors and set the file
+    clearErrors("customImage");
+    setValue("customImage", file);
   };
 
   /**
