@@ -35,10 +35,11 @@ export async function uploadThumbnailToIPFS(
       };
     }
 
-    // Upload to IPFS
+    // Upload to IPFS with 5MB limit for thumbnails (larger than avatars)
     const result = await ipfsService.uploadFile(file, {
       pin: true,
-      wrapWithDirectory: false
+      wrapWithDirectory: false,
+      maxSize: 5 * 1024 * 1024 // 5MB for thumbnails
     });
 
     if (!result.success || !result.url) {

@@ -92,6 +92,7 @@ export class IPFSService {
   async uploadFile(file: File, options: {
     pin?: boolean;
     wrapWithDirectory?: boolean;
+    maxSize?: number; // Optional max size override (defaults to 2MB for avatars)
   } = {}): Promise<IPFSUploadResult> {
     try {
       // Initialize client if needed
@@ -104,11 +105,13 @@ export class IPFSService {
         };
       }
 
-      // Validate file
-      if (!this.isValidImageFile(file)) {
+      // Validate file with optional max size override
+      const maxSize = options.maxSize || 2 * 1024 * 1024; // Default 2MB for avatars, can be overridden for thumbnails
+      if (!this.isValidImageFile(file, maxSize)) {
+        const maxSizeMB = Math.round(maxSize / (1024 * 1024));
         return {
           success: false,
-          error: 'Invalid file. Please upload a JPEG, PNG, GIF, or WebP image under 2MB.',
+          error: `Invalid file. Please upload a JPEG, PNG, GIF, or WebP image under ${maxSizeMB}MB.`,
         };
       }
 
@@ -166,9 +169,8 @@ export class IPFSService {
   }
 
   // Validate image file
-  private isValidImageFile(file: File): boolean {
+  private isValidImageFile(file: File, maxSize: number = 2 * 1024 * 1024): boolean {
     const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-    const maxSize = 2 * 1024 * 1024; // 2MB - optimal for avatar images
     
     if (!allowedTypes.includes(file.type)) {
       return false;

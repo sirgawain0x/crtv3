@@ -73,6 +73,8 @@ const CreateThumbnailForm = ({
   const [thumbnailUploading, setThumbnailUploading] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | undefined>();
   const [showMeTokenCreator, setShowMeTokenCreator] = useState(false);
+  const blobUrlRef = useRef<string | null>(null);
+  const currentImageRef = useRef<File | null>(null);
 
   const { userMeToken, loading: meTokenLoading, checkUserMeToken } = useMeTokensSupabase();
   const { makePayment, isProcessing: isPaymentProcessing, isConnected } = useX402Payment();
@@ -90,11 +92,26 @@ const CreateThumbnailForm = ({
   // Handle custom image upload
   useEffect(() => {
     if (customImage && thumbnailType === "custom") {
+      // Store the current image in ref to check against stale closures
+      currentImageRef.current = customImage;
+      const imageToUpload = customImage;
+      
       // Upload thumbnail to IPFS immediately for persistence
       setThumbnailUploading(true);
-      uploadThumbnailToIPFS(customImage, livepeerAssetId || 'unknown')
+      uploadThumbnailToIPFS(imageToUpload, livepeerAssetId || 'unknown')
         .then((result) => {
+          // Check if customImage has changed while upload was in progress
+          if (currentImageRef.current !== imageToUpload) {
+            // Image changed, ignore this result
+            return;
+          }
+          
           if (result.success && result.thumbnailUrl) {
+            // Clean up any existing blob URL before setting IPFS URL
+            if (blobUrlRef.current) {
+              URL.revokeObjectURL(blobUrlRef.current);
+              blobUrlRef.current = null;
+            }
             // Use the IPFS URL
             setCustomPreviewUrl(result.thumbnailUrl);
             setSelectedImage(result.thumbnailUrl);
@@ -102,28 +119,56 @@ const CreateThumbnailForm = ({
             toast.success("Custom thumbnail uploaded successfully!");
           } else {
             toast.error(result.error || "Failed to upload thumbnail");
+            // Clean up any existing blob URL before creating a new one
+            if (blobUrlRef.current) {
+              URL.revokeObjectURL(blobUrlRef.current);
+            }
             // Create temporary preview URL for display only
-            const url = URL.createObjectURL(customImage);
+            const url = URL.createObjectURL(imageToUpload);
+            blobUrlRef.current = url;
             setCustomPreviewUrl(url);
             setSelectedImage(url);
             onSelectThumbnailImages(url);
-            return () => URL.revokeObjectURL(url);
           }
         })
         .catch((error) => {
+          // Check if customImage has changed while upload was in progress
+          if (currentImageRef.current !== imageToUpload) {
+            // Image changed, ignore this error
+            return;
+          }
+          
           console.error("Error uploading thumbnail:", error);
           toast.error("Failed to upload thumbnail");
+          // Clean up any existing blob URL before creating a new one
+          if (blobUrlRef.current) {
+            URL.revokeObjectURL(blobUrlRef.current);
+          }
           // Create temporary preview URL for display only
-          const url = URL.createObjectURL(customImage);
+          const url = URL.createObjectURL(imageToUpload);
+          blobUrlRef.current = url;
           setCustomPreviewUrl(url);
           setSelectedImage(url);
           onSelectThumbnailImages(url);
-          return () => URL.revokeObjectURL(url);
         })
         .finally(() => {
+          // Always reset loading state when upload completes (whether successful, failed, or stale)
+          // If image changed, the upload is stale but we still need to reset the loading state
           setThumbnailUploading(false);
         });
+    } else {
+      // Reset ref when no image is selected and reset loading state
+      currentImageRef.current = null;
+      setThumbnailUploading(false);
     }
+
+    // Cleanup function to revoke blob URLs when component unmounts or dependencies change
+    return () => {
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [customImage, thumbnailType, livepeerAssetId]);
 
