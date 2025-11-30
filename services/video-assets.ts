@@ -218,9 +218,13 @@ export async function getPublishedVideoAssets(options: GetPublishedVideoAssetsOp
     .select('*', { count: 'exact' })
     .eq('status', 'published');
   
-  // Add creator filter if specified
+  // Add creator filter if specified (case-insensitive comparison)
   if (options.creatorId) {
-    query = query.eq('creator_id', options.creatorId);
+    // Normalize to lowercase for consistent matching
+    // Since creator_id might be stored in checksum format (mixed case), we need case-insensitive comparison
+    const normalizedCreatorId = options.creatorId.toLowerCase();
+    // Use ilike for case-insensitive matching (handles both checksum and lowercase addresses)
+    query = query.ilike('creator_id', normalizedCreatorId);
   }
   
   // Add category filter if specified

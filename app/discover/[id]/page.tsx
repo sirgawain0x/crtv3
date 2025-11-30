@@ -22,6 +22,9 @@ import makeBlockie from "ethereum-blockies-base64";
 import { convertFailingGateway } from "@/lib/utils/image-gateway";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import Link from "next/link";
+import { Suspense } from "react";
+import { VideoShareButton } from "@/components/Videos/VideoShareButton";
 
 type VideoDetailsPageProps = {
   params: Promise<{
@@ -147,30 +150,46 @@ export default async function VideoDetailsPage({
           {/* Video Player */}
           <div>
             <VideoDetails asset={assetData} />
-            {/* Uploader Section */}
-            {creatorAddress && (
-              <div className="flex items-center gap-3 mt-4">
-                <Avatar className="h-10 w-10">
-                  <AvatarImage 
-                    src={creatorProfile?.avatar_url || makeBlockie(creatorAddress)} 
-                    alt={creatorProfile?.username || "Creator"} 
-                  />
-                  <AvatarFallback>
-                    {creatorProfile?.username 
-                      ? creatorProfile.username.charAt(0).toUpperCase() 
-                      : creatorAddress.slice(2, 3).toUpperCase() || "C"}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex flex-col">
-                  <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                    {creatorProfile?.username || "Creator"}
-                  </span>
-                  <span className="text-xs text-gray-500 dark:text-gray-400 font-mono">
-                    {shortenAddress(creatorAddress)}
-                  </span>
-                </div>
-              </div>
-            )}
+            {/* Uploader Section with Share Button */}
+            <div className="flex items-center justify-between mt-4">
+              {creatorAddress ? (
+                <Link 
+                  href={`/creator/${creatorAddress}`}
+                  className="flex items-center gap-3 hover:opacity-80 transition-opacity cursor-pointer"
+                >
+                  <Avatar className="h-10 w-10">
+                    <AvatarImage 
+                      src={creatorProfile?.avatar_url || makeBlockie(creatorAddress)} 
+                      alt={creatorProfile?.username || "Creator"} 
+                    />
+                    <AvatarFallback>
+                      {creatorProfile?.username 
+                        ? creatorProfile.username.charAt(0).toUpperCase() 
+                        : creatorAddress.slice(2, 3).toUpperCase() || "C"}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                      {creatorProfile?.username || shortenAddress(creatorAddress)}
+                    </span>
+                    {creatorProfile?.username && (
+                      <span className="text-xs text-gray-500 dark:text-gray-400 font-mono">
+                        {shortenAddress(creatorAddress)}
+                      </span>
+                    )}
+                  </div>
+                </Link>
+              ) : (
+                <div></div>
+              )}
+              <Suspense fallback={<div className="h-9 w-9" />}>
+                <VideoShareButton
+                  videoId={id}
+                  videoTitle={assetData?.name || "Video"}
+                  playbackId={assetData?.playbackId || undefined}
+                />
+              </Suspense>
+            </div>
             {/* Metrics components */}
             {assetData.playbackId && (
               <div className="flex gap-4 items-center mt-4">

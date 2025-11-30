@@ -8,7 +8,7 @@ import {
   CardHeader,
   CardTitle,
 } from "../ui/card";
-import { Avatar, AvatarImage } from "../ui/avatar";
+import { Avatar, AvatarImage, AvatarFallback } from "../ui/avatar";
 import { Badge } from "../ui/badge";
 import { cn } from "../../lib/utils";
 import { Player } from "@/components/Player/Player";
@@ -22,6 +22,7 @@ import { useEffect, useRef, useState } from "react";
 import { fetchVideoAssetByPlaybackId } from "@/lib/utils/video-assets-client";
 import VideoThumbnail from './VideoThumbnail';
 import { ShareDialog } from "./ShareDialog";
+import { useCreatorProfile } from "@/lib/hooks/metokens/useCreatorProfile";
 
 interface VideoCardProps {
   asset: Asset;
@@ -33,6 +34,9 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
   const [dbStatus, setDbStatus] = useState<"draft" | "published" | "minted" | "archived" | null>(null);
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
   const playerRef = useRef<HTMLDivElement>(null);
+
+  const address = asset.creatorId?.value as string;
+  const { profile: creatorProfile } = useCreatorProfile(address);
 
 
   const handlePlay = () => {
@@ -118,7 +122,6 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
     return null;
   }
 
-  const address = asset.creatorId?.value as string;
   if (!address) {
     console.warn(`VideoCard: No creator address for asset ${asset.id}`, asset);
     return null;
@@ -134,22 +137,32 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
       <Card key={asset?.id} className={cn("w-full max-w-[360px] mx-auto overflow-hidden")}>
         <div className="mx-auto flex-1 flex-wrap">
           <CardHeader>
-            <div className="flex items-center space-x-2">
-              <Avatar>
+            <Link 
+              href={`/creator/${address}`}
+              className="flex items-center space-x-2 hover:opacity-80 transition-opacity cursor-pointer"
+              onClick={(e) => {
+                // Prevent event bubbling to avoid triggering video card interactions
+                e.stopPropagation();
+              }}
+            >
+              <Avatar className="h-10 w-10">
                 <AvatarImage
-                  src={makeBlockie(address)}
+                  src={creatorProfile?.avatar_url || makeBlockie(address)}
+                  alt={creatorProfile?.username || "Creator"}
                   className="h-10 w-10 rounded-full"
                 />
+                <AvatarFallback>
+                  {creatorProfile?.username 
+                    ? creatorProfile.username.charAt(0).toUpperCase() 
+                    : address.slice(2, 3).toUpperCase() || "C"}
+                </AvatarFallback>
               </Avatar>
               <div className="flex flex-col">
                 <span className="text-sm font-medium">
-                  {shortenAddress(address)}
-                </span>
-                <span className="text-xs text-gray-500">
-                  {shortenAddress(address)}
+                  {creatorProfile?.username || shortenAddress(address)}
                 </span>
               </div>
-            </div>
+            </Link>
           </CardHeader>
         </div>
         <VideoThumbnail
