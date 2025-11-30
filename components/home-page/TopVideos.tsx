@@ -9,71 +9,15 @@ import {
 } from "@/components/ui/carousel";
 import { TrendingPlayer } from "@/components/Player/TrendingPlayer";
 import { getDetailPlaybackSource } from "@/lib/hooks/livepeer/useDetailPlaybackSources";
+import { fetchPublishedVideos } from "@/lib/utils/published-videos-client";
+import type { VideoAsset } from "@/lib/types/video-asset";
 import { Src } from "@livepeer/react";
 import { toast } from "sonner";
 import Link from "next/link";
 import { TrendingUpIcon } from "lucide-react";
 
-interface Video {
-  playbackId: string;
-  assetId: string;
-  title: string;
-}
-
-const videos: Video[] = [
-  {
-    playbackId: "4b211g2avwfkpw3f",
-    assetId: "4b214949-39ca-4b92-a058-aa54f6338f6b",
-    title: "Two Songs Of Kurdistan",
-  },
-  {
-    playbackId: "29f9k3ep6k7uvye5",
-    assetId: "29f953ea-b2f9-499b-96df-3ca3efb857d1",
-    title: "How Nouns Are Born",
-  },
-  {
-    playbackId: "9477p8y4da3knfr5",
-    assetId: "9477a771-19b4-4737-999f-473c75cac5d2",
-    title: "G2 - Monster Lyric Video",
-  },
-  {
-    playbackId: "a2b2fcgqx7ghfpxj",
-    assetId: "a2b2356d-bb51-46f3-9882-5bde2ec04654",
-    title: "DAO Documentary",
-  },
-  {
-    playbackId: "ed401mvzp9c9z8gq",
-    assetId: "ed40cc47-3b8a-4b15-81c2-871b5ae54158",
-    title: "Creative Podcast Episode 2",
-  },
-  {
-    playbackId: "6461dsqs9qjr1dji",
-    assetId: "64616676-8e21-47eb-a7f8-668f4041617b",
-    title: "Creative Podcast Episode 1",
-  },
-  {
-    playbackId: "bc628p4ch452mimr",
-    assetId: "bc62564f-76a5-4bdf-b125-b5107558ebb5",
-    title: "The Rise of Blus: A Nouns Movie",
-  },
-  {
-    playbackId: "0c5bbanq1327kvdw",
-    assetId: "7d373c41-ad8f-4aa9-a26f-438e26a29f96",
-    title: "DOAC: The ADHD Doctor",
-  },
-  {
-    playbackId: "df2cseikhacfacsq",
-    assetId: "df2c123b-1ae3-4da1-ac12-e6585593a9bb",
-    title: "NFT.NYC Studio Event",
-  },
-  {
-    playbackId: "2cf3hdfx83kqqucf",
-    assetId: "2cf31795-bf64-4cae-862d-4d4d89cbf8cb",
-    title: "The Wizard's Hat ⌐◨-◨ Animated Short",
-  },
-];
-
 export function TopVideos() {
+  const [videos, setVideos] = React.useState<VideoAsset[]>([]);
   const [playbackSources, setPlaybackSources] = React.useState<
     Record<string, Src[] | null>
   >({});
@@ -84,44 +28,85 @@ export function TopVideos() {
     let isMounted = true;
     let abortController: AbortController | null = null;
 
-    const fetchPlaybackSources = async () => {
+    const fetchTrendingVideos = async () => {
       if (!isMounted) return;
       
       abortController = new AbortController();
       const signal = abortController.signal;
       
       try {
+        setLoading(true);
+        setError(null);
+
+        // Step 1: Fetch trending videos from database (ordered by views_count)
+        console.log("Fetching trending videos from database...");
+        const { data: trendingVideos } = await fetchPublishedVideos({
+          limit: 10, // Fetch top 10 trending videos
+          offset: 0,
+          orderBy: 'views_count', // Order by views to get trending content
+          order: 'desc',
+        });
+
+        if (!isMounted || signal.aborted) return;
+
+        if (!trendingVideos || trendingVideos.length === 0) {
+          console.warn("No trending videos found");
+          setVideos([]);
+          setPlaybackSources({});
+          setLoading(false);
+          return;
+        }
+
+        console.log(`Found ${trendingVideos.length} trending videos`);
+
+        // Step 2: Fetch playback sources for each video
+        // Don't set videos state until playback sources are ready to avoid rendering videos without sources
         const sources: Record<string, Src[] | null> = {};
         console.log("Starting to fetch playback sources...");
 
-        for (const video of videos) {
-          if (!isMounted || signal.aborted) return;
+        for (const video of trendingVideos) {
+          if (!isMounted || signal.aborted) {
+            // If aborted, don't set any state - component is unmounting
+            return;
+          }
           
+          if (!video.playback_id) {
+            console.warn(`Video ${video.asset_id} has no playback_id`);
+            sources[video.asset_id] = null;
+            continue;
+          }
+
           try {
             console.log(
-              `Fetching playback source for video ${video.playbackId}...`
+              `Fetching playback source for video ${video.playback_id}...`
             );
 
             // Get the playback source with abort signal support
-            const src = await getDetailPlaybackSource(video.playbackId, { 
+            const src = await getDetailPlaybackSource(video.playback_id, { 
               signal 
             });
             
-            if (!isMounted || signal.aborted) return;
+            if (!isMounted || signal.aborted) {
+              // If aborted, don't set any state - component is unmounting
+              return;
+            }
             
-            console.log(`Playback source for ${video.playbackId}:`, src);
+            console.log(`Playback source for ${video.playback_id}:`, src);
 
             if (!src || src.length === 0) {
               console.error(
-                `No valid source found for video ${video.playbackId}`
+                `No valid source found for video ${video.playback_id}`
               );
-              sources[video.playbackId] = null;
+              sources[video.asset_id] = null;
               continue;
             }
 
-            sources[video.playbackId] = src;
+            sources[video.asset_id] = src;
           } catch (error) {
-            if (!isMounted || signal.aborted) return;
+            if (!isMounted || signal.aborted) {
+              // If aborted, don't set any state - component is unmounting
+              return;
+            }
             
             // Check if it's an abort error
             if (error instanceof Error && (
@@ -129,21 +114,28 @@ export function TopVideos() {
               error.message.includes('aborted') ||
               error.message.includes('signal is aborted')
             )) {
-              console.warn(`Video ${video.playbackId} fetch was aborted:`, error.message);
-              return; // Exit the entire function if aborted
+              console.warn(`Video ${video.playback_id} fetch was aborted:`, error.message);
+              // If aborted, don't set any state - component is unmounting
+              return;
             }
             
             console.error(
-              `Error fetching playback source for video ${video.playbackId}:`,
+              `Error fetching playback source for video ${video.playback_id}:`,
               error
             );
-            sources[video.playbackId] = null;
+            sources[video.asset_id] = null;
           }
         }
 
-        if (!isMounted || signal.aborted) return;
+        if (!isMounted || signal.aborted) {
+          // If aborted, don't set any state - component is unmounting
+          return;
+        }
         
+        // Only set both videos and playback sources together after all sources are fetched
+        // This ensures videos are never rendered without their playback sources
         console.log("Final playback sources:", sources);
+        setVideos(trendingVideos);
         setPlaybackSources(sources);
       } catch (error) {
         if (!isMounted || signal.aborted) return;
@@ -158,9 +150,9 @@ export function TopVideos() {
           return; // Don't set error for abort signals
         }
         
-        console.error("Error in fetchPlaybackSources:", error);
-        setError("Failed to load videos");
-        toast.error("Failed to load videos");
+        console.error("Error in fetchTrendingVideos:", error);
+        setError("Failed to load trending videos");
+        toast.error("Failed to load trending videos");
       } finally {
         if (isMounted && !signal.aborted) {
           setLoading(false);
@@ -168,7 +160,7 @@ export function TopVideos() {
       }
     };
 
-    fetchPlaybackSources();
+    fetchTrendingVideos();
 
     return () => {
       isMounted = false;
@@ -220,6 +212,22 @@ export function TopVideos() {
     );
   }
 
+  if (videos.length === 0) {
+    return (
+      <div className="mx-auto w-full max-w-7xl py-8">
+        <div className="mb-8 text-center">
+          <h1 className="mb-4 text-3xl font-bold">
+            <span className="animate-pulse">
+              <TrendingUpIcon className="inline-block h-10 w-10 text-green-700" />
+            </span>{" "}
+            TRENDING VIDEOS
+          </h1>
+          <p className="text-gray-500">No trending videos available at the moment.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto w-full max-w-7xl py-8">
       <div className="mb-8 text-center">
@@ -235,25 +243,25 @@ export function TopVideos() {
           <CarouselContent className="-ml-1">
             {videos.map((video) => (
               <CarouselItem
-                key={video.playbackId}
+                key={video.asset_id}
                 className="basis-full pl-0 sm:basis-1/2 sm:pl-1 md:basis-1/2 lg:basis-1/3 xl:basis-1/3"
               >
                 <div className="group h-full p-1">
                   <Card className="relative h-[300px] w-full overflow-hidden transition-transform duration-200 ease-in-out group-hover:scale-[1.02]">
                     <CardContent className="absolute inset-0 p-0">
                       <TrendingPlayer
-                        src={playbackSources[video.playbackId]}
+                        src={playbackSources[video.asset_id]}
                         title={video.title}
                         assetMetadata={{
-                          assetId: video.assetId,
-                          playbackId: video.playbackId,
+                          assetId: video.asset_id,
+                          playbackId: video.playback_id,
                           title: video.title,
-                          description: "",
+                          description: video.description || "",
                         }}
                       />
                       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-4">
                         <Link
-                          href={`/discover/${video.assetId}`}
+                          href={`/discover/${video.asset_id}`}
                           className="block hover:underline"
                         >
                           <h3 className="line-clamp-2 text-sm font-medium text-white">
