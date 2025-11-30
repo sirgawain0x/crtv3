@@ -20,6 +20,8 @@ import { shortenAddress } from "@/lib/utils/utils";
 import { createClient } from "@/lib/sdk/supabase/server";
 import makeBlockie from "ethereum-blockies-base64";
 import { convertFailingGateway } from "@/lib/utils/image-gateway";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 type VideoDetailsPageProps = {
   params: Promise<{
@@ -179,9 +181,11 @@ export default async function VideoDetailsPage({
             {/* Description */}
             {videoAsset?.description && (
               <div className="mt-4">
-                <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-                  {videoAsset.description}
-                </p>
+                <div className="prose prose-sm dark:prose-invert max-w-none">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {videoAsset.description}
+                  </ReactMarkdown>
+                </div>
               </div>
             )}
           </div>

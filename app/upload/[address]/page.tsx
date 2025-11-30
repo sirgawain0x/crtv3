@@ -14,11 +14,11 @@ export default function UploadPage() {
   return (
     <ProfilePageGuard>
       <div className="min-h-screen p-2 sm:p-6">
-          <div className="mb-6 rounded-lg bg-white p-4 shadow-md sm:mb-8 sm:p-8">
-            <h1 className="mb-4 text-center text-2xl font-bold text-gray-800 sm:mb-6 sm:text-4xl">
+          <div className="mb-6 rounded-lg bg-card border p-4 shadow-md sm:mb-8 sm:p-8">
+            <h1 className="mb-4 text-center text-2xl font-bold text-foreground sm:mb-6 sm:text-4xl">
               Upload Your Music Video
             </h1>
-            <p className="mb-6 text-center text-sm text-gray-600 sm:mb-8 sm:text-base">
+            <p className="mb-6 text-center text-sm text-muted-foreground sm:mb-8 sm:text-base">
               Upload your music video to the platform and share it with the world.
             </p>
           </div>

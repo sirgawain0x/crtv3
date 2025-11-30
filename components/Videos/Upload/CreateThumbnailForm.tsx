@@ -81,6 +81,8 @@ const CreateThumbnailForm = ({
   const [showMeTokenCreator, setShowMeTokenCreator] = useState(false);
   const blobUrlRef = useRef<string | null>(null);
   const currentImageRef = useRef<File | null>(null);
+  const blobUrlFileRef = useRef<File | null>(null); // Track which file the blob URL belongs to
+  const isSettingFileRef = useRef<boolean>(false); // Flag to prevent cleanup during file selection
 
   const { userMeToken, loading: meTokenLoading, checkUserMeToken } = useMeTokensSupabase();
   const { makePayment, isProcessing: isPaymentProcessing, isConnected } = useX402Payment();
@@ -97,6 +99,12 @@ const CreateThumbnailForm = ({
 
   // Handle custom image upload with compression
   useEffect(() => {
+    // Reset the flag at the start of the effect (after cleanup has already run)
+    // This ensures the flag was checked during cleanup, and now we can reset it
+    if (isSettingFileRef.current) {
+      isSettingFileRef.current = false;
+    }
+    
     if (customImage && thumbnailType === "custom") {
       // Store the current image in ref to check against stale closures
       currentImageRef.current = customImage;
@@ -136,13 +144,19 @@ const CreateThumbnailForm = ({
             return;
           }
 
-          // Step 2: Create preview URL from compressed file
-          if (blobUrlRef.current) {
+          // Step 2: Update preview URL with compressed file (or keep existing if already showing)
+          // Create compressed preview URL first
+          const compressedPreviewUrl = URL.createObjectURL(compressedFile);
+          
+          // Revoke the original preview URL if it's different from the compressed one
+          if (blobUrlRef.current && blobUrlRef.current !== compressedPreviewUrl) {
             URL.revokeObjectURL(blobUrlRef.current);
           }
-          const previewUrl = URL.createObjectURL(compressedFile);
-          blobUrlRef.current = previewUrl;
-          setCustomPreviewUrl(previewUrl);
+          
+          // Update refs and state with compressed preview URL
+          blobUrlRef.current = compressedPreviewUrl;
+          blobUrlFileRef.current = imageToUpload; // Still track as the same file
+          setCustomPreviewUrl(compressedPreviewUrl);
           setUploadProgress(50);
 
           // Step 3: Upload to IPFS
@@ -164,6 +178,7 @@ const CreateThumbnailForm = ({
             if (blobUrlRef.current) {
               URL.revokeObjectURL(blobUrlRef.current);
               blobUrlRef.current = null;
+              blobUrlFileRef.current = null;
             }
             // Use the IPFS URL with gateway fallback
             const ipfsUrl = convertFailingGateway(result.thumbnailUrl);
@@ -178,6 +193,7 @@ const CreateThumbnailForm = ({
             if (blobUrlRef.current) {
               URL.revokeObjectURL(blobUrlRef.current);
               blobUrlRef.current = null;
+              blobUrlFileRef.current = null;
             }
             setCustomPreviewUrl(null);
             setSelectedImage(undefined);
@@ -198,6 +214,7 @@ const CreateThumbnailForm = ({
           if (blobUrlRef.current) {
             URL.revokeObjectURL(blobUrlRef.current);
             blobUrlRef.current = null;
+            blobUrlFileRef.current = null;
           }
           setCustomPreviewUrl(null);
           setSelectedImage(undefined);
@@ -214,22 +231,68 @@ const CreateThumbnailForm = ({
 
       processAndUpload();
     } else {
-      // Reset ref when no image is selected and reset loading state
+      // Reset refs when no image is selected and reset loading state
       currentImageRef.current = null;
+      // Clear blob URL if no image is selected
+      if (blobUrlRef.current && !isSettingFileRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+        blobUrlFileRef.current = null;
+      }
       setThumbnailUploading(false);
       setIsCompressing(false);
       setUploadProgress(0);
+      // Reset the flag when no image is selected
+      isSettingFileRef.current = false;
     }
 
     // Cleanup function to revoke blob URLs when component unmounts or dependencies change
+    // This runs both when dependencies change AND when component unmounts
     return () => {
-      if (blobUrlRef.current) {
+      // Skip cleanup entirely if we're in the middle of setting a new file (prevents race condition)
+      // This flag is set in handleFileSelect before calling setValue, so cleanup won't revoke
+      // the blob URL we just created for the immediate preview
+      if (isSettingFileRef.current) {
+        // Don't reset the flag here - let it reset after useEffect runs
+        return;
+      }
+      
+      // Clean up blob URLs when selection is cleared or component unmounts
+      // We avoid comparing customImage to blobUrlFileRef because customImage is from closure (stale)
+      // Strategy:
+      // 1. handleFileSelect always cleans up old blob URLs before creating new ones (for file changes)
+      // 2. Cleanup here only handles: clearing selection (customImage → null) or unmounting
+      // 3. When customImage changes but isn't null, handleFileSelect handles cleanup
+      if (blobUrlRef.current && !customImage) {
+        // Only clean up if customImage is being cleared (set to null)
+        // This avoids the stale closure comparison issue entirely
         URL.revokeObjectURL(blobUrlRef.current);
         blobUrlRef.current = null;
+        blobUrlFileRef.current = null;
       }
+      // Note: For file changes (customImage changing from one file to another),
+      // handleFileSelect already cleaned up the old blob URL before creating the new one,
+      // so we don't need to handle that case here.
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [customImage, thumbnailType, livepeerAssetId]);
+
+  // Separate cleanup effect for component unmount to ensure blob URLs are always cleaned up
+  useEffect(() => {
+    return () => {
+      // Always clean up blob URLs on unmount, regardless of flags
+      // When component unmounts, we must clean up all resources to prevent memory leaks
+      // The isSettingFileRef flag is only relevant for preventing cleanup during dependency changes,
+      // not during unmount where we always want to clean up
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+        blobUrlFileRef.current = null;
+      }
+      // Reset flag on unmount to ensure clean state if component remounts
+      isSettingFileRef.current = false;
+    };
+  }, []); // Empty deps = only run on mount/unmount
 
   // Watch MeToken config changes
   useEffect(() => {
@@ -275,8 +338,30 @@ const CreateThumbnailForm = ({
       return;
     }
 
-    // File is valid - compression will handle size limits
+    // File is valid - create immediate preview URL for instant feedback
     clearErrors("customImage");
+    
+    // Set flag to prevent cleanup from revoking the blob URL we're about to create
+    isSettingFileRef.current = true;
+    
+    // Create immediate preview from original file before compression
+    // Always clean up previous blob URL before creating a new one to prevent leaks
+    // Even if it's the same file, we're creating a new blob URL so the old one should be revoked
+    if (blobUrlRef.current) {
+      URL.revokeObjectURL(blobUrlRef.current);
+      blobUrlRef.current = null;
+      // Don't clear blobUrlFileRef yet - we'll set it to the new file below
+    }
+    
+    // Create new blob URL and track which file it belongs to
+    const immediatePreviewUrl = URL.createObjectURL(file);
+    blobUrlRef.current = immediatePreviewUrl;
+    blobUrlFileRef.current = file; // Track that this blob URL belongs to this file
+    setCustomPreviewUrl(immediatePreviewUrl);
+    
+    // Set the file in form state (this will trigger the compression/upload useEffect)
+    // The cleanup will see isSettingFileRef.current === true and skip revoking the blob URL
+    // The flag will be reset at the start of the useEffect body
     setValue("customImage", file);
   };
 
@@ -541,8 +626,8 @@ const CreateThumbnailForm = ({
               )}
             </div>
 
-            {/* Custom Image Preview */}
-            {customPreviewUrl && !isCompressing && !thumbnailUploading && (
+            {/* Custom Image Preview - Show immediately when file is selected */}
+            {customPreviewUrl && (
               <div className="space-y-2">
                 <Label>Preview</Label>
                 <div className="relative w-full aspect-video rounded-lg overflow-hidden border">
@@ -554,6 +639,18 @@ const CreateThumbnailForm = ({
                     unoptimized
                     showSkeleton={false}
                   />
+                  {/* Show loading overlay during compression/upload */}
+                  {(isCompressing || thumbnailUploading) && (
+                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                      <div className="text-center text-white">
+                        <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
+                        <p className="text-sm">
+                          {isCompressing ? "Compressing..." : "Uploading..."}
+                        </p>
+                        <p className="text-xs mt-1">{uploadProgress}%</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

@@ -61,7 +61,10 @@ const CreateInfo = ({ onPressNext }: TCreateInfoProps) => {
             placeholder="Rick Astley - Never Gonna Give You Up (Official Video)"
             className={
               "mt-2 h-10 w-full rounded-md border border-[#444752] p-2 text-sm " +
-              "text-gray-600 placeholder:text-gray-400 focus:outline-none sm:h-12 sm:text-base"
+              "text-gray-600 dark:text-gray-200 dark:bg-[#1a1a1a] " +
+              "placeholder:text-gray-400 dark:placeholder:text-gray-500 " +
+              "focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-600 " +
+              "sm:h-12 sm:text-base"
             }
             data-testid="create-info-title"
             {...form.register("title", {
@@ -69,20 +72,28 @@ const CreateInfo = ({ onPressNext }: TCreateInfoProps) => {
             })}
           />
         </div>
-        <Label className="mt-6 text-sm sm:mt-10">Description</Label>
-        <textarea
-          placeholder="Never Gonna Give You Up was a global smash on its release in July 1987, topping the charts in 25 countries 
-          including Rick's native UK and the US Billboard Hot 100. It won the Brit Award for Best single in 1988. 
-          Stock Aitken and Waterman wrote and produced the track which was the lead-off single from Rick's debut LP "
-          className={
-            "mt-2 h-24 w-full rounded-md border border-[#444752] p-2 text-sm " +
-            "text-gray-600 placeholder:text-gray-400 focus:outline-none sm:h-32 sm:text-base"
-          }
-          data-testid="create-info-description"
-          {...form.register("description", {
-            required: true,
-          })}
-        />
+        <div className="mt-6 sm:mt-10">
+          <Label className="text-sm">Description</Label>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 mb-2">
+            Markdown is supported (e.g., **bold**, *italic*, [links](url), lists, etc.)
+          </p>
+          <textarea
+            placeholder="Never Gonna Give You Up was a global smash on its release in July 1987, topping the charts in 25 countries 
+            including Rick's native UK and the US Billboard Hot 100. It won the Brit Award for Best single in 1988. 
+            Stock Aitken and Waterman wrote and produced the track which was the lead-off single from Rick's debut LP "
+            className={
+              "mt-2 h-24 w-full rounded-md border border-[#444752] p-2 text-sm " +
+              "text-gray-600 dark:text-gray-200 dark:bg-[#1a1a1a] " +
+              "placeholder:text-gray-400 dark:placeholder:text-gray-500 " +
+              "focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-600 " +
+              "sm:h-32 sm:text-base"
+            }
+            data-testid="create-info-description"
+            {...form.register("description", {
+              required: true,
+            })}
+          />
+        </div>
         <div className="mt-6 flex w-full flex-col gap-4 sm:mt-10 sm:flex-row sm:justify-between lg:gap-6">
           <div className="flex w-full flex-col sm:w-2/5">
             <Label className="text-sm">Location</Label>
@@ -91,7 +102,10 @@ const CreateInfo = ({ onPressNext }: TCreateInfoProps) => {
               placeholder="New York - United States"
               className={
                 "mt-2 h-10 w-full rounded-md border border-[#444752] p-2 text-sm " +
-                "text-gray-600 placeholder:text-gray-400 focus:outline-none sm:h-12 sm:text-base"
+                "text-gray-600 dark:text-gray-200 dark:bg-[#1a1a1a] " +
+                "placeholder:text-gray-400 dark:placeholder:text-gray-500 " +
+                "focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-600 " +
+                "sm:h-12 sm:text-base"
               }
               data-testid="create-info-location"
               {...form.register("location", {

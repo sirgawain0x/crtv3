@@ -183,10 +183,11 @@ const VideoCardGrid: React.FC<VideoCardGridProps> = ({
 
   // Helper function to determine if pagination should be shown
   const shouldShowPagination = useCallback(() => {
-    // Show pagination if:
-    // 1. We have more than one page worth of assets, OR
+    // Show pagination only when:
+    // 1. We have more than one page worth of assets (totalAssets > ITEMS_PER_PAGE), OR
     // 2. We're on a page > 1 (to allow navigation back), OR
-    // 3. There's a next page available
+    // 3. There's a next page available (hasNextPage)
+    // This prevents showing pagination when there's only one page of results
     return totalAssets > ITEMS_PER_PAGE || currentPage > 1 || hasNextPage;
   }, [totalAssets, currentPage, hasNextPage]);
 
@@ -219,6 +220,8 @@ const VideoCardGrid: React.FC<VideoCardGridProps> = ({
             onPrevPage={handlePrevPage}
             isLoading={loading}
             totalDisplayed={validVideosCount}
+            totalVideos={totalAssets}
+            itemsPerPage={ITEMS_PER_PAGE}
           />
         )}
       </div>
@@ -242,6 +245,8 @@ const VideoCardGrid: React.FC<VideoCardGridProps> = ({
             onPrevPage={handlePrevPage}
             isLoading={loading}
             totalDisplayed={validVideosCount}
+            totalVideos={totalAssets}
+            itemsPerPage={ITEMS_PER_PAGE}
           />
         )}
       </div>
@@ -269,6 +274,8 @@ const VideoCardGrid: React.FC<VideoCardGridProps> = ({
           onPrevPage={handlePrevPage}
           isLoading={loading}
           totalDisplayed={validVideosCount}
+          totalVideos={totalAssets}
+          itemsPerPage={ITEMS_PER_PAGE}
         />
       )}
     </div>

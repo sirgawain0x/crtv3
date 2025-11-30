@@ -85,22 +85,22 @@ const PreviewVideo: FC<PreviewVideoProps> = ({ video }) => {
   return (
     <div className="flex w-full items-center justify-center">
       {videoUrl && (
-        <div className="relative w-full pt-[56.25%] bg-gray-100 rounded-lg overflow-hidden">
+        <div className="relative w-full pt-[56.25%] bg-muted rounded-lg overflow-hidden">
           {isLoading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
+            <div className="absolute inset-0 flex items-center justify-center bg-muted">
               <div className="text-center">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-500 mx-auto mb-2"></div>
-                <p className="text-sm text-gray-600">Loading video preview...</p>
+                <p className="text-sm text-muted-foreground">Loading video preview...</p>
               </div>
             </div>
           )}
           
           {hasError && (
-            <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
+            <div className="absolute inset-0 flex items-center justify-center bg-muted">
               <div className="text-center p-4">
-                <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-3" />
-                <p className="text-sm text-red-600 mb-2">{errorMessage}</p>
-                <p className="text-xs text-gray-500 mb-4">
+                <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-3" />
+                <p className="text-sm text-destructive mb-2">{errorMessage}</p>
+                <p className="text-xs text-muted-foreground mb-4">
                   File: {video?.name}
                 </p>
                 <button
