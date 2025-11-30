@@ -19,6 +19,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { shortenAddress } from "@/lib/utils/utils";
 import { createClient } from "@/lib/sdk/supabase/server";
 import makeBlockie from "ethereum-blockies-base64";
+import { convertFailingGateway } from "@/lib/utils/image-gateway";
 
 type VideoDetailsPageProps = {
   params: Promise<{
@@ -229,11 +230,49 @@ export async function generateMetadata({
     
     if (!asset?.asset) return { title: "Video Not Found" };
 
+    // Get thumbnail from database or use fallback
+    let thumbnailUrl = 
+      (videoAsset as any)?.thumbnail_url || 
+      (asset.asset as any)?.thumbnailUri || 
+      "/Creative_TV.png";
+
+    // Apply gateway conversion for IPFS URLs (consistent with ShareDialog)
+    thumbnailUrl = convertFailingGateway(thumbnailUrl);
+
+    // Construct absolute URL for Open Graph
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 
+                    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 
+                    "https://tv.creativeplatform.xyz");
+    const absoluteUrl = `${baseUrl}/discover/${id}`;
+    
+    // Construct absolute thumbnail URL with proper path joining
+    let absoluteThumbnailUrl: string;
+    if (thumbnailUrl.startsWith("http://") || thumbnailUrl.startsWith("https://")) {
+      // Already an absolute URL, use as-is
+      absoluteThumbnailUrl = thumbnailUrl;
+    } else {
+      // Relative URL - ensure proper path joining
+      const normalizedPath = thumbnailUrl.startsWith("/") 
+        ? thumbnailUrl 
+        : `/${thumbnailUrl}`;
+      absoluteThumbnailUrl = `${baseUrl}${normalizedPath}`;
+    }
+
+    // Use consistent fallback for asset name
+    const assetName = asset.asset.name ?? "Watch Video";
+    
+    // Use nullish coalescing to preserve empty strings (only replace null/undefined)
+    const videoDescription = (videoAsset as any)?.description ?? `Watch ${assetName} on Creative TV`;
+    
     return {
-      title: asset.asset.name ?? "Watch Video",
+      title: assetName,
+      description: videoDescription,
       openGraph: {
-        title: asset.asset.name,
-        images: [(asset.asset as any).thumbnailUri || "/default-thumbnail.webp"],
+        title: assetName,
+        description: videoDescription,
+        images: [absoluteThumbnailUrl],
+        url: absoluteUrl,
+        type: "video.other",
         videos: asset.asset.playbackUrl
           ? [
               {
@@ -244,6 +283,12 @@ export async function generateMetadata({
               },
             ]
           : [],
+      },
+      twitter: {
+        card: "summary_large_image",
+        title: assetName,
+        description: videoDescription,
+        images: [absoluteThumbnailUrl],
       },
     };
   } catch (error) {

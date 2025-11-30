@@ -27,7 +27,7 @@ export const metadata: Metadata = {
     description: "The Way Content Should Be.",
     images: [
       {
-        url: "https://tv.creativeplatform.xyz/Creative_TV_Logo.png",
+        url: "/images/Creative_TV_Logo.png",
         width: 500,
         height: 500,
         alt: "Creative TV Logo",
@@ -39,7 +39,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Creative TV",
     description: "The Way Content Should Be.",
-    images: ["https://tv.creativeplatform.xyz/creative-banner.png"],
+    images: ["/Creative_TV.png"],
   },
 };
 

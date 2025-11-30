@@ -21,6 +21,7 @@ import { useVideo } from "@/context/VideoContext";
 import { useEffect, useRef, useState } from "react";
 import { fetchVideoAssetByPlaybackId } from "@/lib/utils/video-assets-client";
 import VideoThumbnail from './VideoThumbnail';
+import { ShareDialog } from "./ShareDialog";
 
 interface VideoCardProps {
   asset: Asset;
@@ -30,6 +31,7 @@ interface VideoCardProps {
 const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
   const { currentPlayingId, setCurrentPlayingId } = useVideo();
   const [dbStatus, setDbStatus] = useState<"draft" | "published" | "minted" | "archived" | null>(null);
+  const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
   const playerRef = useRef<HTMLDivElement>(null);
 
 
@@ -217,6 +219,7 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
                 className="flex-1 cursor-pointer hover:scale-125"
                 aria-label={`Share ${asset?.name}`}
                 variant="ghost"
+                onClick={() => setIsShareDialogOpen(true)}
               >
                 Share
               </Button>
@@ -224,6 +227,15 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
           ) : null}
         </CardFooter>
       </Card>
+
+      {/* Share Dialog */}
+      <ShareDialog
+        open={isShareDialogOpen}
+        onOpenChange={setIsShareDialogOpen}
+        videoTitle={asset?.name || "Video"}
+        videoId={asset?.id || ""}
+        playbackId={asset?.playbackId || undefined}
+      />
     </div>
   );
 };

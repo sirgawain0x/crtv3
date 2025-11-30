@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { Button } from "../../ui/button";
-import { SparklesIcon, AlertCircle, Upload, CreditCard } from "lucide-react";
+import { SparklesIcon, AlertCircle, Upload, CreditCard, Loader2 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
 import { useMeTokensSupabase } from "@/lib/hooks/metokens/useMeTokensSupabase";
 import { uploadThumbnailToIPFS, uploadThumbnailFromBlob } from "@/lib/services/thumbnail-upload";
 import { AlchemyMeTokenCreator } from "@/components/UserProfile/AlchemyMeTokenCreator";
@@ -16,7 +17,9 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import Image from "next/image";
+import { compressImage } from "@/lib/utils/image-compression";
+import { convertFailingGateway } from "@/lib/utils/image-gateway";
+import { GatewayImage } from "@/components/ui/gateway-image";
 
 interface FormValues {
   thumbnailType: "custom" | "ai";
@@ -71,6 +74,9 @@ const CreateThumbnailForm = ({
   const [aiLoading, setAiLoading] = useState(false);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [thumbnailUploading, setThumbnailUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isCompressing, setIsCompressing] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | undefined>();
   const [showMeTokenCreator, setShowMeTokenCreator] = useState(false);
   const blobUrlRef = useRef<string | null>(null);
@@ -89,17 +95,64 @@ const CreateThumbnailForm = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Handle custom image upload
+  // Handle custom image upload with compression
   useEffect(() => {
     if (customImage && thumbnailType === "custom") {
       // Store the current image in ref to check against stale closures
       currentImageRef.current = customImage;
       const imageToUpload = customImage;
       
-      // Upload thumbnail to IPFS immediately for persistence
-      setThumbnailUploading(true);
-      uploadThumbnailToIPFS(imageToUpload, livepeerAssetId || 'unknown')
-        .then((result) => {
+      // Process image: compress then upload
+      const processAndUpload = async () => {
+        try {
+          // Step 1: Compress image
+          setIsCompressing(true);
+          setUploadProgress(10);
+          
+          const compressionResult = await compressImage(imageToUpload, {
+            maxSizeMB: 5,
+            maxWidth: 1920,
+            maxHeight: 1080,
+            quality: 0.8,
+            outputFormat: 'image/jpeg',
+          });
+
+          setUploadProgress(30);
+
+          if (!compressionResult.success) {
+            setError("customImage", { 
+              message: compressionResult.error || "Failed to compress image. Please use a smaller image size." 
+            });
+            setIsCompressing(false);
+            setThumbnailUploading(false);
+            setUploadProgress(0);
+            return;
+          }
+
+          const compressedFile = compressionResult.file!;
+          
+          // Check if customImage has changed while compression was in progress
+          if (currentImageRef.current !== imageToUpload) {
+            return;
+          }
+
+          // Step 2: Create preview URL from compressed file
+          if (blobUrlRef.current) {
+            URL.revokeObjectURL(blobUrlRef.current);
+          }
+          const previewUrl = URL.createObjectURL(compressedFile);
+          blobUrlRef.current = previewUrl;
+          setCustomPreviewUrl(previewUrl);
+          setUploadProgress(50);
+
+          // Step 3: Upload to IPFS
+          setIsCompressing(false);
+          setThumbnailUploading(true);
+          
+          const result = await uploadThumbnailToIPFS(compressedFile, livepeerAssetId || 'unknown');
+          
+          setUploadProgress(100);
+
           // Check if customImage has changed while upload was in progress
           if (currentImageRef.current !== imageToUpload) {
             // Image changed, ignore this result
@@ -107,59 +160,65 @@ const CreateThumbnailForm = ({
           }
           
           if (result.success && result.thumbnailUrl) {
-            // Clean up any existing blob URL before setting IPFS URL
+            // Clean up blob URL and use IPFS URL
             if (blobUrlRef.current) {
               URL.revokeObjectURL(blobUrlRef.current);
               blobUrlRef.current = null;
             }
-            // Use the IPFS URL
-            setCustomPreviewUrl(result.thumbnailUrl);
-            setSelectedImage(result.thumbnailUrl);
-            onSelectThumbnailImages(result.thumbnailUrl);
+            // Use the IPFS URL with gateway fallback
+            const ipfsUrl = convertFailingGateway(result.thumbnailUrl);
+            setCustomPreviewUrl(ipfsUrl);
+            setSelectedImage(ipfsUrl);
+            onSelectThumbnailImages(ipfsUrl);
             toast.success("Custom thumbnail uploaded successfully!");
           } else {
-            toast.error(result.error || "Failed to upload thumbnail");
-            // Clean up any existing blob URL before creating a new one
+            // IPFS upload failed - clear selected image since blob URLs can't be used on server
+            toast.error(result.error || "Failed to upload thumbnail. Please try again.");
+            // Clear blob URL and selected image to prevent submission with invalid URL
             if (blobUrlRef.current) {
               URL.revokeObjectURL(blobUrlRef.current);
+              blobUrlRef.current = null;
             }
-            // Create temporary preview URL for display only
-            const url = URL.createObjectURL(imageToUpload);
-            blobUrlRef.current = url;
-            setCustomPreviewUrl(url);
-            setSelectedImage(url);
-            onSelectThumbnailImages(url);
+            setCustomPreviewUrl(null);
+            setSelectedImage(undefined);
+            setValue("customImage", null);
+            setError("customImage", {
+              message: "Thumbnail upload failed. Please select a different image and try again."
+            });
           }
-        })
-        .catch((error) => {
-          // Check if customImage has changed while upload was in progress
+        } catch (error) {
+          // Check if customImage has changed while processing was in progress
           if (currentImageRef.current !== imageToUpload) {
-            // Image changed, ignore this error
             return;
           }
           
-          console.error("Error uploading thumbnail:", error);
-          toast.error("Failed to upload thumbnail");
-          // Clean up any existing blob URL before creating a new one
+          console.error("Error processing thumbnail:", error);
+          toast.error("Failed to process thumbnail. Please try again.");
+          // Clear blob URL and selected image to prevent submission with invalid URL
           if (blobUrlRef.current) {
             URL.revokeObjectURL(blobUrlRef.current);
+            blobUrlRef.current = null;
           }
-          // Create temporary preview URL for display only
-          const url = URL.createObjectURL(imageToUpload);
-          blobUrlRef.current = url;
-          setCustomPreviewUrl(url);
-          setSelectedImage(url);
-          onSelectThumbnailImages(url);
-        })
-        .finally(() => {
-          // Always reset loading state when upload completes (whether successful, failed, or stale)
-          // If image changed, the upload is stale but we still need to reset the loading state
+          setCustomPreviewUrl(null);
+          setSelectedImage(undefined);
+          setValue("customImage", null);
+          setError("customImage", { 
+            message: "Failed to process image. Please select a different image and try again." 
+          });
+        } finally {
+          setIsCompressing(false);
           setThumbnailUploading(false);
-        });
+          setUploadProgress(0);
+        }
+      };
+
+      processAndUpload();
     } else {
       // Reset ref when no image is selected and reset loading state
       currentImageRef.current = null;
       setThumbnailUploading(false);
+      setIsCompressing(false);
+      setUploadProgress(0);
     }
 
     // Cleanup function to revoke blob URLs when component unmounts or dependencies change
@@ -192,56 +251,67 @@ const CreateThumbnailForm = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleCustomImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    
+  const handleFileSelect = (file: File) => {
     // Clear any previous errors first
     clearErrors("customImage");
     
     if (!file) {
-      // Reset the file input value to allow re-selecting the same file
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
       setValue("customImage", null);
       setCustomPreviewUrl(null);
       setSelectedImage(undefined);
-      // Explicitly clear errors when user cancels selection
       clearErrors("customImage");
       return;
     }
     
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      setError("customImage", { message: "Please select an image file" });
-      // Reset the file input to allow selecting a new file
+      setError("customImage", { message: "Please select an image file (JPG, PNG, WebP)" });
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
       setValue("customImage", null);
-      // Clear preview state to avoid showing stale preview
-      setCustomPreviewUrl(null);
-      setSelectedImage(undefined);
-      return;
-    }
-    
-    // Validate file size (5MB limit)
-    if (file.size > 5 * 1024 * 1024) {
-      setError("customImage", { message: "File size must be less than 5MB" });
-      // Reset the file input to allow selecting a new file
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-      setValue("customImage", null);
-      // Clear preview state to avoid showing stale preview
       setCustomPreviewUrl(null);
       setSelectedImage(undefined);
       return;
     }
 
-    // File is valid - clear any errors and set the file
+    // File is valid - compression will handle size limits
     clearErrors("customImage");
     setValue("customImage", file);
+  };
+
+  const handleCustomImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleFileSelect(file);
+    }
+    // Reset the file input to allow re-selecting the same file
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(false);
+    
+    const file = e.dataTransfer.files[0];
+    if (file) {
+      handleFileSelect(file);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(false);
   };
 
   /**
@@ -350,8 +420,6 @@ const CreateThumbnailForm = ({
   };
 
   const handleImageSelection = async (imageUrl: string) => {
-    setSelectedImage(imageUrl);
-    
     // If it's a blob URL (AI-generated image), upload to IPFS first
     if (imageUrl.startsWith('blob:')) {
       setThumbnailUploading(true);
@@ -359,25 +427,30 @@ const CreateThumbnailForm = ({
         const result = await uploadThumbnailFromBlob(imageUrl, livepeerAssetId || 'unknown');
         if (result.success && result.thumbnailUrl) {
           // Use the IPFS URL instead of blob URL
-          onSelectThumbnailImages(result.thumbnailUrl);
-          setSelectedImage(result.thumbnailUrl);
+          const ipfsUrl = convertFailingGateway(result.thumbnailUrl);
+          setSelectedImage(ipfsUrl);
+          onSelectThumbnailImages(ipfsUrl);
           toast.success("AI thumbnail uploaded successfully!");
         } else {
-          toast.error(result.error || "Failed to upload AI thumbnail");
-          // Fallback to blob URL
-          onSelectThumbnailImages(imageUrl);
+          // IPFS upload failed - clear selection since blob URLs can't be used on server
+          toast.error(result.error || "Failed to upload AI thumbnail. Please try selecting again.");
+          setSelectedImage(undefined);
+          // Don't call onSelectThumbnailImages with blob URL - it's invalid for server use
         }
       } catch (error) {
         console.error("Error uploading AI thumbnail:", error);
-        toast.error("Failed to upload AI thumbnail");
-        // Fallback to blob URL
-        onSelectThumbnailImages(imageUrl);
+        toast.error("Failed to upload AI thumbnail. Please try selecting again.");
+        // Clear selection - blob URLs can't be used on server
+        setSelectedImage(undefined);
+        // Don't call onSelectThumbnailImages with blob URL - it's invalid for server use
       } finally {
         setThumbnailUploading(false);
       }
     } else {
       // It's already a persistent URL (IPFS or other), use it directly
-      onSelectThumbnailImages(imageUrl);
+      const persistentUrl = convertFailingGateway(imageUrl);
+      setSelectedImage(persistentUrl);
+      onSelectThumbnailImages(persistentUrl);
     }
   };
 
@@ -400,7 +473,16 @@ const CreateThumbnailForm = ({
         <TabsContent value="custom" className="space-y-4">
           <div className="space-y-4">
             <Label>Upload Thumbnail Image</Label>
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+            <div
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+                dragOver
+                  ? "border-primary bg-primary/5"
+                  : "border-gray-300 hover:border-gray-400"
+              }`}
+            >
               <input
                 ref={fileInputRef}
                 type="file"
@@ -408,33 +490,69 @@ const CreateThumbnailForm = ({
                 onChange={handleCustomImageChange}
                 className="hidden"
               />
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => fileInputRef.current?.click()}
-                className="mb-2"
-              >
-                <Upload className="h-4 w-4 mr-2" />
-                Choose Image
-              </Button>
-              <p className="text-sm text-gray-500">
-                JPG, PNG, WebP up to 5MB
-              </p>
+              <div className="flex flex-col items-center gap-4">
+                <Upload className={`h-8 w-8 ${dragOver ? "text-primary" : "text-gray-400"}`} />
+                <div className="space-y-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isCompressing || thumbnailUploading}
+                  >
+                    {isCompressing || thumbnailUploading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-4 w-4 mr-2" />
+                        Choose Image
+                      </>
+                    )}
+                  </Button>
+                  <p className="text-sm text-gray-500">
+                    Drag and drop an image here, or click to browse
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    JPG, PNG, WebP (will be compressed to 5MB if needed)
+                  </p>
+                </div>
+              </div>
+              
+              {/* Upload Progress */}
+              {(isCompressing || thumbnailUploading) && (
+                <div className="mt-4 space-y-2">
+                  <div className="flex items-center justify-between text-xs text-gray-600">
+                    <span>
+                      {isCompressing ? "Compressing image..." : "Uploading to IPFS..."}
+                    </span>
+                    <span>{uploadProgress}%</span>
+                  </div>
+                  <Progress value={uploadProgress} className="h-2" />
+                </div>
+              )}
+
               {errors.customImage && (
-                <p className="text-red-500 text-sm mt-2">{errors.customImage.message}</p>
+                <Alert variant="destructive" className="mt-4">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{errors.customImage.message}</AlertDescription>
+                </Alert>
               )}
             </div>
 
             {/* Custom Image Preview */}
-            {customPreviewUrl && (
+            {customPreviewUrl && !isCompressing && !thumbnailUploading && (
               <div className="space-y-2">
                 <Label>Preview</Label>
                 <div className="relative w-full aspect-video rounded-lg overflow-hidden border">
-                  <Image
+                  <GatewayImage
                     src={customPreviewUrl}
                     alt="Custom thumbnail preview"
                     fill
                     className="object-cover"
+                    unoptimized
+                    showSkeleton={false}
                   />
                 </div>
               </div>
@@ -517,11 +635,13 @@ const CreateThumbnailForm = ({
                       />
                       <Label htmlFor={`ai-image-${index}`} className="cursor-pointer">
                         <div className="relative w-full aspect-video rounded-lg overflow-hidden border hover:border-blue-300 transition-colors">
-                          <Image
+                          <GatewayImage
                             src={image.url}
                             alt={`AI Generated Thumbnail ${index + 1}`}
                             fill
                             className="object-cover"
+                            unoptimized
+                            showSkeleton={false}
                           />
                           <div className="absolute top-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
                             Gemini
