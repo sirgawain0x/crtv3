@@ -7,7 +7,6 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from "@/components/ui/carousel";
-import { TrendingPlayer } from "@/components/Player/TrendingPlayer";
 import { getDetailPlaybackSource } from "@/lib/hooks/livepeer/useDetailPlaybackSources";
 import { fetchPublishedVideos } from "@/lib/utils/published-videos-client";
 import type { VideoAsset } from "@/lib/types/video-asset";
@@ -15,6 +14,8 @@ import { Src } from "@livepeer/react";
 import { toast } from "sonner";
 import Link from "next/link";
 import { TrendingUpIcon } from "lucide-react";
+import VideoThumbnail from "@/components/Videos/VideoThumbnail";
+import { ViewsComponent } from "@/components/Player/ViewsComponent";
 
 export function TopVideos() {
   const [videos, setVideos] = React.useState<VideoAsset[]>([]);
@@ -249,16 +250,27 @@ export function TopVideos() {
                 <div className="group h-full p-1">
                   <Card className="relative h-[300px] w-full overflow-hidden transition-transform duration-200 ease-in-out group-hover:scale-[1.02]">
                     <CardContent className="absolute inset-0 p-0">
-                      <TrendingPlayer
-                        src={playbackSources[video.asset_id]}
-                        title={video.title}
-                        assetMetadata={{
-                          assetId: video.asset_id,
-                          playbackId: video.playback_id,
-                          title: video.title,
-                          description: video.description || "",
-                        }}
-                      />
+                      {video.playback_id ? (
+                        <VideoThumbnail
+                          playbackId={video.playback_id}
+                          src={playbackSources[video.asset_id]}
+                          title={video.title}
+                          assetId={video.asset_id}
+                          className="!aspect-auto h-full w-full"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center bg-gray-900 text-white">
+                          No playback ID available
+                        </div>
+                      )}
+                      {/* Top bar with view counts */}
+                      {video.playback_id && (
+                        <div className="absolute left-0 right-0 top-0 bg-gradient-to-b from-black/60 to-transparent pt-2">
+                          <div className="flex items-center justify-end px-3 py-1">
+                            <ViewsComponent playbackId={video.playback_id} />
+                          </div>
+                        </div>
+                      )}
                       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-4">
                         <Link
                           href={`/discover/${video.asset_id}`}

@@ -201,12 +201,12 @@ export default function LivePage() {
     <ProfilePageGuard>
       <MembershipGuard>
         <div className="min-h-screen p-6">
-          <div className="mb-8 rounded-lg bg-white p-8 shadow-md">
-            <h1 className="mb-6 flex items-center justify-center gap-2 text-center text-4xl font-bold text-red-600">
+          <div className="mb-8 rounded-lg bg-white dark:bg-gray-800/60 p-8 shadow-md">
+            <h1 className="mb-6 flex items-center justify-center gap-2 text-center text-4xl font-bold text-red-600 dark:text-red-400">
               <VideoIcon className="h-10 w-10" />
               <span>LIVE</span>
             </h1>
-            <p className="mb-8 text-center text-gray-600">THE STAGE IS YOURS</p>
+            <p className="mb-8 text-center text-gray-600 dark:text-gray-400">THE STAGE IS YOURS</p>
           </div>
           <div className="my-5 p-4">
             <Breadcrumb>

@@ -30,6 +30,8 @@ const VideoThumbnail: React.FC<VideoThumbnailProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [showPlayer, setShowPlayer] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
+  const showPlayerRef = React.useRef(showPlayer);
+  const observerRef = React.useRef<IntersectionObserver | null>(null);
 
   useEffect(() => {
     async function fetchThumbnail() {
@@ -69,6 +71,76 @@ const VideoThumbnail: React.FC<VideoThumbnailProps> = ({
     fetchThumbnail();
   }, [playbackId]);
 
+  // Reset showPlayer when playbackId changes or component unmounts
+  // This ensures that when scrolling in a carousel, the thumbnail resets to show the image instead of the player
+  useEffect(() => {
+    // Reset showPlayer when playbackId changes
+    setShowPlayer(false);
+    showPlayerRef.current = false;
+    
+    // Reset on unmount as well
+    return () => {
+      setShowPlayer(false);
+      showPlayerRef.current = false;
+    };
+  }, [playbackId]);
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    showPlayerRef.current = showPlayer;
+  }, [showPlayer]);
+
+  // Use Intersection Observer to reset showPlayer when component goes out of view
+  // This handles the carousel case where components stay mounted but go out of view
+  // Note: We use a ref to track showPlayer state to avoid recreating the observer on every state change
+  // We use a callback ref pattern to update the observer when the element changes
+  const setupObserver = React.useCallback((element: HTMLDivElement | null) => {
+    // Clean up existing observer
+    if (observerRef.current) {
+      observerRef.current.disconnect();
+      observerRef.current = null;
+    }
+
+    if (!element) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          // If the component is not visible (out of viewport), reset showPlayer
+          // Use ref to check current state without causing effect re-runs
+          if (!entry.isIntersecting && showPlayerRef.current) {
+            setShowPlayer(false);
+            showPlayerRef.current = false;
+          }
+        });
+      },
+      {
+        threshold: 0.1, // Trigger when at least 10% of the element is visible
+      }
+    );
+
+    observer.observe(element);
+    observerRef.current = observer;
+  }, []);
+
+  // Cleanup observer on unmount
+  useEffect(() => {
+    return () => {
+      if (observerRef.current) {
+        observerRef.current.disconnect();
+        observerRef.current = null;
+      }
+    };
+  }, []);
+
+  // Update observer when ref element changes (using callback ref)
+  const containerCallbackRef = React.useCallback(
+    (element: HTMLDivElement | null) => {
+      setupObserver(element);
+    },
+    [setupObserver]
+  );
+
   const handleThumbnailClick = () => {
     setShowPlayer(true);
     onPlay?.();
@@ -77,12 +149,14 @@ const VideoThumbnail: React.FC<VideoThumbnailProps> = ({
   // Show player if clicked
   if (showPlayer) {
     return (
-      <Player
-        src={src}
-        assetId={assetId}
-        title={title}
-        onPlay={onPlay}
-      />
+      <div ref={containerCallbackRef} className={className}>
+        <Player
+          src={src}
+          assetId={assetId}
+          title={title}
+          onPlay={onPlay}
+        />
+      </div>
     );
   }
 
@@ -101,18 +175,21 @@ const VideoThumbnail: React.FC<VideoThumbnailProps> = ({
   // If no thumbnail URL found, show player
   if (!thumbnailUrl) {
     return (
-      <Player
-        src={src}
-        assetId={assetId}
-        title={title}
-        onPlay={onPlay}
-      />
+      <div ref={containerCallbackRef} className={className}>
+        <Player
+          src={src}
+          assetId={assetId}
+          title={title}
+          onPlay={onPlay}
+        />
+      </div>
     );
   }
 
   // Show thumbnail with play button overlay
   return (
     <div 
+      ref={containerCallbackRef}
       className={`relative aspect-video cursor-pointer group ${className}`}
       onClick={handleThumbnailClick}
     >
