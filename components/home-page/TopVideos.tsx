@@ -16,6 +16,7 @@ import Link from "next/link";
 import { TrendingUpIcon } from "lucide-react";
 import VideoThumbnail from "@/components/Videos/VideoThumbnail";
 import { ViewsComponent } from "@/components/Player/ViewsComponent";
+import { HERO_VIDEO_ASSET_ID } from "@/context/context";
 
 export function TopVideos() {
   const [videos, setVideos] = React.useState<VideoAsset[]>([]);
@@ -40,9 +41,10 @@ export function TopVideos() {
         setError(null);
 
         // Step 1: Fetch trending videos from database (ordered by views_count)
+        // Fetch 11 videos to ensure we have 10 after excluding the hero video
         console.log("Fetching trending videos from database...");
         const { data: trendingVideos } = await fetchPublishedVideos({
-          limit: 10, // Fetch top 10 trending videos
+          limit: 11, // Fetch 11 to ensure we have 10 after excluding hero video
           offset: 0,
           orderBy: 'views_count', // Order by views to get trending content
           order: 'desc',
@@ -58,14 +60,27 @@ export function TopVideos() {
           return;
         }
 
-        console.log(`Found ${trendingVideos.length} trending videos`);
+        // Filter out the hero video from the trending list
+        const filteredVideos = trendingVideos.filter(
+          (video) => video.asset_id !== HERO_VIDEO_ASSET_ID
+        ).slice(0, 10); // Take top 10 after filtering
+
+        if (filteredVideos.length === 0) {
+          console.warn("No trending videos found after filtering hero video");
+          setVideos([]);
+          setPlaybackSources({});
+          setLoading(false);
+          return;
+        }
+
+        console.log(`Found ${filteredVideos.length} trending videos (excluding hero video)`);
 
         // Step 2: Fetch playback sources for each video
         // Don't set videos state until playback sources are ready to avoid rendering videos without sources
         const sources: Record<string, Src[] | null> = {};
         console.log("Starting to fetch playback sources...");
 
-        for (const video of trendingVideos) {
+        for (const video of filteredVideos) {
           if (!isMounted || signal.aborted) {
             // If aborted, don't set any state - component is unmounting
             return;
@@ -136,7 +151,7 @@ export function TopVideos() {
         // Only set both videos and playback sources together after all sources are fetched
         // This ensures videos are never rendered without their playback sources
         console.log("Final playback sources:", sources);
-        setVideos(trendingVideos);
+        setVideos(filteredVideos);
         setPlaybackSources(sources);
       } catch (error) {
         if (!isMounted || signal.aborted) return;
