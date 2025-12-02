@@ -448,6 +448,7 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
         let approveTxHash: string | null = null;
         
         // Only approve if allowance is insufficient
+        // If allowance exists, we'll try minting first and handle bundler sync issues via retry logic
         if (!hasUnlimitedAllowance && !hasSufficientAllowance) {
           console.log('📝 Allowance insufficient, sending approve transaction...');
           setSuccess('Step 1: Approving DAI... Please sign in your wallet.');
@@ -515,7 +516,9 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
           setApprovalTxHash(approveTxHash);
           setSuccess('Approval confirmed! Waiting for state propagation...');
         } else {
-          console.log('✅ Sufficient allowance already exists, skipping approval');
+          // Allowance exists - log it but proceed to mint
+          // If bundler doesn't see it, retry logic will handle sending fresh approval
+          console.log('✅ Sufficient allowance already exists, proceeding to mint');
           console.log('📊 Allowance details:', {
             allowance: currentAllowance.toString(),
             formatted: formatEther(currentAllowance),

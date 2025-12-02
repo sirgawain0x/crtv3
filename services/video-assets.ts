@@ -41,6 +41,7 @@ export async function createVideoAsset(
       attributes: data.attributes,
       requires_metoken: data.requires_metoken || false,
       metoken_price: data.metoken_price || null,
+      creator_metoken_id: data.creator_metoken_id || null,
     })
     .select()
     .single();
@@ -73,7 +74,7 @@ export async function getVideoAssetByPlaybackId(playbackId: string) {
   
   const { data: result, error } = await supabase
     .from('video_assets')
-    .select('id, status, thumbnail_url')
+    .select('id, status, thumbnail_url, creator_metoken_id')
     .eq('playback_id', playbackId)
     .maybeSingle(); // Use maybeSingle() instead of single()
 
