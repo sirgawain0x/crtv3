@@ -74,7 +74,7 @@ export async function getVideoAssetByPlaybackId(playbackId: string) {
   
   const { data: result, error } = await supabase
     .from('video_assets')
-    .select('id, status, thumbnail_url')
+    .select('id, status, thumbnail_url, creator_metoken_id')
     .eq('playback_id', playbackId)
     .maybeSingle(); // Use maybeSingle() instead of single()
 

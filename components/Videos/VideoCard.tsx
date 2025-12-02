@@ -23,6 +23,8 @@ import { fetchVideoAssetByPlaybackId } from "@/lib/utils/video-assets-client";
 import VideoThumbnail from './VideoThumbnail';
 import { ShareDialog } from "./ShareDialog";
 import { useCreatorProfile } from "@/lib/hooks/metokens/useCreatorProfile";
+import { VideoMeTokenBuyDialog } from "./VideoMeTokenBuyDialog";
+import { VideoMeTokenContribution } from "./VideoMeTokenContribution";
 
 interface VideoCardProps {
   asset: Asset;
@@ -33,6 +35,7 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
   const { currentPlayingId, setCurrentPlayingId } = useVideo();
   const [dbStatus, setDbStatus] = useState<"draft" | "published" | "minted" | "archived" | null>(null);
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
+  const [isBuyDialogOpen, setIsBuyDialogOpen] = useState(false);
   const playerRef = useRef<HTMLDivElement>(null);
 
   const address = asset.creatorId?.value as string;
@@ -47,19 +50,50 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
     }
   };
 
+  const [videoAssetId, setVideoAssetId] = useState<number | null>(null);
+  const [hasMeToken, setHasMeToken] = useState<boolean>(false);
+
   useEffect(() => {
     async function fetchStatus() {
+      // Reset state when playbackId changes or is missing
+      if (!asset?.playbackId) {
+        setVideoAssetId(null);
+        setHasMeToken(false);
+        return;
+      }
+
+      // Reset state at the start of each fetch to prevent stale data
+      setVideoAssetId(null);
+      setHasMeToken(false);
+
       try {
-        if (!asset?.playbackId) return;
         const row = await fetchVideoAssetByPlaybackId(asset.playbackId);
-        if (row?.status) {
-          const validStatuses = ["draft", "published", "minted", "archived"] as const;
-          if (validStatuses.includes(row.status as any)) {
-            setDbStatus(row.status as "draft" | "published" | "minted" | "archived");
+        if (row) {
+          if (row.id) {
+            setVideoAssetId(row.id);
           }
+          if (row?.status) {
+            const validStatuses = ["draft", "published", "minted", "archived"] as const;
+            if (validStatuses.includes(row.status as any)) {
+              setDbStatus(row.status as "draft" | "published" | "minted" | "archived");
+            }
+          }
+          // Check if video has an associated MeToken
+          if (row?.creator_metoken_id) {
+            setHasMeToken(true);
+          } else {
+            setHasMeToken(false);
+          }
+        } else {
+          // No video asset found - reset state
+          setVideoAssetId(null);
+          setHasMeToken(false);
         }
       } catch (e) {
-        // no-op
+        // Reset state on error to prevent stale data from previous video
+        console.error('Error fetching video asset:', e);
+        setVideoAssetId(null);
+        setHasMeToken(false);
       }
     }
     fetchStatus();
@@ -186,6 +220,14 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
             </div>
             <VideoViewMetrics playbackId={asset.playbackId || ""} />
           </div>
+          {videoAssetId && (
+            <div className="my-2">
+              <VideoMeTokenContribution 
+                videoId={videoAssetId} 
+                playbackId={asset.playbackId || undefined}
+              />
+            </div>
+          )}
           <div className="mt-6 grid grid-flow-row auto-rows-max space-y-3 overflow-hidden">
             <CardTitle>
               <Link href={`/discover/${asset.id}`}>
@@ -210,13 +252,16 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
         <CardFooter className="mx-auto flex items-center justify-center">
           {asset?.status?.phase === "ready" ? (
             <div className="flex space-x-10">
-              <Button
-                className="flex-1 cursor-pointer hover:scale-125"
-                aria-label={`Buy ${asset?.name}`}
-                variant="ghost"
-              >
-                Buy
-              </Button>
+              {hasMeToken && (
+                <Button
+                  className="flex-1 cursor-pointer hover:scale-125"
+                  aria-label={`Buy ${asset?.name}`}
+                  variant="ghost"
+                  onClick={() => setIsBuyDialogOpen(true)}
+                >
+                  Buy
+                </Button>
+              )}
               <Link
                 href={`/discover/${encodeURIComponent(asset?.id)}`}
               >
@@ -249,6 +294,16 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
         videoId={asset?.id || ""}
         playbackId={asset?.playbackId || undefined}
       />
+
+      {/* Buy MeToken Dialog - Only show if creator has a MeToken */}
+      {asset?.playbackId && hasMeToken && (
+        <VideoMeTokenBuyDialog
+          open={isBuyDialogOpen}
+          onOpenChange={setIsBuyDialogOpen}
+          playbackId={asset.playbackId}
+          videoTitle={asset?.name}
+        />
+      )}
     </div>
   );
 };
