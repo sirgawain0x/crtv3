@@ -2,6 +2,76 @@ import { MeTokenData, MeTokenInfo } from '@/lib/hooks/metokens/useMeTokensSupaba
 import { publicClient } from '@/lib/viem';
 import { parseAbi } from 'viem';
 
+// Diamond contract ABI for getMeTokenInfo function
+const DIAMOND_ABI = [
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "meToken",
+        "type": "address"
+      }
+    ],
+    "name": "getMeTokenInfo",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "address",
+            "name": "owner",
+            "type": "address"
+          },
+          {
+            "internalType": "uint256",
+            "name": "hubId",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "balancePooled",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "balanceLocked",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "startTime",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "endTime",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "endCooldown",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "targetHubId",
+            "type": "uint256"
+          },
+          {
+            "internalType": "address",
+            "name": "migration",
+            "type": "address"
+          }
+        ],
+        "internalType": "struct MeTokenInfo",
+        "name": "",
+        "type": "tuple"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  }
+] as const;
+
 /**
  * Check if a MeToken is subscribed to a hub
  * A MeToken is considered subscribed if it has balancePooled > 0 or balanceLocked > 0
@@ -88,15 +158,10 @@ export async function checkMeTokenSubscriptionFromBlockchain(meTokenAddress: str
     
     // Try multiple approaches to get MeToken info
     const approaches = [
-      // Approach 1: Try getMeTokenInfo function
+      // Approach 1: Use proper JSON ABI format
       async () => {
         const DIAMOND_ADDRESS = '0xba5502db2aC2cBff189965e991C07109B14eB3f5';
-        const DIAMOND_ABI = parseAbi([
-          'function getMeTokenInfo(address meToken) view returns (address owner, uint256 hubId, ' +
-            'uint256 balancePooled, uint256 balanceLocked, uint256 startTime, uint256 endTime, ' +
-            'uint256 endCooldown, uint256 targetHubId, address migration)'
-        ]);
-
+        
         const meTokenInfo = await publicClient.readContract({
           address: DIAMOND_ADDRESS,
           abi: DIAMOND_ABI,
@@ -104,7 +169,77 @@ export async function checkMeTokenSubscriptionFromBlockchain(meTokenAddress: str
           args: [meTokenAddress as `0x${string}`]
         });
 
-        return meTokenInfo;
+        // Handle null case - throw error to be caught by approach loop
+        if (meTokenInfo === null) {
+          throw new Error('Contract returned null for MeToken info');
+        }
+
+        // Handle both struct object and tuple array formats
+        // Normalize to always return a 9-element array: [owner, hubId, balancePooled, balanceLocked, startTime, endTime, endCooldown, targetHubId, migration]
+        if (typeof meTokenInfo === 'object' && !Array.isArray(meTokenInfo)) {
+          // Struct object format - convert to 9-element array
+          // Safely access all properties with fallbacks to prevent undefined values
+          const owner = meTokenInfo.owner ?? '0x0000000000000000000000000000000000000000';
+          const hubId = meTokenInfo.hubId ?? BigInt(0);
+          const balancePooled = meTokenInfo.balancePooled ?? BigInt(0);
+          const balanceLocked = meTokenInfo.balanceLocked ?? BigInt(0);
+          const startTime = meTokenInfo.startTime ?? BigInt(0);
+          const endTime = meTokenInfo.endTime ?? BigInt(0);
+          const endCooldown = meTokenInfo.endCooldown !== undefined && meTokenInfo.endCooldown !== null 
+            ? meTokenInfo.endCooldown 
+            : BigInt(0);
+          const targetHubId = meTokenInfo.targetHubId ?? BigInt(0);
+          const migration = meTokenInfo.migration ?? '0x0000000000000000000000000000000000000000';
+          
+          return [
+            owner,
+            hubId,
+            balancePooled,
+            balanceLocked,
+            startTime,
+            endTime,
+            endCooldown, // endCooldown - safely accessed with fallback
+            targetHubId,
+            migration
+          ];
+        }
+        
+        // Tuple array format - normalize to 9 elements
+        if (Array.isArray(meTokenInfo)) {
+          // If array has 8 elements (missing endCooldown), insert it at index 6
+          if (meTokenInfo.length === 8) {
+            return [
+              meTokenInfo[0] ?? '0x0000000000000000000000000000000000000000', // owner
+              meTokenInfo[1] ?? BigInt(0), // hubId
+              meTokenInfo[2] ?? BigInt(0), // balancePooled
+              meTokenInfo[3] ?? BigInt(0), // balanceLocked
+              meTokenInfo[4] ?? BigInt(0), // startTime
+              meTokenInfo[5] ?? BigInt(0), // endTime
+              BigInt(0),      // endCooldown - fallback if missing (shouldn't happen with correct ABI)
+              meTokenInfo[6] ?? BigInt(0), // targetHubId
+              meTokenInfo[7] ?? '0x0000000000000000000000000000000000000000'  // migration
+            ];
+          }
+          // If already 9 elements (correct format), validate with null-safety checks and return
+          if (meTokenInfo.length === 9) {
+            return [
+              meTokenInfo[0] ?? '0x0000000000000000000000000000000000000000', // owner
+              meTokenInfo[1] ?? BigInt(0), // hubId
+              meTokenInfo[2] ?? BigInt(0), // balancePooled
+              meTokenInfo[3] ?? BigInt(0), // balanceLocked
+              meTokenInfo[4] ?? BigInt(0), // startTime
+              meTokenInfo[5] ?? BigInt(0), // endTime
+              meTokenInfo[6] ?? BigInt(0), // endCooldown
+              meTokenInfo[7] ?? BigInt(0), // targetHubId
+              meTokenInfo[8] ?? '0x0000000000000000000000000000000000000000'  // migration
+            ];
+          }
+          // If array has unexpected length, normalize it to 9 elements with fallbacks
+          throw new Error(`Unexpected array length: ${meTokenInfo.length}. Expected 8 or 9 elements.`);
+        }
+        
+        // If we get here, the format is unexpected - throw error
+        throw new Error(`Unexpected MeToken info format: ${typeof meTokenInfo}`);
       },
       
       // Approach 2: Try getMeTokenInfo with different signature
@@ -119,9 +254,50 @@ export async function checkMeTokenSubscriptionFromBlockchain(meTokenAddress: str
           abi: DIAMOND_ABI,
           functionName: 'getMeTokenInfo',
           args: [meTokenAddress as `0x${string}`]
-        });
+        }) as any;
 
-        return meTokenInfo;
+        // Handle null case - throw error to be caught by approach loop
+        if (meTokenInfo === null) {
+          throw new Error('Contract returned null for MeToken info');
+        }
+
+        // Normalize to 9-element array format
+        // Note: Contract struct has 8 fields, but we need 9 for destructuring (includes endCooldown)
+        if (Array.isArray(meTokenInfo)) {
+          if (meTokenInfo.length === 8) {
+            // Insert endCooldown at index 6 (after endTime, before targetHubId)
+            return [
+              meTokenInfo[0] ?? '0x0000000000000000000000000000000000000000', // owner
+              meTokenInfo[1] ?? BigInt(0), // hubId
+              meTokenInfo[2] ?? BigInt(0), // balancePooled
+              meTokenInfo[3] ?? BigInt(0), // balanceLocked
+              meTokenInfo[4] ?? BigInt(0), // startTime
+              meTokenInfo[5] ?? BigInt(0), // endTime
+              BigInt(0), // endCooldown - not in struct, insert as BigInt(0)
+              meTokenInfo[6] ?? BigInt(0), // targetHubId
+              meTokenInfo[7] ?? '0x0000000000000000000000000000000000000000'  // migration
+            ];
+          }
+          // If already 9 elements, validate with null-safety checks and return
+          if (meTokenInfo.length === 9) {
+            return [
+              meTokenInfo[0] ?? '0x0000000000000000000000000000000000000000', // owner
+              meTokenInfo[1] ?? BigInt(0), // hubId
+              meTokenInfo[2] ?? BigInt(0), // balancePooled
+              meTokenInfo[3] ?? BigInt(0), // balanceLocked
+              meTokenInfo[4] ?? BigInt(0), // startTime
+              meTokenInfo[5] ?? BigInt(0), // endTime
+              meTokenInfo[6] ?? BigInt(0), // endCooldown
+              meTokenInfo[7] ?? BigInt(0), // targetHubId
+              meTokenInfo[8] ?? '0x0000000000000000000000000000000000000000'  // migration
+            ];
+          }
+          // If array has unexpected length, throw error
+          throw new Error(`Unexpected array length: ${meTokenInfo.length}. Expected 8 or 9 elements.`);
+        }
+        
+        // If we get here, the format is unexpected - throw error
+        throw new Error(`Unexpected MeToken info format: ${typeof meTokenInfo}`);
       },
       
       // Approach 3: Try meTokenInfo function
@@ -136,9 +312,50 @@ export async function checkMeTokenSubscriptionFromBlockchain(meTokenAddress: str
           abi: DIAMOND_ABI,
           functionName: 'meTokenInfo',
           args: [meTokenAddress as `0x${string}`]
-        });
+        }) as any;
 
-        return meTokenInfo;
+        // Handle null case - throw error to be caught by approach loop
+        if (meTokenInfo === null) {
+          throw new Error('Contract returned null for MeToken info');
+        }
+
+        // Normalize to 9-element array format
+        // Note: Contract struct has 8 fields, but we need 9 for destructuring (includes endCooldown)
+        if (Array.isArray(meTokenInfo)) {
+          if (meTokenInfo.length === 8) {
+            // Insert endCooldown at index 6 (after endTime, before targetHubId)
+            return [
+              meTokenInfo[0] ?? '0x0000000000000000000000000000000000000000', // owner
+              meTokenInfo[1] ?? BigInt(0), // hubId
+              meTokenInfo[2] ?? BigInt(0), // balancePooled
+              meTokenInfo[3] ?? BigInt(0), // balanceLocked
+              meTokenInfo[4] ?? BigInt(0), // startTime
+              meTokenInfo[5] ?? BigInt(0), // endTime
+              BigInt(0), // endCooldown - not in struct, insert as BigInt(0)
+              meTokenInfo[6] ?? BigInt(0), // targetHubId
+              meTokenInfo[7] ?? '0x0000000000000000000000000000000000000000'  // migration
+            ];
+          }
+          // If already 9 elements, validate with null-safety checks and return
+          if (meTokenInfo.length === 9) {
+            return [
+              meTokenInfo[0] ?? '0x0000000000000000000000000000000000000000', // owner
+              meTokenInfo[1] ?? BigInt(0), // hubId
+              meTokenInfo[2] ?? BigInt(0), // balancePooled
+              meTokenInfo[3] ?? BigInt(0), // balanceLocked
+              meTokenInfo[4] ?? BigInt(0), // startTime
+              meTokenInfo[5] ?? BigInt(0), // endTime
+              meTokenInfo[6] ?? BigInt(0), // endCooldown
+              meTokenInfo[7] ?? BigInt(0), // targetHubId
+              meTokenInfo[8] ?? '0x0000000000000000000000000000000000000000'  // migration
+            ];
+          }
+          // If array has unexpected length, throw error
+          throw new Error(`Unexpected array length: ${meTokenInfo.length}. Expected 8 or 9 elements.`);
+        }
+        
+        // If we get here, the format is unexpected - throw error
+        throw new Error(`Unexpected MeToken info format: ${typeof meTokenInfo}`);
       },
       
       // Approach 4: Fallback - Check if MeToken exists and try to get basic info

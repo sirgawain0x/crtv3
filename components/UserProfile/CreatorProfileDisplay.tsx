@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { useCreatorProfileWithMeToken } from '@/lib/hooks/metokens/useCreatorProfile';
 import { Loader2, User, TrendingUp, Wallet } from 'lucide-react';
+import { convertFailingGateway } from '@/lib/utils/image-gateway';
 
 interface CreatorProfileDisplayProps {
   ownerAddress: string;
@@ -49,13 +50,14 @@ export function CreatorProfileDisplay({
 
   const displayName = profile?.username || `${ownerAddress.slice(0, 6)}...${ownerAddress.slice(-4)}`;
   const displayBio = profile?.bio || 'No bio available';
+  const avatarUrl = profile?.avatar_url ? convertFailingGateway(profile.avatar_url) : undefined;
 
   return (
     <Card>
       <CardHeader>
         <div className="flex items-start gap-4">
           <Avatar className="h-16 w-16">
-            <AvatarImage src={profile?.avatar_url} alt={displayName} />
+            <AvatarImage src={avatarUrl} alt={displayName} />
             <AvatarFallback>
               {profile?.username ? profile.username.charAt(0).toUpperCase() : <User className="h-8 w-8" />}
             </AvatarFallback>
