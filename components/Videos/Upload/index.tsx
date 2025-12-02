@@ -88,7 +88,7 @@ const HookMultiStepForm = () => {
           onPressBack={() =>
             setActiveStep((prevActiveStep) => prevActiveStep - 1)
           }
-          onPressNext={(livepeerAsset: any) => {
+          onPressNext={async (livepeerAsset: any) => {
             console.log('🎬 FileUpload onPressNext called with asset:', {
               id: livepeerAsset?.id,
               playbackId: livepeerAsset?.playbackId,
@@ -103,6 +103,27 @@ const HookMultiStepForm = () => {
 
             // Set the asset FIRST
             setLivepeerAsset(livepeerAsset);
+            
+            // Fetch creator's MeToken if address is available
+            // Note: Creators may not have created a MeToken yet, which is perfectly fine
+            let creatorMeTokenId: string | null = null;
+            if (address) {
+              try {
+                const meTokenResponse = await fetch(`/api/metokens?owner=${address}`);
+                const meTokenResult = await meTokenResponse.json();
+                
+                // Check if MeToken exists and has an ID
+                if (meTokenResult.data && meTokenResult.data.id) {
+                  creatorMeTokenId = meTokenResult.data.id;
+                  console.log('✅ Linked video to creator MeToken:', creatorMeTokenId);
+                }
+                // If no MeToken found, creatorMeTokenId remains null - this is expected and normal
+              } catch (error) {
+                // Silently continue - MeToken lookup is optional and not critical for video creation
+                // Many creators won't have MeTokens yet, and that's perfectly fine
+                console.debug('MeToken lookup skipped (creator may not have one yet)');
+              }
+            }
             
             // Create the video asset in the database and store its ID
             createVideoAsset({
@@ -131,6 +152,7 @@ const HookMultiStepForm = () => {
               attributes: null,
               requires_metoken: false,
               metoken_price: null,
+              creator_metoken_id: creatorMeTokenId,
               subtitles_uri: null,
               subtitles: null,
             }).then((dbAsset) => {

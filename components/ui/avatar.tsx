@@ -34,6 +34,9 @@ const AvatarImage = React.forwardRef<
   const initialSrc = normalizedSrc ? convertFailingGateway(normalizedSrc) : undefined;
   const [imageSrc, setImageSrc] = React.useState(initialSrc);
   const [fallbackIndex, setFallbackIndex] = React.useState(0);
+  
+  // Use ref to track current fallback index to avoid stale closures in handleError
+  const fallbackIndexRef = React.useRef(0);
 
   // Get fallbacks for current src (recalculated when src changes)
   const { fallbacks } = React.useMemo(
@@ -52,14 +55,20 @@ const AvatarImage = React.forwardRef<
     }
     // Reset fallback index when src changes
     setFallbackIndex(0);
+    fallbackIndexRef.current = 0;
   }, [normalizedSrc]);
 
   const handleError = React.useCallback((e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+    // Use ref to get current fallback index value (avoids stale closure issues)
+    const currentIndex = fallbackIndexRef.current;
+    
     // Try fallback gateways if available
-    if (fallbacks.length > fallbackIndex) {
-      console.log(`Avatar image failed, trying fallback gateway ${fallbackIndex + 1}/${fallbacks.length}`);
-      setImageSrc(fallbacks[fallbackIndex]);
-      setFallbackIndex((prev) => prev + 1);
+    if (fallbacks.length > currentIndex) {
+      console.log(`Avatar image failed, trying fallback gateway ${currentIndex + 1}/${fallbacks.length}`);
+      setImageSrc(fallbacks[currentIndex]);
+      const nextIndex = currentIndex + 1;
+      setFallbackIndex(nextIndex);
+      fallbackIndexRef.current = nextIndex;
       return;
     }
 
@@ -67,7 +76,7 @@ const AvatarImage = React.forwardRef<
     if (onError) {
       onError(e);
     }
-  }, [fallbacks, fallbackIndex, onError]);
+  }, [fallbacks, onError]);
 
   return (
     <AvatarPrimitive.Image

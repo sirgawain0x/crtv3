@@ -41,6 +41,7 @@ export async function createVideoAsset(
       attributes: data.attributes,
       requires_metoken: data.requires_metoken || false,
       metoken_price: data.metoken_price || null,
+      creator_metoken_id: data.creator_metoken_id || null,
     })
     .select()
     .single();
