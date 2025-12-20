@@ -1,4 +1,36 @@
 import createPWA from "next-pwa";
+import { appendFileSync, mkdirSync } from "fs";
+import { join } from "path";
+
+// Debug logging helper
+const logPath = join(process.cwd(), '.cursor', 'debug.log');
+const log = (location, message, data, hypothesisId) => {
+  try {
+    const dir = join(process.cwd(), '.cursor');
+    try {
+      mkdirSync(dir, { recursive: true });
+    } catch (e) {
+      // Directory might already exist
+    }
+    const logEntry = JSON.stringify({
+      location,
+      message,
+      data,
+      timestamp: Date.now(),
+      sessionId: 'debug-session',
+      runId: 'run1',
+      hypothesisId,
+    }) + '\n';
+    appendFileSync(logPath, logEntry, 'utf8');
+  } catch (e) {
+    // Silent fail if log file can't be written
+    console.error('Log error:', e.message);
+  }
+};
+
+// #region agent log
+log('next.config.mjs:1', 'config file loaded', { cwd: process.cwd() }, 'H4');
+// #endregion
 
 const withPWA = createPWA({
   dest: "public",
@@ -23,10 +55,14 @@ const nextConfig = {
     optimizePackageImports: ['@account-kit/react', '@account-kit/core', '@apollo/client', 'lucide-react', 'framer-motion'],
   },
   // External packages that should not be processed by the bundler
-  // Note: Only externalize if they're causing build issues
-  // serverComponentsExternalPackages: ['thread-stream'],
+  // Externalize thread-stream and pino packages on server to avoid bundling test files
+  serverExternalPackages: ['thread-stream', 'pino', 'pino-pretty'],
   // Webpack configuration for WebAssembly support
   webpack: (config, { isServer, webpack }) => {
+    // #region agent log
+    log('next.config.mjs:29', 'webpack config called', { isServer }, 'H4');
+    // #endregion
+
     // Enable async WebAssembly loading (required for XMTP WASM bindings)
     config.experiments = {
       ...config.experiments,
@@ -38,6 +74,31 @@ const nextConfig = {
     config.resolve.alias = {
       ...config.resolve.alias,
     };
+    // Prevent webpack from resolving test files and benchmarks
+    config.resolve.modules = config.resolve.modules || ['node_modules'];
+
+    // Add resolve plugins to filter out problematic files
+    if (!config.resolve.plugins) {
+      config.resolve.plugins = [];
+    }
+
+    // Custom resolve plugin to log thread-stream module resolution attempts
+    // #region agent log
+    config.resolve.plugins.push({
+      apply(resolver) {
+        resolver.hooks.resolve.tapAsync('ThreadStreamResolver', (request, resolveContext, callback) => {
+          if (request.request && (request.request.includes('thread-stream') || request.request.includes('tap') || request.request.includes('desm') || request.request.includes('why-is-node-running'))) {
+            log('next.config.mjs:58', 'resolve attempt', {
+              request: request.request,
+              context: request.context || '',
+              issuer: request.context?.issuer || '',
+            }, 'H5');
+          }
+          callback();
+        });
+      },
+    });
+    // #endregion
 
     // Tell webpack not to parse test files and other non-essential files
     config.module = config.module || {};
@@ -47,26 +108,124 @@ const nextConfig = {
       config.module.noParse.push(/node_modules\/thread-stream\/test/);
       config.module.noParse.push(/node_modules\/thread-stream\/.*\.test\./);
       config.module.noParse.push(/node_modules\/thread-stream\/.*\.spec\./);
+      config.module.noParse.push(/node_modules\/thread-stream\/bench\.js/);
     }
 
-    // Ignore test files and other non-essential files from node_modules
-    // This prevents Turbopack/webpack from trying to process test files
+    // Ensure plugins array exists
+    if (!config.plugins) {
+      config.plugins = [];
+    }
+
+    // Use IgnorePlugin with multiple patterns to catch all test file references
+    // Pattern 1: Ignore test directory imports
     config.plugins.push(
       new webpack.IgnorePlugin({
-        resourceRegExp: /thread-stream\/test/,
+        resourceRegExp: /^\.\/test\//,
+        contextRegExp: /thread-stream/,
+        checkResource(resource, context) {
+          // #region agent log
+          const shouldIgnore = /^\.\/test\//.test(resource) && /thread-stream/.test(context || '');
+          if (/thread-stream/.test(resource || '') || /thread-stream/.test(context || '')) {
+            log('next.config.mjs:77', 'IgnorePlugin pattern1 check', {
+              resource,
+              context,
+              shouldIgnore,
+            }, 'H1');
+          }
+          // #endregion
+          return shouldIgnore;
+        },
       })
     );
 
+    // Pattern 2: Ignore all files in thread-stream/test directory
     config.plugins.push(
       new webpack.IgnorePlugin({
-        resourceRegExp: /thread-stream\/.*\.(test|spec)\./,
+        resourceRegExp: /thread-stream[\/\\]test[\/\\]/,
+        checkResource(resource) {
+          // #region agent log
+          const shouldIgnore = /thread-stream[\/\\]test[\/\\]/.test(resource || '');
+          if (/thread-stream/.test(resource || '')) {
+            log('next.config.mjs:91', 'IgnorePlugin pattern2 check', {
+              resource,
+              shouldIgnore,
+            }, 'H1');
+          }
+          // #endregion
+          return shouldIgnore;
+        },
       })
     );
 
+    // Pattern 3: Ignore bench.js file
     config.plugins.push(
       new webpack.IgnorePlugin({
-        resourceRegExp: /thread-stream\/.*\.(md|txt|zip|sh|LICENSE)/,
+        resourceRegExp: /thread-stream[\/\\]bench\.js$/,
+        checkResource(resource) {
+          // #region agent log
+          const shouldIgnore = /thread-stream[\/\\]bench\.js$/.test(resource || '');
+          if (/thread-stream/.test(resource || '')) {
+            log('next.config.mjs:106', 'IgnorePlugin pattern3 check', {
+              resource,
+              shouldIgnore,
+            }, 'H1');
+          }
+          // #endregion
+          return shouldIgnore;
+        },
       })
+    );
+
+    // Pattern 4: Ignore test files by extension
+    config.plugins.push(
+      new webpack.IgnorePlugin({
+        resourceRegExp: /thread-stream.*\.(test|spec)\.(js|mjs|ts)$/,
+        checkResource(resource) {
+          // #region agent log
+          const shouldIgnore = /thread-stream.*\.(test|spec)\.(js|mjs|ts)$/.test(resource || '');
+          if (/thread-stream/.test(resource || '')) {
+            log('next.config.mjs:121', 'IgnorePlugin pattern4 check', {
+              resource,
+              shouldIgnore,
+            }, 'H1');
+          }
+          // #endregion
+          return shouldIgnore;
+        },
+      })
+    );
+
+    // Use NormalModuleReplacementPlugin to replace problematic test file imports with empty module
+    // This catches imports that reference test files directly
+    const emptyModulePath = require.resolve('./lib/webpack/empty-module.js');
+    config.plugins.push(
+      new webpack.NormalModuleReplacementPlugin(
+        /thread-stream[\/\\]test[\/\\].*\.(js|mjs|ts)$/,
+        (resource) => {
+          // #region agent log
+          log('next.config.mjs:133', 'NormalModuleReplacementPlugin test files', {
+            resource: resource.request || resource,
+            replacing: true,
+          }, 'H2');
+          // #endregion
+          resource.request = emptyModulePath;
+        }
+      )
+    );
+
+    config.plugins.push(
+      new webpack.NormalModuleReplacementPlugin(
+        /thread-stream[\/\\]bench\.js$/,
+        (resource) => {
+          // #region agent log
+          log('next.config.mjs:143', 'NormalModuleReplacementPlugin bench', {
+            resource: resource.request || resource,
+            replacing: true,
+          }, 'H2');
+          // #endregion
+          resource.request = emptyModulePath;
+        }
+      )
     );
 
     // Handle .wasm files as asset resources
@@ -82,8 +241,22 @@ const nextConfig = {
 
     // Ensure proper public path resolution for WASM files
     if (!isServer) {
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        'pino': false,
+        'thread-stream': false,
+        'pino-pretty': false,
+        'lokijs': false,
+        'encoding': false,
+      };
+
       config.resolve.fallback = {
         ...config.resolve.fallback,
+        'pino': false,
+        'thread-stream': false,
+        'pino-pretty': false,
+        'lokijs': false,
+        'encoding': false,
       };
 
       // Note: Webpack plugins may not work with Turbopack
