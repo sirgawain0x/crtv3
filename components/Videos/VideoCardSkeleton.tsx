@@ -26,8 +26,8 @@ export function VideoCardSkeleton() {
             <Skeleton className="h-5 w-16" />
           </div>
           <div className="mt-6 space-y-2">
-            <Skeleton className="h-6 w-3/4" />
             <Skeleton className="h-4 w-1/4" />
+            <Skeleton className="h-6 w-3/4" />
           </div>
         </CardContent>
         <CardFooter className="mx-auto flex items-center justify-center">

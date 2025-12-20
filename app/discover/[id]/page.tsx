@@ -25,6 +25,7 @@ import remarkGfm from "remark-gfm";
 import Link from "next/link";
 import { Suspense } from "react";
 import { VideoShareButton } from "@/components/Videos/VideoShareButton";
+import { VideoBuyButton } from "@/components/Videos/VideoBuyButton";
 
 type VideoDetailsPageProps = {
   params: Promise<{
@@ -139,7 +140,7 @@ export default async function VideoDetailsPage({
             </BreadcrumbSeparator>
             <BreadcrumbItem>
               <BreadcrumbLink>
-                <BreadcrumbPage>{assetData?.name}</BreadcrumbPage>
+                <BreadcrumbPage>{videoAsset?.title || assetData?.name}</BreadcrumbPage>
               </BreadcrumbLink>
             </BreadcrumbItem>
           </BreadcrumbList>
@@ -149,7 +150,10 @@ export default async function VideoDetailsPage({
         <div className="max-w-4xl mx-auto space-y-6">
           {/* Video Player */}
           <div>
-            <VideoDetails asset={assetData} />
+            <VideoDetails
+              asset={assetData}
+              videoTitle={videoAsset?.title || assetData?.name}
+            />
             {/* Uploader Section with Share Button */}
             <div className="flex items-center justify-between mt-4">
               {creatorAddress ? (
@@ -182,13 +186,23 @@ export default async function VideoDetailsPage({
               ) : (
                 <div></div>
               )}
-              <Suspense fallback={<div className="h-9 w-9" />}>
-                <VideoShareButton
-                  videoId={id}
-                  videoTitle={assetData?.name || "Video"}
-                  playbackId={assetData?.playbackId || undefined}
-                />
-              </Suspense>
+              <div className="flex items-center gap-2">
+                <Suspense fallback={<div className="h-9 w-9" />}>
+                  {assetData?.playbackId && (
+                    <VideoBuyButton
+                      playbackId={assetData.playbackId}
+                      videoTitle={videoAsset?.title || assetData?.name || "Video"}
+                    />
+                  )}
+                </Suspense>
+                <Suspense fallback={<div className="h-9 w-9" />}>
+                  <VideoShareButton
+                    videoId={id}
+                    videoTitle={videoAsset?.title || assetData?.name || "Video"}
+                    playbackId={assetData?.playbackId || undefined}
+                  />
+                </Suspense>
+              </div>
             </div>
             {/* Metrics components */}
             {assetData.playbackId && (
@@ -214,7 +228,7 @@ export default async function VideoDetailsPage({
             <div className="mt-8">
               <VideoCommentsWrapper
                 videoAssetId={videoAsset.id}
-                videoName={assetData?.name || videoAsset.title || "this video"}
+                videoName={videoAsset.title || assetData?.name || "this video"}
                 creatorAddress={creatorAddress}
               />
             </div>
