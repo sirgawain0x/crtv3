@@ -2,7 +2,7 @@
 
 ## Problem
 When navigating to the upload page, console errors were appearing immediately:
-```
+```console
 ❌ CreateThumbnail: No asset ID provided!
 This usually means the video upload did not complete successfully.
 Please check the FileUpload component logs.

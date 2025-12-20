@@ -41,6 +41,7 @@ const VideoCardGrid: React.FC<VideoCardGridProps> = ({
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [totalAssets, setTotalAssets] = useState<number>(0);
   const [hasNextPage, setHasNextPage] = useState<boolean>(false);
+  const [validVideosCount, setValidVideosCount] = useState<number>(0);
 
   const fetchSources = useCallback(async (page: number) => {
     try {
@@ -88,11 +89,10 @@ const VideoCardGrid: React.FC<VideoCardGridProps> = ({
       });
 
       
-      // Update total and pagination state
+      // Update total (hasMore will be updated after filtering valid videos)
       setTotalAssets(total);
-      setHasNextPage(hasMore);
 
-      if (videos.length === 0 && currentPage === 1) {
+      if (videos.length === 0 && page === 1) {
         setError(searchQuery ? "No videos found matching your search." : "No videos available at the moment.");
         setPlaybackSources([]);
         return;
@@ -126,9 +126,19 @@ const VideoCardGrid: React.FC<VideoCardGridProps> = ({
         (video) => video.detailedSrc !== null
       );
 
+      // Update the count of valid videos that actually rendered
+      setValidVideosCount(validPlaybackSources.length);
 
-      if (validPlaybackSources.length === 0 && currentPage === 1) {
+      // Update hasMore based on actual valid videos returned
+      // If we got fewer videos than requested, we've reached the end
+      // Also check if API says there are no more pages
+      const actualHasMore = hasMore && validPlaybackSources.length >= ITEMS_PER_PAGE;
+      setHasNextPage(actualHasMore);
+
+      if (validPlaybackSources.length === 0 && page === 1) {
         setError("Unable to load video playback. Please try again later.");
+        setPlaybackSources([]);
+        setValidVideosCount(0);
         return;
       }
 
@@ -136,14 +146,17 @@ const VideoCardGrid: React.FC<VideoCardGridProps> = ({
     } catch (err) {
       console.error("Error fetching videos:", err);
       setError("Failed to load videos. Please try again later.");
+      setValidVideosCount(0);
+      setPlaybackSources([]);
     } finally {
       setLoading(false);
     }
-  }, [currentPage, searchQuery, category, creatorId, orderBy]);
+  }, [searchQuery, category, creatorId, orderBy]);
 
   // Reset to page 1 when search/filter parameters change
   useEffect(() => {
     setCurrentPage(1);
+    setValidVideosCount(0);
   }, [searchQuery, category, creatorId, orderBy]);
 
   useEffect(() => {
@@ -170,10 +183,11 @@ const VideoCardGrid: React.FC<VideoCardGridProps> = ({
 
   // Helper function to determine if pagination should be shown
   const shouldShowPagination = useCallback(() => {
-    // Show pagination if:
-    // 1. We have more than one page worth of assets, OR
+    // Show pagination only when:
+    // 1. We have more than one page worth of assets (totalAssets > ITEMS_PER_PAGE), OR
     // 2. We're on a page > 1 (to allow navigation back), OR
-    // 3. There's a next page available
+    // 3. There's a next page available (hasNextPage)
+    // This prevents showing pagination when there's only one page of results
     return totalAssets > ITEMS_PER_PAGE || currentPage > 1 || hasNextPage;
   }, [totalAssets, currentPage, hasNextPage]);
 
@@ -205,7 +219,9 @@ const VideoCardGrid: React.FC<VideoCardGridProps> = ({
             onNextPage={handleNextPage}
             onPrevPage={handlePrevPage}
             isLoading={loading}
-            totalDisplayed={0}
+            totalDisplayed={validVideosCount}
+            totalVideos={totalAssets}
+            itemsPerPage={ITEMS_PER_PAGE}
           />
         )}
       </div>
@@ -228,7 +244,9 @@ const VideoCardGrid: React.FC<VideoCardGridProps> = ({
             onNextPage={handleNextPage}
             onPrevPage={handlePrevPage}
             isLoading={loading}
-            totalDisplayed={0}
+            totalDisplayed={validVideosCount}
+            totalVideos={totalAssets}
+            itemsPerPage={ITEMS_PER_PAGE}
           />
         )}
       </div>
@@ -255,7 +273,9 @@ const VideoCardGrid: React.FC<VideoCardGridProps> = ({
           onNextPage={handleNextPage}
           onPrevPage={handlePrevPage}
           isLoading={loading}
-          totalDisplayed={playbackSources.length}
+          totalDisplayed={validVideosCount}
+          totalVideos={totalAssets}
+          itemsPerPage={ITEMS_PER_PAGE}
         />
       )}
     </div>

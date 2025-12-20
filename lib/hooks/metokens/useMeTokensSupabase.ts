@@ -777,7 +777,11 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
   };
 
   // Buy MeTokens
-  const buyMeTokens = async (meTokenAddress: string, collateralAmount: string) => {
+  const buyMeTokens = async (
+    meTokenAddress: string, 
+    collateralAmount: string,
+    videoTracking?: { video_id?: number; playback_id?: string }
+  ) => {
     if (!address || !user) throw new Error('No wallet connected');
     if (!client) throw new Error('Smart account client not initialized');
     
@@ -801,7 +805,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
       // Update MeToken data in Supabase
       const meToken = await meTokenSupabaseService.getMeTokenByAddress(meTokenAddress);
       if (meToken) {
-        // Record the transaction
+        // Record the transaction with video tracking if provided
         await meTokenSupabaseService.recordTransaction({
           metoken_id: meToken.id,
           user_address: address,
@@ -810,6 +814,8 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
           collateral_amount: parseFloat(collateralAmount),
           transaction_hash: txHash,
           block_number: 0,
+          video_id: videoTracking?.video_id,
+          playback_id: videoTracking?.playback_id,
         });
         
         // Update user balance in Supabase

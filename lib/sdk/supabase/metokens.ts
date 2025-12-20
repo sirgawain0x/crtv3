@@ -54,6 +54,31 @@ export class MeTokenSupabaseService {
     }
   }
 
+  // Get MeToken by ID (UUID)
+  async getMeTokenById(id: string): Promise<MeToken | null> {
+    try {
+      const { data, error } = await supabase
+        .from('metokens')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') return null; // Not found
+        console.error('Supabase error fetching MeToken by ID:', error);
+        throw new Error(`Failed to fetch MeToken by ID: ${error.message}`);
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error in getMeTokenById:', error);
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error('Unknown error occurred while fetching MeToken by ID');
+    }
+  }
+
   // Get all MeTokens with pagination and sorting
   async getAllMeTokens(options: {
     limit?: number;
@@ -191,6 +216,8 @@ export class MeTokenSupabaseService {
     collateral_amount?: number;
     transaction_hash?: string;
     block_number?: number;
+    video_id?: number;
+    playback_id?: string;
   }): Promise<MeTokenTransaction> {
     const { data, error } = await supabase
       .from('metoken_transactions')

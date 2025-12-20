@@ -20,7 +20,7 @@ import {
 import { getIngest } from "@livepeer/react/external";
 import { toast } from "sonner";
 import * as Popover from "@radix-ui/react-popover";
-import { CheckIcon, ChevronDownIcon, XIcon } from "lucide-react";
+import { CheckIcon, ChevronDownIcon, XIcon, CopyIcon } from "lucide-react";
 import { useEffect, useRef } from "react";
 import {
   listMultistreamTargets,
@@ -50,21 +50,24 @@ interface CreateStreamProxyParams {
   profiles: StreamProfile[];
   record: boolean;
   playbackPolicy: any;
-  multistream: any;
+  multistream?: any;
 }
 
 export async function createStreamViaProxy(params: CreateStreamProxyParams) {
   const { name, profiles, record, playbackPolicy, multistream } = params;
+  const body: any = {
+    name,
+    profiles,
+    record,
+    playbackPolicy,
+  };
+  if (multistream !== undefined) {
+    body.multistream = multistream;
+  }
   const res = await fetch("/api/livepeer/livepeer-proxy", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      name,
-      profiles,
-      record,
-      playbackPolicy,
-      multistream,
-    }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error("Failed to create stream");
   return res.json();
@@ -130,11 +133,9 @@ function BroadcastWithControls({ streamKey }: BroadcastProps) {
             ],
             record: false,
             playbackPolicy: { type: "jwt" },
-            multistream: {
-              targets: multistreamTargets
-                .filter((t) => t.id)
-                .map((t) => ({ id: t.id, profile: "source" })),
-            },
+            // Don't include multistream targets during initial creation
+            // Targets can be added after stream creation using the API
+            multistream: undefined,
           });
 
           console.log("Stream created:", result);
@@ -150,7 +151,8 @@ function BroadcastWithControls({ streamKey }: BroadcastProps) {
     };
 
     createStream();
-  }, [streamKey, isCreatingStream, multistreamTargets]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [streamKey, isCreatingStream]); // Removed multistreamTargets to prevent circular updates
 
   useEffect(() => {
     async function startCamera() {
@@ -174,15 +176,26 @@ function BroadcastWithControls({ streamKey }: BroadcastProps) {
     };
   }, []);
 
+  // Fetch multistream targets only after stream is created
   React.useEffect(() => {
     async function fetchTargets() {
+      if (!streamData?.id) {
+        // Clear targets if no stream exists
+        setMultistreamTargets([]);
+        return;
+      }
+      
       setIsLoadingTargets(true);
-      const result = await listMultistreamTargets();
+      const result = await listMultistreamTargets({ streamId: streamData.id });
       setIsLoadingTargets(false);
-      if (result.targets) setMultistreamTargets(result.targets);
+      if (result.targets) {
+        setMultistreamTargets(result.targets);
+      } else if (result.error) {
+        console.error("Error fetching multistream targets:", result.error);
+      }
     }
     fetchTargets();
-  }, []);
+  }, [streamData?.id]);
 
   function handleTargetAdded(target: MultistreamTarget) {
     setMultistreamTargets((prev) => [...prev, target]);
@@ -279,6 +292,8 @@ function BroadcastWithControls({ streamKey }: BroadcastProps) {
                     ref={settingsButtonRef}
                     className="h-5 w-5 flex-shrink-0 transition hover:scale-110"
                     streamId={streamData?.id || ""}
+                    streamKey={streamKey}
+                    ingestUrl={ingestUrl}
                   >
                     <SettingsIcon className="h-full w-full text-white" />
                   </Settings>
@@ -400,7 +415,15 @@ export const Settings = React.forwardRef(
       className,
       children,
       streamId,
-    }: { className?: string; children?: React.ReactNode; streamId: string },
+      streamKey,
+      ingestUrl,
+    }: { 
+      className?: string; 
+      children?: React.ReactNode; 
+      streamId: string;
+      streamKey?: string | null;
+      ingestUrl?: string | null;
+    },
     ref: React.Ref<HTMLButtonElement> | undefined
   ) => {
     const [multistreamTargets, setMultistreamTargets] = React.useState<
@@ -408,15 +431,25 @@ export const Settings = React.forwardRef(
     >([]);
     const [isLoadingTargets, setIsLoadingTargets] = React.useState(false);
 
+    // Fetch multistream targets for the specific stream
     React.useEffect(() => {
       async function fetchTargets() {
+        if (!streamId) {
+          setMultistreamTargets([]);
+          return;
+        }
+        
         setIsLoadingTargets(true);
-        const result = await listMultistreamTargets();
+        const result = await listMultistreamTargets({ streamId });
         setIsLoadingTargets(false);
-        if (result.targets) setMultistreamTargets(result.targets);
+        if (result.targets) {
+          setMultistreamTargets(result.targets);
+        } else if (result.error) {
+          console.error("Error fetching multistream targets:", result.error);
+        }
       }
       fetchTargets();
-    }, []);
+    }, [streamId]);
 
     function handleTargetAdded(target: MultistreamTarget) {
       setMultistreamTargets((prev) => [...prev, target]);
@@ -425,6 +458,24 @@ export const Settings = React.forwardRef(
     function handleTargetRemoved(id: string) {
       setMultistreamTargets((prev) => prev.filter((t) => t.id !== id));
     }
+
+    const copyToClipboard = async (text: string, label: string) => {
+      try {
+        await navigator.clipboard.writeText(text);
+        toast.success(`${label} copied to clipboard!`);
+      } catch (err) {
+        console.error("Failed to copy:", err);
+        toast.error("Failed to copy to clipboard");
+      }
+    };
+
+    // Extract base RTMP URL (without stream key) for display
+    // Format is typically: rtmp://ingest.livepeer.studio/live/{streamKey}
+    const rtmpServerUrl = ingestUrl && streamKey
+      ? ingestUrl.replace(streamKey, '').replace(/\/$/, '') + '/'
+      : ingestUrl 
+        ? ingestUrl.split('/').slice(0, -1).join('/') + '/'
+        : null;
 
     return (
       <Popover.Root>
@@ -440,7 +491,7 @@ export const Settings = React.forwardRef(
         </Popover.Trigger>
         <Popover.Portal>
           <Popover.Content
-            className="w-72 rounded-md border border-white/50 bg-black/80 p-4 shadow-md \
+            className="w-96 max-w-[90vw] rounded-md border border-white/50 bg-black/80 p-4 shadow-md \
             outline-none backdrop-blur-md data-[state=open]:animate-in data-[state=closed]:animate-out \
             data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 \
             data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 \
@@ -454,6 +505,64 @@ export const Settings = React.forwardRef(
               <p className="mb-1 text-base font-medium text-white">
                 Stream settings
               </p>
+
+              {/* Stream Info Section */}
+              {streamKey && rtmpServerUrl && (
+                <div className="mb-2 rounded-md border border-white/20 bg-white/5 p-3">
+                  <p className="mb-2 text-sm font-semibold text-white">
+                    Stream Info (for OBS)
+                  </p>
+                  <div className="space-y-2">
+                    {/* RTMP Server URL */}
+                    <div className="flex flex-col gap-1">
+                      <label className="text-xs text-gray-300">
+                        RTMP Server URL
+                      </label>
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="text"
+                          readOnly
+                          value={rtmpServerUrl}
+                          className="flex-1 rounded border border-white/20 bg-gray-900/80 px-2 py-1 text-xs font-mono text-white"
+                          onClick={(e) => (e.target as HTMLInputElement).select()}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(rtmpServerUrl, "RTMP Server URL")}
+                          className="flex h-7 w-7 items-center justify-center rounded border border-white/20 bg-gray-800/80 text-white transition hover:bg-gray-700/80"
+                          aria-label="Copy RTMP Server URL"
+                        >
+                          <CopyIcon className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                    {/* Stream Key */}
+                    <div className="flex flex-col gap-1">
+                      <label className="text-xs text-gray-300">Stream Key</label>
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="text"
+                          readOnly
+                          value={streamKey}
+                          className="flex-1 rounded border border-white/20 bg-gray-900/80 px-2 py-1 text-xs font-mono text-white"
+                          onClick={(e) => (e.target as HTMLInputElement).select()}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(streamKey, "Stream Key")}
+                          className="flex h-7 w-7 items-center justify-center rounded border border-white/20 bg-gray-800/80 text-white transition hover:bg-gray-700/80"
+                          aria-label="Copy Stream Key"
+                        >
+                          <CopyIcon className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-400">
+                      Use these credentials in OBS Studio or other broadcasting software
+                    </p>
+                  </div>
+                </div>
+              )}
 
               <div className="flex flex-col gap-2">
                 <label

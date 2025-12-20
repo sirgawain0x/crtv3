@@ -3,14 +3,19 @@ import { config, queryClient } from "@/config";
 import { AlchemyAccountProvider } from "@account-kit/react";
 import { AlchemyClientState } from "@account-kit/core";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { PropsWithChildren, useMemo, Suspense } from "react";
+import { PropsWithChildren, Suspense, useEffect, useState } from "react";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "sonner";
 import { VideoProvider } from "../context/VideoContext";
-import { ErrorBoundary } from "next/dist/client/components/error-boundary";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ApolloNextAppProvider } from "@apollo/client-integration-nextjs";
 import { makeClient } from "./apolloWrapper";
 import { RadixProvider } from "@/components/ui/radix-provider";
+import { cleanupExistingIframes } from "@/components/IframeCleanup";
+// Import dev warning suppression (only active in development)
+import "@/lib/utils/suppressDevWarnings";
+// Import WASM patch early to fix XMTP WASM loading in Web Workers
+import "@/lib/utils/xmtp/wasm-patch";
 
 function ErrorFallback({ error }: { error: Error }) {
   return (
@@ -26,8 +31,25 @@ function ErrorFallback({ error }: { error: Error }) {
 export const Providers = (
   props: PropsWithChildren<{ initialState?: AlchemyClientState }>
 ) => {
+  const [isReady, setIsReady] = useState(false);
+
+  useEffect(() => {
+    // Clean up any existing iframes before initializing providers
+    cleanupExistingIframes();
+    setIsReady(true);
+  }, []);
+
+  // Don't render providers until cleanup is complete
+  if (!isReady) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        Loading...
+      </div>
+    );
+  }
+
   return (
-    <ErrorBoundary errorComponent={ErrorFallback}>
+    <ErrorBoundary fallback={(error) => <ErrorFallback error={error} />}>
       <Suspense
         fallback={
           <div className="flex min-h-screen items-center justify-center">

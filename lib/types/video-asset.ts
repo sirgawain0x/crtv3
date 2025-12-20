@@ -39,6 +39,7 @@ export interface VideoAsset {
   attributes: Record<string, any> | null;
   requires_metoken: boolean;
   metoken_price: number | null;
+  creator_metoken_id: string | null;  // UUID reference to creator's MeToken
   // Subtitle fields
   subtitles_uri: string | null;  // IPFS URI for decentralized storage
   subtitles: Subtitles | null;    // Cached JSONB data for fast access

@@ -50,12 +50,9 @@ import {
 import {
   Copy,
   LogOut,
-  Wallet,
   Send,
   ArrowUpRight,
   ArrowUpDown,
-  ArrowBigDown,
-  ArrowBigUp,
   Key,
   Loader2,
   CloudUpload,
@@ -64,6 +61,7 @@ import {
   ShieldUser,
   Plus,
   ArrowRight,
+  AlertTriangle,
 } from "lucide-react";
 import { CheckIcon } from "@radix-ui/react-icons";
 import Image from "next/image";
@@ -75,7 +73,8 @@ import {
   DialogClose,
   DialogDescription,
 } from "@/components/ui/dialog";
-import WertFundButton from "@/components/wallet/buy/wert-fund-button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import CoinbaseFundButton from "@/components/wallet/buy/coinbase-fund-button";
 import { LoginButton } from "@/components/auth/LoginButton";
 import { AlchemySwapWidget } from "@/components/wallet/swap/AlchemySwapWidget";
 import useModularAccount from "@/lib/hooks/accountkit/useModularAccount";
@@ -172,23 +171,28 @@ interface SessionKeyConfig {
 // Token configuration for send modal
 type TokenSymbol = 'ETH' | 'USDC' | 'DAI';
 
-const TOKEN_INFO = {
-  ETH: { 
-    decimals: 18, 
-    symbol: "ETH",
-    address: null, // Native token
-  },
-  USDC: { 
-    decimals: USDC_TOKEN_DECIMALS, 
-    symbol: "USDC",
-    address: USDC_TOKEN_ADDRESSES.base,
-  },
-  DAI: { 
-    decimals: DAI_TOKEN_DECIMALS, 
-    symbol: "DAI",
-    address: DAI_TOKEN_ADDRESSES.base,
-  },
-} as const;
+// Helper function to get token info for the current chain
+const getTokenInfo = (chainId?: number) => {
+  const chainKey = chainId === base.id ? "base" : undefined;
+  
+  return {
+    ETH: { 
+      decimals: 18, 
+      symbol: "ETH",
+      address: null, // Native token
+    },
+    USDC: { 
+      decimals: USDC_TOKEN_DECIMALS, 
+      symbol: "USDC",
+      address: chainKey ? (USDC_TOKEN_ADDRESSES as any)[chainKey] : undefined,
+    },
+    DAI: { 
+      decimals: DAI_TOKEN_DECIMALS, 
+      symbol: "DAI",
+      address: chainKey ? (DAI_TOKEN_ADDRESSES as any)[chainKey] : undefined,
+    },
+  } as const;
+};
 
 const SESSION_KEY_TYPES: SessionKeyConfig[] = [
   {
@@ -264,20 +268,20 @@ export function AccountDropdown() {
     },
   });
 
-  const { account } = useModularAccount();
+  const { account, address: smartAccountAddress } = useModularAccount();
   const { client } = useSmartAccountClient({});
   const validationClient = chain
     ? (client?.extend(installValidationActions as any) as any)
     : undefined;
 
-  const { isVerified, hasMembership } = useMembershipVerification();
+  const { isVerified, hasMembership, isLoading: isMembershipLoading, error: membershipError } = useMembershipVerification();
 
   useEffect(() => {
     console.log({
       "EOA Address (user.address)": user?.address,
-      "Smart Contract Account Address": account?.address,
+      "Smart Contract Account Address": smartAccountAddress,
     });
-  }, [account, user]);
+  }, [smartAccountAddress, user]);
 
   useEffect(() => {
     let newDisplayAddress = "";
@@ -285,15 +289,15 @@ export function AccountDropdown() {
       newDisplayAddress = `${user.address.slice(0, 6)}...${user.address.slice(
         -4
       )}`;
-    else if (account?.address)
-      newDisplayAddress = `${account.address.slice(
+    else if (smartAccountAddress)
+      newDisplayAddress = `${smartAccountAddress.slice(
         0,
         6
-      )}...${account.address.slice(-4)}`;
+      )}...${smartAccountAddress.slice(-4)}`;
     // Only update if value actually changes
     if (displayAddress !== newDisplayAddress)
       setDisplayAddress(newDisplayAddress);
-  }, [user, account, displayAddress]);
+  }, [user, smartAccountAddress, displayAddress]);
 
   useEffect(() => {
     const checkNetworkStatus = async () => {
@@ -319,34 +323,46 @@ export function AccountDropdown() {
   // Fetch token balances when dialog opens with send action
   useEffect(() => {
     const fetchTokenBalances = async () => {
-      if (!client || !account?.address || dialogAction !== 'send' || !isDialogOpen) return;
+      if (!client || !smartAccountAddress || dialogAction !== 'send' || !isDialogOpen) return;
 
       try {
         // Get ETH balance
         const ethBalance = await client.getBalance({
-          address: account.address as Address,
+          address: smartAccountAddress as Address,
         });
         
-        // Get USDC balance
-        const usdcBalance = await client.readContract({
-          address: USDC_TOKEN_ADDRESSES.base as Address,
-          abi: erc20Abi,
-          functionName: 'balanceOf',
-          args: [account.address as Address],
-        }) as bigint;
+        // Resolve per-chain ERC-20 addresses (Base only for now)
+        const chainKey = chain?.id === base.id ? "base" : undefined;
+        let usdc = 0n;
+        let dai = 0n;
         
-        // Get DAI balance
-        const daiBalance = await client.readContract({
-          address: DAI_TOKEN_ADDRESSES.base as Address,
-          abi: erc20Abi,
-          functionName: 'balanceOf',
-          args: [account.address as Address],
-        }) as bigint;
+        if (chainKey) {
+          const usdcAddr = (USDC_TOKEN_ADDRESSES as any)[chainKey] as Address | undefined;
+          const daiAddr = (DAI_TOKEN_ADDRESSES as any)[chainKey] as Address | undefined;
+          
+          if (usdcAddr) {
+            usdc = await client.readContract({
+              address: usdcAddr,
+              abi: erc20Abi,
+              functionName: 'balanceOf',
+              args: [smartAccountAddress as Address],
+            }) as bigint;
+          }
+          
+          if (daiAddr) {
+            dai = await client.readContract({
+              address: daiAddr,
+              abi: erc20Abi,
+              functionName: 'balanceOf',
+              args: [smartAccountAddress as Address],
+            }) as bigint;
+          }
+        }
 
         setTokenBalances({
           ETH: formatUnits(ethBalance, 18),
-          USDC: formatUnits(usdcBalance, USDC_TOKEN_DECIMALS),
-          DAI: formatUnits(daiBalance, DAI_TOKEN_DECIMALS),
+          USDC: formatUnits(usdc, USDC_TOKEN_DECIMALS),
+          DAI: formatUnits(dai, DAI_TOKEN_DECIMALS),
         });
       } catch (error) {
         console.error('Error fetching token balances:', error);
@@ -354,11 +370,11 @@ export function AccountDropdown() {
     };
 
     fetchTokenBalances();
-  }, [client, account?.address, dialogAction, isDialogOpen]);
+  }, [client, smartAccountAddress, dialogAction, isDialogOpen, chain?.id]);
 
   const copyToClipboard = async () => {
     const addressToCopy =
-      user?.type === "eoa" ? user?.address : account?.address;
+      user?.type === "eoa" ? user?.address : smartAccountAddress;
     if (addressToCopy) {
       try {
         await navigator.clipboard.writeText(addressToCopy);
@@ -385,7 +401,7 @@ export function AccountDropdown() {
   };
 
   const handleCreateSessionKey = async () => {
-    if (!account?.address) return;
+    if (!smartAccountAddress) return;
 
     try {
       const sessionKeyEntityId = sessionKeys.length + 1;
@@ -510,7 +526,7 @@ export function AccountDropdown() {
         description: `Sending ${sendAmount} ${selectedToken}...`,
       });
 
-      const tokenInfo = TOKEN_INFO[selectedToken];
+      const tokenInfo = getTokenInfo(chain?.id)[selectedToken];
 
       let operation;
       
@@ -527,6 +543,17 @@ export function AccountDropdown() {
         });
       } else {
         // Send ERC-20 token (USDC or DAI)
+        // Check if token is supported on current chain
+        if (!tokenInfo.address) {
+          toast({
+            title: "Unsupported Network",
+            description: `${selectedToken} is not available on the current network. Please switch to Base.`,
+            variant: "destructive",
+          });
+          setIsSending(false);
+          return;
+        }
+        
         const tokenAmount = parseUnits(sendAmount, tokenInfo.decimals);
         
         // Encode the transfer calldata
@@ -596,7 +623,7 @@ export function AccountDropdown() {
   };
 
   const handleRemoveSessionKey = async (sessionKey: any) => {
-    if (!validationClient || !account?.address || !chain) return;
+    if (!validationClient || !smartAccountAddress || !chain) return;
 
     try {
       const sessionKeyEntityId = sessionKeys.indexOf(sessionKey) + 1;
@@ -658,7 +685,7 @@ export function AccountDropdown() {
               Purchase crypto directly to your wallet.
             </p>
             <div className="flex flex-col gap-4">
-              <WertFundButton onClose={() => setIsDialogOpen(false)} />
+              <CoinbaseFundButton onClose={() => setIsDialogOpen(false)} />
             </div>
           </div>
         );
@@ -1035,7 +1062,7 @@ export function AccountDropdown() {
           >
             <Avatar className="h-8 w-8">
               <AvatarImage
-                src={makeBlockie(account?.address || user?.address || "0x")}
+                src={makeBlockie(smartAccountAddress || user?.address || "0x")}
                 alt="Wallet avatar"
               />
             </Avatar>
@@ -1053,7 +1080,7 @@ export function AccountDropdown() {
           >
             <Avatar className="h-8 w-8">
               <AvatarImage
-                src={makeBlockie(account?.address || user?.address || "0x")}
+                src={makeBlockie(smartAccountAddress || user?.address || "0x")}
                 alt="Wallet avatar"
               />
             </Avatar>
@@ -1184,8 +1211,27 @@ export function AccountDropdown() {
             <MembershipSection />
           </div>
 
-          {/* Member Access Links - Only for Members */}
-          {isVerified && hasMembership && (
+          {/* Membership Error Handling */}
+          {membershipError && (
+            <div className="px-2 py-2 w-full">
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  {membershipError.code === 'LOCK_NOT_FOUND' && 'Unable to verify membership. Please try again later.'}
+                  {membershipError.code === 'BALANCE_CHECK_ERROR' && 'Unable to check membership status. Please try again later.'}
+                  {membershipError.code === 'MEMBERSHIP_CHECK_ERROR' && 'Error verifying membership. Please try again later.'}
+                  {membershipError.code === 'INVALID_ADDRESS' && 'Invalid wallet address. Please reconnect your wallet.'}
+                  {membershipError.code === 'NO_VALID_ADDRESS' && 'Please connect your wallet to verify membership.'}
+                  {membershipError.code === 'PROVIDER_ERROR' && 'Network connection error. Please try again later.'}
+                  {membershipError.code === 'LOCK_FETCH_ERROR' && 'Unable to fetch membership details. Basic verification will continue.'}
+                  {!membershipError.code && 'An error occurred while verifying membership.'}
+                </AlertDescription>
+              </Alert>
+            </div>
+          )}
+
+          {/* Member Access Links - Only for Members (hide if error or loading) */}
+          {!membershipError && !isMembershipLoading && isVerified && hasMembership && (
             <>
               
               <div className="px-2 py-2 w-full">
@@ -1332,7 +1378,14 @@ export function AccountDropdown() {
               {dialogAction === "swap" &&
                 "Exchange one cryptocurrency for another at the best available rates."}
             </DialogDescription>
-            <DialogClose asChild className="absolute right-4 top-4" />
+            <DialogClose asChild>
+              <button
+                // className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
+                aria-label="Close"
+              >
+                <span className="sr-only">Close</span>
+              </button>
+            </DialogClose>
           </DialogHeader>
           <div className="flex flex-col overflow-hidden">
             <div className="space-y-4 overflow-y-auto flex-1 pr-2">

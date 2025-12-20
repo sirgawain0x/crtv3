@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import { CopyIcon } from "lucide-react";
 import {
@@ -76,6 +76,73 @@ const FileUpload: React.FC<FileUploadProps> = ({
   // Use Universal Account to get smart account address (SCA), not controller wallet
   const { address, type, loading } = useUniversalAccount();
 
+  // Persist upload state to recover from page reloads
+  useEffect(() => {
+    if (uploadState === 'loading' && livepeerAsset?.id) {
+      const uploadData = {
+        assetId: livepeerAsset.id,
+        progress,
+        timestamp: Date.now(),
+        metadata: metadata,
+        address,
+      };
+      localStorage.setItem('upload-in-progress', JSON.stringify(uploadData));
+      console.log('Upload state saved:', uploadData);
+    } else if (uploadState === 'complete' && livepeerAsset?.id) {
+      localStorage.removeItem('upload-in-progress');
+      console.log('Upload completed, state cleared');
+    }
+  }, [uploadState, livepeerAsset, progress, metadata, address]);
+
+  // Check for interrupted upload on mount and attempt recovery
+  useEffect(() => {
+    const checkInterruptedUpload = async () => {
+      const savedUpload = localStorage.getItem('upload-in-progress');
+      if (savedUpload && address) {
+        try {
+          const { assetId, timestamp, address: savedAddress } = JSON.parse(savedUpload);
+          
+          // Only recover if same user and upload was within last 30 minutes
+          if (savedAddress === address && Date.now() - timestamp < 30 * 60 * 1000) {
+            console.log('Attempting to recover interrupted upload:', assetId);
+            toast.info('Checking previous upload status...');
+            
+            const asset = await getLivepeerAsset(assetId);
+            if (asset) {
+              console.log('Recovered asset:', asset);
+              setLivepeerAsset(asset);
+              
+              if (asset.status?.phase === 'ready') {
+                setUploadState('complete');
+                setUploadComplete(true);
+                setProgress(100);
+                toast.success('Previous upload recovered successfully!');
+                localStorage.removeItem('upload-in-progress');
+              } else if (asset.status?.phase === 'processing') {
+                setUploadState('loading');
+                setProgress(75);
+                toast.info('Upload is still processing...');
+              } else if (asset.status?.phase === 'failed') {
+                toast.error('Previous upload failed. Please try again.');
+                localStorage.removeItem('upload-in-progress');
+              }
+            }
+          } else {
+            // Clear stale upload data
+            localStorage.removeItem('upload-in-progress');
+          }
+        } catch (error) {
+          console.error('Failed to recover upload:', error);
+          localStorage.removeItem('upload-in-progress');
+        }
+      }
+    };
+    
+    if (!loading && address) {
+      checkInterruptedUpload();
+    }
+  }, [loading, address]);
+
   // Livepeer supported video formats
   // Containers: MP4, MOV, MKV, WebM, FLV, TS
   // Video codecs: H.264, H.265 (HEVC), VP8, VP9, AV1
@@ -101,6 +168,14 @@ const FileUpload: React.FC<FileUploadProps> = ({
   ];
 
   const validateVideoFile = (file: File): { valid: boolean; error?: string } => {
+    // Check MIME type presence first - reject files with empty/unknown MIME types
+    if (!file.type || file.type.trim() === '') {
+      return {
+        valid: false,
+        error: 'Unable to determine file type. Please ensure you are uploading a valid video file with a recognized format (MP4, MOV, MKV, WebM, FLV, or TS).',
+      };
+    }
+
     // Check file extension
     const fileExtension = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
     const isValidExtension = SUPPORTED_VIDEO_EXTENSIONS.includes(fileExtension);
@@ -108,10 +183,31 @@ const FileUpload: React.FC<FileUploadProps> = ({
     // Check MIME type
     const isValidMimeType = SUPPORTED_VIDEO_FORMATS.includes(file.type);
     
-    if (!isValidExtension && !isValidMimeType) {
+    // Log warning if extension and MIME type disagree (mismatch detected)
+    if (isValidExtension !== isValidMimeType) {
+      console.warn('File validation mismatch detected:', {
+        filename: file.name,
+        extension: fileExtension,
+        mimeType: file.type,
+        extensionValid: isValidExtension,
+        mimeTypeValid: isValidMimeType,
+        timestamp: new Date().toISOString(),
+      });
+    }
+    
+    // Require BOTH valid extension AND valid MIME type
+    if (!isValidExtension || !isValidMimeType) {
+      const errors = [];
+      if (!isValidExtension) {
+        errors.push(`invalid extension (${fileExtension})`);
+      }
+      if (!isValidMimeType) {
+        errors.push(`invalid MIME type (${file.type})`);
+      }
+      
       return {
         valid: false,
-        error: `Unsupported video format: ${fileExtension}. Please use MP4, MOV, MKV, WebM, FLV, or TS format with H.264/H.265 codec.`,
+        error: `Unsupported video format - ${errors.join(' and ')}. Please use a valid video file with both a supported extension (MP4, MOV, MKV, WebM, FLV, or TS) and valid MIME type. Required codec: H.264/H.265.`,
       };
     }
 
@@ -196,7 +292,8 @@ const FileUpload: React.FC<FileUploadProps> = ({
         endpoint: uploadRequestResult?.tusEndpoint,
         metadata: {
           filename: selectedFile.name,
-          filetype: selectedFile.type || "video/mp4", // Use actual file MIME type
+          // Validation should ensure type is always present, but use safe fallback as defensive measure
+          filetype: selectedFile.type || "application/octet-stream",
         },
         uploadSize: selectedFile.size,
         onError(err: any) {
@@ -268,7 +365,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
   if (loading) {
     return (
       <div className="text-center p-8">
-        <p>Loading your wallet...</p>
+        <p className="text-foreground">Loading your wallet...</p>
       </div>
     );
   }
@@ -276,16 +373,16 @@ const FileUpload: React.FC<FileUploadProps> = ({
   if (!address) {
     return (
       <div className="text-center p-8">
-        <p>Please connect your wallet to upload videos</p>
+        <p className="text-foreground">Please connect your wallet to upload videos</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen w-full bg-white">
+    <div className="min-h-screen w-full bg-background">
       <div className="mx-auto flex min-h-[calc(100vh-200px)] max-w-4xl flex-col px-2 py-4 sm:px-4 sm:py-8">
-        <div className="flex-1 rounded-lg bg-white p-4 shadow-lg sm:p-8">
-          <h1 className="mb-6 text-center text-xl font-semibold text-gray-900 sm:mb-8 sm:text-2xl">
+        <div className="flex-1 rounded-lg bg-card border p-4 shadow-lg sm:p-8">
+          <h1 className="mb-6 text-center text-xl font-semibold text-foreground sm:mb-8 sm:text-2xl">
             Upload A File
           </h1>
 
@@ -294,7 +391,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
             <div className="space-y-2">
               <label
                 htmlFor="file-upload"
-                className="block text-sm font-medium text-gray-700"
+                className="block text-sm font-medium text-foreground"
               >
                 Choose A File To Upload:
               </label>
@@ -302,21 +399,21 @@ const FileUpload: React.FC<FileUploadProps> = ({
                 type="file"
                 id="file-upload"
                 accept="video/mp4,video/quicktime,video/x-matroska,video/webm,video/x-flv,video/mp2t,.mp4,.mov,.mkv,.webm,.flv,.ts"
-                className="file:border-1 block w-full rounded-lg border border-gray-200 text-sm text-[#EC407A] 
-                file:mr-2 file:cursor-pointer file:rounded-full file:border-0 file:bg-white file:px-3 file:py-2 file:text-xs 
-                sm:file:mr-4 sm:file:px-4 sm:file:text-sm file:font-semibold file:text-[#EC407A] hover:file:bg-gray-50"
+                className="file:border-1 block w-full rounded-lg border border-input bg-background text-sm text-[#EC407A] 
+                file:mr-2 file:cursor-pointer file:rounded-full file:border-0 file:bg-card file:px-3 file:py-2 file:text-xs 
+                sm:file:mr-4 sm:file:px-4 sm:file:text-sm file:font-semibold file:text-[#EC407A] hover:file:bg-accent"
                 data-testid="file-upload-input"
                 onChange={handleFileChange}
               />
               <div className="mt-2 space-y-1">
-                <p className="text-xs text-gray-600 font-medium">
+                <p className="text-xs text-muted-foreground font-medium">
                   📹 Supported formats: MP4, MOV, MKV, WebM, FLV, TS
                 </p>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-muted-foreground">
                   ✅ <strong>Required codecs:</strong> H.264 or H.265 (HEVC) • Max size: 5GB
                 </p>
-                <p className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded">
-                  ⚠️ <strong>Important:</strong> Your video must use H.264 or H.265 codec. If upload fails, convert your video using <a href="https://handbrake.fr/" target="_blank" rel="noopener noreferrer" className="underline hover:text-amber-800">HandBrake</a> or FFmpeg.
+                <p className="text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 px-2 py-1 rounded border border-amber-200 dark:border-amber-800">
+                  ⚠️ <strong>Important:</strong> Your video must use H.264 or H.265 codec. If upload fails, convert your video using <a href="https://handbrake.fr/" target="_blank" rel="noopener noreferrer" className="underline hover:text-amber-800 dark:hover:text-amber-300">HandBrake</a> or FFmpeg.
                 </p>
               </div>
             </div>
@@ -325,16 +422,16 @@ const FileUpload: React.FC<FileUploadProps> = ({
             {selectedFile && (
               <div className="space-y-6 sm:space-y-8">
                 <div className="text-center">
-                  <p className="text-sm font-medium text-gray-500">
+                  <p className="text-sm font-medium text-muted-foreground">
                     Selected File
                   </p>
-                  <p className="mt-1 text-sm text-gray-900 break-words sm:text-base">
+                  <p className="mt-1 text-sm text-foreground break-words sm:text-base">
                     {selectedFile.name}
                   </p>
                 </div>
 
                 {/* Video Preview */}
-                <div className="overflow-hidden rounded-lg border border-gray-200">
+                <div className="overflow-hidden rounded-lg border border-border">
                   <PreviewVideo video={selectedFile} />
                 </div>
 
@@ -359,14 +456,14 @@ const FileUpload: React.FC<FileUploadProps> = ({
                       <Progress
                         value={progress}
                         max={100}
-                        className="h-2 w-full overflow-hidden rounded-full bg-gray-100"
+                        className="h-2 w-full overflow-hidden rounded-full bg-muted"
                       >
                         <div
                           className="h-full bg-[#EC407A] transition-all duration-500 ease-in-out"
                           style={{ width: `${progress}%` }}
                         />
                       </Progress>
-                      <p className="text-center text-xs text-gray-600 sm:text-sm">
+                      <p className="text-center text-xs text-muted-foreground sm:text-sm">
                         {uploadState === "complete"
                           ? "Upload Complete!"
                           : `${progress}% uploaded`}
@@ -379,26 +476,26 @@ const FileUpload: React.FC<FileUploadProps> = ({
 
             {/* Error Message */}
             {error && (
-              <div className="rounded-lg bg-red-50 p-4">
-                <p className="text-sm text-red-600">{error}</p>
+              <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-4">
+                <p className="text-sm text-destructive">{error}</p>
               </div>
             )}
 
             {/* Success Message */}
             {uploadedUri && (
-              <div className="rounded-lg border border-green-200 bg-green-50 p-4">
-                <p className="flex items-center gap-2 text-sm text-green-700">
+              <div className="rounded-lg border border-green-500/20 bg-green-500/10 dark:bg-green-500/5 p-4">
+                <p className="flex items-center gap-2 text-sm text-green-700 dark:text-green-400">
                   <span>File uploaded successfully! IPFS URI:</span>
                   <Link
                     href={uploadedUri}
                     target="_blank"
-                    className="text-green-600 underline hover:text-green-800"
+                    className="text-green-600 dark:text-green-400 underline hover:text-green-800 dark:hover:text-green-300"
                   >
                     {truncateUri(uploadedUri)}
                   </Link>
                   <button
                     onClick={() => copyToClipboard(uploadedUri)}
-                    className="inline-flex items-center gap-1 rounded-md p-1 text-green-600 hover:bg-green-100 hover:text-green-800"
+                    className="inline-flex items-center gap-1 rounded-md p-1 text-green-600 dark:text-green-400 hover:bg-green-500/20 dark:hover:bg-green-500/10 hover:text-green-800 dark:hover:text-green-300"
                   >
                     <CopyIcon className="h-4 w-4" />
                     <span className="text-xs">Copy</span>
@@ -453,7 +550,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
         </div>
 
         {isPolling && (
-          <div className="text-center text-sm text-gray-500 mt-4">
+          <div className="text-center text-sm text-muted-foreground mt-4">
             Processing video and syncing metadata...
           </div>
         )}

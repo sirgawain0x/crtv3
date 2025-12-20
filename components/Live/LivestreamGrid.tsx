@@ -68,7 +68,7 @@ export default function LivestreamGrid() {
 
   if (streams.length === 0) {
     return (
-      <div className="py-8 text-center text-gray-500">
+      <div className="py-8 text-center text-gray-500 dark:text-gray-400">
         No active livestreams at the moment
       </div>
     );
@@ -79,13 +79,13 @@ export default function LivestreamGrid() {
       {streams.map((stream) => (
         <Link key={stream.id} href={`/watch/${stream.playbackId}`}>
           <Card className="overflow-hidden transition-shadow hover:shadow-lg">
-            <div className="relative aspect-video bg-gray-100">
+            <div className="relative aspect-video bg-gray-100 dark:bg-gray-800/40">
               {thumbnails?.[String(stream.id)] ? (
                 <LivestreamThumbnail
                   thumbnailUrl={thumbnails[String(stream.id)]}
                 />
               ) : (
-                <div className="flex h-full w-full items-center justify-center text-gray-400">
+                <div className="flex h-full w-full items-center justify-center text-gray-400 dark:text-gray-500">
                   Loading thumbnail...
                 </div>
               )}
@@ -95,7 +95,7 @@ export default function LivestreamGrid() {
             </div>
             <div className="p-4">
               <h3 className="truncate font-semibold">{stream.name}</h3>
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-gray-500 dark:text-gray-400">
                 Started{" "}
                 {stream.createdAt
                   ? new Date(stream.createdAt).toLocaleDateString()

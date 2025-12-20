@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useToast } from '@/components/ui/use-toast';
 import { useMeTokensSupabase, MeTokenData } from '@/lib/hooks/metokens/useMeTokensSupabase';
 import { useUser } from '@account-kit/react';
 import { MeTokenCreator } from './MeTokenCreator';
@@ -23,7 +24,9 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
   const [userMeToken, setUserMeToken] = useState<MeTokenData | null>(null);
   const [manualMeTokenAddress, setManualMeTokenAddress] = useState('');
   const [isCheckingManual, setIsCheckingManual] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const user = useUser();
+  const { toast } = useToast();
 
   const { 
     userMeToken: hookMeToken, 
@@ -60,8 +63,25 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
   };
 
   const handleSyncExistingMeToken = async () => {
+    // Early validation for walletAddress
+    if (!walletAddress) {
+      toast({
+        title: "Wallet Not Connected",
+        description: "No wallet address available. Please ensure you are logged in.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSyncing(true);
+    
     try {
       console.log('🔄 Attempting to sync existing MeToken from subgraph...');
+      
+      toast({
+        title: "Syncing MeToken",
+        description: "Searching for your MeToken in the subgraph...",
+      });
       
       // Import the subgraph client
       const { meTokensSubgraph } = await import('@/lib/sdk/metokens/subgraph');
@@ -86,8 +106,12 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
               console.log('✅ Synced MeToken:', syncData);
               
               // Check if this one belongs to our user
-              if (syncData.data?.owner_address?.toLowerCase() === walletAddress?.toLowerCase()) {
+              if (syncData.data?.owner_address?.toLowerCase() === walletAddress.toLowerCase()) {
                 console.log('🎯 Found our MeToken!');
+                toast({
+                  title: "MeToken Found!",
+                  description: "Your MeToken has been synced successfully.",
+                });
                 await handleRefresh(); // Refresh to show the synced MeToken
                 return;
               }
@@ -98,11 +122,20 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
         }
       }
       
-      alert('No existing MeToken found in the subgraph. If you recently created a MeToken, ' +
-        'please wait a few minutes for the subgraph to sync, then try again.');
+      toast({
+        title: "No MeToken Found",
+        description: "No existing MeToken found in the subgraph. If you recently created a MeToken, please wait a few minutes for the subgraph to sync, then try again.",
+        variant: "destructive",
+      });
     } catch (err) {
       console.error('Failed to sync existing MeToken:', err);
-      alert('Failed to sync existing MeToken. Please try again or contact support.');
+      toast({
+        title: "Sync Failed",
+        description: "Failed to sync existing MeToken. Please try again or contact support.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -113,13 +146,22 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
     
     // Validate address format
     if (!address.startsWith('0x') || address.length !== 42) {
-      alert('Invalid address format. Please enter a valid Ethereum address (0x followed by 40 hex characters).\n\n' +
-        'Note: Do not paste the transaction hash - you need to find the MeToken contract address from the "Internal Txns" tab on Basescan.');
+      toast({
+        title: "Invalid Address Format",
+        description: "Please enter a valid Ethereum address (0x followed by 40 hex characters). Note: Do not paste the transaction hash - you need to find the MeToken contract address from the \"Internal Txns\" tab on Basescan.",
+        variant: "destructive",
+      });
       return;
     }
     
     setIsCheckingManual(true);
+    
     try {
+      toast({
+        title: "Checking MeToken",
+        description: "Syncing MeToken from blockchain...",
+      });
+      
       // First, try to sync the MeToken from blockchain to database
       const syncResponse = await fetch('/api/metokens/sync', {
         method: 'POST',
@@ -134,19 +176,35 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
         // Now check if it belongs to this user
         const result = await checkSpecificMeToken(manualMeTokenAddress.trim());
         if (result) {
+          toast({
+            title: "MeToken Found!",
+            description: "Your MeToken has been synced and loaded successfully.",
+          });
           setActiveTab('overview');
           setManualMeTokenAddress('');
         } else {
-          alert('MeToken found on blockchain, but it does not belong to this wallet address.');
+          toast({
+            title: "MeToken Not Yours",
+            description: "MeToken found on blockchain, but it does not belong to this wallet address.",
+            variant: "destructive",
+          });
         }
       } else {
         const error = await syncResponse.json();
         console.error('Sync failed:', error);
-        alert(`Failed to sync MeToken: ${error.error || 'Unknown error'}`);
+        toast({
+          title: "Sync Failed",
+          description: `Failed to sync MeToken: ${error.error || 'Unknown error'}`,
+          variant: "destructive",
+        });
       }
     } catch (err) {
       console.error('Failed to check manual MeToken:', err);
-      alert('Failed to check MeToken. Please try again.');
+      toast({
+        title: "Check Failed",
+        description: "Failed to check MeToken. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setIsCheckingManual(false);
     }
@@ -422,12 +480,22 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
                     </p>
                     <Button 
                       onClick={handleSyncExistingMeToken}
+                      disabled={isSyncing}
                       variant="secondary"
                       size="sm"
                       className="flex items-center gap-2"
                     >
-                      <RefreshCw className="h-4 w-4" />
-                      Sync Existing MeToken
+                      {isSyncing ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Syncing...
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="h-4 w-4" />
+                          Sync Existing MeToken
+                        </>
+                      )}
                     </Button>
                   </div>
                   

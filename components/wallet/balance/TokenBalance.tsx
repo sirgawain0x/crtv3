@@ -83,6 +83,7 @@ export function TokenBalance() {
         else {
           console.warn(`Unsupported chain ID: ${chain.id}`);
           if (isMounted && !signal.aborted) {
+            setError(`Unsupported chain (ID: ${chain.id})`);
             setUsdcBalance(null);
             setDaiBalance(null);
             setIsLoading(false);

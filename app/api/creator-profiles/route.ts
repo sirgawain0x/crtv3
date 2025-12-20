@@ -7,8 +7,10 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const owner = searchParams.get('owner');
     const search = searchParams.get('search');
-    const limit = parseInt(searchParams.get('limit') || '50');
-    const offset = parseInt(searchParams.get('offset') || '0');
+    
+    // Clamp limit and offset to safe integer values
+    const limit = Math.max(1, Math.min(100, parseInt(searchParams.get('limit') || '50')));
+    const offset = Math.max(0, parseInt(searchParams.get('offset') || '0'));
 
     if (owner) {
       // Get specific creator profile by owner address
@@ -56,7 +58,7 @@ export async function GET(request: NextRequest) {
           .from('creator_profiles')
           .select('*')
           .or(`username.ilike.%${search}%,bio.ilike.%${search}%`)
-          .limit(limit)
+          .range(offset, offset + limit - 1)
           .order('created_at', { ascending: false });
         data = result.data;
         error = result.error;
@@ -66,7 +68,7 @@ export async function GET(request: NextRequest) {
           .from('creator_profiles')
           .select('*')
           .or(`username.ilike.%${search}%,bio.ilike.%${search}%`)
-          .limit(limit)
+          .range(offset, offset + limit - 1)
           .order('created_at', { ascending: false });
         data = result.data;
         error = result.error;
@@ -272,17 +274,32 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
+    let error;
+    
     if (supabaseService) {
-      await supabaseService
+      const result = await supabaseService
         .from('creator_profiles')
         .delete()
         .eq('owner_address', owner.toLowerCase());
+      error = result.error;
     } else {
       const supabase = await createClient();
-      await supabase
+      const result = await supabase
         .from('creator_profiles')
         .delete()
         .eq('owner_address', owner.toLowerCase());
+      error = result.error;
+    }
+
+    if (error) {
+      console.error('Delete operation failed:', error);
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: `Failed to delete creator profile: ${error.message}` 
+        },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({ 

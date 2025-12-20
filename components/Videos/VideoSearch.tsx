@@ -37,6 +37,7 @@ const VIDEO_CATEGORIES = [
   { value: "Reggae", label: "Reggae" },
   { value: "Latin", label: "Latin" },
   { value: "Metal", label: "Metal" },
+  { value: "Podcast", label: "Podcast" },
   { value: "Other", label: "World Music" },
 ];
 

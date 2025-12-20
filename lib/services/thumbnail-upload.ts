@@ -1,9 +1,13 @@
 import { IPFSService } from '@/lib/sdk/ipfs/service';
 
 // Initialize IPFS service for thumbnail uploads
+// Prefer KEY and PROOF for backend/serverless (recommended)
+// Fallback to EMAIL for persistent environments
 const ipfsService = new IPFSService({
-  apiKey: process.env.NEXT_PUBLIC_LIGHTHOUSE_API_KEY || '',
-  gateway: process.env.NEXT_PUBLIC_IPFS_GATEWAY || 'https://gateway.lighthouse.storage/ipfs'
+  key: process.env.STORACHA_KEY,
+  proof: process.env.STORACHA_PROOF,
+  email: process.env.NEXT_PUBLIC_STORACHA_EMAIL,
+  gateway: process.env.NEXT_PUBLIC_IPFS_GATEWAY || 'https://w3s.link/ipfs'
 });
 
 export interface ThumbnailUploadResult {
@@ -31,10 +35,11 @@ export async function uploadThumbnailToIPFS(
       };
     }
 
-    // Upload to IPFS
+    // Upload to IPFS with 5MB limit for thumbnails (larger than avatars)
     const result = await ipfsService.uploadFile(file, {
       pin: true,
-      wrapWithDirectory: false
+      wrapWithDirectory: false,
+      maxSize: 5 * 1024 * 1024 // 5MB for thumbnails
     });
 
     if (!result.success || !result.url) {

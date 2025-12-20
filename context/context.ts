@@ -63,7 +63,7 @@ export const STEPPER_FORM_KEYS = {
   3: ["thumbnail"],
 } as const;
 
-export const HERO_VIDEO_TITLE = "Creative TV Demo";
+export const HERO_VIDEO_TITLE = "Creative Intro";
 
 // Featured content configuration
 export const FEATURED_VIDEO_TITLE = "The Creative Podcast Episode 03";
@@ -74,7 +74,8 @@ export const LIVEPEER_FEATURED_PLAYBACK_ID = "5c2bzf537qbq0r7o";
  * These IDs connect to specific assets hosted on Livepeer's platform
  * CAUTION: Changing these values will affect what media is displayed to users
  */
-export const LIVEPEER_HERO_PLAYBACK_ID = "cbd1dw72qst9xmps"; // Default playback ID for hero section video
+export const LIVEPEER_HERO_PLAYBACK_ID = "cb8ekf9y8kaatrpu"; // Default playback ID for hero section video (fallback)
+export const HERO_VIDEO_ASSET_ID = "cb8eabe3-ed26-4a9a-91a5-949712f85030"; // Asset ID for hero section video
 
 // URLS
 export const API_BASE_URL = "https://api.poap.tech";

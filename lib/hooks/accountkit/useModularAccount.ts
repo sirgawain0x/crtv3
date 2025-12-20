@@ -55,6 +55,7 @@ export default function useModularAccount(props?: UseModularAccountProps) {
 
   return {
     account: smartAccountClient?.account,
+    address, // Expose the smart account address directly
     smartAccountClient,
     loading: isLoadingClient,
     error,
