@@ -1,6 +1,5 @@
 import {
   createConfig,
-  cookieStorage,
   type AlchemyAccountsUIConfig,
   type CreateConfigProps,
 } from "@account-kit/react";
@@ -20,6 +19,39 @@ const defaultChain = base;
 // Create transport
 const transport = alchemy({
   apiKey: process.env.NEXT_PUBLIC_ALCHEMY_API_KEY as string,
+});
+
+// Custom storage implementation with 30-day expiration to prevent auto-logout
+// Must be a function that returns the storage object (CreateStorageFn)
+const customStorage = (config?: { sessionLength?: number; domain?: string }) => ({
+  getItem: (key: string) => {
+    if (typeof document === "undefined") return null;
+    const match = document.cookie.match(new RegExp(`(^| )${key}=([^;]+)`));
+    return match ? decodeURIComponent(match[2]) : null;
+  },
+  setItem: (key: string, value: string) => {
+    if (typeof document === "undefined") return;
+    // Set cookie with 30-day expiration (2592000 seconds)
+    // SameSite=Lax is standard for auth cookies
+    // Path=/ ensures it works across the entire site
+    document.cookie = `${key}=${encodeURIComponent(value)}; max-age=2592000; path=/; SameSite=Lax; Secure`;
+  },
+  removeItem: (key: string) => {
+    if (typeof document === "undefined") return;
+    document.cookie = `${key}=; max-age=0; path=/; SameSite=Lax; Secure`;
+  },
+  clear: () => {
+    if (typeof document === "undefined") return;
+    const cookies = document.cookie.split(";");
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i];
+      const eqPos = cookie.indexOf("=");
+      const name = eqPos > -1 ? cookie.substr(0, eqPos) : cookie;
+      document.cookie = `${name}=; max-age=0; path=/; SameSite=Lax; Secure`;
+    }
+  },
+  length: 0, // Placeholder
+  key: (index: number) => null, // Placeholder
 });
 
 // Create query client with optimized settings for memory management
@@ -83,8 +115,12 @@ export const config = createConfig(
       transport,
     })),
     ssr: true,
-    storage: cookieStorage,
     enablePopupOauth: true,
+    // Configure persistent sessions
+    sessionConfig: {
+      expirationTimeMs: 1000 * 60 * 60 * 24 * 30, // 30 days
+      storage: customStorage(),
+    },
     accountConfig: {
       type: "ModularAccountV2",
       accountParams: {

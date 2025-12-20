@@ -15,41 +15,27 @@ export function useAuthStateMonitor() {
 
   useEffect(() => {
     const previousUser = previousUserRef.current;
-    
+
     // User transitioned from logged in to logged out
     if (previousUser && !user) {
       console.log('🔴 User logged out/timed out');
-      
+
       // Show toast only once
       if (!logoutToastShownRef.current) {
         toast.info('Session ended. Click "Get Started" to reconnect.');
         logoutToastShownRef.current = true;
       }
-      
-      // Clear any stale auth state from localStorage
-      try {
-        const keysToRemove: string[] = [];
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i);
-          if (key && (key.includes('auth') || key.includes('session') || key.includes('upload-in-progress'))) {
-            keysToRemove.push(key);
-          }
-        }
-        keysToRemove.forEach(key => {
-          localStorage.removeItem(key);
-          console.log('Cleared stale state:', key);
-        });
-      } catch (e) {
-        console.warn('Could not clear auth localStorage:', e);
-      }
+
+      // Removed aggressive localStorage cleanup to prevent "stuck" state
+      // where user has to refresh to sign in again.
     }
-    
+
     // User logged in
     if (!previousUser && user) {
       console.log('🟢 User logged in:', user.address);
       logoutToastShownRef.current = false;
     }
-    
+
     previousUserRef.current = user;
   }, [user]);
 

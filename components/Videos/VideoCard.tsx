@@ -1,5 +1,6 @@
 "use client";
 import { Button } from "../ui/button";
+import { convertFailingGateway } from '@/lib/utils/image-gateway';
 import {
   Card,
   CardContent,
@@ -18,6 +19,7 @@ import { Src } from "@livepeer/react";
 import makeBlockie from "ethereum-blockies-base64";
 import VideoViewMetrics from "./VideoViewMetrics";
 import { useVideo } from "@/context/VideoContext";
+import { CircleDollarSign, MessageCircle, Share2 } from 'lucide-react';
 import { useEffect, useRef, useState } from "react";
 import { fetchVideoAssetByPlaybackId } from "@/lib/utils/video-assets-client";
 import VideoThumbnail from './VideoThumbnail';
@@ -79,7 +81,7 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
             }
           }
           // Check if video has an associated MeToken
-          if (row?.creator_metoken_id) {
+          if (row?.creator_metoken_id || row?.attributes?.content_coin_id) {
             setHasMeToken(true);
           } else {
             setHasMeToken(false);
@@ -103,12 +105,12 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
   useEffect(() => {
     async function syncViewCount() {
       if (!asset?.playbackId || dbStatus !== 'published') return;
-      
+
       // Check last sync time from localStorage to avoid excessive API calls
       const lastSyncKey = `view-sync-${asset.playbackId}`;
       const lastSyncStr = localStorage.getItem(lastSyncKey);
       const now = Date.now();
-      
+
       // Only sync if more than 1 hour has passed since last sync for this video
       if (lastSyncStr) {
         const lastSync = parseInt(lastSyncStr);
@@ -117,13 +119,13 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
           return; // Skip sync, too soon
         }
       }
-      
+
       try {
         // Call server endpoint that fetches from Livepeer and updates database
         const response = await fetch(`/api/video-assets/sync-views/${asset.playbackId}`, {
           method: 'GET',
         });
-        
+
         if (response.ok) {
           const result = await response.json();
           // Update last sync time in localStorage only on success
@@ -135,7 +137,7 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
         console.error('Failed to sync view count:', error);
       }
     }
-    
+
     // Only sync if the video is published
     if (dbStatus === 'published') {
       syncViewCount();
@@ -168,10 +170,10 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
 
   return (
     <div className="w-full" ref={playerRef}>
-      <Card key={asset?.id} className={cn("w-full max-w-[360px] mx-auto overflow-hidden")}>
+      <Card key={asset?.id} className={cn("w-full overflow-hidden")}>
         <div className="mx-auto flex-1 flex-wrap">
           <CardHeader>
-            <Link 
+            <Link
               href={`/creator/${address}`}
               className="flex items-center space-x-2 hover:opacity-80 transition-opacity cursor-pointer"
               onClick={(e) => {
@@ -181,13 +183,13 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
             >
               <Avatar className="h-10 w-10">
                 <AvatarImage
-                  src={creatorProfile?.avatar_url || makeBlockie(address)}
+                  src={creatorProfile?.avatar_url ? convertFailingGateway(creatorProfile.avatar_url) : makeBlockie(address)}
                   alt={creatorProfile?.username || "Creator"}
                   className="h-10 w-10 rounded-full"
                 />
                 <AvatarFallback>
-                  {creatorProfile?.username 
-                    ? creatorProfile.username.charAt(0).toUpperCase() 
+                  {creatorProfile?.username
+                    ? creatorProfile.username.charAt(0).toUpperCase()
                     : address.slice(2, 3).toUpperCase() || "C"}
                 </AvatarFallback>
               </Avatar>
@@ -199,13 +201,15 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
             </Link>
           </CardHeader>
         </div>
-        <VideoThumbnail
-          playbackId={asset.playbackId!}
-          src={playbackSources}
-          assetId={asset?.id}
-          title={asset?.name}
-          onPlay={handlePlay}
-        />
+        <Link href={`/discover/${asset.id}`} className="block cursor-pointer">
+          <VideoThumbnail
+            playbackId={asset.playbackId!}
+            src={playbackSources}
+            assetId={asset?.id}
+            title={asset?.name}
+            enablePreview={true}
+          />
+        </Link>
         <CardContent>
           <div className="my-2 flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -222,8 +226,8 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
           </div>
           {videoAssetId && (
             <div className="my-2">
-              <VideoMeTokenContribution 
-                videoId={videoAssetId} 
+              <VideoMeTokenContribution
+                videoId={videoAssetId}
                 playbackId={asset.playbackId || undefined}
               />
             </div>
@@ -259,7 +263,7 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
                   variant="ghost"
                   onClick={() => setIsBuyDialogOpen(true)}
                 >
-                  Buy
+                  <CircleDollarSign className="w-5 h-5" />
                 </Button>
               )}
               <Link
@@ -270,7 +274,7 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
                   aria-label={`Comment on ${asset?.name}`}
                   variant="ghost"
                 >
-                  Comment
+                  <MessageCircle className="w-5 h-5" />
                 </Button>
               </Link>
               <Button
@@ -279,7 +283,7 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
                 variant="ghost"
                 onClick={() => setIsShareDialogOpen(true)}
               >
-                Share
+                <Share2 className="w-5 h-5" />
               </Button>
             </div>
           ) : null}

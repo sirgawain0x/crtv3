@@ -13,7 +13,9 @@ import { MeTokenCreator } from './MeTokenCreator';
 import { MeTokenTrading } from './MeTokenTrading';
 import { MeTokenInfo } from './MeTokenInfo';
 import { CreatorProfileManager } from './CreatorProfileManager';
-import { Loader2, AlertCircle, Plus, TrendingUp, Info, RefreshCw, Search, Wallet, User } from 'lucide-react';
+import { MeTokenHistory } from './MeTokenHistory';
+import { Loader2, AlertCircle, Plus, TrendingUp, Info, RefreshCw, Search, Wallet, User, History } from 'lucide-react';
+import { formatEther } from 'viem';
 
 interface MeTokensSectionProps {
   walletAddress?: string;
@@ -28,10 +30,10 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
   const user = useUser();
   const { toast } = useToast();
 
-  const { 
-    userMeToken: hookMeToken, 
-    loading, 
-    error, 
+  const {
+    userMeToken: hookMeToken,
+    loading,
+    error,
     isConfirmed,
     checkSpecificMeToken,
     checkUserMeToken
@@ -74,22 +76,22 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
     }
 
     setIsSyncing(true);
-    
+
     try {
       console.log('🔄 Attempting to sync existing MeToken from subgraph...');
-      
+
       toast({
         title: "Syncing MeToken",
         description: "Searching for your MeToken in the subgraph...",
       });
-      
+
       // Import the subgraph client
       const { meTokensSubgraph } = await import('@/lib/sdk/metokens/subgraph');
-      
+
       // Get recent MeTokens from subgraph
       const allMeTokens = await meTokensSubgraph.getAllMeTokens(50, 0);
       console.log(`📋 Found ${allMeTokens.length} recent MeTokens in subgraph`);
-      
+
       if (allMeTokens.length > 0) {
         // Try to sync the most recent ones to database
         for (const meToken of allMeTokens.slice(0, 10)) {
@@ -100,11 +102,11 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ meTokenAddress: meToken.id })
             });
-            
+
             if (syncResponse.ok) {
               const syncData = await syncResponse.json();
               console.log('✅ Synced MeToken:', syncData);
-              
+
               // Check if this one belongs to our user
               if (syncData.data?.owner_address?.toLowerCase() === walletAddress.toLowerCase()) {
                 console.log('🎯 Found our MeToken!');
@@ -121,7 +123,7 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
           }
         }
       }
-      
+
       toast({
         title: "No MeToken Found",
         description: "No existing MeToken found in the subgraph. If you recently created a MeToken, please wait a few minutes for the subgraph to sync, then try again.",
@@ -141,9 +143,9 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
 
   const handleCheckManualMeToken = async () => {
     if (!manualMeTokenAddress.trim()) return;
-    
+
     const address = manualMeTokenAddress.trim();
-    
+
     // Validate address format
     if (!address.startsWith('0x') || address.length !== 42) {
       toast({
@@ -153,26 +155,26 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
       });
       return;
     }
-    
+
     setIsCheckingManual(true);
-    
+
     try {
       toast({
         title: "Checking MeToken",
         description: "Syncing MeToken from blockchain...",
       });
-      
+
       // First, try to sync the MeToken from blockchain to database
       const syncResponse = await fetch('/api/metokens/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ meTokenAddress: address })
       });
-      
+
       if (syncResponse.ok) {
         const syncData = await syncResponse.json();
         console.log('MeToken synced:', syncData);
-        
+
         // Now check if it belongs to this user
         const result = await checkSpecificMeToken(manualMeTokenAddress.trim());
         if (result) {
@@ -250,9 +252,9 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
                 Create and manage your personal token to build a community around your success
               </CardDescription>
             </div>
-            <Button 
-              variant="outline" 
-              size="sm" 
+            <Button
+              variant="outline"
+              size="sm"
               onClick={handleRefresh}
               disabled={loading}
               className="flex items-center gap-2"
@@ -266,11 +268,11 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
           <Alert>
             <Info className="h-4 w-4" />
             <AlertDescription>
-              MeTokens are personal tokens that allow your community to invest in your future success. 
+              MeTokens are personal tokens that allow your community to invest in your future success.
               They can be traded, appreciate in value, and provide utility through token-gated features.
             </AlertDescription>
           </Alert>
-          
+
           {user && walletAddress && user.address && user.address !== walletAddress && (
             <Alert>
               <Wallet className="h-4 w-4" />
@@ -288,7 +290,7 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
                 </div>
                 <div className="text-muted-foreground pt-2 border-t">
                   💡 <strong>Note:</strong> When you create a MeToken, it will be owned by your{' '}
-                  <strong>Smart Account</strong> address ({walletAddress?.slice(0,6)}...{walletAddress?.slice(-4)}).
+                  <strong>Smart Account</strong> address ({walletAddress?.slice(0, 6)}...{walletAddress?.slice(-4)}).
                 </div>
               </AlertDescription>
             </Alert>
@@ -298,7 +300,7 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
 
       {userMeToken ? (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="overview" className="flex items-center gap-2">
               <Info className="h-4 w-4" />
               Overview
@@ -314,6 +316,10 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
             <TabsTrigger value="info" className="flex items-center gap-2">
               <Info className="h-4 w-4" />
               Details
+            </TabsTrigger>
+            <TabsTrigger value="history" className="flex items-center gap-2">
+              <History className="h-4 w-4" />
+              History
             </TabsTrigger>
           </TabsList>
 
@@ -345,13 +351,12 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
                       ${userMeToken.tvl.toFixed(2)}
                     </p>
                   </div>
-                  <div>
+                  <div className="space-y-1">
                     <p className="text-sm font-medium text-muted-foreground">Price</p>
                     <p className="text-2xl font-bold">
-                      {
-                        (parseFloat(userMeToken.totalSupply.toString()) > 0)
-                          ? `$${(userMeToken.tvl / (parseFloat(userMeToken.totalSupply.toString()) / 1e18)).toFixed(4)}`
-                          : '-'
+                      {userMeToken.totalSupply > BigInt(0)
+                        ? '$' + (userMeToken.tvl / parseFloat(formatEther(userMeToken.totalSupply))).toFixed(4)
+                        : '-'
                       }
                     </p>
                   </div>
@@ -361,15 +366,19 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
           </TabsContent>
 
           <TabsContent value="profile">
-            <CreatorProfileManager targetAddress={walletAddress} onProfileUpdated={() => {}} />
+            <CreatorProfileManager targetAddress={walletAddress} onProfileUpdated={() => { }} />
           </TabsContent>
 
           <TabsContent value="trading">
-            <MeTokenTrading meToken={userMeToken} />
+            <MeTokenTrading meToken={userMeToken} onRefresh={handleRefresh} />
           </TabsContent>
 
           <TabsContent value="info">
             <MeTokenInfo meToken={userMeToken} />
+          </TabsContent>
+
+          <TabsContent value="history">
+            <MeTokenHistory meToken={userMeToken} />
           </TabsContent>
         </Tabs>
       ) : (
@@ -397,11 +406,11 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
                 <Alert>
                   <Info className="h-4 w-4" />
                   <AlertDescription>
-                    MeTokens are personal tokens that represent your future success. 
+                    MeTokens are personal tokens that represent your future success.
                     Community members can buy and hold your token, and it can appreciate in value based on demand.
                   </AlertDescription>
                 </Alert>
-                
+
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <h4 className="font-semibold">Benefits of Creating a MeToken:</h4>
@@ -435,10 +444,10 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
                   <Alert className="mb-4">
                     <Info className="h-4 w-4" />
                     <AlertDescription className="text-xs">
-                      <strong>How to find your MeToken address:</strong><br/>
-                      1. Go to your creation transaction on Basescan<br/>
-                      2. Click the <strong>&quot;Internal Txns&quot;</strong> tab<br/>
-                      3. Look for <strong>&quot;Contract Creation&quot;</strong><br/>
+                      <strong>How to find your MeToken address:</strong><br />
+                      1. Go to your creation transaction on Basescan<br />
+                      2. Click the <strong>&quot;Internal Txns&quot;</strong> tab<br />
+                      3. Look for <strong>&quot;Contract Creation&quot;</strong><br />
                       4. Copy the contract address (42 characters starting with 0x)
                     </AlertDescription>
                   </Alert>
@@ -453,7 +462,7 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
                         disabled={isCheckingManual}
                       />
                     </div>
-                    <Button 
+                    <Button
                       onClick={handleCheckManualMeToken}
                       disabled={!manualMeTokenAddress.trim() || isCheckingManual}
                       variant="outline"
@@ -468,7 +477,7 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
                       Check MeToken
                     </Button>
                   </div>
-                  
+
                   {/* Auto-sync section */}
                   <div className="border-t pt-4 mt-4">
                     <h4 className="font-semibold mb-3 flex items-center gap-2">
@@ -478,7 +487,7 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
                     <p className="text-sm text-muted-foreground mb-4">
                       If you recently created a MeToken but it&apos;s not showing up, try syncing from the subgraph.
                     </p>
-                    <Button 
+                    <Button
                       onClick={handleSyncExistingMeToken}
                       disabled={isSyncing}
                       variant="secondary"
@@ -498,7 +507,7 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
                       )}
                     </Button>
                   </div>
-                  
+
                   {/* Error recovery section */}
                   <div className="border-t pt-4 mt-4">
                     <h4 className="font-semibold mb-3 flex items-center gap-2 text-orange-600">
@@ -508,9 +517,9 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
                     <Alert className="mb-4">
                       <AlertCircle className="h-4 w-4" />
                       <AlertDescription>
-                        <strong>This error means you already have a MeToken!</strong><br/>
-                        The system detected that your wallet address already owns a MeToken. 
-                        Try the &quot;Sync Existing MeToken&quot; button above, or if that doesn&apos;t work, 
+                        <strong>This error means you already have a MeToken!</strong><br />
+                        The system detected that your wallet address already owns a MeToken.
+                        Try the &quot;Sync Existing MeToken&quot; button above, or if that doesn&apos;t work,
                         you can manually enter your MeToken contract address.
                       </AlertDescription>
                     </Alert>

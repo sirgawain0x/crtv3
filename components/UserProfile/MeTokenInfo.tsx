@@ -1,15 +1,38 @@
-"use client";
+import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { MeTokenData } from '@/lib/hooks/metokens/useMeTokens';
 import { formatEther } from 'viem';
-import { TrendingUp, Users, DollarSign, Clock } from 'lucide-react';
+import { TrendingUp, Users, DollarSign, Clock, Copy, Check } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/components/ui/use-toast';
 
 interface MeTokenInfoProps {
   meToken: MeTokenData;
 }
 
 export function MeTokenInfo({ meToken }: MeTokenInfoProps) {
+  const { toast } = useToast();
+  const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
+
+  const copyToClipboard = async (text: string, label: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedAddress(label);
+      toast({
+        title: "Copied!",
+        description: `${label} address copied to clipboard`,
+      });
+      setTimeout(() => setCopiedAddress(null), 2000);
+    } catch (err) {
+      toast({
+        title: "Failed to copy",
+        description: "Please try again manually",
+        variant: "destructive",
+      });
+    }
+  };
+
   const formatAddress = (address: string) => {
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
@@ -49,10 +72,25 @@ export function MeTokenInfo({ meToken }: MeTokenInfoProps) {
           </div>
 
           <div>
-            <p className="text-sm font-medium text-muted-foreground">Contract Address</p>
-            <p className="text-sm font-mono bg-muted px-2 py-1 rounded">
-              {formatAddress(meToken.address)}
-            </p>
+            <p className="text-sm font-medium text-muted-foreground mb-1">Contract Address</p>
+            <div className="flex items-center gap-2">
+              <code className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-sm">
+                {formatAddress(meToken.address)}
+              </code>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={() => copyToClipboard(meToken.address, 'Contract')}
+              >
+                {copiedAddress === 'Contract' ? (
+                  <Check className="h-3 w-3 text-green-500" />
+                ) : (
+                  <Copy className="h-3 w-3" />
+                )}
+                <span className="sr-only">Copy address</span>
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -114,10 +152,25 @@ export function MeTokenInfo({ meToken }: MeTokenInfoProps) {
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
-            <p className="text-sm font-medium text-muted-foreground">Owner</p>
-            <p className="text-sm font-mono bg-muted px-2 py-1 rounded">
-              {formatAddress(meToken.info.owner)}
-            </p>
+            <p className="text-sm font-medium text-muted-foreground mb-1">Owner</p>
+            <div className="flex items-center gap-2">
+              <code className="relative rounded bg-muted px-[0.3rem] py-[0.2rem] font-mono text-sm">
+                {formatAddress(meToken.info.owner)}
+              </code>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={() => copyToClipboard(meToken.info.owner, 'Owner')}
+              >
+                {copiedAddress === 'Owner' ? (
+                  <Check className="h-3 w-3 text-green-500" />
+                ) : (
+                  <Copy className="h-3 w-3" />
+                )}
+                <span className="sr-only">Copy address</span>
+              </Button>
+            </div>
           </div>
 
           <div>
@@ -169,7 +222,10 @@ export function MeTokenInfo({ meToken }: MeTokenInfoProps) {
             <div>
               <p className="text-sm font-medium text-muted-foreground">Price per Token</p>
               <p className="text-lg font-semibold">
-                ${(meToken.tvl / parseFloat(formatEther(meToken.totalSupply))).toFixed(4)}
+                ${meToken.totalSupply > 0
+                  ? (meToken.tvl / parseFloat(formatEther(meToken.totalSupply))).toFixed(4)
+                  : '0.0000'
+                }
               </p>
             </div>
           </div>
@@ -177,7 +233,10 @@ export function MeTokenInfo({ meToken }: MeTokenInfoProps) {
           <div className="pt-2">
             <p className="text-sm font-medium text-muted-foreground">Your Holdings Value</p>
             <p className="text-lg font-semibold text-green-600">
-              ${(meToken.tvl * parseFloat(formatEther(meToken.balance)) / parseFloat(formatEther(meToken.totalSupply))).toFixed(2)}
+              ${meToken.totalSupply > 0
+                ? (meToken.tvl * parseFloat(formatEther(meToken.balance)) / parseFloat(formatEther(meToken.totalSupply))).toFixed(2)
+                : '0.00'
+              }
             </p>
           </div>
         </CardContent>

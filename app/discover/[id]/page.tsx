@@ -36,7 +36,7 @@ const fetchAssetData = async (id: string): Promise<Asset | null> => {
   try {
     // Validate UUID format
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-    
+
     if (!uuidRegex.test(id)) {
       console.error("Invalid video asset ID format:", id);
       return null;
@@ -44,7 +44,7 @@ const fetchAssetData = async (id: string): Promise<Asset | null> => {
 
     // First, get the video asset from NeonDB using the asset_id (UUID)
     const videoAsset = await getVideoAssetByAssetId(id);
-    
+
     if (!videoAsset) {
       console.error("Video asset not found in database");
       return null;
@@ -94,7 +94,7 @@ export default async function VideoDetailsPage({
         .select('avatar_url, username')
         .eq('owner_address', creatorAddress.toLowerCase())
         .single();
-      
+
       if (error) {
         // PGRST116 means no rows found - this is acceptable (profile doesn't exist)
         if (error.code === 'PGRST116') {
@@ -153,18 +153,18 @@ export default async function VideoDetailsPage({
             {/* Uploader Section with Share Button */}
             <div className="flex items-center justify-between mt-4">
               {creatorAddress ? (
-                <Link 
+                <Link
                   href={`/creator/${creatorAddress}`}
                   className="flex items-center gap-3 hover:opacity-80 transition-opacity cursor-pointer"
                 >
                   <Avatar className="h-10 w-10">
-                    <AvatarImage 
-                      src={creatorProfile?.avatar_url || makeBlockie(creatorAddress)} 
-                      alt={creatorProfile?.username || "Creator"} 
+                    <AvatarImage
+                      src={creatorProfile?.avatar_url ? convertFailingGateway(creatorProfile.avatar_url) : makeBlockie(creatorAddress)}
+                      alt={creatorProfile?.username || "Creator"}
                     />
                     <AvatarFallback>
-                      {creatorProfile?.username 
-                        ? creatorProfile.username.charAt(0).toUpperCase() 
+                      {creatorProfile?.username
+                        ? creatorProfile.username.charAt(0).toUpperCase()
                         : creatorAddress.slice(2, 3).toUpperCase() || "C"}
                     </AvatarFallback>
                   </Avatar>
@@ -212,7 +212,7 @@ export default async function VideoDetailsPage({
           {/* Comments Section - Below video like YouTube */}
           {videoAsset && (
             <div className="mt-8">
-              <VideoCommentsWrapper 
+              <VideoCommentsWrapper
                 videoAssetId={videoAsset.id}
                 videoName={assetData?.name || videoAsset.title || "this video"}
                 creatorAddress={creatorAddress}
@@ -232,42 +232,42 @@ export async function generateMetadata({
 }): Promise<Metadata> {
   try {
     const { id } = await params;
-    
+
     // Validate UUID format
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-    
+
     if (!uuidRegex.test(id)) {
       console.error("Invalid video asset ID format for metadata:", id);
       return { title: "Video Not Found" };
     }
-    
+
     // First, get the video asset from NeonDB using the asset_id (UUID)
     const videoAsset = await getVideoAssetByAssetId(id);
-    
+
     if (!videoAsset) {
       return { title: "Video Not Found" };
     }
 
     // Then, fetch the Livepeer asset using the same asset_id
     const asset = await fetchAssetId(id);
-    
+
     if (!asset?.asset) return { title: "Video Not Found" };
 
     // Get thumbnail from database or use fallback
-    let thumbnailUrl = 
-      (videoAsset as any)?.thumbnail_url || 
-      (asset.asset as any)?.thumbnailUri || 
+    let thumbnailUrl =
+      (videoAsset as any)?.thumbnail_url ||
+      (asset.asset as any)?.thumbnailUri ||
       "/Creative_TV.png";
 
     // Apply gateway conversion for IPFS URLs (consistent with ShareDialog)
     thumbnailUrl = convertFailingGateway(thumbnailUrl);
 
     // Construct absolute URL for Open Graph
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 
-                    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 
-                    "https://tv.creativeplatform.xyz");
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ||
+      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` :
+        "https://tv.creativeplatform.xyz");
     const absoluteUrl = `${baseUrl}/discover/${id}`;
-    
+
     // Construct absolute thumbnail URL with proper path joining
     let absoluteThumbnailUrl: string;
     if (thumbnailUrl.startsWith("http://") || thumbnailUrl.startsWith("https://")) {
@@ -275,18 +275,18 @@ export async function generateMetadata({
       absoluteThumbnailUrl = thumbnailUrl;
     } else {
       // Relative URL - ensure proper path joining
-      const normalizedPath = thumbnailUrl.startsWith("/") 
-        ? thumbnailUrl 
+      const normalizedPath = thumbnailUrl.startsWith("/")
+        ? thumbnailUrl
         : `/${thumbnailUrl}`;
       absoluteThumbnailUrl = `${baseUrl}${normalizedPath}`;
     }
 
     // Use consistent fallback for asset name
     const assetName = asset.asset.name ?? "Watch Video";
-    
+
     // Use nullish coalescing to preserve empty strings (only replace null/undefined)
     const videoDescription = (videoAsset as any)?.description ?? `Watch ${assetName} on Creative TV`;
-    
+
     return {
       title: assetName,
       description: videoDescription,
@@ -298,13 +298,13 @@ export async function generateMetadata({
         type: "video.other",
         videos: asset.asset.playbackUrl
           ? [
-              {
-                url: asset.asset.playbackUrl,
-                type: "video/mp4",
-                width: 1280,
-                height: 720,
-              },
-            ]
+            {
+              url: asset.asset.playbackUrl,
+              type: "video/mp4",
+              width: 1280,
+              height: 720,
+            },
+          ]
           : [],
       },
       twitter: {

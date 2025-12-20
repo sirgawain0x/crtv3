@@ -1,15 +1,3 @@
-import { IPFSService } from '@/lib/sdk/ipfs/service';
-
-// Initialize IPFS service for thumbnail uploads
-// Prefer KEY and PROOF for backend/serverless (recommended)
-// Fallback to EMAIL for persistent environments
-const ipfsService = new IPFSService({
-  key: process.env.STORACHA_KEY,
-  proof: process.env.STORACHA_PROOF,
-  email: process.env.NEXT_PUBLIC_STORACHA_EMAIL,
-  gateway: process.env.NEXT_PUBLIC_IPFS_GATEWAY || 'https://w3s.link/ipfs'
-});
-
 export interface ThumbnailUploadResult {
   success: boolean;
   thumbnailUrl?: string;
@@ -17,13 +5,14 @@ export interface ThumbnailUploadResult {
 }
 
 /**
- * Uploads a thumbnail image file to IPFS and returns a persistent URL
+ * Uploads a thumbnail image file to IPFS via the API route
+ * This ensures the upload goes through the server to trigger the persistence backup layer
  * @param file - The image file to upload
- * @param playbackId - The video's playback ID for naming
+ * @param playbackId - The video's playback ID for naming (unused in API but kept for signature compatibility)
  * @returns Promise<ThumbnailUploadResult>
  */
 export async function uploadThumbnailToIPFS(
-  file: File, 
+  file: File,
   playbackId: string
 ): Promise<ThumbnailUploadResult> {
   try {
@@ -35,14 +24,19 @@ export async function uploadThumbnailToIPFS(
       };
     }
 
-    // Upload to IPFS with 5MB limit for thumbnails (larger than avatars)
-    const result = await ipfsService.uploadFile(file, {
-      pin: true,
-      wrapWithDirectory: false,
-      maxSize: 5 * 1024 * 1024 // 5MB for thumbnails
+    // Prepare FormData for API upload
+    const formData = new FormData();
+    formData.append('file', file);
+
+    // Upload via API route
+    const response = await fetch('/api/ipfs/upload', {
+      method: 'POST',
+      body: formData,
     });
 
-    if (!result.success || !result.url) {
+    const result = await response.json();
+
+    if (!response.ok || !result.success) {
       return {
         success: false,
         error: result.error || 'Failed to upload thumbnail to IPFS'
@@ -73,7 +67,7 @@ export async function blobUrlToFile(blobUrl: string, filename: string): Promise<
   try {
     const response = await fetch(blobUrl);
     const blob = await response.blob();
-    
+
     // Create a File object from the blob
     const file = new File([blob], filename, { type: blob.type });
     return file;
@@ -90,13 +84,13 @@ export async function blobUrlToFile(blobUrl: string, filename: string): Promise<
  * @returns Promise<ThumbnailUploadResult>
  */
 export async function uploadThumbnailFromBlob(
-  blobUrl: string, 
+  blobUrl: string,
   playbackId: string
 ): Promise<ThumbnailUploadResult> {
   try {
     // Convert blob URL to file
     const file = await blobUrlToFile(blobUrl, `thumbnail-${playbackId}.jpg`);
-    
+
     if (!file) {
       return {
         success: false,

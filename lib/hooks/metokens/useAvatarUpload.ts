@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { useUser } from '@account-kit/react';
-import { ipfsService, IPFSUploadResult } from '@/lib/sdk/ipfs/service';
+import { IPFSUploadResult } from '@/lib/sdk/ipfs/service';
 import { useCreatorProfile } from './useCreatorProfile';
 import { useToast } from '@/components/ui/use-toast';
 
@@ -19,7 +19,7 @@ export function useAvatarUpload(targetAddress?: string): UseAvatarUploadResult {
   const user = useUser();
   const { toast } = useToast();
   const { updateProfile, upsertProfile } = useCreatorProfile(targetAddress);
-  
+
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -38,7 +38,7 @@ export function useAvatarUpload(targetAddress?: string): UseAvatarUploadResult {
     setUploadProgress(0);
 
     try {
-      // Simulate upload progress (Storacha doesn't provide real progress)
+      // Simulate upload progress
       const progressInterval = setInterval(() => {
         setUploadProgress(prev => {
           if (prev >= 90) {
@@ -49,34 +49,43 @@ export function useAvatarUpload(targetAddress?: string): UseAvatarUploadResult {
         });
       }, 100);
 
-      // Upload to IPFS via Storacha
-      const result = await ipfsService.uploadFile(file);
+      // Upload to IPFS via API (triggers Helia + Storacha Backup)
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('/api/ipfs/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = await response.json();
 
       clearInterval(progressInterval);
       setUploadProgress(100);
 
-      if (result.success && result.url) {
+      if (response.ok && result.success && result.url) {
         // Update creator profile with new avatar URL
         // Use upsertProfile to handle cases where profile doesn't exist yet
-        await upsertProfile({ 
+        await upsertProfile({
           owner_address: address,
-          avatar_url: result.url 
+          avatar_url: result.url
         });
-        
+
         toast({
           title: "Avatar Updated",
           description: "Your profile avatar has been updated successfully",
         });
+        return { success: true, url: result.url, hash: result.hash };
       } else {
-        setError(result.error || 'Upload failed');
+        const errorMsg = result.error || 'Upload failed';
+        setError(errorMsg);
         toast({
           variant: "destructive",
           title: "Upload Failed",
-          description: result.error || 'Failed to upload avatar',
+          description: errorMsg,
         });
+        return { success: false, error: errorMsg };
       }
-
-      return result;
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Upload failed';
       setError(errorMsg);
@@ -105,11 +114,11 @@ export function useAvatarUpload(targetAddress?: string): UseAvatarUploadResult {
     try {
       // For IPFS, we can't actually delete the content, but we can remove the reference
       // Update creator profile to remove avatar URL
-      await upsertProfile({ 
+      await upsertProfile({
         owner_address: address,
-        avatar_url: '' 
+        avatar_url: ''
       });
-      
+
       toast({
         title: "Avatar Removed",
         description: "Your profile avatar has been removed successfully",
