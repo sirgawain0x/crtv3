@@ -10,8 +10,7 @@ import { Asset } from "livepeer/models/components";
 
 import { StepperFormValues } from "@/lib/types/hook-stepper";
 import StepperIndicator from "@/components/Videos/Upload/Stepper-Indicator";
-import FileUpload from "@/components/Videos/Upload/FileUpload";
-import CreateInfo from "@/components/Videos/Upload/Create-info";
+import CreateDetailsAndUpload from "@/components/Videos/Upload/CreateDetailsAndUpload";
 import CreateThumbnailWrapper from "@/components/Videos/Upload/CreateThumbnailWrapper";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import type { TVideoMetaForm } from "@/components/Videos/Upload/Create-info";
@@ -21,6 +20,7 @@ import type { VideoAsset } from "@/lib/types/video-asset";
 
 import { useUniversalAccount } from "@/lib/hooks/accountkit/useUniversalAccount";
 import { getLivepeerAsset } from "@/app/api/livepeer/assetUploadActions";
+import { useAutoDeployContentCoin } from "@/lib/hooks/marketplace/useAutoDeployContentCoin";
 
 const HookMultiStepForm = () => {
   const [activeStep, setActiveStep] = useState(1);
@@ -35,16 +35,16 @@ const HookMultiStepForm = () => {
   const [thumbnailUri, setThumbnailUri] = useState<string>();
   const [dbAssetId, setDbAssetId] = useState<number | null>(null);
   const [videoAsset, setVideoAsset] = useState<VideoAsset | null>(null);
+  const [creatorMeToken, setCreatorMeToken] = useState<string | null>(null);
+
+  const { handleUploadSuccess } = useAutoDeployContentCoin();
 
   const { address, type, loading } = useUniversalAccount();
 
   const router = useRouter();
 
   const {
-    trigger,
-    handleSubmit,
-    setError,
-    formState: { isSubmitting, errors },
+    formState: { errors },
   } = methods;
 
   // focus errored input on submit
@@ -57,9 +57,73 @@ const HookMultiStepForm = () => {
     }
   }, [erroredInputName]);
 
-  const handleCreateInfoSubmit = (data: TVideoMetaForm) => {
+  const handleStep1Submit = async (data: TVideoMetaForm, asset: Asset) => {
+    console.log('🎬 Step 1 Submit:', { data, assetId: asset.id });
+
+    if (!asset?.id || !asset?.playbackId) {
+      toast.error("Video asset invalid. Please try again.");
+      return;
+    }
+
     setMetadata(data);
-    setActiveStep((prevActiveStep) => prevActiveStep + 1);
+    setLivepeerAsset(asset);
+
+    // Fetch creator's MeToken
+    let creatorMeTokenId: string | null = null;
+    if (address) {
+      try {
+        const meTokenResponse = await fetch(`/api/metokens?owner=${address}`);
+        const meTokenResult = await meTokenResponse.json();
+
+        if (meTokenResult.data && meTokenResult.data.id) {
+          creatorMeTokenId = meTokenResult.data.id;
+          setCreatorMeToken(creatorMeTokenId);
+        }
+      } catch (error) {
+        console.debug('MeToken lookup skipped');
+      }
+    }
+
+    // Create Video Asset in DB
+    try {
+      const dbAsset = await createVideoAsset({
+        title: data.title,
+        asset_id: asset.id,
+        category: data.category || "",
+        location: data.location || "",
+        playback_id: asset.playbackId || "",
+        description: data.description || "",
+        creator_id: address || "",
+        status: "draft",
+        thumbnailUri: "",
+        duration: asset.videoSpec?.duration || null,
+        views_count: 0,
+        likes_count: 0,
+        is_minted: false,
+        token_id: null,
+        contract_address: null,
+        minted_at: null,
+        mint_transaction_hash: null,
+        royalty_percentage: null,
+        price: null,
+        max_supply: null,
+        current_supply: 0,
+        metadata_uri: null,
+        attributes: null,
+        requires_metoken: false,
+        metoken_price: null,
+        creator_metoken_id: creatorMeTokenId,
+        subtitles_uri: null,
+        subtitles: null,
+      });
+
+      console.log('✅ Video asset created in DB:', dbAsset);
+      setVideoAsset(dbAsset as VideoAsset);
+      setActiveStep(2); // Move to Thumbnail step
+    } catch (error) {
+      console.error('❌ Failed to create video asset in DB:', error);
+      toast.error("Failed to save video data. Please try again.");
+    }
   };
 
   return (
@@ -72,103 +136,14 @@ const HookMultiStepForm = () => {
           <AlertDescription>{errors.root?.formError?.message}</AlertDescription>
         </Alert>
       )}
-      
-      {/* Step 1: Create Info */}
+
+      {/* Step 1: Details & Upload */}
       {activeStep === 1 && (
-        <CreateInfo onPressNext={handleCreateInfoSubmit} />
+        <CreateDetailsAndUpload onPressNext={handleStep1Submit} />
       )}
-      
-      {/* Step 2: File Upload */}
-      {activeStep === 2 && (
-        <FileUpload
-          newAssetTitle={metadata?.title}
-          metadata={metadata}
-          onFileSelect={(file) => {}}
-          onFileUploaded={(videoUrl: string) => {}}
-          onPressBack={() =>
-            setActiveStep((prevActiveStep) => prevActiveStep - 1)
-          }
-          onPressNext={async (livepeerAsset: any) => {
-            console.log('🎬 FileUpload onPressNext called with asset:', {
-              id: livepeerAsset?.id,
-              playbackId: livepeerAsset?.playbackId,
-              hasAsset: !!livepeerAsset,
-            });
 
-            if (!livepeerAsset?.id || !livepeerAsset?.playbackId) {
-              console.error('❌ Invalid asset data:', livepeerAsset);
-              toast.error("Video upload incomplete. Please try again.");
-              return;
-            }
-
-            // Set the asset FIRST
-            setLivepeerAsset(livepeerAsset);
-            
-            // Fetch creator's MeToken if address is available
-            // Note: Creators may not have created a MeToken yet, which is perfectly fine
-            let creatorMeTokenId: string | null = null;
-            if (address) {
-              try {
-                const meTokenResponse = await fetch(`/api/metokens?owner=${address}`);
-                const meTokenResult = await meTokenResponse.json();
-                
-                // Check if MeToken exists and has an ID
-                if (meTokenResult.data && meTokenResult.data.id) {
-                  creatorMeTokenId = meTokenResult.data.id;
-                  console.log('✅ Linked video to creator MeToken:', creatorMeTokenId);
-                }
-                // If no MeToken found, creatorMeTokenId remains null - this is expected and normal
-              } catch (error) {
-                // Silently continue - MeToken lookup is optional and not critical for video creation
-                // Many creators won't have MeTokens yet, and that's perfectly fine
-                console.debug('MeToken lookup skipped (creator may not have one yet)');
-              }
-            }
-            
-            // Create the video asset in the database and store its ID
-            createVideoAsset({
-              title: metadata?.title || "",
-              asset_id: livepeerAsset.id,
-              category: metadata?.category || "",
-              location: metadata?.location || "",
-              playback_id: livepeerAsset.playbackId || "",
-              description: metadata?.description || "",
-              creator_id: address || "",
-              status: "draft",
-              thumbnailUri: "",
-              duration: livepeerAsset.duration || null,
-              views_count: 0,
-              likes_count: 0,
-              is_minted: false,
-              token_id: null,
-              contract_address: null,
-              minted_at: null,
-              mint_transaction_hash: null,
-              royalty_percentage: null,
-              price: null,
-              max_supply: null,
-              current_supply: 0,
-              metadata_uri: null,
-              attributes: null,
-              requires_metoken: false,
-              metoken_price: null,
-              creator_metoken_id: creatorMeTokenId,
-              subtitles_uri: null,
-              subtitles: null,
-            }).then((dbAsset) => {
-              console.log('✅ Video asset created in DB:', dbAsset);
-              setVideoAsset(dbAsset as VideoAsset);
-              setActiveStep((prevActiveStep) => prevActiveStep + 1);
-            }).catch((error) => {
-              console.error('❌ Failed to create video asset in DB:', error);
-              toast.error("Failed to save video data. Please try again.");
-            });
-          }}
-        />
-      )}
-      
-      {/* Step 3: Create Thumbnail - Only render when we reach this step */}
-      {activeStep === 3 && livepeerAsset?.id && (
+      {/* Step 2: Create Thumbnail (Formerly Step 3) */}
+      {activeStep === 2 && livepeerAsset?.id && (
         <CreateThumbnailWrapper
           livePeerAssetId={livepeerAsset.id}
           thumbnailUri={thumbnailUri}
@@ -181,53 +156,46 @@ const HookMultiStepForm = () => {
           }) => {
             setThumbnailUri(data.thumbnailUri);
 
-            // Ensure all required data is present
             if (!livepeerAsset || !metadata) {
               toast.error("Missing asset metadata. Please try again.");
               return;
             }
 
             if (!address) {
-              toast.error("Wallet address is required to track points.");
+              toast.error("Wallet address is required.");
               return;
             }
 
             try {
-              // Fetch the latest Livepeer asset to get the most up-to-date metadata_uri
               const latestAsset = await getLivepeerAsset(livepeerAsset.id);
-              
+
               // --- PUBLISH LOGIC ---
-              // Update video asset with thumbnail, metadata, and MeToken configuration
               await updateVideoAsset(videoAsset?.id as number, {
                 thumbnailUri: data.thumbnailUri,
                 status: "published",
-                metadata_uri:
-                  latestAsset?.storage?.ipfs?.nftMetadata?.url || null,
+                metadata_uri: latestAsset?.storage?.ipfs?.nftMetadata?.url || null,
                 requires_metoken: data.meTokenConfig?.requireMeToken || false,
                 metoken_price: data.meTokenConfig?.priceInMeToken || null,
               });
 
-              // Video published successfully with MeToken configuration
               toast.success("Video uploaded and published successfully!");
 
-              // Award points for uploading a video
-              // await stack.track("video_upload", {
-              //   account: address,
-              //   points: 10,
-              // });
-
-              // const points = await stack.getPoints(address as string);
-              // toast.success("Video uploaded and published successfully!", {
-              //   description: `You earned 10 points! Your total balance is now ${points} points.`,
-              // });
+              // --- AUTO DEPLOY CONTENT COIN ---
+              if (creatorMeToken && address && metadata?.ticker) {
+                toast.info("Deploying Content Coin Market...");
+                await handleUploadSuccess(
+                  metadata.title,
+                  metadata.ticker,
+                  creatorMeToken,
+                  address
+                );
+                toast.success("Market Deployment Initiated!");
+              }
 
               router.push("/discover");
             } catch (error) {
               console.error("Failed to complete video upload:", error);
-              toast.error("Failed to complete video upload", {
-                description:
-                  "Your video was uploaded but we couldn't save all information.",
-              });
+              toast.error("Failed to complete video upload");
             }
           }}
         />

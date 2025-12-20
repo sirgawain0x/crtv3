@@ -42,7 +42,7 @@ export function VideoMeTokenBuyDialog({
   videoTitle,
 }: VideoMeTokenBuyDialogProps) {
   const [meToken, setMeToken] = useState<MeToken | null>(null);
-  const [videoAsset, setVideoAsset] = useState<{ id?: number; playback_id?: string } | null>(null);
+  const [videoAsset, setVideoAsset] = useState<{ id?: number; playback_id?: string; attributes?: any; creator_metoken_id?: string } | null>(null);
   const [buyAmount, setBuyAmount] = useState('');
   const [buyPreview, setBuyPreview] = useState('0');
   const [error, setError] = useState<string | null>(null);
@@ -72,15 +72,32 @@ export function VideoMeTokenBuyDialog({
         // Fetch video asset to get creator_metoken_id
         const fetchedVideoAsset = await fetchVideoAssetByPlaybackId(playbackId);
         setVideoAsset(fetchedVideoAsset);
-        
-        if (!fetchedVideoAsset?.creator_metoken_id) {
+
+        let tokenIdentifier = fetchedVideoAsset?.creator_metoken_id;
+        let fetchUrl = `/api/metokens/by-id/${tokenIdentifier}`;
+
+        // Check for specific Content Coin first
+        if (fetchedVideoAsset?.attributes?.content_coin_id) {
+          const contentCoinId = fetchedVideoAsset.attributes.content_coin_id;
+          // If it looks like an address, use a different endpoint or param?
+          // Assuming for now we rely on the same ID structure or I need to find 'by-address' endpoint.
+          // Let's assume for now I should look at how to fetch by address.
+          if (contentCoinId.startsWith('0x')) {
+            fetchUrl = `/api/metokens/by-address/${contentCoinId}`;
+          } else {
+            tokenIdentifier = contentCoinId;
+            fetchUrl = `/api/metokens/by-id/${tokenIdentifier}`;
+          }
+        }
+
+        if (!tokenIdentifier && !fetchedVideoAsset?.attributes?.content_coin_id) {
           setError('This video does not have an associated MeToken.');
           setIsLoadingMeToken(false);
           return;
         }
 
-        // Fetch MeToken by ID
-        const response = await fetch(`/api/metokens/by-id/${fetchedVideoAsset.creator_metoken_id}`);
+        // Fetch MeToken
+        const response = await fetch(fetchUrl);
         if (!response.ok) {
           throw new Error('Failed to fetch MeToken');
         }
@@ -226,7 +243,7 @@ export function VideoMeTokenBuyDialog({
       });
       setSuccess('Buy order submitted successfully!');
       setBuyAmount('');
-      
+
       // Close dialog after a short delay
       setTimeout(() => {
         onOpenChange(false);

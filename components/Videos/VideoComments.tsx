@@ -9,11 +9,11 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { 
-  MessageSquare, 
-  Send, 
-  AlertCircle, 
-  Heart, 
+import {
+  MessageSquare,
+  Send,
+  AlertCircle,
+  Heart,
   HeartOff,
   Reply,
   Edit2,
@@ -57,7 +57,7 @@ export function VideoComments({ videoAssetId, videoName, className }: VideoComme
   const [expandedReplies, setExpandedReplies] = useState<Set<number>>(new Set());
   const [loadingReplies, setLoadingReplies] = useState<Set<number>>(new Set());
   const [replies, setReplies] = useState<Record<number, any[]>>({});
-  
+
   const user = useUser();
   const { address: smartAccountAddress } = useModularAccount();
   const userAddress = smartAccountAddress || user?.address || null;
@@ -289,7 +289,7 @@ export function VideoComments({ videoAssetId, videoName, className }: VideoComme
                             value={editContent}
                             onChange={(e) => setEditContent(e.target.value)}
                             className="min-h-[80px]"
-                            maxLength={2000}
+                            maxLength={500}
                           />
                           <div className="flex gap-2">
                             <Button
@@ -383,7 +383,7 @@ export function VideoComments({ videoAssetId, videoName, className }: VideoComme
                             onChange={(e) => setReplyContent(e.target.value)}
                             placeholder={userAddress ? "Write a reply..." : "Connect your wallet to reply..."}
                             className="min-h-[60px]"
-                            maxLength={2000}
+                            maxLength={500}
                             disabled={!userAddress}
                           />
                           <div className="flex gap-2">
@@ -498,17 +498,17 @@ export function VideoComments({ videoAssetId, videoName, className }: VideoComme
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
               placeholder={
-                userAddress 
+                userAddress
                   ? `Add a comment about "${videoName || "this video"}"...`
                   : "Connect your wallet to comment..."
               }
               className="min-h-[80px] resize-none"
-              maxLength={2000}
+              maxLength={500}
               disabled={isLoading || !userAddress}
             />
             <div className="flex justify-between items-center">
               <span className="text-xs text-muted-foreground">
-                {newComment.length}/2000
+                {newComment.length}/500
               </span>
               <Button
                 type="submit"

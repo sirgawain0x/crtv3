@@ -56,7 +56,7 @@ const nextConfig = {
   },
   // External packages that should not be processed by the bundler
   // Externalize thread-stream and pino packages on server to avoid bundling test files
-  serverExternalPackages: ['thread-stream', 'pino', 'pino-pretty'],
+  serverExternalPackages: ['thread-stream', 'pino', 'pino-pretty', 'node-datachannel'],
   // Webpack configuration for WebAssembly support
   webpack: (config, { isServer, webpack }) => {
     // #region agent log

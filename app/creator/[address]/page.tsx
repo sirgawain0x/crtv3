@@ -15,6 +15,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import makeBlockie from "ethereum-blockies-base64";
 import { shortenAddress } from "@/lib/utils/utils";
 import { AddressWithCopy } from "@/components/Creator/AddressWithCopy";
+import { convertFailingGateway } from "@/lib/utils/image-gateway";
 
 type CreatorPageProps = {
   params: Promise<{
@@ -71,7 +72,9 @@ export default async function CreatorPage({ params }: CreatorPageProps) {
   ]);
 
   const displayName = creatorProfile?.username || shortenAddress(address);
-  const avatarUrl = creatorProfile?.avatar_url || makeBlockie(address);
+  const avatarUrl = creatorProfile?.avatar_url
+    ? convertFailingGateway(creatorProfile.avatar_url)
+    : makeBlockie(address);
   const bio = creatorProfile?.bio || null;
 
   return (

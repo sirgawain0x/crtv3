@@ -26,6 +26,7 @@ export type TVideoMetaForm = {
   description: string;
   location?: string;
   category?: string;
+  ticker: string;
 };
 
 const CreateInfo = ({ onPressNext }: TCreateInfoProps) => {
@@ -36,6 +37,7 @@ const CreateInfo = ({ onPressNext }: TCreateInfoProps) => {
       description: "",
       location: "",
       category: "",
+      ticker: ""
     },
   });
 
@@ -113,6 +115,30 @@ const CreateInfo = ({ onPressNext }: TCreateInfoProps) => {
               })}
             />
           </div>
+          <div className="flex w-full flex-col sm:w-2/5">
+            <Label className="text-sm">Content Coin Ticker</Label>
+            <Input
+              type="text"
+              placeholder="VID1"
+              maxLength={10}
+              className={
+                "mt-2 h-10 w-full rounded-md border border-[#444752] p-2 text-sm " +
+                "text-gray-600 dark:text-gray-200 dark:bg-[#1a1a1a] " +
+                "placeholder:text-gray-400 dark:placeholder:text-gray-500 " +
+                "focus:outline-none focus:ring-1 focus:ring-gray-400 dark:focus:ring-gray-600 " +
+                "sm:h-12 sm:text-base"
+              }
+              {...form.register("ticker", {
+                required: true,
+                pattern: {
+                  value: /^[A-Z0-9]+$/,
+                  message: "Ticker must be uppercase alphanumeric"
+                }
+              })}
+            />
+            {form.formState.errors.ticker && <span className="text-xs text-red-500">{form.formState.errors.ticker.message}</span>}
+          </div>
+
           <div className="flex w-full flex-col sm:w-2/5">
             <FormLabel className="text-sm">Genre</FormLabel>
             <Controller

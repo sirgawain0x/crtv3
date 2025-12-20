@@ -25,7 +25,7 @@ type CreateThumbnailProps = {
       requireMeToken: boolean;
       priceInMeToken: number;
     };
-  }) => void;
+  }) => Promise<void> | void;
 };
 
 export default function CreateThumbnail({
@@ -42,6 +42,8 @@ export default function CreateThumbnail({
     requireMeToken: boolean;
     priceInMeToken: number;
   } | undefined>(undefined);
+
+  const [isPublishing, setIsPublishing] = useState(false);
 
   // Log component initialization
   useEffect(() => {
@@ -67,21 +69,21 @@ export default function CreateThumbnail({
               updatedAt: data?.status?.updatedAt,
               hasPlaybackId: !!data?.playbackId,
             });
-            
+
             setLivepeerAssetData(data);
-            
+
             if (data?.status?.phase === "failed") {
               console.error('Transcoding failed. Full asset data:', JSON.stringify(data, null, 2));
               const errorMsg = data.status.errorMessage || "Unknown error during video processing";
-              
+
               // Check if it's a codec/container error
-              const isCodecError = errorMsg.toLowerCase().includes('codec') || 
-                                   errorMsg.toLowerCase().includes('container');
-              
+              const isCodecError = errorMsg.toLowerCase().includes('codec') ||
+                errorMsg.toLowerCase().includes('container');
+
               if (isCodecError) {
                 toast.error(
                   "Video format not supported",
-                  { 
+                  {
                     duration: 15000,
                     description: "Your video file uses an unsupported codec. Please convert it to H.264 or H.265 codec in an MP4 container. Tools like HandBrake or FFmpeg can help convert your video."
                   }
@@ -89,7 +91,7 @@ export default function CreateThumbnail({
               } else {
                 toast.error(
                   `Video transcoding failed: ${errorMsg}`,
-                  { 
+                  {
                     duration: 10000,
                     description: "Please try uploading your video again or contact support."
                   }
@@ -167,13 +169,13 @@ export default function CreateThumbnail({
       toast.error("Video data not found. Please try again.");
       return;
     }
-    
+
     // Validate thumbnail URI is not empty
     if (!thumbnailUri || thumbnailUri.trim() === "") {
       toast.error("Please select a thumbnail before publishing.");
       return;
     }
-    
+
     setSelectedThumbnail(thumbnailUri);
     // Use the parameter directly instead of state to avoid stale state issues
     onComplete({
@@ -182,17 +184,25 @@ export default function CreateThumbnail({
     });
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     // Require thumbnail selection for better UX and to avoid breaking downstream code
     if (!selectedThumbnail) {
       toast.error("Please select a thumbnail before publishing.");
       return;
     }
-    
-    onComplete({
-      thumbnailUri: selectedThumbnail,
-      meTokenConfig: meTokenConfig,
-    });
+
+    try {
+      setIsPublishing(true);
+      await onComplete({
+        thumbnailUri: selectedThumbnail,
+        meTokenConfig: meTokenConfig,
+      });
+    } catch (error) {
+      console.error("Publication failed:", error);
+      toast.error("Failed to publish video. Please try again.");
+    } finally {
+      setIsPublishing(false);
+    }
   };
 
   // Memoize callbacks to prevent infinite loops in child component
@@ -212,7 +222,7 @@ export default function CreateThumbnail({
       <div className="my-6 text-center">
         <h4 className="text-2xl font-bold">Almost Done...</h4>
       </div>
-      
+
       {/* Asset ID is guaranteed to exist when this component renders */}
       {livePeerAssetId && (
         <>
@@ -225,28 +235,28 @@ export default function CreateThumbnail({
                 Fetching video information...
               </p>
             )}
-            
+
             {/* Show detailed error message and help for failed transcoding */}
             {livepeerAssetData?.status?.phase === "failed" && (
-              <div className="my-6 p-6 bg-red-50 border border-red-200 rounded-lg">
-                <h3 className="text-lg font-semibold text-red-700 mb-3">
+              <div className="my-6 p-6 bg-destructive/10 border border-destructive/20 rounded-lg">
+                <h3 className="text-lg font-semibold text-destructive mb-3">
                   ❌ Video Processing Failed
                 </h3>
-                <p className="text-sm text-red-600 mb-4">
+                <p className="text-sm text-destructive/90 mb-4">
                   <strong>Error:</strong> {livepeerAssetData.status.errorMessage}
                 </p>
-                <div className="bg-white p-4 rounded border border-red-100 mb-4">
-                  <p className="text-sm text-gray-700 mb-2">
+                <div className="bg-card p-4 rounded border border-border mb-4">
+                  <p className="text-sm text-foreground mb-2">
                     <strong>How to fix this:</strong>
                   </p>
-                  <ol className="text-sm text-gray-600 space-y-2 list-decimal list-inside">
+                  <ol className="text-sm text-muted-foreground space-y-2 list-decimal list-inside">
                     <li>Convert your video to <strong>H.264</strong> or <strong>H.265</strong> codec</li>
                     <li>Save it in <strong>MP4</strong> container format</li>
-                    <li>Use free tools like <a href="https://handbrake.fr/" target="_blank" rel="noopener noreferrer" className="text-blue-600 underline hover:text-blue-800">HandBrake</a> or FFmpeg</li>
+                    <li>Use free tools like <a href="https://handbrake.fr/" target="_blank" rel="noopener noreferrer" className="text-primary underline hover:text-primary/80">HandBrake</a> or FFmpeg</li>
                     <li>Re-upload your converted video</li>
                   </ol>
-                  <div className="mt-3 p-3 bg-blue-50 rounded border border-blue-200">
-                    <p className="text-xs text-blue-800">
+                  <div className="mt-3 p-3 bg-accent rounded border border-border">
+                    <p className="text-xs text-foreground">
                       💡 <strong>Quick HandBrake settings:</strong> Use the &quot;Fast 1080p30&quot; preset with H.264 codec
                     </p>
                   </div>
@@ -317,13 +327,22 @@ export default function CreateThumbnail({
             </Button>
             <Button
               disabled={
-                !selectedThumbnail || livepeerAssetData?.status?.phase !== "ready"
+                !selectedThumbnail || livepeerAssetData?.status?.phase !== "ready" || isPublishing
               }
               onClick={handleSubmit}
-              className="w-full sm:w-auto min-w-[120px] touch-manipulation"
+              className="w-full sm:w-auto min-w-[120px] touch-manipulation relative"
               style={{ WebkitTapHighlightColor: 'transparent' }}
             >
-              Publish
+              {isPublishing ? (
+                <>
+                  <span className="opacity-0">Publish</span>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  </div>
+                </>
+              ) : (
+                "Publish"
+              )}
             </Button>
           </div>
         </>
