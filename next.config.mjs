@@ -11,12 +11,20 @@ const withPWA = createPWA({
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Turbopack configuration (Next.js 16 uses Turbopack by default)
-  turbopack: {},
+  turbopack: {
+    // Exclude test files and other non-essential files from processing
+    resolveAlias: {
+      // This helps prevent processing of test files
+    },
+  },
   // Optimize memory usage in development
   experimental: {
     // Reduce memory usage by optimizing compilation
     optimizePackageImports: ['@account-kit/react', '@account-kit/core', '@apollo/client', 'lucide-react', 'framer-motion'],
   },
+  // External packages that should not be processed by the bundler
+  // Note: Only externalize if they're causing build issues
+  // serverComponentsExternalPackages: ['thread-stream'],
   // Webpack configuration for WebAssembly support
   webpack: (config, { isServer, webpack }) => {
     // Enable async WebAssembly loading (required for XMTP WASM bindings)
@@ -24,6 +32,42 @@ const nextConfig = {
       ...config.experiments,
       asyncWebAssembly: true,
     };
+
+    // Configure resolve to ignore problematic patterns
+    config.resolve = config.resolve || {};
+    config.resolve.alias = {
+      ...config.resolve.alias,
+    };
+
+    // Tell webpack not to parse test files and other non-essential files
+    config.module = config.module || {};
+    config.module.noParse = config.module.noParse || [];
+    // Add regex patterns for files that shouldn't be parsed
+    if (Array.isArray(config.module.noParse)) {
+      config.module.noParse.push(/node_modules\/thread-stream\/test/);
+      config.module.noParse.push(/node_modules\/thread-stream\/.*\.test\./);
+      config.module.noParse.push(/node_modules\/thread-stream\/.*\.spec\./);
+    }
+
+    // Ignore test files and other non-essential files from node_modules
+    // This prevents Turbopack/webpack from trying to process test files
+    config.plugins.push(
+      new webpack.IgnorePlugin({
+        resourceRegExp: /thread-stream\/test/,
+      })
+    );
+
+    config.plugins.push(
+      new webpack.IgnorePlugin({
+        resourceRegExp: /thread-stream\/.*\.(test|spec)\./,
+      })
+    );
+
+    config.plugins.push(
+      new webpack.IgnorePlugin({
+        resourceRegExp: /thread-stream\/.*\.(md|txt|zip|sh|LICENSE)/,
+      })
+    );
 
     // Handle .wasm files as asset resources
     // Place them in static/media/ to match Next.js default behavior
