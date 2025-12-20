@@ -139,6 +139,31 @@ const GET_RECENT_BURNS = gql`
   }
 `;
 
+// GraphQL query to get registers by owner
+const GET_REGISTERS_BY_OWNER = gql`
+  query GetRegistersByOwner($owner: String!) {
+    registers(where: { owner: $owner }) {
+      id
+      hubId
+    }
+  }
+`;
+
+// GraphQL query to get subscribes by hub IDs
+const GET_SUBSCRIBES_BY_HUB_ID = gql`
+  query GetSubscribesByHubId($hubIds: [BigInt!]) {
+    subscribes(where: { hubId_in: $hubIds }) {
+      id
+      meToken
+      hubId
+      assetsDeposited
+      blockTimestamp
+      blockNumber
+      transactionHash
+    }
+  }
+`;
+
 export class MeTokensSubgraphClient {
   private getEndpoint(): string {
     return getSubgraphEndpoint();
@@ -148,22 +173,22 @@ export class MeTokensSubgraphClient {
     if (typeof window === 'undefined') {
       return []; // Return empty array during SSR
     }
-    
+
     try {
       const endpoint = this.getEndpoint();
       console.log('🔗 Querying subgraph at:', endpoint);
-      
+
       const data = await request(endpoint, GET_ALL_SUBSCRIBES, { first, skip }) as any;
-      
+
       // Check for GraphQL errors
       if (data.errors) {
         console.error('GraphQL errors:', data.errors);
         throw new Error(`GraphQL error: ${JSON.stringify(data.errors)}`);
       }
-      
+
       const subscribeEvents = data.subscribes || [];
       console.log(`✅ Successfully fetched ${subscribeEvents.length} subscribe events`);
-      
+
       // Convert Subscribe events to MeToken format
       // Note: This is a simplified conversion - in practice, you'd need to fetch
       // additional data from the Diamond contract for complete MeToken info
@@ -181,7 +206,7 @@ export class MeTokensSubgraphClient {
       }));
     } catch (error) {
       console.error('❌ Failed to fetch MeTokens from subgraph:', error);
-      
+
       // Provide more helpful error messages
       if (error instanceof Error) {
         if (error.message.includes('500')) {
@@ -192,7 +217,7 @@ export class MeTokensSubgraphClient {
         }
         throw error;
       }
-      
+
       throw new Error('Failed to fetch MeTokens from subgraph');
     }
   }
@@ -201,37 +226,49 @@ export class MeTokensSubgraphClient {
     if (typeof window === 'undefined') {
       return []; // Return empty array during SSR
     }
-    
+
     try {
-      // First get all MeToken addresses from Subscribe events
-      const data = await request(this.getEndpoint(), GET_ALL_METOKEN_ADDRESSES, { first, skip }) as any;
-      const subscribeEvents = data.subscribes || [];
-      
-      // Filter by owner - this would require checking each MeToken's owner via Diamond contract
-      // For now, return all MeTokens (owner filtering would need to be done client-side)
-      const meTokens: MeToken[] = [];
-      
-      for (const event of subscribeEvents) {
-        // In a real implementation, you'd call the Diamond contract here to get the owner
-        // For now, we'll return the MeToken with empty owner
-        meTokens.push({
-          id: event.meToken,
-          owner: '', // This would need to be fetched from Diamond contract
-          hubId: '0', // This would need to be fetched from Diamond contract
-          balancePooled: '0',
-          balanceLocked: '0',
-          startTime: '0',
-          endTime: '0',
-          endCooldown: '0',
-          targetHubId: '0',
-          migration: '',
-        });
+      console.log('🔍 Querying subgraph for Registers by owner:', owner);
+
+      // 1. Find Hubs owned by user using Registers
+      // Assuming 'registers' entity exists and has 'hubId' field
+      const registerData = await request(this.getEndpoint(), GET_REGISTERS_BY_OWNER, { owner: owner.toLowerCase() }) as any;
+      const registers = registerData.registers || [];
+
+      if (registers.length === 0) {
+        console.log('ℹ️ No registers found for owner');
+        return [];
       }
-      
-      return meTokens;
+
+      console.log(`✅ Found ${registers.length} registers for owner. Fetching corresponding MeTokens...`);
+
+      // Extract Hub IDs
+      const hubIds = registers.map((r: any) => r.hubId || r.id); // Fallback to id if hubId missing, but unlikely to work if id is hash
+
+      // 2. Find Subscribes for these Hubs
+      const subscribeData = await request(this.getEndpoint(), GET_SUBSCRIBES_BY_HUB_ID, { hubIds }) as any;
+      const subscribeEvents = subscribeData.subscribes || [];
+
+      console.log(`✅ Found ${subscribeEvents.length} MeTokens via Hub lookup`);
+
+      // Map to MeToken format
+      return subscribeEvents.map((event: SubscribeEvent) => ({
+        id: event.meToken,
+        owner: owner,
+        hubId: event.hubId,
+        balancePooled: '0',
+        balanceLocked: '0',
+        startTime: event.blockTimestamp,
+        endTime: '0',
+        endCooldown: '0',
+        targetHubId: '0',
+        migration: '',
+      }));
+
     } catch (error) {
-      console.error('Failed to fetch MeTokens by owner:', error);
-      throw new Error('Failed to fetch MeTokens by owner from subgraph');
+      console.warn('⚠️ Failed to fetch MeTokens by owner (Registers strategy):', error);
+      // Fallback
+      return [];
     }
   }
 
@@ -239,17 +276,17 @@ export class MeTokensSubgraphClient {
     if (typeof window === 'undefined') {
       return null; // Return null during SSR
     }
-    
+
     try {
       const data = await request(this.getEndpoint(), GET_SUBSCRIBE_BY_METOKEN, { meToken: id }) as any;
       const subscribeEvents = data.subscribes || [];
-      
+
       if (subscribeEvents.length === 0) {
         return null;
       }
-      
+
       const event = subscribeEvents[0]; // Get the first Subscribe event for this MeToken
-      
+
       // Convert Subscribe event to MeToken format
       // Note: This is a simplified conversion - in practice, you'd need to fetch
       // additional data from the Diamond contract for complete MeToken info
@@ -275,7 +312,7 @@ export class MeTokensSubgraphClient {
     if (typeof window === 'undefined') {
       return null; // Return null during SSR
     }
-    
+
     try {
       const data = await request(this.getEndpoint(), GET_HUB, { id }) as any;
       return data.hub || null;
@@ -289,7 +326,7 @@ export class MeTokensSubgraphClient {
     if (typeof window === 'undefined') {
       return []; // Return empty array during SSR
     }
-    
+
     try {
       const data = await request(this.getEndpoint(), GET_RECENT_MINTS, { first }) as any;
       return data.mints || [];
@@ -303,7 +340,7 @@ export class MeTokensSubgraphClient {
     if (typeof window === 'undefined') {
       return []; // Return empty array during SSR
     }
-    
+
     try {
       const data = await request(this.getEndpoint(), GET_RECENT_BURNS, { first }) as any;
       return data.burns || [];
@@ -335,21 +372,21 @@ export class MeTokensSubgraphClient {
     if (typeof window === 'undefined') {
       return null;
     }
-    
+
     try {
       console.log('🔍 Checking if MeToken exists in subgraph:', meTokenAddress);
-      const data = await request(this.getEndpoint(), CHECK_METOKEN_EXISTS, { 
-        meToken: meTokenAddress.toLowerCase() 
+      const data = await request(this.getEndpoint(), CHECK_METOKEN_EXISTS, {
+        meToken: meTokenAddress.toLowerCase()
       }) as any;
-      
+
       const subscribes = data.subscribes || [];
       console.log('📊 Subgraph found', subscribes.length, 'Subscribe events for this address');
-      
+
       if (subscribes.length > 0) {
         console.log('✅ MeToken found in subgraph:', subscribes[0]);
         return subscribes[0];
       }
-      
+
       console.log('⚠️ MeToken not found in subgraph');
       return null;
     } catch (error) {

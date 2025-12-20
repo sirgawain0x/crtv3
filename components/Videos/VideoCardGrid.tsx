@@ -18,14 +18,14 @@ interface VideoCardGridProps {
   orderBy?: 'created_at' | 'views_count' | 'likes_count' | 'updated_at';
 }
 
-const VideoCardGrid: React.FC<VideoCardGridProps> = ({ 
-  searchQuery, 
-  category, 
+const VideoCardGrid: React.FC<VideoCardGridProps> = ({
+  searchQuery,
+  category,
   creatorId,
   orderBy = 'created_at'
 }) => {
   const [playbackSources, setPlaybackSources] = useState<
-    (Omit<VideoAsset, 'id' | 'status' | 'created_at'> & { 
+    (Omit<VideoAsset, 'id' | 'status' | 'created_at'> & {
       detailedSrc: Src[] | null;
       id: string;
       playbackId: string;
@@ -62,8 +62,7 @@ const VideoCardGrid: React.FC<VideoCardGridProps> = ({
         } catch (err) {
           if (retries > 0) {
             console.warn(
-              `Retrying playback source fetch for ${playbackId}. Attempts remaining: ${
-                retries - 1
+              `Retrying playback source fetch for ${playbackId}. Attempts remaining: ${retries - 1
               }`
             );
             await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -88,7 +87,7 @@ const VideoCardGrid: React.FC<VideoCardGridProps> = ({
         search: searchQuery,
       });
 
-      
+
       // Update total (hasMore will be updated after filtering valid videos)
       setTotalAssets(total);
 
@@ -165,18 +164,18 @@ const VideoCardGrid: React.FC<VideoCardGridProps> = ({
 
   const handleNextPage = useCallback(() => {
     if (!hasNextPage || loading) return;
-    
+
     setCurrentPage((prev) => prev + 1);
-    
+
     // Scroll to top
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [hasNextPage, loading]);
 
   const handlePrevPage = useCallback(() => {
     if (currentPage === 1 || loading) return;
-    
+
     setCurrentPage((prev) => prev - 1);
-    
+
     // Scroll to top
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [currentPage, loading]);
@@ -194,7 +193,7 @@ const VideoCardGrid: React.FC<VideoCardGridProps> = ({
   if (loading) {
     return (
       <div>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-1 sm:gap-4 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-y-4 sm:grid-cols-1 sm:gap-4 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           {Array.from({ length: ITEMS_PER_PAGE }).map((_, index) => (
             <VideoCardSkeleton key={index} />
           ))}
@@ -209,7 +208,7 @@ const VideoCardGrid: React.FC<VideoCardGridProps> = ({
         <div className="flex min-h-[200px] items-center justify-center rounded-lg bg-red-50 p-4 text-red-800">
           <p>{error}</p>
         </div>
-        
+
         {/* Show pagination controls if appropriate */}
         {shouldShowPagination() && (
           <Pagination
@@ -234,7 +233,7 @@ const VideoCardGrid: React.FC<VideoCardGridProps> = ({
         <div className="flex min-h-[200px] items-center justify-center rounded-lg bg-gray-50 p-4">
           <p>No videos available at the moment. Please check back later.</p>
         </div>
-        
+
         {/* Show pagination controls if appropriate */}
         {shouldShowPagination() && (
           <Pagination
@@ -255,7 +254,7 @@ const VideoCardGrid: React.FC<VideoCardGridProps> = ({
 
   return (
     <div>
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-1 sm:gap-4 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-y-4 sm:grid-cols-1 sm:gap-4 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
         {playbackSources.map((video) => (
           <VideoCard
             key={video.id}
@@ -264,7 +263,7 @@ const VideoCardGrid: React.FC<VideoCardGridProps> = ({
           />
         ))}
       </div>
-      
+
       {shouldShowPagination() && (
         <Pagination
           hasNextPage={hasNextPage}

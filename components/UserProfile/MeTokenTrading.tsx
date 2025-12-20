@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useMeTokensSupabase, MeTokenData } from '@/lib/hooks/metokens/useMeTokensSupabase';
-import { Loader2, TrendingUp, TrendingDown, AlertCircle, CheckCircle, Lock } from 'lucide-react';
+import { Loader2, TrendingUp, TrendingDown, AlertCircle, CheckCircle, Lock, ExternalLink } from 'lucide-react';
 import { formatEther, parseEther, encodeFunctionData } from 'viem';
 import { useSmartAccountClient, useChain } from '@account-kit/react';
 import { DAI_TOKEN_ADDRESSES, getDaiTokenContract } from '@/lib/contracts/DAIToken';
@@ -17,15 +17,16 @@ import { DaiFundingOptions } from '@/components/wallet/funding/DaiFundingOptions
 
 interface MeTokenTradingProps {
   meToken: MeTokenData;
+  onRefresh?: () => Promise<void>;
 }
 
-export function MeTokenTrading({ meToken }: MeTokenTradingProps) {
+export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
   const [buyAmount, setBuyAmount] = useState('');
   const [sellAmount, setSellAmount] = useState('');
   const [buyPreview, setBuyPreview] = useState('0');
   const [sellPreview, setSellPreview] = useState('0');
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [success, setSuccess] = useState<React.ReactNode | null>(null);
   const [isSubscribed, setIsSubscribed] = useState<boolean | null>(null);
   const [daiAllowance, setDaiAllowance] = useState<bigint>(BigInt(0));
   const [daiBalance, setDaiBalance] = useState<bigint>(BigInt(0));
@@ -33,10 +34,10 @@ export function MeTokenTrading({ meToken }: MeTokenTradingProps) {
 
   const { client } = useSmartAccountClient({});
   const { chain } = useChain();
-  const { 
-    buyMeTokens, 
-    sellMeTokens, 
-    calculateMeTokensMinted, 
+  const {
+    buyMeTokens,
+    sellMeTokens,
+    calculateMeTokensMinted,
     calculateAssetsReturned,
     isPending,
     isConfirming,
@@ -47,7 +48,7 @@ export function MeTokenTrading({ meToken }: MeTokenTradingProps) {
   // Check if MeToken is subscribed using the blockchain utility function
   const checkSubscriptionStatus = useCallback(async () => {
     if (!client || !meToken.address) return;
-    
+
     setIsCheckingSubscription(true);
     try {
       console.log('🔍 Checking real subscription status for trading component:', meToken.address);
@@ -67,17 +68,17 @@ export function MeTokenTrading({ meToken }: MeTokenTradingProps) {
   // Check DAI balance
   const checkDaiBalance = useCallback(async () => {
     if (!client) return;
-    
+
     try {
       const daiContract = getDaiTokenContract('base');
-      
+
       const balance = await client.readContract({
         address: daiContract.address as `0x${string}`,
         abi: erc20Abi,
         functionName: 'balanceOf',
         args: [client.account?.address as `0x${string}`],
       }) as bigint;
-      
+
       setDaiBalance(balance);
     } catch (err) {
       console.error('Failed to check DAI balance:', err);
@@ -88,18 +89,18 @@ export function MeTokenTrading({ meToken }: MeTokenTradingProps) {
   // Check DAI allowance
   const checkDaiAllowance = useCallback(async () => {
     if (!client) return;
-    
+
     try {
       const daiContract = getDaiTokenContract('base');
       const diamondAddress = '0xba5502db2aC2cBff189965e991C07109B14eB3f5'; // Diamond contract address
-      
+
       const allowance = await client.readContract({
         address: daiContract.address as `0x${string}`,
         abi: erc20Abi,
         functionName: 'allowance',
         args: [client.account?.address as `0x${string}`, diamondAddress as `0x${string}`],
       }) as bigint;
-      
+
       setDaiAllowance(allowance);
     } catch (err) {
       console.error('Failed to check DAI allowance:', err);
@@ -110,11 +111,11 @@ export function MeTokenTrading({ meToken }: MeTokenTradingProps) {
   // Approve DAI for Diamond contract
   const approveDai = async (amount: string) => {
     if (!client) return;
-    
+
     try {
       const daiContract = getDaiTokenContract('base');
       const diamondAddress = '0xba5502db2aC2cBff189965e991C07109B14eB3f5';
-      
+
       const result = await client.sendTransaction({
         chain,
         to: daiContract.address as `0x${string}`,
@@ -125,7 +126,7 @@ export function MeTokenTrading({ meToken }: MeTokenTradingProps) {
         }),
         value: BigInt(0),
       });
-      
+
       if (result) {
         await client.waitForTransactionReceipt({ hash: result });
         await checkDaiAllowance(); // Refresh allowance
@@ -189,17 +190,37 @@ export function MeTokenTrading({ meToken }: MeTokenTradingProps) {
 
     try {
       const buyAmountWei = parseEther(buyAmount);
-      
+
       // Check if we need to approve DAI
       if (daiAllowance < buyAmountWei) {
         setSuccess('Approving DAI...');
         await approveDai(buyAmount);
         setSuccess('DAI approved! Proceeding with purchase...');
       }
-      
-      await buyMeTokens(meToken.address, buyAmount);
-      setSuccess('Buy order submitted!');
+
+      const hash = await buyMeTokens(meToken.address, buyAmount);
+      setSuccess(
+        <div className="flex flex-col gap-1">
+          <span>Buy order submitted!</span>
+          {hash && (
+            <a
+              href={`https://basescan.org/tx/${hash}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs underline flex items-center gap-1"
+            >
+              View on Explorer <ExternalLink className="h-3 w-3" />
+            </a>
+          )}
+        </div>
+      );
       setBuyAmount('');
+
+      // Refresh parent data
+      if (onRefresh) {
+        // Add a small delay for RPC sync
+        setTimeout(() => onRefresh(), 2000);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to buy MeTokens');
     }
@@ -220,9 +241,29 @@ export function MeTokenTrading({ meToken }: MeTokenTradingProps) {
     setSuccess(null);
 
     try {
-      await sellMeTokens(meToken.address, sellAmount);
-      setSuccess('Sell order submitted!');
+      const hash = await sellMeTokens(meToken.address, sellAmount);
+      setSuccess(
+        <div className="flex flex-col gap-1">
+          <span>Sell order submitted!</span>
+          {hash && (
+            <a
+              href={`https://basescan.org/tx/${hash}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs underline flex items-center gap-1"
+            >
+              View on Explorer <ExternalLink className="h-3 w-3" />
+            </a>
+          )}
+        </div>
+      );
       setSellAmount('');
+
+      // Refresh parent data
+      if (onRefresh) {
+        // Add a small delay for RPC sync
+        setTimeout(() => onRefresh(), 2000);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to sell MeTokens');
     }
@@ -255,6 +296,7 @@ export function MeTokenTrading({ meToken }: MeTokenTradingProps) {
     return (
       <div className="space-y-4">
         <Card>
+          {/* ... existing card content ... */}
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <span>Trade {meToken.symbol}</span>
@@ -271,7 +313,7 @@ export function MeTokenTrading({ meToken }: MeTokenTradingProps) {
                 Trading is not available for unsubscribed MeTokens. Please subscribe your MeToken to a hub first to enable trading.
               </AlertDescription>
             </Alert>
-            
+
             <div className="text-sm text-muted-foreground space-y-2">
               <p><strong>MeToken Info:</strong></p>
               <ul className="list-disc list-inside space-y-1 ml-4">
@@ -283,12 +325,16 @@ export function MeTokenTrading({ meToken }: MeTokenTradingProps) {
             </div>
           </CardContent>
         </Card>
-        
-        <MeTokenSubscription 
-          meToken={meToken} 
+
+        <MeTokenSubscription
+          meToken={meToken}
           onSubscriptionSuccess={() => {
-            // Refresh subscription status after successful subscription
+            // Refresh subscription status
             checkSubscriptionStatus();
+            // Refresh parent data to update balance
+            if (onRefresh) {
+              setTimeout(() => onRefresh(), 2000);
+            }
           }}
         />
       </div>
@@ -316,7 +362,7 @@ export function MeTokenTrading({ meToken }: MeTokenTradingProps) {
                 Trading requires DAI. Please get DAI first to enable trading.
               </AlertDescription>
             </Alert>
-            
+
             <div className="text-sm text-muted-foreground space-y-2">
               <p><strong>MeToken Info:</strong></p>
               <ul className="list-disc list-inside space-y-1 ml-4">
@@ -328,7 +374,7 @@ export function MeTokenTrading({ meToken }: MeTokenTradingProps) {
             </div>
           </CardContent>
         </Card>
-        
+
         <DaiFundingOptions
           onBalanceUpdate={(newBalance) => {
             setDaiBalance(newBalance);
@@ -430,7 +476,7 @@ export function MeTokenTrading({ meToken }: MeTokenTradingProps) {
               />
             )}
 
-            <Button 
+            <Button
               onClick={handleBuy}
               disabled={isLoading || !buyAmount || parseFloat(buyAmount) <= 0 || daiBalance < parseEther(buyAmount || '0')}
               className="w-full"
@@ -465,7 +511,7 @@ export function MeTokenTrading({ meToken }: MeTokenTradingProps) {
               </p>
             </div>
 
-            <Button 
+            <Button
               onClick={handleSell}
               disabled={isLoading || !sellAmount || parseFloat(sellAmount) <= 0}
               className="w-full"

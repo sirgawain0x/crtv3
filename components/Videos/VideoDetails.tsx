@@ -42,9 +42,10 @@ import { fetchVideoAssetByPlaybackId } from "@/lib/utils/video-assets-client";
 
 type VideoDetailsProps = {
   asset: Asset;
+  videoTitle?: string;
 };
 
-export default function VideoDetails({ asset }: VideoDetailsProps) {
+export default function VideoDetails({ asset, videoTitle }: VideoDetailsProps) {
   const [playbackSources, setPlaybackSources] = useState<Src[] | null>(null);
   const [conditionalProps, setConditionalProps] = useState<any>({});
   const [dbStatus, setDbStatus] = useState<"draft" | "published" | "minted" | "archived" | null>(null);
@@ -61,13 +62,15 @@ export default function VideoDetails({ asset }: VideoDetailsProps) {
       try {
         if (!asset?.playbackId) return;
         const row = await fetchVideoAssetByPlaybackId(asset.playbackId);
-        if (row?.status) {
-          const validStatuses = ["draft", "published", "minted", "archived"] as const;
-          if (validStatuses.includes(row.status as any)) {
-            setDbStatus(row.status as "draft" | "published" | "minted" | "archived");
+        if (row) {
+          if (row?.status) {
+            const validStatuses = ["draft", "published", "minted", "archived"] as const;
+            if (validStatuses.includes(row.status as any)) {
+              setDbStatus(row.status as "draft" | "published" | "minted" | "archived");
+            }
           }
         }
-      } catch {}
+      } catch { }
     };
     fetchPlaybackSources();
     fetchDbStatus();
@@ -330,7 +333,7 @@ export default function VideoDetails({ asset }: VideoDetailsProps) {
       <SubtitlesInitializer assetMetadata={null} />
       <div className="w-full">
         <div className="w-full space-y-6">
-          <h1 className="text-2xl font-bold">{asset?.name}</h1>
+          <h1 className="text-2xl font-bold">{videoTitle || asset?.name}</h1>
           <div className="flex items-center gap-2">
             {asset?.status?.phase && (
               <Badge>{asset.status.phase}</Badge>

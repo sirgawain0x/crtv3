@@ -79,7 +79,7 @@ const DIAMOND_ABI = [
 export function isMeTokenSubscribed(meToken: MeTokenData | MeTokenInfo): boolean {
   const balancePooled = 'balancePooled' in meToken ? meToken.balancePooled : BigInt((meToken as MeTokenInfo).balancePooled || '0');
   const balanceLocked = 'balanceLocked' in meToken ? meToken.balanceLocked : BigInt((meToken as MeTokenInfo).balanceLocked || '0');
-  
+
   return balancePooled > BigInt(0) || balanceLocked > BigInt(0);
 }
 
@@ -104,9 +104,9 @@ export function getMeTokenSubscriptionDetails(meToken: MeTokenData | MeTokenInfo
   const balancePooled = 'balancePooled' in meToken ? meToken.balancePooled : BigInt((meToken as MeTokenInfo).balancePooled || '0');
   const balanceLocked = 'balanceLocked' in meToken ? meToken.balanceLocked : BigInt((meToken as MeTokenInfo).balanceLocked || '0');
   const hubId = 'hubId' in meToken ? meToken.hubId : BigInt((meToken as MeTokenInfo).hubId || '0');
-  
+
   const isSubscribed = balancePooled > BigInt(0) || balanceLocked > BigInt(0);
-  
+
   return {
     isSubscribed,
     status: isSubscribed ? 'subscribed' : 'not-subscribed',
@@ -133,7 +133,7 @@ export function getSubscriptionRequirementsMessage(meToken: MeTokenData | MeToke
   if (isMeTokenSubscribed(meToken)) {
     return 'MeToken is subscribed and ready for trading.';
   }
-  
+
   return 'MeToken must be subscribed to a hub before trading is enabled. Please subscribe your MeToken first.';
 }
 
@@ -155,13 +155,13 @@ export async function checkMeTokenSubscriptionFromBlockchain(meTokenAddress: str
 }> {
   try {
     console.log('🔍 Checking MeToken subscription status for:', meTokenAddress);
-    
+
     // Try multiple approaches to get MeToken info
     const approaches = [
       // Approach 1: Use proper JSON ABI format
       async () => {
         const DIAMOND_ADDRESS = '0xba5502db2aC2cBff189965e991C07109B14eB3f5';
-        
+
         const meTokenInfo = await publicClient.readContract({
           address: DIAMOND_ADDRESS,
           abi: DIAMOND_ABI,
@@ -185,12 +185,12 @@ export async function checkMeTokenSubscriptionFromBlockchain(meTokenAddress: str
           const balanceLocked = meTokenInfo.balanceLocked ?? BigInt(0);
           const startTime = meTokenInfo.startTime ?? BigInt(0);
           const endTime = meTokenInfo.endTime ?? BigInt(0);
-          const endCooldown = meTokenInfo.endCooldown !== undefined && meTokenInfo.endCooldown !== null 
-            ? meTokenInfo.endCooldown 
+          const endCooldown = meTokenInfo.endCooldown !== undefined && meTokenInfo.endCooldown !== null
+            ? meTokenInfo.endCooldown
             : BigInt(0);
           const targetHubId = meTokenInfo.targetHubId ?? BigInt(0);
           const migration = meTokenInfo.migration ?? '0x0000000000000000000000000000000000000000';
-          
+
           return [
             owner,
             hubId,
@@ -203,7 +203,7 @@ export async function checkMeTokenSubscriptionFromBlockchain(meTokenAddress: str
             migration
           ];
         }
-        
+
         // Tuple array format - normalize to 9 elements
         if (Array.isArray(meTokenInfo)) {
           // If array has 8 elements (missing endCooldown), insert it at index 6
@@ -237,11 +237,11 @@ export async function checkMeTokenSubscriptionFromBlockchain(meTokenAddress: str
           // If array has unexpected length, normalize it to 9 elements with fallbacks
           throw new Error(`Unexpected array length: ${meTokenInfo.length}. Expected 8 or 9 elements.`);
         }
-        
+
         // If we get here, the format is unexpected - throw error
         throw new Error(`Unexpected MeToken info format: ${typeof meTokenInfo}`);
       },
-      
+
       // Approach 2: Try getMeTokenInfo with different signature
       async () => {
         const DIAMOND_ADDRESS = '0xba5502db2aC2cBff189965e991C07109B14eB3f5';
@@ -295,11 +295,11 @@ export async function checkMeTokenSubscriptionFromBlockchain(meTokenAddress: str
           // If array has unexpected length, throw error
           throw new Error(`Unexpected array length: ${meTokenInfo.length}. Expected 8 or 9 elements.`);
         }
-        
+
         // If we get here, the format is unexpected - throw error
         throw new Error(`Unexpected MeToken info format: ${typeof meTokenInfo}`);
       },
-      
+
       // Approach 3: Try meTokenInfo function
       async () => {
         const DIAMOND_ADDRESS = '0xba5502db2aC2cBff189965e991C07109B14eB3f5';
@@ -353,31 +353,31 @@ export async function checkMeTokenSubscriptionFromBlockchain(meTokenAddress: str
           // If array has unexpected length, throw error
           throw new Error(`Unexpected array length: ${meTokenInfo.length}. Expected 8 or 9 elements.`);
         }
-        
+
         // If we get here, the format is unexpected - throw error
         throw new Error(`Unexpected MeToken info format: ${typeof meTokenInfo}`);
       },
-      
+
       // Approach 4: Fallback - Check if MeToken exists and try to get basic info
       async () => {
         console.log('🔍 Fallback approach: Checking if MeToken exists...');
-        
+
         // Check if the MeToken contract exists
         const code = await publicClient.getCode({
           address: meTokenAddress as `0x${string}`
         });
-        
+
         if (!code || code === '0x') {
           throw new Error('MeToken contract does not exist');
         }
-        
+
         // Try to get basic ERC20 info as a fallback
         const ERC20_ABI = parseAbi([
           'function name() view returns (string)',
           'function symbol() view returns (string)',
           'function totalSupply() view returns (uint256)'
         ]);
-        
+
         const [name, symbol, totalSupply] = await Promise.all([
           publicClient.readContract({
             address: meTokenAddress as `0x${string}`,
@@ -395,7 +395,7 @@ export async function checkMeTokenSubscriptionFromBlockchain(meTokenAddress: str
             functionName: 'totalSupply'
           })
         ]);
-        
+
         // Return a fallback structure indicating we couldn't get subscription info
         return ['unknown', BigInt(0), BigInt(0), BigInt(0), BigInt(0), BigInt(0), BigInt(0), BigInt(0), 'unknown'];
       }
@@ -436,7 +436,7 @@ export async function checkMeTokenSubscriptionFromBlockchain(meTokenAddress: str
 
     // Check if this is the fallback result (all zeros/unknown values)
     const isFallbackResult = meTokenInfo[1] === BigInt(0) && meTokenInfo[2] === BigInt(0) && meTokenInfo[3] === BigInt(0);
-    
+
     if (isFallbackResult) {
       console.debug('ℹ️ Using fallback result - MeToken exists but subscription info not available via Diamond contract');
       return {
@@ -533,7 +533,7 @@ export async function getMeTokenSubscriptionInfo(meTokenAddress: string): Promis
 
     // Check subscription status from blockchain
     const subscriptionStatus = await checkMeTokenSubscriptionFromBlockchain(meTokenAddress);
-    
+
     // Get basic token info
     let basicInfo;
     try {
@@ -565,5 +565,140 @@ export async function getMeTokenSubscriptionInfo(meTokenAddress: string): Promis
       },
       error: error instanceof Error ? error.message : 'Unknown error occurred'
     };
+  }
+}
+
+/**
+ * Get the vault address for a specific Hub ID
+ * @param hubId - The Hub ID to get the vault for
+ * @returns The vault address
+ */
+export async function getHubVaultAddress(hubId: bigint | number): Promise<string> {
+  try {
+    console.log(`🔍 fetching Vault address for Hub ${hubId}...`);
+
+    // Default to Hub 1 if invalid
+    const cleanHubId = hubId ? BigInt(hubId) : BigInt(1);
+
+    const DIAMOND_ADDRESS = '0xba5502db2aC2cBff189965e991C07109B14eB3f5';
+    // Use JSON ABI syntax matching viem requirements
+    const HUB_ABI = [
+      {
+        "inputs": [
+          {
+            "internalType": "uint256",
+            "name": "hubId",
+            "type": "uint256"
+          }
+        ],
+        "name": "getHubInfo",
+        "outputs": [
+          {
+            "components": [
+              {
+                "internalType": "uint256",
+                "name": "startTime",
+                "type": "uint256"
+              },
+              {
+                "internalType": "uint256",
+                "name": "endTime",
+                "type": "uint256"
+              },
+              {
+                "internalType": "uint256",
+                "name": "endCooldown",
+                "type": "uint256"
+              },
+              {
+                "internalType": "uint256",
+                "name": "refundRatio",
+                "type": "uint256"
+              },
+              {
+                "internalType": "uint256",
+                "name": "targetRefundRatio",
+                "type": "uint256"
+              },
+              {
+                "internalType": "address",
+                "name": "owner",
+                "type": "address"
+              },
+              {
+                "internalType": "address",
+                "name": "vault",
+                "type": "address"
+              },
+              {
+                "internalType": "address",
+                "name": "asset",
+                "type": "address"
+              },
+              {
+                "internalType": "bool",
+                "name": "updating",
+                "type": "bool"
+              },
+              {
+                "internalType": "bool",
+                "name": "reconfigure",
+                "type": "bool"
+              },
+              {
+                "internalType": "bool",
+                "name": "active",
+                "type": "bool"
+              }
+            ],
+            "internalType": "struct LibHub.HubInfo",
+            "name": "hubInfo",
+            "type": "tuple"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      }
+    ] as const;
+
+    const hubInfo = await publicClient.readContract({
+      address: DIAMOND_ADDRESS,
+      abi: HUB_ABI,
+      functionName: 'getHubInfo',
+      args: [cleanHubId]
+    }) as any;
+
+    if (!hubInfo) {
+      throw new Error(`Hub ${cleanHubId} not found`);
+    }
+
+    // Extract vault address from the tuple/struct
+    // The struct structure is:
+    // [startTime, endTime, endCooldown, refundRatio, targetRefundRatio, owner, vault, asset, updating, reconfigure, active]
+    // Vault is at index 6
+
+    let vaultAddress: string;
+
+    if (Array.isArray(hubInfo)) {
+      vaultAddress = hubInfo[6] as string;
+    } else if (typeof hubInfo === 'object' && 'vault' in hubInfo) {
+      vaultAddress = hubInfo.vault as string;
+    } else {
+      console.warn('⚠️ Unexpected hubInfo format:', hubInfo);
+      // Fallback: try to access by index if it's an object behaving like array
+      vaultAddress = (hubInfo as any)[6] || (hubInfo as any).vault;
+    }
+
+    if (!vaultAddress || vaultAddress === '0x0000000000000000000000000000000000000000') {
+      console.warn(`⚠️ Vault address for Hub ${cleanHubId} is zero address`);
+      return '0xba5502db2aC2cBff189965e991C07109B14eB3f5'; // Fallback to Diamond if vault is missing (should verify this behavior)
+    }
+
+    console.log(`✅ Vault address for Hub ${cleanHubId}:`, vaultAddress);
+    return vaultAddress;
+  } catch (error) {
+    console.error(`❌ Failed to get vault address:`, error);
+    // Fallback to Diamond address to assume it's the spender if we fail (safe default for legacy behavior)
+    return '0xba5502db2aC2cBff189965e991C07109B14eB3f5';
   }
 }

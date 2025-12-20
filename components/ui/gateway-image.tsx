@@ -18,16 +18,17 @@ interface GatewayImageProps extends Omit<ImageProps, 'src'> {
  * Uses unoptimized for IPFS images to avoid Next.js optimization timeouts
  * Shows skeleton loader while image loads
  */
-export function GatewayImage({ 
-  src, 
-  fallbackSrc, 
-  onError, 
-  unoptimized, 
+export function GatewayImage({
+  src,
+  fallbackSrc,
+  onError,
+  unoptimized,
   showSkeleton = true,
   className,
   onLoadingComplete,
-  ...props 
+  ...props
 }: GatewayImageProps) {
+  const { fill } = props;
   const [imageSrc, setImageSrc] = useState(() => {
     // Convert failing gateways on initial load
     if (src && convertFailingGateway(src) !== src) {
@@ -61,7 +62,7 @@ export function GatewayImage({
     }
 
     setIsLoading(false);
-    
+
     // Call original onError handler if provided
     if (onError) {
       onError(e);
@@ -77,22 +78,23 @@ export function GatewayImage({
 
   // Use unoptimized for IPFS images to avoid Next.js optimization timeouts
   // IPFS images are already optimized and don't need Next.js processing
-  const shouldUnoptimize = unoptimized !== undefined ? unoptimized : isIpfs;
+  // Blob URLs (local previews) must also be unoptimized as Next.js cannot optimize them
+  const isBlob = imageSrc?.startsWith('blob:');
+  const shouldUnoptimize = unoptimized !== undefined ? unoptimized : (isIpfs || isBlob);
 
   return (
-    <div className="relative">
+    <div className={`relative ${fill ? 'w-full h-full' : ''}`}>
       {showSkeleton && isLoading && (
         <Skeleton className={className || "w-full h-full absolute inset-0"} />
       )}
-      <Image 
-        src={imageSrc} 
-        onError={handleError} 
+      <Image
+        src={imageSrc}
+        onError={handleError}
         onLoadingComplete={handleLoadingComplete}
         unoptimized={shouldUnoptimize}
-        className={`transition-opacity duration-300 ${
-          isLoading ? 'opacity-0' : 'opacity-100'
-        } ${className || ''}`}
-        {...props} 
+        className={`transition-opacity duration-300 ${isLoading ? 'opacity-0' : 'opacity-100'
+          } ${className || ''}`}
+        {...props}
       />
     </div>
   );

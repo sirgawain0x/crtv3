@@ -12,7 +12,7 @@ export async function createVideoAsset(
   // Use service client to bypass RLS since we're using smart account addresses
   // which don't match Supabase JWT authentication
   const supabase = createServiceClient();
-  
+
   const { data: result, error } = await supabase
     .from('video_assets')
     .insert({
@@ -55,7 +55,7 @@ export async function createVideoAsset(
 
 export async function getVideoAssetById(id: number) {
   const supabase = await createClient();
-  
+
   const { data: result, error } = await supabase
     .from('video_assets')
     .select('*')
@@ -71,10 +71,10 @@ export async function getVideoAssetById(id: number) {
 
 export async function getVideoAssetByPlaybackId(playbackId: string) {
   const supabase = await createClient();
-  
+
   const { data: result, error } = await supabase
     .from('video_assets')
-    .select('id, status, thumbnail_url, creator_metoken_id')
+    .select('id, status, thumbnail_url, creator_metoken_id, attributes')
     .eq('playback_id', playbackId)
     .maybeSingle(); // Use maybeSingle() instead of single()
 
@@ -88,13 +88,13 @@ export async function getVideoAssetByPlaybackId(playbackId: string) {
 export async function getVideoAssetByAssetId(assetId: string) {
   // Validate UUID format
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  
+
   if (!uuidRegex.test(assetId)) {
     throw new Error(`Invalid asset ID: ${assetId}. Asset ID must be a valid UUID.`);
   }
-  
+
   const supabase = await createClient();
-  
+
   const { data: result, error } = await supabase
     .from('video_assets')
     .select('*')
@@ -118,7 +118,7 @@ export async function updateVideoAssetMintingStatus(
 ) {
   // Use service client to bypass RLS
   const supabase = createServiceClient();
-  
+
   const { data: result, error } = await supabase
     .from('video_assets')
     .update({
@@ -152,11 +152,12 @@ export async function updateVideoAsset(
     metadata_uri?: string | null;
     requires_metoken?: boolean;
     metoken_price?: number | null;
+    attributes?: Record<string, any> | null;
   }
 ) {
   // Use service client to bypass RLS
   const supabase = createServiceClient();
-  
+
   const updateData: any = {
     thumbnail_url: data.thumbnailUri,
     status: data.status,
@@ -182,7 +183,10 @@ export async function updateVideoAsset(
   if (data.metoken_price !== undefined) {
     updateData.metoken_price = data.metoken_price;
   }
-  
+  if (data.attributes !== undefined) {
+    updateData.attributes = data.attributes;
+  }
+
   const { data: result, error } = await supabase
     .from('video_assets')
     .update(updateData)
@@ -213,12 +217,12 @@ export interface GetPublishedVideoAssetsOptions {
  */
 export async function getPublishedVideoAssets(options: GetPublishedVideoAssetsOptions = {}) {
   const supabase = await createClient();
-  
+
   let query = supabase
     .from('video_assets')
     .select('*', { count: 'exact' })
     .eq('status', 'published');
-  
+
   // Add creator filter if specified (case-insensitive comparison)
   if (options.creatorId) {
     // Normalize to lowercase for consistent matching
@@ -227,38 +231,38 @@ export async function getPublishedVideoAssets(options: GetPublishedVideoAssetsOp
     // Use ilike for case-insensitive matching (handles both checksum and lowercase addresses)
     query = query.ilike('creator_id', normalizedCreatorId);
   }
-  
+
   // Add category filter if specified
   if (options.category) {
     query = query.eq('category', options.category);
   }
-  
+
   // Add full-text search if specified (searches title and description)
   if (options.search && options.search.trim()) {
     // Use text search across title and description
     const searchTerm = options.search.trim();
     query = query.or(`title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`);
   }
-  
+
   // Add ordering
   const orderBy = options.orderBy || 'created_at';
   const order = options.order || 'desc';
   query = query.order(orderBy, { ascending: order === 'asc' });
-  
+
   // Add pagination
   if (options.limit) {
     const offset = options.offset || 0;
     query = query.range(offset, offset + options.limit - 1);
   }
-  
+
   const { data, error, count } = await query;
-  
+
   if (error) {
     throw new Error(`Failed to fetch published videos: ${error.message}`);
   }
-  
-  return { 
-    data: data || [], 
+
+  return {
+    data: data || [],
     total: count || 0,
     hasMore: options.limit ? (count || 0) > (options.offset || 0) + (options.limit || 0) : false
   };
@@ -296,10 +300,10 @@ export async function createMultistreamTarget({
   if (!streamId || !url) {
     return { error: "Missing streamId or URL" };
   }
-  
+
   // Name is optional - provide default if not given
   const targetName = name || `Target ${Date.now()}`;
-  
+
   try {
     const target = await fullLivepeer.stream.addMultistreamTarget(
       {
@@ -309,16 +313,16 @@ export async function createMultistreamTarget({
       },
       streamId
     );
-    
+
     if (!target) {
       return { error: "Failed to create multistream target" };
     }
-    
+
     return { target: { ...target, url, name: targetName } };
   } catch (e: any) {
     console.error("Error creating multistream target:", e);
-    return { 
-      error: e?.message || "Failed to create multistream target" 
+    return {
+      error: e?.message || "Failed to create multistream target"
     };
   }
 }
@@ -345,28 +349,28 @@ export async function listMultistreamTargets(
   if (!streamId) {
     return { error: "Stream ID is required" };
   }
-  
+
   try {
     // Fetch the stream to get its multistream targets
     const stream = await fullLivepeer.stream.get(streamId);
-    
+
     if (!stream || !stream.stream) {
       return { error: "Stream not found" };
     }
-    
+
     // Extract multistream targets from the stream object
     // Livepeer API returns targets in stream.multistream.targets
     const targets = stream.stream.multistream?.targets || [];
-    
+
     if (!Array.isArray(targets)) {
       return { error: "Invalid multistream targets format" };
     }
-    
+
     return { targets: targets as MultistreamTarget[] };
   } catch (e: any) {
     console.error("Error fetching multistream targets:", e);
-    return { 
-      error: e?.message || "Failed to fetch multistream targets" 
+    return {
+      error: e?.message || "Failed to fetch multistream targets"
     };
   }
 }

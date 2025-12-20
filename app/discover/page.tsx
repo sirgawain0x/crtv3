@@ -23,7 +23,7 @@ const AllVideosContent: React.FC = () => {
   const [sortBy, setSortBy] = useState<'created_at' | 'views_count' | 'likes_count' | 'updated_at'>('created_at');
 
   return (
-    <div className="min-h-screen px-4 py-6 sm:p-6">
+    <div className="min-h-screen px-0 py-6 sm:px-6 sm:py-6">
       <div className="mb-8 rounded-lg bg-white dark:bg-gray-800/60 p-8 shadow-md">
         <h1 className="mb-6 text-center text-4xl font-bold text-gray-800 dark:text-gray-200">
           Discover Amazing Music Videos
@@ -103,7 +103,7 @@ const AllVideosContent: React.FC = () => {
       {/* Videos Section */}
       <div>
         <h2 className="my-4 text-2xl font-bold">Discover Videos</h2>
-        
+
         {/* Search and Filter Controls */}
         <VideoSearch
           onSearchChange={setSearchQuery}
@@ -113,9 +113,9 @@ const AllVideosContent: React.FC = () => {
           initialCategory={category}
           initialSort={sortBy}
         />
-        
+
         {/* Video Grid */}
-        <VideoCardGrid 
+        <VideoCardGrid
           searchQuery={searchQuery}
           category={category}
           orderBy={sortBy}
