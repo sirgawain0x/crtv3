@@ -6,10 +6,11 @@ import { convertFailingGateway, getImageUrlWithFallback, isIpfsUrl } from '@/lib
 import { Skeleton } from '@/components/ui/skeleton';
 import type { ImageProps } from 'next/image';
 
-interface GatewayImageProps extends Omit<ImageProps, 'src'> {
+interface GatewayImageProps extends Omit<ImageProps, 'src' | 'onLoad'> {
   src: string;
   fallbackSrc?: string;
   showSkeleton?: boolean;
+  onLoad?: (event: React.SyntheticEvent<HTMLImageElement, Event>) => void;
 }
 
 /**
@@ -25,7 +26,7 @@ export function GatewayImage({
   unoptimized,
   showSkeleton = true,
   className,
-  onLoadingComplete,
+  onLoad: onLoadProp,
   ...props
 }: GatewayImageProps) {
   const { fill } = props;
@@ -69,10 +70,10 @@ export function GatewayImage({
     }
   };
 
-  const handleLoadingComplete = (result: any) => {
+  const handleLoad = (event: React.SyntheticEvent<HTMLImageElement, Event>) => {
     setIsLoading(false);
-    if (onLoadingComplete) {
-      onLoadingComplete(result);
+    if (onLoadProp) {
+      onLoadProp(event);
     }
   };
 
@@ -90,7 +91,7 @@ export function GatewayImage({
       <Image
         src={imageSrc}
         onError={handleError}
-        onLoadingComplete={handleLoadingComplete}
+        onLoad={handleLoad}
         unoptimized={shouldUnoptimize}
         className={`transition-opacity duration-300 ${isLoading ? 'opacity-0' : 'opacity-100'
           } ${className || ''}`}

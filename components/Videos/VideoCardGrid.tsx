@@ -255,11 +255,12 @@ const VideoCardGrid: React.FC<VideoCardGridProps> = ({
   return (
     <div>
       <div className="grid grid-cols-1 gap-y-4 sm:grid-cols-1 sm:gap-4 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-        {playbackSources.map((video) => (
+        {playbackSources.map((video, index) => (
           <VideoCard
             key={video.id}
             asset={video as any} // Type assertion needed due to Asset interface mismatch
             playbackSources={video.detailedSrc}
+            priority={index === 0} // First video gets priority for LCP optimization
           />
         ))}
       </div>

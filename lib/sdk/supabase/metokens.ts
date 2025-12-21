@@ -1,4 +1,5 @@
 import { supabase, MeToken, MeTokenBalance, MeTokenTransaction, CreateMeTokenData, UpdateMeTokenData } from './client';
+import { createServiceClient } from './service';
 
 // Re-export types for external use
 export type { MeToken, MeTokenBalance, MeTokenTransaction, CreateMeTokenData, UpdateMeTokenData };
@@ -176,6 +177,7 @@ export class MeTokenSupabaseService {
   }
 
   // Update user's MeToken balance
+  // Uses service role client to bypass RLS (since app uses Account Kit, not Supabase Auth)
   async updateUserBalance(
     meTokenAddress: string,
     userAddress: string,
@@ -186,7 +188,25 @@ export class MeTokenSupabaseService {
       throw new Error('MeToken not found');
     }
 
-    const { data, error } = await supabase
+    // Use service client to bypass RLS (required for Account Kit authentication)
+    // Service client is only available server-side, so this method should be called from API routes
+    // Wrap in try-catch to gracefully fallback to regular client if service key is not configured
+    // Note: createServiceClient() throws an error if SUPABASE_SERVICE_ROLE_KEY is missing,
+    // so we catch it and fall back to the regular client (which will be subject to RLS)
+    let serviceClient: ReturnType<typeof createServiceClient> | null = null;
+    try {
+      serviceClient = createServiceClient();
+    } catch (error) {
+      // Service role key not configured - fallback to regular client
+      // This will still be subject to RLS, but allows the operation to proceed
+      // The try-catch prevents the function from crashing, and the fallback below ensures
+      // we always have a valid client to use
+      console.warn('Service role key not available, using regular client (may be subject to RLS):', error instanceof Error ? error.message : String(error));
+    }
+    // Fallback to regular client if service client creation failed (serviceClient will be null)
+    const client = serviceClient || supabase;
+
+    const { data, error } = await client
       .from('metoken_balances')
       .upsert({
         metoken_id: meToken.id,
@@ -208,6 +228,7 @@ export class MeTokenSupabaseService {
   }
 
   // Record a MeToken transaction
+  // Uses service role client to bypass RLS (since app uses Account Kit, not Supabase Auth)
   async recordTransaction(transactionData: {
     metoken_id: string;
     user_address: string;
@@ -219,7 +240,25 @@ export class MeTokenSupabaseService {
     video_id?: number;
     playback_id?: string;
   }): Promise<MeTokenTransaction> {
-    const { data, error } = await supabase
+    // Use service client to bypass RLS (required for Account Kit authentication)
+    // Service client is only available server-side, so this method should be called from API routes
+    // Wrap in try-catch to gracefully fallback to regular client if service key is not configured
+    // Note: createServiceClient() throws an error if SUPABASE_SERVICE_ROLE_KEY is missing,
+    // so we catch it and fall back to the regular client (which will be subject to RLS)
+    let serviceClient: ReturnType<typeof createServiceClient> | null = null;
+    try {
+      serviceClient = createServiceClient();
+    } catch (error) {
+      // Service role key not configured - fallback to regular client
+      // This will still be subject to RLS, but allows the operation to proceed
+      // The try-catch prevents the function from crashing, and the fallback below ensures
+      // we always have a valid client to use
+      console.warn('Service role key not available, using regular client (may be subject to RLS):', error instanceof Error ? error.message : String(error));
+    }
+    // Fallback to regular client if service client creation failed (serviceClient will be null)
+    const client = serviceClient || supabase;
+    
+    const { data, error } = await client
       .from('metoken_transactions')
       .insert({
         ...transactionData,

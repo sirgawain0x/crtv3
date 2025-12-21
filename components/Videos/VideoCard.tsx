@@ -30,9 +30,10 @@ import { VideoBuyButton } from "./VideoBuyButton";
 interface VideoCardProps {
   asset: Asset;
   playbackSources: Src[] | null;
+  priority?: boolean; // If true, uses loading="eager" for above-the-fold images (LCP optimization)
 }
 
-const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
+const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources, priority = false }) => {
   const { currentPlayingId, setCurrentPlayingId } = useVideo();
   const [dbStatus, setDbStatus] = useState<"draft" | "published" | "minted" | "archived" | null>(null);
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
@@ -216,6 +217,7 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources }) => {
             assetId={asset?.id}
             title={asset?.name}
             enablePreview={true}
+            priority={priority}
           />
         </Link>
         <CardContent>
