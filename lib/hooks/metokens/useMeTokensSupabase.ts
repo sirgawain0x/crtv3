@@ -179,14 +179,14 @@ export function useMeTokensSupabase(targetAddress?: string) {
         if (infoData) {
           currentInfo = {
             owner: infoData.owner,
-            hubId: BigInt(infoData.hubId),
-            balancePooled: BigInt(infoData.balancePooled),
-            balanceLocked: BigInt(infoData.balanceLocked),
-            startTime: BigInt(infoData.startTime),
-            endTime: BigInt(infoData.endTime),
-            endCooldown: BigInt(infoData.endCooldown),
-            targetHubId: BigInt(infoData.targetHubId),
-            migration: infoData.migration,
+            hubId: BigInt(infoData.hubId || 0),
+            balancePooled: BigInt(infoData.balancePooled || 0),
+            balanceLocked: BigInt(infoData.balanceLocked || 0),
+            startTime: BigInt(infoData.startTime || 0),
+            endTime: BigInt(infoData.endTime || 0),
+            endCooldown: BigInt(infoData.endCooldown || 0),
+            targetHubId: BigInt(infoData.targetHubId || 0),
+            migration: infoData.migration || "0x0000000000000000000000000000000000000000",
           };
         }
       }
@@ -952,26 +952,59 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         hash: operation.hash,
       });
 
-      // Update MeToken data in Supabase
+      // Update MeToken data in Supabase via API route (uses service role client)
       const meToken = await meTokenSupabaseService.getMeTokenByAddress(meTokenAddress);
       if (meToken) {
-        // Record the transaction with video tracking if provided
-        await meTokenSupabaseService.recordTransaction({
-          metoken_id: meToken.id,
-          user_address: address,
-          transaction_type: 'mint',
-          amount: parseFloat(collateralAmount),
-          collateral_amount: parseFloat(collateralAmount),
-          transaction_hash: txHash,
-          block_number: 0,
-          video_id: videoTracking?.video_id,
-          playback_id: videoTracking?.playback_id,
-        });
+        // Record the transaction with video tracking if provided via API route
+        try {
+          const response = await fetch(`/api/metokens/${meTokenAddress}/transactions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              user_address: address,
+              transaction_type: 'mint',
+              amount: parseFloat(collateralAmount),
+              collateral_amount: parseFloat(collateralAmount),
+              transaction_hash: txHash,
+              block_number: 0,
+              video_id: videoTracking?.video_id,
+              playback_id: videoTracking?.playback_id,
+            }),
+          });
 
-        // Update user balance in Supabase
-        const currentBalance = await meTokenSupabaseService.getUserMeTokenBalance(meTokenAddress, address);
-        const newBalance = (currentBalance?.balance || 0) + parseFloat(collateralAmount);
-        await meTokenSupabaseService.updateUserBalance(meTokenAddress, address, newBalance);
+          if (!response.ok) {
+            const error = await response.json();
+            console.error('Failed to record transaction:', error);
+            // Don't throw - transaction succeeded on-chain, just logging failed
+          }
+        } catch (error) {
+          console.error('Error recording transaction:', error);
+          // Don't throw - transaction succeeded on-chain, just logging failed
+        }
+
+        // Update user balance in Supabase via API route (uses service role client)
+        try {
+          const currentBalance = await meTokenSupabaseService.getUserMeTokenBalance(meTokenAddress, address);
+          const newBalance = (currentBalance?.balance || 0) + parseFloat(collateralAmount);
+          
+          const balanceResponse = await fetch(`/api/metokens/${meTokenAddress}/balance`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              user_address: address,
+              balance: newBalance,
+            }),
+          });
+
+          if (!balanceResponse.ok) {
+            const error = await balanceResponse.json();
+            console.error('Failed to update user balance:', error);
+            // Don't throw - transaction succeeded on-chain, just logging failed
+          }
+        } catch (error) {
+          console.error('Error updating user balance:', error);
+          // Don't throw - transaction succeeded on-chain, just logging failed
+        }
       }
 
       // Refresh data
@@ -1064,23 +1097,56 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         hash: operation.hash,
       });
 
-      // Update MeToken data in Supabase
+      // Update MeToken data in Supabase via API route (uses service role client)
       const meToken = await meTokenSupabaseService.getMeTokenByAddress(meTokenAddress);
       if (meToken) {
-        // Record the transaction
-        await meTokenSupabaseService.recordTransaction({
-          metoken_id: meToken.id,
-          user_address: address,
-          transaction_type: 'burn',
-          amount: parseFloat(meTokenAmount),
-          transaction_hash: txHash,
-          block_number: 0,
-        });
+        // Record the transaction via API route
+        try {
+          const response = await fetch(`/api/metokens/${meTokenAddress}/transactions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              user_address: address,
+              transaction_type: 'burn',
+              amount: parseFloat(meTokenAmount),
+              transaction_hash: txHash,
+              block_number: 0,
+            }),
+          });
 
-        // Update user balance in Supabase
-        const currentBalance = await meTokenSupabaseService.getUserMeTokenBalance(meTokenAddress, address);
-        const newBalance = Math.max(0, (currentBalance?.balance || 0) - parseFloat(meTokenAmount));
-        await meTokenSupabaseService.updateUserBalance(meTokenAddress, address, newBalance);
+          if (!response.ok) {
+            const error = await response.json();
+            console.error('Failed to record transaction:', error);
+            // Don't throw - transaction succeeded on-chain, just logging failed
+          }
+        } catch (error) {
+          console.error('Error recording transaction:', error);
+          // Don't throw - transaction succeeded on-chain, just logging failed
+        }
+
+        // Update user balance in Supabase via API route (uses service role client)
+        try {
+          const currentBalance = await meTokenSupabaseService.getUserMeTokenBalance(meTokenAddress, address);
+          const newBalance = Math.max(0, (currentBalance?.balance || 0) - parseFloat(meTokenAmount));
+          
+          const balanceResponse = await fetch(`/api/metokens/${meTokenAddress}/balance`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              user_address: address,
+              balance: newBalance,
+            }),
+          });
+
+          if (!balanceResponse.ok) {
+            const error = await balanceResponse.json();
+            console.error('Failed to update user balance:', error);
+            // Don't throw - transaction succeeded on-chain, just logging failed
+          }
+        } catch (error) {
+          console.error('Error updating user balance:', error);
+          // Don't throw - transaction succeeded on-chain, just logging failed
+        }
       }
 
       // Refresh data

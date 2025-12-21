@@ -17,6 +17,7 @@ interface VideoThumbnailProps {
   onPlay?: () => void;
   className?: string;
   enablePreview?: boolean;
+  priority?: boolean; // If true, uses loading="eager" for above-the-fold images (LCP optimization)
 }
 
 const VideoThumbnail: React.FC<VideoThumbnailProps> = ({
@@ -26,7 +27,8 @@ const VideoThumbnail: React.FC<VideoThumbnailProps> = ({
   assetId,
   onPlay,
   className = "",
-  enablePreview = false
+  enablePreview = false,
+  priority = false
 }) => {
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -98,11 +100,18 @@ const VideoThumbnail: React.FC<VideoThumbnailProps> = ({
   useEffect(() => {
     if (isPreviewing && previewVideoRef.current) {
       const vid = previewVideoRef.current;
+      let isMounted = true;
 
       const handleTimeUpdate = () => {
+        if (!isMounted || !previewVideoRef.current) return;
         if (vid.currentTime >= 30) {
           vid.currentTime = 0;
-          vid.play().catch(e => console.error("Error looping preview:", e));
+          vid.play().catch(e => {
+            // AbortError is expected when video is removed/unmounted
+            if (e instanceof Error && e.name !== 'AbortError') {
+              console.error("Error looping preview:", e);
+            }
+          });
         }
       };
 
@@ -110,15 +119,48 @@ const VideoThumbnail: React.FC<VideoThumbnailProps> = ({
 
       // Attempt to play unmuted
       vid.play().catch(err => {
-        console.warn("Autoplay unmuted failed, trying muted", err);
+        // AbortError is expected when video is removed/unmounted
+        if (err instanceof Error && err.name === 'AbortError') {
+          return;
+        }
+        if (!isMounted || !previewVideoRef.current) return;
+        
+        // NotAllowedError is expected when autoplay is blocked by browser policy
+        // This is normal browser behavior - we handle it by falling back to muted playback
+        const isAutoplayBlocked = err instanceof Error && 
+          (err.name === 'NotAllowedError' || 
+           err.message?.includes('user didn\'t interact') ||
+           err.message?.includes('play() failed'));
+        
+        if (!isAutoplayBlocked) {
+          // Only log unexpected errors
+          console.warn("Autoplay unmuted failed with unexpected error, trying muted", err);
+        }
+        
+        // Fallback to muted playback (browsers allow muted autoplay)
         vid.muted = true;
         setIsMuted(true);
-        vid.play().catch(e => console.error("Autoplay muted failed too", e));
+        vid.play().catch(e => {
+          // AbortError is expected when video is removed/unmounted
+          // NotAllowedError on muted playback is also possible but less common
+          if (e instanceof Error && e.name !== 'AbortError' && e.name !== 'NotAllowedError') {
+            console.error("Autoplay muted failed with unexpected error", e);
+          }
+        });
       });
 
       return () => {
-        vid.removeEventListener('timeupdate', handleTimeUpdate);
-        vid.pause();
+        isMounted = false;
+        if (previewVideoRef.current) {
+          previewVideoRef.current.removeEventListener('timeupdate', handleTimeUpdate);
+          // Pause the video (pause() is synchronous and doesn't throw)
+          try {
+            previewVideoRef.current.pause();
+          } catch (e) {
+            // Ignore any errors - video may already be removed
+            // This is unlikely since pause() is synchronous, but we handle it just in case
+          }
+        }
       };
     }
   }, [isPreviewing]);
@@ -264,10 +306,11 @@ const VideoThumbnail: React.FC<VideoThumbnailProps> = ({
               fill
               className={`object-cover rounded-lg transition-opacity duration-300 ${imageLoading ? 'opacity-0' : 'opacity-100'
                 }`}
-              loading="lazy"
+              loading={priority ? "eager" : "lazy"}
+              priority={priority}
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
               unoptimized={thumbnailUrl ? isIpfsUrl(thumbnailUrl) : false}
-              onLoadingComplete={() => setImageLoading(false)}
+              onLoad={() => setImageLoading(false)}
               onError={() => {
                 setImageLoading(false);
                 setThumbnailUrl(null);

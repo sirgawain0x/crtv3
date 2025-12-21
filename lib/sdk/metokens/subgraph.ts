@@ -139,16 +139,6 @@ const GET_RECENT_BURNS = gql`
   }
 `;
 
-// GraphQL query to get registers by owner
-const GET_REGISTERS_BY_OWNER = gql`
-  query GetRegistersByOwner($owner: String!) {
-    registers(where: { owner: $owner }) {
-      id
-      hubId
-    }
-  }
-`;
-
 // GraphQL query to get subscribes by hub IDs
 const GET_SUBSCRIBES_BY_HUB_ID = gql`
   query GetSubscribesByHubId($hubIds: [BigInt!]) {
@@ -227,49 +217,14 @@ export class MeTokensSubgraphClient {
       return []; // Return empty array during SSR
     }
 
-    try {
-      console.log('🔍 Querying subgraph for Registers by owner:', owner);
-
-      // 1. Find Hubs owned by user using Registers
-      // Assuming 'registers' entity exists and has 'hubId' field
-      const registerData = await request(this.getEndpoint(), GET_REGISTERS_BY_OWNER, { owner: owner.toLowerCase() }) as any;
-      const registers = registerData.registers || [];
-
-      if (registers.length === 0) {
-        console.log('ℹ️ No registers found for owner');
-        return [];
-      }
-
-      console.log(`✅ Found ${registers.length} registers for owner. Fetching corresponding MeTokens...`);
-
-      // Extract Hub IDs
-      const hubIds = registers.map((r: any) => r.hubId || r.id); // Fallback to id if hubId missing, but unlikely to work if id is hash
-
-      // 2. Find Subscribes for these Hubs
-      const subscribeData = await request(this.getEndpoint(), GET_SUBSCRIBES_BY_HUB_ID, { hubIds }) as any;
-      const subscribeEvents = subscribeData.subscribes || [];
-
-      console.log(`✅ Found ${subscribeEvents.length} MeTokens via Hub lookup`);
-
-      // Map to MeToken format
-      return subscribeEvents.map((event: SubscribeEvent) => ({
-        id: event.meToken,
-        owner: owner,
-        hubId: event.hubId,
-        balancePooled: '0',
-        balanceLocked: '0',
-        startTime: event.blockTimestamp,
-        endTime: '0',
-        endCooldown: '0',
-        targetHubId: '0',
-        migration: '',
-      }));
-
-    } catch (error) {
-      console.warn('⚠️ Failed to fetch MeTokens by owner (Registers strategy):', error);
-      // Fallback
-      return [];
-    }
+    // Note: The subgraph doesn't support querying hubs or hub entities,
+    // and subscribes don't contain owner information directly.
+    // Owner information is stored on the Hub entity, which we cannot query.
+    // Therefore, we cannot determine MeToken ownership through the subgraph alone.
+    // This function returns an empty array, and the caller should rely on
+    // Supabase or direct contract queries for owner-based filtering.
+    console.log('⚠️ Subgraph does not support querying MeTokens by owner (hub queries unavailable). Returning empty array. Use Supabase or contract queries instead.');
+    return [];
   }
 
   async getMeToken(id: string): Promise<MeToken | null> {
@@ -317,8 +272,9 @@ export class MeTokensSubgraphClient {
       const data = await request(this.getEndpoint(), GET_HUB, { id }) as any;
       return data.hub || null;
     } catch (error) {
-      console.error('Failed to fetch Hub:', error);
-      throw new Error('Failed to fetch Hub from subgraph');
+      // The subgraph doesn't support hub queries - return null gracefully
+      console.warn(`⚠️ Subgraph does not support hub queries (hub ${id}):`, error instanceof Error ? error.message : String(error));
+      return null;
     }
   }
 
@@ -356,7 +312,11 @@ export class MeTokensSubgraphClient {
       if (!meToken) return null;
 
       const hub = await this.getHub(meToken.hubId);
-      if (!hub) return null;
+      // Return null if hub cannot be fetched (subgraph doesn't support hub queries)
+      if (!hub) {
+        console.warn(`⚠️ Cannot fetch hub ${meToken.hubId} for MeToken ${id} - subgraph doesn't support hub queries`);
+        return null;
+      }
 
       return {
         ...meToken,
@@ -364,7 +324,7 @@ export class MeTokensSubgraphClient {
       };
     } catch (error) {
       console.error('Failed to fetch MeToken with Hub:', error);
-      throw new Error('Failed to fetch MeToken with Hub from subgraph');
+      return null; // Return null instead of throwing to allow fallback to other data sources
     }
   }
 
