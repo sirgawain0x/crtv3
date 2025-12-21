@@ -5,6 +5,7 @@ import { encodeFunctionData, parseEther } from 'viem';
 import { useToast } from '@/components/ui/use-toast';
 import { METOKEN_FACTORY_ABI, METOKEN_FACTORY_ADDRESSES } from '@/lib/contracts/MeTokenFactory';
 import { METOKEN_ABI } from '@/lib/contracts/MeToken';
+import { parseBundlerError } from '@/lib/utils/bundlerErrorParser';
 
 // Diamond Address (Hardcoded for Base as per previous files)
 const DIAMOND = '0xba5502db2aC2cBff189965e991C07109B14eB3f5';
@@ -147,9 +148,19 @@ export function useContentCoin() {
                 args: [vaultAddress as `0x${string}`, amountWei]
             });
 
-            await client.sendUserOperation({
+            console.log('Sending approve user operation...');
+            const approveOp = await client.sendUserOperation({
                 uo: { target: creatorTokenAddress as `0x${string}`, data: approveData, value: BigInt(0) }
             });
+
+            console.log('Approve user operation sent, waiting for confirmation...', approveOp.hash);
+            // Wait for approve transaction to complete before sending mint
+            // This ensures the nonce is properly incremented and prevents AA25 errors
+            await client.waitForUserOperationTransaction({ hash: approveOp.hash });
+            console.log('Approve transaction confirmed, proceeding with mint...');
+
+            // Small delay to ensure state propagation across RPC nodes
+            await new Promise(resolve => setTimeout(resolve, 2000));
 
             // B. Mint ContentCoin (via Diamond)
             const mintData = encodeFunctionData({
@@ -158,12 +169,14 @@ export function useContentCoin() {
                 args: [contentCoinAddress as `0x${string}`, amountWei, client.account.address]
             });
 
+            console.log('Sending mint user operation...');
             const mintOp = await client.sendUserOperation({
                 uo: { target: DIAMOND as `0x${string}`, data: mintData, value: BigInt(0) }
             });
 
             setIsPending(false);
             setIsConfirming(true);
+            console.log('Mint user operation sent, waiting for confirmation...', mintOp.hash);
             const tx = await client.waitForUserOperationTransaction({ hash: mintOp.hash });
             setIsConfirming(false);
 
@@ -172,8 +185,24 @@ export function useContentCoin() {
         } catch (e) {
             setIsPending(false);
             setIsConfirming(false);
-            console.error(e);
-            toast({ title: "Error", description: "Buy failed", variant: "destructive" });
+            console.error('Buy Content Coin error:', e);
+            
+            // Parse error for better user feedback
+            const error = e instanceof Error ? e : new Error(String(e));
+            const parsedError = parseBundlerError(error);
+            
+            let errorMessage = parsedError.message;
+            if (parsedError.code === 'AA25') {
+                errorMessage = 'Transaction nonce mismatch. Please try again in a moment.';
+            } else if (parsedError.suggestion) {
+                errorMessage = `${parsedError.message}. ${parsedError.suggestion}`;
+            }
+            
+            toast({ 
+                title: "Error", 
+                description: errorMessage || "Buy failed. Please try again.", 
+                variant: "destructive" 
+            });
             throw e;
         }
     };

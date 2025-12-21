@@ -257,7 +257,7 @@ export function TopVideos() {
       <div className="relative mx-auto w-full max-w-7xl">
         <Carousel className="min-w-sm mx-auto w-full max-w-7xl">
           <CarouselContent className="-ml-1">
-            {videos.map((video) => (
+            {videos.map((video, index) => (
               <CarouselItem
                 key={video.asset_id}
                 className="basis-full pl-0 sm:basis-1/2 sm:pl-1 md:basis-1/2 lg:basis-1/3 xl:basis-1/3"
@@ -272,6 +272,7 @@ export function TopVideos() {
                           title={video.title}
                           assetId={video.asset_id}
                           className="!aspect-auto h-full w-full"
+                          priority={index === 0} // First video gets priority for LCP optimization
                         />
                       ) : (
                         <div className="flex h-full w-full items-center justify-center bg-gray-900 text-white">
