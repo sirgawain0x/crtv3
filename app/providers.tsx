@@ -12,6 +12,7 @@ import { ApolloNextAppProvider } from "@apollo/client-integration-nextjs";
 import { makeClient } from "./apolloWrapper";
 import { RadixProvider } from "@/components/ui/radix-provider";
 import { cleanupExistingIframes } from "@/components/IframeCleanup";
+import { WagmiProvider } from "wagmi";
 // Import dev warning suppression (only active in development)
 import "@/lib/utils/suppressDevWarnings";
 // Import WASM patch early to fix XMTP WASM loading in Web Workers
@@ -65,12 +66,14 @@ export const Providers = (
                 queryClient={queryClient}
                 initialState={props.initialState}
               >
-                <RadixProvider>
-                  <VideoProvider>
-                    {props.children}
-                    <Toaster position="top-right" richColors />
-                  </VideoProvider>
-                </RadixProvider>
+                <WagmiProvider config={config}>
+                  <RadixProvider>
+                    <VideoProvider>
+                      {props.children}
+                      <Toaster position="top-right" richColors />
+                    </VideoProvider>
+                  </RadixProvider>
+                </WagmiProvider>
               </AlchemyAccountProvider>
             </ApolloNextAppProvider>
           </ThemeProvider>
