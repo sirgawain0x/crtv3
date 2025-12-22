@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useSmartAccountClient } from '@account-kit/react';
-import { usePublicClient } from 'wagmi';
-import { encodeFunctionData, parseEther } from 'viem';
+import { createPublicClient, encodeFunctionData, parseEther } from 'viem';
+import { alchemy, base } from '@account-kit/infra';
 import { useToast } from '@/components/ui/use-toast';
 import { METOKEN_FACTORY_ABI, METOKEN_FACTORY_ADDRESSES } from '@/lib/contracts/MeTokenFactory';
 import { METOKEN_ABI } from '@/lib/contracts/MeToken';
@@ -13,10 +13,20 @@ const DIAMOND = '0xba5502db2aC2cBff189965e991C07109B14eB3f5';
 
 export function useContentCoin() {
     const { client } = useSmartAccountClient({});
-    const publicClient = usePublicClient();
     const { toast } = useToast();
     const [isPending, setIsPending] = useState(false);
     const [isConfirming, setIsConfirming] = useState(false);
+
+    // Create a public client directly using viem (no Wagmi dependency)
+    // Uses the same transport pattern as the Account Kit config
+    const publicClient = useMemo(() => {
+        return createPublicClient({
+            chain: base,
+            transport: alchemy({
+                apiKey: process.env.NEXT_PUBLIC_ALCHEMY_API_KEY as string,
+            }),
+        });
+    }, []);
 
     // 1. Deploy & Register Logic
     const deployContentCoin = async (
