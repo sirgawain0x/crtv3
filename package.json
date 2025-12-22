@@ -54,6 +54,7 @@
     "@snapshot-labs/snapshot.js": "^0.12.61",
     "@stackso/js-core": "^0.5.11",
     "@storacha/client": "^1.8.14",
+    "@story-protocol/core-sdk": "^1.4.2",
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.57.4",
     "@tailwindcss/typography": "^0.5.19",

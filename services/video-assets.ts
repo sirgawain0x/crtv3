@@ -42,6 +42,12 @@ export async function createVideoAsset(
       requires_metoken: data.requires_metoken || false,
       metoken_price: data.metoken_price || null,
       creator_metoken_id: data.creator_metoken_id || null,
+      story_ip_registered: data.story_ip_registered || false,
+      story_ip_id: data.story_ip_id || null,
+      story_ip_registration_tx: data.story_ip_registration_tx || null,
+      story_ip_registered_at: data.story_ip_registered_at || null,
+      story_license_terms_id: data.story_license_terms_id || null,
+      story_license_template_id: data.story_license_template_id || null,
     })
     .select()
     .single();
@@ -141,6 +147,44 @@ export async function updateVideoAssetMintingStatus(
   return result;
 }
 
+/**
+ * Update Story Protocol IP registration status for a video asset
+ */
+export async function updateVideoAssetStoryIPStatus(
+  id: number,
+  storyData: {
+    story_ip_registered: boolean;
+    story_ip_id: string;
+    story_ip_registration_tx: string;
+    story_license_terms_id?: string | null;
+    story_license_template_id?: string | null;
+  }
+) {
+  // Use service client to bypass RLS
+  const supabase = createServiceClient();
+
+  const { data: result, error } = await supabase
+    .from('video_assets')
+    .update({
+      story_ip_registered: storyData.story_ip_registered,
+      story_ip_id: storyData.story_ip_id,
+      story_ip_registration_tx: storyData.story_ip_registration_tx,
+      story_ip_registered_at: new Date().toISOString(),
+      story_license_terms_id: storyData.story_license_terms_id || null,
+      story_license_template_id: storyData.story_license_template_id || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to update Story Protocol IP status: ${error.message}`);
+  }
+
+  return result;
+}
+
 export async function updateVideoAsset(
   id: number,
   data: {
@@ -157,6 +201,12 @@ export async function updateVideoAsset(
     requires_metoken?: boolean;
     metoken_price?: number | null;
     attributes?: Record<string, any> | null;
+    story_ip_registered?: boolean;
+    story_ip_id?: string | null;
+    story_ip_registration_tx?: string | null;
+    story_ip_registered_at?: Date | null;
+    story_license_terms_id?: string | null;
+    story_license_template_id?: string | null;
   }
 ) {
   // Use service client to bypass RLS
@@ -205,6 +255,24 @@ export async function updateVideoAsset(
   }
   if (data.attributes !== undefined) {
     updateData.attributes = data.attributes;
+  }
+  if (data.story_ip_registered !== undefined) {
+    updateData.story_ip_registered = data.story_ip_registered;
+  }
+  if (data.story_ip_id !== undefined) {
+    updateData.story_ip_id = data.story_ip_id;
+  }
+  if (data.story_ip_registration_tx !== undefined) {
+    updateData.story_ip_registration_tx = data.story_ip_registration_tx;
+  }
+  if (data.story_ip_registered_at !== undefined) {
+    updateData.story_ip_registered_at = data.story_ip_registered_at?.toISOString();
+  }
+  if (data.story_license_terms_id !== undefined) {
+    updateData.story_license_terms_id = data.story_license_terms_id;
+  }
+  if (data.story_license_template_id !== undefined) {
+    updateData.story_license_template_id = data.story_license_template_id;
   }
 
   const { data: result, error } = await supabase

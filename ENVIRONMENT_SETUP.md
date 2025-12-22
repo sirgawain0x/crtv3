@@ -110,7 +110,41 @@ Your Coinbase Developer Platform (CDP) Secret API Key for JWT authentication.
 - [CDP API Key Authentication](https://docs.cdp.coinbase.com/api-reference/v2/authentication)
 - [Session Token Authentication](https://docs.cdp.coinbase.com/onramp-&-offramp/session-token-authentication)
 
-### 6. Optional Configuration
+### 6. Story Protocol Configuration (Optional)
+
+#### `NEXT_PUBLIC_STORY_RPC_URL`
+RPC URL for Story Protocol network. Defaults to testnet RPC if not provided.
+
+**Default values:**
+- Testnet (Aeneid): `https://rpc.aeneid.story.foundation`
+- Mainnet: `https://rpc.story.foundation` (when mainnet is available)
+
+#### `NEXT_PUBLIC_STORY_NETWORK`
+Story Protocol network to use. Set to `"testnet"` for Aeneid testnet or `"mainnet"` for mainnet.
+
+**Default:** `"testnet"`
+
+**How to configure:**
+1. For testnet (recommended for development):
+   ```bash
+   NEXT_PUBLIC_STORY_NETWORK=testnet
+   NEXT_PUBLIC_STORY_RPC_URL=https://rpc.aeneid.story.foundation
+   ```
+
+2. For mainnet (production):
+   ```bash
+   NEXT_PUBLIC_STORY_NETWORK=mainnet
+   NEXT_PUBLIC_STORY_RPC_URL=https://rpc.story.foundation
+   ```
+
+**Note:** Story Protocol IP registration requires users to have an NFT minted for their video before registration. The registration process uses the user's connected wallet (via Account Kit) to sign transactions.
+
+**Documentation:**
+- [Story Protocol Documentation](https://docs.story.foundation/)
+- [Story Protocol SDK](https://github.com/storyprotocol/core-sdk)
+- [Aeneid Testnet Guide](https://docs.story.foundation/developer-guides/testnet-setup)
+
+### 7. Optional Configuration
 
 #### `NEXT_PUBLIC_SUPPORT_URL`
 Your application's support URL.
@@ -144,6 +178,15 @@ SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 # Coinbase CDP Configuration (Onramp/Offramp)
 COINBASE_CDP_API_KEY_ID=your_cdp_api_key_id
 COINBASE_CDP_API_KEY_SECRET=your_cdp_api_key_secret
+
+# Story Protocol Configuration (Optional - for IP Asset registration)
+NEXT_PUBLIC_STORY_NETWORK=testnet
+NEXT_PUBLIC_STORY_RPC_URL=https://rpc.aeneid.story.foundation
+
+# NFT Contract Configuration (Optional - for NFT minting in upload flow)
+# Set this to your ERC-721 NFT contract address for video asset minting
+# This is required if you want to enable NFT minting in the upload flow
+NEXT_PUBLIC_NFT_CONTRACT_ADDRESS=0x0000000000000000000000000000000000000000
 
 # Optional
 NEXT_PUBLIC_SUPPORT_URL=https://your-support-url.com

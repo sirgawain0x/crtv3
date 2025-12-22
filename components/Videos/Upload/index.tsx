@@ -115,6 +115,12 @@ const HookMultiStepForm = () => {
         creator_metoken_id: creatorMeTokenId,
         subtitles_uri: null,
         subtitles: null,
+        story_ip_registered: false,
+        story_ip_id: null,
+        story_ip_registration_tx: null,
+        story_ip_registered_at: null,
+        story_license_terms_id: null,
+        story_license_template_id: null,
       });
 
       console.log('✅ Video asset created in DB:', dbAsset);
@@ -147,11 +153,22 @@ const HookMultiStepForm = () => {
         <CreateThumbnailWrapper
           livePeerAssetId={livepeerAsset.id}
           thumbnailUri={thumbnailUri}
+          videoAssetId={videoAsset?.id}
+          creatorAddress={address || undefined}
           onComplete={async (data: {
             thumbnailUri: string;
             meTokenConfig?: {
               requireMeToken: boolean;
               priceInMeToken: number;
+            };
+            storyConfig?: {
+              registerIP: boolean;
+              licenseTerms?: any;
+            };
+            nftMintResult?: {
+              tokenId: string;
+              contractAddress: string;
+              txHash: string;
             };
           }) => {
             setThumbnailUri(data.thumbnailUri);
@@ -170,7 +187,7 @@ const HookMultiStepForm = () => {
               const latestAsset = await getLivepeerAsset(livepeerAsset.id);
 
               // --- PUBLISH LOGIC ---
-              await updateVideoAsset(videoAsset?.id as number, {
+              const updatedAsset = await updateVideoAsset(videoAsset?.id as number, {
                 thumbnailUri: data.thumbnailUri,
                 status: "published",
                 metadata_uri: latestAsset?.storage?.ipfs?.nftMetadata?.url || null,
@@ -179,6 +196,44 @@ const HookMultiStepForm = () => {
               });
 
               toast.success("Video uploaded and published successfully!");
+
+              // --- STORY PROTOCOL IP REGISTRATION ---
+              if (data.storyConfig?.registerIP && address) {
+                // Check if video has an NFT before attempting registration
+                if (!updatedAsset.contract_address || !updatedAsset.token_id) {
+                  toast.warning("Story Protocol registration skipped", {
+                    description: "Video must have an NFT minted before IP registration. Please mint an NFT for this video first, then register it on Story Protocol.",
+                    duration: 8000,
+                  });
+                  console.warn("Story Protocol registration skipped: Video does not have an NFT minted");
+                } else {
+                  try {
+                    toast.info("Registering IP on Story Protocol...");
+                    const { registerVideoAsIPAsset } = await import("@/services/story-protocol");
+                    
+                    const registrationResult = await registerVideoAsIPAsset(
+                      updatedAsset as VideoAsset,
+                      address as `0x${string}`,
+                      {
+                        registerIP: true,
+                        licenseTerms: data.storyConfig.licenseTerms,
+                        metadataURI: latestAsset?.storage?.ipfs?.nftMetadata?.url || undefined,
+                      }
+                    );
+
+                    if (registrationResult.success) {
+                      toast.success("IP registered on Story Protocol successfully!", {
+                        description: registrationResult.ipId ? `IP ID: ${registrationResult.ipId}` : undefined,
+                      });
+                    } else {
+                      toast.error(`Story Protocol registration failed: ${registrationResult.error}`);
+                    }
+                  } catch (storyError) {
+                    console.error("Story Protocol registration error:", storyError);
+                    toast.error("Failed to register IP on Story Protocol. You can register it later.");
+                  }
+                }
+              }
 
               // --- AUTO DEPLOY CONTENT COIN ---
               if (creatorMeToken && address && metadata?.ticker) {

@@ -19,11 +19,23 @@ import { Progress } from "@/components/ui/progress";
 type CreateThumbnailProps = {
   livePeerAssetId: string | undefined;
   thumbnailUri?: string;
+  videoAssetId?: number;
+  creatorAddress?: string;
+  metadataURI?: string;
   onComplete: (data: {
     thumbnailUri: string;
     meTokenConfig?: {
       requireMeToken: boolean;
       priceInMeToken: number;
+    };
+    storyConfig?: {
+      registerIP: boolean;
+      licenseTerms?: any;
+    };
+    nftMintResult?: {
+      tokenId: string;
+      contractAddress: string;
+      txHash: string;
     };
   }) => Promise<void> | void;
 };
@@ -31,6 +43,9 @@ type CreateThumbnailProps = {
 export default function CreateThumbnail({
   livePeerAssetId,
   thumbnailUri,
+  videoAssetId,
+  creatorAddress,
+  metadataURI,
   onComplete,
 }: CreateThumbnailProps) {
   const router = useRouter();
@@ -42,6 +57,15 @@ export default function CreateThumbnail({
     requireMeToken: boolean;
     priceInMeToken: number;
   } | undefined>(undefined);
+  const [storyConfig, setStoryConfig] = useState<{
+    registerIP: boolean;
+    licenseTerms?: any;
+  } | undefined>(undefined);
+  const [nftMintResult, setNftMintResult] = useState<{
+    tokenId: string;
+    contractAddress: string;
+    txHash: string;
+  } | null>(null);
 
   const [isPublishing, setIsPublishing] = useState(false);
 
@@ -196,6 +220,8 @@ export default function CreateThumbnail({
       await onComplete({
         thumbnailUri: selectedThumbnail,
         meTokenConfig: meTokenConfig,
+        storyConfig: storyConfig,
+        nftMintResult: nftMintResult || undefined,
       });
     } catch (error) {
       console.error("Publication failed:", error);
@@ -215,6 +241,13 @@ export default function CreateThumbnail({
     priceInMeToken: number;
   }) => {
     setMeTokenConfig(config);
+  }, []);
+
+  const handleStoryConfigChange = useCallback((config: {
+    registerIP: boolean;
+    licenseTerms?: any;
+  }) => {
+    setStoryConfig(config);
   }, []);
 
   return (
@@ -310,8 +343,19 @@ export default function CreateThumbnail({
             <CreateThumbnailForm
               livepeerAssetId={livePeerAssetId}
               assetReady={livepeerAssetData?.status?.phase === "ready"}
+              videoAssetId={videoAssetId}
+              creatorAddress={creatorAddress as `0x${string}` | undefined}
+              metadataURI={metadataURI || livepeerAssetData?.storage?.ipfs?.nftMetadata?.url}
               onSelectThumbnailImages={handleSelectThumbnailImages}
               onMeTokenConfigChange={handleMeTokenConfigChange}
+              onStoryConfigChange={handleStoryConfigChange}
+              onNFTMinted={(result) => {
+                setNftMintResult({
+                  tokenId: result.tokenId,
+                  contractAddress: result.contractAddress,
+                  txHash: result.txHash,
+                });
+              }}
             />
           </div>
 
