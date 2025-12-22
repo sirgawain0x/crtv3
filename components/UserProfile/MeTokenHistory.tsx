@@ -95,7 +95,9 @@ export function MeTokenHistory({ meToken }: MeTokenHistoryProps) {
                                                         {tx.transaction_type === 'mint' && <ArrowDownLeft className="h-4 w-4 text-green-500" />}
                                                         {tx.transaction_type === 'burn' && <ArrowUpRight className="h-4 w-4 text-red-500" />}
                                                         {tx.transaction_type === 'create' && <Plus className="h-4 w-4 text-blue-500" />}
-                                                        <span className="capitalize">{tx.transaction_type}</span>
+                                                        <span>
+                                                            {tx.transaction_type === 'mint' ? 'Buy' : tx.transaction_type.charAt(0).toUpperCase() + tx.transaction_type.slice(1)}
+                                                        </span>
                                                     </div>
                                                 </td>
                                                 <td className="p-4 align-middle">
@@ -107,7 +109,7 @@ export function MeTokenHistory({ meToken }: MeTokenHistoryProps) {
                                                 </td>
                                                 <td className="p-4 align-middle">
                                                     {tx.collateral_amount ? (
-                                                        <span>{tx.collateral_amount.toFixed(2)} DAI</span>
+                                                        <span>{tx.collateral_amount.toFixed(3)} DAI</span>
                                                     ) : (
                                                         <span className="text-muted-foreground">-</span>
                                                     )}

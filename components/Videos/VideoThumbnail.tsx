@@ -18,6 +18,7 @@ interface VideoThumbnailProps {
   className?: string;
   enablePreview?: boolean;
   priority?: boolean; // If true, uses loading="eager" for above-the-fold images (LCP optimization)
+  hidePlayOverlay?: boolean; // If true, hides the play button overlay
 }
 
 const VideoThumbnail: React.FC<VideoThumbnailProps> = ({
@@ -28,7 +29,8 @@ const VideoThumbnail: React.FC<VideoThumbnailProps> = ({
   onPlay,
   className = "",
   enablePreview = false,
-  priority = false
+  priority = false,
+  hidePlayOverlay = false
 }) => {
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -52,7 +54,7 @@ const VideoThumbnail: React.FC<VideoThumbnailProps> = ({
 
         // First, try to get thumbnail from database
         const dbAsset = await fetchVideoAssetByPlaybackId(playbackId);
-        if (dbAsset && (dbAsset as any).thumbnail_url) {
+        if (dbAsset && (dbAsset as any).thumbnail_url && (dbAsset as any).thumbnail_url.trim() !== "") {
           console.log('Found database thumbnail:', (dbAsset as any).thumbnail_url);
           // Convert failing gateways to alternative gateways
           const convertedUrl = convertFailingGateway((dbAsset as any).thumbnail_url);
@@ -66,10 +68,17 @@ const VideoThumbnail: React.FC<VideoThumbnailProps> = ({
         const url = await getThumbnailUrl(playbackId);
         // Convert failing gateways to alternative gateways
         const convertedUrl = url ? convertFailingGateway(url) : null;
-        setThumbnailUrl(convertedUrl);
+        
+        // Fallback to default thumbnail if no thumbnail found
+        if (!convertedUrl) {
+          setThumbnailUrl("/Creative_TV.png");
+        } else {
+          setThumbnailUrl(convertedUrl);
+        }
       } catch (error) {
         console.error('Error fetching thumbnail:', error);
-        setThumbnailUrl(null);
+        // Fallback to default thumbnail on error
+        setThumbnailUrl("/Creative_TV.png");
       } finally {
         setIsLoading(false);
       }
@@ -313,21 +322,27 @@ const VideoThumbnail: React.FC<VideoThumbnailProps> = ({
               onLoad={() => setImageLoading(false)}
               onError={() => {
                 setImageLoading(false);
-                setThumbnailUrl(null);
+                // Fallback to default thumbnail on image load error (only if not already the default)
+                if (thumbnailUrl !== "/Creative_TV.png") {
+                  setThumbnailUrl("/Creative_TV.png");
+                }
               }}
             />
           ) : (
-            // Fallback if no thumbnail URL and not previewing
-            <Player
-              src={src}
-              assetId={assetId}
-              title={title}
-              onPlay={onPlay}
+            // Fallback to default thumbnail if no thumbnail URL
+            <Image
+              src="/Creative_TV.png"
+              alt={title}
+              fill
+              className="object-cover rounded-lg"
+              loading={priority ? "eager" : "lazy"}
+              priority={priority}
+              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
             />
           )}
 
-          {/* Play button overlay - only show when image is loaded and NOT previewing */}
-          {!imageLoading && thumbnailUrl && !isPreviewing && !enablePreview && (
+          {/* Play button overlay - only show when image is loaded and NOT previewing and not hidden */}
+          {!imageLoading && thumbnailUrl && !isPreviewing && !enablePreview && !hidePlayOverlay && (
             <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20 group-hover:bg-opacity-30 transition-all duration-200">
               <div className="flex items-center justify-center w-16 h-16 bg-white bg-opacity-90 rounded-full group-hover:bg-opacity-100 transition-all duration-200">
                 <PlayIcon className="w-8 h-8 text-black ml-1" />

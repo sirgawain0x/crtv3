@@ -11,10 +11,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, AlertCircle, CheckCircle } from 'lucide-react';
+import { Loader2, AlertCircle, CheckCircle, TrendingUp } from 'lucide-react';
 import { useMeTokensSupabase } from '@/lib/hooks/metokens/useMeTokensSupabase';
 import { formatEther, parseEther, encodeFunctionData } from 'viem';
-import { useSmartAccountClient } from '@account-kit/react';
+import { useSmartAccountClient, useAuthModal, useUser } from '@account-kit/react';
 import { getDaiTokenContract } from '@/lib/contracts/DAIToken';
 import { erc20Abi } from 'viem';
 import { DaiFundingOptions } from '@/components/wallet/funding/DaiFundingOptions';
@@ -25,6 +25,7 @@ import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import Image from 'next/image';
 import { creatorProfileSupabaseService } from '@/lib/sdk/supabase/creator-profiles';
 import { convertFailingGateway } from '@/lib/utils/image-gateway';
+import { useVideoContribution } from '@/lib/hooks/metokens/useVideoContribution';
 
 interface VideoMeTokenBuyDialogProps {
   open: boolean;
@@ -60,8 +61,20 @@ export function VideoMeTokenBuyDialog({
   const [isLoadingMeToken, setIsLoadingMeToken] = useState(false);
   const [creatorAvatarUrl, setCreatorAvatarUrl] = useState<string | null>(null);
 
+  // Fetch video contribution (earnings) with real-time updates
+  // Poll every 5 seconds while dialog is open
+  const { contribution, formattedContribution, isLoading: isLoadingContribution } = useVideoContribution({
+    playbackId: playbackId || undefined,
+    pollInterval: open ? 5000 : undefined, // Poll every 5 seconds when dialog is open
+  });
+
   const { toast } = useToast();
   const { client } = useSmartAccountClient({});
+  const { openAuthModal } = useAuthModal();
+  const user = useUser();
+  
+  // Check if wallet is connected
+  const isConnected = !!user && !!client;
   const {
     buyMeTokens,
     sellMeTokens,
@@ -197,13 +210,13 @@ export function VideoMeTokenBuyDialog({
     }
   }, [client, meToken]);
 
-  // Refresh DAI balance and allowance when dialog opens
+  // Refresh DAI balance and allowance when dialog opens (only if connected)
   useEffect(() => {
-    if (open && client && meToken) {
+    if (open && isConnected && client && meToken) {
       checkDaiBalance();
       checkDaiAllowance();
     }
-  }, [open, client, meToken, checkDaiBalance, checkDaiAllowance]);
+  }, [open, isConnected, client, meToken, checkDaiBalance, checkDaiAllowance]);
 
   // Check user's MeToken balance
   const checkMeTokenBalance = useCallback(async () => {
@@ -224,16 +237,17 @@ export function VideoMeTokenBuyDialog({
     }
   }, [client, meToken]);
 
-  // Refresh MeToken balance when dialog opens or mode changes
+  // Refresh MeToken balance when dialog opens or mode changes (only if connected)
   useEffect(() => {
-    if (open && client && meToken) {
+    if (open && isConnected && client && meToken) {
       checkMeTokenBalance();
     }
-  }, [open, client, meToken, checkMeTokenBalance, mode]);
+  }, [open, isConnected, client, meToken, checkMeTokenBalance, mode]);
 
-  // Calculate preview when amount changes
+  // Calculate preview when amount changes (only if connected and has amount)
   useEffect(() => {
     const calculatePreview = async () => {
+      // Allow preview calculation even when not connected (for viewing purposes)
       if (amount && parseFloat(amount) > 0 && meToken) {
         try {
           if (mode === 'buy') {
@@ -288,6 +302,21 @@ export function VideoMeTokenBuyDialog({
   const handleBuy = async () => {
     console.log('🛒 Buy button clicked', { amount, meToken, daiAllowance });
     
+    // Check if wallet is connected first
+    if (!isConnected) {
+      toast({
+        title: "Wallet Not Connected",
+        description: "Please connect your wallet to make a purchase.",
+        variant: "destructive",
+      });
+      // Close the buy dialog first to avoid modal layering issues
+      onOpenChange(false);
+      setTimeout(() => {
+        openAuthModal();
+      }, 100);
+      return;
+    }
+    
     if (!amount || parseFloat(amount) <= 0) {
       setError('Please enter a valid amount');
       toast({
@@ -317,6 +346,7 @@ export function VideoMeTokenBuyDialog({
         description: "Wallet not connected. Please connect your wallet.",
         variant: "destructive",
       });
+      openAuthModal();
       return;
     }
 
@@ -386,6 +416,21 @@ export function VideoMeTokenBuyDialog({
   const handleSell = async () => {
     console.log('💸 Sell button clicked', { amount, meToken, meTokenBalance });
     
+    // Check if wallet is connected first
+    if (!isConnected) {
+      toast({
+        title: "Wallet Not Connected",
+        description: "Please connect your wallet to sell tokens.",
+        variant: "destructive",
+      });
+      // Close the buy dialog first to avoid modal layering issues
+      onOpenChange(false);
+      setTimeout(() => {
+        openAuthModal();
+      }, 100);
+      return;
+    }
+    
     if (!amount || parseFloat(amount) <= 0) {
       setError('Please enter a valid amount');
       toast({
@@ -415,6 +460,7 @@ export function VideoMeTokenBuyDialog({
         description: "Wallet not connected. Please connect your wallet.",
         variant: "destructive",
       });
+      openAuthModal();
       return;
     }
 
@@ -512,6 +558,25 @@ export function VideoMeTokenBuyDialog({
               ? 'Purchase MeTokens to support this creator'
               : 'Sell your MeTokens back to the pool'}
           </DialogDescription>
+          {/* Video Earnings Display */}
+          {videoAsset?.id && (
+            <div className="flex items-center gap-2 mt-2 p-2 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900">
+              <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" />
+              <div className="flex-1">
+                <p className="text-xs text-muted-foreground">Video Earnings</p>
+                <p className="text-sm font-semibold text-green-600 dark:text-green-400">
+                  {isLoadingContribution ? (
+                    <span className="inline-flex items-center gap-1">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Loading...
+                    </span>
+                  ) : (
+                    formattedContribution || '$0.00'
+                  )}
+                </p>
+              </div>
+            </div>
+          )}
         </DialogHeader>
 
         <div className="space-y-4">
@@ -535,8 +600,18 @@ export function VideoMeTokenBuyDialog({
                 setSuccess(null);
               }}>
                 <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="buy">Buy</TabsTrigger>
-                  <TabsTrigger value="sell">Sell</TabsTrigger>
+                  <TabsTrigger 
+                    value="buy"
+                    className={mode === 'buy' ? 'data-[state=active]:bg-green-500 data-[state=active]:text-white' : ''}
+                  >
+                    Buy
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="sell"
+                    className={mode === 'sell' ? 'data-[state=active]:bg-red-500 data-[state=active]:text-white' : ''}
+                  >
+                    Sell
+                  </TabsTrigger>
                 </TabsList>
               </Tabs>
 
@@ -622,7 +697,7 @@ export function VideoMeTokenBuyDialog({
                     placeholder="0.00"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
-                    disabled={isLoading}
+                    disabled={isLoading || !isConnected}
                     min="0"
                     step="0.01"
                     className={mode === 'buy' || mode === 'sell' ? 'pl-10' : ''}
@@ -685,7 +760,17 @@ export function VideoMeTokenBuyDialog({
                 </Alert>
               )}
 
-              {mode === 'buy' && amount && parseFloat(amount) > 0 && daiBalance < parseEther(amount) && (
+              {/* Connect Wallet Info Message */}
+              {!isConnected && (
+                <Alert className="border-orange-200 bg-orange-50 dark:bg-orange-950/20 dark:border-orange-900">
+                  <AlertCircle className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                  <AlertDescription className="text-orange-800 dark:text-orange-200">
+                    Connect your wallet to {mode === 'buy' ? 'purchase' : 'sell'} tokens
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {mode === 'buy' && amount && parseFloat(amount) > 0 && isConnected && daiBalance < parseEther(amount) && (
                 <DaiFundingOptions
                   requiredAmount={parseEther(amount).toString()}
                   onBalanceUpdate={setDaiBalance}
@@ -694,37 +779,67 @@ export function VideoMeTokenBuyDialog({
               )}
 
               <div className="flex gap-2">
-                <Button
-                  onClick={mode === 'buy' ? handleBuy : handleSell}
-                  disabled={
-                    isLoading ||
-                    !amount ||
-                    parseFloat(amount) <= 0 ||
-                    (mode === 'buy' && daiBalance < parseEther(amount || '0')) ||
-                    (mode === 'sell' && meTokenBalance < parseEther(amount || '0'))
-                  }
-                  className="flex-1"
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      {isPending 
-                        ? (mode === 'buy' ? 'Buying...' : 'Selling...')
-                        : isConfirming 
-                          ? 'Confirming...' 
-                          : 'Processing...'}
-                    </>
-                  ) : (
-                    `${mode === 'buy' ? 'Buy' : 'Sell'} ${meToken.symbol}`
-                  )}
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => onOpenChange(false)}
-                  disabled={isLoading}
-                >
-                  Cancel
-                </Button>
+                {!isConnected ? (
+                  <>
+                    <Button
+                      onClick={() => {
+                        // Close the buy dialog first to avoid modal layering issues
+                        onOpenChange(false);
+                        // Small delay to ensure dialog closes before opening auth modal
+                        setTimeout(() => {
+                          openAuthModal();
+                        }, 100);
+                      }}
+                      className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white"
+                    >
+                      Connect Wallet to {mode === 'buy' ? 'Buy' : 'Sell'}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => onOpenChange(false)}
+                    >
+                      Cancel
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      onClick={mode === 'buy' ? handleBuy : handleSell}
+                      disabled={
+                        isLoading ||
+                        !amount ||
+                        parseFloat(amount) <= 0 ||
+                        (mode === 'buy' && daiBalance < parseEther(amount || '0')) ||
+                        (mode === 'sell' && meTokenBalance < parseEther(amount || '0'))
+                      }
+                      className={`flex-1 ${
+                        mode === 'buy' 
+                          ? 'bg-green-600 hover:bg-green-700 text-white' 
+                          : 'bg-red-600 hover:bg-red-700 text-white'
+                      }`}
+                    >
+                      {isLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          {isPending 
+                            ? (mode === 'buy' ? 'Buying...' : 'Selling...')
+                            : isConfirming 
+                              ? 'Confirming...' 
+                              : 'Processing...'}
+                        </>
+                      ) : (
+                        `${mode === 'buy' ? 'Buy' : 'Sell'} ${meToken.symbol}`
+                      )}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => onOpenChange(false)}
+                      disabled={isLoading}
+                    >
+                      Cancel
+                    </Button>
+                  </>
+                )}
               </div>
 
               <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30 border text-xs">
@@ -744,7 +859,11 @@ export function VideoMeTokenBuyDialog({
                   </div>
                 </div>
                 <div className="text-right">
-                  {mode === 'buy' ? (
+                  {!isConnected ? (
+                    <span className="text-xs text-muted-foreground italic">
+                      Connect wallet to view balance
+                    </span>
+                  ) : mode === 'buy' ? (
                     <div className="flex items-center gap-1.5">
                       <Image
                         src="/images/tokens/dai-logo.svg"

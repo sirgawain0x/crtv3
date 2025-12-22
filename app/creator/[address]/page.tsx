@@ -16,6 +16,8 @@ import makeBlockie from "ethereum-blockies-base64";
 import { shortenAddress } from "@/lib/utils/utils";
 import { AddressWithCopy } from "@/components/Creator/AddressWithCopy";
 import { convertFailingGateway } from "@/lib/utils/image-gateway";
+import { meTokenSupabaseService } from "@/lib/sdk/supabase/metokens";
+import { CreatorProfileHeader } from "@/components/Creator/CreatorProfileHeader";
 
 type CreatorPageProps = {
   params: Promise<{
@@ -65,13 +67,15 @@ export default async function CreatorPage({ params }: CreatorPageProps) {
   const { address } = await params;
   const normalizedAddress = address.toLowerCase();
 
-  // Fetch creator profile and video count in parallel
-  const [creatorProfile, videoCount] = await Promise.all([
+  // Fetch creator profile, MeToken, and video count in parallel
+  const [creatorProfile, meToken, videoCount] = await Promise.all([
     fetchCreatorProfile(normalizedAddress),
+    meTokenSupabaseService.getMeTokenByOwner(normalizedAddress).catch(() => null),
     fetchVideoCount(normalizedAddress),
   ]);
 
-  const displayName = creatorProfile?.username || shortenAddress(address);
+  const displayName = meToken?.name || creatorProfile?.username || shortenAddress(address);
+  const displaySymbol = meToken?.symbol || null;
   const avatarUrl = creatorProfile?.avatar_url
     ? convertFailingGateway(creatorProfile.avatar_url)
     : makeBlockie(address);
@@ -111,27 +115,12 @@ export default async function CreatorPage({ params }: CreatorPageProps) {
       <div className="mb-8">
         <Card className="overflow-hidden">
           <CardHeader className="bg-gradient-to-r from-primary/10 to-primary/5 pb-6">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
-              <Avatar className="h-24 w-24 border-4 border-background shadow-lg">
-                <AvatarImage src={avatarUrl} alt={displayName} />
-                <AvatarFallback>
-                  {creatorProfile?.username
-                    ? creatorProfile.username.charAt(0).toUpperCase()
-                    : address.slice(2, 3).toUpperCase() || "C"}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1">
-                <h1 className="text-3xl font-bold mb-2">{displayName}</h1>
-                <div className="mb-4">
-                  <AddressWithCopy address={address} />
-                </div>
-                {bio && (
-                  <p className="text-sm text-muted-foreground max-w-2xl">
-                    {bio}
-                  </p>
-                )}
-              </div>
-            </div>
+            <CreatorProfileHeader
+              address={address}
+              creatorProfile={creatorProfile}
+              meToken={meToken}
+              bio={bio}
+            />
           </CardHeader>
           <CardContent className="pt-6">
             <div className="flex items-center gap-6">

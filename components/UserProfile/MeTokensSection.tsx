@@ -14,7 +14,7 @@ import { MeTokenTrading } from './MeTokenTrading';
 import { MeTokenInfo } from './MeTokenInfo';
 import { CreatorProfileManager } from './CreatorProfileManager';
 import { MeTokenHistory } from './MeTokenHistory';
-import { Loader2, AlertCircle, Plus, TrendingUp, Info, RefreshCw, Search, Wallet, User, History } from 'lucide-react';
+import { Loader2, AlertCircle, Plus, TrendingUp, Info, RefreshCw, Search, Wallet, User, History, Copy, Check, Coins, DollarSign, BarChart3 } from 'lucide-react';
 import { formatEther } from 'viem';
 
 interface MeTokensSectionProps {
@@ -27,6 +27,7 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
   const [manualMeTokenAddress, setManualMeTokenAddress] = useState('');
   const [isCheckingManual, setIsCheckingManual] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
   const user = useUser();
   const { toast } = useToast();
 
@@ -62,6 +63,29 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
     if (checkUserMeToken) {
       await checkUserMeToken();
     }
+  };
+
+  const copyToClipboard = async (text: string, label: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedAddress(label);
+      toast({
+        title: "Copied!",
+        description: `${label} address copied to clipboard`,
+      });
+      setTimeout(() => setCopiedAddress(null), 2000);
+    } catch (err) {
+      toast({
+        title: "Failed to copy",
+        description: "Please try again manually",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const formatAddress = (address: string) => {
+    if (!address) return '';
+    return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
 
   const handleSyncExistingMeToken = async () => {
@@ -273,25 +297,44 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
             </AlertDescription>
           </Alert>
 
-          {user && walletAddress && user.address && user.address !== walletAddress && (
+          {walletAddress && (
             <Alert>
               <Wallet className="h-4 w-4" />
-              <AlertDescription className="text-xs space-y-2">
-                <div><strong>Understanding Your Addresses:</strong></div>
-                <div className="space-y-1">
-                  <div className="flex items-start gap-2">
-                    <div className="font-semibold min-w-[110px]">Smart Account:</div>
-                    <div className="font-mono text-[10px] break-all">{walletAddress}</div>
-                  </div>
-                  <div className="flex items-start gap-2">
-                    <div className="font-semibold min-w-[110px]">Controller:</div>
-                    <div className="font-mono text-[10px] break-all">{user.address}</div>
-                  </div>
+              <AlertDescription className="space-y-3">
+                <div className="font-semibold text-sm">Your Token Address:</div>
+                <div className="space-y-3">
+
+                  {/* MeToken Address - only show if MeToken exists */}
+                  {userMeToken?.address && (
+                    <div className="space-y-1 pt-2 border-t">
+                      <p className="text-xs sm:text-sm font-medium text-muted-foreground">MeToken Address</p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <code className="relative rounded bg-muted px-2 py-1.5 font-mono text-xs sm:text-sm break-all sm:break-normal overflow-wrap-anywhere">
+                          {formatAddress(userMeToken.address)}
+                        </code>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 sm:h-6 sm:w-6 flex-shrink-0"
+                          onClick={() => copyToClipboard(userMeToken.address, 'MeToken')}
+                        >
+                          {copiedAddress === 'MeToken' ? (
+                            <Check className="h-3.5 w-3.5 sm:h-3 sm:w-3 text-green-500" />
+                          ) : (
+                            <Copy className="h-3.5 w-3.5 sm:h-3 sm:w-3" />
+                          )}
+                          <span className="sr-only">Copy MeToken address</span>
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div className="text-muted-foreground pt-2 border-t">
-                  💡 <strong>Note:</strong> When you create a MeToken, it will be owned by your{' '}
-                  <strong>Smart Account</strong> address ({walletAddress?.slice(0, 6)}...{walletAddress?.slice(-4)}).
-                </div>
+                {!userMeToken && (
+                  <div className="text-xs text-muted-foreground pt-2 border-t">
+                    💡 <strong>Note:</strong> When you create a MeToken, it will be owned by your{' '}
+                    <strong>Account Address</strong> ({formatAddress(walletAddress)}).
+                  </div>
+                )}
               </AlertDescription>
             </Alert>
           )}
@@ -332,30 +375,57 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Your Balance</p>
-                    <p className="text-2xl font-bold">
-                      {parseFloat(userMeToken.balance.toString()) / 1e18} {userMeToken.symbol}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+                  {/* Your Balance */}
+                  <div className="rounded-lg border bg-muted/30 p-4 sm:p-5 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 rounded-md bg-blue-500/10">
+                        <Coins className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      </div>
+                      <p className="text-xs sm:text-sm font-medium text-muted-foreground uppercase tracking-wide">Your Balance</p>
+                    </div>
+                    <p className="text-3xl sm:text-4xl font-bold tracking-tight">
+                      {parseFloat(userMeToken.balance.toString()) / 1e18} <span className="text-lg sm:text-xl text-muted-foreground">{userMeToken.symbol}</span>
                     </p>
                   </div>
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">Total Supply</p>
-                    <p className="text-2xl font-bold">
-                      {parseFloat(userMeToken.totalSupply.toString()) / 1e18} {userMeToken.symbol}
+
+                  {/* Total Supply */}
+                  <div className="rounded-lg border bg-muted/30 p-4 sm:p-5 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 rounded-md bg-purple-500/10">
+                        <BarChart3 className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                      </div>
+                      <p className="text-xs sm:text-sm font-medium text-muted-foreground uppercase tracking-wide">Total Supply</p>
+                    </div>
+                    <p className="text-3xl sm:text-4xl font-bold tracking-tight">
+                      {parseFloat(userMeToken.totalSupply.toString()) / 1e18} <span className="text-lg sm:text-xl text-muted-foreground">{userMeToken.symbol}</span>
                     </p>
                   </div>
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground">TVL</p>
-                    <p className="text-2xl font-bold text-green-600">
-                      ${userMeToken.tvl.toFixed(2)}
+
+                  {/* TVL */}
+                  <div className="rounded-lg border bg-muted/30 p-4 sm:p-5 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 rounded-md bg-green-500/10">
+                        <DollarSign className="h-4 w-4 text-green-600 dark:text-green-400" />
+                      </div>
+                      <p className="text-xs sm:text-sm font-medium text-muted-foreground uppercase tracking-wide">TVL</p>
+                    </div>
+                    <p className="text-3xl sm:text-4xl font-bold text-green-600 dark:text-green-500 tracking-tight">
+                      ${userMeToken.tvl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </p>
                   </div>
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium text-muted-foreground">Price</p>
-                    <p className="text-2xl font-bold">
+
+                  {/* Price */}
+                  <div className="rounded-lg border bg-muted/30 p-4 sm:p-5 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 rounded-md bg-orange-500/10">
+                        <TrendingUp className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                      </div>
+                      <p className="text-xs sm:text-sm font-medium text-muted-foreground uppercase tracking-wide">Price</p>
+                    </div>
+                    <p className="text-3xl sm:text-4xl font-bold tracking-tight">
                       {userMeToken.totalSupply > BigInt(0)
-                        ? '$' + (userMeToken.tvl / parseFloat(formatEther(userMeToken.totalSupply))).toFixed(4)
+                        ? '$' + (userMeToken.tvl / parseFloat(formatEther(userMeToken.totalSupply))).toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 })
                         : '-'
                       }
                     </p>
