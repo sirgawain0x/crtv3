@@ -1,0 +1,287 @@
+/**
+ * Story Protocol Gateway (SPG) Service
+ * 
+ * Provides high-level functions for interacting with Story Protocol's SPG,
+ * which includes collection creation and mint-and-register operations.
+ * 
+ * SPG Methods Available:
+ * - createCollection: Create a new NFT collection for a creator
+ * - mintAndRegisterIp: Mint an NFT and register it as an IP Asset in one transaction
+ * - mintAndRegisterIpAndAttachPilTerms: Mint, register, and attach license terms in one transaction
+ */
+
+import { StoryClient } from "@story-protocol/core-sdk";
+import type { Address } from "viem";
+
+/**
+ * Parameters for creating an NFT collection via SPG
+ */
+export interface CreateCollectionParams {
+  name: string; // Collection name (e.g., "Creator Name's Videos")
+  symbol: string; // Collection symbol (e.g., "CRTV")
+  description?: string; // Optional collection description
+  owner?: Address; // Collection owner address (defaults to client account)
+  mintFeeRecipient?: Address; // Address to receive mint fees (defaults to owner)
+}
+
+/**
+ * Result of creating a collection
+ */
+export interface CreateCollectionResult {
+  collectionAddress: Address; // Address of the created NFT collection
+  txHash: string; // Transaction hash
+}
+
+/**
+ * Parameters for minting and registering an IP Asset
+ */
+export interface MintAndRegisterParams {
+  collectionAddress: Address; // SPG NFT collection address
+  recipient: Address; // Address to receive the NFT
+  metadataURI?: string; // IPFS metadata URI (optional)
+  allowDuplicates?: boolean; // Allow duplicate registrations (default: false)
+}
+
+/**
+ * Result of minting and registering an IP Asset
+ */
+export interface MintAndRegisterResult {
+  tokenId: string; // Minted NFT token ID
+  ipId: string; // Story Protocol IP Asset ID
+  txHash: string; // Transaction hash
+}
+
+/**
+ * Parameters for minting, registering, and attaching PIL terms
+ */
+export interface MintAndRegisterWithLicenseParams extends MintAndRegisterParams {
+  licenseTermsData: Array<{
+    terms: {
+      transferable: boolean;
+      commercialUse: boolean;
+      commercialAttribution: boolean; // Required by SDK
+      commercializerChecker: Address; // Required by SDK (use zero address for no restrictions)
+      commercializerCheckerData: Address; // Required by SDK (use zero address if not needed)
+      commercialRevShare: number; // 0-100, where 100 = 100% (required by SDK)
+      derivativesAllowed: boolean;
+      derivativesAttribution: boolean; // Required by SDK
+      derivativesApproval: boolean; // Required by SDK
+      derivativesReciprocal: boolean; // Required by SDK
+      currency: Address; // Payment currency (required by SDK, use zero address for native token)
+      uri: string; // License terms URI (required by SDK, use empty string if not needed)
+      defaultMintingFee: bigint | number; // Minting fee in wei (required by SDK)
+      expiration: bigint | number; // Expiration timestamp (0 = never expires, required by SDK)
+      commercialRevCeiling: bigint | number; // Revenue ceiling for commercial use (required by SDK)
+      derivativeRevCeiling: bigint | number; // Revenue ceiling for derivatives (required by SDK)
+    };
+  }>;
+}
+
+/**
+ * Result of minting, registering, and attaching license terms
+ */
+export interface MintAndRegisterWithLicenseResult extends MintAndRegisterResult {
+  licenseTermsIds: string[]; // Array of attached license terms IDs
+}
+
+/**
+ * Create a new NFT collection using Story Protocol's SPG
+ * 
+ * @param client - Story Protocol client instance
+ * @param params - Collection creation parameters
+ * @returns Collection address and transaction hash
+ */
+export async function createCollection(
+  client: StoryClient,
+  params: CreateCollectionParams
+): Promise<CreateCollectionResult> {
+  try {
+    // Get the account address from the client config or use provided owner
+    const accountAddress = (params.owner || (client as any).config?.account) as Address;
+    
+    if (!accountAddress) {
+      throw new Error("Account address not found. Please provide owner in params or ensure client is configured with an account.");
+    }
+
+    // Use nftClient.createNFTCollection() to create a new SPG NFT collection
+    const result = await client.nftClient.createNFTCollection({
+      name: params.name,
+      symbol: params.symbol,
+      isPublicMinting: false, // Only creator can mint initially
+      mintOpen: true, // Collection is open for minting
+      mintFeeRecipient: params.mintFeeRecipient || accountAddress, // Creator receives mint fees
+      contractURI: "", // Can be set later if needed
+      owner: accountAddress,
+    });
+
+    if (!result.txHash) {
+      throw new Error("Collection creation transaction hash not returned");
+    }
+
+    // The SDK returns spgNftContract in the result
+    let collectionAddress: Address;
+    
+    if (result.spgNftContract) {
+      collectionAddress = result.spgNftContract;
+    } else {
+      // Fallback: Parse from transaction receipt events
+      // SPG emits a CollectionCreated event with the collection address
+      const { createStoryPublicClient } = await import("./client");
+      const publicClient = createStoryPublicClient();
+      
+      const receipt = await publicClient.waitForTransactionReceipt({
+        hash: result.txHash as `0x${string}`,
+      });
+
+      // Look for CollectionCreated event in logs
+      // Event signature: CollectionCreated(address indexed collection, ...)
+      const collectionCreatedEvent = receipt.logs.find((log) => {
+        // CollectionCreated event signature (first 32 bytes of keccak256("CollectionCreated(address,string,string)"))
+        return log.topics.length >= 2;
+      });
+
+      if (collectionCreatedEvent && collectionCreatedEvent.topics[1]) {
+        // Extract address from topic (remove 0x prefix and pad, then take last 40 chars)
+        const addressHex = collectionCreatedEvent.topics[1].slice(-40);
+        collectionAddress = `0x${addressHex}` as Address;
+      } else {
+        throw new Error(
+          "Could not extract collection address from transaction receipt. " +
+          "Please check the transaction manually or update the SPG service."
+        );
+      }
+    }
+
+    return {
+      collectionAddress,
+      txHash: result.txHash,
+    };
+  } catch (error) {
+    console.error("Failed to create collection:", error);
+    throw new Error(
+      `Collection creation failed: ${error instanceof Error ? error.message : "Unknown error"}`
+    );
+  }
+}
+
+/**
+ * Mint an NFT and register it as an IP Asset in one transaction
+ * 
+ * @param client - Story Protocol client instance
+ * @param params - Mint and register parameters
+ * @returns Token ID, IP ID, and transaction hash
+ */
+export async function mintAndRegisterIp(
+  client: StoryClient,
+  params: MintAndRegisterParams
+): Promise<MintAndRegisterResult> {
+  try {
+    const result = await client.ipAsset.mintAndRegisterIp({
+      spgNftContract: params.collectionAddress,
+      recipient: params.recipient,
+      ipMetadata: params.metadataURI
+        ? {
+            ipMetadataURI: params.metadataURI,
+          }
+        : undefined,
+      allowDuplicates: params.allowDuplicates ?? false,
+    });
+
+    if (!result.txHash) {
+      throw new Error("Mint and register transaction hash not returned");
+    }
+
+    // Extract token ID and IP ID from the result
+    // The SDK should return these, but we may need to parse from events
+    const tokenId = result.tokenId?.toString();
+    const ipId = result.ipId;
+
+    // Throw errors if critical IDs are missing to prevent database corruption
+    if (!tokenId) {
+      throw new Error(
+        "Token ID not returned from mint and register operation. " +
+        "This is required for database persistence. Transaction hash: " + result.txHash
+      );
+    }
+
+    if (!ipId) {
+      throw new Error(
+        "IP ID not returned from mint and register operation. " +
+        "This is required for database persistence. Transaction hash: " + result.txHash
+      );
+    }
+
+    return {
+      tokenId,
+      ipId,
+      txHash: result.txHash,
+    };
+  } catch (error) {
+    console.error("Failed to mint and register IP Asset:", error);
+    throw new Error(
+      `Mint and register failed: ${error instanceof Error ? error.message : "Unknown error"}`
+    );
+  }
+}
+
+/**
+ * Mint an NFT, register it as an IP Asset, and attach PIL terms in one transaction
+ * 
+ * @param client - Story Protocol client instance
+ * @param params - Mint, register, and license parameters
+ * @returns Token ID, IP ID, license terms IDs, and transaction hash
+ */
+export async function mintAndRegisterIpAndAttachPilTerms(
+  client: StoryClient,
+  params: MintAndRegisterWithLicenseParams
+): Promise<MintAndRegisterWithLicenseResult> {
+  try {
+    const result = await client.ipAsset.mintAndRegisterIpAssetWithPilTerms({
+      spgNftContract: params.collectionAddress,
+      recipient: params.recipient,
+      ipMetadata: params.metadataURI
+        ? {
+            ipMetadataURI: params.metadataURI,
+          }
+        : undefined,
+      licenseTermsData: params.licenseTermsData,
+      allowDuplicates: params.allowDuplicates ?? false,
+    });
+
+    if (!result.txHash) {
+      throw new Error("Mint, register, and attach license transaction hash not returned");
+    }
+
+    const tokenId = result.tokenId?.toString();
+    const ipId = result.ipId;
+    const licenseTermsIds = result.licenseTermsIds?.map((id) => id.toString()) || [];
+
+    // Throw errors if critical IDs are missing to prevent database corruption
+    if (!tokenId) {
+      throw new Error(
+        "Token ID not returned from mint, register, and attach license operation. " +
+        "This is required for database persistence. Transaction hash: " + result.txHash
+      );
+    }
+
+    if (!ipId) {
+      throw new Error(
+        "IP ID not returned from mint, register, and attach license operation. " +
+        "This is required for database persistence. Transaction hash: " + result.txHash
+      );
+    }
+
+    return {
+      tokenId,
+      ipId,
+      licenseTermsIds,
+      txHash: result.txHash,
+    };
+  } catch (error) {
+    console.error("Failed to mint, register, and attach license terms:", error);
+    throw new Error(
+      `Mint, register, and attach license failed: ${error instanceof Error ? error.message : "Unknown error"}`
+    );
+  }
+}
+

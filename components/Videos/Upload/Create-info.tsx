@@ -21,12 +21,15 @@ type TCreateInfoProps = {
   onPressNext: (formData: TVideoMetaForm) => void;
 };
 
+import type { CollaboratorFormData } from "@/lib/types/splits";
+
 export type TVideoMetaForm = {
   title: string;
   description: string;
   location?: string;
   category?: string;
   ticker: string;
+  collaborators?: CollaboratorFormData[];  // Optional array of collaborators for revenue splits
 };
 
 const CreateInfo = ({ onPressNext }: TCreateInfoProps) => {

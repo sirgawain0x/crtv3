@@ -20,6 +20,10 @@ import { toast } from "sonner";
 import { compressImage } from "@/lib/utils/image-compression";
 import { convertFailingGateway } from "@/lib/utils/image-gateway";
 import { GatewayImage } from "@/components/ui/gateway-image";
+import { StoryLicenseSelector } from "./StoryLicenseSelector";
+import { NFTMintingStep } from "./NFTMintingStep";
+import type { StoryLicenseTerms } from "@/lib/types/story-protocol";
+import type { Address } from "viem";
 
 interface FormValues {
   thumbnailType: "custom" | "ai";
@@ -35,18 +39,35 @@ interface FormValues {
 interface CreateThumbnailFormProps {
   livepeerAssetId?: string;
   assetReady?: boolean;
+  videoAssetId?: number;
+  creatorAddress?: Address;
+  metadataURI?: string;
   onSelectThumbnailImages: (imageUrl: string) => void;
   onMeTokenConfigChange?: (meTokenConfig: {
     requireMeToken: boolean;
     priceInMeToken: number;
+  }) => void;
+  onStoryConfigChange?: (storyConfig: {
+    registerIP: boolean;
+    licenseTerms?: any;
+  }) => void;
+  onNFTMinted?: (mintResult: {
+    tokenId: string;
+    contractAddress: Address;
+    txHash: string;
   }) => void;
 }
 
 const CreateThumbnailForm = ({
   livepeerAssetId,
   assetReady = false,
+  videoAssetId,
+  creatorAddress,
+  metadataURI,
   onSelectThumbnailImages,
   onMeTokenConfigChange,
+  onStoryConfigChange,
+  onNFTMinted,
 }: CreateThumbnailFormProps) => {
   const {
     control,
@@ -89,6 +110,8 @@ const CreateThumbnailForm = ({
   const requireMeToken = watch("meTokenConfig.requireMeToken");
   const thumbnailType = watch("thumbnailType");
   const customImage = watch("customImage");
+  const [storyIPEnabled, setStoryIPEnabled] = useState(false);
+  const [selectedStoryLicense, setSelectedStoryLicense] = useState<StoryLicenseTerms | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -871,6 +894,46 @@ const CreateThumbnailForm = ({
                 Users will need to hold at least this amount of your MeToken to access this content
               </p>
             </div>
+          </div>
+        )}
+      </div>
+
+      {/* Story Protocol IP Registration Section */}
+      <div className="mt-8 space-y-4 border-t pt-4">
+        <StoryLicenseSelector
+          enabled={storyIPEnabled}
+          selectedLicense={selectedStoryLicense}
+          onEnabledChange={(enabled) => {
+            setStoryIPEnabled(enabled);
+            if (onStoryConfigChange) {
+              onStoryConfigChange({
+                registerIP: enabled,
+                licenseTerms: enabled ? selectedStoryLicense : undefined,
+              });
+            }
+          }}
+          onLicenseChange={(license) => {
+            setSelectedStoryLicense(license);
+            if (onStoryConfigChange && storyIPEnabled) {
+              onStoryConfigChange({
+                registerIP: true,
+                licenseTerms: license || undefined,
+              });
+            }
+          }}
+        />
+
+        {/* NFT Minting Step - Show when Story Protocol is enabled */}
+        {storyIPEnabled && videoAssetId && creatorAddress && metadataURI && (
+          <div className="mt-4">
+            <NFTMintingStep
+              videoAssetId={videoAssetId}
+              metadataURI={metadataURI}
+              recipientAddress={creatorAddress}
+              onMintSuccess={(result) => {
+                onNFTMinted?.(result);
+              }}
+            />
           </div>
         )}
       </div>

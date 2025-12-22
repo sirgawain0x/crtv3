@@ -6,6 +6,7 @@ import VideoThumbnail from "@/components/Videos/VideoThumbnail";
 import * as helpers from "@/lib/helpers";
 import type { VideoAsset } from "@/lib/types/video-asset";
 import { Calendar, Clock } from "lucide-react";
+import { VideoSplitDistributeButton } from "@/components/Videos/VideoSplitDistributeButton";
 
 interface UploadHistoryCardProps {
   asset: VideoAsset;
@@ -21,8 +22,8 @@ export function UploadHistoryCard({ asset, index }: UploadHistoryCardProps) {
   );
 
   return (
-    <Link href={`/discover/${asset.asset_id}`}>
-      <Card className="group h-full overflow-hidden transition-all duration-200 hover:shadow-lg hover:scale-[1.02]">
+    <Card className="group h-full overflow-hidden transition-all duration-200 hover:shadow-lg hover:scale-[1.02] relative">
+      <Link href={`/discover/${asset.asset_id}`} className="block">
         <div className="relative aspect-video w-full overflow-hidden bg-muted">
           {asset.playback_id ? (
             <VideoThumbnail
@@ -57,8 +58,22 @@ export function UploadHistoryCard({ asset, index }: UploadHistoryCardProps) {
             </div>
           </div>
         </CardContent>
-      </Card>
-    </Link>
+      </Link>
+      {/* Distribute Revenue Button - Only shows if video has splits */}
+      {asset.splits_address && asset.creator_id && (
+        <div 
+          className="absolute bottom-4 right-4 z-10"
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <VideoSplitDistributeButton
+            videoAssetId={asset.asset_id}
+            creatorId={asset.creator_id}
+            splitsAddress={asset.splits_address}
+          />
+        </div>
+      )}
+    </Card>
   );
 }
 

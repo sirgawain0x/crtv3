@@ -21,6 +21,8 @@ import type { VideoAsset } from "@/lib/types/video-asset";
 import { useUniversalAccount } from "@/lib/hooks/accountkit/useUniversalAccount";
 import { getLivepeerAsset } from "@/app/api/livepeer/assetUploadActions";
 import { useAutoDeployContentCoin } from "@/lib/hooks/marketplace/useAutoDeployContentCoin";
+import { useSmartAccountClient } from "@account-kit/react";
+import { createSplitForVideo } from "@/services/splits";
 
 const HookMultiStepForm = () => {
   const [activeStep, setActiveStep] = useState(1);
@@ -40,6 +42,7 @@ const HookMultiStepForm = () => {
   const { handleUploadSuccess } = useAutoDeployContentCoin();
 
   const { address, type, loading } = useUniversalAccount();
+  const { client: smartAccountClient } = useSmartAccountClient({ type: 'MultiOwnerModularAccount' });
 
   const router = useRouter();
 
@@ -115,7 +118,14 @@ const HookMultiStepForm = () => {
         creator_metoken_id: creatorMeTokenId,
         subtitles_uri: null,
         subtitles: null,
-      });
+        story_ip_registered: false,
+        story_ip_id: null,
+        story_ip_registration_tx: null,
+        story_ip_registered_at: null,
+        story_license_terms_id: null,
+        story_license_template_id: null,
+        splits_address: null,
+      }, data.collaborators);
 
       console.log('✅ Video asset created in DB:', dbAsset);
       setVideoAsset(dbAsset as VideoAsset);
@@ -147,11 +157,22 @@ const HookMultiStepForm = () => {
         <CreateThumbnailWrapper
           livePeerAssetId={livepeerAsset.id}
           thumbnailUri={thumbnailUri}
+          videoAssetId={videoAsset?.id}
+          creatorAddress={address || undefined}
           onComplete={async (data: {
             thumbnailUri: string;
             meTokenConfig?: {
               requireMeToken: boolean;
               priceInMeToken: number;
+            };
+            storyConfig?: {
+              registerIP: boolean;
+              licenseTerms?: any;
+            };
+            nftMintResult?: {
+              tokenId: string;
+              contractAddress: string;
+              txHash: string;
             };
           }) => {
             setThumbnailUri(data.thumbnailUri);
@@ -166,19 +187,144 @@ const HookMultiStepForm = () => {
               return;
             }
 
+            if (!videoAsset?.id) {
+              toast.error("Video asset not found. Please try uploading again.");
+              console.error("Video asset is null or missing ID:", videoAsset);
+              return;
+            }
+
             try {
               const latestAsset = await getLivepeerAsset(livepeerAsset.id);
 
-              // --- PUBLISH LOGIC ---
-              await updateVideoAsset(videoAsset?.id as number, {
+              // --- CREATE SPLIT CONTRACT (if collaborators exist) ---
+              let splitsAddress: string | null = null;
+              
+              if (videoAsset && smartAccountClient) {
+                try {
+                  // Check if video has collaborators by checking if metadata had collaborators
+                  const hasCollaborators = metadata?.collaborators && metadata.collaborators.length > 0;
+                  
+                  if (hasCollaborators) {
+                    toast.info("Creating revenue split contract...");
+                    const splitResult = await createSplitForVideo(videoAsset.id, smartAccountClient);
+                    
+                    if (splitResult.success && splitResult.splitAddress) {
+                      splitsAddress = splitResult.splitAddress;
+                      toast.success("Revenue split contract created!", {
+                        description: `Split address: ${splitResult.splitAddress.slice(0, 10)}...`,
+                      });
+                    } else {
+                      console.error("Split creation failed:", splitResult.error);
+                      toast.warning("Failed to create split contract", {
+                        description: splitResult.error || "Split creation failed. Video will be published without splits.",
+                      });
+                      // Continue with publishing even if split creation fails
+                    }
+                  }
+                } catch (splitError) {
+                  console.error("Error creating split contract:", splitError);
+                  toast.warning("Split creation error", {
+                    description: "Video will be published without revenue splits. You can add them later.",
+                  });
+                  // Continue with publishing
+                }
+              }
+
+              // --- PUBLISH LOGIC (Atomic Update with Split Address) ---
+              const updatedAsset = await updateVideoAsset(videoAsset.id, {
                 thumbnailUri: data.thumbnailUri,
                 status: "published",
                 metadata_uri: latestAsset?.storage?.ipfs?.nftMetadata?.url || null,
                 requires_metoken: data.meTokenConfig?.requireMeToken || false,
                 metoken_price: data.meTokenConfig?.priceInMeToken || null,
+                splits_address: splitsAddress, // Include split address in atomic update
               });
 
               toast.success("Video uploaded and published successfully!");
+
+              // --- STORY PROTOCOL IP REGISTRATION ---
+              if (data.storyConfig?.registerIP && address) {
+                try {
+                  const metadataURI = latestAsset?.storage?.ipfs?.nftMetadata?.url;
+                  
+                  if (!metadataURI) {
+                    toast.warning("Story Protocol registration skipped", {
+                      description: "Video metadata URI is required for IP registration. Please ensure the video has been processed and metadata is available.",
+                      duration: 8000,
+                    });
+                    console.warn("Story Protocol registration skipped: No metadata URI available");
+                  } else {
+                    // Check if user already minted an NFT via NFTMintingStep
+                    if (data.nftMintResult?.tokenId && data.nftMintResult?.contractAddress) {
+                      // User already minted an NFT - register the existing NFT on Story Protocol
+                      console.log("Using existing NFT for Story Protocol registration:", data.nftMintResult);
+                      
+                      // First, update the video asset with the NFT info
+                      // videoAsset.id is already validated above
+                      await updateVideoAsset(videoAsset.id, {
+                        contract_address: data.nftMintResult.contractAddress,
+                        token_id: data.nftMintResult.tokenId,
+                        metadata_uri: metadataURI,
+                      });
+
+                      // Then register the existing NFT as an IP Asset
+                      toast.info("Registering existing NFT as IP Asset on Story Protocol...");
+                      const { registerVideoAsIPAsset } = await import("@/services/story-protocol");
+                      
+                      const registrationResult = await registerVideoAsIPAsset(
+                        {
+                          ...updatedAsset,
+                          contract_address: data.nftMintResult.contractAddress,
+                          token_id: data.nftMintResult.tokenId,
+                          metadata_uri: metadataURI,
+                        } as VideoAsset,
+                        address as `0x${string}`,
+                        {
+                          registerIP: true,
+                          licenseTerms: data.storyConfig.licenseTerms,
+                          metadataURI: metadataURI,
+                        }
+                      );
+
+                      if (registrationResult.success) {
+                        toast.success("IP registered on Story Protocol!", {
+                          description: registrationResult.ipId 
+                            ? `IP ID: ${registrationResult.ipId} | Token ID: ${data.nftMintResult.tokenId}`
+                            : undefined,
+                        });
+                      } else {
+                        toast.error(`Story Protocol registration failed: ${registrationResult.error}`);
+                      }
+                    } else {
+                      // No existing NFT - mint and register on Story Protocol in one transaction
+                      toast.info("Minting NFT and registering IP on Story Protocol...");
+                      const { mintAndRegisterVideoIP } = await import("@/services/story-protocol");
+                      
+                      const mintResult = await mintAndRegisterVideoIP(
+                        updatedAsset as VideoAsset,
+                        address as `0x${string}`,
+                        metadataURI,
+                        undefined, // collectionName - will use default
+                        undefined, // collectionSymbol - will use default
+                        data.storyConfig.licenseTerms
+                      );
+
+                      if (mintResult.success) {
+                        toast.success("NFT minted and IP registered on Story Protocol!", {
+                          description: mintResult.ipId 
+                            ? `IP ID: ${mintResult.ipId} | Token ID: ${mintResult.tokenId}`
+                            : undefined,
+                        });
+                      } else {
+                        toast.error(`Story Protocol mint and register failed: ${mintResult.error}`);
+                      }
+                    }
+                  }
+                } catch (storyError) {
+                  console.error("Story Protocol registration error:", storyError);
+                  toast.error("Failed to register IP on Story Protocol. You can try again later.");
+                }
+              }
 
               // --- AUTO DEPLOY CONTENT COIN ---
               if (creatorMeToken && address && metadata?.ticker) {
