@@ -298,7 +298,7 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources, priority 
       <ShareDialog
         open={isShareDialogOpen}
         onOpenChange={setIsShareDialogOpen}
-        videoTitle={asset?.name || "Video"}
+        videoTitle={videoTitle || asset?.name || "Video"}
         videoId={asset?.id || ""}
         playbackId={asset?.playbackId || undefined}
       />

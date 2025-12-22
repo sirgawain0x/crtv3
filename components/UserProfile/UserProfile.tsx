@@ -136,9 +136,9 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
               <TabsContent value="Uploads">
                 <Card>
                   <CardHeader className="space-y-1">
-                    <CardTitle className="text-2xl">Upload Content</CardTitle>
+                    <CardTitle className="text-2xl">Uploads History</CardTitle>
                     <CardDescription>
-                      Share your videos with the community
+                      View and manage your uploaded videos
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">

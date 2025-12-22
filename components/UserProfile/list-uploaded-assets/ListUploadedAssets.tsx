@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import type { Account } from "@/lib/types/account";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
-import { UploadAssetRow } from "./UploadedAsset";
+import { Card } from "@/components/ui/card";
+import { UploadHistoryCard } from "./UploadHistoryCard";
 import type { VideoAsset } from "@/lib/types/video-asset";
 import { fetchPublishedVideos } from "@/lib/utils/published-videos-client";
 
@@ -50,52 +51,36 @@ export function ListUploadedAssets({ activeAccount }: ListUploadedAssetsProps) {
 
   if (isLoading)
     return (
-      <div className="flex h-40 items-center justify-center">
-        <Skeleton className="h-8 w-1/2" />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <Card key={i} className="overflow-hidden">
+            <Skeleton className="aspect-video w-full" />
+            <div className="p-4 space-y-2">
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-3 w-1/2" />
+            </div>
+          </Card>
+        ))}
       </div>
     );
 
   if (assets.length === 0 && !isLoading)
     return (
-      <div className="flex h-40 items-center justify-center">
+      <div className="flex h-40 items-center justify-center rounded-lg border border-dashed">
         <p className="text-muted-foreground">No videos uploaded yet</p>
       </div>
     );
 
   return (
-    <div className="relative overflow-x-auto rounded-lg border">
-      <table
-        className="w-full table-auto divide-y divide-border"
-        role="grid"
-        aria-label="Uploaded Assets"
-      >
-        <thead>
-          <tr className="bg-muted/50">
-            <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
-              S/No.
-            </th>
-            <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
-              Name
-            </th>
-            <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
-              Created
-            </th>
-            <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">
-              Updated
-            </th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-border">
-          {assets.map((asset, i) => (
-            <UploadAssetRow
-              key={`${asset.asset_id}-${asset.created_at}`}
-              asset={asset}
-              idx={i}
-              activeAccount={activeAccount}
-            />
-          ))}
-        </tbody>
-      </table>
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+      {assets.map((asset, index) => (
+        <UploadHistoryCard
+          key={`${asset.asset_id}-${asset.created_at}`}
+          asset={asset}
+          index={index}
+        />
+      ))}
     </div>
   );
 }

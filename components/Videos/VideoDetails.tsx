@@ -10,7 +10,7 @@ import {
 import { Src } from "@livepeer/react";
 import * as Popover from "@radix-ui/react-popover";
 
-import { useUser } from "@account-kit/react";
+import { useUser, useAuthModal } from "@account-kit/react";
 import { userToAccount } from "@/lib/types/account";
 
 import {
@@ -38,6 +38,7 @@ import { getDetailPlaybackSource } from "@/lib/hooks/livepeer/useDetailPlaybackS
 import { generateAccessKey, WebhookContext } from "@/lib/access-key";
 import { Skeleton } from "../ui/skeleton";
 import { Badge } from "../ui/badge";
+import { Button } from "../ui/button";
 import { fetchVideoAssetByPlaybackId } from "@/lib/utils/video-assets-client";
 import { getThumbnailUrl } from "@/lib/utils/thumbnail";
 import { convertFailingGateway } from "@/lib/utils/image-gateway";
@@ -55,6 +56,8 @@ export default function VideoDetails({ asset, videoTitle }: VideoDetailsProps) {
 
   const user = useUser();
   const account = userToAccount(user);
+  const { openAuthModal } = useAuthModal();
+  const isConnected = !!user;
 
   useEffect(() => {
     const fetchPlaybackSources = async () => {
@@ -81,7 +84,7 @@ export default function VideoDetails({ asset, videoTitle }: VideoDetailsProps) {
       try {
         // First, try to get thumbnail from database
         const row = await fetchVideoAssetByPlaybackId(asset.playbackId);
-        if (row && (row as any).thumbnail_url) {
+        if (row && (row as any).thumbnail_url && (row as any).thumbnail_url.trim() !== "") {
           const convertedUrl = convertFailingGateway((row as any).thumbnail_url);
           setThumbnailUrl(convertedUrl);
           return;
@@ -97,11 +100,13 @@ export default function VideoDetails({ asset, videoTitle }: VideoDetailsProps) {
           const convertedUrl = convertFailingGateway(url);
           setThumbnailUrl(convertedUrl);
         } else {
-          setThumbnailUrl(null);
+          // Fallback to default thumbnail if no thumbnail found
+          setThumbnailUrl("/Creative_TV.png");
         }
       } catch (error) {
         // Silently fail - thumbnail is optional, video will still play
-        setThumbnailUrl(null);
+        // Fallback to default thumbnail on error
+        setThumbnailUrl("/Creative_TV.png");
       }
     };
     fetchPlaybackSources();
@@ -377,7 +382,40 @@ export default function VideoDetails({ asset, videoTitle }: VideoDetailsProps) {
             {dbStatus && <Badge variant="secondary">{dbStatus}</Badge>}
           </div>
           {/* Render other asset details */}
-          {playbackSources ? (
+          {!isConnected ? (
+            // Connect wallet prompt overlay
+            <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-gray-800">
+              {thumbnailUrl && (
+                <img
+                  src={thumbnailUrl}
+                  alt={videoTitle || asset?.name}
+                  className="absolute inset-0 w-full h-full object-cover opacity-50"
+                />
+              )}
+              <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+                <div className="flex flex-col items-center gap-6 p-8 max-w-md text-center">
+                  <div className="flex flex-col gap-2">
+                    <h2 className="text-2xl font-bold text-white">
+                      Connect Your Wallet
+                    </h2>
+                    <p className="text-gray-300">
+                      Please connect your wallet to watch this video.
+                    </p>
+                  </div>
+                  <Button
+                    onClick={() => {
+                      openAuthModal();
+                    }}
+                    className="bg-gradient-to-r from-blue-600 to-purple-600 
+                      hover:from-blue-700 hover:to-purple-700 text-white 
+                      px-8 py-3 text-lg font-semibold transition-all duration-300 hover:shadow-lg"
+                  >
+                    Get Started
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : playbackSources ? (
             <>
               <Player.Root src={playbackSources} {...conditionalProps}>
                 <Player.Container className="aspect-video w-full overflow-hidden rounded-lg bg-gray-800">

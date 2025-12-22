@@ -144,8 +144,12 @@ export async function updateVideoAssetMintingStatus(
 export async function updateVideoAsset(
   id: number,
   data: {
-    thumbnailUri: string;
-    status: string;
+    thumbnailUri?: string;
+    status?: string;
+    title?: string;
+    description?: string | null;
+    category?: string;
+    location?: string;
     max_supply?: number | null;
     price?: number | null;
     royalty_percentage?: number | null;
@@ -159,12 +163,28 @@ export async function updateVideoAsset(
   const supabase = createServiceClient();
 
   const updateData: any = {
-    thumbnail_url: data.thumbnailUri,
-    status: data.status,
     updated_at: new Date().toISOString(),
   };
 
   // Only include fields if they are provided
+  if (data.thumbnailUri !== undefined) {
+    updateData.thumbnail_url = data.thumbnailUri;
+  }
+  if (data.status !== undefined) {
+    updateData.status = data.status;
+  }
+  if (data.title !== undefined) {
+    updateData.title = data.title;
+  }
+  if (data.description !== undefined) {
+    updateData.description = data.description;
+  }
+  if (data.category !== undefined) {
+    updateData.category = data.category;
+  }
+  if (data.location !== undefined) {
+    updateData.location = data.location;
+  }
   if (data.max_supply !== undefined) {
     updateData.max_supply = data.max_supply;
   }
