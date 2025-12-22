@@ -48,7 +48,7 @@ export function VideoEditButton({
         // Check if user is the owner (either EOA or Smart Account)
         const isVideoOwner =
           normalizedCreatorId === normalizedUserAddress ||
-          (user?.address &&
+          !!(user?.address &&
             normalizedCreatorId === user.address.toLowerCase());
 
         setIsOwner(isVideoOwner);
