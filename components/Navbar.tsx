@@ -841,6 +841,9 @@ export default function Navbar() {
               <Link href="/leaderboard" className={navLinkClass}>
                 Leaderboard
               </Link>
+              <Link href="/market" className={navLinkClass}>
+                Market
+              </Link>
               {isVerified && hasMembership && (
                 <Link href="/vote" prefetch={false} className={navLinkClass}>
                   Vote
@@ -1009,6 +1012,13 @@ export default function Navbar() {
                     onClick={handleLinkClick}
                   >
                     Leaderboard
+                  </Link>
+                  <Link
+                    href="/market"
+                    className={mobileNavLinkClass}
+                    onClick={handleLinkClick}
+                  >
+                    Market
                   </Link>
                   {isVerified && hasMembership && (
                     <Link

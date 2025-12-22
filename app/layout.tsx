@@ -14,8 +14,9 @@ import { IframeCleanup } from "@/components/IframeCleanup";
 
 const inter = Inter({ 
   subsets: ["latin"],
-  // Next.js automatically handles font-display: swap and preloading
-  // The font is applied to body via inter.className, ensuring immediate use
+  display: 'swap',
+  preload: true,
+  adjustFontFallback: true,
 });
 
 export const metadata: Metadata = {
