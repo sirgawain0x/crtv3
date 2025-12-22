@@ -76,8 +76,9 @@ export default function VideoDetails({ asset, videoTitle }: VideoDetailsProps) {
       } catch { }
     };
     const fetchThumbnail = async () => {
+      if (!asset?.playbackId) return;
+      
       try {
-        if (!asset?.playbackId) return;
         // First, try to get thumbnail from database
         const row = await fetchVideoAssetByPlaybackId(asset.playbackId);
         if (row && (row as any).thumbnail_url) {
@@ -85,18 +86,30 @@ export default function VideoDetails({ asset, videoTitle }: VideoDetailsProps) {
           setThumbnailUrl(convertedUrl);
           return;
         }
+      } catch (error) {
+        // Silently fail - database thumbnail is optional
+      }
+      
+      try {
         // If no database thumbnail, try Livepeer VTT thumbnails
         const url = await getThumbnailUrl(asset.playbackId);
-        const convertedUrl = url ? convertFailingGateway(url) : null;
-        setThumbnailUrl(convertedUrl);
+        if (url) {
+          const convertedUrl = convertFailingGateway(url);
+          setThumbnailUrl(convertedUrl);
+        } else {
+          setThumbnailUrl(null);
+        }
       } catch (error) {
-        console.error('Error fetching thumbnail:', error);
+        // Silently fail - thumbnail is optional, video will still play
         setThumbnailUrl(null);
       }
     };
     fetchPlaybackSources();
     fetchDbStatus();
-    fetchThumbnail();
+    // Wrap in try-catch to prevent unhandled promise rejection
+    fetchThumbnail().catch(() => {
+      // Silently handle - thumbnail is optional
+    });
     const conProps: Record<string, unknown> = {
       ...(asset.playbackPolicy && {
         accessKey: generateAccessKey(
