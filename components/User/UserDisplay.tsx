@@ -41,6 +41,7 @@ const avatarSizes = {
 };
 
 const textSizes = {
+  xs: "text-[10px]",
   sm: "text-xs",
   md: "text-sm",
   lg: "text-base",
