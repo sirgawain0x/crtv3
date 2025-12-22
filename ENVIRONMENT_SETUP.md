@@ -124,25 +124,41 @@ Story Protocol network to use. Set to `"testnet"` for Aeneid testnet or `"mainne
 
 **Default:** `"testnet"`
 
+#### `NEXT_PUBLIC_STORY_ALCHEMY_API_KEY` (Optional)
+Alchemy API key for Story Protocol testnet. If provided, uses Alchemy's RPC endpoint for better reliability.
+
+**How to get it:**
+1. Go to [Alchemy Dashboard](https://dashboard.alchemy.com/)
+2. Create a new app or select an existing one
+3. Select "Story" as the chain (or use custom RPC)
+4. Copy the API key
+
+**Note:** If not provided, the public Story Protocol RPC will be used.
+
 **How to configure:**
 1. For testnet (recommended for development):
    ```bash
    NEXT_PUBLIC_STORY_NETWORK=testnet
    NEXT_PUBLIC_STORY_RPC_URL=https://rpc.aeneid.story.foundation
+   # Optional: Use Alchemy for better reliability
+   NEXT_PUBLIC_STORY_ALCHEMY_API_KEY=your_story_alchemy_key
    ```
 
 2. For mainnet (production):
    ```bash
    NEXT_PUBLIC_STORY_NETWORK=mainnet
    NEXT_PUBLIC_STORY_RPC_URL=https://rpc.story.foundation
+   # Optional: Use Alchemy for better reliability
+   NEXT_PUBLIC_STORY_ALCHEMY_API_KEY=your_story_alchemy_key
    ```
 
-**Note:** Story Protocol IP registration requires users to have an NFT minted for their video before registration. The registration process uses the user's connected wallet (via Account Kit) to sign transactions.
+**Note:** Story Protocol now supports mint-and-register functionality via SPG (Story Protocol Gateway). When enabled, videos are automatically minted as NFTs and registered as IP Assets on Story Protocol in a single transaction. Each creator gets their own NFT collection address for true ownership and branding.
 
 **Documentation:**
 - [Story Protocol Documentation](https://docs.story.foundation/)
 - [Story Protocol SDK](https://github.com/storyprotocol/core-sdk)
 - [Aeneid Testnet Guide](https://docs.story.foundation/developer-guides/testnet-setup)
+- [SPG (Story Protocol Gateway)](https://docs.story.foundation/concepts/spg/overview.md)
 
 ### 7. Optional Configuration
 
@@ -182,6 +198,8 @@ COINBASE_CDP_API_KEY_SECRET=your_cdp_api_key_secret
 # Story Protocol Configuration (Optional - for IP Asset registration)
 NEXT_PUBLIC_STORY_NETWORK=testnet
 NEXT_PUBLIC_STORY_RPC_URL=https://rpc.aeneid.story.foundation
+# Optional: Use Alchemy for Story Protocol (better reliability)
+# NEXT_PUBLIC_STORY_ALCHEMY_API_KEY=your_story_alchemy_key
 
 # NFT Contract Configuration (Optional - for NFT minting in upload flow)
 # Set this to your ERC-721 NFT contract address for video asset minting

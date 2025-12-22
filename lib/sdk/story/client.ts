@@ -7,7 +7,8 @@
  */
 
 import { StoryClient, StoryConfig } from "@story-protocol/core-sdk";
-import { http } from "viem";
+import { http, createPublicClient, createWalletClient } from "viem";
+import { alchemy, base } from "@account-kit/infra";
 import type { Address } from "viem";
 
 /**
@@ -58,5 +59,74 @@ export function createStoryClientWithAccount(accountAddress: Address): StoryClie
  */
 export function getStoryRpcUrl(): string {
   return process.env.NEXT_PUBLIC_STORY_RPC_URL || "https://rpc.aeneid.story.foundation";
+}
+
+/**
+ * Create a public client for Base chain
+ * Used for reading blockchain data on Base
+ */
+export function createBasePublicClient() {
+  return createPublicClient({
+    chain: base,
+    transport: alchemy({
+      apiKey: process.env.NEXT_PUBLIC_ALCHEMY_API_KEY as string,
+    }),
+  });
+}
+
+/**
+ * Create a public client for Story testnet
+ * Used for reading blockchain data on Story Protocol
+ */
+export function createStoryPublicClient() {
+  const rpcUrl = getStoryRpcUrl();
+  return createPublicClient({
+    transport: http(rpcUrl),
+  });
+}
+
+/**
+ * Create a wallet client for Base chain
+ * Used for writing transactions on Base
+ */
+export function createBaseWalletClient(account: Address) {
+  return createWalletClient({
+    chain: base,
+    transport: alchemy({
+      apiKey: process.env.NEXT_PUBLIC_ALCHEMY_API_KEY as string,
+    }),
+    account: account as any, // Type assertion for viem compatibility
+  });
+}
+
+/**
+ * Create a wallet client for Story Protocol (testnet or mainnet)
+ * Used for writing transactions on Story Protocol
+ */
+export function createStoryWalletClient(account: Address) {
+  const rpcUrl = getStoryRpcUrl();
+  const storyAlchemyKey = process.env.NEXT_PUBLIC_STORY_ALCHEMY_API_KEY;
+  const network = process.env.NEXT_PUBLIC_STORY_NETWORK || "testnet";
+  
+  // Use Alchemy RPC if available, otherwise use public RPC
+  // Determine the correct Alchemy endpoint based on network
+  let transport;
+  if (storyAlchemyKey) {
+    if (network === "mainnet") {
+      // Story mainnet Alchemy endpoint (when available)
+      transport = http(`https://story-mainnet.g.alchemy.com/v2/${storyAlchemyKey}`);
+    } else {
+      // Story testnet Alchemy endpoint
+      transport = http(`https://story-testnet.g.alchemy.com/v2/${storyAlchemyKey}`);
+    }
+  } else {
+    // Use public RPC (already configured for correct network via getStoryRpcUrl)
+    transport = http(rpcUrl);
+  }
+
+  return createWalletClient({
+    transport,
+    account: account as any, // Type assertion for viem compatibility
+  });
 }
 

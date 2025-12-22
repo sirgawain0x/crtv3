@@ -2,13 +2,19 @@
  * NFT Minting Service
  * Handles minting ERC-721 NFTs for video assets
  * 
- * This service mints NFTs using a configurable ERC-721 contract.
+ * This service supports two modes:
+ * 1. Base chain: Traditional ERC-721 minting (existing functionality)
+ * 2. Story Protocol: Minting via SPG with automatic IP registration (new)
+ * 
  * The contract address is configurable via environment variables.
  */
 
 import type { Address, Hex } from "viem";
 import { encodeFunctionData, parseAbi } from "viem";
 import { publicClient } from "@/lib/viem";
+import { createStoryClient } from "@/lib/sdk/story/client";
+import { mintAndRegisterIp } from "@/lib/sdk/story/spg-service";
+import { getOrCreateCreatorCollection } from "@/lib/sdk/story/collection-service";
 
 // Standard ERC721 ABI for minting
 const ERC721_MINT_ABI = parseAbi([
@@ -149,5 +155,65 @@ export function getNFTContractAddress(): Address | null {
     return null;
   }
   return address as Address;
+}
+
+/**
+ * Mint an NFT on Story Protocol using SPG (Story Protocol Gateway)
+ * This mints the NFT and registers it as an IP Asset in one transaction
+ * 
+ * @param creatorAddress - Creator's wallet address
+ * @param recipient - Address to receive the NFT
+ * @param metadataURI - IPFS/URI for NFT metadata
+ * @param collectionName - Optional collection name (if creating new collection)
+ * @param collectionSymbol - Optional collection symbol (if creating new collection)
+ * @returns Mint result with token ID, collection address, IP ID, and transaction hash
+ */
+export async function mintVideoNFTOnStory(
+  creatorAddress: Address,
+  recipient: Address,
+  metadataURI: string,
+  collectionName?: string,
+  collectionSymbol?: string
+): Promise<{
+  tokenId: string;
+  collectionAddress: Address;
+  ipId: string;
+  txHash: string;
+}> {
+  try {
+    // Create Story Protocol client
+    const storyClient = createStoryClient(creatorAddress);
+
+    // Get or create creator's collection
+    const defaultCollectionName = collectionName || `${creatorAddress.slice(0, 6)}'s Videos`;
+    const defaultCollectionSymbol = collectionSymbol || "CRTV";
+
+    const collectionAddress = await getOrCreateCreatorCollection(
+      storyClient,
+      creatorAddress,
+      defaultCollectionName,
+      defaultCollectionSymbol
+    );
+
+    // Mint and register as IP Asset in one transaction
+    const result = await mintAndRegisterIp(storyClient, {
+      collectionAddress,
+      recipient,
+      metadataURI,
+      allowDuplicates: false,
+    });
+
+    return {
+      tokenId: result.tokenId,
+      collectionAddress,
+      ipId: result.ipId,
+      txHash: result.txHash,
+    };
+  } catch (error) {
+    console.error("Failed to mint NFT on Story Protocol:", error);
+    throw new Error(
+      `Story Protocol NFT minting failed: ${error instanceof Error ? error.message : "Unknown error"}`
+    );
+  }
 }
 

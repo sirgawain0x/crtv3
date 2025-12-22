@@ -183,11 +183,17 @@ const HookMultiStepForm = () => {
               return;
             }
 
+            if (!videoAsset?.id) {
+              toast.error("Video asset not found. Please try uploading again.");
+              console.error("Video asset is null or missing ID:", videoAsset);
+              return;
+            }
+
             try {
               const latestAsset = await getLivepeerAsset(livepeerAsset.id);
 
               // --- PUBLISH LOGIC ---
-              const updatedAsset = await updateVideoAsset(videoAsset?.id as number, {
+              const updatedAsset = await updateVideoAsset(videoAsset.id, {
                 thumbnailUri: data.thumbnailUri,
                 status: "published",
                 metadata_uri: latestAsset?.storage?.ipfs?.nftMetadata?.url || null,
@@ -199,39 +205,85 @@ const HookMultiStepForm = () => {
 
               // --- STORY PROTOCOL IP REGISTRATION ---
               if (data.storyConfig?.registerIP && address) {
-                // Check if video has an NFT before attempting registration
-                if (!updatedAsset.contract_address || !updatedAsset.token_id) {
-                  toast.warning("Story Protocol registration skipped", {
-                    description: "Video must have an NFT minted before IP registration. Please mint an NFT for this video first, then register it on Story Protocol.",
-                    duration: 8000,
-                  });
-                  console.warn("Story Protocol registration skipped: Video does not have an NFT minted");
-                } else {
-                  try {
-                    toast.info("Registering IP on Story Protocol...");
-                    const { registerVideoAsIPAsset } = await import("@/services/story-protocol");
-                    
-                    const registrationResult = await registerVideoAsIPAsset(
-                      updatedAsset as VideoAsset,
-                      address as `0x${string}`,
-                      {
-                        registerIP: true,
-                        licenseTerms: data.storyConfig.licenseTerms,
-                        metadataURI: latestAsset?.storage?.ipfs?.nftMetadata?.url || undefined,
-                      }
-                    );
-
-                    if (registrationResult.success) {
-                      toast.success("IP registered on Story Protocol successfully!", {
-                        description: registrationResult.ipId ? `IP ID: ${registrationResult.ipId}` : undefined,
+                try {
+                  const metadataURI = latestAsset?.storage?.ipfs?.nftMetadata?.url;
+                  
+                  if (!metadataURI) {
+                    toast.warning("Story Protocol registration skipped", {
+                      description: "Video metadata URI is required for IP registration. Please ensure the video has been processed and metadata is available.",
+                      duration: 8000,
+                    });
+                    console.warn("Story Protocol registration skipped: No metadata URI available");
+                  } else {
+                    // Check if user already minted an NFT via NFTMintingStep
+                    if (data.nftMintResult?.tokenId && data.nftMintResult?.contractAddress) {
+                      // User already minted an NFT - register the existing NFT on Story Protocol
+                      console.log("Using existing NFT for Story Protocol registration:", data.nftMintResult);
+                      
+                      // First, update the video asset with the NFT info
+                      // videoAsset.id is already validated above
+                      await updateVideoAsset(videoAsset.id, {
+                        contract_address: data.nftMintResult.contractAddress,
+                        token_id: data.nftMintResult.tokenId,
+                        metadata_uri: metadataURI,
                       });
+
+                      // Then register the existing NFT as an IP Asset
+                      toast.info("Registering existing NFT as IP Asset on Story Protocol...");
+                      const { registerVideoAsIPAsset } = await import("@/services/story-protocol");
+                      
+                      const registrationResult = await registerVideoAsIPAsset(
+                        {
+                          ...updatedAsset,
+                          contract_address: data.nftMintResult.contractAddress,
+                          token_id: data.nftMintResult.tokenId,
+                          metadata_uri: metadataURI,
+                        } as VideoAsset,
+                        address as `0x${string}`,
+                        {
+                          registerIP: true,
+                          licenseTerms: data.storyConfig.licenseTerms,
+                          metadataURI: metadataURI,
+                        }
+                      );
+
+                      if (registrationResult.success) {
+                        toast.success("IP registered on Story Protocol!", {
+                          description: registrationResult.ipId 
+                            ? `IP ID: ${registrationResult.ipId} | Token ID: ${data.nftMintResult.tokenId}`
+                            : undefined,
+                        });
+                      } else {
+                        toast.error(`Story Protocol registration failed: ${registrationResult.error}`);
+                      }
                     } else {
-                      toast.error(`Story Protocol registration failed: ${registrationResult.error}`);
+                      // No existing NFT - mint and register on Story Protocol in one transaction
+                      toast.info("Minting NFT and registering IP on Story Protocol...");
+                      const { mintAndRegisterVideoIP } = await import("@/services/story-protocol");
+                      
+                      const mintResult = await mintAndRegisterVideoIP(
+                        updatedAsset as VideoAsset,
+                        address as `0x${string}`,
+                        metadataURI,
+                        undefined, // collectionName - will use default
+                        undefined, // collectionSymbol - will use default
+                        data.storyConfig.licenseTerms
+                      );
+
+                      if (mintResult.success) {
+                        toast.success("NFT minted and IP registered on Story Protocol!", {
+                          description: mintResult.ipId 
+                            ? `IP ID: ${mintResult.ipId} | Token ID: ${mintResult.tokenId}`
+                            : undefined,
+                        });
+                      } else {
+                        toast.error(`Story Protocol mint and register failed: ${mintResult.error}`);
+                      }
                     }
-                  } catch (storyError) {
-                    console.error("Story Protocol registration error:", storyError);
-                    toast.error("Failed to register IP on Story Protocol. You can register it later.");
                   }
+                } catch (storyError) {
+                  console.error("Story Protocol registration error:", storyError);
+                  toast.error("Failed to register IP on Story Protocol. You can try again later.");
                 }
               }
 

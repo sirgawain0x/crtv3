@@ -7,6 +7,12 @@
 
 import { createStoryClient } from "@/lib/sdk/story/client";
 import { registerIPAsset, attachLicenseTerms } from "@/lib/sdk/story/ip-registration";
+import {
+  mintAndRegisterIp,
+  mintAndRegisterIpAndAttachPilTerms,
+  type MintAndRegisterWithLicenseParams,
+} from "@/lib/sdk/story/spg-service";
+import { getOrCreateCreatorCollection } from "@/lib/sdk/story/collection-service";
 import { updateVideoAssetStoryIPStatus } from "./video-assets";
 import type { VideoAsset } from "@/lib/types/video-asset";
 import type {
@@ -206,6 +212,221 @@ export async function attachLicenseTermsToIP(
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}
+
+/**
+ * Mint an NFT and register it as an IP Asset on Story Protocol in one transaction
+ * Uses Story Protocol's SPG (Story Protocol Gateway) for efficient mint-and-register
+ * 
+ * @param videoAsset - Video asset to mint and register
+ * @param creatorAddress - Creator's wallet address
+ * @param metadataURI - IPFS metadata URI for the NFT
+ * @param collectionName - Name for the creator's collection (if creating new collection)
+ * @param collectionSymbol - Symbol for the creator's collection (if creating new collection)
+ * @param licenseTerms - Optional license terms to attach during minting
+ * @returns Mint and registration result
+ */
+export async function mintAndRegisterVideoIP(
+  videoAsset: VideoAsset,
+  creatorAddress: Address,
+  metadataURI: string,
+  collectionName?: string,
+  collectionSymbol?: string,
+  licenseTerms?: StoryLicenseTerms
+): Promise<{
+  success: boolean;
+  tokenId?: string;
+  collectionAddress?: Address;
+  ipId?: string;
+  txHash?: string;
+  licenseTermsIds?: string[];
+  error?: string;
+}> {
+  try {
+    if (!creatorAddress) {
+      return {
+        success: false,
+        error: "Creator address is required",
+      };
+    }
+
+    // Create Story Protocol client
+    const storyClient = createStoryClient(creatorAddress);
+
+    // Step 1: Get or create creator's collection
+    const defaultCollectionName = collectionName || `${creatorAddress.slice(0, 6)}'s Videos`;
+    const defaultCollectionSymbol = collectionSymbol || "CRTV";
+    
+    let collectionAddress: Address;
+    try {
+      collectionAddress = await getOrCreateCreatorCollection(
+        storyClient,
+        creatorAddress,
+        defaultCollectionName,
+        defaultCollectionSymbol
+      );
+    } catch (collectionError) {
+      console.error("Failed to get or create collection:", collectionError);
+      return {
+        success: false,
+        error: `Collection creation failed: ${collectionError instanceof Error ? collectionError.message : "Unknown error"}`,
+      };
+    }
+
+    // Step 2: Mint NFT and register as IP Asset (with optional license terms)
+    let result: {
+      tokenId: string;
+      ipId: string;
+      txHash: string;
+      licenseTermsIds?: string[];
+    };
+
+    if (licenseTerms) {
+      // Mint, register, and attach license terms in one transaction
+      const licenseParams: MintAndRegisterWithLicenseParams = {
+        collectionAddress,
+        recipient: creatorAddress,
+        metadataURI,
+        allowDuplicates: false,
+        licenseTermsData: [
+          {
+            terms: {
+              transferable: true,
+              commercialUse: licenseTerms.commercialUse ?? false,
+              commercialAttribution:
+                (licenseTerms.commercialUse ?? false) &&
+                (licenseTerms.derivativesAttribution ?? false),
+              commercializerChecker: "0x0000000000000000000000000000000000000000" as Address,
+              commercializerCheckerData: "0x0000000000000000000000000000000000000000" as Address,
+              commercialRevShare: licenseTerms.revenueShare ?? 0,
+              derivativesAllowed: licenseTerms.derivativesAllowed ?? false,
+              derivativesAttribution: licenseTerms.derivativesAttribution ?? false,
+              derivativesApproval: licenseTerms.derivativesApproval ?? false,
+              derivativesReciprocal: licenseTerms.derivativesReciprocal ?? false,
+              currency: "0x0000000000000000000000000000000000000000" as Address,
+              uri: "", // Required by SDK, use empty string if not needed
+              defaultMintingFee: 0, // Required by SDK
+              expiration: 0, // Required by SDK (0 = never expires)
+              commercialRevCeiling: 0, // Required by SDK
+              derivativeRevCeiling: 0, // Required by SDK
+            },
+          },
+        ],
+      };
+
+      const mintResult = await mintAndRegisterIpAndAttachPilTerms(
+        storyClient,
+        licenseParams
+      );
+
+      result = {
+        tokenId: mintResult.tokenId,
+        ipId: mintResult.ipId,
+        txHash: mintResult.txHash,
+        licenseTermsIds: mintResult.licenseTermsIds,
+      };
+    } else {
+      // Just mint and register (no license terms)
+      const mintResult = await mintAndRegisterIp(storyClient, {
+        collectionAddress,
+        recipient: creatorAddress,
+        metadataURI,
+        allowDuplicates: false,
+      });
+
+      result = {
+        tokenId: mintResult.tokenId,
+        ipId: mintResult.ipId,
+        txHash: mintResult.txHash,
+      };
+    }
+
+    // Step 3: Update video asset in database
+    try {
+      await updateVideoAssetStoryIPStatus(videoAsset.id, {
+        story_ip_registered: true,
+        story_ip_id: result.ipId,
+        story_ip_registration_tx: result.txHash,
+        story_license_terms_id: result.licenseTermsIds?.[0] || null,
+        story_license_template_id: licenseTerms?.templateId || null,
+        // Note: We should also update contract_address and token_id
+        // This requires updating the updateVideoAssetStoryIPStatus function
+      });
+
+      // Also update the collection address and NFT contract/token info
+      // Note: story_collection_address column is added by migration 20250118_add_creator_collections.sql
+      // If the migration hasn't been applied, gracefully handle the missing column
+      const { createServiceClient } = await import("@/lib/sdk/supabase/service");
+      const supabase = createServiceClient();
+      
+      const updateData: Record<string, any> = {
+        contract_address: collectionAddress,
+        token_id: result.tokenId,
+        story_collection_address: collectionAddress,
+      };
+      
+      // Try to update with story_collection_address first
+      // If the column doesn't exist (migration not applied), fall back to updating without it
+      const { error: updateError } = await supabase
+        .from("video_assets")
+        .update(updateData)
+        .eq("id", videoAsset.id);
+      
+      if (updateError) {
+        // Check if error is due to missing column (PostgreSQL error code 42703 = undefined_column)
+        const isColumnError = 
+          updateError.code === "42703" ||
+          updateError.message?.includes("story_collection_address") ||
+          updateError.message?.includes("column") ||
+          updateError.message?.toLowerCase().includes("does not exist");
+        
+        if (isColumnError) {
+          console.warn(
+            "story_collection_address column not found. " +
+            "Please run migration 20250118_add_creator_collections.sql. " +
+            "Updating without collection address..."
+          );
+          
+          // Retry without the story_collection_address column
+          const { error: retryError } = await supabase
+            .from("video_assets")
+            .update({
+              contract_address: collectionAddress,
+              token_id: result.tokenId,
+            })
+            .eq("id", videoAsset.id);
+          
+          if (retryError) {
+            console.error("Failed to update video asset (retry without collection address):", retryError);
+            // Don't throw - the on-chain registration succeeded, this is just metadata
+          }
+        } else {
+          // Some other database error occurred
+          console.error("Failed to update video asset with Story Protocol data:", updateError);
+          // Don't throw - the on-chain registration succeeded, this is just metadata
+        }
+      }
+    } catch (dbError) {
+      console.error("Failed to update video asset with Story Protocol data:", dbError);
+      // Continue - the on-chain registration succeeded
+      console.warn("IP Asset minted and registered on-chain but database update failed");
+    }
+
+    return {
+      success: true,
+      tokenId: result.tokenId,
+      collectionAddress,
+      ipId: result.ipId,
+      txHash: result.txHash,
+      licenseTermsIds: result.licenseTermsIds,
+    };
+  } catch (error) {
+    console.error("Mint and register IP Asset error:", error);
+    return {
+      success: false,
+      error: `Mint and register failed: ${error instanceof Error ? error.message : "Unknown error"}`,
     };
   }
 }

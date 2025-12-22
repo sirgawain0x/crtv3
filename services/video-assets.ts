@@ -201,6 +201,8 @@ export async function updateVideoAsset(
     requires_metoken?: boolean;
     metoken_price?: number | null;
     attributes?: Record<string, any> | null;
+    contract_address?: string | null;
+    token_id?: string | null;
     story_ip_registered?: boolean;
     story_ip_id?: string | null;
     story_ip_registration_tx?: string | null;
@@ -255,6 +257,12 @@ export async function updateVideoAsset(
   }
   if (data.attributes !== undefined) {
     updateData.attributes = data.attributes;
+  }
+  if (data.contract_address !== undefined) {
+    updateData.contract_address = data.contract_address;
+  }
+  if (data.token_id !== undefined) {
+    updateData.token_id = data.token_id;
   }
   if (data.story_ip_registered !== undefined) {
     updateData.story_ip_registered = data.story_ip_registered;
