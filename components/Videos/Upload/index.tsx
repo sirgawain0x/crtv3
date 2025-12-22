@@ -21,6 +21,8 @@ import type { VideoAsset } from "@/lib/types/video-asset";
 import { useUniversalAccount } from "@/lib/hooks/accountkit/useUniversalAccount";
 import { getLivepeerAsset } from "@/app/api/livepeer/assetUploadActions";
 import { useAutoDeployContentCoin } from "@/lib/hooks/marketplace/useAutoDeployContentCoin";
+import { useSmartAccountClient } from "@account-kit/react";
+import { createSplitForVideo } from "@/services/splits";
 
 const HookMultiStepForm = () => {
   const [activeStep, setActiveStep] = useState(1);
@@ -40,6 +42,7 @@ const HookMultiStepForm = () => {
   const { handleUploadSuccess } = useAutoDeployContentCoin();
 
   const { address, type, loading } = useUniversalAccount();
+  const { client: smartAccountClient } = useSmartAccountClient({ type: 'MultiOwnerModularAccount' });
 
   const router = useRouter();
 
@@ -121,7 +124,8 @@ const HookMultiStepForm = () => {
         story_ip_registered_at: null,
         story_license_terms_id: null,
         story_license_template_id: null,
-      });
+        splits_address: null,
+      }, data.collaborators);
 
       console.log('✅ Video asset created in DB:', dbAsset);
       setVideoAsset(dbAsset as VideoAsset);
@@ -192,13 +196,48 @@ const HookMultiStepForm = () => {
             try {
               const latestAsset = await getLivepeerAsset(livepeerAsset.id);
 
-              // --- PUBLISH LOGIC ---
+              // --- CREATE SPLIT CONTRACT (if collaborators exist) ---
+              let splitsAddress: string | null = null;
+              
+              if (videoAsset && smartAccountClient) {
+                try {
+                  // Check if video has collaborators by checking if metadata had collaborators
+                  const hasCollaborators = metadata?.collaborators && metadata.collaborators.length > 0;
+                  
+                  if (hasCollaborators) {
+                    toast.info("Creating revenue split contract...");
+                    const splitResult = await createSplitForVideo(videoAsset.id, smartAccountClient);
+                    
+                    if (splitResult.success && splitResult.splitAddress) {
+                      splitsAddress = splitResult.splitAddress;
+                      toast.success("Revenue split contract created!", {
+                        description: `Split address: ${splitResult.splitAddress.slice(0, 10)}...`,
+                      });
+                    } else {
+                      console.error("Split creation failed:", splitResult.error);
+                      toast.warning("Failed to create split contract", {
+                        description: splitResult.error || "Split creation failed. Video will be published without splits.",
+                      });
+                      // Continue with publishing even if split creation fails
+                    }
+                  }
+                } catch (splitError) {
+                  console.error("Error creating split contract:", splitError);
+                  toast.warning("Split creation error", {
+                    description: "Video will be published without revenue splits. You can add them later.",
+                  });
+                  // Continue with publishing
+                }
+              }
+
+              // --- PUBLISH LOGIC (Atomic Update with Split Address) ---
               const updatedAsset = await updateVideoAsset(videoAsset.id, {
                 thumbnailUri: data.thumbnailUri,
                 status: "published",
                 metadata_uri: latestAsset?.storage?.ipfs?.nftMetadata?.url || null,
                 requires_metoken: data.meTokenConfig?.requireMeToken || false,
                 metoken_price: data.meTokenConfig?.priceInMeToken || null,
+                splits_address: splitsAddress, // Include split address in atomic update
               });
 
               toast.success("Video uploaded and published successfully!");

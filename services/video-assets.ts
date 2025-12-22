@@ -5,9 +5,11 @@ import { createClient } from "@/lib/sdk/supabase/server";
 import { createServiceClient } from "@/lib/sdk/supabase/service";
 import type { VideoAsset } from "@/lib/types/video-asset";
 import { fullLivepeer } from "@/lib/sdk/livepeer/fullClient";
+import type { CollaboratorFormData } from "@/lib/types/splits";
 
 export async function createVideoAsset(
-  data: Omit<VideoAsset, "id" | "created_at" | "updated_at">
+  data: Omit<VideoAsset, "id" | "created_at" | "updated_at">,
+  collaborators?: CollaboratorFormData[]
 ) {
   // Use service client to bypass RLS since we're using smart account addresses
   // which don't match Supabase JWT authentication
@@ -48,12 +50,54 @@ export async function createVideoAsset(
       story_ip_registered_at: data.story_ip_registered_at || null,
       story_license_terms_id: data.story_license_terms_id || null,
       story_license_template_id: data.story_license_template_id || null,
+      splits_address: null, // Will be set when split contract is created during publish
     })
     .select()
     .single();
 
   if (error) {
     throw new Error(`Failed to create video asset: ${error.message}`);
+  }
+
+  // Store collaborators if provided
+  if (collaborators && collaborators.length > 0 && result?.id) {
+    // Convert percentages to basis points, ensuring total equals exactly 10000
+    // This handles rounding errors from decimal percentages (e.g., 33.333% + 33.333% + 33.334% = 100%)
+    const collaboratorInserts = collaborators.map((collab, index) => {
+      // Convert to basis points (0-10000)
+      let sharePercentage = Math.round(collab.percentage * 100);
+      
+      // For the last collaborator, adjust to ensure total equals exactly 10000
+      // This compensates for rounding errors in previous collaborators
+      if (index === collaborators.length - 1) {
+        // Calculate what the total would be without this last collaborator
+        const previousTotal = collaborators
+          .slice(0, -1)
+          .reduce((sum, c) => sum + Math.round(c.percentage * 100), 0);
+        
+        // Set the last collaborator's share to make the total exactly 10000
+        sharePercentage = 10000 - previousTotal;
+        
+        // Ensure it's within valid range (0-10000)
+        if (sharePercentage < 0) sharePercentage = 0;
+        if (sharePercentage > 10000) sharePercentage = 10000;
+      }
+      
+      return {
+        video_id: result.id,
+        collaborator_address: collab.address,
+        share_percentage: sharePercentage,
+      };
+    });
+
+    const { error: collabError } = await supabase
+      .from('video_collaborators')
+      .insert(collaboratorInserts);
+
+    if (collabError) {
+      console.error('Failed to store collaborators:', collabError);
+      // Don't throw - video asset is created, collaborators can be added later
+    }
   }
 
   return result;
@@ -209,6 +253,7 @@ export async function updateVideoAsset(
     story_ip_registered_at?: Date | null;
     story_license_terms_id?: string | null;
     story_license_template_id?: string | null;
+    splits_address?: string | null;
   }
 ) {
   // Use service client to bypass RLS
@@ -281,6 +326,9 @@ export async function updateVideoAsset(
   }
   if (data.story_license_template_id !== undefined) {
     updateData.story_license_template_id = data.story_license_template_id;
+  }
+  if (data.splits_address !== undefined) {
+    updateData.splits_address = data.splits_address;
   }
 
   const { data: result, error } = await supabase

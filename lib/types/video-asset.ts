@@ -50,6 +50,8 @@ export interface VideoAsset {
   story_ip_registered_at: Date | null;  // When IP was registered
   story_license_terms_id: string | null;  // ID of attached license terms
   story_license_template_id: string | null;  // ID of license template used
+  // Splits.org fields
+  splits_address: string | null;  // Address of the Splits contract for revenue distribution
   created_at: Date;
   updated_at: Date;
 }

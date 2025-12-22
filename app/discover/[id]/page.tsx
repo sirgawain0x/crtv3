@@ -27,6 +27,7 @@ import { Suspense } from "react";
 import { VideoShareButton } from "@/components/Videos/VideoShareButton";
 import { VideoBuyButton } from "@/components/Videos/VideoBuyButton";
 import { VideoEditButton } from "@/components/Videos/VideoEditButton";
+import { VideoSplitDistributeButton } from "@/components/Videos/VideoSplitDistributeButton";
 import { CreatorDisplay } from "@/components/Creator/CreatorDisplay";
 
 type VideoDetailsPageProps = {
@@ -165,12 +166,21 @@ export default async function VideoDetailsPage({
               )}
               <div className="flex items-center gap-2">
                 {creatorAddress && (
-                  <Suspense fallback={<div className="h-9 w-9" />}>
-                    <VideoEditButton
-                      videoAssetId={id}
-                      creatorId={creatorAddress}
-                    />
-                  </Suspense>
+                  <>
+                    <Suspense fallback={<div className="h-9 w-9" />}>
+                      <VideoEditButton
+                        videoAssetId={id}
+                        creatorId={creatorAddress}
+                      />
+                    </Suspense>
+                    <Suspense fallback={<div className="h-9 w-9" />}>
+                      <VideoSplitDistributeButton
+                        videoAssetId={id}
+                        creatorId={creatorAddress}
+                        splitsAddress={videoAsset?.splits_address || null}
+                      />
+                    </Suspense>
+                  </>
                 )}
                 <Suspense fallback={<div className="h-9 w-9" />}>
                   {assetData?.playbackId && (

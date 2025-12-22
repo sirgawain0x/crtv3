@@ -13,6 +13,9 @@
     "postinstall": "echo 'Postinstall completed successfully'"
   },
   "dependencies": {
+    "@0xsplits/splits-kit": "^2.2.0",
+    "@0xsplits/splits-sdk": "^6.3.0",
+    "@0xsplits/splits-sdk-react": "^4.2.0",
     "@aa-sdk/core": "^4.65.0",
     "@aa-sdk/ethers": "^4.65.0",
     "@account-kit/core": "^4.65.0",
