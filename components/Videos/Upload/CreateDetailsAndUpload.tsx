@@ -17,6 +17,9 @@ import FileUpload from "./FileUpload";
 import { TVideoMetaForm } from "./Create-info";
 import { useState } from "react";
 import { Asset } from "livepeer/models/components";
+import { Collapsible } from "@/components/ui/collapsible";
+import { SplitsCollaboratorsForm } from "./SplitsCollaboratorsForm";
+import { Users } from "lucide-react";
 
 type CreateDetailsAndUploadProps = {
     onPressNext: (formData: TVideoMetaForm, livepeerAsset: Asset) => void;
@@ -33,7 +36,8 @@ const CreateDetailsAndUpload = ({ onPressNext }: CreateDetailsAndUploadProps) =>
             description: "",
             location: "",
             category: "",
-            ticker: ""
+            ticker: "",
+            collaborators: []
         },
     });
 
@@ -184,6 +188,25 @@ const CreateDetailsAndUpload = ({ onPressNext }: CreateDetailsAndUploadProps) =>
                                             </FormItem>
                                         )}
                                     />
+
+                                    {/* Revenue Splits Section */}
+                                    <div className="pt-2">
+                                        <Collapsible
+                                            trigger={
+                                                <div className="flex items-center gap-2">
+                                                    <Users className="h-4 w-4" />
+                                                    <span>Revenue Splits (Optional)</span>
+                                                </div>
+                                            }
+                                        >
+                                            <SplitsCollaboratorsForm
+                                                collaborators={form.watch("collaborators") || []}
+                                                onChange={(collaborators) => {
+                                                    form.setValue("collaborators", collaborators, { shouldValidate: true });
+                                                }}
+                                            />
+                                        </Collapsible>
+                                    </div>
                                 </div>
                             </div>
                         </form>

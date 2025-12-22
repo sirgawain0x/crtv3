@@ -18,6 +18,7 @@ import { AddressWithCopy } from "@/components/Creator/AddressWithCopy";
 import { convertFailingGateway } from "@/lib/utils/image-gateway";
 import { meTokenSupabaseService } from "@/lib/sdk/supabase/metokens";
 import { CreatorProfileHeader } from "@/components/Creator/CreatorProfileHeader";
+import { TokenPriceChart } from "@/components/Market/TokenPriceChart";
 
 type CreatorPageProps = {
   params: Promise<{
@@ -135,6 +136,18 @@ export default async function CreatorPage({ params }: CreatorPageProps) {
           </CardContent>
         </Card>
       </div>
+
+      {/* MeToken Price Chart */}
+      {meToken && meToken.address && (
+        <div className="mb-8">
+          <TokenPriceChart
+            tokenAddress={meToken.address}
+            tokenSymbol={meToken.symbol || displaySymbol || 'TOKEN'}
+            height={400}
+            showControls={true}
+          />
+        </div>
+      )}
 
       {/* Videos Section */}
       <div>

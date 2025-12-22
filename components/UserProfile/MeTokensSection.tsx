@@ -14,6 +14,7 @@ import { MeTokenTrading } from './MeTokenTrading';
 import { MeTokenInfo } from './MeTokenInfo';
 import { CreatorProfileManager } from './CreatorProfileManager';
 import { MeTokenHistory } from './MeTokenHistory';
+import { TokenPriceChart } from '@/components/Market/TokenPriceChart';
 import { Loader2, AlertCircle, Plus, TrendingUp, Info, RefreshCw, Search, Wallet, User, History, Copy, Check, Coins, DollarSign, BarChart3 } from 'lucide-react';
 import { formatEther } from 'viem';
 
@@ -374,7 +375,7 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
                   ${userMeToken.symbol} - Total Value Locked: ${userMeToken.tvl.toFixed(2)}
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-6">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
                   {/* Your Balance */}
                   <div className="rounded-lg border bg-muted/30 p-4 sm:p-5 space-y-2">
@@ -433,6 +434,26 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
                 </div>
               </CardContent>
             </Card>
+
+            {/* Price Chart */}
+            {userMeToken.address && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Price Chart</CardTitle>
+                  <CardDescription>
+                    Historical price data for {userMeToken.symbol}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <TokenPriceChart
+                    tokenAddress={userMeToken.address}
+                    tokenSymbol={userMeToken.symbol}
+                    height={400}
+                    showControls={true}
+                  />
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
           <TabsContent value="profile">
