@@ -19,7 +19,10 @@ const ERC20_ABI = [
 
 /**
  * Cron job to sync token data from blockchain to Supabase
- * Runs every 15 minutes to keep market data fresh
+ * Runs once per day at 3:00 AM (Vercel Hobby plan limitation: once per day max)
+ * 
+ * Note: On Hobby plan, execution may occur anywhere between 3:00-3:59 AM.
+ * For more frequent updates, upgrade to Pro plan and change schedule in vercel.json.
  * 
  * Security: Requires CRON_SECRET in Authorization header
  */
