@@ -26,6 +26,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { VideoShareButton } from "@/components/Videos/VideoShareButton";
 import { VideoBuyButton } from "@/components/Videos/VideoBuyButton";
+import { CreatorDisplay } from "@/components/Creator/CreatorDisplay";
 
 type VideoDetailsPageProps = {
   params: Promise<{
@@ -157,32 +158,7 @@ export default async function VideoDetailsPage({
             {/* Uploader Section with Share Button */}
             <div className="flex items-center justify-between mt-4">
               {creatorAddress ? (
-                <Link
-                  href={`/creator/${creatorAddress}`}
-                  className="flex items-center gap-3 hover:opacity-80 transition-opacity cursor-pointer"
-                >
-                  <Avatar className="h-10 w-10">
-                    <AvatarImage
-                      src={creatorProfile?.avatar_url ? convertFailingGateway(creatorProfile.avatar_url) : makeBlockie(creatorAddress)}
-                      alt={creatorProfile?.username || "Creator"}
-                    />
-                    <AvatarFallback>
-                      {creatorProfile?.username
-                        ? creatorProfile.username.charAt(0).toUpperCase()
-                        : creatorAddress.slice(2, 3).toUpperCase() || "C"}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex flex-col">
-                    <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                      {creatorProfile?.username || shortenAddress(creatorAddress)}
-                    </span>
-                    {creatorProfile?.username && (
-                      <span className="text-xs text-gray-500 dark:text-gray-400 font-mono">
-                        {shortenAddress(creatorAddress)}
-                      </span>
-                    )}
-                  </div>
-                </Link>
+                <CreatorDisplay creatorAddress={creatorAddress} />
               ) : (
                 <div></div>
               )}

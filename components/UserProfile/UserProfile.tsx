@@ -23,6 +23,7 @@ import {
 } from "@/components/auth/MembershipGuard";
 import type { MembershipDetails } from "@/lib/hooks/unlock/useMembershipVerification";
 import { MeTokensSection } from "./MeTokensSection";
+import { UserDisplay } from "@/components/User/UserDisplay";
 
 function useServerMembership(address?: string) {
   const [data, setData] = useState<any>(null);
@@ -97,7 +98,19 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
   return (
     <ProfilePageGuard>
       <div className="container mx-auto px-4 py-8">
-          <Tabs defaultValue="Uploads" className="w-full">
+        {/* Profile Header */}
+        {displayAddress && (
+          <div className="mb-6">
+            <UserDisplay
+              address={displayAddress}
+              avatarSize="lg"
+              showAddress={true}
+              clickable={false}
+              variant="inline"
+            />
+          </div>
+        )}
+        <Tabs defaultValue="Uploads" className="w-full">
             <TabsList className="flex h-10 items-center justify-start space-x-1 rounded-lg bg-muted p-1">
               <TabsTrigger
                 value="Uploads"

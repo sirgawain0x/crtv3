@@ -27,7 +27,19 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
   const [sellPreview, setSellPreview] = useState('0');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<React.ReactNode | null>(null);
-  const [isSubscribed, setIsSubscribed] = useState<boolean | null>(null);
+  
+  // Initialize subscription status from meToken prop data immediately
+  // This prevents showing "not subscribed" while waiting for blockchain check
+  const getInitialSubscriptionStatus = (meToken: MeTokenData): boolean => {
+    // Check balancePooled and balanceLocked directly from prop data
+    const balancePooled = meToken.info?.balancePooled ?? BigInt(0);
+    const balanceLocked = meToken.info?.balanceLocked ?? BigInt(0);
+    return balancePooled > BigInt(0) || balanceLocked > BigInt(0);
+  };
+  
+  const [isSubscribed, setIsSubscribed] = useState<boolean | null>(() => 
+    getInitialSubscriptionStatus(meToken)
+  );
   const [daiAllowance, setDaiAllowance] = useState<bigint>(BigInt(0));
   const [daiBalance, setDaiBalance] = useState<bigint>(BigInt(0));
   const [isCheckingSubscription, setIsCheckingSubscription] = useState(false);
@@ -46,24 +58,45 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
   } = useMeTokensSupabase();
 
   // Check if MeToken is subscribed using the blockchain utility function
+  // Falls back to meToken prop data if blockchain check fails
   const checkSubscriptionStatus = useCallback(async () => {
     if (!client || !meToken.address) return;
 
+    // First, check subscription status from meToken prop data (fast, from database)
+    const { isMeTokenSubscribed } = await import('@/lib/utils/metokenSubscriptionUtils');
+    const propSubscriptionStatus = isMeTokenSubscribed(meToken);
+    console.log('🔍 Subscription status from prop data:', propSubscriptionStatus, {
+      balancePooled: meToken.info?.balancePooled?.toString(),
+      balanceLocked: meToken.info?.balanceLocked?.toString(),
+      hubId: meToken.hubId
+    });
+
+    // Set initial status from prop data
+    setIsSubscribed(propSubscriptionStatus);
+
+    // Then verify with blockchain check (slower, but more accurate)
     setIsCheckingSubscription(true);
     try {
-      console.log('🔍 Checking real subscription status for trading component:', meToken.address);
-      // Use the blockchain utility function to check real subscription status
+      console.log('🔍 Verifying subscription status from blockchain:', meToken.address);
       const { checkMeTokenSubscriptionFromBlockchain } = await import('@/lib/utils/metokenSubscriptionUtils');
       const status = await checkMeTokenSubscriptionFromBlockchain(meToken.address);
-      console.log('✅ Real subscription status for trading:', status);
-      setIsSubscribed(status.isSubscribed);
+      console.log('✅ Blockchain subscription status:', status);
+      
+      // Use blockchain result if available, otherwise keep prop data result
+      if (!status.error) {
+        setIsSubscribed(status.isSubscribed);
+      } else {
+        console.warn('⚠️ Blockchain check failed, using prop data:', status.error);
+        // Keep the prop data result we set earlier
+      }
     } catch (err) {
-      console.error('Failed to check subscription status:', err);
-      setIsSubscribed(false);
+      console.error('Failed to check subscription status from blockchain:', err);
+      // Keep the prop data result we set earlier instead of defaulting to false
+      console.log('ℹ️ Using subscription status from prop data due to blockchain check failure');
     } finally {
       setIsCheckingSubscription(false);
     }
-  }, [client, meToken.address]);
+  }, [client, meToken]);
 
   // Check DAI balance
   const checkDaiBalance = useCallback(async () => {
@@ -136,12 +169,12 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
     }
   };
 
-  // Check subscription status on mount
+  // Check subscription status on mount and when meToken data changes
   useEffect(() => {
     checkSubscriptionStatus();
     checkDaiBalance();
     checkDaiAllowance();
-  }, [meToken.address, checkSubscriptionStatus, checkDaiBalance, checkDaiAllowance]);
+  }, [meToken.address, meToken.info?.balancePooled, meToken.info?.balanceLocked, meToken.hubId, checkSubscriptionStatus, checkDaiBalance, checkDaiAllowance]);
 
   // Calculate buy preview when amount changes
   useEffect(() => {
@@ -422,11 +455,11 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
 
         <Tabs defaultValue="buy" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="buy" className="flex items-center gap-2">
+            <TabsTrigger value="buy" className="flex items-center gap-2 data-[state=active]:bg-green-600 data-[state=active]:text-white">
               <TrendingUp className="h-4 w-4" />
               Buy
             </TabsTrigger>
-            <TabsTrigger value="sell" className="flex items-center gap-2">
+            <TabsTrigger value="sell" className="flex items-center gap-2 data-[state=active]:bg-red-600 data-[state=active]:text-white">
               <TrendingDown className="h-4 w-4" />
               Sell
             </TabsTrigger>
@@ -479,7 +512,7 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
             <Button
               onClick={handleBuy}
               disabled={isLoading || !buyAmount || parseFloat(buyAmount) <= 0 || daiBalance < parseEther(buyAmount || '0')}
-              className="w-full"
+              className="w-full bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading ? (
                 <>
@@ -514,7 +547,7 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
             <Button
               onClick={handleSell}
               disabled={isLoading || !sellAmount || parseFloat(sellAmount) <= 0}
-              className="w-full"
+              className="w-full bg-red-600 hover:bg-red-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading ? (
                 <>

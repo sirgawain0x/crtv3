@@ -30,6 +30,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { UserDisplayCompact, UserNameDisplay } from "@/components/User/UserDisplay";
 
 interface VideoCommentsProps {
   videoAssetId: number;
@@ -238,17 +239,19 @@ export function VideoComments({ videoAssetId, videoName, className }: VideoComme
                   {/* Comment */}
                   <div className="flex gap-3">
                     <div className="flex-shrink-0">
-                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                        <span className="text-xs font-medium">
-                          {formatAddress(comment.commenter_address).slice(0, 2).toUpperCase()}
-                        </span>
-                      </div>
+                      <UserDisplayCompact
+                        address={comment.commenter_address}
+                        avatarSize="md"
+                        showAddress={false}
+                      />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-sm font-medium">
-                          {formatAddress(comment.commenter_address)}
-                        </span>
+                        <UserNameDisplay
+                          address={comment.commenter_address}
+                          size="sm"
+                          showAddress={true}
+                        />
                         <span className="text-xs text-muted-foreground">
                           {new Date(comment.created_at).toLocaleDateString([], {
                             month: "short",
@@ -416,17 +419,19 @@ export function VideoComments({ videoAssetId, videoName, className }: VideoComme
                             return (
                               <div key={reply.id} className="flex gap-2">
                                 <div className="flex-shrink-0">
-                                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
-                                    <span className="text-[10px] font-medium">
-                                      {formatAddress(reply.commenter_address).slice(0, 2).toUpperCase()}
-                                    </span>
-                                  </div>
+                                  <UserDisplayCompact
+                                    address={reply.commenter_address}
+                                    avatarSize="sm"
+                                    showAddress={false}
+                                  />
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-2 mb-1">
-                                    <span className="text-xs font-medium">
-                                      {formatAddress(reply.commenter_address)}
-                                    </span>
+                                    <UserNameDisplay
+                                      address={reply.commenter_address}
+                                      size="sm"
+                                      showAddress={true}
+                                    />
                                     <span className="text-[10px] text-muted-foreground">
                                       {new Date(reply.created_at).toLocaleDateString([], {
                                         month: "short",

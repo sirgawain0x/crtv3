@@ -39,6 +39,8 @@ import { generateAccessKey, WebhookContext } from "@/lib/access-key";
 import { Skeleton } from "../ui/skeleton";
 import { Badge } from "../ui/badge";
 import { fetchVideoAssetByPlaybackId } from "@/lib/utils/video-assets-client";
+import { getThumbnailUrl } from "@/lib/utils/thumbnail";
+import { convertFailingGateway } from "@/lib/utils/image-gateway";
 
 type VideoDetailsProps = {
   asset: Asset;
@@ -49,6 +51,7 @@ export default function VideoDetails({ asset, videoTitle }: VideoDetailsProps) {
   const [playbackSources, setPlaybackSources] = useState<Src[] | null>(null);
   const [conditionalProps, setConditionalProps] = useState<any>({});
   const [dbStatus, setDbStatus] = useState<"draft" | "published" | "minted" | "archived" | null>(null);
+  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
 
   const user = useUser();
   const account = userToAccount(user);
@@ -72,8 +75,28 @@ export default function VideoDetails({ asset, videoTitle }: VideoDetailsProps) {
         }
       } catch { }
     };
+    const fetchThumbnail = async () => {
+      try {
+        if (!asset?.playbackId) return;
+        // First, try to get thumbnail from database
+        const row = await fetchVideoAssetByPlaybackId(asset.playbackId);
+        if (row && (row as any).thumbnail_url) {
+          const convertedUrl = convertFailingGateway((row as any).thumbnail_url);
+          setThumbnailUrl(convertedUrl);
+          return;
+        }
+        // If no database thumbnail, try Livepeer VTT thumbnails
+        const url = await getThumbnailUrl(asset.playbackId);
+        const convertedUrl = url ? convertFailingGateway(url) : null;
+        setThumbnailUrl(convertedUrl);
+      } catch (error) {
+        console.error('Error fetching thumbnail:', error);
+        setThumbnailUrl(null);
+      }
+    };
     fetchPlaybackSources();
     fetchDbStatus();
+    fetchThumbnail();
     const conProps: Record<string, unknown> = {
       ...(asset.playbackPolicy && {
         accessKey: generateAccessKey(
@@ -345,7 +368,11 @@ export default function VideoDetails({ asset, videoTitle }: VideoDetailsProps) {
             <>
               <Player.Root src={playbackSources} {...conditionalProps}>
                 <Player.Container className="aspect-video w-full overflow-hidden rounded-lg bg-gray-800">
-                  <Player.Video title={asset?.name} className="h-full w-full" />
+                  <Player.Video 
+                    title={asset?.name} 
+                    className="h-full w-full" 
+                    poster={thumbnailUrl || undefined}
+                  />
                   <Player.LoadingIndicator
                     className="relative h-full w-full bg-black/50 backdrop-blur data-[visible=true]:animate-in 
                   data-[visible=false]:animate-out data-[visible=false]:fade-out-0 data-[visible=true]:fade-in-0"
@@ -408,6 +435,32 @@ export default function VideoDetails({ asset, videoTitle }: VideoDetailsProps) {
                       <LoadingIcon className="mx-auto h-6 w-6 animate-spin md:h-8 md:w-8" />
                     </div>
                   </Player.ErrorIndicator>
+
+                  {/* Play button overlay - shows when video is not playing */}
+                  <Player.PlayingIndicator
+                    matcher={false}
+                    className="absolute inset-0 z-20 flex items-center justify-center 
+                    data-[visible=true]:animate-in data-[visible=false]:animate-out 
+                    data-[visible=false]:fade-out-0 data-[visible=true]:fade-in-0"
+                  >
+                    <Player.PlayPauseTrigger className="group relative flex h-20 w-20 cursor-pointer 
+                      touch-none items-center justify-center rounded-full bg-black/50 
+                      hover:bg-black/70 transition-all duration-200 hover:scale-110">
+                      <Player.PlayingIndicator asChild matcher={false}>
+                        <PlayIcon
+                          className="h-12 w-12 ml-1"
+                          style={{ color: "#EC407A" }}
+                        />
+                      </Player.PlayingIndicator>
+                      <Player.PlayingIndicator asChild>
+                        <PauseIcon
+                          className="h-12 w-12"
+                          style={{ color: "#EC407A" }}
+                        />
+                      </Player.PlayingIndicator>
+                    </Player.PlayPauseTrigger>
+                  </Player.PlayingIndicator>
+
                   <Player.Controls
                     className="flex flex-col-reverse gap-1 bg-gradient-to-b 
                   from-black/5 via-black/30 via-80% to-black/60 px-3 py-2 duration-1000 
