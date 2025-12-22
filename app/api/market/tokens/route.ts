@@ -48,7 +48,9 @@ export async function GET(request: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50');
     const offset = parseInt(searchParams.get('offset') || '0');
     const includeStats = searchParams.get('includeStats') === 'true';
-    const useFreshData = searchParams.get('fresh') === 'true'; // Option to fetch fresh data from blockchain
+    // Only fetch fresh data from blockchain if explicitly requested (disabled by default for performance)
+    // Background cron job keeps Supabase data fresh
+    const useFreshData = searchParams.get('fresh') === 'true';
 
     const supabase = await createClient();
 
@@ -380,7 +382,7 @@ export async function GET(request: NextRequest) {
       };
     }
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       data: paginatedTokens,
       pagination: {
         total,
@@ -390,6 +392,21 @@ export async function GET(request: NextRequest) {
       },
       ...(stats && { stats }),
     });
+
+    // Add caching headers for Vercel Edge Cache
+    // Shorter cache for search queries or fresh data requests, longer for standard queries
+    const cacheDuration = search || useFreshData
+      ? "public, s-maxage=10, stale-while-revalidate=30" // Short cache for dynamic queries
+      : "public, s-maxage=60, stale-while-revalidate=300"; // Longer cache for standard queries
+    
+    response.headers.set("Cache-Control", cacheDuration);
+    
+    // Add cache tags for Vercel cache invalidation
+    const cacheTags = ['market', 'tokens', type || 'all'];
+    if (search) cacheTags.push(`search:${search}`);
+    response.headers.set("x-vercel-cache-tags", cacheTags.join(','));
+
+    return response;
   } catch (error) {
     console.error('Error fetching market tokens:', error);
     return NextResponse.json(
