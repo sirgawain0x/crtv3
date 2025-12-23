@@ -12,7 +12,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Loader2, ArrowRightLeft, CheckCircle, Wallet } from "lucide-react";
-import { formatEther, toHex, parseEther } from "viem";
+import { toHex, parseUnits, formatUnits } from "viem";
+import { USDC_TOKEN_ADDRESSES, USDC_TOKEN_DECIMALS } from "@/lib/contracts/USDCToken";
 
 /**
  * Supported Chain IDs
@@ -25,10 +26,17 @@ const CHAIN_IDS = {
 
 /**
  * Token Addresses
- * NATIVE: 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEee
+ * NATIVE: 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEee (ETH or IP token)
+ * USDC on Base: 0x833589fcd6edb6e08f4c7c32d4f71b54bda02913
+ * USDC on Story Mainnet: 0xF1815bd50389c46847f0Bda824eC8da914045D14
+ * Note: Story testnet USDC address TBD - using mainnet for now
  */
 const TOKENS = {
     NATIVE: "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEee",
+    USDC_BASE: USDC_TOKEN_ADDRESSES.base,
+    USDC_STORY_MAINNET: "0xF1815bd50389c46847f0Bda824eC8da914045D14",
+    // TODO: Add Story testnet USDC address when available
+    USDC_STORY_TESTNET: "0xF1815bd50389c46847f0Bda824eC8da914045D14", // Using mainnet address as placeholder
 } as const;
 
 interface CrossChainSwapProps {
@@ -43,9 +51,15 @@ export function CrossChainSwap({ onSwapSuccess, requiredAmount }: CrossChainSwap
     const [quote, setQuote] = useState<any>(null); // TODO: Type properly from SDK if available
 
     // Get current Story Network from env or default to testnet
-    const targetChainId = process.env.NEXT_PUBLIC_STORY_NETWORK === "mainnet"
+    const isMainnet = process.env.NEXT_PUBLIC_STORY_NETWORK === "mainnet";
+    const targetChainId = isMainnet
         ? CHAIN_IDS.STORY_MAINNET
         : CHAIN_IDS.STORY_TESTNET;
+    
+    // Get USDC address for target Story network
+    const storyUsdcAddress = isMainnet
+        ? TOKENS.USDC_STORY_MAINNET
+        : TOKENS.USDC_STORY_TESTNET;
 
     // 1. Prepare Swap Hook
     const { prepareSwapAsync, isPreparingSwap } = usePrepareSwap({
@@ -75,16 +89,31 @@ export function CrossChainSwap({ onSwapSuccess, requiredAmount }: CrossChainSwap
         setQuote(null);
 
         try {
-            // Use requiredAmount if provided, otherwise default to 0.001 ETH
-            const val = requiredAmount ? parseEther(requiredAmount) : BigInt("1000000000000000"); // 0.001 ETH
+            // Use requiredAmount if provided, otherwise default to 1 USDC
+            // USDC has 6 decimals, so 1 USDC = 1000000 units
+            const defaultAmount = "1"; // 1 USDC
+            const amountStr = requiredAmount || defaultAmount;
+            const val = parseUnits(amountStr, USDC_TOKEN_DECIMALS);
             const amountToSwap = toHex(val);
+
+            // Get paymaster policy ID from env (if configured)
+            const paymasterPolicyId = process.env.NEXT_PUBLIC_ALCHEMY_PAYMASTER_POLICY_ID;
 
             const result = await prepareSwapAsync({
                 from: client.account.address,
-                fromToken: TOKENS.NATIVE,
+                fromToken: TOKENS.USDC_BASE, // USDC on Base
                 toChainId: toHex(targetChainId),
-                toToken: TOKENS.NATIVE, // Native IP token on Story
+                toToken: storyUsdcAddress, // USDC on Story
                 fromAmount: amountToSwap,
+                // Include paymaster capabilities if policy ID is configured
+                // This allows gas sponsorship or paying gas with ERC-20 tokens (like USDC)
+                ...(paymasterPolicyId && {
+                    capabilities: {
+                        paymasterService: {
+                            policyId: paymasterPolicyId,
+                        },
+                    },
+                }),
             });
 
             const { quote: swapQuote, ...calls } = result;
@@ -130,7 +159,7 @@ export function CrossChainSwap({ onSwapSuccess, requiredAmount }: CrossChainSwap
                     Fund Story Wallet
                 </CardTitle>
                 <CardDescription>
-                    Swap ETH from Base to $IP on Story Protocol to pay for gas fees.
+                    Swap USDC from Base to USDC on Story Protocol.
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -162,7 +191,7 @@ export function CrossChainSwap({ onSwapSuccess, requiredAmount }: CrossChainSwap
                             </>
                         ) : (
                             <>
-                                Get Quote (0.001 ETH)
+                                Get Quote (1 USDC)
                             </>
                         )}
                     </Button>
@@ -173,13 +202,15 @@ export function CrossChainSwap({ onSwapSuccess, requiredAmount }: CrossChainSwap
                         <div className="bg-white p-3 rounded-md border text-sm">
                             <div className="flex justify-between mb-1">
                                 <span className="text-muted-foreground">Pay (Base):</span>
-                                <span className="font-medium">0.001 ETH</span>
+                                <span className="font-medium">
+                                    {requiredAmount ? `${requiredAmount} USDC` : "1 USDC"}
+                                </span>
                             </div>
                             <div className="flex justify-between">
                                 <span className="text-muted-foreground">Receive (Story):</span>
                                 {/* Display estimated receive amount if available in quote */}
                                 <span className="font-medium">
-                                    {quote.quote.minimumToAmount ? `~${formatEther(BigInt(quote.quote.minimumToAmount))} IP` : "Calculated at execution"}
+                                    {quote.quote.minimumToAmount ? `~${formatUnits(BigInt(quote.quote.minimumToAmount), USDC_TOKEN_DECIMALS)} USDC` : "Calculated at execution"}
                                 </span>
                             </div>
                         </div>
