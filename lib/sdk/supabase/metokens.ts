@@ -193,18 +193,14 @@ export class MeTokenSupabaseService {
     // Wrap in try-catch to gracefully fallback to regular client if service key is not configured
     // Note: createServiceClient() throws an error if SUPABASE_SERVICE_ROLE_KEY is missing,
     // so we catch it and fall back to the regular client (which will be subject to RLS)
-    let serviceClient: ReturnType<typeof createServiceClient> | null = null;
+    let serviceClient: ReturnType<typeof createServiceClient>;
     try {
       serviceClient = createServiceClient();
     } catch (error) {
-      // Service role key not configured - fallback to regular client
-      // This will still be subject to RLS, but allows the operation to proceed
-      // The try-catch prevents the function from crashing, and the fallback below ensures
-      // we always have a valid client to use
-      console.warn('Service role key not available, using regular client (may be subject to RLS):', error instanceof Error ? error.message : String(error));
+      console.error('Failed to create service client for balance update:', error);
+      throw new Error('Service configuration error: Unable to authenticate as service role');
     }
-    // Fallback to regular client if service client creation failed (serviceClient will be null)
-    const client = serviceClient || supabase;
+    const client = serviceClient;
 
     const { data, error } = await client
       .from('metoken_balances')
@@ -213,6 +209,8 @@ export class MeTokenSupabaseService {
         user_address: userAddress.toLowerCase(),
         balance,
         updated_at: new Date().toISOString(),
+      }, {
+        onConflict: 'metoken_id,user_address'
       })
       .select(`
         *,
@@ -245,19 +243,15 @@ export class MeTokenSupabaseService {
     // Wrap in try-catch to gracefully fallback to regular client if service key is not configured
     // Note: createServiceClient() throws an error if SUPABASE_SERVICE_ROLE_KEY is missing,
     // so we catch it and fall back to the regular client (which will be subject to RLS)
-    let serviceClient: ReturnType<typeof createServiceClient> | null = null;
+    let serviceClient: ReturnType<typeof createServiceClient>;
     try {
       serviceClient = createServiceClient();
     } catch (error) {
-      // Service role key not configured - fallback to regular client
-      // This will still be subject to RLS, but allows the operation to proceed
-      // The try-catch prevents the function from crashing, and the fallback below ensures
-      // we always have a valid client to use
-      console.warn('Service role key not available, using regular client (may be subject to RLS):', error instanceof Error ? error.message : String(error));
+      console.error('Failed to create service client for transaction record:', error);
+      throw new Error('Service configuration error: Unable to authenticate as service role');
     }
-    // Fallback to regular client if service client creation failed (serviceClient will be null)
-    const client = serviceClient || supabase;
-    
+    const client = serviceClient;
+
     const { data, error } = await client
       .from('metoken_transactions')
       .insert({

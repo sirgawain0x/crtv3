@@ -55,11 +55,14 @@ export function VideoMeTokenBuyDialog({
   const [preview, setPreview] = useState('0');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [daiAllowance, setDaiAllowance] = useState<bigint>(BigInt(0));
+  // const [daiAllowance, setDaiAllowance] = useState<bigint>(BigInt(0)); // removed
+
   const [daiBalance, setDaiBalance] = useState<bigint>(BigInt(0));
   const [meTokenBalance, setMeTokenBalance] = useState<bigint>(BigInt(0));
   const [isLoadingMeToken, setIsLoadingMeToken] = useState(false);
   const [creatorAvatarUrl, setCreatorAvatarUrl] = useState<string | null>(null);
+  // vaultAddress state removed
+
 
   // Fetch video contribution (earnings) with real-time updates
   // Poll every 5 seconds while dialog is open
@@ -72,7 +75,7 @@ export function VideoMeTokenBuyDialog({
   const { client } = useSmartAccountClient({});
   const { openAuthModal } = useAuthModal();
   const user = useUser();
-  
+
   // Check if wallet is connected
   const isConnected = !!user && !!client;
   const {
@@ -84,6 +87,8 @@ export function VideoMeTokenBuyDialog({
     isConfirming,
     isConfirmed,
     transactionError,
+    // getMeTokenVaultAddress, // not needed locally if we use ensureDaiApproval
+    ensureDaiApproval,
   } = useMeTokensSupabase();
 
   // Fetch video asset and MeToken
@@ -169,6 +174,9 @@ export function VideoMeTokenBuyDialog({
     fetchMeToken();
   }, [open, playbackId]);
 
+  // Vault Address fetch effect removed
+
+
   // Check DAI balance
   const checkDaiBalance = useCallback(async () => {
     if (!client) return;
@@ -189,34 +197,16 @@ export function VideoMeTokenBuyDialog({
     }
   }, [client]);
 
-  // Check DAI allowance
-  const checkDaiAllowance = useCallback(async () => {
-    if (!client || !meToken) return;
+  // checkDaiAllowance removed
 
-    try {
-      const daiContract = getDaiTokenContract('base');
-      const diamondAddress = '0xba5502db2aC2cBff189965e991C07109B14eB3f5';
-      const allowance = await client.readContract({
-        address: daiContract.address as `0x${string}`,
-        abi: erc20Abi,
-        functionName: 'allowance',
-        args: [client.account?.address as `0x${string}`, diamondAddress as `0x${string}`],
-      }) as bigint;
 
-      setDaiAllowance(allowance);
-    } catch (err) {
-      console.error('Failed to check DAI allowance:', err);
-      setDaiAllowance(BigInt(0));
-    }
-  }, [client, meToken]);
-
-  // Refresh DAI balance and allowance when dialog opens (only if connected)
+  // Refresh DAI balance when dialog opens (only if connected)
   useEffect(() => {
     if (open && isConnected && client && meToken) {
       checkDaiBalance();
-      checkDaiAllowance();
+      // checkDaiAllowance(); // removed
     }
-  }, [open, isConnected, client, meToken, checkDaiBalance, checkDaiAllowance]);
+  }, [open, isConnected, client, meToken, checkDaiBalance]);
 
   // Check user's MeToken balance
   const checkMeTokenBalance = useCallback(async () => {
@@ -269,39 +259,12 @@ export function VideoMeTokenBuyDialog({
     calculatePreview();
   }, [amount, mode, calculateMeTokensMinted, calculateAssetsReturned, meToken]);
 
-  // Approve DAI
-  const approveDai = async (amount: string) => {
-    if (!client) throw new Error('Smart account client not initialized');
+  // approveDai function removed - using ensureDaiApproval from hook
 
-    const daiContract = getDaiTokenContract('base');
-    const diamondAddress = '0xba5502db2aC2cBff189965e991C07109B14eB3f5';
-    const amountWei = parseEther(amount);
-
-    // Send approval user operation
-    const approveOperation = await client.sendUserOperation({
-      uo: {
-        target: daiContract.address as `0x${string}`,
-        data: encodeFunctionData({
-          abi: erc20Abi,
-          functionName: 'approve',
-          args: [diamondAddress as `0x${string}`, amountWei],
-        }),
-        value: BigInt(0),
-      },
-    });
-
-    // Wait for transaction confirmation
-    await client.waitForUserOperationTransaction({
-      hash: approveOperation.hash,
-    });
-
-    // Check allowance after confirmation
-    await checkDaiAllowance();
-  };
 
   const handleBuy = async () => {
-    console.log('🛒 Buy button clicked', { amount, meToken, daiAllowance });
-    
+    console.log('🛒 Buy button clicked', { amount, meToken });
+
     // Check if wallet is connected first
     if (!isConnected) {
       toast({
@@ -316,7 +279,7 @@ export function VideoMeTokenBuyDialog({
       }, 100);
       return;
     }
-    
+
     if (!amount || parseFloat(amount) <= 0) {
       setError('Please enter a valid amount');
       toast({
@@ -354,24 +317,20 @@ export function VideoMeTokenBuyDialog({
     setSuccess(null);
 
     try {
-      console.log('💰 Starting purchase...', { 
-        meTokenAddress: meToken.address, 
+      console.log('💰 Starting purchase...', {
+        meTokenAddress: meToken.address,
         amount,
-        daiAllowance: daiAllowance.toString(),
         videoId: videoAsset?.id,
-        playbackId 
+        playbackId
       });
 
-      const buyAmountWei = parseEther(amount);
+      // const buyAmountWei = parseEther(amount); // removed unused var
 
-      // Check if we need to approve DAI
-      if (daiAllowance < buyAmountWei) {
-        console.log('🔐 Approval needed, approving DAI...');
-        setSuccess('Approving DAI...');
-        await approveDai(amount);
-        setSuccess('DAI approved! Proceeding with purchase...');
-        console.log('✅ DAI approved');
-      }
+      setSuccess('Checking allowance...');
+      console.log('🔐 Checking/Approving DAI...');
+      await ensureDaiApproval(meToken.address, amount);
+      setSuccess('DAI check passed / approved! Proceeding with purchase...');
+      console.log('✅ DAI approved');
 
       // Pass video tracking information when buying
       console.log('🔄 Calling buyMeTokens...');
@@ -403,7 +362,7 @@ export function VideoMeTokenBuyDialog({
       const errorMessage = err instanceof Error ? err.message : 'Failed to buy MeTokens';
       setError(errorMessage);
       setSuccess(null);
-      
+
       // Show error toast
       toast({
         title: "Purchase Failed",
@@ -415,7 +374,7 @@ export function VideoMeTokenBuyDialog({
 
   const handleSell = async () => {
     console.log('💸 Sell button clicked', { amount, meToken, meTokenBalance });
-    
+
     // Check if wallet is connected first
     if (!isConnected) {
       toast({
@@ -430,7 +389,7 @@ export function VideoMeTokenBuyDialog({
       }, 100);
       return;
     }
-    
+
     if (!amount || parseFloat(amount) <= 0) {
       setError('Please enter a valid amount');
       toast({
@@ -479,12 +438,12 @@ export function VideoMeTokenBuyDialog({
     setSuccess(null);
 
     try {
-      console.log('💸 Starting sale...', { 
-        meTokenAddress: meToken.address, 
+      console.log('💸 Starting sale...', {
+        meTokenAddress: meToken.address,
         amount,
         meTokenBalance: meTokenBalance.toString(),
         videoId: videoAsset?.id,
-        playbackId 
+        playbackId
       });
 
       // Pass video tracking information when selling
@@ -514,7 +473,7 @@ export function VideoMeTokenBuyDialog({
       const errorMessage = err instanceof Error ? err.message : 'Failed to sell MeTokens';
       setError(errorMessage);
       setSuccess(null);
-      
+
       // Show error toast
       toast({
         title: "Sale Failed",
@@ -554,7 +513,7 @@ export function VideoMeTokenBuyDialog({
             </div>
           </div>
           <DialogDescription>
-            {mode === 'buy' 
+            {mode === 'buy'
               ? 'Purchase MeTokens to support this creator'
               : 'Sell your MeTokens back to the pool'}
           </DialogDescription>
@@ -600,13 +559,13 @@ export function VideoMeTokenBuyDialog({
                 setSuccess(null);
               }}>
                 <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger 
+                  <TabsTrigger
                     value="buy"
                     className={mode === 'buy' ? 'data-[state=active]:bg-green-500 data-[state=active]:text-white' : ''}
                   >
                     Buy
                   </TabsTrigger>
-                  <TabsTrigger 
+                  <TabsTrigger
                     value="sell"
                     className={mode === 'sell' ? 'data-[state=active]:bg-red-500 data-[state=active]:text-white' : ''}
                   >
@@ -812,19 +771,18 @@ export function VideoMeTokenBuyDialog({
                         (mode === 'buy' && daiBalance < parseEther(amount || '0')) ||
                         (mode === 'sell' && meTokenBalance < parseEther(amount || '0'))
                       }
-                      className={`flex-1 ${
-                        mode === 'buy' 
-                          ? 'bg-green-600 hover:bg-green-700 text-white' 
-                          : 'bg-red-600 hover:bg-red-700 text-white'
-                      }`}
+                      className={`flex-1 ${mode === 'buy'
+                        ? 'bg-green-600 hover:bg-green-700 text-white'
+                        : 'bg-red-600 hover:bg-red-700 text-white'
+                        }`}
                     >
                       {isLoading ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          {isPending 
+                          {isPending
                             ? (mode === 'buy' ? 'Buying...' : 'Selling...')
-                            : isConfirming 
-                              ? 'Confirming...' 
+                            : isConfirming
+                              ? 'Confirming...'
                               : 'Processing...'}
                         </>
                       ) : (

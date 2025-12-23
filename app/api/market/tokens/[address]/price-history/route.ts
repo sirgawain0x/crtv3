@@ -17,7 +17,7 @@ export async function GET(
   try {
     const { address } = await params;
     const { searchParams } = new URL(request.url);
-    
+
     const period = searchParams.get('period') as '7d' | '30d' | 'all' || '7d';
     const interval = searchParams.get('interval') as 'hour' | 'day' || 'hour';
 
@@ -63,7 +63,7 @@ export async function GET(
     // Calculate time range
     const now = new Date();
     let startDate: Date;
-    
+
     switch (period) {
       case '7d':
         startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -81,14 +81,14 @@ export async function GET(
     // Fetch transactions for this token
     const { data: transactions, error: txError } = await supabase
       .from('metoken_transactions')
-      .select('created_at, transaction_type, amount, collateral_amount, me_tokens_minted, assets_returned')
+      .select('created_at, transaction_type, amount, collateral_amount') // Removed non-existent columns
       .eq('metoken_id', meToken.id)
       .gte('created_at', startDate.toISOString())
       .order('created_at', { ascending: true });
 
     // Calculate current price for fallback response
     const currentTotalSupply = BigInt(meToken.total_supply || 0);
-    const currentPrice = currentTotalSupply > 0 
+    const currentPrice = currentTotalSupply > 0
       ? meToken.tvl / parseFloat(formatEther(currentTotalSupply))
       : 0;
 
@@ -125,29 +125,42 @@ export async function GET(
     for (const tx of transactions || []) {
       const txDate = new Date(tx.created_at);
       const txTimestamp = Math.floor(txDate.getTime() / 1000);
-      
+
       // Determine time bucket key
       const bucketKey = interval === 'hour'
         ? txDate.toISOString().slice(0, 13) + ':00:00'
         : txDate.toISOString().slice(0, 10);
 
+      // Calculate price BEFORE this transaction to estimate returned value for burns
+      const preTxPrice = runningSupply > 0
+        ? runningTvl / parseFloat(formatEther(runningSupply))
+        : 0;
+
       // Update running totals based on transaction type
       if (tx.transaction_type === 'mint') {
-        const minted = tx.me_tokens_minted 
-          ? BigInt(tx.me_tokens_minted.toString())
-          : BigInt(0);
-        const collateral = parseFloat(tx.collateral_amount?.toString() || tx.amount?.toString() || '0');
+        // Fallback: Use 'amount' as proxy for minted tokens if better data unavailable
+        const minted = BigInt(Math.floor(tx.amount || 0));
+        const collateral = parseFloat(tx.collateral_amount?.toString() || '0');
         runningSupply += minted;
         runningTvl += collateral;
       } else if (tx.transaction_type === 'burn') {
-        const burned = BigInt(tx.amount?.toString() || '0');
-        const returned = parseFloat(tx.assets_returned?.toString() || '0');
+        const burned = BigInt(Math.floor(tx.amount || 0));
+
+        // ESTIMATION: We lack assets_returned in DB.
+        // Estimate returned assets based on the price *before* the burn.
+        // This assumes the burn happened at approximately the current calculated price.
+        // returned = burned_tokens * price_per_token
+        const returnedEstimate = parseFloat(formatEther(burned)) * preTxPrice;
+
         runningSupply -= burned;
-        runningTvl -= returned;
+        runningTvl -= returnedEstimate;
+
+        // Safety check: TVL shouldn't go below 0 (though technically possible with slippage/fees, for display we clamp)
+        if (runningTvl < 0) runningTvl = 0;
       }
 
-      // Calculate price at this point
-      const price = runningSupply > 0 
+      // Calculate price AFTER this transaction
+      const price = runningSupply > 0
         ? runningTvl / parseFloat(formatEther(runningSupply))
         : 0;
 
@@ -164,11 +177,11 @@ export async function GET(
       const bucket = historyMap.get(bucketKey)!;
       bucket.prices.push(price);
       bucket.tvls.push(runningTvl);
-      
+
       // Calculate volume for this transaction
       const volume = tx.transaction_type === 'mint'
         ? parseFloat(tx.collateral_amount?.toString() || tx.amount?.toString() || '0')
-        : parseFloat(tx.assets_returned?.toString() || '0');
+        : parseFloat(tx.amount?.toString() || '0') * preTxPrice; // Estimate volume in DAI
       bucket.volumes.push(volume);
     }
 
