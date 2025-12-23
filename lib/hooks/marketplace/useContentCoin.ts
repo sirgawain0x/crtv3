@@ -51,13 +51,20 @@ export function useContentCoin() {
             });
 
             // Send UserOp to deployment factory
-            const deployOp = await client.sendUserOperation({
+            // Add a timeout for the UserOp sending itself as well
+            const sendOpPromise = client.sendUserOperation({
                 uo: {
                     target: METOKEN_FACTORY_ADDRESSES.base,
                     data: createData,
                     value: BigInt(0),
                 },
             });
+
+            const sendTimeoutPromise = new Promise<never>((_, reject) =>
+                setTimeout(() => reject(new Error("Send UserOp timed out")), 5000)
+            );
+
+            const deployOp = await Promise.race([sendOpPromise, sendTimeoutPromise]);
 
             const deployTxPromise = client.waitForUserOperationTransaction({ hash: deployOp.hash });
 
@@ -196,22 +203,22 @@ export function useContentCoin() {
             setIsPending(false);
             setIsConfirming(false);
             console.error('Buy Content Coin error:', e);
-            
+
             // Parse error for better user feedback
             const error = e instanceof Error ? e : new Error(String(e));
             const parsedError = parseBundlerError(error);
-            
+
             let errorMessage = parsedError.message;
             if (parsedError.code === 'AA25') {
                 errorMessage = 'Transaction nonce mismatch. Please try again in a moment.';
             } else if (parsedError.suggestion) {
                 errorMessage = `${parsedError.message}. ${parsedError.suggestion}`;
             }
-            
-            toast({ 
-                title: "Error", 
-                description: errorMessage || "Buy failed. Please try again.", 
-                variant: "destructive" 
+
+            toast({
+                title: "Error",
+                description: errorMessage || "Buy failed. Please try again.",
+                variant: "destructive"
             });
             throw e;
         }

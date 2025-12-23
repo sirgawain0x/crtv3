@@ -16,12 +16,18 @@ import type { Address } from "viem";
 /**
  * Parameters for creating an NFT collection via SPG
  */
+/**
+ * Parameters for creating an NFT collection via SPG
+ */
 export interface CreateCollectionParams {
   name: string; // Collection name (e.g., "Creator Name's Videos")
   symbol: string; // Collection symbol (e.g., "CRTV")
   description?: string; // Optional collection description
   owner?: Address; // Collection owner address (defaults to client account)
   mintFeeRecipient?: Address; // Address to receive mint fees (defaults to owner)
+  contractURI?: string; // IPFS URI for collection metadata
+  baseURI?: string; // Base URI for token metadata
+  maxSupply?: number; // Maximum supply of tokens (defaults to uint32 max)
 }
 
 /**
@@ -98,7 +104,7 @@ export async function createCollection(
   try {
     // Get the account address from the client config or use provided owner
     const accountAddress = (params.owner || (client as any).config?.account) as Address;
-    
+
     if (!accountAddress) {
       throw new Error("Account address not found. Please provide owner in params or ensure client is configured with an account.");
     }
@@ -110,7 +116,9 @@ export async function createCollection(
       isPublicMinting: false, // Only creator can mint initially
       mintOpen: true, // Collection is open for minting
       mintFeeRecipient: params.mintFeeRecipient || accountAddress, // Creator receives mint fees
-      contractURI: "", // Can be set later if needed
+      contractURI: params.contractURI || "", // Can be set later if needed
+      baseURI: params.baseURI || "", // Base URI for tokens
+      maxSupply: params.maxSupply || 4294967295, // Default to max uint32
       owner: accountAddress,
     });
 
@@ -120,7 +128,7 @@ export async function createCollection(
 
     // The SDK returns spgNftContract in the result
     let collectionAddress: Address;
-    
+
     if (result.spgNftContract) {
       collectionAddress = result.spgNftContract;
     } else {
@@ -128,7 +136,7 @@ export async function createCollection(
       // SPG emits a CollectionCreated event with the collection address
       const { createStoryPublicClient } = await import("./client");
       const publicClient = createStoryPublicClient();
-      
+
       const receipt = await publicClient.waitForTransactionReceipt({
         hash: result.txHash as `0x${string}`,
       });
@@ -181,8 +189,8 @@ export async function mintAndRegisterIp(
       recipient: params.recipient,
       ipMetadata: params.metadataURI
         ? {
-            ipMetadataURI: params.metadataURI,
-          }
+          ipMetadataURI: params.metadataURI,
+        }
         : undefined,
       allowDuplicates: params.allowDuplicates ?? false,
     });
@@ -241,8 +249,8 @@ export async function mintAndRegisterIpAndAttachPilTerms(
       recipient: params.recipient,
       ipMetadata: params.metadataURI
         ? {
-            ipMetadataURI: params.metadataURI,
-          }
+          ipMetadataURI: params.metadataURI,
+        }
         : undefined,
       licenseTermsData: params.licenseTermsData,
       allowDuplicates: params.allowDuplicates ?? false,

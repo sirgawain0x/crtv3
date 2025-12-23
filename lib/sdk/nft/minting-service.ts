@@ -10,11 +10,12 @@
  */
 
 import type { Address, Hex } from "viem";
-import { encodeFunctionData, parseAbi } from "viem";
+import { encodeFunctionData, parseAbi, parseEther } from "viem";
 import { publicClient } from "@/lib/viem";
 import { createStoryClient } from "@/lib/sdk/story/client";
-import { mintAndRegisterIp } from "@/lib/sdk/story/spg-service";
-import { getOrCreateCreatorCollection } from "@/lib/sdk/story/collection-service";
+import { mintAndRegisterIp, mintAndRegisterIpAndAttachPilTerms, createCollection } from "@/lib/sdk/story/spg-service";
+import { PILFlavor } from "@story-protocol/core-sdk";
+import { WIP_TOKEN_ADDRESS } from "@/lib/sdk/story/constants";
 
 // Standard ERC721 ABI for minting
 const ERC721_MINT_ABI = parseAbi([
@@ -108,8 +109,8 @@ export async function mintVideoNFT(
           // Try to decode as Transfer event
           // The Transfer event signature is keccak256("Transfer(address,address,uint256)")
           // For minting, from should be address(0)
-          return log.topics[0] === "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef" && 
-                 log.topics[1] === "0x0000000000000000000000000000000000000000000000000000000000000000";
+          return log.topics[0] === "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef" &&
+            log.topics[1] === "0x0000000000000000000000000000000000000000000000000000000000000000";
         } catch {
           return false;
         }
@@ -158,61 +159,158 @@ export function getNFTContractAddress(): Address | null {
 }
 
 /**
+ * Parameters for license terms configuration
+ */
+export interface LicenseParams {
+  commercialRevShare: number; // Percentage (0-100)
+  mintingFee: string; // Fee amount in string format (e.g., "1")
+}
+
+/**
  * Mint an NFT on Story Protocol using SPG (Story Protocol Gateway)
  * This mints the NFT and registers it as an IP Asset in one transaction
  * 
  * @param creatorAddress - Creator's wallet address
  * @param recipient - Address to receive the NFT
  * @param metadataURI - IPFS/URI for NFT metadata
- * @param collectionName - Optional collection name (if creating new collection)
- * @param collectionSymbol - Optional collection symbol (if creating new collection)
+ * @param collectionAddress - Address of the SPG NFT collection
+ * @param customTransport - Optional custom transport for client-side signing
+ * @param licenseParams - Optional parameters to attach license terms with fees
  * @returns Mint result with token ID, collection address, IP ID, and transaction hash
  */
 export async function mintVideoNFTOnStory(
   creatorAddress: Address,
   recipient: Address,
   metadataURI: string,
-  collectionName?: string,
-  collectionSymbol?: string
+  collectionAddress: Address,
+  customTransport?: any,
+  licenseParams?: LicenseParams
 ): Promise<{
   tokenId: string;
   collectionAddress: Address;
   ipId: string;
   txHash: string;
+  licenseTermsIds?: string[];
 }> {
   try {
-    // Create Story Protocol client
-    const storyClient = createStoryClient(creatorAddress);
+    // Create Story Protocol client with optional custom transport
+    const storyClient = createStoryClient(creatorAddress, undefined, customTransport);
 
-    // Get or create creator's collection
-    const defaultCollectionName = collectionName || `${creatorAddress.slice(0, 6)}'s Videos`;
-    const defaultCollectionSymbol = collectionSymbol || "CRTV";
+    if (licenseParams) {
+      console.log("Minting with license terms:", licenseParams);
+      // Mint, register, and attach PIL terms
+      const result = await mintAndRegisterIpAndAttachPilTerms(storyClient, {
+        collectionAddress,
+        recipient,
+        metadataURI,
+        allowDuplicates: false,
+        licenseTermsData: [
+          {
+            terms: PILFlavor.commercialRemix({
+              commercialRevShare: licenseParams.commercialRevShare,
+              defaultMintingFee: parseEther(licenseParams.mintingFee),
+              currency: WIP_TOKEN_ADDRESS,
+            }),
+          },
+        ],
+      });
 
-    const collectionAddress = await getOrCreateCreatorCollection(
-      storyClient,
-      creatorAddress,
-      defaultCollectionName,
-      defaultCollectionSymbol
-    );
+      return {
+        tokenId: result.tokenId,
+        collectionAddress,
+        ipId: result.ipId,
+        txHash: result.txHash,
+        licenseTermsIds: result.licenseTermsIds,
+      };
+    } else {
+      // Mint and register as IP Asset only (no license terms)
+      const result = await mintAndRegisterIp(storyClient, {
+        collectionAddress,
+        recipient,
+        metadataURI,
+        allowDuplicates: false,
+      });
 
-    // Mint and register as IP Asset in one transaction
-    const result = await mintAndRegisterIp(storyClient, {
-      collectionAddress,
-      recipient,
-      metadataURI,
-      allowDuplicates: false,
-    });
-
-    return {
-      tokenId: result.tokenId,
-      collectionAddress,
-      ipId: result.ipId,
-      txHash: result.txHash,
-    };
+      return {
+        tokenId: result.tokenId,
+        collectionAddress,
+        ipId: result.ipId,
+        txHash: result.txHash,
+      };
+    }
   } catch (error) {
     console.error("Failed to mint NFT on Story Protocol:", error);
     throw new Error(
       `Story Protocol NFT minting failed: ${error instanceof Error ? error.message : "Unknown error"}`
+    );
+  }
+}
+
+/**
+ * Create a new collection and mint an NFT on Story Protocol
+ *
+ * @param creatorAddress - Creator's wallet address
+ * @param recipient - Address to receive the NFT
+ * @param metadataURI - IPFS/URI for NFT metadata
+ * @param name - Collection name
+ * @param symbol - Collection symbol
+ * @param customTransport - Optional custom transport
+ * @param licenseParams - Optional license parameters
+ */
+export async function createCollectionAndMintVideoNFTOnStory(
+  creatorAddress: Address,
+  recipient: Address,
+  metadataURI: string,
+  name: string,
+  symbol: string,
+  customTransport?: any,
+  licenseParams?: LicenseParams
+) {
+  try {
+    const storyClient = createStoryClient(creatorAddress, undefined, customTransport);
+
+    console.log("Creating collection...", { name, symbol });
+    const { collectionAddress } = await createCollection(storyClient, {
+      name,
+      symbol,
+      owner: creatorAddress,
+      mintFeeRecipient: creatorAddress,
+    });
+    console.log("Collection created at:", collectionAddress);
+
+    let result;
+    if (licenseParams) {
+      result = await mintAndRegisterIpAndAttachPilTerms(storyClient, {
+        collectionAddress,
+        recipient,
+        metadataURI,
+        licenseTermsData: [
+          {
+            terms: PILFlavor.commercialRemix({
+              commercialRevShare: licenseParams.commercialRevShare,
+              defaultMintingFee: parseEther(licenseParams.mintingFee),
+              currency: WIP_TOKEN_ADDRESS,
+            }),
+          },
+        ],
+      });
+    } else {
+      result = await mintAndRegisterIp(storyClient, {
+        collectionAddress,
+        recipient,
+        metadataURI,
+      });
+    }
+
+    return {
+      ...result,
+      collectionAddress
+    };
+
+  } catch (error) {
+    console.error("Failed to create collection and mint on Story:", error);
+    throw new Error(
+      `Story Protocol create & mint failed: ${error instanceof Error ? error.message : "Unknown error"}`
     );
   }
 }

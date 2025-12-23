@@ -12,7 +12,17 @@ export function useAutoDeployContentCoin() {
     const handleUploadSuccess = async (videoTitle: string, symbol: string, creatorMeToken: string, creatorAddress: string, playbackId?: string) => {
         try {
             console.log("Auto-deploying Content Coin for:", videoTitle);
-            const deployTx = await deployContentCoin(videoTitle, symbol, creatorMeToken, creatorAddress);
+
+            // Add a timeout race for the deployment promise
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error("Content coin deployment timed out")), 12000)
+            );
+
+            const deployTx = await Promise.race([
+                deployContentCoin(videoTitle, symbol, creatorMeToken, creatorAddress),
+                timeoutPromise
+            ]);
+
             console.log("Content Coin Deployment Initiated:", deployTx);
 
             if (playbackId && typeof deployTx === 'string') {
@@ -34,8 +44,14 @@ export function useAutoDeployContentCoin() {
             }
 
             return deployTx;
-        } catch (e) {
+        } catch (e: any) {
             console.error("Auto-deploy failed:", e);
+
+            if (e.message === "Content coin deployment timed out") {
+                console.warn("Continuing despite deployment timeout");
+                // Return null or similar to indicate partial failure but don't throw
+                return null;
+            }
             // Don't block upload success UI
         }
     };

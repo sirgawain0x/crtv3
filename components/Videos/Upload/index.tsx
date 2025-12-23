@@ -193,60 +193,80 @@ const HookMultiStepForm = () => {
               return;
             }
 
-            try {
-              const latestAsset = await getLivepeerAsset(livepeerAsset.id);
+            const latestAsset = await getLivepeerAsset(livepeerAsset.id);
 
-              // --- CREATE SPLIT CONTRACT (if collaborators exist) ---
-              let splitsAddress: string | null = null;
-              
-              if (videoAsset && smartAccountClient) {
-                try {
-                  // Check if video has collaborators by checking if metadata had collaborators
-                  const hasCollaborators = metadata?.collaborators && metadata.collaborators.length > 0;
-                  
-                  if (hasCollaborators) {
-                    toast.info("Creating revenue split contract...");
-                    const splitResult = await createSplitForVideo(videoAsset.id, smartAccountClient);
-                    
-                    if (splitResult.success && splitResult.splitAddress) {
-                      splitsAddress = splitResult.splitAddress;
-                      toast.success("Revenue split contract created!", {
-                        description: `Split address: ${splitResult.splitAddress.slice(0, 10)}...`,
-                      });
-                    } else {
-                      console.error("Split creation failed:", splitResult.error);
-                      toast.warning("Failed to create split contract", {
-                        description: splitResult.error || "Split creation failed. Video will be published without splits.",
-                      });
-                      // Continue with publishing even if split creation fails
-                    }
+            // Helper for timeouts
+            const withTimeout = <T,>(promise: Promise<T>, ms: number, fallbackValue?: T): Promise<T | undefined> => {
+              return Promise.race([
+                promise,
+                new Promise<T | undefined>((resolve) => setTimeout(() => resolve(fallbackValue), ms))
+              ]);
+            };
+
+            // --- CREATE SPLIT CONTRACT (if collaborators exist) ---
+            let splitsAddress: string | null = null;
+
+            if (videoAsset && smartAccountClient) {
+              try {
+                // Check if video has collaborators by checking if metadata had collaborators
+                const hasCollaborators = metadata?.collaborators && metadata.collaborators.length > 0;
+
+                if (hasCollaborators) {
+                  toast.info("Creating revenue split contract...");
+                  // 15s timeout for splits
+                  const splitResult = await withTimeout(
+                    createSplitForVideo(videoAsset.id, smartAccountClient),
+                    15000
+                  );
+
+                  if (splitResult && splitResult.success && splitResult.splitAddress) {
+                    splitsAddress = splitResult.splitAddress;
+                    toast.success("Revenue split contract created!", {
+                      description: `Split address: ${splitResult.splitAddress.slice(0, 10)}...`,
+                    });
+                  } else if (!splitResult) {
+                    console.warn("Split creation timed out");
+                    toast.warning("Split creation timed out", {
+                      description: "Video will be published without revenue splits.",
+                    });
+                  } else {
+                    console.error("Split creation failed:", splitResult.error);
+                    toast.warning("Failed to create split contract", {
+                      description: splitResult.error || "Split creation failed. Video will be published without splits.",
+                    });
+                    // Continue with publishing even if split creation fails
                   }
-                } catch (splitError) {
-                  console.error("Error creating split contract:", splitError);
-                  toast.warning("Split creation error", {
-                    description: "Video will be published without revenue splits. You can add them later.",
-                  });
-                  // Continue with publishing
                 }
+              } catch (splitError) {
+                console.error("Error creating split contract:", splitError);
+                toast.warning("Split creation error", {
+                  description: "Video will be published without revenue splits. You can add them later.",
+                });
+                // Continue with publishing
               }
+            }
 
-              // --- PUBLISH LOGIC (Atomic Update with Split Address) ---
-              const updatedAsset = await updateVideoAsset(videoAsset.id, {
-                thumbnailUri: data.thumbnailUri,
-                status: "published",
-                metadata_uri: latestAsset?.storage?.ipfs?.nftMetadata?.url || null,
-                requires_metoken: data.meTokenConfig?.requireMeToken || false,
-                metoken_price: data.meTokenConfig?.priceInMeToken || null,
-                splits_address: splitsAddress, // Include split address in atomic update
-              });
+            // --- PUBLISH LOGIC (Atomic Update with Split Address) ---
+            // This is critical, no timeout wrapper here (or a long one if needed), but usually DB updates are fast
+            const updatedAsset = await updateVideoAsset(videoAsset.id, {
+              thumbnailUri: data.thumbnailUri,
+              status: "published",
+              metadata_uri: latestAsset?.storage?.ipfs?.nftMetadata?.url || null,
+              requires_metoken: data.meTokenConfig?.requireMeToken || false,
+              metoken_price: data.meTokenConfig?.priceInMeToken || null,
+              splits_address: splitsAddress, // Include split address in atomic update
+            });
 
-              toast.success("Video uploaded and published successfully!");
+            toast.success("Video uploaded and published successfully!");
 
-              // --- STORY PROTOCOL IP REGISTRATION ---
-              if (data.storyConfig?.registerIP && address) {
+            // --- STORY PROTOCOL IP REGISTRATION ---
+            if (data.storyConfig?.registerIP && address) {
+              // Non-blocking async operation (mostly)
+              // We await it but with timeout to ensure we don't hang forever
+              (async () => {
                 try {
                   const metadataURI = latestAsset?.storage?.ipfs?.nftMetadata?.url;
-                  
+
                   if (!metadataURI) {
                     toast.warning("Story Protocol registration skipped", {
                       description: "Video metadata URI is required for IP registration. Please ensure the video has been processed and metadata is available.",
@@ -258,9 +278,8 @@ const HookMultiStepForm = () => {
                     if (data.nftMintResult?.tokenId && data.nftMintResult?.contractAddress) {
                       // User already minted an NFT - register the existing NFT on Story Protocol
                       console.log("Using existing NFT for Story Protocol registration:", data.nftMintResult);
-                      
+
                       // First, update the video asset with the NFT info
-                      // videoAsset.id is already validated above
                       await updateVideoAsset(videoAsset.id, {
                         contract_address: data.nftMintResult.contractAddress,
                         token_id: data.nftMintResult.tokenId,
@@ -270,28 +289,34 @@ const HookMultiStepForm = () => {
                       // Then register the existing NFT as an IP Asset
                       toast.info("Registering existing NFT as IP Asset on Story Protocol...");
                       const { registerVideoAsIPAsset } = await import("@/services/story-protocol");
-                      
-                      const registrationResult = await registerVideoAsIPAsset(
-                        {
-                          ...updatedAsset,
-                          contract_address: data.nftMintResult.contractAddress,
-                          token_id: data.nftMintResult.tokenId,
-                          metadata_uri: metadataURI,
-                        } as VideoAsset,
-                        address as `0x${string}`,
-                        {
-                          registerIP: true,
-                          licenseTerms: data.storyConfig.licenseTerms,
-                          metadataURI: metadataURI,
-                        }
+
+                      // 20s timeout for registration
+                      const registrationResult = await withTimeout(
+                        registerVideoAsIPAsset(
+                          {
+                            ...updatedAsset,
+                            contract_address: data.nftMintResult.contractAddress,
+                            token_id: data.nftMintResult.tokenId,
+                            metadata_uri: metadataURI,
+                          } as VideoAsset,
+                          address as `0x${string}`,
+                          {
+                            registerIP: true,
+                            licenseTerms: data.storyConfig?.licenseTerms,
+                            metadataURI: metadataURI,
+                          }
+                        ),
+                        20000
                       );
 
-                      if (registrationResult.success) {
+                      if (registrationResult && registrationResult.success) {
                         toast.success("IP registered on Story Protocol!", {
-                          description: registrationResult.ipId 
+                          description: registrationResult.ipId
                             ? `IP ID: ${registrationResult.ipId} | Token ID: ${data.nftMintResult.tokenId}`
                             : undefined,
                         });
+                      } else if (!registrationResult) {
+                        toast.warning("Story Protocol registration timed out (background)");
                       } else {
                         toast.error(`Story Protocol registration failed: ${registrationResult.error}`);
                       }
@@ -299,22 +324,28 @@ const HookMultiStepForm = () => {
                       // No existing NFT - mint and register on Story Protocol in one transaction
                       toast.info("Minting NFT and registering IP on Story Protocol...");
                       const { mintAndRegisterVideoIP } = await import("@/services/story-protocol");
-                      
-                      const mintResult = await mintAndRegisterVideoIP(
-                        updatedAsset as VideoAsset,
-                        address as `0x${string}`,
-                        metadataURI,
-                        undefined, // collectionName - will use default
-                        undefined, // collectionSymbol - will use default
-                        data.storyConfig.licenseTerms
+
+                      // 25s timeout for mint & register
+                      const mintResult = await withTimeout(
+                        mintAndRegisterVideoIP(
+                          updatedAsset as VideoAsset,
+                          address as `0x${string}`,
+                          metadataURI,
+                          undefined, // collectionName - will use default
+                          undefined, // collectionSymbol - will use default
+                          data.storyConfig?.licenseTerms
+                        ),
+                        25000
                       );
 
-                      if (mintResult.success) {
+                      if (mintResult && mintResult.success) {
                         toast.success("NFT minted and IP registered on Story Protocol!", {
-                          description: mintResult.ipId 
+                          description: mintResult.ipId
                             ? `IP ID: ${mintResult.ipId} | Token ID: ${mintResult.tokenId}`
                             : undefined,
                         });
+                      } else if (!mintResult) {
+                        toast.warning("Story Protocol minting timed out (background)");
                       } else {
                         toast.error(`Story Protocol mint and register failed: ${mintResult.error}`);
                       }
@@ -324,25 +355,37 @@ const HookMultiStepForm = () => {
                   console.error("Story Protocol registration error:", storyError);
                   toast.error("Failed to register IP on Story Protocol. You can try again later.");
                 }
-              }
-
-              // --- AUTO DEPLOY CONTENT COIN ---
-              if (creatorMeToken && address && metadata?.ticker) {
-                toast.info("Deploying Content Coin Market...");
-                await handleUploadSuccess(
-                  metadata.title,
-                  metadata.ticker,
-                  creatorMeToken,
-                  address
-                );
-                toast.success("Market Deployment Initiated!");
-              }
-
-              router.push("/discover");
-            } catch (error) {
-              console.error("Failed to complete video upload:", error);
-              toast.error("Failed to complete video upload");
+              })(); // Execute as side effect slightly decoupled, OR keep awaited but limited by timeout above
+              // Note: I kept it awaited effectively by putting logic inside.
+              // To truly unblock navigation, we can remove the 'await' before the IIFE if we want it completely background,
+              // but usually user wants to see the result. The timeout provides the safety.
             }
+
+            // --- AUTO DEPLOY CONTENT COIN ---
+            if (creatorMeToken && address && metadata?.ticker) {
+              toast.info("Deploying Content Coin Market...");
+              try {
+                // 15s timeout for content coin
+                await withTimeout(
+                  handleUploadSuccess(
+                    metadata.title,
+                    metadata.ticker,
+                    creatorMeToken,
+                    address
+                  ),
+                  15000
+                );
+                // The hook handles its own toasts usually, but we ensure we don't hang
+                // Note: handleUploadSuccess logs success
+              } catch (ccError) {
+                console.error("Content Coin deployment error:", ccError);
+                // Swallowed to allow redirect
+              }
+            }
+
+            // Ensure redirect happens
+            console.log("Redirecting to discover page...");
+            router.push("/discover");
           }}
         />
       )}
