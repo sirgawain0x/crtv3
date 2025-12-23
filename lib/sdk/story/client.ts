@@ -17,7 +17,8 @@ import type { Address } from "viem";
  */
 export function createStoryClient(
   accountAddress: Address,
-  privateKey?: string
+  privateKey?: string,
+  transport?: any // Optional transport override (e.g., for client-side signing)
 ): StoryClient {
   const rpcUrl = process.env.NEXT_PUBLIC_STORY_RPC_URL || "https://rpc.aeneid.story.foundation";
   const network = process.env.NEXT_PUBLIC_STORY_NETWORK || "testnet";
@@ -29,7 +30,7 @@ export function createStoryClient(
   const config: StoryConfig = {
     account: accountAddress,
     chainId: network === "testnet" ? "aeneid" : "mainnet",
-    transport: http(rpcUrl) as any, // Type assertion needed due to viem version mismatch
+    transport: transport || (http(rpcUrl) as any), // Use provided transport or default to HTTP
     // If privateKey is provided, use it for signing (server-side operations)
     // Otherwise, rely on Account Kit's signer (client-side operations)
     ...(privateKey && { privateKey }),
@@ -107,7 +108,7 @@ export function createStoryWalletClient(account: Address) {
   const rpcUrl = getStoryRpcUrl();
   const storyAlchemyKey = process.env.NEXT_PUBLIC_STORY_ALCHEMY_API_KEY;
   const network = process.env.NEXT_PUBLIC_STORY_NETWORK || "testnet";
-  
+
   // Use Alchemy RPC if available, otherwise use public RPC
   // Determine the correct Alchemy endpoint based on network
   let transport;

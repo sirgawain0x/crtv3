@@ -1,3 +1,5 @@
+"use server";
+
 /**
  * Story Protocol Collection Service
  * 
@@ -31,7 +33,7 @@ export async function getOrCreateCreatorCollection(
   collectionSymbol: string
 ): Promise<Address> {
   const supabase = createServiceClient();
-  
+
   // First, check if creator already has a collection in the database
   const { data: existingCollection } = await supabase
     .from("creator_collections")
@@ -46,7 +48,7 @@ export async function getOrCreateCreatorCollection(
       const code = await publicClient.getBytecode({
         address: existingCollection.collection_address as Address,
       });
-      
+
       if (code && code !== "0x") {
         // Collection exists on-chain
         return existingCollection.collection_address as Address;
@@ -95,7 +97,7 @@ export async function getOrCreateCreatorCollection(
   // If upsert failed due to unique constraint (race condition), retrieve existing collection
   if (upsertError) {
     console.warn("Collection upsert failed (likely race condition), retrieving existing collection:", upsertError);
-    
+
     const { data: existing } = await supabase
       .from("creator_collections")
       .select("collection_address")
@@ -105,7 +107,7 @@ export async function getOrCreateCreatorCollection(
     if (existing?.collection_address) {
       return existing.collection_address as Address;
     }
-    
+
     // If we still can't find it, throw an error
     throw new Error(
       `Failed to create or retrieve collection for creator ${creatorAddress}: ${upsertError.message}`

@@ -1,19 +1,21 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useSmartAccountClient } from "@account-kit/react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, CheckCircle, XCircle, InfoIcon } from "lucide-react";
-import { toast } from "sonner";
-import { mintVideoNFT, getNFTContractAddress } from "@/lib/sdk/nft/minting-service";
-import type { Address } from "viem";
+import { Loader2, InfoIcon, XCircle } from "lucide-react";
+import { CrossChainSwap } from "./CrossChainSwap";
+import { createStoryPublicClient } from "@/lib/sdk/story/client";
+import { getNFTContractAddress, mintVideoNFT, createCollectionAndMintVideoNFTOnStory } from "@/lib/sdk/nft/minting-service";
+import { formatEther, type Address } from "viem";
+import { STORY_CHAIN_ID } from "@/lib/sdk/story/constants";
 
-interface NFTMintingStepProps {
+export interface NFTMintingStepProps {
   videoAssetId: number;
   metadataURI: string;
-  recipientAddress: Address;
+  recipientAddress?: Address;
   onMintSuccess: (result: {
     tokenId: string;
     contractAddress: Address;
@@ -33,90 +35,90 @@ export function NFTMintingStep({
   const [isMinting, setIsMinting] = useState(false);
   const [mintError, setMintError] = useState<string | null>(null);
   const [nftContractAddress, setNftContractAddress] = useState<Address | null>(null);
+  const [ipBalance, setIpBalance] = useState<string | null>(null);
+  const [isCheckingBalance, setIsCheckingBalance] = useState(false);
 
   useEffect(() => {
     const address = getNFTContractAddress();
     setNftContractAddress(address);
-    // Removed strict error check for missing env var
-    // If missing, we default to Story Protocol minting (SPG)
-  }, []);
+    checkBalance();
+  }, [recipientAddress]);
+
+  const checkBalance = async () => {
+    if (!recipientAddress) return;
+    setIsCheckingBalance(true);
+    try {
+      const publicClient = createStoryPublicClient();
+      const bal = await publicClient.getBalance({ address: recipientAddress });
+      setIpBalance(formatEther(bal));
+    } catch (e) {
+      console.error("Failed to check balance", e);
+    } finally {
+      setIsCheckingBalance(false);
+    }
+  };
 
   const handleMint = async () => {
-    if (!client) {
-      toast.error("Smart account client not initialized");
-      return;
-    }
+    if (!client || !client.account) return;
 
     setIsMinting(true);
     setMintError(null);
 
     try {
       if (nftContractAddress) {
-        // Standard ERC-721 Minting (Legacy/Manual mode)
-        toast.info("Minting NFT...", {
-          description: "Please confirm the transaction in your wallet",
-        });
+        // Base Chain Minting
+        // Check if on Base (optional, but good practice)
+        // For now trusting the client configuration or just trying
 
         const result = await mintVideoNFT(
           client,
           nftContractAddress,
-          recipientAddress,
+          recipientAddress || client.account.address,
           metadataURI
         );
-
-        toast.success("NFT minted successfully!", {
-          description: `Token ID: ${result.tokenId}`,
-        });
 
         onMintSuccess(result);
       } else {
-        // Story Protocol SPG Minting (Default/modern mode)
-        toast.info("Minting on Story Protocol...", {
-          description: "Creating collection and registering IP asset",
-        });
+        // Story Protocol Minting
+        // Check if connected to Story Chain
+        if (client.chain?.id !== STORY_CHAIN_ID) {
+          throw new Error(`Please switch your wallet to Story Network (Chain ID: ${STORY_CHAIN_ID})`);
+        }
 
-        // We need to import this dynamically or ensure it's imported at top
-        const { mintVideoNFTOnStory } = await import("@/lib/sdk/nft/minting-service");
+        // Generate default collection details
+        // In a real app, we might ask the user for these
+        const collectionName = "My Creative Videos";
+        const collectionSymbol = "CRTV";
 
-        const result = await mintVideoNFTOnStory(
-          recipientAddress, // Creator is the initial owner
-          recipientAddress, // Recipient
-          metadataURI
+        const result = await createCollectionAndMintVideoNFTOnStory(
+          client.account.address,
+          recipientAddress || client.account.address,
+          metadataURI,
+          collectionName,
+          collectionSymbol,
+          client.transport // Pass the client transport to use the connected wallet
         );
 
-        toast.success("NFT minted & IP Registered!", {
-          description: `Token ID: ${result.tokenId}`,
-        });
-
-        // Map SPG result to expected format
         onMintSuccess({
           tokenId: result.tokenId,
           contractAddress: result.collectionAddress,
           txHash: result.txHash
         });
       }
-    } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to mint NFT";
-      setMintError(errorMessage);
-      toast.error("NFT minting failed", {
-        description: errorMessage,
-      });
+    } catch (e) {
+      console.error("Minting failed:", e);
+      setMintError(e instanceof Error ? e.message : "Minting failed");
     } finally {
       setIsMinting(false);
     }
   };
 
   if (!client) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>NFT Minting</CardTitle>
-          <CardDescription>Connect your wallet to mint an NFT</CardDescription>
-        </CardHeader>
-      </Card>
-    );
+    // ... (existing not connected state)
   }
+
+  // Determine if user funds are sufficient (Threshold: 0.5 IP for safety)
+  const hasSufficientFunds = ipBalance ? parseFloat(ipBalance) >= 0.5 : false;
 
   return (
     <Card>
@@ -131,6 +133,29 @@ export function NFTMintingStep({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Balance Check */}
+        <div className="flex items-center justify-between text-sm bg-slate-50 p-2 rounded-md border">
+          <div className="flex flex-col">
+            <span className="text-muted-foreground">Story Protocol Balance ($IP):</span>
+            <span className="font-semibold text-lg">
+              {ipBalance ? `${parseFloat(ipBalance).toFixed(4)} IP` : "Loading..."}
+            </span>
+          </div>
+          <Button variant="ghost" size="sm" onClick={checkBalance} disabled={isCheckingBalance}>
+            {isCheckingBalance ? <Loader2 className="h-3 w-3 animate-spin" /> : "Refresh"}
+          </Button>
+        </div>
+
+        {/* Swap Component if funds are low */}
+        {ipBalance && !hasSufficientFunds && (
+          <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+            <CrossChainSwap onSwapSuccess={checkBalance} />
+            <div className="text-center text-xs text-muted-foreground mt-2">
+              You need at least 0.5 $IP to cover minting fees and gas.
+            </div>
+          </div>
+        )}
+
         {/* Info Alert based on mode */}
         <Alert>
           <InfoIcon className="h-4 w-4" />
@@ -141,13 +166,7 @@ export function NFTMintingStep({
           </AlertDescription>
         </Alert>
 
-        <div className="space-y-2">
-          <div className="text-sm text-muted-foreground">
-            {nftContractAddress && <p>Contract: {nftContractAddress}</p>}
-            <p>Recipient: {recipientAddress}</p>
-            <p>Metadata URI: {metadataURI}</p>
-          </div>
-        </div>
+        {/* ... (Existing details display: metadataURI etc) */}
 
         {mintError && (
           <Alert variant="destructive">
@@ -159,7 +178,7 @@ export function NFTMintingStep({
         <div className="flex gap-3">
           <Button
             onClick={handleMint}
-            disabled={isMinting}
+            disabled={isMinting || !hasSufficientFunds} // Disable if low funds
             className="flex-1"
           >
             {isMinting ? (

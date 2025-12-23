@@ -4,7 +4,7 @@ import { useState, Suspense } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useAccount, useChain, useSmartAccountClient, useSignMessage } from "@account-kit/react";
+import { useChain, useSignMessage } from "@account-kit/react";
 import { useRouter } from "next/navigation";
 import { createProposal } from "@/app/vote/create/[address]/actions";
 import { SNAPSHOT_SPACE } from "@/context/context";
@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
+import { useWalletStatus } from "@/lib/hooks/accountkit/useWalletStatus";
 
 const proposalSchema = z.object({
   title: z.string().min(3, "Title is required"),
@@ -52,21 +53,20 @@ function getUnixTimestamp(date: string, time: string) {
 }
 
 function Create() {
-  const { address } = useAccount({ type: "ModularAccountV2" });
   const { chain } = useChain();
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  // Get smart account client for signing using AccountKit
-  const { client: smartAccountClient, isLoadingClient } = useSmartAccountClient({
-    type: "ModularAccountV2",
-    accountParams: {
-      mode: "default",
-    },
-  });
+  // Use the shared wallet status hook to ensure we're using the correct client context
+  const {
+    smartAccountClient,
+    isLoadingClient,
+    isConnected,
+    smartAccountAddress: address,
+  } = useWalletStatus();
 
-  // Use signMessageAsync from AccountKit - returns a Promise directly (no callbacks needed)
+  // Use signMessageAsync from AccountKit - depends on the shared smartAccountClient
   const { signMessageAsync, isSigningMessage, error: signMessageError } = useSignMessage({
     client: smartAccountClient || undefined,
   });
@@ -99,20 +99,25 @@ function Create() {
 
   async function onSubmit(values: ProposalForm) {
     setFormError(null);
-    if (!address || !chain?.id) {
+
+    // Validate connection state
+    if (!isConnected || !address || !chain?.id) {
       setFormError("Please connect your wallet.");
       return;
     }
+
     if (isLoadingClient) {
       setFormError("Smart account client is still loading. Please wait...");
       setIsSubmitting(false);
       return;
     }
+
     if (!smartAccountClient) {
       setFormError("Smart account client not ready. Please connect your wallet.");
       setIsSubmitting(false);
       return;
     }
+
     if (!signMessageAsync) {
       setFormError("Sign message function not available. Please refresh the page.");
       setIsSubmitting(false);
@@ -140,12 +145,15 @@ function Create() {
         return;
       }
     }
+
     const start = getUnixTimestamp(values.start, values.startTime);
     const end = getUnixTimestamp(values.end, values.endTime);
+
     if (end <= start) {
       setFormError("End time must be after start time.");
       return;
     }
+
     setIsSubmitting(true);
 
     try {
@@ -201,7 +209,6 @@ function Create() {
       }
 
       // Create proposal payload for signing with actual block number
-      // Note: plugins should be an object, not a stringified JSON
       const proposalPayload = {
         address,
         space: SNAPSHOT_SPACE,
@@ -224,51 +231,35 @@ function Create() {
       // Sign the proposal message on client side using AccountKit
       console.log("Preparing message to sign...");
       const messageToSign = JSON.stringify(proposalPayload);
-      console.log("Message to sign:", messageToSign);
-      console.log("Smart account client ready:", !!smartAccountClient);
-      console.log("Sign message function available:", !!signMessageAsync);
-      console.log("Is currently signing:", isSigningMessage);
+      console.log("Message to sign prepared");
 
-      // Ensure iframe container exists
+      // Ensure iframe container exists (this is where Alchemy injects the signer)
       const iframeContainer = document.getElementById("alchemy-signer-iframe-container");
       if (!iframeContainer) {
-        throw new Error("Alchemy signer iframe container not found. Please refresh the page.");
+        throw new Error("Alchemy signer iframe container not found. This may indicate the wallet connection is broken.");
       }
-      console.log("Iframe container found:", !!iframeContainer);
 
       if (signMessageError) {
-        throw new Error(`Sign message error: ${signMessageError.message}`);
+        throw new Error(`Sign message error pre-check: ${signMessageError.message}`);
       }
 
-      // Wait for any in-progress signing to complete
-      if (isSigningMessage) {
-        console.warn("⚠️ Already signing, waiting for current operation to complete...");
-        // Wait up to 10 seconds for current signing to complete
-        for (let i = 0; i < 20; i++) {
-          await new Promise(resolve => setTimeout(resolve, 500));
-          if (!isSigningMessage) {
-            console.log("✅ Previous signing operation completed");
-            break;
-          }
-        }
-        if (isSigningMessage) {
-          throw new Error("Previous signing operation is still in progress. Please wait and try again.");
-        }
-      }
+      console.log("Calling AccountKit signMessageAsync...");
 
-      // Wait a brief moment to ensure everything is ready
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      // Use signMessageAsync which returns a Promise directly (AccountKit v4.59.1+)
-      console.log("Calling AccountKit signMessageAsync with message length:", messageToSign.length);
-      console.log("Waiting for user to approve signing in AccountKit iframe...");
-
+      // We implement a race against a timeout because the signer sometimes hangs indefinitely
+      // if the iframe communication breaks or the user closes the popup improperly.
       let signature: string;
       try {
-        signature = await signMessageAsync({
+        const signPromise = signMessageAsync({
           message: messageToSign,
         });
-        console.log("✅ Message signed successfully, signature:", signature?.substring(0, 20) + "...");
+
+        // Race the signing against a 60 second timeout (users may take time to approve)
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error("Signing timed out. Please check if the popup was blocked or closed.")), 60000);
+        });
+
+        signature = await Promise.race([signPromise, timeoutPromise]);
+        console.log("✅ Message signed successfully");
       } catch (error) {
         console.error("❌ Error signing message:", error);
         throw error instanceof Error
@@ -276,10 +267,8 @@ function Create() {
           : new Error(`Failed to sign message: ${String(error)}`);
       }
 
-      console.log("Signature received, submitting to server...");
-
-      // Call server action with signature
       console.log("Submitting proposal to server...");
+
       const result = await createProposal({
         title: values.title,
         content: values.content,
@@ -291,8 +280,6 @@ function Create() {
         signature,
         proposalPayload,
       });
-
-      console.log("Server response:", result);
 
       if (result?.serverError) {
         console.error("Server error:", result.serverError);
