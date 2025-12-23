@@ -27,7 +27,7 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
   const [sellPreview, setSellPreview] = useState('0');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<React.ReactNode | null>(null);
-  
+
   // Initialize subscription status from meToken prop data immediately
   // This prevents showing "not subscribed" while waiting for blockchain check
   const getInitialSubscriptionStatus = (meToken: MeTokenData): boolean => {
@@ -36,11 +36,10 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
     const balanceLocked = meToken.info?.balanceLocked ?? BigInt(0);
     return balancePooled > BigInt(0) || balanceLocked > BigInt(0);
   };
-  
-  const [isSubscribed, setIsSubscribed] = useState<boolean | null>(() => 
+
+  const [isSubscribed, setIsSubscribed] = useState<boolean | null>(() =>
     getInitialSubscriptionStatus(meToken)
   );
-  const [daiAllowance, setDaiAllowance] = useState<bigint>(BigInt(0));
   const [daiBalance, setDaiBalance] = useState<bigint>(BigInt(0));
   const [isCheckingSubscription, setIsCheckingSubscription] = useState(false);
 
@@ -54,7 +53,8 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
     isPending,
     isConfirming,
     isConfirmed,
-    transactionError
+    transactionError,
+    ensureDaiApproval
   } = useMeTokensSupabase();
 
   // Check if MeToken is subscribed using the blockchain utility function
@@ -81,7 +81,7 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
       const { checkMeTokenSubscriptionFromBlockchain } = await import('@/lib/utils/metokenSubscriptionUtils');
       const status = await checkMeTokenSubscriptionFromBlockchain(meToken.address);
       console.log('✅ Blockchain subscription status:', status);
-      
+
       // Use blockchain result if available, otherwise keep prop data result
       if (!status.error) {
         setIsSubscribed(status.isSubscribed);
@@ -119,62 +119,16 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
     }
   }, [client]);
 
-  // Check DAI allowance
-  const checkDaiAllowance = useCallback(async () => {
-    if (!client) return;
 
-    try {
-      const daiContract = getDaiTokenContract('base');
-      const diamondAddress = '0xba5502db2aC2cBff189965e991C07109B14eB3f5'; // Diamond contract address
 
-      const allowance = await client.readContract({
-        address: daiContract.address as `0x${string}`,
-        abi: erc20Abi,
-        functionName: 'allowance',
-        args: [client.account?.address as `0x${string}`, diamondAddress as `0x${string}`],
-      }) as bigint;
 
-      setDaiAllowance(allowance);
-    } catch (err) {
-      console.error('Failed to check DAI allowance:', err);
-      setDaiAllowance(BigInt(0));
-    }
-  }, [client]);
-
-  // Approve DAI for Diamond contract
-  const approveDai = async (amount: string) => {
-    if (!client) return;
-
-    try {
-      const daiContract = getDaiTokenContract('base');
-      const diamondAddress = '0xba5502db2aC2cBff189965e991C07109B14eB3f5';
-
-      const result = await client.sendTransaction({
-        chain,
-        to: daiContract.address as `0x${string}`,
-        data: encodeFunctionData({
-          abi: erc20Abi,
-          functionName: 'approve',
-          args: [diamondAddress as `0x${string}`, parseEther(amount)],
-        }),
-        value: BigInt(0),
-      });
-
-      if (result) {
-        await client.waitForTransactionReceipt({ hash: result });
-        await checkDaiAllowance(); // Refresh allowance
-      }
-    } catch (err) {
-      throw new Error(err instanceof Error ? err.message : 'Failed to approve DAI');
-    }
-  };
 
   // Check subscription status on mount and when meToken data changes
   useEffect(() => {
     checkSubscriptionStatus();
+    checkSubscriptionStatus();
     checkDaiBalance();
-    checkDaiAllowance();
-  }, [meToken.address, meToken.info?.balancePooled, meToken.info?.balanceLocked, meToken.hubId, checkSubscriptionStatus, checkDaiBalance, checkDaiAllowance]);
+  }, [meToken.address, meToken.info?.balancePooled, meToken.info?.balanceLocked, meToken.hubId, checkSubscriptionStatus, checkDaiBalance]);
 
   // Calculate buy preview when amount changes
   useEffect(() => {
@@ -222,14 +176,9 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
     setSuccess(null);
 
     try {
-      const buyAmountWei = parseEther(buyAmount);
-
-      // Check if we need to approve DAI
-      if (daiAllowance < buyAmountWei) {
-        setSuccess('Approving DAI...');
-        await approveDai(buyAmount);
-        setSuccess('DAI approved! Proceeding with purchase...');
-      }
+      setSuccess('Checking allowance...');
+      await ensureDaiApproval(meToken.address, buyAmount);
+      setSuccess('DAI approved! Proceeding with purchase...');
 
       const hash = await buyMeTokens(meToken.address, buyAmount);
       setSuccess(
@@ -256,6 +205,7 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to buy MeTokens');
+      setSuccess(null);
     }
   };
 
@@ -350,9 +300,9 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
             <div className="text-sm text-muted-foreground space-y-2">
               <p><strong>MeToken Info:</strong></p>
               <ul className="list-disc list-inside space-y-1 ml-4">
-                <li>Total Supply: {formatEther(meToken.totalSupply)} {meToken.symbol}</li>
-                <li>TVL: ${meToken.tvl.toFixed(2)}</li>
-                <li>Your Balance: {formatEther(meToken.balance)} {meToken.symbol}</li>
+                <li>Total Supply: {parseFloat(formatEther(meToken.totalSupply)).toLocaleString(undefined, { maximumFractionDigits: 4 })} {meToken.symbol}</li>
+                <li>TVL: ${meToken.tvl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</li>
+                <li>Your Balance: {parseFloat(formatEther(meToken.balance)).toLocaleString(undefined, { maximumFractionDigits: 4 })} {meToken.symbol}</li>
                 <li>Status: Not Subscribed</li>
               </ul>
             </div>
@@ -399,10 +349,10 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
             <div className="text-sm text-muted-foreground space-y-2">
               <p><strong>MeToken Info:</strong></p>
               <ul className="list-disc list-inside space-y-1 ml-4">
-                <li>Total Supply: {formatEther(meToken.totalSupply)} {meToken.symbol}</li>
-                <li>TVL: ${meToken.tvl.toFixed(2)}</li>
-                <li>Your Balance: {formatEther(meToken.balance)} {meToken.symbol}</li>
-                <li>Your DAI Balance: {formatEther(daiBalance)} DAI</li>
+                <li>Total Supply: {parseFloat(formatEther(meToken.totalSupply)).toLocaleString(undefined, { maximumFractionDigits: 4 })} {meToken.symbol}</li>
+                <li>TVL: ${meToken.tvl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</li>
+                <li>Your Balance: {parseFloat(formatEther(meToken.balance)).toLocaleString(undefined, { maximumFractionDigits: 4 })} {meToken.symbol}</li>
+                <li>Your DAI Balance: {parseFloat(formatEther(daiBalance)).toLocaleString(undefined, { maximumFractionDigits: 4 })} DAI</li>
               </ul>
             </div>
           </CardContent>
@@ -426,7 +376,7 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
           {isConfirmed && <CheckCircle className="h-5 w-5 text-green-500" />}
         </CardTitle>
         <CardDescription>
-          Buy and sell {meToken.name} tokens. Your balance: {formatEther(meToken.balance)} {meToken.symbol}
+          Buy and sell {meToken.name} tokens. Your balance: {parseFloat(formatEther(meToken.balance)).toLocaleString(undefined, { maximumFractionDigits: 4 })} {meToken.symbol}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -479,7 +429,7 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
                 min="0"
               />
               <p className="text-sm text-muted-foreground">
-                You will receive approximately {buyPreview} {meToken.symbol} tokens
+                You will receive approximately {parseFloat(buyPreview).toLocaleString(undefined, { maximumFractionDigits: 4 })} {meToken.symbol} tokens
               </p>
               {buyAmount && parseFloat(buyAmount) > 0 && (
                 <div className="text-sm space-y-1">
@@ -488,13 +438,6 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
                       <span className="text-green-600">✓ DAI balance sufficient</span>
                     ) : (
                       <span className="text-red-600">⚠ Insufficient DAI balance</span>
-                    )}
-                  </div>
-                  <div>
-                    {daiAllowance >= parseEther(buyAmount) ? (
-                      <span className="text-green-600">✓ DAI allowance sufficient</span>
-                    ) : (
-                      <span className="text-orange-600">⚠ DAI approval required</span>
                     )}
                   </div>
                 </div>
@@ -540,7 +483,7 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
                 max={formatEther(meToken.balance)}
               />
               <p className="text-sm text-muted-foreground">
-                You will receive approximately {sellPreview} DAI
+                You will receive approximately {parseFloat(sellPreview).toLocaleString(undefined, { maximumFractionDigits: 4 })} DAI
               </p>
             </div>
 
@@ -564,9 +507,9 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
         <div className="text-sm text-muted-foreground space-y-2">
           <p><strong>MeToken Info:</strong></p>
           <ul className="list-disc list-inside space-y-1 ml-4">
-            <li>Total Supply: {formatEther(meToken.totalSupply)} {meToken.symbol}</li>
-            <li>TVL: ${meToken.tvl.toFixed(2)}</li>
-            <li>Your Balance: {formatEther(meToken.balance)} {meToken.symbol}</li>
+            <li>Total Supply: {parseFloat(formatEther(meToken.totalSupply)).toLocaleString(undefined, { maximumFractionDigits: 4 })} {meToken.symbol}</li>
+            <li>TVL: ${meToken.tvl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</li>
+            <li>Your Balance: {parseFloat(formatEther(meToken.balance)).toLocaleString(undefined, { maximumFractionDigits: 4 })} {meToken.symbol}</li>
           </ul>
           <p className="text-xs">
             Note: Selling MeTokens incurs a 20% stability fee to prevent pump-and-dump attacks.

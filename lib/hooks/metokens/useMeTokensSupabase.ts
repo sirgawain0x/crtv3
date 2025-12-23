@@ -935,7 +935,18 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
     if (!address || !user) throw new Error('No wallet connected');
     if (!client) throw new Error('Smart account client not initialized');
 
+    setIsPending(true);
+    setIsConfirming(false);
+    setIsConfirmed(false);
+    setError(null);
+    setTransactionError(null);
+
     try {
+      // Ensure DAI approval first (if needed for the vault)
+      // Note: VideoMeTokenBuyDialog also handles DAI approval for the diamond, 
+      // but we should ensure it here too for robustness if it's a different approval flow
+      // For now, we'll assume the dialog handled the DIAMOND approval.
+
       const operation = await client.sendUserOperation({
         uo: {
           target: DIAMOND,
@@ -948,9 +959,15 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         },
       });
 
+      console.log('🎉 Buy UserOperation sent! Hash:', operation.hash);
+      setIsPending(false);
+      setIsConfirming(true);
+
       const txHash = await client.waitForUserOperationTransaction({
         hash: operation.hash,
       });
+
+      console.log('✅ Buy Transaction mined! Hash:', txHash);
 
       // Update MeToken data in Supabase via API route (uses service role client)
       const meToken = await meTokenSupabaseService.getMeTokenByAddress(meTokenAddress);
@@ -984,9 +1001,17 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
 
         // Update user balance in Supabase via API route (uses service role client)
         try {
-          const currentBalance = await meTokenSupabaseService.getUserMeTokenBalance(meTokenAddress, address);
-          const newBalance = (currentBalance?.balance || 0) + parseFloat(collateralAmount);
-          
+          // Read actual balance from chain to ensure accuracy
+          const actualBalance = await client.readContract({
+            address: meTokenAddress as `0x${string}`,
+            abi: ERC20_ABI,
+            functionName: 'balanceOf',
+            args: [address as `0x${string}`],
+          }) as bigint;
+
+          const newBalance = parseFloat(formatEther(actualBalance));
+          console.log(`📊 Syncing balance to Supabase: ${newBalance} (Chain balance: ${actualBalance.toString()})`);
+
           const balanceResponse = await fetch(`/api/metokens/${meTokenAddress}/balance`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
@@ -997,20 +1022,39 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
           });
 
           if (!balanceResponse.ok) {
-            const error = await balanceResponse.json();
-            console.error('Failed to update user balance:', error);
+            let errorMsg = 'Unknown error';
+            try {
+              const errorBody = await balanceResponse.text();
+              errorMsg = errorBody;
+              try {
+                // Try to format JSON for better readability
+                errorMsg = JSON.stringify(JSON.parse(errorBody), null, 2);
+              } catch { }
+            } catch (readErr) {
+              errorMsg = `Could not read response body: ${readErr}`;
+            }
+            console.error(`Failed to update user balance (Status: ${balanceResponse.status}): ${errorMsg}`);
             // Don't throw - transaction succeeded on-chain, just logging failed
+          } else {
+            console.log('✅ User balance synced to Supabase successfully');
           }
         } catch (error) {
-          console.error('Error updating user balance:', error);
+          console.warn('⚠️ Error updating user balance in Supabase:', error);
           // Don't throw - transaction succeeded on-chain, just logging failed
         }
       }
+
+      setIsConfirming(false);
+      setIsConfirmed(true);
 
       // Refresh data
       await checkUserMeToken();
       return txHash;
     } catch (err) {
+      console.error('❌ Error in buyMeTokens:', err);
+      setIsPending(false);
+      setIsConfirming(false);
+      setTransactionError(err as Error);
       throw new Error(err instanceof Error ? err.message : 'Failed to buy MeTokens');
     }
   };
@@ -1020,38 +1064,19 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
     if (!client || !address) throw new Error('Client or address not available');
 
     try {
-      // Get the vault address from the meToken info
-      const meTokenInfo = await client.readContract({
-        address: DIAMOND,
-        abi: METOKEN_ABI,
-        functionName: 'getMeTokenInfo',
-        args: [meTokenAddress as `0x${string}`],
-      });
-
-      const hubId = (meTokenInfo as any).hubId;
-
-      // Get hub info to find the vault address
-      const hubInfo = await client.readContract({
-        address: DIAMOND,
-        abi: METOKEN_ABI,
-        functionName: 'getHubInfo',
-        args: [hubId],
-      });
-
-      const vaultAddress = (hubInfo as any).vault;
       const daiContract = getDaiTokenContract('base');
 
-      // Check current allowance
+      // Check current allowance for DIAMOND contract
       const currentAllowance = await client.readContract({
         address: daiContract.address as `0x${string}`,
         abi: daiContract.abi,
         functionName: 'allowance',
-        args: [address as `0x${string}`, vaultAddress as `0x${string}`],
+        args: [address as `0x${string}`, DIAMOND as `0x${string}`],
       });
 
       const requiredAmount = parseEther(collateralAmount);
 
-      // If allowance is insufficient, approve the vault to spend DAI
+      // If allowance is insufficient, approve the DIAMOND to spend DAI
       if (currentAllowance < requiredAmount) {
         const operation = await client.sendUserOperation({
           uo: {
@@ -1059,7 +1084,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
             data: encodeFunctionData({
               abi: daiContract.abi,
               functionName: 'approve',
-              args: [vaultAddress as `0x${string}`, BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff')], // Max approval
+              args: [DIAMOND as `0x${string}`, BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff')], // Max approval
             }),
             value: BigInt(0),
           },
@@ -1080,6 +1105,12 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
     if (!address || !user) throw new Error('No wallet connected');
     if (!client) throw new Error('Smart account client not initialized');
 
+    setIsPending(true);
+    setIsConfirming(false);
+    setIsConfirmed(false);
+    setError(null);
+    setTransactionError(null);
+
     try {
       const operation = await client.sendUserOperation({
         uo: {
@@ -1093,9 +1124,15 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         },
       });
 
+      console.log('🎉 Sell UserOperation sent! Hash:', operation.hash);
+      setIsPending(false);
+      setIsConfirming(true);
+
       const txHash = await client.waitForUserOperationTransaction({
         hash: operation.hash,
       });
+
+      console.log('✅ Sell Transaction mined! Hash:', txHash);
 
       // Update MeToken data in Supabase via API route (uses service role client)
       const meToken = await meTokenSupabaseService.getMeTokenByAddress(meTokenAddress);
@@ -1126,9 +1163,17 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
 
         // Update user balance in Supabase via API route (uses service role client)
         try {
-          const currentBalance = await meTokenSupabaseService.getUserMeTokenBalance(meTokenAddress, address);
-          const newBalance = Math.max(0, (currentBalance?.balance || 0) - parseFloat(meTokenAmount));
-          
+          // Read actual balance from chain to ensure accuracy
+          const actualBalance = await client.readContract({
+            address: meTokenAddress as `0x${string}`,
+            abi: ERC20_ABI,
+            functionName: 'balanceOf',
+            args: [address as `0x${string}`],
+          }) as bigint;
+
+          const newBalance = parseFloat(formatEther(actualBalance));
+          console.log(`📊 Syncing balance to Supabase: ${newBalance} (Chain balance: ${actualBalance.toString()})`);
+
           const balanceResponse = await fetch(`/api/metokens/${meTokenAddress}/balance`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
@@ -1139,9 +1184,21 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
           });
 
           if (!balanceResponse.ok) {
-            const error = await balanceResponse.json();
-            console.error('Failed to update user balance:', error);
+            let errorMsg = 'Unknown error';
+            try {
+              const errorBody = await balanceResponse.text();
+              errorMsg = errorBody;
+              try {
+                // Try to format JSON for better readability
+                errorMsg = JSON.stringify(JSON.parse(errorBody), null, 2);
+              } catch { }
+            } catch (readErr) {
+              errorMsg = `Could not read response body: ${readErr}`;
+            }
+            console.error(`Failed to update user balance (Status: ${balanceResponse.status}): ${errorMsg}`);
             // Don't throw - transaction succeeded on-chain, just logging failed
+          } else {
+            console.log('✅ User balance synced to Supabase successfully');
           }
         } catch (error) {
           console.error('Error updating user balance:', error);
@@ -1149,10 +1206,17 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         }
       }
 
+      setIsConfirming(false);
+      setIsConfirmed(true);
+
       // Refresh data
       await checkUserMeToken();
       return txHash;
     } catch (err) {
+      console.error('❌ Error in sellMeTokens:', err);
+      setIsPending(false);
+      setIsConfirming(false);
+      setTransactionError(err as Error);
       throw new Error(err instanceof Error ? err.message : 'Failed to sell MeTokens');
     }
   };
@@ -1179,7 +1243,18 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
   // Calculate assets returned
   const calculateAssetsReturned = async (meTokenAddress: string, meTokenAmount: string): Promise<string> => {
     try {
-      if (!client || !address) return '0';
+      if (!client || !address) {
+        console.warn('⚠️ calculateAssetsReturned: Missing client or address', { hasClient: !!client, address });
+        return '0';
+      }
+
+      console.log('📊 calculateAssetsReturned input:', {
+        meTokenAddress,
+        meTokenAmount,
+        meTokenAmountWei: parseEther(meTokenAmount).toString(),
+        senderAddress: address,
+        diamondAddress: DIAMOND
+      });
 
       const result = await client.readContract({
         address: DIAMOND,
@@ -1188,9 +1263,22 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         args: [meTokenAddress as `0x${string}`, parseEther(meTokenAmount), address as `0x${string}`],
       });
 
-      return formatEther(result as bigint);
+      const assetsReturned = formatEther(result as bigint);
+      console.log('✅ calculateAssetsReturned result:', {
+        resultWei: (result as bigint).toString(),
+        assetsReturned,
+        meTokenAmount
+      });
+
+      return assetsReturned;
     } catch (err) {
-      console.error('Failed to calculate assets returned:', err);
+      console.error('❌ Failed to calculate assets returned:', err);
+      console.error('❌ Error details:', {
+        meTokenAddress,
+        meTokenAmount,
+        address,
+        error: err instanceof Error ? err.message : String(err)
+      });
       return '0';
     }
   };
@@ -1274,5 +1362,28 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
     isConfirming,
     isConfirmed,
     transactionError,
+    getMeTokenVaultAddress: async (meTokenAddress: string) => {
+      if (!client) return null;
+      try {
+        const meTokenInfo = await client.readContract({
+          address: DIAMOND,
+          abi: METOKEN_ABI,
+          functionName: 'getMeTokenInfo',
+          args: [meTokenAddress as `0x${string}`],
+        });
+        const hubId = (meTokenInfo as any).hubId;
+        const hubInfo = await client.readContract({
+          address: DIAMOND,
+          abi: METOKEN_ABI,
+          functionName: 'getHubInfo',
+          args: [hubId],
+        });
+        return (hubInfo as any).vault as string;
+      } catch (error) {
+        console.error('Failed to get vault address:', error);
+        return null;
+      }
+    },
+    ensureDaiApproval
   };
 }

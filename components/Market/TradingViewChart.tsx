@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from 'react';
-import { createChart, IChartApi, ISeriesApi, LineStyleOptions, AreaStyleOptions, ColorType } from 'lightweight-charts';
+import { createChart, IChartApi, ISeriesApi, LineStyleOptions, AreaStyleOptions, ColorType, HistogramStyleOptions, AreaSeries, LineSeries, HistogramSeries } from 'lightweight-charts';
 import { useTheme } from 'next-themes';
 import {
   ChartDataPoint,
@@ -96,18 +96,10 @@ export function TradingViewChart({
 
     if (chartType === 'area') {
       const areaOptions = getAreaSeriesOptions(isDark);
-      // Use addSeries with proper v5.x API structure
-      series = chart.addSeries({
-        ...areaOptions,
-        type: 'Area',
-      } as any) as ISeriesApi<'Area'>;
+      series = chart.addSeries(AreaSeries, areaOptions as AreaStyleOptions);
     } else {
       const lineOptions = getLineSeriesOptions(isDark);
-      // Use addSeries with proper v5.x API structure
-      series = chart.addSeries({
-        ...lineOptions,
-        type: 'Line',
-      } as any) as ISeriesApi<'Line'>;
+      series = chart.addSeries(LineSeries, lineOptions as LineStyleOptions);
     }
 
     series.setData(chartData);
@@ -117,11 +109,11 @@ export function TradingViewChart({
     if (showVolume && data.length > 0) {
       const volumeData = convertToVolumeData(data);
       const volumeOptions = getVolumeSeriesOptions(isDark);
-      
+
       // Create volume series on separate price scale using v5.x API
-      const volumeSeries = chart.addSeries({
+      // Create volume series on separate price scale using v5.x API
+      const volumeSeries = chart.addSeries(HistogramSeries, {
         ...volumeOptions,
-        type: 'Histogram',
         priceFormat: {
           type: 'volume',
         },
@@ -130,7 +122,7 @@ export function TradingViewChart({
           top: 0.8,
           bottom: 0,
         },
-      } as any) as ISeriesApi<'Histogram'>;
+      } as HistogramStyleOptions);
 
       volumeSeries.setData(volumeData);
       volumeSeriesRef.current = volumeSeries;
@@ -153,7 +145,12 @@ export function TradingViewChart({
     return () => {
       resizeObserver.disconnect();
       if (chartRef.current) {
-        chartRef.current.remove();
+        try {
+          chartRef.current.remove();
+        } catch (e) {
+          // Ignore errors during cleanup to prevent "Assertion failed"
+          console.debug('Chart cleanup error:', e);
+        }
         chartRef.current = null;
         seriesRef.current = null;
         volumeSeriesRef.current = null;

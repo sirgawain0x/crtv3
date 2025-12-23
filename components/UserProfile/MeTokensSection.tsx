@@ -378,53 +378,53 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
               <CardContent className="space-y-6">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
                   {/* Your Balance */}
-                  <div className="rounded-lg border bg-muted/30 p-4 sm:p-5 space-y-2">
+                  <div className="rounded-lg border bg-muted/30 p-4 sm:p-5 space-y-2 overflow-hidden">
                     <div className="flex items-center gap-2">
                       <div className="p-2 rounded-md bg-blue-500/10">
                         <Coins className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                       </div>
                       <p className="text-xs sm:text-sm font-medium text-muted-foreground uppercase tracking-wide">Your Balance</p>
                     </div>
-                    <p className="text-3xl sm:text-4xl font-bold tracking-tight">
-                      {parseFloat(userMeToken.balance.toString()) / 1e18} <span className="text-lg sm:text-xl text-muted-foreground">{userMeToken.symbol}</span>
+                    <p className="text-2xl sm:text-3xl font-bold tracking-tight truncate" title={(parseFloat(userMeToken.balance.toString()) / 1e18).toString()}>
+                      {(parseFloat(userMeToken.balance.toString()) / 1e18).toLocaleString(undefined, { maximumFractionDigits: 4 })} <span className="text-base sm:text-lg text-muted-foreground">{userMeToken.symbol}</span>
                     </p>
                   </div>
 
                   {/* Total Supply */}
-                  <div className="rounded-lg border bg-muted/30 p-4 sm:p-5 space-y-2">
+                  <div className="rounded-lg border bg-muted/30 p-4 sm:p-5 space-y-2 overflow-hidden">
                     <div className="flex items-center gap-2">
                       <div className="p-2 rounded-md bg-purple-500/10">
                         <BarChart3 className="h-4 w-4 text-purple-600 dark:text-purple-400" />
                       </div>
                       <p className="text-xs sm:text-sm font-medium text-muted-foreground uppercase tracking-wide">Total Supply</p>
                     </div>
-                    <p className="text-3xl sm:text-4xl font-bold tracking-tight">
-                      {parseFloat(userMeToken.totalSupply.toString()) / 1e18} <span className="text-lg sm:text-xl text-muted-foreground">{userMeToken.symbol}</span>
+                    <p className="text-2xl sm:text-3xl font-bold tracking-tight truncate" title={(parseFloat(userMeToken.totalSupply.toString()) / 1e18).toString()}>
+                      {(parseFloat(userMeToken.totalSupply.toString()) / 1e18).toLocaleString(undefined, { maximumFractionDigits: 4 })} <span className="text-base sm:text-lg text-muted-foreground">{userMeToken.symbol}</span>
                     </p>
                   </div>
 
                   {/* TVL */}
-                  <div className="rounded-lg border bg-muted/30 p-4 sm:p-5 space-y-2">
+                  <div className="rounded-lg border bg-muted/30 p-4 sm:p-5 space-y-2 overflow-hidden">
                     <div className="flex items-center gap-2">
                       <div className="p-2 rounded-md bg-green-500/10">
                         <DollarSign className="h-4 w-4 text-green-600 dark:text-green-400" />
                       </div>
                       <p className="text-xs sm:text-sm font-medium text-muted-foreground uppercase tracking-wide">TVL</p>
                     </div>
-                    <p className="text-3xl sm:text-4xl font-bold text-green-600 dark:text-green-500 tracking-tight">
+                    <p className="text-2xl sm:text-3xl font-bold text-green-600 dark:text-green-500 tracking-tight truncate" title={`$${userMeToken.tvl.toFixed(2)}`}>
                       ${userMeToken.tvl.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </p>
                   </div>
 
                   {/* Price */}
-                  <div className="rounded-lg border bg-muted/30 p-4 sm:p-5 space-y-2">
+                  <div className="rounded-lg border bg-muted/30 p-4 sm:p-5 space-y-2 overflow-hidden">
                     <div className="flex items-center gap-2">
                       <div className="p-2 rounded-md bg-orange-500/10">
                         <TrendingUp className="h-4 w-4 text-orange-600 dark:text-orange-400" />
                       </div>
                       <p className="text-xs sm:text-sm font-medium text-muted-foreground uppercase tracking-wide">Price</p>
                     </div>
-                    <p className="text-3xl sm:text-4xl font-bold tracking-tight">
+                    <p className="text-2xl sm:text-3xl font-bold tracking-tight truncate">
                       {userMeToken.totalSupply > BigInt(0)
                         ? '$' + (userMeToken.tvl / parseFloat(formatEther(userMeToken.totalSupply))).toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 4 })
                         : '-'
