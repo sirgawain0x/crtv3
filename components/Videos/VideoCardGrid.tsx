@@ -18,14 +18,14 @@ interface VideoCardGridProps {
   orderBy?: 'created_at' | 'views_count' | 'likes_count' | 'updated_at';
 }
 
-const VideoCardGrid: React.FC<VideoCardGridProps> = ({ 
-  searchQuery, 
-  category, 
+const VideoCardGrid: React.FC<VideoCardGridProps> = ({
+  searchQuery,
+  category,
   creatorId,
   orderBy = 'created_at'
 }) => {
   const [playbackSources, setPlaybackSources] = useState<
-    (Omit<VideoAsset, 'id' | 'status' | 'created_at'> & { 
+    (Omit<VideoAsset, 'id' | 'status' | 'created_at'> & {
       detailedSrc: Src[] | null;
       id: string;
       playbackId: string;
@@ -41,6 +41,7 @@ const VideoCardGrid: React.FC<VideoCardGridProps> = ({
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [totalAssets, setTotalAssets] = useState<number>(0);
   const [hasNextPage, setHasNextPage] = useState<boolean>(false);
+  const [validVideosCount, setValidVideosCount] = useState<number>(0);
 
   const fetchSources = useCallback(async (page: number) => {
     try {
@@ -61,8 +62,7 @@ const VideoCardGrid: React.FC<VideoCardGridProps> = ({
         } catch (err) {
           if (retries > 0) {
             console.warn(
-              `Retrying playback source fetch for ${playbackId}. Attempts remaining: ${
-                retries - 1
+              `Retrying playback source fetch for ${playbackId}. Attempts remaining: ${retries - 1
               }`
             );
             await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -87,12 +87,11 @@ const VideoCardGrid: React.FC<VideoCardGridProps> = ({
         search: searchQuery,
       });
 
-      
-      // Update total and pagination state
-      setTotalAssets(total);
-      setHasNextPage(hasMore);
 
-      if (videos.length === 0 && currentPage === 1) {
+      // Update total (hasMore will be updated after filtering valid videos)
+      setTotalAssets(total);
+
+      if (videos.length === 0 && page === 1) {
         setError(searchQuery ? "No videos found matching your search." : "No videos available at the moment.");
         setPlaybackSources([]);
         return;
@@ -126,9 +125,19 @@ const VideoCardGrid: React.FC<VideoCardGridProps> = ({
         (video) => video.detailedSrc !== null
       );
 
+      // Update the count of valid videos that actually rendered
+      setValidVideosCount(validPlaybackSources.length);
 
-      if (validPlaybackSources.length === 0 && currentPage === 1) {
+      // Update hasMore based on actual valid videos returned
+      // If we got fewer videos than requested, we've reached the end
+      // Also check if API says there are no more pages
+      const actualHasMore = hasMore && validPlaybackSources.length >= ITEMS_PER_PAGE;
+      setHasNextPage(actualHasMore);
+
+      if (validPlaybackSources.length === 0 && page === 1) {
         setError("Unable to load video playback. Please try again later.");
+        setPlaybackSources([]);
+        setValidVideosCount(0);
         return;
       }
 
@@ -136,14 +145,17 @@ const VideoCardGrid: React.FC<VideoCardGridProps> = ({
     } catch (err) {
       console.error("Error fetching videos:", err);
       setError("Failed to load videos. Please try again later.");
+      setValidVideosCount(0);
+      setPlaybackSources([]);
     } finally {
       setLoading(false);
     }
-  }, [currentPage, searchQuery, category, creatorId, orderBy]);
+  }, [searchQuery, category, creatorId, orderBy]);
 
   // Reset to page 1 when search/filter parameters change
   useEffect(() => {
     setCurrentPage(1);
+    setValidVideosCount(0);
   }, [searchQuery, category, creatorId, orderBy]);
 
   useEffect(() => {
@@ -152,35 +164,36 @@ const VideoCardGrid: React.FC<VideoCardGridProps> = ({
 
   const handleNextPage = useCallback(() => {
     if (!hasNextPage || loading) return;
-    
+
     setCurrentPage((prev) => prev + 1);
-    
+
     // Scroll to top
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [hasNextPage, loading]);
 
   const handlePrevPage = useCallback(() => {
     if (currentPage === 1 || loading) return;
-    
+
     setCurrentPage((prev) => prev - 1);
-    
+
     // Scroll to top
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [currentPage, loading]);
 
   // Helper function to determine if pagination should be shown
   const shouldShowPagination = useCallback(() => {
-    // Show pagination if:
-    // 1. We have more than one page worth of assets, OR
+    // Show pagination only when:
+    // 1. We have more than one page worth of assets (totalAssets > ITEMS_PER_PAGE), OR
     // 2. We're on a page > 1 (to allow navigation back), OR
-    // 3. There's a next page available
+    // 3. There's a next page available (hasNextPage)
+    // This prevents showing pagination when there's only one page of results
     return totalAssets > ITEMS_PER_PAGE || currentPage > 1 || hasNextPage;
   }, [totalAssets, currentPage, hasNextPage]);
 
   if (loading) {
     return (
       <div>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-1 sm:gap-4 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-y-4 sm:grid-cols-1 sm:gap-4 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           {Array.from({ length: ITEMS_PER_PAGE }).map((_, index) => (
             <VideoCardSkeleton key={index} />
           ))}
@@ -195,7 +208,7 @@ const VideoCardGrid: React.FC<VideoCardGridProps> = ({
         <div className="flex min-h-[200px] items-center justify-center rounded-lg bg-red-50 p-4 text-red-800">
           <p>{error}</p>
         </div>
-        
+
         {/* Show pagination controls if appropriate */}
         {shouldShowPagination() && (
           <Pagination
@@ -205,7 +218,9 @@ const VideoCardGrid: React.FC<VideoCardGridProps> = ({
             onNextPage={handleNextPage}
             onPrevPage={handlePrevPage}
             isLoading={loading}
-            totalDisplayed={0}
+            totalDisplayed={validVideosCount}
+            totalVideos={totalAssets}
+            itemsPerPage={ITEMS_PER_PAGE}
           />
         )}
       </div>
@@ -218,7 +233,7 @@ const VideoCardGrid: React.FC<VideoCardGridProps> = ({
         <div className="flex min-h-[200px] items-center justify-center rounded-lg bg-gray-50 p-4">
           <p>No videos available at the moment. Please check back later.</p>
         </div>
-        
+
         {/* Show pagination controls if appropriate */}
         {shouldShowPagination() && (
           <Pagination
@@ -228,7 +243,9 @@ const VideoCardGrid: React.FC<VideoCardGridProps> = ({
             onNextPage={handleNextPage}
             onPrevPage={handlePrevPage}
             isLoading={loading}
-            totalDisplayed={0}
+            totalDisplayed={validVideosCount}
+            totalVideos={totalAssets}
+            itemsPerPage={ITEMS_PER_PAGE}
           />
         )}
       </div>
@@ -237,16 +254,17 @@ const VideoCardGrid: React.FC<VideoCardGridProps> = ({
 
   return (
     <div>
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-1 sm:gap-4 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-        {playbackSources.map((video) => (
+      <div className="grid grid-cols-1 gap-y-4 sm:grid-cols-1 sm:gap-4 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+        {playbackSources.map((video, index) => (
           <VideoCard
             key={video.id}
             asset={video as any} // Type assertion needed due to Asset interface mismatch
             playbackSources={video.detailedSrc}
+            priority={index === 0} // First video gets priority for LCP optimization
           />
         ))}
       </div>
-      
+
       {shouldShowPagination() && (
         <Pagination
           hasNextPage={hasNextPage}
@@ -255,7 +273,9 @@ const VideoCardGrid: React.FC<VideoCardGridProps> = ({
           onNextPage={handleNextPage}
           onPrevPage={handlePrevPage}
           isLoading={loading}
-          totalDisplayed={playbackSources.length}
+          totalDisplayed={validVideosCount}
+          totalVideos={totalAssets}
+          itemsPerPage={ITEMS_PER_PAGE}
         />
       )}
     </div>

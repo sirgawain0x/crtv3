@@ -8,34 +8,31 @@ The MeTokens subgraph endpoint has CORS restrictions that prevent direct access 
 
 ## Setup Instructions
 
-### 1. Environment Variables
+### 1. Subgraph Configuration
 
-Create a `.env.local` file in your project root and add the following:
+The application now uses **Goldsky** for subgraph indexing, which provides public endpoints that don't require authentication keys.
 
-```bash
-# MeTokens Subgraph Configuration
-SUBGRAPH_QUERY_KEY=your_subgraph_query_key_here
-```
+**Subgraph Endpoints:**
+- **MeTokens**: `https://api.goldsky.com/api/public/project_cmh0iv6s500dbw2p22vsxcfo6/subgraphs/metokens/v0.0.1/gn`
+  - Deployment ID: `QmVaWYhk4HKhk9rNQi11RKujTVS4KHF1uHGNVUF4f7xJ53`
+- **Creative TV**: `https://api.goldsky.com/api/public/project_cmh0iv6s500dbw2p22vsxcfo6/subgraphs/creative_tv/0.1/gn`
+  - Deployment ID: `QmbDp8Wfy82g8L7Mv6RCAZHRcYUQB4prQfqchvexfZR8yZ`
 
-**Important:** You need to obtain the `SUBGRAPH_QUERY_KEY` from:
-- The MeTokens team
-- Satsuma dashboard
-- Or by following the authentication documentation
+**Note:** No environment variables are required for basic subgraph access since these are public Goldsky endpoints.
 
 ### 2. API Proxy
 
 The application includes an API proxy route at `/api/metokens-subgraph` that:
 - Handles CORS issues by making server-side requests
-- Embeds the query key directly in the URL path (as required by Satsuma)
-- Forwards GraphQL queries to the MeTokens subgraph
+- Forwards GraphQL queries to the Goldsky MeTokens subgraph
+- Provides better error handling and logging
 
 ### 3. Testing the Integration
 
 To test if the MeTokens integration is working:
 
-1. Make sure your `.env.local` file has the correct `SUBGRAPH_QUERY_KEY`
-2. Restart your development server
-3. Add the `MeTokensTest` component to any page to verify the connection
+1. Start your development server: `yarn dev`
+2. Add the `MeTokensTest` component to any page to verify the connection
 
 ```tsx
 import MeTokensTest from '@/components/UserProfile/MeTokensTest';
@@ -44,14 +41,21 @@ import MeTokensTest from '@/components/UserProfile/MeTokensTest';
 <MeTokensTest />
 ```
 
-### 4. MeTokens Subgraph Endpoint
+### 4. MeTokens Subgraph Endpoints
 
-The subgraph endpoint format is:
+The subgraph endpoints are now using **Goldsky** public APIs:
+
+**MeTokens Subgraph:**
 ```
-https://subgraph.satsuma-prod.com/${QUERY_KEY}/creative-organization-dao--378139/metokens/api
+https://api.goldsky.com/api/public/project_cmh0iv6s500dbw2p22vsxcfo6/subgraphs/metokens/v0.0.1/gn
 ```
 
-Where `${QUERY_KEY}` is your actual query key from the `SUBGRAPH_QUERY_KEY` environment variable.
+**Creative TV Subgraph:**
+```
+https://api.goldsky.com/api/public/project_cmh0iv6s500dbw2p22vsxcfo6/subgraphs/creative_tv/0.1/gn
+```
+
+These are public endpoints and don't require authentication.
 
 ### 5. Available Queries
 
@@ -66,9 +70,10 @@ The MeTokens subgraph client supports:
 ### 6. Error Handling
 
 If you encounter errors:
-1. Check that `SUBGRAPH_QUERY_KEY` is set correctly
-2. Verify the subgraph endpoint is accessible
+1. Verify the Goldsky subgraph endpoint is accessible
+2. Check your internet connection
 3. Check the browser console and server logs for detailed error messages
+4. Look for rate limiting issues (HTTP 429 responses)
 
 ### 7. Contract Addresses (Base)
 
@@ -79,19 +84,20 @@ If you encounter errors:
 
 ### CORS Errors
 If you still see CORS errors, ensure:
-1. The API proxy is working correctly
-2. The `SUBGRAPH_QUERY_KEY` is valid
-3. Your development server is running
+1. The API proxy is working correctly at `/api/metokens-subgraph`
+2. Your development server is running
+3. Check browser console for specific CORS error messages
 
-### Authentication Errors
-If you get authentication errors (403 Forbidden):
-1. Verify your `SUBGRAPH_QUERY_KEY` is correct
-2. Check if the key has expired
-3. Test your query key by visiting: `https://subgraph.satsuma-prod.com/${QUERY_KEY}/creative-organization-dao--378139/metokens/api`
-4. Contact the MeTokens team for a new key if needed
+### Rate Limiting
+If you get rate limiting errors (429):
+1. Goldsky public endpoints have rate limits
+2. Implement request throttling in your application
+3. Consider caching responses when appropriate
+4. Contact Goldsky for higher rate limits if needed
 
 ### Network Errors
 If you get network errors:
 1. Check your internet connection
-2. Verify the subgraph endpoint is accessible
+2. Verify the Goldsky endpoint is accessible
 3. Check if there are any firewall restrictions
+4. Monitor Goldsky status at their status page

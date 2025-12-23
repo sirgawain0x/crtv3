@@ -1,19 +1,25 @@
 # Quick Fix Guide for Console Errors
 
-## 🚨 Seeing MeTokens Subgraph Error (500)?
+## 🚨 Seeing MeTokens Subgraph Error?
+
+### What's New
+The application now uses **Goldsky** public endpoints for subgraph access!
+
+**No API keys required** - The endpoints are publicly accessible:
+- MeTokens: `https://api.goldsky.com/api/public/project_cmh0iv6s500dbw2p22vsxcfo6/subgraphs/metokens/v0.0.1/gn`
+- Creative TV: `https://api.goldsky.com/api/public/project_cmh0iv6s500dbw2p22vsxcfo6/subgraphs/creative_tv/0.1/gn`
 
 ### Quick Fix
-1. Get your API key from https://app.satsuma.xyz/
-2. Add to `.env.local`:
-   ```
-   SUBGRAPH_QUERY_KEY=your_key_here
-   ```
-3. Restart dev server: `yarn dev`
+1. Restart your dev server: `yarn dev`
+2. The app automatically uses the new Goldsky endpoints
+3. No environment variables needed for basic access
 
 ### What Changed
-- App now continues to work even if subgraph fails
-- Better error messages tell you exactly what's wrong
-- Portfolio page shows empty holdings instead of crashing
+- ✅ Migrated from Satsuma to Goldsky
+- ✅ No authentication keys required
+- ✅ App continues to work even if subgraph fails
+- ✅ Better error messages for troubleshooting
+- ✅ Portfolio page shows empty holdings instead of crashing
 
 ---
 
@@ -50,9 +56,10 @@ Look for emoji prefixes:
 
 #### Issue: Subgraph always fails
 **Check:**
-1. Is `SUBGRAPH_QUERY_KEY` set in `.env.local`?
-2. Did you restart the dev server after adding it?
-3. Is the key valid? Test at https://app.satsuma.xyz/
+1. Is your internet connection working?
+2. Is the Goldsky service accessible? (check status page)
+3. Are you being rate limited? (HTTP 429 responses)
+4. Check server logs for detailed error messages
 
 #### Issue: Video upload stuck
 **Check:**

@@ -14,6 +14,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { useWalletStatus } from '@/lib/hooks/accountkit/useWalletStatus';
 import { AvatarUpload } from './AvatarUpload';
 import { Loader2, CheckCircle, AlertCircle, User, Save, Edit3 } from 'lucide-react';
+import { convertFailingGateway, isIpfsUrl } from '@/lib/utils/image-gateway';
 
 interface CreatorProfileManagerProps {
   targetAddress?: string;
@@ -195,11 +196,12 @@ export function CreatorProfileManager({ targetAddress, onProfileUpdated }: Creat
                   {formData.avatar_url ? (
                     <div className="flex items-center gap-2">
                       <Image 
-                        src={formData.avatar_url} 
+                        src={convertFailingGateway(formData.avatar_url)} 
                         alt="Avatar" 
                         width={32}
                         height={32}
                         className="h-8 w-8 rounded-full object-cover"
+                        unoptimized={isIpfsUrl(formData.avatar_url)}
                       />
                       <span className="text-sm">Avatar uploaded</span>
                     </div>

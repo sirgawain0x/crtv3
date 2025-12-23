@@ -1,4 +1,5 @@
 import { supabase, MeToken, MeTokenBalance, MeTokenTransaction, CreateMeTokenData, UpdateMeTokenData } from './client';
+import { createServiceClient } from './service';
 
 // Re-export types for external use
 export type { MeToken, MeTokenBalance, MeTokenTransaction, CreateMeTokenData, UpdateMeTokenData };
@@ -51,6 +52,31 @@ export class MeTokenSupabaseService {
         throw error;
       }
       throw new Error('Unknown error occurred while fetching MeToken by owner');
+    }
+  }
+
+  // Get MeToken by ID (UUID)
+  async getMeTokenById(id: string): Promise<MeToken | null> {
+    try {
+      const { data, error } = await supabase
+        .from('metokens')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') return null; // Not found
+        console.error('Supabase error fetching MeToken by ID:', error);
+        throw new Error(`Failed to fetch MeToken by ID: ${error.message}`);
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error in getMeTokenById:', error);
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error('Unknown error occurred while fetching MeToken by ID');
     }
   }
 
@@ -151,6 +177,7 @@ export class MeTokenSupabaseService {
   }
 
   // Update user's MeToken balance
+  // Uses service role client to bypass RLS (since app uses Account Kit, not Supabase Auth)
   async updateUserBalance(
     meTokenAddress: string,
     userAddress: string,
@@ -161,19 +188,72 @@ export class MeTokenSupabaseService {
       throw new Error('MeToken not found');
     }
 
-    const { data, error } = await supabase
+    // Use service client to bypass RLS (required for Account Kit authentication)
+    // Service client is only available server-side, so this method should be called from API routes
+    // Wrap in try-catch to gracefully fallback to regular client if service key is not configured
+    // Note: createServiceClient() throws an error if SUPABASE_SERVICE_ROLE_KEY is missing,
+    // so we catch it and fall back to the regular client (which will be subject to RLS)
+    let serviceClient: ReturnType<typeof createServiceClient>;
+    try {
+      serviceClient = createServiceClient();
+    } catch (error) {
+      console.error('Failed to create service client for balance update:', error);
+      throw new Error('Service configuration error: Unable to authenticate as service role');
+    }
+    const client = serviceClient;
+
+    // Check if balance record exists
+    const { data: existing, error: checkError } = await client
       .from('metoken_balances')
-      .upsert({
-        metoken_id: meToken.id,
-        user_address: userAddress.toLowerCase(),
-        balance,
-        updated_at: new Date().toISOString(),
-      })
-      .select(`
-        *,
-        metoken:metokens(*)
-      `)
-      .single();
+      .select('id')
+      .eq('metoken_id', meToken.id)
+      .eq('user_address', userAddress.toLowerCase())
+      .maybeSingle();
+
+    // If checkError is not a "not found" error, log it but continue
+    if (checkError && checkError.code !== 'PGRST116') {
+      console.warn('Error checking existing balance:', checkError);
+    }
+
+    let data, error;
+
+    if (existing) {
+      // Update existing record
+      const result = await client
+        .from('metoken_balances')
+        .update({
+          balance,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('metoken_id', meToken.id)
+        .eq('user_address', userAddress.toLowerCase())
+        .select(`
+          *,
+          metoken:metokens(*)
+        `)
+        .single();
+
+      data = result.data;
+      error = result.error;
+    } else {
+      // Insert new record
+      const result = await client
+        .from('metoken_balances')
+        .insert({
+          metoken_id: meToken.id,
+          user_address: userAddress.toLowerCase(),
+          balance,
+          updated_at: new Date().toISOString(),
+        })
+        .select(`
+          *,
+          metoken:metokens(*)
+        `)
+        .single();
+
+      data = result.data;
+      error = result.error;
+    }
 
     if (error) {
       throw new Error(`Failed to update user balance: ${error.message}`);
@@ -183,6 +263,7 @@ export class MeTokenSupabaseService {
   }
 
   // Record a MeToken transaction
+  // Uses service role client to bypass RLS (since app uses Account Kit, not Supabase Auth)
   async recordTransaction(transactionData: {
     metoken_id: string;
     user_address: string;
@@ -191,8 +272,24 @@ export class MeTokenSupabaseService {
     collateral_amount?: number;
     transaction_hash?: string;
     block_number?: number;
+    video_id?: number;
+    playback_id?: string;
   }): Promise<MeTokenTransaction> {
-    const { data, error } = await supabase
+    // Use service client to bypass RLS (required for Account Kit authentication)
+    // Service client is only available server-side, so this method should be called from API routes
+    // Wrap in try-catch to gracefully fallback to regular client if service key is not configured
+    // Note: createServiceClient() throws an error if SUPABASE_SERVICE_ROLE_KEY is missing,
+    // so we catch it and fall back to the regular client (which will be subject to RLS)
+    let serviceClient: ReturnType<typeof createServiceClient>;
+    try {
+      serviceClient = createServiceClient();
+    } catch (error) {
+      console.error('Failed to create service client for transaction record:', error);
+      throw new Error('Service configuration error: Unable to authenticate as service role');
+    }
+    const client = serviceClient;
+
+    const { data, error } = await client
       .from('metoken_transactions')
       .insert({
         ...transactionData,

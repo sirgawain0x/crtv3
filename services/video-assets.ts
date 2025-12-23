@@ -5,14 +5,16 @@ import { createClient } from "@/lib/sdk/supabase/server";
 import { createServiceClient } from "@/lib/sdk/supabase/service";
 import type { VideoAsset } from "@/lib/types/video-asset";
 import { fullLivepeer } from "@/lib/sdk/livepeer/fullClient";
+import type { CollaboratorFormData } from "@/lib/types/splits";
 
 export async function createVideoAsset(
-  data: Omit<VideoAsset, "id" | "created_at" | "updated_at">
+  data: Omit<VideoAsset, "id" | "created_at" | "updated_at">,
+  collaborators?: CollaboratorFormData[]
 ) {
   // Use service client to bypass RLS since we're using smart account addresses
   // which don't match Supabase JWT authentication
   const supabase = createServiceClient();
-  
+
   const { data: result, error } = await supabase
     .from('video_assets')
     .insert({
@@ -41,6 +43,14 @@ export async function createVideoAsset(
       attributes: data.attributes,
       requires_metoken: data.requires_metoken || false,
       metoken_price: data.metoken_price || null,
+      creator_metoken_id: data.creator_metoken_id || null,
+      story_ip_registered: data.story_ip_registered || false,
+      story_ip_id: data.story_ip_id || null,
+      story_ip_registration_tx: data.story_ip_registration_tx || null,
+      story_ip_registered_at: data.story_ip_registered_at || null,
+      story_license_terms_id: data.story_license_terms_id || null,
+      story_license_template_id: data.story_license_template_id || null,
+      splits_address: null, // Will be set when split contract is created during publish
     })
     .select()
     .single();
@@ -49,12 +59,53 @@ export async function createVideoAsset(
     throw new Error(`Failed to create video asset: ${error.message}`);
   }
 
+  // Store collaborators if provided
+  if (collaborators && collaborators.length > 0 && result?.id) {
+    // Convert percentages to basis points, ensuring total equals exactly 10000
+    // This handles rounding errors from decimal percentages (e.g., 33.333% + 33.333% + 33.334% = 100%)
+    const collaboratorInserts = collaborators.map((collab, index) => {
+      // Convert to basis points (0-10000)
+      let sharePercentage = Math.round(collab.percentage * 100);
+      
+      // For the last collaborator, adjust to ensure total equals exactly 10000
+      // This compensates for rounding errors in previous collaborators
+      if (index === collaborators.length - 1) {
+        // Calculate what the total would be without this last collaborator
+        const previousTotal = collaborators
+          .slice(0, -1)
+          .reduce((sum, c) => sum + Math.round(c.percentage * 100), 0);
+        
+        // Set the last collaborator's share to make the total exactly 10000
+        sharePercentage = 10000 - previousTotal;
+        
+        // Ensure it's within valid range (0-10000)
+        if (sharePercentage < 0) sharePercentage = 0;
+        if (sharePercentage > 10000) sharePercentage = 10000;
+      }
+      
+      return {
+        video_id: result.id,
+        collaborator_address: collab.address,
+        share_percentage: sharePercentage,
+      };
+    });
+
+    const { error: collabError } = await supabase
+      .from('video_collaborators')
+      .insert(collaboratorInserts);
+
+    if (collabError) {
+      console.error('Failed to store collaborators:', collabError);
+      // Don't throw - video asset is created, collaborators can be added later
+    }
+  }
+
   return result;
 }
 
 export async function getVideoAssetById(id: number) {
   const supabase = await createClient();
-  
+
   const { data: result, error } = await supabase
     .from('video_assets')
     .select('*')
@@ -70,10 +121,10 @@ export async function getVideoAssetById(id: number) {
 
 export async function getVideoAssetByPlaybackId(playbackId: string) {
   const supabase = await createClient();
-  
+
   const { data: result, error } = await supabase
     .from('video_assets')
-    .select('id, status, thumbnail_url')
+    .select('id, status, thumbnail_url, creator_metoken_id, attributes')
     .eq('playback_id', playbackId)
     .maybeSingle(); // Use maybeSingle() instead of single()
 
@@ -87,13 +138,13 @@ export async function getVideoAssetByPlaybackId(playbackId: string) {
 export async function getVideoAssetByAssetId(assetId: string) {
   // Validate UUID format
   const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  
+
   if (!uuidRegex.test(assetId)) {
     throw new Error(`Invalid asset ID: ${assetId}. Asset ID must be a valid UUID.`);
   }
-  
+
   const supabase = await createClient();
-  
+
   const { data: result, error } = await supabase
     .from('video_assets')
     .select('*')
@@ -117,7 +168,7 @@ export async function updateVideoAssetMintingStatus(
 ) {
   // Use service client to bypass RLS
   const supabase = createServiceClient();
-  
+
   const { data: result, error } = await supabase
     .from('video_assets')
     .update({
@@ -140,29 +191,97 @@ export async function updateVideoAssetMintingStatus(
   return result;
 }
 
+/**
+ * Update Story Protocol IP registration status for a video asset
+ */
+export async function updateVideoAssetStoryIPStatus(
+  id: number,
+  storyData: {
+    story_ip_registered: boolean;
+    story_ip_id: string;
+    story_ip_registration_tx: string;
+    story_license_terms_id?: string | null;
+    story_license_template_id?: string | null;
+  }
+) {
+  // Use service client to bypass RLS
+  const supabase = createServiceClient();
+
+  const { data: result, error } = await supabase
+    .from('video_assets')
+    .update({
+      story_ip_registered: storyData.story_ip_registered,
+      story_ip_id: storyData.story_ip_id,
+      story_ip_registration_tx: storyData.story_ip_registration_tx,
+      story_ip_registered_at: new Date().toISOString(),
+      story_license_terms_id: storyData.story_license_terms_id || null,
+      story_license_template_id: storyData.story_license_template_id || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to update Story Protocol IP status: ${error.message}`);
+  }
+
+  return result;
+}
+
 export async function updateVideoAsset(
   id: number,
   data: {
-    thumbnailUri: string;
-    status: string;
+    thumbnailUri?: string;
+    status?: string;
+    title?: string;
+    description?: string | null;
+    category?: string;
+    location?: string;
     max_supply?: number | null;
     price?: number | null;
     royalty_percentage?: number | null;
     metadata_uri?: string | null;
     requires_metoken?: boolean;
     metoken_price?: number | null;
+    attributes?: Record<string, any> | null;
+    contract_address?: string | null;
+    token_id?: string | null;
+    story_ip_registered?: boolean;
+    story_ip_id?: string | null;
+    story_ip_registration_tx?: string | null;
+    story_ip_registered_at?: Date | null;
+    story_license_terms_id?: string | null;
+    story_license_template_id?: string | null;
+    splits_address?: string | null;
   }
 ) {
   // Use service client to bypass RLS
   const supabase = createServiceClient();
-  
+
   const updateData: any = {
-    thumbnail_url: data.thumbnailUri,
-    status: data.status,
     updated_at: new Date().toISOString(),
   };
 
   // Only include fields if they are provided
+  if (data.thumbnailUri !== undefined) {
+    updateData.thumbnail_url = data.thumbnailUri;
+  }
+  if (data.status !== undefined) {
+    updateData.status = data.status;
+  }
+  if (data.title !== undefined) {
+    updateData.title = data.title;
+  }
+  if (data.description !== undefined) {
+    updateData.description = data.description;
+  }
+  if (data.category !== undefined) {
+    updateData.category = data.category;
+  }
+  if (data.location !== undefined) {
+    updateData.location = data.location;
+  }
   if (data.max_supply !== undefined) {
     updateData.max_supply = data.max_supply;
   }
@@ -181,7 +300,37 @@ export async function updateVideoAsset(
   if (data.metoken_price !== undefined) {
     updateData.metoken_price = data.metoken_price;
   }
-  
+  if (data.attributes !== undefined) {
+    updateData.attributes = data.attributes;
+  }
+  if (data.contract_address !== undefined) {
+    updateData.contract_address = data.contract_address;
+  }
+  if (data.token_id !== undefined) {
+    updateData.token_id = data.token_id;
+  }
+  if (data.story_ip_registered !== undefined) {
+    updateData.story_ip_registered = data.story_ip_registered;
+  }
+  if (data.story_ip_id !== undefined) {
+    updateData.story_ip_id = data.story_ip_id;
+  }
+  if (data.story_ip_registration_tx !== undefined) {
+    updateData.story_ip_registration_tx = data.story_ip_registration_tx;
+  }
+  if (data.story_ip_registered_at !== undefined) {
+    updateData.story_ip_registered_at = data.story_ip_registered_at?.toISOString();
+  }
+  if (data.story_license_terms_id !== undefined) {
+    updateData.story_license_terms_id = data.story_license_terms_id;
+  }
+  if (data.story_license_template_id !== undefined) {
+    updateData.story_license_template_id = data.story_license_template_id;
+  }
+  if (data.splits_address !== undefined) {
+    updateData.splits_address = data.splits_address;
+  }
+
   const { data: result, error } = await supabase
     .from('video_assets')
     .update(updateData)
@@ -212,48 +361,52 @@ export interface GetPublishedVideoAssetsOptions {
  */
 export async function getPublishedVideoAssets(options: GetPublishedVideoAssetsOptions = {}) {
   const supabase = await createClient();
-  
+
   let query = supabase
     .from('video_assets')
     .select('*', { count: 'exact' })
     .eq('status', 'published');
-  
-  // Add creator filter if specified
+
+  // Add creator filter if specified (case-insensitive comparison)
   if (options.creatorId) {
-    query = query.eq('creator_id', options.creatorId);
+    // Normalize to lowercase for consistent matching
+    // Since creator_id might be stored in checksum format (mixed case), we need case-insensitive comparison
+    const normalizedCreatorId = options.creatorId.toLowerCase();
+    // Use ilike for case-insensitive matching (handles both checksum and lowercase addresses)
+    query = query.ilike('creator_id', normalizedCreatorId);
   }
-  
+
   // Add category filter if specified
   if (options.category) {
     query = query.eq('category', options.category);
   }
-  
+
   // Add full-text search if specified (searches title and description)
   if (options.search && options.search.trim()) {
     // Use text search across title and description
     const searchTerm = options.search.trim();
     query = query.or(`title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`);
   }
-  
+
   // Add ordering
   const orderBy = options.orderBy || 'created_at';
   const order = options.order || 'desc';
   query = query.order(orderBy, { ascending: order === 'asc' });
-  
+
   // Add pagination
   if (options.limit) {
     const offset = options.offset || 0;
     query = query.range(offset, offset + options.limit - 1);
   }
-  
+
   const { data, error, count } = await query;
-  
+
   if (error) {
     throw new Error(`Failed to fetch published videos: ${error.message}`);
   }
-  
-  return { 
-    data: data || [], 
+
+  return {
+    data: data || [],
     total: count || 0,
     hasMore: options.limit ? (count || 0) > (options.offset || 0) + (options.limit || 0) : false
   };
@@ -288,21 +441,33 @@ export async function createMultistreamTarget({
   profile = "720p0",
   videoOnly = false,
 }: CreateMultistreamTargetParams): Promise<CreateMultistreamTargetResult> {
-  if (!streamId || !name || !url)
-    return { error: "Missing streamId, name, or URL" };
+  if (!streamId || !url) {
+    return { error: "Missing streamId or URL" };
+  }
+
+  // Name is optional - provide default if not given
+  const targetName = name || `Target ${Date.now()}`;
+
   try {
     const target = await fullLivepeer.stream.addMultistreamTarget(
       {
         profile,
         videoOnly,
-        spec: { name, url },
+        spec: { name: targetName, url },
       },
       streamId
     );
-    if (!target) return { error: "Failed to create multistream target" };
-    return { target: { ...target, url } };
-  } catch (e) {
-    return { error: "Failed to create multistream target" };
+
+    if (!target) {
+      return { error: "Failed to create multistream target" };
+    }
+
+    return { target: { ...target, url, name: targetName } };
+  } catch (e: any) {
+    console.error("Error creating multistream target:", e);
+    return {
+      error: e?.message || "Failed to create multistream target"
+    };
   }
 }
 
@@ -311,14 +476,46 @@ export interface ListMultistreamTargetsResult {
   error?: string;
 }
 
-export async function listMultistreamTargets(): Promise<ListMultistreamTargetsResult> {
+export interface ListMultistreamTargetsParams {
+  streamId: string;
+}
+
+/**
+ * Lists multistream targets for a specific stream.
+ * According to Livepeer docs, multistream targets are stream-specific.
+ * 
+ * @param streamId - The Livepeer stream ID to fetch targets for
+ * @returns List of multistream targets for the specified stream
+ */
+export async function listMultistreamTargets(
+  { streamId }: ListMultistreamTargetsParams
+): Promise<ListMultistreamTargetsResult> {
+  if (!streamId) {
+    return { error: "Stream ID is required" };
+  }
+
   try {
-    const targets = await fullLivepeer.multistream.getAll();
-    if (!Array.isArray(targets))
-      return { error: "Failed to fetch multistream targets" };
+    // Fetch the stream to get its multistream targets
+    const stream = await fullLivepeer.stream.get(streamId);
+
+    if (!stream || !stream.stream) {
+      return { error: "Stream not found" };
+    }
+
+    // Extract multistream targets from the stream object
+    // Livepeer API returns targets in stream.multistream.targets
+    const targets = stream.stream.multistream?.targets || [];
+
+    if (!Array.isArray(targets)) {
+      return { error: "Invalid multistream targets format" };
+    }
+
     return { targets: targets as MultistreamTarget[] };
-  } catch (e) {
-    return { error: "Failed to fetch multistream targets" };
+  } catch (e: any) {
+    console.error("Error fetching multistream targets:", e);
+    return {
+      error: e?.message || "Failed to fetch multistream targets"
+    };
   }
 }
 

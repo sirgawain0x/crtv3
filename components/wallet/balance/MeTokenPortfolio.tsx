@@ -7,11 +7,11 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useMeTokenHoldings } from '@/lib/hooks/metokens/useMeTokenHoldings';
 import { MeTokenHolding } from '@/lib/hooks/metokens/useMeTokenHoldings';
-import { 
-  Wallet, 
-  TrendingUp, 
-  Users, 
-  Crown, 
+import {
+  Wallet,
+  TrendingUp,
+  Users,
+  Crown,
   ExternalLink,
   RefreshCw,
   AlertCircle,
@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useUser } from '@account-kit/react';
 import Link from 'next/link';
+import { convertFailingGateway } from '@/lib/utils/image-gateway';
 
 interface MeTokenPortfolioProps {
   targetAddress?: string;
@@ -91,9 +92,9 @@ export function MeTokenPortfolio({ targetAddress, className }: MeTokenPortfolioP
             <AlertCircle className="h-4 w-4" />
             <span className="text-sm">{error}</span>
           </div>
-          <Button 
-            variant="outline" 
-            size="sm" 
+          <Button
+            variant="outline"
+            size="sm"
             onClick={handleRefresh}
             className="mt-4"
           >
@@ -151,9 +152,9 @@ export function MeTokenPortfolio({ targetAddress, className }: MeTokenPortfolioP
                 {holdings.length} MeToken{holdings.length !== 1 ? 's' : ''} in your portfolio
               </CardDescription>
             </div>
-            <Button 
-              variant="outline" 
-              size="sm" 
+            <Button
+              variant="outline"
+              size="sm"
               onClick={handleRefresh}
               disabled={refreshing}
             >
@@ -197,7 +198,7 @@ export function MeTokenPortfolio({ targetAddress, className }: MeTokenPortfolioP
             <CardDescription>MeToken you created</CardDescription>
           </CardHeader>
           <CardContent>
-            <MeTokenHoldingCard holding={ownMeToken} showCreatorProfile={false} />
+            <MeTokenHoldingCard holding={ownMeToken} showCreatorProfile={true} />
           </CardContent>
         </Card>
       )}
@@ -215,9 +216,9 @@ export function MeTokenPortfolio({ targetAddress, className }: MeTokenPortfolioP
           <CardContent>
             <div className="space-y-4">
               {otherHoldings.map((holding) => (
-                <MeTokenHoldingCard 
-                  key={holding.address} 
-                  holding={holding} 
+                <MeTokenHoldingCard
+                  key={holding.address}
+                  holding={holding}
                   showCreatorProfile={true}
                 />
               ))}
@@ -262,9 +263,9 @@ function MeTokenHoldingCard({ holding, showCreatorProfile }: MeTokenHoldingCardP
         {/* Creator Avatar */}
         {showCreatorProfile && (
           <Avatar className="h-10 w-10">
-            <AvatarImage 
-              src={holding.creatorProfile?.avatar_url} 
-              alt={holding.creatorProfile?.username || 'Creator'} 
+            <AvatarImage
+              src={holding.creatorProfile?.avatar_url ? convertFailingGateway(holding.creatorProfile.avatar_url) : undefined}
+              alt={holding.creatorProfile?.username || 'Creator'}
             />
             <AvatarFallback>
               {holding.creatorProfile?.username?.charAt(0).toUpperCase() || 'C'}
@@ -283,13 +284,13 @@ function MeTokenHoldingCard({ holding, showCreatorProfile }: MeTokenHoldingCardP
               </Badge>
             )}
           </div>
-          
+
           {showCreatorProfile && holding.creatorProfile && (
             <p className="text-sm text-muted-foreground">
               by {holding.creatorProfile.username || 'Unknown Creator'}
             </p>
           )}
-          
+
           <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
             <span>Balance: {formatBalance(holding.balance)}</span>
             <span>TVL: {formatTVL(holding.tvl)}</span>

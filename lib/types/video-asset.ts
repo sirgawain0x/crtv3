@@ -39,9 +39,19 @@ export interface VideoAsset {
   attributes: Record<string, any> | null;
   requires_metoken: boolean;
   metoken_price: number | null;
+  creator_metoken_id: string | null;  // UUID reference to creator's MeToken
   // Subtitle fields
   subtitles_uri: string | null;  // IPFS URI for decentralized storage
   subtitles: Subtitles | null;    // Cached JSONB data for fast access
+  // Story Protocol fields
+  story_ip_registered: boolean;
+  story_ip_id: string | null;  // Story Protocol IP Asset ID (ipId)
+  story_ip_registration_tx: string | null;  // Transaction hash of IP registration
+  story_ip_registered_at: Date | null;  // When IP was registered
+  story_license_terms_id: string | null;  // ID of attached license terms
+  story_license_template_id: string | null;  // ID of license template used
+  // Splits.org fields
+  splits_address: string | null;  // Address of the Splits contract for revenue distribution
   created_at: Date;
   updated_at: Date;
 }

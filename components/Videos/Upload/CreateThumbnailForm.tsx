@@ -1,21 +1,29 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useForm, Controller } from "react-hook-form";
 import { Button } from "../../ui/button";
-import { SparklesIcon, AlertCircle, Upload, CreditCard } from "lucide-react";
+import { SparklesIcon, AlertCircle, Upload, CreditCard, Loader2 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
+import { Progress } from "@/components/ui/progress";
 import { useMeTokensSupabase } from "@/lib/hooks/metokens/useMeTokensSupabase";
 import { uploadThumbnailToIPFS, uploadThumbnailFromBlob } from "@/lib/services/thumbnail-upload";
 import { AlchemyMeTokenCreator } from "@/components/UserProfile/AlchemyMeTokenCreator";
+import { useX402Payment } from "@/lib/hooks/payments/useX402Payment";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import Image from "next/image";
+import { compressImage } from "@/lib/utils/image-compression";
+import { convertFailingGateway } from "@/lib/utils/image-gateway";
+import { GatewayImage } from "@/components/ui/gateway-image";
+import { StoryLicenseSelector } from "./StoryLicenseSelector";
+import { NFTMintingStep } from "./NFTMintingStep";
+import type { StoryLicenseTerms } from "@/lib/types/story-protocol";
+import type { Address } from "viem";
 
 interface FormValues {
   thumbnailType: "custom" | "ai";
@@ -31,24 +39,42 @@ interface FormValues {
 interface CreateThumbnailFormProps {
   livepeerAssetId?: string;
   assetReady?: boolean;
+  videoAssetId?: number;
+  creatorAddress?: Address;
+  metadataURI?: string;
   onSelectThumbnailImages: (imageUrl: string) => void;
   onMeTokenConfigChange?: (meTokenConfig: {
     requireMeToken: boolean;
     priceInMeToken: number;
+  }) => void;
+  onStoryConfigChange?: (storyConfig: {
+    registerIP: boolean;
+    licenseTerms?: any;
+  }) => void;
+  onNFTMinted?: (mintResult: {
+    tokenId: string;
+    contractAddress: Address;
+    txHash: string;
   }) => void;
 }
 
 const CreateThumbnailForm = ({
   livepeerAssetId,
   assetReady = false,
+  videoAssetId,
+  creatorAddress,
+  metadataURI,
   onSelectThumbnailImages,
   onMeTokenConfigChange,
+  onStoryConfigChange,
+  onNFTMinted,
 }: CreateThumbnailFormProps) => {
   const {
     control,
     watch,
     formState: { errors, isSubmitting },
     setError,
+    clearErrors,
     setValue,
     register,
   } = useForm<FormValues>({
@@ -69,13 +95,23 @@ const CreateThumbnailForm = ({
   const [aiLoading, setAiLoading] = useState(false);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [thumbnailUploading, setThumbnailUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isCompressing, setIsCompressing] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | undefined>();
   const [showMeTokenCreator, setShowMeTokenCreator] = useState(false);
+  const blobUrlRef = useRef<string | null>(null);
+  const currentImageRef = useRef<File | null>(null);
+  const blobUrlFileRef = useRef<File | null>(null); // Track which file the blob URL belongs to
+  const isSettingFileRef = useRef<boolean>(false); // Flag to prevent cleanup during file selection
 
   const { userMeToken, loading: meTokenLoading, checkUserMeToken } = useMeTokensSupabase();
+  const { makePayment, isProcessing: isPaymentProcessing, isConnected } = useX402Payment();
   const requireMeToken = watch("meTokenConfig.requireMeToken");
   const thumbnailType = watch("thumbnailType");
   const customImage = watch("customImage");
+  const [storyIPEnabled, setStoryIPEnabled] = useState(false);
+  const [selectedStoryLicense, setSelectedStoryLicense] = useState<StoryLicenseTerms | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -84,45 +120,202 @@ const CreateThumbnailForm = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Handle custom image upload
+  // Handle custom image upload with compression
   useEffect(() => {
+    // Reset the flag at the start of the effect (after cleanup has already run)
+    // This ensures the flag was checked during cleanup, and now we can reset it
+    if (isSettingFileRef.current) {
+      isSettingFileRef.current = false;
+    }
+
     if (customImage && thumbnailType === "custom") {
-      // Upload thumbnail to IPFS immediately for persistence
-      setThumbnailUploading(true);
-      uploadThumbnailToIPFS(customImage, livepeerAssetId || 'unknown')
-        .then((result) => {
+      // Store the current image in ref to check against stale closures
+      currentImageRef.current = customImage;
+      const imageToUpload = customImage;
+
+      // Process image: compress then upload
+      const processAndUpload = async () => {
+        try {
+          // Step 1: Compress image
+          setIsCompressing(true);
+          setUploadProgress(10);
+
+          const compressionResult = await compressImage(imageToUpload, {
+            maxSizeMB: 5,
+            maxWidth: 1920,
+            maxHeight: 1080,
+            quality: 0.8,
+            outputFormat: 'image/jpeg',
+          });
+
+          setUploadProgress(30);
+
+          if (!compressionResult.success) {
+            setError("customImage", {
+              message: compressionResult.error || "Failed to compress image. Please use a smaller image size."
+            });
+            setIsCompressing(false);
+            setThumbnailUploading(false);
+            setUploadProgress(0);
+            return;
+          }
+
+          const compressedFile = compressionResult.file!;
+
+          // Check if customImage has changed while compression was in progress
+          if (currentImageRef.current !== imageToUpload) {
+            return;
+          }
+
+          // Step 2: Update preview URL with compressed file (or keep existing if already showing)
+          // Create compressed preview URL first
+          const compressedPreviewUrl = URL.createObjectURL(compressedFile);
+
+          // Revoke the original preview URL if it's different from the compressed one
+          if (blobUrlRef.current && blobUrlRef.current !== compressedPreviewUrl) {
+            URL.revokeObjectURL(blobUrlRef.current);
+          }
+
+          // Update refs and state with compressed preview URL
+          blobUrlRef.current = compressedPreviewUrl;
+          blobUrlFileRef.current = imageToUpload; // Still track as the same file
+          setCustomPreviewUrl(compressedPreviewUrl);
+          setUploadProgress(50);
+
+          // Step 3: Upload to IPFS
+          setIsCompressing(false);
+          setThumbnailUploading(true);
+
+          const result = await uploadThumbnailToIPFS(compressedFile, livepeerAssetId || 'unknown');
+
+          setUploadProgress(100);
+
+          // Check if customImage has changed while upload was in progress
+          if (currentImageRef.current !== imageToUpload) {
+            // Image changed, ignore this result
+            return;
+          }
+
           if (result.success && result.thumbnailUrl) {
-            // Use the IPFS URL
-            setCustomPreviewUrl(result.thumbnailUrl);
-            setSelectedImage(result.thumbnailUrl);
-            onSelectThumbnailImages(result.thumbnailUrl);
+            // Keep the blob URL for the preview to ensure it remains visible instantly
+            // and doesn't rely on the IPFS gateway for the visual feedback.
+
+            // Use the IPFS URL with gateway fallback for submission ONLY
+            const ipfsUrl = convertFailingGateway(result.thumbnailUrl);
+
+            // We consciously DO NOT update customPreviewUrl here to avoid flicker/loading
+            // The blob URL remains valid until component unmount or new file selection
+
+            setSelectedImage(ipfsUrl);
+            onSelectThumbnailImages(ipfsUrl);
             toast.success("Custom thumbnail uploaded successfully!");
           } else {
-            toast.error(result.error || "Failed to upload thumbnail");
-            // Create temporary preview URL for display only
-            const url = URL.createObjectURL(customImage);
-            setCustomPreviewUrl(url);
-            setSelectedImage(url);
-            onSelectThumbnailImages(url);
-            return () => URL.revokeObjectURL(url);
+            // IPFS upload failed - clear selected image since blob URLs can't be used on server
+            toast.error(result.error || "Failed to upload thumbnail. Please try again.");
+            // Clear blob URL and selected image to prevent submission with invalid URL
+            if (blobUrlRef.current) {
+              URL.revokeObjectURL(blobUrlRef.current);
+              blobUrlRef.current = null;
+              blobUrlFileRef.current = null;
+            }
+            setCustomPreviewUrl(null);
+            setSelectedImage(undefined);
+            setValue("customImage", null);
+            setError("customImage", {
+              message: "Thumbnail upload failed. Please select a different image and try again."
+            });
           }
-        })
-        .catch((error) => {
-          console.error("Error uploading thumbnail:", error);
-          toast.error("Failed to upload thumbnail");
-          // Create temporary preview URL for display only
-          const url = URL.createObjectURL(customImage);
-          setCustomPreviewUrl(url);
-          setSelectedImage(url);
-          onSelectThumbnailImages(url);
-          return () => URL.revokeObjectURL(url);
-        })
-        .finally(() => {
+        } catch (error) {
+          // Check if customImage has changed while processing was in progress
+          if (currentImageRef.current !== imageToUpload) {
+            return;
+          }
+
+          console.error("Error processing thumbnail:", error);
+          toast.error("Failed to process thumbnail. Please try again.");
+          // Clear blob URL and selected image to prevent submission with invalid URL
+          if (blobUrlRef.current) {
+            URL.revokeObjectURL(blobUrlRef.current);
+            blobUrlRef.current = null;
+            blobUrlFileRef.current = null;
+          }
+          setCustomPreviewUrl(null);
+          setSelectedImage(undefined);
+          setValue("customImage", null);
+          setError("customImage", {
+            message: "Failed to process image. Please select a different image and try again."
+          });
+        } finally {
+          setIsCompressing(false);
           setThumbnailUploading(false);
-        });
+          setUploadProgress(0);
+        }
+      };
+
+      processAndUpload();
+    } else {
+      // Reset refs when no image is selected and reset loading state
+      currentImageRef.current = null;
+      // Clear blob URL if no image is selected
+      if (blobUrlRef.current && !isSettingFileRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+        blobUrlFileRef.current = null;
+      }
+      setThumbnailUploading(false);
+      setIsCompressing(false);
+      setUploadProgress(0);
+      // Reset the flag when no image is selected
+      isSettingFileRef.current = false;
     }
+
+    // Cleanup function to revoke blob URLs when component unmounts or dependencies change
+    // This runs both when dependencies change AND when component unmounts
+    return () => {
+      // Skip cleanup entirely if we're in the middle of setting a new file (prevents race condition)
+      // This flag is set in handleFileSelect before calling setValue, so cleanup won't revoke
+      // the blob URL we just created for the immediate preview
+      if (isSettingFileRef.current) {
+        // Don't reset the flag here - let it reset after useEffect runs
+        return;
+      }
+
+      // Clean up blob URLs when selection is cleared or component unmounts
+      // We avoid comparing customImage to blobUrlFileRef because customImage is from closure (stale)
+      // Strategy:
+      // 1. handleFileSelect always cleans up old blob URLs before creating new ones (for file changes)
+      // 2. Cleanup here only handles: clearing selection (customImage → null) or unmounting
+      // 3. When customImage changes but isn't null, handleFileSelect handles cleanup
+      if (blobUrlRef.current && !customImage) {
+        // Only clean up if customImage is being cleared (set to null)
+        // This avoids the stale closure comparison issue entirely
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+        blobUrlFileRef.current = null;
+      }
+      // Note: For file changes (customImage changing from one file to another),
+      // handleFileSelect already cleaned up the old blob URL before creating the new one,
+      // so we don't need to handle that case here.
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [customImage, thumbnailType, livepeerAssetId]);
+
+  // Separate cleanup effect for component unmount to ensure blob URLs are always cleaned up
+  useEffect(() => {
+    return () => {
+      // Always clean up blob URLs on unmount, regardless of flags
+      // When component unmounts, we must clean up all resources to prevent memory leaks
+      // The isSettingFileRef flag is only relevant for preventing cleanup during dependency changes,
+      // not during unmount where we always want to clean up
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+        blobUrlFileRef.current = null;
+      }
+      // Reset flag on unmount to ensure clean state if component remounts
+      isSettingFileRef.current = false;
+    };
+  }, []); // Empty deps = only run on mount/unmount
 
   // Watch MeToken config changes
   useEffect(() => {
@@ -144,39 +337,109 @@ const CreateThumbnailForm = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const handleFileSelect = (file: File) => {
+    // Clear any previous errors first
+    clearErrors("customImage");
+
+    if (!file) {
+      setValue("customImage", null);
+      setCustomPreviewUrl(null);
+      setSelectedImage(undefined);
+      clearErrors("customImage");
+      return;
+    }
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setError("customImage", { message: "Please select an image file (JPG, PNG, WebP)" });
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      setValue("customImage", null);
+      setCustomPreviewUrl(null);
+      setSelectedImage(undefined);
+      return;
+    }
+
+    // File is valid - create immediate preview URL for instant feedback
+    clearErrors("customImage");
+
+    // Set flag to prevent cleanup from revoking the blob URL we're about to create
+    isSettingFileRef.current = true;
+
+    // Create immediate preview from original file before compression
+    // Always clean up previous blob URL before creating a new one to prevent leaks
+    // Even if it's the same file, we're creating a new blob URL so the old one should be revoked
+    if (blobUrlRef.current) {
+      URL.revokeObjectURL(blobUrlRef.current);
+      blobUrlRef.current = null;
+      // Don't clear blobUrlFileRef yet - we'll set it to the new file below
+    }
+
+    // Create new blob URL and track which file it belongs to
+    const immediatePreviewUrl = URL.createObjectURL(file);
+    blobUrlRef.current = immediatePreviewUrl;
+    blobUrlFileRef.current = file; // Track that this blob URL belongs to this file
+    setCustomPreviewUrl(immediatePreviewUrl);
+
+    // Set the file in form state (this will trigger the compression/upload useEffect)
+    // The cleanup will see isSettingFileRef.current === true and skip revoking the blob URL
+    // The flag will be reset at the start of the useEffect body
+    setValue("customImage", file);
+  };
+
   const handleCustomImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Validate file type
-      if (!file.type.startsWith('image/')) {
-        setError("customImage", { message: "Please select an image file" });
-        return;
-      }
-      
-      // Validate file size (5MB limit)
-      if (file.size > 5 * 1024 * 1024) {
-        setError("customImage", { message: "File size must be less than 5MB" });
-        return;
-      }
-
-      setValue("customImage", file);
+      handleFileSelect(file);
+    }
+    // Reset the file input to allow re-selecting the same file
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
-  const makeX402Payment = async () => {
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(false);
+
+    const file = e.dataTransfer.files[0];
+    if (file) {
+      handleFileSelect(file);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(false);
+  };
+
+  /**
+   * Make x402 payment using the user's connected smart account
+   * This is a client-side payment that requires wallet access
+   */
+  const makeX402PaymentWithWallet = async () => {
     try {
-      const response = await fetch('/api/x402/pay-for-ai-thumbnail', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          service: 'ai-thumbnail-generation',
-          amount: '1000000', // 1 USDC (6 decimals) on Base
-        }),
+      // Check if wallet is connected
+      if (!isConnected) {
+        throw new Error('Please connect your wallet to make payments');
+      }
+
+      // Make the payment using the client-side hook
+      const result = await makePayment({
+        service: 'ai-thumbnail-generation',
+        amount: '1000000', // 1 USDC (6 decimals) on Base
+        endpoint: 'https://x402.payai.network/api/base/paid-content',
       });
 
-      const result = await response.json();
       return result;
     } catch (error) {
       return {
@@ -193,26 +456,26 @@ const CreateThumbnailForm = ({
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           prompt: prompt,
           service: 'gemini-2.5-flash',
         }),
       });
 
       const result = await response.json();
-      
+
       if (result.success && result.images && result.images.length > 0) {
         return {
           success: true,
           images: result.images,
         };
       }
-      
+
       return {
         success: false,
         error: result.error || "Gemini AI generation failed",
       };
-      
+
     } catch (error) {
       return {
         success: false,
@@ -224,18 +487,27 @@ const CreateThumbnailForm = ({
   const handleAiGenerateWithPayment = async (prompt: string) => {
     setPaymentLoading(true);
     setAiLoading(true);
-    
+
     try {
-      // Step 1: Make x402 payment
-      const paymentResult = await makeX402Payment();
-      
+      // Check wallet connection first
+      if (!isConnected) {
+        throw new Error('Please connect your wallet to use AI generation');
+      }
+
+      // Step 1: Make x402 payment using client-side wallet
+      toast.info('Processing payment...');
+      const paymentResult = await makeX402PaymentWithWallet();
+
       if (!paymentResult.success) {
         throw new Error(paymentResult.error || "Payment failed");
       }
 
+      toast.success('Payment successful!');
+
       // Step 2: Generate AI image with Gemini after successful payment
+      toast.info('Generating AI thumbnail...');
       const aiResult = await generateAiImage(prompt);
-      
+
       if (aiResult.success) {
         setAiImages(aiResult.images);
         toast.success(`Generated ${aiResult.images.length} AI thumbnail${aiResult.images.length > 1 ? 's' : ''} with Gemini!`);
@@ -245,6 +517,7 @@ const CreateThumbnailForm = ({
 
     } catch (error) {
       console.error('AI Generation Error:', error);
+      toast.error(error instanceof Error ? error.message : "Failed to generate AI thumbnail");
       setError("root", {
         message: error instanceof Error ? error.message : "Failed to generate AI thumbnail with Gemini",
       });
@@ -255,8 +528,6 @@ const CreateThumbnailForm = ({
   };
 
   const handleImageSelection = async (imageUrl: string) => {
-    setSelectedImage(imageUrl);
-    
     // If it's a blob URL (AI-generated image), upload to IPFS first
     if (imageUrl.startsWith('blob:')) {
       setThumbnailUploading(true);
@@ -264,25 +535,30 @@ const CreateThumbnailForm = ({
         const result = await uploadThumbnailFromBlob(imageUrl, livepeerAssetId || 'unknown');
         if (result.success && result.thumbnailUrl) {
           // Use the IPFS URL instead of blob URL
-          onSelectThumbnailImages(result.thumbnailUrl);
-          setSelectedImage(result.thumbnailUrl);
+          const ipfsUrl = convertFailingGateway(result.thumbnailUrl);
+          setSelectedImage(ipfsUrl);
+          onSelectThumbnailImages(ipfsUrl);
           toast.success("AI thumbnail uploaded successfully!");
         } else {
-          toast.error(result.error || "Failed to upload AI thumbnail");
-          // Fallback to blob URL
-          onSelectThumbnailImages(imageUrl);
+          // IPFS upload failed - clear selection since blob URLs can't be used on server
+          toast.error(result.error || "Failed to upload AI thumbnail. Please try selecting again.");
+          setSelectedImage(undefined);
+          // Don't call onSelectThumbnailImages with blob URL - it's invalid for server use
         }
       } catch (error) {
         console.error("Error uploading AI thumbnail:", error);
-        toast.error("Failed to upload AI thumbnail");
-        // Fallback to blob URL
-        onSelectThumbnailImages(imageUrl);
+        toast.error("Failed to upload AI thumbnail. Please try selecting again.");
+        // Clear selection - blob URLs can't be used on server
+        setSelectedImage(undefined);
+        // Don't call onSelectThumbnailImages with blob URL - it's invalid for server use
       } finally {
         setThumbnailUploading(false);
       }
     } else {
       // It's already a persistent URL (IPFS or other), use it directly
-      onSelectThumbnailImages(imageUrl);
+      const persistentUrl = convertFailingGateway(imageUrl);
+      setSelectedImage(persistentUrl);
+      onSelectThumbnailImages(persistentUrl);
     }
   };
 
@@ -305,7 +581,15 @@ const CreateThumbnailForm = ({
         <TabsContent value="custom" className="space-y-4">
           <div className="space-y-4">
             <Label>Upload Thumbnail Image</Label>
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+            <div
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${dragOver
+                  ? "border-primary bg-primary/5"
+                  : "border-gray-300 hover:border-gray-400"
+                }`}
+            >
               <input
                 ref={fileInputRef}
                 type="file"
@@ -313,34 +597,82 @@ const CreateThumbnailForm = ({
                 onChange={handleCustomImageChange}
                 className="hidden"
               />
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => fileInputRef.current?.click()}
-                className="mb-2"
-              >
-                <Upload className="h-4 w-4 mr-2" />
-                Choose Image
-              </Button>
-              <p className="text-sm text-gray-500">
-                JPG, PNG, WebP up to 5MB
-              </p>
+              <div className="flex flex-col items-center gap-4">
+                <Upload className={`h-8 w-8 ${dragOver ? "text-primary" : "text-gray-400"}`} />
+                <div className="space-y-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isCompressing || thumbnailUploading}
+                  >
+                    {isCompressing || thumbnailUploading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-4 w-4 mr-2" />
+                        Choose Image
+                      </>
+                    )}
+                  </Button>
+                  <p className="text-sm text-gray-500">
+                    Drag and drop an image here, or click to browse
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    JPG, PNG, WebP (will be compressed to 5MB if needed)
+                  </p>
+                </div>
+              </div>
+
+              {/* Upload Progress */}
+              {(isCompressing || thumbnailUploading) && (
+                <div className="mt-4 space-y-2">
+                  <div className="flex items-center justify-between text-xs text-gray-600">
+                    <span>
+                      {isCompressing ? "Compressing image..." : "Uploading to IPFS..."}
+                    </span>
+                    <span>{uploadProgress}%</span>
+                  </div>
+                  <Progress value={uploadProgress} className="h-2" />
+                </div>
+              )}
+
               {errors.customImage && (
-                <p className="text-red-500 text-sm mt-2">{errors.customImage.message}</p>
+                <Alert variant="destructive" className="mt-4">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>{errors.customImage.message}</AlertDescription>
+                </Alert>
               )}
             </div>
 
-            {/* Custom Image Preview */}
+            {/* Custom Image Preview - Show immediately when file is selected */}
             {customPreviewUrl && (
               <div className="space-y-2">
                 <Label>Preview</Label>
                 <div className="relative w-full aspect-video rounded-lg overflow-hidden border">
-                  <Image
+                  <GatewayImage
                     src={customPreviewUrl}
                     alt="Custom thumbnail preview"
                     fill
                     className="object-cover"
+                    unoptimized
+                    showSkeleton={false}
                   />
+                  {/* Show loading overlay during compression/upload */}
+                  {(isCompressing || thumbnailUploading) && (
+                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                      <div className="text-center text-white">
+                        <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
+                        <p className="text-sm">
+                          {isCompressing ? "Compressing..." : "Uploading..."}
+                        </p>
+                        <p className="text-xs mt-1">{uploadProgress}%</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -356,7 +688,7 @@ const CreateThumbnailForm = ({
                 <Label className="text-blue-800 font-semibold">Paid AI Generation with Gemini</Label>
               </div>
               <p className="text-sm text-blue-700">
-                Powered by Google&apos;s Gemini 2.5 Flash model. 
+                Powered by Google&apos;s Gemini 2.5 Flash model.
                 Generate high-quality, photorealistic thumbnails for 1 USDC on Base.
               </p>
             </div>
@@ -422,11 +754,13 @@ const CreateThumbnailForm = ({
                       />
                       <Label htmlFor={`ai-image-${index}`} className="cursor-pointer">
                         <div className="relative w-full aspect-video rounded-lg overflow-hidden border hover:border-blue-300 transition-colors">
-                          <Image
+                          <GatewayImage
                             src={image.url}
                             alt={`AI Generated Thumbnail ${index + 1}`}
                             fill
                             className="object-cover"
+                            unoptimized
+                            showSkeleton={false}
                           />
                           <div className="absolute top-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
                             Gemini
@@ -454,7 +788,7 @@ const CreateThumbnailForm = ({
       {/* MeToken Configuration Section */}
       <div className="mt-8 space-y-4 border-t pt-4">
         <h3 className="text-lg font-semibold">Content Access Control</h3>
-        
+
         {/* MeToken Status */}
         {meTokenLoading ? (
           <Skeleton className="h-20 w-full" />
@@ -472,10 +806,10 @@ const CreateThumbnailForm = ({
             <AlertTitle className="text-amber-800">No MeToken Found</AlertTitle>
             <AlertDescription className="text-amber-700">
               You need a MeToken to set access controls for your content.
-              <Button 
+              <Button
                 type="button"
-                variant="outline" 
-                size="sm" 
+                variant="outline"
+                size="sm"
                 className="ml-2 mt-2"
                 onClick={() => setShowMeTokenCreator(true)}
               >
@@ -495,7 +829,7 @@ const CreateThumbnailForm = ({
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <AlchemyMeTokenCreator 
+              <AlchemyMeTokenCreator
                 onMeTokenCreated={(meToken) => {
                   setShowMeTokenCreator(false);
                   checkUserMeToken();
@@ -511,8 +845,8 @@ const CreateThumbnailForm = ({
             name="meTokenConfig.requireMeToken"
             control={control}
             render={({ field }) => (
-              <Switch 
-                checked={field.value} 
+              <Switch
+                checked={field.value}
                 onCheckedChange={field.onChange}
                 disabled={!userMeToken}
               />
@@ -560,6 +894,46 @@ const CreateThumbnailForm = ({
                 Users will need to hold at least this amount of your MeToken to access this content
               </p>
             </div>
+          </div>
+        )}
+      </div>
+
+      {/* Story Protocol IP Registration Section */}
+      <div className="mt-8 space-y-4 border-t pt-4">
+        <StoryLicenseSelector
+          enabled={storyIPEnabled}
+          selectedLicense={selectedStoryLicense}
+          onEnabledChange={(enabled) => {
+            setStoryIPEnabled(enabled);
+            if (onStoryConfigChange) {
+              onStoryConfigChange({
+                registerIP: enabled,
+                licenseTerms: enabled ? selectedStoryLicense : undefined,
+              });
+            }
+          }}
+          onLicenseChange={(license) => {
+            setSelectedStoryLicense(license);
+            if (onStoryConfigChange && storyIPEnabled) {
+              onStoryConfigChange({
+                registerIP: true,
+                licenseTerms: license || undefined,
+              });
+            }
+          }}
+        />
+
+        {/* NFT Minting Step - Show when Story Protocol is enabled */}
+        {storyIPEnabled && videoAssetId && creatorAddress && metadataURI && (
+          <div className="mt-4">
+            <NFTMintingStep
+              videoAssetId={videoAssetId}
+              metadataURI={metadataURI}
+              recipientAddress={creatorAddress}
+              onMintSuccess={(result) => {
+                onNFTMinted?.(result);
+              }}
+            />
           </div>
         )}
       </div>

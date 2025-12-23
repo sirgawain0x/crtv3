@@ -15,10 +15,12 @@ Failed to fetch MeTokens from subgraph
 ```
 
 ### Root Cause
-The subgraph API proxy was returning a 500 error when trying to query the MeTokens subgraph. This was likely due to:
-- Missing or invalid `SUBGRAPH_QUERY_KEY` environment variable
-- Network issues with the Satsuma subgraph endpoint
+The subgraph API proxy was returning errors when trying to query the MeTokens subgraph. This was historically due to:
+- Network issues with the subgraph endpoint
 - Subgraph indexing issues
+- Authentication requirements
+
+**Note:** The application has now been migrated to **Goldsky** public endpoints, which don't require authentication.
 
 ### Fixes Applied
 
@@ -40,20 +42,19 @@ The subgraph API proxy was returning a 500 error when trying to query the MeToke
 - Added GraphQL error detection
 - Better distinction between different types of failures
 
-### Configuration Required
+### Current Configuration (Goldsky Migration)
 
-To fully resolve this issue, you need to:
+The application now uses **Goldsky** for subgraph indexing:
 
-1. **Get a Subgraph Query Key**:
-   - Visit https://app.satsuma.xyz/
-   - Sign up or log in
-   - Get your API query key for the MeTokens subgraph
+1. **No Authentication Required**:
+   - Goldsky provides public endpoints
+   - No API keys or environment variables needed for basic access
 
-2. **Set Environment Variable**:
-   Add to your `.env.local` file:
-   ```env
-   SUBGRAPH_QUERY_KEY=your_satsuma_api_key_here
-   ```
+2. **Subgraph Endpoints**:
+   - **MeTokens**: `https://api.goldsky.com/api/public/project_cmh0iv6s500dbw2p22vsxcfo6/subgraphs/metokens/v0.0.1/gn`
+     - Deployment ID: `QmVaWYhk4HKhk9rNQi11RKujTVS4KHF1uHGNVUF4f7xJ53`
+   - **Creative TV**: `https://api.goldsky.com/api/public/project_cmh0iv6s500dbw2p22vsxcfo6/subgraphs/creative_tv/0.1/gn`
+     - Deployment ID: `QmbDp8Wfy82g8L7Mv6RCAZHRcYUQB4prQfqchvexfZR8yZ`
 
 3. **Restart Development Server**:
    ```bash
@@ -61,11 +62,10 @@ To fully resolve this issue, you need to:
    ```
 
 ### Testing
-After setting the environment variable, the console should show:
+After restarting, the console should show:
 ```
-✅ Query key available
-🔗 Forwarding to subgraph endpoint: https://subgraph.satsuma-prod.com/***/...
-✅ Subgraph query successful
+🔗 Forwarding to Goldsky subgraph endpoint: https://api.goldsky.com/...
+✅ Goldsky subgraph query successful
 ```
 
 ---
@@ -136,12 +136,12 @@ The `CreateThumbnail` component was rendering before the `livepeerAsset` state w
 
 ## Testing Checklist
 
-### MeTokens Subgraph
-- [ ] Set `SUBGRAPH_QUERY_KEY` environment variable
+### MeTokens Subgraph (Goldsky)
 - [ ] Restart development server
-- [ ] Check console for successful subgraph queries
+- [ ] Check console for successful Goldsky subgraph queries
 - [ ] Verify portfolio page loads MeToken holdings
-- [ ] Test with invalid key to verify error handling
+- [ ] Test error handling with network disconnected
+- [ ] Monitor for rate limiting (HTTP 429 responses)
 
 ### Video Upload Flow
 - [ ] Upload a video file
@@ -171,15 +171,17 @@ The `CreateThumbnail` component was rendering before the `livepeerAsset` state w
 ## Next Steps
 
 ### Immediate Actions Required
-1. **Configure Subgraph Access**:
-   - Get API key from Satsuma
-   - Add to environment variables
-   - Test MeToken features
+1. **Test Goldsky Integration**:
+   - Restart development server
+   - Verify subgraph queries work
+   - Test MeToken features on portfolio page
+   - Monitor for rate limiting
 
 ### Recommended Improvements
 1. **Add Health Check Endpoint**:
-   - Create `/api/health` to check subgraph connectivity
+   - Create `/api/health` to check Goldsky connectivity
    - Display status in admin panel
+   - Monitor for rate limiting
 
 2. **Add Retry Logic**:
    - Implement exponential backoff for subgraph queries
@@ -207,10 +209,11 @@ If you continue to experience issues:
 4. **Review Server Logs**: Check Next.js terminal output
 
 For subgraph-specific issues:
-- Visit https://app.satsuma.xyz/
-- Check subgraph indexing status
-- Verify API key permissions
-- Review subgraph documentation
+- Check Goldsky service status
+- Monitor for rate limiting (HTTP 429)
+- Review Goldsky documentation at https://docs.goldsky.com/
+- Test endpoint directly with curl
+- Verify network connectivity
 
 ---
 

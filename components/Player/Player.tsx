@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import * as LivepeerPlayer from "@livepeer/react/player";
 import type { PlaybackError } from "@livepeer/react";
 import {
@@ -15,6 +15,7 @@ import { useVideo } from "@/context/VideoContext";
 import "./Player.css";
 import { Src } from "@livepeer/react";
 import { SubtitlesControl } from "./Subtitles";
+import { safelyPauseVideo } from "@/lib/utils/video-controls";
 
 export const PlayerLoading: React.FC<{ title: string }> = ({ title }) => {
   return (
@@ -74,6 +75,12 @@ export function Player(props: {
     };
   }, [playerId, currentPlayingId, setCurrentPlayingId, assetId, onPlay]);
 
+  const safelyPauseCurrentVideo = useCallback(async () => {
+    if (videoRef.current) {
+      await safelyPauseVideo(videoRef.current);
+    }
+  }, []);
+
   useEffect(() => {
     if (!videoRef.current) return;
 
@@ -82,9 +89,9 @@ export function Player(props: {
       currentPlayingId !== (assetId || playerId) &&
       !videoRef.current.paused
     ) {
-      videoRef.current.pause();
+      safelyPauseCurrentVideo();
     }
-  }, [currentPlayingId, playerId, assetId]);
+  }, [currentPlayingId, playerId, assetId, safelyPauseCurrentVideo]);
 
   const resetFadeTimeout = () => {
     if (fadeTimeoutRef.current) {
@@ -127,7 +134,7 @@ export function Player(props: {
     <LivepeerPlayer.Root
       src={src}
       autoPlay={false}
-      volume={0.5}
+      volume={0}
       aspectRatio={16 / 9}
     >
       <LivepeerPlayer.Container

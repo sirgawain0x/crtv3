@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getCachedPoapAccessToken } from "@/lib/utils/poap-auth";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -8,13 +9,17 @@ export async function GET(req: Request) {
   if (!/^[0-9]+$/.test(proposalId))
     return NextResponse.json({ error: "Invalid proposalId" }, { status: 400 });
 
-  const accessToken = process.env.POAP_ACCESS_TOKEN;
-
-  if (!accessToken)
+  let accessToken: string;
+  try {
+    // Fetch access token from Auth0 using new endpoint
+    accessToken = await getCachedPoapAccessToken();
+  } catch (error) {
+    console.error("Error fetching POAP access token:", error);
     return NextResponse.json(
-      { error: "No access token returned from Auth0" },
+      { error: "Failed to authenticate with POAP API" },
       { status: 500 }
     );
+  }
 
   const url = `https://api.poap.tech/snapshot/proposal/${proposalId}`;
   const res = await fetch(url, {
@@ -39,7 +44,17 @@ export async function POST(req: Request) {
   // Example: get data from request body if needed
   // const { address, eventId } = await req.json()
 
-  const accessToken = process.env.POAP_ACCESS_TOKEN; // or pass it in securely
+  let accessToken: string;
+  try {
+    // Fetch access token from Auth0 using new endpoint
+    accessToken = await getCachedPoapAccessToken();
+  } catch (error) {
+    console.error("Error fetching POAP access token:", error);
+    return NextResponse.json(
+      { error: "Failed to authenticate with POAP API" },
+      { status: 500 }
+    );
+  }
 
   const res = await fetch("https://api.poap.tech/actions/claim-qr", {
     method: "GET", // or "POST" if required by the endpoint

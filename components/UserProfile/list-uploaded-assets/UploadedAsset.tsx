@@ -1,12 +1,12 @@
 import * as helpers from "@/lib/helpers";
 import Link from "next/link";
-import type { Asset } from "@/lib/types/asset";
+import type { VideoAsset } from "@/lib/types/video-asset";
 import type { Account } from "@/lib/types/account";
 
 interface UploadAssetRowProps {
   idx: number;
   activeAccount: Account;
-  asset: Asset;
+  asset: VideoAsset;
 }
 
 export function UploadAssetRow({
@@ -17,23 +17,23 @@ export function UploadAssetRow({
   if (!activeAccount) return null;
 
   return (
-    <tr key={asset.id} className="text-[16px] hover:bg-muted/50">
+    <tr key={asset.asset_id} className="text-[16px] hover:bg-muted/50">
       <td className="border border-slate-700 px-4 py-1">{idx + 1}</td>
       <td className="border border-slate-700 px-4 py-1">
         <Link
-          href={`/discover/${asset.id}`}
+          href={`/discover/${asset.asset_id}`}
           className="text-primary hover:text-primary/80 hover:underline"
         >
           {helpers.titleCase(
-            asset.name.length > 12 ? asset.name.slice(0, 9) + "..." : asset.name
+            asset.title.length > 12 ? asset.title.slice(0, 9) + "..." : asset.title
           )}
         </Link>
       </td>
       <td className="border border-slate-700 px-4 py-1">
-        {helpers.parseTimestampToDate(Number(asset.createdAt))}
+        {helpers.parseTimestampToDate(new Date(asset.created_at).getTime())}
       </td>
       <td className="border border-slate-700 px-4 py-1">
-        {helpers.parseTimestampToDate(asset.status?.updatedAt ?? 0)}
+        {helpers.parseTimestampToDate(new Date(asset.updated_at).getTime())}
       </td>
     </tr>
   );

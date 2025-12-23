@@ -53,21 +53,61 @@ export async function POST(request: NextRequest) {
       },
     });
     
-    // Extract generated images
+    // Extract generated images and upload to IPFS
     const images = [];
     if (genImagesResponse.generatedImages) {
       for (const generatedImage of genImagesResponse.generatedImages) {
         if (generatedImage.image?.imageBytes) {
-          // Convert bytes to base64
-          const base64Image = Buffer.from(generatedImage.image.imageBytes).toString('base64');
+          const imageId = `gemini-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
           const mimeType = generatedImage.image.mimeType || 'image/png';
+          const base64Image = Buffer.from(generatedImage.image.imageBytes).toString('base64');
           const dataUrl = `data:${mimeType};base64,${base64Image}`;
           
-          images.push({
-            url: dataUrl,
-            id: `gemini-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-            mimeType: mimeType,
-          });
+          // Try to upload to IPFS for permanent storage
+          try {
+            const uploadResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || ''}/api/ai/upload-to-ipfs`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                imageUrl: dataUrl,
+                filename: `${imageId}.png`,
+              }),
+            });
+
+            const uploadResult = await uploadResponse.json();
+
+            if (uploadResult.success && uploadResult.ipfsUrl) {
+              // Use IPFS URL for permanent storage
+              images.push({
+                url: uploadResult.ipfsUrl,
+                ipfsHash: uploadResult.ipfsHash,
+                id: imageId,
+                mimeType: mimeType,
+                storage: 'ipfs',
+              });
+            } else {
+              // Fallback to data URL if IPFS upload fails
+              console.warn('IPFS upload failed, using data URL:', uploadResult.error);
+              images.push({
+                url: dataUrl,
+                id: imageId,
+                mimeType: mimeType,
+                storage: 'temporary',
+                ipfsError: uploadResult.error,
+              });
+            }
+          } catch (ipfsError) {
+            // If IPFS upload fails, use data URL
+            console.warn('IPFS upload error:', ipfsError);
+            images.push({
+              url: dataUrl,
+              id: imageId,
+              mimeType: mimeType,
+              storage: 'temporary',
+            });
+          }
         }
       }
     }

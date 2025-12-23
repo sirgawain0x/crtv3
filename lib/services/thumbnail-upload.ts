@@ -1,11 +1,3 @@
-import { IPFSService } from '@/lib/sdk/ipfs/service';
-
-// Initialize IPFS service for thumbnail uploads
-const ipfsService = new IPFSService({
-  apiKey: process.env.NEXT_PUBLIC_LIGHTHOUSE_API_KEY || '',
-  gateway: process.env.NEXT_PUBLIC_IPFS_GATEWAY || 'https://gateway.lighthouse.storage/ipfs'
-});
-
 export interface ThumbnailUploadResult {
   success: boolean;
   thumbnailUrl?: string;
@@ -13,13 +5,14 @@ export interface ThumbnailUploadResult {
 }
 
 /**
- * Uploads a thumbnail image file to IPFS and returns a persistent URL
+ * Uploads a thumbnail image file to IPFS via the API route
+ * This ensures the upload goes through the server to trigger the persistence backup layer
  * @param file - The image file to upload
- * @param playbackId - The video's playback ID for naming
+ * @param playbackId - The video's playback ID for naming (unused in API but kept for signature compatibility)
  * @returns Promise<ThumbnailUploadResult>
  */
 export async function uploadThumbnailToIPFS(
-  file: File, 
+  file: File,
   playbackId: string
 ): Promise<ThumbnailUploadResult> {
   try {
@@ -31,13 +24,19 @@ export async function uploadThumbnailToIPFS(
       };
     }
 
-    // Upload to IPFS
-    const result = await ipfsService.uploadFile(file, {
-      pin: true,
-      wrapWithDirectory: false
+    // Prepare FormData for API upload
+    const formData = new FormData();
+    formData.append('file', file);
+
+    // Upload via API route
+    const response = await fetch('/api/ipfs/upload', {
+      method: 'POST',
+      body: formData,
     });
 
-    if (!result.success || !result.url) {
+    const result = await response.json();
+
+    if (!response.ok || !result.success) {
       return {
         success: false,
         error: result.error || 'Failed to upload thumbnail to IPFS'
@@ -68,7 +67,7 @@ export async function blobUrlToFile(blobUrl: string, filename: string): Promise<
   try {
     const response = await fetch(blobUrl);
     const blob = await response.blob();
-    
+
     // Create a File object from the blob
     const file = new File([blob], filename, { type: blob.type });
     return file;
@@ -85,13 +84,13 @@ export async function blobUrlToFile(blobUrl: string, filename: string): Promise<
  * @returns Promise<ThumbnailUploadResult>
  */
 export async function uploadThumbnailFromBlob(
-  blobUrl: string, 
+  blobUrl: string,
   playbackId: string
 ): Promise<ThumbnailUploadResult> {
   try {
     // Convert blob URL to file
     const file = await blobUrlToFile(blobUrl, `thumbnail-${playbackId}.jpg`);
-    
+
     if (!file) {
       return {
         success: false,

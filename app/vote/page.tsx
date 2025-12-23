@@ -12,6 +12,7 @@ import { ProposalList } from "@/components/proposal-list/ProposalList";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { ProposalListSkeleton } from "@/components/proposal-list/ProposalListSkeleton";
+import { SNAPSHOT_SPACE } from "@/context/context";
 // import Vote from "@/components/Voting/Index";
 
 export default function VotePage() {
@@ -50,7 +51,7 @@ export default function VotePage() {
       <div className="p-4">
         <div className="grid gap-4 w-full max-w-full">
           <Suspense fallback={<ProposalListSkeleton />}>
-            <ProposalList space="vote.thecreative.eth" />
+            <ProposalList space={SNAPSHOT_SPACE} />
           </Suspense>
         </div>
       </div>

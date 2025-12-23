@@ -9,6 +9,10 @@
     {
       "path": "/api/video-assets/sync-views/cron",
       "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/market/tokens/sync/cron",
+      "schedule": "0 3 * * *"
     }
   ]
 }

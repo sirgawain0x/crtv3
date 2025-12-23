@@ -8,8 +8,17 @@ export async function POST(
 ) {
   try {
     const { playbackId } = await params;
-    const body = await request.json();
-    const { viewCount } = body;
+    
+    // Safely parse JSON body, falling back to empty object on empty/invalid body
+    let body: any = {};
+    try {
+      body = await request.json();
+    } catch (jsonError) {
+      // Empty or invalid JSON body - use empty object
+      body = {};
+    }
+    
+    const { viewCount } = body || {};
 
     if (!playbackId) {
       return NextResponse.json(

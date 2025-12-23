@@ -1,6 +1,7 @@
 /** @type {import('tailwindcss').Config} */
 import { createColorSet, withAccountKitUi } from "@account-kit/react/tailwind";
 import animate from "tailwindcss-animate";
+import typography from "@tailwindcss/typography";
 
 export default withAccountKitUi({
     darkMode: ["class"],
@@ -64,5 +65,5 @@ export default withAccountKitUi({
     "btn-primary": createColorSet("#E82594", "#FF66CC"),
     "fg-accent-brand": createColorSet("#E82594", "#FF66CC"),
   },
-  plugins: [animate],
+  plugins: [animate, typography],
 });

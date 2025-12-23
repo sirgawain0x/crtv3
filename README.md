@@ -175,13 +175,15 @@ yarn install
 
 3. Set up environment variables:
 
-```
-# Create a .env.local file with the following variables
-NEXT_PUBLIC_ALCHEMY_API_KEY=your_NEXT_PUBLIC_ALCHEMY_API_KEY
-LIVEPEER_API_KEY=your_livepeer_api_key
-LIVEPEER_WEBHOOK_ID=your_livepeer_webhook_id
-# Add other required environment variables
-```
+Create a `.env.local` file in the root directory with the required variables. See **[ENVIRONMENT_SETUP.md](./ENVIRONMENT_SETUP.md)** for detailed instructions on how to obtain and configure:
+
+- `NEXT_PUBLIC_ALCHEMY_API_KEY` - Your Alchemy API key
+- `NEXT_PUBLIC_ALCHEMY_PAYMASTER_POLICY_ID` - Your Gas Manager policy ID  
+- `LIVEPEER_API_KEY` - Your Livepeer API key
+- `LIVEPEER_WEBHOOK_ID` - Your Livepeer webhook ID
+- And other required variables
+
+**Quick start:** See the [Environment Variables Setup Guide](./ENVIRONMENT_SETUP.md) for step-by-step instructions.
 
 4. Run the development server:
 

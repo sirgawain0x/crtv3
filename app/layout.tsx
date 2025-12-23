@@ -12,7 +12,12 @@ import Footer from "@/components/Footer";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { IframeCleanup } from "@/components/IframeCleanup";
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ 
+  subsets: ["latin"],
+  display: 'swap',
+  preload: true,
+  adjustFontFallback: true,
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://tv.creativeplatform.xyz"),
@@ -23,7 +28,7 @@ export const metadata: Metadata = {
     description: "The Way Content Should Be.",
     images: [
       {
-        url: "https://tv.creativeplatform.xyz/Creative_TV_Logo.png",
+        url: "/images/Creative_TV_Logo.png",
         width: 500,
         height: 500,
         alt: "Creative TV Logo",
@@ -35,7 +40,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Creative TV",
     description: "The Way Content Should Be.",
-    images: ["https://tv.creativeplatform.xyz/creative-banner.png"],
+    images: ["/Creative_TV.png"],
   },
 };
 
@@ -71,6 +76,7 @@ export default async function RootLayout({
           inter.className,
           "min-h-screen bg-background antialiased"
         )}
+        suppressHydrationWarning
       >
         <div id="alchemy-signer-iframe-container" style={{ display: "none" }} />
         {/* Alchemy signer iframe container for modular account functionality */}

@@ -32,10 +32,38 @@ export async function fetchVideoAssetByPlaybackId(
       if (response.status === 404) {
         return null;
       }
-      const errorData = await response.json();
-      throw new Error(
-        errorData.details || errorData.error || "Failed to fetch video asset"
-      );
+      
+      // Check if response is JSON before trying to parse
+      const contentType = response.headers.get("content-type");
+      let errorMessage = `Failed to fetch video asset (${response.status} ${response.statusText})`;
+      
+      if (contentType && contentType.includes("application/json")) {
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.details || errorData.error || errorMessage;
+        } catch (parseError) {
+          // JSON parsing failed, use default error message
+          console.warn("Failed to parse error response as JSON:", parseError);
+        }
+      } else {
+        // Response is not JSON (likely HTML error page from Cloudflare/Supabase)
+        try {
+          const text = await response.text();
+          // Try to extract meaningful error info from HTML if possible
+          if (text.includes("500") || text.includes("Internal server error")) {
+            errorMessage = "Supabase server error (500). Please try again in a few minutes.";
+          } else if (text.includes("502") || text.includes("Bad Gateway")) {
+            errorMessage = "Supabase service temporarily unavailable. Please try again later.";
+          } else if (text.includes("503") || text.includes("Service Unavailable")) {
+            errorMessage = "Supabase service is temporarily unavailable. Please try again later.";
+          }
+        } catch (textError) {
+          // Failed to read response text, use default error message
+          console.warn("Failed to read error response text:", textError);
+        }
+      }
+      
+      throw new Error(errorMessage);
     }
 
     return await response.json();
@@ -66,10 +94,38 @@ export async function fetchVideoAssetByAssetId(
       if (response.status === 404) {
         return null;
       }
-      const errorData = await response.json();
-      throw new Error(
-        errorData.details || errorData.error || "Failed to fetch video asset"
-      );
+      
+      // Check if response is JSON before trying to parse
+      const contentType = response.headers.get("content-type");
+      let errorMessage = `Failed to fetch video asset (${response.status} ${response.statusText})`;
+      
+      if (contentType && contentType.includes("application/json")) {
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.details || errorData.error || errorMessage;
+        } catch (parseError) {
+          // JSON parsing failed, use default error message
+          console.warn("Failed to parse error response as JSON:", parseError);
+        }
+      } else {
+        // Response is not JSON (likely HTML error page from Cloudflare/Supabase)
+        try {
+          const text = await response.text();
+          // Try to extract meaningful error info from HTML if possible
+          if (text.includes("500") || text.includes("Internal server error")) {
+            errorMessage = "Supabase server error (500). Please try again in a few minutes.";
+          } else if (text.includes("502") || text.includes("Bad Gateway")) {
+            errorMessage = "Supabase service temporarily unavailable. Please try again later.";
+          } else if (text.includes("503") || text.includes("Service Unavailable")) {
+            errorMessage = "Supabase service is temporarily unavailable. Please try again later.";
+          }
+        } catch (textError) {
+          // Failed to read response text, use default error message
+          console.warn("Failed to read error response text:", textError);
+        }
+      }
+      
+      throw new Error(errorMessage);
     }
 
     return await response.json();
@@ -97,10 +153,38 @@ export async function fetchVideoAssetById(
       if (response.status === 404) {
         return null;
       }
-      const errorData = await response.json();
-      throw new Error(
-        errorData.details || errorData.error || "Failed to fetch video asset"
-      );
+      
+      // Check if response is JSON before trying to parse
+      const contentType = response.headers.get("content-type");
+      let errorMessage = `Failed to fetch video asset (${response.status} ${response.statusText})`;
+      
+      if (contentType && contentType.includes("application/json")) {
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.details || errorData.error || errorMessage;
+        } catch (parseError) {
+          // JSON parsing failed, use default error message
+          console.warn("Failed to parse error response as JSON:", parseError);
+        }
+      } else {
+        // Response is not JSON (likely HTML error page from Cloudflare/Supabase)
+        try {
+          const text = await response.text();
+          // Try to extract meaningful error info from HTML if possible
+          if (text.includes("500") || text.includes("Internal server error")) {
+            errorMessage = "Supabase server error (500). Please try again in a few minutes.";
+          } else if (text.includes("502") || text.includes("Bad Gateway")) {
+            errorMessage = "Supabase service temporarily unavailable. Please try again later.";
+          } else if (text.includes("503") || text.includes("Service Unavailable")) {
+            errorMessage = "Supabase service is temporarily unavailable. Please try again later.";
+          }
+        } catch (textError) {
+          // Failed to read response text, use default error message
+          console.warn("Failed to read error response text:", textError);
+        }
+      }
+      
+      throw new Error(errorMessage);
     }
 
     return await response.json();

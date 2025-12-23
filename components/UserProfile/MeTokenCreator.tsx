@@ -264,7 +264,7 @@ export function MeTokenCreator({ onMeTokenCreated }: MeTokenCreatorProps) {
                 <Info className="h-3 w-3" />
                 <AlertDescription className="text-xs">
                   <strong>Need DAI?</strong> Use the account menu to:
-                  <br/>1. Click <strong>&quot;Buy&quot;</strong> to purchase USDC with Wert
+                  <br/>1. Click <strong>&quot;Buy&quot;</strong> to purchase USDC with Coinbase
                   <br/>2. Click <strong>&quot;Swap&quot;</strong> to convert USDC → DAI
                 </AlertDescription>
               </Alert>

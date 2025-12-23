@@ -4,9 +4,12 @@ import { useState, Suspense } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useAccount, useChain } from "@account-kit/react";
+import { useAccount, useChain, useSmartAccountClient, useSignMessage } from "@account-kit/react";
 import { useRouter } from "next/navigation";
 import { createProposal } from "@/app/vote/create/[address]/actions";
+import { SNAPSHOT_SPACE } from "@/context/context";
+import { createPublicClient } from "viem";
+import { alchemy, base } from "@account-kit/infra";
 import {
   Form,
   FormField,
@@ -19,6 +22,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Separator } from "@/components/ui/separator";
 
 const proposalSchema = z.object({
   title: z.string().min(3, "Title is required"),
@@ -30,6 +35,12 @@ const proposalSchema = z.object({
   startTime: z.string().min(1, "Start time required"),
   end: z.string().min(1, "End date required"),
   endTime: z.string().min(1, "End time required"),
+  // POAP fields (optional)
+  createPoap: z.boolean(),
+  poapName: z.string().optional(),
+  poapDescription: z.string().optional(),
+  poapImageUrl: z.string().url("Must be a valid URL").optional().or(z.literal("")),
+  poapEventUrl: z.string().url("Must be a valid URL").optional().or(z.literal("")),
 });
 type ProposalForm = z.infer<typeof proposalSchema>;
 
@@ -47,6 +58,19 @@ function Create() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
+  // Get smart account client for signing using AccountKit
+  const { client: smartAccountClient, isLoadingClient } = useSmartAccountClient({
+    type: "ModularAccountV2",
+    accountParams: {
+      mode: "default",
+    },
+  });
+
+  // Use signMessageAsync from AccountKit - returns a Promise directly (no callbacks needed)
+  const { signMessageAsync, isSigningMessage, error: signMessageError } = useSignMessage({
+    client: smartAccountClient || undefined,
+  });
+
   const form = useForm<ProposalForm>({
     resolver: zodResolver(proposalSchema),
     defaultValues: {
@@ -57,9 +81,16 @@ function Create() {
       startTime: "",
       end: "",
       endTime: "",
+      createPoap: false,
+      poapName: "",
+      poapDescription: "",
+      poapImageUrl: "",
+      poapEventUrl: "",
     },
     mode: "onTouched",
   });
+
+  const createPoap = form.watch("createPoap");
 
   const { fields, append, remove } = useFieldArray<ProposalForm>({
     control: form.control,
@@ -72,6 +103,43 @@ function Create() {
       setFormError("Please connect your wallet.");
       return;
     }
+    if (isLoadingClient) {
+      setFormError("Smart account client is still loading. Please wait...");
+      setIsSubmitting(false);
+      return;
+    }
+    if (!smartAccountClient) {
+      setFormError("Smart account client not ready. Please connect your wallet.");
+      setIsSubmitting(false);
+      return;
+    }
+    if (!signMessageAsync) {
+      setFormError("Sign message function not available. Please refresh the page.");
+      setIsSubmitting(false);
+      return;
+    }
+
+    // Check if already signing - wait for it to complete or timeout
+    if (isSigningMessage) {
+      console.warn("⚠️ Signing already in progress, waiting for completion...");
+      setFormError("Waiting for previous signing to complete...");
+
+      // Wait up to 5 seconds for it to complete
+      for (let i = 0; i < 10; i++) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        if (!isSigningMessage) {
+          console.log("✅ Previous signing completed");
+          setFormError(null);
+          break;
+        }
+      }
+
+      if (isSigningMessage) {
+        setFormError("Previous signing operation is stuck. Please refresh the page and try again.");
+        setIsSubmitting(false);
+        return;
+      }
+    }
     const start = getUnixTimestamp(values.start, values.startTime);
     const end = getUnixTimestamp(values.end, values.endTime);
     if (end <= start) {
@@ -79,29 +147,181 @@ function Create() {
       return;
     }
     setIsSubmitting(true);
-    const result = await createProposal({
-      title: values.title,
-      content: values.content,
-      choices: values.choices.map((c) => c.value),
-      start,
-      end,
-      address,
-      chainId: chain.id,
-    });
-    setIsSubmitting(false);
-    if (result?.serverError) {
-      setFormError(result.serverError || "Failed to create proposal.");
-      return;
+
+    try {
+      console.log("Starting proposal creation...");
+
+      // Get current block number before signing
+      console.log("Fetching block number...");
+      const publicClient = createPublicClient({
+        chain: base,
+        transport: alchemy({
+          apiKey: process.env.NEXT_PUBLIC_ALCHEMY_API_KEY as string,
+        }),
+      });
+      const block = await publicClient.getBlockNumber();
+      const blockNumber = Number(block);
+      console.log("Block number fetched:", blockNumber);
+
+      // Create POAP event if requested
+      let poapEventId: string | null = null;
+      let poapTokenId: string | null = null;
+
+      if (values.createPoap && values.poapName && values.poapDescription) {
+        try {
+          console.log("Creating POAP event...");
+          const poapResponse = await fetch("/api/poap/create-event", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name: values.poapName,
+              description: values.poapDescription,
+              image_url: values.poapImageUrl || undefined,
+              start_date: new Date(start * 1000).toISOString(),
+              end_date: new Date(end * 1000).toISOString(),
+              event_url: values.poapEventUrl || undefined,
+              virtual_event: true,
+            }),
+          });
+
+          if (poapResponse.ok) {
+            const poapData = await poapResponse.json();
+            poapEventId = poapData.data?.id || poapData.data?.fancy_id;
+            poapTokenId = poapData.data?.token_id || "1";
+            console.log("POAP event created:", poapEventId);
+          } else {
+            const error = await poapResponse.json();
+            console.warn("Failed to create POAP event:", error);
+            // Continue with proposal creation even if POAP creation fails
+          }
+        } catch (poapError) {
+          console.error("Error creating POAP event:", poapError);
+          // Continue with proposal creation even if POAP creation fails
+        }
+      }
+
+      // Create proposal payload for signing with actual block number
+      // Note: plugins should be an object, not a stringified JSON
+      const proposalPayload = {
+        address,
+        space: SNAPSHOT_SPACE,
+        type: "weighted",
+        title: values.title,
+        body: values.content,
+        choices: values.choices.map((c) => c.value),
+        start,
+        end,
+        snapshot: blockNumber,
+        discussion: "",
+        plugins: {
+          poap: {
+            address: poapEventId ? `0x${poapEventId}` : "0x0000000000000000000000000000000000000000",
+            tokenId: poapTokenId || "1",
+          },
+        },
+      };
+
+      // Sign the proposal message on client side using AccountKit
+      console.log("Preparing message to sign...");
+      const messageToSign = JSON.stringify(proposalPayload);
+      console.log("Message to sign:", messageToSign);
+      console.log("Smart account client ready:", !!smartAccountClient);
+      console.log("Sign message function available:", !!signMessageAsync);
+      console.log("Is currently signing:", isSigningMessage);
+
+      // Ensure iframe container exists
+      const iframeContainer = document.getElementById("alchemy-signer-iframe-container");
+      if (!iframeContainer) {
+        throw new Error("Alchemy signer iframe container not found. Please refresh the page.");
+      }
+      console.log("Iframe container found:", !!iframeContainer);
+
+      if (signMessageError) {
+        throw new Error(`Sign message error: ${signMessageError.message}`);
+      }
+
+      // Wait for any in-progress signing to complete
+      if (isSigningMessage) {
+        console.warn("⚠️ Already signing, waiting for current operation to complete...");
+        // Wait up to 10 seconds for current signing to complete
+        for (let i = 0; i < 20; i++) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+          if (!isSigningMessage) {
+            console.log("✅ Previous signing operation completed");
+            break;
+          }
+        }
+        if (isSigningMessage) {
+          throw new Error("Previous signing operation is still in progress. Please wait and try again.");
+        }
+      }
+
+      // Wait a brief moment to ensure everything is ready
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Use signMessageAsync which returns a Promise directly (AccountKit v4.59.1+)
+      console.log("Calling AccountKit signMessageAsync with message length:", messageToSign.length);
+      console.log("Waiting for user to approve signing in AccountKit iframe...");
+
+      let signature: string;
+      try {
+        signature = await signMessageAsync({
+          message: messageToSign,
+        });
+        console.log("✅ Message signed successfully, signature:", signature?.substring(0, 20) + "...");
+      } catch (error) {
+        console.error("❌ Error signing message:", error);
+        throw error instanceof Error
+          ? error
+          : new Error(`Failed to sign message: ${String(error)}`);
+      }
+
+      console.log("Signature received, submitting to server...");
+
+      // Call server action with signature
+      console.log("Submitting proposal to server...");
+      const result = await createProposal({
+        title: values.title,
+        content: values.content,
+        choices: values.choices.map((c) => c.value),
+        start,
+        end,
+        address,
+        chainId: chain.id,
+        signature,
+        proposalPayload,
+      });
+
+      console.log("Server response:", result);
+
+      if (result?.serverError) {
+        console.error("Server error:", result.serverError);
+        setFormError(result.serverError || "Failed to create proposal.");
+        return;
+      }
+      if (result?.validationErrors) {
+        console.error("Validation errors:", result.validationErrors);
+        setFormError("Validation failed. Please check your input.");
+        return;
+      }
+      if (!result?.data) {
+        console.error("No data in result:", result);
+        setFormError("Failed to create proposal.");
+        return;
+      }
+
+      console.log("Proposal created successfully:", result.data);
+      router.push("/vote");
+    } catch (error) {
+      console.error("Error creating proposal:", error);
+      setFormError(
+        error instanceof Error
+          ? error.message
+          : "Failed to create proposal. Please try again."
+      );
+    } finally {
+      setIsSubmitting(false);
     }
-    if (result?.validationErrors) {
-      setFormError("Validation failed. Please check your input.");
-      return;
-    }
-    if (!result?.data) {
-      setFormError("Failed to create proposal.");
-      return;
-    }
-    router.push("/vote");
   }
 
   return (
@@ -235,6 +455,110 @@ function Create() {
                 )}
               />
             </div>
+
+            <Separator />
+
+            {/* POAP Configuration Section */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <FormLabel className="text-base font-semibold">Create POAP</FormLabel>
+                  <p className="text-sm text-muted-foreground">
+                    Create a POAP event for voters to claim after voting
+                  </p>
+                </div>
+                <FormField
+                  name="createPoap"
+                  control={form.control}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <Switch
+                          checked={field.value ?? false}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {createPoap && (
+                <div className="space-y-4 pl-4 border-l-2">
+                  <FormField
+                    name="poapName"
+                    control={form.control}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>POAP Name</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="e.g., Vote on Proposal #123"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    name="poapDescription"
+                    control={form.control}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>POAP Description</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Describe the POAP event..."
+                            rows={3}
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    name="poapImageUrl"
+                    control={form.control}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>POAP Image URL (Optional)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="url"
+                            placeholder="https://example.com/image.png"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    name="poapEventUrl"
+                    control={form.control}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Event URL (Optional)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="url"
+                            placeholder="https://example.com/event"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              )}
+            </div>
+
             {formError && (
               <div className="text-red-500 text-sm font-medium">
                 {formError}

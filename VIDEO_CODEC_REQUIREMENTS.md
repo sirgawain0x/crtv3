@@ -5,7 +5,7 @@ This document explains the video format requirements for uploading videos to the
 
 ## The Problem
 Users were encountering transcoding failures with the error:
-```
+```text
 invalid video file codec or container, check your input file against the input codec and container support matrix
 ```
 

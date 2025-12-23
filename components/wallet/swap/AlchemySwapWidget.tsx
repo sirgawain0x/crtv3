@@ -177,8 +177,8 @@ export function AlchemySwapWidget({ onSwapSuccess, className }: AlchemySwapWidge
         console.log('Parsed balances:', newBalances);
         setBalances(newBalances);
         
-        // Check if the account has any ETH at all - BUT ONLY FOR NON-SPONSORED SWAPS
-        if (ethBalance === 0n && !swapState.quote?.feePayment?.sponsored) {
+        // Check if the account has any ETH at all
+        if (ethBalance === 0n) {
           console.warn('Account has zero ETH balance. This may cause swap failures.');
           setSwapState(prev => ({
             ...prev,
@@ -198,7 +198,7 @@ export function AlchemySwapWidget({ onSwapSuccess, className }: AlchemySwapWidge
     };
 
     fetchBalances();
-  }, [address, client, swapState.quote?.feePayment?.sponsored]);
+  }, [address, client]);
 
   const handleFromTokenChange = (value: string) => {
     const newFromToken = value as TokenSymbol;
@@ -454,9 +454,9 @@ export function AlchemySwapWidget({ onSwapSuccess, className }: AlchemySwapWidge
         }
       }
 
-      // Check 3: Ensure minimum ETH for gas (0.001 ETH minimum recommended) - ONLY FOR NON-SPONSORED SWAPS
+      // Check 3: Ensure minimum ETH for gas (0.001 ETH minimum recommended)
       const minGasEth = parseEther('0.001');
-      if (ethBalance < minGasEth && !swapState.quote?.feePayment?.sponsored) {
+      if (ethBalance < minGasEth) {
         throw new Error(
           `Insufficient ETH for gas fees. You need at least 0.001 ETH, ` +
             `but you have ${formatEther(ethBalance)} ETH. Please add more ETH to your account.`
@@ -550,7 +550,6 @@ export function AlchemySwapWidget({ onSwapSuccess, className }: AlchemySwapWidge
             });
             
             console.log('✅ Approval confirmed! Hash:', approvalTxHash);
-            setIsApprovingToken(false); // Reset approval flag
             console.log('✅ Proceeding to swap...');
           } else {
             console.log('✅ Sufficient allowance already exists');
@@ -619,7 +618,6 @@ export function AlchemySwapWidget({ onSwapSuccess, className }: AlchemySwapWidge
         isSwapping: false,
       }));
       
-      setIsApprovingToken(false); // Reset approval flag on success
       onSwapSuccess?.();
 
     } catch (error) {

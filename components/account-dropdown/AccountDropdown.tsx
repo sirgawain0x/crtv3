@@ -50,12 +50,9 @@ import {
 import {
   Copy,
   LogOut,
-  Wallet,
   Send,
   ArrowUpRight,
   ArrowUpDown,
-  ArrowBigDown,
-  ArrowBigUp,
   Key,
   Loader2,
   CloudUpload,
@@ -64,6 +61,7 @@ import {
   ShieldUser,
   Plus,
   ArrowRight,
+  AlertTriangle,
 } from "lucide-react";
 import { CheckIcon } from "@radix-ui/react-icons";
 import Image from "next/image";
@@ -75,7 +73,8 @@ import {
   DialogClose,
   DialogDescription,
 } from "@/components/ui/dialog";
-import WertFundButton from "@/components/wallet/buy/wert-fund-button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import CoinbaseFundButton from "@/components/wallet/buy/coinbase-fund-button";
 import { LoginButton } from "@/components/auth/LoginButton";
 import { AlchemySwapWidget } from "@/components/wallet/swap/AlchemySwapWidget";
 import useModularAccount from "@/lib/hooks/accountkit/useModularAccount";
@@ -115,7 +114,7 @@ const chainIconMap: Record<number, string> = {
 };
 
 function getChainIcon(chain: { id: number }) {
-  return chainIconMap[chain.id] || "/images/chains/default.svg";
+  return chainIconMap[chain.id] || "/images/chains/default-chain.svg";
 }
 
 function NetworkStatus({ isConnected }: { isConnected: boolean }) {
@@ -172,23 +171,28 @@ interface SessionKeyConfig {
 // Token configuration for send modal
 type TokenSymbol = 'ETH' | 'USDC' | 'DAI';
 
-const TOKEN_INFO = {
-  ETH: { 
-    decimals: 18, 
-    symbol: "ETH",
-    address: null, // Native token
-  },
-  USDC: { 
-    decimals: USDC_TOKEN_DECIMALS, 
-    symbol: "USDC",
-    address: USDC_TOKEN_ADDRESSES.base,
-  },
-  DAI: { 
-    decimals: DAI_TOKEN_DECIMALS, 
-    symbol: "DAI",
-    address: DAI_TOKEN_ADDRESSES.base,
-  },
-} as const;
+// Helper function to get token info for the current chain
+const getTokenInfo = (chainId?: number) => {
+  const chainKey = chainId === base.id ? "base" : undefined;
+
+  return {
+    ETH: {
+      decimals: 18,
+      symbol: "ETH",
+      address: null, // Native token
+    },
+    USDC: {
+      decimals: USDC_TOKEN_DECIMALS,
+      symbol: "USDC",
+      address: chainKey ? (USDC_TOKEN_ADDRESSES as any)[chainKey] : undefined,
+    },
+    DAI: {
+      decimals: DAI_TOKEN_DECIMALS,
+      symbol: "DAI",
+      address: chainKey ? (DAI_TOKEN_ADDRESSES as any)[chainKey] : undefined,
+    },
+  } as const;
+};
 
 const SESSION_KEY_TYPES: SessionKeyConfig[] = [
   {
@@ -264,20 +268,20 @@ export function AccountDropdown() {
     },
   });
 
-  const { account } = useModularAccount();
+  const { account, address: smartAccountAddress } = useModularAccount();
   const { client } = useSmartAccountClient({});
   const validationClient = chain
     ? (client?.extend(installValidationActions as any) as any)
     : undefined;
 
-  const { isVerified, hasMembership } = useMembershipVerification();
+  const { isVerified, hasMembership, isLoading: isMembershipLoading, error: membershipError } = useMembershipVerification();
 
   useEffect(() => {
     console.log({
       "EOA Address (user.address)": user?.address,
-      "Smart Contract Account Address": account?.address,
+      "Smart Contract Account Address": smartAccountAddress,
     });
-  }, [account, user]);
+  }, [smartAccountAddress, user]);
 
   useEffect(() => {
     let newDisplayAddress = "";
@@ -285,15 +289,15 @@ export function AccountDropdown() {
       newDisplayAddress = `${user.address.slice(0, 6)}...${user.address.slice(
         -4
       )}`;
-    else if (account?.address)
-      newDisplayAddress = `${account.address.slice(
+    else if (smartAccountAddress)
+      newDisplayAddress = `${smartAccountAddress.slice(
         0,
         6
-      )}...${account.address.slice(-4)}`;
+      )}...${smartAccountAddress.slice(-4)}`;
     // Only update if value actually changes
     if (displayAddress !== newDisplayAddress)
       setDisplayAddress(newDisplayAddress);
-  }, [user, account, displayAddress]);
+  }, [user, smartAccountAddress, displayAddress]);
 
   useEffect(() => {
     const checkNetworkStatus = async () => {
@@ -319,34 +323,46 @@ export function AccountDropdown() {
   // Fetch token balances when dialog opens with send action
   useEffect(() => {
     const fetchTokenBalances = async () => {
-      if (!client || !account?.address || dialogAction !== 'send' || !isDialogOpen) return;
+      if (!client || !smartAccountAddress || dialogAction !== 'send' || !isDialogOpen) return;
 
       try {
         // Get ETH balance
         const ethBalance = await client.getBalance({
-          address: account.address as Address,
+          address: smartAccountAddress as Address,
         });
-        
-        // Get USDC balance
-        const usdcBalance = await client.readContract({
-          address: USDC_TOKEN_ADDRESSES.base as Address,
-          abi: erc20Abi,
-          functionName: 'balanceOf',
-          args: [account.address as Address],
-        }) as bigint;
-        
-        // Get DAI balance
-        const daiBalance = await client.readContract({
-          address: DAI_TOKEN_ADDRESSES.base as Address,
-          abi: erc20Abi,
-          functionName: 'balanceOf',
-          args: [account.address as Address],
-        }) as bigint;
+
+        // Resolve per-chain ERC-20 addresses (Base only for now)
+        const chainKey = chain?.id === base.id ? "base" : undefined;
+        let usdc = 0n;
+        let dai = 0n;
+
+        if (chainKey) {
+          const usdcAddr = (USDC_TOKEN_ADDRESSES as any)[chainKey] as Address | undefined;
+          const daiAddr = (DAI_TOKEN_ADDRESSES as any)[chainKey] as Address | undefined;
+
+          if (usdcAddr) {
+            usdc = await client.readContract({
+              address: usdcAddr,
+              abi: erc20Abi,
+              functionName: 'balanceOf',
+              args: [smartAccountAddress as Address],
+            }) as bigint;
+          }
+
+          if (daiAddr) {
+            dai = await client.readContract({
+              address: daiAddr,
+              abi: erc20Abi,
+              functionName: 'balanceOf',
+              args: [smartAccountAddress as Address],
+            }) as bigint;
+          }
+        }
 
         setTokenBalances({
           ETH: formatUnits(ethBalance, 18),
-          USDC: formatUnits(usdcBalance, USDC_TOKEN_DECIMALS),
-          DAI: formatUnits(daiBalance, DAI_TOKEN_DECIMALS),
+          USDC: formatUnits(usdc, USDC_TOKEN_DECIMALS),
+          DAI: formatUnits(dai, DAI_TOKEN_DECIMALS),
         });
       } catch (error) {
         console.error('Error fetching token balances:', error);
@@ -354,11 +370,11 @@ export function AccountDropdown() {
     };
 
     fetchTokenBalances();
-  }, [client, account?.address, dialogAction, isDialogOpen]);
+  }, [client, smartAccountAddress, dialogAction, isDialogOpen, chain?.id]);
 
   const copyToClipboard = async () => {
     const addressToCopy =
-      user?.type === "eoa" ? user?.address : account?.address;
+      user?.type === "eoa" ? user?.address : smartAccountAddress;
     if (addressToCopy) {
       try {
         await navigator.clipboard.writeText(addressToCopy);
@@ -366,7 +382,7 @@ export function AccountDropdown() {
         setTimeout(() => setCopySuccess(false), 2000);
         // Optionally close dropdown after copying
         // setIsDropdownOpen(false);
-      } catch {}
+      } catch { }
     }
   };
 
@@ -385,7 +401,7 @@ export function AccountDropdown() {
   };
 
   const handleCreateSessionKey = async () => {
-    if (!account?.address) return;
+    if (!smartAccountAddress) return;
 
     try {
       const sessionKeyEntityId = sessionKeys.length + 1;
@@ -493,7 +509,7 @@ export function AccountDropdown() {
     // Check balance
     const availableBalance = parseFloat(tokenBalances[selectedToken]);
     const requestedAmount = parseFloat(sendAmount);
-    
+
     if (requestedAmount > availableBalance) {
       toast({
         variant: "destructive",
@@ -510,10 +526,10 @@ export function AccountDropdown() {
         description: `Sending ${sendAmount} ${selectedToken}...`,
       });
 
-      const tokenInfo = TOKEN_INFO[selectedToken];
+      const tokenInfo = getTokenInfo(chain?.id)[selectedToken];
 
       let operation;
-      
+
       if (selectedToken === 'ETH') {
         // Send native ETH
         const valueInWei = parseUnits(sendAmount, tokenInfo.decimals);
@@ -527,8 +543,19 @@ export function AccountDropdown() {
         });
       } else {
         // Send ERC-20 token (USDC or DAI)
+        // Check if token is supported on current chain
+        if (!tokenInfo.address) {
+          toast({
+            title: "Unsupported Network",
+            description: `${selectedToken} is not available on the current network. Please switch to Base.`,
+            variant: "destructive",
+          });
+          setIsSending(false);
+          return;
+        }
+
         const tokenAmount = parseUnits(sendAmount, tokenInfo.decimals);
-        
+
         // Encode the transfer calldata
         const transferCalldata = encodeFunctionData({
           abi: parseAbi(["function transfer(address,uint256) returns (bool)"]),
@@ -572,12 +599,12 @@ export function AccountDropdown() {
           </ToastAction>
         ),
       });
-      
+
       // Reset form
       setIsDialogOpen(false);
       setRecipientAddress("");
       setSendAmount("");
-      
+
       // Refresh balances - refetch on next render
       // Token balances will be refreshed on next component update
     } catch (error: unknown) {
@@ -596,7 +623,7 @@ export function AccountDropdown() {
   };
 
   const handleRemoveSessionKey = async (sessionKey: any) => {
-    if (!validationClient || !account?.address || !chain) return;
+    if (!validationClient || !smartAccountAddress || !chain) return;
 
     try {
       const sessionKeyEntityId = sessionKeys.indexOf(sessionKey) + 1;
@@ -658,7 +685,7 @@ export function AccountDropdown() {
               Purchase crypto directly to your wallet.
             </p>
             <div className="flex flex-col gap-4">
-              <WertFundButton onClose={() => setIsDialogOpen(false)} />
+              <CoinbaseFundButton onClose={() => setIsDialogOpen(false)} />
             </div>
           </div>
         );
@@ -675,11 +702,10 @@ export function AccountDropdown() {
                       key={token}
                       type="button"
                       onClick={() => setSelectedToken(token)}
-                      className={`flex items-center justify-center space-x-2 p-3 border rounded-lg transition-colors ${
-                        selectedToken === token
+                      className={`flex items-center justify-center space-x-2 p-3 border rounded-lg transition-colors ${selectedToken === token
                           ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-400'
                           : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
-                      }`}
+                        }`}
                     >
                       <Image
                         src={`/images/tokens/${token.toLowerCase()}-logo.svg`}
@@ -688,11 +714,10 @@ export function AccountDropdown() {
                         height={20}
                         className="w-5 h-5 flex-shrink-0"
                       />
-                      <span className={`text-sm font-medium ${
-                        selectedToken === token
+                      <span className={`text-sm font-medium ${selectedToken === token
                           ? 'text-blue-700 dark:text-blue-300'
                           : 'text-gray-900 dark:text-gray-100'
-                      }`}>
+                        }`}>
                         {token}
                       </span>
                     </button>
@@ -782,7 +807,7 @@ export function AccountDropdown() {
         return (
           <div className="space-y-4">
             <div className="space-y-4">
-              <AlchemySwapWidget 
+              <AlchemySwapWidget
                 onSwapSuccess={() => {
                   setIsDialogOpen(false);
                   toast({
@@ -900,12 +925,12 @@ export function AccountDropdown() {
                             {key.permissions.isGlobal
                               ? "Global Access"
                               : key.permissions.timeLimit
-                              ? `Time Limited (${Math.floor(
+                                ? `Time Limited (${Math.floor(
                                   key.permissions.timeLimit / 3600
                                 )}h)`
-                              : key.permissions.spendingLimit
-                              ? `Spend Limited (${key.permissions.spendingLimit} ETH)`
-                              : "Limited Access"}
+                                : key.permissions.spendingLimit
+                                  ? `Spend Limited (${key.permissions.spendingLimit} ETH)`
+                                  : "Limited Access"}
                           </p>
                         </div>
                         <Button
@@ -1035,7 +1060,7 @@ export function AccountDropdown() {
           >
             <Avatar className="h-8 w-8">
               <AvatarImage
-                src={makeBlockie(account?.address || user?.address || "0x")}
+                src={makeBlockie(smartAccountAddress || user?.address || "0x")}
                 alt="Wallet avatar"
               />
             </Avatar>
@@ -1046,267 +1071,286 @@ export function AccountDropdown() {
         }
       >
         <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="outline"
-            className="hidden md:flex items-center gap-2 transition-all hover:bg-gray-100 dark:hover:bg-gray-800 hover:border-blue-500"
-          >
-            <Avatar className="h-8 w-8">
-              <AvatarImage
-                src={makeBlockie(account?.address || user?.address || "0x")}
-                alt="Wallet avatar"
-              />
-            </Avatar>
-            <span className="max-w-[100px] truncate">
-              {displayAddress || "Loading..."}
-            </span>
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent
-          className="w-[320px] md:w-80 max-h-[80vh] overflow-y-auto"
-          align="end"
-        >
-          <DropdownMenuLabel className="font-normal">
-            <div
-              className={`flex items-center justify-between cursor-pointer 
-              hover:bg-gray-100 dark:hover:bg-gray-800 rounded px-2 py-1 transition-colors`}
-              onClick={copyToClipboard}
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              className="hidden md:flex items-center gap-2 transition-all hover:bg-gray-100 dark:hover:bg-gray-800 hover:border-blue-500"
             >
-              <div className="flex flex-col space-y-1">
-                <p className="text-xs text-gray-500">
-                  {user?.type === "eoa" ? "EOA" : "Smart Account"}
-                </p>
-                <p className="font-mono text-sm">{displayAddress}</p>
-                {user?.type !== "eoa" && user?.address && (
+              <Avatar className="h-8 w-8">
+                <AvatarImage
+                  src={makeBlockie(smartAccountAddress || user?.address || "0x")}
+                  alt="Wallet avatar"
+                />
+              </Avatar>
+              <span className="max-w-[100px] truncate">
+                {displayAddress || "Loading..."}
+              </span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            className="w-[320px] md:w-80 max-h-[80vh] overflow-y-auto"
+            align="end"
+          >
+            <DropdownMenuLabel className="font-normal">
+              <div
+                className={`flex items-center justify-between cursor-pointer 
+              hover:bg-gray-100 dark:hover:bg-gray-800 rounded px-2 py-1 transition-colors`}
+                onClick={copyToClipboard}
+              >
+                <div className="flex flex-col space-y-1">
                   <p className="text-xs text-gray-500">
-                    Controller: {shortenAddress(user.address)}
+                    {user?.type === "eoa" ? "EOA" : "Smart Account"}
                   </p>
+                  <p className="font-mono text-sm">{displayAddress}</p>
+                  {user?.type !== "eoa" && user?.address && (
+                    <p className="text-xs text-gray-500">
+                      Controller: {shortenAddress(user.address)}
+                    </p>
+                  )}
+                </div>
+                {copySuccess ? (
+                  <CheckIcon className="ml-2 h-4 w-4 text-green-500" />
+                ) : (
+                  <Copy className="ml-2 h-4 w-4" />
                 )}
               </div>
-              {copySuccess ? (
-                <CheckIcon className="ml-2 h-4 w-4 text-green-500" />
-              ) : (
-                <Copy className="ml-2 h-4 w-4" />
-              )}
+            </DropdownMenuLabel>
+
+            <DropdownMenuSeparator />
+
+            {/* Balances Section */}
+            <div className="px-2 py-2">
+              <TokenBalance />
             </div>
-          </DropdownMenuLabel>
 
-          <DropdownMenuSeparator />
+            <DropdownMenuSeparator />
 
-          {/* Balances Section */}
-          <div className="px-2 py-2">
-            <TokenBalance />
-          </div>
-
-          <DropdownMenuSeparator />
-
-          {/* MeToken Balances Section */}
-          <div className="px-2 py-2">
-            <MeTokenBalances />
-          </div>
-
-          <DropdownMenuSeparator />
-
-          {/* Wallet Actions Section - Grid Layout */}
-          <div className="px-2 py-2 w-full">
-            <p className="text-xs text-muted-foreground mb-2">Actions</p>
-            <div className="grid grid-cols-3 gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleActionClick("buy")}
-                className="flex flex-col items-center justify-center p-3 h-16 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-              >
-                <Plus className="h-4 w-4 text-green-500 mb-1" />
-                <span className="text-xs">Add</span>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleActionClick("send")}
-                className="flex flex-col items-center justify-center p-3 h-16 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-              >
-                <ArrowUpRight className="h-4 w-4 text-blue-500 mb-1" />
-                <span className="text-xs">Send</span>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleActionClick("swap")}
-                className="flex flex-col items-center justify-center p-3 h-16 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-              >
-                <ArrowUpDown className="h-4 w-4 text-purple-500 mb-1" />
-                <span className="text-xs">Swap</span>
-              </Button>
+            {/* MeToken Balances Section */}
+            <div className="px-2 py-2">
+              <MeTokenBalances />
             </div>
-          </div>
 
-          <DropdownMenuSeparator />
-          
+            <DropdownMenuSeparator />
 
-          {/* Profile & Upload Access - Always Available */}
-          <div className="px-2 py-2 w-full">
-            <p className="text-xs text-muted-foreground mb-2">
-              Options
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              <Link href="/profile" className="w-full">
+            {/* Wallet Actions Section - Grid Layout */}
+            <div className="px-2 py-2 w-full">
+              <p className="text-xs text-muted-foreground mb-2">Actions</p>
+              <div className="grid grid-cols-3 gap-2">
                 <Button
                   variant="outline"
                   size="sm"
-                  className={
-                    "w-full flex flex-col items-center justify-center p-2 h-12 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                  }
-                  onClick={() => setIsDropdownOpen(false)}
+                  onClick={() => handleActionClick("buy")}
+                  className="flex flex-col items-center justify-center p-3 h-16 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                 >
-                  <ShieldUser className="h-3 w-3 mb-1" />
-                  <span className="text-xs">Profile</span>
+                  <Plus className="h-4 w-4 text-green-500 mb-1" />
+                  <span className="text-xs">Add</span>
                 </Button>
-              </Link>
-              <Link href="/upload" className="w-full">
                 <Button
                   variant="outline"
                   size="sm"
-                  className={
-                    "w-full flex flex-col items-center justify-center p-2 h-12 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                  }
-                  onClick={() => setIsDropdownOpen(false)}
+                  onClick={() => handleActionClick("send")}
+                  className="flex flex-col items-center justify-center p-3 h-16 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                 >
-                  <CloudUpload className="h-3 w-3 mb-1" />
-                  <span className="text-xs">Upload</span>
+                  <ArrowUpRight className="h-4 w-4 text-blue-500 mb-1" />
+                  <span className="text-xs">Send</span>
                 </Button>
-              </Link>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleActionClick("swap")}
+                  className="flex flex-col items-center justify-center p-3 h-16 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                >
+                  <ArrowUpDown className="h-4 w-4 text-purple-500 mb-1" />
+                  <span className="text-xs">Swap</span>
+                </Button>
+              </div>
             </div>
-          </div>
-          <DropdownMenuSeparator />
-          {/* Membership Section */}
-          <div className="px-2 py-2 w-full">
-            <MembershipSection />
-          </div>
 
-          {/* Member Access Links - Only for Members */}
-          {isVerified && hasMembership && (
-            <>
-              
+            <DropdownMenuSeparator />
+
+
+            {/* Profile & Upload Access - Always Available */}
+            <div className="px-2 py-2 w-full">
+              <p className="text-xs text-muted-foreground mb-2">
+                Options
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <Link href="/profile" className="w-full">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={
+                      "w-full flex flex-col items-center justify-center p-2 h-12 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                    }
+                    onClick={() => setIsDropdownOpen(false)}
+                  >
+                    <ShieldUser className="h-3 w-3 mb-1" />
+                    <span className="text-xs">Profile</span>
+                  </Button>
+                </Link>
+                <Link href="/upload" className="w-full">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className={
+                      "w-full flex flex-col items-center justify-center p-2 h-12 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                    }
+                    onClick={() => setIsDropdownOpen(false)}
+                  >
+                    <CloudUpload className="h-3 w-3 mb-1" />
+                    <span className="text-xs">Upload</span>
+                  </Button>
+                </Link>
+              </div>
+            </div>
+            <DropdownMenuSeparator />
+            {/* Membership Section */}
+            <div className="px-2 py-2 w-full">
+              <MembershipSection />
+            </div>
+
+            {/* Membership Error Handling */}
+            {membershipError && (
               <div className="px-2 py-2 w-full">
-                <p className="text-xs text-muted-foreground mb-2">
-                  Member Access
-                </p>
-                {isLinksLoading ? (
-                  <div className="grid grid-cols-2 gap-2">
-                    <Skeleton className="h-12 w-full" />
-                    <Skeleton className="h-12 w-full" />
-                    <Skeleton className="h-12 w-full" />
-                    <Skeleton className="h-12 w-full" />
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-2 gap-2">
-                    <Link href="/live" className="w-full">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className={
-                          "w-full flex flex-col items-center justify-center p-2 h-12 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                        }
-                        onClick={() => setIsDropdownOpen(false)}
-                      >
-                        <RadioTower className="h-3 w-3 mb-1" />
-                        <span className="text-xs">Live</span>
-                      </Button>
-                    </Link>
-                    <Link href="https://create.creativeplatform.xyz" className="w-full">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full flex flex-col items-center justify-center p-2 h-12 hover:bg-gray-50 
+                <Alert variant="destructive">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>
+                    {membershipError.code === 'LOCK_NOT_FOUND' && 'Unable to verify membership. Please try again later.'}
+                    {membershipError.code === 'BALANCE_CHECK_ERROR' && 'Unable to check membership status. Please try again later.'}
+                    {membershipError.code === 'MEMBERSHIP_CHECK_ERROR' && 'Error verifying membership. Please try again later.'}
+                    {membershipError.code === 'INVALID_ADDRESS' && 'Invalid wallet address. Please reconnect your wallet.'}
+                    {membershipError.code === 'NO_VALID_ADDRESS' && 'Please connect your wallet to verify membership.'}
+                    {membershipError.code === 'PROVIDER_ERROR' && 'Network connection error. Please try again later.'}
+                    {membershipError.code === 'LOCK_FETCH_ERROR' && 'Unable to fetch membership details. Basic verification will continue.'}
+                    {!membershipError.code && 'An error occurred while verifying membership.'}
+                  </AlertDescription>
+                </Alert>
+              </div>
+            )}
+
+            {/* Member Access Links - Only for Members (hide if error or loading) */}
+            {!membershipError && !isMembershipLoading && isVerified && hasMembership && (
+              <>
+
+                <div className="px-2 py-2 w-full">
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Member Access
+                  </p>
+                  {isLinksLoading ? (
+                    <div className="grid grid-cols-2 gap-2">
+                      <Skeleton className="h-12 w-full" />
+                      <Skeleton className="h-12 w-full" />
+                      <Skeleton className="h-12 w-full" />
+                      <Skeleton className="h-12 w-full" />
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2">
+                      <Link href="/live" className="w-full">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className={
+                            "w-full flex flex-col items-center justify-center p-2 h-12 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                          }
+                          onClick={() => setIsDropdownOpen(false)}
+                        >
+                          <RadioTower className="h-3 w-3 mb-1" />
+                          <span className="text-xs">Live</span>
+                        </Button>
+                      </Link>
+                      <Link href="https://create.creativeplatform.xyz" className="w-full">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full flex flex-col items-center justify-center p-2 h-12 hover:bg-gray-50 
                           dark:hover:bg-gray-800 transition-colors relative"
-                        onClick={() => setIsDropdownOpen(false)}
-                      >
-                        <Bot className="h-3 w-3 mb-1" />
-                        <span className="text-xs">Pixels</span>
-                        <span className="absolute -top-1 -right-1 px-1 py-0.5 rounded bg-blue-500 text-white text-[8px]">
-                          Beta
-                        </span>
-                      </Button>
-                    </Link>
-                    <Link href="/vote/create" className="w-full">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full flex flex-col items-center justify-center p-2 h-12 hover:bg-green-50 
+                          onClick={() => setIsDropdownOpen(false)}
+                        >
+                          <Bot className="h-3 w-3 mb-1" />
+                          <span className="text-xs">Pixels</span>
+                          <span className="absolute -top-1 -right-1 px-1 py-0.5 rounded bg-blue-500 text-white text-[8px]">
+                            Beta
+                          </span>
+                        </Button>
+                      </Link>
+                      <Link href="/vote/create" className="w-full">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full flex flex-col items-center justify-center p-2 h-12 hover:bg-green-50 
                           dark:hover:bg-green-900 transition-colors text-green-600 dark:text-green-400 
                           font-medium border-green-200 dark:border-green-800"
-                        onClick={() => setIsDropdownOpen(false)}
-                      >
-                        <Plus className="h-3 w-3 mb-1" />
-                        <span className="text-xs">Start Vote</span>
-                      </Button>
-                    </Link>
-                  </div>
-                )}
-              </div>
-            </>
-          )}
-              <DropdownMenuSeparator />
+                          onClick={() => setIsDropdownOpen(false)}
+                        >
+                          <Plus className="h-3 w-3 mb-1" />
+                          <span className="text-xs">Start Vote</span>
+                        </Button>
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+            <DropdownMenuSeparator />
 
-          {/* Session Keys Section - Compact */}
-          {user?.type !== "eoa" && (
-            <>
-              <div className="px-2 py-1 w-full">
-                <DropdownMenuItem
-                  onClick={() => handleActionClick("session-keys")}
+            {/* Session Keys Section - Compact */}
+            {user?.type !== "eoa" && (
+              <>
+                <div className="px-2 py-1 w-full">
+                  <DropdownMenuItem
+                    onClick={() => handleActionClick("session-keys")}
+                    className="w-full flex items-center cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors p-2 rounded"
+                  >
+                    <Key className="mr-2 h-4 w-4 text-yellow-500" />
+                    <span className="text-sm">Session Keys</span>
+                    <ArrowRight className="ml-auto h-3 w-3" />
+                  </DropdownMenuItem>
+                </div>
+                <DropdownMenuSeparator />
+              </>
+            )}
+
+            {/* Feedback Link */}
+            <div className="px-2 py-1 w-full">
+              <DropdownMenuItem asChild>
+                <Link
+                  href="https://feedback.creativeplatform.xyz/crtv"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="w-full flex items-center cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors p-2 rounded"
+                  onClick={() => setIsDropdownOpen(false)}
                 >
-                  <Key className="mr-2 h-4 w-4 text-yellow-500" />
-                  <span className="text-sm">Session Keys</span>
-                  <ArrowRight className="ml-auto h-3 w-3" />
-                </DropdownMenuItem>
-              </div>
-              <DropdownMenuSeparator />
-            </>
-          )}
+                  <ArrowUpRight className="mr-2 h-4 w-4" />
+                  <span className="text-sm">Feedback</span>
+                </Link>
+              </DropdownMenuItem>
+            </div>
 
-          {/* Feedback Link */}
-          <div className="px-2 py-1 w-full">
-            <DropdownMenuItem asChild>
-              <Link
-                href="https://feedback.creativeplatform.xyz/crtv"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-full flex items-center cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors p-2 rounded"
-                onClick={() => setIsDropdownOpen(false)}
-              >
-                <ArrowUpRight className="mr-2 h-4 w-4" />
-                <span className="text-sm">Feedback</span>
-              </Link>
-            </DropdownMenuItem>
-          </div>
+            <DropdownMenuSeparator />
 
-          <DropdownMenuSeparator />
-
-          {/* Logout */}
-          <div className="px-2 py-1 w-full">
-            <DropdownMenuItem
-              onClick={async () => {
-                try {
-                  await logout();
-                  console.log('Logged out successfully');
-                  // Small delay to ensure logout completes
-                  setTimeout(() => {
+            {/* Logout */}
+            <div className="px-2 py-1 w-full">
+              <DropdownMenuItem
+                onClick={async () => {
+                  try {
+                    await logout();
+                    console.log('Logged out successfully');
+                    // Small delay to ensure logout completes
+                    setTimeout(() => {
+                      setIsDropdownOpen(false);
+                    }, 100);
+                  } catch (error) {
+                    console.error('Logout error:', error);
                     setIsDropdownOpen(false);
-                  }, 100);
-                } catch (error) {
-                  console.error('Logout error:', error);
-                  setIsDropdownOpen(false);
-                }
-              }}
-              className="w-full flex items-center cursor-pointer hover:bg-red-50 dark:hover:bg-red-900 transition-colors p-2 text-red-500 rounded"
-            >
-              <LogOut className="mr-2 h-4 w-4" />
-              <span className="text-sm">Logout</span>
-            </DropdownMenuItem>
-          </div>
-        </DropdownMenuContent>
+                  }
+                }}
+                className="w-full flex items-center cursor-pointer hover:bg-red-50 dark:hover:bg-red-900 transition-colors p-2 text-red-500 rounded"
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                <span className="text-sm">Logout</span>
+              </DropdownMenuItem>
+            </div>
+          </DropdownMenuContent>
         </DropdownMenu>
       </HydrationSafe>
 
@@ -1332,7 +1376,14 @@ export function AccountDropdown() {
               {dialogAction === "swap" &&
                 "Exchange one cryptocurrency for another at the best available rates."}
             </DialogDescription>
-            <DialogClose asChild className="absolute right-4 top-4" />
+            <DialogClose asChild>
+              <button
+                // className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
+                aria-label="Close"
+              >
+                <span className="sr-only">Close</span>
+              </button>
+            </DialogClose>
           </DialogHeader>
           <div className="flex flex-col overflow-hidden">
             <div className="space-y-4 overflow-y-auto flex-1 pr-2">

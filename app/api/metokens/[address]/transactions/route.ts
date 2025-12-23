@@ -60,6 +60,8 @@ export async function POST(
       collateral_amount,
       transaction_hash,
       block_number,
+      video_id,
+      playback_id,
     } = body;
 
     // Validate required fields
@@ -87,6 +89,8 @@ export async function POST(
       collateral_amount,
       transaction_hash,
       block_number,
+      video_id,
+      playback_id,
     };
 
     const result = await meTokenSupabaseService.recordTransaction(transactionData);

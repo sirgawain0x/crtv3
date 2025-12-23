@@ -10,6 +10,7 @@ export function useWalletStatus() {
   const user = useUser();
   const {
     smartAccountClient,
+    address: smartAccountAddress,
     loading: isLoadingClient,
     signerReady,
   } = useModularAccount();
@@ -23,7 +24,7 @@ export function useWalletStatus() {
     signerReady,
     hasSmartAccount: !!smartAccountClient,
     walletAddress: user?.address || null,
-    smartAccountAddress: smartAccountClient?.account?.address || null,
+    smartAccountAddress: smartAccountAddress || null,
     user,
     smartAccountClient,
   };
