@@ -17,6 +17,7 @@ import { formatEther, parseEther, encodeFunctionData } from 'viem';
 import { useSmartAccountClient, useAuthModal, useUser } from '@account-kit/react';
 import { getDaiTokenContract } from '@/lib/contracts/DAIToken';
 import { erc20Abi } from 'viem';
+import { METOKEN_ABI } from '@/lib/contracts/MeToken';
 import { DaiFundingOptions } from '@/components/wallet/funding/DaiFundingOptions';
 import { fetchVideoAssetByPlaybackId } from '@/lib/utils/video-assets-client';
 import { useToast } from '@/components/ui/use-toast';
@@ -197,14 +198,10 @@ export function VideoMeTokenBuyDialog({
     }
   }, [client]);
 
-  // checkDaiAllowance removed
-
-
   // Refresh DAI balance when dialog opens (only if connected)
   useEffect(() => {
     if (open && isConnected && client && meToken) {
       checkDaiBalance();
-      // checkDaiAllowance(); // removed
     }
   }, [open, isConnected, client, meToken, checkDaiBalance]);
 
@@ -258,9 +255,6 @@ export function VideoMeTokenBuyDialog({
 
     calculatePreview();
   }, [amount, mode, calculateMeTokensMinted, calculateAssetsReturned, meToken]);
-
-  // approveDai function removed - using ensureDaiApproval from hook
-
 
   const handleBuy = async () => {
     console.log('🛒 Buy button clicked', { amount, meToken });

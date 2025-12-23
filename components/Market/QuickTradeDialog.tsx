@@ -14,7 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, AlertCircle, CheckCircle, TrendingUp } from 'lucide-react';
 import { useMeTokensSupabase } from '@/lib/hooks/metokens/useMeTokensSupabase';
-import { formatEther, parseEther, encodeFunctionData } from 'viem';
+import { formatEther, parseEther } from 'viem';
 import { useSmartAccountClient, useAuthModal, useUser } from '@account-kit/react';
 import { getDaiTokenContract } from '@/lib/contracts/DAIToken';
 import { erc20Abi } from 'viem';
@@ -26,6 +26,7 @@ import Image from 'next/image';
 import { creatorProfileSupabaseService } from '@/lib/sdk/supabase/creator-profiles';
 import { convertFailingGateway } from '@/lib/utils/image-gateway';
 import { MarketToken } from '@/app/api/market/tokens/route';
+import { useVideoContribution } from '@/lib/hooks/metokens/useVideoContribution';
 
 interface QuickTradeDialogProps {
   open: boolean;
@@ -43,7 +44,6 @@ export function QuickTradeDialog({
   const [preview, setPreview] = useState('0');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [daiAllowance, setDaiAllowance] = useState<bigint>(BigInt(0));
   const [daiBalance, setDaiBalance] = useState<bigint>(BigInt(0));
   const [meTokenBalance, setMeTokenBalance] = useState<bigint>(BigInt(0));
   const [creatorAvatarUrl, setCreatorAvatarUrl] = useState<string | null>(null);
@@ -63,7 +63,15 @@ export function QuickTradeDialog({
     isConfirming,
     isConfirmed,
     transactionError,
+    ensureDaiApproval,
   } = useMeTokensSupabase();
+
+  // Fetch video contribution (earnings) with real-time updates for content coins
+  // Poll every 5 seconds while dialog is open
+  const { contribution, formattedContribution, isLoading: isLoadingContribution } = useVideoContribution({
+    playbackId: token?.type === 'content_coin' && token?.playback_id ? token.playback_id : undefined,
+    pollInterval: open ? 5000 : undefined, // Poll every 5 seconds when dialog is open
+  });
 
   // Fetch creator avatar
   useEffect(() => {
@@ -101,26 +109,6 @@ export function QuickTradeDialog({
     }
   }, [client]);
 
-  // Check DAI allowance
-  const checkDaiAllowance = useCallback(async () => {
-    if (!client || !token) return;
-
-    try {
-      const daiContract = getDaiTokenContract('base');
-      const diamondAddress = '0xba5502db2aC2cBff189965e991C07109B14eB3f5';
-      const allowance = await client.readContract({
-        address: daiContract.address as `0x${string}`,
-        abi: erc20Abi,
-        functionName: 'allowance',
-        args: [client.account?.address as `0x${string}`, diamondAddress as `0x${string}`],
-      }) as bigint;
-
-      setDaiAllowance(allowance);
-    } catch (err) {
-      console.error('Failed to check DAI allowance:', err);
-      setDaiAllowance(BigInt(0));
-    }
-  }, [client, token]);
 
   // Check user's MeToken balance
   const checkMeTokenBalance = useCallback(async () => {
@@ -145,10 +133,9 @@ export function QuickTradeDialog({
   useEffect(() => {
     if (open && isConnected && client && token) {
       checkDaiBalance();
-      checkDaiAllowance();
       checkMeTokenBalance();
     }
-  }, [open, isConnected, client, token, checkDaiBalance, checkDaiAllowance, checkMeTokenBalance]);
+  }, [open, isConnected, client, token, checkDaiBalance, checkMeTokenBalance]);
 
   // Calculate preview when amount changes
   useEffect(() => {
@@ -174,59 +161,54 @@ export function QuickTradeDialog({
     calculatePreview();
   }, [amount, mode, calculateMeTokensMinted, calculateAssetsReturned, token]);
 
-  // Approve DAI
-  const approveDai = async (amount: string) => {
-    if (!client) throw new Error('Smart account client not initialized');
-
-    const daiContract = getDaiTokenContract('base');
-    const diamondAddress = '0xba5502db2aC2cBff189965e991C07109B14eB3f5';
-    const amountWei = parseEther(amount);
-
-    const approveOperation = await client.sendUserOperation({
-      uo: {
-        target: daiContract.address as `0x${string}`,
-        data: encodeFunctionData({
-          abi: erc20Abi,
-          functionName: 'approve',
-          args: [diamondAddress as `0x${string}`, amountWei],
-        }),
-        value: BigInt(0),
-      },
-    });
-
-    await client.waitForUserOperationTransaction({
-      hash: approveOperation.hash,
-    });
-
-    await checkDaiAllowance();
-  };
 
   const handleBuy = async () => {
+    console.log('🛒 Buy button clicked', { amount, token });
+
+    // Check if wallet is connected first
     if (!isConnected) {
       toast({
         title: "Wallet Not Connected",
         description: "Please connect your wallet to make a purchase.",
         variant: "destructive",
       });
+      // Close the buy dialog first to avoid modal layering issues
       onOpenChange(false);
       setTimeout(() => {
         openAuthModal();
       }, 100);
       return;
     }
-    
+
     if (!amount || parseFloat(amount) <= 0) {
       setError('Please enter a valid amount');
+      toast({
+        title: "Error",
+        description: "Please enter a valid amount",
+        variant: "destructive",
+      });
       return;
     }
 
     if (!token) {
+      console.error('❌ Token not available', { token });
       setError('Token information not available');
+      toast({
+        title: "Error",
+        description: "Token information not available",
+        variant: "destructive",
+      });
       return;
     }
 
     if (!client) {
+      console.error('❌ Smart account client not initialized');
       setError('Wallet not connected. Please connect your wallet.');
+      toast({
+        title: "Error",
+        description: "Wallet not connected. Please connect your wallet.",
+        variant: "destructive",
+      });
       openAuthModal();
       return;
     }
@@ -235,36 +217,55 @@ export function QuickTradeDialog({
     setSuccess(null);
 
     try {
-      const buyAmountWei = parseEther(amount);
+      console.log('💰 Starting purchase...', {
+        meTokenAddress: token.address,
+        amount,
+        videoId: token.video_id,
+        playbackId: token.playback_id
+      });
 
-      if (daiAllowance < buyAmountWei) {
-        setSuccess('Approving DAI...');
-        await approveDai(amount);
-        setSuccess('DAI approved! Proceeding with purchase...');
-      }
+      setSuccess('Checking allowance...');
+      console.log('🔐 Checking/Approving DAI...');
+      await ensureDaiApproval(token.address, amount);
+      setSuccess('DAI check passed / approved! Proceeding with purchase...');
+      console.log('✅ DAI approved');
 
-      await buyMeTokens(token.address, amount);
+      // Pass video tracking information when buying (if content coin)
+      console.log('🔄 Calling buyMeTokens...');
+      const trackingInfo = token.type === 'content_coin' && token.playback_id
+        ? {
+            video_id: token.video_id,
+            playback_id: token.playback_id,
+          }
+        : undefined;
+      
+      await buyMeTokens(token.address, amount, trackingInfo);
+      console.log('✅ Buy order submitted successfully!');
       setSuccess('Buy order submitted successfully!');
       setAmount('');
 
+      // Show success toast
       toast({
         title: "Purchase Successful",
         description: `Successfully purchased ${parseFloat(preview).toFixed(4)} ${token.symbol}`,
       });
 
+      // Refresh balances
       await checkDaiBalance();
       await checkMeTokenBalance();
 
+      // Close dialog after a short delay
       setTimeout(() => {
         onOpenChange(false);
         setSuccess(null);
       }, 2000);
     } catch (err) {
-      console.error('Error in handleBuy:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Failed to buy tokens';
+      console.error('❌ Error in handleBuy:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to buy MeTokens';
       setError(errorMessage);
       setSuccess(null);
-      
+
+      // Show error toast
       toast({
         title: "Purchase Failed",
         description: errorMessage,
@@ -380,6 +381,30 @@ export function QuickTradeDialog({
               : `Sell your ${token.symbol} tokens back to the pool`}
           </DialogDescription>
         </DialogHeader>
+
+        {/* Video Contribution Display for Content Coins */}
+        {token.type === 'content_coin' && token.playback_id && (
+          <div className="flex items-center justify-between p-3 rounded-lg bg-green-500/10 border border-green-500/20">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" />
+              <div>
+                <p className="text-sm font-semibold text-green-600 dark:text-green-400">
+                  Video Earnings
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Total contributions to this video
+                </p>
+              </div>
+            </div>
+            {isLoadingContribution ? (
+              <div className="h-4 w-16 bg-muted animate-pulse rounded" />
+            ) : (
+              <p className="text-2xl sm:text-3xl font-bold text-green-600 dark:text-green-500 tracking-tight truncate" title={`$${contribution?.toFixed(2) || '0.00'}`}>
+                {formattedContribution}
+              </p>
+            )}
+          </div>
+        )}
 
         <div className="space-y-4">
           <Tabs value={mode} onValueChange={(value) => {

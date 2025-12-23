@@ -9,11 +9,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useMeTokensSupabase, MeTokenData } from '@/lib/hooks/metokens/useMeTokensSupabase';
 import { Loader2, TrendingUp, TrendingDown, AlertCircle, CheckCircle, Lock, ExternalLink } from 'lucide-react';
 import { formatEther, parseEther, encodeFunctionData } from 'viem';
-import { useSmartAccountClient, useChain } from '@account-kit/react';
+import { useSmartAccountClient, useChain, useAuthModal, useUser } from '@account-kit/react';
 import { DAI_TOKEN_ADDRESSES, getDaiTokenContract } from '@/lib/contracts/DAIToken';
 import { erc20Abi } from 'viem';
 import { MeTokenSubscription } from './MeTokenSubscription';
 import { DaiFundingOptions } from '@/components/wallet/funding/DaiFundingOptions';
+import { useToast } from '@/components/ui/use-toast';
 
 interface MeTokenTradingProps {
   meToken: MeTokenData;
@@ -45,6 +46,11 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
 
   const { client } = useSmartAccountClient({});
   const { chain } = useChain();
+  const { openAuthModal } = useAuthModal();
+  const user = useUser();
+  const { toast } = useToast();
+  const isConnected = !!user && !!client;
+  
   const {
     buyMeTokens,
     sellMeTokens,
@@ -167,8 +173,49 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
   }, [sellAmount, calculateAssetsReturned, meToken.address]);
 
   const handleBuy = async () => {
+    console.log('🛒 Buy button clicked', { buyAmount, meToken });
+
+    // Check if wallet is connected first
+    if (!isConnected) {
+      toast({
+        title: "Wallet Not Connected",
+        description: "Please connect your wallet to make a purchase.",
+        variant: "destructive",
+      });
+      openAuthModal();
+      return;
+    }
+
     if (!buyAmount || parseFloat(buyAmount) <= 0) {
       setError('Please enter a valid amount');
+      toast({
+        title: "Error",
+        description: "Please enter a valid amount",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!meToken) {
+      console.error('❌ MeToken not available', { meToken });
+      setError('MeToken information not available');
+      toast({
+        title: "Error",
+        description: "MeToken information not available",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!client) {
+      console.error('❌ Smart account client not initialized');
+      setError('Wallet not connected. Please connect your wallet.');
+      toast({
+        title: "Error",
+        description: "Wallet not connected. Please connect your wallet.",
+        variant: "destructive",
+      });
+      openAuthModal();
       return;
     }
 
@@ -176,11 +223,20 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
     setSuccess(null);
 
     try {
-      setSuccess('Checking allowance...');
-      await ensureDaiApproval(meToken.address, buyAmount);
-      setSuccess('DAI approved! Proceeding with purchase...');
+      console.log('💰 Starting purchase...', {
+        meTokenAddress: meToken.address,
+        amount: buyAmount,
+      });
 
+      setSuccess('Checking allowance...');
+      console.log('🔐 Checking/Approving DAI...');
+      await ensureDaiApproval(meToken.address, buyAmount);
+      setSuccess('DAI check passed / approved! Proceeding with purchase...');
+      console.log('✅ DAI approved');
+
+      console.log('🔄 Calling buyMeTokens...');
       const hash = await buyMeTokens(meToken.address, buyAmount);
+      console.log('✅ Buy order submitted successfully!');
       setSuccess(
         <div className="flex flex-col gap-1">
           <span>Buy order submitted!</span>
@@ -198,25 +254,90 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
       );
       setBuyAmount('');
 
+      // Show success toast
+      toast({
+        title: "Purchase Successful",
+        description: `Successfully purchased ${parseFloat(buyPreview).toFixed(4)} ${meToken.symbol}`,
+      });
+
+      // Refresh balances
+      await checkDaiBalance();
+
       // Refresh parent data
       if (onRefresh) {
         // Add a small delay for RPC sync
         setTimeout(() => onRefresh(), 2000);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to buy MeTokens');
+      console.error('❌ Error in handleBuy:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to buy MeTokens';
+      setError(errorMessage);
       setSuccess(null);
+
+      // Show error toast
+      toast({
+        title: "Purchase Failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
     }
   };
 
   const handleSell = async () => {
-    if (!sellAmount || parseFloat(sellAmount) <= 0) {
-      setError('Please enter a valid amount');
+    console.log('💸 Sell button clicked', { sellAmount, meToken, balance: meToken.balance });
+
+    // Check if wallet is connected first
+    if (!isConnected) {
+      toast({
+        title: "Wallet Not Connected",
+        description: "Please connect your wallet to sell tokens.",
+        variant: "destructive",
+      });
+      openAuthModal();
       return;
     }
 
-    if (parseFloat(sellAmount) > parseFloat(formatEther(meToken.balance))) {
-      setError('Insufficient MeToken balance');
+    if (!sellAmount || parseFloat(sellAmount) <= 0) {
+      setError('Please enter a valid amount');
+      toast({
+        title: "Error",
+        description: "Please enter a valid amount",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!meToken) {
+      console.error('❌ MeToken not available', { meToken });
+      setError('MeToken information not available');
+      toast({
+        title: "Error",
+        description: "MeToken information not available",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!client) {
+      console.error('❌ Smart account client not initialized');
+      setError('Wallet not connected. Please connect your wallet.');
+      toast({
+        title: "Error",
+        description: "Wallet not connected. Please connect your wallet.",
+        variant: "destructive",
+      });
+      openAuthModal();
+      return;
+    }
+
+    const sellAmountWei = parseEther(sellAmount);
+    if (meToken.balance < sellAmountWei) {
+      setError(`Insufficient balance. You have ${formatEther(meToken.balance)} ${meToken.symbol}`);
+      toast({
+        title: "Insufficient Balance",
+        description: `You have ${formatEther(meToken.balance)} ${meToken.symbol}`,
+        variant: "destructive",
+      });
       return;
     }
 
@@ -224,7 +345,15 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
     setSuccess(null);
 
     try {
+      console.log('💸 Starting sale...', {
+        meTokenAddress: meToken.address,
+        amount: sellAmount,
+        meTokenBalance: meToken.balance.toString(),
+      });
+
+      console.log('🔄 Calling sellMeTokens...');
       const hash = await sellMeTokens(meToken.address, sellAmount);
+      console.log('✅ Sell order submitted successfully!');
       setSuccess(
         <div className="flex flex-col gap-1">
           <span>Sell order submitted!</span>
@@ -242,13 +371,32 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
       );
       setSellAmount('');
 
+      // Show success toast
+      toast({
+        title: "Sale Successful",
+        description: `Successfully sold ${sellAmount} ${meToken.symbol} for ${parseFloat(sellPreview).toFixed(4)} DAI`,
+      });
+
+      // Refresh balances
+      await checkDaiBalance();
+
       // Refresh parent data
       if (onRefresh) {
         // Add a small delay for RPC sync
         setTimeout(() => onRefresh(), 2000);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to sell MeTokens');
+      console.error('❌ Error in handleSell:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to sell MeTokens';
+      setError(errorMessage);
+      setSuccess(null);
+
+      // Show error toast
+      toast({
+        title: "Sale Failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
     }
   };
 
@@ -403,6 +551,15 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
           </Alert>
         )}
 
+        {!isConnected && (
+          <Alert className="border-orange-200 bg-orange-50 dark:bg-orange-950/20 dark:border-orange-900">
+            <AlertCircle className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+            <AlertDescription className="text-orange-800 dark:text-orange-200">
+              Connect your wallet to trade tokens
+            </AlertDescription>
+          </Alert>
+        )}
+
         <Tabs defaultValue="buy" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="buy" className="flex items-center gap-2 data-[state=active]:bg-green-600 data-[state=active]:text-white">
@@ -452,20 +609,29 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
               />
             )}
 
-            <Button
-              onClick={handleBuy}
-              disabled={isLoading || !buyAmount || parseFloat(buyAmount) <= 0 || daiBalance < parseEther(buyAmount || '0')}
-              className="w-full bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {isPending ? 'Buying...' : isConfirming ? 'Confirming...' : 'Processing...'}
-                </>
-              ) : (
-                `Buy ${meToken.symbol}`
-              )}
-            </Button>
+            {!isConnected ? (
+              <Button
+                onClick={() => openAuthModal()}
+                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white"
+              >
+                Connect Wallet to Buy
+              </Button>
+            ) : (
+              <Button
+                onClick={handleBuy}
+                disabled={isLoading || !buyAmount || parseFloat(buyAmount) <= 0 || daiBalance < parseEther(buyAmount || '0')}
+                className="w-full bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {isPending ? 'Buying...' : isConfirming ? 'Confirming...' : 'Processing...'}
+                  </>
+                ) : (
+                  `Buy ${meToken.symbol}`
+                )}
+              </Button>
+            )}
           </TabsContent>
 
           <TabsContent value="sell" className="space-y-4">
@@ -487,20 +653,29 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
               </p>
             </div>
 
-            <Button
-              onClick={handleSell}
-              disabled={isLoading || !sellAmount || parseFloat(sellAmount) <= 0}
-              className="w-full bg-red-600 hover:bg-red-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {isPending ? 'Selling...' : isConfirming ? 'Confirming...' : 'Processing...'}
-                </>
-              ) : (
-                `Sell ${meToken.symbol}`
-              )}
-            </Button>
+            {!isConnected ? (
+              <Button
+                onClick={() => openAuthModal()}
+                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white"
+              >
+                Connect Wallet to Sell
+              </Button>
+            ) : (
+              <Button
+                onClick={handleSell}
+                disabled={isLoading || !sellAmount || parseFloat(sellAmount) <= 0}
+                className="w-full bg-red-600 hover:bg-red-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {isPending ? 'Selling...' : isConfirming ? 'Confirming...' : 'Processing...'}
+                  </>
+                ) : (
+                  `Sell ${meToken.symbol}`
+                )}
+              </Button>
+            )}
           </TabsContent>
         </Tabs>
 

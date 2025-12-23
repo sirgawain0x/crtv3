@@ -937,16 +937,91 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
 
     setIsPending(true);
     setIsConfirming(false);
-    setIsConfirmed(false);
-    setError(null);
     setTransactionError(null);
 
     try {
-      // Ensure DAI approval first (if needed for the vault)
-      // Note: VideoMeTokenBuyDialog also handles DAI approval for the diamond, 
-      // but we should ensure it here too for robustness if it's a different approval flow
-      // For now, we'll assume the dialog handled the DIAMOND approval.
+      // Get the vault address that will actually perform transferFrom
+      // 1. Get meToken's hubId
+      const meTokenInfo = await client.readContract({
+        address: DIAMOND,
+        abi: METOKEN_ABI,
+        functionName: 'getMeTokenInfo',
+        args: [meTokenAddress as `0x${string}`],
+      }) as any;
 
+      const hubId = meTokenInfo.hubId || meTokenInfo[1] || BigInt(1);
+
+      // 2. Get vault address for this hub
+      const hubInfo = await client.readContract({
+        address: DIAMOND,
+        abi: METOKEN_ABI,
+        functionName: 'getHubInfo',
+        args: [hubId],
+      }) as any;
+
+      // Extract vault address (index 6 in the tuple)
+      let vaultAddress: string;
+      if (Array.isArray(hubInfo)) {
+        vaultAddress = hubInfo[6] as string;
+      } else if (typeof hubInfo === 'object' && 'vault' in hubInfo) {
+        vaultAddress = hubInfo.vault as string;
+      } else {
+        vaultAddress = (hubInfo as any)[6] || (hubInfo as any).vault;
+      }
+
+      // Fallback to Diamond if vault is zero address (shouldn't happen, but safe)
+      if (!vaultAddress || vaultAddress === '0x0000000000000000000000000000000000000000') {
+        console.warn('⚠️ Vault address is zero, falling back to Diamond');
+        vaultAddress = DIAMOND;
+      }
+
+      console.log('🔍 Mint flow: Using vault address:', vaultAddress, 'for Hub ID:', hubId.toString());
+
+      // 3. Check and approve DAI for the vault (not Diamond!)
+      const daiContract = getDaiTokenContract('base');
+      const collateralAmountWei = parseEther(collateralAmount);
+
+      const currentAllowance = await client.readContract({
+        address: daiContract.address as `0x${string}`,
+        abi: daiContract.abi,
+        functionName: 'allowance',
+        args: [address as `0x${string}`, vaultAddress as `0x${string}`],
+      }) as bigint;
+
+      console.log('📊 Current DAI allowance for vault:', {
+        vaultAddress,
+        currentAllowance: currentAllowance.toString(),
+        required: collateralAmountWei.toString(),
+        hasEnough: currentAllowance >= collateralAmountWei,
+      });
+
+      if (currentAllowance < collateralAmountWei) {
+        console.log('🔓 Approving DAI for vault...');
+        const approveData = encodeFunctionData({
+          abi: daiContract.abi,
+          functionName: 'approve',
+          args: [vaultAddress as `0x${string}`, collateralAmountWei],
+        });
+
+        const approveOp = await client.sendUserOperation({
+          uo: {
+            target: daiContract.address as `0x${string}`,
+            data: approveData,
+            value: BigInt(0),
+          },
+        });
+
+        console.log('⏳ Waiting for approval confirmation...');
+        await client.waitForUserOperationTransaction({
+          hash: approveOp.hash,
+        });
+
+        console.log('✅ DAI approved for vault');
+      } else {
+        console.log('✅ Sufficient DAI allowance already exists for vault');
+      }
+
+      // 4. Now mint (the vault will use the allowance we just set)
       const operation = await client.sendUserOperation({
         uo: {
           target: DIAMOND,
@@ -959,7 +1034,6 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         },
       });
 
-      console.log('🎉 Buy UserOperation sent! Hash:', operation.hash);
       setIsPending(false);
       setIsConfirming(true);
 
@@ -967,7 +1041,8 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         hash: operation.hash,
       });
 
-      console.log('✅ Buy Transaction mined! Hash:', txHash);
+      setIsConfirming(false);
+      setIsConfirmed(true);
 
       // Update MeToken data in Supabase via API route (uses service role client)
       const meToken = await meTokenSupabaseService.getMeTokenByAddress(meTokenAddress);
@@ -1051,11 +1126,11 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
       await checkUserMeToken();
       return txHash;
     } catch (err) {
-      console.error('❌ Error in buyMeTokens:', err);
       setIsPending(false);
       setIsConfirming(false);
-      setTransactionError(err as Error);
-      throw new Error(err instanceof Error ? err.message : 'Failed to buy MeTokens');
+      const error = err instanceof Error ? err : new Error('Failed to buy MeTokens');
+      setTransactionError(error);
+      throw error;
     }
   };
 
@@ -1064,35 +1139,84 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
     if (!client || !address) throw new Error('Client or address not available');
 
     try {
-      const daiContract = getDaiTokenContract('base');
+      // Get the vault address that will actually perform transferFrom
+      // 1. Get meToken's hubId
+      const meTokenInfo = await client.readContract({
+        address: DIAMOND,
+        abi: METOKEN_ABI,
+        functionName: 'getMeTokenInfo',
+        args: [meTokenAddress as `0x${string}`],
+      }) as any;
 
-      // Check current allowance for DIAMOND contract
+      const hubId = meTokenInfo.hubId || meTokenInfo[1] || BigInt(1);
+
+      // 2. Get vault address for this hub
+      const hubInfo = await client.readContract({
+        address: DIAMOND,
+        abi: METOKEN_ABI,
+        functionName: 'getHubInfo',
+        args: [hubId],
+      }) as any;
+
+      // Extract vault address (index 6 in the tuple)
+      let vaultAddress: string;
+      if (Array.isArray(hubInfo)) {
+        vaultAddress = hubInfo[6] as string;
+      } else if (typeof hubInfo === 'object' && 'vault' in hubInfo) {
+        vaultAddress = hubInfo.vault as string;
+      } else {
+        vaultAddress = (hubInfo as any)[6] || (hubInfo as any).vault;
+      }
+
+      // Fallback to Diamond if vault is zero address (shouldn't happen, but safe)
+      if (!vaultAddress || vaultAddress === '0x0000000000000000000000000000000000000000') {
+        console.warn('⚠️ Vault address is zero, falling back to Diamond');
+        vaultAddress = DIAMOND;
+      }
+
+      console.log('🔍 ensureDaiApproval: Using vault address:', vaultAddress, 'for Hub ID:', hubId.toString());
+
+      const daiContract = getDaiTokenContract('base');
+      const requiredAmount = parseEther(collateralAmount);
+
+      // Check current allowance for vault (not Diamond!)
       const currentAllowance = await client.readContract({
         address: daiContract.address as `0x${string}`,
         abi: daiContract.abi,
         functionName: 'allowance',
-        args: [address as `0x${string}`, DIAMOND as `0x${string}`],
+        args: [address as `0x${string}`, vaultAddress as `0x${string}`],
+      }) as bigint;
+
+      console.log('📊 Current DAI allowance for vault:', {
+        vaultAddress,
+        currentAllowance: currentAllowance.toString(),
+        required: requiredAmount.toString(),
+        hasEnough: currentAllowance >= requiredAmount,
       });
 
-      const requiredAmount = parseEther(collateralAmount);
-
-      // If allowance is insufficient, approve the DIAMOND to spend DAI
+      // If allowance is insufficient, approve the vault to spend DAI
       if (currentAllowance < requiredAmount) {
+        console.log('🔓 Approving DAI for vault...');
         const operation = await client.sendUserOperation({
           uo: {
             target: daiContract.address as `0x${string}`,
             data: encodeFunctionData({
               abi: daiContract.abi,
               functionName: 'approve',
-              args: [DIAMOND as `0x${string}`, BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff')], // Max approval
+              args: [vaultAddress as `0x${string}`, BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff')], // Max approval
             }),
             value: BigInt(0),
           },
         });
 
+        console.log('⏳ Waiting for approval confirmation...');
         await client.waitForUserOperationTransaction({
           hash: operation.hash,
         });
+
+        console.log('✅ DAI approved for vault');
+      } else {
+        console.log('✅ Sufficient DAI allowance already exists for vault');
       }
     } catch (err) {
       console.error('Failed to ensure DAI approval:', err);
@@ -1107,8 +1231,6 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
 
     setIsPending(true);
     setIsConfirming(false);
-    setIsConfirmed(false);
-    setError(null);
     setTransactionError(null);
 
     try {
@@ -1124,7 +1246,6 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         },
       });
 
-      console.log('🎉 Sell UserOperation sent! Hash:', operation.hash);
       setIsPending(false);
       setIsConfirming(true);
 
@@ -1132,7 +1253,8 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         hash: operation.hash,
       });
 
-      console.log('✅ Sell Transaction mined! Hash:', txHash);
+      setIsConfirming(false);
+      setIsConfirmed(true);
 
       // Update MeToken data in Supabase via API route (uses service role client)
       const meToken = await meTokenSupabaseService.getMeTokenByAddress(meTokenAddress);
@@ -1213,11 +1335,11 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
       await checkUserMeToken();
       return txHash;
     } catch (err) {
-      console.error('❌ Error in sellMeTokens:', err);
       setIsPending(false);
       setIsConfirming(false);
-      setTransactionError(err as Error);
-      throw new Error(err instanceof Error ? err.message : 'Failed to sell MeTokens');
+      const error = err instanceof Error ? err : new Error('Failed to sell MeTokens');
+      setTransactionError(error);
+      throw error;
     }
   };
 

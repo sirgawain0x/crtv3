@@ -1,14 +1,15 @@
 "use client";
 
+import { useState } from 'react';
 import { MarketToken } from '@/app/api/market/tokens/route';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { TrendingUp, TrendingDown, Play, Coins } from 'lucide-react';
+import { TrendingUp, TrendingDown, Play, Coins, BarChart3 } from 'lucide-react';
 import { convertFailingGateway } from '@/lib/utils/image-gateway';
 import Link from 'next/link';
 import Image from 'next/image';
-import { TokenPriceChart } from './TokenPriceChart';
+import { TokenChartDialog } from './TokenChartDialog';
 
 interface TokenCardProps {
   token: MarketToken;
@@ -17,6 +18,7 @@ interface TokenCardProps {
 }
 
 export function TokenCard({ token, onQuickTrade, showChart = false }: TokenCardProps) {
+  const [chartDialogOpen, setChartDialogOpen] = useState(false);
   const priceChange = token.price_change_24h || 0;
   const isPositive = priceChange >= 0;
   const isContentCoin = token.type === 'content_coin';
@@ -119,19 +121,6 @@ export function TokenCard({ token, onQuickTrade, showChart = false }: TokenCardP
           </div>
         </div>
 
-        {/* Mini Chart */}
-        {showChart && (
-          <div className="h-24 -mx-4">
-            <TokenPriceChart
-              tokenAddress={token.address}
-              tokenSymbol={token.symbol}
-              height={96}
-              showControls={false}
-              className="border-0 shadow-none"
-            />
-          </div>
-        )}
-
         {/* Actions */}
         <div className="flex gap-2">
           <Button
@@ -143,14 +132,13 @@ export function TokenCard({ token, onQuickTrade, showChart = false }: TokenCardP
             Quick Trade
           </Button>
           <Button
-            variant="ghost"
+            variant="outline"
             size="sm"
-            asChild
             className="flex-1"
+            onClick={() => setChartDialogOpen(true)}
           >
-            <Link href={token.owner_address ? `/creator/${token.owner_address}` : '#'}>
-              View Profile
-            </Link>
+            <BarChart3 className="h-4 w-4 mr-2" />
+            View Chart
           </Button>
         </div>
 
@@ -175,6 +163,13 @@ export function TokenCard({ token, onQuickTrade, showChart = false }: TokenCardP
           </div>
         )}
       </CardContent>
+
+      {/* Chart Dialog */}
+      <TokenChartDialog
+        open={chartDialogOpen}
+        onOpenChange={setChartDialogOpen}
+        token={token}
+      />
     </Card>
   );
 }

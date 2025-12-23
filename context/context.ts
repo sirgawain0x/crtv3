@@ -82,7 +82,7 @@ export const API_BASE_URL = "https://api.poap.tech";
 export const APP_BASE_URL = "https://app.poap.xyz";
 
 // SPACE
-export const SNAPSHOT_SPACE = "thecreative.eth";
+export const SNAPSHOT_SPACE = "vote.thecreative.eth";
 
 // STATES
 export const NO_POAP = "NO_POAP";

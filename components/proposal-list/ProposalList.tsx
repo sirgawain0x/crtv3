@@ -22,17 +22,48 @@ function ProposalList({ space }: ProposalListProps) {
     GET_PROPOSALS,
     {
       variables: { space, first: 10 },
+      errorPolicy: "all",
     }
   );
 
-  if (error)
+  // Log for debugging
+  if (typeof window !== "undefined") {
+    console.log("ProposalList query:", {
+      space,
+      hasData: !!data,
+      proposalCount: data?.proposals?.length || 0,
+      error: error?.message,
+    });
+  }
+
+  if (error) {
+    console.error("ProposalList error:", error);
     return (
       <div className="p-4 text-red-500">
-        Failed to load proposals: {error.message}
+        <div className="font-semibold">Failed to load proposals</div>
+        <div className="text-sm mt-1">{error.message}</div>
+        <div className="text-xs mt-2 text-gray-400">
+          Space: {space}
+        </div>
+        {error.networkError && (
+          <div className="text-xs mt-1 text-gray-400">
+            Network error: {error.networkError.message}
+          </div>
+        )}
       </div>
     );
-  if (!data?.proposals?.length)
-    return <div className="p-4">No proposals found.</div>;
+  }
+  
+  if (!data?.proposals?.length) {
+    return (
+      <div className="p-4">
+        <div>No proposals found in space: <span className="font-mono text-sm">{space}</span></div>
+        <div className="text-sm text-gray-500 mt-2">
+          {data?.proposals ? "The space exists but has no proposals yet." : "Unable to query the space."}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="grid gap-4 w-full overflow-x-auto">

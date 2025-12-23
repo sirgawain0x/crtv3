@@ -202,21 +202,58 @@ export class MeTokenSupabaseService {
     }
     const client = serviceClient;
 
-    const { data, error } = await client
+    // Check if balance record exists
+    const { data: existing, error: checkError } = await client
       .from('metoken_balances')
-      .upsert({
-        metoken_id: meToken.id,
-        user_address: userAddress.toLowerCase(),
-        balance,
-        updated_at: new Date().toISOString(),
-      }, {
-        onConflict: 'metoken_id,user_address'
-      })
-      .select(`
-        *,
-        metoken:metokens(*)
-      `)
-      .single();
+      .select('id')
+      .eq('metoken_id', meToken.id)
+      .eq('user_address', userAddress.toLowerCase())
+      .maybeSingle();
+
+    // If checkError is not a "not found" error, log it but continue
+    if (checkError && checkError.code !== 'PGRST116') {
+      console.warn('Error checking existing balance:', checkError);
+    }
+
+    let data, error;
+
+    if (existing) {
+      // Update existing record
+      const result = await client
+        .from('metoken_balances')
+        .update({
+          balance,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('metoken_id', meToken.id)
+        .eq('user_address', userAddress.toLowerCase())
+        .select(`
+          *,
+          metoken:metokens(*)
+        `)
+        .single();
+
+      data = result.data;
+      error = result.error;
+    } else {
+      // Insert new record
+      const result = await client
+        .from('metoken_balances')
+        .insert({
+          metoken_id: meToken.id,
+          user_address: userAddress.toLowerCase(),
+          balance,
+          updated_at: new Date().toISOString(),
+        })
+        .select(`
+          *,
+          metoken:metokens(*)
+        `)
+        .single();
+
+      data = result.data;
+      error = result.error;
+    }
 
     if (error) {
       throw new Error(`Failed to update user balance: ${error.message}`);

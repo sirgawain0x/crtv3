@@ -63,7 +63,88 @@ export async function GET(request: NextRequest) {
       search: search || undefined,
     };
 
-    const meTokens = type === 'content_coin' ? [] : await meTokenSupabaseService.getAllMeTokens(meTokenOptions);
+    let meTokens = type === 'content_coin' ? [] : await meTokenSupabaseService.getAllMeTokens(meTokenOptions);
+
+    // If Supabase has very few tokens, try to sync from subgraph (similar to profile page)
+    // This ensures the market shows data even if Supabase hasn't been fully synced yet
+    if (type !== 'content_coin' && meTokens.length < 5 && !search) {
+      try {
+        console.log('📊 Market API: Supabase has few tokens, checking subgraph for sync...');
+        
+        // Query subgraph directly (bypassing the client's SSR check)
+        const { request, gql } = await import('graphql-request');
+        
+        // Construct absolute URL for server-side request
+        // graphql-request requires absolute URLs in server-side contexts
+        let subgraphEndpoint = process.env.NEXT_PUBLIC_SUBGRAPH_URL;
+        if (!subgraphEndpoint || subgraphEndpoint.startsWith('/')) {
+          // Build absolute URL for relative endpoint
+          const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
+                         (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+          subgraphEndpoint = subgraphEndpoint 
+            ? `${baseUrl}${subgraphEndpoint}` 
+            : `${baseUrl}/api/metokens-subgraph`;
+        }
+        
+        const GET_ALL_SUBSCRIBES = gql`
+          query GetAllSubscribes($first: Int = 100, $skip: Int = 0) {
+            subscribes(first: $first, skip: $skip, orderBy: blockTimestamp, orderDirection: desc) {
+              id
+              meToken
+              hubId
+              assetsDeposited
+              blockTimestamp
+              blockNumber
+              transactionHash
+            }
+          }
+        `;
+        
+        const subgraphData = await request(subgraphEndpoint, GET_ALL_SUBSCRIBES, { first: 50, skip: 0 }) as any;
+        const subscribeEvents = subgraphData?.subscribes || [];
+        
+        if (subscribeEvents.length > 0) {
+          console.log(`📋 Found ${subscribeEvents.length} MeTokens in subgraph, syncing recent ones...`);
+          
+          // Sync the most recent tokens from subgraph to Supabase
+          // Limit to 10 to avoid timeout
+          for (const event of subscribeEvents.slice(0, 10)) {
+            try {
+              const meTokenAddress = event.meToken;
+              
+              // Check if already in Supabase
+              const existing = await meTokenSupabaseService.getMeTokenByAddress(meTokenAddress);
+              if (existing) continue; // Skip if already synced
+              
+              // Sync from subgraph to Supabase using internal API call
+              // Use absolute URL for server-side fetch
+              const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
+                             (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+              
+              const syncResponse = await fetch(`${baseUrl}/api/metokens/sync`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ meTokenAddress })
+              });
+              
+              if (syncResponse.ok) {
+                console.log(`✅ Synced MeToken: ${meTokenAddress}`);
+              }
+            } catch (syncErr) {
+              console.warn(`⚠️ Failed to sync MeToken ${event.meToken}:`, syncErr);
+              // Continue with other tokens even if one fails
+            }
+          }
+          
+          // Re-fetch from Supabase after syncing
+          meTokens = await meTokenSupabaseService.getAllMeTokens(meTokenOptions);
+          console.log(`✅ After sync, found ${meTokens.length} MeTokens in Supabase`);
+        }
+      } catch (subgraphErr) {
+        console.warn('⚠️ Market API: Subgraph sync failed (non-critical):', subgraphErr);
+        // Continue with existing Supabase data - this is a fallback, not critical
+      }
+    }
 
     // Fetch Content Coins (MeTokens that are referenced in video_assets)
     let contentCoins: any[] = [];

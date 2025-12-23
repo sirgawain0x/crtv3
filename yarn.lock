@@ -42,21 +42,21 @@
     graphql "^16.8.1"
     lodash "^4.17.21"
 
-"@aa-sdk/core@^4.65.0":
-  version "4.65.0"
-  resolved "https://registry.npmjs.org/@aa-sdk/core/-/core-4.65.0.tgz"
-  integrity sha512-osG+fWDxMfOuFQU1DOcIMBZvKsGRS3VcFi9QgyV0lanGkRc5uksJ5MTkYjoH2XS39OrKKZGewAflqg4qzPMidw==
+"@aa-sdk/core@^4.82.0":
+  version "4.82.0"
+  resolved "https://registry.npmjs.org/@aa-sdk/core/-/core-4.82.0.tgz#171db92c14cb8230a713e2afc5e950847f95e5a3"
+  integrity sha512-SwFtrrl09R6UgKZaS2MijRc0ISA+POfl625+XvJY+BTo1uGj0KJX+mTQZG493jZnh8TErEqj5Ownlv2ObNFmPw==
   dependencies:
     abitype "^0.8.3"
     eventemitter3 "^5.0.1"
     zod "^3.22.4"
 
-"@aa-sdk/ethers@^4.65.0":
-  version "4.65.0"
-  resolved "https://registry.npmjs.org/@aa-sdk/ethers/-/ethers-4.65.0.tgz"
-  integrity sha512-JltdeOPvmib8AHdE8aIl+wsRsynVQtXx2tLbsJb8nd4s4AWjZD0jfQsmNqrL2hO1AHf7QMSp6iFJRLjIyXBAoA==
+"@aa-sdk/ethers@^4.82.0":
+  version "4.82.0"
+  resolved "https://registry.npmjs.org/@aa-sdk/ethers/-/ethers-4.82.0.tgz#a786fcebe95b56dfa7b75629acdb9188d9d7d886"
+  integrity sha512-na9Pq/Srgp7t2yxoNvHtjLkZS7c4O7utYNAaO/sLrE0SG3Xsv3mB2WNxXu8Yb3mC+anCk2cJ3cQpKmZoiTpvPQ==
   dependencies:
-    "@aa-sdk/core" "^4.65.0"
+    "@aa-sdk/core" "^4.82.0"
     "@ethersproject/abi" "^5.7.0"
     "@ethersproject/abstract-signer" "^5.7.0"
     "@ethersproject/bytes" "^5.7.0"
@@ -71,17 +71,17 @@
   resolved "https://registry.npmjs.org/@account-abstraction/contracts/-/contracts-0.5.0.tgz"
   integrity sha512-CKyS9Zh5rcYUM+4B6TlaB9+THHzJ+6TY3tWF5QofqvFpqGNvIhF8ddy6wyCmqZw6TB74/yYv7cYD/RarVudfDg==
 
-"@account-kit/core@^4.65.0":
-  version "4.65.0"
-  resolved "https://registry.npmjs.org/@account-kit/core/-/core-4.65.0.tgz"
-  integrity sha512-1F6BtjNj0YQbKOmxxVFwgwrYPlXKa9p0UYmWjwVzUutucWKMUv/1NKYZdbQgxvb/UXiMFDe0MnjvdefvdwDz3A==
+"@account-kit/core@^4.82.0":
+  version "4.82.0"
+  resolved "https://registry.npmjs.org/@account-kit/core/-/core-4.82.0.tgz#e99d928710e9e8ba81df9afb07748d13c55728f7"
+  integrity sha512-F/A5RHcGZr6hPIff5hl2KQwJfBMTug3kVSWfqcDcfKf0iDZRN6SgzAgW02mqtmqbuKgNGYabpmHMmbWrt3QwWw==
   dependencies:
-    "@account-kit/infra" "^4.65.0"
-    "@account-kit/logging" "^4.65.0"
-    "@account-kit/react-native-signer" "^4.65.0"
-    "@account-kit/signer" "^4.65.0"
-    "@account-kit/smart-contracts" "^4.65.0"
-    "@account-kit/wallet-client" "^4.65.0"
+    "@account-kit/infra" "^4.82.0"
+    "@account-kit/logging" "^4.82.0"
+    "@account-kit/react-native-signer" "^4.82.0"
+    "@account-kit/signer" "^4.82.0"
+    "@account-kit/smart-contracts" "^4.82.0"
+    "@account-kit/wallet-client" "^4.82.0"
     "@solana/web3.js" "^1.98.0"
     js-cookie "^3.0.5"
     zod "^3.22.4"
@@ -89,49 +89,49 @@
   optionalDependencies:
     alchemy-sdk "^3.0.0"
 
-"@account-kit/infra@^4.65.0":
-  version "4.65.0"
-  resolved "https://registry.npmjs.org/@account-kit/infra/-/infra-4.65.0.tgz"
-  integrity sha512-ZiiX4HwKLAl0j6qzILQsq8HSPKWIrGTWpdF5uajg1olGADui9NDgl16sDfjLzneihj/sXSlVZJmMM7j0xsO+4g==
+"@account-kit/infra@^4.82.0":
+  version "4.82.0"
+  resolved "https://registry.npmjs.org/@account-kit/infra/-/infra-4.82.0.tgz#84780fc2fc6b698e980f90a65847416b9efc432b"
+  integrity sha512-GGmYCiHilvbqCU1X4IVZ/ZyTkUeWVi7nWaP8aGB7sHgS17X0U1gRbdyjUxL1MtAv4DGW5S9RjEY9HKJuVfND3w==
   dependencies:
-    "@aa-sdk/core" "^4.65.0"
-    "@account-kit/logging" "^4.65.0"
+    "@aa-sdk/core" "^4.82.0"
+    "@account-kit/logging" "^4.82.0"
     eventemitter3 "^5.0.1"
     zod "^3.22.4"
   optionalDependencies:
     alchemy-sdk "^3.0.0"
 
-"@account-kit/logging@^4.65.0":
-  version "4.65.0"
-  resolved "https://registry.npmjs.org/@account-kit/logging/-/logging-4.65.0.tgz"
-  integrity sha512-a7oBiQWlPoCmDDwgvHkMDlgmuMf6TeAj52b4EjLX6LOYwVhDeaXEuSqlQnMjj2fNC+phqMQnHtBJzZMM1sAang==
+"@account-kit/logging@^4.82.0":
+  version "4.82.0"
+  resolved "https://registry.npmjs.org/@account-kit/logging/-/logging-4.82.0.tgz#685b7d4535e499005e8d0f3716a7630985e3a660"
+  integrity sha512-W3Fxdiq5ck5llmJp5oi8NlD368NuQx0TsM7L3XHTExYFumx3hIdML9uNVY1eQgV5yfoLBtzkPrdcPAL3tVntLA==
   dependencies:
     "@segment/analytics-next" "1.74.0"
     uuid "^11.0.2"
 
-"@account-kit/react-native-signer@^4.65.0":
-  version "4.65.0"
-  resolved "https://registry.npmjs.org/@account-kit/react-native-signer/-/react-native-signer-4.65.0.tgz"
-  integrity sha512-jTm8E36g5GwaUa6RB+MTAmT7XDGow8k0+ppCnZTyJix7dnmu19W/Obx/w9F6qp1mEoity90qDHiyDDHhTNeAFA==
+"@account-kit/react-native-signer@^4.82.0":
+  version "4.82.0"
+  resolved "https://registry.npmjs.org/@account-kit/react-native-signer/-/react-native-signer-4.82.0.tgz#507cb8f8b8319a24a12b7f3cf4aa36aada9f2838"
+  integrity sha512-IQXJmCTapQGRjRlYmeSlHEdd64irXjeBTUjLDFlvO8+BSLzSTzVAC9GDizwcvMhjAxqHpbwRndge1f9sFhjYkw==
   dependencies:
-    "@aa-sdk/core" "^4.65.0"
-    "@account-kit/signer" "^4.65.0"
+    "@aa-sdk/core" "^4.82.0"
+    "@account-kit/signer" "^4.82.0"
     "@turnkey/crypto" "^2.5.0"
     "@turnkey/react-native-passkey-stamper" "^1.1.4"
     uuid "^11.1.0"
     viem "^2.29.2"
     zod "^3.22.4"
 
-"@account-kit/react@^4.65.0":
-  version "4.65.0"
-  resolved "https://registry.npmjs.org/@account-kit/react/-/react-4.65.0.tgz"
-  integrity sha512-fuIZNE/RyglwfoarEeaTpIgHLiDiF4rFAgQgK69pUJwmn2J/cPV+fbhWWS04KFR+Qv+lUWYH2rp8hDmATcsa3Q==
+"@account-kit/react@^4.82.0":
+  version "4.82.0"
+  resolved "https://registry.npmjs.org/@account-kit/react/-/react-4.82.0.tgz#c0754cce65ebdc38d16464aefaf1493c74774928"
+  integrity sha512-Xvxq6j0k/Az2/lSTS68e4HSjL/cti3uMxIvmi2XtmEZJYVTsFy9IW6CQYDUsqbLCncTxsWdGiiCIcxZnloGXHQ==
   dependencies:
-    "@account-kit/core" "^4.65.0"
-    "@account-kit/infra" "^4.65.0"
-    "@account-kit/logging" "^4.65.0"
-    "@account-kit/signer" "^4.65.0"
-    "@account-kit/wallet-client" "^4.65.0"
+    "@account-kit/core" "^4.82.0"
+    "@account-kit/infra" "^4.82.0"
+    "@account-kit/logging" "^4.82.0"
+    "@account-kit/signer" "^4.82.0"
+    "@account-kit/wallet-client" "^4.82.0"
     "@solana/wallet-adapter-react" "^0.15.39"
     "@solana/wallet-adapter-wallets" "^0.19.37"
     "@solana/web3.js" "^1.98.0"
@@ -145,13 +145,13 @@
   optionalDependencies:
     alchemy-sdk "^3.0.0"
 
-"@account-kit/signer@^4.65.0":
-  version "4.65.0"
-  resolved "https://registry.npmjs.org/@account-kit/signer/-/signer-4.65.0.tgz"
-  integrity sha512-fTm6yzztelI7LcBnmaCOlNbIb3TKkb4AshkZQMLetz/37AwCa77XoPaUGgcIu1LFqj5qPo9V9tiP44bAmYIvjw==
+"@account-kit/signer@^4.82.0":
+  version "4.82.0"
+  resolved "https://registry.npmjs.org/@account-kit/signer/-/signer-4.82.0.tgz#75875b7e5ad5cee3dbba85e1350c3038e01afbd1"
+  integrity sha512-c9d0o5e/5GrrLPEm2mWIosrWhVC+2vbqiHnqO8AON/7zqbthdFfN2F3fqeFpOkITjqdVC9gfidlQsIKOIJV6Fw==
   dependencies:
-    "@aa-sdk/core" "^4.65.0"
-    "@account-kit/logging" "^4.65.0"
+    "@aa-sdk/core" "^4.82.0"
+    "@account-kit/logging" "^4.82.0"
     "@noble/curves" "^1.9.2"
     "@noble/hashes" "1.7.1"
     "@noble/secp256k1" "^2.3.0"
@@ -165,24 +165,24 @@
     zod "^3.22.4"
     zustand "^5.0.0-rc.2"
 
-"@account-kit/smart-contracts@^4.65.0":
-  version "4.65.0"
-  resolved "https://registry.npmjs.org/@account-kit/smart-contracts/-/smart-contracts-4.65.0.tgz"
-  integrity sha512-fESuA0AWtnQ0xlYKUGPLZ2y6OS2S0aPYaUbFYrdHTsm5RPyf4/ah5LB0Mumb6pH9ienFI1pi5YpRLAch+AOCLw==
+"@account-kit/smart-contracts@^4.82.0":
+  version "4.82.0"
+  resolved "https://registry.npmjs.org/@account-kit/smart-contracts/-/smart-contracts-4.82.0.tgz#4d7984518abdb2b3e60819f44c319673ad326d4f"
+  integrity sha512-tkCNOO+iKyZK/j1tcws/tdeGpu609AlVMLqJ4RzxIqKpsKovYkMaKU588UF5PpyXnzHLS5EZFFEgaLbzmKt+mQ==
   dependencies:
-    "@aa-sdk/core" "^4.65.0"
-    "@account-kit/infra" "^4.65.0"
+    "@aa-sdk/core" "^4.82.0"
+    "@account-kit/infra" "^4.82.0"
     webauthn-p256 "^0.0.10"
 
-"@account-kit/wallet-client@^4.65.0":
-  version "4.65.0"
-  resolved "https://registry.npmjs.org/@account-kit/wallet-client/-/wallet-client-4.65.0.tgz"
-  integrity sha512-K8putT3KaQ02Lu6V2jFJXwo1OoXgz/KhoUgby4rZiChge+nCXugE0gEb5bcr+dMHceRoJFCR2Xegz3rfVy7LSA==
+"@account-kit/wallet-client@^4.82.0":
+  version "4.82.0"
+  resolved "https://registry.npmjs.org/@account-kit/wallet-client/-/wallet-client-4.82.0.tgz#8119200420838154bd856952443f444e210ba7e0"
+  integrity sha512-qG8xfBIIA5itqNkMLV3e+FMAltPkqM+T+g3ojxMo9QgtcAN3uUYKh7VIH6iJDMeQznuqb0sC7hCuMSUQIwpqTg==
   dependencies:
-    "@aa-sdk/core" "^4.65.0"
-    "@account-kit/infra" "^4.65.0"
-    "@account-kit/smart-contracts" "^4.65.0"
-    "@alchemy/wallet-api-types" "0.1.0-alpha.16"
+    "@aa-sdk/core" "^4.82.0"
+    "@account-kit/infra" "^4.82.0"
+    "@account-kit/smart-contracts" "^4.82.0"
+    "@alchemy/wallet-api-types" "0.1.0-alpha.18"
     deep-equal "^2.2.3"
     ox "^0.6.12"
 
@@ -238,14 +238,14 @@
   resolved "https://registry.npmjs.org/@adraffy/ens-normalize/-/ens-normalize-1.11.1.tgz"
   integrity sha512-nhCBV3quEgesuf7c7KYfperqSS14T8bYuvJ8PcLJp6znkZpFc0AuW4qBtr8eKVyPPe/8RSr7sglCWPU5eaxwKQ==
 
-"@alchemy/wallet-api-types@0.1.0-alpha.16":
-  version "0.1.0-alpha.16"
-  resolved "https://registry.npmjs.org/@alchemy/wallet-api-types/-/wallet-api-types-0.1.0-alpha.16.tgz"
-  integrity sha512-hpBCyyYHvPSzXwYqNwpcvXyhovUCFXrwFk7+bvD+buHiGZUfld3/WTzXN64rVhOeU7u4psGUdQaKUuAgmNjiNg==
+"@alchemy/wallet-api-types@0.1.0-alpha.18":
+  version "0.1.0-alpha.18"
+  resolved "https://registry.npmjs.org/@alchemy/wallet-api-types/-/wallet-api-types-0.1.0-alpha.18.tgz#83b4e6d56c5e3b993f5cc3110588b9c21720aaa2"
+  integrity sha512-zhp1JjyM8eVIutl+iMcXfAYTVvtLTSGn2ty36akfx3eC4okUeVZilgt7N1qN6sx5ydJOPlhh3z1dRJJ0HC2DXA==
   dependencies:
-    "@sinclair/typebox" "^0.34.33"
     deep-equal "^2.2.3"
     ox "^0.6.12"
+    typebox "^1.0.0"
     viem "2.29.2"
 
 "@alloc/quick-lru@^5.2.0":
@@ -6785,11 +6785,6 @@
   resolved "https://registry.npmjs.org/@sinclair/typebox/-/typebox-0.33.22.tgz"
   integrity sha512-auUj4k+f4pyrIVf4GW5UKquSZFHJWri06QgARy9C0t9ZTjJLIuNIrr1yl9bWcJWJ1Gz1vOvYN1D+QPaIlNMVkQ==
 
-"@sinclair/typebox@^0.34.33":
-  version "0.34.41"
-  resolved "https://registry.npmjs.org/@sinclair/typebox/-/typebox-0.34.41.tgz"
-  integrity sha512-6gS8pZzSXdyRHTIqoqSVknxolr1kzfy4/CeDnrzsVz8TTIWUbOBr6gnzOmTYJ3eXQNh4IYHIGi5aIL7sOZ2G/g==
-
 "@sindresorhus/fnv1a@^3.1.0":
   version "3.1.0"
   resolved "https://registry.npmjs.org/@sindresorhus/fnv1a/-/fnv1a-3.1.0.tgz"
@@ -6809,10 +6804,10 @@
   dependencies:
     "@sinonjs/commons" "^3.0.0"
 
-"@snapshot-labs/snapshot.js@^0.12.61":
-  version "0.12.61"
-  resolved "https://registry.npmjs.org/@snapshot-labs/snapshot.js/-/snapshot.js-0.12.61.tgz"
-  integrity sha512-ihaq69DVzUoVGmEz31dvfVM8HeRqD1gRZUhvDto3MpcNq8Eu8ZY9t3bOMo1QlL6A7h3C2KwSXDMVtJqxswsD1g==
+"@snapshot-labs/snapshot.js@^0.14.18":
+  version "0.14.18"
+  resolved "https://registry.npmjs.org/@snapshot-labs/snapshot.js/-/snapshot.js-0.14.18.tgz#9736e823f9866a90e8f4db59ffefe70efaf14e98"
+  integrity sha512-KnwM1rVITeYmtRyGePrzPRAZuelp0yV61Y6WUOe6jM08RqkJG2DwZCHCF/C6kUHRr/oD6UyIua1raeLy1aw/eg==
   dependencies:
     "@ensdomains/eth-ens-namehash" "^2.0.15"
     "@ethersproject/abi" "^5.6.4"
@@ -11511,10 +11506,31 @@ ajv@^8.0.0, ajv@^8.11.0, ajv@^8.12.0, ajv@^8.6.0, ajv@^8.9.0:
     json-schema-traverse "^1.0.0"
     require-from-string "^2.0.2"
 
-alchemy-sdk@^3.0.0, alchemy-sdk@^3.6.4:
+alchemy-sdk@^3.0.0:
   version "3.6.4"
   resolved "https://registry.npmjs.org/alchemy-sdk/-/alchemy-sdk-3.6.4.tgz"
   integrity sha512-c1CZIywrqlGIcTfUB/LGNWZCtt4vcMgS4JRgz2QQq1f6oJ+jHf1EGPxM9G35zkXun5W6yBO+pnnrf/HO+whRdg==
+  dependencies:
+    "@ethersproject/abi" "^5.7.0"
+    "@ethersproject/abstract-provider" "^5.7.0"
+    "@ethersproject/bignumber" "^5.7.0"
+    "@ethersproject/bytes" "^5.7.0"
+    "@ethersproject/contracts" "^5.7.0"
+    "@ethersproject/hash" "^5.7.0"
+    "@ethersproject/networks" "^5.7.0"
+    "@ethersproject/providers" "^5.7.0"
+    "@ethersproject/units" "^5.7.0"
+    "@ethersproject/wallet" "^5.7.0"
+    "@ethersproject/web" "^5.7.0"
+    "@solana/web3.js" "^1.87.6"
+    axios "^1.12.0"
+    sturdy-websocket "^0.2.1"
+    websocket "^1.0.34"
+
+alchemy-sdk@^3.6.5:
+  version "3.6.5"
+  resolved "https://registry.npmjs.org/alchemy-sdk/-/alchemy-sdk-3.6.5.tgz#cc4cf77c7e9359f5e7d24c4163550b009e842f76"
+  integrity sha512-vikvJvExqPoifnOtnIPoANwS2C46Nv44XsEWJz8kd5hrnZrS320GmhKWGyKSgupd8cvudAWv1+76iSr0pjy8DA==
   dependencies:
     "@ethersproject/abi" "^5.7.0"
     "@ethersproject/abstract-provider" "^5.7.0"
@@ -22425,6 +22441,11 @@ type@^2.7.2:
   version "2.7.3"
   resolved "https://registry.npmjs.org/type/-/type-2.7.3.tgz"
   integrity sha512-8j+1QmAbPvLZow5Qpi6NCaN8FB60p/6x8/vfNqOk/hC+HuvFZhL4+WfekuhQLiqFZXOgQdrs3B+XxEmCc6b3FQ==
+
+typebox@^1.0.0:
+  version "1.0.65"
+  resolved "https://registry.npmjs.org/typebox/-/typebox-1.0.65.tgz#644f5ddf4a86a4382d1803086735970fda6613ae"
+  integrity sha512-3WaZ4QmfAxmelhi0dwusYDoZ+DLDoVrsc3aORzgtk1I8JfIf4wn+F8i1TtrnU2jJKM/hZgjJGfzXrwS4B31zZw==
 
 typed-array-buffer@^1.0.3:
   version "1.0.3"

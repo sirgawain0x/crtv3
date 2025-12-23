@@ -1,11 +1,6 @@
 import { createSafeActionClient } from "next-safe-action";
 import { z } from "zod";
-import { client } from "@/lib/sdk/snapshot/snapshot-client";
 import type { ActionResponse } from "@/lib/types/actions";
-import { createModularAccountClient } from "@/lib/sdk/accountKit/modularAccountClient";
-import { base } from "@account-kit/infra"; // or your target chain
-import { signer } from "@/lib/sdk/accountKit/signer";
-import { stringToHex } from "viem";
 import { submitSnapshotProposal } from "@/lib/sdk/snapshot/snapshot-proposal-wrapper";
 
 const actionClient = createSafeActionClient();
@@ -18,24 +13,14 @@ const createProposalSchema = z.object({
   end: z.number().int().positive(),
   address: z.string().min(1, "Wallet address required"),
   chainId: z.number().int().positive(),
+  signature: z.string().min(1, "Signature is required"),
+  proposalPayload: z.record(z.unknown()),
 });
-
-// Adapter for Snapshot.js that mimics an ethers.js Wallet using Account Kit signer
-function createSnapshotEoaAdapter() {
-  return {
-    getAddress: async () => signer.instance.getAddress(),
-    signMessage: async (message: string | Uint8Array) =>
-      signer.instance.signMessage({
-        raw: typeof message === "string" ? stringToHex(message) : message,
-      }),
-  };
-}
 
 export const createProposal = actionClient
   .schema(createProposalSchema)
   .action(async ({ parsedInput }) => {
-    const { title, content, choices, start, end, address, chainId } =
-      parsedInput;
+    const { address, end, start, signature, proposalPayload } = parsedInput;
 
     if (!address)
       return {
@@ -50,50 +35,29 @@ export const createProposal = actionClient
       } as ActionResponse;
 
     try {
-      // 1. Get the modular account client
-      const modularAccountClient = await createModularAccountClient({
-        chain: base, // or your chain object
-        apiKey: process.env.NEXT_PUBLIC_ALCHEMY_API_KEY as string,
-      });
-
-      // 2. Get the current block number (using viem or account kit client)
-      const block = await modularAccountClient.getBlockNumber();
-
-      // 4. Create the proposal using the Account Kit signer as EOA
-      const space = "thecreative.eth";
-      const snapshotSigner = createSnapshotEoaAdapter();
-      const proposalData = {
-        space,
-        type: "weighted",
-        title,
-        body: content,
-        choices,
-        start,
-        end,
-        snapshot: block,
-        discussion: "",
-        plugins: JSON.stringify({
-          poap: {
-            address: "0x0000000000000000000000000000000000000000",
-            tokenId: "1",
-          },
-        }),
-      };
+      // Submit the pre-signed proposal to Snapshot
+      // The proposal payload already includes the block number from the client
       const result = await submitSnapshotProposal({
-        signer: snapshotSigner,
-        proposal: proposalData,
+        address,
+        signature,
+        proposal: proposalPayload,
       });
+
       if ("error" in result) {
+        console.error("Snapshot proposal error:", result.error);
         return { success: false, error: result.error } as ActionResponse;
       }
+
       return { success: true, data: { id: result.id } } as ActionResponse<{
         id: string;
       }>;
     } catch (error) {
       console.error("Error creating proposal:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to create proposal";
       return {
         success: false,
-        error: (error as Error).message || "Failed to create proposal",
+        error: errorMessage,
       } as ActionResponse;
     }
   });
