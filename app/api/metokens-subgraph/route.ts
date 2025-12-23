@@ -54,9 +54,9 @@ export async function POST(request: NextRequest) {
 
     let response = await performFetch(subgraphEndpoint, headers);
 
-    // Fallback logic: If private endpoint fails with 404 (not enabled), try public
-    if (isPrivate && response.status === 404) {
-      console.warn('⚠️ Private endpoint returned 404, falling back to public endpoint...');
+    // Fallback logic: If private endpoint fails with 404 (not enabled) or 5xx (server error), try public
+    if (isPrivate && (response.status === 404 || response.status >= 500)) {
+      console.warn(`⚠️ Private endpoint returned ${response.status}, falling back to public endpoint...`);
       subgraphEndpoint = publicEndpoint;
       // Remove auth header for public request (optional, but cleaner)
       const publicHeaders = { ...headers };

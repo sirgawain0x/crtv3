@@ -1,3 +1,9 @@
+---
+description: Create a table containing ERC-20 Transfers for several or all token contracts
+globs: 
+alwaysApply: false
+---
+
 # ERC-20 transfers
 
 > Create a table containing ERC-20 Transfers for several or all token contracts

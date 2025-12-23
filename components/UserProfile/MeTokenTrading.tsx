@@ -50,7 +50,7 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
   const user = useUser();
   const { toast } = useToast();
   const isConnected = !!user && !!client;
-  
+
   const {
     buyMeTokens,
     sellMeTokens,
@@ -60,7 +60,7 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
     isConfirming,
     isConfirmed,
     transactionError,
-    ensureDaiApproval
+
   } = useMeTokensSupabase();
 
   // Check if MeToken is subscribed using the blockchain utility function
@@ -227,12 +227,6 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
         meTokenAddress: meToken.address,
         amount: buyAmount,
       });
-
-      setSuccess('Checking allowance...');
-      console.log('🔐 Checking/Approving DAI...');
-      await ensureDaiApproval(meToken.address, buyAmount);
-      setSuccess('DAI check passed / approved! Proceeding with purchase...');
-      console.log('✅ DAI approved');
 
       console.log('🔄 Calling buyMeTokens...');
       const hash = await buyMeTokens(meToken.address, buyAmount);

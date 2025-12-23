@@ -52,7 +52,7 @@ export function QuickTradeDialog({
   const { client } = useSmartAccountClient({});
   const { openAuthModal } = useAuthModal();
   const user = useUser();
-  
+
   const isConnected = !!user && !!client;
   const {
     buyMeTokens,
@@ -63,7 +63,7 @@ export function QuickTradeDialog({
     isConfirming,
     isConfirmed,
     transactionError,
-    ensureDaiApproval,
+
   } = useMeTokensSupabase();
 
   // Fetch video contribution (earnings) with real-time updates for content coins
@@ -224,21 +224,15 @@ export function QuickTradeDialog({
         playbackId: token.playback_id
       });
 
-      setSuccess('Checking allowance...');
-      console.log('🔐 Checking/Approving DAI...');
-      await ensureDaiApproval(token.address, amount);
-      setSuccess('DAI check passed / approved! Proceeding with purchase...');
-      console.log('✅ DAI approved');
-
       // Pass video tracking information when buying (if content coin)
       console.log('🔄 Calling buyMeTokens...');
       const trackingInfo = token.type === 'content_coin' && token.playback_id
         ? {
-            video_id: token.video_id,
-            playback_id: token.playback_id,
-          }
+          video_id: token.video_id,
+          playback_id: token.playback_id,
+        }
         : undefined;
-      
+
       await buyMeTokens(token.address, amount, trackingInfo);
       console.log('✅ Buy order submitted successfully!');
       setSuccess('Buy order submitted successfully!');
@@ -287,7 +281,7 @@ export function QuickTradeDialog({
       }, 100);
       return;
     }
-    
+
     if (!amount || parseFloat(amount) <= 0) {
       setError('Please enter a valid amount');
       return;
@@ -335,7 +329,7 @@ export function QuickTradeDialog({
       const errorMessage = err instanceof Error ? err.message : 'Failed to sell tokens';
       setError(errorMessage);
       setSuccess(null);
-      
+
       toast({
         title: "Sale Failed",
         description: errorMessage,
@@ -376,33 +370,29 @@ export function QuickTradeDialog({
             </div>
           </div>
           <DialogDescription>
-            {mode === 'buy' 
+            {mode === 'buy'
               ? `Purchase ${token.symbol} tokens`
               : `Sell your ${token.symbol} tokens back to the pool`}
           </DialogDescription>
         </DialogHeader>
 
-        {/* Video Contribution Display for Content Coins */}
+        {/* Video Earnings Display */}
         {token.type === 'content_coin' && token.playback_id && (
-          <div className="flex items-center justify-between p-3 rounded-lg bg-green-500/10 border border-green-500/20">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" />
-              <div>
-                <p className="text-sm font-semibold text-green-600 dark:text-green-400">
-                  Video Earnings
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  Total contributions to this video
-                </p>
-              </div>
-            </div>
-            {isLoadingContribution ? (
-              <div className="h-4 w-16 bg-muted animate-pulse rounded" />
-            ) : (
-              <p className="text-2xl sm:text-3xl font-bold text-green-600 dark:text-green-500 tracking-tight truncate" title={`$${contribution?.toFixed(2) || '0.00'}`}>
-                {formattedContribution}
+          <div className="flex items-center gap-2 mt-2 p-2 rounded-lg bg-green-5 dark:bg-green-950/20 border border-green-200 dark:border-green-900">
+            <TrendingUp className="h-4 w-4 text-green-600 dark:text-green-400" />
+            <div className="flex-1">
+              <p className="text-xs text-muted-foreground">Video Earnings</p>
+              <p className="text-sm font-semibold text-green-600 dark:text-green-400">
+                {isLoadingContribution ? (
+                  <span className="inline-flex items-center gap-1">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    Loading...
+                  </span>
+                ) : (
+                  formattedContribution || '$0.00'
+                )}
               </p>
-            )}
+            </div>
           </div>
         )}
 
@@ -415,13 +405,13 @@ export function QuickTradeDialog({
             setSuccess(null);
           }}>
             <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger 
+              <TabsTrigger
                 value="buy"
                 className={mode === 'buy' ? 'data-[state=active]:bg-green-500 data-[state=active]:text-white' : ''}
               >
                 Buy
               </TabsTrigger>
-              <TabsTrigger 
+              <TabsTrigger
                 value="sell"
                 className={mode === 'sell' ? 'data-[state=active]:bg-red-500 data-[state=active]:text-white' : ''}
               >
@@ -429,6 +419,53 @@ export function QuickTradeDialog({
               </TabsTrigger>
             </TabsList>
           </Tabs>
+
+          {/* Token Display Section */}
+          <div className="flex items-center gap-3 p-4 border rounded-lg bg-muted/30">
+            <div className="flex items-center gap-3 flex-1">
+              {mode === 'buy' ? (
+                <>
+                  <div className="relative h-12 w-12 rounded-full overflow-hidden bg-white border-2 border-primary/20 flex-shrink-0">
+                    <Image
+                      src="/images/tokens/dai-logo.svg"
+                      alt="DAI"
+                      width={48}
+                      height={48}
+                      className="object-contain p-1"
+                    />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">DAI</p>
+                    <p className="text-xs text-muted-foreground">Dai Stablecoin</p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <Avatar className="h-12 w-12 border-2 border-primary/20 flex-shrink-0">
+                    <AvatarImage
+                      src={creatorAvatarUrl ? convertFailingGateway(creatorAvatarUrl) : undefined}
+                      alt={token.symbol}
+                    />
+                    <AvatarFallback className="bg-primary/10 text-primary font-semibold">
+                      {token.symbol.slice(0, 2).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="text-sm font-medium">{token.symbol}</p>
+                    <p className="text-xs text-muted-foreground">{token.name}</p>
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-muted-foreground">
+                {mode === 'buy' ? 'You pay' : 'You sell'}
+              </p>
+              <p className="text-lg font-semibold">
+                {mode === 'buy' ? 'DAI' : token.symbol}
+              </p>
+            </div>
+          </div>
 
           <div className="space-y-2">
             <Label htmlFor="amount">
@@ -446,6 +483,19 @@ export function QuickTradeDialog({
                   />
                 </div>
               )}
+              {mode === 'sell' && (
+                <div className="absolute left-3 top-1/2 -translate-y-1/2 z-10">
+                  <Avatar className="h-5 w-5">
+                    <AvatarImage
+                      src={creatorAvatarUrl ? convertFailingGateway(creatorAvatarUrl) : undefined}
+                      alt={token.symbol}
+                    />
+                    <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
+                      {token.symbol.slice(0, 2).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                </div>
+              )}
               <Input
                 id="amount"
                 type="number"
@@ -455,16 +505,48 @@ export function QuickTradeDialog({
                 disabled={isLoading || !isConnected}
                 min="0"
                 step="0.01"
-                className={mode === 'buy' ? 'pl-10' : ''}
+                className={mode === 'buy' || mode === 'sell' ? 'pl-10' : ''}
               />
             </div>
             {preview && parseFloat(preview) > 0 && (
               <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 border">
-                <p className="text-sm text-muted-foreground">
-                  You will receive approximately{' '}
-                  <span className="font-medium text-foreground">{parseFloat(preview).toFixed(4)}</span>{' '}
-                  <span className="font-medium">{mode === 'buy' ? token.symbol : 'DAI'}</span>
-                </p>
+                <div className="flex items-center gap-2 flex-1">
+                  {mode === 'buy' ? (
+                    <>
+                      <Avatar className="h-6 w-6 border border-primary/20">
+                        <AvatarImage
+                          src={creatorAvatarUrl ? convertFailingGateway(creatorAvatarUrl) : undefined}
+                          alt={token.symbol}
+                        />
+                        <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
+                          {token.symbol.slice(0, 2).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <p className="text-sm text-muted-foreground">
+                        You will receive approximately{' '}
+                        <span className="font-medium text-foreground">{parseFloat(preview).toFixed(4)}</span>{' '}
+                        <span className="font-medium">{token.symbol}</span>
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <div className="relative h-6 w-6 rounded-full overflow-hidden bg-white border border-primary/20 flex-shrink-0">
+                        <Image
+                          src="/images/tokens/dai-logo.svg"
+                          alt="DAI"
+                          width={24}
+                          height={24}
+                          className="object-contain p-0.5"
+                        />
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        You will receive approximately{' '}
+                        <span className="font-medium text-foreground">{parseFloat(preview).toFixed(4)}</span>{' '}
+                        <span className="font-medium">DAI</span>
+                      </p>
+                    </>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -532,19 +614,18 @@ export function QuickTradeDialog({
                     (mode === 'buy' && daiBalance < parseEther(amount || '0')) ||
                     (mode === 'sell' && meTokenBalance < parseEther(amount || '0'))
                   }
-                  className={`flex-1 ${
-                    mode === 'buy' 
-                      ? 'bg-green-600 hover:bg-green-700 text-white' 
-                      : 'bg-red-600 hover:bg-red-700 text-white'
-                  }`}
+                  className={`flex-1 ${mode === 'buy'
+                    ? 'bg-green-600 hover:bg-green-700 text-white'
+                    : 'bg-red-600 hover:bg-red-700 text-white'
+                    }`}
                 >
                   {isLoading ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      {isPending 
+                      {isPending
                         ? (mode === 'buy' ? 'Buying...' : 'Selling...')
-                        : isConfirming 
-                          ? 'Confirming...' 
+                        : isConfirming
+                          ? 'Confirming...'
                           : 'Processing...'}
                     </>
                   ) : (

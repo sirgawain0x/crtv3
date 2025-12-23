@@ -89,7 +89,6 @@ export function VideoMeTokenBuyDialog({
     isConfirmed,
     transactionError,
     // getMeTokenVaultAddress, // not needed locally if we use ensureDaiApproval
-    ensureDaiApproval,
   } = useMeTokensSupabase();
 
   // Fetch video asset and MeToken
@@ -319,12 +318,6 @@ export function VideoMeTokenBuyDialog({
       });
 
       // const buyAmountWei = parseEther(amount); // removed unused var
-
-      setSuccess('Checking allowance...');
-      console.log('🔐 Checking/Approving DAI...');
-      await ensureDaiApproval(meToken.address, amount);
-      setSuccess('DAI check passed / approved! Proceeding with purchase...');
-      console.log('✅ DAI approved');
 
       // Pass video tracking information when buying
       console.log('🔄 Calling buyMeTokens...');

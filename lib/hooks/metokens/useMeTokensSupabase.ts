@@ -18,59 +18,49 @@ const ERC20_ABI = [
   {
     "inputs": [],
     "name": "name",
-    "outputs": [
-      {
-        "internalType": "string",
-        "name": "",
-        "type": "string"
-      }
-    ],
+    "outputs": [{ "internalType": "string", "name": "", "type": "string" }],
     "stateMutability": "view",
     "type": "function"
   },
   {
     "inputs": [],
     "name": "symbol",
-    "outputs": [
-      {
-        "internalType": "string",
-        "name": "",
-        "type": "string"
-      }
-    ],
+    "outputs": [{ "internalType": "string", "name": "", "type": "string" }],
     "stateMutability": "view",
     "type": "function"
   },
   {
     "inputs": [],
     "name": "totalSupply",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
+    "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{ "internalType": "address", "name": "account", "type": "address" }],
+    "name": "balanceOf",
+    "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
     "stateMutability": "view",
     "type": "function"
   },
   {
     "inputs": [
-      {
-        "internalType": "address",
-        "name": "account",
-        "type": "address"
-      }
+      { "internalType": "address", "name": "owner", "type": "address" },
+      { "internalType": "address", "name": "spender", "type": "address" }
     ],
-    "name": "balanceOf",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
+    "name": "allowance",
+    "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }],
     "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "spender", "type": "address" },
+      { "internalType": "uint256", "name": "amount", "type": "uint256" }
+    ],
+    "name": "approve",
+    "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }],
+    "stateMutability": "nonpayable",
     "type": "function"
   }
 ] as const;
@@ -952,12 +942,15 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
       const hubId = meTokenInfo.hubId || meTokenInfo[1] || BigInt(1);
 
       // 2. Get vault address for this hub
+      console.log('🔍 Fetching Vault address for Hub ID:', hubId.toString());
       const hubInfo = await client.readContract({
         address: DIAMOND,
         abi: METOKEN_ABI,
         functionName: 'getHubInfo',
         args: [hubId],
       }) as any;
+
+      console.log('🔍 Raw Hub Info:', hubInfo);
 
       // Extract vault address (index 6 in the tuple)
       let vaultAddress: string;
@@ -981,6 +974,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
       const daiContract = getDaiTokenContract('base');
       const collateralAmountWei = parseEther(collateralAmount);
 
+      console.log('🔍 Checking DAI allowance for vault...');
       const currentAllowance = await client.readContract({
         address: daiContract.address as `0x${string}`,
         abi: daiContract.abi,
@@ -996,11 +990,55 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
       });
 
       if (currentAllowance < collateralAmountWei) {
-        console.log('🔓 Approving DAI for vault...');
+        console.log('🔓 Approving DAI for vault...', vaultAddress);
         const approveData = encodeFunctionData({
           abi: daiContract.abi,
           functionName: 'approve',
           args: [vaultAddress as `0x${string}`, collateralAmountWei],
+        });
+
+        console.log('📤 Sending DAI approve UserOp...');
+        const approveOp = await client.sendUserOperation({
+          uo: {
+            target: daiContract.address as `0x${string}`,
+            data: approveData,
+            value: BigInt(0),
+          },
+        });
+
+        console.log('⏳ Waiting for approval confirmation...', approveOp.hash);
+        await client.waitForUserOperationTransaction({
+          hash: approveOp.hash,
+        });
+
+        console.log('✅ DAI approved for vault');
+      } else {
+        console.log('✅ Sufficient DAI allowance already exists for vault');
+      }
+
+      // 3b. ALSO Check/Approve DAI for the DIAMOND (Just in case Diamond calls transferFrom directly)
+      // This covers the case where Diamond is the spender, or Vault is the spender.
+      console.log('🔍 Checking DAI allowance for DIAMOND...');
+      const diamondAllowance = await client.readContract({
+        address: daiContract.address as `0x${string}`,
+        abi: daiContract.abi,
+        functionName: 'allowance',
+        args: [address as `0x${string}`, DIAMOND as `0x${string}`],
+      }) as bigint;
+
+      console.log('📊 Current DAI allowance for DIAMOND:', {
+        DIAMOND,
+        currentAllowance: diamondAllowance.toString(),
+        required: collateralAmountWei.toString(),
+        hasEnough: diamondAllowance >= collateralAmountWei,
+      });
+
+      if (diamondAllowance < collateralAmountWei) {
+        console.log('🔓 Approving DAI for DIAMOND...');
+        const approveData = encodeFunctionData({
+          abi: daiContract.abi,
+          functionName: 'approve',
+          args: [DIAMOND as `0x${string}`, collateralAmountWei],
         });
 
         const approveOp = await client.sendUserOperation({
@@ -1011,18 +1049,21 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
           },
         });
 
-        console.log('⏳ Waiting for approval confirmation...');
+        console.log('⏳ Waiting for DIAMOND approval confirmation...', approveOp.hash);
         await client.waitForUserOperationTransaction({
           hash: approveOp.hash,
         });
-
-        console.log('✅ DAI approved for vault');
+        console.log('✅ DAI approved for DIAMOND');
       } else {
-        console.log('✅ Sufficient DAI allowance already exists for vault');
+        console.log('✅ Sufficient DAI allowance already exists for DIAMOND');
       }
 
-      // 4. Now mint (the vault will use the allowance we just set)
-      const operation = await client.sendUserOperation({
+
+      // 4. Now mint
+      console.log('📤 Sending Mint UserOp to DIAMOND...');
+
+      // Create the UserOp promise
+      const sendMintOpPromise = client.sendUserOperation({
         uo: {
           target: DIAMOND,
           data: encodeFunctionData({
@@ -1034,12 +1075,23 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         },
       });
 
+      // Create a timeout promise (e.g., 60 seconds)
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Transaction simulation timed out. Please try again.')), 60000);
+      });
+
+      // Race them
+      const operation = await Promise.race([sendMintOpPromise, timeoutPromise]) as any;
+
+      console.log('🎉 Mint UserOp sent! Hash:', operation.hash);
       setIsPending(false);
       setIsConfirming(true);
 
+      console.log('⏳ Waiting for Mint transaction confirmation...');
       const txHash = await client.waitForUserOperationTransaction({
         hash: operation.hash,
       });
+      console.log('✅ Mint transaction confirmed! Hash:', txHash);
 
       setIsConfirming(false);
       setIsConfirmed(true);
@@ -1126,6 +1178,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
       await checkUserMeToken();
       return txHash;
     } catch (err) {
+      console.error('❌ Error in buyMeTokens:', err);
       setIsPending(false);
       setIsConfirming(false);
       const error = err instanceof Error ? err : new Error('Failed to buy MeTokens');
@@ -1141,6 +1194,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
     try {
       // Get the vault address that will actually perform transferFrom
       // 1. Get meToken's hubId
+      console.log('🔍 ensureDaiApproval: Fetching Hub ID for token:', meTokenAddress);
       const meTokenInfo = await client.readContract({
         address: DIAMOND,
         abi: METOKEN_ABI,
@@ -1151,6 +1205,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
       const hubId = meTokenInfo.hubId || meTokenInfo[1] || BigInt(1);
 
       // 2. Get vault address for this hub
+      console.log('🔍 ensureDaiApproval: Fetching Vault for Hub ID:', hubId.toString());
       const hubInfo = await client.readContract({
         address: DIAMOND,
         abi: METOKEN_ABI,
@@ -1196,7 +1251,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
 
       // If allowance is insufficient, approve the vault to spend DAI
       if (currentAllowance < requiredAmount) {
-        console.log('🔓 Approving DAI for vault...');
+        console.log('🔓 Approving DAI for vault...', vaultAddress);
         const operation = await client.sendUserOperation({
           uo: {
             target: daiContract.address as `0x${string}`,
@@ -1209,7 +1264,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
           },
         });
 
-        console.log('⏳ Waiting for approval confirmation...');
+        console.log('⏳ Waiting for approval confirmation...', operation.hash);
         await client.waitForUserOperationTransaction({
           hash: operation.hash,
         });
@@ -1234,24 +1289,85 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
     setTransactionError(null);
 
     try {
+      console.log('💸 Sell requested:', { meTokenAddress, meTokenAmount });
+      const sellAmountWei = parseEther(meTokenAmount);
+
+      // IMPORTANT: Check if Diamond needs approval to burn MeTokens
+      // If MeToken is a separate contract, Diamond calls burn() which might need allowance if implementation calls transferFrom or burnFrom
+      // Assuming MeToken follows standard ERC20 where "burn" from specific account (not msg.sender) needs allowance.
+      // Or Diamond.burn(meToken, amount, from) requires MeToken.approve(Diamond, amount)
+
+      // Let's check allowance of MeToken for Diamond
+      console.log('🔍 Checking MeToken allowance for Diamond...');
+      try {
+        const currentAllowance = await client.readContract({
+          address: meTokenAddress as `0x${string}`,
+          abi: ERC20_ABI,
+          functionName: 'allowance',
+          args: [address as `0x${string}`, DIAMOND as `0x${string}`],
+        }) as bigint;
+
+        console.log('📊 MeToken allowance for Diamond:', currentAllowance?.toString());
+
+        // If allowance is not enough, approve Diamond to spend MeToken
+        // Note: We are approving DIAMOND here, not Vault, because usually burn logic is in Diamond or routed through it
+        // If burn implementation uses Vault, we might need to approve Vault. But typical Diamond pattern handles logic.
+        // Assuming Diamond is the operator.
+        // If this fails, we might need to approve Vault instead. But for now try Diamond.
+
+        if (currentAllowance < sellAmountWei) {
+          console.log('🔓 Approving Diamond to spend/burn MeToken...');
+          const approveData = encodeFunctionData({
+            abi: ERC20_ABI,
+            functionName: 'approve',
+            args: [DIAMOND as `0x${string}`, BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff')],
+          });
+
+          const approveOp = await client.sendUserOperation({
+            uo: {
+              target: meTokenAddress as `0x${string}`,
+              data: approveData,
+              value: BigInt(0),
+            }
+          });
+
+          console.log('⏳ Waiting for MeToken approval...', approveOp.hash);
+          await client.waitForUserOperationTransaction({
+            hash: approveOp.hash
+          });
+          console.log('✅ MeToken approved for Diamond');
+        } else {
+          console.log('✅ Sufficient MeToken allowance exists');
+        }
+
+      } catch (allowanceErr) {
+        console.warn('⚠️ Failed to check/approve MeToken allowance (might not be needed for burn):', allowanceErr);
+        // Continue anyway - if approval wasn't needed, burn will work. If it was, burn will fail.
+      }
+
+
+      console.log('📤 Sending Burn UserOp to DIAMOND...');
       const operation = await client.sendUserOperation({
         uo: {
           target: DIAMOND,
           data: encodeFunctionData({
             abi: METOKEN_ABI,
             functionName: 'burn',
-            args: [meTokenAddress as `0x${string}`, parseEther(meTokenAmount), address as `0x${string}`],
+            args: [meTokenAddress as `0x${string}`, sellAmountWei, address as `0x${string}`],
           }),
           value: BigInt(0),
         },
       });
 
+      console.log('🎉 Burn UserOp sent! Hash:', operation.hash);
       setIsPending(false);
       setIsConfirming(true);
 
+      console.log('⏳ Waiting for Burn transaction confirmation...');
       const txHash = await client.waitForUserOperationTransaction({
         hash: operation.hash,
       });
+      console.log('✅ Burn transaction confirmed! Hash:', txHash);
 
       setIsConfirming(false);
       setIsConfirmed(true);
@@ -1335,6 +1451,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
       await checkUserMeToken();
       return txHash;
     } catch (err) {
+      console.error('❌ Error in sellMeTokens:', err);
       setIsPending(false);
       setIsConfirming(false);
       const error = err instanceof Error ? err : new Error('Failed to sell MeTokens');
