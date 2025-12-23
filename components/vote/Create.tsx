@@ -36,7 +36,7 @@ const proposalSchema = z.object({
   end: z.string().min(1, "End date required"),
   endTime: z.string().min(1, "End time required"),
   // POAP fields (optional)
-  createPoap: z.boolean().default(false),
+  createPoap: z.boolean(),
   poapName: z.string().optional(),
   poapDescription: z.string().optional(),
   poapImageUrl: z.string().url("Must be a valid URL").optional().or(z.literal("")),
@@ -57,7 +57,7 @@ function Create() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-  
+
   // Get smart account client for signing using AccountKit
   const { client: smartAccountClient, isLoadingClient } = useSmartAccountClient({
     type: "ModularAccountV2",
@@ -65,7 +65,7 @@ function Create() {
       mode: "default",
     },
   });
-  
+
   // Use signMessageAsync from AccountKit - returns a Promise directly (no callbacks needed)
   const { signMessageAsync, isSigningMessage, error: signMessageError } = useSignMessage({
     client: smartAccountClient || undefined,
@@ -89,7 +89,7 @@ function Create() {
     },
     mode: "onTouched",
   });
-  
+
   const createPoap = form.watch("createPoap");
 
   const { fields, append, remove } = useFieldArray<ProposalForm>({
@@ -118,12 +118,12 @@ function Create() {
       setIsSubmitting(false);
       return;
     }
-    
+
     // Check if already signing - wait for it to complete or timeout
     if (isSigningMessage) {
       console.warn("⚠️ Signing already in progress, waiting for completion...");
       setFormError("Waiting for previous signing to complete...");
-      
+
       // Wait up to 5 seconds for it to complete
       for (let i = 0; i < 10; i++) {
         await new Promise(resolve => setTimeout(resolve, 500));
@@ -133,7 +133,7 @@ function Create() {
           break;
         }
       }
-      
+
       if (isSigningMessage) {
         setFormError("Previous signing operation is stuck. Please refresh the page and try again.");
         setIsSubmitting(false);
@@ -147,10 +147,10 @@ function Create() {
       return;
     }
     setIsSubmitting(true);
-    
+
     try {
       console.log("Starting proposal creation...");
-      
+
       // Get current block number before signing
       console.log("Fetching block number...");
       const publicClient = createPublicClient({
@@ -162,11 +162,11 @@ function Create() {
       const block = await publicClient.getBlockNumber();
       const blockNumber = Number(block);
       console.log("Block number fetched:", blockNumber);
-      
+
       // Create POAP event if requested
       let poapEventId: string | null = null;
       let poapTokenId: string | null = null;
-      
+
       if (values.createPoap && values.poapName && values.poapDescription) {
         try {
           console.log("Creating POAP event...");
@@ -183,7 +183,7 @@ function Create() {
               virtual_event: true,
             }),
           });
-          
+
           if (poapResponse.ok) {
             const poapData = await poapResponse.json();
             poapEventId = poapData.data?.id || poapData.data?.fancy_id;
@@ -199,7 +199,7 @@ function Create() {
           // Continue with proposal creation even if POAP creation fails
         }
       }
-      
+
       // Create proposal payload for signing with actual block number
       // Note: plugins should be an object, not a stringified JSON
       const proposalPayload = {
@@ -220,7 +220,7 @@ function Create() {
           },
         },
       };
-      
+
       // Sign the proposal message on client side using AccountKit
       console.log("Preparing message to sign...");
       const messageToSign = JSON.stringify(proposalPayload);
@@ -228,18 +228,18 @@ function Create() {
       console.log("Smart account client ready:", !!smartAccountClient);
       console.log("Sign message function available:", !!signMessageAsync);
       console.log("Is currently signing:", isSigningMessage);
-      
+
       // Ensure iframe container exists
       const iframeContainer = document.getElementById("alchemy-signer-iframe-container");
       if (!iframeContainer) {
         throw new Error("Alchemy signer iframe container not found. Please refresh the page.");
       }
       console.log("Iframe container found:", !!iframeContainer);
-      
+
       if (signMessageError) {
         throw new Error(`Sign message error: ${signMessageError.message}`);
       }
-      
+
       // Wait for any in-progress signing to complete
       if (isSigningMessage) {
         console.warn("⚠️ Already signing, waiting for current operation to complete...");
@@ -255,14 +255,14 @@ function Create() {
           throw new Error("Previous signing operation is still in progress. Please wait and try again.");
         }
       }
-      
+
       // Wait a brief moment to ensure everything is ready
       await new Promise(resolve => setTimeout(resolve, 100));
-      
+
       // Use signMessageAsync which returns a Promise directly (AccountKit v4.59.1+)
       console.log("Calling AccountKit signMessageAsync with message length:", messageToSign.length);
       console.log("Waiting for user to approve signing in AccountKit iframe...");
-      
+
       let signature: string;
       try {
         signature = await signMessageAsync({
@@ -271,13 +271,13 @@ function Create() {
         console.log("✅ Message signed successfully, signature:", signature?.substring(0, 20) + "...");
       } catch (error) {
         console.error("❌ Error signing message:", error);
-        throw error instanceof Error 
-          ? error 
+        throw error instanceof Error
+          ? error
           : new Error(`Failed to sign message: ${String(error)}`);
       }
-      
+
       console.log("Signature received, submitting to server...");
-      
+
       // Call server action with signature
       console.log("Submitting proposal to server...");
       const result = await createProposal({
@@ -291,9 +291,9 @@ function Create() {
         signature,
         proposalPayload,
       });
-      
+
       console.log("Server response:", result);
-      
+
       if (result?.serverError) {
         console.error("Server error:", result.serverError);
         setFormError(result.serverError || "Failed to create proposal.");
@@ -309,7 +309,7 @@ function Create() {
         setFormError("Failed to create proposal.");
         return;
       }
-      
+
       console.log("Proposal created successfully:", result.data);
       router.push("/vote");
     } catch (error) {
@@ -455,9 +455,9 @@ function Create() {
                 )}
               />
             </div>
-            
+
             <Separator />
-            
+
             {/* POAP Configuration Section */}
             <div className="space-y-4">
               <div className="flex items-center justify-between">
@@ -482,7 +482,7 @@ function Create() {
                   )}
                 />
               </div>
-              
+
               {createPoap && (
                 <div className="space-y-4 pl-4 border-l-2">
                   <FormField
@@ -501,7 +501,7 @@ function Create() {
                       </FormItem>
                     )}
                   />
-                  
+
                   <FormField
                     name="poapDescription"
                     control={form.control}
@@ -519,7 +519,7 @@ function Create() {
                       </FormItem>
                     )}
                   />
-                  
+
                   <FormField
                     name="poapImageUrl"
                     control={form.control}
@@ -537,7 +537,7 @@ function Create() {
                       </FormItem>
                     )}
                   />
-                  
+
                   <FormField
                     name="poapEventUrl"
                     control={form.control}
@@ -558,7 +558,7 @@ function Create() {
                 </div>
               )}
             </div>
-            
+
             {formError && (
               <div className="text-red-500 text-sm font-medium">
                 {formError}
