@@ -437,22 +437,12 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
 
             {/* Price Chart */}
             {userMeToken.address && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Price Chart</CardTitle>
-                  <CardDescription>
-                    Historical price data for {userMeToken.symbol}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <TokenPriceChart
-                    tokenAddress={userMeToken.address}
-                    tokenSymbol={userMeToken.symbol}
-                    height={400}
-                    showControls={true}
-                  />
-                </CardContent>
-              </Card>
+              <TokenPriceChart
+                tokenAddress={userMeToken.address}
+                tokenSymbol={userMeToken.symbol}
+                height={400}
+                showControls={true}
+              />
             )}
           </TabsContent>
 

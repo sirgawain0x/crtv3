@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/sdk/supabase/server';
 import { meTokenSupabaseService } from '@/lib/sdk/supabase/metokens';
 import { formatEther } from 'viem';
+import { getMeTokenProtocolInfo, getMeTokenInfoFromBlockchain, getBulkMeTokenInfo } from '@/lib/utils/metokenUtils';
 
 export interface MarketToken {
   id: string;
@@ -39,7 +40,7 @@ export interface MarketStats {
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    
+
     // Query parameters
     const type = searchParams.get('type') as 'all' | 'metoken' | 'content_coin' | null;
     const search = searchParams.get('search') || '';
@@ -70,22 +71,22 @@ export async function GET(request: NextRequest) {
     if (type !== 'content_coin' && meTokens.length < 5 && !search) {
       try {
         console.log('📊 Market API: Supabase has few tokens, checking subgraph for sync...');
-        
+
         // Query subgraph directly (bypassing the client's SSR check)
         const { request, gql } = await import('graphql-request');
-        
+
         // Construct absolute URL for server-side request
         // graphql-request requires absolute URLs in server-side contexts
         let subgraphEndpoint = process.env.NEXT_PUBLIC_SUBGRAPH_URL;
         if (!subgraphEndpoint || subgraphEndpoint.startsWith('/')) {
           // Build absolute URL for relative endpoint
-          const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
-                         (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
-          subgraphEndpoint = subgraphEndpoint 
-            ? `${baseUrl}${subgraphEndpoint}` 
+          const baseUrl = process.env.NEXT_PUBLIC_APP_URL ||
+            (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+          subgraphEndpoint = subgraphEndpoint
+            ? `${baseUrl}${subgraphEndpoint}`
             : `${baseUrl}/api/metokens-subgraph`;
         }
-        
+
         const GET_ALL_SUBSCRIBES = gql`
           query GetAllSubscribes($first: Int = 100, $skip: Int = 0) {
             subscribes(first: $first, skip: $skip, orderBy: blockTimestamp, orderDirection: desc) {
@@ -99,34 +100,34 @@ export async function GET(request: NextRequest) {
             }
           }
         `;
-        
+
         const subgraphData = await request(subgraphEndpoint, GET_ALL_SUBSCRIBES, { first: 50, skip: 0 }) as any;
         const subscribeEvents = subgraphData?.subscribes || [];
-        
+
         if (subscribeEvents.length > 0) {
           console.log(`📋 Found ${subscribeEvents.length} MeTokens in subgraph, syncing recent ones...`);
-          
+
           // Sync the most recent tokens from subgraph to Supabase
           // Limit to 10 to avoid timeout
           for (const event of subscribeEvents.slice(0, 10)) {
             try {
               const meTokenAddress = event.meToken;
-              
+
               // Check if already in Supabase
               const existing = await meTokenSupabaseService.getMeTokenByAddress(meTokenAddress);
               if (existing) continue; // Skip if already synced
-              
+
               // Sync from subgraph to Supabase using internal API call
               // Use absolute URL for server-side fetch
-              const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 
-                             (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
-              
+              const baseUrl = process.env.NEXT_PUBLIC_APP_URL ||
+                (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+
               const syncResponse = await fetch(`${baseUrl}/api/metokens/sync`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ meTokenAddress })
               });
-              
+
               if (syncResponse.ok) {
                 console.log(`✅ Synced MeToken: ${meTokenAddress}`);
               }
@@ -135,7 +136,7 @@ export async function GET(request: NextRequest) {
               // Continue with other tokens even if one fails
             }
           }
-          
+
           // Re-fetch from Supabase after syncing
           meTokens = await meTokenSupabaseService.getAllMeTokens(meTokenOptions);
           console.log(`✅ After sync, found ${meTokens.length} MeTokens in Supabase`);
@@ -202,116 +203,33 @@ export async function GET(request: NextRequest) {
     // Combine and transform tokens
     let allTokens: MarketToken[] = [];
 
-    // Helper function to refresh a single token's data from blockchain
-    // Note: For performance, we'll only refresh if explicitly requested
-    // In production, you might want to batch these or use a background job
-    const refreshTokenData = async (address: string): Promise<any> => {
-      if (!useFreshData) return null;
-      
-      try {
-        // Import the fresh data function directly instead of making HTTP request
-        const { getMeTokenInfoFromBlockchain, getMeTokenProtocolInfo } = await import('@/lib/utils/metokenUtils');
-        const { createPublicClient, http, formatEther } = await import('viem');
-        const { base } = await import('viem/chains');
-        
-        const publicClient = createPublicClient({
-          chain: base,
-          transport: http(process.env.NEXT_PUBLIC_ALCHEMY_RPC_URL || process.env.NEXT_PUBLIC_BASE_RPC_URL),
-        });
-
-        const ERC20_ABI = [
-          {
-            constant: true,
-            inputs: [],
-            name: 'totalSupply',
-            outputs: [{ name: '', type: 'uint256' }],
-            type: 'function',
-          },
-        ] as const;
-
-        const [tokenInfo, protocolInfo, totalSupply] = await Promise.all([
-          getMeTokenInfoFromBlockchain(address as `0x${string}`),
-          getMeTokenProtocolInfo(address as `0x${string}`),
-          publicClient.readContract({
-            address: address as `0x${string}`,
-            abi: ERC20_ABI,
-            functionName: 'totalSupply',
-          }) as Promise<bigint>,
-        ]);
-
-        if (!protocolInfo) {
-          return null;
-        }
-
-        const balancePooled = BigInt(protocolInfo.balancePooled || 0);
-        const balanceLocked = BigInt(protocolInfo.balanceLocked || 0);
-        const totalBalance = balancePooled + balanceLocked;
-        const tvl = parseFloat(formatEther(totalBalance));
-        const supply = parseFloat(formatEther(totalSupply));
-        const price = supply > 0 ? tvl / supply : 0;
-
-        return {
-          tvl,
-          price,
-          total_supply: totalSupply.toString(),
-        };
-      } catch (error) {
-        console.warn(`Failed to refresh token ${address}:`, error);
-        return null;
-      }
-    };
-
-    // Transform MeTokens
+    // Transform MeTokens with Supabase data first
     for (const meToken of meTokens) {
-      let tokenData = {
+      allTokens.push({
         id: meToken.id,
         address: meToken.address,
         name: meToken.name,
         symbol: meToken.symbol,
         owner_address: meToken.owner_address,
         type: 'metoken' as const,
-        price: 0,
+        price: 0, // Will update below
         tvl: meToken.tvl,
         total_supply: meToken.total_supply?.toString() || '0',
         market_cap: meToken.tvl,
         created_at: meToken.created_at,
-      };
-
-      // If fresh data is requested, try to fetch it (but don't block on failure)
-      if (useFreshData) {
-        const freshData = await refreshTokenData(meToken.address);
-        if (freshData) {
-          tokenData = {
-            ...tokenData,
-            tvl: freshData.tvl,
-            price: freshData.price,
-            total_supply: freshData.total_supply,
-            market_cap: freshData.tvl,
-          };
-        } else {
-          // Fallback to Supabase data
-          const totalSupply = BigInt(meToken.total_supply || 0);
-          tokenData.price = totalSupply > 0 ? meToken.tvl / parseFloat(formatEther(totalSupply)) : 0;
-        }
-      } else {
-        // Use Supabase data
-        const totalSupply = BigInt(meToken.total_supply || 0);
-        tokenData.price = totalSupply > 0 ? meToken.tvl / parseFloat(formatEther(totalSupply)) : 0;
-      }
-
-      allTokens.push(tokenData);
+      });
     }
 
-    // Transform Content Coins
+    // Transform Content Coins with Supabase data first
     for (const contentCoin of contentCoins) {
-      let tokenData = {
+      allTokens.push({
         id: contentCoin.id,
         address: contentCoin.address,
         name: contentCoin.name,
         symbol: contentCoin.symbol,
         owner_address: contentCoin.owner_address,
         type: 'content_coin' as const,
-        price: 0,
+        price: 0, // Will update below
         tvl: contentCoin.tvl,
         total_supply: contentCoin.total_supply?.toString() || '0',
         market_cap: contentCoin.tvl,
@@ -320,31 +238,47 @@ export async function GET(request: NextRequest) {
         playback_id: contentCoin.playback_id,
         thumbnail_url: contentCoin.thumbnail_url,
         created_at: contentCoin.created_at,
-      };
+      });
+    }
 
-      // If fresh data is requested, try to fetch it (but don't block on failure)
-      if (useFreshData) {
-        const freshData = await refreshTokenData(contentCoin.address);
-        if (freshData) {
-          tokenData = {
-            ...tokenData,
-            tvl: freshData.tvl,
-            price: freshData.price,
-            total_supply: freshData.total_supply,
-            market_cap: freshData.tvl,
+    // Identify tokens that need fresh data
+    const tokensToRefresh = allTokens.filter(t => useFreshData || t.total_supply === '0' || t.tvl === 0);
+
+    // Refresh data if needed
+    if (tokensToRefresh.length > 0) {
+      const addresses = tokensToRefresh.map(t => t.address);
+      const bulkData = await getBulkMeTokenInfo(addresses);
+
+      // Update tokens with fresh data and calculate prices
+      allTokens = allTokens.map(token => {
+        const fresh = bulkData[token.address];
+
+        if (fresh) {
+          return {
+            ...token,
+            tvl: fresh.tvl,
+            price: fresh.price,
+            total_supply: fresh.totalSupply,
+            market_cap: fresh.tvl
           };
-        } else {
-          // Fallback to Supabase data
-          const totalSupply = BigInt(contentCoin.total_supply || 0);
-          tokenData.price = totalSupply > 0 ? contentCoin.tvl / parseFloat(formatEther(totalSupply)) : 0;
         }
-      } else {
-        // Use Supabase data
-        const totalSupply = BigInt(contentCoin.total_supply || 0);
-        tokenData.price = totalSupply > 0 ? contentCoin.tvl / parseFloat(formatEther(totalSupply)) : 0;
-      }
 
-      allTokens.push(tokenData);
+        // If no fresh data found (or not successfully fetched), fall back to calculating price from existing data
+        const totalSupply = BigInt(token.total_supply || 0);
+        const price = totalSupply > 0n ? token.tvl / parseFloat(formatEther(totalSupply)) : 0;
+
+        return {
+          ...token,
+          price
+        };
+      });
+    } else {
+      // Just calculate prices for all tokens based on Supabase data
+      allTokens = allTokens.map(token => {
+        const totalSupply = BigInt(token.total_supply || 0);
+        const price = totalSupply > 0n ? token.tvl / parseFloat(formatEther(totalSupply)) : 0;
+        return { ...token, price };
+      });
     }
 
     // Apply search filter if provided
@@ -363,13 +297,136 @@ export async function GET(request: NextRequest) {
       allTokens = allTokens.filter((token) => token.type === type);
     }
 
-    // Calculate 24h price change and volume (simplified - would need transaction history)
-    // For now, we'll set these to 0 and they can be calculated later from transactions
-    allTokens = allTokens.map((token) => ({
-      ...token,
-      price_change_24h: 0, // TODO: Calculate from transactions
-      volume_24h: 0, // TODO: Calculate from transactions
-    }));
+    // Calculate 24h price change and volume
+    const now = new Date();
+    const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+    // Fetch recent transactions for stats calculation
+    const { data: recentTxs } = await supabase
+      .from('metoken_transactions')
+      .select('metoken_id, transaction_type, amount, collateral_amount, created_at')
+      .gte('created_at', twentyFourHoursAgo.toISOString())
+      .order('created_at', { ascending: false }); // Descending for reverse replay
+
+    // Stats map by metoken_id
+    const statsMap = new Map<string, { volume: number; priceCheck: { supplyDelta: bigint; tvlDelta: number } }>();
+
+    if (recentTxs) {
+      for (const tx of recentTxs) {
+        if (!statsMap.has(tx.metoken_id)) {
+          statsMap.set(tx.metoken_id, { volume: 0, priceCheck: { supplyDelta: 0n, tvlDelta: 0 } });
+        }
+        const stats = statsMap.get(tx.metoken_id)!;
+
+        // Volume calculation (in ETH/DAI terms)
+        // For MINT: collateral_amount is the volume
+        // For BURN: we estimate volume based on amount * current_price (since we process in batch, we might simplify)
+        // Better: Use collateral_amount for MINT. For BURN, use an estimate if collateral is missing.
+        // Assuming collateral_amount is present for MINTs
+
+        // Note: The Price History route estimates volume for burns using price * amounts.
+        // Here we'll do a simplified volume sum.
+        let txVolume = 0;
+        const amount = BigInt(Math.floor(tx.amount || 0));
+        const collateral = parseFloat(tx.collateral_amount?.toString() || '0');
+
+        if (tx.transaction_type === 'mint') {
+          txVolume = collateral;
+          // Reverse replay: User +Collateral -> +Supply. To go back, we subtract.
+          stats.priceCheck.supplyDelta += amount;
+          stats.priceCheck.tvlDelta += collateral;
+        } else if (tx.transaction_type === 'burn') {
+          // Reverse replay: User -Supply -> +Collateral. To go back, we add supply and put collateral back.
+          // Problem: We don't know exact collateral returned.
+          // We'll estimate it later or use 0 if negligible? No, burns affect price significantly.
+          stats.priceCheck.supplyDelta -= amount;
+          // We will handle TVL delta estimation when processing the token, as we need the price.
+          // Store the burn amount to process later?
+          // Actually, accumulating "burn amount" separately might be needed.
+          // For now, let's treat tvlDelta as "known changes". For burns, we might have to use the token's current price as a proxy for the whole day?
+          // Simplification: Assume constant price for volume/delta? No, defeats the purpose.
+        }
+
+        // Identify volume
+        if (tx.transaction_type === 'mint') {
+          stats.volume += collateral;
+        } else {
+          // For stats volume, we want the dollar value of the trade.
+          // Use collateral if available (not in DB), else 0 (under-report) or estimate?
+          // Let's use 0 for now to avoid massive errors, or improve DB later.
+          stats.volume += 0;
+        }
+      }
+    }
+
+    // Apply calculated stats
+    allTokens = allTokens.map((token) => {
+      const tokenStats = statsMap.get(token.id);
+
+      let price_change_24h = 0;
+      let volume_24h = 0;
+
+      if (tokenStats) {
+        volume_24h = tokenStats.volume;
+
+        // Calculate Price Change
+        // Current Price is known: token.price
+        // Price 24h ago = (CurrentTVL - DeltaTVL) / (CurrentSupply - DeltaSupply)
+
+        // Correct logic for Reverse Replay:
+        // Start: Current State
+        // Review Txs (Newest to Oldest):
+        //  Mint: We gained TVL and Supply. So Prev = Curr - Mint.
+        //  Burn: We lost TVL and Supply. So Prev = Curr + Burn.
+
+        const currentSupply = BigInt(token.total_supply || 0);
+        const currentTvl = token.tvl;
+
+        // We need to account for the burns that we couldn't sum up in the loop easily without price
+        // Re-scan recentTxs for this token to estimate burn values? 
+        // Optimization: Filter them now.
+        const tokenTxs = recentTxs?.filter(tx => tx.metoken_id === token.id) || [];
+
+        let replaySupply = currentSupply;
+        let replayTvl = currentTvl;
+
+        for (const tx of tokenTxs) {
+          const amount = BigInt(Math.floor(tx.amount || 0));
+          const collateral = parseFloat(tx.collateral_amount?.toString() || '0');
+
+          // Price at this moment (approximate using current replay state)
+          const replayPrice = replaySupply > 0n ? replayTvl / parseFloat(formatEther(replaySupply)) : 0;
+
+          if (tx.transaction_type === 'mint') {
+            // Undo Mint: Remove supply, remove collateral
+            replaySupply -= amount;
+            replayTvl -= collateral;
+          } else if (tx.transaction_type === 'burn') {
+            // Undo Burn: Add supply back, add collateral back
+            replaySupply += amount;
+            // Estimate collateral returned: amount * price
+            const estCollateral = parseFloat(formatEther(amount)) * replayPrice;
+            replayTvl += estCollateral;
+
+            // Also add to volume (estimated)
+            volume_24h += estCollateral;
+          }
+        }
+
+        // Now replayState is "24h ago"
+        const price24hAgo = replaySupply > 0n ? replayTvl / parseFloat(formatEther(replaySupply)) : 0;
+
+        if (price24hAgo > 0) {
+          price_change_24h = ((token.price - price24hAgo) / price24hAgo) * 100;
+        }
+      }
+
+      return {
+        ...token,
+        price_change_24h,
+        volume_24h,
+      };
+    });
 
     // Sort tokens
     allTokens.sort((a, b) => {
@@ -479,9 +536,9 @@ export async function GET(request: NextRequest) {
     const cacheDuration = search || useFreshData
       ? "public, s-maxage=10, stale-while-revalidate=30" // Short cache for dynamic queries
       : "public, s-maxage=60, stale-while-revalidate=300"; // Longer cache for standard queries
-    
+
     response.headers.set("Cache-Control", cacheDuration);
-    
+
     // Add cache tags for Vercel cache invalidation
     const cacheTags = ['market', 'tokens', type || 'all'];
     if (search) cacheTags.push(`search:${search}`);

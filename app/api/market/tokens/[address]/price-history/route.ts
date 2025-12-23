@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/sdk/supabase/server';
-import { formatEther } from 'viem';
+import { formatEther, createPublicClient, http, parseAbi } from 'viem';
+import { base } from 'viem/chains';
+import { METOKEN_ABI } from '@/lib/contracts/MeToken';
+
+const DIAMOND = '0xba5502db2aC2cBff189965e991C07109B14eB3f5';
 
 export interface PriceHistoryPoint {
   timestamp: number;
@@ -87,10 +91,76 @@ export async function GET(
       .order('created_at', { ascending: true });
 
     // Calculate current price for fallback response
-    const currentTotalSupply = BigInt(meToken.total_supply || 0);
+    // Calculate current price for fallback response
+    let currentTotalSupply = BigInt(meToken.total_supply || 0);
+    let currentTvl = meToken.tvl || 0;
+
+    // Fallback to blockchain if data is zero/missing in DB
+    // This ensures we show the correct price even if the DB indexer is lagging
+    if (currentTotalSupply === BigInt(0) || currentTvl === 0) {
+      try {
+        console.log('� DB data missing/zero, fetching from blockchain for:', meToken.address);
+        const apiKey = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY;
+        const transportUrl = apiKey
+          ? `https://base-mainnet.g.alchemy.com/v2/${apiKey}`
+          : undefined;
+
+        const publicClient = createPublicClient({
+          chain: base,
+          transport: http(transportUrl)
+        });
+
+        // Fetch fresh data
+        const [totalSupply, infoData] = await Promise.all([
+          publicClient.readContract({
+            address: meToken.address as `0x${string}`,
+            abi: parseAbi(['function totalSupply() view returns (uint256)']),
+            functionName: 'totalSupply',
+          }) as Promise<bigint>,
+          publicClient.readContract({
+            address: DIAMOND,
+            abi: METOKEN_ABI,
+            functionName: 'getMeTokenInfo',
+            args: [meToken.address as `0x${string}`],
+          }) as Promise<any>
+        ]);
+
+        if (totalSupply) {
+          currentTotalSupply = totalSupply;
+        }
+
+        if (infoData) {
+          // TVL = pooled + locked (in DAI terms)
+          // Note: The struct return might vary depending on viem version/ABI parsing, 
+          // usually it returns an object if named outputs, or array.
+          // Based on useMeTokensSupabase, it seems to return an object property access compatible result
+          const balancePooled = BigInt(infoData.balancePooled || infoData[2] || 0);
+          const balanceLocked = BigInt(infoData.balanceLocked || infoData[3] || 0);
+          currentTvl = parseFloat(formatEther(balancePooled + balanceLocked));
+        }
+
+        console.log('✅ Fetched live data:', {
+          supply: currentTotalSupply.toString(),
+          tvl: currentTvl
+        });
+
+      } catch (chainErr) {
+        console.warn('⚠️ Failed to fetch live blockchain data:', chainErr);
+      }
+    }
+
     const currentPrice = currentTotalSupply > 0
-      ? meToken.tvl / parseFloat(formatEther(currentTotalSupply))
+      ? currentTvl / parseFloat(formatEther(currentTotalSupply))
       : 0;
+
+    console.log('💾 Final price values (DB + Chain fallback):', {
+      address: meToken.address,
+      dbSupply: meToken.total_supply,
+      dbTvl: meToken.tvl,
+      finalSupply: currentTotalSupply.toString(),
+      finalTvl: currentTvl,
+      calculatedPrice: currentPrice,
+    });
 
     if (txError) {
       console.error('Error fetching transactions:', txError);
@@ -119,8 +189,74 @@ export async function GET(
       : new Date(currentTimestamp * 1000).toISOString().slice(0, 10);
 
     // Process transactions to build price history
+    // Logic: We have the *Current* state (reliable) and the list of transactions in the period.
+    // To find the *Start* state (at startDate), we must "reverse replay" the transactions from Current backwards.
+    // Then we can forward replay to generate the points.
+
     let runningSupply = BigInt(0);
     let runningTvl = 0;
+
+    // 1. Reverse Replay to find initial state
+    let replaySupply = currentTotalSupply;
+    let replayTvl = currentTvl;
+
+    // Sort descending for reverse replay
+    const reverseTxs = [...(transactions || [])].sort((a, b) =>
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+
+    for (const tx of reverseTxs) {
+      const amount = BigInt(Math.floor(tx.amount || 0));
+      const collateral = parseFloat(tx.collateral_amount?.toString() || '0');
+
+      // Price at this moment (approximate using current replay state)
+      const replayPrice = replaySupply > 0n ? replayTvl / parseFloat(formatEther(replaySupply)) : 0;
+
+      if (tx.transaction_type === 'mint') {
+        // Undo Mint: Remove supply, remove collateral
+        replaySupply -= amount;
+        replayTvl -= collateral;
+      } else if (tx.transaction_type === 'burn') {
+        // Undo Burn: Add supply back, add collateral back
+        replaySupply += amount;
+        // Estimate collateral returned if not stored: amount * price
+        // If collateral_amount exists (it should for burns in a perfect world, but might not), use it? 
+        // DB schema says collateral_amount is there.
+        // If assume collateral_amount is accurate:
+        // replayTvl += collateral; 
+        // But in `history` route we see collateral_amount is often used for mints.
+        // Let's stick to estimation if collateral is 0 or low? 
+        // For consistency with forward pass, let's use the price estimation derived from similar logic.
+        // Forward pass says: `returnedEstimate = ... * preTxPrice`.
+
+        // Undo burn: Tvl = Tvl_after + returned.
+        // returned = amount * price_before_burn.  
+        // price_before_burn = (Tvl_after + returned) / (Supply_after + amount).
+        // This is circular if we don't know returned.
+
+        // Let's use the simple approximation: 
+        const estimatedValue = parseFloat(formatEther(amount)) * replayPrice;
+        replayTvl += estimatedValue;
+      }
+    }
+
+    // Set initial running values (clamped to 0 to avoid precision errors causing negatives)
+    runningSupply = replaySupply > 0n ? replaySupply : 0n;
+    runningTvl = replayTvl > 0 ? replayTvl : 0;
+
+    console.log('⏮️ Reverse Replay Result:', {
+      currentSupply: currentTotalSupply.toString(),
+      currentTvl,
+      startSupply: runningSupply.toString(),
+      startTvl: runningTvl,
+      txCount: transactions?.length
+    });
+
+    console.log('📝 Processing transactions (Forward):', {
+      totalTxCount: transactions?.length || 0,
+      firstTx: transactions?.[0],
+      lastTx: transactions?.[transactions.length - 1],
+    });
 
     for (const tx of transactions || []) {
       const txDate = new Date(tx.created_at);
@@ -132,7 +268,7 @@ export async function GET(
         : txDate.toISOString().slice(0, 10);
 
       // Calculate price BEFORE this transaction to estimate returned value for burns
-      const preTxPrice = runningSupply > 0
+      const preTxPrice = runningSupply > 0n
         ? runningTvl / parseFloat(formatEther(runningSupply))
         : 0;
 
@@ -160,7 +296,7 @@ export async function GET(
       }
 
       // Calculate price AFTER this transaction
-      const price = runningSupply > 0
+      const price = runningSupply > 0n
         ? runningTvl / parseFloat(formatEther(runningSupply))
         : 0;
 
@@ -218,7 +354,7 @@ export async function GET(
         timestamp: currentTimestamp,
         price: currentPrice,
         volume: 0,
-        tvl: meToken.tvl,
+        tvl: currentTvl,
       });
     }
 
@@ -227,7 +363,7 @@ export async function GET(
       token: {
         address: meToken.address,
         current_price: currentPrice,
-        current_tvl: meToken.tvl,
+        current_tvl: currentTvl,
       },
     });
   } catch (error) {

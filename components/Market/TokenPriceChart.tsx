@@ -25,6 +25,7 @@ export function TokenPriceChart({
 }: TokenPriceChartProps) {
   const [period, setPeriod] = useState<'7d' | '30d' | 'all'>('7d');
   const [data, setData] = useState<PriceHistoryPoint[]>([]);
+  const [currentPrice, setCurrentPrice] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -52,24 +53,31 @@ export function TokenPriceChart({
           } catch {
             // If JSON parsing fails, use default message
           }
-          
+
           // For 404, just return empty data (token might not have transactions yet)
           if (response.status === 404) {
             console.log('Token not found or no price history available');
             setData([]);
+            setCurrentPrice(null);
             setError(null);
             return;
           }
-          
+
           throw new Error(errorMessage);
         }
 
         const result = await response.json();
+        console.log('📊 Price History API Response:', result);
+        console.log('📈 History Data Points:', result.data?.length || 0);
+        console.log('💰 Current Price from API:', result.token?.current_price);
+
         setData(result.data || []);
+        setCurrentPrice(result.token?.current_price || null);
       } catch (err) {
         console.error('Error fetching price history:', err);
         setError(err instanceof Error ? err.message : 'Failed to load chart');
         setData([]); // Set empty data on error
+        setCurrentPrice(null);
       } finally {
         setLoading(false);
       }
@@ -80,19 +88,42 @@ export function TokenPriceChart({
 
   // Calculate price change for display
   const priceInfo = useMemo(() => {
-    if (data.length === 0) return null;
+    console.log('🔍 Calculating priceInfo:', {
+      dataLength: data.length,
+      currentPrice,
+      firstDataPoint: data[0],
+      lastDataPoint: data[data.length - 1]
+    });
+
+    if (data.length === 0) {
+      // If no data but we have currentPrice from API, use it
+      if (currentPrice !== null && currentPrice > 0) {
+        return {
+          lastPrice: currentPrice,
+          priceChange: 0,
+          isPositive: true,
+        };
+      }
+      return null;
+    }
 
     const firstPrice = data[0]?.price || 0;
     const lastPrice = data[data.length - 1]?.price || 0;
-    const priceChange = firstPrice > 0 ? ((lastPrice - firstPrice) / firstPrice) * 100 : 0;
+
+    console.log('💵 Price values:', { firstPrice, lastPrice, currentPrice });
+
+    // If lastPrice is 0 but we have currentPrice from API, use that instead
+    const displayPrice = (lastPrice > 0) ? lastPrice : (currentPrice || 0);
+
+    const priceChange = firstPrice > 0 ? ((displayPrice - firstPrice) / firstPrice) * 100 : 0;
     const isPositive = priceChange >= 0;
 
     return {
-      lastPrice,
+      lastPrice: displayPrice,
       priceChange,
       isPositive,
     };
-  }, [data]);
+  }, [data, currentPrice]);
 
   if (loading) {
     return (
