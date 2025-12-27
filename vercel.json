@@ -5,6 +5,7 @@
       "NODE_ENV": "production"
     }
   },
+  "installCommand": "yarn install --network-timeout 600000",
   "crons": [
     {
       "path": "/api/video-assets/sync-views/cron",
