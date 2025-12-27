@@ -11,7 +11,7 @@
  */
 
 import { StoryClient } from "@story-protocol/core-sdk";
-import type { Address } from "viem";
+import type { Address, Log } from "viem";
 
 /**
  * Parameters for creating an NFT collection via SPG
@@ -102,12 +102,17 @@ export async function createCollection(
   params: CreateCollectionParams
 ): Promise<CreateCollectionResult> {
   try {
-    // Get the account address from the client config or use provided owner
-    const accountAddress = (params.owner || (client as any).config?.account) as Address;
+    // Get the account address from the client config (the signer)
+    const accountAddress = ((client as any).config?.account) as Address;
 
     if (!accountAddress) {
-      throw new Error("Account address not found. Please provide owner in params or ensure client is configured with an account.");
+      throw new Error("Account address not found. Please ensure client is configured with an account.");
     }
+
+    // The owner parameter determines who owns the collection on-chain
+    // The accountAddress is used for signing the transaction (paying gas)
+    // These can be different: platform pays gas, creator owns collection
+    const collectionOwner = params.owner || accountAddress;
 
     // Use nftClient.createNFTCollection() to create a new SPG NFT collection
     const result = await client.nftClient.createNFTCollection({
@@ -115,11 +120,11 @@ export async function createCollection(
       symbol: params.symbol,
       isPublicMinting: false, // Only creator can mint initially
       mintOpen: true, // Collection is open for minting
-      mintFeeRecipient: params.mintFeeRecipient || accountAddress, // Creator receives mint fees
+      mintFeeRecipient: params.mintFeeRecipient || collectionOwner, // Creator receives mint fees
       contractURI: params.contractURI || "", // Can be set later if needed
       baseURI: params.baseURI || "", // Base URI for tokens
       maxSupply: params.maxSupply || 4294967295, // Default to max uint32
-      owner: accountAddress,
+      owner: collectionOwner, // Collection owner (can be different from signer)
     });
 
     if (!result.txHash) {
@@ -143,7 +148,7 @@ export async function createCollection(
 
       // Look for CollectionCreated event in logs
       // Event signature: CollectionCreated(address indexed collection, ...)
-      const collectionCreatedEvent = receipt.logs.find((log) => {
+      const collectionCreatedEvent = receipt.logs.find((log: Log) => {
         // CollectionCreated event signature (first 32 bytes of keccak256("CollectionCreated(address,string,string)"))
         return log.topics.length >= 2;
       });

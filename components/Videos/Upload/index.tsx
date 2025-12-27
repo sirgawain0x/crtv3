@@ -12,6 +12,7 @@ import { StepperFormValues } from "@/lib/types/hook-stepper";
 import StepperIndicator from "@/components/Videos/Upload/Stepper-Indicator";
 import CreateDetailsAndUpload from "@/components/Videos/Upload/CreateDetailsAndUpload";
 import CreateThumbnailWrapper from "@/components/Videos/Upload/CreateThumbnailWrapper";
+import { CreateDetailsAndUploadSkeleton } from "@/components/Videos/Upload/CreateDetailsAndUploadSkeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import type { TVideoMetaForm } from "@/components/Videos/Upload/Create-info";
 import { updateVideoAsset } from "@/services/video-assets";
@@ -149,7 +150,11 @@ const HookMultiStepForm = () => {
 
       {/* Step 1: Details & Upload */}
       {activeStep === 1 && (
-        <CreateDetailsAndUpload onPressNext={handleStep1Submit} />
+        loading ? (
+          <CreateDetailsAndUploadSkeleton />
+        ) : (
+          <CreateDetailsAndUpload onPressNext={handleStep1Submit} />
+        )
       )}
 
       {/* Step 2: Create Thumbnail (Formerly Step 3) */}
@@ -338,7 +343,41 @@ const HookMultiStepForm = () => {
                         25000
                       );
 
-                      if (mintResult && mintResult.success) {
+                      if (mintResult && mintResult.success && mintResult.collectionAddress && mintResult.tokenId) {
+                        // Set royalty recipient to split contract if available
+                        const splitsAddress = updatedAsset?.splits_address 
+                          ? (updatedAsset.splits_address as `0x${string}`)
+                          : undefined;
+
+                        if (splitsAddress && smartAccountClient) {
+                          try {
+                            const { setTokenRoyaltyToSplit } = await import("@/lib/sdk/nft/royalty-service");
+                            toast.info("Setting royalties to split contract...");
+                            
+                            const royaltyResult = await setTokenRoyaltyToSplit(
+                              smartAccountClient,
+                              mintResult.collectionAddress,
+                              mintResult.tokenId,
+                              splitsAddress,
+                              500 // Default 5% royalty
+                            );
+
+                            if (royaltyResult.success && royaltyResult.txHash) {
+                              console.log("Royalty set to split contract:", royaltyResult.txHash);
+                            } else {
+                              console.warn("Failed to set royalty to split:", royaltyResult.error);
+                              toast.warning("Failed to set royalties to split contract", {
+                                description: royaltyResult.error || "You can set this manually later",
+                              });
+                            }
+                          } catch (royaltyError) {
+                            console.error("Error setting royalty to split:", royaltyError);
+                            toast.warning("Error setting royalties to split contract", {
+                              description: "You can set this manually later",
+                            });
+                          }
+                        }
+
                         toast.success("NFT minted and IP registered on Story Protocol!", {
                           description: mintResult.ipId
                             ? `IP ID: ${mintResult.ipId} | Token ID: ${mintResult.tokenId}`

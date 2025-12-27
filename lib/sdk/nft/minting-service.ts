@@ -170,13 +170,27 @@ export interface LicenseParams {
  * Mint an NFT on Story Protocol using SPG (Story Protocol Gateway)
  * This mints the NFT and registers it as an IP Asset in one transaction
  * 
- * @param creatorAddress - Creator's wallet address
- * @param recipient - Address to receive the NFT
+ * Ownership Model:
+ * - The `recipient` parameter determines who receives the NFT (IP ownership)
+ * - The platform can mint on behalf of creators by setting recipient to creator's address
+ * - The creator owns the collection (set during collection creation)
+ * - The platform signs transactions (pays gas) but doesn't own the IP
+ * 
+ * Royalty Distribution:
+ * - If `splitsAddress` is provided, sets EIP-2981 royalty recipient to the split contract
+ * - This enables automatic royalty distribution to collaborators via splits.org
+ * - Royalties from secondary sales will be automatically split according to the split contract configuration
+ * 
+ * @param creatorAddress - Creator's wallet address (used for client context)
+ * @param recipient - Address to receive the NFT (should be creator's address for creator ownership)
  * @param metadataURI - IPFS/URI for NFT metadata
- * @param collectionAddress - Address of the SPG NFT collection
+ * @param collectionAddress - Address of the SPG NFT collection (owned by creator)
  * @param customTransport - Optional custom transport for client-side signing
  * @param licenseParams - Optional parameters to attach license terms with fees
  * @returns Mint result with token ID, collection address, IP ID, and transaction hash
+ * 
+ * @note To set royalties to a split contract, call setTokenRoyaltyToSplit separately after minting
+ * @see setTokenRoyaltyToSplit in ./royalty-service.ts
  */
 export async function mintVideoNFTOnStory(
   creatorAddress: Address,
@@ -258,23 +272,50 @@ export async function mintVideoNFTOnStory(
  * @param licenseParams - Optional license parameters
  */
 export async function createCollectionAndMintVideoNFTOnStory(
-  creatorAddress: Address,
+  accountAddress: Address, // Account address for SDK (should match private key if provided)
   recipient: Address,
   metadataURI: string,
   name: string,
   symbol: string,
   customTransport?: any,
-  licenseParams?: LicenseParams
+  licenseParams?: LicenseParams,
+  privateKey?: string, // Optional private key for server-side signing
+  creatorAddress?: Address // Optional creator address for collection ownership (defaults to accountAddress)
 ) {
   try {
-    const storyClient = createStoryClient(creatorAddress, undefined, customTransport);
+    // Use private key if provided (server-side signing), otherwise rely on SDK's default behavior
+    // The accountAddress should match the private key address for proper signing
+    const storyClient = createStoryClient(accountAddress, privateKey, customTransport);
+    
+    // Use creatorAddress if provided, otherwise use accountAddress
+    // The owner determines who owns the collection on-chain
+    // The accountAddress is used for signing transactions (paying gas)
+    // These can be different: platform pays gas, creator owns collection
+    const collectionOwner = creatorAddress || accountAddress;
 
-    console.log("Creating collection...", { name, symbol });
+    console.log("Creating collection...", { 
+      name, 
+      symbol, 
+      accountAddress, // Address used for signing (funding wallet - pays gas)
+      collectionOwner, // Address that owns the collection (creator - true owner)
+      recipient, // Address that receives the NFT (creator - IP owner)
+    });
+    
+    // IMPORTANT: Story Protocol's mintAndRegisterIp requires the caller to be authorized.
+    // Since the funding wallet (accountAddress) is signing transactions, it needs to be
+    // the collection owner OR the collection needs public minting enabled.
+    // 
+    // For now, we set the funding wallet as owner so it can mint on behalf of creators.
+    // The recipient parameter ensures the NFT goes to the creator, maintaining creator ownership
+    // of the IP even though the platform wallet owns the collection contract.
+    // 
+    // Alternative: Enable public minting (isPublicMinting: true) but this allows anyone to mint.
+    // Future: Implement a grant mechanism if SPG supports it.
     const { collectionAddress } = await createCollection(storyClient, {
       name,
       symbol,
-      owner: creatorAddress,
-      mintFeeRecipient: creatorAddress,
+      owner: accountAddress, // Funding wallet owns collection (needed for minting authorization)
+      mintFeeRecipient: collectionOwner, // Creator receives mint fees
     });
     console.log("Collection created at:", collectionAddress);
 

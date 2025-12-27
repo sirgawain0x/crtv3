@@ -52,6 +52,7 @@ export function useContentCoin() {
 
             // Send UserOp to deployment factory
             // Add a timeout for the UserOp sending itself as well
+            // Note: User operations require wallet signing, which can take time
             const sendOpPromise = client.sendUserOperation({
                 uo: {
                     target: METOKEN_FACTORY_ADDRESSES.base,
@@ -60,8 +61,10 @@ export function useContentCoin() {
                 },
             });
 
+            // Increased timeout to 120 seconds (2 minutes) to allow for wallet interaction
+            // This matches the timeout used in other parts of the codebase for wallet signatures
             const sendTimeoutPromise = new Promise<never>((_, reject) =>
-                setTimeout(() => reject(new Error("Send UserOp timed out")), 5000)
+                setTimeout(() => reject(new Error("Transaction signature timeout. Please check your wallet and approve the transaction, or try again.")), 120000)
             );
 
             const deployOp = await Promise.race([sendOpPromise, sendTimeoutPromise]);
@@ -116,8 +119,25 @@ export function useContentCoin() {
             return "0xMOCK_CONTENT_COIN_ADDRESS";
 
         } catch (e) {
-            console.error(e);
+            console.error('Content Coin deployment error:', e);
             setIsPending(false);
+            
+            // Provide user-friendly error messages
+            const error = e instanceof Error ? e : new Error(String(e));
+            if (error.message.includes('timeout')) {
+                toast({
+                    title: "Transaction Timeout",
+                    description: error.message || "The transaction took too long. Please check your wallet and try again.",
+                    variant: "destructive"
+                });
+            } else {
+                toast({
+                    title: "Deployment Failed",
+                    description: error.message || "Failed to deploy content coin. Please try again.",
+                    variant: "destructive"
+                });
+            }
+            
             throw e;
         }
     };

@@ -653,14 +653,27 @@ const CreateThumbnailForm = ({
               <div className="space-y-2">
                 <Label>Preview</Label>
                 <div className="relative w-full aspect-video rounded-lg overflow-hidden border">
-                  <GatewayImage
-                    src={customPreviewUrl}
-                    alt="Custom thumbnail preview"
-                    fill
-                    className="object-cover"
-                    unoptimized
-                    showSkeleton={false}
-                  />
+                  {/* Use regular img tag for blob URLs (local previews), GatewayImage for IPFS URLs */}
+                  {customPreviewUrl.startsWith('blob:') ? (
+                    <img
+                      src={customPreviewUrl}
+                      alt="Custom thumbnail preview"
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        console.error("Preview image failed to load:", e);
+                        setCustomPreviewUrl(null);
+                      }}
+                    />
+                  ) : (
+                    <GatewayImage
+                      src={customPreviewUrl}
+                      alt="Custom thumbnail preview"
+                      fill
+                      className="object-cover"
+                      unoptimized
+                      showSkeleton={false}
+                    />
+                  )}
                   {/* Show loading overlay during compression/upload */}
                   {(isCompressing || thumbnailUploading) && (
                     <div className="absolute inset-0 bg-black/50 flex items-center justify-center">

@@ -39,6 +39,7 @@
     "node_modules",
     "scripts",
     "examples",
-    "supabase/functions"
+    "supabase/functions",
+    "vitest.config.ts"
   ]
 }
