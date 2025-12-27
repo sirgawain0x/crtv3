@@ -11,7 +11,7 @@
  */
 
 import { StoryClient } from "@story-protocol/core-sdk";
-import type { Address } from "viem";
+import type { Address, Log } from "viem";
 
 /**
  * Parameters for creating an NFT collection via SPG
@@ -148,7 +148,7 @@ export async function createCollection(
 
       // Look for CollectionCreated event in logs
       // Event signature: CollectionCreated(address indexed collection, ...)
-      const collectionCreatedEvent = receipt.logs.find((log) => {
+      const collectionCreatedEvent = receipt.logs.find((log: Log) => {
         // CollectionCreated event signature (first 32 bytes of keccak256("CollectionCreated(address,string,string)"))
         return log.topics.length >= 2;
       });

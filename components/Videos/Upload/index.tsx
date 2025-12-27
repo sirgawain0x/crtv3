@@ -345,8 +345,8 @@ const HookMultiStepForm = () => {
 
                       if (mintResult && mintResult.success && mintResult.collectionAddress && mintResult.tokenId) {
                         // Set royalty recipient to split contract if available
-                        const splitsAddress = latestAsset?.splits_address 
-                          ? (latestAsset.splits_address as `0x${string}`)
+                        const splitsAddress = updatedAsset?.splits_address 
+                          ? (updatedAsset.splits_address as `0x${string}`)
                           : undefined;
 
                         if (splitsAddress && smartAccountClient) {

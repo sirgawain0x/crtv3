@@ -49,24 +49,27 @@ export function createStoryClient(
       const account = privateKeyToAccount(privateKey as `0x${string}`);
       const chainId = network === "mainnet" ? 1514 : 1315;
       
+      // Define the chain configuration for reuse
+      const chainConfig = {
+        id: chainId,
+        name: network === "mainnet" ? "Story Mainnet" : "Story Testnet (Aeneid)",
+        nativeCurrency: {
+          name: "IP",
+          symbol: "IP",
+          decimals: 18,
+        },
+        rpcUrls: {
+          default: {
+            http: [rpcUrl],
+          },
+        },
+      } as any;
+      
       // Create a wallet client with the private key for signing
       // This will be used to intercept and sign transactions
       const walletClient = createWalletClient({
         account,
-        chain: {
-          id: chainId,
-          name: network === "mainnet" ? "Story Mainnet" : "Story Testnet (Aeneid)",
-          nativeCurrency: {
-            name: "IP",
-            symbol: "IP",
-            decimals: 18,
-          },
-          rpcUrls: {
-            default: {
-              http: [rpcUrl],
-            },
-          },
-        } as any,
+        chain: chainConfig,
         transport: baseHttpTransport,
       });
       
@@ -98,6 +101,7 @@ export function createStoryClient(
               try {
                 // Sign and send the transaction as a raw transaction using the wallet client
                 const hash = await walletClient.sendTransaction({
+                  chain: chainConfig,
                   to: txParams.to as Address,
                   data: txParams.data as `0x${string}`,
                   value: txParams.value ? BigInt(txParams.value) : undefined,

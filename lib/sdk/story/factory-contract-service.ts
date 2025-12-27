@@ -21,7 +21,7 @@
  * 6. NFTs can be registered on Story Protocol as IP Assets
  */
 
-import type { Address, Hex } from "viem";
+import type { Address, Hex, Log } from "viem";
 import { encodeFunctionData, parseAbi, getAddress } from "viem";
 import { createStoryPublicClient } from "./client";
 import { createServiceClient } from "@/lib/sdk/supabase/service";
@@ -174,7 +174,7 @@ export async function deployCreatorCollection(
     // Extract collection address from the CollectionCreated event
     const COLLECTION_CREATED_EVENT_SIGNATURE = "0x4f51faf6c4561ff95f067657e43439f0f856d97c04d9eb9075eb457ab0d5e1f1";
     
-    const collectionCreatedEvent = receipt.logs.find((log) => {
+    const collectionCreatedEvent = receipt.logs.find((log: Log) => {
       return log.topics[0] === COLLECTION_CREATED_EVENT_SIGNATURE;
     });
 
