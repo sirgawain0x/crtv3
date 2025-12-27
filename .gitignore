@@ -43,3 +43,13 @@ next-env.d.ts
 .vscode/
 
 sw.js
+
+# Foundry compilation symlinks (workaround for thirdweb contract imports)
+/lib/CurrencyTransferLib.sol
+/lib/FeeType.sol
+/lib/Address.sol
+/extension
+/infra
+/external-deps
+/contracts/interface
+/eip

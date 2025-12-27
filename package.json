@@ -10,7 +10,14 @@
     "start": "next start",
     "lint": "next lint",
     "knip": "knip",
-    "postinstall": "echo 'Postinstall completed successfully'"
+    "postinstall": "echo 'Postinstall completed successfully'",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:solidity": "forge test",
+    "test:solidity:gas": "forge test --gas-report",
+    "test:solidity:fuzz": "forge test --fuzz-runs 10000",
+    "test:all": "npm run test:solidity && npm run test"
   },
   "dependencies": {
     "@0xsplits/splits-kit": "^2.2.0",
@@ -117,12 +124,15 @@
     "@types/node": "^22.15.18",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "@vitest/coverage-v8": "^2.1.0",
     "baseline-browser-mapping": "^2.8.32",
     "eslint": "^8.57.0",
     "eslint-config-next": "^15.5.3",
+    "forge-std": "^1.1.2",
     "postcss": "^8",
     "tailwindcss": "^3.4.4",
     "tsx": "^4.20.5",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "vitest": "^2.1.0"
   }
 }

@@ -154,11 +154,52 @@ Alchemy API key for Story Protocol testnet. If provided, uses Alchemy's RPC endp
 
 **Note:** Story Protocol now supports mint-and-register functionality via SPG (Story Protocol Gateway). When enabled, videos are automatically minted as NFTs and registered as IP Assets on Story Protocol in a single transaction. Each creator gets their own NFT collection address for true ownership and branding.
 
+#### `NEXT_PUBLIC_CREATOR_IP_FACTORY_ADDRESS` (Optional)
+Address of the deployed CreatorIPCollectionFactory contract on Story Protocol. If provided, the system will use the factory to deploy creator-owned collections instead of using SPG directly.
+
+**How to get it:**
+1. Deploy the factory contract using the deployment script (see `contracts/DEPLOY_FACTORY_GUIDE.md`)
+2. Copy the factory address from the deployment output
+
+**Note:** If not provided, the system will fallback to using Story Protocol SPG for collection creation.
+
+#### `STORY_PROTOCOL_PRIVATE_KEY` (Optional, Server-side only)
+Private key for a wallet that will fund Story Protocol transactions (minting NFTs, IP registration, etc.). This wallet must have IP tokens for gas fees on Story Protocol.
+
+**Important:**
+- This is a **funding wallet** - it pays for gas fees but doesn't need to match the creator's address
+- The wallet must have IP tokens on Story Protocol (testnet or mainnet depending on your configuration)
+- This is a sensitive credential - never commit to version control
+- For production, use a dedicated service wallet with limited funds
+
+**How to get IP tokens:**
+1. Get the funding wallet address by calling `/api/story/funding-wallet` (after setting the private key)
+2. Transfer IP tokens to that address using Story Protocol's testnet faucet or mainnet bridge
+3. For testnet: Use the Aeneid testnet faucet to get IP tokens
+
+**Warning:** This is a sensitive credential. Never commit this to version control. Use environment variables and secure key management in production.
+
+#### `FACTORY_OWNER_PRIVATE_KEY` (Optional, Server-side only)
+Private key of the factory owner account. Required for factory-based collection deployments. This must be kept secure and should only be used server-side.
+
+**Warning:** This is a sensitive credential. Never commit this to version control. Use environment variables and secure key management in production.
+
+#### `COLLECTION_BYTECODE` (Optional, Server-side only)
+Creation bytecode of the TokenERC721 contract. This is required for factory deployments. The bytecode should match the bytecode hash stored in the factory contract.
+
+**How to get it:**
+1. Compile the TokenERC721 contract (from `contracts/CreatorIPCollection.sol`) using Foundry
+2. Extract the bytecode from the compiled output: `out/CreatorIPCollection.sol/TokenERC721.json`
+3. Copy the `bytecode.object` field
+
+**Note:** The factory contract validates that the bytecode hash matches the stored hash, so ensure the bytecode is correct.
+
 **Documentation:**
 - [Story Protocol Documentation](https://docs.story.foundation/)
 - [Story Protocol SDK](https://github.com/storyprotocol/core-sdk)
 - [Aeneid Testnet Guide](https://docs.story.foundation/developer-guides/testnet-setup)
 - [SPG (Story Protocol Gateway)](https://docs.story.foundation/concepts/spg/overview.md)
+- [Factory Deployment Guide](./contracts/DEPLOY_FACTORY_GUIDE.md)
 
 ### 7. Optional Configuration
 
@@ -200,6 +241,17 @@ NEXT_PUBLIC_STORY_NETWORK=testnet
 NEXT_PUBLIC_STORY_RPC_URL=https://rpc.aeneid.story.foundation
 # Optional: Use Alchemy for Story Protocol (better reliability)
 # NEXT_PUBLIC_STORY_ALCHEMY_API_KEY=your_story_alchemy_key
+
+# Story Protocol Funding Wallet (Required for NFT minting and IP registration)
+# This wallet must have IP tokens for gas fees on Story Protocol
+# Get IP tokens from testnet faucet or mainnet bridge
+STORY_PROTOCOL_PRIVATE_KEY=0x...  # Server-side only - funding wallet private key
+
+# Factory Configuration (Optional - for factory-based collection deployment)
+# If provided, uses factory to deploy collections; otherwise falls back to SPG
+# NEXT_PUBLIC_CREATOR_IP_FACTORY_ADDRESS=0x...
+# FACTORY_OWNER_PRIVATE_KEY=0x...  # Server-side only - factory owner's private key
+# COLLECTION_BYTECODE=0x...  # Server-side only - TokenERC721 creation bytecode
 
 # NFT Contract Configuration (Optional - for NFT minting in upload flow)
 # Set this to your ERC-721 NFT contract address for video asset minting

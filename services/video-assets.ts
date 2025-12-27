@@ -15,6 +15,74 @@ export async function createVideoAsset(
   // which don't match Supabase JWT authentication
   const supabase = createServiceClient();
 
+  // Check if video asset with this asset_id already exists
+  const { data: existingAsset } = await supabase
+    .from('video_assets')
+    .select('*')
+    .eq('asset_id', data.asset_id)
+    .maybeSingle();
+
+  // If asset already exists, return it instead of creating a duplicate
+  if (existingAsset) {
+    console.log(`Video asset with asset_id ${data.asset_id} already exists, returning existing asset`);
+    
+    // Update collaborators if provided and different from existing
+    if (collaborators && collaborators.length > 0 && existingAsset.id) {
+      // Check if collaborators need to be updated
+      const { data: existingCollaborators } = await supabase
+        .from('video_collaborators')
+        .select('*')
+        .eq('video_id', existingAsset.id);
+
+      // Only update if collaborators are different
+      // Note: share_percentage is stored in basis points (0-10000), where 10000 = 100%
+      // collab.percentage is a percentage (0-100), so we convert to basis points for comparison
+      const needsUpdate = !existingCollaborators || 
+        existingCollaborators.length !== collaborators.length ||
+        collaborators.some((collab, index) => {
+          const existing = existingCollaborators[index];
+          return !existing || 
+            existing.collaborator_address.toLowerCase() !== collab.address.toLowerCase() ||
+            existing.share_percentage !== Math.round(collab.percentage * 100);
+        });
+
+      if (needsUpdate) {
+        // Delete existing collaborators
+        await supabase
+          .from('video_collaborators')
+          .delete()
+          .eq('video_id', existingAsset.id);
+
+        // Insert new collaborators
+        const collaboratorInserts = collaborators.map((collab, index) => {
+          let sharePercentage = Math.round(collab.percentage * 100);
+          
+          if (index === collaborators.length - 1) {
+            const previousTotal = collaborators
+              .slice(0, -1)
+              .reduce((sum, c) => sum + Math.round(c.percentage * 100), 0);
+            sharePercentage = 10000 - previousTotal;
+            if (sharePercentage < 0) sharePercentage = 0;
+            if (sharePercentage > 10000) sharePercentage = 10000;
+          }
+          
+          return {
+            video_id: existingAsset.id,
+            collaborator_address: collab.address,
+            share_percentage: sharePercentage,
+          };
+        });
+
+        await supabase
+          .from('video_collaborators')
+          .insert(collaboratorInserts);
+      }
+    }
+
+    return existingAsset;
+  }
+
+  // Create new video asset
   const { data: result, error } = await supabase
     .from('video_assets')
     .insert({
@@ -56,6 +124,10 @@ export async function createVideoAsset(
     .single();
 
   if (error) {
+    // Provide more specific error message for duplicate key constraint
+    if (error.message.includes('duplicate key') || error.message.includes('unique constraint')) {
+      throw new Error(`A video asset with this asset ID already exists. Please use a different video or check your existing uploads.`);
+    }
     throw new Error(`Failed to create video asset: ${error.message}`);
   }
 

@@ -1,0 +1,18 @@
+{
+  "network": "mainnet",
+  "chainId": 1514,
+  "factoryAddress": "0xd17c79631eae76270ea2ace8d107c258dfc77397",
+  "transactionHash": "0xdfeb7cbab9f3842b63cae543a2698b1d7ba5c340f44dc0ad9950a2cdaca3dd25",
+  "blockNumber": "12332016",
+  "deployer": "0x1Fde40a4046Eda0cA0539Dd6c77ABF8933B94260",
+  "owner": "0x1Fde40a4046Eda0cA0539Dd6c77ABF8933B94260",
+  "config": {
+    "defaultContractURI": "ipfs://QmDefaultContractURI",
+    "defaultRoyaltyRecipient": "0x0000000000000000000000000000000000000000",
+    "defaultRoyaltyBps": 500,
+    "defaultPlatformFeeRecipient": "0x0000000000000000000000000000000000000000",
+    "defaultPlatformFeeBps": 0,
+    "trustedForwarders": []
+  },
+  "deployedAt": "2025-12-27T04:21:31.905Z"
+}

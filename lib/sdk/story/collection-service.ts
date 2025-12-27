@@ -5,11 +5,35 @@
  * 
  * Manages creator NFT collections on Story Protocol.
  * Each creator gets their own collection address for true ownership and branding.
+ * 
+ * This service uses the Factory Pattern to ensure creators own their collections
+ * from day one. The platform can mint on behalf of creators using the `recipient`
+ * parameter in mintAndRegisterIp, but creators maintain full ownership.
+ * 
+ * Ownership Model:
+ * - Creator owns the collection (set as owner during creation)
+ * - Platform signs transactions (pays gas via factory owner)
+ * - Creator receives NFTs via `recipient` parameter (IP ownership)
+ * - Platform acts as a "relayer" for minting operations
+ * 
+ * Collection Creation Strategy:
+ * 1. First, try to use the factory contract (if configured)
+ * 2. Fallback to Story Protocol SPG (createCollection) if factory not available
  */
 
 import { StoryClient } from "@story-protocol/core-sdk";
 import { createStoryPublicClient } from "./client";
 import { createCollection, type CreateCollectionParams } from "./spg-service";
+import { 
+  getFactoryContractAddress, 
+  getCreatorCollectionAddress,
+  computeCollectionAddress,
+  getCollectionBytecode,
+  deployCreatorCollection 
+} from "./factory-contract-service";
+import { createWalletClient, http } from "viem";
+import { privateKeyToAccount } from "viem/accounts";
+import { getStoryRpcUrl } from "./client";
 import type { Address } from "viem";
 import { createServiceClient } from "@/lib/sdk/supabase/service";
 
@@ -58,18 +82,96 @@ export async function getOrCreateCreatorCollection(
     }
   }
 
-  // Create new collection via SPG
-  // Note: Multiple concurrent calls may both reach here, but upsert will handle the conflict
-  console.log(`Creating new collection for creator ${creatorAddress}...`);
-  const result = await createCollection(client, {
-    name: collectionName,
-    symbol: collectionSymbol,
-    owner: creatorAddress,
-    mintFeeRecipient: creatorAddress,
-  });
+  // Try to use factory contract first (if configured), then fallback to SPG
+  const factoryAddress = getFactoryContractAddress();
+  let collectionAddress: Address;
 
-  // The createCollection function now handles collection address extraction
-  const collectionAddress = result.collectionAddress;
+  if (factoryAddress) {
+    // Use factory contract directly (server-side deployment)
+    console.log(`🏭 Creating new collection via factory for creator ${creatorAddress}...`, {
+      factory: factoryAddress,
+      owner: creatorAddress, // Creator owns from day one
+    });
+
+    try {
+      // Check if collection already exists on-chain (may have been deployed but not in DB)
+      const existingOnChain = await getCreatorCollectionAddress(creatorAddress);
+      if (existingOnChain) {
+        collectionAddress = existingOnChain;
+      } else {
+        // Get bytecode and factory owner private key
+        const bytecode = getCollectionBytecode();
+        const factoryOwnerPrivateKey = process.env.FACTORY_OWNER_PRIVATE_KEY;
+
+        if (!bytecode || !factoryOwnerPrivateKey) {
+          throw new Error(
+            "Factory deployment requires COLLECTION_BYTECODE and FACTORY_OWNER_PRIVATE_KEY environment variables"
+          );
+        }
+
+        // Create wallet client with factory owner account
+        const account = privateKeyToAccount(factoryOwnerPrivateKey as `0x${string}`);
+        const rpcUrl = getStoryRpcUrl();
+        const network = process.env.NEXT_PUBLIC_STORY_NETWORK || "testnet";
+        const chainId = network === "mainnet" ? 1514 : 1315;
+
+        const walletClient = createWalletClient({
+          account,
+          chain: {
+            id: chainId,
+            name: network === "mainnet" ? "Story Mainnet" : "Story Testnet (Aeneid)",
+            nativeCurrency: {
+              name: "IP Token",
+              symbol: "IP",
+              decimals: 18,
+            },
+            rpcUrls: {
+              default: {
+                http: [rpcUrl],
+              },
+            },
+          },
+          transport: http(rpcUrl),
+        });
+
+        // Deploy collection via factory
+        const result = await deployCreatorCollection(
+          walletClient,
+          creatorAddress,
+          collectionName,
+          collectionSymbol,
+          bytecode
+        );
+
+        collectionAddress = result.collectionAddress;
+      }
+    } catch (factoryError) {
+      console.warn("Factory deployment failed, falling back to SPG:", factoryError);
+      // Fallback to SPG if factory deployment fails
+      const result = await createCollection(client, {
+        name: collectionName,
+        symbol: collectionSymbol,
+        owner: creatorAddress, // CRITICAL: Creator owns the collection
+        mintFeeRecipient: creatorAddress, // Creator receives mint fees
+      });
+      collectionAddress = result.collectionAddress;
+    }
+  } else {
+    // Factory not configured, use SPG
+    console.log(`Creating new collection via SPG for creator ${creatorAddress}...`, {
+      owner: creatorAddress, // Creator owns from day one
+      signer: (client as any).config?.account, // Platform signs (pays gas)
+    });
+    
+    const result = await createCollection(client, {
+      name: collectionName,
+      symbol: collectionSymbol,
+      owner: creatorAddress, // CRITICAL: Creator owns the collection
+      mintFeeRecipient: creatorAddress, // Creator receives mint fees
+    });
+
+    collectionAddress = result.collectionAddress;
+  }
 
   // Store collection in database with conflict handling
   // If another concurrent call already created a collection, this will either:
