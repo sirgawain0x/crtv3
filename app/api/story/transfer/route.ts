@@ -127,24 +127,27 @@ export async function POST(request: NextRequest) {
     
     const chainId = network === "mainnet" ? 1514 : 1315;
 
+    // Define the chain configuration
+    const chain = {
+      id: chainId,
+      name: network === "mainnet" ? "Story Mainnet" : "Story Testnet (Aeneid)",
+      nativeCurrency: {
+        name: "IP",
+        symbol: "IP",
+        decimals: 18,
+      },
+      rpcUrls: {
+        default: {
+          http: [rpcUrl],
+        },
+      },
+    } as const;
+
     // Create wallet client with private key for signing
     const account = privateKeyToAccount(privateKey as `0x${string}`);
     const walletClient = createWalletClient({
       account,
-      chain: {
-        id: chainId,
-        name: network === "mainnet" ? "Story Mainnet" : "Story Testnet (Aeneid)",
-        nativeCurrency: {
-          name: "IP",
-          symbol: "IP",
-          decimals: 18,
-        },
-        rpcUrls: {
-          default: {
-            http: [rpcUrl],
-          },
-        },
-      } as any,
+      chain: chain as any,
       transport: http(rpcUrl),
     });
 
@@ -172,6 +175,7 @@ export async function POST(request: NextRequest) {
     });
 
     const txHash = await walletClient.sendTransaction({
+      chain: chain as any,
       to: toAddress as Address,
       value: amountBigInt,
     });
