@@ -316,7 +316,7 @@ export function NFTMintingStep({
               </span>
             )}
           </div>
-          <Button variant="ghost" size="sm" onClick={checkBalance} disabled={isCheckingBalance}>
+          <Button variant="ghost" size="sm" onClick={() => checkBalance()} disabled={isCheckingBalance}>
             {isCheckingBalance ? <Loader2 className="h-3 w-3 animate-spin" /> : "Refresh"}
           </Button>
         </div>
