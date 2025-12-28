@@ -47,6 +47,7 @@ export function QuickTradeDialog({
   const [daiBalance, setDaiBalance] = useState<bigint>(BigInt(0));
   const [meTokenBalance, setMeTokenBalance] = useState<bigint>(BigInt(0));
   const [creatorAvatarUrl, setCreatorAvatarUrl] = useState<string | null>(null);
+  const [activeOperation, setActiveOperation] = useState<'buy' | 'sell' | null>(null);
 
   const { toast } = useToast();
   const { client } = useSmartAccountClient({});
@@ -215,6 +216,7 @@ export function QuickTradeDialog({
 
     setError(null);
     setSuccess(null);
+    setActiveOperation('buy');
 
     try {
       console.log('💰 Starting purchase...', {
@@ -252,12 +254,14 @@ export function QuickTradeDialog({
       setTimeout(() => {
         onOpenChange(false);
         setSuccess(null);
+        setActiveOperation(null);
       }, 2000);
     } catch (err) {
       console.error('❌ Error in handleBuy:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to buy MeTokens';
       setError(errorMessage);
       setSuccess(null);
+      setActiveOperation(null);
 
       // Show error toast
       toast({
@@ -306,6 +310,7 @@ export function QuickTradeDialog({
 
     setError(null);
     setSuccess(null);
+    setActiveOperation('sell');
 
     try {
       await sellMeTokens(token.address, amount);
@@ -323,12 +328,14 @@ export function QuickTradeDialog({
       setTimeout(() => {
         onOpenChange(false);
         setSuccess(null);
+        setActiveOperation(null);
       }, 2000);
     } catch (err) {
       console.error('Error in handleSell:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to sell tokens';
       setError(errorMessage);
       setSuccess(null);
+      setActiveOperation(null);
 
       toast({
         title: "Sale Failed",
@@ -338,7 +345,8 @@ export function QuickTradeDialog({
     }
   };
 
-  const isLoading = isPending || isConfirming;
+  // Only show loading state if there's an active operation and it matches the current mode
+  const isLoading = (isPending || isConfirming) && activeOperation === mode;
 
   if (!token) {
     return null;
@@ -398,11 +406,14 @@ export function QuickTradeDialog({
 
         <div className="space-y-4">
           <Tabs value={mode} onValueChange={(value) => {
-            setMode(value as 'buy' | 'sell');
-            setAmount('');
-            setPreview('0');
-            setError(null);
-            setSuccess(null);
+            // Only allow switching tabs if no operation is in progress
+            if (!isLoading) {
+              setMode(value as 'buy' | 'sell');
+              setAmount('');
+              setPreview('0');
+              setError(null);
+              setSuccess(null);
+            }
           }}>
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger
@@ -619,11 +630,11 @@ export function QuickTradeDialog({
                     : 'bg-red-600 hover:bg-red-700 text-white'
                     }`}
                 >
-                  {isLoading ? (
+                  {isLoading && activeOperation === mode ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       {isPending
-                        ? (mode === 'buy' ? 'Buying...' : 'Selling...')
+                        ? (activeOperation === 'buy' ? 'Buying...' : 'Selling...')
                         : isConfirming
                           ? 'Confirming...'
                           : 'Processing...'}

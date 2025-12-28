@@ -2,6 +2,9 @@ import { MeTokenData, MeTokenInfo } from '@/lib/hooks/metokens/useMeTokensSupaba
 import { publicClient } from '@/lib/viem';
 import { parseAbi } from 'viem';
 
+// Base mainnet Diamond contract address
+const DIAMOND_ADDRESS = '0xba5502db2aC2cBff189965e991C07109B14eB3f5' as const;
+
 // Diamond contract ABI for getMeTokenInfo function
 const DIAMOND_ABI = [
   {
@@ -158,7 +161,6 @@ export async function checkMeTokenSubscriptionFromBlockchain(meTokenAddress: str
 
     // Use the standardized ABI from contracts
     const { METOKEN_ABI } = await import('@/lib/contracts/MeToken');
-    const DIAMOND_ADDRESS = '0xba5502db2aC2cBff189965e991C07109B14eB3f5';
 
     let meTokenInfo: any = null;
 
@@ -393,7 +395,6 @@ export async function getHubVaultAddress(hubId: bigint | number): Promise<string
     // Default to Hub 1 if invalid
     const cleanHubId = hubId ? BigInt(hubId) : BigInt(1);
 
-    const DIAMOND_ADDRESS = '0xba5502db2aC2cBff189965e991C07109B14eB3f5';
     // Use JSON ABI syntax matching viem requirements
     const HUB_ABI = [
       {
@@ -504,7 +505,7 @@ export async function getHubVaultAddress(hubId: bigint | number): Promise<string
 
     if (!vaultAddress || vaultAddress === '0x0000000000000000000000000000000000000000') {
       console.warn(`⚠️ Vault address for Hub ${cleanHubId} is zero address`);
-      return '0xba5502db2aC2cBff189965e991C07109B14eB3f5'; // Fallback to Diamond if vault is missing (should verify this behavior)
+      return DIAMOND_ADDRESS; // Fallback to Diamond if vault is missing (should verify this behavior)
     }
 
     console.log(`✅ Vault address for Hub ${cleanHubId}:`, vaultAddress);
@@ -512,6 +513,6 @@ export async function getHubVaultAddress(hubId: bigint | number): Promise<string
   } catch (error) {
     console.error(`❌ Failed to get vault address:`, error);
     // Fallback to Diamond address to assume it's the spender if we fail (safe default for legacy behavior)
-    return '0xba5502db2aC2cBff189965e991C07109B14eB3f5';
+    return DIAMOND_ADDRESS;
   }
 }
