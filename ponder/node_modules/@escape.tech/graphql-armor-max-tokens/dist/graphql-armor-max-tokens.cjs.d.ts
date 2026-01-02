@@ -1,0 +1,2 @@
+export * from "./declarations/src/index.js";
+//# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJmaWxlIjoiZ3JhcGhxbC1hcm1vci1tYXgtdG9rZW5zLmNqcy5kLnRzIiwic291cmNlUm9vdCI6IiIsInNvdXJjZXMiOlsiLi9kZWNsYXJhdGlvbnMvc3JjL2luZGV4LmQudHMiXSwibmFtZXMiOltdLCJtYXBwaW5ncyI6IkFBQUEifQ==

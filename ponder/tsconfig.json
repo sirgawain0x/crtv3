@@ -1,0 +1,17 @@
+{
+    "compilerOptions": {
+        "target": "ESNext",
+        "module": "ESNext",
+        "moduleResolution": "node",
+        "resolveJsonModule": true,
+        "esModuleInterop": true,
+        "strict": true,
+        "rootDir": "src",
+        "outDir": "dist"
+    },
+    "include": [
+        "src",
+        "ponder.config.ts",
+        "ponder.schema.ts"
+    ]
+}
