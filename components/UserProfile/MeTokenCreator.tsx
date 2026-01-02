@@ -19,11 +19,11 @@ export function MeTokenCreator({ onMeTokenCreated }: MeTokenCreatorProps) {
   const [symbol, setSymbol] = useState('');
   const [daiAmount, setDaiAmount] = useState('0');
   const [localError, setLocalError] = useState<string | null>(null);
-  
+
   const user = useUser();
   const { toast } = useToast();
   const { createMeToken, isPending, isConfirming, isConfirmed, transactionError, checkUserMeToken, userMeToken } = useMeTokensSupabase();
-  
+
   // Debug: Log user state
   useEffect(() => {
     console.log('👤 User state:', { user, address: user?.address });
@@ -73,7 +73,7 @@ export function MeTokenCreator({ onMeTokenCreated }: MeTokenCreatorProps) {
 
   const handleCreateMeToken = async () => {
     console.log('🚀 handleCreateMeToken called', { name, symbol, daiAmount });
-    
+
     if (!name.trim() || !symbol.trim()) {
       setLocalError('Please fill in all fields');
       return;
@@ -101,24 +101,32 @@ export function MeTokenCreator({ onMeTokenCreated }: MeTokenCreatorProps) {
           setLocalError('You already have a MeToken. Please use the existing one or contact support if you need to create a new one.');
           return;
         }
-        
+
         // Also check subgraph for any MeTokens that might not be in database yet
         console.log('🔍 Checking subgraph for existing MeTokens...');
         const { meTokensSubgraph } = await import('@/lib/sdk/metokens/subgraph');
         const allMeTokens = await meTokensSubgraph.getAllMeTokens(20, 0);
         console.log(`📋 Found ${allMeTokens.length} recent MeTokens in subgraph`);
-        
+
         // Check if any of these MeTokens belong to our user
-        for (const meToken of allMeTokens.slice(0, 5)) {
+        const recentTokens = allMeTokens.slice(0, 5);
+        if (recentTokens.length > 0) {
           try {
-            const { getMeTokenInfoFromBlockchain } = await import('@/lib/utils/metokenUtils');
-            const meTokenInfo = await getMeTokenInfoFromBlockchain(meToken.id);
-            if (meTokenInfo && meTokenInfo.owner.toLowerCase() === user?.address?.toLowerCase()) {
-              setLocalError('You already have a MeToken. Please use the "Sync Existing MeToken" button to load it.');
-              return;
+            const { getBulkMeTokenInfo } = await import('@/lib/utils/metokenUtils');
+            const recentTokenIds = recentTokens.map(t => t.id);
+            console.log('📦 Bulk checking ownership for:', recentTokenIds);
+            const results = await getBulkMeTokenInfo(recentTokenIds);
+
+            for (const id of recentTokenIds) {
+              const info = results[id];
+              if (info && info.owner.toLowerCase() === user?.address?.toLowerCase()) {
+                console.log('✅ Found existing MeToken for user via bulk check:', id);
+                setLocalError('You already have a MeToken. Please use the "Sync Existing MeToken" button to load it.');
+                return;
+              }
             }
           } catch (err) {
-            console.warn('Failed to check MeToken ownership:', meToken.id, err);
+            console.warn('Failed to check MeToken ownership via bulk info:', err);
           }
         }
       } catch (checkErr) {
@@ -131,7 +139,7 @@ export function MeTokenCreator({ onMeTokenCreated }: MeTokenCreatorProps) {
       // Don't set success here - let the hook handle the state
     } catch (err) {
       console.error('❌ Error in createMeToken:', err);
-      
+
       // Handle specific error cases with user-friendly messages
       let errorMessage = 'Failed to create MeToken';
       if (err instanceof Error) {
@@ -148,7 +156,7 @@ export function MeTokenCreator({ onMeTokenCreated }: MeTokenCreatorProps) {
           errorMessage = err.message;
         }
       }
-      
+
       setLocalError(errorMessage);
     }
   };
@@ -164,7 +172,7 @@ export function MeTokenCreator({ onMeTokenCreated }: MeTokenCreatorProps) {
           {isConfirmed && <CheckCircle className="h-5 w-5 text-green-500" />}
         </CardTitle>
         <CardDescription>
-          Create your personal token to build a community around your success. 
+          Create your personal token to build a community around your success.
           Your MeToken will be tradeable and can appreciate in value based on demand.
         </CardDescription>
       </CardHeader>
@@ -177,7 +185,7 @@ export function MeTokenCreator({ onMeTokenCreated }: MeTokenCreatorProps) {
             </AlertDescription>
           </Alert>
         )}
-        
+
         {hasError && (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
@@ -264,8 +272,8 @@ export function MeTokenCreator({ onMeTokenCreated }: MeTokenCreatorProps) {
                 <Info className="h-3 w-3" />
                 <AlertDescription className="text-xs">
                   <strong>Need DAI?</strong> Use the account menu to:
-                  <br/>1. Click <strong>&quot;Buy&quot;</strong> to purchase USDC with Coinbase
-                  <br/>2. Click <strong>&quot;Swap&quot;</strong> to convert USDC → DAI
+                  <br />1. Click <strong>&quot;Buy&quot;</strong> to purchase USDC with Coinbase
+                  <br />2. Click <strong>&quot;Swap&quot;</strong> to convert USDC → DAI
                 </AlertDescription>
               </Alert>
             </div>
@@ -273,7 +281,7 @@ export function MeTokenCreator({ onMeTokenCreated }: MeTokenCreatorProps) {
         </div>
 
         <div className="pt-4">
-          <Button 
+          <Button
             onClick={handleCreateMeToken}
             disabled={!user || isLoading || !name.trim() || !symbol.trim() || isConfirmed}
             className="w-full"
@@ -303,7 +311,7 @@ export function MeTokenCreator({ onMeTokenCreated }: MeTokenCreatorProps) {
           <Alert className="mt-4">
             <Info className="h-4 w-4" />
             <AlertDescription className="text-xs">
-              <strong>Pro Tip:</strong> You can start with 0 DAI and add liquidity later. 
+              <strong>Pro Tip:</strong> You can start with 0 DAI and add liquidity later.
               Initial DAI deposits help bootstrap your token&apos;s value.
             </AlertDescription>
           </Alert>

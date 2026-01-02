@@ -1,9 +1,9 @@
-import { ponder } from "@/generated";
+import { ponder } from "ponder:registry";
 
-ponder.on("SoundCreatorV1:SoundEditionCreated", async ({ event, context }) => {
+ponder.on("SoundCreatorV1:SoundEditionCreated", async ({ event, context }: { event: any, context: any }) => {
     const { collection } = context.db;
-    // Access network name from context if available, otherwise fallback
-    const networkName = context.network ? context.network.name : "mainnet";
+    // Access chain name from context if available, otherwise fallback
+    const networkName = context.chain ? context.chain.name : "mainnet";
 
     await collection.create({
         id: event.args.soundEdition,
@@ -17,9 +17,9 @@ ponder.on("SoundCreatorV1:SoundEditionCreated", async ({ event, context }) => {
     });
 });
 
-ponder.on("ZoraCreator1155Factory:SetupNewContract", async ({ event, context }) => {
+ponder.on("ZoraCreator1155Factory:SetupNewContract", async ({ event, context }: { event: any, context: any }) => {
     const { collection } = context.db;
-    const networkName = context.network ? context.network.name : "optimism";
+    const networkName = context.chain ? context.chain.name : "optimism";
 
     await collection.create({
         id: event.args.newContract,

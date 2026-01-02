@@ -1,4 +1,4 @@
-import { onchainTable } from "@ponder/core";
+import { onchainTable } from "ponder";
 
 export const collection = onchainTable("collection", (t) => ({
     id: t.text().primaryKey(),
