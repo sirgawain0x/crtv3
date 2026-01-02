@@ -1,0 +1,33 @@
+{
+  "name": "@escape.tech/graphql-armor-types",
+  "version": "0.7.0",
+  "description": "Export GraphQL Armor types.",
+  "packageManager": "yarn@4.5.0",
+  "main": "dist/graphql-armor-types.cjs.js",
+  "module": "dist/graphql-armor-types.esm.js",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc -w"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Escape-Technologies/graphql-armor.git",
+    "directory": "packages/types"
+  },
+  "author": "Escape Technologies SAS",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Escape-Technologies/graphql-armor/issues"
+  },
+  "homepage": "https://github.com/Escape-Technologies/graphql-armor",
+  "dependencies": {
+    "graphql": "^16.0.0"
+  },
+  "devDependencies": {
+    "graphql": "16.8.1",
+    "typescript": "5.4.5"
+  }
+}

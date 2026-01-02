@@ -409,17 +409,27 @@ export function useMeTokensSupabase(targetAddress?: string) {
       console.log(`📋 Found ${allMeTokens.length} recent MeTokens in subgraph`);
 
       // Check if any of these MeTokens belong to our user
-      for (const meToken of allMeTokens.slice(0, 10)) {
+      // Check if any of these MeTokens belong to our user
+      const recentTokens = allMeTokens.slice(0, 10);
+      if (recentTokens.length > 0) {
         try {
-          console.log('🔍 Checking MeToken ownership:', meToken.id);
-          const { getMeTokenInfoFromBlockchain } = await import('@/lib/utils/metokenUtils');
-          const meTokenInfo = await getMeTokenInfoFromBlockchain(meToken.id);
-          if (meTokenInfo && meTokenInfo.owner.toLowerCase() === address.toLowerCase()) {
-            console.log('⚠️ User already has a MeToken in subgraph:', meToken.id);
-            throw new Error('You already have a MeToken. Please use the existing one or contact support if you need to create a new one.');
+          const { getBulkMeTokenInfo } = await import('@/lib/utils/metokenUtils');
+          const recentTokenIds = recentTokens.map(t => t.id);
+          console.log('📦 Bulk checking ownership for:', recentTokenIds);
+          const results = await getBulkMeTokenInfo(recentTokenIds);
+
+          for (const id of recentTokenIds) {
+            const info = results[id];
+            if (info && info.owner.toLowerCase() === address.toLowerCase()) {
+              console.log('⚠️ User already has a MeToken in subgraph (via bulk check):', id);
+              throw new Error('You already have a MeToken. Please use the existing one or contact support if you need to create a new one.');
+            }
           }
         } catch (err) {
-          console.warn('Failed to check MeToken ownership:', meToken.id, err);
+          if (err instanceof Error && err.message.includes('already have a MeToken')) {
+            throw err;
+          }
+          console.warn('Failed to check MeToken ownership via bulk info:', err);
         }
       }
 
@@ -1093,7 +1103,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
           // Race the sendUserOperation with timeout
           const sendMintOpPromise = client.sendUserOperation(mintOperation);
           operation = await Promise.race([sendMintOpPromise, timeoutPromise]) as any;
-          
+
           // Success - break out of retry loop
           break;
         } catch (error) {
@@ -1539,7 +1549,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
           // Race the sendUserOperation with timeout
           const sendBurnOpPromise = client.sendUserOperation(burnOperation);
           operation = await Promise.race([sendBurnOpPromise, timeoutPromise]) as any;
-          
+
           // Success - break out of retry loop
           break;
         } catch (error) {

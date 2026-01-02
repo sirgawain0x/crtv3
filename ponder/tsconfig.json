@@ -1,0 +1,29 @@
+{
+    "compilerOptions": {
+        "target": "ESNext",
+        "module": "ESNext",
+        "moduleResolution": "node",
+        "resolveJsonModule": true,
+        "esModuleInterop": true,
+        "strict": true,
+        "skipLibCheck": true,
+        "rootDir": ".",
+        "outDir": "dist",
+        "paths": {
+            "@/generated": [
+                "./generated/index.ts"
+            ],
+            "@/*": [
+                "./generated/*"
+            ]
+        }
+    },
+    "include": [
+        "src",
+        "ponder.config.ts",
+        "ponder.schema.ts",
+        "generated",
+        "ponder-env.d.ts",
+        "node_modules/ponder/src/types.d.ts"
+    ]
+}

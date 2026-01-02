@@ -248,81 +248,63 @@ export async function getMeTokenInfoFromBlockchain(meTokenAddress: string): Prom
       'function totalSupply() view returns (uint256)'
     ]);
 
-    // Get MeToken protocol info from Diamond contract
-    // Note: getMeTokenInfo returns a struct/tuple with 8 fields (no endCooldown in this view)
+    // Diamond ABI
     const DIAMOND_ADDRESS = '0xba5502db2aC2cBff189965e991C07109B14eB3f5';
     const DIAMOND_ABI = parseAbi([
       'struct MeTokenInfo { address owner; uint256 hubId; uint256 balancePooled; uint256 balanceLocked; uint256 startTime; uint256 endTime; uint256 targetHubId; address migration; }',
       'function getMeTokenInfo(address meToken) view returns (MeTokenInfo)'
     ]);
 
-    // Get basic token information and owner from Diamond - try one at a time to see which fails
-    let name, symbol, totalSupply, meTokenInfo;
+    // Use multicall to fetch all data in a single RPC request
+    const results = await publicClient.multicall({
+      contracts: [
+        {
+          address: meTokenAddress as `0x${string}`,
+          abi: ERC20_ABI,
+          functionName: 'name'
+        },
+        {
+          address: meTokenAddress as `0x${string}`,
+          abi: ERC20_ABI,
+          functionName: 'symbol'
+        },
+        {
+          address: meTokenAddress as `0x${string}`,
+          abi: ERC20_ABI,
+          functionName: 'totalSupply'
+        },
+        {
+          address: DIAMOND_ADDRESS,
+          abi: DIAMOND_ABI,
+          functionName: 'getMeTokenInfo',
+          args: [meTokenAddress as `0x${string}`]
+        }
+      ]
+    });
 
-    try {
-      console.log('📝 Fetching name...');
-      name = await publicClient.readContract({
-        address: meTokenAddress as `0x${string}`,
-        abi: ERC20_ABI,
-        functionName: 'name'
-      });
-      console.log('✅ Name:', name);
-    } catch (err) {
-      console.error('❌ Failed to get name:', err);
-      // Non-critical, continue
+    const nameResult = results[0];
+    const symbolResult = results[1];
+    const supplyResult = results[2];
+    const infoResult = results[3];
+
+    // Check for critical failures (Diamond info is critical for owner)
+    if (infoResult.status !== 'success') {
+      console.error('❌ Failed to get MeToken info from Diamond:', infoResult.error);
+      throw new Error('Failed to get MeToken info from Diamond');
     }
 
-    try {
-      console.log('🔤 Fetching symbol...');
-      symbol = await publicClient.readContract({
-        address: meTokenAddress as `0x${string}`,
-        abi: ERC20_ABI,
-        functionName: 'symbol'
-      });
-      console.log('✅ Symbol:', symbol);
-    } catch (err) {
-      console.error('❌ Failed to get symbol:', err);
-      // Non-critical, continue
-    }
+    const name = nameResult.status === 'success' ? nameResult.result as string : '';
+    const symbol = symbolResult.status === 'success' ? symbolResult.result as string : '';
+    const totalSupply = supplyResult.status === 'success' ? (supplyResult.result as bigint).toString() : '0';
+    const meTokenInfo = infoResult.result as any;
 
-    try {
-      console.log('💰 Fetching totalSupply...');
-      totalSupply = await publicClient.readContract({
-        address: meTokenAddress as `0x${string}`,
-        abi: ERC20_ABI,
-        functionName: 'totalSupply'
-      });
-      console.log('✅ TotalSupply:', totalSupply);
-    } catch (err) {
-      console.error('❌ Failed to get totalSupply:', err);
-      throw new Error('Failed to get MeToken totalSupply: ' + (err instanceof Error ? err.message : 'Unknown error'));
-    }
-
-    try {
-      console.log('👤 Fetching getMeTokenInfo from Diamond...');
-      meTokenInfo = await publicClient.readContract({
-        address: DIAMOND_ADDRESS,
-        abi: DIAMOND_ABI,
-        functionName: 'getMeTokenInfo',
-        args: [meTokenAddress as `0x${string}`]
-      });
-      console.log('✅ MeTokenInfo:', meTokenInfo);
-    } catch (err) {
-      console.error('❌ Failed to get getMeTokenInfo:', err);
-      throw new Error('Failed to get MeToken info from Diamond: ' + (err instanceof Error ? err.message : 'Unknown error'));
-    }
-
-    // Extract owner from the MeTokenInfo struct
-    // viem returns a struct as an object with named properties if defined in parseAbi
-    // or as a tuple/object if implicit. With the struct definition above, it should be an object.
-    const owner = (meTokenInfo as any).owner;
-    console.log('👤 Owner:', owner);
+    console.log('✅ Fetched MeToken info:', { name, symbol, totalSupply, owner: meTokenInfo.owner });
 
     return {
-      name: name || '',
-      symbol: symbol || '',
-      totalSupply: totalSupply.toString(),
-      owner: owner
+      name,
+      symbol,
+      totalSupply,
+      owner: meTokenInfo.owner
     };
   } catch (error) {
     console.error('❌ Failed to get MeToken info from blockchain:', error);
@@ -409,34 +391,40 @@ export async function getBulkMeTokenInfo(meTokenAddresses: string[]): Promise<Re
       'function getMeTokenInfo(address meToken) view returns (MeTokenInfo)'
     ]);
 
-    // Construct calls for totalSupply
-    const totalSupplyCalls = meTokenAddresses.map(address => ({
-      address: address as `0x${string}`,
-      abi: ERC20_ABI,
-      functionName: 'totalSupply'
-    }));
+    // Construct all calls into a single array
+    const calls = [];
 
-    // Construct calls for Diamond info
-    const diamondCalls = meTokenAddresses.map(address => ({
-      address: DIAMOND_ADDRESS as `0x${string}`,
-      abi: DIAMOND_ABI,
-      functionName: 'getMeTokenInfo',
-      args: [address as `0x${string}`]
-    }));
+    // Add totalSupply calls
+    for (const address of meTokenAddresses) {
+      calls.push({
+        address: address as `0x${string}`,
+        abi: ERC20_ABI,
+        functionName: 'totalSupply'
+      });
+    }
 
-    // Execute multicalls
-    const [totalSupplyResults, diamondResults] = await Promise.all([
-      publicClient.multicall({ contracts: totalSupplyCalls }),
-      publicClient.multicall({ contracts: diamondCalls })
-    ]);
+    // Add Diamond info calls
+    for (const address of meTokenAddresses) {
+      calls.push({
+        address: DIAMOND_ADDRESS as `0x${string}`,
+        abi: DIAMOND_ABI,
+        functionName: 'getMeTokenInfo',
+        args: [address as `0x${string}`]
+      });
+    }
 
-    const results: Record<string, any> = {};
+    // Execute single multicall
+    const results = await publicClient.multicall({ contracts: calls });
+
+    const parsedResults: Record<string, any> = {};
+    const count = meTokenAddresses.length;
 
     // Process results
-    for (let i = 0; i < meTokenAddresses.length; i++) {
+    for (let i = 0; i < count; i++) {
       const address = meTokenAddresses[i];
-      const supplyResult = totalSupplyResults[i];
-      const diamondResult = diamondResults[i];
+      // results[i] is totalSupply, results[i + count] is diamond info
+      const supplyResult = results[i] as { status: string, result: any };
+      const diamondResult = results[i + count] as { status: string, result: any };
 
       if (supplyResult.status === 'success' && diamondResult.status === 'success') {
         const totalSupply = supplyResult.result as bigint;
@@ -450,7 +438,7 @@ export async function getBulkMeTokenInfo(meTokenAddresses: string[]): Promise<Re
         const supplyLog = parseFloat(formatEther(totalSupply));
         const price = supplyLog > 0 ? tvl / supplyLog : 0;
 
-        results[address] = {
+        parsedResults[address] = {
           totalSupply: totalSupply.toString(),
           owner: info.owner,
           tvl,
@@ -459,7 +447,7 @@ export async function getBulkMeTokenInfo(meTokenAddresses: string[]): Promise<Re
       }
     }
 
-    return results;
+    return parsedResults;
   } catch (err) {
     console.error('❌ Failed to bulk fetch MeToken info:', err);
     return {};
