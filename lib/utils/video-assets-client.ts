@@ -18,25 +18,30 @@ export async function fetchVideoAssetByPlaybackId(
   playbackId: string
 ): Promise<VideoAssetResponse | null> {
   try {
-    const response = await fetch(
-      `/api/video-assets/by-playback-id/${playbackId}`,
-      {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      }
-    );
+    const url = `/api/video-assets/by-playback-id/${playbackId}`;
+    console.log(`[fetchVideoAssetByPlaybackId] Fetching from: ${url}`);
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    }).catch((fetchError) => {
+      // Catch network-level fetch errors (ECONNREFUSED, DNS issues, etc.)
+      console.error(`[fetchVideoAssetByPlaybackId] Network fetch failed for ${url}:`, fetchError);
+      throw new Error(`Network error: Unable to connect to API. ${fetchError.message || 'fetch failed'}`);
+    });
 
     if (!response.ok) {
       if (response.status === 404) {
+        console.log(`[fetchVideoAssetByPlaybackId] Video asset not found (404) for playbackId: ${playbackId}`);
         return null;
       }
-      
+
       // Check if response is JSON before trying to parse
       const contentType = response.headers.get("content-type");
       let errorMessage = `Failed to fetch video asset (${response.status} ${response.statusText})`;
-      
+
       if (contentType && contentType.includes("application/json")) {
         try {
           const errorData = await response.json();
@@ -62,14 +67,16 @@ export async function fetchVideoAssetByPlaybackId(
           console.warn("Failed to read error response text:", textError);
         }
       }
-      
+
       throw new Error(errorMessage);
     }
 
-    return await response.json();
+    const data = await response.json();
+    console.log(`[fetchVideoAssetByPlaybackId] Successfully fetched asset for playbackId: ${playbackId}`);
+    return data;
   } catch (error) {
     console.error(
-      `[fetchVideoAssetByPlaybackId] Error fetching asset:`,
+      `[fetchVideoAssetByPlaybackId] Error fetching asset for playbackId ${playbackId}:`,
       error
     );
     throw error;
@@ -94,11 +101,11 @@ export async function fetchVideoAssetByAssetId(
       if (response.status === 404) {
         return null;
       }
-      
+
       // Check if response is JSON before trying to parse
       const contentType = response.headers.get("content-type");
       let errorMessage = `Failed to fetch video asset (${response.status} ${response.statusText})`;
-      
+
       if (contentType && contentType.includes("application/json")) {
         try {
           const errorData = await response.json();
@@ -124,7 +131,7 @@ export async function fetchVideoAssetByAssetId(
           console.warn("Failed to read error response text:", textError);
         }
       }
-      
+
       throw new Error(errorMessage);
     }
 
@@ -153,11 +160,11 @@ export async function fetchVideoAssetById(
       if (response.status === 404) {
         return null;
       }
-      
+
       // Check if response is JSON before trying to parse
       const contentType = response.headers.get("content-type");
       let errorMessage = `Failed to fetch video asset (${response.status} ${response.statusText})`;
-      
+
       if (contentType && contentType.includes("application/json")) {
         try {
           const errorData = await response.json();
@@ -183,7 +190,7 @@ export async function fetchVideoAssetById(
           console.warn("Failed to read error response text:", textError);
         }
       }
-      
+
       throw new Error(errorMessage);
     }
 

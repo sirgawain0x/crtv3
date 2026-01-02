@@ -42,6 +42,11 @@ interface SwapQuoteResponse {
     };
     type: string;
     data: any;
+    calls?: Array<{
+      to: Hex;
+      data: Hex;
+      value: Hex;
+    }>;
     signatureRequest: {
       type: string;
       data: {
@@ -154,7 +159,8 @@ export class AlchemySwapService {
         },
       } : undefined,
       slippage: `0x${slippage.toString(16)}`,
-    };
+      returnRawCalls: true,
+    } as any;
 
     // Add either fromAmount or minimumToAmount
     if (fromAmount) {
@@ -201,24 +207,24 @@ export class AlchemySwapService {
     }
 
     const result = await response.json() as SwapQuoteResponse;
-    
+
     console.log('Swap quote response:', {
       hasResult: !!result.result,
       hasError: !!result.error,
       error: result.error,
       result: result.result ? 'PRESENT' : 'MISSING'
     });
-    
+
     if (result.error) {
       console.error('Swap quote error details:', {
         code: result.error.code,
         message: result.error.message,
         fullError: result.error
       });
-      
+
       // Provide more specific error messages based on the error type
       let specificMessage = result.error.message;
-      
+
       if (result.error.message?.includes('Multicall3: call failed')) {
         specificMessage = `Swap failed: Multicall3 call failed. This usually means:
 1. The account doesn't have sufficient ${fromToken} balance
@@ -237,7 +243,7 @@ Original error: ${result.error.message}`;
         specificMessage = `Smart account not deployed: Your smart account needs to be deployed on Base network ` +
           `before you can perform swaps. Try sending a small amount of ETH to your account first.`;
       }
-      
+
       throw new Error(specificMessage);
     }
 
@@ -284,7 +290,7 @@ Original error: ${result.error.message}`;
     }
 
     const result = await response.json() as SendPreparedCallsResponse;
-    
+
     if (result.error) {
       throw new Error(`RPC Error: ${result.error.message}`);
     }
@@ -315,7 +321,7 @@ Original error: ${result.error.message}`;
     }
 
     const result = await response.json() as CallStatusResponse;
-    
+
     if (result.error) {
       throw new Error(`RPC Error: ${result.error.message}`);
     }
@@ -329,18 +335,18 @@ Original error: ${result.error.message}`;
   async waitForCallCompletion(callId: string, maxAttempts = 60, intervalMs = 2000): Promise<CallStatusResponse> {
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       const status = await this.getCallStatus(callId);
-      
+
       // Status codes: 100 = Pending, 200 = Confirmed, 400 = Offchain Failure, 500 = Onchain Failure
       if (status.result.status === 200) {
         return status; // Success
       } else if (status.result.status >= 400) {
         throw new Error(`Transaction failed with status ${status.result.status}`);
       }
-      
+
       // Still pending, wait and try again
       await new Promise(resolve => setTimeout(resolve, intervalMs));
     }
-    
+
     throw new Error(`Transaction timed out after ${maxAttempts} attempts`);
   }
 

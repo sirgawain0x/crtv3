@@ -28,86 +28,81 @@ export async function submitSnapshotProposal({
 
   let payload: Record<string, unknown>;
 
+  // Check if we're dealing with an EIP-712 envelope
+  const isEip712 = 'domain' in proposal && 'types' in proposal && 'message' in proposal;
+
   if (signer) {
-    // Use signer to get address and sign message
+    // ... server-side signing logic (unchanged for now, assuming personal_sign)
+    // ...
     finalAddress = await signer.getAddress();
     payload = {
       address: finalAddress,
       ...proposal,
     };
-    // Snapshot expects the payload to be signed as a stringified JSON
-    // For EIP-191 personal_sign, sign the plain string (not hex-encoded)
     const message = JSON.stringify(payload);
     sig = await signer.signMessage(message);
   } else if (address && signature) {
-    // Use pre-signed signature
-    // CRITICAL: Use the exact proposal payload that was signed on the client
-    // Do NOT reconstruct it, as JSON.stringify() field order matters for signature verification
-    // Snapshot will verify the signature against JSON.stringify(payload), so it must match exactly
     finalAddress = address;
     sig = signature;
-    
-    // Use the exact proposal object that was signed - don't reconstruct it
-    // This ensures the JSON.stringify() output matches what was signed
-    payload = proposal as Record<string, unknown>;
-    
-    // Verify the address in the payload matches the provided address
-    // The payload should already contain the address field (set by the client)
-    const payloadAddress = payload.address as string | undefined;
-    if (!payloadAddress) {
-      return {
-        error: "Payload missing address field - cannot verify signature",
-      };
+
+    if (isEip712) {
+      // For EIP-712, the payload is the envelope itself
+      payload = proposal as Record<string, unknown>;
+
+      // Basic verification for EIP-712
+      // We check if the 'from' field in the message matches the signer address
+      const message = (proposal as any).message || {};
+      const payloadAddress = message.from;
+
+      if (!payloadAddress) {
+        return { error: "EIP-712 message missing 'from' field" };
+      }
+      if (payloadAddress.toLowerCase() !== address.toLowerCase()) {
+        return { error: "Address mismatch: message.from does not match provided address" };
+      }
+    } else {
+      // Use pre-signed signature (Personal Sign)
+      payload = proposal as Record<string, unknown>;
+
+      // Verify the address in the payload matches the provided address
+      const payloadAddress = payload.address as string | undefined;
+      if (!payloadAddress) {
+        return { error: "Payload missing address field" };
+      }
+      if (payloadAddress.toLowerCase() !== address.toLowerCase()) {
+        return { error: "Address mismatch: payload address does not match provided address" };
+      }
     }
-    if (payloadAddress.toLowerCase() !== address.toLowerCase()) {
-      return {
-        error: "Address mismatch: payload address does not match provided address",
-      };
-    }
-    
-    // Don't modify the payload - use it exactly as signed to preserve field order
   } else {
     return {
       error: "Either signer or (address and signature) must be provided",
     };
   }
 
-  // Validate required fields for Snapshot proposal
-  const requiredFields = ['space', 'type', 'title', 'body', 'choices', 'start', 'end', 'snapshot'];
-  const missingFields = requiredFields.filter(field => !(field in payload) || payload[field] === undefined);
-  
-  if (missingFields.length > 0) {
-    return {
-      error: `Missing required fields in proposal: ${missingFields.join(', ')}`,
-    };
+  // Skip deep field validation for EIP-712 for now as structure is different
+  if (!isEip712) {
+    // Validate required fields for Snapshot proposal (Personal Sign)
+    const requiredFields = ['space', 'type', 'title', 'body', 'choices', 'start', 'end', 'snapshot'];
+    const missingFields = requiredFields.filter(field => !(field in payload) || payload[field] === undefined);
+
+    if (missingFields.length > 0) {
+      return {
+        error: `Missing required fields in proposal: ${missingFields.join(', ')}`,
+      };
+    }
   }
 
-  // Validate signature format (should start with 0x and be 132 characters for 65-byte signature)
+  // Validate signature format
   if (!sig.startsWith('0x') || sig.length !== 132) {
     return {
       error: `Invalid signature format. Expected 0x-prefixed 132 character hex string, got: ${sig.length} characters`,
     };
   }
 
-  // Snapshot API format:
-  // - address: the signer's address (top level)
-  // - sig: the signature  
-  // - data: the proposal data
-  // - type: "proposal"
-  //
-  // IMPORTANT: Snapshot verifies by reconstructing the message.
-  // The exact format depends on Snapshot's implementation, but typically:
-  // - If data includes address: Snapshot verifies JSON.stringify(data)
-  // - If data excludes address: Snapshot verifies JSON.stringify({ address, ...data })
-  //
-  // Since we signed: JSON.stringify({ address, ...proposal })
-  // We'll try sending data WITH address first (as signed), which is the most direct match
-  // If that fails, we can try without address
-  
   const requestBody = {
     address: finalAddress,
     sig,
-    data: payload, // Include full payload with address as it was signed
+    data: payload,
     type: "proposal",
   };
 
@@ -148,10 +143,10 @@ export async function submitSnapshotProposal({
     // Try to parse error response for more details
     let errorMessage = `Snapshot proposal failed: ${res.statusText}`;
     let errorDetails: any = null;
-    
+
     try {
       const errorJson = JSON.parse(responseText);
-      
+
       if (errorJson.error) {
         errorMessage = `Snapshot proposal failed: ${errorJson.error}`;
         // Include additional error details if available
@@ -173,12 +168,12 @@ export async function submitSnapshotProposal({
         errorDetails = errorJson;
         errorMessage = `Snapshot proposal failed: ${res.statusText} - ${JSON.stringify(errorJson).substring(0, 200)}`;
       }
-      
+
       // For "client_error", try to extract more details
       if (errorMessage.includes("client_error") && errorJson) {
         // Log the full error response to help debug
         console.error("Snapshot client_error details - full response:", JSON.stringify(errorJson, null, 2));
-        
+
         // Check for common issues
         if (errorJson.message) {
           errorMessage = `Snapshot proposal failed: ${errorJson.message}`;
@@ -192,7 +187,7 @@ export async function submitSnapshotProposal({
       // If JSON parsing fails, include the raw response
       errorMessage = `Snapshot proposal failed: ${res.statusText} - ${responseText.substring(0, 200)}`;
     }
-    
+
     // Only log error details if they contain useful information
     if (errorDetails) {
       console.error("Snapshot error details:", errorDetails);
@@ -203,7 +198,7 @@ export async function submitSnapshotProposal({
         body: responseText.substring(0, 500),
       });
     }
-    
+
     return { error: errorMessage };
   }
 
@@ -222,16 +217,16 @@ export async function submitSnapshotProposal({
     console.log("Proposal created successfully:", json.id);
     return { id: json.id };
   }
-  
+
   // Response was OK but doesn't contain an ID - check for error fields
   const errorMessage = json.error || json.message || json.reason || "Unknown error from Snapshot API";
-  
+
   // Log the full response for debugging if it's not a success
   console.error("Snapshot returned error in successful response:", {
     status: res.status,
     response: json,
     errorMessage,
   });
-  
+
   return { error: errorMessage };
 }

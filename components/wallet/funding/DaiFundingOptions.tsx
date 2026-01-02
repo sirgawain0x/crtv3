@@ -26,23 +26,23 @@ export function DaiFundingOptions({ requiredAmount, onBalanceUpdate, className }
 
   const checkDaiBalance = useCallback(async () => {
     if (!client) return;
-    
+
     setIsLoading(true);
     setError(null);
-    
+
     try {
       const daiContract = {
         address: DAI_TOKEN_ADDRESSES.base as `0x${string}`,
         abi: erc20Abi,
       };
-      
+
       const balance = await client.readContract({
         address: daiContract.address,
         abi: daiContract.abi,
         functionName: 'balanceOf',
         args: [client.account?.address as `0x${string}`],
       }) as bigint;
-      
+
       setDaiBalance(balance);
       onBalanceUpdate?.(balance);
     } catch (err) {
@@ -105,7 +105,7 @@ export function DaiFundingOptions({ requiredAmount, onBalanceUpdate, className }
           {hasAnyDai ? 'Insufficient DAI Balance' : 'No DAI Found'}
         </CardTitle>
         <CardDescription>
-          {hasAnyDai 
+          {hasAnyDai
             ? `You have ${formatEther(daiBalance)} DAI, but need ${requiredAmount ? formatEther(BigInt(requiredAmount)) : 'more'} DAI.`
             : 'You need DAI to proceed. Choose an option below to get DAI.'
           }
@@ -133,7 +133,7 @@ export function DaiFundingOptions({ requiredAmount, onBalanceUpdate, className }
 
           <TabsContent value="buy" className="mt-4">
             <DaiFundButton
-              presetAmount={requiredAmount ? Math.ceil(parseFloat(requiredAmount)) : 50}
+              presetAmount={requiredAmount ? Math.ceil(parseFloat(formatEther(BigInt(requiredAmount)))) : 50}
               onSuccess={() => {
                 checkDaiBalance();
               }}
