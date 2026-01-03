@@ -4,11 +4,11 @@ import { useState, Suspense } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useChain, useSignMessage } from "@account-kit/react";
+import { useChain, useSigner } from "@account-kit/react";
 import { useRouter } from "next/navigation";
 import { createProposal } from "@/app/vote/create/[address]/actions";
 import { SNAPSHOT_SPACE } from "@/context/context";
-import { createPublicClient } from "viem";
+import { createPublicClient, stringToHex } from "viem";
 import { alchemy, base } from "@account-kit/infra";
 import {
   Form,
@@ -63,13 +63,12 @@ function Create() {
     smartAccountClient,
     isLoadingClient,
     isConnected,
+    walletAddress, // EOA address
     smartAccountAddress: address,
   } = useWalletStatus();
 
-  // Use signMessageAsync from AccountKit - depends on the shared smartAccountClient
-  const { signMessageAsync, isSigningMessage, error: signMessageError } = useSignMessage({
-    client: smartAccountClient || undefined,
-  });
+  // Use the signer directly to sign as EOA (Signer)
+  const signer = useSigner();
 
   const form = useForm<ProposalForm>({
     resolver: zodResolver(proposalSchema),
@@ -101,7 +100,7 @@ function Create() {
     setFormError(null);
 
     // Validate connection state
-    if (!isConnected || !address || !chain?.id) {
+    if (!isConnected || !walletAddress || !chain?.id) {
       setFormError("Please connect your wallet.");
       return;
     }
@@ -118,32 +117,10 @@ function Create() {
       return;
     }
 
-    if (!signMessageAsync) {
-      setFormError("Sign message function not available. Please refresh the page.");
+    if (!signer) {
+      setFormError("Signer not available. Please refresh the page.");
       setIsSubmitting(false);
       return;
-    }
-
-    // Check if already signing - wait for it to complete or timeout
-    if (isSigningMessage) {
-      console.warn("⚠️ Signing already in progress, waiting for completion...");
-      setFormError("Waiting for previous signing to complete...");
-
-      // Wait up to 5 seconds for it to complete
-      for (let i = 0; i < 10; i++) {
-        await new Promise(resolve => setTimeout(resolve, 500));
-        if (!isSigningMessage) {
-          console.log("✅ Previous signing completed");
-          setFormError(null);
-          break;
-        }
-      }
-
-      if (isSigningMessage) {
-        setFormError("Previous signing operation is stuck. Please refresh the page and try again.");
-        setIsSubmitting(false);
-        return;
-      }
     }
 
     const start = getUnixTimestamp(values.start, values.startTime);
@@ -158,6 +135,13 @@ function Create() {
 
     try {
       console.log("Starting proposal creation...");
+      console.log("Using signer (EOA) address:", walletAddress);
+      console.log("Signer object keys:", Object.keys(signer || {}));
+      console.log("Signer methods:",
+        Object.getOwnPropertyNames(Object.getPrototypeOf(signer) || {}).concat(
+          Object.keys(signer || {})
+        ).filter(k => typeof (signer as any)[k] === 'function')
+      );
 
       // Get current block number before signing
       console.log("Fetching block number...");
@@ -209,8 +193,9 @@ function Create() {
       }
 
       // Create proposal payload for signing with actual block number
+      // CRITICAL: Use Smart Account address for attribution, but sign with EOA signer
       const proposalPayload = {
-        address,
+        address, // Use Smart Account address
         space: SNAPSHOT_SPACE,
         type: "weighted",
         title: values.title,
@@ -228,7 +213,7 @@ function Create() {
         },
       };
 
-      // Sign the proposal message on client side using AccountKit
+      // Sign the proposal message on client side using EOA Signer
       console.log("Preparing message to sign...");
       const messageToSign = JSON.stringify(proposalPayload);
       console.log("Message to sign prepared");
@@ -239,27 +224,75 @@ function Create() {
         throw new Error("Alchemy signer iframe container not found. This may indicate the wallet connection is broken.");
       }
 
-      if (signMessageError) {
-        throw new Error(`Sign message error pre-check: ${signMessageError.message}`);
+      // Debugging Signer State
+      console.log("Signer Type:", (signer as any).signerType);
+
+      console.log("Verifying signer responsiveness...");
+      const signerAddress = await signer.getAddress();
+      console.log("Signer responded with address:", signerAddress);
+
+      if (signerAddress !== walletAddress) {
+        console.warn("Signer address mismatch!", { signerAddress, walletAddress });
       }
 
-      console.log("Calling AccountKit signMessageAsync...");
+      console.log("Calling signer.signTypedData...");
 
-      // We implement a race against a timeout because the signer sometimes hangs indefinitely
-      // if the iframe communication breaks or the user closes the popup improperly.
+      const domain = {
+        name: "snapshot",
+        version: "0.1.4",
+      } as const;
+
+      const types = {
+        Proposal: [
+          { name: "from", type: "address" },
+          { name: "space", type: "string" },
+          { name: "timestamp", type: "uint64" },
+          { name: "payload", type: "string" },
+        ],
+      } as const;
+
+      // We need to sync timestamp between envelope and payload?
+      // Usually payload contains 'timestamp' too (created timestamp).
+      // Let's ensure proposalPayload has timestamp if needed.
+      // proposalPayload has 'start', 'end', 'snapshot'. It does NOT have 'timestamp' (created).
+      // Snapshot proposals usually have a 'timestamp' field in the body too.
+      // Let's add it to proposalPayload.
+
+      const now = Math.floor(Date.now() / 1000);
+      (proposalPayload as any).timestamp = now;
+      const updatedProposalString = JSON.stringify(proposalPayload);
+
+      const typedMessage = {
+        from: address!, // Use Smart Account address here
+        space: SNAPSHOT_SPACE,
+        timestamp: now as any, // Cast to any to avoid TS error with BigInt requirement, as number works at runtime
+        payload: updatedProposalString
+      };
+
+      console.log("Signing Typed Data:", { domain, types, message: typedMessage });
+
       let signature: string;
       try {
-        const signPromise = signMessageAsync({
-          message: messageToSign,
+        // signer.signTypedData signature: (params: { domain, types, primaryType, message })
+        const signPromise = signer.signTypedData({
+          domain,
+          types,
+          primaryType: "Proposal",
+          message: typedMessage,
         });
 
-        // Race the signing against a 60 second timeout (users may take time to approve)
         const timeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error("Signing timed out. Please check if the popup was blocked or closed.")), 60000);
+          setTimeout(() => reject(new Error("Signing timed out after 60s.")), 60000);
         });
 
-        signature = await Promise.race([signPromise, timeoutPromise]);
-        console.log("✅ Message signed successfully");
+        // The signer returns a signature directly
+        const result = await Promise.race([signPromise, timeoutPromise]);
+        signature = result as string;
+
+        console.log("✅ Typed Data Signed successfully:", signature);
+
+        // Temporarily stop here to verify success
+        // throw new Error("EIP-712 Signing Worked! Implementation needed for backend.");
       } catch (error) {
         console.error("❌ Error signing message:", error);
         throw error instanceof Error
@@ -269,16 +302,24 @@ function Create() {
 
       console.log("Submitting proposal to server...");
 
+      // Construct the full EIP-712 envelope to send to the server
+      const envelope = {
+        domain,
+        types,
+        message: typedMessage
+      };
+
       const result = await createProposal({
         title: values.title,
         content: values.content,
         choices: values.choices.map((c) => c.value),
         start,
         end,
-        address,
+        address: address!, // Use Smart Account address for attribution
         chainId: chain.id,
         signature,
-        proposalPayload,
+        // Pass the full envelope as the payload for EIP-712
+        proposalPayload: envelope as any,
       });
 
       if (result?.serverError) {

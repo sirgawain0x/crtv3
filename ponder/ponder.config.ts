@@ -3,6 +3,7 @@ import { http } from "viem";
 
 import { SoundCreatorV1Abi } from "./abis/SoundCreatorV1Abi";
 import { ZoraCreator1155FactoryAbi } from "./abis/ZoraCreator1155FactoryAbi";
+import { SupercollectorFactoryAbi } from "./abis/SupercollectorFactoryAbi";
 
 export default createConfig({
     chains: {
@@ -24,8 +25,8 @@ export default createConfig({
             abi: SoundCreatorV1Abi,
             chain: {
                 mainnet: {
-                    address: "0x78E3aDc0E811e4f93BD9F1f9389b923c9A3355c2",
-                    startBlock: 18000000,
+                    address: "0xAef3e8c8723D9c31863BE8dE54dF2668Ef7c4B89",
+                    startBlock: 15570834,
                 },
             },
         },
@@ -33,13 +34,22 @@ export default createConfig({
             abi: ZoraCreator1155FactoryAbi,
             chain: {
                 base: {
-                    address: "0x777777C338d93e2C7CAF734d0557096d2b6348ef", // Commonly used deterministic address for Zora
-                    startBlock: 6000000,
+                    address: "0x777777751622c0d3258f214F9DF38E35BF45baF3",
+                    startBlock: 2000000,
                 },
                 optimism: {
-                    address: "0x777777C338d93e2C7CAF734d0557096d2b6348ef",
-                    startBlock: 6000000,
+                    address: "0x777777751622c0d3258f214F9DF38E35BF45baF3",
+                    startBlock: 105000000,
                 }
+            },
+        },
+        SupercollectorFactory: {
+            abi: SupercollectorFactoryAbi,
+            chain: {
+                optimism: {
+                    address: "0x68392873003d60229011c14cf2970365e9c8bd3f",
+                    startBlock: 96976821,
+                },
             },
         },
     },

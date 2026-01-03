@@ -47,6 +47,7 @@ export function TokenBalance() {
   const { client } = useSmartAccountClient({});
   const user = useUser();
   const { chain } = useChain();
+  const [ethBalance, setEthBalance] = useState<bigint | null>(null);
   const [usdcBalance, setUsdcBalance] = useState<bigint | null>(null);
   const [daiBalance, setDaiBalance] = useState<bigint | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -58,18 +59,19 @@ export function TokenBalance() {
 
     async function getBalances() {
       if (!isMounted) return;
-      
+
       // Create a new AbortController for this effect
       abortController = new AbortController();
       const signal = abortController.signal;
-      
+
       setIsLoading(true);
       setError(null);
-      
+
       try {
         const address = client?.account?.address || user?.address;
         if (!address || !chain) {
           if (isMounted && !signal.aborted) {
+            setEthBalance(null);
             setUsdcBalance(null);
             setDaiBalance(null);
             setIsLoading(false);
@@ -84,6 +86,7 @@ export function TokenBalance() {
           console.warn(`Unsupported chain ID: ${chain.id}`);
           if (isMounted && !signal.aborted) {
             setError(`Unsupported chain (ID: ${chain.id})`);
+            setEthBalance(null);
             setUsdcBalance(null);
             setDaiBalance(null);
             setIsLoading(false);
@@ -96,10 +99,26 @@ export function TokenBalance() {
           transport: http(),
         });
 
+        // Get ETH balance
+        try {
+          if (!isMounted || signal.aborted) return;
+          const ethBalance = await publicClient.getBalance({
+            address: address as `0x${string}`
+          });
+          if (isMounted && !signal.aborted) {
+            setEthBalance(ethBalance);
+          }
+        } catch (error) {
+          if (isMounted && !signal.aborted) {
+            console.error("Error fetching ETH balance:", error);
+            setEthBalance(null);
+          }
+        }
+
         // Get USDC balance
         try {
           if (!isMounted || signal.aborted) return;
-          
+
           const usdcTokenContract = getUsdcTokenContract(chainKey);
           const usdcBalance = (await publicClient.readContract({
             address: usdcTokenContract.address,
@@ -120,7 +139,7 @@ export function TokenBalance() {
         // Get DAI balance
         try {
           if (!isMounted || signal.aborted) return;
-          
+
           const daiTokenContract = getDaiTokenContract(chainKey);
           const daiBalance = (await publicClient.readContract({
             address: daiTokenContract.address,
@@ -141,6 +160,7 @@ export function TokenBalance() {
         if (isMounted && !signal.aborted) {
           console.error("Error fetching balances:", error);
           setError(error instanceof Error ? error.message : "Unknown error");
+          setEthBalance(null);
           setUsdcBalance(null);
           setDaiBalance(null);
         }
@@ -168,32 +188,45 @@ export function TokenBalance() {
           <CardTitle className="text-sm font-medium">Balances</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <Image
-              src="/images/tokens/usdc-logo.svg"
-              alt="USDC"
-              width={16}
-              height={16}
-              className="w-4 h-4"
-            />
-            <span className="text-sm">USDC</span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Image
+                src="/images/tokens/eth-logo.svg"
+                alt="ETH"
+                width={16}
+                height={16}
+                className="w-4 h-4"
+              />
+              <span className="text-sm">ETH</span>
+            </div>
+            <Skeleton className="h-5 w-16" />
           </div>
-          <Skeleton className="h-5 w-16" />
-        </div>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <Image
-              src="/images/tokens/dai-logo.svg"
-              alt="DAI"
-              width={16}
-              height={16}
-              className="w-4 h-4"
-            />
-            <span className="text-sm">DAI</span>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Image
+                src="/images/tokens/usdc-logo.svg"
+                alt="USDC"
+                width={16}
+                height={16}
+                className="w-4 h-4"
+              />
+              <span className="text-sm">USDC</span>
+            </div>
+            <Skeleton className="h-5 w-16" />
           </div>
-          <Skeleton className="h-5 w-16" />
-        </div>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Image
+                src="/images/tokens/dai-logo.svg"
+                alt="DAI"
+                width={16}
+                height={16}
+                className="w-4 h-4"
+              />
+              <span className="text-sm">DAI</span>
+            </div>
+            <Skeleton className="h-5 w-16" />
+          </div>
         </CardContent>
       </Card>
     );
@@ -220,6 +253,23 @@ export function TokenBalance() {
         <CardTitle className="text-sm font-medium">Balances</CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <Image
+              src="/images/tokens/eth-logo.svg"
+              alt="ETH"
+              width={16}
+              height={16}
+              className="w-4 h-4"
+            />
+            <span className="text-sm">ETH</span>
+          </div>
+          <span className="text-sm font-medium">
+            {ethBalance
+              ? formatBalance(formatUnits(ethBalance, 18))
+              : "0"}
+          </span>
+        </div>
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <Image

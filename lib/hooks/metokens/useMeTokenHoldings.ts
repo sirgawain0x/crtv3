@@ -168,12 +168,12 @@ export interface UseMeTokenHoldingsResult {
 
 export function useMeTokenHoldings(targetAddress?: string): UseMeTokenHoldingsResult {
   const user = useUser();
-  const { client } = useSmartAccountClient({});
+  const { client, address: scaAddress } = useSmartAccountClient({});
   const [holdings, setHoldings] = useState<MeTokenHolding[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const address = targetAddress || user?.address;
+  const address = targetAddress || scaAddress || user?.address;
 
   const fetchHoldings = useCallback(async () => {
     if (!address || !client) {
@@ -185,7 +185,12 @@ export function useMeTokenHoldings(targetAddress?: string): UseMeTokenHoldingsRe
     setError(null);
 
     try {
-      console.log('🔍 Fetching MeToken holdings for address:', address);
+      console.log('🔍 Fetching MeToken holdings for address:', {
+        resolvedAddress: address,
+        scaAddress,
+        userAddress: user?.address,
+        targetAddress
+      });
 
       // Get all MeTokens from subgraph with error handling
       let allMeTokens;

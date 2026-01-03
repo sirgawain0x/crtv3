@@ -4,20 +4,22 @@ const PONDER_URL = process.env.NEXT_PUBLIC_PONDER_URL || 'http://localhost:42069
 
 export const ponderClient = new GraphQLClient(PONDER_URL);
 
-interface TrendingToken {
+export interface TrendingToken {
+  id: string;
+  tokenId: string;
+  mintCount: string;
+  collection: {
     id: string;
-    tokenId: string;
-    mintCount: string;
-    collection: {
-        id: string;
-        owner: string;
-        network: string;
-        platform: string;
-    };
+    owner: string;
+    network: string;
+    platform: string;
+    name?: string;
+    image?: string;
+  };
 }
 
 export const getTrendingMusic = async (): Promise<TrendingToken[]> => {
-    const query = `
+  const query = `
     query GetTrendingMusic {
       tokens(orderBy: "mintCount", orderDirection: "desc", limit: 20) {
         id
@@ -32,6 +34,6 @@ export const getTrendingMusic = async (): Promise<TrendingToken[]> => {
       }
     }
   `;
-    const data = await ponderClient.request<{ tokens: TrendingToken[] }>(query);
-    return data.tokens;
+  const data = await ponderClient.request<{ tokens: TrendingToken[] }>(query);
+  return data.tokens;
 };

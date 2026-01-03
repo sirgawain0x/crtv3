@@ -30,6 +30,7 @@ const SelectTrigger = React.forwardRef<
       "focus:outline-none focus:ring-1 focus:ring-ring",
       "disabled:cursor-not-allowed disabled:opacity-50",
       "[&>span]:line-clamp-1",
+      "touch-manipulation",
       className
     )}
     {...props}
@@ -86,7 +87,7 @@ const SelectContent = React.forwardRef<
       ref={ref}
       className={cn(
         [
-          "relative z-50 min-w-[8rem] overflow-y-auto overflow-x-hidden",
+          "relative z-[99999] min-w-[8rem] overflow-y-auto overflow-x-hidden",
           "rounded-md border bg-popover text-popover-foreground shadow-md",
           "max-h-[--radix-select-content-available-height]",
         ].join(" "),
@@ -99,12 +100,12 @@ const SelectContent = React.forwardRef<
         "data-[side=top]:slide-in-from-bottom-2",
         "origin-[--radix-select-content-transform-origin]",
         position === "popper" &&
-          [
-            "data-[side=bottom]:translate-y-1",
-            "data-[side=left]:-translate-x-1",
-            "data-[side=right]:translate-x-1",
-            "data-[side=top]:-translate-y-1",
-          ].join(" "),
+        [
+          "data-[side=bottom]:translate-y-1",
+          "data-[side=left]:-translate-x-1",
+          "data-[side=right]:translate-x-1",
+          "data-[side=top]:-translate-y-1",
+        ].join(" "),
         className
       )}
       position={position}
@@ -115,7 +116,7 @@ const SelectContent = React.forwardRef<
         className={cn(
           "p-1",
           position === "popper" &&
-            "h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)]"
+          "h-[var(--radix-select-trigger-height)] w-full min-w-[var(--radix-select-trigger-width)]"
         )}
       >
         {children}

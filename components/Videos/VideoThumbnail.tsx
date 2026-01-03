@@ -53,22 +53,27 @@ const VideoThumbnail: React.FC<VideoThumbnailProps> = ({
         setIsLoading(true);
 
         // First, try to get thumbnail from database
-        const dbAsset = await fetchVideoAssetByPlaybackId(playbackId);
-        if (dbAsset && (dbAsset as any).thumbnail_url && (dbAsset as any).thumbnail_url.trim() !== "") {
-          console.log('Found database thumbnail:', (dbAsset as any).thumbnail_url);
-          // Convert failing gateways to alternative gateways
-          const convertedUrl = convertFailingGateway((dbAsset as any).thumbnail_url);
-          setThumbnailUrl(convertedUrl);
-          setIsLoading(false);
-          return;
+        try {
+          const dbAsset = await fetchVideoAssetByPlaybackId(playbackId);
+          if (dbAsset && (dbAsset as any).thumbnail_url && (dbAsset as any).thumbnail_url.trim() !== "") {
+            console.log('Found database thumbnail:', (dbAsset as any).thumbnail_url);
+            // Convert failing gateways to alternative gateways
+            const convertedUrl = convertFailingGateway((dbAsset as any).thumbnail_url);
+            setThumbnailUrl(convertedUrl);
+            setIsLoading(false);
+            return;
+          }
+        } catch (dbError) {
+          // Log the error but don't throw - we'll fall back to Livepeer VTT
+          console.warn(`Failed to fetch database thumbnail for ${playbackId}, falling back to Livepeer VTT:`, dbError);
         }
 
-        // If no database thumbnail, try Livepeer VTT thumbnails
+        // If no database thumbnail or error, try Livepeer VTT thumbnails
         console.log('No database thumbnail found, trying Livepeer VTT for:', playbackId);
         const url = await getThumbnailUrl(playbackId);
         // Convert failing gateways to alternative gateways
         const convertedUrl = url ? convertFailingGateway(url) : null;
-        
+
         // Fallback to default thumbnail if no thumbnail found
         if (!convertedUrl) {
           setThumbnailUrl("/Creative_TV.png");
@@ -133,19 +138,19 @@ const VideoThumbnail: React.FC<VideoThumbnailProps> = ({
           return;
         }
         if (!isMounted || !previewVideoRef.current) return;
-        
+
         // NotAllowedError is expected when autoplay is blocked by browser policy
         // This is normal browser behavior - we handle it by falling back to muted playback
-        const isAutoplayBlocked = err instanceof Error && 
-          (err.name === 'NotAllowedError' || 
-           err.message?.includes('user didn\'t interact') ||
-           err.message?.includes('play() failed'));
-        
+        const isAutoplayBlocked = err instanceof Error &&
+          (err.name === 'NotAllowedError' ||
+            err.message?.includes('user didn\'t interact') ||
+            err.message?.includes('play() failed'));
+
         if (!isAutoplayBlocked) {
           // Only log unexpected errors
           console.warn("Autoplay unmuted failed with unexpected error, trying muted", err);
         }
-        
+
         // Fallback to muted playback (browsers allow muted autoplay)
         vid.muted = true;
         setIsMuted(true);

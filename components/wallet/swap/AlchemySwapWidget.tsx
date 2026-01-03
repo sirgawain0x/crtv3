@@ -17,6 +17,7 @@ import { CurrencyConverter } from '@/lib/utils/currency-converter';
 interface AlchemySwapWidgetProps {
   onSwapSuccess?: () => void;
   className?: string;
+  hideHeader?: boolean;
 }
 
 interface SwapState {
@@ -31,9 +32,9 @@ interface SwapState {
   transactionHash: string | null;
 }
 
-export function AlchemySwapWidget({ onSwapSuccess, className }: AlchemySwapWidgetProps) {
+export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false }: AlchemySwapWidgetProps) {
   const { address, client } = useSmartAccountClient({});
-  
+
   const [swapState, setSwapState] = useState<SwapState>({
     fromToken: 'ETH',
     toToken: 'USDC',
@@ -122,14 +123,14 @@ export function AlchemySwapWidget({ onSwapSuccess, className }: AlchemySwapWidge
     const fetchBalances = async () => {
       try {
         console.log('Fetching balances for address:', address);
-        
+
         // Get ETH balance
         const ethBalance = await client.getBalance({
           address: address as Address,
         });
-        
+
         console.log('ETH balance (wei):', ethBalance.toString());
-        
+
         // Get USDC balance (ERC20)
         let usdcBalance = 0n;
         try {
@@ -167,7 +168,7 @@ export function AlchemySwapWidget({ onSwapSuccess, className }: AlchemySwapWidge
         } catch (e) {
           console.warn('Failed to fetch DAI balance:', e);
         }
-        
+
         const newBalances: Record<TokenSymbol, string> = {
           ETH: AlchemySwapService.parseAmount(`0x${ethBalance.toString(16)}` as Hex, 'ETH'),
           USDC: AlchemySwapService.parseAmount(`0x${usdcBalance.toString(16)}` as Hex, 'USDC'),
@@ -176,7 +177,7 @@ export function AlchemySwapWidget({ onSwapSuccess, className }: AlchemySwapWidge
 
         console.log('Parsed balances:', newBalances);
         setBalances(newBalances);
-        
+
         // Check if the account has any ETH at all
         if (ethBalance === 0n) {
           console.warn('Account has zero ETH balance. This may cause swap failures.');
@@ -191,7 +192,7 @@ export function AlchemySwapWidget({ onSwapSuccess, className }: AlchemySwapWidge
             error: prev.error?.includes('zero ETH balance') ? null : prev.error
           }));
         }
-        
+
       } catch (error) {
         console.error('Error fetching balances:', error);
       }
@@ -200,96 +201,111 @@ export function AlchemySwapWidget({ onSwapSuccess, className }: AlchemySwapWidge
     fetchBalances();
   }, [address, client]);
 
-  const handleFromTokenChange = (value: string) => {
-    const newFromToken = value as TokenSymbol;
-    setSwapState(prev => ({
-      ...prev,
-      fromToken: newFromToken,
-      toToken: prev.fromToken, // Swap the tokens
-      fromAmount: '',
-      toAmount: '',
-      quote: null,
-      error: null,
-    }));
-  };
-
-  const handleToTokenChange = (value: string) => {
-    const newToToken = value as TokenSymbol;
-    setSwapState(prev => ({
-      ...prev,
-      toToken: newToToken,
-      fromAmount: '',
-      toAmount: '',
-      quote: null,
-      error: null,
-    }));
-  };
-
-  const handleFromAmountChange = async (value: string) => {
-    setSwapState(prev => ({ ...prev, fromAmount: value, toAmount: '', quote: null, error: null }));
-    
-    if (!value || parseFloat(value) <= 0 || !address) return;
+  const fetchQuote = async (amount: string, fromToken: TokenSymbol, toToken: TokenSymbol) => {
+    if (!amount || parseFloat(amount) <= 0 || !address) {
+      setSwapState(prev => ({ ...prev, fromAmount: amount, quote: null, error: null }));
+      return;
+    }
 
     try {
-      setSwapState(prev => ({ ...prev, isLoading: true }));
-      
-      // Check if the amount is greater than the available balance
-      const availableBalance = parseFloat(balances[swapState.fromToken]);
-      const requestedAmount = parseFloat(value);
-      
-      if (requestedAmount > availableBalance) {
-        setSwapState(prev => ({
-          ...prev,
-          error: `Insufficient balance. You have ${availableBalance} ${swapState.fromToken}, ` +
-            `but trying to swap ${requestedAmount} ${swapState.fromToken}`,
-        }));
-        return;
-      }
-      
-      const fromAmountHex = AlchemySwapService.formatAmount(value, swapState.fromToken);
-      
+      setSwapState(prev => ({ ...prev, isLoading: true, error: null }));
+
+      const fromAmountHex = AlchemySwapService.formatAmount(amount, fromToken);
+
       console.log('Requesting swap quote:', {
         from: address,
-        fromToken: swapState.fromToken,
-        toToken: swapState.toToken,
-        fromAmount: value,
+        fromToken,
+        toToken,
+        fromAmount: amount,
         fromAmountHex,
-        availableBalance
       });
-      
+
       const quoteResponse = await alchemySwapService.requestSwapQuote({
         from: address as Address,
-        fromToken: swapState.fromToken,
-        toToken: swapState.toToken,
+        fromToken,
+        toToken,
         fromAmount: fromAmountHex,
       });
 
       if (quoteResponse.result?.quote) {
         const toAmount = AlchemySwapService.parseAmount(
           quoteResponse.result.quote.minimumToAmount,
-          swapState.toToken
+          toToken
         );
-        
+
         setSwapState(prev => ({
           ...prev,
+          fromAmount: amount,
           toAmount,
           quote: quoteResponse.result,
+          isLoading: false,
         }));
+      } else {
+        setSwapState(prev => ({ ...prev, isLoading: false, quote: null }));
       }
     } catch (error) {
       console.error('Error getting quote:', error);
       setSwapState(prev => ({
         ...prev,
+        isLoading: false,
+        quote: null,
         error: error instanceof Error ? error.message : 'Failed to get quote',
       }));
-    } finally {
-      setSwapState(prev => ({ ...prev, isLoading: false }));
     }
+  };
+
+  const handleFromTokenChange = async (value: string) => {
+    const newFromToken = value as TokenSymbol;
+    const currentToToken = swapState.toToken;
+    let newToToken = currentToToken;
+
+    // If selecting same token as destination, swap them
+    if (newFromToken === currentToToken) {
+      newToToken = swapState.fromToken;
+    }
+
+    setSwapState(prev => ({
+      ...prev,
+      fromToken: newFromToken,
+      toToken: newToToken,
+    }));
+
+    // Re-fetch quote if we have an amount
+    if (swapState.fromAmount && parseFloat(swapState.fromAmount) > 0) {
+      await fetchQuote(swapState.fromAmount, newFromToken, newToToken);
+    }
+  };
+
+  const handleToTokenChange = async (value: string) => {
+    const newToToken = value as TokenSymbol;
+    const currentFromToken = swapState.fromToken;
+    let newFromToken = currentFromToken;
+
+    // If selecting same token as source, swap them
+    if (newToToken === currentFromToken) {
+      newFromToken = swapState.toToken;
+    }
+
+    setSwapState(prev => ({
+      ...prev,
+      fromToken: newFromToken,
+      toToken: newToToken,
+    }));
+
+    // Re-fetch quote if we have an amount
+    if (swapState.fromAmount && parseFloat(swapState.fromAmount) > 0) {
+      await fetchQuote(swapState.fromAmount, newFromToken, newToToken);
+    }
+  };
+
+  const handleFromAmountChange = async (value: string) => {
+    setSwapState(prev => ({ ...prev, fromAmount: value }));
+    await fetchQuote(value, swapState.fromToken, swapState.toToken);
   };
 
   const handleUSDInputChange = async (value: string) => {
     setUsdInput(value);
-    
+
     if (!value || parseFloat(value) <= 0) {
       setSwapState(prev => ({ ...prev, fromAmount: '', toAmount: '', quote: null, error: null }));
       return;
@@ -305,7 +321,7 @@ export function AlchemySwapWidget({ onSwapSuccess, className }: AlchemySwapWidge
         parseFloat(value),
         swapState.fromToken
       );
-      
+
       // Check balance before requesting quote
       const availableBalance = parseFloat(balances[swapState.fromToken]);
       if (tokenAmount > availableBalance) {
@@ -317,7 +333,7 @@ export function AlchemySwapWidget({ onSwapSuccess, className }: AlchemySwapWidge
         }));
         return;
       }
-      
+
       // Update the token amount and trigger quote
       await handleFromAmountChange(tokenAmount.toFixed(6));
     } catch (error) {
@@ -333,7 +349,7 @@ export function AlchemySwapWidget({ onSwapSuccess, className }: AlchemySwapWidge
   const handleInputModeToggle = () => {
     setInputMode(prev => {
       const newMode = prev === 'token' ? 'usd' : 'token';
-      
+
       // When switching to USD mode, calculate USD value from token amount
       if (newMode === 'usd' && swapState.fromAmount) {
         const calculateUSD = async () => {
@@ -345,7 +361,7 @@ export function AlchemySwapWidget({ onSwapSuccess, className }: AlchemySwapWidge
         };
         calculateUSD();
       }
-      
+
       return newMode;
     });
   };
@@ -358,7 +374,7 @@ export function AlchemySwapWidget({ onSwapSuccess, className }: AlchemySwapWidge
 
   const handleMaxAmount = async () => {
     const availableBalance = parseFloat(balances[swapState.fromToken]);
-    
+
     if (availableBalance <= 0) {
       setSwapState(prev => ({ ...prev, error: `No ${swapState.fromToken} balance available` }));
       return;
@@ -375,16 +391,23 @@ export function AlchemySwapWidget({ onSwapSuccess, className }: AlchemySwapWidge
     }
   };
 
-  const handleSwapTokens = () => {
+  const handleSwapTokens = async () => {
+    const newFrom = swapState.toToken;
+    const newTo = swapState.fromToken;
+    const newFromAmount = swapState.toAmount;
+
     setSwapState(prev => ({
       ...prev,
-      fromToken: prev.toToken,
-      toToken: prev.fromToken,
-      fromAmount: prev.toAmount,
-      toAmount: prev.fromAmount,
-      quote: null,
-      error: null,
+      fromToken: newFrom,
+      toToken: newTo,
+      fromAmount: newFromAmount,
+      toAmount: '', // Clear toAmount until new quote comes in
+      quote: null
     }));
+
+    if (newFromAmount && parseFloat(newFromAmount) > 0) {
+      await fetchQuote(newFromAmount, newFrom, newTo);
+    }
   };
 
 
@@ -394,262 +417,129 @@ export function AlchemySwapWidget({ onSwapSuccess, className }: AlchemySwapWidge
     try {
       setSwapState(prev => ({ ...prev, isSwapping: true, error: null }));
 
-      console.log('Executing swap with EIP-7702:', swapState.quote);
+      console.log('Executing swap with structure:', swapState.quote);
 
       // ========== PRE-FLIGHT CHECKS ==========
-      
-      // Check 1: Verify account has ETH balance
+
       const ethBalance = await client.getBalance({ address });
       console.log('ETH Balance:', formatEther(ethBalance), 'ETH');
-      
-      // Check 2: Verify smart account is deployed
-      // Use eth_getCode to check if contract code exists at the address
-      let isDeployed = true; // Default to true, will check below
-      
+
+      let isDeployed = true;
       try {
         const code = await client.transport.request({
           method: "eth_getCode",
           params: [address, "latest"],
         }) as Hex;
-        
-        console.log('🔍 Deployment check:', {
-          address,
-          codeLength: code?.length,
-          codePreview: code?.slice(0, 20),
-          isEmpty: code === '0x' || code === '0x0' || !code,
-        });
-        
-        // Only mark as not deployed if we definitely get empty code
         isDeployed = code && code.length > 2 && code !== '0x' && code !== '0x0';
-        
-        if (!isDeployed) {
-          console.warn('⚠️ Account appears not deployed. Code returned:', code);
-          // Only throw if we have ETH balance (account should be deployed if it has balance)
-          if (ethBalance > BigInt(0)) {
-            console.log('✓ Account has balance, assuming deployed despite code check');
-            isDeployed = true; // Override - if account has balance, it's likely deployed
-          } else {
-            throw new Error(
-              '🚀 Smart account not deployed yet!\n\n' +
-              'Your smart account address:\n' + address + '\n\n' +
-              '📝 To deploy your account:\n' +
-              '1. Send at least 0.001 ETH to the address above\n' +
-              '2. Use Base Bridge: https://bridge.base.org\n' +
-              '3. Or buy ETH on Coinbase and withdraw to Base network\n\n' +
-              '💡 The account will auto-deploy when it receives ETH.\n' +
-              'Check deployment status: https://basescan.org/address/' + address
-            );
-          }
-        } else {
-          console.log('✓ Account deployed successfully');
-        }
+        if (!isDeployed) console.warn('⚠️ Account appears not deployed.');
       } catch (error) {
-        // If deployment check fails, log but don't block if account has balance
         console.warn('⚠️ Deployment check failed:', error);
-        if (ethBalance > BigInt(0)) {
-          console.log('✓ Account has balance, proceeding with swap');
-          isDeployed = true;
-        } else {
-          throw error; // Re-throw if no balance
-        }
       }
 
-      // Check 3: Ensure minimum ETH for gas (0.001 ETH minimum recommended)
       const minGasEth = parseEther('0.001');
       if (ethBalance < minGasEth) {
-        throw new Error(
-          `Insufficient ETH for gas fees. You need at least 0.001 ETH, ` +
-            `but you have ${formatEther(ethBalance)} ETH. Please add more ETH to your account.`
-        );
+        console.warn(`Low ETH balance (${formatEther(ethBalance)} ETH). Swap might fail if not sponsored.`);
       }
 
-      // Check 4: If swapping FROM ETH, verify total ETH needed
-      if (swapState.fromToken === 'ETH') {
-        const quoteData = swapState.quote.data;
-        const swapAmount = BigInt(quoteData.value || '0x0');
-        // Need swap amount + buffer for gas
-        const totalNeeded = swapAmount + minGasEth;
-        
-        console.log('ETH Swap Check:', {
-          swapAmount: formatEther(swapAmount),
-          gasBuffer: formatEther(minGasEth),
-          totalNeeded: formatEther(totalNeeded),
-          available: formatEther(ethBalance),
-          sufficient: ethBalance >= totalNeeded
-        });
-        
-        if (ethBalance < totalNeeded) {
-          throw new Error(
-            `Insufficient ETH. You need ${formatEther(totalNeeded)} ETH total ` +
-            `(${formatEther(swapAmount)} for swap + 0.001 ETH for gas), ` +
-            `but you have ${formatEther(ethBalance)} ETH`
-          );
-        }
-      }
+      console.log('✓ Pre-flight checks passed');
 
-      console.log('✓ All pre-flight checks passed');
+      // ========== EXECUTE CALLS ==========
 
-      // ========== INSPECT QUOTE STRUCTURE ==========
-      console.log('📦 Full quote structure:', JSON.stringify(swapState.quote, null, 2));
-      console.log('📦 Quote type:', swapState.quote.type);
-      console.log('📦 Quote data keys:', Object.keys(swapState.quote.data || {}));
+      // Use the raw calls returned by the API (includes Approval + Swap)
+      // Note: We need to cast to any because the type definition update might not be picked up yet
+      const calls = (swapState.quote as any).calls;
 
-      // ========== TOKEN APPROVAL CHECK ==========
-      
-      // If swapping FROM an ERC-20 token (not ETH), we need to check approval
-      if (swapState.fromToken !== 'ETH') {
-        console.log(`📋 Checking ${swapState.fromToken} approval...`);
-        
-        const tokenAddress = BASE_TOKENS[swapState.fromToken] as Address;
-        const quoteData = swapState.quote.data;
-        const spenderAddress = quoteData.sender as Address; // The router/multicall contract
-        const swapAmountHex = AlchemySwapService.formatAmount(swapState.fromAmount, swapState.fromToken);
-        const swapAmount = BigInt(swapAmountHex);
-        
-        try {
-          // Check current allowance
-          const allowance = await client.readContract({
-            address: tokenAddress,
-            abi: erc20Abi,
-            functionName: 'allowance',
-            args: [address as Address, spenderAddress],
-          }) as bigint;
-          
-          console.log(`Current allowance: ${allowance.toString()}, needed: ${swapAmount.toString()}`);
-          
-          // If allowance is insufficient, request approval
-          if (allowance < swapAmount) {
-            console.log('⚠️ Insufficient allowance, requesting approval...');
-            
-            // Set flag to indicate we're doing approval
-            setIsApprovingToken(true);
-            
-            // Send approval transaction with max allowance to avoid future approvals
-            const approvalData = encodeFunctionData({
-              abi: erc20Abi,
-              functionName: 'approve',
-              args: [spenderAddress, maxUint256], // Max approval
-            });
-            
-            console.log(`📝 Sending approval for ${swapState.fromToken}...`);
-            
-            // Use direct client method for approval too
-            const approvalOp = await client.sendUserOperation({
-              uo: {
-                target: tokenAddress,
-                data: approvalData as Hex,
-                value: BigInt(0),
-              },
-            });
-            
-            console.log('✅ Approval UserOperation sent:', approvalOp.hash);
-            
-            // Wait for approval to be mined
-            const approvalTxHash = await client.waitForUserOperationTransaction({
-              hash: approvalOp.hash,
-            });
-            
-            console.log('✅ Approval confirmed! Hash:', approvalTxHash);
-            console.log('✅ Proceeding to swap...');
-          } else {
-            console.log('✅ Sufficient allowance already exists');
+      if (calls && Array.isArray(calls) && calls.length > 0) {
+        console.log(`📦 Found ${calls.length} prepared calls from API`);
+
+        let txHash: Hex | null = null;
+
+        // Execute calls sequentially to ensure Approval confirms before Swap checks
+        for (let i = 0; i < calls.length; i++) {
+          const call = calls[i];
+          const isLast = i === calls.length - 1;
+          const description = i === 0 && calls.length > 1 ? 'Approval' : 'Swap';
+
+          console.log(`🚀 Sending ${description} UserOperation (${i + 1}/${calls.length})...`, {
+            target: call.to,
+            value: call.value,
+            dataLength: call.data.length
+          });
+
+          const operation = await client.sendUserOperation({
+            uo: {
+              target: call.to,
+              data: call.data,
+              value: BigInt(call.value || '0x0'),
+            }
+          });
+
+          console.log(`🎉 ${description} UserOperation sent! Hash:`, operation.hash);
+
+          // Wait for confirmation
+          const receipt = await client.waitForUserOperationTransaction({
+            hash: operation.hash,
+          });
+
+          console.log(`✅ ${description} confirmed! TxHash:`, receipt);
+
+          if (isLast) {
+            txHash = receipt;
           }
-        } catch (approvalError) {
-          setIsApprovingToken(false);
-          console.error('Approval failed:', approvalError);
-          throw new Error(
-            `Failed to approve ${swapState.fromToken} for swap. ` +
-            (approvalError instanceof Error ? approvalError.message : 'Please try again.')
-          );
         }
+
+        // Update state with success (use the last hash)
+        setSwapState(prev => ({
+          ...prev,
+          transactionHash: txHash,
+          isSwapping: false,
+        }));
+
+        onSwapSuccess?.();
+
+      } else {
+        // Fallback for legacy quote structure (UserOperation object)
+        console.warn('⚠️ No raw calls found, attempting legacy UserOperation execution...');
+
+        const quoteData = swapState.quote.data;
+        const target = (quoteData.target || quoteData.sender || address) as Address;
+
+        const operation = await client.sendUserOperation({
+          uo: {
+            target,
+            data: quoteData.callData as Hex,
+            value: BigInt(quoteData.value || '0x0'),
+          },
+        });
+
+        const txHash = await client.waitForUserOperationTransaction({
+          hash: operation.hash,
+        });
+
+        setSwapState(prev => ({
+          ...prev,
+          transactionHash: txHash,
+          isSwapping: false,
+        }));
+
+        onSwapSuccess?.();
       }
-
-      // ========== EXECUTE SWAP ==========
-
-      // Extract the call data from the quote's user operation
-      const quoteData = swapState.quote.data;
-      
-      console.log('🔄 Quote data structure:', {
-        sender: quoteData.sender,
-        target: quoteData.target,
-        callDataLength: quoteData.callData?.length,
-        value: quoteData.value,
-        hasCallGasLimit: !!quoteData.callGasLimit,
-        fullQuote: quoteData,
-      });
-
-      // IMPORTANT: The target should be extracted from the callData
-      // Alchemy's swap quotes contain multicall data where the first call is the actual swap
-      // The sender is the user's account, we need to extract the actual target from callData
-      
-      // For now, use the sender as the target since it's a self-call multicall pattern
-      // The account will execute the multicall which contains the swap instructions
-      const target = (quoteData.target || quoteData.sender || address) as Address;
-      
-      console.log('📍 Using target address:', target);
-      console.log('📍 Call data:', quoteData.callData);
-      
-      // Use client.sendUserOperation directly to bypass EIP-5792 wallet_prepareCalls
-      // This uses the traditional EIP-4337 UserOperation flow
-      console.log('🚀 Sending UserOperation via direct client method...');
-      
-      const operation = await client.sendUserOperation({
-        uo: {
-          target,
-          data: quoteData.callData as Hex,
-          value: BigInt(quoteData.value || '0x0'),
-        },
-      });
-
-      console.log('🎉 UserOperation sent! Hash:', operation.hash);
-      console.log('⏳ Waiting for transaction confirmation...');
-      
-      // Wait for the UserOperation to be mined
-      const txHash = await client.waitForUserOperationTransaction({
-        hash: operation.hash,
-      });
-      
-      console.log('✅ Transaction mined! Hash:', txHash);
-      
-      // Update state with success
-      setSwapState(prev => ({
-        ...prev,
-        transactionHash: txHash,
-        isSwapping: false,
-      }));
-      
-      onSwapSuccess?.();
 
     } catch (error) {
       console.error('❌ Swap failed:', error);
-      setIsApprovingToken(false); // Reset approval flag
-      
-      // Provide user-friendly error messages
+      setIsApprovingToken(false);
+
       let userMessage = 'Swap execution failed';
       const errorStr = error instanceof Error ? error.message : String(error);
-      
+
       if (errorStr.includes('AA23')) {
-        userMessage = 
-          '⚠️ Transaction validation failed (AA23 error).\n\n' +
-          'This usually means:\n' +
-          '• Insufficient ETH for gas fees\n' +
-          '• Insufficient token balance for swap\n' +
-          '• Token approval required\n\n' +
-          'Please check your balances and try again.';
-      } else if (errorStr.includes('AA24')) {
-        userMessage = 'Transaction signature error. Please try again.';
-      } else if (errorStr.includes('AA25')) {
-        userMessage = 'Invalid signature. Please reconnect your wallet.';
-      } else if (errorStr.includes('insufficient')) {
-        userMessage = errorStr; // Use our detailed insufficient balance message
-      } else if (errorStr.includes('not deployed')) {
-        userMessage = errorStr; // Use our account deployment message
-      } else if (errorStr.includes('User rejected') || errorStr.includes('user rejected')) {
-        userMessage = 'Transaction cancelled by user';
+        userMessage = 'Transaction validation failed (AA23). Check balances and gas.';
+      } else if (errorStr.includes('Multicall3')) {
+        userMessage = 'Swap failed (Multicall3). This often means the Swap Validation failed. Ensure you have USDC/ETH and the account is properly deployed.';
       } else {
         userMessage = errorStr;
       }
-      
+
       setSwapState(prev => ({
         ...prev,
         error: userMessage,
@@ -658,11 +548,11 @@ export function AlchemySwapWidget({ onSwapSuccess, className }: AlchemySwapWidge
     }
   };
 
-  const canExecuteSwap = 
-    swapState.fromAmount && 
-    parseFloat(swapState.fromAmount) > 0 && 
-    swapState.quote && 
-    !swapState.isLoading && 
+  const canExecuteSwap =
+    swapState.fromAmount &&
+    parseFloat(swapState.fromAmount) > 0 &&
+    swapState.quote &&
+    !swapState.isLoading &&
     !swapState.isSwapping &&
     swapState.fromToken !== swapState.toToken;
 
@@ -702,7 +592,7 @@ export function AlchemySwapWidget({ onSwapSuccess, className }: AlchemySwapWidge
               <div>{swapState.error}</div>
               {swapState.error.includes('Insufficient balance') && address && (
                 <div className="mt-2 text-xs">
-                  <a 
+                  <a
                     href={`/send?address=${address}`}
                     className="underline hover:text-destructive-foreground"
                   >
@@ -717,8 +607,8 @@ export function AlchemySwapWidget({ onSwapSuccess, className }: AlchemySwapWidge
         {address && balances[swapState.fromToken] && parseFloat(balances[swapState.fromToken]) === 0 && !swapState.error && (
           <Alert>
             <AlertDescription className="text-sm">
-              You don&apos;t have any {swapState.fromToken} to swap. 
-              <a 
+              You don&apos;t have any {swapState.fromToken} to swap.
+              <a
                 href={`/send?address=${address}`}
                 className="ml-1 underline hover:text-primary"
               >
@@ -774,16 +664,27 @@ export function AlchemySwapWidget({ onSwapSuccess, className }: AlchemySwapWidge
             </div>
           </div>
           <div className="flex gap-2">
-            <div className="flex items-center space-x-2 p-2 border rounded bg-background w-32">
+            <div className="relative flex items-center space-x-2 px-3 border rounded-md bg-background w-28 sm:w-32 h-10">
+              {/* Native Select for Mobile */}
+              <select
+                className="absolute inset-0 w-full h-full opacity-0 z-10 cursor-pointer md:hidden"
+                value={swapState.fromToken}
+                onChange={(e) => handleFromTokenChange(e.target.value as TokenSymbol)}
+              >
+                <option value="ETH">ETH</option>
+                <option value="USDC">USDC</option>
+                <option value="DAI">DAI</option>
+              </select>
+
               <Image
                 src={`/images/tokens/${swapState.fromToken.toLowerCase()}-logo.svg`}
                 alt={swapState.fromToken}
                 width={20}
                 height={20}
-                className="w-5 h-5"
+                className="w-5 h-5 shrink-0"
               />
               <Select value={swapState.fromToken} onValueChange={handleFromTokenChange}>
-                <SelectTrigger className="w-full bg-transparent border-none outline-none p-0 h-auto">
+                <SelectTrigger className="w-full bg-transparent border-none outline-none p-0 h-auto focus:ring-0">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -798,12 +699,12 @@ export function AlchemySwapWidget({ onSwapSuccess, className }: AlchemySwapWidge
                 type="number"
                 placeholder={inputMode === 'usd' ? '0.00' : '0.0'}
                 value={inputMode === 'usd' ? usdInput : swapState.fromAmount}
-                onChange={(e) => 
-                  inputMode === 'usd' 
+                onChange={(e) =>
+                  inputMode === 'usd'
                     ? handleUSDInputChange(e.target.value)
                     : handleFromAmountChange(e.target.value)
                 }
-                className={inputMode === 'usd' ? 'pl-6 pr-20' : 'pr-20'}
+                className={inputMode === 'usd' ? 'pl-6 pr-20 h-10' : 'pr-20 h-10'}
                 disabled={swapState.isLoading || swapState.isSwapping}
               />
               {inputMode === 'usd' && (
@@ -838,7 +739,7 @@ export function AlchemySwapWidget({ onSwapSuccess, className }: AlchemySwapWidge
               <span>@ {PriceService.formatUSD(prices[swapState.fromToken])}</span>
             )}
           </div>
-          
+
           {/* Quick Amount Presets */}
           {inputMode === 'usd' && (
             <div className="space-y-2">
@@ -860,8 +761,8 @@ export function AlchemySwapWidget({ onSwapSuccess, className }: AlchemySwapWidge
               {address && balances[swapState.fromToken] && parseFloat(balances[swapState.fromToken]) > 0 && (
                 <div className="text-xs text-muted-foreground text-right">
                   Max: ~{PriceService.formatUSD(
-                    usdValues.fromAmount > 0 
-                      ? parseFloat(balances[swapState.fromToken]) * prices[swapState.fromToken] 
+                    usdValues.fromAmount > 0
+                      ? parseFloat(balances[swapState.fromToken]) * prices[swapState.fromToken]
                       : 0
                   )}
                 </div>
@@ -886,16 +787,27 @@ export function AlchemySwapWidget({ onSwapSuccess, className }: AlchemySwapWidge
         <div className="space-y-2">
           <label className="text-sm font-medium">You Receive</label>
           <div className="flex gap-2">
-            <div className="flex items-center space-x-2 p-2 border rounded bg-background w-32">
+            <div className="relative flex items-center space-x-2 px-3 border rounded-md bg-background w-28 sm:w-32 h-10">
+              {/* Native Select for Mobile */}
+              <select
+                className="absolute inset-0 w-full h-full opacity-0 z-10 cursor-pointer md:hidden"
+                value={swapState.toToken}
+                onChange={(e) => handleToTokenChange(e.target.value as TokenSymbol)}
+              >
+                <option value="ETH">ETH</option>
+                <option value="USDC">USDC</option>
+                <option value="DAI">DAI</option>
+              </select>
+
               <Image
                 src={`/images/tokens/${swapState.toToken.toLowerCase()}-logo.svg`}
                 alt={swapState.toToken}
                 width={20}
                 height={20}
-                className="w-5 h-5"
+                className="w-5 h-5 shrink-0"
               />
               <Select value={swapState.toToken} onValueChange={handleToTokenChange}>
-                <SelectTrigger className="w-full bg-transparent border-none outline-none p-0 h-auto">
+                <SelectTrigger className="w-full bg-transparent border-none outline-none p-0 h-auto focus:ring-0">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -911,7 +823,7 @@ export function AlchemySwapWidget({ onSwapSuccess, className }: AlchemySwapWidge
                 placeholder="0.0"
                 value={swapState.toAmount}
                 readOnly
-                className="bg-muted pr-20"
+                className="bg-muted pr-20 h-10"
               />
               {usdValues.toAmount > 0 && (
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
