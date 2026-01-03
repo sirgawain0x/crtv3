@@ -32,7 +32,7 @@ function resolveWasmUrl(url: string, baseOrigin: string): string {
   // XMTP WASM files are typically in /_next/static/media/ or /_next/static/chunks/
   if (url.startsWith('./') || url.startsWith('../')) {
     const basePath = url.replace(/^\.\//, '').replace(/^\.\.\//, '');
-    
+
     // Try common Next.js WASM paths
     const possiblePaths = [
       `/_next/static/media/${basePath}`,
@@ -40,7 +40,7 @@ function resolveWasmUrl(url: string, baseOrigin: string): string {
       `/_next/static/wasm/${basePath}`,
       `/${basePath}`,
     ];
-    
+
     try {
       return new URL(possiblePaths[0], baseOrigin).href;
     } catch (e) {
@@ -109,8 +109,8 @@ function getAppOrigin(): string {
   if (process.env.NODE_ENV === 'development') {
     console.warn('[WASM Patch] Using fallback origin. This may cause issues.');
   }
-  return typeof window !== 'undefined' && window.location 
-    ? window.location.origin 
+  return typeof window !== 'undefined' && window.location
+    ? window.location.origin
     : 'http://localhost:3000';
 }
 
@@ -124,12 +124,20 @@ export function patchGlobalFetch(): void {
   }
 
   const context = typeof window !== 'undefined' ? window : self;
-  
-  // Store original fetch
-  const originalFetch = context.fetch.bind(context);
-  
-  // Store original for reference
+
+  // CRITICAL: Check if already patched to prevent infinite recursion
+  if ((context as any).__WASM_FETCH_PATCHED__) {
+    return;
+  }
+
+  // Store REAL original fetch before any patching
+  const originalFetch = (context as any).__ORIGINAL_FETCH__ || context.fetch.bind(context);
+
+  // Store original for reference and future calls
   (context as any).__ORIGINAL_FETCH__ = originalFetch;
+
+  // Mark as patched
+  (context as any).__WASM_FETCH_PATCHED__ = true;
 
   // Patch fetch
   context.fetch = async function (
@@ -140,22 +148,35 @@ export function patchGlobalFetch(): void {
       // Convert input to string URL
       let url: string;
       let needsConversion = false;
-      
+
       if (typeof input === 'string') {
         url = input;
+        // CRITICAL: Skip patching for ANY fully-qualified URL
+        // Only patch relative paths to .wasm files
+        if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('blob:')) {
+          return originalFetch(input, init);
+        }
         // Check if it's a relative or absolute path that needs conversion
-        if (url.endsWith('.wasm') && !url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('blob:')) {
+        if (url.endsWith('.wasm')) {
           needsConversion = true;
         }
       } else if (input instanceof URL) {
         url = input.href;
+        // Skip patching for ANY fully-qualified URL
+        if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('blob:')) {
+          return originalFetch(input, init);
+        }
         // Check if URL object has a relative path
-        if (url.endsWith('.wasm') && !url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('blob:')) {
+        if (url.endsWith('.wasm')) {
           needsConversion = true;
         }
       } else if (input instanceof Request) {
         url = input.url;
-        if (url.endsWith('.wasm') && !url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('blob:')) {
+        // Skip patching for ANY fully-qualified URL
+        if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('blob:')) {
+          return originalFetch(input, init);
+        }
+        if (url.endsWith('.wasm')) {
           needsConversion = true;
         }
       } else {
@@ -168,11 +189,11 @@ export function patchGlobalFetch(): void {
         // For relative or absolute paths, resolve against app origin
         const appOrigin = getAppOrigin();
         const absoluteUrl = resolveWasmUrl(url, appOrigin);
-        
+
         if (process.env.NODE_ENV === 'development') {
           console.log('[WASM Patch] Converting WASM URL:', url, '->', absoluteUrl, '(context:', typeof window !== 'undefined' ? 'main' : 'worker', ', origin:', appOrigin, ')');
         }
-        
+
         // Use original fetch with absolute URL
         if (typeof input === 'string') {
           return originalFetch(absoluteUrl, init);
@@ -273,10 +294,10 @@ function interceptWorkerCreation(): void {
 
   const OriginalWorker = window.Worker;
   const appOrigin = window.location.origin;
-  
+
   // Store original for reference
   (window as any).__ORIGINAL_WORKER__ = OriginalWorker;
-  
+
   // Store origin globally for workers to access
   (window as any).__WASM_APP_ORIGIN__ = appOrigin;
 
@@ -285,16 +306,16 @@ function interceptWorkerCreation(): void {
       try {
         // Call original constructor
         super(scriptURL, options);
-        
+
         // Immediately send origin to worker via postMessage
         // This must happen as early as possible
         try {
           // Use setTimeout to ensure worker is ready
           setTimeout(() => {
             try {
-              this.postMessage({ 
-                type: 'WASM_ORIGIN', 
-                origin: appOrigin 
+              this.postMessage({
+                type: 'WASM_ORIGIN',
+                origin: appOrigin
               });
             } catch (e) {
               // Ignore if worker not ready
@@ -309,7 +330,7 @@ function interceptWorkerCreation(): void {
       }
     }
   } as typeof Worker;
-  
+
   console.log('[WASM Patch] Worker interception enabled, origin:', appOrigin);
 }
 
@@ -323,7 +344,7 @@ function patchURLConstructor(): void {
 
   const context = typeof window !== 'undefined' ? window : self;
   const OriginalURL = context.URL;
-  
+
   // Get app origin
   const getOrigin = () => {
     if (typeof window !== 'undefined' && window.location) {
@@ -350,7 +371,7 @@ function patchURLConstructor(): void {
 
   // Store original for reference
   (context as any).__ORIGINAL_URL__ = OriginalURL;
-  
+
   // Patch URL constructor
   context.URL = class PatchedURL extends OriginalURL {
     constructor(url: string | URL, base?: string | URL) {
@@ -358,14 +379,14 @@ function patchURLConstructor(): void {
         // Convert URL to string if it's a URL object
         const urlString = typeof url === 'string' ? url : url.href;
         const appOrigin = getOrigin();
-        
+
         // CRITICAL: If constructing a WASM file URL, always use app origin
         // This handles the case where XMTP does: new URL('/_next/static/media/...', blobUrl)
         if (urlString.endsWith('.wasm')) {
           // If base is a blob URL or missing, always use app origin
           const baseIsBlob = base && typeof base === 'string' && base.startsWith('blob:');
           const baseIsInvalid = base && typeof base === 'string' && !base.startsWith('http');
-          
+
           if (!base || baseIsBlob || baseIsInvalid || (typeof self !== 'undefined' && typeof window === 'undefined')) {
             // Handle absolute paths (starting with /)
             if (urlString.startsWith('/')) {
@@ -380,7 +401,7 @@ function patchURLConstructor(): void {
               }
               return;
             }
-            
+
             // Handle relative paths
             const cleanPath = urlString.replace(/^\.\//, '').replace(/^\.\.\//, '');
             const absolutePath = cleanPath.startsWith('/') ? cleanPath : `/_next/static/media/${cleanPath}`;
@@ -395,7 +416,7 @@ function patchURLConstructor(): void {
             return;
           }
         }
-        
+
         // For non-WASM URLs, check if base is problematic
         if (base && typeof base === 'string' && base.startsWith('blob:')) {
           const urlString = typeof url === 'string' ? url : url.href;
@@ -405,7 +426,7 @@ function patchURLConstructor(): void {
             return;
           }
         }
-        
+
         // If no base provided in worker context, use app origin
         if (!base && typeof self !== 'undefined' && typeof window === 'undefined') {
           const urlString = typeof url === 'string' ? url : url.href;
@@ -415,7 +436,7 @@ function patchURLConstructor(): void {
             return;
           }
         }
-        
+
         // Default: use original URL constructor
         super(url, base);
       } catch (error) {
@@ -451,7 +472,7 @@ function patchURLConstructor(): void {
       }
     }
   } as typeof URL;
-  
+
   // Mark as patched
   (context as any).__WASM_URL_PATCHED__ = true;
 }
@@ -462,7 +483,7 @@ function patchURLConstructor(): void {
 export function initWasmPatch(): void {
   // Patch URL constructor first (handles new URL() calls)
   patchURLConstructor();
-  
+
   // Patch fetch immediately
   patchGlobalFetch();
 
@@ -491,10 +512,10 @@ export function initWasmPatch(): void {
     // This must happen before any WASM loading
     patchURLConstructor();
     patchGlobalFetch();
-    
+
     // Try to get origin from multiple sources
     let appOrigin: string | null = null;
-    
+
     // 1. Check for stored origin from main thread
     if ((self as any).__WASM_APP_ORIGIN__) {
       appOrigin = (self as any).__WASM_APP_ORIGIN__;
@@ -502,7 +523,7 @@ export function initWasmPatch(): void {
         console.log('[WASM Patch] Worker: Using stored origin:', appOrigin);
       }
     }
-    
+
     // 2. Try to extract from blob URL
     if (!appOrigin && self.location && self.location.href) {
       if (self.location.href.startsWith('blob:')) {
@@ -526,7 +547,7 @@ export function initWasmPatch(): void {
         }
       }
     }
-    
+
     // 3. Listen for origin from main thread (most reliable)
     if (typeof addEventListener !== 'undefined') {
       const messageHandler = (event: MessageEvent) => {
@@ -545,7 +566,7 @@ export function initWasmPatch(): void {
       };
       addEventListener('message', messageHandler);
     }
-    
+
     if (process.env.NODE_ENV === 'development') {
       console.log('[WASM Patch] Worker: Patches applied, origin:', appOrigin || 'pending');
     }

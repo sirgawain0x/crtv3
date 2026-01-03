@@ -19,21 +19,39 @@ export interface TrendingToken {
 }
 
 export const getTrendingMusic = async (): Promise<TrendingToken[]> => {
-  const query = `
-    query GetTrendingMusic {
-      tokens(orderBy: "mintCount", orderDirection: "desc", limit: 20) {
-        id
-        tokenId
-        mintCount
-        collection {
-          id
-          owner
-          network
-          platform
+  try {
+    const query = `
+      query GetTrendingMusic {
+        collections(orderBy: "createdAt", orderDirection: "desc", limit: 20) {
+          items {
+            id
+            owner
+            network
+            platform
+            name
+            image
+            createdAt
+          }
         }
       }
-    }
-  `;
-  const data = await ponderClient.request<{ tokens: TrendingToken[] }>(query);
-  return data.tokens;
+    `;
+    const data = await ponderClient.request<{ collections: { items: any[] } }>(query);
+
+    return data.collections.items.map(collection => ({
+      id: collection.id,
+      tokenId: "0", // Default as we are fetching collections
+      mintCount: "0", // Default as we don't have mint counts indexed yet
+      collection: {
+        id: collection.id,
+        owner: collection.owner,
+        network: collection.network,
+        platform: collection.platform,
+        name: collection.name || `New ${collection.platform} Drop`,
+        image: collection.image || ""
+      }
+    }));
+  } catch (error) {
+    console.error('Failed to fetch from Ponder (is the server running at ' + PONDER_URL + '?):', error);
+    return []; // Return empty array if Ponder is unavailable
+  }
 };

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { MarketToken, MarketStats } from '@/app/api/market/tokens/route';
+import { useMarketRealtime } from './useMarketRealtime';
 
 export interface MarketFilters {
   type: 'all' | 'metoken' | 'content_coin';
@@ -79,7 +80,7 @@ export function useMarketData(options: UseMarketDataOptions = {}): UseMarketData
       });
 
       const response = await fetch(`/api/market/tokens?${params.toString()}`);
-      
+
       if (!response.ok) {
         throw new Error(`Failed to fetch market data: ${response.statusText}`);
       }
@@ -142,7 +143,7 @@ export function useMarketData(options: UseMarketDataOptions = {}): UseMarketData
 
   // Auto-refresh - use ref to track if we should refresh
   const shouldRefreshRef = useRef(true);
-  
+
   useEffect(() => {
     if (!autoRefresh) return;
 
@@ -172,6 +173,36 @@ export function useMarketData(options: UseMarketDataOptions = {}): UseMarketData
   const refresh = useCallback(async () => {
     await fetchMarketData();
   }, [fetchMarketData]);
+
+  // Real-time updates
+  const handleRealtimeUpdate = useCallback(async (tokenAddress: string) => {
+    // Debounce or throttle could be added here
+    console.log(`⚡ Real-time update for ${tokenAddress}`);
+
+    try {
+      // Fetch fresh data for this specific token
+      const response = await fetch(`/api/market/tokens/${tokenAddress}/fresh`);
+      if (response.ok) {
+        const result = await response.json();
+        if (result.data) {
+          setTokens(prevTokens =>
+            prevTokens.map(t =>
+              t.address.toLowerCase() === tokenAddress.toLowerCase()
+                ? { ...t, ...result.data } // Merge fresh data
+                : t
+            )
+          );
+        }
+      }
+    } catch (error) {
+      console.error('Failed to fetch fresh token data:', error);
+    }
+  }, []);
+
+  useMarketRealtime(tokens, {
+    enabled: autoRefresh, // Only use WSS if auto-refresh is on (or add specific flag)
+    onUpdate: handleRealtimeUpdate
+  });
 
   return {
     tokens,

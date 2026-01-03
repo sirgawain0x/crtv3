@@ -20,34 +20,15 @@ export interface NinaRelease {
 
 export const getNinaTrending = async (): Promise<TrendingToken[]> => {
     try {
-        const response = await fetch('https://api.ninaprotocol.com/v1/releases?limit=20&sort=date', {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-        });
+        const response = await fetch('/api/trending/nina');
 
         if (!response.ok) {
             console.error('Failed to fetch Nina releases:', response.statusText);
             return [];
         }
 
-        const data = await response.json();
-        const releases: any[] = data.releases || [];
-
-        return releases.map((release: any) => ({
-            id: release.publicKey,
-            tokenId: release.publicKey,
-            mintCount: release.accountData?.release?.totalSupply || "0", // Total supply as proxy for mints/activity
-            collection: {
-                id: release.publicKey,
-                owner: release.accountData?.authority || "Unknown", // Assuming authority is the owner
-                network: "solana",
-                platform: "Nina",
-                name: release.metadata?.properties?.title || "Untitled",
-                image: release.metadata?.image || "",
-            },
-        }));
+        const tracks = await response.json();
+        return tracks;
 
     } catch (error) {
         console.error('Error fetching Nina trending:', error);

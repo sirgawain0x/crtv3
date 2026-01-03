@@ -5,6 +5,8 @@ export const collection = onchainTable("collection", (t) => ({
     owner: t.text(),
     network: t.text(), // 'mainnet', 'optimism', etc.
     platform: t.text(), // 'Sound', 'Zora'
+    name: t.text(), // NEW: Collection name
+    image: t.text(), // NEW: Collection image URL
     createdAt: t.bigint(),
     transactionHash: t.text(),
 }));

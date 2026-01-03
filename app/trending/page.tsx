@@ -1,14 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { getTrendingMusic, TrendingToken } from "@/lib/ponder";
 import { getNinaTrending } from "@/lib/nina";
 import { getSpinampTrending } from "@/lib/spinamp";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import TrendingFilters, { FilterState } from "@/components/TrendingFilters";
 
 export default function TrendingPage() {
-    const [trending, setTrending] = useState<TrendingToken[]>([]);
+    const [allTracks, setAllTracks] = useState<TrendingToken[]>([]);
     const [loading, setLoading] = useState(true);
+    const [filters, setFilters] = useState<FilterState>({
+        searchQuery: "",
+        platforms: new Set(),
+        networks: new Set(),
+        sortBy: "mintCount-desc",
+    });
 
     useEffect(() => {
         async function fetchData() {
@@ -19,14 +26,9 @@ export default function TrendingPage() {
                     getSpinampTrending()
                 ]);
 
-                // Merge and sort
-                // Note: Spinamp data has "0" mintCount, so it will likely end up at the bottom unless we interleave or sort by another metric.
-                // For now, simple sort descending by mintCount.
-                const combined = [...ponderData, ...ninaData, ...spinampData].sort((a, b) =>
-                    parseInt(b.mintCount) - parseInt(a.mintCount)
-                );
-
-                setTrending(combined);
+                // Merge all data sources
+                const combined = [...ponderData, ...ninaData, ...spinampData];
+                setAllTracks(combined);
             } catch (error) {
                 console.error("Failed to fetch trending music:", error);
             } finally {
@@ -35,6 +37,57 @@ export default function TrendingPage() {
         }
         fetchData();
     }, []);
+
+    // Apply filters and sorting
+    const filteredTracks = useMemo(() => {
+        let result = [...allTracks];
+
+        // Search filter
+        if (filters.searchQuery) {
+            const query = filters.searchQuery.toLowerCase();
+            result = result.filter((track) => {
+                const name = track.collection.name?.toLowerCase() || "";
+                const platform = track.collection.platform.toLowerCase();
+                return name.includes(query) || platform.includes(query);
+            });
+        }
+
+        // Platform filter
+        if (filters.platforms.size > 0) {
+            result = result.filter((track) =>
+                filters.platforms.has(track.collection.platform)
+            );
+        }
+
+        // Network filter
+        if (filters.networks.size > 0) {
+            result = result.filter((track) =>
+                filters.networks.has(track.collection.network)
+            );
+        }
+
+        // Sort
+        result.sort((a, b) => {
+            switch (filters.sortBy) {
+                case "mintCount-desc":
+                    return parseInt(b.mintCount) - parseInt(a.mintCount);
+                case "mintCount-asc":
+                    return parseInt(a.mintCount) - parseInt(b.mintCount);
+                case "name-asc":
+                    const nameA = a.collection.name || a.tokenId;
+                    const nameB = b.collection.name || b.tokenId;
+                    return nameA.localeCompare(nameB);
+                case "name-desc":
+                    const nameA2 = a.collection.name || a.tokenId;
+                    const nameB2 = b.collection.name || b.tokenId;
+                    return nameB2.localeCompare(nameA2);
+                default:
+                    return 0;
+            }
+        });
+
+        return result;
+    }, [allTracks, filters]);
 
     if (loading) {
         return (
@@ -56,11 +109,22 @@ export default function TrendingPage() {
         <div className="container mx-auto py-8">
             <h1 className="text-3xl font-bold mb-6">Trending Music</h1>
 
-            {trending.length === 0 ? (
-                <p className="text-muted-foreground">No trending data found.</p>
+            <TrendingFilters
+                filters={filters}
+                onFiltersChange={setFilters}
+                totalCount={allTracks.length}
+                filteredCount={filteredTracks.length}
+            />
+
+            {filteredTracks.length === 0 ? (
+                <p className="text-muted-foreground text-center py-12">
+                    {allTracks.length === 0
+                        ? "No trending data found."
+                        : "No tracks match your filters. Try adjusting your search or filters."}
+                </p>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {trending.map((item) => (
+                    {filteredTracks.map((item) => (
                         <Card key={`${item.collection.platform}-${item.id}`} className="hover:shadow-lg transition-shadow overflow-hidden">
                             {item.collection.image && (
                                 <div className="aspect-square w-full relative">
