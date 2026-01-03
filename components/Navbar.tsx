@@ -42,6 +42,7 @@ import { base } from "@account-kit/infra";
 import { ArrowBigDown, ArrowBigUp, ChevronDown, Search, X } from "lucide-react";
 import CoinbaseFundButton from "./wallet/buy/coinbase-fund-button";
 import { TokenBalance } from "./wallet/balance/TokenBalance";
+import { MeTokenBalances } from "./wallet/balance/MeTokenBalances";
 import type { Chain as ViemChain } from "viem/chains";
 import { AccountDropdown } from "@/components/account-dropdown/AccountDropdown";
 import { useMembershipVerification } from "@/lib/hooks/unlock/useMembershipVerification";
@@ -504,6 +505,11 @@ export default function Navbar() {
                     {/* Add TokenBalance here */}
                     <div className="mt-4">
                       <TokenBalance />
+                    </div>
+
+                    {/* Add MeTokenBalances here */}
+                    <div className="mt-4">
+                      <MeTokenBalances />
                     </div>
 
                     {/* Add Membership Section here */}
