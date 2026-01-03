@@ -26,7 +26,7 @@ export function CreatorProfileManager({ targetAddress, onProfileUpdated }: Creat
   const { toast } = useToast();
   const { smartAccountAddress } = useWalletStatus();
   const { profile, loading, error, updateProfile, upsertProfile } = useCreatorProfile(targetAddress);
-  
+
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
     username: '',
@@ -143,8 +143,8 @@ export function CreatorProfileManager({ targetAddress, onProfileUpdated }: Creat
           </Alert>
         )}
 
-        <div className="flex items-start gap-4">
-          <AvatarUpload 
+        <div className="flex flex-col md:flex-row items-start gap-4">
+          <AvatarUpload
             targetAddress={targetAddress}
             size="md"
             showUploadButton={isOwner && isEditing}
@@ -152,7 +152,7 @@ export function CreatorProfileManager({ targetAddress, onProfileUpdated }: Creat
               setFormData(prev => ({ ...prev, avatar_url: url }));
             }}
           />
-          
+
           <div className="flex-1 space-y-4">
             <div className="space-y-2">
               <Label htmlFor="username">Username</Label>
@@ -195,9 +195,9 @@ export function CreatorProfileManager({ targetAddress, onProfileUpdated }: Creat
                 <div className="p-2 border rounded-md bg-muted">
                   {formData.avatar_url ? (
                     <div className="flex items-center gap-2">
-                      <Image 
-                        src={convertFailingGateway(formData.avatar_url)} 
-                        alt="Avatar" 
+                      <Image
+                        src={convertFailingGateway(formData.avatar_url)}
+                        alt="Avatar"
                         width={32}
                         height={32}
                         className="h-8 w-8 rounded-full object-cover"
@@ -221,7 +221,7 @@ export function CreatorProfileManager({ targetAddress, onProfileUpdated }: Creat
           <div className="flex gap-2 pt-4">
             {isEditing ? (
               <>
-                <Button 
+                <Button
                   onClick={handleSave}
                   disabled={isSaving}
                   className="flex items-center gap-2"
@@ -233,8 +233,8 @@ export function CreatorProfileManager({ targetAddress, onProfileUpdated }: Creat
                   )}
                   {isSaving ? 'Saving...' : 'Save Profile'}
                 </Button>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={handleCancel}
                   disabled={isSaving}
                 >
@@ -242,7 +242,7 @@ export function CreatorProfileManager({ targetAddress, onProfileUpdated }: Creat
                 </Button>
               </>
             ) : (
-              <Button 
+              <Button
                 onClick={() => setIsEditing(true)}
                 className="flex items-center gap-2"
               >
