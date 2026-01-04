@@ -41,7 +41,7 @@ export class PriceService {
 
     try {
       const price = await this.fetchTokenPrice(symbol);
-      
+
       // Update cache
       priceCache.set(symbol, {
         symbol,
@@ -52,19 +52,20 @@ export class PriceService {
       return price;
     } catch (error) {
       console.error(`Failed to fetch price for ${symbol}:`, error);
-      
+
       // Return cached price if available, even if expired
       if (cached) {
         return cached.price;
       }
-      
+
       // Fallback prices (approximate)
       const fallbackPrices: Record<TokenSymbol, number> = {
         ETH: 3000,
         USDC: 1,
         DAI: 1,
+        DEARCRTV: 0,
       };
-      
+
       return fallbackPrices[symbol];
     }
   }
@@ -77,6 +78,7 @@ export class PriceService {
       ETH: 'ethereum',
       USDC: 'usd-coin',
       DAI: 'dai',
+      DEARCRTV: '',
     };
 
     const coinId = coinGeckoIds[symbol];
@@ -106,10 +108,10 @@ export class PriceService {
    */
   async getTokenPrices(symbols: TokenSymbol[]): Promise<Record<TokenSymbol, number>> {
     const prices: Record<TokenSymbol, number> = {} as Record<TokenSymbol, number>;
-    
+
     // Check cache for all tokens first
     const uncachedSymbols: TokenSymbol[] = [];
-    
+
     for (const symbol of symbols) {
       const cached = priceCache.get(symbol);
       if (cached && Date.now() - cached.lastUpdated < CACHE_DURATION) {
@@ -126,10 +128,11 @@ export class PriceService {
           ETH: 'ethereum',
           USDC: 'usd-coin',
           DAI: 'dai',
+          DEARCRTV: '',
         };
 
         const coinIds = uncachedSymbols.map(symbol => coinGeckoIds[symbol]).join(',');
-        
+
         const response = await fetch(
           `https://api.coingecko.com/api/v3/simple/price?ids=${coinIds}&vs_currencies=usd`,
           {
@@ -141,13 +144,13 @@ export class PriceService {
 
         if (response.ok) {
           const data = await response.json();
-          
+
           for (const symbol of uncachedSymbols) {
             const coinId = coinGeckoIds[symbol];
             const price = data[coinId]?.usd || 0;
-            
+
             prices[symbol] = price;
-            
+
             // Update cache
             priceCache.set(symbol, {
               symbol,
@@ -163,7 +166,7 @@ export class PriceService {
         }
       } catch (error) {
         console.error('Failed to fetch multiple prices:', error);
-        
+
         // Fallback to individual requests
         for (const symbol of uncachedSymbols) {
           prices[symbol] = await this.getTokenPrice(symbol);
