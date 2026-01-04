@@ -332,7 +332,7 @@ export function useMeTokens() {
   const user = useUser();
   const { client } = useSmartAccountClient({});
   const { sendUserOperation, isSendingUserOperation, error } = useSendUserOperation({ client });
-  
+
   const address = user?.address;
 
   const [userMeToken, setUserMeToken] = useState<MeTokenData | null>(null);
@@ -344,17 +344,17 @@ export function useMeTokens() {
   // Check if user has a MeToken by calling Diamond contract directly
   const checkUserMeToken = useCallback(async () => {
     if (!address || !client) return;
-    
+
     setLoading(true);
     setError(null);
-    
+
     try {
       // First, let's try to get MeTokens from subgraph
       const meTokens = await meTokensSubgraph.getAllMeTokens(100, 0);
-      
+
       // Filter MeTokens by checking each one's owner via Diamond contract
       let userMeToken: MeTokenData | null = null;
-      
+
       for (const meToken of meTokens) {
         try {
           // Get MeToken info from Diamond contract
@@ -364,7 +364,7 @@ export function useMeTokens() {
             functionName: 'getMeTokenInfo',
             args: [meToken.id as `0x${string}`],
           }) as any;
-          
+
           // Check if this MeToken belongs to the current user
           if (info && info.owner.toLowerCase() === address.toLowerCase()) {
             // Get ERC20 token info
@@ -373,26 +373,26 @@ export function useMeTokens() {
               abi: ERC20_ABI,
               functionName: 'name',
             }) as string;
-            
+
             const symbol = await client.readContract({
               address: meToken.id as `0x${string}`,
               abi: ERC20_ABI,
               functionName: 'symbol',
             }) as string;
-            
+
             const totalSupply = await client.readContract({
               address: meToken.id as `0x${string}`,
               abi: ERC20_ABI,
               functionName: 'totalSupply',
             }) as bigint;
-            
+
             const balance = await client.readContract({
               address: meToken.id as `0x${string}`,
               abi: ERC20_ABI,
               functionName: 'balanceOf',
               args: [address as `0x${string}`],
             }) as bigint;
-            
+
             userMeToken = {
               address: meToken.id,
               name,
@@ -429,7 +429,7 @@ export function useMeTokens() {
           console.warn(`Failed to check MeToken ${meToken.id}:`, err);
         }
       }
-      
+
       setUserMeToken(userMeToken);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to check MeToken');
@@ -442,26 +442,66 @@ export function useMeTokens() {
   // Create a new MeToken
   const createMeToken = async (name: string, symbol: string, hubId: number = 1, assetsDeposited: string = "0") => {
     if (!address || !user) throw new Error('No wallet connected');
-    
+
     setIsConfirming(false);
     setIsConfirmed(false);
     setError(null);
-    
-    try {
-      // Step 1: Create the MeToken contract using the factory
+
+    // Base USDC Address
+    const USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+    const GAS_POLICY_ID = process.env.NEXT_PUBLIC_ANYTOKEN_POLICY_ID;
+
+    // Helper to execute the creation transaction
+    const executeCreation = async (useUsdcPaymaster: boolean = false) => {
       const createData = encodeFunctionData({
         abi: METOKEN_FACTORY_ABI,
         functionName: 'create',
         args: [name, symbol, DIAMOND],
       });
 
-      const result = await sendUserOperation({
-        uo: {
-          target: METOKEN_FACTORY,
-          data: createData,
-          value: BigInt(0),
-        },
-      });
+      const uoCallData = {
+        target: METOKEN_FACTORY as `0x${string}`,
+        data: createData,
+        value: BigInt(0),
+      };
+
+      if (useUsdcPaymaster && GAS_POLICY_ID) {
+        return await sendUserOperation({
+          uo: uoCallData,
+          overrides: {
+            paymasterAndData: undefined, // Let the paymaster service handle it
+          },
+          context: {
+            paymasterService: {
+              policyId: GAS_POLICY_ID,
+              token: USDC_ADDRESS as `0x${string}`,
+            },
+          },
+        });
+      } else {
+        return await sendUserOperation({
+          uo: uoCallData,
+        });
+      }
+    };
+
+    try {
+      let result;
+
+      // 1. Try with USDC Paymaster first if configured
+      if (GAS_POLICY_ID) {
+        try {
+          console.log("Attempting to create MeToken with USDC gas payment...");
+          result = await executeCreation(true);
+        } catch (paymasterError) {
+          console.warn("USDC gas payment failed, falling back to standard gas:", paymasterError);
+          // 2. Fallback to standard gas (ETH/Sponsored default) if USDC fails
+          result = await executeCreation(false);
+        }
+      } else {
+        // No policy ID, just standard execution
+        result = await executeCreation(false);
+      }
 
       if (result !== undefined) {
         setIsConfirming(true);
@@ -471,15 +511,15 @@ export function useMeTokens() {
         }
         setIsConfirming(false);
         setIsConfirmed(true);
-        
+
         // Refresh the user's MeToken data
         await checkUserMeToken();
       }
-      
+
     } catch (err) {
       setIsConfirming(false);
       setIsConfirmed(false);
-      
+
       // Handle specific error cases
       if (err instanceof Error) {
         if (err.message.includes('User denied') || err.message.includes('User rejected')) {
@@ -513,7 +553,7 @@ export function useMeTokens() {
   // Check for a specific MeToken by address (useful for newly created MeTokens)
   const checkSpecificMeToken = async (meTokenAddress: string) => {
     if (!address || !client) return null;
-    
+
     try {
       // Get MeToken info from Diamond contract
       const info = await client.readContract({
@@ -522,7 +562,7 @@ export function useMeTokens() {
         functionName: 'getMeTokenInfo',
         args: [meTokenAddress as `0x${string}`],
       }) as any;
-      
+
       // Check if this MeToken belongs to the current user
       if (info && info.owner.toLowerCase() === address.toLowerCase()) {
         // Get ERC20 token info
@@ -531,26 +571,26 @@ export function useMeTokens() {
           abi: ERC20_ABI,
           functionName: 'name',
         }) as string;
-        
+
         const symbol = await client.readContract({
           address: meTokenAddress as `0x${string}`,
           abi: ERC20_ABI,
           functionName: 'symbol',
         }) as string;
-        
+
         const totalSupply = await client.readContract({
           address: meTokenAddress as `0x${string}`,
           abi: ERC20_ABI,
           functionName: 'totalSupply',
         }) as bigint;
-        
+
         const balance = await client.readContract({
           address: meTokenAddress as `0x${string}`,
           abi: ERC20_ABI,
           functionName: 'balanceOf',
           args: [address as `0x${string}`],
         }) as bigint;
-        
+
         const meTokenData: MeTokenData = {
           address: meTokenAddress,
           name,
@@ -580,11 +620,11 @@ export function useMeTokens() {
             migration: info.migration,
           }),
         };
-        
+
         setUserMeToken(meTokenData);
         return meTokenData;
       }
-      
+
       return null;
     } catch (err) {
       console.error(`Failed to check MeToken ${meTokenAddress}:`, err);
@@ -595,7 +635,7 @@ export function useMeTokens() {
   // Buy MeTokens
   const buyMeTokens = async (meTokenAddress: string, collateralAmount: string) => {
     if (!address || !user) throw new Error('No wallet connected');
-    
+
     try {
       await sendUserOperation({
         uo: {
@@ -616,7 +656,7 @@ export function useMeTokens() {
   // Sell MeTokens
   const sellMeTokens = async (meTokenAddress: string, meTokenAmount: string) => {
     if (!address || !user) throw new Error('No wallet connected');
-    
+
     try {
       await sendUserOperation({
         uo: {
@@ -638,14 +678,14 @@ export function useMeTokens() {
   const calculateMeTokensMinted = async (meTokenAddress: string, collateralAmount: string): Promise<string> => {
     try {
       if (!client) return '0';
-      
+
       const result = await client.readContract({
         address: DIAMOND,
         abi: DIAMOND_ABI,
         functionName: 'calculateMeTokensMinted',
         args: [meTokenAddress as `0x${string}`, parseEther(collateralAmount)],
       });
-      
+
       return formatEther(result as bigint);
     } catch (err) {
       console.error('Failed to calculate MeTokens minted:', err);
@@ -657,14 +697,14 @@ export function useMeTokens() {
   const calculateAssetsReturned = async (meTokenAddress: string, meTokenAmount: string): Promise<string> => {
     try {
       if (!client || !address) return '0';
-      
+
       const result = await client.readContract({
         address: DIAMOND,
         abi: DIAMOND_ABI,
         functionName: 'calculateAssetsReturned',
         args: [meTokenAddress as `0x${string}`, parseEther(meTokenAmount), address as `0x${string}`],
       });
-      
+
       return formatEther(result as bigint);
     } catch (err) {
       console.error('Failed to calculate assets returned:', err);
