@@ -50,13 +50,10 @@ export async function getSubscriberCount() {
         const pub = await paragraph.publications.get({ domain: DOMAIN }).single();
         if (!pub?.id) return 0;
 
-        // Based on SDK discovery: api.subscribers.get({ publicationId }) exists
         // @ts-ignore
-        const response = await paragraph.subscribers.get({ publicationId: pub.id });
+        const response = await paragraph.subscribers.getCount({ publicationId: pub.id });
 
-        // Check structure. Response might be a list or have a meta count.
-        // If it's a paginated list, it often has `meta: { total: number }`
-        return (response as any).meta?.total || response.items?.length || 0;
+        return response.count || 0;
     } catch (error) {
         console.error("Error fetching subscribers:", error);
         return 0;
@@ -66,15 +63,87 @@ export async function getSubscriberCount() {
 export async function getCoinData(contractAddress: string) {
     try {
         // @ts-ignore
-        const response = await paragraph.coins.get({ contractAddress });
+        const coin = await paragraph.coins.get({ contractAddress }).single();
 
-        // Normalize response
-        if (response.items && response.items.length > 0) {
-            return response.items[0];
-        }
-        return null;
+        return coin;
     } catch (error) {
         console.error("Error fetching coin data:", error);
+        return null;
+    }
+}
+
+export async function getBuyArgs(contractAddress: string, walletAddress: string, amount: string) {
+    try {
+        const url = `https://public.api.paragraph.com/api/v1/coins/buy/contract/${contractAddress}?walletAddress=${walletAddress}&amount=${amount}`;
+
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'Referer': 'https://paragraph.xyz',
+                'Origin': 'https://paragraph.xyz',
+                'Authorization': `Bearer ${process.env.PARAGRAPH_API_KEY}`
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error("Error fetching buy args:", error);
+        return null;
+    }
+}
+
+export async function getSellArgs(contractAddress: string, walletAddress: string, amount: string) {
+    try {
+        const url = `https://public.api.paragraph.com/api/v1/coins/sell/contract/${contractAddress}?walletAddress=${walletAddress}&amount=${amount}`;
+
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'Referer': 'https://paragraph.xyz',
+                'Origin': 'https://paragraph.xyz',
+                'Authorization': `Bearer ${process.env.PARAGRAPH_API_KEY}`
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error("Error fetching sell args:", error);
+        return null;
+    }
+}
+
+export async function getQuote(contractAddress: string, amount: string, side: 'buy' | 'sell' = 'buy') {
+    try {
+        const url = `https://public.api.paragraph.com/api/v1/coins/quote/contract/${contractAddress}?amount=${amount}&side=${side}`;
+
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'Referer': 'https://paragraph.xyz',
+                'Origin': 'https://paragraph.xyz',
+                'Authorization': `Bearer ${process.env.PARAGRAPH_API_KEY}`
+            }
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        return data.quote; // Returns the amount of tokens (wei)
+    } catch (error) {
+        console.error("Error fetching quote:", error);
         return null;
     }
 }
