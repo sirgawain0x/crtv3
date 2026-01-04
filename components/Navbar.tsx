@@ -412,9 +412,9 @@ export default function Navbar() {
               <Link href="/discover" className={navLinkClass}>
                 Discover
               </Link>
-              <Link href="/leaderboard" className={navLinkClass}>
+              {/* <Link href="/leaderboard" className={navLinkClass}>
                 Leaderboard
-              </Link>
+              </Link> */}
               <Link href="/market" className={navLinkClass}>
                 Trade
               </Link>
@@ -585,13 +585,13 @@ export default function Navbar() {
                   >
                     Discover
                   </Link>
-                  <Link
+                  {/* <Link
                     href="/leaderboard"
                     className={mobileNavLinkClass}
                     onClick={handleLinkClick}
                   >
                     Leaderboard
-                  </Link>
+                  </Link> */}
                   <Link
                     href="/market"
                     className={mobileNavLinkClass}

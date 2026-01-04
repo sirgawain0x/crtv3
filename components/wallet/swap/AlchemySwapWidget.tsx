@@ -18,6 +18,7 @@ interface AlchemySwapWidgetProps {
   onSwapSuccess?: () => void;
   className?: string;
   hideHeader?: boolean;
+  defaultToToken?: TokenSymbol;
 }
 
 interface SwapState {
@@ -32,12 +33,12 @@ interface SwapState {
   transactionHash: string | null;
 }
 
-export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false }: AlchemySwapWidgetProps) {
+export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false, defaultToToken = 'USDC' }: AlchemySwapWidgetProps) {
   const { address, client } = useSmartAccountClient({});
 
   const [swapState, setSwapState] = useState<SwapState>({
     fromToken: 'ETH',
-    toToken: 'USDC',
+    toToken: defaultToToken,
     fromAmount: '',
     toAmount: '',
     isLoading: false,
@@ -53,12 +54,14 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
     ETH: '0',
     USDC: '0',
     DAI: '0',
+    DEARCRTV: '0',
   });
 
   const [prices, setPrices] = useState<Record<TokenSymbol, number>>({
     ETH: 0,
     USDC: 0,
     DAI: 0,
+    DEARCRTV: 0,
   });
 
   const [usdValues, setUsdValues] = useState<{
@@ -76,7 +79,7 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
   useEffect(() => {
     const fetchPrices = async () => {
       try {
-        const tokenPrices = await priceService.getTokenPrices(['ETH', 'USDC', 'DAI']);
+        const tokenPrices = await priceService.getTokenPrices(['ETH', 'USDC', 'DAI', 'DEARCRTV']);
         setPrices(tokenPrices);
       } catch (error) {
         console.error('Error fetching prices:', error);
@@ -169,10 +172,30 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
           console.warn('Failed to fetch DAI balance:', e);
         }
 
+        // Get DEARCRTV balance (ERC20)
+        let dearcrtvBalance = 0n;
+        try {
+          dearcrtvBalance = await client.readContract({
+            address: BASE_TOKENS.DEARCRTV as Address,
+            abi: [{
+              name: 'balanceOf',
+              type: 'function',
+              stateMutability: 'view',
+              inputs: [{ name: 'account', type: 'address' }],
+              outputs: [{ name: 'balance', type: 'uint256' }],
+            }],
+            functionName: 'balanceOf',
+            args: [address as Address],
+          }) as bigint;
+        } catch (e) {
+          console.warn('Failed to fetch DEARCRTV balance:', e);
+        }
+
         const newBalances: Record<TokenSymbol, string> = {
           ETH: AlchemySwapService.parseAmount(`0x${ethBalance.toString(16)}` as Hex, 'ETH'),
           USDC: AlchemySwapService.parseAmount(`0x${usdcBalance.toString(16)}` as Hex, 'USDC'),
           DAI: AlchemySwapService.parseAmount(`0x${daiBalance.toString(16)}` as Hex, 'DAI'),
+          DEARCRTV: AlchemySwapService.parseAmount(`0x${dearcrtvBalance.toString(16)}` as Hex, 'DEARCRTV'),
         };
 
         console.log('Parsed balances:', newBalances);
@@ -674,6 +697,7 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
                 <option value="ETH">ETH</option>
                 <option value="USDC">USDC</option>
                 <option value="DAI">DAI</option>
+                <option value="DEARCRTV">DEARCRTV</option>
               </select>
 
               <Image
@@ -691,6 +715,7 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
                   <SelectItem value="ETH">ETH</SelectItem>
                   <SelectItem value="USDC">USDC</SelectItem>
                   <SelectItem value="DAI">DAI</SelectItem>
+                  <SelectItem value="DEARCRTV">DEARCRTV</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -797,6 +822,7 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
                 <option value="ETH">ETH</option>
                 <option value="USDC">USDC</option>
                 <option value="DAI">DAI</option>
+                <option value="DEARCRTV">DEARCRTV</option>
               </select>
 
               <Image
