@@ -5,6 +5,7 @@ export const BASE_TOKENS = {
   ETH: "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEee", // Native ETH
   USDC: "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913", // USDC on Base
   DAI: "0x50c5725949a6f0c72e6c4a641f24049a917db0cb", // DAI on Base
+  DEARCRTV: "0x81ced3c6e7058c1fe8d9b6c5a2435a65a4593292", // Paragraph Coin
 } as const;
 
 export type TokenSymbol = keyof typeof BASE_TOKENS;
@@ -14,6 +15,7 @@ export const TOKEN_INFO = {
   ETH: { decimals: 18, symbol: "ETH" },
   USDC: { decimals: 6, symbol: "USDC" },
   DAI: { decimals: 18, symbol: "DAI" },
+  DEARCRTV: { decimals: 18, symbol: "DEARCRTV" },
 } as const;
 
 interface SwapQuoteRequest {
@@ -148,6 +150,15 @@ export class AlchemySwapService {
       }
     }
 
+    // Check if target is Paragraph Coin
+    if (toToken === 'DEARCRTV') {
+      return this.getParagraphBuyQuote({
+        from,
+        fromAmount: fromAmount || '0x0', // Fallback, usually passed
+        contractAddress: BASE_TOKENS.DEARCRTV
+      });
+    }
+
     const quoteRequest: SwapQuoteRequest = {
       from,
       chainId: "0x2105", // Base mainnet chain ID
@@ -248,6 +259,92 @@ Original error: ${result.error.message}`;
     }
 
     return result;
+  }
+
+  /**
+   * Get Swap Quote from Paragraph API
+   */
+  async getParagraphBuyQuote(params: {
+    from: Address;
+    fromAmount: Hex;
+    contractAddress: string;
+  }): Promise<SwapQuoteResponse> {
+    const { from, fromAmount, contractAddress } = params;
+    const amountBigInt = BigInt(fromAmount);
+
+    console.log('Fetching Paragraph Buy Quote:', { from, amount: amountBigInt.toString(), contractAddress });
+
+    const url = `https://public.api.paragraph.com/api/v1/coins/buy/contract/${contractAddress}?walletAddress=${from}&amount=${amountBigInt.toString()}`;
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" }
+    });
+
+    if (!response.ok) {
+      throw new Error(`Paragraph API failed: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log('Paragraph API Response:', data);
+
+    // Universal Router Address on Base
+    const UNIVERSAL_ROUTER = "0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD";
+
+    // Reconstruct calls for UserOperation
+    // Paragraph returns { commands: string, inputs: string[] }
+    // We need to encode this into a call to UniversalRouter.execute(bytes commands, bytes[] inputs, uint256 deadline)
+    // Actually, check standard UniversalRouter ABI. It often is execute(bytes,bytes[],uint256) or execute(bytes,bytes[])
+    // Looking at common UniversalRouter interfaces, usually it is:
+    // function execute(bytes calldata commands, bytes[] calldata inputs, uint256 deadline) external payable;
+
+    // Commands is hex string, Input is array of hex strings
+    // We need to encodeFunctionData
+
+    // Simple manual encoding or import encodeFunctionData
+    const { encodeFunctionData, parseAbi } = require('viem');
+
+    const abi = parseAbi([
+      'function execute(bytes commands, bytes[] inputs, uint256 deadline) external payable'
+    ]);
+
+    const deadline = BigInt(Math.floor(Date.now() / 1000) + 60 * 20); // 20 mins
+
+    const callData = encodeFunctionData({
+      abi,
+      functionName: 'execute',
+      args: [
+        data.commands as Hex,
+        data.inputs as Hex[],
+        deadline
+      ]
+    });
+
+    return {
+      id: 1,
+      jsonrpc: "2.0",
+      result: {
+        quote: {
+          // Paragraph API doesn't return minAmount out directly in this endpoint easily
+          // We'll mock it or try to estimate. For now, putting 0 or fromAmount is tricky.
+          minimumToAmount: "0x0",
+          expiry: `0x${deadline.toString(16)}`,
+          fromAmount: fromAmount
+        },
+        type: "paragraph_swap",
+        data: {}, // Legacy field
+        calls: [{
+          to: UNIVERSAL_ROUTER,
+          data: callData,
+          value: fromAmount // Assuming we are spending ETH
+        }],
+        signatureRequest: {
+          type: "",
+          data: { raw: "0x" },
+          rawPayload: "0x"
+        }
+      }
+    };
   }
 
   /**
