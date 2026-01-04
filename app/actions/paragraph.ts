@@ -50,10 +50,22 @@ export async function getSubscriberCount() {
         const pub = await paragraph.publications.get({ domain: DOMAIN }).single();
         if (!pub?.id) return 0;
 
-        // @ts-ignore
-        const response = await paragraph.subscribers.getCount({ publicationId: pub.id });
+        const url = `https://public.api.paragraph.com/api/v1/publications/${pub.id}/subscribers/count`;
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${process.env.PARAGRAPH_API_KEY}`
+            }
+        });
 
-        return response.count || 0;
+        if (response.ok) {
+            const data = await response.json();
+            return data.count || 0;
+        }
+
+        console.error("Failed to fetch subscriber count:", response.status, await response.text());
+        return 0;
     } catch (error) {
         console.error("Error fetching subscribers:", error);
         return 0;

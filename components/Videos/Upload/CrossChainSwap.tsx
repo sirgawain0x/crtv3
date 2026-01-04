@@ -34,9 +34,10 @@ const TOKENS = {
 interface CrossChainSwapProps {
     onSwapSuccess?: () => void;
     requiredAmount?: string; // Optional amount hint
+    recipientAddress?: string; // Optional custom recipient
 }
 
-export function CrossChainSwap({ onSwapSuccess, requiredAmount }: CrossChainSwapProps) {
+export function CrossChainSwap({ onSwapSuccess, requiredAmount, recipientAddress: propRecipientAddress }: CrossChainSwapProps) {
     const user = useUser();
     const { client } = useSmartAccountClient({});
     const [error, setError] = useState<string | null>(null);
@@ -49,10 +50,9 @@ export function CrossChainSwap({ onSwapSuccess, requiredAmount }: CrossChainSwap
     const targetChainId = isMainnet
         ? CHAIN_IDS.STORY_MAINNET
         : CHAIN_IDS.STORY_TESTNET;
-    
+
     // Always swap to native IP token on Story Protocol
-    // This is needed for gas fees and transactions on Story Protocol
-    const storyTokenAddress = TOKENS.NATIVE; // Native IP token on Story Protocol
+    const storyTokenAddress = TOKENS.NATIVE;
 
     // 1. Prepare Swap Hook
     const { prepareSwapAsync, isPreparingSwap } = usePrepareSwap({
@@ -106,7 +106,6 @@ export function CrossChainSwap({ onSwapSuccess, requiredAmount }: CrossChainSwap
         setQuote(null);
         setIsCheckingBalance(true);
 
-        // Declare balanceFormatted at function scope so it's accessible in catch block
         let balanceFormatted: string | null = null;
 
         try {
@@ -119,7 +118,6 @@ export function CrossChainSwap({ onSwapSuccess, requiredAmount }: CrossChainSwap
             setEthBalance(balanceFormatted);
 
             // Use requiredAmount if provided, otherwise default to 0.001 ETH
-            // ETH has 18 decimals
             const defaultAmount = "0.001"; // 0.001 ETH
             const amountStr = requiredAmount || defaultAmount;
             const amountToSwapBigInt = parseEther(amountStr);
@@ -133,17 +131,11 @@ export function CrossChainSwap({ onSwapSuccess, requiredAmount }: CrossChainSwap
             }
 
             const amountToSwap = toHex(amountToSwapBigInt);
-
-            // Get paymaster policy ID from env (if configured)
             const paymasterPolicyId = process.env.NEXT_PUBLIC_ALCHEMY_PAYMASTER_POLICY_ID;
 
-            // Check if a custom recipient address is configured for Story Protocol funding wallet
-            // This allows sending IP tokens directly to the wallet that funds Story Protocol transactions
-            // IMPORTANT: Cross-chain swaps typically send tokens to the same address on the destination chain
-            // (i.e., your smart account address on Story Protocol). If you need tokens in a different wallet,
-            // you may need to transfer them after the swap completes, or use a different bridging method.
+            // Determine recipient address priority: Prop > Env Var > Client Address
             const storyFundingWallet = process.env.NEXT_PUBLIC_STORY_FUNDING_WALLET_ADDRESS;
-            const recipientAddress = storyFundingWallet || client.account.address;
+            const targetRecipient = propRecipientAddress || storyFundingWallet || client.account.address;
 
             const swapParams: any = {
                 from: client.account.address,
@@ -151,8 +143,6 @@ export function CrossChainSwap({ onSwapSuccess, requiredAmount }: CrossChainSwap
                 toChainId: toHex(targetChainId),
                 toToken: storyTokenAddress, // Native IP token on Story Protocol
                 fromAmount: amountToSwap,
-                // Include paymaster capabilities if policy ID is configured
-                // This allows gas sponsorship or paying gas with ERC-20 tokens (like USDC)
                 ...(paymasterPolicyId && {
                     capabilities: {
                         paymasterService: {
@@ -162,93 +152,63 @@ export function CrossChainSwap({ onSwapSuccess, requiredAmount }: CrossChainSwap
                 }),
             };
 
-            // If a custom recipient is specified and different from sender, try to add it
-            // Note: Alchemy's cross-chain swap API may not support custom recipients
-            // Tokens will likely still be sent to the smart account address on Story Protocol
-            // If you need tokens in a different wallet, use the transfer feature after the swap
-            if (storyFundingWallet && recipientAddress.toLowerCase() !== client.account.address.toLowerCase()) {
-                console.log("🎯 Attempting to use custom recipient address for Story Protocol funding wallet:", recipientAddress);
-                console.log("⚠️ Note: Cross-chain swaps may not support custom recipients. Tokens may still go to your smart account address.");
-                // Some swap APIs support a 'to' parameter for the destination address
-                // This is API-dependent and may not be supported by Alchemy's swap API
-                swapParams.to = recipientAddress;
+            // If target recipient is different from sender, try to use it
+            if (targetRecipient && targetRecipient.toLowerCase() !== client.account.address.toLowerCase()) {
+                console.log("🎯 Using custom recipient address for swap:", targetRecipient);
+                // Try standard 'to' parameter (API specific support)
+                swapParams.to = targetRecipient;
             }
 
             const result = await prepareSwapAsync(swapParams);
 
             const { quote: swapQuote, ...calls } = result;
-            
-            // Debug: Log the raw quote to understand the format and verify the amount
+
             console.log("🔍 Full swap quote response:", {
                 quote: swapQuote,
+                recipient: targetRecipient,
                 fullResult: result,
             });
-            
+
             if (swapQuote.minimumToAmount) {
                 const rawAmount = BigInt(swapQuote.minimumToAmount);
                 const formattedAmount = formatEther(rawAmount);
                 const ipAmount = parseFloat(formattedAmount);
-                
-                console.log("📊 Quote Analysis:", {
-                    fromAmount: amountStr + " ETH",
-                    minimumToAmountRaw: swapQuote.minimumToAmount,
-                    minimumToAmountType: typeof swapQuote.minimumToAmount,
-                    minimumToAmountBigInt: rawAmount.toString(),
-                    formattedIP: formattedAmount,
-                    ipAmountNumeric: ipAmount,
-                    expectedIP: `~${(parseFloat(amountStr) * 500).toFixed(2)} IP (based on CoinGecko: 0.5 IP ≈ $0.725, ETH ≈ $3000)`,
-                    isZero: rawAmount === 0n,
-                    isVerySmall: ipAmount < 0.000001,
-                });
-                
+
                 // Warn if the quote seems unreasonably low
                 if (ipAmount < 0.01) {
                     const expectedAmount = parseFloat(amountStr) * 500; // Conservative estimate
                     console.warn(`⚠️ Quote seems very low! Expected ~${expectedAmount.toFixed(2)} IP for ${amountStr} ETH, got:`, formattedAmount);
-                    console.warn("⚠️ This likely means the swap route ETH (Base) → IP (Story) is not available or has no liquidity.");
-                    console.warn("⚠️ You may need to use a different route or bridge to get IP tokens.");
                 }
-                
+
                 // If the amount is actually zero, this route doesn't exist
                 if (rawAmount === 0n) {
                     console.error("❌ Quote returned ZERO - This swap route does not exist!");
-                    console.error("❌ The cross-chain route USDC (Base) → IP (Story) is not available.");
-                    console.error("❌ Consider: 1) Using a different bridge, 2) Swapping to ETH first, 3) Using Story mainnet if on testnet");
                 }
-            } else {
-                console.error("❌ No minimumToAmount in quote response:", swapQuote);
             }
-            
+
             setQuote({ quote: swapQuote, calls });
 
         } catch (err) {
             console.error("Swap quote error:", err);
             let errorMessage = "Failed to get swap quote";
-            
+
             if (err instanceof Error) {
-                // Check for common error messages
-                if (err.message.includes("transfer amount exceeds balance") || 
-                    err.message.includes("ERC20: transfer amount exceeds balance") ||
+                if (err.message.includes("transfer amount exceeds balance") ||
                     err.message.includes("insufficient funds")) {
-                    // Use balanceFormatted if available (from current fetch), otherwise fall back to state
                     const currentBalance = balanceFormatted || ethBalance || "0";
                     const defaultAmount = requiredAmount || "0.001";
-                    errorMessage = `Insufficient ETH balance. You have ${currentBalance} ETH, but need ${defaultAmount} ETH for this swap. Please ensure your smart wallet has enough ETH on Base network.`;
+                    errorMessage = `Insufficient ETH balance. You have ${currentBalance} ETH, but need ${defaultAmount} ETH for this swap.`;
                 } else if (err.message.includes("status 500") || err.message.includes("500")) {
-                    // Handle API 500 errors - often means route not available or invalid token address
                     if (!isMainnet) {
-                        errorMessage = `Cross-chain swap to Story Testnet may not be available. The swap API returned an error. This could be because:
-                        
-1. The swap route may not be available for Story Testnet
-2. Try switching to Story Mainnet (set NEXT_PUBLIC_STORY_NETWORK=mainnet) or contact support.`;
+                        errorMessage = `Cross-chain swap to Story Testnet may not be available. The swap API returned an error.`;
                     } else {
-                        errorMessage = `Swap API error. The cross-chain swap route may not be available or there may be a temporary issue. Please try again later or contact support.`;
+                        errorMessage = `Swap API error. The cross-chain swap route may not be available.`;
                     }
                 } else {
                     errorMessage = err.message;
                 }
             }
-            
+
             setError(errorMessage);
         } finally {
             setIsCheckingBalance(false);
@@ -268,12 +228,10 @@ export function CrossChainSwap({ onSwapSuccess, requiredAmount }: CrossChainSwap
 
     // Status Helpers
     const isSwapSuccessful = statusResult?.statusCode === 200;
-    // 120 = Cross-Chain In Progress
     const isCrossChainPending = statusResult?.statusCode === 120 || (isWaitingForConfirmation && !isSwapSuccessful);
 
     React.useEffect(() => {
         if (isSwapSuccessful) {
-            // Refresh balance after successful swap
             fetchEthBalance();
             if (onSwapSuccess) {
                 onSwapSuccess();
@@ -285,6 +243,11 @@ export function CrossChainSwap({ onSwapSuccess, requiredAmount }: CrossChainSwap
         return <div className="text-sm text-center p-4">Please connect wallet to swap.</div>;
     }
 
+    // Determine which address gets the funds for display text
+    const storyFundingWallet = process.env.NEXT_PUBLIC_STORY_FUNDING_WALLET_ADDRESS;
+    const targetRecipient = propRecipientAddress || storyFundingWallet || client?.account?.address;
+    const isUsingFundingWallet = targetRecipient && client?.account?.address && targetRecipient.toLowerCase() !== client.account.address.toLowerCase();
+
     return (
         <Card className="w-full">
             <CardHeader className="pb-3">
@@ -293,10 +256,12 @@ export function CrossChainSwap({ onSwapSuccess, requiredAmount }: CrossChainSwap
                     Fund Story Wallet
                 </CardTitle>
                 <CardDescription>
-                    Swap ETH from Base to $IP on Story Protocol{!isMainnet ? " (Testnet - may not be available)" : ""}.
-                    <span className="block mt-1 text-xs text-muted-foreground">
-                        IP tokens will be sent to your smart account. After the swap, transfer them to the funding wallet to pay for Story Protocol transactions.
-                    </span>
+                    Swap ETH from Base to $IP on Story Protocol{!isMainnet ? " (Testnet)" : ""}.
+                    {isUsingFundingWallet && (
+                        <span className="block mt-1 text-xs text-muted-foreground font-medium text-green-600 dark:text-green-400">
+                            Funds will be sent directly to the gas wallet to pay for your minting.
+                        </span>
+                    )}
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -354,88 +319,45 @@ export function CrossChainSwap({ onSwapSuccess, requiredAmount }: CrossChainSwap
                             </div>
                             <div className="flex justify-between">
                                 <span className="text-muted-foreground">Receive (Story):</span>
-                                {/* Display estimated receive amount if available in quote */}
-                                {/* IP token uses 18 decimals (like ETH), so use formatEther */}
                                 <span className="font-medium text-foreground">
                                     {quote.quote.minimumToAmount ? (() => {
                                         try {
-                                            // Handle both string and hex formats
-                                            const amount = typeof quote.quote.minimumToAmount === 'string' 
+                                            const amount = typeof quote.quote.minimumToAmount === 'string'
                                                 ? quote.quote.minimumToAmount.startsWith('0x')
                                                     ? BigInt(quote.quote.minimumToAmount)
                                                     : BigInt(quote.quote.minimumToAmount)
                                                 : BigInt(quote.quote.minimumToAmount);
                                             const formatted = formatEther(amount);
-                                            // Format to show reasonable precision (up to 6 decimal places)
                                             const numFormatted = parseFloat(formatted);
-                                            
-                                            // Warn if quote seems unreasonably low (expected ~0.69 IP for 1 USDC)
-                                            // Use same default as swap amount (0.001 ETH)
-                                            const swapAmount = parseFloat(requiredAmount || "0.001");
-                                            const expectedMin = swapAmount * 0.5; // Conservative estimate
-                                            if (numFormatted < expectedMin) {
-                                                console.warn(`⚠️ Quote seems low: ${numFormatted.toFixed(6)} IP for ${swapAmount} USDC. Expected at least ~${expectedMin.toFixed(2)} IP based on market rates.`);
-                                            }
-                                            
                                             return `~${numFormatted.toFixed(6)} IP`;
                                         } catch (e) {
-                                            console.error("Error formatting IP amount:", e, quote.quote.minimumToAmount);
-                                            return "Error formatting amount";
+                                            return "Calculated at execution";
                                         }
                                     })() : "Calculated at execution"}
                                 </span>
                             </div>
                         </div>
-                        
+
                         {/* Warning if quote seems unreasonably low or zero */}
                         {quote.quote.minimumToAmount && (() => {
                             try {
-                                const amount = typeof quote.quote.minimumToAmount === 'string' 
+                                const amount = typeof quote.quote.minimumToAmount === 'string'
                                     ? quote.quote.minimumToAmount.startsWith('0x')
                                         ? BigInt(quote.quote.minimumToAmount)
                                         : BigInt(quote.quote.minimumToAmount)
                                     : BigInt(quote.quote.minimumToAmount);
-                                const ipAmount = parseFloat(formatEther(amount));
-                                // Use same default as swap amount (0.001 ETH)
-                                const swapAmount = parseFloat(requiredAmount || "0.001");
-                                const expectedMin = swapAmount * 0.5; // Based on CoinGecko: 0.5 IP = $0.725, so 1 USDC should get ~0.69 IP
-                                
-                                // If quote is zero, the route doesn't exist
+
                                 if (amount === 0n) {
                                     return (
                                         <Alert className="bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800">
                                             <AlertTitle className="text-red-800 dark:text-red-200">Route Not Available</AlertTitle>
                                             <AlertDescription className="text-xs text-red-800 dark:text-red-200">
-                                                ❌ The cross-chain swap route ETH (Base) → IP (Story) is not available. 
-                                                The quote returned zero, which means this route doesn't exist or has no liquidity.
-                                                <br /><br />
-                                                <strong>Possible solutions:</strong>
-                                                <br />• Try using Story Mainnet instead of Testnet
-                                                <br />• Use a different bridge or swap service
-                                                <br />• Check if IP tokens are available through a faucet (for testnet)
-                                                <br />• Contact Story Protocol support for bridge options
-                                            </AlertDescription>
-                                        </Alert>
-                                    );
-                                }
-                                
-                                // If quote is very low, warn about poor rates
-                                if (ipAmount < expectedMin && ipAmount > 0) {
-                                    return (
-                                        <Alert className="bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800">
-                                            <AlertTitle className="text-yellow-800 dark:text-yellow-200">Low Quote Warning</AlertTitle>
-                                            <AlertDescription className="text-xs text-yellow-800 dark:text-yellow-200">
-                                                ⚠️ This quote seems unusually low. Based on market rates (0.5 IP ≈ $0.725), 
-                                                you should receive approximately {expectedMin.toFixed(2)} IP for {swapAmount} ETH, 
-                                                but the quote shows {ipAmount.toFixed(6)} IP.
-                                                <br /><br />
-                                                The swap route may have very low liquidity. Check the browser console for detailed quote information.
+                                                ❌ The cross-chain swap route ETH (Base) → IP (Story) is not available.
                                             </AlertDescription>
                                         </Alert>
                                     );
                                 }
                             } catch (e) {
-                                console.error("Error checking quote amount:", e);
                                 return null;
                             }
                             return null;
@@ -467,7 +389,11 @@ export function CrossChainSwap({ onSwapSuccess, requiredAmount }: CrossChainSwap
                             <div className="flex flex-col items-center gap-2 text-green-600 dark:text-green-400">
                                 <CheckCircle className="h-8 w-8" />
                                 <p className="font-semibold">Swap Complete!</p>
-                                <p className="text-sm text-muted-foreground">Your Balance has been funded.</p>
+                                <p className="text-sm text-muted-foreground mr-1">
+                                    {isUsingFundingWallet
+                                        ? "Funds sent to gas wallet."
+                                        : "Your Balance has been funded."}
+                                </p>
                             </div>
                         ) : (
                             <div className="flex flex-col items-center gap-2 text-primary">
@@ -476,7 +402,7 @@ export function CrossChainSwap({ onSwapSuccess, requiredAmount }: CrossChainSwap
                                     {isCrossChainPending ? "Cross-Chain Swap in Progress..." : "Processing..."}
                                 </p>
                                 <p className="text-xs text-muted-foreground">
-                                    This may take a few minutes. You can close this or wait for confirmation.
+                                    This may take a few minutes.
                                 </p>
                             </div>
                         )}
