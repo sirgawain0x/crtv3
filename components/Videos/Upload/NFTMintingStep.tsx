@@ -5,9 +5,8 @@ import { useSmartAccountClient } from "@account-kit/react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, InfoIcon, XCircle, CheckCircle, ExternalLink } from "lucide-react";
+import { Loader2, InfoIcon, XCircle, CheckCircle, ExternalLink, FuelIcon } from "lucide-react";
 import { CrossChainSwap } from "./CrossChainSwap";
-import { TransferIP } from "./TransferIP";
 import { createStoryPublicClient } from "@/lib/sdk/story/client";
 import { getNFTContractAddress, mintVideoNFT } from "@/lib/sdk/nft/minting-service";
 import { formatEther, type Address } from "viem";
@@ -42,115 +41,60 @@ export function NFTMintingStep({
     ipId?: string;
   } | null>(null);
   const [nftContractAddress, setNftContractAddress] = useState<Address | null>(null);
-  const [ipBalance, setIpBalance] = useState<string | null>(null);
-  const [isCheckingBalance, setIsCheckingBalance] = useState(false);
 
-  // Get current Story Network from env to construct correct StoryScan URLs
+  // Funding wallet state
+  const [fundingWalletAddress, setFundingWalletAddress] = useState<string | null>(null);
+  const [fundingWalletBalance, setFundingWalletBalance] = useState<string | null>(null);
+  const [isCheckingFunding, setIsCheckingFunding] = useState(false);
+
+  // Get current Story Network from env
   const network = process.env.NEXT_PUBLIC_STORY_NETWORK || "testnet";
   const isMainnet = network === "mainnet";
-  const storyScanBaseUrl = isMainnet 
-    ? "https://www.storyscan.io" 
+  const storyScanBaseUrl = isMainnet
+    ? "https://www.storyscan.io"
     : "https://aeneid.storyscan.io";
-
-  // Get the address to check balance for - use smart account address (where swap sends tokens)
-  // Fall back to recipientAddress if smart account is not available
-  const balanceCheckAddress = client?.account?.address || recipientAddress;
 
   useEffect(() => {
     const address = getNFTContractAddress();
     setNftContractAddress(address);
-    checkBalance();
-  }, [recipientAddress, client?.account?.address]);
+    checkFundingWallet();
+  }, []);
 
-  const checkBalance = async (retryCount = 0) => {
-    // Use smart account address (where the swap sends tokens) or fall back to recipientAddress
-    const addressToCheck = client?.account?.address || recipientAddress;
-    if (!addressToCheck) {
-      console.warn("No address available for balance check");
-      return;
-    }
-
-    setIsCheckingBalance(true);
+  const checkFundingWallet = async (retryCount = 0) => {
+    setIsCheckingFunding(true);
     try {
-      // Get network from environment (client-side accessible)
-      const network = process.env.NEXT_PUBLIC_STORY_NETWORK || "testnet";
-      const rpcUrl = process.env.NEXT_PUBLIC_STORY_RPC_URL || (network === "mainnet" ? "https://rpc.story.foundation" : "https://rpc.aeneid.story.foundation");
-      
-      console.log("🔍 Starting balance check:", {
-        network,
-        rpcUrl,
-        address: addressToCheck,
-        expectedChainId: network === "mainnet" ? 1514 : 1315,
-      });
-
-      const publicClient = createStoryPublicClient();
-      
-      // Verify we're on the correct network by getting chain ID
-      let chainId: number;
-      try {
-        chainId = await publicClient.getChainId();
-        console.log("✅ Connected to chain:", chainId);
-      } catch (chainError) {
-        console.error("❌ Failed to get chain ID:", chainError);
-        throw new Error(`Cannot connect to Story Protocol RPC. Please check your RPC URL: ${rpcUrl}`);
+      // 1. Get the funding wallet address from our API
+      const response = await fetch("/api/story/funding-wallet");
+      if (!response.ok) {
+        throw new Error("Failed to fetch funding wallet address");
       }
+      const data = await response.json();
 
-      // Verify chain ID matches expected network
-      const expectedChainId = network === "mainnet" ? 1514 : 1315;
-      if (chainId !== expectedChainId) {
-        console.warn(`⚠️ Chain ID mismatch! Expected ${expectedChainId} for ${network}, got ${chainId}`);
-        console.warn("This might indicate a network configuration issue.");
+      if (data.success && data.address) {
+        setFundingWalletAddress(data.address);
+
+        // 2. Check its balance on Story Protocol
+        const publicClient = createStoryPublicClient();
+        const balance = await publicClient.getBalance({
+          address: data.address as Address,
+        });
+
+        const formattedBalance = formatEther(balance);
+        setFundingWalletBalance(formattedBalance);
+
+        console.log("✅ Funding Wallet Status:", {
+          address: data.address,
+          balance: formattedBalance
+        });
       }
-
-      console.log("📊 Fetching balance for address:", addressToCheck);
-      const bal = await publicClient.getBalance({ address: addressToCheck });
-      const formattedBalance = formatEther(bal);
-      setIpBalance(formattedBalance);
-      
-      console.log("✅ IP Balance checked:", {
-        address: addressToCheck,
-        balance: formattedBalance,
-        rawBalance: bal.toString(),
-        chainId,
-        network,
-        rpcUrl,
-      });
-
-      // If balance is still 0 after a swap, retry a few times (cross-chain swaps can take time)
-      if (parseFloat(formattedBalance) === 0 && retryCount < 3) {
-        console.log(`⏳ Balance is 0, retrying in ${(retryCount + 1) * 2} seconds... (attempt ${retryCount + 1}/3)`);
-        setTimeout(() => {
-          checkBalance(retryCount + 1);
-        }, (retryCount + 1) * 2000); // 2s, 4s, 6s delays
-      }
-    } catch (e) {
-      console.error("❌ Failed to check balance:", e);
-      const errorMessage = e instanceof Error ? e.message : String(e);
-      console.error("Error details:", {
-        error: errorMessage,
-        address: addressToCheck,
-        network: process.env.NEXT_PUBLIC_STORY_NETWORK || "testnet",
-        rpcUrl: process.env.NEXT_PUBLIC_STORY_RPC_URL || "not set",
-      });
-      
-      // Retry on error if we haven't exceeded retry limit
+    } catch (error) {
+      console.error("Error checking funding wallet:", error);
+      // Retry logic
       if (retryCount < 2) {
-        console.log(`🔄 Retrying balance check in 2 seconds... (attempt ${retryCount + 1}/2)`);
-        setTimeout(() => {
-          checkBalance(retryCount + 1);
-        }, 2000);
-      } else {
-        // Show error to user after all retries fail
-        const network = process.env.NEXT_PUBLIC_STORY_NETWORK || "testnet";
-        const rpcUrl = process.env.NEXT_PUBLIC_STORY_RPC_URL || "not configured";
-        setMintError(
-          `Failed to check IP balance. Error: ${errorMessage}. ` +
-          `Network: ${network}, RPC: ${rpcUrl}. ` +
-          `Please check your browser console for details and verify your environment variables are set correctly.`
-        );
+        setTimeout(() => checkFundingWallet(retryCount + 1), 2000);
       }
     } finally {
-      setIsCheckingBalance(false);
+      setIsCheckingFunding(false);
     }
   };
 
@@ -162,10 +106,7 @@ export function NFTMintingStep({
 
     try {
       if (nftContractAddress) {
-        // Base Chain Minting
-        // Check if on Base (optional, but good practice)
-        // For now trusting the client configuration or just trying
-
+        // Existing logic for base chain minting...
         const result = await mintVideoNFT(
           client,
           nftContractAddress,
@@ -176,17 +117,11 @@ export function NFTMintingStep({
         onMintSuccess(result);
       } else {
         // Story Protocol Minting
-        // Note: Story Protocol uses a custom transport, so it should work from any chain
-        // However, we'll show a warning if not on Story network for better UX
-        
         // Generate default collection details
-        // In a real app, we might ask the user for these
         const collectionName = "My Creative Videos";
         const collectionSymbol = "CRTV";
 
-        // Story Protocol requires server-side signing with a private key
-        // since it only supports eth_sendRawTransaction (not eth_sendTransaction)
-        // Call the server action which uses STORY_PROTOCOL_PRIVATE_KEY for signing
+        // Call the server action which uses STORY_PROTOCOL_PRIVATE_KEY
         const response = await fetch("/api/story/mint", {
           method: "POST",
           headers: {
@@ -207,14 +142,14 @@ export function NFTMintingStep({
         }
 
         const result = await response.json();
-        
+
         if (!result.success) {
           throw new Error(result.error || "Minting failed");
         }
 
         // Clear any previous errors
         setMintError(null);
-        
+
         // Show success state
         setMintSuccess({
           tokenId: result.tokenId,
@@ -223,7 +158,7 @@ export function NFTMintingStep({
           ipId: result.ipId,
         });
 
-        // Also call the callback for parent component
+        // Callback
         onMintSuccess({
           tokenId: result.tokenId,
           contractAddress: result.collectionAddress,
@@ -233,45 +168,15 @@ export function NFTMintingStep({
     } catch (e) {
       console.error("Minting failed:", e);
       const errorMessage = e instanceof Error ? e.message : "Minting failed";
-      
-      // Provide helpful error messages for common issues
-      if (errorMessage.includes("eth_sendTransaction") || errorMessage.includes("Unsupported method")) {
-        setMintError(
-          `Story Protocol only supports eth_sendRawTransaction (not eth_sendTransaction). ` +
-          `This means transactions must be signed locally before sending. ` +
-          `\n\nThe Story Protocol SDK requires a signer to:\n` +
-          `1. Create the transaction\n` +
-          `2. Sign it locally\n` +
-          `3. Send it as a raw transaction\n` +
-          `\nSince Account Kit smart accounts don't provide direct signing for Story Protocol, ` +
-          `server-side signing is used with STORY_PROTOCOL_PRIVATE_KEY. ` +
-          `The funding wallet (configured via STORY_PROTOCOL_PRIVATE_KEY) must have IP tokens to pay for gas fees. ` +
-          `Make sure you've transferred IP tokens to the funding wallet using the transfer feature above.`
-        );
-      } else if (errorMessage.includes("network") || errorMessage.includes("chain") || errorMessage.includes("Chain ID")) {
-        setMintError(
-          `Story Protocol transaction failed. The Story Protocol SDK uses a custom connection to Story Network (Chain ID: ${expectedChainId}), ` +
-          `but your wallet may need to be configured to sign transactions on that network. ` +
-          `Please ensure your wallet supports Story Protocol or contact support for assistance.`
-        );
-      } else {
-        setMintError(errorMessage);
-      }
+      setMintError(errorMessage);
     } finally {
       setIsMinting(false);
     }
   };
 
-  if (!client) {
-    // ... (existing not connected state)
-  }
+  // Check if funding wallet has enough funds (Threshold: 0.5 IP)
+  const hasFundingFunds = fundingWalletBalance ? parseFloat(fundingWalletBalance) >= 0.5 : false;
 
-  // Determine if user funds are sufficient (Threshold: 0.5 IP for safety)
-  const hasSufficientFunds = ipBalance ? parseFloat(ipBalance) >= 0.5 : false;
-  
-  // Check if on Story Protocol network (for informational purposes)
-  // Note: Story Protocol uses custom transport, so transactions work from any chain
-  const isOnStoryNetwork = client?.chain?.id === STORY_CHAIN_ID;
   const expectedChainId = network === "mainnet" ? 1514 : 1315;
 
   return (
@@ -287,88 +192,68 @@ export function NFTMintingStep({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Network Info Alert - Show if not on Story network (informational only) */}
-        {!nftContractAddress && !isOnStoryNetwork && (
-          <Alert>
-            <InfoIcon className="h-4 w-4" />
-            <AlertDescription>
-              <strong>Note:</strong> Your wallet is connected to {client?.chain?.name || "Base"} (Chain ID: {client?.chain?.id}).
-              Story Protocol transactions will be executed on Story {network === "mainnet" ? "Mainnet" : "Testnet"} (Chain ID: {expectedChainId}) 
-              using a custom connection. Your current network connection does not need to be changed.
-            </AlertDescription>
-          </Alert>
-        )}
-        {/* Balance Check */}
-        <div className="flex items-center justify-between text-sm bg-muted/50 p-2 rounded-md border">
-          <div className="flex flex-col">
-            <span className="text-muted-foreground">
-              Story Protocol Balance ($IP):
-              <span className="ml-2 text-xs">
-                ({process.env.NEXT_PUBLIC_STORY_NETWORK || "testnet"})
+        {/* System Gas Status */}
+        <div className={`flex items-center justify-between text-sm p-3 rounded-md border ${hasFundingFunds ? "bg-green-50 border-green-200" : "bg-amber-50 border-amber-200"
+          }`}>
+          <div className="flex items-center gap-2">
+            <FuelIcon className={`h-4 w-4 ${hasFundingFunds ? "text-green-600" : "text-amber-600"}`} />
+            <div className="flex flex-col">
+              <span className="font-medium text-foreground">
+                Story Protocol Gas Status
               </span>
-            </span>
-            <span className="font-semibold text-lg text-foreground">
-              {ipBalance ? `${parseFloat(ipBalance).toFixed(4)} IP` : "Loading..."}
-            </span>
-            {balanceCheckAddress && (
-              <span className="text-xs text-muted-foreground mt-1">
-                Address: {balanceCheckAddress.slice(0, 6)}...{balanceCheckAddress.slice(-4)}
+              <span className="text-xs text-muted-foreground">
+                Network: {network}
               </span>
-            )}
+            </div>
           </div>
-          <Button variant="ghost" size="sm" onClick={() => checkBalance()} disabled={isCheckingBalance}>
-            {isCheckingBalance ? <Loader2 className="h-3 w-3 animate-spin" /> : "Refresh"}
-          </Button>
+          <div className="flex items-center gap-2">
+            <span className={`font-mono text-sm ${hasFundingFunds ? "text-green-700 font-medium" : "text-amber-700"}`}>
+              {fundingWalletBalance ? `${parseFloat(fundingWalletBalance).toFixed(4)} IP` : "Loading..."}
+            </span>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={() => checkFundingWallet()}
+              disabled={isCheckingFunding}
+            >
+              <Loader2 className={`h-3 w-3 ${isCheckingFunding ? "animate-spin" : ""}`} />
+            </Button>
+          </div>
         </div>
 
-        {/* Transfer IP Component - Users transfer IP tokens to funding wallet to pay for Story Protocol transactions */}
-        {ipBalance && parseFloat(ipBalance) > 0 && (
-          <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-            <TransferIP 
-              onTransferSuccess={() => {
-                // Refresh balance after transfer
-                setTimeout(() => {
-                  checkBalance(0);
-                }, 2000);
-              }} 
-            />
-          </div>
-        )}
+        {/* Swap Component if system funds are low */}
+        {!hasFundingFunds && fundingWalletAddress && (
+          <div className="animate-in fade-in slide-in-from-top-2 duration-300 space-y-3">
+            <Alert variant="destructive" className="bg-amber-50 border-amber-200 text-amber-800">
+              <InfoIcon className="h-4 w-4 text-amber-600" />
+              <AlertDescription>
+                The system gas wallet is low on IP tokens. You can help by swapping some ETH to IP.
+                The funds will be sent directly to the gas wallet to pay for your minting transaction.
+              </AlertDescription>
+            </Alert>
 
-        {/* Swap Component if funds are low */}
-        {ipBalance && !hasSufficientFunds && (
-          <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-            <CrossChainSwap 
+            <CrossChainSwap
+              recipientAddress={fundingWalletAddress}
               onSwapSuccess={() => {
-                // Wait a bit for cross-chain swap to finalize, then check balance with retries
-                console.log("🔄 Swap completed, checking balance in 3 seconds...");
+                console.log("🔄 Swap completed, checking funding balance in 3 seconds...");
                 setTimeout(() => {
-                  checkBalance(0); // Start retry sequence
+                  checkFundingWallet(0);
                 }, 3000);
-              }} 
+              }}
             />
-            <div className="text-center text-xs text-muted-foreground mt-2">
-              You need at least 0.5 $IP to cover minting fees and gas.
-            </div>
-            {balanceCheckAddress && (
-              <div className="text-center text-xs text-muted-foreground mt-1">
-                Checking balance for: {balanceCheckAddress.slice(0, 6)}...{balanceCheckAddress.slice(-4)}
-              </div>
-            )}
           </div>
         )}
 
-        {/* Info Alert based on mode */}
+        {/* Info Alert */}
         <Alert>
           <InfoIcon className="h-4 w-4" />
           <AlertDescription>
             {nftContractAddress
               ? "Minting an NFT will create a unique token for your video."
-              : "This action will create a dedicated NFT collection for your content and register this video as an IP Asset on Story Protocol."}
+              : "We handle the gas fees! This action will register your video as an IP Asset on Story Protocol using our sponsored gas wallet."}
           </AlertDescription>
         </Alert>
-
-        {/* ... (Existing details display: metadataURI etc) */}
 
         {mintSuccess && (
           <Alert className="border-green-500 bg-green-50 dark:bg-green-950">
@@ -401,18 +286,6 @@ export function NFTMintingStep({
                   >
                     View transaction on StoryScan <ExternalLink className="h-3 w-3" />
                   </a>
-                  {mintSuccess.ipId && (
-                    <div>
-                      <a
-                        href={`${storyScanBaseUrl}/ip/${mintSuccess.ipId}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-green-600 dark:text-green-400 hover:underline font-medium text-xs"
-                      >
-                        View IP Asset <ExternalLink className="h-3 w-3" />
-                      </a>
-                    </div>
-                  )}
                 </div>
               </div>
             </AlertDescription>
@@ -429,7 +302,7 @@ export function NFTMintingStep({
         <div className="flex gap-3">
           <Button
             onClick={handleMint}
-            disabled={isMinting || !hasSufficientFunds || !!mintSuccess} // Disable if low funds or already succeeded
+            disabled={isMinting || !hasFundingFunds || !!mintSuccess}
             className="flex-1"
           >
             {isMinting ? (
@@ -457,4 +330,3 @@ export function NFTMintingStep({
     </Card>
   );
 }
-
