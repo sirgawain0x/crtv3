@@ -21,7 +21,7 @@ const DialogOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      `fixed inset-0 z-50 bg-black/80  data-[state=open]:animate-in 
+      `fixed inset-0 z-45 bg-black/80  data-[state=open]:animate-in 
       data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0`,
       className
     )}
@@ -42,7 +42,7 @@ const DialogContent = React.forwardRef<
       <DialogPrimitive.Content
         ref={ref}
         className={cn(
-          `fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background 
+          `fixed left-[50%] top-[50%] z-45 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background 
           p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out 
           data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 
           data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] 
@@ -53,7 +53,7 @@ const DialogContent = React.forwardRef<
           // When dialog opens, blur any focused elements outside the dialog
           // This prevents aria-hidden warnings when background elements retain focus
           const activeElement = document.activeElement as HTMLElement;
-          
+
           // Check if the active element is outside the dialog
           if (activeElement && !activeElement.closest('[data-radix-dialog-content]')) {
             previousActiveElementRef.current = activeElement;
@@ -69,10 +69,10 @@ const DialogContent = React.forwardRef<
           // Prevent auto-focus conflicts that can cause aria-hidden warnings
           // This helps avoid accessibility warnings with third-party scripts that inject buttons
           if (
-            activeElement && 
+            activeElement &&
             (activeElement.closest('[data-radix-dialog-content]') ||
-             activeElement.tagName === 'BUTTON' ||
-             activeElement.closest('script'))
+              activeElement.tagName === 'BUTTON' ||
+              activeElement.closest('script'))
           ) {
             e.preventDefault();
           }
