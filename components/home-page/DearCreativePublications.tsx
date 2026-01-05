@@ -98,15 +98,12 @@ export default function DearCreativePublications() {
     return (
         <div className="mx-auto w-full max-w-7xl py-8">
             <div className="mb-8 text-center">
-                <h3 className="mb-4 text-3xl font-bold flex items-center justify-center gap-2">
+                <h3 className="mb-4 text-2xl font-bold flex items-center justify-center gap-2">
 
                     <span className="animate-pulse">
                         <Newspaper className="inline-block h-10 w-10 text-[#EC407A]" />
                     </span>
                     <span className="text-primary">LATEST ARTICLES</span>
-                    {/* <span className="text-muted-foreground text-sm font-normal block md:inline-block ml-2 align-middle">
-                        Latest Articles
-                    </span> */}
                 </h3>
 
                 {/* Stats Section - Visible only when connected */}

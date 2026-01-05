@@ -333,7 +333,7 @@ export function useMeTokens() {
   const user = useUser();
   const { client } = useSmartAccountClient({});
   const { getGasContext } = useGasSponsorship();
-  const { sendUserOperation, isSendingUserOperation, error } = useSendUserOperation({ client });
+  const { sendUserOperationAsync, isSendingUserOperation, error } = useSendUserOperation({ client });
 
   const address = user?.address;
 
@@ -466,7 +466,7 @@ export function useMeTokens() {
         value: BigInt(0),
       };
 
-      return await sendUserOperation({
+      return await sendUserOperationAsync({
         uo: uoCallData,
         context: context,
         overrides: {
@@ -631,7 +631,7 @@ export function useMeTokens() {
     if (!address || !user) throw new Error('No wallet connected');
 
     try {
-      await sendUserOperation({
+      await sendUserOperationAsync({
         uo: {
           target: DIAMOND,
           data: encodeFunctionData({
@@ -652,7 +652,7 @@ export function useMeTokens() {
     if (!address || !user) throw new Error('No wallet connected');
 
     try {
-      await sendUserOperation({
+      await sendUserOperationAsync({
         uo: {
           target: DIAMOND,
           data: encodeFunctionData({
