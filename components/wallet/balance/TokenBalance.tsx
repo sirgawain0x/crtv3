@@ -181,6 +181,21 @@ export function TokenBalance() {
     };
   }, [client, user, chain]);
 
+  // Helper to get token icon based on chain
+  const getTokenIcon = (symbol: string) => {
+    const isBase = chain?.id === 8453;
+    switch (symbol) {
+      case "ETH":
+        return isBase ? "/images/tokens/ETHonBase.svg" : "/images/tokens/eth-logo.svg";
+      case "USDC":
+        return isBase ? "/images/tokens/USDCB.svg" : "/images/tokens/usdc-logo.svg";
+      case "DAI":
+        return isBase ? "/images/tokens/DAIB.svg" : "/images/tokens/dai-logo.svg";
+      default:
+        return "/images/tokens/eth-logo.svg";
+    }
+  };
+
   if (isLoading) {
     return (
       <Card>
@@ -191,7 +206,7 @@ export function TokenBalance() {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <Image
-                src="/images/tokens/eth-logo.svg"
+                src={getTokenIcon("ETH")}
                 alt="ETH"
                 width={16}
                 height={16}
@@ -204,7 +219,7 @@ export function TokenBalance() {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <Image
-                src="/images/tokens/usdc-logo.svg"
+                src={getTokenIcon("USDC")}
                 alt="USDC"
                 width={16}
                 height={16}
@@ -217,7 +232,7 @@ export function TokenBalance() {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <Image
-                src="/images/tokens/dai-logo.svg"
+                src={getTokenIcon("DAI")}
                 alt="DAI"
                 width={16}
                 height={16}
@@ -256,7 +271,7 @@ export function TokenBalance() {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <Image
-              src="/images/tokens/eth-logo.svg"
+              src={getTokenIcon("ETH")}
               alt="ETH"
               width={16}
               height={16}
@@ -273,7 +288,7 @@ export function TokenBalance() {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <Image
-              src="/images/tokens/usdc-logo.svg"
+              src={getTokenIcon("USDC")}
               alt="USDC"
               width={16}
               height={16}
@@ -290,7 +305,7 @@ export function TokenBalance() {
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <Image
-              src="/images/tokens/dai-logo.svg"
+              src={getTokenIcon("DAI")}
               alt="DAI"
               width={16}
               height={16}

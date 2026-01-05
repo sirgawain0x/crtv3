@@ -556,6 +556,11 @@ export default function Navbar() {
                         <CloudUpload className="mr-2 h-4 w-4" /> Upload
                       </Link>
 
+                      {/* Membership Status Section */}
+                      <div className="mt-4">
+                        <MembershipSection />
+                      </div>
+
                       {/* Member Access Links (mobile) */}
                       {isVerified && hasMembership && (
                         <>
@@ -605,46 +610,17 @@ export default function Navbar() {
                         </Link>
                       </div>
 
-                      {/* Logout Button */}
-                      <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                        <button
-                          onClick={() => {
-                            logout();
-                            setIsMenuOpen(false);
-                          }}
-                          className="flex w-full items-center rounded-md p-2 text-sm font-medium
-                            hover:bg-red-50 dark:hover:bg-red-900 transition-colors text-red-500"
-                        >
-                          <LogOut className="mr-2 h-4 w-4" />
-                          Logout
-                        </button>
-                      </div>
+
                     </nav>
 
-                    {/* Add TokenBalance here */}
-                    <div className="mt-4">
-                      <TokenBalance />
-                    </div>
-
-                    {/* Add MeTokenBalances here */}
-                    {shouldShowMetokens && (
-                      <div className="mt-4">
-                        <MeTokenBalances />
-                      </div>
-                    )}
-
-                    {/* Add Membership Section here */}
-                    <div className="mt-4">
-                      <MembershipSection />
-                    </div>
-
-                    {/* Add Chain Selector here */}
-                    <div className="mt-4">
+                    {/* Network Selection */}
+                    <div className="mt-4 border-t border-gray-200 dark:border-gray-700 pt-4">
                       <p className="text-sm font-medium mb-2">Network</p>
                       <ChainSelect className="w-full" />
                     </div>
 
-                    <div className="grid grid-cols-3 gap-2">
+                    {/* Wallet Actions */}
+                    <div className="mt-4 grid grid-cols-3 gap-2 pb-4 border-b border-gray-200 dark:border-gray-700">
                       <Button
                         variant="outline"
                         size="sm"
@@ -682,6 +658,35 @@ export default function Navbar() {
                         Swap
                       </Button>
                     </div>
+
+                    {/* Add TokenBalance here */}
+                    <div className="mt-4">
+                      <TokenBalance />
+                    </div>
+
+                    {/* Add MeTokenBalances here */}
+                    {shouldShowMetokens && (
+                      <div className="mt-4">
+                        <MeTokenBalances />
+                      </div>
+                    )}
+
+                    {/* Logout Button (moved to bottom) */}
+                    {user && (
+                      <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                        <button
+                          onClick={() => {
+                            logout();
+                            setIsMenuOpen(false);
+                          }}
+                          className="flex w-full items-center rounded-md p-2 text-sm font-medium
+                            hover:bg-red-50 dark:hover:bg-red-900 transition-colors text-red-500"
+                        >
+                          <LogOut className="mr-2 h-4 w-4" />
+                          Logout
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <Button

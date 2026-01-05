@@ -61,17 +61,17 @@ export function UserDisplay({
   const isLoading = meTokenLoading || profileLoading;
 
   // Determine what to display
-  const displayName = meToken?.name || profile?.username || null;
+  const displayName = profile?.username || meToken?.name || null;
   const displaySymbol = meToken?.symbol || null;
-  const avatarUrl = profile?.avatar_url 
+  const avatarUrl = profile?.avatar_url
     ? convertFailingGateway(profile.avatar_url)
     : makeBlockie(address);
 
   const avatarFallback = displayName
     ? displayName.charAt(0).toUpperCase()
     : displaySymbol
-    ? displaySymbol.slice(0, 2).toUpperCase()
-    : formatAddress(address).slice(0, 2).toUpperCase();
+      ? displaySymbol.slice(0, 2).toUpperCase()
+      : formatAddress(address).slice(0, 2).toUpperCase();
 
   const content = (
     <div
@@ -130,7 +130,7 @@ export function UserDisplayCompact({
   const { meToken } = useMeTokenByOwner(address);
   const { profile } = useCreatorProfile(address);
 
-  const displayName = meToken?.name || profile?.username || null;
+  const displayName = profile?.username || meToken?.name || null;
   const displaySymbol = meToken?.symbol || null;
   const avatarUrl = profile?.avatar_url
     ? convertFailingGateway(profile.avatar_url)
@@ -139,8 +139,8 @@ export function UserDisplayCompact({
   const avatarFallback = displayName
     ? displayName.charAt(0).toUpperCase()
     : displaySymbol
-    ? displaySymbol.slice(0, 2).toUpperCase()
-    : formatAddress(address).slice(0, 2).toUpperCase();
+      ? displaySymbol.slice(0, 2).toUpperCase()
+      : formatAddress(address).slice(0, 2).toUpperCase();
 
   return (
     <div className={cn("flex items-center gap-2", className)}>
@@ -179,7 +179,7 @@ export function UserNameDisplay({
   const { meToken } = useMeTokenByOwner(address);
   const { profile } = useCreatorProfile(address);
 
-  const displayName = meToken?.name || profile?.username || null;
+  const displayName = profile?.username || meToken?.name || null;
   const displaySymbol = meToken?.symbol || null;
 
   return (

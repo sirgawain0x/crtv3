@@ -15,10 +15,18 @@ import { priceService, PriceService } from '@/lib/sdk/alchemy/price-service';
 import { CurrencyConverter } from '@/lib/utils/currency-converter';
 import { useGasSponsorship } from '@/lib/hooks/wallet/useGasSponsorship';
 
-const TOKEN_LOGOS: Record<TokenSymbol, string> = {
-  ETH: "/images/tokens/ETHB.svg",
-  USDC: "/images/tokens/USDCB.svg",
-  DAI: "/images/tokens/DAIB.svg",
+const getTokenIcon = (symbol: string, chainId?: number) => {
+  const isBase = chainId === 8453;
+  switch (symbol) {
+    case "ETH":
+      return isBase ? "/images/tokens/ETHonBase.svg" : "/images/tokens/eth-logo.svg";
+    case "USDC":
+      return isBase ? "/images/tokens/USDCB.svg" : "/images/tokens/usdc-logo.svg";
+    case "DAI":
+      return isBase ? "/images/tokens/DAIB.svg" : "/images/tokens/dai-logo.svg";
+    default:
+      return "/images/tokens/eth-logo.svg";
+  }
 };
 
 interface AlchemySwapWidgetProps {
@@ -720,7 +728,7 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
               </select>
 
               <Image
-                src={TOKEN_LOGOS[swapState.fromToken]}
+                src={getTokenIcon(swapState.fromToken, client?.chain?.id)}
                 alt={swapState.fromToken}
                 width={20}
                 height={20}
@@ -770,7 +778,7 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
           <div className="flex justify-between text-xs text-muted-foreground">
             <div className="flex items-center space-x-1">
               <Image
-                src={TOKEN_LOGOS[swapState.fromToken]}
+                src={getTokenIcon(swapState.fromToken, client?.chain?.id)}
                 alt={swapState.fromToken}
                 width={12}
                 height={12}
@@ -843,7 +851,7 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
               </select>
 
               <Image
-                src={TOKEN_LOGOS[swapState.toToken]}
+                src={getTokenIcon(swapState.toToken, client?.chain?.id)}
                 alt={swapState.toToken}
                 width={20}
                 height={20}
@@ -878,7 +886,7 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
           <div className="flex justify-between text-xs text-muted-foreground">
             <div className="flex items-center space-x-1">
               <Image
-                src={TOKEN_LOGOS[swapState.toToken]}
+                src={getTokenIcon(swapState.toToken, client?.chain?.id)}
                 alt={swapState.toToken}
                 width={12}
                 height={12}

@@ -80,7 +80,7 @@ export default function VideoDetails({ asset, videoTitle }: VideoDetailsProps) {
     };
     const fetchThumbnail = async () => {
       if (!asset?.playbackId) return;
-      
+
       try {
         // First, try to get thumbnail from database
         const row = await fetchVideoAssetByPlaybackId(asset.playbackId);
@@ -92,7 +92,7 @@ export default function VideoDetails({ asset, videoTitle }: VideoDetailsProps) {
       } catch (error) {
         // Silently fail - database thumbnail is optional
       }
-      
+
       try {
         // If no database thumbnail, try Livepeer VTT thumbnails
         const url = await getThumbnailUrl(asset.playbackId);
@@ -196,7 +196,7 @@ export default function VideoDetails({ asset, videoTitle }: VideoDetailsProps) {
           </Popover.Trigger>
           <Popover.Portal>
             <Popover.Content
-              className="bg-gray/50 w-60 rounded-md border border-white/50 p-3 shadow-md 
+              className="bg-gray/50 w-60 rounded-md border border-white/50 p-3 shadow-md z-50
               outline-none backdrop-blur-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 
               data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 
               data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2"
@@ -231,7 +231,7 @@ export default function VideoDetails({ asset, videoTitle }: VideoDetailsProps) {
                       </Player.SelectIcon>
                     </Player.SelectTrigger>
                     <Player.SelectPortal>
-                      <Player.SelectContent className="overflow-hidden rounded-sm bg-gray-400">
+                      <Player.SelectContent className="overflow-hidden rounded-sm bg-gray-400 z-[60]">
                         <Player.SelectViewport className="p-1">
                           <Player.SelectGroup className="">
                             <RateSelectItem value={0.5}>0.5x</RateSelectItem>
@@ -271,7 +271,7 @@ export default function VideoDetails({ asset, videoTitle }: VideoDetailsProps) {
                       </Player.SelectIcon>
                     </Player.SelectTrigger>
                     <Player.SelectPortal>
-                      <Player.SelectContent className="overflow-hidden rounded-sm bg-gray-400">
+                      <Player.SelectContent className="overflow-hidden rounded-sm bg-gray-400 z-[60]">
                         <Player.SelectViewport className="p-[5px]">
                           <Player.SelectGroup>
                             <VideoQualitySelectItem value="auto">
@@ -419,9 +419,9 @@ export default function VideoDetails({ asset, videoTitle }: VideoDetailsProps) {
             <>
               <Player.Root src={playbackSources} {...conditionalProps}>
                 <Player.Container className="aspect-video w-full overflow-hidden rounded-lg bg-gray-800">
-                  <Player.Video 
-                    title={asset?.name} 
-                    className="h-full w-full" 
+                  <Player.Video
+                    title={asset?.name}
+                    className="h-full w-full"
                     poster={thumbnailUrl || undefined}
                   />
                   <Player.LoadingIndicator
@@ -492,11 +492,11 @@ export default function VideoDetails({ asset, videoTitle }: VideoDetailsProps) {
                     matcher={false}
                     className="absolute inset-0 z-20 flex items-center justify-center 
                     data-[visible=true]:animate-in data-[visible=false]:animate-out 
-                    data-[visible=false]:fade-out-0 data-[visible=true]:fade-in-0"
+                    data-[visible=false]:fade-out-0 data-[visible=true]:fade-in-0 pointer-events-none"
                   >
                     <Player.PlayPauseTrigger className="group relative flex h-20 w-20 cursor-pointer 
                       touch-none items-center justify-center rounded-full bg-black/50 
-                      hover:bg-black/70 transition-all duration-200 hover:scale-110">
+                      hover:bg-black/70 transition-all duration-200 hover:scale-110 pointer-events-auto">
                       <Player.PlayingIndicator asChild matcher={false}>
                         <PlayIcon
                           className="h-12 w-12 ml-1"
@@ -513,7 +513,7 @@ export default function VideoDetails({ asset, videoTitle }: VideoDetailsProps) {
                   </Player.PlayingIndicator>
 
                   <Player.Controls
-                    className="flex flex-col-reverse gap-1 bg-gradient-to-b 
+                    className="relative z-30 flex flex-col-reverse gap-1 bg-gradient-to-b 
                   from-black/5 via-black/30 via-80% to-black/60 px-3 py-2 duration-1000 
                   data-[visible=true]:animate-in data-[visible=false]:animate-out 
                   data-[visible=false]:fade-out-0 data-[visible=true]:fade-in-0 md:px-3"

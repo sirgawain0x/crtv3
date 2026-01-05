@@ -173,6 +173,20 @@ interface SessionKeyConfig {
 // Token configuration for send modal
 type TokenSymbol = 'ETH' | 'USDC' | 'DAI';
 
+const getTokenIcon = (symbol: TokenSymbol, chainId?: number) => {
+  const isBase = chainId === 8453;
+  switch (symbol) {
+    case "ETH":
+      return isBase ? "/images/tokens/ETHonBase.svg" : "/images/tokens/eth-logo.svg";
+    case "USDC":
+      return isBase ? "/images/tokens/USDCB.svg" : "/images/tokens/usdc-logo.svg";
+    case "DAI":
+      return isBase ? "/images/tokens/DAIB.svg" : "/images/tokens/dai-logo.svg";
+    default:
+      return "/images/tokens/eth-logo.svg";
+  }
+};
+
 // Helper function to get token info for the current chain
 const getTokenInfo = (chainId?: number) => {
   const chainKey = chainId === base.id ? "base" : undefined;
@@ -716,7 +730,7 @@ export function AccountDropdown() {
                         }`}
                     >
                       <Image
-                        src={`/images/tokens/${token.toLowerCase()}-logo.svg`}
+                        src={getTokenIcon(token, chain?.id)}
                         alt={token}
                         width={20}
                         height={20}
@@ -734,7 +748,7 @@ export function AccountDropdown() {
                 <div className="flex justify-between items-center text-xs text-gray-500 dark:text-gray-400">
                   <div className="flex items-center space-x-2">
                     <Image
-                      src={`/images/tokens/${selectedToken.toLowerCase()}-logo.svg`}
+                      src={getTokenIcon(selectedToken, chain?.id)}
                       alt={selectedToken}
                       width={12}
                       height={12}
