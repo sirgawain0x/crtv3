@@ -110,7 +110,7 @@ const VideoThumbnail: React.FC<VideoThumbnailProps> = ({
     showPlayerRef.current = showPlayer;
   }, [showPlayer]);
 
-  // Preview Loop Logic (30s)
+  // Preview Loop Logic (10s)
   useEffect(() => {
     if (isPreviewing && previewVideoRef.current) {
       const vid = previewVideoRef.current;
@@ -118,7 +118,7 @@ const VideoThumbnail: React.FC<VideoThumbnailProps> = ({
 
       const handleTimeUpdate = () => {
         if (!isMounted || !previewVideoRef.current) return;
-        if (vid.currentTime >= 30) {
+        if (vid.currentTime >= 10) {
           vid.currentTime = 0;
           vid.play().catch(e => {
             // AbortError is expected when video is removed/unmounted
@@ -292,7 +292,7 @@ const VideoThumbnail: React.FC<VideoThumbnailProps> = ({
             className="w-full h-full object-cover"
             playsInline
             muted={isMuted} // Controlled by state
-            loop={false} // Managed manually for 30s loop
+            loop={false} // Managed manually for 10s loop
           />
           <div className="absolute bottom-2 right-2 p-1 bg-black/50 rounded-full">
             {isMuted ? <VolumeX className="w-4 h-4 text-white" /> : <Volume2 className="w-4 h-4 text-white" />}

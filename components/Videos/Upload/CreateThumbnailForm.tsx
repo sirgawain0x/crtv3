@@ -449,6 +449,66 @@ const CreateThumbnailForm = ({
     }
   };
 
+  const [selectedModel, setSelectedModel] = useState<'nano-banana' | 'gemini-3-pro'>('nano-banana');
+
+  const getModelPrice = (model: 'nano-banana' | 'gemini-3-pro') => {
+    return model === 'nano-banana' ? 500000 : 1000000; // 0.5 USDC vs 1.0 USDC
+  };
+
+  const getModelName = (model: 'nano-banana' | 'gemini-3-pro') => {
+    return model === 'nano-banana' ? 'Nano Banana (Gemini 2.5 Flash)' : 'Nano Banana Pro (Gemini 3 Pro)';
+  };
+
+  const handleAiGenerateWithPayment = async (prompt: string) => {
+    setPaymentLoading(true);
+    setAiLoading(true);
+
+    try {
+      // Check wallet connection first
+      if (!isConnected) {
+        throw new Error('Please connect your wallet to use AI generation');
+      }
+
+      // Step 1: Make x402 payment using client-side wallet
+      const price = getModelPrice(selectedModel);
+      toast.info(`Processing payment of ${(price / 1000000).toFixed(2)} USDC...`);
+
+      const paymentResult = await makePayment({
+        service: 'ai-thumbnail-generation',
+        amount: price.toString(),
+        endpoint: 'https://x402.payai.network/api/base/paid-content',
+        recipientAddress: '0x31ee83aef931a1af321c505053040e98545a5614',
+      });
+
+      if (!paymentResult.success) {
+        throw new Error(paymentResult.error || "Payment failed");
+      }
+
+      toast.success('Payment successful!');
+
+      // Step 2: Generate AI image with Gemini after successful payment
+      toast.info(`Generating AI thumbnail with ${getModelName(selectedModel)}...`);
+      const aiResult = await generateAiImage(prompt);
+
+      if (aiResult.success) {
+        setAiImages(aiResult.images);
+        toast.success(`Generated ${aiResult.images.length} AI thumbnail${aiResult.images.length > 1 ? 's' : ''}!`);
+      } else {
+        throw new Error(aiResult.error || "Gemini AI generation failed");
+      }
+
+    } catch (error) {
+      console.error('AI Generation Error:', error);
+      toast.error(error instanceof Error ? error.message : "Failed to generate AI thumbnail");
+      setError("root", {
+        message: error instanceof Error ? error.message : "Failed to generate AI thumbnail with Gemini",
+      });
+    } finally {
+      setPaymentLoading(false);
+      setAiLoading(false);
+    }
+  };
+
   const generateAiImage = async (prompt: string) => {
     try {
       const response = await fetch('/api/ai/generate-thumbnail', {
@@ -458,7 +518,7 @@ const CreateThumbnailForm = ({
         },
         body: JSON.stringify({
           prompt: prompt,
-          service: 'gemini-2.5-flash',
+          model: selectedModel,
         }),
       });
 
@@ -481,49 +541,6 @@ const CreateThumbnailForm = ({
         success: false,
         error: error instanceof Error ? error.message : "AI generation failed",
       };
-    }
-  };
-
-  const handleAiGenerateWithPayment = async (prompt: string) => {
-    setPaymentLoading(true);
-    setAiLoading(true);
-
-    try {
-      // Check wallet connection first
-      if (!isConnected) {
-        throw new Error('Please connect your wallet to use AI generation');
-      }
-
-      // Step 1: Make x402 payment using client-side wallet
-      toast.info('Processing payment...');
-      const paymentResult = await makeX402PaymentWithWallet();
-
-      if (!paymentResult.success) {
-        throw new Error(paymentResult.error || "Payment failed");
-      }
-
-      toast.success('Payment successful!');
-
-      // Step 2: Generate AI image with Gemini after successful payment
-      toast.info('Generating AI thumbnail...');
-      const aiResult = await generateAiImage(prompt);
-
-      if (aiResult.success) {
-        setAiImages(aiResult.images);
-        toast.success(`Generated ${aiResult.images.length} AI thumbnail${aiResult.images.length > 1 ? 's' : ''} with Gemini!`);
-      } else {
-        throw new Error(aiResult.error || "Gemini AI generation failed");
-      }
-
-    } catch (error) {
-      console.error('AI Generation Error:', error);
-      toast.error(error instanceof Error ? error.message : "Failed to generate AI thumbnail");
-      setError("root", {
-        message: error instanceof Error ? error.message : "Failed to generate AI thumbnail with Gemini",
-      });
-    } finally {
-      setPaymentLoading(false);
-      setAiLoading(false);
     }
   };
 
@@ -586,8 +603,8 @@ const CreateThumbnailForm = ({
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${dragOver
-                  ? "border-primary bg-primary/5"
-                  : "border-gray-300 hover:border-gray-400"
+                ? "border-primary bg-primary/5"
+                : "border-gray-300 hover:border-gray-400"
                 }`}
             >
               <input
@@ -695,15 +712,39 @@ const CreateThumbnailForm = ({
         {/* AI Generation Tab */}
         <TabsContent value="ai" className="space-y-4">
           <div className="space-y-4">
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-2">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
+              <div className="flex items-center gap-2">
                 <CreditCard className="h-5 w-5 text-blue-600" />
-                <Label className="text-blue-800 font-semibold">Paid AI Generation with Gemini</Label>
+                <Label className="text-blue-800 font-semibold">Paid AI Generation</Label>
               </div>
-              <p className="text-sm text-blue-700">
-                Powered by Google&apos;s Gemini 2.5 Flash model.
-                Generate high-quality, photorealistic thumbnails for 1 USDC on Base.
-              </p>
+
+              <RadioGroup
+                value={selectedModel}
+                onValueChange={(v) => setSelectedModel(v as 'nano-banana' | 'gemini-3-pro')}
+                className="grid gap-3 pt-2"
+              >
+                <Label className="cursor-pointer border border-blue-200 bg-white p-3 rounded-md hover:bg-blue-50 transition-colors flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="nano-banana" id="model-nano" />
+                    <div className="grid gap-0.5">
+                      <span className="font-medium text-sm">Nano Banana (Gemini 2.5 Flash)</span>
+                      <span className="text-xs text-slate-500">Fast, efficient generation</span>
+                    </div>
+                  </div>
+                  <span className="text-sm font-bold text-blue-600">0.5 USDC</span>
+                </Label>
+
+                <Label className="cursor-pointer border border-blue-200 bg-white p-3 rounded-md hover:bg-blue-50 transition-colors flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="gemini-3-pro" id="model-pro" />
+                    <div className="grid gap-0.5">
+                      <span className="font-medium text-sm">Nano Banana Pro (Gemini 3 Pro)</span>
+                      <span className="text-xs text-slate-500">Premium quality, highest detail</span>
+                    </div>
+                  </div>
+                  <span className="text-sm font-bold text-blue-600">1.0 USDC</span>
+                </Label>
+              </RadioGroup>
             </div>
 
             <div className="space-y-2">
@@ -740,8 +781,7 @@ const CreateThumbnailForm = ({
                 </>
               ) : (
                 <>
-                  <SparklesIcon className="h-4 w-4 mr-2" />
-                  Generate AI Thumbnail with Gemini (1 USDC)
+                  Generate with {getModelName(selectedModel)} ({(getModelPrice(selectedModel) / 1000000).toFixed(1)} USDC)
                 </>
               )}
             </Button>

@@ -476,7 +476,7 @@ export default function Navbar() {
                   "text-popover-foreground"
                 }
               >
-                {/* User Account Section for Mobile */}
+                {/* User Account Section or Get Started */}
                 {user ? (
                   <div className="space-y-4 border-b border-gray-200 dark:border-gray-700 pb-4">
                     <div className="flex items-center justify-between">
@@ -509,35 +509,53 @@ export default function Navbar() {
                         )}
                       </Button>
                     </div>
+                  </div>
+                ) : (
+                  <div className="pb-4 border-b border-gray-200 dark:border-gray-700">
+                    <Button
+                      className="w-full bg-gradient-to-r from-blue-600 to-purple-600 
+                        hover:from-blue-700 hover:to-purple-700 text-white 
+                        transition-all duration-300 hover:shadow-lg"
+                      onClick={() => {
+                        openAuthModal();
+                        setIsMenuOpen(false);
+                      }}
+                    >
+                      Get Started
+                    </Button>
+                  </div>
+                )}
 
-                    {/* Navigation Links - Moved above balances */}
-                    <nav className="grid grid-flow-row gap-2 auto-rows-max text-sm pb-4 border-b border-gray-200 dark:border-gray-700">
-                      <Link
-                        href="/discover"
-                        className={mobileNavLinkClass}
-                        onClick={handleLinkClick}
-                      >
-                        Discover
-                      </Link>
-                      <Link
-                        href="/market"
-                        className={mobileNavLinkClass}
-                        onClick={handleLinkClick}
-                      >
-                        Trade
-                      </Link>
-                      {isVerified && hasMembership && (
-                        <Link
-                          href="/vote"
-                          className={mobileNavLinkClass}
-                          onClick={handleLinkClick}
-                        >
-                          Vote
-                        </Link>
-                      )}
+                {/* Navigation Links */}
+                <nav className="grid grid-flow-row gap-2 auto-rows-max text-sm pb-4 border-b border-gray-200 dark:border-gray-700">
+                  <Link
+                    href="/discover"
+                    className={mobileNavLinkClass}
+                    onClick={handleLinkClick}
+                  >
+                    Discover
+                  </Link>
+                  <Link
+                    href="/market"
+                    className={mobileNavLinkClass}
+                    onClick={handleLinkClick}
+                  >
+                    Trade
+                  </Link>
 
-                      {/* Profile & Upload Access (mobile) - Only show when user is connected */}
-                      {/* Note: User check is redundant here as this entire block is within user && check */}
+                  {user && isVerified && hasMembership && (
+                    <Link
+                      href="/vote"
+                      className={mobileNavLinkClass}
+                      onClick={handleLinkClick}
+                    >
+                      Vote
+                    </Link>
+                  )}
+
+                  {/* Member/User Options */}
+                  {user && (
+                    <>
                       <div className="mt-4 mb-1 text-xs text-muted-foreground font-semibold">
                         Options
                       </div>
@@ -561,7 +579,6 @@ export default function Navbar() {
                         <MembershipSection />
                       </div>
 
-                      {/* Member Access Links (mobile) */}
                       {isVerified && hasMembership && (
                         <>
                           <div className="mt-4 mb-1 text-xs text-muted-foreground font-semibold">
@@ -595,26 +612,29 @@ export default function Navbar() {
                           </Link>
                         </>
                       )}
+                    </>
+                  )}
 
-                      {/* Feedback Link */}
-                      <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                        <Link
-                          href="https://feedback.creativeplatform.xyz/crtv"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className={mobileNavLinkClass}
-                          onClick={handleLinkClick}
-                        >
-                          <ArrowUpRight className="mr-2 h-4 w-4" />
-                          Feedback
-                        </Link>
-                      </div>
+                  {/* Feedback Link */}
+                  <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <Link
+                      href="https://feedback.creativeplatform.xyz/crtv"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={mobileNavLinkClass}
+                      onClick={handleLinkClick}
+                    >
+                      <ArrowUpRight className="mr-2 h-4 w-4" />
+                      Feedback
+                    </Link>
+                  </div>
+                </nav>
 
-
-                    </nav>
-
+                {/* User Specific Bottom Sections */}
+                {user && (
+                  <>
                     {/* Network Selection */}
-                    <div className="mt-4 border-t border-gray-200 dark:border-gray-700 pt-4">
+                    <div className="mt-4 pt-4">
                       <p className="text-sm font-medium mb-2">Network</p>
                       <ChainSelect className="w-full" />
                     </div>
@@ -671,35 +691,21 @@ export default function Navbar() {
                       </div>
                     )}
 
-                    {/* Logout Button (moved to bottom) */}
-                    {user && (
-                      <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                        <button
-                          onClick={() => {
-                            logout();
-                            setIsMenuOpen(false);
-                          }}
-                          className="flex w-full items-center rounded-md p-2 text-sm font-medium
-                            hover:bg-red-50 dark:hover:bg-red-900 transition-colors text-red-500"
-                        >
-                          <LogOut className="mr-2 h-4 w-4" />
-                          Logout
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <Button
-                    className="w-full bg-gradient-to-r from-blue-600 to-purple-600 
-                      hover:from-blue-700 hover:to-purple-700 text-white 
-                      transition-all duration-300 hover:shadow-lg"
-                    onClick={() => {
-                      openAuthModal();
-                      setIsMenuOpen(false);
-                    }}
-                  >
-                    Get Started
-                  </Button>
+                    {/* Logout Button */}
+                    <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                      <button
+                        onClick={() => {
+                          logout();
+                          setIsMenuOpen(false);
+                        }}
+                        className="flex w-full items-center rounded-md p-2 text-sm font-medium
+                          hover:bg-red-50 dark:hover:bg-red-900 transition-colors text-red-500"
+                      >
+                        <LogOut className="mr-2 h-4 w-4" />
+                        Logout
+                      </button>
+                    </div>
+                  </>
                 )}
 
                 {/* Navigation Links */}

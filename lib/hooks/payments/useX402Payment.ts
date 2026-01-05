@@ -29,6 +29,7 @@ export interface X402PaymentOptions {
   service: string;
   amount?: string;
   endpoint?: string;
+  recipientAddress?: string;
   additionalData?: Record<string, any>;
 }
 
@@ -78,12 +79,16 @@ export function useX402Payment() {
         service,
         amount = X402_CONFIG.defaultAmount,
         endpoint = 'https://x402.payai.network/api/base/paid-content',
+        recipientAddress,
         additionalData = {},
       } = options;
 
       console.log(`Processing x402 payment for ${service}`);
-      console.log(`Amount: ${amount} (${Number(amount) / 10**X402_CONFIG.token.decimals} ${X402_CONFIG.token.symbol})`);
+      console.log(`Amount: ${amount} (${Number(amount) / 10 ** X402_CONFIG.token.decimals} ${X402_CONFIG.token.symbol})`);
       console.log(`Token: ${X402_CONFIG.token.address} on Base`);
+      if (recipientAddress) {
+        console.log(`Recipient: ${recipientAddress}`);
+      }
 
       // Wrap fetch with x402 payment capability
       // This will automatically handle payment negotiations and token approvals
@@ -102,6 +107,7 @@ export function useX402Payment() {
           amount,
           token: X402_CONFIG.token.address,
           chain: 'base',
+          recipient: recipientAddress,
           ...additionalData,
         }),
       });
@@ -114,6 +120,15 @@ export function useX402Payment() {
 
       const paymentResponse = decodeXPaymentResponse(paymentHeader);
 
+      // Wait for transaction receipt if we have a transaction hash
+      if (paymentResponse.transaction) {
+        console.log(`Waiting for transaction receipt: ${paymentResponse.transaction}`);
+        await client.waitForTransactionReceipt({
+          hash: paymentResponse.transaction as `0x${string}`
+        });
+        console.log('Transaction confirmed');
+      }
+
       // Parse the response data
       const data = await response.json().catch(() => null);
 
@@ -121,7 +136,7 @@ export function useX402Payment() {
         success: true,
         paymentResponse: {
           amount,
-          amountFormatted: `${Number(amount) / 10**X402_CONFIG.token.decimals} ${X402_CONFIG.token.symbol}`,
+          amountFormatted: `${Number(amount) / 10 ** X402_CONFIG.token.decimals} ${X402_CONFIG.token.symbol}`,
           token: X402_CONFIG.token.address,
           chain: 'base',
           service,
@@ -136,7 +151,7 @@ export function useX402Payment() {
 
     } catch (error) {
       console.error('x402 payment failed:', error);
-      
+
       const errorResult: X402PaymentResponse = {
         success: false,
         error: error instanceof Error ? error.message : 'Payment failed',

@@ -3,8 +3,8 @@ import { GoogleGenAI, PersonGeneration, SafetyFilterLevel } from '@google/genai'
 
 export async function POST(request: NextRequest) {
   try {
-    const { prompt } = await request.json();
-    
+    const { prompt, model } = await request.json();
+
     if (!prompt) {
       return NextResponse.json({
         success: false,
@@ -18,6 +18,12 @@ export async function POST(request: NextRequest) {
         success: false,
         error: "Google Gemini API key not configured",
       });
+    }
+
+    // Determine which Gemini model to use based on client selection
+    let aiModel = 'gemini-2.5-flash-image'; // Default to Nano Banana (Flash)
+    if (model === 'gemini-3-pro') {
+      aiModel = 'gemini-3-pro-image-preview';
     }
 
     // Initialize Google GenAI client with the new SDK
@@ -41,9 +47,9 @@ export async function POST(request: NextRequest) {
       Make it engaging and professional, suitable for a creative video platform.
     `;
 
-    // Use the new SDK to generate images with Gemini 2.5 Flash
+    // Use the new SDK to generate images with the selected model
     const genImagesResponse = await ai.models.generateImages({
-      model: 'gemini-2.5-flash',
+      model: aiModel,
       prompt: enhancedPrompt,
       config: {
         numberOfImages: 1,
@@ -52,7 +58,7 @@ export async function POST(request: NextRequest) {
         personGeneration: PersonGeneration.ALLOW_ALL,
       },
     });
-    
+
     // Extract generated images and upload to IPFS
     const images = [];
     if (genImagesResponse.generatedImages) {
@@ -62,7 +68,7 @@ export async function POST(request: NextRequest) {
           const mimeType = generatedImage.image.mimeType || 'image/png';
           const base64Image = Buffer.from(generatedImage.image.imageBytes).toString('base64');
           const dataUrl = `data:${mimeType};base64,${base64Image}`;
-          
+
           // Try to upload to IPFS for permanent storage
           try {
             const uploadResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || ''}/api/ai/upload-to-ipfs`, {
@@ -124,7 +130,7 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Gemini API Error:', error);
-    
+
     // Handle specific Gemini API errors
     let errorMessage = "AI generation failed";
     if (error instanceof Error) {
