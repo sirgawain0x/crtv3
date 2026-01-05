@@ -67,7 +67,7 @@ export function MeTokenBalances() {
 
   // Get the user's MeToken data
   const { userMeToken, loading: meTokenLoading, error: meTokenError } = useMeTokensSupabase();
-  
+
   // Get all MeToken holdings
   const { holdings, loading: holdingsLoading } = useMeTokenHoldings();
 
@@ -115,16 +115,7 @@ export function MeTokenBalances() {
 
   // Show no MeTokens state - only show this if we're not loading and have no holdings or user MeToken
   if (!isLoading && !meTokenLoading && !holdingsLoading && holdings.length === 0 && !userMeToken) {
-    return (
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-sm font-medium text-gray-500">MeTokens</span>
-        </div>
-        <div className="text-xs text-gray-500">
-          No MeTokens found
-        </div>
-      </div>
-    );
+    return null;
   }
 
   // If user has their own MeToken but no holdings (0 balance), show the MeToken
@@ -151,9 +142,9 @@ export function MeTokenBalances() {
             <div className="text-right">
               <div className="text-sm font-medium">
                 {formatBalance(
-                  typeof userMeToken.balance === 'bigint' 
-                    ? formatEther(userMeToken.balance) 
-                    : (userMeToken.balance || "0"), 
+                  typeof userMeToken.balance === 'bigint'
+                    ? formatEther(userMeToken.balance)
+                    : (userMeToken.balance || "0"),
                   userMeToken.symbol
                 )}
               </div>
@@ -162,10 +153,10 @@ export function MeTokenBalances() {
               </div>
             </div>
           </div>
-          
+
           {/* Link to profile for MeToken management */}
           <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
-            <Link 
+            <Link
               href={`/profile/${scaAddress || user?.address}`}
               className={`flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors`}
             >
@@ -180,29 +171,20 @@ export function MeTokenBalances() {
 
   // Show single MeToken balance (simple view)
   const singleHolding = holdings[0];
-  
+
   // Safety check - if no holdings, return empty state
   if (!singleHolding) {
-    return (
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-sm font-medium text-gray-500">MeTokens</span>
-        </div>
-        <div className="text-xs text-gray-500">
-          No MeTokens found
-        </div>
-      </div>
-    );
+    return null;
   }
-  
+
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
         <span className="text-sm font-medium text-gray-500">MeTokens</span>
         {holdings.length > 1 && (
-          <Button 
-            variant="ghost" 
-            size="sm" 
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => setShowPortfolio(true)}
             className="text-xs h-6 px-2"
           >
@@ -241,10 +223,10 @@ export function MeTokenBalances() {
             </div>
           </div>
         </div>
-        
+
         {/* Link to profile for MeToken management */}
         <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
-          <Link 
+          <Link
             href={`/profile/${singleHolding.isOwnMeToken ? (scaAddress || user?.address) : singleHolding.ownerAddress}`}
             className={`flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors`}
           >

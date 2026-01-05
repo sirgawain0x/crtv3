@@ -4,17 +4,15 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { ParagraphAPI } from "@paragraph-com/sdk";
+import { DearCreativeTradeButton } from "@/components/home-page/DearCreativeTradeButton";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
-import { AlchemySwapWidget } from "@/components/wallet/swap/AlchemySwapWidget";
-
 import { NewsletterModal } from "@/components/home-page/NewsletterModal";
 
 export default function MusicNewsPage() {
     const [posts, setPosts] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedPost, setSelectedPost] = useState<any | null>(null);
-    const [isSwapOpen, setIsSwapOpen] = useState(false);
+
 
     useEffect(() => {
         async function fetchMusicPosts() {
@@ -58,37 +56,11 @@ export default function MusicNewsPage() {
         <div className="mx-auto w-full max-w-7xl py-12 px-4">
             <div className="mb-12 text-center relative">
                 <div className="absolute right-0 top-0 hidden sm:block">
-                    <Dialog open={isSwapOpen} onOpenChange={setIsSwapOpen}>
-                        <DialogTrigger asChild>
-                            <Button className="font-bold bg-primary text-primary-foreground hover:bg-primary/90">
-                                Buy $DEARCRTV
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent className="sm:max-w-[425px] p-0 border-none bg-transparent shadow-none">
-                            <AlchemySwapWidget
-                                className="w-full"
-                                defaultToToken="DEARCRTV"
-                                onSwapSuccess={() => setIsSwapOpen(false)}
-                            />
-                        </DialogContent>
-                    </Dialog>
+                    <DearCreativeTradeButton />
                 </div>
 
                 <div className="sm:hidden mb-6 flex justify-center">
-                    <Dialog open={isSwapOpen} onOpenChange={setIsSwapOpen}>
-                        <DialogTrigger asChild>
-                            <Button className="font-bold bg-primary text-primary-foreground hover:bg-primary/90">
-                                Buy $DEARCRTV
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent className="sm:max-w-[425px] p-0 border-none bg-transparent shadow-none">
-                            <AlchemySwapWidget
-                                className="w-full"
-                                defaultToToken="DEARCRTV"
-                                onSwapSuccess={() => setIsSwapOpen(false)}
-                            />
-                        </DialogContent>
-                    </Dialog>
+                    <DearCreativeTradeButton />
                 </div>
 
                 <h1 className="text-4xl font-extrabold tracking-tight lg:text-5xl mb-4">

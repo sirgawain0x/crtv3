@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useUser, useSendUserOperation, useSmartAccountClient } from '@account-kit/react';
+import { useGasSponsorship } from "@/lib/hooks/wallet/useGasSponsorship";
 import { parseEther, formatEther, encodeFunctionData } from 'viem';
 import { meTokensSubgraph, MeToken } from '@/lib/sdk/metokens/subgraph';
 
@@ -331,6 +332,7 @@ export interface MeTokenData {
 export function useMeTokens() {
   const user = useUser();
   const { client } = useSmartAccountClient({});
+  const { getGasContext } = useGasSponsorship();
   const { sendUserOperation, isSendingUserOperation, error } = useSendUserOperation({ client });
 
   const address = user?.address;
@@ -441,7 +443,7 @@ export function useMeTokens() {
 
   // Create a new MeToken
   const createMeToken = async (name: string, symbol: string, hubId: number = 1, assetsDeposited: string = "0") => {
-    if (!address || !user) throw new Error('No wallet connected');
+    if (!address || !user || !client) throw new Error('No wallet connected');
 
     setIsConfirming(false);
     setIsConfirmed(false);
@@ -449,10 +451,9 @@ export function useMeTokens() {
 
     // Base USDC Address
     const USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
-    const GAS_POLICY_ID = process.env.NEXT_PUBLIC_ANYTOKEN_POLICY_ID;
 
     // Helper to execute the creation transaction
-    const executeCreation = async (useUsdcPaymaster: boolean = false) => {
+    const executeCreation = async (context: any) => {
       const createData = encodeFunctionData({
         abi: METOKEN_FACTORY_ABI,
         functionName: 'create',
@@ -465,50 +466,43 @@ export function useMeTokens() {
         value: BigInt(0),
       };
 
-      if (useUsdcPaymaster && GAS_POLICY_ID) {
-        return await sendUserOperation({
-          uo: uoCallData,
-          overrides: {
-            paymasterAndData: undefined, // Let the paymaster service handle it
-          },
-          context: {
-            paymasterService: {
-              policyId: GAS_POLICY_ID,
-              token: USDC_ADDRESS as `0x${string}`,
-            },
-          },
-        });
-      } else {
-        return await sendUserOperation({
-          uo: uoCallData,
-        });
-      }
+      return await sendUserOperation({
+        uo: uoCallData,
+        context: context,
+        overrides: {
+          paymasterAndData: context ? undefined : undefined,
+        },
+      });
     };
 
     try {
+      setIsConfirming(true);
+
+      // Determine gas context (Member -> Sponsored, Non-Member -> USDC)
+      const gasContext = getGasContext('usdc');
+      const primaryContext = gasContext.context;
+
       let result;
 
-      // 1. Try with USDC Paymaster first if configured
-      if (GAS_POLICY_ID) {
-        try {
-          console.log("Attempting to create MeToken with USDC gas payment...");
-          result = await executeCreation(true);
-        } catch (paymasterError) {
-          console.warn("USDC gas payment failed, falling back to standard gas:", paymasterError);
-          // 2. Fallback to standard gas (ETH/Sponsored default) if USDC fails
-          result = await executeCreation(false);
+      try {
+        console.log(`Attempting to create MeToken with ${gasContext.isSponsored ? 'Sponsored' : (primaryContext ? 'USDC' : 'Standard')} gas...`);
+        result = await executeCreation(primaryContext);
+      } catch (error) {
+        if (primaryContext) {
+          console.warn("Primary gas payment failed, falling back to standard gas:", error);
+          // Fallback to standard gas (ETH)
+          result = await executeCreation(undefined);
+        } else {
+          throw error;
         }
-      } else {
-        // No policy ID, just standard execution
-        result = await executeCreation(false);
       }
 
-      if (result !== undefined) {
-        setIsConfirming(true);
-        // Wait for the transaction to be mined
-        if (result && typeof result === 'object' && 'wait' in result) {
-          await (result as any).wait();
-        }
+      if (result && (result as any).hash) {
+        // Wait for transaction to be mined
+        const receipt = await client.waitForUserOperationTransaction({
+          hash: (result as any).hash,
+        });
+
         setIsConfirming(false);
         setIsConfirmed(true);
 

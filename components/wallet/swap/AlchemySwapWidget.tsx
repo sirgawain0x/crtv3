@@ -13,6 +13,13 @@ import { type Hex, type Address, parseEther, formatEther, encodeFunctionData, er
 import { alchemySwapService, AlchemySwapService, type TokenSymbol, BASE_TOKENS, TOKEN_INFO } from '@/lib/sdk/alchemy/swap-service';
 import { priceService, PriceService } from '@/lib/sdk/alchemy/price-service';
 import { CurrencyConverter } from '@/lib/utils/currency-converter';
+import { useGasSponsorship } from '@/lib/hooks/wallet/useGasSponsorship';
+
+const TOKEN_LOGOS: Record<TokenSymbol, string> = {
+  ETH: "/images/tokens/ETHB.svg",
+  USDC: "/images/tokens/USDCB.svg",
+  DAI: "/images/tokens/DAIB.svg",
+};
 
 interface AlchemySwapWidgetProps {
   onSwapSuccess?: () => void;
@@ -35,6 +42,7 @@ interface SwapState {
 
 export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false, defaultToToken = 'USDC' }: AlchemySwapWidgetProps) {
   const { address, client } = useSmartAccountClient({});
+  const { getGasContext } = useGasSponsorship();
 
   const [swapState, setSwapState] = useState<SwapState>({
     fromToken: 'ETH',
@@ -54,14 +62,12 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
     ETH: '0',
     USDC: '0',
     DAI: '0',
-    DEARCRTV: '0',
   });
 
   const [prices, setPrices] = useState<Record<TokenSymbol, number>>({
     ETH: 0,
     USDC: 0,
     DAI: 0,
-    DEARCRTV: 0,
   });
 
   const [usdValues, setUsdValues] = useState<{
@@ -79,7 +85,7 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
   useEffect(() => {
     const fetchPrices = async () => {
       try {
-        const tokenPrices = await priceService.getTokenPrices(['ETH', 'USDC', 'DAI', 'DEARCRTV']);
+        const tokenPrices = await priceService.getTokenPrices(['ETH', 'USDC', 'DAI']);
         setPrices(tokenPrices);
       } catch (error) {
         console.error('Error fetching prices:', error);
@@ -172,30 +178,10 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
           console.warn('Failed to fetch DAI balance:', e);
         }
 
-        // Get DEARCRTV balance (ERC20)
-        let dearcrtvBalance = 0n;
-        try {
-          dearcrtvBalance = await client.readContract({
-            address: BASE_TOKENS.DEARCRTV as Address,
-            abi: [{
-              name: 'balanceOf',
-              type: 'function',
-              stateMutability: 'view',
-              inputs: [{ name: 'account', type: 'address' }],
-              outputs: [{ name: 'balance', type: 'uint256' }],
-            }],
-            functionName: 'balanceOf',
-            args: [address as Address],
-          }) as bigint;
-        } catch (e) {
-          console.warn('Failed to fetch DEARCRTV balance:', e);
-        }
-
         const newBalances: Record<TokenSymbol, string> = {
           ETH: AlchemySwapService.parseAmount(`0x${ethBalance.toString(16)}` as Hex, 'ETH'),
           USDC: AlchemySwapService.parseAmount(`0x${usdcBalance.toString(16)}` as Hex, 'USDC'),
           DAI: AlchemySwapService.parseAmount(`0x${daiBalance.toString(16)}` as Hex, 'DAI'),
-          DEARCRTV: AlchemySwapService.parseAmount(`0x${dearcrtvBalance.toString(16)}` as Hex, 'DEARCRTV'),
         };
 
         console.log('Parsed balances:', newBalances);
@@ -442,6 +428,17 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
 
       console.log('Executing swap with structure:', swapState.quote);
 
+      // ========== GAS SPONSORSHIP ==========
+      // Determine gas sponsorship context (Member=Sponsored, Non-Member=USDC/ETH)
+      // We need to fetch this outside the loop if possible, or inside if hook usage allows
+      // Since this is an event handler, we rely on the hook values passed in
+      // Note: We need to refactor slightly to access the getGasContext result
+
+      // For now, we'll assume we pass the context manually to the sendUserOperation
+      // But we need the values from the hook. Let's rely on the component scope variables.
+      const gasContext = getGasContext('usdc');
+      console.log('Gas Sponsorship Context:', gasContext);
+
       // ========== PRE-FLIGHT CHECKS ==========
 
       const ethBalance = await client.getBalance({ address });
@@ -489,13 +486,36 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
             dataLength: call.data.length
           });
 
-          const operation = await client.sendUserOperation({
-            uo: {
-              target: call.to,
-              data: call.data,
-              value: BigInt(call.value || '0x0'),
+          const executeOperation = async (context: any) => {
+            return await client.sendUserOperation({
+              uo: {
+                target: call.to,
+                data: call.data,
+                value: BigInt(call.value || '0x0'),
+              },
+              context: context,
+              overrides: {
+                paymasterAndData: context ? undefined : undefined, // Explicit undefined to trigger default behavior if no context
+              }
+            });
+          };
+
+          let operation;
+          // Try with preferred context (Sponsored or USDC)
+          const primaryContext = gasContext.context;
+
+          try {
+            console.log(`🚀 Sending ${description} UserOperation (${i + 1}/${calls.length}) with context:`, primaryContext ? 'Custom' : 'Standard');
+            operation = await executeOperation(primaryContext);
+          } catch (err) {
+            // If primary method fails (e.g. USDC payment fails), try fallback if it was a custom context
+            if (primaryContext) {
+              console.warn(`⚠️ Primary gas method failed, falling back to standard ETH payment...`, err);
+              operation = await executeOperation(undefined);
+            } else {
+              throw err;
             }
-          });
+          }
 
           console.log(`🎉 ${description} UserOperation sent! Hash:`, operation.hash);
 
@@ -697,11 +717,10 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
                 <option value="ETH">ETH</option>
                 <option value="USDC">USDC</option>
                 <option value="DAI">DAI</option>
-                <option value="DEARCRTV">DEARCRTV</option>
               </select>
 
               <Image
-                src={`/images/tokens/${swapState.fromToken.toLowerCase()}-logo.svg`}
+                src={TOKEN_LOGOS[swapState.fromToken]}
                 alt={swapState.fromToken}
                 width={20}
                 height={20}
@@ -715,7 +734,6 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
                   <SelectItem value="ETH">ETH</SelectItem>
                   <SelectItem value="USDC">USDC</SelectItem>
                   <SelectItem value="DAI">DAI</SelectItem>
-                  <SelectItem value="DEARCRTV">DEARCRTV</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -752,7 +770,7 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
           <div className="flex justify-between text-xs text-muted-foreground">
             <div className="flex items-center space-x-1">
               <Image
-                src={`/images/tokens/${swapState.fromToken.toLowerCase()}-logo.svg`}
+                src={TOKEN_LOGOS[swapState.fromToken]}
                 alt={swapState.fromToken}
                 width={12}
                 height={12}
@@ -822,11 +840,10 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
                 <option value="ETH">ETH</option>
                 <option value="USDC">USDC</option>
                 <option value="DAI">DAI</option>
-                <option value="DEARCRTV">DEARCRTV</option>
               </select>
 
               <Image
-                src={`/images/tokens/${swapState.toToken.toLowerCase()}-logo.svg`}
+                src={TOKEN_LOGOS[swapState.toToken]}
                 alt={swapState.toToken}
                 width={20}
                 height={20}
@@ -861,7 +878,7 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
           <div className="flex justify-between text-xs text-muted-foreground">
             <div className="flex items-center space-x-1">
               <Image
-                src={`/images/tokens/${swapState.toToken.toLowerCase()}-logo.svg`}
+                src={TOKEN_LOGOS[swapState.toToken]}
                 alt={swapState.toToken}
                 width={12}
                 height={12}

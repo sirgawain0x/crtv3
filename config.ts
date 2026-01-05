@@ -129,7 +129,7 @@ export const config = createConfig(
       },
       gasManagerConfig: {
         policyId: process.env.NEXT_PUBLIC_ALCHEMY_PAYMASTER_POLICY_ID,
-        sponsorUserOperations: true,
+        sponsorUserOperations: false,
       },
     },
   } as CreateConfigProps,

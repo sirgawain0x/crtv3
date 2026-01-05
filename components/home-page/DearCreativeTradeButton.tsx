@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils/utils";
+import Image from "next/image";
 
 const DEARCRTV_ADDRESS = "0x81ced3c6e7058c1fe8d9b6c5a2435a65a4593292";
 const UNIVERSAL_ROUTER_ADDRESS = "0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD";
@@ -39,6 +40,27 @@ export function DearCreativeTradeButton() {
     const [amount, setAmount] = useState("0.001");
     const [quote, setQuote] = useState<string | null>(null);
     const [isQuoting, setIsQuoting] = useState(false);
+    const [tokenImage, setTokenImage] = useState<string | null>(null);
+
+    // Fetch Token Metadata
+    useEffect(() => {
+        const fetchTokenMetadata = async () => {
+            try {
+                const response = await fetch(`https://public.api.paragraph.com/api/v1/coins/contract/${DEARCRTV_ADDRESS}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    // The API returns the image in metadata.image or metadata.logoURI
+                    if (data?.metadata?.image || data?.metadata?.logoURI) {
+                        setTokenImage(data.metadata.image || data.metadata.logoURI);
+                    }
+                }
+            } catch (error) {
+                console.error("Failed to fetch token metadata:", error);
+            }
+        };
+
+        fetchTokenMetadata();
+    }, []);
 
     // Debounced Quote Fetching
     useEffect(() => {
@@ -152,7 +174,18 @@ export function DearCreativeTradeButton() {
                 }}
                 className="font-bold bg-primary text-primary-foreground hover:bg-primary/90 gap-2"
             >
-                <ArrowRightLeft className="w-4 h-4" />
+                {tokenImage ? (
+                    <div className="relative w-5 h-5 rounded-full overflow-hidden">
+                        <Image
+                            src={tokenImage}
+                            alt="$DEARCRTV"
+                            fill
+                            className="object-cover"
+                        />
+                    </div>
+                ) : (
+                    <ArrowRightLeft className="w-4 h-4" />
+                )}
                 Trade $DEARCRTV
             </Button>
 
@@ -160,7 +193,19 @@ export function DearCreativeTradeButton() {
                 {user && (
                     <DialogContent>
                         <DialogHeader>
-                            <DialogTitle>Trade $DEARCRTV</DialogTitle>
+                            <DialogTitle className="flex items-center gap-2">
+                                {tokenImage && (
+                                    <div className="relative w-6 h-6 rounded-full overflow-hidden">
+                                        <Image
+                                            src={tokenImage}
+                                            alt="$DEARCRTV"
+                                            fill
+                                            className="object-cover"
+                                        />
+                                    </div>
+                                )}
+                                Trade $DEARCRTV
+                            </DialogTitle>
                             <DialogDescription>
                                 Buy or Sell $DEARCRTV tokens instantly.
                             </DialogDescription>

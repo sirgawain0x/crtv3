@@ -4,24 +4,25 @@ import { useState, useCallback, useEffect } from "react";
 import { useSmartAccountClient } from "@account-kit/react";
 import { type Address, type Hex, encodeFunctionData, parseAbi, parseUnits, formatUnits, erc20Abi } from "viem";
 import { USDC_TOKEN_ADDRESSES, USDC_TOKEN_DECIMALS } from "@/lib/contracts/USDCToken";
+import { useGasSponsorship } from "@/lib/hooks/wallet/useGasSponsorship";
 import { DAI_TOKEN_ADDRESSES, DAI_TOKEN_DECIMALS } from "@/lib/contracts/DAIToken";
 import { toast } from "sonner";
 
 export type TokenSymbol = 'ETH' | 'USDC' | 'DAI';
 
 const TOKEN_INFO = {
-  ETH: { 
-    decimals: 18, 
+  ETH: {
+    decimals: 18,
     symbol: "ETH",
     address: null, // Native token
   },
-  USDC: { 
-    decimals: USDC_TOKEN_DECIMALS, 
+  USDC: {
+    decimals: USDC_TOKEN_DECIMALS,
     symbol: "USDC",
     address: USDC_TOKEN_ADDRESSES.base,
   },
-  DAI: { 
-    decimals: DAI_TOKEN_DECIMALS, 
+  DAI: {
+    decimals: DAI_TOKEN_DECIMALS,
     symbol: "DAI",
     address: DAI_TOKEN_ADDRESSES.base,
   },
@@ -55,6 +56,7 @@ export function useVideoTip(): UseVideoTipReturn {
   });
 
   const { address, client } = useSmartAccountClient({});
+  const { getGasContext } = useGasSponsorship();
 
   // Fetch token balances
   const fetchBalances = useCallback(async () => {
@@ -65,7 +67,7 @@ export function useVideoTip(): UseVideoTipReturn {
       const ethBalance = await client.getBalance({
         address: address as Address,
       });
-      
+
       // Get USDC balance
       const usdcBalance = await client.readContract({
         address: USDC_TOKEN_ADDRESSES.base as Address,
@@ -73,7 +75,7 @@ export function useVideoTip(): UseVideoTipReturn {
         functionName: 'balanceOf',
         args: [address as Address],
       }) as bigint;
-      
+
       // Get DAI balance
       const daiBalance = await client.readContract({
         address: DAI_TOKEN_ADDRESSES.base as Address,
@@ -124,38 +126,50 @@ export function useVideoTip(): UseVideoTipReturn {
 
       try {
         const tokenInfo = TOKEN_INFO[token];
-        
-        let operation;
-        
-        if (token === 'ETH') {
-          // Send native ETH
-          const valueInWei = parseUnits(amount, tokenInfo.decimals);
 
-          operation = await client.sendUserOperation({
-            uo: {
-              target: creatorAddress as Address,
-              data: "0x" as Hex,
-              value: valueInWei,
-            },
-          });
-        } else {
-          // Send ERC-20 token (USDC or DAI)
+        let transferCalldata: Hex | undefined;
+        if (token !== 'ETH') {
           const tokenAmount = parseUnits(amount, tokenInfo.decimals);
-          
-          // Encode the transfer calldata
-          const transferCalldata = encodeFunctionData({
+          transferCalldata = encodeFunctionData({
             abi: parseAbi(["function transfer(address,uint256) returns (bool)"]),
             functionName: "transfer",
             args: [creatorAddress as Address, tokenAmount],
           });
+        }
 
-          operation = await client.sendUserOperation({
-            uo: {
-              target: tokenInfo.address as Address,
-              data: transferCalldata as Hex,
-              value: BigInt(0), // No native value for ERC-20 transfers
-            },
+        let operation;
+
+        // Define helper for fallback execution
+        const executeOperation = async (context: any) => {
+          const uo = {
+            target: token === 'ETH' ? (creatorAddress as Address) : (tokenInfo.address as Address),
+            data: token === 'ETH' ? ("0x" as Hex) : (transferCalldata as Hex),
+            value: token === 'ETH' ? (parseUnits(amount, tokenInfo.decimals)) : BigInt(0),
+          };
+
+          return await client.sendUserOperation({
+            uo,
+            context,
+            overrides: {
+              paymasterAndData: context ? undefined : undefined,
+            }
           });
+        };
+
+        // Get Gas Context
+        const gasContext = getGasContext('usdc');
+        const primaryContext = gasContext.context;
+
+        try {
+          operation = await executeOperation(primaryContext);
+        } catch (err) {
+          console.warn("Primary gas payment failed, retrying with standard gas...", err);
+          // Fallback to standard gas if primary fails (e.g. USDC paymaster failure)
+          if (primaryContext) {
+            operation = await executeOperation(undefined);
+          } else {
+            throw err;
+          }
         }
 
         // Wait for transaction to be mined
@@ -165,7 +179,7 @@ export function useVideoTip(): UseVideoTipReturn {
 
         // Success
         toast.success(`Tip of ${amount} ${token} sent successfully!`);
-        
+
         // Refresh balances
         await fetchBalances();
 

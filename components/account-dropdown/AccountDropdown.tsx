@@ -106,6 +106,8 @@ import { shortenAddress } from "@/lib/utils/utils";
 import Link from "next/link";
 import { useMembershipVerification } from "@/lib/hooks/unlock/useMembershipVerification";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useMeTokensSupabase } from "@/lib/hooks/metokens/useMeTokensSupabase";
+import { useMeTokenHoldings } from "@/lib/hooks/metokens/useMeTokenHoldings";
 import { chains } from "@/config";
 import { HydrationSafe } from "@/components/ui/hydration-safe";
 
@@ -275,6 +277,12 @@ export function AccountDropdown() {
     : undefined;
 
   const { isVerified, hasMembership, isLoading: isMembershipLoading, error: membershipError } = useMembershipVerification();
+
+  // Check for MeTokens to conditionally render the section
+  const { userMeToken, loading: meTokenLoading } = useMeTokensSupabase();
+  const { holdings, loading: holdingsLoading } = useMeTokenHoldings();
+  const hasMetokens = !!userMeToken || holdings.length > 0;
+  const shouldShowMetokens = hasMetokens || meTokenLoading || holdingsLoading;
 
   useEffect(() => {
     console.log({
@@ -703,8 +711,8 @@ export function AccountDropdown() {
                       type="button"
                       onClick={() => setSelectedToken(token)}
                       className={`flex items-center justify-center space-x-2 p-3 border rounded-lg transition-colors ${selectedToken === token
-                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-400'
-                          : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-400'
+                        : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
                         }`}
                     >
                       <Image
@@ -715,8 +723,8 @@ export function AccountDropdown() {
                         className="w-5 h-5 flex-shrink-0"
                       />
                       <span className={`text-sm font-medium ${selectedToken === token
-                          ? 'text-blue-700 dark:text-blue-300'
-                          : 'text-gray-900 dark:text-gray-100'
+                        ? 'text-blue-700 dark:text-blue-300'
+                        : 'text-gray-900 dark:text-gray-100'
                         }`}>
                         {token}
                       </span>
@@ -1123,12 +1131,15 @@ export function AccountDropdown() {
               <TokenBalance />
             </div>
 
-            <DropdownMenuSeparator />
-
-            {/* MeToken Balances Section */}
-            <div className="px-2 py-2">
-              <MeTokenBalances />
-            </div>
+            {shouldShowMetokens && (
+              <>
+                <DropdownMenuSeparator />
+                {/* MeToken Balances Section */}
+                <div className="px-2 py-2">
+                  <MeTokenBalances />
+                </div>
+              </>
+            )}
 
             <DropdownMenuSeparator />
 

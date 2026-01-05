@@ -46,6 +46,8 @@ import { MeTokenBalances } from "./wallet/balance/MeTokenBalances";
 import type { Chain as ViemChain } from "viem/chains";
 import { AccountDropdown } from "@/components/account-dropdown/AccountDropdown";
 import { useMembershipVerification } from "@/lib/hooks/unlock/useMembershipVerification";
+import { useMeTokensSupabase } from "@/lib/hooks/metokens/useMeTokensSupabase";
+import { useMeTokenHoldings } from "@/lib/hooks/metokens/useMeTokenHoldings";
 import { MembershipSection } from "./account-dropdown/MembershipSection";
 import { ChainSelect } from "@/components/ui/select";
 import { TokenSelect } from "@/components/ui/token-select";
@@ -164,6 +166,12 @@ export default function Navbar() {
   const [isSessionSigsModalOpen, setIsSessionSigsModalOpen] = useState(false);
   const { isVerified, hasMembership } = useMembershipVerification();
   const [selectedToken, setSelectedToken] = useState<"ETH" | "USDC" | "DAI">("ETH");
+
+  // Check for MeTokens to conditionally render the section
+  const { userMeToken, loading: meTokenLoading } = useMeTokensSupabase();
+  const { holdings, loading: holdingsLoading } = useMeTokenHoldings();
+  const hasMetokens = !!userMeToken || holdings.length > 0;
+  const shouldShowMetokens = hasMetokens || meTokenLoading || holdingsLoading;
 
   // Update display address when user changes
   useEffect(() => {
@@ -502,15 +510,128 @@ export default function Navbar() {
                       </Button>
                     </div>
 
+                    {/* Navigation Links - Moved above balances */}
+                    <nav className="grid grid-flow-row gap-2 auto-rows-max text-sm pb-4 border-b border-gray-200 dark:border-gray-700">
+                      <Link
+                        href="/discover"
+                        className={mobileNavLinkClass}
+                        onClick={handleLinkClick}
+                      >
+                        Discover
+                      </Link>
+                      <Link
+                        href="/market"
+                        className={mobileNavLinkClass}
+                        onClick={handleLinkClick}
+                      >
+                        Trade
+                      </Link>
+                      {isVerified && hasMembership && (
+                        <Link
+                          href="/vote"
+                          className={mobileNavLinkClass}
+                          onClick={handleLinkClick}
+                        >
+                          Vote
+                        </Link>
+                      )}
+
+                      {/* Profile & Upload Access (mobile) - Only show when user is connected */}
+                      {/* Note: User check is redundant here as this entire block is within user && check */}
+                      <div className="mt-4 mb-1 text-xs text-muted-foreground font-semibold">
+                        Options
+                      </div>
+                      <Link
+                        href="/profile"
+                        className={mobileMemberNavLinkClass}
+                        onClick={handleLinkClick}
+                      >
+                        <ShieldUser className="mr-2 h-4 w-4" /> Profile
+                      </Link>
+                      <Link
+                        href="/upload"
+                        className={mobileMemberNavLinkClass}
+                        onClick={handleLinkClick}
+                      >
+                        <CloudUpload className="mr-2 h-4 w-4" /> Upload
+                      </Link>
+
+                      {/* Member Access Links (mobile) */}
+                      {isVerified && hasMembership && (
+                        <>
+                          <div className="mt-4 mb-1 text-xs text-muted-foreground font-semibold">
+                            Member Access
+                          </div>
+                          <Link
+                            href="/live"
+                            className={mobileMemberNavLinkClass}
+                            onClick={handleLinkClick}
+                          >
+                            <RadioTower className="mr-2 h-4 w-4" /> Live
+                          </Link>
+                          <Link
+                            href="https://create.creativeplatform.xyz"
+                            className={mobileMemberNavLinkClass}
+                            onClick={handleLinkClick}
+                          >
+                            <Bot className="mr-2 h-4 w-4" /> Pixels
+                            <span className="ml-2 px-2 py-0.5 rounded bg-muted-foreground/10 text-xs text-muted-foreground">
+                              Beta
+                            </span>
+                          </Link>
+                          <Link
+                            href="/vote/create"
+                            className="flex w-full items-center rounded-md p-2 text-sm font-medium
+                              hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors
+                              text-green-600 dark:text-green-400"
+                            onClick={handleLinkClick}
+                          >
+                            <Plus className="mr-2 h-4 w-4 text-green-500" /> Start A Vote
+                          </Link>
+                        </>
+                      )}
+
+                      {/* Feedback Link */}
+                      <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                        <Link
+                          href="https://feedback.creativeplatform.xyz/crtv"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={mobileNavLinkClass}
+                          onClick={handleLinkClick}
+                        >
+                          <ArrowUpRight className="mr-2 h-4 w-4" />
+                          Feedback
+                        </Link>
+                      </div>
+
+                      {/* Logout Button */}
+                      <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                        <button
+                          onClick={() => {
+                            logout();
+                            setIsMenuOpen(false);
+                          }}
+                          className="flex w-full items-center rounded-md p-2 text-sm font-medium
+                            hover:bg-red-50 dark:hover:bg-red-900 transition-colors text-red-500"
+                        >
+                          <LogOut className="mr-2 h-4 w-4" />
+                          Logout
+                        </button>
+                      </div>
+                    </nav>
+
                     {/* Add TokenBalance here */}
                     <div className="mt-4">
                       <TokenBalance />
                     </div>
 
                     {/* Add MeTokenBalances here */}
-                    <div className="mt-4">
-                      <MeTokenBalances />
-                    </div>
+                    {shouldShowMetokens && (
+                      <div className="mt-4">
+                        <MeTokenBalances />
+                      </div>
+                    )}
 
                     {/* Add Membership Section here */}
                     <div className="mt-4">
@@ -577,135 +698,7 @@ export default function Navbar() {
                 )}
 
                 {/* Navigation Links */}
-                <nav className="grid grid-flow-row gap-2 auto-rows-max text-sm">
-                  <Link
-                    href="/discover"
-                    className={mobileNavLinkClass}
-                    onClick={handleLinkClick}
-                  >
-                    Discover
-                  </Link>
-                  {/* <Link
-                    href="/leaderboard"
-                    className={mobileNavLinkClass}
-                    onClick={handleLinkClick}
-                  >
-                    Leaderboard
-                  </Link> */}
-                  <Link
-                    href="/market"
-                    className={mobileNavLinkClass}
-                    onClick={handleLinkClick}
-                  >
-                    Trade
-                  </Link>
-                  {isVerified && hasMembership && (
-                    <Link
-                      href="/vote"
-                      className={mobileNavLinkClass}
-                      onClick={handleLinkClick}
-                    >
-                      Vote
-                    </Link>
-                  )}
-                  {/* Profile & Upload Access (mobile) - Only show when user is connected */}
-                  {user && (
-                    <>
-                      <div className="mt-4 mb-1 text-xs text-muted-foreground font-semibold">
-                        Options
-                      </div>
-                      <Link
-                        href="/profile"
-                        className={mobileMemberNavLinkClass}
-                        onClick={handleLinkClick}
-                      >
-                        <ShieldUser className="mr-2 h-4 w-4" /> Profile
-                      </Link>
-                      <Link
-                        href="/upload"
-                        className={mobileMemberNavLinkClass}
-                        onClick={handleLinkClick}
-                      >
-                        <CloudUpload className="mr-2 h-4 w-4" /> Upload
-                      </Link>
-                    </>
-                  )}
 
-                  {/* Member Access Links (mobile) */}
-                  {isVerified && hasMembership && (
-                    <>
-                      <div className="mt-4 mb-1 text-xs text-muted-foreground font-semibold">
-                        Member Access
-                      </div>
-                      <Link
-                        href="/live"
-                        className={mobileMemberNavLinkClass}
-                        onClick={handleLinkClick}
-                      >
-                        <RadioTower className="mr-2 h-4 w-4" /> Live
-                      </Link>
-                      <Link
-                        href="https://create.creativeplatform.xyz"
-                        className={mobileMemberNavLinkClass}
-                        onClick={handleLinkClick}
-                      >
-                        <Bot className="mr-2 h-4 w-4" /> Pixels
-                        <span className="ml-2 px-2 py-0.5 rounded bg-muted-foreground/10 text-xs text-muted-foreground">
-                          Beta
-                        </span>
-                      </Link>
-                      {/* <Link
-                        href="/portfolio"
-                        className={mobileMemberNavLinkClass}
-                        onClick={handleLinkClick}
-                      >
-                        <User className="mr-2 h-4 w-4" /> Portfolio
-                      </Link> */}
-                      <Link
-                        href="/vote/create"
-                        className="flex w-full items-center rounded-md p-2 text-sm font-medium
-                          hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors
-                          text-green-600 dark:text-green-400"
-                        onClick={handleLinkClick}
-                      >
-                        <Plus className="mr-2 h-4 w-4 text-green-500" /> Start A Vote
-                      </Link>
-                    </>
-                  )}
-
-                  {/* Feedback Link - Only show when wallet is connected */}
-                  {user && (
-                    <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                      <Link
-                        href="https://feedback.creativeplatform.xyz/crtv"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={mobileNavLinkClass}
-                        onClick={handleLinkClick}
-                      >
-                        <ArrowUpRight className="mr-2 h-4 w-4" />
-                        Feedback
-                      </Link>
-                    </div>
-                  )}
-
-                  {/* Logout Button - Always at the bottom */}
-                  {user && (
-                    <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                      <button
-                        onClick={() => {
-                          logout();
-                          setIsMenuOpen(false);
-                        }}
-                        className="flex w-full items-center rounded-md p-2 text-sm font-medium
-                          hover:bg-red-50 dark:hover:bg-red-900 transition-colors text-red-500"
-                      >
-                        <LogOut className="mr-2 h-4 w-4" />
-                        Logout
-                      </button>
-                    </div>
-                  )}
-                </nav>
               </div>
             </div>
           )}

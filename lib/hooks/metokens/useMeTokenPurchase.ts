@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useSmartAccountClient } from '@account-kit/react';
 import { encodeFunctionData, parseEther } from 'viem';
 import { useToast } from '@/components/ui/use-toast';
+import { useGasSponsorship } from '@/lib/hooks/wallet/useGasSponsorship';
 
 const ERC20_ABI = [
     {
@@ -18,6 +19,7 @@ const ERC20_ABI = [
 
 export function useMeTokenPurchase() {
     const { client } = useSmartAccountClient({});
+    const { getGasContext } = useGasSponsorship();
     const { toast } = useToast();
     const [isPending, setIsPending] = useState(false);
     const [isConfirming, setIsConfirming] = useState(false);
@@ -44,19 +46,43 @@ export function useMeTokenPurchase() {
             // 1. Send Transfer Transaction (Pay the creator)
             // In a real app, this might go to a platform contract that handles splits, 
             // but for now we transfer directly to owner as per requirements.
+            // 1. Send Transfer Transaction (Pay the creator)
             const data = encodeFunctionData({
                 abi: ERC20_ABI,
                 functionName: 'transfer',
                 args: [creatorAddress as `0x${string}`, amountWei],
             });
 
-            const uo = await client.sendUserOperation({
-                uo: {
-                    target: meTokenAddress as `0x${string}`,
-                    data: data,
-                    value: BigInt(0),
-                },
-            });
+            const uoCallData = {
+                target: meTokenAddress as `0x${string}`,
+                data: data,
+                value: BigInt(0),
+            };
+
+            const executeOperation = async (context: any) => {
+                return await client.sendUserOperation({
+                    uo: uoCallData,
+                    context: context,
+                    overrides: {
+                        paymasterAndData: context ? undefined : undefined,
+                    }
+                });
+            };
+
+            const gasContext = getGasContext('usdc');
+            const primaryContext = gasContext.context;
+
+            let uo;
+            try {
+                uo = await executeOperation(primaryContext);
+            } catch (err) {
+                if (primaryContext) {
+                    console.warn("Primary gas payment failed, retrying with standard gas...", err);
+                    uo = await executeOperation(undefined);
+                } else {
+                    throw err;
+                }
+            }
 
             setIsPending(false);
             setIsConfirming(true);

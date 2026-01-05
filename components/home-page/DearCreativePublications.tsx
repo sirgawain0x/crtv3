@@ -6,6 +6,7 @@ import Link from "next/link";
 import { NewsletterModal } from "./NewsletterModal";
 import { getPublicationPosts, getSubscriberCount, getCoinData } from "@/app/actions/paragraph";
 import { useUser } from "@account-kit/react";
+import { Newspaper } from "lucide-react";
 
 const COIN_ADDRESS = "0x81ced3c6e7058c1fe8d9b6c5a2435a65a4593292";
 
@@ -97,12 +98,16 @@ export default function DearCreativePublications() {
     return (
         <div className="mx-auto w-full max-w-7xl py-8">
             <div className="mb-8 text-center">
-                <h2 className="mb-4 text-3xl font-bold flex items-center justify-center gap-2">
-                    <span className="text-primary">DEAR CREATIVE</span>
-                    <span className="text-muted-foreground text-sm font-normal block md:inline-block ml-2 align-middle">
-                        NEWSLETTER
+                <h3 className="mb-4 text-3xl font-bold flex items-center justify-center gap-2">
+
+                    <span className="animate-pulse">
+                        <Newspaper className="inline-block h-10 w-10 text-[#EC407A]" />
                     </span>
-                </h2>
+                    <span className="text-primary">LATEST ARTICLES</span>
+                    {/* <span className="text-muted-foreground text-sm font-normal block md:inline-block ml-2 align-middle">
+                        Latest Articles
+                    </span> */}
+                </h3>
 
                 {/* Stats Section - Visible only when connected */}
                 {user && (
@@ -139,7 +144,7 @@ export default function DearCreativePublications() {
                     target="_blank"
                     className="text-sm text-primary hover:underline transition-colors block mt-2"
                 >
-                    View all issues
+                    Read all issues
                 </Link>
             </div>
 

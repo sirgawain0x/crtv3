@@ -63,7 +63,6 @@ export class PriceService {
         ETH: 3000,
         USDC: 1,
         DAI: 1,
-        DEARCRTV: 0,
       };
 
       return fallbackPrices[symbol];
@@ -78,7 +77,6 @@ export class PriceService {
       ETH: 'ethereum',
       USDC: 'usd-coin',
       DAI: 'dai',
-      DEARCRTV: '',
     };
 
     const coinId = coinGeckoIds[symbol];
@@ -128,7 +126,6 @@ export class PriceService {
           ETH: 'ethereum',
           USDC: 'usd-coin',
           DAI: 'dai',
-          DEARCRTV: '',
         };
 
         const coinIds = uncachedSymbols.map(symbol => coinGeckoIds[symbol]).join(',');
