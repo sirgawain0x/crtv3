@@ -24,6 +24,7 @@ import {
 import type { MembershipDetails } from "@/lib/hooks/unlock/useMembershipVerification";
 import { MeTokensSection } from "./MeTokensSection";
 import { UserDisplay } from "@/components/User/UserDisplay";
+import { CreativeBankTab } from "./CreativeBankTab";
 
 function useServerMembership(address?: string) {
   const [data, setData] = useState<any>(null);
@@ -111,64 +112,74 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
           </div>
         )}
         <Tabs defaultValue="Uploads" className="w-full">
-            <TabsList className="flex h-10 items-center justify-start space-x-1 rounded-lg bg-muted p-1">
-              <TabsTrigger
-                value="Uploads"
-                className="flex-shrink-0 rounded-t-lg px-4 py-2 text-sm font-medium"
-              >
-                Uploads
-              </TabsTrigger>
-              <TabsTrigger
-                value="MeTokens"
-                className="flex-shrink-0 rounded-t-lg px-4 py-2 text-sm font-medium"
-              >
-                MeTokens
-              </TabsTrigger>
-              {/* <TabsTrigger
+          <TabsList className="flex h-10 items-center justify-start space-x-1 rounded-lg bg-muted p-1">
+            <TabsTrigger
+              value="Uploads"
+              className="flex-shrink-0 rounded-t-lg px-4 py-2 text-sm font-medium"
+            >
+              Uploads
+            </TabsTrigger>
+            <TabsTrigger
+              value="MeTokens"
+              className="flex-shrink-0 rounded-t-lg px-4 py-2 text-sm font-medium"
+            >
+              MeTokens
+            </TabsTrigger>
+            <TabsTrigger
+              value="Bank"
+              className="flex-shrink-0 rounded-t-lg px-4 py-2 text-sm font-medium"
+            >
+              Bank
+            </TabsTrigger>
+            {/* <TabsTrigger
                 value="Revenue"
                 className="flex-shrink-0 rounded-t-lg px-4 py-2 text-sm font-medium"
               >
                 Revenue
               </TabsTrigger> */}
-            </TabsList>
+          </TabsList>
 
-            <div className="mt-6">
-              <TabsContent value="Uploads">
-                <Card>
-                  <CardHeader className="space-y-1">
-                    <CardTitle className="text-2xl">Uploads History</CardTitle>
-                    <CardDescription>
-                      View and manage your uploaded videos
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <Link
-                      href="/upload"
-                      className={`inline-flex items-center rounded-md bg-primary px-4 py-2 
+          <div className="mt-6">
+            <TabsContent value="Uploads">
+              <Card>
+                <CardHeader className="space-y-1">
+                  <CardTitle className="text-2xl">Uploads History</CardTitle>
+                  <CardDescription>
+                    View and manage your uploaded videos
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <Link
+                    href="/upload"
+                    className={`inline-flex items-center rounded-md bg-primary px-4 py-2 
                       text-sm font-medium text-primary-foreground hover:bg-primary/90`}
-                    >
-                      Upload New Video
-                    </Link>
-                    <div className="mt-6">
-                      {displayAddress && (
-                        <ListUploadedAssets
-                          activeAccount={{
-                            address: displayAddress,
-                            type: walletType ?? "eoa",
-                          }}
-                        />
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
+                  >
+                    Upload New Video
+                  </Link>
+                  <div className="mt-6">
+                    {displayAddress && (
+                      <ListUploadedAssets
+                        activeAccount={{
+                          address: displayAddress,
+                          type: walletType ?? "eoa",
+                        }}
+                      />
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
 
-              <TabsContent value="MeTokens">
-                <MeTokensSection walletAddress={displayAddress} />
-              </TabsContent>
+            <TabsContent value="MeTokens">
+              <MeTokensSection walletAddress={displayAddress} />
+            </TabsContent>
 
-              {/* Revenue content will be implemented later */}
-              {/* <TabsContent value="Revenue">
+            <TabsContent value="Bank">
+              <CreativeBankTab />
+            </TabsContent>
+
+            {/* Revenue content will be implemented later */}
+            {/* <TabsContent value="Revenue">
                 <Card>
                   <CardHeader className="space-y-1">
                     <CardTitle className="text-2xl">Revenue</CardTitle>
@@ -187,9 +198,9 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
                   </CardContent>
                 </Card>
               </TabsContent> */}
-            </div>
-          </Tabs>
-        </div>
+          </div>
+        </Tabs>
+      </div>
     </ProfilePageGuard>
   );
 };
