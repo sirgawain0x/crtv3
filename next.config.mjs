@@ -1,43 +1,8 @@
 import createPWA from "next-pwa";
-import { appendFileSync, mkdirSync } from "fs";
-import { join } from "path";
-
-// Debug logging helper
-const logPath = join(process.cwd(), '.cursor', 'debug.log');
-const log = (location, message, data, hypothesisId) => {
-  try {
-    const dir = join(process.cwd(), '.cursor');
-    try {
-      mkdirSync(dir, { recursive: true });
-    } catch (e) {
-      // Directory might already exist
-    }
-    const logEntry = JSON.stringify({
-      location,
-      message,
-      data,
-      timestamp: Date.now(),
-      sessionId: 'debug-session',
-      runId: 'run1',
-      hypothesisId,
-    }) + '\n';
-    appendFileSync(logPath, logEntry, 'utf8');
-  } catch (e) {
-    // Silent fail if log file can't be written
-    console.error('Log error:', e.message);
-  }
-};
-
-// #region agent log
-log('next.config.mjs:1', 'config file loaded', { cwd: process.cwd() }, 'H4');
-// #endregion
 
 const withPWA = createPWA({
   dest: "public",
-  disable: true, // Temporarily disable PWA to test if service worker is causing abort signal issues
-  // disable: process.env.NODE_ENV === "development",
-  // Disable PWA for Vercel builds to avoid routes-manifest.json issues
-  // disable: process.env.NODE_ENV === "development" || process.env.VERCEL === "1",
+  disable: process.env.NODE_ENV === "development" || process.env.VERCEL === "1",
 });
 
 /** @type {import('next').NextConfig} */
@@ -59,10 +24,6 @@ const nextConfig = {
   serverExternalPackages: ['thread-stream', 'pino', 'pino-pretty', 'node-datachannel'],
   // Webpack configuration for WebAssembly support
   webpack: (config, { isServer, webpack }) => {
-    // #region agent log
-    log('next.config.mjs:29', 'webpack config called', { isServer }, 'H4');
-    // #endregion
-
     // Enable async WebAssembly loading (required for XMTP WASM bindings)
     config.experiments = {
       ...config.experiments,
@@ -81,24 +42,6 @@ const nextConfig = {
     if (!config.resolve.plugins) {
       config.resolve.plugins = [];
     }
-
-    // Custom resolve plugin to log thread-stream module resolution attempts
-    // #region agent log
-    config.resolve.plugins.push({
-      apply(resolver) {
-        resolver.hooks.resolve.tapAsync('ThreadStreamResolver', (request, resolveContext, callback) => {
-          if (request.request && (request.request.includes('thread-stream') || request.request.includes('tap') || request.request.includes('desm') || request.request.includes('why-is-node-running'))) {
-            log('next.config.mjs:58', 'resolve attempt', {
-              request: request.request,
-              context: request.context || '',
-              issuer: request.context?.issuer || '',
-            }, 'H5');
-          }
-          callback();
-        });
-      },
-    });
-    // #endregion
 
     // Tell webpack not to parse test files and other non-essential files
     config.module = config.module || {};
@@ -123,17 +66,7 @@ const nextConfig = {
         resourceRegExp: /^\.\/test\//,
         contextRegExp: /thread-stream/,
         checkResource(resource, context) {
-          // #region agent log
-          const shouldIgnore = /^\.\/test\//.test(resource) && /thread-stream/.test(context || '');
-          if (/thread-stream/.test(resource || '') || /thread-stream/.test(context || '')) {
-            log('next.config.mjs:77', 'IgnorePlugin pattern1 check', {
-              resource,
-              context,
-              shouldIgnore,
-            }, 'H1');
-          }
-          // #endregion
-          return shouldIgnore;
+          return /^\.\/test\//.test(resource) && /thread-stream/.test(context || '');
         },
       })
     );
@@ -143,16 +76,7 @@ const nextConfig = {
       new webpack.IgnorePlugin({
         resourceRegExp: /thread-stream[\/\\]test[\/\\]/,
         checkResource(resource) {
-          // #region agent log
-          const shouldIgnore = /thread-stream[\/\\]test[\/\\]/.test(resource || '');
-          if (/thread-stream/.test(resource || '')) {
-            log('next.config.mjs:91', 'IgnorePlugin pattern2 check', {
-              resource,
-              shouldIgnore,
-            }, 'H1');
-          }
-          // #endregion
-          return shouldIgnore;
+          return /thread-stream[\/\\]test[\/\\]/.test(resource || '');
         },
       })
     );
@@ -162,16 +86,7 @@ const nextConfig = {
       new webpack.IgnorePlugin({
         resourceRegExp: /thread-stream[\/\\]bench\.js$/,
         checkResource(resource) {
-          // #region agent log
-          const shouldIgnore = /thread-stream[\/\\]bench\.js$/.test(resource || '');
-          if (/thread-stream/.test(resource || '')) {
-            log('next.config.mjs:106', 'IgnorePlugin pattern3 check', {
-              resource,
-              shouldIgnore,
-            }, 'H1');
-          }
-          // #endregion
-          return shouldIgnore;
+          return /thread-stream[\/\\]bench\.js$/.test(resource || '');
         },
       })
     );
@@ -181,16 +96,7 @@ const nextConfig = {
       new webpack.IgnorePlugin({
         resourceRegExp: /thread-stream.*\.(test|spec)\.(js|mjs|ts)$/,
         checkResource(resource) {
-          // #region agent log
-          const shouldIgnore = /thread-stream.*\.(test|spec)\.(js|mjs|ts)$/.test(resource || '');
-          if (/thread-stream/.test(resource || '')) {
-            log('next.config.mjs:121', 'IgnorePlugin pattern4 check', {
-              resource,
-              shouldIgnore,
-            }, 'H1');
-          }
-          // #endregion
-          return shouldIgnore;
+          return /thread-stream.*\.(test|spec)\.(js|mjs|ts)$/.test(resource || '');
         },
       })
     );
@@ -202,12 +108,6 @@ const nextConfig = {
       new webpack.NormalModuleReplacementPlugin(
         /thread-stream[\/\\]test[\/\\].*\.(js|mjs|ts)$/,
         (resource) => {
-          // #region agent log
-          log('next.config.mjs:133', 'NormalModuleReplacementPlugin test files', {
-            resource: resource.request || resource,
-            replacing: true,
-          }, 'H2');
-          // #endregion
           resource.request = emptyModulePath;
         }
       )
@@ -217,12 +117,6 @@ const nextConfig = {
       new webpack.NormalModuleReplacementPlugin(
         /thread-stream[\/\\]bench\.js$/,
         (resource) => {
-          // #region agent log
-          log('next.config.mjs:143', 'NormalModuleReplacementPlugin bench', {
-            resource: resource.request || resource,
-            replacing: true,
-          }, 'H2');
-          // #endregion
           resource.request = emptyModulePath;
         }
       )
