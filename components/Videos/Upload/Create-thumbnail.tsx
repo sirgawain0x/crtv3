@@ -376,6 +376,7 @@ export default function CreateThumbnail({
               onClick={handleSubmit}
               className="w-full sm:w-auto min-w-[120px] touch-manipulation relative"
               style={{ WebkitTapHighlightColor: 'transparent' }}
+              id="publish-video-btn"
             >
               {isPublishing ? (
                 <>

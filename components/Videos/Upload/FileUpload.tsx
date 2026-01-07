@@ -363,7 +363,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
   }
 
   return (
-    <div className="w-full">
+    <div className="w-full" id="upload-video-form">
       <div className="flex flex-col space-y-6">
         <div className="space-y-6 sm:space-y-8">
           {/* File Input */}

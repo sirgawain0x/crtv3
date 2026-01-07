@@ -417,13 +417,13 @@ export default function Navbar() {
             </Link>
 
             <nav className="hidden md:flex items-center ml-8 space-x-1">
-              <Link href="/discover" className={navLinkClass}>
+              <Link href="/discover" className={navLinkClass} id="nav-discover-link">
                 Discover
               </Link>
               {/* <Link href="/leaderboard" className={navLinkClass}>
                 Leaderboard
               </Link> */}
-              <Link href="/market" className={navLinkClass}>
+              <Link href="/market" className={navLinkClass} id="nav-trade-link">
                 Trade
               </Link>
               {isVerified && hasMembership && (
@@ -445,6 +445,7 @@ export default function Navbar() {
               }
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               aria-expanded={isMenuOpen}
+              id="mobile-menu-btn"
             >
               <span className="sr-only">Open main menu</span>
               <MenuIcon className="h-6 w-6" />
@@ -520,6 +521,7 @@ export default function Navbar() {
                         openAuthModal();
                         setIsMenuOpen(false);
                       }}
+                      id="connect-wallet-btn"
                     >
                       Get Started
                     </Button>
@@ -539,6 +541,7 @@ export default function Navbar() {
                     href="/market"
                     className={mobileNavLinkClass}
                     onClick={handleLinkClick}
+                    id="mobile-nav-trade-link"
                   >
                     Trade
                   </Link>
@@ -570,6 +573,7 @@ export default function Navbar() {
                         href="/upload"
                         className={mobileMemberNavLinkClass}
                         onClick={handleLinkClick}
+                        id="nav-upload-link"
                       >
                         <CloudUpload className="mr-2 h-4 w-4" /> Upload
                       </Link>
