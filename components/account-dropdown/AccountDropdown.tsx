@@ -1097,6 +1097,7 @@ export function AccountDropdown() {
             <Button
               variant="outline"
               className="hidden md:flex items-center gap-2 transition-all hover:bg-gray-100 dark:hover:bg-gray-800 hover:border-blue-500"
+              id="nav-user-menu"
             >
               <Avatar className="h-8 w-8">
                 <AvatarImage
@@ -1213,7 +1214,7 @@ export function AccountDropdown() {
                     <span className="text-xs">Profile</span>
                   </Button>
                 </Link>
-                <Link href="/upload" className="w-full">
+                <Link href="/upload" className="w-full" id="nav-upload-link">
                   <Button
                     variant="outline"
                     size="sm"

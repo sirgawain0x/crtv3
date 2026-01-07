@@ -6,13 +6,14 @@ import { headers } from "next/headers";
 import "./globals.css";
 import { Providers } from "./providers";
 import Navbar from "@/components/Navbar";
+import { Tour } from '@/components/Tour/Tour';
 import { cn } from "@/lib/utils/utils";
 import { Toaster } from "@/components/ui/toaster";
 import Footer from "@/components/Footer";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { IframeCleanup } from "@/components/IframeCleanup";
 
-const inter = Inter({ 
+const inter = Inter({
   subsets: ["latin"],
   display: 'swap',
   preload: true,
@@ -83,6 +84,7 @@ export default async function RootLayout({
         <IframeCleanup />
         <Providers initialState={initialState}>
           <ErrorBoundary>
+            <Tour />
             <Navbar />
             <div className="min-h-screen flex flex-col">
               <main className="flex-1">{children}</main>

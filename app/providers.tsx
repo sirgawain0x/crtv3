@@ -7,6 +7,7 @@ import { PropsWithChildren, Suspense, useEffect, useState } from "react";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "sonner";
 import { VideoProvider } from "../context/VideoContext";
+import { TourProvider } from "../context/TourContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ApolloNextAppProvider } from "@apollo/client-integration-nextjs";
 import { makeClient } from "./apolloWrapper";
@@ -66,10 +67,12 @@ export const Providers = (
                 initialState={props.initialState}
               >
                 <RadixProvider>
-                  <VideoProvider>
-                    {props.children}
-                    <Toaster position="top-right" richColors />
-                  </VideoProvider>
+                  <TourProvider>
+                    <VideoProvider>
+                      {props.children}
+                      <Toaster position="top-right" richColors />
+                    </VideoProvider>
+                  </TourProvider>
                 </RadixProvider>
               </AlchemyAccountProvider>
             </ApolloNextAppProvider>

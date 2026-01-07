@@ -11,6 +11,7 @@ import { Src } from "@livepeer/react";
 import { HeroPlayer } from "../Player/HeroPlayer";
 import { PlayerLoading } from "../Player/Player";
 import { getHeroPlaybackSource } from "../../lib/hooks/livepeer/useHeroPlaybackSource";
+import { useTour } from "@/context/TourContext";
 
 // Custom PlayIcon component
 const PlayIcon = (props: React.SVGProps<SVGSVGElement>) => {
@@ -33,6 +34,12 @@ const HeroSection: React.FC = () => {
   const [src, setSrc] = useState<Src[] | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+
+  const { startTour } = useTour();
+
+  const handleWatchDemo = () => {
+    startTour();
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -108,7 +115,7 @@ const HeroSection: React.FC = () => {
                 "flex items-center space-x-2 rounded-full bg-pink-500 px-6 py-2 text-lg font-normal text-white " +
                 "transition duration-200 hover:bg-pink-600 lg:py-3"
               }
-              onClick={() => router.push(HERO_BUTTONS.secondary.href)}
+              onClick={handleWatchDemo}
             >
               <PlayIcon className="h-5 w-5" />
               <span>{HERO_BUTTONS.secondary.text}</span>

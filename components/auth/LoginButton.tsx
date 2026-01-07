@@ -85,6 +85,7 @@ export function LoginButton({
         transition-all duration-300 hover:shadow-lg ${className}`}
       variant={variant}
       size={size}
+      id="connect-wallet-btn"
     >
       Get Started
     </Button>
