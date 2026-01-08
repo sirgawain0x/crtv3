@@ -49,80 +49,9 @@ const DESKTOP_STEPS: Step[] = [
     },
 ];
 
-const MOBILE_STEPS: Step[] = [
-    {
-        target: '#mobile-menu-btn',
-        content: 'Tap the menu to get started by signing in.',
-        disableBeacon: true,
-        disableOverlayClose: true,
-        hideCloseButton: true,
-    },
-    {
-        target: '#mobile-menu-btn',
-        content: 'In the menu, you can select "Upload" to add your own content.',
-    },
-    {
-        target: '#mobile-menu-btn',
-        content: 'Use the "Discover" link in the menu to see what others are creating.',
-    },
-    {
-        target: '#mobile-menu-btn',
-        content: 'Access the "Trading Market" via the menu to buy or sell Creative Coins.',
-    },
-];
 
-interface TourTooltipProps {
-    index: number;
-    step: Step;
-    backProps: any;
-    closeProps: any;
-    primaryProps: any;
-    tooltipProps: any;
-    size: number;
-    isLastStep: boolean;
-}
 
-const TourTooltip = ({
-    index,
-    step,
-    primaryProps,
-    tooltipProps,
-    size,
-}: TourTooltipProps) => {
-    const stepId = (step.data as any)?.id;
 
-    // Hide "Next" button on interactive steps (Desktop only by ID)
-    const hideNext = [
-        'connect',
-        'user-menu',
-        'upload-form',
-        'publish-btn',
-    ].includes(stepId);
-
-    return (
-        <div {...tooltipProps} className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-2xl border border-indigo-100 dark:border-indigo-900 max-w-sm relative overflow-hidden">
-            {/* Decorative BG element */}
-            <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 opacity-10 rounded-bl-full -mr-4 -mt-4"></div>
-
-            <div className="relative z-10 text-slate-800 dark:text-slate-100">
-                {step.content}
-            </div>
-
-            <div className="mt-6 flex justify-between items-center relative z-10">
-                <div className="text-xs text-slate-400 font-medium">
-                    Step {index + 1} of {size}
-                </div>
-                <div className="flex gap-2">
-                    {!hideNext && (
-                        <button {...primaryProps} className="px-4 py-2 bg-indigo-600 text-white text-sm font-bold rounded-full hover:bg-indigo-700 transition shadow-lg shadow-indigo-200 dark:shadow-none">
-                            {index === size - 1 ? 'Finish' : 'Next'}
-                        </button>
-                    )}
-                </div>
-            </div>
-        </div>
-    );
-};
 
 export const Tour = () => {
     const { run, stepIndex, setRun, setStepIndex } = useTour();
@@ -143,6 +72,42 @@ export const Tour = () => {
         window.addEventListener('resize', checkMobile);
         return () => window.removeEventListener('resize', checkMobile);
     }, []);
+
+    const MOBILE_STEPS: Step[] = [
+        {
+            target: '#mobile-menu-btn',
+            content: 'Tap the menu to get started by signing in.',
+            disableBeacon: true,
+            disableOverlayClose: true,
+            hideCloseButton: true,
+            data: { id: 'connect' }
+        },
+        {
+            target: '#mobile-menu-btn',
+            content: 'In the menu, you can select "Upload" to add your own content.',
+            data: { id: 'user-menu' }
+        },
+        {
+            target: '#mobile-menu-btn',
+            content: 'Select "Upload" in the menu to access the video upload form.',
+            data: { id: 'upload-form' }
+        },
+        {
+            target: '#mobile-menu-btn',
+            content: 'After selecting a file, use the "Publish" button to share your video.',
+            data: { id: 'publish-btn' }
+        },
+        {
+            target: '#mobile-menu-btn',
+            content: 'Use the "Discover" link in the menu to see what others are creating.',
+            data: { id: 'discover' }
+        },
+        {
+            target: '#mobile-menu-btn',
+            content: 'Access the "Trading Market" via the menu to buy or sell Creative Coins.',
+            data: { id: 'trade' }
+        },
+    ];
 
     const steps = isMobile ? MOBILE_STEPS : DESKTOP_STEPS;
 
@@ -176,29 +141,27 @@ export const Tour = () => {
     // Desktop: Connect (0) -> User Menu (1)
     // Mobile: Connect (1) -> Open Menu for Upload (2)
     useEffect(() => {
-        if (isConnected && run && !isMobile) {
+        if (isConnected && run) {
             // If we are on the connect step, move forward
             const connectIndex = getStepIndex('connect');
             if (stepIndex === connectIndex) {
                 setStepIndex(connectIndex + 1);
             }
         }
-    }, [isConnected, stepIndex, run, steps, isMobile]);
+    }, [isConnected, stepIndex, run, steps]);
 
     // 2. Navigation to /upload
     useEffect(() => {
-        if (pathname.startsWith('/upload') && run && !isMobile) {
+        if (pathname.startsWith('/upload') && run) {
             const uploadFormIndex = getStepIndex('upload-form');
             if (stepIndex < uploadFormIndex && uploadFormIndex !== -1) {
                 setStepIndex(uploadFormIndex);
             }
         }
-    }, [pathname, stepIndex, run, steps, isMobile]);
+    }, [pathname, stepIndex, run, steps]);
 
     // 3. Publish Button Appearance
     useEffect(() => {
-        if (isMobile) return;
-
         let interval: NodeJS.Timeout;
         const uploadFormIndex = getStepIndex('upload-form');
         const publishBtnIndex = getStepIndex('publish-btn');
@@ -211,11 +174,11 @@ export const Tour = () => {
             }, 1000);
         }
         return () => clearInterval(interval);
-    }, [stepIndex, run, steps, isMobile]);
+    }, [stepIndex, run, steps]);
 
     // 4. Navigation to /discover
     useEffect(() => {
-        if (pathname.startsWith('/discover') && run && !isMobile) {
+        if (pathname.startsWith('/discover') && run) {
             const discoverIndex = getStepIndex('discover');
             if (stepIndex < discoverIndex && discoverIndex !== -1) {
                 setStepIndex(discoverIndex);
@@ -223,6 +186,60 @@ export const Tour = () => {
         }
     }, [pathname, stepIndex, run, steps]);
 
+
+    // Custom Tooltip component
+    const TourTooltip = ({
+        index,
+        step,
+        backProps,
+        primaryProps,
+        skipProps,
+        tooltipProps,
+        isLastStep,
+        size,
+    }: any) => {
+        const stepId = (step.data as any)?.id;
+
+        // Hide "Next" button on interactive steps ONLY ON DESKTOP
+        // This preserves the "works great" interactive flow for desktop
+        // while giving mobile users the "slideshow" experience they requested.
+        const hideNext = !isMobile && [
+            'connect',
+            'user-menu',
+            'upload-form',
+            'publish-btn',
+        ].includes(stepId);
+
+        return (
+            <div {...tooltipProps} className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-2xl border border-indigo-100 dark:border-indigo-900 max-w-sm relative overflow-hidden">
+                {/* Decorative BG element */}
+                <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 opacity-10 rounded-bl-full -mr-4 -mt-4"></div>
+
+                <div className="relative z-10 text-slate-800 dark:text-slate-100">
+                    {step.content}
+                </div>
+
+                <div className="mt-6 flex justify-between items-center relative z-10 w-full">
+                    <div className="flex gap-2">
+                        <button {...skipProps} className="px-3 py-1.5 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 text-sm font-medium transition">
+                            Skip
+                        </button>
+                    </div>
+
+                    <div className="flex gap-2">
+                        {!hideNext && (
+                            <button {...primaryProps} className="px-4 py-2 bg-indigo-600 text-white text-sm font-bold rounded-full hover:bg-indigo-700 transition shadow-lg shadow-indigo-200 dark:shadow-none">
+                                {isLastStep ? 'Finish' : 'Next'}
+                            </button>
+                        )}
+                    </div>
+                </div>
+                <div className="mt-2 text-center text-xs text-slate-400 font-medium">
+                    Step {index + 1} of {size}
+                </div>
+            </div>
+        );
+    };
 
     return (
         <Joyride
