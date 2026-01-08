@@ -1,10 +1,128 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Joyride, { CallBackProps, STATUS, Step, EVENTS } from 'react-joyride';
 import { usePathname, useRouter } from 'next/navigation';
 import { useUser } from '@account-kit/react';
 import { useTour } from '@/context/TourContext';
+
+const DESKTOP_STEPS: Step[] = [
+    {
+        target: '#connect-wallet-btn',
+        content: 'Sign in to get started! Click "Get Started" to create your account with just your email.',
+        disableBeacon: true,
+        disableOverlayClose: true,
+        hideCloseButton: true,
+        spotlightClicks: true,
+        floaterProps: {
+            hideArrow: false,
+        },
+        data: { id: 'connect' }
+    },
+    {
+        target: '#nav-user-menu',
+        content: 'Click your profile to open the menu, then select "Upload" to start adding content.',
+        spotlightClicks: true,
+        disableOverlayClose: true,
+        data: { id: 'user-menu' }
+    },
+    {
+        target: '#upload-video-form',
+        content: 'Upload your video file here. You can drag and drop or select a file.',
+        placement: 'bottom',
+        data: { id: 'upload-form' }
+    },
+    {
+        target: '#publish-video-btn',
+        content: 'Once uploaded, click Publish to share it with the world!',
+        data: { id: 'publish-btn' }
+    },
+    {
+        target: '#nav-discover-link',
+        content: 'Check out what others are creating on the Discover page.',
+        data: { id: 'discover' }
+    },
+    {
+        target: '#nav-trade-link',
+        content: 'Buy or sell Creative Coins by creators on the platform in the Trading Market.',
+        data: { id: 'trade' }
+    },
+];
+
+const MOBILE_STEPS: Step[] = [
+    {
+        target: '#mobile-menu-btn',
+        content: 'Tap the menu to get started by signing in.',
+        disableBeacon: true,
+        disableOverlayClose: true,
+        hideCloseButton: true,
+    },
+    {
+        target: '#mobile-menu-btn',
+        content: 'In the menu, you can select "Upload" to add your own content.',
+    },
+    {
+        target: '#mobile-menu-btn',
+        content: 'Use the "Discover" link in the menu to see what others are creating.',
+    },
+    {
+        target: '#mobile-menu-btn',
+        content: 'Access the "Trading Market" via the menu to buy or sell Creative Coins.',
+    },
+];
+
+interface TourTooltipProps {
+    index: number;
+    step: Step;
+    backProps: any;
+    closeProps: any;
+    primaryProps: any;
+    tooltipProps: any;
+    size: number;
+    isLastStep: boolean;
+}
+
+const TourTooltip = ({
+    index,
+    step,
+    primaryProps,
+    tooltipProps,
+    size,
+}: TourTooltipProps) => {
+    const stepId = (step.data as any)?.id;
+
+    // Hide "Next" button on interactive steps (Desktop only by ID)
+    const hideNext = [
+        'connect',
+        'user-menu',
+        'upload-form',
+        'publish-btn',
+    ].includes(stepId);
+
+    return (
+        <div {...tooltipProps} className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-2xl border border-indigo-100 dark:border-indigo-900 max-w-sm relative overflow-hidden">
+            {/* Decorative BG element */}
+            <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 opacity-10 rounded-bl-full -mr-4 -mt-4"></div>
+
+            <div className="relative z-10 text-slate-800 dark:text-slate-100">
+                {step.content}
+            </div>
+
+            <div className="mt-6 flex justify-between items-center relative z-10">
+                <div className="text-xs text-slate-400 font-medium">
+                    Step {index + 1} of {size}
+                </div>
+                <div className="flex gap-2">
+                    {!hideNext && (
+                        <button {...primaryProps} className="px-4 py-2 bg-indigo-600 text-white text-sm font-bold rounded-full hover:bg-indigo-700 transition shadow-lg shadow-indigo-200 dark:shadow-none">
+                            {index === size - 1 ? 'Finish' : 'Next'}
+                        </button>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
 
 export const Tour = () => {
     const { run, stepIndex, setRun, setStepIndex } = useTour();
@@ -13,137 +131,98 @@ export const Tour = () => {
     const user = useUser();
     const isConnected = !!user;
 
-    const steps: Step[] = [
-        {
-            target: '#connect-wallet-btn',
-            content: 'Sign in to get started! Click "Get Started" to create your account with just your email.',
-            disableBeacon: true,
-            disableOverlayClose: true,
-            hideCloseButton: true,
-            spotlightClicks: true,
-            floaterProps: {
-                hideArrow: false,
-            },
-        },
-        {
-            target: '#nav-user-menu, #mobile-menu-btn',
-            content: 'Click your profile to open the menu, then select "Upload" to start adding content.',
-            spotlightClicks: true,
-            disableOverlayClose: true,
-        },
-        {
-            target: '#upload-video-form',
-            content: 'Upload your video file here. You can drag and drop or select a file.',
-            placement: 'bottom',
-        },
-        {
-            target: '#publish-video-btn',
-            content: 'Once uploaded, click Publish to share it with the world!',
-        },
-        {
-            target: '#nav-discover-link',
-            content: 'Check out what others are creating on the Discover page.',
-        },
-        {
-            target: '#nav-trade-link, #mobile-nav-trade-link',
-            content: 'Buy or sell Creative Coins by creators on the platform in the Trading Market.',
-        },
-    ];
+    // Simple mobile detection
+    const [isMobile, setIsMobile] = useState(false);
+
+    useEffect(() => {
+        const checkMobile = () => {
+            setIsMobile(window.innerWidth < 768);
+        };
+
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
+
+    const steps = isMobile ? MOBILE_STEPS : DESKTOP_STEPS;
+
+    // Helper to find step index by ID
+    const getStepIndex = (id: string) => {
+        return steps.findIndex(s => (s.data as any)?.id === id);
+    };
 
     const handleJoyrideCallback = (data: CallBackProps) => {
-        const { index, status, type } = data;
-        console.log("Tour: Callback data:", data);
+        const { index, status, type, action } = data;
+        const currentStep = steps[index];
+        const currentId = (currentStep?.data as any)?.id;
+
+        console.log("Tour: Callback", { index, status, type, action, currentId });
 
         if ([STATUS.FINISHED, STATUS.SKIPPED].includes(status as any)) {
-            console.log("Tour: Finished or Skipped");
             setRun(false);
             localStorage.setItem('crtv3_tour_completed', 'true');
         } else if (type === EVENTS.STEP_AFTER) {
-            console.log("Tour: Advancing step");
+            // Logic to handle specific transitions if needed, 
+            // otherwise just let it go to next index
             setStepIndex(index + 1);
         } else if (type === EVENTS.TARGET_NOT_FOUND) {
-            console.log("Tour: Target not found for step", index, " - Waiting for element to appear...");
-            // Do NOT advance step index. 
-            // This allows the step to remain active (or be retried) until the element appears 
-            // (e.g., via page navigation or loading state handled by useEffects).
+            // Wait
         }
     };
 
-    // Custom logic to advance step if wallet connects while on step 0
-    useEffect(() => {
-        if (isConnected && stepIndex === 0 && run) {
-            setStepIndex(1);
-        }
-    }, [isConnected, stepIndex, run, setStepIndex]);
+    // Auto-advance logic refactored to use IDs
 
-    // Auto-advance if on upload page and previous steps are meant for navigation
-    // Step 1 is "Navigate to Upload". If we are on /upload, we should be on Step 2.
+    // 1. Authenticated -> Go to next relevant step
+    // Desktop: Connect (0) -> User Menu (1)
+    // Mobile: Connect (1) -> Open Menu for Upload (2)
     useEffect(() => {
-        if (pathname.startsWith('/upload') && stepIndex < 2 && run) {
-            setStepIndex(2);
+        if (isConnected && run && !isMobile) {
+            // If we are on the connect step, move forward
+            const connectIndex = getStepIndex('connect');
+            if (stepIndex === connectIndex) {
+                setStepIndex(connectIndex + 1);
+            }
         }
-    }, [pathname, stepIndex, run, setStepIndex]);
+    }, [isConnected, stepIndex, run, steps, isMobile]);
 
-    // Auto-advance from File Upload (Step 2) to Publish (Step 3) 
-    // when the Publish button appears in the DOM.
+    // 2. Navigation to /upload
     useEffect(() => {
+        if (pathname.startsWith('/upload') && run && !isMobile) {
+            const uploadFormIndex = getStepIndex('upload-form');
+            if (stepIndex < uploadFormIndex && uploadFormIndex !== -1) {
+                setStepIndex(uploadFormIndex);
+            }
+        }
+    }, [pathname, stepIndex, run, steps, isMobile]);
+
+    // 3. Publish Button Appearance
+    useEffect(() => {
+        if (isMobile) return;
+
         let interval: NodeJS.Timeout;
-        if (stepIndex === 2 && run) {
+        const uploadFormIndex = getStepIndex('upload-form');
+        const publishBtnIndex = getStepIndex('publish-btn');
+
+        if (stepIndex === uploadFormIndex && run && uploadFormIndex !== -1 && publishBtnIndex !== -1) {
             interval = setInterval(() => {
                 if (document.getElementById('publish-video-btn')) {
-                    setStepIndex(3);
+                    setStepIndex(publishBtnIndex);
                 }
             }, 1000);
         }
         return () => clearInterval(interval);
-    }, [stepIndex, run, setStepIndex]);
+    }, [stepIndex, run, steps, isMobile]);
 
-    // Auto-advance to Discover (Step 4) if we land on /discover page
-    // This handles the redirect after clicking Publish.
+    // 4. Navigation to /discover
     useEffect(() => {
-        if (pathname.startsWith('/discover') && stepIndex === 3 && run) {
-            setStepIndex(4);
+        if (pathname.startsWith('/discover') && run && !isMobile) {
+            const discoverIndex = getStepIndex('discover');
+            if (stepIndex < discoverIndex && discoverIndex !== -1) {
+                setStepIndex(discoverIndex);
+            }
         }
-    }, [pathname, stepIndex, run, setStepIndex]);
+    }, [pathname, stepIndex, run, steps]);
 
-    // Custom Tooltip component
-    const Tooltip = ({
-        index,
-        step,
-        backProps,
-        closeProps,
-        primaryProps,
-        tooltipProps,
-    }: any) => {
-        // Hide "Next" button on Step 0 (Connect) and Step 1 (Navigate)
-        // User must perform the action to advance.
-        // Also hide on upload steps where we auto-advance based on UI interactions
-        const showNextButton = index !== 0 && index !== 1 && index !== 2 && index !== 3;
-
-        return (
-            <div {...tooltipProps} className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-2xl border border-indigo-100 dark:border-indigo-900 max-w-sm relative overflow-hidden">
-                {/* Decorative BG element */}
-                <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 opacity-10 rounded-bl-full -mr-4 -mt-4"></div>
-
-                <div className="relative z-10 text-slate-800 dark:text-slate-100">
-                    {step.content}
-                </div>
-
-                <div className="mt-6 flex justify-between items-center relative z-10">
-                    <div className="text-xs text-slate-400 font-medium">
-                        Step {index + 1} of {steps.length}
-                    </div>
-                    <div className="flex gap-2">
-                        {showNextButton && (
-                            <button {...primaryProps} className="px-4 py-2 bg-indigo-600 text-white text-sm font-bold rounded-full hover:bg-indigo-700 transition shadow-lg shadow-indigo-200 dark:shadow-none">
-                                {index === steps.length - 1 ? 'Finish' : 'Next'}
-                            </button>
-                        )}
-                    </div>
-                </div>
-            </div>
-        );
-    };
 
     return (
         <Joyride
@@ -154,7 +233,7 @@ export const Tour = () => {
             continuous
             showProgress
             showSkipButton
-            tooltipComponent={Tooltip}
+            tooltipComponent={TourTooltip}
             styles={{
                 options: {
                     zIndex: 10000,

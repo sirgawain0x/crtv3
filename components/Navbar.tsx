@@ -534,6 +534,7 @@ export default function Navbar() {
                     href="/discover"
                     className={mobileNavLinkClass}
                     onClick={handleLinkClick}
+                    id="mobile-nav-discover-link"
                   >
                     Discover
                   </Link>
