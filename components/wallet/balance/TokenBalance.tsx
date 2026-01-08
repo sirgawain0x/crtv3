@@ -186,11 +186,11 @@ export function TokenBalance() {
     const isBase = chain?.id === 8453;
     switch (symbol) {
       case "ETH":
-        return isBase ? "/images/tokens/ETHonBase.svg" : "/images/tokens/eth-logo.svg";
+        return isBase ? "/images/tokens/ETH_on_Base.svg" : "/images/tokens/eth-logo.svg";
       case "USDC":
-        return isBase ? "/images/tokens/USDCB.svg" : "/images/tokens/usdc-logo.svg";
+        return isBase ? "/images/tokens/USDC_on_Base.svg" : "/images/tokens/usdc-logo.svg";
       case "DAI":
-        return isBase ? "/images/tokens/DAIB.svg" : "/images/tokens/dai-logo.svg";
+        return isBase ? "/images/tokens/DAI_on_Base.svg" : "/images/tokens/dai-logo.svg";
       default:
         return "/images/tokens/eth-logo.svg";
     }

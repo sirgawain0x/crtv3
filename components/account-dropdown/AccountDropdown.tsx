@@ -110,6 +110,7 @@ import { useMeTokensSupabase } from "@/lib/hooks/metokens/useMeTokensSupabase";
 import { useMeTokenHoldings } from "@/lib/hooks/metokens/useMeTokenHoldings";
 import { chains } from "@/config";
 import { HydrationSafe } from "@/components/ui/hydration-safe";
+import { useMembershipNFTs, type MembershipNFT } from "@/lib/hooks/unlock/useMembershipNFTs";
 
 const chainIconMap: Record<number, string> = {
   [base.id]: "/images/chains/base.svg",
@@ -177,11 +178,11 @@ const getTokenIcon = (symbol: TokenSymbol, chainId?: number) => {
   const isBase = chainId === 8453;
   switch (symbol) {
     case "ETH":
-      return isBase ? "/images/tokens/ETHonBase.svg" : "/images/tokens/eth-logo.svg";
+      return isBase ? "/images/tokens/ETH_on_Base.svg" : "/images/tokens/eth-logo.svg";
     case "USDC":
-      return isBase ? "/images/tokens/USDCB.svg" : "/images/tokens/usdc-logo.svg";
+      return isBase ? "/images/tokens/USDC_on_Base.svg" : "/images/tokens/usdc-logo.svg";
     case "DAI":
-      return isBase ? "/images/tokens/DAIB.svg" : "/images/tokens/dai-logo.svg";
+      return isBase ? "/images/tokens/DAI_on_Base.svg" : "/images/tokens/dai-logo.svg";
     default:
       return "/images/tokens/eth-logo.svg";
   }
@@ -267,11 +268,14 @@ export function AccountDropdown() {
   const [sendAmount, setSendAmount] = useState<string>("");
   const [isSending, setIsSending] = useState(false);
   const [selectedToken, setSelectedToken] = useState<TokenSymbol>('ETH');
+  const [sendType, setSendType] = useState<'token' | 'nft'>('token');
+  const [selectedNFT, setSelectedNFT] = useState<MembershipNFT | null>(null);
   const [tokenBalances, setTokenBalances] = useState<Record<TokenSymbol, string>>({
     ETH: '0',
     USDC: '0',
     DAI: '0',
   });
+  const { nfts: membershipNFTs, isLoading: isLoadingNFTs } = useMembershipNFTs();
   const { toast } = useToast();
   const [isLinksLoading, setIsLinksLoading] = useState(false);
 
@@ -526,79 +530,135 @@ export function AccountDropdown() {
   };
 
   const handleSend = async () => {
-    if (!client || !recipientAddress || !sendAmount) return;
+    if (!client || !recipientAddress) return;
 
-    // Check balance
-    const availableBalance = parseFloat(tokenBalances[selectedToken]);
-    const requestedAmount = parseFloat(sendAmount);
-
-    if (requestedAmount > availableBalance) {
+    // Validate based on send type
+    if (sendType === 'token' && !sendAmount) {
       toast({
         variant: "destructive",
-        title: "Insufficient Balance",
-        description: `You have ${availableBalance} ${selectedToken}, but trying to send ${requestedAmount} ${selectedToken}`,
+        title: "Amount Required",
+        description: "Please enter an amount to send.",
+      });
+      return;
+    }
+    if (sendType === 'nft' && !selectedNFT) {
+      toast({
+        variant: "destructive",
+        title: "No NFT Selected",
+        description: "Please select a membership NFT to send.",
       });
       return;
     }
 
     try {
       setIsSending(true);
-      toast({
-        title: "Transaction Initiated",
-        description: `Sending ${sendAmount} ${selectedToken}...`,
-      });
-
-      const tokenInfo = getTokenInfo(chain?.id)[selectedToken];
 
       let operation;
 
-      if (selectedToken === 'ETH') {
-        // Send native ETH
-        const valueInWei = parseUnits(sendAmount, tokenInfo.decimals);
+      if (sendType === 'nft' && selectedNFT) {
+        // Send ERC-721 NFT (membership)
+        toast({
+          title: "Transaction Initiated",
+          description: `Sending membership NFT...`,
+        });
+
+        // Encode the safeTransferFrom calldata
+        const transferCalldata = encodeFunctionData({
+          abi: parseAbi([
+            "function safeTransferFrom(address from, address to, uint256 tokenId)",
+          ]),
+          functionName: "safeTransferFrom",
+          args: [
+            smartAccountAddress as Address,
+            recipientAddress as Address,
+            BigInt(selectedNFT.tokenId),
+          ],
+        });
+
+        console.log('Sending ERC-721 transfer:', {
+          contract: selectedNFT.lockAddress,
+          tokenId: selectedNFT.tokenId,
+          recipient: recipientAddress,
+        });
 
         operation = await client!.sendUserOperation({
           uo: {
-            target: recipientAddress as `0x${string}`,
-            data: "0x" as Hex,
-            value: valueInWei,
+            target: selectedNFT.lockAddress as Address,
+            data: transferCalldata as Hex,
+            value: BigInt(0), // No native value for NFT transfers
           },
         });
       } else {
-        // Send ERC-20 token (USDC or DAI)
-        // Check if token is supported on current chain
-        if (!tokenInfo.address) {
+        // Send token (existing logic)
+        // Check balance
+        const availableBalance = parseFloat(tokenBalances[selectedToken]);
+        const requestedAmount = parseFloat(sendAmount);
+
+        if (requestedAmount > availableBalance) {
           toast({
-            title: "Unsupported Network",
-            description: `${selectedToken} is not available on the current network. Please switch to Base.`,
             variant: "destructive",
+            title: "Insufficient Balance",
+            description: `You have ${availableBalance} ${selectedToken}, but trying to send ${requestedAmount} ${selectedToken}`,
           });
           setIsSending(false);
           return;
         }
 
-        const tokenAmount = parseUnits(sendAmount, tokenInfo.decimals);
-
-        // Encode the transfer calldata
-        const transferCalldata = encodeFunctionData({
-          abi: parseAbi(["function transfer(address,uint256) returns (bool)"]),
-          functionName: "transfer",
-          args: [recipientAddress as Address, tokenAmount],
+        toast({
+          title: "Transaction Initiated",
+          description: `Sending ${sendAmount} ${selectedToken}...`,
         });
 
-        console.log('Sending ERC-20 transfer:', {
-          token: selectedToken,
-          tokenAddress: tokenInfo.address,
-          recipient: recipientAddress,
-          amount: tokenAmount.toString(),
-        });
+        const tokenInfo = getTokenInfo(chain?.id)[selectedToken];
 
-        operation = await client!.sendUserOperation({
-          uo: {
-            target: tokenInfo.address as Address,
-            data: transferCalldata as Hex,
-            value: BigInt(0), // No native value for ERC-20 transfers
-          },
-        });
+        if (selectedToken === 'ETH') {
+          // Send native ETH
+          const valueInWei = parseUnits(sendAmount, tokenInfo.decimals);
+
+          operation = await client!.sendUserOperation({
+            uo: {
+              target: recipientAddress as `0x${string}`,
+              data: "0x" as Hex,
+              value: valueInWei,
+            },
+          });
+        } else {
+          // Send ERC-20 token (USDC or DAI)
+          // Check if token is supported on current chain
+          if (!tokenInfo.address) {
+            toast({
+              title: "Unsupported Network",
+              description: `${selectedToken} is not available on the current network. Please switch to Base.`,
+              variant: "destructive",
+            });
+            setIsSending(false);
+            return;
+          }
+
+          const tokenAmount = parseUnits(sendAmount, tokenInfo.decimals);
+
+          // Encode the transfer calldata
+          const transferCalldata = encodeFunctionData({
+            abi: parseAbi(["function transfer(address,uint256) returns (bool)"]),
+            functionName: "transfer",
+            args: [recipientAddress as Address, tokenAmount],
+          });
+
+          console.log('Sending ERC-20 transfer:', {
+            token: selectedToken,
+            tokenAddress: tokenInfo.address,
+            recipient: recipientAddress,
+            amount: tokenAmount.toString(),
+          });
+
+          operation = await client!.sendUserOperation({
+            uo: {
+              target: tokenInfo.address as Address,
+              data: transferCalldata as Hex,
+              value: BigInt(0), // No native value for ERC-20 transfers
+            },
+          });
+        }
       }
 
       // Wait for transaction to be mined
@@ -611,7 +671,9 @@ export function AccountDropdown() {
       console.log("Transaction hash:", txHash);
       toast({
         title: "Transaction Successful!",
-        description: "Your transaction has been confirmed.",
+        description: sendType === 'nft' 
+          ? "Your membership NFT has been transferred."
+          : "Your transaction has been confirmed.",
         action: (
           <ToastAction
             altText="View on Explorer"
@@ -622,10 +684,15 @@ export function AccountDropdown() {
         ),
       });
 
+      // Reset sending state before closing dialog (explicit reset for immediate feedback)
+      setIsSending(false);
+
       // Reset form
       setIsDialogOpen(false);
       setRecipientAddress("");
       setSendAmount("");
+      setSelectedNFT(null);
+      setSendType('token');
 
       // Refresh balances - refetch on next render
       // Token balances will be refreshed on next component update
@@ -640,6 +707,7 @@ export function AccountDropdown() {
             : "Failed to initiate transaction.",
       });
     } finally {
+      // Ensure sending state is always reset, even if an error occurs
       setIsSending(false);
     }
   };
@@ -715,56 +783,173 @@ export function AccountDropdown() {
         return (
           <div className="space-y-4">
             <div className="flex flex-col gap-4">
-              {/* Token Selection */}
+              {/* Send Type Selection */}
               <div className="space-y-3">
-                <label className="text-sm font-medium text-gray-900 dark:text-gray-100">Token</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {(['ETH', 'USDC', 'DAI'] as TokenSymbol[]).map((token) => (
-                    <button
-                      key={token}
-                      type="button"
-                      onClick={() => setSelectedToken(token)}
-                      className={`flex items-center justify-center space-x-2 p-3 border rounded-lg transition-colors ${selectedToken === token
-                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-400'
-                        : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
-                        }`}
-                    >
-                      <Image
-                        src={getTokenIcon(token, chain?.id)}
-                        alt={token}
-                        width={20}
-                        height={20}
-                        className="w-5 h-5 flex-shrink-0"
-                      />
-                      <span className={`text-sm font-medium ${selectedToken === token
-                        ? 'text-blue-700 dark:text-blue-300'
-                        : 'text-gray-900 dark:text-gray-100'
-                        }`}>
-                        {token}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-                <div className="flex justify-between items-center text-xs text-gray-500 dark:text-gray-400">
-                  <div className="flex items-center space-x-2">
-                    <Image
-                      src={getTokenIcon(selectedToken, chain?.id)}
-                      alt={selectedToken}
-                      width={12}
-                      height={12}
-                      className="w-3 h-3"
-                    />
-                    <span>Balance: {parseFloat(tokenBalances[selectedToken]).toFixed(6)}</span>
-                  </div>
+                <label className="text-sm font-medium text-gray-900 dark:text-gray-100">Send Type</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <button
                     type="button"
-                    onClick={() => setSendAmount(tokenBalances[selectedToken])}
-                    className="text-blue-600 hover:text-blue-700 dark:text-blue-400 font-medium px-2 py-1 rounded text-xs"
+                    onClick={() => {
+                      setSendType('token');
+                      setSelectedNFT(null);
+                    }}
+                    className={`flex items-center justify-center space-x-2 p-3 sm:p-2.5 border rounded-lg transition-colors min-h-[44px] ${sendType === 'token'
+                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-400'
+                      : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
+                      }`}
                   >
-                    MAX
+                    <span className={`text-sm font-medium ${sendType === 'token'
+                      ? 'text-blue-700 dark:text-blue-300'
+                      : 'text-gray-900 dark:text-gray-100'
+                      }`}>
+                      Token
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSendType('nft');
+                      setSendAmount('');
+                    }}
+                    disabled={membershipNFTs.length === 0}
+                    className={`flex items-center justify-center space-x-2 p-3 sm:p-2.5 border rounded-lg transition-colors min-h-[44px] ${sendType === 'nft'
+                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-400'
+                      : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
+                      } ${membershipNFTs.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    <span className={`text-sm font-medium ${sendType === 'nft'
+                      ? 'text-blue-700 dark:text-blue-300'
+                      : 'text-gray-900 dark:text-gray-100'
+                      }`}>
+                      Membership NFT
+                    </span>
                   </button>
                 </div>
+                {membershipNFTs.length === 0 && sendType === 'nft' && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400 px-1">
+                    You don't have any membership NFTs to send.
+                  </p>
+                )}
               </div>
+
+              {sendType === 'token' ? (
+                <>
+                  {/* Token Selection */}
+                  <div className="space-y-3">
+                    <label className="text-sm font-medium text-gray-900 dark:text-gray-100">Token</label>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      {(['ETH', 'USDC', 'DAI'] as TokenSymbol[]).map((token) => (
+                        <button
+                          key={token}
+                          type="button"
+                          onClick={() => setSelectedToken(token)}
+                          className={`flex items-center justify-center space-x-2 p-3 sm:p-2.5 border rounded-lg transition-colors min-h-[44px] ${selectedToken === token
+                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-400'
+                            : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
+                            }`}
+                        >
+                          <Image
+                            src={getTokenIcon(token, chain?.id)}
+                            alt={token}
+                            width={20}
+                            height={20}
+                            className="w-5 h-5 sm:w-4 sm:h-4 flex-shrink-0"
+                          />
+                          <span className={`text-sm font-medium ${selectedToken === token
+                            ? 'text-blue-700 dark:text-blue-300'
+                            : 'text-gray-900 dark:text-gray-100'
+                            }`}>
+                            {token}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                      <div className="flex items-center space-x-2">
+                        <Image
+                          src={getTokenIcon(selectedToken, chain?.id)}
+                          alt={selectedToken}
+                          width={12}
+                          height={12}
+                          className="w-3 h-3"
+                        />
+                        <span className="break-all sm:break-normal">Balance: {parseFloat(tokenBalances[selectedToken]).toFixed(6)}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSendAmount(tokenBalances[selectedToken])}
+                        className="text-blue-600 hover:text-blue-700 dark:text-blue-400 font-medium px-3 py-1.5 rounded text-xs min-h-[32px] touch-manipulation"
+                      >
+                        MAX
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Amount */}
+                  <div className="space-y-3">
+                    <label className="text-sm font-medium text-gray-900 dark:text-gray-100">Amount ({selectedToken})</label>
+                    <input
+                      type="number"
+                      placeholder="0.0"
+                      step="any"
+                      inputMode="decimal"
+                      className="w-full p-3 sm:p-2.5 border rounded-lg dark:bg-gray-700 dark:border-gray-600 bg-white border-gray-200 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-base sm:text-sm min-h-[44px]"
+                      value={sendAmount}
+                      onChange={(e) => setSendAmount(e.target.value)}
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* NFT Selection */}
+                  <div className="space-y-3">
+                    <label className="text-sm font-medium text-gray-900 dark:text-gray-100">Membership NFT</label>
+                    {isLoadingNFTs ? (
+                      <div className="p-4 border rounded-lg">
+                        <Skeleton className="h-20 w-full" />
+                      </div>
+                    ) : membershipNFTs.length === 0 ? (
+                      <div className="p-4 border rounded-lg text-center text-sm text-gray-500 dark:text-gray-400">
+                        No membership NFTs found
+                      </div>
+                    ) : (
+                      <div className="space-y-2 max-h-48 sm:max-h-64 overflow-y-auto -mx-1 px-1">
+                        {membershipNFTs.map((nft) => (
+                          <button
+                            key={`${nft.lockAddress}-${nft.tokenId}`}
+                            type="button"
+                            onClick={() => setSelectedNFT(nft)}
+                            className={`w-full p-3 sm:p-2.5 border rounded-lg text-left transition-colors min-h-[60px] sm:min-h-[56px] touch-manipulation ${selectedNFT?.lockAddress === nft.lockAddress && selectedNFT?.tokenId === nft.tokenId
+                              ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-400'
+                              : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 active:bg-gray-100 dark:active:bg-gray-600'
+                              }`}
+                          >
+                            <div className="flex items-center space-x-3 sm:space-x-2">
+                              {nft.metadata?.image && (
+                                <Image
+                                  src={nft.metadata.image}
+                                  alt={nft.metadata.name || 'Membership NFT'}
+                                  width={40}
+                                  height={40}
+                                  className="w-12 h-12 sm:w-10 sm:h-10 rounded object-cover flex-shrink-0"
+                                />
+                              )}
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                                  {nft.metadata?.name || nft.lockName}
+                                </p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                  Token ID: {nft.tokenId}
+                                </p>
+                              </div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
 
               {/* Recipient Address */}
               <div className="space-y-3">
@@ -772,22 +957,10 @@ export function AccountDropdown() {
                 <input
                   type="text"
                   placeholder="0x..."
-                  className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 bg-white border-gray-200 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
+                  inputMode="text"
+                  className="w-full p-3 sm:p-2.5 border rounded-lg dark:bg-gray-700 dark:border-gray-600 bg-white border-gray-200 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-base sm:text-sm min-h-[44px] font-mono"
                   value={recipientAddress}
                   onChange={(e) => setRecipientAddress(e.target.value)}
-                />
-              </div>
-
-              {/* Amount */}
-              <div className="space-y-3">
-                <label className="text-sm font-medium text-gray-900 dark:text-gray-100">Amount ({selectedToken})</label>
-                <input
-                  type="number"
-                  placeholder="0.0"
-                  step="any"
-                  className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 bg-white border-gray-200 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
-                  value={sendAmount}
-                  onChange={(e) => setSendAmount(e.target.value)}
                 />
               </div>
 
@@ -795,29 +968,35 @@ export function AccountDropdown() {
               <div className="flex flex-col sm:flex-row gap-3 pt-2">
                 <Button
                   variant="outline"
-                  className="w-full sm:w-auto sm:order-2"
-                  onClick={() => setIsDialogOpen(false)}
+                  className="w-full sm:w-auto sm:order-2 min-h-[44px] touch-manipulation"
+                  onClick={() => {
+                    setIsDialogOpen(false);
+                    setSelectedNFT(null);
+                    setSendType('token');
+                  }}
                 >
                   Cancel
                 </Button>
                 <Button
-                  className="w-full sm:flex-1 sm:order-1"
+                  className="w-full sm:flex-1 sm:order-1 min-h-[44px] touch-manipulation"
                   onClick={handleSend}
                   disabled={
                     isSending ||
                     !recipientAddress ||
-                    !sendAmount
+                    (sendType === 'token' && !sendAmount) ||
+                    (sendType === 'nft' && !selectedNFT)
                   }
                 >
                   {isSending ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Sending {selectedToken}...
+                      <span className="hidden sm:inline">{sendType === 'nft' ? 'Sending NFT...' : `Sending ${selectedToken}...`}</span>
+                      <span className="sm:hidden">Sending...</span>
                     </>
                   ) : (
                     <>
                       <Send className="mr-2 h-4 w-4" />
-                      Send {selectedToken}
+                      {sendType === 'nft' ? 'Send NFT' : `Send ${selectedToken}`}
                     </>
                   )}
                 </Button>
@@ -1386,10 +1565,14 @@ export function AccountDropdown() {
           setIsDialogOpen(open);
           if (!open) {
             setDialogAction("buy");
+            setSelectedNFT(null);
+            setSendType('token');
+            setRecipientAddress("");
+            setSendAmount("");
           }
         }}
       >
-        <DialogContent className="sm:max-w-[425px] w-[95%] md:w-auto max-h-[90vh] overflow-hidden">
+        <DialogContent className="sm:max-w-[425px] w-[95%] max-w-[95vw] md:w-auto max-h-[95vh] sm:max-h-[90vh] overflow-hidden">
           <DialogHeader className="pb-4 pr-12">
             <DialogTitle className="text-lg sm:text-xl">
               {dialogAction.charAt(0).toUpperCase() + dialogAction.slice(1)}

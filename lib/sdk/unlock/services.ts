@@ -158,28 +158,38 @@ export class UnlockService {
     try {
       const contract = this.getContract(lockAddress);
 
-      // Check if user has any valid keys
-      const hasValidKey = await contract.read.getHasValidKey([
-        userAddress as `0x${string}`,
-      ]);
-
-      if (!hasValidKey) {
-        console.log("No valid key found for user");
-        return [];
-      }
-
-      // Get balance of valid keys
+      // Get balance of tokens
       const balanceResult = await contract.read.balanceOf([
         userAddress as `0x${string}`,
       ]);
       const balance = BigInt(String(balanceResult));
+
+      if (balance === 0n) {
+        console.log("No tokens found for user");
+        return [];
+      }
 
       console.log(
         `Balance for ${userAddress} at ${lockAddress}:`,
         balance.toString()
       );
 
-      return balance > 0n ? [1n] : []; // Return dummy token ID if user has balance
+      // Get all token IDs using tokenOfOwnerByIndex
+      const tokenIds: bigint[] = [];
+      for (let i = 0n; i < balance; i++) {
+        try {
+          const tokenId = await contract.read.tokenOfOwnerByIndex([
+            userAddress as `0x${string}`,
+            i,
+          ]);
+          tokenIds.push(BigInt(String(tokenId)));
+        } catch (error) {
+          console.warn(`Error getting token at index ${i}:`, error);
+          // Continue to next token
+        }
+      }
+
+      return tokenIds;
     } catch (error) {
       console.error(
         `Error getting tokens for ${userAddress} at ${lockAddress}:`,
@@ -297,6 +307,60 @@ export class UnlockService {
   }
 
   /**
+   * Get all membership NFTs with token IDs for an address
+   */
+  async getAllMembershipNFTs(userAddress: string) {
+    console.log("Getting all membership NFTs for address:", userAddress);
+
+    if (!userAddress) {
+      throw this.createError("User address is required", "INVALID_ADDRESS", {
+        userAddress,
+      });
+    }
+
+    const membershipNFTs: Array<{
+      lockName: LockAddress;
+      lockAddress: string;
+      tokenId: string;
+      metadata: LockMetadata | null;
+    }> = [];
+
+    await Promise.all(
+      Object.entries(LOCK_ADDRESSES).map(async ([name, address]) => {
+        try {
+          const tokens = await this.getTokensOfOwner(address, userAddress);
+          
+          for (const tokenId of tokens) {
+            let metadata = null;
+            try {
+              metadata = await this.getNftMetadata(address, tokenId.toString());
+            } catch (error) {
+              console.warn(
+                `Failed to get metadata for token ${tokenId} at ${address}:`,
+                error
+              );
+            }
+
+            membershipNFTs.push({
+              lockName: name as LockAddress,
+              lockAddress: address,
+              tokenId: tokenId.toString(),
+              metadata,
+            });
+          }
+        } catch (error) {
+          console.error(
+            `Error getting membership NFTs for ${address}:`,
+            error
+          );
+        }
+      })
+    );
+
+    return membershipNFTs;
+  }
+
+  /**
    * Get all memberships for an address across multiple locks
    */
   async getAllMemberships(userAddress: string) {
@@ -327,8 +391,10 @@ export class UnlockService {
               // Get token IDs for the user
               const tokens = await this.getTokensOfOwner(address, userAddress);
               if (tokens.length > 0) {
+                // Return all token IDs, not just the first one
+                // The caller can use any of them
                 tokenId = tokens[0].toString();
-                // Get metadata for the token
+                // Get metadata for the first token
                 metadata = await this.getNftMetadata(address, tokenId);
                 if (metadata) {
                   lock = {
