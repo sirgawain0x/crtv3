@@ -60,9 +60,9 @@ export function TokenSelect({
           <Image
             src={selectedToken.logo}
             alt={selectedToken.symbol}
-            width={24}
-            height={24}
-            className="rounded-full"
+            width={32}
+            height={32}
+            className="w-8 h-8 rounded-full"
           />
           <span className="font-medium">{selectedToken.symbol}</span>
         </div>
@@ -100,9 +100,9 @@ export function TokenSelect({
                 <Image
                   src={token.logo}
                   alt={token.symbol}
-                  width={24}
-                  height={24}
-                  className="rounded-full"
+                  width={32}
+                  height={32}
+                  className="w-8 h-8 rounded-full"
                 />
                 <div className="flex flex-col">
                   <span className="font-medium">{token.symbol}</span>

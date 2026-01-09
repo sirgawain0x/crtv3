@@ -851,9 +851,9 @@ export function AccountDropdown() {
                           <Image
                             src={getTokenIcon(token, chain?.id)}
                             alt={token}
-                            width={20}
-                            height={20}
-                            className="w-5 h-5 sm:w-4 sm:h-4 flex-shrink-0"
+                            width={32}
+                            height={32}
+                            className="w-8 h-8 sm:w-7 sm:h-7 flex-shrink-0"
                           />
                           <span className={`text-sm font-medium ${selectedToken === token
                             ? 'text-blue-700 dark:text-blue-300'
@@ -869,9 +869,9 @@ export function AccountDropdown() {
                         <Image
                           src={getTokenIcon(selectedToken, chain?.id)}
                           alt={selectedToken}
-                          width={12}
-                          height={12}
-                          className="w-3 h-3"
+                          width={20}
+                          height={20}
+                          className="w-5 h-5"
                         />
                         <span className="break-all sm:break-normal">Balance: {parseFloat(tokenBalances[selectedToken]).toFixed(6)}</span>
                       </div>

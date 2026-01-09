@@ -208,9 +208,9 @@ export function TokenBalance() {
               <Image
                 src={getTokenIcon("ETH")}
                 alt="ETH"
-                width={16}
-                height={16}
-                className="w-4 h-4"
+                width={24}
+                height={24}
+                className="w-6 h-6"
               />
               <span className="text-sm">ETH</span>
             </div>
@@ -221,9 +221,9 @@ export function TokenBalance() {
               <Image
                 src={getTokenIcon("USDC")}
                 alt="USDC"
-                width={16}
-                height={16}
-                className="w-4 h-4"
+                width={24}
+                height={24}
+                className="w-6 h-6"
               />
               <span className="text-sm">USDC</span>
             </div>
@@ -234,9 +234,9 @@ export function TokenBalance() {
               <Image
                 src={getTokenIcon("DAI")}
                 alt="DAI"
-                width={16}
-                height={16}
-                className="w-4 h-4"
+                width={24}
+                height={24}
+                className="w-6 h-6"
               />
               <span className="text-sm">DAI</span>
             </div>

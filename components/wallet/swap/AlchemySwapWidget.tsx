@@ -730,9 +730,9 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
               <Image
                 src={getTokenIcon(swapState.fromToken, client?.chain?.id)}
                 alt={swapState.fromToken}
-                width={20}
-                height={20}
-                className="w-5 h-5 shrink-0"
+                width={32}
+                height={32}
+                className="w-8 h-8 shrink-0"
               />
               <Select value={swapState.fromToken} onValueChange={handleFromTokenChange}>
                 <SelectTrigger className="w-full bg-transparent border-none outline-none p-0 h-auto focus:ring-0">
@@ -780,9 +780,9 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
               <Image
                 src={getTokenIcon(swapState.fromToken, client?.chain?.id)}
                 alt={swapState.fromToken}
-                width={12}
-                height={12}
-                className="w-3 h-3"
+                width={20}
+                height={20}
+                className="w-5 h-5"
               />
               <span>Balance: {balances[swapState.fromToken]}</span>
             </div>
@@ -853,9 +853,9 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
               <Image
                 src={getTokenIcon(swapState.toToken, client?.chain?.id)}
                 alt={swapState.toToken}
-                width={20}
-                height={20}
-                className="w-5 h-5 shrink-0"
+                width={32}
+                height={32}
+                className="w-8 h-8 shrink-0"
               />
               <Select value={swapState.toToken} onValueChange={handleToTokenChange}>
                 <SelectTrigger className="w-full bg-transparent border-none outline-none p-0 h-auto focus:ring-0">
@@ -888,9 +888,9 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
               <Image
                 src={getTokenIcon(swapState.toToken, client?.chain?.id)}
                 alt={swapState.toToken}
-                width={12}
-                height={12}
-                className="w-3 h-3"
+                width={20}
+                height={20}
+                className="w-5 h-5"
               />
               <span>Balance: {balances[swapState.toToken]}</span>
             </div>
