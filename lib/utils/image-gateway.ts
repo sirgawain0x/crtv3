@@ -4,14 +4,15 @@
  */
 
 // List of IPFS gateways to try (in order of preference)
+// Lighthouse first for better CDN distribution (especially West Coast)
 // Using actual IPFS gateways for proper decentralized access
 const IPFS_GATEWAYS = [
-  'https://w3s.link/ipfs', // Storacha (web3.storage) - fast and reliable
-  'https://gateway.pinata.cloud/ipfs', // Pinata gateway - reliable
+  'https://gateway.lighthouse.storage/ipfs', // Lighthouse - Primary (better CDN, works well on West Coast)
+  'https://w3s.link/ipfs', // Storacha (web3.storage) - fast and reliable fallback
+  'https://gateway.pinata.cloud/ipfs', // Pinata gateway - reliable fallback
   'https://dweb.link/ipfs', // Protocol Labs - standard IPFS gateway
   'https://4everland.io/ipfs', // 4everland - decentralized
-  'https://ipfs.io/ipfs', // Public gateway - fallback
-  'https://gateway.lighthouse.storage/ipfs', // Lighthouse - keep as fallback
+  'https://ipfs.io/ipfs', // Public gateway - last resort fallback
 ];
 
 /**
@@ -83,10 +84,8 @@ export function getAllIpfsGateways(url: string): string[] {
 export function isFailingGateway(url: string): boolean {
   if (!url) return false;
 
-  // Lighthouse gateway (503 errors)
-  if (url.includes('gateway.lighthouse.storage')) {
-    return true;
-  }
+  // Note: Lighthouse is now primary, so we don't mark it as failing by default
+  // Only mark as failing if we detect actual failures (handled in components)
 
   // Google Cloud Storage from Livepeer AI (404 errors)
   if (url.includes('storage.googleapis.com/lp-ai-generate-com')) {
@@ -108,9 +107,13 @@ export function isIpfsUrl(url: string): boolean {
 }
 
 /**
- * Converts a failing gateway URL to an alternative gateway
- * @param url - The URL that's failing
- * @returns The converted URL using an alternative gateway, or original if not IPFS
+ * Converts known failing/unreliable gateway URLs to alternative gateways
+ * Note: Lighthouse is PRIMARY and should NOT be converted proactively.
+ * Only converts known problematic gateways (like ipfs.io).
+ * Actual failures are handled by the error handler trying fallback gateways.
+ * 
+ * @param url - The URL that uses a known failing/unreliable gateway
+ * @returns The converted URL using an alternative gateway, or original if not IPFS or already using a good gateway
  */
 export function convertFailingGateway(url: string): string {
   if (!url) return url;
@@ -125,21 +128,23 @@ export function convertFailingGateway(url: string): string {
   const hash = extractIpfsHash(url);
   if (!hash) return url; // Not an IPFS URL
 
-  // Handle Lighthouse gateway failures - convert to Storacha (w3s.link)
-  if (url.includes('gateway.lighthouse.storage')) {
-    return `https://w3s.link/ipfs/${hash}`;
-  }
-
-  // Handle ipfs.io timeouts - convert to Storacha for better performance
+  // Note: Lighthouse is now the PRIMARY gateway and should be tried first
+  // Do NOT convert Lighthouse URLs proactively - let them try first
+  // Actual failures will be handled by the error handler trying fallback gateways
+  
+  // Handle known slow/unreliable gateways - convert to Lighthouse (primary) for better CDN
   if (url.includes('ipfs.io/ipfs')) {
-    return `https://w3s.link/ipfs/${hash}`;
+    // ipfs.io can be slow/unreliable, prefer Lighthouse for better performance
+    return `https://gateway.lighthouse.storage/ipfs/${hash}`;
   }
 
-  // If it's already an IPFS URL but not using w3s.link, prefer w3s.link for reliability
-  if (!url.includes('w3s.link') && !url.includes('pinata.cloud') && !url.includes('dweb.link')) {
-    return `https://w3s.link/ipfs/${hash}`;
+  // If it's already an IPFS URL but not using a known gateway, prefer Lighthouse for better CDN
+  if (!url.includes('lighthouse.storage') && !url.includes('w3s.link') && !url.includes('pinata.cloud') && !url.includes('dweb.link') && !url.includes('4everland.io')) {
+    return `https://gateway.lighthouse.storage/ipfs/${hash}`;
   }
 
+  // For Lighthouse URLs (and other known good gateways), return as-is
+  // The error handler will handle actual failures by trying fallback gateways
   return url;
 }
 
@@ -202,7 +207,7 @@ export function getImageUrlWithFallback(url: string): {
   if (hash) {
     const allGateways = getAllIpfsGateways(url);
     return {
-      primary: allGateways[0], // Storacha (w3s.link) - fast and reliable
+      primary: allGateways[0], // Lighthouse - better CDN distribution (especially West Coast)
       fallbacks: allGateways.slice(1),
     };
   }

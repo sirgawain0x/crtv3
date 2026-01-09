@@ -4,6 +4,7 @@ import * as Proof from '@storacha/client/proof';
 import { Signer } from '@storacha/client/principal/ed25519';
 import { createHelia } from 'helia';
 import { unixfs } from '@helia/unixfs';
+import { LighthouseService } from './lighthouse-service';
 
 export interface IPFSUploadResult {
   success: boolean;
@@ -13,6 +14,7 @@ export interface IPFSUploadResult {
 }
 
 export interface IPFSConfig {
+  lighthouseApiKey?: string;
   key?: string;
   proof?: string;
   email?: string;
@@ -24,20 +26,34 @@ let heliaInstance: any = null;
 let heliaFs: any = null;
 
 export class IPFSService {
+  private lighthouseApiKey?: string;
   private key?: string;
   private proof?: string;
   private email?: string;
   private gateway: string;
+  private lighthouseService?: LighthouseService;
   private storachaClient: any;
   private helia: any;
   private fs: any;
   private initialized: boolean = false;
 
   constructor(config: IPFSConfig) {
+    this.lighthouseApiKey = config.lighthouseApiKey;
     this.key = config.key;
     this.proof = config.proof;
     this.email = config.email;
-    this.gateway = config.gateway || 'https://ipfs.io/ipfs';
+    // Use Lighthouse gateway as default if API key is provided
+    this.gateway = config.gateway || (config.lighthouseApiKey 
+      ? 'https://gateway.lighthouse.storage/ipfs' 
+      : 'https://w3s.link/ipfs');
+    
+    // Initialize Lighthouse service if API key is provided
+    if (this.lighthouseApiKey) {
+      this.lighthouseService = new LighthouseService({
+        apiKey: this.lighthouseApiKey,
+        gateway: this.gateway,
+      });
+    }
   }
 
   // Initialize clients (Helia + Storacha)
@@ -98,21 +114,46 @@ export class IPFSService {
 
   // Upload file to IPFS
   // Strategy:
-  // 1. Add to Helia (Fast, Local/Ephemeral)
-  // 2. Return CID immediately
-  // 3. Background: Upload to Storacha (Persistence)
+  // 1. Upload to Lighthouse (Primary - better CDN, especially West Coast)
+  // 2. Background: Upload to Storacha (Backup/Persistence)
+  // 3. Fallback: Use Helia if both fail
   async uploadFile(file: File | Blob, options: {
     pin?: boolean;
     wrapWithDirectory?: boolean;
     maxSize?: number;
   } = {}): Promise<IPFSUploadResult> {
     try {
+      // 1. Try Lighthouse first (Primary - better CDN distribution)
+      if (this.lighthouseService) {
+        try {
+          const lighthouseResult = await this.lighthouseService.uploadFile(file);
+          if (lighthouseResult.success && lighthouseResult.hash) {
+            console.log('✅ Lighthouse upload successful:', lighthouseResult.hash);
+            
+            // Background: Upload to Storacha as backup (fire and forget)
+            this.uploadToStorachaBackup(file, lighthouseResult.hash).catch((err) => {
+              console.warn('Storacha backup failed (non-critical):', err);
+            });
+
+            return {
+              success: true,
+              url: lighthouseResult.url,
+              hash: lighthouseResult.hash,
+            };
+          }
+        } catch (lighthouseError) {
+          console.warn('Lighthouse upload failed, trying fallback:', lighthouseError);
+          // Continue to fallback
+        }
+      }
+
+      // 2. Fallback: Use Helia + Storacha (original method)
       await this.initialize();
 
       if (!this.fs) {
         return {
           success: false,
-          error: 'Helia node not initialized.',
+          error: 'IPFS node not initialized.',
         };
       }
 
@@ -120,22 +161,13 @@ export class IPFSService {
       const buffer = await file.arrayBuffer();
       const content = new Uint8Array(buffer);
 
-      // 1. Add to Helia
+      // Add to Helia
       const cid = await this.fs.addBytes(content);
       const hash = cid.toString();
       const url = `${this.gateway}/${hash}`;
 
-      // 2. Background Upload to Storacha (Fire and Forget)
+      // Background: Upload to Storacha (Backup)
       if (this.storachaClient) {
-        // We use a non-awaited promise here to not block the user response
-        // However, in serverless functions, we might need to await it or use `waitUntil` equivalent
-        // For now, we await it to ensure persistence, but it might be slower. 
-        // Given the requirement is "free and fast", maybe we assume Helia is enough for immediate interaction?
-        // User asked for Storacha as "backup" where "uploads go cold".
-        // Let's log it and await it but handle errors gracefully so it doesn't fail the request.
-
-        // Note: For large files, this might timeout serverless functions.
-        // Ideally this should be a separate queue. For now, we do it inline but safe.
         this.storachaClient.uploadFile(file).then((result: any) => {
           console.log(`Storacha backup complete for ${hash}:`, result);
         }).catch((err: any) => {
@@ -154,6 +186,24 @@ export class IPFSService {
         success: false,
         error: error instanceof Error ? error.message : 'Upload failed',
       };
+    }
+  }
+
+  // Helper method to upload to Storacha as backup
+  private async uploadToStorachaBackup(file: File | Blob, hash: string): Promise<void> {
+    if (!this.storachaClient) {
+      // Initialize Storacha if not already initialized
+      await this.initializeStoracha();
+    }
+
+    if (this.storachaClient) {
+      try {
+        await this.storachaClient.uploadFile(file);
+        console.log(`✅ Storacha backup complete for ${hash}`);
+      } catch (error) {
+        console.warn(`⚠️ Storacha backup failed for ${hash}:`, error);
+        // Non-critical, don't throw
+      }
     }
   }
 
@@ -176,10 +226,15 @@ export class IPFSService {
 }
 
 // Default IPFS service instance
+// Uses Lighthouse as primary (if API key provided), Storacha as backup
 export const ipfsService = new IPFSService({
+  lighthouseApiKey: process.env.NEXT_PUBLIC_LIGHTHOUSE_API_KEY,
   key: process.env.STORACHA_KEY,
   proof: process.env.STORACHA_PROOF,
   // We intentionally OMIT email here to prevent fallback to interactive mode
   // email: process.env.NEXT_PUBLIC_STORACHA_EMAIL, 
-  gateway: process.env.NEXT_PUBLIC_IPFS_GATEWAY || 'https://ipfs.io/ipfs',
+  gateway: process.env.NEXT_PUBLIC_IPFS_GATEWAY || 
+    (process.env.NEXT_PUBLIC_LIGHTHOUSE_API_KEY 
+      ? 'https://gateway.lighthouse.storage/ipfs' 
+      : 'https://w3s.link/ipfs'),
 });

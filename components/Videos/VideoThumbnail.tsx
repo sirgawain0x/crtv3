@@ -8,6 +8,7 @@ import { PlayIcon, Volume2, VolumeX } from 'lucide-react';
 import { Src } from '@livepeer/react';
 import { convertFailingGateway, isIpfsUrl } from '@/lib/utils/image-gateway';
 import { Skeleton } from '@/components/ui/skeleton';
+import { GatewayImage } from '@/components/ui/gateway-image';
 
 interface VideoThumbnailProps {
   playbackId: string;
@@ -314,7 +315,7 @@ const VideoThumbnail: React.FC<VideoThumbnailProps> = ({
           )}
 
           {thumbnailUrl ? (
-            <Image
+            <GatewayImage
               src={thumbnailUrl}
               alt={title}
               fill
@@ -323,7 +324,8 @@ const VideoThumbnail: React.FC<VideoThumbnailProps> = ({
               loading={priority ? "eager" : "lazy"}
               priority={priority}
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-              unoptimized={thumbnailUrl ? isIpfsUrl(thumbnailUrl) : false}
+              fallbackSrc="/Creative_TV.png"
+              showSkeleton={false}
               onLoad={() => setImageLoading(false)}
               onError={() => {
                 setImageLoading(false);

@@ -1,14 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { IPFSService } from '@/lib/sdk/ipfs/service';
 
-// Initialize IPFS service
-// Prefer KEY and PROOF for backend/serverless (recommended)
-// Fallback to EMAIL for persistent environments
+// Initialize IPFS service with hybrid storage
+// Lighthouse (Primary) - Better CDN distribution, especially for West Coast
+// Storacha (Backup) - Ensures long-term persistence
 const ipfsService = new IPFSService({
+  lighthouseApiKey: process.env.NEXT_PUBLIC_LIGHTHOUSE_API_KEY,
   key: process.env.STORACHA_KEY,
   proof: process.env.STORACHA_PROOF,
   email: process.env.NEXT_PUBLIC_STORACHA_EMAIL,
-  gateway: process.env.NEXT_PUBLIC_IPFS_GATEWAY || 'https://w3s.link/ipfs'
+  gateway: process.env.NEXT_PUBLIC_IPFS_GATEWAY || 
+    (process.env.NEXT_PUBLIC_LIGHTHOUSE_API_KEY 
+      ? 'https://gateway.lighthouse.storage/ipfs' 
+      : 'https://w3s.link/ipfs')
 });
 
 /**

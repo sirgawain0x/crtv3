@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { convertFailingGateway, getImageUrlWithFallback, isIpfsUrl } from '@/lib/utils/image-gateway';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -41,7 +41,39 @@ export function GatewayImage({
   const [hasError, setHasError] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  const { fallbacks } = getImageUrlWithFallback(src);
+  // Sync imageSrc state when src prop changes (e.g., when parent updates thumbnailUrl)
+  useEffect(() => {
+    // Convert failing gateways when src prop changes
+    const convertedSrc = src && convertFailingGateway(src) !== src 
+      ? convertFailingGateway(src) 
+      : (src || '');
+    
+    // Update imageSrc when src prop changes and reset fallback state
+    setImageSrc(convertedSrc);
+    setFallbackIndex(0);
+    setHasError(false);
+    setIsLoading(true);
+  }, [src]);
+
+  // Get fallbacks, but exclude the gateway that's already being used in imageSrc
+  // This prevents retrying the same gateway when it fails.
+  // 
+  // Issue: When src is ipfs:// protocol, convertFailingGateway converts it to Lighthouse,
+  // but getAllIpfsGateways also generates Lighthouse as the first gateway. This causes
+  // imageSrc to be Lighthouse, and if primary is also Lighthouse, we'd retry the same URL.
+  // 
+  // Solution: Filter out any fallback that matches imageSrc, and also exclude primary
+  // if it matches imageSrc (though primary shouldn't be in fallbacks array normally).
+  const { primary, fallbacks: allFallbacks } = getImageUrlWithFallback(src);
+  const fallbacks = allFallbacks.filter(fallback => {
+    // Exclude any fallback that matches the current imageSrc
+    // This prevents wasting a retry attempt on the same URL
+    return fallback !== imageSrc;
+  });
+  
+  // Also check if primary matches imageSrc - if so, we should skip it
+  // (though primary shouldn't be in fallbacks, this is a safety check)
+  // Note: We don't add primary to fallbacks because it's already being used as imageSrc
   const isIpfs = isIpfsUrl(imageSrc);
 
   const handleError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {

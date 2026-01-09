@@ -1,10 +1,4 @@
-import { createHelia } from 'helia';
-import { unixfs } from '@helia/unixfs';
-import { createFileEncoderStream, CAREncoderStream } from 'ipfs-car';
-import type { Block } from 'ipfs-car';
-import * as Storacha from '@storacha/client';
-import * as Proof from '@storacha/client/proof';
-import * as Delegation from '@storacha/client/delegation';
+import { IPFSService } from '@/lib/sdk/ipfs/service';
 
 export interface ThumbnailUploadResult {
   success: boolean;
@@ -13,8 +7,9 @@ export interface ThumbnailUploadResult {
 }
 
 /**
- * Uploads a thumbnail image file to Helia (local) and Storacha (global)
- * This ensures immediate availability via local IPFS and long-term persistence via Storacha
+ * Uploads a thumbnail image file using hybrid storage:
+ * - Lighthouse (Primary) - Better CDN distribution, especially for West Coast
+ * - Storacha (Backup) - Ensures long-term persistence
  * @param file - The image file to upload
  * @param playbackId - The video's playback ID (unused but kept for signature compatibility)
  * @returns Promise<ThumbnailUploadResult>
@@ -32,79 +27,38 @@ export async function uploadThumbnailToIPFS(
       };
     }
 
-    console.log('Starting Helia + Storacha upload...');
+    console.log('Starting hybrid upload (Lighthouse primary, Storacha backup)...');
 
-    // 1. Initialize Helia for local speed
-    const helia = await createHelia();
-    const fs = unixfs(helia);
-
-    // 2. Add to local Helia (Florida speed - fast local access)
-    // Convert File to Uint8Array for Helia
-    const fileBytes = new Uint8Array(await file.arrayBuffer());
-    const localCid = await fs.addBytes(fileBytes);
-    console.log('Local Helia CID:', localCid.toString());
-
-    // 3. Create a CAR file for Global Access
-    const blocks: Block[] = [];
-    const fileEncoder = createFileEncoderStream(file);
-
-    await fileEncoder.pipeTo(new WritableStream({
-      write(block) { blocks.push(block); }
-    }));
-
-    const root = blocks.at(-1)!.cid;
-    const rootCid = root.toString();
-
-    // Reconstruct the block stream for CAR encoding
-    const blockStream = new ReadableStream({
-      pull(controller) {
-        if (blocks.length) { controller.enqueue(blocks.shift()); }
-        else { controller.close(); }
-      }
+    // Use the IPFS service which handles Lighthouse + Storacha automatically
+    const ipfsService = new IPFSService({
+      lighthouseApiKey: process.env.NEXT_PUBLIC_LIGHTHOUSE_API_KEY,
+      key: process.env.STORACHA_KEY,
+      proof: process.env.STORACHA_PROOF,
+      gateway: process.env.NEXT_PUBLIC_IPFS_GATEWAY || 
+        (process.env.NEXT_PUBLIC_LIGHTHOUSE_API_KEY 
+          ? 'https://gateway.lighthouse.storage/ipfs' 
+          : 'https://w3s.link/ipfs'),
     });
 
-    const carChunks: Uint8Array[] = [];
-    await blockStream
-      .pipeThrough(new CAREncoderStream([root]))
-      .pipeTo(new WritableStream({
-        write(chunk) { carChunks.push(chunk); }
-      }));
+    const result = await ipfsService.uploadFile(file, {
+      pin: true,
+      wrapWithDirectory: false
+    });
 
-    const carBlob = new Blob(carChunks, { type: 'application/car' });
-
-    console.log('CAR packed. Root CID:', rootCid);
-
-    // 4. Upload to Storacha (Global Bridge)
-    try {
-      const client = await Storacha.create();
-      const proofStr = process.env.NEXT_PUBLIC_STORACHA_PROOF;
-
-      if (proofStr) {
-        // 1. Extract the delegation from your base64 string
-        const delegation = await Delegation.extract(
-          new Uint8Array(Buffer.from(proofStr, 'base64'))
-        );
-
-        if (delegation.ok) {
-          // 2. Add the proof to the client agent
-          const space = await client.addSpace(delegation.ok);
-          await client.setCurrentSpace(space.did());
-          console.log('✅ Storacha space active:', space.did());
-        }
-      }
-
-      // 3. Upload the CAR (This pushes to the global network)
-      await client.uploadCAR(carBlob);
-      console.log('🚀 Global upload complete. Reachable on West Coast.');
-
-    } catch (storachaError) {
-      console.warn('⚠️ Storacha global pin failed. Falling back to Helia local.', storachaError);
+    if (!result.success || !result.hash) {
+      return {
+        success: false,
+        error: result.error || 'Upload failed'
+      };
     }
+
+    console.log('✅ Thumbnail upload successful:', result.hash);
+    console.log('📍 Accessible via:', result.url);
 
     // Return the CID format expected by the app (IPFS URI)
     return {
       success: true,
-      thumbnailUrl: `ipfs://${root.toString()}`
+      thumbnailUrl: `ipfs://${result.hash}`
     };
 
   } catch (error) {
