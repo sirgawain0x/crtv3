@@ -787,14 +787,14 @@ export function AccountDropdown() {
               {/* Send Type Selection */}
               <div className="space-y-3">
                 <label className="text-sm font-medium text-gray-900 dark:text-gray-100">Send Type</label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="flex flex-col sm:grid sm:grid-cols-2 gap-2">
                   <button
                     type="button"
                     onClick={() => {
                       setSendType('token');
                       setSelectedNFT(null);
                     }}
-                    className={`flex items-center justify-center space-x-2 p-3 sm:p-2.5 border rounded-lg transition-colors min-h-[44px] ${sendType === 'token'
+                    className={`flex items-center justify-center space-x-2 p-3 sm:p-2.5 border rounded-lg transition-colors min-h-[44px] w-full ${sendType === 'token'
                       ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-400'
                       : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
                       }`}
@@ -813,7 +813,7 @@ export function AccountDropdown() {
                       setSendAmount('');
                     }}
                     disabled={membershipNFTs.length === 0}
-                    className={`flex items-center justify-center space-x-2 p-3 sm:p-2.5 border rounded-lg transition-colors min-h-[44px] ${sendType === 'nft'
+                    className={`flex items-center justify-center space-x-2 p-3 sm:p-2.5 border rounded-lg transition-colors min-h-[44px] w-full ${sendType === 'nft'
                       ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-400'
                       : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
                       } ${membershipNFTs.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
