@@ -65,6 +65,7 @@ import {
 } from "lucide-react";
 import { CheckIcon } from "@radix-ui/react-icons";
 import Image from "next/image";
+import { GatewayImage } from "@/components/ui/gateway-image";
 import {
   Dialog,
   DialogContent,
@@ -925,15 +926,22 @@ export function AccountDropdown() {
                               }`}
                           >
                             <div className="flex items-center space-x-3 sm:space-x-2">
-                              {nft.metadata?.image && (
-                                <Image
-                                  src={nft.metadata.image}
-                                  alt={nft.metadata.name || 'Membership NFT'}
-                                  width={40}
-                                  height={40}
-                                  className="w-12 h-12 sm:w-10 sm:h-10 rounded object-cover flex-shrink-0"
-                                />
-                              )}
+                              <div className="w-12 h-12 sm:w-10 sm:h-10 rounded object-cover flex-shrink-0 bg-gray-100 dark:bg-gray-800 flex items-center justify-center overflow-hidden">
+                                {nft.metadata?.image ? (
+                                  <GatewayImage
+                                    src={nft.metadata.image}
+                                    alt={nft.metadata.name || 'Membership NFT'}
+                                    width={40}
+                                    height={40}
+                                    className="w-full h-full object-cover"
+                                    showSkeleton={false}
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-green-400 to-green-600 dark:from-green-500 dark:to-green-700">
+                                    <Key className="h-6 w-6 sm:h-5 sm:w-5 text-white" />
+                                  </div>
+                                )}
+                              </div>
                               <div className="flex-1 min-w-0">
                                 <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
                                   {nft.metadata?.name || nft.lockName}
@@ -941,6 +949,11 @@ export function AccountDropdown() {
                                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                                   Token ID: {nft.tokenId}
                                 </p>
+                                {nft.metadata?.description && (
+                                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 line-clamp-1">
+                                    {nft.metadata.description}
+                                  </p>
+                                )}
                               </div>
                             </div>
                           </button>

@@ -272,6 +272,11 @@ const nextConfig = {
         hostname: "*.livepeercdn.com",
         pathname: "/**",
       },
+      {
+        protocol: "https",
+        hostname: "storage.unlock-protocol.com",
+        pathname: "/**",
+      },
     ],
   },
   async headers() {

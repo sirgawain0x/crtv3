@@ -8,6 +8,7 @@ import {
 } from "viem";
 import { alchemy, base } from "@account-kit/infra";
 import { createAlchemyPublicRpcClient } from "@account-kit/infra";
+import { parseIpfsUriWithFallback } from "@/lib/utils/image-gateway";
 
 // Use environment variables for sensitive data
 const alchemyRpcUrl = process.env.NEXT_PUBLIC_ALCHEMY_BASE_RPC_URL;
@@ -64,6 +65,9 @@ export const LOCK_ADDRESSES = {
   BASE_CREATIVE_PASS_2: "0x13b818daf7016b302383737ba60c3a39fef231cf",
   BASE_CREATIVE_PASS_3: "0x9c3744c96200a52d05a630d4aec0db707d7509be",
 } as const;
+
+// Maximum number of NFTs per tier/lock that can be held in any wallet
+export const MAX_NFTS_PER_TIER = 4;
 
 export type LockAddress = keyof typeof LOCK_ADDRESSES;
 export type LockAddressValue = (typeof LOCK_ADDRESSES)[LockAddress];
@@ -218,25 +222,40 @@ export class UnlockService {
           ? result[0]?.toString()
           : String(result);
 
-      if (!tokenUri) {
+      // Validate that tokenUri is a non-empty string
+      if (!tokenUri || typeof tokenUri !== 'string') {
         console.warn(
           `No tokenURI found for token ${tokenId} at ${lockAddress}`
         );
         return null;
       }
 
+      // Convert IPFS URI to HTTP gateway URL if needed
+      const httpTokenUri = parseIpfsUriWithFallback(tokenUri);
+
       // Fetch metadata from the token URI
-      const response = await fetch(tokenUri);
+      const response = await fetch(httpTokenUri);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const metadata = await response.json();
 
+      // Convert IPFS image URL to HTTP gateway URL if needed
+      // Validate that image is a string before processing
+      const imageUrl = metadata.image && typeof metadata.image === 'string'
+        ? parseIpfsUriWithFallback(metadata.image)
+        : "";
+
+      // Validate that external_url is a string before processing
+      const externalUrl = metadata.external_url && typeof metadata.external_url === 'string'
+        ? parseIpfsUriWithFallback(metadata.external_url)
+        : undefined;
+
       return {
         name: metadata.name || "",
         description: metadata.description || "",
-        image: metadata.image || "",
-        externalUrl: metadata.external_url,
+        image: imageUrl,
+        externalUrl,
       };
     } catch (error) {
       console.error(
@@ -330,7 +349,10 @@ export class UnlockService {
         try {
           const tokens = await this.getTokensOfOwner(address, userAddress);
           
-          for (const tokenId of tokens) {
+          // Limit to maximum of 4 NFTs per tier/lock
+          const limitedTokens = tokens.slice(0, MAX_NFTS_PER_TIER);
+          
+          for (const tokenId of limitedTokens) {
             let metadata = null;
             try {
               metadata = await this.getNftMetadata(address, tokenId.toString());

@@ -154,7 +154,8 @@ export function parseIpfsUriWithFallback(
   uri: string,
   preferGateway: number = 0
 ): string {
-  if (!uri) return '';
+  // Validate input is a string to prevent runtime errors
+  if (!uri || typeof uri !== 'string') return '';
 
   // If it's already a failing gateway, convert it
   if (isFailingGateway(uri)) {
