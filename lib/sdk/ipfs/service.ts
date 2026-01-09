@@ -5,20 +5,24 @@ import { Signer } from '@storacha/client/principal/ed25519';
 import { createHelia } from 'helia';
 import { unixfs } from '@helia/unixfs';
 import { LighthouseService } from './lighthouse-service';
+import { FilecoinFirstService } from './filecoin-first-service';
 
 export interface IPFSUploadResult {
   success: boolean;
   url?: string;
   hash?: string;
   error?: string;
+  filecoinDealId?: string; // Optional: Filecoin deal ID if archived
 }
 
 export interface IPFSConfig {
   lighthouseApiKey?: string;
+  filecoinFirstApiKey?: string; // Optional: Filecoin First API key for long-term archival
   key?: string;
   proof?: string;
   email?: string;
   gateway?: string;
+  enableFilecoinArchival?: boolean; // Optional: Enable automatic Filecoin archival (default: false)
 }
 
 // Global Helia instance to prevent multiple nodes in dev mode
@@ -27,11 +31,14 @@ let heliaFs: any = null;
 
 export class IPFSService {
   private lighthouseApiKey?: string;
+  private filecoinFirstApiKey?: string;
+  private enableFilecoinArchival: boolean;
   private key?: string;
   private proof?: string;
   private email?: string;
   private gateway: string;
   private lighthouseService?: LighthouseService;
+  private filecoinFirstService?: FilecoinFirstService;
   private storachaClient: any;
   private helia: any;
   private fs: any;
@@ -39,6 +46,8 @@ export class IPFSService {
 
   constructor(config: IPFSConfig) {
     this.lighthouseApiKey = config.lighthouseApiKey;
+    this.filecoinFirstApiKey = config.filecoinFirstApiKey;
+    this.enableFilecoinArchival = config.enableFilecoinArchival ?? false;
     this.key = config.key;
     this.proof = config.proof;
     this.email = config.email;
@@ -52,6 +61,13 @@ export class IPFSService {
       this.lighthouseService = new LighthouseService({
         apiKey: this.lighthouseApiKey,
         gateway: this.gateway,
+      });
+    }
+
+    // Initialize Filecoin First service if API key is provided and archival is enabled
+    if (this.filecoinFirstApiKey && this.enableFilecoinArchival) {
+      this.filecoinFirstService = new FilecoinFirstService({
+        apiKey: this.filecoinFirstApiKey,
       });
     }
   }
@@ -128,17 +144,30 @@ export class IPFSService {
         try {
           const lighthouseResult = await this.lighthouseService.uploadFile(file);
           if (lighthouseResult.success && lighthouseResult.hash) {
-            console.log('✅ Lighthouse upload successful:', lighthouseResult.hash);
+            const hash = lighthouseResult.hash;
+            console.log('✅ Lighthouse upload successful:', hash);
             
             // Background: Upload to Storacha as backup (fire and forget)
-            this.uploadToStorachaBackup(file, lighthouseResult.hash).catch((err) => {
+            this.uploadToStorachaBackup(file, hash).catch((err) => {
               console.warn('Storacha backup failed (non-critical):', err);
             });
+
+            // Background: Create Filecoin deal for long-term archival (fire and forget)
+            // Note: This is async and non-blocking, so filecoinDealId will be undefined in the response
+            if (this.filecoinFirstService && this.enableFilecoinArchival) {
+              this.createFilecoinDeal(hash).then((result) => {
+                if (result.success && result.dealId) {
+                  console.log(`✅ Filecoin deal created for ${hash}:`, result.dealId);
+                }
+              }).catch((err) => {
+                console.warn('Filecoin archival failed (non-critical):', err);
+              });
+            }
 
             return {
               success: true,
               url: lighthouseResult.url,
-              hash: lighthouseResult.hash,
+              hash,
             };
           }
         } catch (lighthouseError) {
@@ -175,6 +204,17 @@ export class IPFSService {
         });
       }
 
+      // Background: Create Filecoin deal for long-term archival (fire and forget)
+      if (this.filecoinFirstService && this.enableFilecoinArchival) {
+        this.createFilecoinDeal(hash).then((result) => {
+          if (result.success && result.dealId) {
+            console.log(`✅ Filecoin deal created for ${hash}:`, result.dealId);
+          }
+        }).catch((err) => {
+          console.warn('Filecoin archival failed (non-critical):', err);
+        });
+      }
+
       return {
         success: true,
         url,
@@ -207,6 +247,27 @@ export class IPFSService {
     }
   }
 
+  // Helper method to create Filecoin deal for long-term archival
+  private async createFilecoinDeal(cid: string): Promise<{ success: boolean; dealId?: string; error?: string }> {
+    if (!this.filecoinFirstService) {
+      return { success: false, error: 'Filecoin First service not initialized' };
+    }
+
+    try {
+      const result = await this.filecoinFirstService.pinCid(cid);
+      if (result.success) {
+        console.log(`📦 Filecoin deal initiated for CID: ${cid}`);
+      }
+      return result;
+    } catch (error) {
+      console.error(`Filecoin deal creation error for ${cid}:`, error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
   // Upload multiple files
   async uploadFiles(files: File[], options: {
     pin?: boolean;
@@ -226,9 +287,11 @@ export class IPFSService {
 }
 
 // Default IPFS service instance
-// Uses Lighthouse as primary (if API key provided), Storacha as backup
+// Uses Lighthouse as primary (if API key provided), Storacha as backup, Filecoin First for archival (optional)
 export const ipfsService = new IPFSService({
   lighthouseApiKey: process.env.NEXT_PUBLIC_LIGHTHOUSE_API_KEY,
+  filecoinFirstApiKey: process.env.NEXT_PUBLIC_FILECOIN_FIRST_API_KEY,
+  enableFilecoinArchival: process.env.NEXT_PUBLIC_ENABLE_FILECOIN_ARCHIVAL === 'true',
   key: process.env.STORACHA_KEY,
   proof: process.env.STORACHA_PROOF,
   // We intentionally OMIT email here to prevent fallback to interactive mode

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Image from 'next/image';
 import { convertFailingGateway, getImageUrlWithFallback, isIpfsUrl } from '@/lib/utils/image-gateway';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -40,6 +40,8 @@ export function GatewayImage({
   const [fallbackIndex, setFallbackIndex] = useState(0);
   const [hasError, setHasError] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  // Track which gateways have been tried to avoid retrying them
+  const triedGatewaysRef = useRef<Set<string>>(new Set());
 
   // Sync imageSrc state when src prop changes (e.g., when parent updates thumbnailUrl)
   useEffect(() => {
@@ -53,34 +55,54 @@ export function GatewayImage({
     setFallbackIndex(0);
     setHasError(false);
     setIsLoading(true);
+    // Reset tried gateways when src changes
+    triedGatewaysRef.current = new Set();
+    // Mark the initial converted src as tried since we're using it
+    if (convertedSrc) {
+      triedGatewaysRef.current.add(convertedSrc);
+    }
   }, [src]);
 
-  // Get fallbacks, but exclude the gateway that's already being used in imageSrc
-  // This prevents retrying the same gateway when it fails.
-  // 
-  // Issue: When src is ipfs:// protocol, convertFailingGateway converts it to Lighthouse,
-  // but getAllIpfsGateways also generates Lighthouse as the first gateway. This causes
-  // imageSrc to be Lighthouse, and if primary is also Lighthouse, we'd retry the same URL.
-  // 
-  // Solution: Filter out any fallback that matches imageSrc, and also exclude primary
-  // if it matches imageSrc (though primary shouldn't be in fallbacks array normally).
-  const { primary, fallbacks: allFallbacks } = getImageUrlWithFallback(src);
-  const fallbacks = allFallbacks.filter(fallback => {
-    // Exclude any fallback that matches the current imageSrc
-    // This prevents wasting a retry attempt on the same URL
-    return fallback !== imageSrc;
-  });
-  
-  // Also check if primary matches imageSrc - if so, we should skip it
-  // (though primary shouldn't be in fallbacks, this is a safety check)
-  // Note: We don't add primary to fallbacks because it's already being used as imageSrc
+  // Calculate fallbacks once when src changes and exclude the initial gateway
+  // This prevents recalculating and filtering on every render, which was causing
+  // gateways to be skipped as imageSrc changed
+  const fallbacks = useMemo(() => {
+    const { primary, fallbacks: allFallbacks } = getImageUrlWithFallback(src);
+    const initialSrc = src && convertFailingGateway(src) !== src 
+      ? convertFailingGateway(src) 
+      : (src || '');
+    
+    // Filter out the initial gateway (to avoid retrying it) and any already tried
+    // We calculate this once based on src, not on every render based on imageSrc
+    return allFallbacks.filter(fallback => {
+      // Exclude the initial converted gateway
+      if (fallback === initialSrc) {
+        return false;
+      }
+      // Exclude primary if it matches initial src (safety check)
+      if (fallback === primary && primary === initialSrc) {
+        return false;
+      }
+      return true;
+    });
+  }, [src]);
+
   const isIpfs = isIpfsUrl(imageSrc);
 
   const handleError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-    // Try fallback URLs if available
-    if (fallbacks.length > fallbackIndex) {
-      console.log(`Trying fallback gateway ${fallbackIndex + 1}/${fallbacks.length} for IPFS image`);
-      setImageSrc(fallbacks[fallbackIndex]);
+    // Mark the current gateway as tried
+    if (imageSrc) {
+      triedGatewaysRef.current.add(imageSrc);
+    }
+
+    // Find the next gateway that hasn't been tried yet
+    const nextGateway = fallbacks.find(fallback => !triedGatewaysRef.current.has(fallback));
+
+    if (nextGateway) {
+      console.log(`Trying fallback gateway ${triedGatewaysRef.current.size}/${fallbacks.length} for IPFS image:`, nextGateway);
+      // Mark it as tried before setting it as the new source
+      triedGatewaysRef.current.add(nextGateway);
+      setImageSrc(nextGateway);
       setFallbackIndex((prev) => prev + 1);
       setIsLoading(true); // Reset loading state for new URL
       return;

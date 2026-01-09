@@ -1,4 +1,4 @@
-import { IPFSService } from '@/lib/sdk/ipfs/service';
+import { ipfsService } from '@/lib/sdk/ipfs/service';
 
 export interface ThumbnailUploadResult {
   success: boolean;
@@ -10,6 +10,7 @@ export interface ThumbnailUploadResult {
  * Uploads a thumbnail image file using hybrid storage:
  * - Lighthouse (Primary) - Better CDN distribution, especially for West Coast
  * - Storacha (Backup) - Ensures long-term persistence
+ * - Filecoin First (Optional) - Long-term archival if enabled
  * @param file - The image file to upload
  * @param playbackId - The video's playback ID (unused but kept for signature compatibility)
  * @returns Promise<ThumbnailUploadResult>
@@ -27,19 +28,12 @@ export async function uploadThumbnailToIPFS(
       };
     }
 
-    console.log('Starting hybrid upload (Lighthouse primary, Storacha backup)...');
+    console.log('Starting hybrid upload (Lighthouse primary, Storacha backup, Filecoin archival if enabled)...');
 
-    // Use the IPFS service which handles Lighthouse + Storacha automatically
-    const ipfsService = new IPFSService({
-      lighthouseApiKey: process.env.NEXT_PUBLIC_LIGHTHOUSE_API_KEY,
-      key: process.env.STORACHA_KEY,
-      proof: process.env.STORACHA_PROOF,
-      gateway: process.env.NEXT_PUBLIC_IPFS_GATEWAY || 
-        (process.env.NEXT_PUBLIC_LIGHTHOUSE_API_KEY 
-          ? 'https://gateway.lighthouse.storage/ipfs' 
-          : 'https://w3s.link/ipfs'),
-    });
+    // Use the default IPFS service instance which is pre-configured with all storage options
+    // This ensures consistency across the app and includes Filecoin archival if enabled
 
+    // Use the default IPFS service (pre-configured with Lighthouse, Storacha, and optional Filecoin)
     const result = await ipfsService.uploadFile(file, {
       pin: true,
       wrapWithDirectory: false
