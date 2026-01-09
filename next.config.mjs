@@ -1,4 +1,5 @@
 import createPWA from "next-pwa";
+import { withAxiom } from "next-axiom";
 
 const withPWA = createPWA({
   dest: "public",
@@ -317,4 +318,4 @@ const nextConfig = {
   },
 };
 
-export default withPWA(nextConfig);
+export default withAxiom(withPWA(nextConfig));

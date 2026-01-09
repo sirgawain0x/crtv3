@@ -12,6 +12,7 @@ import { Toaster } from "@/components/ui/toaster";
 import Footer from "@/components/Footer";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { IframeCleanup } from "@/components/IframeCleanup";
+import { WebVitals } from "@/components/WebVitals";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -82,6 +83,7 @@ export default async function RootLayout({
         <div id="alchemy-signer-iframe-container" style={{ display: "none" }} />
         {/* Alchemy signer iframe container for modular account functionality */}
         <IframeCleanup />
+        <WebVitals />
         <Providers initialState={initialState}>
           <ErrorBoundary>
             <Tour />
