@@ -13,6 +13,7 @@ import Footer from "@/components/Footer";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { IframeCleanup } from "@/components/IframeCleanup";
 import { WebVitals } from "@/components/WebVitals";
+import { Analytics } from "@vercel/analytics/next";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -95,6 +96,7 @@ export default async function RootLayout({
           </ErrorBoundary>
         </Providers>
         <Toaster />
+        <Analytics />
       </body>
     </html>
   );
