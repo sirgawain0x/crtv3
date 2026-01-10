@@ -170,7 +170,7 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
               </Card>
             </TabsContent>
 
-            <TabsContent value="MeToken™">
+            <TabsContent value="MeTokens">
               <MeTokensSection walletAddress={displayAddress} />
             </TabsContent>
 
