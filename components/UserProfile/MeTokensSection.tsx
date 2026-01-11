@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/components/ui/use-toast';
 import { useMeTokensSupabase, MeTokenData } from '@/lib/hooks/metokens/useMeTokensSupabase';
 import { useUser } from '@account-kit/react';
-import { MeTokenCreator } from './MeTokenCreator';
+import { RobustMeTokenCreator } from './RobustMeTokenCreator';
 import { MeTokenTrading } from './MeTokenTrading';
 import { MeTokenInfo } from './MeTokenInfo';
 import { CreatorProfileManager } from './CreatorProfileManager';
@@ -619,7 +619,7 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
           </TabsContent>
 
           <TabsContent value="create">
-            <MeTokenCreator onMeTokenCreated={handleMeTokenCreated} />
+            <RobustMeTokenCreator onMeTokenCreated={handleMeTokenCreated} />
           </TabsContent>
         </Tabs>
       )}
