@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { useMeTokensSupabase } from "@/lib/hooks/metokens/useMeTokensSupabase";
 import { uploadThumbnailToIPFS, uploadThumbnailFromBlob } from "@/lib/services/thumbnail-upload";
-import { AlchemyMeTokenCreator } from "@/components/UserProfile/AlchemyMeTokenCreator";
+import { RobustMeTokenCreator } from "@/components/UserProfile/RobustMeTokenCreator";
 import { useX402Payment } from "@/lib/hooks/payments/useX402Payment";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -882,7 +882,7 @@ const CreateThumbnailForm = ({
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <AlchemyMeTokenCreator
+              <RobustMeTokenCreator
                 onMeTokenCreated={(meToken) => {
                   setShowMeTokenCreator(false);
                   checkUserMeToken();

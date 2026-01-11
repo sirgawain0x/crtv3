@@ -33,19 +33,62 @@ function useServerMembership(address?: string) {
 
   useEffect(() => {
     if (!address) return;
+    
+    const abortController = new AbortController();
     setLoading(true);
+    setError(null);
+    
     fetch("/api/membership", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ address }),
+      signal: abortController.signal,
     })
-      .then((res) => res.json())
       .then((res) => {
-        if (res.error) setError(res.error);
-        else setData(res.memberships);
+        if (!res.ok) {
+          throw new Error(`HTTP error! status: ${res.status}`);
+        }
+        return res.json();
       })
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
+      .then((res) => {
+        if (res.error) {
+          setError(res.error);
+        } else {
+          setData(res.memberships);
+          setError(null);
+        }
+      })
+      .catch((e) => {
+        // Only set error if it's not an abort or connection refused error
+        // Connection refused typically means server isn't ready yet
+        if (e.name === "AbortError") {
+          // Request was aborted, ignore
+          return;
+        }
+        // Connection errors are common during development hot reload
+        // Don't set error state for network/connection errors to avoid noise
+        const isConnectionError = 
+          e.message.includes("ERR_CONNECTION_REFUSED") || 
+          e.message.includes("Failed to fetch") ||
+          e.message.includes("NetworkError") ||
+          e.message.includes("Network request failed");
+        
+        if (isConnectionError) {
+          // Log but don't set error state - server may be restarting
+          console.debug("Membership API not available:", e.message);
+          return;
+        }
+        setError(e.message);
+      })
+      .finally(() => {
+        if (!abortController.signal.aborted) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      abortController.abort();
+    };
   }, [address]);
 
   return { data, loading, error };

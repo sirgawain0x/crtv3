@@ -142,5 +142,14 @@
     "tsx": "^4.20.5",
     "typescript": "^5.8.3",
     "vitest": "^2.1.0"
+  },
+  "resolutions": {
+    "@reown/appkit": "1.7.8",
+    "@reown/appkit-controllers": "1.7.8",
+    "@reown/appkit-common": "1.7.8",
+    "@reown/appkit-scaffold-ui": "1.7.8",
+    "@reown/appkit-ui": "1.7.8",
+    "@reown/appkit-utils": "1.7.8",
+    "@reown/appkit-wallet": "1.7.8"
   }
 }
