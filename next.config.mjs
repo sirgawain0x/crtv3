@@ -16,6 +16,8 @@ const nextConfig = {
       // Handle Solana package version conflicts by pointing to empty modules for client-side
       // The x402-fetch package has Solana dependencies that are incompatible with the installed @solana/kit
     },
+    // Externalize problematic packages to avoid bundling issues
+    resolveExtensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],
   },
   // Optimize memory usage in development
   experimental: {
@@ -34,6 +36,15 @@ const nextConfig = {
     '@solana/kit',
     'x402',
     'x402-fetch',
+    // Externalize WalletConnect/Reown packages to avoid bundling issues
+    '@reown/appkit',
+    '@reown/appkit-controllers',
+    '@reown/appkit-scaffold-ui',
+    '@reown/appkit-ui',
+    '@reown/appkit-common',
+    '@reown/appkit-utils',
+    '@walletconnect/ethereum-provider',
+    '@walletconnect/universal-provider',
   ],
   // Webpack configuration for WebAssembly support
   webpack: (config, { isServer, webpack }) => {

@@ -1,5 +1,5 @@
 @openzeppelin/=node_modules/@openzeppelin/
-forge-std/=node_modules/forge-std/src/
+forge-std/=lib/forge-std/src/
 lib/openzeppelin-contracts-upgradeable/contracts/=node_modules/@openzeppelin/contracts-upgradeable/
 extension/=node_modules/@thirdweb-dev/contracts/extension/
 interface/=node_modules/@thirdweb-dev/contracts/prebuilts/interface/

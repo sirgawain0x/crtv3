@@ -713,7 +713,7 @@ export function useMeTokensSupabase(targetAddress?: string) {
                 // If we can't verify, rethrow the original timeout error
                 throw approveGasError;
               }
-            } else if (approvePrimaryContext) {
+            } else if (approvePrimaryContext && !isTimeoutError(approveGasError)) {
               console.warn("⚠️ DAI approval primary gas payment failed, falling back to standard gas:", approveGasError);
               console.log('🔄 Attempting fallback with standard ETH gas for approval...');
               
@@ -1189,12 +1189,22 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
             }
             
             // MeToken wasn't found, provide helpful error message
-            throw new Error(
+            const helpfulError = new Error(
               'Transaction is taking longer than expected. Your MeToken creation may still be processing. ' +
               'Please wait 1-2 minutes and refresh the page to check if it completed. ' +
               'If your MeToken appears, you\'re all set! Otherwise, you can safely retry.'
             );
+            throw helpfulError;
           } catch (checkErr) {
+            // Check if this is the helpful error we just threw (MeToken not found)
+            // If so, rethrow it to preserve the helpful context
+            if (checkErr instanceof Error && 
+                checkErr.message.includes('Transaction is taking longer than expected') &&
+                checkErr.message.includes('Your MeToken creation may still be processing')) {
+              throw checkErr;
+            }
+            
+            // Otherwise, this is a verification error (RPC error, etc.)
             console.warn('⚠️ Could not verify if MeToken was created:', checkErr);
             // If we can't verify, rethrow the original timeout error to avoid misleading the user
             throw gasError;
@@ -1312,12 +1322,22 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
             }
             
             // Provide a helpful message to the user
-            throw new Error(
+            const helpfulError = new Error(
               `Transaction was submitted (hash: ${operation.hash.slice(0, 10)}...) but confirmation is taking longer than expected. ` +
               'Your MeToken may still be created. Please wait 1-2 minutes and refresh the page. ' +
               'If your MeToken appears, you\'re all set!'
             );
+            throw helpfulError;
           } catch (checkErr) {
+            // Check if this is the helpful error we just threw (MeToken not found)
+            // If so, rethrow it to preserve the helpful context
+            if (checkErr instanceof Error && 
+                checkErr.message.includes('Transaction was submitted') &&
+                checkErr.message.includes('Your MeToken may still be created')) {
+              throw checkErr;
+            }
+            
+            // Otherwise, this is a verification error (RPC error, etc.)
             console.warn('⚠️ Could not verify if MeToken was created:', checkErr);
             // If we can't verify, rethrow the original timeout error to avoid misleading the user
             throw waitError;

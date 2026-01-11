@@ -17,7 +17,7 @@
     "test:solidity": "forge test",
     "test:solidity:gas": "forge test --gas-report",
     "test:solidity:fuzz": "forge test --fuzz-runs 10000",
-    "test:all": "npm run test:solidity && npm run test"
+    "test:all": "yarn test:solidity && yarn test"
   },
   "dependencies": {
     "@0xsplits/splits-kit": "^2.2.0",
@@ -82,6 +82,7 @@
     "@vercel/analytics": "^1.6.1",
     "@wagmi/connectors": "^5.8.2",
     "@wagmi/core": "^2.17.2",
+    "@walletconnect/universal-provider": "^2.23.1",
     "@xmtp/browser-sdk": "^5.0.1",
     "alchemy-sdk": "^3.6.5",
     "class-variance-authority": "^0.7.1",
@@ -129,14 +130,20 @@
     "zod": "^3.24.3"
   },
   "devDependencies": {
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.1",
+    "@testing-library/react-hooks": "^8.0.1",
     "@types/node": "^22.15.18",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "@vitest/coverage-v8": "^2.1.0",
+    "@vitest/ui": "^4.0.16",
     "baseline-browser-mapping": "^2.8.32",
     "eslint": "^8.57.0",
     "eslint-config-next": "^15.5.3",
     "forge-std": "^1.1.2",
+    "jsdom": "^27.4.0",
     "postcss": "^8",
     "tailwindcss": "^3.4.4",
     "tsx": "^4.20.5",

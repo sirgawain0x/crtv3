@@ -94,27 +94,16 @@ export function useX402Payment() {
         throw new Error(X402_DISABLED_MESSAGE);
       }
 
-      console.log(`Processing x402 payment for ${service}`);
-      console.log(`Amount: ${amount} (${Number(amount) / 10 ** X402_CONFIG.token.decimals} ${X402_CONFIG.token.symbol})`);
-      console.log(`Token: ${X402_CONFIG.token.address} on Base`);
-      if (recipientAddress) {
-        console.log(`Recipient: ${recipientAddress}`);
-      }
-
-      // x402-fetch would be loaded and used here when re-enabled
-      // For now, this code path is unreachable due to the X402_DISABLED check above
-      // When x402 dependencies are fixed, remove the X402_DISABLED check and implement:
-      // 1. Dynamic import of x402-fetch
-      // 2. wrapFetchWithPayment call
-      // 3. Payment request and response handling
+      // TODO: When x402 dependencies are fixed and X402_DISABLED is set to false, implement payment logic here:
+      // 1. Dynamic import of x402-fetch: import { wrapFetchWithPayment, decodeXPaymentResponse } from 'x402-fetch';
+      // 2. Wrap fetch with payment: const fetchWithPayment = wrapFetchWithPayment(fetch, client.account);
+      // 3. Make payment request to endpoint with service, amount, token, chain, recipient, etc.
+      // 4. Decode payment response from headers: const paymentResponse = decodeXPaymentResponse(response.headers.get('x-payment-response'));
+      // 5. Wait for transaction receipt if transaction hash is present: await client.waitForTransactionReceipt({ hash: paymentResponse.transaction });
+      // 6. Return success response with payment details
       
-      // This should never be reached due to the throw above
-      const result: X402PaymentResponse = {
-        success: false,
-        error: X402_DISABLED_MESSAGE,
-      };
-      setLastPayment(result);
-      return result;
+      // Note: Code below this point is currently unreachable due to X402_DISABLED being true
+      // Remove the X402_DISABLED check above when implementing the payment logic
 
     } catch (error) {
       console.error('x402 payment failed:', error);
