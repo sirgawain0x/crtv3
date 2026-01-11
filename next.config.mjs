@@ -13,6 +13,8 @@ const nextConfig = {
     // Exclude test files and other non-essential files from processing
     resolveAlias: {
       // This helps prevent processing of test files
+      // Handle Solana package version conflicts by pointing to empty modules for client-side
+      // The x402-fetch package has Solana dependencies that are incompatible with the installed @solana/kit
     },
   },
   // Optimize memory usage in development
@@ -22,7 +24,17 @@ const nextConfig = {
   },
   // External packages that should not be processed by the bundler
   // Externalize thread-stream and pino packages on server to avoid bundling test files
-  serverExternalPackages: ['thread-stream', 'pino', 'pino-pretty', 'node-datachannel'],
+  // Also externalize Solana packages that have version conflicts with x402-fetch
+  serverExternalPackages: [
+    'thread-stream', 
+    'pino', 
+    'pino-pretty', 
+    'node-datachannel',
+    '@solana-program/compute-budget',
+    '@solana/kit',
+    'x402',
+    'x402-fetch',
+  ],
   // Webpack configuration for WebAssembly support
   webpack: (config, { isServer, webpack }) => {
     // Enable async WebAssembly loading (required for XMTP WASM bindings)

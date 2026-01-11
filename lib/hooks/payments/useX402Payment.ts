@@ -9,9 +9,15 @@
 
 import { useCallback, useState } from 'react';
 import { useSmartAccountClient } from '@account-kit/react';
-import { wrapFetchWithPayment, decodeXPaymentResponse } from 'x402-fetch';
 import { USDC_TOKEN_ADDRESSES, USDC_TOKEN_DECIMALS } from '@/lib/contracts/USDCToken';
 import { base } from '@account-kit/infra';
+
+// x402-fetch is currently disabled due to Solana package version conflicts
+// The @solana-program/compute-budget package requires isDurableNonceTransaction from @solana/kit
+// but the installed version of @solana/kit doesn't export this function.
+// TODO: Re-enable when x402-fetch updates its dependencies or @solana/kit is updated
+const X402_DISABLED = true;
+const X402_DISABLED_MESSAGE = 'x402 payments are temporarily disabled due to a dependency update in progress. Please use alternative payment methods.';
 
 // x402 Payment Configuration for USDC on Base
 const X402_CONFIG = {
@@ -83,6 +89,11 @@ export function useX402Payment() {
         additionalData = {},
       } = options;
 
+      // Check if x402 is currently disabled due to dependency conflicts
+      if (X402_DISABLED) {
+        throw new Error(X402_DISABLED_MESSAGE);
+      }
+
       console.log(`Processing x402 payment for ${service}`);
       console.log(`Amount: ${amount} (${Number(amount) / 10 ** X402_CONFIG.token.decimals} ${X402_CONFIG.token.symbol})`);
       console.log(`Token: ${X402_CONFIG.token.address} on Base`);
@@ -90,62 +101,18 @@ export function useX402Payment() {
         console.log(`Recipient: ${recipientAddress}`);
       }
 
-      // Wrap fetch with x402 payment capability
-      // This will automatically handle payment negotiations and token approvals
-      // Note: Type assertion needed due to viem version mismatch between x402's bundled viem and our viem
-      // The x402-fetch library only takes fetch and account as parameters
-      const fetchWithPayment = (wrapFetchWithPayment as any)(fetch, client.account);
-
-      // Make the x402 payment request
-      const response = await fetchWithPayment(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          service,
-          amount,
-          token: X402_CONFIG.token.address,
-          chain: 'base',
-          recipient: recipientAddress,
-          ...additionalData,
-        }),
-      });
-
-      // Decode the payment response from headers
-      const paymentHeader = response.headers.get('x-payment-response');
-      if (!paymentHeader) {
-        throw new Error('No payment response received from server');
-      }
-
-      const paymentResponse = decodeXPaymentResponse(paymentHeader);
-
-      // Wait for transaction receipt if we have a transaction hash
-      if (paymentResponse.transaction) {
-        console.log(`Waiting for transaction receipt: ${paymentResponse.transaction}`);
-        await client.waitForTransactionReceipt({
-          hash: paymentResponse.transaction as `0x${string}`
-        });
-        console.log('Transaction confirmed');
-      }
-
-      // Parse the response data
-      const data = await response.json().catch(() => null);
-
+      // x402-fetch would be loaded and used here when re-enabled
+      // For now, this code path is unreachable due to the X402_DISABLED check above
+      // When x402 dependencies are fixed, remove the X402_DISABLED check and implement:
+      // 1. Dynamic import of x402-fetch
+      // 2. wrapFetchWithPayment call
+      // 3. Payment request and response handling
+      
+      // This should never be reached due to the throw above
       const result: X402PaymentResponse = {
-        success: true,
-        paymentResponse: {
-          amount,
-          amountFormatted: `${Number(amount) / 10 ** X402_CONFIG.token.decimals} ${X402_CONFIG.token.symbol}`,
-          token: X402_CONFIG.token.address,
-          chain: 'base',
-          service,
-          timestamp: Date.now(),
-          transactionHash: paymentResponse.transaction, // x402-fetch uses 'transaction' not 'transactionHash'
-        },
-        data,
+        success: false,
+        error: X402_DISABLED_MESSAGE,
       };
-
       setLastPayment(result);
       return result;
 
