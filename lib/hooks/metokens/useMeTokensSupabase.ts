@@ -7,6 +7,7 @@ import { getMeTokenFactoryContract, METOKEN_FACTORY_ADDRESSES } from '@/lib/cont
 import { METOKEN_ABI } from '@/lib/contracts/MeToken';
 import { DAI_TOKEN_ADDRESSES, getDaiTokenContract } from '@/lib/contracts/DAIToken';
 import { useToast } from '@/components/ui/use-toast';
+import { useGasSponsorship } from '@/lib/hooks/wallet/useGasSponsorship';
 
 // MeTokens contract addresses on Base
 const METOKEN_FACTORY = '0xb31Ae2583d983faa7D8C8304e6A16E414e721A0B';
@@ -97,6 +98,7 @@ export function useMeTokensSupabase(targetAddress?: string) {
   const user = useUser();
   const { client } = useSmartAccountClient({});
   const { toast } = useToast();
+  const { getGasContext, isMember } = useGasSponsorship();
 
   // Use targetAddress if provided, otherwise use the smart account address from client
   const address = targetAddress || client?.account?.address || user?.address;
@@ -506,7 +508,8 @@ export function useMeTokensSupabase(targetAddress?: string) {
 
       const depositAmount = parseEther(assetsDeposited);
 
-      // If depositing DAI, we need to approve the Diamond contract first
+      // If depositing DAI, we need to approve the vault contract (not Diamond!)
+      // The subscribe function calls IVault(vault).handleDeposit() which calls transferFrom
       if (depositAmount > BigInt(0)) {
         console.log('💰 Depositing DAI, checking approval...');
 
@@ -581,41 +584,116 @@ export function useMeTokensSupabase(targetAddress?: string) {
           );
         }
 
-        // Check current allowance
+        // Get the vault address for this hub (the actual spender for subscribe)
+        console.log('🔍 Fetching Vault address for Hub ID:', hubId);
+        let vaultAddress: string | null = null;
+        try {
+          const hubInfo = await client.readContract({
+            address: DIAMOND,
+            abi: METOKEN_ABI,
+            functionName: 'getHubInfo',
+            args: [BigInt(hubId)],
+          }) as any;
+
+          // Extract vault address (index 6 in the tuple)
+          if (Array.isArray(hubInfo)) {
+            vaultAddress = hubInfo[6] as string;
+          } else if (typeof hubInfo === 'object' && 'vault' in hubInfo) {
+            vaultAddress = hubInfo.vault as string;
+          } else {
+            vaultAddress = (hubInfo as any)[6] || (hubInfo as any).vault;
+          }
+
+          // Validate vault address - if zero or invalid, skip vault approval (DIAMOND approval will handle it)
+          if (!vaultAddress || vaultAddress === '0x0000000000000000000000000000000000000000') {
+            console.warn('⚠️ Vault address is zero or invalid, skipping vault approval (will rely on DIAMOND approval)');
+            vaultAddress = null;
+          } else {
+            console.log('✅ Vault address for Hub ID', hubId, ':', vaultAddress);
+          }
+        } catch (vaultErr) {
+          console.error('❌ Failed to get vault address, skipping vault approval (will rely on DIAMOND approval):', vaultErr);
+          vaultAddress = null;
+        }
+
+        // Only check/approve vault if we successfully retrieved a valid vault address
+        // If vault address retrieval failed, skip this block and rely on DIAMOND approval only
+        if (vaultAddress) {
+          // Check current allowance for vault (the actual spender)
+          console.log('🔍 Checking DAI allowance for vault...');
         const currentAllowance = await client.readContract({
           address: daiContract.address as `0x${string}`,
           abi: daiContract.abi,
           functionName: 'allowance',
-          args: [address as `0x${string}`, DIAMOND as `0x${string}`]
+          args: [address as `0x${string}`, vaultAddress as `0x${string}`]
         }) as bigint;
 
-        console.log('📊 Current DAI allowance:', currentAllowance.toString());
+        console.log('📊 Current DAI allowance for vault:', {
+          vaultAddress,
+          currentAllowance: currentAllowance.toString(),
+          required: depositAmount.toString(),
+          hasEnough: currentAllowance >= depositAmount
+        });
 
         if (currentAllowance < depositAmount) {
-          console.log('🔓 Approving DAI...');
+          console.log('🔓 Approving DAI for vault...', vaultAddress);
 
           const approveData = encodeFunctionData({
             abi: daiContract.abi,
             functionName: 'approve',
-            args: [DIAMOND as `0x${string}`, depositAmount],
+            args: [vaultAddress as `0x${string}`, depositAmount],
           });
 
           console.log('📤 Sending DAI approval user operation...');
           console.log('📊 Approval details:', {
             target: DAI_ADDRESS,
-            spender: DIAMOND,
+            spender: vaultAddress,
+            hubId,
             amount: depositAmount.toString(),
             smartAccountAddress: address,
             approvalData: approveData
           });
 
-          const approveOp = await client.sendUserOperation({
-            uo: {
-              target: daiContract.address as `0x${string}`,
-              data: approveData,
-              value: BigInt(0),
-            },
-          });
+          // Apply gas sponsorship for approval too
+          const approveGasContext = getGasContext('usdc');
+          const approvePrimaryContext = approveGasContext.context;
+
+          let approveOp;
+          try {
+            approveOp = await client.sendUserOperation({
+              uo: {
+                target: daiContract.address as `0x${string}`,
+                data: approveData,
+                value: BigInt(0),
+              },
+              context: approvePrimaryContext, // Apply gas sponsorship
+            });
+          } catch (approveGasError) {
+            if (approvePrimaryContext) {
+              console.warn("⚠️ DAI approval primary gas payment failed, falling back to standard gas:", approveGasError);
+              console.log('🔄 Attempting fallback with standard ETH gas for approval...');
+              const fallbackApprovePromise = client.sendUserOperation({
+                uo: {
+                  target: daiContract.address as `0x${string}`,
+                  data: approveData,
+                  value: BigInt(0),
+                },
+                // No context = standard ETH payment
+                overrides: {
+                  paymasterAndData: undefined,
+                },
+              });
+
+              // Add timeout to prevent indefinite hanging (60 seconds)
+              const fallbackTimeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('Vault approval fallback timed out after 60 seconds')), 60000);
+              });
+
+              approveOp = await Promise.race([fallbackApprovePromise, fallbackTimeoutPromise]) as any;
+            } else {
+              throw approveGasError;
+            }
+          }
 
           console.log('🎉 Approval UserOperation sent! Hash:', approveOp.hash);
           console.log('⏳ Waiting for approval confirmation...');
@@ -646,7 +724,7 @@ export function useMeTokensSupabase(targetAddress?: string) {
                 address: daiContract.address as `0x${string}`,
                 abi: daiContract.abi,
                 functionName: 'allowance',
-                args: [address as `0x${string}`, DIAMOND as `0x${string}`]
+                args: [address as `0x${string}`, vaultAddress as `0x${string}`]
               }) as bigint;
 
               console.log(`📊 DAI allowance check ${retryCount + 1}: ${newAllowance.toString()} (expected: ${depositAmount.toString()})`);
@@ -667,7 +745,8 @@ export function useMeTokensSupabase(targetAddress?: string) {
             console.error('📊 Final allowance:', newAllowance.toString());
             console.error('📊 Expected allowance:', depositAmount.toString());
             console.error('📊 Smart account address:', address);
-            console.error('📊 DIAMOND address:', DIAMOND);
+            console.error('📊 Vault address:', vaultAddress);
+            console.error('📊 Hub ID:', hubId);
 
             // Provide helpful error message with suggestions
             const errorMsg = `DAI approval failed after ${maxRetries} retries. This could be due to:
@@ -684,7 +763,139 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
             throw new Error(errorMsg);
           }
         } else {
-          console.log('✅ Sufficient DAI allowance already exists');
+          console.log('✅ Sufficient DAI allowance already exists for vault');
+        }
+        } // End of vault approval block (only executed if vaultAddress is valid)
+
+        // 3b. ALSO Check/Approve DAI for the DIAMOND (Just in case Diamond calls transferFrom directly)
+        // This covers the case where Diamond is the spender, or Vault is the spender.
+        console.log('🔍 Checking DAI allowance for DIAMOND (fallback)...');
+        const diamondAllowance = await client.readContract({
+          address: daiContract.address as `0x${string}`,
+          abi: daiContract.abi,
+          functionName: 'allowance',
+          args: [address as `0x${string}`, DIAMOND as `0x${string}`]
+        }) as bigint;
+
+        console.log('📊 Current DAI allowance for DIAMOND:', diamondAllowance.toString());
+
+        if (diamondAllowance < depositAmount) {
+          console.log('🔓 Approving DAI for DIAMOND (fallback)...');
+          const diamondApproveData = encodeFunctionData({
+            abi: daiContract.abi,
+            functionName: 'approve',
+            args: [DIAMOND as `0x${string}`, depositAmount],
+          });
+
+          console.log('📤 Sending DAI approval for DIAMOND user operation...');
+          
+          // Apply gas sponsorship for DIAMOND approval (consistent with vault approval)
+          const diamondApproveGasContext = getGasContext('usdc');
+          const diamondApprovePrimaryContext = diamondApproveGasContext.context;
+
+          let diamondApproveOp;
+          try {
+            diamondApproveOp = await client.sendUserOperation({
+              uo: {
+                target: daiContract.address as `0x${string}`,
+                data: diamondApproveData,
+                value: BigInt(0),
+              },
+              context: diamondApprovePrimaryContext, // Apply gas sponsorship
+            });
+          } catch (diamondApproveGasError) {
+            if (diamondApprovePrimaryContext) {
+              console.warn("⚠️ DAI approval for DIAMOND primary gas payment failed, falling back to standard gas:", diamondApproveGasError);
+              console.log('🔄 Attempting fallback with standard ETH gas for DIAMOND approval...');
+              const fallbackDiamondApprovePromise = client.sendUserOperation({
+                uo: {
+                  target: daiContract.address as `0x${string}`,
+                  data: diamondApproveData,
+                  value: BigInt(0),
+                },
+                // No context = standard ETH payment
+                overrides: {
+                  paymasterAndData: undefined,
+                },
+              });
+
+              // Add timeout to prevent indefinite hanging (60 seconds)
+              const fallbackDiamondTimeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('DIAMOND approval fallback timed out after 60 seconds')), 60000);
+              });
+
+              diamondApproveOp = await Promise.race([fallbackDiamondApprovePromise, fallbackDiamondTimeoutPromise]) as any;
+            } else {
+              throw diamondApproveGasError;
+            }
+          }
+
+          console.log('⏳ Waiting for DIAMOND approval confirmation...', diamondApproveOp.hash);
+          const diamondApprovalTxHash = await client.waitForUserOperationTransaction({
+            hash: diamondApproveOp.hash,
+          });
+
+          console.log('✅ DIAMOND approval transaction confirmed! Hash:', diamondApprovalTxHash);
+
+          // Wait for the approval state to propagate with retry logic
+          console.log('⏳ Waiting for DIAMOND approval state to update...');
+          let diamondNewAllowance = BigInt(0);
+          let diamondRetryCount = 0;
+          const diamondMaxRetries = 5;
+
+          while (diamondRetryCount < diamondMaxRetries && diamondNewAllowance < depositAmount) {
+            // Wait progressively longer between retries
+            const waitTime = 2000 + (diamondRetryCount * 1000); // 2s, 3s, 4s, 5s, 6s
+            console.log(`⏳ Waiting ${waitTime}ms for DIAMOND approval state to update... (attempt ${diamondRetryCount + 1}/${diamondMaxRetries})`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+
+            try {
+              // Verify the approval was successful
+              diamondNewAllowance = await client.readContract({
+                address: daiContract.address as `0x${string}`,
+                abi: daiContract.abi,
+                functionName: 'allowance',
+                args: [address as `0x${string}`, DIAMOND as `0x${string}`]
+              }) as bigint;
+
+              console.log(`📊 DAI allowance for DIAMOND check ${diamondRetryCount + 1}: ${diamondNewAllowance.toString()} (expected: ${depositAmount.toString()})`);
+
+              if (diamondNewAllowance >= depositAmount) {
+                console.log('✅ DAI allowance for DIAMOND confirmed!');
+                break;
+              }
+            } catch (err) {
+              console.warn(`⚠️ DIAMOND allowance check failed on attempt ${diamondRetryCount + 1}:`, err);
+            }
+
+            diamondRetryCount++;
+          }
+
+          if (diamondNewAllowance < depositAmount) {
+            console.error('❌ DAI approval for DIAMOND verification failed after all retries');
+            console.error('📊 Final allowance:', diamondNewAllowance.toString());
+            console.error('📊 Expected allowance:', depositAmount.toString());
+            console.error('📊 Smart account address:', address);
+            console.error('📊 DIAMOND address:', DIAMOND);
+
+            // Provide helpful error message with suggestions
+            const errorMsg = `DAI approval for DIAMOND failed after ${diamondMaxRetries} retries. This could be due to:
+1. Network congestion - try again in a few minutes
+2. Smart account deployment issue - ensure your account is properly deployed
+3. Insufficient gas - the approval transaction may have failed
+4. RPC provider issues - try refreshing the page
+
+Expected allowance: ${formatEther(depositAmount)} DAI
+Actual allowance: ${formatEther(diamondNewAllowance)} DAI
+
+You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
+
+            throw new Error(errorMsg);
+          }
+
+          console.log('✅ DAI approved for DIAMOND');
+        } else {
+          console.log('✅ Sufficient DAI allowance already exists for DIAMOND');
         }
       }
 
@@ -709,23 +920,107 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
 
       console.log('🔨 Encoded subscribe data');
 
-      console.log('📤 Sending subscribe user operation via client...');
-      const operation = await client.sendUserOperation({
-        uo: {
-          target: DIAMOND, // Subscribe is called on the Diamond contract
-          data: subscribeData,
-          value: BigInt(0),
-        },
+      // Apply gas sponsorship: Members get sponsored, Non-members pay in USDC or ETH
+      const gasContext = getGasContext('usdc');
+      const primaryContext = gasContext.context;
+
+      console.log(`📤 Sending subscribe user operation via client with ${gasContext.isSponsored ? 'Sponsored' : (primaryContext ? 'USDC' : 'Standard ETH')} gas...`);
+      console.log('🔍 Operation details:', {
+        target: DIAMOND,
+        hasData: !!subscribeData,
+        dataLength: subscribeData?.length,
+        hasContext: !!primaryContext,
+        contextType: primaryContext ? (gasContext.isSponsored ? 'Sponsored' : 'USDC') : 'None'
       });
+
+      let operation;
+      try {
+        console.log('⏳ Calling sendUserOperation (this may take a moment)...');
+        const sendOpPromise = client.sendUserOperation({
+          uo: {
+            target: DIAMOND, // Subscribe is called on the Diamond contract
+            data: subscribeData,
+            value: BigInt(0),
+          },
+          context: primaryContext, // Apply gas sponsorship context
+        });
+
+        // Add timeout to prevent indefinite hanging (60 seconds)
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('sendUserOperation timed out after 60 seconds')), 60000);
+        });
+
+        console.log('⏳ Waiting for sendUserOperation to complete...');
+        operation = await Promise.race([sendOpPromise, timeoutPromise]) as any;
+        console.log('✅ sendUserOperation completed!');
+      } catch (gasError) {
+        // Detect timeout errors - DO NOT retry on timeout to avoid duplicate transactions
+        // The original operation may still complete in the background
+        const isTimeoutError = gasError instanceof Error && gasError.message.includes('timed out after 60 seconds');
+        
+        if (isTimeoutError) {
+          console.error('❌ sendUserOperation timed out after 60 seconds');
+          console.error('⚠️ The original operation may still be pending and could complete later.');
+          console.error('⚠️ NOT retrying to avoid creating duplicate MeToken subscriptions.');
+          console.error('💡 Please wait a few moments and check if the transaction completed, then retry if needed.');
+          throw new Error('Transaction timed out. Please wait a few moments to check if it completed, then retry if necessary. This prevents duplicate transactions.');
+        }
+
+        console.error('❌ Error sending user operation:', gasError);
+        console.error('❌ Error details:', {
+          message: gasError instanceof Error ? gasError.message : String(gasError),
+          stack: gasError instanceof Error ? gasError.stack : undefined,
+          name: gasError instanceof Error ? gasError.name : undefined,
+          hasPrimaryContext: !!primaryContext
+        });
+
+        // Only retry on actual operation errors (not timeouts)
+        if (primaryContext) {
+          console.warn("⚠️ Primary gas payment failed, falling back to standard gas:", gasError);
+          console.log('🔄 Attempting fallback with standard ETH gas...');
+          try {
+            const fallbackSubscribePromise = client.sendUserOperation({
+              uo: {
+                target: DIAMOND,
+                data: subscribeData,
+                value: BigInt(0),
+              },
+              // No context = standard ETH payment
+              overrides: {
+                paymasterAndData: undefined,
+              },
+            });
+
+            // Add timeout to prevent indefinite hanging (60 seconds)
+            const fallbackSubscribeTimeoutPromise = new Promise((_, reject) => {
+              setTimeout(() => reject(new Error('Subscribe fallback timed out after 60 seconds')), 60000);
+            });
+
+            operation = await Promise.race([fallbackSubscribePromise, fallbackSubscribeTimeoutPromise]) as any;
+            console.log('✅ Fallback to standard gas succeeded!');
+          } catch (fallbackError) {
+            console.error('❌ Fallback to standard gas also failed:', fallbackError);
+            throw new Error(`Failed to send user operation with both primary (${gasContext.isSponsored ? 'Sponsored' : 'USDC'}) and fallback (ETH) gas methods. Last error: ${fallbackError instanceof Error ? fallbackError.message : String(fallbackError)}`);
+          }
+        } else {
+          throw gasError;
+        }
+      }
 
       console.log('🎉 UserOperation sent! Hash:', operation.hash);
       setIsPending(false);
       setIsConfirming(true);
 
       console.log('⏳ Waiting for transaction confirmation...');
-      const txHash = await client.waitForUserOperationTransaction({
-        hash: operation.hash,
-      });
+
+      let txHash: string;
+      try {
+        txHash = await client.waitForUserOperationTransaction({
+          hash: operation.hash,
+        });
+      } catch (waitError) {
+        throw waitError;
+      }
 
       console.log('✅ Transaction mined! Hash:', txHash);
 
@@ -804,6 +1099,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
 
     } catch (err) {
       console.error('❌ Error in createMeToken:', err);
+
       setIsPending(false);
       setIsConfirming(false);
 
