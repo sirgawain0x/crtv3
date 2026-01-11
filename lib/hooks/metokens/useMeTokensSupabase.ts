@@ -670,7 +670,7 @@ export function useMeTokensSupabase(targetAddress?: string) {
           const approveGasContext = getGasContext('usdc');
           const approvePrimaryContext = approveGasContext.context;
 
-          let approveOp;
+          let approveOp: { hash: `0x${string}` } | undefined;
           try {
             approveOp = await sendUserOperationWithTimeout(
               () => client.sendUserOperation({
@@ -684,7 +684,36 @@ export function useMeTokensSupabase(targetAddress?: string) {
               { sendTimeout: APPROVAL_TIMEOUT }
             );
           } catch (approveGasError) {
-            if (approvePrimaryContext && !isTimeoutError(approveGasError)) {
+            // Handle timeout errors specially - check if approval actually succeeded
+            if (isTimeoutError(approveGasError)) {
+              console.warn('⚠️ DAI approval sendUserOperation timed out - checking if approval may have succeeded...');
+              
+              // Wait a moment for the transaction to be mined
+              await new Promise(resolve => setTimeout(resolve, 5000));
+              
+              try {
+                // Check if the approval actually succeeded by querying the contract
+                const currentAllowance = await client.readContract({
+                  address: daiContract.address as `0x${string}`,
+                  abi: daiContract.abi,
+                  functionName: 'allowance',
+                  args: [address as `0x${string}`, vaultAddress as `0x${string}`]
+                }) as bigint;
+                
+                if (currentAllowance >= depositAmount) {
+                  console.log('✅ DAI approval actually succeeded despite timeout! Allowance:', currentAllowance.toString());
+                  // Approval succeeded, skip the rest of the approval flow
+                  approveOp = undefined; // Mark as skipped
+                } else {
+                  // Approval didn't succeed, rethrow the timeout error
+                  throw approveGasError;
+                }
+              } catch (checkErr) {
+                console.warn('⚠️ Could not verify if approval succeeded:', checkErr);
+                // If we can't verify, rethrow the original timeout error
+                throw approveGasError;
+              }
+            } else if (approvePrimaryContext) {
               console.warn("⚠️ DAI approval primary gas payment failed, falling back to standard gas:", approveGasError);
               console.log('🔄 Attempting fallback with standard ETH gas for approval...');
               
@@ -707,18 +736,70 @@ export function useMeTokensSupabase(targetAddress?: string) {
             }
           }
 
-          console.log('🎉 Approval UserOperation sent! Hash:', approveOp.hash);
-          console.log('⏳ Waiting for approval confirmation...');
+          // Only wait for confirmation if we actually sent an operation
+          let approvalTxHash: string | undefined;
+          if (approveOp) {
+            console.log('🎉 Approval UserOperation sent! Hash:', approveOp.hash);
+            console.log('⏳ Waiting for approval confirmation...');
 
-          const approvalTxHash = await waitForUserOperationWithTimeout(
-            () => client.waitForUserOperationTransaction({
-              hash: approveOp.hash,
-            }),
-            approveOp.hash,
-            { waitTimeout: APPROVAL_TIMEOUT }
-          );
+            try {
+              approvalTxHash = await waitForUserOperationWithTimeout(
+                () => client.waitForUserOperationTransaction({
+                  hash: approveOp!.hash,
+                }),
+                approveOp.hash,
+                { waitTimeout: APPROVAL_TIMEOUT }
+              );
+              
+              console.log('✅ Approval transaction confirmed! Hash:', approvalTxHash);
+            } catch (waitError) {
+              // If waiting times out, check if approval actually succeeded
+              if (isTimeoutError(waitError)) {
+                console.warn('⚠️ Approval confirmation timed out - checking if approval succeeded...');
+                
+                // Wait a moment for indexing
+                await new Promise(resolve => setTimeout(resolve, 5000));
+                
+                try {
+                  // Check if the approval actually succeeded
+                  const currentAllowance = await client.readContract({
+                    address: daiContract.address as `0x${string}`,
+                    abi: daiContract.abi,
+                    functionName: 'allowance',
+                    args: [address as `0x${string}`, vaultAddress as `0x${string}`]
+                  }) as bigint;
+                  
+                  if (currentAllowance >= depositAmount) {
+                    console.log('✅ Approval actually succeeded despite confirmation timeout! Allowance:', currentAllowance.toString());
+                    // Approval succeeded, continue with the flow
+                    approvalTxHash = 'verified-via-allowance-check'; // Mark as verified
+                  } else {
+                    // Approval didn't succeed, throw error
+                    throw new Error(
+                      `Approval confirmation timed out and allowance check shows insufficient approval. ` +
+                      `Expected: ${depositAmount.toString()}, Actual: ${currentAllowance.toString()}. ` +
+                      `Please retry the approval.`
+                    );
+                  }
+                } catch (checkErr) {
+                  console.warn('⚠️ Could not verify if approval succeeded:', checkErr);
+                  throw new Error(
+                    `Approval confirmation timed out. The approval may still be processing. ` +
+                    `Please wait a moment and check if the approval completed before retrying.`
+                  );
+                }
+              } else {
+                throw waitError;
+              }
+            }
+          } else {
+            console.log('✅ Approval was verified to have succeeded (skipped waiting due to timeout recovery)');
+            approvalTxHash = 'verified-via-timeout-recovery'; // Mark as verified
+          }
 
-          console.log('✅ Approval transaction confirmed! Hash:', approvalTxHash);
+          if (approvalTxHash) {
+            console.log('✅ Approval transaction confirmed! Hash:', approvalTxHash);
+          }
 
           console.log('✅ DAI approved!');
 
@@ -809,7 +890,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
           const diamondApproveGasContext = getGasContext('usdc');
           const diamondApprovePrimaryContext = diamondApproveGasContext.context;
 
-          let diamondApproveOp;
+          let diamondApproveOp: { hash: `0x${string}` } | undefined;
           try {
             diamondApproveOp = await sendUserOperationWithTimeout(
               () => client.sendUserOperation({
@@ -823,7 +904,36 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
               { sendTimeout: APPROVAL_TIMEOUT }
             );
           } catch (diamondApproveGasError) {
-            if (diamondApprovePrimaryContext && !isTimeoutError(diamondApproveGasError)) {
+            // Handle timeout errors specially - check if approval actually succeeded
+            if (isTimeoutError(diamondApproveGasError)) {
+              console.warn('⚠️ DIAMOND approval sendUserOperation timed out - checking if approval may have succeeded...');
+              
+              // Wait a moment for the transaction to be mined
+              await new Promise(resolve => setTimeout(resolve, 5000));
+              
+              try {
+                // Check if the approval actually succeeded by querying the contract
+                const currentAllowance = await client.readContract({
+                  address: daiContract.address as `0x${string}`,
+                  abi: daiContract.abi,
+                  functionName: 'allowance',
+                  args: [address as `0x${string}`, DIAMOND as `0x${string}`]
+                }) as bigint;
+                
+                if (currentAllowance >= depositAmount) {
+                  console.log('✅ DIAMOND approval actually succeeded despite timeout! Allowance:', currentAllowance.toString());
+                  // Approval succeeded, skip the rest of the approval flow
+                  diamondApproveOp = undefined; // Mark as skipped
+                } else {
+                  // Approval didn't succeed, rethrow the timeout error
+                  throw diamondApproveGasError;
+                }
+              } catch (checkErr) {
+                console.warn('⚠️ Could not verify if DIAMOND approval succeeded:', checkErr);
+                // If we can't verify, rethrow the original timeout error
+                throw diamondApproveGasError;
+              }
+            } else if (diamondApprovePrimaryContext && !isTimeoutError(diamondApproveGasError)) {
               console.warn("⚠️ DAI approval for DIAMOND primary gas payment failed, falling back to standard gas:", diamondApproveGasError);
               console.log('🔄 Attempting fallback with standard ETH gas for DIAMOND approval...');
               
@@ -846,16 +956,69 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
             }
           }
 
-          console.log('⏳ Waiting for DIAMOND approval confirmation...', diamondApproveOp.hash);
-          const diamondApprovalTxHash = await waitForUserOperationWithTimeout(
-            () => client.waitForUserOperationTransaction({
-              hash: diamondApproveOp.hash,
-            }),
-            diamondApproveOp.hash,
-            { waitTimeout: APPROVAL_TIMEOUT }
-          );
+          // Only wait for confirmation if we actually sent an operation
+          let diamondApprovalTxHash: string | undefined;
+          if (diamondApproveOp) {
+            console.log('⏳ Waiting for DIAMOND approval confirmation...', diamondApproveOp.hash);
+            
+            try {
+              diamondApprovalTxHash = await waitForUserOperationWithTimeout(
+                () => client.waitForUserOperationTransaction({
+                  hash: diamondApproveOp!.hash,
+                }),
+                diamondApproveOp.hash,
+                { waitTimeout: APPROVAL_TIMEOUT }
+              );
+              
+              console.log('✅ DIAMOND approval transaction confirmed! Hash:', diamondApprovalTxHash);
+            } catch (waitError) {
+              // If waiting times out, check if approval actually succeeded
+              if (isTimeoutError(waitError)) {
+                console.warn('⚠️ DIAMOND approval confirmation timed out - checking if approval succeeded...');
+                
+                // Wait a moment for indexing
+                await new Promise(resolve => setTimeout(resolve, 5000));
+                
+                try {
+                  // Check if the approval actually succeeded
+                  const currentAllowance = await client.readContract({
+                    address: daiContract.address as `0x${string}`,
+                    abi: daiContract.abi,
+                    functionName: 'allowance',
+                    args: [address as `0x${string}`, DIAMOND as `0x${string}`]
+                  }) as bigint;
+                  
+                  if (currentAllowance >= depositAmount) {
+                    console.log('✅ DIAMOND approval actually succeeded despite confirmation timeout! Allowance:', currentAllowance.toString());
+                    // Approval succeeded, continue with the flow
+                    diamondApprovalTxHash = 'verified-via-allowance-check'; // Mark as verified
+                  } else {
+                    // Approval didn't succeed, throw error
+                    throw new Error(
+                      `DIAMOND approval confirmation timed out and allowance check shows insufficient approval. ` +
+                      `Expected: ${depositAmount.toString()}, Actual: ${currentAllowance.toString()}. ` +
+                      `Please retry the approval.`
+                    );
+                  }
+                } catch (checkErr) {
+                  console.warn('⚠️ Could not verify if DIAMOND approval succeeded:', checkErr);
+                  throw new Error(
+                    `DIAMOND approval confirmation timed out. The approval may still be processing. ` +
+                    `Please wait a moment and check if the approval completed before retrying.`
+                  );
+                }
+              } else {
+                throw waitError;
+              }
+            }
+          } else {
+            console.log('✅ DIAMOND approval was verified to have succeeded (skipped waiting due to timeout recovery)');
+            diamondApprovalTxHash = 'verified-via-timeout-recovery'; // Mark as verified
+          }
 
-          console.log('✅ DIAMOND approval transaction confirmed! Hash:', diamondApprovalTxHash);
+          if (diamondApprovalTxHash) {
+            console.log('✅ DIAMOND approval transaction confirmed! Hash:', diamondApprovalTxHash);
+          }
 
           // Wait for the approval state to propagate with retry logic
           console.log('⏳ Waiting for DIAMOND approval state to update...');
@@ -989,22 +1152,24 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         if (isTimeoutError(gasError)) {
           console.warn('⚠️ sendUserOperation timed out - checking if transaction may have succeeded...');
           
-          // Wait a moment and check if a MeToken was created for this user
+          // Wait a moment for the transaction to be mined and indexed
           await new Promise(resolve => setTimeout(resolve, 5000));
           
           try {
-            const { meTokensSubgraph } = await import('@/lib/sdk/metokens/subgraph');
-            const userMeTokens = await meTokensSubgraph.getMeTokensByOwner(address);
+            // Use contract query instead of subgraph (subgraph doesn't support owner queries)
+            // This queries the blockchain directly for MeTokenCreated events
+            const { getLatestMeTokenByOwner } = await import('@/lib/utils/metokenUtils');
+            const meTokenAddress = await getLatestMeTokenByOwner(address);
             
-            if (userMeTokens.length > 0) {
-              console.log('✅ MeToken was actually created despite timeout! Address:', userMeTokens[0].id);
+            if (meTokenAddress) {
+              console.log('✅ MeToken was actually created despite timeout! Address:', meTokenAddress);
               
               // Sync to database and complete successfully
               try {
                 await fetch('/api/metokens/sync', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ meTokenAddress: userMeTokens[0].id })
+                  body: JSON.stringify({ meTokenAddress })
                 });
               } catch (syncErr) {
                 console.warn('⚠️ Failed to sync MeToken, but it was created:', syncErr);
@@ -1022,16 +1187,18 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
               
               return;
             }
+            
+            // MeToken wasn't found, provide helpful error message
+            throw new Error(
+              'Transaction is taking longer than expected. Your MeToken creation may still be processing. ' +
+              'Please wait 1-2 minutes and refresh the page to check if it completed. ' +
+              'If your MeToken appears, you\'re all set! Otherwise, you can safely retry.'
+            );
           } catch (checkErr) {
             console.warn('⚠️ Could not verify if MeToken was created:', checkErr);
+            // If we can't verify, rethrow the original timeout error to avoid misleading the user
+            throw gasError;
           }
-          
-          // MeToken wasn't found, provide helpful error message
-          throw new Error(
-            'Transaction is taking longer than expected. Your MeToken creation may still be processing. ' +
-            'Please wait 1-2 minutes and refresh the page to check if it completed. ' +
-            'If your MeToken appears, you\'re all set! Otherwise, you can safely retry.'
-          );
         }
 
         console.error('❌ Error sending user operation:', gasError);
@@ -1105,15 +1272,17 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         if (isTimeoutError(waitError)) {
           console.warn('⚠️ Transaction confirmation timed out - checking if MeToken was created...');
           
-          // Wait a moment for indexing
+          // Wait a moment for the transaction to be mined and indexed
           await new Promise(resolve => setTimeout(resolve, 10000));
           
           try {
-            const { meTokensSubgraph } = await import('@/lib/sdk/metokens/subgraph');
-            const userMeTokens = await meTokensSubgraph.getMeTokensByOwner(address);
+            // Use contract query instead of subgraph (subgraph doesn't support owner queries)
+            // This queries the blockchain directly for MeTokenCreated events
+            const { getLatestMeTokenByOwner } = await import('@/lib/utils/metokenUtils');
+            const meTokenAddress = await getLatestMeTokenByOwner(address);
             
-            if (userMeTokens.length > 0) {
-              console.log('✅ MeToken was created despite confirmation timeout! Address:', userMeTokens[0].id);
+            if (meTokenAddress) {
+              console.log('✅ MeToken was created despite confirmation timeout! Address:', meTokenAddress);
               
               // Sync to database
               try {
@@ -1121,7 +1290,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({ 
-                    meTokenAddress: userMeTokens[0].id,
+                    meTokenAddress,
                     transactionHash: operation.hash 
                   })
                 });
@@ -1141,16 +1310,18 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
               
               return;
             }
+            
+            // Provide a helpful message to the user
+            throw new Error(
+              `Transaction was submitted (hash: ${operation.hash.slice(0, 10)}...) but confirmation is taking longer than expected. ` +
+              'Your MeToken may still be created. Please wait 1-2 minutes and refresh the page. ' +
+              'If your MeToken appears, you\'re all set!'
+            );
           } catch (checkErr) {
             console.warn('⚠️ Could not verify if MeToken was created:', checkErr);
+            // If we can't verify, rethrow the original timeout error to avoid misleading the user
+            throw waitError;
           }
-          
-          // Provide a helpful message to the user
-          throw new Error(
-            `Transaction was submitted (hash: ${operation.hash.slice(0, 10)}...) but confirmation is taking longer than expected. ` +
-            'Your MeToken may still be created. Please wait 1-2 minutes and refresh the page. ' +
-            'If your MeToken appears, you\'re all set!'
-          );
         }
         
         throw waitError;
