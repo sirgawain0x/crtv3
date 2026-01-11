@@ -150,6 +150,17 @@ export function MeTokenCreator({ onMeTokenCreated }: MeTokenCreatorProps) {
           errorMessage = 'Transaction was cancelled by user.';
         } else if (err.message.includes('insufficient funds')) {
           errorMessage = 'Insufficient funds to complete the transaction.';
+        } else if (err.message.includes('taking longer than expected') || 
+                   err.message.includes('timed out') ||
+                   err.message.includes('may still be processing')) {
+          // Timeout errors - provide helpful guidance
+          errorMessage = err.message;
+          
+          toast({
+            title: "Transaction Taking Longer",
+            description: "Your MeToken creation may still complete. Please wait 1-2 minutes and refresh the page.",
+            duration: 10000,
+          });
         } else if (err.message.includes('gas')) {
           errorMessage = 'Transaction failed due to gas issues. Please try again.';
         } else {
@@ -199,7 +210,12 @@ export function MeTokenCreator({ onMeTokenCreated }: MeTokenCreatorProps) {
           <Alert>
             <Loader2 className="h-4 w-4 animate-spin" />
             <AlertDescription>
-              Creating MeToken... Please confirm the transaction in your wallet.
+              <div className="space-y-1">
+                <p className="font-medium">Creating your MeToken...</p>
+                <p className="text-sm text-muted-foreground">
+                  This process may take 1-2 minutes. Please keep this page open.
+                </p>
+              </div>
             </AlertDescription>
           </Alert>
         )}
@@ -208,7 +224,12 @@ export function MeTokenCreator({ onMeTokenCreated }: MeTokenCreatorProps) {
           <Alert>
             <Loader2 className="h-4 w-4 animate-spin" />
             <AlertDescription>
-              Transaction submitted! Waiting for confirmation...
+              <div className="space-y-1">
+                <p className="font-medium">Transaction submitted! Waiting for blockchain confirmation...</p>
+                <p className="text-sm text-muted-foreground">
+                  This may take up to 3 minutes during network congestion. Please keep this page open.
+                </p>
+              </div>
             </AlertDescription>
           </Alert>
         )}

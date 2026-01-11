@@ -8,6 +8,18 @@ import { METOKEN_ABI } from '@/lib/contracts/MeToken';
 import { DAI_TOKEN_ADDRESSES, getDaiTokenContract } from '@/lib/contracts/DAIToken';
 import { useToast } from '@/components/ui/use-toast';
 import { useGasSponsorship } from '@/lib/hooks/wallet/useGasSponsorship';
+import { 
+  sendUserOperationWithTimeout, 
+  waitForUserOperationWithTimeout,
+  isTimeoutError,
+  analyzeTransactionError,
+  TransactionStage 
+} from '@/lib/utils/userOperationTimeout';
+
+// Timeout configuration for MeToken creation (longer timeouts for complex operations)
+const METOKEN_CREATION_SEND_TIMEOUT = 120000; // 2 minutes for sendUserOperation
+const METOKEN_CREATION_WAIT_TIMEOUT = 180000; // 3 minutes for waitForUserOperationTransaction
+const APPROVAL_TIMEOUT = 90000; // 1.5 minutes for approval transactions
 
 // MeTokens contract addresses on Base
 const METOKEN_FACTORY = '0xb31Ae2583d983faa7D8C8304e6A16E414e721A0B';
@@ -660,36 +672,36 @@ export function useMeTokensSupabase(targetAddress?: string) {
 
           let approveOp;
           try {
-            approveOp = await client.sendUserOperation({
-              uo: {
-                target: daiContract.address as `0x${string}`,
-                data: approveData,
-                value: BigInt(0),
-              },
-              context: approvePrimaryContext, // Apply gas sponsorship
-            });
-          } catch (approveGasError) {
-            if (approvePrimaryContext) {
-              console.warn("⚠️ DAI approval primary gas payment failed, falling back to standard gas:", approveGasError);
-              console.log('🔄 Attempting fallback with standard ETH gas for approval...');
-              const fallbackApprovePromise = client.sendUserOperation({
+            approveOp = await sendUserOperationWithTimeout(
+              () => client.sendUserOperation({
                 uo: {
                   target: daiContract.address as `0x${string}`,
                   data: approveData,
                   value: BigInt(0),
                 },
-                // No context = standard ETH payment
-                overrides: {
-                  paymasterAndData: undefined,
-                },
-              });
-
-              // Add timeout to prevent indefinite hanging (60 seconds)
-              const fallbackTimeoutPromise = new Promise((_, reject) => {
-                setTimeout(() => reject(new Error('Vault approval fallback timed out after 60 seconds')), 60000);
-              });
-
-              approveOp = await Promise.race([fallbackApprovePromise, fallbackTimeoutPromise]) as any;
+                context: approvePrimaryContext, // Apply gas sponsorship
+              }),
+              { sendTimeout: APPROVAL_TIMEOUT }
+            );
+          } catch (approveGasError) {
+            if (approvePrimaryContext && !isTimeoutError(approveGasError)) {
+              console.warn("⚠️ DAI approval primary gas payment failed, falling back to standard gas:", approveGasError);
+              console.log('🔄 Attempting fallback with standard ETH gas for approval...');
+              
+              approveOp = await sendUserOperationWithTimeout(
+                () => client.sendUserOperation({
+                  uo: {
+                    target: daiContract.address as `0x${string}`,
+                    data: approveData,
+                    value: BigInt(0),
+                  },
+                  // No context = standard ETH payment
+                  overrides: {
+                    paymasterAndData: undefined,
+                  },
+                }),
+                { sendTimeout: APPROVAL_TIMEOUT }
+              );
             } else {
               throw approveGasError;
             }
@@ -698,9 +710,13 @@ export function useMeTokensSupabase(targetAddress?: string) {
           console.log('🎉 Approval UserOperation sent! Hash:', approveOp.hash);
           console.log('⏳ Waiting for approval confirmation...');
 
-          const approvalTxHash = await client.waitForUserOperationTransaction({
-            hash: approveOp.hash,
-          });
+          const approvalTxHash = await waitForUserOperationWithTimeout(
+            () => client.waitForUserOperationTransaction({
+              hash: approveOp.hash,
+            }),
+            approveOp.hash,
+            { waitTimeout: APPROVAL_TIMEOUT }
+          );
 
           console.log('✅ Approval transaction confirmed! Hash:', approvalTxHash);
 
@@ -795,45 +811,49 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
 
           let diamondApproveOp;
           try {
-            diamondApproveOp = await client.sendUserOperation({
-              uo: {
-                target: daiContract.address as `0x${string}`,
-                data: diamondApproveData,
-                value: BigInt(0),
-              },
-              context: diamondApprovePrimaryContext, // Apply gas sponsorship
-            });
-          } catch (diamondApproveGasError) {
-            if (diamondApprovePrimaryContext) {
-              console.warn("⚠️ DAI approval for DIAMOND primary gas payment failed, falling back to standard gas:", diamondApproveGasError);
-              console.log('🔄 Attempting fallback with standard ETH gas for DIAMOND approval...');
-              const fallbackDiamondApprovePromise = client.sendUserOperation({
+            diamondApproveOp = await sendUserOperationWithTimeout(
+              () => client.sendUserOperation({
                 uo: {
                   target: daiContract.address as `0x${string}`,
                   data: diamondApproveData,
                   value: BigInt(0),
                 },
-                // No context = standard ETH payment
-                overrides: {
-                  paymasterAndData: undefined,
-                },
-              });
-
-              // Add timeout to prevent indefinite hanging (60 seconds)
-              const fallbackDiamondTimeoutPromise = new Promise((_, reject) => {
-                setTimeout(() => reject(new Error('DIAMOND approval fallback timed out after 60 seconds')), 60000);
-              });
-
-              diamondApproveOp = await Promise.race([fallbackDiamondApprovePromise, fallbackDiamondTimeoutPromise]) as any;
+                context: diamondApprovePrimaryContext, // Apply gas sponsorship
+              }),
+              { sendTimeout: APPROVAL_TIMEOUT }
+            );
+          } catch (diamondApproveGasError) {
+            if (diamondApprovePrimaryContext && !isTimeoutError(diamondApproveGasError)) {
+              console.warn("⚠️ DAI approval for DIAMOND primary gas payment failed, falling back to standard gas:", diamondApproveGasError);
+              console.log('🔄 Attempting fallback with standard ETH gas for DIAMOND approval...');
+              
+              diamondApproveOp = await sendUserOperationWithTimeout(
+                () => client.sendUserOperation({
+                  uo: {
+                    target: daiContract.address as `0x${string}`,
+                    data: diamondApproveData,
+                    value: BigInt(0),
+                  },
+                  // No context = standard ETH payment
+                  overrides: {
+                    paymasterAndData: undefined,
+                  },
+                }),
+                { sendTimeout: APPROVAL_TIMEOUT }
+              );
             } else {
               throw diamondApproveGasError;
             }
           }
 
           console.log('⏳ Waiting for DIAMOND approval confirmation...', diamondApproveOp.hash);
-          const diamondApprovalTxHash = await client.waitForUserOperationTransaction({
-            hash: diamondApproveOp.hash,
-          });
+          const diamondApprovalTxHash = await waitForUserOperationWithTimeout(
+            () => client.waitForUserOperationTransaction({
+              hash: diamondApproveOp.hash,
+            }),
+            diamondApproveOp.hash,
+            { waitTimeout: APPROVAL_TIMEOUT }
+          );
 
           console.log('✅ DIAMOND approval transaction confirmed! Hash:', diamondApprovalTxHash);
 
@@ -933,37 +953,85 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         contextType: primaryContext ? (gasContext.isSponsored ? 'Sponsored' : 'USDC') : 'None'
       });
 
-      let operation;
+      let operation: { hash: `0x${string}` } | undefined;
+      let operationSubmittedSuccessfully = false;
+      
       try {
-        console.log('⏳ Calling sendUserOperation (this may take a moment)...');
-        const sendOpPromise = client.sendUserOperation({
-          uo: {
-            target: DIAMOND, // Subscribe is called on the Diamond contract
-            data: subscribeData,
-            value: BigInt(0),
-          },
-          context: primaryContext, // Apply gas sponsorship context
-        });
-
-        // Add timeout to prevent indefinite hanging (60 seconds)
-        const timeoutPromise = new Promise((_, reject) => {
-          setTimeout(() => reject(new Error('sendUserOperation timed out after 60 seconds')), 60000);
-        });
-
-        console.log('⏳ Waiting for sendUserOperation to complete...');
-        operation = await Promise.race([sendOpPromise, timeoutPromise]) as any;
-        console.log('✅ sendUserOperation completed!');
-      } catch (gasError) {
-        // Detect timeout errors - DO NOT retry on timeout to avoid duplicate transactions
-        // The original operation may still complete in the background
-        const isTimeoutError = gasError instanceof Error && gasError.message.includes('timed out after 60 seconds');
+        console.log('⏳ Calling sendUserOperation (this may take up to 2 minutes)...');
         
-        if (isTimeoutError) {
-          console.error('❌ sendUserOperation timed out after 60 seconds');
-          console.error('⚠️ The original operation may still be pending and could complete later.');
-          console.error('⚠️ NOT retrying to avoid creating duplicate MeToken subscriptions.');
-          console.error('💡 Please wait a few moments and check if the transaction completed, then retry if needed.');
-          throw new Error('Transaction timed out. Please wait a few moments to check if it completed, then retry if necessary. This prevents duplicate transactions.');
+        // Use the timeout utility with extended timeout for MeToken creation
+        operation = await sendUserOperationWithTimeout(
+          () => client.sendUserOperation({
+            uo: {
+              target: DIAMOND, // Subscribe is called on the Diamond contract
+              data: subscribeData,
+              value: BigInt(0),
+            },
+            context: primaryContext, // Apply gas sponsorship context
+          }),
+          {
+            sendTimeout: METOKEN_CREATION_SEND_TIMEOUT,
+            onProgress: (stage: TransactionStage, message: string) => {
+              console.log(`📊 [${stage}] ${message}`);
+            }
+          }
+        );
+        
+        operationSubmittedSuccessfully = true;
+        console.log('✅ sendUserOperation completed successfully!');
+      } catch (gasError) {
+        // Analyze the error to determine the best course of action
+        const errorAnalysis = gasError instanceof Error 
+          ? analyzeTransactionError(gasError) 
+          : { isTimeout: false, isRetryable: false, userMessage: 'Unknown error', suggestion: '' };
+        
+        // Handle timeout errors specially - check if MeToken was created
+        if (isTimeoutError(gasError)) {
+          console.warn('⚠️ sendUserOperation timed out - checking if transaction may have succeeded...');
+          
+          // Wait a moment and check if a MeToken was created for this user
+          await new Promise(resolve => setTimeout(resolve, 5000));
+          
+          try {
+            const { meTokensSubgraph } = await import('@/lib/sdk/metokens/subgraph');
+            const userMeTokens = await meTokensSubgraph.getMeTokensByOwner(address);
+            
+            if (userMeTokens.length > 0) {
+              console.log('✅ MeToken was actually created despite timeout! Address:', userMeTokens[0].id);
+              
+              // Sync to database and complete successfully
+              try {
+                await fetch('/api/metokens/sync', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ meTokenAddress: userMeTokens[0].id })
+                });
+              } catch (syncErr) {
+                console.warn('⚠️ Failed to sync MeToken, but it was created:', syncErr);
+              }
+              
+              setIsConfirming(false);
+              setIsConfirmed(true);
+              await checkUserMeToken();
+              
+              toast({
+                title: "MeToken Created! 🎉",
+                description: "Your MeToken was created successfully. The confirmation took longer than expected but completed.",
+                duration: 5000,
+              });
+              
+              return;
+            }
+          } catch (checkErr) {
+            console.warn('⚠️ Could not verify if MeToken was created:', checkErr);
+          }
+          
+          // MeToken wasn't found, provide helpful error message
+          throw new Error(
+            'Transaction is taking longer than expected. Your MeToken creation may still be processing. ' +
+            'Please wait 1-2 minutes and refresh the page to check if it completed. ' +
+            'If your MeToken appears, you\'re all set! Otherwise, you can safely retry.'
+          );
         }
 
         console.error('❌ Error sending user operation:', gasError);
@@ -971,54 +1039,120 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
           message: gasError instanceof Error ? gasError.message : String(gasError),
           stack: gasError instanceof Error ? gasError.stack : undefined,
           name: gasError instanceof Error ? gasError.name : undefined,
-          hasPrimaryContext: !!primaryContext
+          hasPrimaryContext: !!primaryContext,
+          analysis: errorAnalysis
         });
 
         // Only retry on actual operation errors (not timeouts)
-        if (primaryContext) {
+        if (primaryContext && errorAnalysis.isRetryable) {
           console.warn("⚠️ Primary gas payment failed, falling back to standard gas:", gasError);
           console.log('🔄 Attempting fallback with standard ETH gas...');
           try {
-            const fallbackSubscribePromise = client.sendUserOperation({
-              uo: {
-                target: DIAMOND,
-                data: subscribeData,
-                value: BigInt(0),
-              },
-              // No context = standard ETH payment
-              overrides: {
-                paymasterAndData: undefined,
-              },
-            });
-
-            // Add timeout to prevent indefinite hanging (60 seconds)
-            const fallbackSubscribeTimeoutPromise = new Promise((_, reject) => {
-              setTimeout(() => reject(new Error('Subscribe fallback timed out after 60 seconds')), 60000);
-            });
-
-            operation = await Promise.race([fallbackSubscribePromise, fallbackSubscribeTimeoutPromise]) as any;
+            operation = await sendUserOperationWithTimeout(
+              () => client.sendUserOperation({
+                uo: {
+                  target: DIAMOND,
+                  data: subscribeData,
+                  value: BigInt(0),
+                },
+                // No context = standard ETH payment
+                overrides: {
+                  paymasterAndData: undefined,
+                },
+              }),
+              { sendTimeout: METOKEN_CREATION_SEND_TIMEOUT }
+            );
+            
+            operationSubmittedSuccessfully = true;
             console.log('✅ Fallback to standard gas succeeded!');
           } catch (fallbackError) {
             console.error('❌ Fallback to standard gas also failed:', fallbackError);
             throw new Error(`Failed to send user operation with both primary (${gasContext.isSponsored ? 'Sponsored' : 'USDC'}) and fallback (ETH) gas methods. Last error: ${fallbackError instanceof Error ? fallbackError.message : String(fallbackError)}`);
           }
-        } else {
+        } else if (!primaryContext || !errorAnalysis.isRetryable) {
           throw gasError;
         }
+      }
+
+      // Ensure operation was submitted before continuing
+      if (!operation) {
+        throw new Error('Failed to submit transaction. Please try again.');
       }
 
       console.log('🎉 UserOperation sent! Hash:', operation.hash);
       setIsPending(false);
       setIsConfirming(true);
 
-      console.log('⏳ Waiting for transaction confirmation...');
+      console.log('⏳ Waiting for transaction confirmation (this may take up to 3 minutes)...');
 
       let txHash: string;
       try {
-        txHash = await client.waitForUserOperationTransaction({
-          hash: operation.hash,
-        });
+        txHash = await waitForUserOperationWithTimeout(
+          () => client.waitForUserOperationTransaction({
+            hash: operation.hash,
+          }),
+          operation.hash,
+          {
+            waitTimeout: METOKEN_CREATION_WAIT_TIMEOUT,
+            onProgress: (stage: TransactionStage, message: string) => {
+              console.log(`📊 [${stage}] ${message}`);
+            }
+          }
+        );
       } catch (waitError) {
+        // If waiting times out, the operation may still complete
+        // Check if MeToken was created despite the timeout
+        if (isTimeoutError(waitError)) {
+          console.warn('⚠️ Transaction confirmation timed out - checking if MeToken was created...');
+          
+          // Wait a moment for indexing
+          await new Promise(resolve => setTimeout(resolve, 10000));
+          
+          try {
+            const { meTokensSubgraph } = await import('@/lib/sdk/metokens/subgraph');
+            const userMeTokens = await meTokensSubgraph.getMeTokensByOwner(address);
+            
+            if (userMeTokens.length > 0) {
+              console.log('✅ MeToken was created despite confirmation timeout! Address:', userMeTokens[0].id);
+              
+              // Sync to database
+              try {
+                await fetch('/api/metokens/sync', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ 
+                    meTokenAddress: userMeTokens[0].id,
+                    transactionHash: operation.hash 
+                  })
+                });
+              } catch (syncErr) {
+                console.warn('⚠️ Failed to sync MeToken:', syncErr);
+              }
+              
+              setIsConfirming(false);
+              setIsConfirmed(true);
+              await checkUserMeToken();
+              
+              toast({
+                title: "MeToken Created! 🎉",
+                description: "Your MeToken was created successfully. Confirmation took longer than expected but completed.",
+                duration: 5000,
+              });
+              
+              return;
+            }
+          } catch (checkErr) {
+            console.warn('⚠️ Could not verify if MeToken was created:', checkErr);
+          }
+          
+          // Provide a helpful message to the user
+          throw new Error(
+            `Transaction was submitted (hash: ${operation.hash.slice(0, 10)}...) but confirmation is taking longer than expected. ` +
+            'Your MeToken may still be created. Please wait 1-2 minutes and refresh the page. ' +
+            'If your MeToken appears, you\'re all set!'
+          );
+        }
+        
         throw waitError;
       }
 
