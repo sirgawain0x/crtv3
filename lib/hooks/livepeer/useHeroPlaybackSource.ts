@@ -1,18 +1,22 @@
-import { fullLivepeer } from "../../sdk/livepeer/fullClient";
 import { getSrc } from "@livepeer/react/external";
 import { Src } from "@livepeer/react";
 import { LIVEPEER_HERO_PLAYBACK_ID, HERO_VIDEO_ASSET_ID } from "../../../context/context";
 
 export const getHeroPlaybackSource = async (): Promise<Src[] | null> => {
   try {
-    // First, try to fetch the asset by asset ID
+    // First, try to fetch the asset by asset ID via our API route (server-side, avoids CORS)
     let playbackId: string | null = null;
     
     if (HERO_VIDEO_ASSET_ID) {
       try {
-        const assetResponse = await fullLivepeer.asset.get(HERO_VIDEO_ASSET_ID);
-        if (assetResponse?.asset?.playbackId) {
-          playbackId = assetResponse.asset.playbackId;
+        const response = await fetch(`/api/livepeer/asset/${HERO_VIDEO_ASSET_ID}`);
+        if (response.ok) {
+          const assetResponse = await response.json();
+          if (assetResponse?.asset?.playbackId) {
+            playbackId = assetResponse.asset.playbackId;
+          }
+        } else {
+          console.warn(`Failed to fetch hero video asset: ${response.status} ${response.statusText}`);
         }
       } catch (error) {
         console.warn("Error fetching hero video asset by ID, falling back to default playback ID:", error);
@@ -24,7 +28,13 @@ export const getHeroPlaybackSource = async (): Promise<Src[] | null> => {
       playbackId = LIVEPEER_HERO_PLAYBACK_ID;
     }
     
-    const playbackInfo = await fullLivepeer.playback.get(playbackId);
+    // Fetch playback info via our API route (server-side, avoids CORS)
+    const playbackResponse = await fetch(`/api/livepeer/playback-info?playbackId=${playbackId}`);
+    if (!playbackResponse.ok) {
+      throw new Error(`Failed to fetch playback info: ${playbackResponse.status} ${playbackResponse.statusText}`);
+    }
+    
+    const playbackInfo = await playbackResponse.json();
     const src = getSrc(playbackInfo?.playbackInfo) as Src[];
     return src;
   } catch (error) {

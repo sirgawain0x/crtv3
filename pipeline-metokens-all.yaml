@@ -1,0 +1,54 @@
+name: pipeline-metokens-all
+resource_size: s
+apiVersion: 3
+sources:
+  metoken_subscribes_source:
+    name: subscribe
+    subgraphs:
+      - name: metokens
+        version: v0.0.1
+    type: subgraph_entity
+  metoken_mints_source:
+    name: mint
+    subgraphs:
+      - name: metokens
+        version: v0.0.1
+    type: subgraph_entity
+  metoken_burns_source:
+    name: burn
+    subgraphs:
+      - name: metokens
+        version: v0.0.1
+    type: subgraph_entity
+  metoken_registers_source:
+    name: register
+    subgraphs:
+      - name: metokens
+        version: v0.0.1
+    type: subgraph_entity
+transforms: {}
+sinks:
+  postgres_metoken_subscribes:
+    from: metoken_subscribes_source
+    schema: public
+    secret_name: POSTGRES_SECRET_CMJIQCIFZ0
+    table: metoken_subscribes
+    type: postgres
+  postgres_metoken_mints:
+    from: metoken_mints_source
+    schema: public
+    secret_name: POSTGRES_SECRET_CMJIQCIFZ0
+    table: metoken_mints
+    type: postgres
+  postgres_metoken_burns:
+    from: metoken_burns_source
+    schema: public
+    secret_name: POSTGRES_SECRET_CMJIQCIFZ0
+    table: metoken_burns
+    type: postgres
+  postgres_metoken_registers:
+    from: metoken_registers_source
+    schema: public
+    secret_name: POSTGRES_SECRET_CMJIQCIFZ0
+    table: metoken_registers
+    type: postgres

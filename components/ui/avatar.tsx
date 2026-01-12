@@ -37,6 +37,8 @@ const AvatarImage = React.forwardRef<
   
   // Use ref to track current fallback index to avoid stale closures in handleError
   const fallbackIndexRef = React.useRef(0);
+  // Track if all gateways have been exhausted to prevent infinite retries
+  const allGatewaysExhaustedRef = React.useRef(false);
 
   // Get fallbacks for current src (recalculated when src changes)
   const { fallbacks } = React.useMemo(
@@ -56,9 +58,19 @@ const AvatarImage = React.forwardRef<
     // Reset fallback index when src changes
     setFallbackIndex(0);
     fallbackIndexRef.current = 0;
+    // Reset exhausted flag when src changes
+    allGatewaysExhaustedRef.current = false;
   }, [normalizedSrc]);
 
   const handleError = React.useCallback((e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+    // Prevent infinite retries if all gateways have been exhausted
+    if (allGatewaysExhaustedRef.current) {
+      if (onError) {
+        onError(e);
+      }
+      return;
+    }
+
     // Use ref to get current fallback index value (avoids stale closure issues)
     const currentIndex = fallbackIndexRef.current;
     
@@ -72,7 +84,11 @@ const AvatarImage = React.forwardRef<
       return;
     }
 
+    // All fallback gateways have been exhausted
+    allGatewaysExhaustedRef.current = true;
+
     // If all fallbacks exhausted, call original onError handler
+    // Radix UI Avatar will automatically show the fallback component
     if (onError) {
       onError(e);
     }

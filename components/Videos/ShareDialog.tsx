@@ -32,6 +32,9 @@ export function ShareDialog({
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
   const [isLoadingThumbnail, setIsLoadingThumbnail] = useState(true);
   const [shareUrl, setShareUrl] = useState<string>("");
+  
+  // Remove .mp4 extension from title if present
+  const cleanTitle = videoTitle.endsWith('.mp4') ? videoTitle.slice(0, -4) : videoTitle;
 
   useEffect(() => {
     if (!open) return;
@@ -50,7 +53,7 @@ export function ShareDialog({
         // First, try to get thumbnail from database
         if (playbackId) {
           const dbAsset = await fetchVideoAssetByPlaybackId(playbackId);
-          if (dbAsset && (dbAsset as any).thumbnail_url) {
+          if (dbAsset && (dbAsset as any).thumbnail_url && (dbAsset as any).thumbnail_url.trim() !== "") {
             thumbnail = convertFailingGateway((dbAsset as any).thumbnail_url);
           }
 
@@ -61,8 +64,8 @@ export function ShareDialog({
           }
         }
 
-        // Fallback to default thumbnail
-        if (!thumbnail) {
+        // Fallback to default thumbnail if no thumbnail found or empty string
+        if (!thumbnail || thumbnail.trim() === "") {
           thumbnail = "/Creative_TV.png";
         }
 
@@ -85,7 +88,7 @@ export function ShareDialog({
         : `${typeof window !== "undefined" ? window.location.origin : ""}${thumbnailUrl}`
       : `${typeof window !== "undefined" ? window.location.origin : ""}/Creative_TV.png`;
 
-    const text = `Check out this video: ${videoTitle}`;
+    const text = `Check out this video: ${cleanTitle}`;
 
     switch (platform) {
       case "x": {
@@ -138,7 +141,7 @@ export function ShareDialog({
         <DialogHeader>
           <DialogTitle>Share Video</DialogTitle>
           <DialogDescription>
-            Share "{videoTitle}" on your favorite platform
+            Share "{cleanTitle}" on your favorite platform
           </DialogDescription>
         </DialogHeader>
 
@@ -153,7 +156,7 @@ export function ShareDialog({
               <div className="w-full aspect-video rounded-lg overflow-hidden border">
                 <img
                   src={thumbnailUrl}
-                  alt={videoTitle}
+                  alt={cleanTitle}
                   className="w-full h-full object-cover"
                 />
               </div>

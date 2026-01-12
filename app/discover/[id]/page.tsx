@@ -264,12 +264,17 @@ export async function generateMetadata({
 
     // Get thumbnail from database or use fallback
     let thumbnailUrl =
-      (videoAsset as any)?.thumbnail_url ||
-      (asset.asset as any)?.thumbnailUri ||
-      "/Creative_TV.png";
+      (videoAsset as any)?.thumbnail_url?.trim() ||
+      (asset.asset as any)?.thumbnailUri?.trim() ||
+      null;
 
-    // Apply gateway conversion for IPFS URLs (consistent with ShareDialog)
-    thumbnailUrl = convertFailingGateway(thumbnailUrl);
+    // If no thumbnail or empty string, use default image
+    if (!thumbnailUrl || thumbnailUrl === "") {
+      thumbnailUrl = "/Creative_TV.png";
+    } else {
+      // Apply gateway conversion for IPFS URLs (consistent with ShareDialog)
+      thumbnailUrl = convertFailingGateway(thumbnailUrl);
+    }
 
     // Construct absolute URL for Open Graph
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ||
@@ -290,17 +295,21 @@ export async function generateMetadata({
       absoluteThumbnailUrl = `${baseUrl}${normalizedPath}`;
     }
 
-    // Use consistent fallback for asset name
-    const assetName = asset.asset.name ?? "Watch Video";
+    // Use database title (from video_assets table) instead of asset name
+    // Remove .mp4 extension if present
+    let videoTitle = (videoAsset as any)?.title || asset.asset.name || "Watch Video";
+    if (videoTitle.endsWith('.mp4')) {
+      videoTitle = videoTitle.slice(0, -4);
+    }
 
     // Use nullish coalescing to preserve empty strings (only replace null/undefined)
-    const videoDescription = (videoAsset as any)?.description ?? `Watch ${assetName} on Creative TV`;
+    const videoDescription = (videoAsset as any)?.description ?? `Watch ${videoTitle} on Creative TV`;
 
     return {
-      title: assetName,
+      title: videoTitle,
       description: videoDescription,
       openGraph: {
-        title: assetName,
+        title: videoTitle,
         description: videoDescription,
         images: [absoluteThumbnailUrl],
         url: absoluteUrl,
@@ -318,7 +327,7 @@ export async function generateMetadata({
       },
       twitter: {
         card: "summary_large_image",
-        title: assetName,
+        title: videoTitle,
         description: videoDescription,
         images: [absoluteThumbnailUrl],
       },

@@ -42,6 +42,8 @@ export function GatewayImage({
   const [isLoading, setIsLoading] = useState(true);
   // Track which gateways have been tried to avoid retrying them
   const triedGatewaysRef = useRef<Set<string>>(new Set());
+  // Track if all gateways have been exhausted to prevent infinite retries
+  const allGatewaysExhaustedRef = useRef(false);
 
   // Sync imageSrc state when src prop changes (e.g., when parent updates thumbnailUrl)
   useEffect(() => {
@@ -57,6 +59,8 @@ export function GatewayImage({
     setIsLoading(true);
     // Reset tried gateways when src changes
     triedGatewaysRef.current = new Set();
+    // Reset exhausted flag when src changes
+    allGatewaysExhaustedRef.current = false;
     // Mark the initial converted src as tried since we're using it
     if (convertedSrc) {
       triedGatewaysRef.current.add(convertedSrc);
@@ -90,6 +94,15 @@ export function GatewayImage({
   const isIpfs = isIpfsUrl(imageSrc);
 
   const handleError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+    // Prevent infinite retries if all gateways have been exhausted
+    if (allGatewaysExhaustedRef.current) {
+      setIsLoading(false);
+      if (onError) {
+        onError(e);
+      }
+      return;
+    }
+
     // Mark the current gateway as tried
     if (imageSrc) {
       triedGatewaysRef.current.add(imageSrc);
@@ -108,6 +121,9 @@ export function GatewayImage({
       return;
     }
 
+    // All fallback gateways have been exhausted
+    allGatewaysExhaustedRef.current = true;
+
     // If all fallbacks exhausted, try the fallbackSrc prop
     if (fallbackSrc && imageSrc !== fallbackSrc && !hasError) {
       setHasError(true);
@@ -116,7 +132,9 @@ export function GatewayImage({
       return;
     }
 
+    // All options exhausted - stop trying
     setIsLoading(false);
+    console.warn('All IPFS gateways exhausted for image:', src);
 
     // Call original onError handler if provided
     if (onError) {

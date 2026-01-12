@@ -18,7 +18,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { compressImage } from "@/lib/utils/image-compression";
-import { convertFailingGateway } from "@/lib/utils/image-gateway";
+import { convertFailingGateway, parseIpfsUriWithFallback } from "@/lib/utils/image-gateway";
 import { GatewayImage } from "@/components/ui/gateway-image";
 import { StoryLicenseSelector } from "./StoryLicenseSelector";
 import { NFTMintingStep } from "./NFTMintingStep";
@@ -200,14 +200,22 @@ const CreateThumbnailForm = ({
             // Keep the blob URL for the preview to ensure it remains visible instantly
             // and doesn't rely on the IPFS gateway for the visual feedback.
 
-            // Use the IPFS URL with gateway fallback for submission ONLY
+            // Convert ipfs:// protocol to gateway URL for database storage
+            // This ensures the URL is in a format that can be accessed from any region
+            // convertFailingGateway handles ipfs:// protocol and converts to Lighthouse gateway
             const ipfsUrl = convertFailingGateway(result.thumbnailUrl);
+            
+            // Ensure we have a valid gateway URL (not ipfs:// protocol)
+            // If conversion didn't work, use parseIpfsUriWithFallback as backup
+            const finalUrl = ipfsUrl.startsWith('ipfs://') 
+              ? parseIpfsUriWithFallback(ipfsUrl, 0) // Use Lighthouse (index 0)
+              : ipfsUrl;
 
             // We consciously DO NOT update customPreviewUrl here to avoid flicker/loading
             // The blob URL remains valid until component unmount or new file selection
 
-            setSelectedImage(ipfsUrl);
-            onSelectThumbnailImages(ipfsUrl);
+            setSelectedImage(finalUrl);
+            onSelectThumbnailImages(finalUrl);
             toast.success("Custom thumbnail uploaded successfully!");
           } else {
             // IPFS upload failed - clear selected image since blob URLs can't be used on server
@@ -551,10 +559,14 @@ const CreateThumbnailForm = ({
       try {
         const result = await uploadThumbnailFromBlob(imageUrl, livepeerAssetId || 'unknown');
         if (result.success && result.thumbnailUrl) {
-          // Use the IPFS URL instead of blob URL
+          // Convert ipfs:// protocol to gateway URL for database storage
           const ipfsUrl = convertFailingGateway(result.thumbnailUrl);
-          setSelectedImage(ipfsUrl);
-          onSelectThumbnailImages(ipfsUrl);
+          // Ensure we have a valid gateway URL (not ipfs:// protocol)
+          const finalUrl = ipfsUrl.startsWith('ipfs://') 
+            ? parseIpfsUriWithFallback(ipfsUrl, 0) // Use Lighthouse (index 0)
+            : ipfsUrl;
+          setSelectedImage(finalUrl);
+          onSelectThumbnailImages(finalUrl);
           toast.success("AI thumbnail uploaded successfully!");
         } else {
           // IPFS upload failed - clear selection since blob URLs can't be used on server
@@ -574,8 +586,12 @@ const CreateThumbnailForm = ({
     } else {
       // It's already a persistent URL (IPFS or other), use it directly
       const persistentUrl = convertFailingGateway(imageUrl);
-      setSelectedImage(persistentUrl);
-      onSelectThumbnailImages(persistentUrl);
+      // Ensure we have a valid gateway URL (not ipfs:// protocol)
+      const finalUrl = persistentUrl.startsWith('ipfs://') 
+        ? parseIpfsUriWithFallback(persistentUrl, 0) // Use Lighthouse (index 0)
+        : persistentUrl;
+      setSelectedImage(finalUrl);
+      onSelectThumbnailImages(finalUrl);
     }
   };
 

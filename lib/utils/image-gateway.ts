@@ -128,6 +128,12 @@ export function convertFailingGateway(url: string): string {
   const hash = extractIpfsHash(url);
   if (!hash) return url; // Not an IPFS URL
 
+  // Handle ipfs:// protocol - convert to Lighthouse gateway URL
+  // This is critical for thumbnails and other uploads that return ipfs:// format
+  if (url.startsWith('ipfs://')) {
+    return `https://gateway.lighthouse.storage/ipfs/${hash}`;
+  }
+
   // Note: Lighthouse is now the PRIMARY gateway and should be tried first
   // Do NOT convert Lighthouse URLs proactively - let them try first
   // Actual failures will be handled by the error handler trying fallback gateways

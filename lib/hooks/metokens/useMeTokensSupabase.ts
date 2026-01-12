@@ -1130,77 +1130,181 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         }
 
         // Check if user already owns a MeToken
-        if (err.message.includes('already owns a meToken') || err.message.includes('already owns')) {
+        // Check error message, details, and cause for "already owns" errors
+        const errorMessage = err.message || '';
+        const errorDetails = (err as any).details || '';
+        const errorCause = (err as any).cause?.message || '';
+        const hasAlreadyOwnsError = 
+          errorMessage.toLowerCase().includes('already owns a metoken') ||
+          errorMessage.toLowerCase().includes('already owns') ||
+          errorDetails.toLowerCase().includes('already owns a metoken') ||
+          errorDetails.toLowerCase().includes('already owns') ||
+          errorCause.toLowerCase().includes('already owns a metoken') ||
+          errorCause.toLowerCase().includes('already owns');
+
+        if (hasAlreadyOwnsError) {
           console.log('💡 User already owns a MeToken! Finding and syncing it...');
+          console.log('📋 Error details:', { errorMessage, errorDetails, errorCause });
 
           try {
-            // Query subgraph for recent MeTokens
-            const { meTokensSubgraph } = await import('@/lib/sdk/metokens/subgraph');
-            console.log('📊 Fetching recent MeTokens from subgraph...');
-            const allMeTokens = await meTokensSubgraph.getAllMeTokens(50, 0);
-            console.log(`📋 Found ${allMeTokens.length} recent MeTokens in subgraph`);
-
             let foundUserMeToken = false;
+            let meTokenAddress: string | null = null;
 
-            if (allMeTokens.length > 0) {
-              // Try to sync the most recent ones to database
-              for (const meToken of allMeTokens.slice(0, 10)) {
-                try {
-                  console.log('💾 Attempting to sync MeToken:', meToken.id);
-                  const syncResponse = await fetch('/api/metokens/sync', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ meTokenAddress: meToken.id })
-                  });
+            // Step 1: Check Supabase first (fastest)
+            console.log('🔍 Step 1: Checking Supabase for existing MeToken...');
+            const addressesToCheck = [address];
+            if (client?.account?.address && client.account.address !== address) {
+              addressesToCheck.push(client.account.address);
+            }
+            if (user?.address && user.address !== address) {
+              addressesToCheck.push(user.address);
+            }
 
-                  if (syncResponse.ok) {
-                    const syncData = await syncResponse.json();
-                    console.log('✅ Synced MeToken:', syncData);
-
-                    // Check if this one belongs to our user
-                    if (syncData.data?.owner_address?.toLowerCase() === address.toLowerCase()) {
-                      console.log('🎯 Found our MeToken!');
-                      foundUserMeToken = true;
-                      break;
-                    }
+            for (const checkAddress of addressesToCheck) {
+              try {
+                const response = await fetch(`/api/metokens?owner=${checkAddress}`);
+                if (response.ok) {
+                  const result = await response.json();
+                  if (result.data) {
+                    console.log('✅ Found MeToken in Supabase for address:', checkAddress);
+                    meTokenAddress = result.data.address;
+                    foundUserMeToken = true;
+                    break;
                   }
-                } catch (syncErr) {
-                  console.warn('Failed to sync MeToken:', meToken.id, syncErr);
+                }
+              } catch (apiErr) {
+                console.warn('Failed to check Supabase for address:', checkAddress, apiErr);
+              }
+            }
+
+            // Step 2: If not in Supabase, query blockchain directly
+            if (!foundUserMeToken) {
+              console.log('🔍 Step 2: Querying blockchain directly for user MeToken...');
+              const { getLatestMeTokenByOwner } = await import('@/lib/utils/metokenUtils');
+
+              for (const checkAddress of addressesToCheck) {
+                try {
+                  const existingMeTokenAddress = await getLatestMeTokenByOwner(checkAddress);
+                  if (existingMeTokenAddress) {
+                    console.log('✅ Found MeToken on blockchain for address:', checkAddress, existingMeTokenAddress);
+                    meTokenAddress = existingMeTokenAddress;
+                    foundUserMeToken = true;
+                    break;
+                  }
+                } catch (blockchainErr) {
+                  console.warn('Failed to query blockchain for address:', checkAddress, blockchainErr);
                 }
               }
             }
 
-            if (foundUserMeToken) {
-              // Refresh to load the MeToken from database
-              console.log('🔄 Refreshing to display your MeToken...');
-              await checkUserMeToken();
+            // Step 3: If we found the MeToken, sync it
+            if (foundUserMeToken && meTokenAddress) {
+              console.log('💾 Syncing found MeToken:', meTokenAddress);
+              try {
+                const syncResponse = await fetch('/api/metokens/sync', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ meTokenAddress })
+                });
 
-              setIsConfirmed(true);
+                if (syncResponse.ok) {
+                  const syncData = await syncResponse.json();
+                  console.log('✅ Successfully synced MeToken:', syncData);
 
-              toast({
-                title: "MeToken Found!",
-                description: "Your existing MeToken has been synced and is now displayed.",
-                duration: 3000,
-              });
+                  // Refresh to load the MeToken from database
+                  console.log('🔄 Refreshing to display your MeToken...');
+                  await checkUserMeToken();
 
-              setTimeout(() => {
-                window.location.reload();
-              }, 2000);
+                  setIsConfirmed(true);
 
-              return;
-            } else {
-              // If we couldn't find the user's MeToken, provide helpful instructions
-              console.log('⚠️ Could not find user MeToken in subgraph');
-              throw new Error('You already have a MeToken, but we could not locate it automatically. ' +
-                'Please use the "Sync Existing MeToken" button or contact support for assistance.');
+                  toast({
+                    title: "MeToken Found!",
+                    description: "Your existing MeToken has been synced and is now displayed.",
+                    duration: 3000,
+                  });
+
+                  setTimeout(() => {
+                    window.location.reload();
+                  }, 2000);
+
+                  return;
+                } else {
+                  const errorData = await syncResponse.json().catch(() => ({}));
+                  console.warn('⚠️ Failed to sync MeToken:', errorData);
+                }
+              } catch (syncErr) {
+                console.error('❌ Error syncing MeToken:', syncErr);
+              }
             }
+
+            // Step 4: Fallback to subgraph search (if we still haven't found it)
+            if (!foundUserMeToken) {
+              console.log('🔍 Step 3: Falling back to subgraph search...');
+              const { meTokensSubgraph } = await import('@/lib/sdk/metokens/subgraph');
+              console.log('📊 Fetching recent MeTokens from subgraph...');
+              const allMeTokens = await meTokensSubgraph.getAllMeTokens(100, 0);
+              console.log(`📋 Found ${allMeTokens.length} recent MeTokens in subgraph`);
+
+              if (allMeTokens.length > 0) {
+                // Try to sync the most recent ones to database
+                for (const meToken of allMeTokens.slice(0, 20)) {
+                  try {
+                    console.log('💾 Attempting to sync MeToken:', meToken.id);
+                    const syncResponse = await fetch('/api/metokens/sync', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ meTokenAddress: meToken.id })
+                    });
+
+                    if (syncResponse.ok) {
+                      const syncData = await syncResponse.json();
+                      console.log('✅ Synced MeToken:', syncData);
+
+                      // Check if this one belongs to our user
+                      if (syncData.data?.owner_address?.toLowerCase() === address.toLowerCase()) {
+                        console.log('🎯 Found our MeToken!');
+                        foundUserMeToken = true;
+                        break;
+                      }
+                    }
+                  } catch (syncErr) {
+                    console.warn('Failed to sync MeToken:', meToken.id, syncErr);
+                  }
+                }
+              }
+
+              if (foundUserMeToken) {
+                // Refresh to load the MeToken from database
+                console.log('🔄 Refreshing to display your MeToken...');
+                await checkUserMeToken();
+
+                setIsConfirmed(true);
+
+                toast({
+                  title: "MeToken Found!",
+                  description: "Your existing MeToken has been synced and is now displayed.",
+                  duration: 3000,
+                });
+
+                setTimeout(() => {
+                  window.location.reload();
+                }, 2000);
+
+                return;
+              }
+            }
+
+            // If we still couldn't find the user's MeToken, provide helpful instructions
+            console.log('⚠️ Could not find user MeToken after all attempts');
+            throw new Error('You already have a MeToken, but we could not locate it automatically. ' +
+              'Please use the "Sync Existing MeToken" button to load it manually, or contact support for assistance.');
           } catch (syncErr) {
-            console.error('Failed to find existing MeToken:', syncErr);
+            console.error('❌ Failed to find existing MeToken:', syncErr);
             if (syncErr instanceof Error && syncErr.message.includes('already have a MeToken')) {
               throw syncErr; // Re-throw our custom error
             }
-            throw new Error('You already have a MeToken, but we could not load it. ' +
-              'Please use the "Sync Existing MeToken" button or contact support.');
+            throw new Error('You already have a MeToken, but we could not load it automatically. ' +
+              'Please use the "Sync Existing MeToken" button to load it manually, or contact support for assistance.');
           }
         }
 
