@@ -8,6 +8,7 @@ import { ThemeProvider } from "next-themes";
 import { Toaster } from "sonner";
 import { VideoProvider } from "../context/VideoContext";
 import { TourProvider } from "../context/TourContext";
+import { HeliaProvider } from "../context/HeliaContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ApolloNextAppProvider } from "@apollo/client-integration-nextjs";
 import { makeClient } from "./apolloWrapper";
@@ -67,12 +68,14 @@ export const Providers = (
                 initialState={props.initialState}
               >
                 <RadixProvider>
-                  <TourProvider>
-                    <VideoProvider>
-                      {props.children}
-                      <Toaster position="top-right" richColors />
-                    </VideoProvider>
-                  </TourProvider>
+                  <HeliaProvider>
+                    <TourProvider>
+                      <VideoProvider>
+                        {props.children}
+                        <Toaster position="top-right" richColors />
+                      </VideoProvider>
+                    </TourProvider>
+                  </HeliaProvider>
                 </RadixProvider>
               </AlchemyAccountProvider>
             </ApolloNextAppProvider>

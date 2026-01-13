@@ -2,8 +2,8 @@ import * as Client from '@storacha/client';
 import { StoreMemory } from '@storacha/client/stores/memory';
 import * as Proof from '@storacha/client/proof';
 import { Signer } from '@storacha/client/principal/ed25519';
-import { createHelia } from 'helia';
-import { unixfs } from '@helia/unixfs';
+import { createHelia, Helia } from 'helia';
+import { unixfs, UnixFS } from '@helia/unixfs';
 import { LighthouseService } from './lighthouse-service';
 import { FilecoinFirstService } from './filecoin-first-service';
 
@@ -23,11 +23,14 @@ export interface IPFSConfig {
   email?: string;
   gateway?: string;
   enableFilecoinArchival?: boolean; // Optional: Enable automatic Filecoin archival (default: false)
+  // Following helia-nextjs pattern: accept Helia instance from context
+  helia?: Helia;
+  fs?: UnixFS;
 }
 
-// Global Helia instance to prevent multiple nodes in dev mode
-let heliaInstance: any = null;
-let heliaFs: any = null;
+// Fallback Helia instance for server-side or direct usage (when not using context)
+let fallbackHeliaInstance: Helia | null = null;
+let fallbackHeliaFs: UnixFS | null = null;
 
 export class IPFSService {
   private lighthouseApiKey?: string;
@@ -40,8 +43,8 @@ export class IPFSService {
   private lighthouseService?: LighthouseService;
   private filecoinFirstService?: FilecoinFirstService;
   private storachaClient: any;
-  private helia: any;
-  private fs: any;
+  private helia?: Helia;
+  private fs?: UnixFS;
   private initialized: boolean = false;
 
   constructor(config: IPFSConfig) {
@@ -55,6 +58,14 @@ export class IPFSService {
     this.gateway = config.gateway || (config.lighthouseApiKey 
       ? 'https://gateway.lighthouse.storage/ipfs' 
       : 'https://w3s.link/ipfs');
+    
+    // Following helia-nextjs pattern: use provided Helia instance from context if available
+    if (config.helia && config.fs) {
+      this.helia = config.helia;
+      this.fs = config.fs;
+      this.initialized = true;
+      console.log('[IPFSService] Using Helia instance from context');
+    }
     
     // Initialize Lighthouse service if API key is provided
     if (this.lighthouseApiKey) {
@@ -72,28 +83,43 @@ export class IPFSService {
     }
   }
 
-  // Initialize clients (Helia + Storacha)
-  private async initialize(): Promise<void> {
+  // Initialize fallback Helia instance (for server-side or when not using context)
+  private async initializeFallback(): Promise<void> {
     if (this.initialized) {
       return;
     }
 
     try {
-      // 1. Initialize Helia (Primary)
-      if (!heliaInstance) {
-        heliaInstance = await createHelia();
-        heliaFs = unixfs(heliaInstance);
+      // Initialize fallback Helia instance (following helia-nextjs pattern)
+      if (!fallbackHeliaInstance) {
+        console.log('[IPFSService] Initializing fallback Helia instance...');
+        fallbackHeliaInstance = await createHelia();
+        fallbackHeliaFs = unixfs(fallbackHeliaInstance);
       }
-      this.helia = heliaInstance;
-      this.fs = heliaFs;
+      this.helia = fallbackHeliaInstance;
+      this.fs = fallbackHeliaFs!;
 
-      // 2. Initialize Storacha (Backup/Persistence) - strictly server-side if possible, or non-interactive
-      await this.initializeStoracha();
-
+      // Mark as initialized immediately after Helia is ready (before optional Storacha)
+      // This prevents infinite retry loops if Storacha initialization fails
       this.initialized = true;
+      console.log('[IPFSService] Fallback Helia initialized successfully');
+
+      // Initialize Storacha (Backup/Persistence) - optional, can fail without affecting service
+      // This is done after setting initialized=true to ensure Helia is usable even if Storacha fails
+      try {
+        await this.initializeStoracha();
+      } catch (storachaError) {
+        // Log but don't throw - Storacha is optional backup
+        console.warn('[IPFSService] Storacha initialization failed (non-critical):', storachaError);
+      }
     } catch (error) {
-      console.error('Failed to initialize IPFS clients:', error);
-      // We don't throw here to allow partial initialization (e.g. Helia works but Storacha fails)
+      console.error('[IPFSService] Failed to initialize fallback IPFS clients:', error);
+      // Only set initialized if Helia was successfully created
+      // If Helia creation itself failed, leave initialized=false to allow retry
+      if (this.helia && this.fs) {
+        this.initialized = true;
+        console.warn('[IPFSService] Helia initialized but some optional services failed');
+      }
     }
   }
 
@@ -129,60 +155,28 @@ export class IPFSService {
   }
 
   // Upload file to IPFS
+  // Following helia-nextjs pattern: Helia is primary method
   // Strategy:
-  // 1. Upload to Lighthouse (Primary - better CDN, especially West Coast)
-  // 2. Background: Upload to Storacha (Backup/Persistence)
-  // 3. Fallback: Use Helia if both fail
+  // 1. Upload to Helia (Primary - following helia-nextjs pattern)
+  // 2. Background: Upload to Lighthouse (CDN distribution)
+  // 3. Background: Upload to Storacha (Backup/Persistence)
+  // 4. Background: Create Filecoin deal (Long-term archival, if enabled)
   async uploadFile(file: File | Blob, options: {
     pin?: boolean;
     wrapWithDirectory?: boolean;
     maxSize?: number;
   } = {}): Promise<IPFSUploadResult> {
     try {
-      // 1. Try Lighthouse first (Primary - better CDN distribution)
-      if (this.lighthouseService) {
-        try {
-          const lighthouseResult = await this.lighthouseService.uploadFile(file);
-          if (lighthouseResult.success && lighthouseResult.hash) {
-            const hash = lighthouseResult.hash;
-            console.log('✅ Lighthouse upload successful:', hash);
-            
-            // Background: Upload to Storacha as backup (fire and forget)
-            this.uploadToStorachaBackup(file, hash).catch((err) => {
-              console.warn('Storacha backup failed (non-critical):', err);
-            });
-
-            // Background: Create Filecoin deal for long-term archival (fire and forget)
-            // Note: This is async and non-blocking, so filecoinDealId will be undefined in the response
-            if (this.filecoinFirstService && this.enableFilecoinArchival) {
-              this.createFilecoinDeal(hash).then((result) => {
-                if (result.success && result.dealId) {
-                  console.log(`✅ Filecoin deal created for ${hash}:`, result.dealId);
-                }
-              }).catch((err) => {
-                console.warn('Filecoin archival failed (non-critical):', err);
-              });
-            }
-
-            return {
-              success: true,
-              url: lighthouseResult.url,
-              hash,
-            };
-          }
-        } catch (lighthouseError) {
-          console.warn('Lighthouse upload failed, trying fallback:', lighthouseError);
-          // Continue to fallback
-        }
+      // 1. Primary: Use Helia (following helia-nextjs pattern)
+      // Initialize fallback if not using context-provided instance
+      if (!this.initialized || !this.fs) {
+        await this.initializeFallback();
       }
-
-      // 2. Fallback: Use Helia + Storacha (original method)
-      await this.initialize();
 
       if (!this.fs) {
         return {
           success: false,
-          error: 'IPFS node not initialized.',
+          error: 'IPFS node not initialized. Please ensure HeliaProvider is mounted or fallback initialization succeeds.',
         };
       }
 
@@ -190,28 +184,53 @@ export class IPFSService {
       const buffer = await file.arrayBuffer();
       const content = new Uint8Array(buffer);
 
-      // Add to Helia
+      // Add to Helia (following helia-nextjs pattern)
       const cid = await this.fs.addBytes(content);
       const hash = cid.toString();
       const url = `${this.gateway}/${hash}`;
 
-      // Background: Upload to Storacha (Backup)
-      if (this.storachaClient) {
-        this.storachaClient.uploadFile(file).then((result: any) => {
-          console.log(`Storacha backup complete for ${hash}:`, result);
-        }).catch((err: any) => {
-          console.warn(`Storacha backup failed for ${hash}:`, err);
+      console.log('[IPFSService] ✅ Helia upload successful:', hash);
+      console.log('[IPFSService] 📍 Accessible via:', url);
+
+      // 2. Background: Upload to Lighthouse (CDN distribution, non-blocking)
+      if (this.lighthouseService) {
+        this.lighthouseService.uploadFile(file).then((result) => {
+          if (result.success && result.hash) {
+            console.log('[IPFSService] ✅ Lighthouse backup complete:', result.hash);
+          }
+        }).catch((err) => {
+          console.warn('[IPFSService] ⚠️ Lighthouse backup failed (non-critical):', err);
         });
       }
 
-      // Background: Create Filecoin deal for long-term archival (fire and forget)
+      // 3. Background: Upload to Storacha (Backup/Persistence, non-blocking)
+      if (this.storachaClient) {
+        this.storachaClient.uploadFile(file).then((result: any) => {
+          console.log(`[IPFSService] ✅ Storacha backup complete for ${hash}:`, result);
+        }).catch((err: any) => {
+          console.warn(`[IPFSService] ⚠️ Storacha backup failed for ${hash}:`, err);
+        });
+      } else {
+        // Try to initialize Storacha in background
+        this.initializeStoracha().then(() => {
+          if (this.storachaClient) {
+            this.storachaClient.uploadFile(file).catch((err: any) => {
+              console.warn(`[IPFSService] ⚠️ Storacha backup failed for ${hash}:`, err);
+            });
+          }
+        }).catch(() => {
+          // Silently fail - Storacha is optional
+        });
+      }
+
+      // 4. Background: Create Filecoin deal for long-term archival (fire and forget)
       if (this.filecoinFirstService && this.enableFilecoinArchival) {
         this.createFilecoinDeal(hash).then((result) => {
           if (result.success && result.dealId) {
-            console.log(`✅ Filecoin deal created for ${hash}:`, result.dealId);
+            console.log(`[IPFSService] ✅ Filecoin deal created for ${hash}:`, result.dealId);
           }
         }).catch((err) => {
-          console.warn('Filecoin archival failed (non-critical):', err);
+          console.warn('[IPFSService] ⚠️ Filecoin archival failed (non-critical):', err);
         });
       }
 
@@ -221,7 +240,7 @@ export class IPFSService {
         hash,
       };
     } catch (error) {
-      console.error('IPFS upload error:', error);
+      console.error('[IPFSService] ❌ IPFS upload error:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Upload failed',

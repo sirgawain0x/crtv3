@@ -50,43 +50,75 @@ const VideoThumbnail: React.FC<VideoThumbnailProps> = ({
         return;
       }
 
+      const startTime = performance.now();
+      const videoTitle = title || playbackId;
+
       try {
         setIsLoading(true);
 
         // First, try to get thumbnail from database
+        // Declare dbStartTime outside try block so it's accessible in catch block
+        const dbStartTime = performance.now();
         try {
           const dbAsset = await fetchVideoAssetByPlaybackId(playbackId);
+          const dbTime = performance.now() - dbStartTime;
+          
           if (dbAsset && (dbAsset as any).thumbnail_url && (dbAsset as any).thumbnail_url.trim() !== "") {
-            console.log('Found database thumbnail:', (dbAsset as any).thumbnail_url);
+            const originalUrl = (dbAsset as any).thumbnail_url;
+            console.log(`[Thumbnail] ${videoTitle} - Found database thumbnail (${dbTime.toFixed(0)}ms):`, originalUrl);
+            
             // Convert failing gateways to alternative gateways
-            const convertedUrl = convertFailingGateway((dbAsset as any).thumbnail_url);
+            const convertedUrl = convertFailingGateway(originalUrl);
+            
+            if (originalUrl !== convertedUrl) {
+              console.log(`[Thumbnail] ${videoTitle} - Converted gateway: ${originalUrl} -> ${convertedUrl}`);
+            }
+            
             setThumbnailUrl(convertedUrl);
             setIsLoading(false);
+            const totalTime = performance.now() - startTime;
+            console.log(`[Thumbnail] ${videoTitle} - Thumbnail loaded in ${totalTime.toFixed(0)}ms (source: database)`);
             return;
+          } else {
+            console.log(`[Thumbnail] ${videoTitle} - No database thumbnail found (${dbTime.toFixed(0)}ms)`);
           }
         } catch (dbError) {
+          const dbTime = performance.now() - dbStartTime;
           // Log the error but don't throw - we'll fall back to Livepeer VTT
-          console.warn(`Failed to fetch database thumbnail for ${playbackId}, falling back to Livepeer VTT:`, dbError);
+          console.warn(`[Thumbnail] ${videoTitle} - Database fetch failed (${dbTime.toFixed(0)}ms), falling back to Livepeer VTT:`, dbError);
         }
 
         // If no database thumbnail or error, try Livepeer VTT thumbnails
-        console.log('No database thumbnail found, trying Livepeer VTT for:', playbackId);
+        const vttStartTime = performance.now();
+        console.log(`[Thumbnail] ${videoTitle} - Trying Livepeer VTT for playbackId: ${playbackId}`);
         const url = await getThumbnailUrl(playbackId);
+        const vttTime = performance.now() - vttStartTime;
+        
         // Convert failing gateways to alternative gateways
         const convertedUrl = url ? convertFailingGateway(url) : null;
 
         // Fallback to default thumbnail if no thumbnail found
         if (!convertedUrl) {
+          console.warn(`[Thumbnail] ${videoTitle} - No Livepeer VTT thumbnail found (${vttTime.toFixed(0)}ms), using default`);
           setThumbnailUrl("/Creative_TV.png");
         } else {
+          if (url !== convertedUrl) {
+            console.log(`[Thumbnail] ${videoTitle} - Converted VTT gateway: ${url} -> ${convertedUrl}`);
+          }
+          console.log(`[Thumbnail] ${videoTitle} - Using Livepeer VTT thumbnail (${vttTime.toFixed(0)}ms):`, convertedUrl);
           setThumbnailUrl(convertedUrl);
         }
       } catch (error) {
-        console.error('Error fetching thumbnail:', error);
+        const totalTime = performance.now() - startTime;
+        console.error(`[Thumbnail] ${videoTitle} - Error fetching thumbnail (${totalTime.toFixed(0)}ms):`, error);
         // Fallback to default thumbnail on error
         setThumbnailUrl("/Creative_TV.png");
       } finally {
         setIsLoading(false);
+        const totalTime = performance.now() - startTime;
+        if (totalTime > 1000) {
+          console.warn(`[Thumbnail] ${videoTitle} - Slow thumbnail fetch: ${totalTime.toFixed(0)}ms`);
+        }
       }
     }
 
@@ -326,11 +358,16 @@ const VideoThumbnail: React.FC<VideoThumbnailProps> = ({
               sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
               fallbackSrc="/Creative_TV.png"
               showSkeleton={false}
-              onLoad={() => setImageLoading(false)}
-              onError={() => {
+              onLoad={() => {
                 setImageLoading(false);
+                console.log(`[Thumbnail] ${title || playbackId} - Image loaded successfully`);
+              }}
+              onError={(e) => {
+                setImageLoading(false);
+                console.error(`[Thumbnail] ${title || playbackId} - Image failed to load:`, thumbnailUrl, e);
                 // Fallback to default thumbnail on image load error (only if not already the default)
                 if (thumbnailUrl !== "/Creative_TV.png") {
+                  console.log(`[Thumbnail] ${title || playbackId} - Falling back to default thumbnail`);
                   setThumbnailUrl("/Creative_TV.png");
                 }
               }}

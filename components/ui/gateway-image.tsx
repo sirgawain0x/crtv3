@@ -44,6 +44,8 @@ export function GatewayImage({
   const triedGatewaysRef = useRef<Set<string>>(new Set());
   // Track if all gateways have been exhausted to prevent infinite retries
   const allGatewaysExhaustedRef = useRef(false);
+  // Track consecutive failures to detect if content doesn't exist (404 from all gateways)
+  const consecutiveFailuresRef = useRef(0);
 
   // Sync imageSrc state when src prop changes (e.g., when parent updates thumbnailUrl)
   useEffect(() => {
@@ -61,6 +63,8 @@ export function GatewayImage({
     triedGatewaysRef.current = new Set();
     // Reset exhausted flag when src changes
     allGatewaysExhaustedRef.current = false;
+    // Reset failure counter when src changes
+    consecutiveFailuresRef.current = 0;
     // Mark the initial converted src as tried since we're using it
     if (convertedSrc) {
       triedGatewaysRef.current.add(convertedSrc);
@@ -103,6 +107,9 @@ export function GatewayImage({
       return;
     }
 
+    // Increment failure counter
+    consecutiveFailuresRef.current += 1;
+
     // Mark the current gateway as tried
     if (imageSrc) {
       triedGatewaysRef.current.add(imageSrc);
@@ -112,7 +119,15 @@ export function GatewayImage({
     const nextGateway = fallbacks.find(fallback => !triedGatewaysRef.current.has(fallback));
 
     if (nextGateway) {
-      console.log(`Trying fallback gateway ${triedGatewaysRef.current.size}/${fallbacks.length} for IPFS image:`, nextGateway);
+      const triedCount = triedGatewaysRef.current.size;
+      console.log(`Trying fallback gateway ${triedCount}/${fallbacks.length + 1} for IPFS image:`, nextGateway);
+      
+      // If we've tried 2+ gateways and all failed, warn that content might not exist
+      if (consecutiveFailuresRef.current >= 2 && isIpfs) {
+        const hash = src.match(/\/ipfs\/([a-zA-Z0-9]+)/)?.[1] || src.match(/ipfs:\/\/([a-zA-Z0-9]+)/)?.[1] || 'unknown';
+        console.warn(`[GatewayImage] Multiple gateways failed for IPFS hash ${hash.substring(0, 10)}... This may indicate the content doesn't exist on IPFS.`);
+      }
+      
       // Mark it as tried before setting it as the new source
       triedGatewaysRef.current.add(nextGateway);
       setImageSrc(nextGateway);
@@ -124,6 +139,12 @@ export function GatewayImage({
     // All fallback gateways have been exhausted
     allGatewaysExhaustedRef.current = true;
 
+    // Log warning about missing content if all IPFS gateways failed
+    if (isIpfs && consecutiveFailuresRef.current >= 2) {
+      const hash = src.match(/\/ipfs\/([a-zA-Z0-9]+)/)?.[1] || src.match(/ipfs:\/\/([a-zA-Z0-9]+)/)?.[1] || 'unknown';
+      console.error(`[GatewayImage] All IPFS gateways failed for hash ${hash}. Content appears to not exist on IPFS. Consider re-uploading the image.`);
+    }
+
     // If all fallbacks exhausted, try the fallbackSrc prop
     if (fallbackSrc && imageSrc !== fallbackSrc && !hasError) {
       setHasError(true);
@@ -134,7 +155,7 @@ export function GatewayImage({
 
     // All options exhausted - stop trying
     setIsLoading(false);
-    console.warn('All IPFS gateways exhausted for image:', src);
+    console.warn('[GatewayImage] All IPFS gateways exhausted for image:', src);
 
     // Call original onError handler if provided
     if (onError) {

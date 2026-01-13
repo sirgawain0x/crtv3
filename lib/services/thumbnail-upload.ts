@@ -1,4 +1,5 @@
 import { ipfsService } from '@/lib/sdk/ipfs/service';
+import { IPFSService } from '@/lib/sdk/ipfs/service';
 
 export interface ThumbnailUploadResult {
   success: boolean;
@@ -7,17 +8,21 @@ export interface ThumbnailUploadResult {
 }
 
 /**
- * Uploads a thumbnail image file using hybrid storage:
- * - Lighthouse (Primary) - Better CDN distribution, especially for West Coast
- * - Storacha (Backup) - Ensures long-term persistence
- * - Filecoin First (Optional) - Long-term archival if enabled
+ * Uploads a thumbnail image file using Helia (following helia-nextjs pattern):
+ * - Helia (Primary) - Following helia-nextjs pattern
+ * - Lighthouse (Background) - Better CDN distribution
+ * - Storacha (Background) - Ensures long-term persistence
+ * - Filecoin First (Background, Optional) - Long-term archival if enabled
+ * 
  * @param file - The image file to upload
  * @param playbackId - The video's playback ID (unused but kept for signature compatibility)
+ * @param service - Optional IPFS service instance (defaults to global instance with fallback)
  * @returns Promise<ThumbnailUploadResult>
  */
 export async function uploadThumbnailToIPFS(
   file: File,
-  playbackId: string
+  playbackId: string,
+  service?: IPFSService
 ): Promise<ThumbnailUploadResult> {
   try {
     // Validate file type
@@ -28,13 +33,13 @@ export async function uploadThumbnailToIPFS(
       };
     }
 
-    console.log('Starting hybrid upload (Lighthouse primary, Storacha backup, Filecoin archival if enabled)...');
+    console.log('[ThumbnailUpload] Starting upload with Helia (following helia-nextjs pattern)...');
 
-    // Use the default IPFS service instance which is pre-configured with all storage options
-    // This ensures consistency across the app and includes Filecoin archival if enabled
-
-    // Use the default IPFS service (pre-configured with Lighthouse, Storacha, and optional Filecoin)
-    const result = await ipfsService.uploadFile(file, {
+    // Use provided service or default IPFS service instance
+    // Following helia-nextjs pattern: uses Helia from context if available via hook
+    const ipfs = service || ipfsService;
+    
+    const result = await ipfs.uploadFile(file, {
       pin: true,
       wrapWithDirectory: false
     });
@@ -46,8 +51,8 @@ export async function uploadThumbnailToIPFS(
       };
     }
 
-    console.log('✅ Thumbnail upload successful:', result.hash);
-    console.log('📍 Accessible via:', result.url);
+    console.log('[ThumbnailUpload] ✅ Thumbnail upload successful:', result.hash);
+    console.log('[ThumbnailUpload] 📍 Accessible via:', result.url);
 
     // Return the CID format expected by the app (IPFS URI)
     return {
@@ -56,7 +61,7 @@ export async function uploadThumbnailToIPFS(
     };
 
   } catch (error) {
-    console.error('Error uploading thumbnail to IPFS:', error);
+    console.error('[ThumbnailUpload] ❌ Error uploading thumbnail to IPFS:', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error occurred'
@@ -86,13 +91,17 @@ export async function blobUrlToFile(blobUrl: string, filename: string): Promise<
 
 /**
  * Uploads a thumbnail from a blob URL to IPFS
+ * Following helia-nextjs pattern with Helia as primary method
+ * 
  * @param blobUrl - The blob URL of the thumbnail
  * @param playbackId - The video's playback ID for naming
+ * @param service - Optional IPFS service instance (defaults to global instance with fallback)
  * @returns Promise<ThumbnailUploadResult>
  */
 export async function uploadThumbnailFromBlob(
   blobUrl: string,
-  playbackId: string
+  playbackId: string,
+  service?: IPFSService
 ): Promise<ThumbnailUploadResult> {
   try {
     // Convert blob URL to file
@@ -105,11 +114,11 @@ export async function uploadThumbnailFromBlob(
       };
     }
 
-    // Upload to IPFS
-    return await uploadThumbnailToIPFS(file, playbackId);
+    // Upload to IPFS (following helia-nextjs pattern)
+    return await uploadThumbnailToIPFS(file, playbackId, service);
 
   } catch (error) {
-    console.error('Error uploading thumbnail from blob:', error);
+    console.error('[ThumbnailUpload] ❌ Error uploading thumbnail from blob:', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error occurred'

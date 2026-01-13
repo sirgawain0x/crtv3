@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import {
   Dialog,
@@ -24,6 +24,12 @@ import {
 import { useToast } from "@/components/ui/use-toast";
 import { updateVideoAsset } from "@/services/video-assets";
 import type { VideoAsset } from "@/lib/types/video-asset";
+import { Loader2, X } from "lucide-react";
+import { compressImage } from "@/lib/utils/image-compression";
+import { uploadThumbnailToIPFS } from "@/lib/services/thumbnail-upload";
+import { convertFailingGateway, parseIpfsUriWithFallback } from "@/lib/utils/image-gateway";
+import { GatewayImage } from "@/components/ui/gateway-image";
+import { Progress } from "@/components/ui/progress";
 
 interface VideoEditDialogProps {
   open: boolean;
@@ -65,6 +71,13 @@ export function VideoEditDialog({
 }: VideoEditDialogProps) {
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
+  const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
+  const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
+  const [isUploadingThumbnail, setIsUploadingThumbnail] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [newThumbnailUrl, setNewThumbnailUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const blobUrlRef = useRef<string | null>(null);
 
   const {
     register,
@@ -93,22 +106,172 @@ export function VideoEditDialog({
         category: videoAsset.category || "",
         location: videoAsset.location || "",
       });
+      // Reset thumbnail state
+      setThumbnailFile(null);
+      setNewThumbnailUrl(null);
+      setUploadProgress(0);
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+      }
+      setThumbnailPreview(null);
     }
   }, [videoAsset, reset]);
+
+  // Cleanup blob URLs on unmount
+  useEffect(() => {
+    return () => {
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+      }
+    };
+  }, []);
+
+  const handleThumbnailSelect = async (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      toast({
+        variant: "destructive",
+        title: "Invalid File",
+        description: "Please select an image file.",
+      });
+      return;
+    }
+
+    setThumbnailFile(file);
+    setIsUploadingThumbnail(true);
+    setUploadProgress(0);
+
+    try {
+      // Compress image
+      setUploadProgress(10);
+      const compressionResult = await compressImage(file, {
+        maxSizeMB: 5,
+        maxWidth: 1920,
+        maxHeight: 1080,
+        quality: 0.8,
+        outputFormat: 'image/jpeg',
+      });
+
+      if (!compressionResult.success) {
+        toast({
+          variant: "destructive",
+          title: "Compression Failed",
+          description: compressionResult.error || "Failed to compress image.",
+        });
+        setThumbnailFile(null);
+        setIsUploadingThumbnail(false);
+        return;
+      }
+
+      // Create preview
+      const compressedFile = compressionResult.file!;
+      const previewUrl = URL.createObjectURL(compressedFile);
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+      }
+      blobUrlRef.current = previewUrl;
+      setThumbnailPreview(previewUrl);
+      setUploadProgress(30);
+
+      // Upload to IPFS
+      setUploadProgress(50);
+      const result = await uploadThumbnailToIPFS(compressedFile, videoAsset.asset_id || 'unknown');
+      setUploadProgress(100);
+
+      if (result.success && result.thumbnailUrl) {
+        // Convert ipfs:// protocol to gateway URL
+        const ipfsUrl = convertFailingGateway(result.thumbnailUrl);
+        const finalUrl = ipfsUrl.startsWith('ipfs://')
+          ? parseIpfsUriWithFallback(ipfsUrl, 0)
+          : ipfsUrl;
+        
+        setNewThumbnailUrl(finalUrl);
+        
+        // Clear preview and revoke blob URL after successful upload to prevent memory leak
+        // The uploaded IPFS thumbnail will be shown in the current thumbnail preview section
+        setThumbnailPreview(null);
+        if (blobUrlRef.current) {
+          URL.revokeObjectURL(blobUrlRef.current);
+          blobUrlRef.current = null;
+        }
+        
+        toast({
+          title: "Thumbnail Uploaded",
+          description: "Thumbnail has been uploaded successfully.",
+        });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Upload Failed",
+          description: result.error || "Failed to upload thumbnail.",
+        });
+        setThumbnailFile(null);
+        setThumbnailPreview(null);
+        if (blobUrlRef.current) {
+          URL.revokeObjectURL(blobUrlRef.current);
+          blobUrlRef.current = null;
+        }
+      }
+    } catch (error) {
+      console.error("Error processing thumbnail:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to process thumbnail. Please try again.",
+      });
+      setThumbnailFile(null);
+      setThumbnailPreview(null);
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+      }
+    } finally {
+      setIsUploadingThumbnail(false);
+      setUploadProgress(0);
+    }
+  };
+
+  const handleThumbnailRemove = () => {
+    setThumbnailFile(null);
+    setNewThumbnailUrl(null);
+    setThumbnailPreview(null);
+    if (blobUrlRef.current) {
+      URL.revokeObjectURL(blobUrlRef.current);
+      blobUrlRef.current = null;
+    }
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
 
   const onSubmit = async (data: VideoEditFormData) => {
     setIsSaving(true);
     try {
-      await updateVideoAsset(videoAsset.id, {
+      const updateData: {
+        title: string;
+        description: string | null;
+        category: string;
+        location: string;
+        thumbnailUri?: string;
+      } = {
         title: data.title.trim(),
         description: data.description.trim() || null,
         category: data.category.trim() || "",
         location: data.location.trim() || "",
-      });
+      };
+
+      // Include thumbnail URL if a new one was uploaded
+      if (newThumbnailUrl) {
+        updateData.thumbnailUri = newThumbnailUrl;
+      }
+
+      await updateVideoAsset(videoAsset.id, updateData);
 
       toast({
         title: "Video Updated",
-        description: "Your video has been updated successfully.",
+        description: newThumbnailUrl
+          ? "Your video and thumbnail have been updated successfully."
+          : "Your video has been updated successfully.",
       });
 
       onOpenChange(false);
@@ -130,7 +293,7 @@ export function VideoEditDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="sm:max-w-[650px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Edit Video</DialogTitle>
           <DialogDescription>
@@ -220,17 +383,99 @@ export function VideoEditDialog({
                 </p>
               )}
             </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="thumbnail">Thumbnail</Label>
+              <div className="space-y-4">
+                {/* Current Thumbnail Preview */}
+                {(videoAsset as any).thumbnail_url && (
+                  <div className="space-y-2">
+                    <Label className="text-sm text-muted-foreground">Current Thumbnail</Label>
+                    <div className="relative aspect-video w-full max-w-md rounded-lg overflow-hidden border">
+                      <GatewayImage
+                        src={(videoAsset as any).thumbnail_url}
+                        alt="Current thumbnail"
+                        fill
+                        className="object-cover"
+                        showSkeleton={true}
+                        fallbackSrc="/Creative_TV.png"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* New Thumbnail Upload */}
+                {thumbnailPreview ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-sm text-muted-foreground">New Thumbnail</Label>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleThumbnailRemove}
+                        className="h-8 w-8 p-0"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <div className="relative aspect-video w-full max-w-md rounded-lg overflow-hidden border">
+                      <img
+                        src={thumbnailPreview}
+                        alt="Thumbnail preview"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    {isUploadingThumbnail && (
+                      <div className="space-y-2">
+                        <Progress value={uploadProgress} className="w-full" />
+                        <p className="text-xs text-muted-foreground">Uploading thumbnail...</p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Input
+                      id="thumbnail"
+                      type="file"
+                      accept="image/*"
+                      ref={fileInputRef}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          handleThumbnailSelect(file);
+                        }
+                      }}
+                      disabled={isUploadingThumbnail}
+                      className="cursor-pointer"
+                    />
+                    {isUploadingThumbnail && (
+                      <div className="space-y-2">
+                        <Progress value={uploadProgress} className="w-full" />
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span>Processing thumbnail...</span>
+                        </div>
+                      </div>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      Upload a new thumbnail image (JPG, PNG, or WebP). Max 5MB.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
           <DialogFooter>
             <Button
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
-              disabled={isSaving}
+              disabled={isSaving || isUploadingThumbnail}
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isSaving}>
+            <Button type="submit" disabled={isSaving || isUploadingThumbnail}>
               {isSaving ? "Saving..." : "Save Changes"}
             </Button>
           </DialogFooter>
