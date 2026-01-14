@@ -26,6 +26,7 @@ import { useWalletStatus } from "@/lib/hooks/accountkit/useWalletStatus";
 import { createVote } from "@/app/vote/[id]/actions";
 import { SNAPSHOT_SPACE } from "@/context/context";
 import { LinkedIdentityDisplay } from "@/components/vote/LinkedIdentityDisplay";
+import { useMembershipVerification } from "@/lib/hooks/unlock/useMembershipVerification";
 
 /**
  * Extract Smart Wallet address from proposal plugins metadata
@@ -240,6 +241,7 @@ function VotingForm({ proposal }: { proposal: Proposal }) {
   const { chain } = useChain();
   const { isConnected, walletAddress } = useWalletStatus();
   const { openAuthModal } = useAuthModal();
+  const { isVerified, hasMembership, isLoading: isMembershipLoading } = useMembershipVerification();
   
   /**
    * IDENTITY STRATEGY:
@@ -251,8 +253,17 @@ function VotingForm({ proposal }: { proposal: Proposal }) {
    */
   const signer = useSigner();
 
+  // Check if user has creative membership (one of the three tiers)
+  const canVote = isVerified && hasMembership;
+
   async function onSubmit(values: { choice: string }) {
     setError(null);
+
+    // Check membership first
+    if (!canVote) {
+      setError("You need a Creative Pass membership (Creative Pass, Creative Pass Plus, or Creative Pass Pro) to vote. Please purchase a membership to participate in voting.");
+      return;
+    }
 
     // Validate connection state
     if (!isConnected || !walletAddress || !chain?.id) {
@@ -419,6 +430,135 @@ function VotingForm({ proposal }: { proposal: Proposal }) {
     }
   }
 
+  // Show membership requirement message if user doesn't have membership
+  // Only show this if membership check is complete (not loading) and user is connected but doesn't have membership
+  if (!isMembershipLoading && isConnected && !canVote) {
+    return (
+      <div className="space-y-4">
+        <div className="p-4 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+          <h3 className="font-semibold text-yellow-800 dark:text-yellow-200 mb-2">
+            Membership Required to Vote
+          </h3>
+          <p className="text-sm text-yellow-700 dark:text-yellow-300 mb-3">
+            You need a Creative Pass membership to participate in voting. Choose from one of our three tiers:
+          </p>
+          <ul className="text-sm text-yellow-700 dark:text-yellow-300 list-disc list-inside space-y-1 mb-3">
+            <li>Creative Pass</li>
+            <li>Creative Pass Plus</li>
+            <li>Creative Pass Pro</li>
+          </ul>
+          <p className="text-sm text-yellow-700 dark:text-yellow-300">
+            You can view all proposals and results, but voting requires an active membership NFT.
+          </p>
+        </div>
+        <div className="p-4 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg">
+          <FormProvider {...methods}>
+            <form className="space-y-4 opacity-60 pointer-events-none">
+              <FormField
+                name="choice"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="mb-3">Vote</FormLabel>
+                    <FormControl>
+                      <RadioGroup
+                        onValueChange={field.onChange}
+                        value={field.value}
+                        className="flex flex-col gap-4"
+                      >
+                        {proposal.choices.map((choice, idx) => (
+                          <div key={choice} className="flex items-center space-x-3 py-1">
+                            <RadioGroupItem
+                              value={choice}
+                              id={`choice-${proposal.id}-${idx}`}
+                              disabled
+                            />
+                            <Label
+                              htmlFor={`choice-${proposal.id}-${idx}`}
+                              className="font-normal"
+                            >
+                              {choice}
+                            </Label>
+                          </div>
+                        ))}
+                      </RadioGroup>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <Button type="button" className="mt-6 w-full" disabled>
+                Submit Vote
+              </Button>
+            </form>
+          </FormProvider>
+        </div>
+      </div>
+    );
+  }
+
+  // Show connect wallet message if user is not connected
+  if (!isConnected && !isMembershipLoading) {
+    return (
+      <div className="space-y-4">
+        <div className="p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+          <h3 className="font-semibold text-blue-800 dark:text-blue-200 mb-2">
+            Connect Your Wallet to Vote
+          </h3>
+          <p className="text-sm text-blue-700 dark:text-blue-300 mb-3">
+            You can view all proposals and results without connecting, but you need to connect your wallet to participate in voting.
+          </p>
+          <Button
+            onClick={() => openAuthModal()}
+            className="mt-2"
+          >
+            Connect Wallet
+          </Button>
+        </div>
+        <div className="p-4 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg">
+          <FormProvider {...methods}>
+            <form className="space-y-4 opacity-60 pointer-events-none">
+              <FormField
+                name="choice"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="mb-3">Vote</FormLabel>
+                    <FormControl>
+                      <RadioGroup
+                        onValueChange={field.onChange}
+                        value={field.value}
+                        className="flex flex-col gap-4"
+                      >
+                        {proposal.choices.map((choice, idx) => (
+                          <div key={choice} className="flex items-center space-x-3 py-1">
+                            <RadioGroupItem
+                              value={choice}
+                              id={`choice-${proposal.id}-${idx}`}
+                              disabled
+                            />
+                            <Label
+                              htmlFor={`choice-${proposal.id}-${idx}`}
+                              className="font-normal"
+                            >
+                              {choice}
+                            </Label>
+                          </div>
+                        ))}
+                      </RadioGroup>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <Button type="button" className="mt-6 w-full" disabled>
+                Submit Vote
+              </Button>
+            </form>
+          </FormProvider>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <FormProvider {...methods}>
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -432,16 +572,18 @@ function VotingForm({ proposal }: { proposal: Proposal }) {
                   onValueChange={field.onChange}
                   value={field.value}
                   className="flex flex-col gap-4"
+                  disabled={!canVote || isMembershipLoading}
                 >
                   {proposal.choices.map((choice, idx) => (
                     <div key={choice} className="flex items-center space-x-3 py-1">
                       <RadioGroupItem
                         value={choice}
                         id={`choice-${proposal.id}-${idx}`}
+                        disabled={!canVote || isMembershipLoading}
                       />
                       <Label
                         htmlFor={`choice-${proposal.id}-${idx}`}
-                        className="cursor-pointer font-normal"
+                        className={canVote && !isMembershipLoading ? "cursor-pointer font-normal" : "font-normal"}
                       >
                         {choice}
                       </Label>
@@ -458,7 +600,11 @@ function VotingForm({ proposal }: { proposal: Proposal }) {
             {error}
           </div>
         )}
-        <Button type="submit" className="mt-6 w-full" disabled={isSubmitting}>
+        <Button 
+          type="submit" 
+          className="mt-6 w-full" 
+          disabled={isSubmitting || !canVote || isMembershipLoading}
+        >
           {isSubmitting ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...

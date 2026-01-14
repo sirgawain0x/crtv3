@@ -1585,8 +1585,8 @@ export function AccountDropdown() {
           }
         }}
       >
-        <DialogContent className="sm:max-w-[425px] w-[95%] max-w-[95vw] md:w-auto max-h-[95vh] sm:max-h-[90vh] overflow-hidden">
-          <DialogHeader className="pb-4 pr-12">
+        <DialogContent className="w-[95vw] max-w-[425px] max-h-[95vh] sm:max-h-[90vh] overflow-hidden p-4 sm:p-6 rounded-lg">
+          <DialogHeader className="pb-4 pr-8 sm:pr-12">
             <DialogTitle className="text-lg sm:text-xl">
               {dialogAction.charAt(0).toUpperCase() + dialogAction.slice(1)}
             </DialogTitle>
@@ -1608,7 +1608,7 @@ export function AccountDropdown() {
             </DialogClose>
           </DialogHeader>
           <div className="flex flex-col overflow-hidden">
-            <div className="space-y-4 overflow-y-auto flex-1 pr-2">
+            <div className="space-y-4 overflow-y-auto flex-1 pr-1 sm:pr-2">
               {getDialogContent()}
             </div>
           </div>

@@ -427,11 +427,9 @@ export default function Navbar() {
               <Link href="/market" className={navLinkClass} id="nav-trade-link">
                 Trade
               </Link>
-              {isVerified && hasMembership && (
-                <Link href="/vote" prefetch={false} className={navLinkClass}>
-                  Vote
-                </Link>
-              )}
+              <Link href="/vote" prefetch={false} className={navLinkClass}>
+                Vote
+              </Link>
             </nav>
           </div>
 
@@ -547,16 +545,13 @@ export default function Navbar() {
                   >
                     Trade
                   </Link>
-
-                  {user && isVerified && hasMembership && (
-                    <Link
-                      href="/vote"
-                      className={mobileNavLinkClass}
-                      onClick={handleLinkClick}
-                    >
-                      Vote
-                    </Link>
-                  )}
+                  <Link
+                    href="/vote"
+                    className={mobileNavLinkClass}
+                    onClick={handleLinkClick}
+                  >
+                    Vote
+                  </Link>
 
                   {/* Member/User Options */}
                   {user && (
