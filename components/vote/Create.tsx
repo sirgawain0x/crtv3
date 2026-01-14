@@ -1,14 +1,14 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import React, { useState, Suspense, useEffect } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useChain, useSigner } from "@account-kit/react";
+import { useChain, useAuthModal, useSigner } from "@account-kit/react";
 import { useRouter } from "next/navigation";
 import { createProposal } from "@/app/vote/create/[address]/actions";
 import { SNAPSHOT_SPACE } from "@/context/context";
-import { createPublicClient, stringToHex } from "viem";
+import { createPublicClient } from "viem";
 import { alchemy, base } from "@account-kit/infra";
 import {
   Form,
@@ -25,6 +25,9 @@ import { Loader2 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { useWalletStatus } from "@/lib/hooks/accountkit/useWalletStatus";
+import { useLinkedIdentity } from "@/lib/hooks/useLinkedIdentity";
+import { formatProposalAuthor } from "@/lib/utils/linked-identity";
+import { shortenAddress } from "@/lib/utils/utils";
 
 const proposalSchema = z.object({
   title: z.string().min(3, "Title is required"),
@@ -47,9 +50,15 @@ type ProposalForm = z.infer<typeof proposalSchema>;
 
 function getUnixTimestamp(date: string, time: string) {
   if (!date || !time) return 0;
-  const [year, month, day] = date.split("-").map(Number);
-  const [hour, minute] = time.split(":").map(Number);
-  return Math.floor(Date.UTC(year, month - 1, day, hour, minute) / 1000);
+  // Interpret the date/time inputs as **local time** (what the user picked in the UI),
+  // then convert to a unix timestamp (seconds).
+  //
+  // Using Date.UTC here can shift the timestamp and accidentally place `end` in the past
+  // for users outside UTC, which Snapshot rejects.
+  const d = new Date(`${date}T${time}:00`);
+  const ms = d.getTime();
+  if (Number.isNaN(ms)) return 0;
+  return Math.floor(ms / 1000);
 }
 
 function Create() {
@@ -63,12 +72,50 @@ function Create() {
     smartAccountClient,
     isLoadingClient,
     isConnected,
-    walletAddress, // EOA address
-    smartAccountAddress: address,
+    walletAddress, // EOA address (for signing)
+    smartAccountAddress: address, // Smart Wallet address (primary identity)
   } = useWalletStatus();
 
-  // Use the signer directly to sign as EOA (Signer)
+  // Get linked identity information
+  const { linkedIdentity, isPermitted, isVerifying } = useLinkedIdentity();
+
+  // Auth modal for re-authentication if connection is lost
+  const { openAuthModal } = useAuthModal();
+
+  /**
+   * IDENTITY STRATEGY FOR CREATIVE TV:
+   * 
+   * Primary Identity (Public): Smart Wallet Address
+   * - This is what users see and interact with
+   * - Used for receiving assets, tips, IP sales
+   * - Better security, social recovery, Web2-like UX
+   * 
+   * Functional Identity (Background): EOA Address
+   * - Used for signing operations (Snapshot, approvals, etc.)
+   * - Many governance tools (like Snapshot) require ECDSA signatures from EOA
+   * - Kept in background for permissions and author roles
+   * 
+   * SNAPSHOT SPECIFIC:
+   * Snapshot sequencer validates signatures as EOA ECDSA (ecrecover). It does NOT accept
+   * smart account / ERC-1271 / ERC-6492 signatures for proposal creation.
+   * 
+   * Therefore, we must sign the Snapshot EIP-712 payload with the underlying EOA signer,
+   * and submit `address` + `message.from` as the EOA address (walletAddress).
+   * 
+   * FUTURE ENHANCEMENT:
+   * Consider using Delegate.cash to link EOA to Smart Wallet, allowing Smart Wallet
+   * to get "credit" for proposals while EOA does the actual signing.
+   */
   const signer = useSigner();
+
+  // Debug info on mount
+  useEffect(() => {
+    console.log("=== Wallet Debug Info ===");
+    console.log("Smart account client:", smartAccountClient ? "exists" : "null");
+    console.log("Smart account address:", address || "not available");
+    console.log("Wallet address:", walletAddress || "not available");
+    console.log("=========================");
+  }, [smartAccountClient, address, walletAddress]);
 
   const form = useForm<ProposalForm>({
     resolver: zodResolver(proposalSchema),
@@ -105,29 +152,39 @@ function Create() {
       return;
     }
 
-    if (isLoadingClient) {
-      setFormError("Smart account client is still loading. Please wait...");
-      setIsSubmitting(false);
-      return;
-    }
-
-    if (!smartAccountClient) {
-      setFormError("Smart account client not ready. Please connect your wallet.");
-      setIsSubmitting(false);
-      return;
-    }
-
+    // Snapshot requires EOA signature
     if (!signer) {
-      setFormError("Signer not available. Please refresh the page.");
-      setIsSubmitting(false);
+      setFormError("Signer not available. Please sign in again.");
+      openAuthModal();
       return;
+    }
+
+    // Verify EOA is a permitted signer for Smart Wallet (if Smart Wallet exists)
+    if (address && walletAddress && address.toLowerCase() !== walletAddress.toLowerCase()) {
+      if (isVerifying) {
+        setFormError("Verifying signer permissions...");
+        return;
+      }
+      if (isPermitted === false) {
+        setFormError(
+          "Your EOA is not a permitted signer for your Smart Wallet. " +
+          "Please ensure you're using the correct wallet or contact support."
+        );
+        return;
+      }
     }
 
     const start = getUnixTimestamp(values.start, values.startTime);
     const end = getUnixTimestamp(values.end, values.endTime);
+    const nowTs = Math.floor(Date.now() / 1000);
 
     if (end <= start) {
       setFormError("End time must be after start time.");
+      return;
+    }
+    // Snapshot requires proposal end date to be in the future
+    if (end <= nowTs) {
+      setFormError("End time must be in the future.");
       return;
     }
 
@@ -135,13 +192,8 @@ function Create() {
 
     try {
       console.log("Starting proposal creation...");
-      console.log("Using signer (EOA) address:", walletAddress);
-      console.log("Signer object keys:", Object.keys(signer || {}));
-      console.log("Signer methods:",
-        Object.getOwnPropertyNames(Object.getPrototypeOf(signer) || {}).concat(
-          Object.keys(signer || {})
-        ).filter(k => typeof (signer as any)[k] === 'function')
-      );
+      console.log("Using wallet address:", walletAddress);
+      console.log("Smart account address:", address);
 
       // Get current block number before signing
       console.log("Fetching block number...");
@@ -192,121 +244,167 @@ function Create() {
         }
       }
 
-      // Create proposal payload for signing with actual block number
-      // CRITICAL: Use Smart Account address for attribution, but sign with EOA signer
-      const proposalPayload = {
-        address, // Use Smart Account address
-        space: SNAPSHOT_SPACE,
-        type: "weighted",
-        title: values.title,
-        body: values.content,
-        choices: values.choices.map((c) => c.value),
-        start,
-        end,
-        snapshot: blockNumber,
-        discussion: "",
-        plugins: {
-          poap: {
-            address: poapEventId ? `0x${poapEventId}` : "0x0000000000000000000000000000000000000000",
-            tokenId: poapTokenId || "1",
-          },
-        },
-      };
-
-      // Sign the proposal message on client side using EOA Signer
-      console.log("Preparing message to sign...");
-      const messageToSign = JSON.stringify(proposalPayload);
-      console.log("Message to sign prepared");
-
-      // Ensure iframe container exists (this is where Alchemy injects the signer)
-      const iframeContainer = document.getElementById("alchemy-signer-iframe-container");
-      if (!iframeContainer) {
-        throw new Error("Alchemy signer iframe container not found. This may indicate the wallet connection is broken.");
-      }
-
-      // Debugging Signer State
-      console.log("Signer Type:", (signer as any).signerType);
-
-      console.log("Verifying signer responsiveness...");
-      const signerAddress = await signer.getAddress();
-      console.log("Signer responded with address:", signerAddress);
-
-      if (signerAddress !== walletAddress) {
-        console.warn("Signer address mismatch!", { signerAddress, walletAddress });
-      }
-
-      console.log("Calling signer.signTypedData...");
+      // Prepare EIP-712 typed data for signing
+      // Using Snapshot's exact proposal types from @snapshot-labs/snapshot.js
+      console.log("Preparing typed data to sign...");
 
       const domain = {
         name: "snapshot",
         version: "0.1.4",
       } as const;
 
+      // Snapshot's exact proposal types - must match their schema exactly
       const types = {
         Proposal: [
-          { name: "from", type: "address" },
+          { name: "from", type: "string" },
           { name: "space", type: "string" },
           { name: "timestamp", type: "uint64" },
-          { name: "payload", type: "string" },
+          { name: "type", type: "string" },
+          { name: "title", type: "string" },
+          { name: "body", type: "string" },
+          { name: "discussion", type: "string" },
+          { name: "choices", type: "string[]" },
+          { name: "labels", type: "string[]" },
+          { name: "start", type: "uint64" },
+          { name: "end", type: "uint64" },
+          { name: "snapshot", type: "uint64" },
+          { name: "plugins", type: "string" },
+          // Some Snapshot sequencer configs reject proposals that explicitly set `privacy`,
+          // but still expect `privacy` to exist in `types`. To handle this, we:
+          // - include `privacy` in the EIP-712 types (matches Snapshot.js)
+          // - sign with `privacy: ""`
+          // - omit `privacy` from the submitted message payload (server should default it)
+          { name: "privacy", type: "string" },
+          { name: "app", type: "string" },
         ],
       } as const;
 
-      // We need to sync timestamp between envelope and payload?
-      // Usually payload contains 'timestamp' too (created timestamp).
-      // Let's ensure proposalPayload has timestamp if needed.
-      // proposalPayload has 'start', 'end', 'snapshot'. It does NOT have 'timestamp' (created).
-      // Snapshot proposals usually have a 'timestamp' field in the body too.
-      // Let's add it to proposalPayload.
-
       const now = Math.floor(Date.now() / 1000);
-      (proposalPayload as any).timestamp = now;
-      const updatedProposalString = JSON.stringify(proposalPayload);
 
+      // Build the message with all required fields matching Snapshot's schema
+      // Message used for SIGNING (includes privacy, because it's in the types)
       const typedMessage = {
-        from: address!, // Use Smart Account address here
+        from: walletAddress, // EOA address (Snapshot requires EOA signature)
         space: SNAPSHOT_SPACE,
-        timestamp: now as any, // Cast to any to avoid TS error with BigInt requirement, as number works at runtime
-        payload: updatedProposalString
+        timestamp: BigInt(now),
+        type: "single-choice" as const,
+        title: values.title,
+        body: values.content,
+        discussion: "",
+        choices: values.choices.map((c) => c.value),
+        labels: [] as string[],
+        start: BigInt(start),
+        end: BigInt(end),
+        snapshot: BigInt(blockNumber),
+        plugins: JSON.stringify({
+          poap: {
+            address: poapEventId ? `0x${poapEventId}` : "0x0000000000000000000000000000000000000000",
+            tokenId: poapTokenId || "1",
+          },
+          // Store Smart Wallet address for linked identity display
+          creativeTv: {
+            smartWallet: address || null, // Primary identity (Smart Wallet)
+            eoa: walletAddress, // Signing identity (EOA)
+          },
+        }),
+        privacy: "",
+        app: "creative-tv",
       };
 
       console.log("Signing Typed Data:", { domain, types, message: typedMessage });
 
-      let signature: string;
+      // Best-effort: verify signer is responsive and bound to the expected EOA.
+      // Some environments report waitForConnected timeouts even when signing works, so do not hard-fail on it.
       try {
-        // signer.signTypedData signature: (params: { domain, types, primaryType, message })
-        const signPromise = signer.signTypedData({
+        const signerAddr = await Promise.race([
+          signer.getAddress(),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("getAddress timed out")), 10000),
+          ),
+        ]);
+        console.log("Signer getAddress():", signerAddr);
+        if (signerAddr?.toLowerCase?.() !== walletAddress.toLowerCase()) {
+          console.warn(
+            "Signer address mismatch; expected walletAddress",
+            walletAddress,
+            "got",
+            signerAddr,
+          );
+        }
+      } catch (e) {
+        console.warn("Signer getAddress failed/timed out:", e);
+        setFormError("Wallet signer is not ready. Please sign in again.");
+        openAuthModal();
+        return;
+      }
+
+      if (typeof (signer as any).waitForConnected === "function") {
+        try {
+          await Promise.race([
+            (signer as any).waitForConnected(),
+            new Promise((_, reject) =>
+              setTimeout(() => reject(new Error("waitForConnected timed out")), 30000),
+            ),
+          ]);
+          console.log("Signer waitForConnected(): connected");
+        } catch (e) {
+          console.warn("Signer waitForConnected failed/timed out:", e);
+          // Continue anyway; signing may still succeed.
+        }
+      }
+
+      console.log("Using EOA signer.signTypedData (Snapshot-compatible)...");
+
+      const signature = await Promise.race([
+        signer.signTypedData({
           domain,
           types,
           primaryType: "Proposal",
           message: typedMessage,
-        });
+        } as any),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("Signing timed out after 120s")), 120000),
+        ),
+      ]);
 
-        const timeoutPromise = new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error("Signing timed out after 60s.")), 60000);
-        });
-
-        // The signer returns a signature directly
-        const result = await Promise.race([signPromise, timeoutPromise]);
-        signature = result as string;
-
-        console.log("✅ Typed Data Signed successfully:", signature);
-
-        // Temporarily stop here to verify success
-        // throw new Error("EIP-712 Signing Worked! Implementation needed for backend.");
-      } catch (error) {
-        console.error("❌ Error signing message:", error);
-        throw error instanceof Error
-          ? error
-          : new Error(`Failed to sign message: ${String(error)}`);
-      }
+      console.log("✅ Typed Data Signed successfully:", signature);
 
       console.log("Submitting proposal to server...");
 
-      // Construct the full EIP-712 envelope to send to the server
+      // Snapshot.js expects the EIP-712 envelope format: { domain, types, message }
+      // The 'message' contains the actual signed data structure
+      // Note: Convert BigInts to numbers for JSON serialization
       const envelope = {
         domain,
         types,
-        message: typedMessage
+        message: {
+          from: walletAddress,
+          space: SNAPSHOT_SPACE,
+          timestamp: now, // number for JSON
+          type: "single-choice",
+          title: values.title,
+          body: values.content,
+          discussion: "",
+          choices: values.choices.map((c) => c.value),
+          labels: [],
+          start: start, // number for JSON
+          end: end, // number for JSON
+          snapshot: blockNumber, // number for JSON
+          plugins: JSON.stringify({
+            poap: {
+              address: poapEventId ? `0x${poapEventId}` : "0x0000000000000000000000000000000000000000",
+              tokenId: poapTokenId || "1",
+            },
+            // Store Smart Wallet address for linked identity display
+            creativeTv: {
+              smartWallet: address || null, // Primary identity (Smart Wallet)
+              eoa: walletAddress, // Signing identity (EOA)
+            },
+          }),
+          // Must match the signed typed data exactly for signature validation to pass
+          privacy: "",
+          app: "creative-tv",
+        },
       };
 
       const result = await createProposal({
@@ -315,16 +413,23 @@ function Create() {
         choices: values.choices.map((c) => c.value),
         start,
         end,
-        address: address!, // Use Smart Account address for attribution
+        // Snapshot expects the signing address here (EOA)
+        address: walletAddress,
         chainId: chain.id,
         signature,
-        // Pass the full envelope as the payload for EIP-712
-        proposalPayload: envelope as any,
+        // Pass the EIP-712 envelope - this is what Snapshot's API expects
+        proposalPayload: envelope,
       });
 
       if (result?.serverError) {
         console.error("Server error:", result.serverError);
-        setFormError(result.serverError || "Failed to create proposal.");
+        // Format the error message to be more user-friendly
+        let errorMsg = result.serverError;
+        if (errorMsg.includes("validation failed")) {
+          const spaceUrl = `https://snapshot.org/#/${SNAPSHOT_SPACE}/settings`;
+          errorMsg = `Proposal validation failed. This usually means:\n\n• You don't have permission to create proposals (check if you're a member/admin)\n• You don't meet the minimum voting power requirement\n• The proposal doesn't meet the space's validation rules\n• The voting period might be too short\n\nCheck space settings: ${spaceUrl}\n\nIf you believe this is an error, contact the space admin.`;
+        }
+        setFormError(errorMsg || "Failed to create proposal.");
         return;
       }
       if (result?.validationErrors) {
@@ -339,6 +444,13 @@ function Create() {
       }
 
       console.log("Proposal created successfully:", result.data);
+      
+      // Show success message with linked identity
+      const authorDisplay = linkedIdentity?.isLinked
+        ? formatProposalAuthor(address || null, walletAddress)
+        : shortenAddress(walletAddress);
+      
+      console.log(`Proposal submitted by: ${authorDisplay}`);
       router.push("/vote");
     } catch (error) {
       console.error("Error creating proposal:", error);

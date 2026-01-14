@@ -1,6 +1,5 @@
 import { createSafeActionClient } from "next-safe-action";
 import { z } from "zod";
-import type { ActionResponse } from "@/lib/types/actions";
 import { submitSnapshotProposal } from "@/lib/sdk/snapshot/snapshot-proposal-wrapper";
 
 const actionClient = createSafeActionClient();
@@ -22,42 +21,27 @@ export const createProposal = actionClient
   .action(async ({ parsedInput }) => {
     const { address, end, start, signature, proposalPayload } = parsedInput;
 
-    if (!address)
-      return {
-        success: false,
-        error: "Wallet address required",
-      } as ActionResponse;
-
-    if (end <= start)
-      return {
-        success: false,
-        error: "End time must be after start time",
-      } as ActionResponse;
-
-    try {
-      // Submit the pre-signed proposal to Snapshot
-      // The proposal payload already includes the block number from the client
-      const result = await submitSnapshotProposal({
-        address,
-        signature,
-        proposal: proposalPayload,
-      });
-
-      if ("error" in result) {
-        console.error("Snapshot proposal error:", result.error);
-        return { success: false, error: result.error } as ActionResponse;
-      }
-
-      return { success: true, data: { id: result.id } } as ActionResponse<{
-        id: string;
-      }>;
-    } catch (error) {
-      console.error("Error creating proposal:", error);
-      const errorMessage =
-        error instanceof Error ? error.message : "Failed to create proposal";
-      return {
-        success: false,
-        error: errorMessage,
-      } as ActionResponse;
+    if (!address) {
+      throw new Error("Wallet address required");
     }
+
+    if (end <= start) {
+      throw new Error("End time must be after start time");
+    }
+
+    // Submit the pre-signed proposal to Snapshot
+    // The proposal payload already includes the block number from the client
+    const result = await submitSnapshotProposal({
+      address,
+      signature,
+      proposal: proposalPayload,
+    });
+
+    if ("error" in result) {
+      console.error("Snapshot proposal error:", result.error);
+      throw new Error(result.error);
+    }
+
+    // Return data directly - next-safe-action will wrap it in { data: ... }
+    return { id: result.id };
   });

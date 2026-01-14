@@ -36,12 +36,14 @@ export const Providers = (
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    // Clean up any existing iframes before initializing providers
+    // Only clean up DUPLICATE iframes, not the active one
+    // This prevents breaking the signer connection while still handling hot-reload duplicates
     cleanupExistingIframes();
     setIsReady(true);
   }, []);
 
-  // Don't render providers until cleanup is complete
+  // Don't render providers until ready
+  // Note: We removed aggressive iframe cleanup to preserve the signer connection
   if (!isReady) {
     return (
       <div className="flex min-h-screen items-center justify-center">

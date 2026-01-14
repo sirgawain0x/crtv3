@@ -93,35 +93,51 @@ export async function submitSnapshotProposal({
   }
 
   // Validate signature format
-  if (!sig.startsWith('0x') || sig.length !== 132) {
+  if (!sig.startsWith('0x')) {
     return {
-      error: `Invalid signature format. Expected 0x-prefixed 132 character hex string, got: ${sig.length} characters`,
+      error: `Invalid signature format. Expected 0x-prefixed hex string, got: ${sig.substring(0, 10)}...`,
     };
   }
+  
+  console.log(`Signature length: ${sig.length} chars (standard is 132)`);
+  console.log(`Signature: ${sig.substring(0, 30)}...${sig.substring(sig.length - 10)}`);
+  
+  // Minimum length check for standard ECDSA signature
+  if (sig.length < 132) {
+    console.warn(`Warning: Signature is shorter than standard (${sig.length} < 132 chars)`);
+  }
 
+  // Snapshot expects: { address, sig, data }
+  // where 'data' is the EIP-712 envelope { domain, types, message } for EIP-712 signatures
+  // or the raw proposal data for personal_sign
   const requestBody = {
     address: finalAddress,
     sig,
     data: payload,
-    type: "proposal",
+    // Note: 'type' field is NOT needed when using EIP-712 envelope format
+    // The type is inferred from the types in the envelope
   };
 
+  // Extract message fields for logging (handle both EIP-712 and personal_sign formats)
+  const messageData = isEip712 ? (payload as any).message : payload;
+  
   console.log("Submitting to Snapshot:", {
     url: `${hubUrl}/api/msg`,
     address: finalAddress,
     signatureLength: sig.length,
     signaturePrefix: sig.substring(0, 10) + "...",
+    isEip712,
     payloadKeys: Object.keys(payload),
-    payloadFields: {
-      space: payload.space,
-      type: payload.type,
-      title: payload.title,
-      hasBody: !!payload.body,
-      choicesCount: Array.isArray(payload.choices) ? payload.choices.length : 0,
-      start: payload.start,
-      end: payload.end,
-      snapshot: payload.snapshot,
-      hasAddress: !!payload.address,
+    messageFields: {
+      space: messageData?.space,
+      type: messageData?.type,
+      title: messageData?.title,
+      hasBody: !!messageData?.body,
+      choicesCount: Array.isArray(messageData?.choices) ? messageData.choices.length : 0,
+      start: messageData?.start,
+      end: messageData?.end,
+      snapshot: messageData?.snapshot,
+      from: messageData?.from,
     },
     fullPayload: JSON.stringify(payload, null, 2),
   });
@@ -147,57 +163,41 @@ export async function submitSnapshotProposal({
     try {
       const errorJson = JSON.parse(responseText);
 
-      if (errorJson.error) {
-        errorMessage = `Snapshot proposal failed: ${errorJson.error}`;
-        // Include additional error details if available
+      // Log full error for debugging
+      console.error("Full Snapshot error response:", JSON.stringify(errorJson, null, 2));
+
+      // Extract error message with priority order
+      if (errorJson.error_description) {
+        errorMessage = errorJson.error_description;
+        // If it's a validation error, try to get more context
+        if (errorJson.error_description === "validation failed" && errorJson.details) {
+          errorMessage = `Validation failed: ${JSON.stringify(errorJson.details)}`;
+        } else if (errorJson.error_description === "validation failed") {
+          errorMessage = "Validation failed. This could mean:\n- You don't have permission to create proposals in this space\n- You don't meet the minimum voting power requirement\n- The proposal doesn't meet the space's validation rules\n- Check the space settings at https://snapshot.org/#/" + (proposal as any).message?.space || "your-space";
+        }
+      } else if (errorJson.error) {
+        errorMessage = errorJson.error;
         if (errorJson.details) {
           errorMessage += ` - ${JSON.stringify(errorJson.details)}`;
         }
-        errorDetails = errorJson;
       } else if (errorJson.message) {
-        errorMessage = `Snapshot proposal failed: ${errorJson.message}`;
-        errorDetails = errorJson;
+        errorMessage = errorJson.message;
       } else if (errorJson.reason) {
-        errorMessage = `Snapshot proposal failed: ${errorJson.reason}`;
-        errorDetails = errorJson;
-      } else if (errorJson.error_description) {
-        errorMessage = `Snapshot proposal failed: ${errorJson.error_description}`;
-        errorDetails = errorJson;
+        errorMessage = errorJson.reason;
       } else if (Object.keys(errorJson).length > 0) {
         // Response has data but no standard error field - include it for debugging
         errorDetails = errorJson;
         errorMessage = `Snapshot proposal failed: ${res.statusText} - ${JSON.stringify(errorJson).substring(0, 200)}`;
       }
 
-      // For "client_error", try to extract more details
-      if (errorMessage.includes("client_error") && errorJson) {
-        // Log the full error response to help debug
-        console.error("Snapshot client_error details - full response:", JSON.stringify(errorJson, null, 2));
-
-        // Check for common issues
-        if (errorJson.message) {
-          errorMessage = `Snapshot proposal failed: ${errorJson.message}`;
-        } else if (errorJson.reason) {
-          errorMessage = `Snapshot proposal failed: ${errorJson.reason}`;
-        } else {
-          errorMessage = `Snapshot proposal failed: client_error - ${JSON.stringify(errorJson)}`;
-        }
-      }
+      errorDetails = errorJson;
     } catch {
       // If JSON parsing fails, include the raw response
       errorMessage = `Snapshot proposal failed: ${res.statusText} - ${responseText.substring(0, 200)}`;
     }
 
-    // Only log error details if they contain useful information
-    if (errorDetails) {
-      console.error("Snapshot error details:", errorDetails);
-    } else {
-      console.error("Snapshot error - no details available. Response:", {
-        status: res.status,
-        statusText: res.statusText,
-        body: responseText.substring(0, 500),
-      });
-    }
+    // Log error details for debugging
+    console.error("Snapshot error details:", errorDetails || responseText);
 
     return { error: errorMessage };
   }

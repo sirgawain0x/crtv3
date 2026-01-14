@@ -8,6 +8,23 @@ import type { Proposal } from "@/components/proposal-list/ProposalList";
 import { VotingForm } from "@/components/proposal-list/ProposalList";
 import ClaimPoap from "@/components/vote/ClaimPoap";
 import { shortenAddress } from "@/lib/utils/utils";
+import { LinkedIdentityDisplay } from "@/components/vote/LinkedIdentityDisplay";
+import { SNAPSHOT_SPACE } from "@/context/context";
+import Link from "next/link";
+import { ExternalLink } from "lucide-react";
+
+/**
+ * Extract Smart Wallet address from proposal plugins metadata
+ */
+function extractSmartWalletFromPlugins(plugins: string | null | undefined): string | null {
+  if (!plugins) return null;
+  try {
+    const parsed = typeof plugins === "string" ? JSON.parse(plugins) : plugins;
+    return parsed?.creativeTv?.smartWallet || null;
+  } catch {
+    return null;
+  }
+}
 
 const GET_PROPOSAL = gql`
   query Proposal($id: String!) {
@@ -24,6 +41,7 @@ const GET_PROPOSAL = gql`
       scores
       scores_total
       votes
+      plugins
     }
   }
 `;
@@ -38,7 +56,7 @@ export default async function ProposalDetailsPage({
   const { id } = await params;
   const client = makeServerClient();
   const { data } = await client.query<{
-    proposal: Proposal & { author: string };
+    proposal: Proposal & { author: string; plugins?: string };
   }>({
     query: GET_PROPOSAL,
     variables: { id },
@@ -108,7 +126,11 @@ export default async function ProposalDetailsPage({
             </h1>
             <div className="mb-4 text-gray-500 space-y-1 break-all">
               <div className="truncate max-w-full">
-                By: {shortenAddress(proposal.author)}
+                <LinkedIdentityDisplay
+                  authorEOA={proposal.author}
+                  smartWalletAddress={extractSmartWalletFromPlugins(proposal.plugins)}
+                  showFull={false}
+                />
               </div>
               <div>
                 Start: {new Date(proposal.start * 1000).toLocaleString()}
@@ -121,7 +143,15 @@ export default async function ProposalDetailsPage({
             </div>
             <div className="mb-6">
               <span className="font-semibold">Snapshot:</span>{" "}
-              {proposal.snapshot}
+              <Link
+                href={`https://snapshot.box/#/s:${SNAPSHOT_SPACE}/proposal/${proposal.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-blue-500 hover:text-blue-700 underline font-mono"
+              >
+                {proposal.snapshot}
+                <ExternalLink className="h-3 w-3" />
+              </Link>
             </div>
           </Card>
           <Card className="p-6 mb-6">

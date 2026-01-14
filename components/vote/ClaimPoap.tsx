@@ -46,10 +46,22 @@ const ClaimPoap = ({ address, proposalId, snapshot }: Props) => {
   useEffect(() => {
     const fetchState = async () => {
       try {
+        // Use proposalId (Snapshot proposal ID) instead of snapshot (block number)
+        // The POAP API expects the Snapshot proposal ID
         const response = await fetch(
-          constructApiUrl(`snapshot/proposal/${snapshot}`)
+          `/api/poap-proxy?proposalId=${encodeURIComponent(proposalId)}`
         );
-        if (!response.ok) throw new Error("Failed to fetch event");
+        if (!response.ok) {
+          // If authentication fails or POAP is not configured, show NO_POAP state
+          const errorData = await response.json().catch(() => ({}));
+          if (response.status === 500 && errorData.error?.includes("authenticate")) {
+            // POAP authentication not configured - silently show NO_POAP
+            console.warn("POAP authentication not configured. POAP features disabled.");
+            setCurrentState(NO_POAP);
+            return;
+          }
+          throw new Error("Failed to fetch event");
+        }
         const {
           image_url,
           currentState,
@@ -58,10 +70,12 @@ const ClaimPoap = ({ address, proposalId, snapshot }: Props) => {
         setCurrentState(currentState);
       } catch (error) {
         console.error("Error fetching current state:", error);
+        // Set to NO_POAP state on error so UI doesn't break
+        setCurrentState(NO_POAP);
       }
     };
     fetchState();
-  }, [address, snapshot]);
+  }, [address, proposalId]);
 
   const action = async () => {
     if ([CLAIMED, UNCLAIMED].includes(currentState)) {

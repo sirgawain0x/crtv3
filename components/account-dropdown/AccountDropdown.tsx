@@ -312,15 +312,14 @@ export function AccountDropdown() {
 
   useEffect(() => {
     let newDisplayAddress = "";
-    if (user?.type === "eoa" && user?.address)
-      newDisplayAddress = `${user.address.slice(0, 6)}...${user.address.slice(
-        -4
-      )}`;
-    else if (smartAccountAddress)
-      newDisplayAddress = `${smartAccountAddress.slice(
-        0,
-        6
-      )}...${smartAccountAddress.slice(-4)}`;
+    // Smart Wallet is the primary public identity for Creative TV
+    // EOA is kept in background for signing and permissions
+    if (smartAccountAddress) {
+      newDisplayAddress = `${smartAccountAddress.slice(0, 6)}...${smartAccountAddress.slice(-4)}`;
+    } else if (user?.address) {
+      // Fallback to EOA only if Smart Wallet is not available
+      newDisplayAddress = `${user.address.slice(0, 6)}...${user.address.slice(-4)}`;
+    }
     // Only update if value actually changes
     if (displayAddress !== newDisplayAddress)
       setDisplayAddress(newDisplayAddress);
@@ -400,8 +399,9 @@ export function AccountDropdown() {
   }, [client, smartAccountAddress, dialogAction, isDialogOpen, chain?.id]);
 
   const copyToClipboard = async () => {
-    const addressToCopy =
-      user?.type === "eoa" ? user?.address : smartAccountAddress;
+    // Copy Smart Wallet address as primary identity
+    // EOA is kept in background for signing operations
+    const addressToCopy = smartAccountAddress || user?.address;
     if (addressToCopy) {
       try {
         await navigator.clipboard.writeText(addressToCopy);
@@ -1314,12 +1314,12 @@ export function AccountDropdown() {
               >
                 <div className="flex flex-col space-y-1">
                   <p className="text-xs text-gray-500">
-                    {user?.type === "eoa" ? "EOA" : "Smart Account"}
+                    {smartAccountAddress ? "Smart Wallet" : user?.address ? "EOA" : "Not Connected"}
                   </p>
                   <p className="font-mono text-sm">{displayAddress}</p>
-                  {user?.type !== "eoa" && user?.address && (
+                  {user?.address && smartAccountAddress && user.address.toLowerCase() !== smartAccountAddress.toLowerCase() && (
                     <p className="text-xs text-gray-500">
-                      Controller: {shortenAddress(user.address)}
+                      Signer (EOA): {shortenAddress(user.address)}
                     </p>
                   )}
                 </div>

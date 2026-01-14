@@ -31,23 +31,38 @@ const customStorage = (config?: { sessionLength?: number; domain?: string }) => 
   },
   setItem: (key: string, value: string) => {
     if (typeof document === "undefined") return;
+    // NOTE:
+    // On http://localhost, cookies with the `Secure` attribute are ignored by the browser.
+    // Account Kit session storage relies on cookies, so in local dev we must omit `Secure`.
+    const isHttps =
+      typeof window !== "undefined" && window.location?.protocol === "https:";
     // Set cookie with 30-day expiration (2592000 seconds)
     // SameSite=Lax is standard for auth cookies
     // Path=/ ensures it works across the entire site
-    document.cookie = `${key}=${encodeURIComponent(value)}; max-age=2592000; path=/; SameSite=Lax; Secure`;
+    document.cookie = `${key}=${encodeURIComponent(value)}; max-age=2592000; path=/; SameSite=Lax${
+      isHttps ? "; Secure" : ""
+    }`;
   },
   removeItem: (key: string) => {
     if (typeof document === "undefined") return;
-    document.cookie = `${key}=; max-age=0; path=/; SameSite=Lax; Secure`;
+    const isHttps =
+      typeof window !== "undefined" && window.location?.protocol === "https:";
+    document.cookie = `${key}=; max-age=0; path=/; SameSite=Lax${
+      isHttps ? "; Secure" : ""
+    }`;
   },
   clear: () => {
     if (typeof document === "undefined") return;
+    const isHttps =
+      typeof window !== "undefined" && window.location?.protocol === "https:";
     const cookies = document.cookie.split(";");
     for (let i = 0; i < cookies.length; i++) {
       const cookie = cookies[i];
       const eqPos = cookie.indexOf("=");
       const name = eqPos > -1 ? cookie.substr(0, eqPos) : cookie;
-      document.cookie = `${name}=; max-age=0; path=/; SameSite=Lax; Secure`;
+      document.cookie = `${name}=; max-age=0; path=/; SameSite=Lax${
+        isHttps ? "; Secure" : ""
+      }`;
     }
   },
   length: 0, // Placeholder

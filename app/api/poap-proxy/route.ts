@@ -6,8 +6,8 @@ export async function GET(req: Request) {
   const proposalId = searchParams.get("proposalId");
   if (!proposalId)
     return NextResponse.json({ error: "Missing proposalId" }, { status: 400 });
-  if (!/^[0-9]+$/.test(proposalId))
-    return NextResponse.json({ error: "Invalid proposalId" }, { status: 400 });
+  // Snapshot proposal IDs are hex strings (0x...), not just numbers
+  // Remove the validation that only accepts numbers
 
   let accessToken: string;
   try {
@@ -15,8 +15,14 @@ export async function GET(req: Request) {
     accessToken = await getCachedPoapAccessToken();
   } catch (error) {
     console.error("Error fetching POAP access token:", error);
+    // Return a more descriptive error message
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(
-      { error: "Failed to authenticate with POAP API" },
+      { 
+        error: "Failed to authenticate with POAP API",
+        details: errorMessage,
+        hint: "POAP_CLIENT_ID and POAP_CLIENT_SECRET must be configured, and the Auth0 client must be authorized for the POAP API audience (https://api.poap.tech)."
+      },
       { status: 500 }
     );
   }

@@ -199,6 +199,11 @@ export class MeTokensSubgraphClient {
 
       // Provide more helpful error messages
       if (error instanceof Error) {
+        // Handle indexing_error - subgraph is syncing or has indexing issues
+        if (error.message.includes('indexing_error')) {
+          console.warn('⚠️ Subgraph indexing error - the subgraph may be syncing or experiencing issues. Returning empty array.');
+          return []; // Return empty array instead of throwing - allows app to continue
+        }
         if (error.message.includes('500')) {
           throw new Error('Subgraph server error (500). This may be due to: missing SUBGRAPH_QUERY_KEY, subgraph indexing issues, or server downtime.');
         }
@@ -259,6 +264,11 @@ export class MeTokensSubgraphClient {
       };
     } catch (error) {
       console.error('Failed to fetch MeToken:', error);
+      // Handle indexing_error gracefully
+      if (error instanceof Error && error.message.includes('indexing_error')) {
+        console.warn('⚠️ Subgraph indexing error - returning null');
+        return null;
+      }
       throw new Error('Failed to fetch MeToken from subgraph');
     }
   }
@@ -272,8 +282,8 @@ export class MeTokensSubgraphClient {
       const data = await request(this.getEndpoint(), GET_HUB, { id }) as any;
       return data.hub || null;
     } catch (error) {
-      // The subgraph doesn't support hub queries - return null gracefully
-      console.warn(`⚠️ Subgraph does not support hub queries (hub ${id}):`, error instanceof Error ? error.message : String(error));
+      // The subgraph doesn't support hub queries or has indexing issues - return null gracefully
+      console.warn(`⚠️ Subgraph query failed (hub ${id}):`, error instanceof Error ? error.message : String(error));
       return null;
     }
   }
@@ -288,6 +298,11 @@ export class MeTokensSubgraphClient {
       return data.mints || [];
     } catch (error) {
       console.error('Failed to fetch recent mints:', error);
+      // Handle indexing_error gracefully - return empty array instead of throwing
+      if (error instanceof Error && error.message.includes('indexing_error')) {
+        console.warn('⚠️ Subgraph indexing error - returning empty array');
+        return [];
+      }
       throw new Error('Failed to fetch recent mints from subgraph');
     }
   }
@@ -302,6 +317,11 @@ export class MeTokensSubgraphClient {
       return data.burns || [];
     } catch (error) {
       console.error('Failed to fetch recent burns:', error);
+      // Handle indexing_error gracefully - return empty array instead of throwing
+      if (error instanceof Error && error.message.includes('indexing_error')) {
+        console.warn('⚠️ Subgraph indexing error - returning empty array');
+        return [];
+      }
       throw new Error('Failed to fetch recent burns from subgraph');
     }
   }
@@ -351,6 +371,10 @@ export class MeTokensSubgraphClient {
       return null;
     } catch (error) {
       console.error('Failed to check MeToken existence:', error);
+      // Handle indexing_error gracefully
+      if (error instanceof Error && error.message.includes('indexing_error')) {
+        console.warn('⚠️ Subgraph indexing error - cannot check MeToken existence');
+      }
       return null;
     }
   }

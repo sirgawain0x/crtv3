@@ -175,7 +175,8 @@ export default function Navbar() {
 
   // Update display address when user changes
   useEffect(() => {
-    // Prioritize Smart Account address, fallback to EOA
+    // Smart Wallet is the primary public identity for Creative TV
+    // EOA is kept in background for signing and permissions
     const addressToDisplay = modularAccount?.address || user?.address;
 
     if (addressToDisplay) {
