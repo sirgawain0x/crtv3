@@ -11,7 +11,15 @@ import { shortenAddress } from "@/lib/utils/utils";
 import { LinkedIdentityDisplay } from "@/components/vote/LinkedIdentityDisplay";
 import { SNAPSHOT_SPACE } from "@/context/context";
 import Link from "next/link";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, Slash } from "lucide-react";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 
 /**
  * Extract Smart Wallet address from proposal plugins metadata
@@ -120,6 +128,32 @@ export default async function ProposalDetailsPage({
     >
       <div className="min-h-screen p-6 flex flex-col items-center">
         <div className="w-full max-w-3xl">
+          <div className="my-5 mb-6">
+            <Breadcrumb>
+              <BreadcrumbList>
+                <BreadcrumbItem>
+                  <BreadcrumbLink href="/">
+                    <span role="img" aria-label="home">
+                      🏠
+                    </span>{" "}
+                    Home
+                  </BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator>
+                  <Slash />
+                </BreadcrumbSeparator>
+                <BreadcrumbItem>
+                  <BreadcrumbLink href="/vote">Vote</BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator>
+                  <Slash />
+                </BreadcrumbSeparator>
+                <BreadcrumbItem>
+                  <BreadcrumbPage>{proposal.title}</BreadcrumbPage>
+                </BreadcrumbItem>
+              </BreadcrumbList>
+            </Breadcrumb>
+          </div>
           <Card className="p-6 mb-6 overflow-x-auto">
             <h1 className="text-2xl font-bold mb-2 break-words">
               {proposal.title}

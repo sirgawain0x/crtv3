@@ -614,7 +614,7 @@ export default function Navbar() {
                               text-green-600 dark:text-green-400"
                             onClick={handleLinkClick}
                           >
-                            <Plus className="mr-2 h-4 w-4 text-green-500" /> Start A Vote
+                            <Plus className="mr-2 h-4 w-4 text-green-500" /> Poll
                           </Link>
                         </>
                       )}

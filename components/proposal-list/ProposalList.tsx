@@ -421,20 +421,20 @@ function VotingForm({ proposal }: { proposal: Proposal }) {
 
   return (
     <FormProvider {...methods}>
-      <form onSubmit={handleSubmit(onSubmit)}>
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <FormField
           name="choice"
           render={({ field }) => (
             <FormItem>
-              <FormLabel>Vote</FormLabel>
+              <FormLabel className="mb-3">Vote</FormLabel>
               <FormControl>
                 <RadioGroup
                   onValueChange={field.onChange}
                   value={field.value}
-                  className="flex flex-col gap-2"
+                  className="flex flex-col gap-4"
                 >
                   {proposal.choices.map((choice, idx) => (
-                    <div key={choice} className="flex items-center space-x-2">
+                    <div key={choice} className="flex items-center space-x-3 py-1">
                       <RadioGroupItem
                         value={choice}
                         id={`choice-${proposal.id}-${idx}`}
@@ -454,11 +454,11 @@ function VotingForm({ proposal }: { proposal: Proposal }) {
           )}
         />
         {error && (
-          <div className="text-red-500 text-sm font-medium mt-2 whitespace-pre-line">
+          <div className="text-red-500 text-sm font-medium mt-4 whitespace-pre-line">
             {error}
           </div>
         )}
-        <Button type="submit" className="mt-2 w-full" disabled={isSubmitting}>
+        <Button type="submit" className="mt-6 w-full" disabled={isSubmitting}>
           {isSubmitting ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...
