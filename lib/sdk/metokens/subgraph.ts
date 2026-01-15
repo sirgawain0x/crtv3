@@ -159,6 +159,22 @@ export class MeTokensSubgraphClient {
     return getSubgraphEndpoint();
   }
 
+  /**
+   * Helper function to check if an error is an indexing error from the subgraph.
+   * graphql-request may structure errors differently, so we check multiple places.
+   */
+  private isIndexingError(error: any): boolean {
+    const errorMessage = error?.message || '';
+    const responseErrors = error?.response?.errors || [];
+    return (
+      errorMessage.includes('indexing_error') ||
+      responseErrors.some((err: any) => 
+        err?.message === 'indexing_error' || 
+        err?.message?.includes('indexing_error')
+      )
+    );
+  }
+
   async getAllMeTokens(first: number = 100, skip: number = 0): Promise<MeToken[]> {
     if (typeof window === 'undefined') {
       return []; // Return empty array during SSR
@@ -170,9 +186,17 @@ export class MeTokensSubgraphClient {
 
       const data = await request(endpoint, GET_ALL_SUBSCRIBES, { first, skip }) as any;
 
-      // Check for GraphQL errors
+      // Check for GraphQL errors in the response
       if (data.errors) {
         console.error('GraphQL errors:', data.errors);
+        // Check if it's an indexing error
+        const hasIndexingError = data.errors.some((err: any) => 
+          err?.message === 'indexing_error' || err?.message?.includes('indexing_error')
+        );
+        if (hasIndexingError) {
+          console.warn('⚠️ Subgraph indexing error - the subgraph may be syncing or experiencing issues. Returning empty array.');
+          return [];
+        }
         throw new Error(`GraphQL error: ${JSON.stringify(data.errors)}`);
       }
 
@@ -194,16 +218,17 @@ export class MeTokensSubgraphClient {
         targetHubId: '0',
         migration: '',
       }));
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Failed to fetch MeTokens from subgraph:', error);
 
-      // Provide more helpful error messages
+      // Handle indexing_error - subgraph is syncing or has indexing issues
+      if (this.isIndexingError(error)) {
+        console.warn('⚠️ Subgraph indexing error - the subgraph may be syncing or experiencing issues. Returning empty array.');
+        return []; // Return empty array instead of throwing - allows app to continue
+      }
+
+      // Provide more helpful error messages for other errors
       if (error instanceof Error) {
-        // Handle indexing_error - subgraph is syncing or has indexing issues
-        if (error.message.includes('indexing_error')) {
-          console.warn('⚠️ Subgraph indexing error - the subgraph may be syncing or experiencing issues. Returning empty array.');
-          return []; // Return empty array instead of throwing - allows app to continue
-        }
         if (error.message.includes('500')) {
           throw new Error('Subgraph server error (500). This may be due to: missing SUBGRAPH_QUERY_KEY, subgraph indexing issues, or server downtime.');
         }
@@ -262,10 +287,10 @@ export class MeTokensSubgraphClient {
         targetHubId: '0',
         migration: '',
       };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch MeToken:', error);
       // Handle indexing_error gracefully
-      if (error instanceof Error && error.message.includes('indexing_error')) {
+      if (this.isIndexingError(error)) {
         console.warn('⚠️ Subgraph indexing error - returning null');
         return null;
       }
@@ -296,10 +321,10 @@ export class MeTokensSubgraphClient {
     try {
       const data = await request(this.getEndpoint(), GET_RECENT_MINTS, { first }) as any;
       return data.mints || [];
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch recent mints:', error);
       // Handle indexing_error gracefully - return empty array instead of throwing
-      if (error instanceof Error && error.message.includes('indexing_error')) {
+      if (this.isIndexingError(error)) {
         console.warn('⚠️ Subgraph indexing error - returning empty array');
         return [];
       }
@@ -315,10 +340,10 @@ export class MeTokensSubgraphClient {
     try {
       const data = await request(this.getEndpoint(), GET_RECENT_BURNS, { first }) as any;
       return data.burns || [];
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to fetch recent burns:', error);
       // Handle indexing_error gracefully - return empty array instead of throwing
-      if (error instanceof Error && error.message.includes('indexing_error')) {
+      if (this.isIndexingError(error)) {
         console.warn('⚠️ Subgraph indexing error - returning empty array');
         return [];
       }
@@ -369,10 +394,10 @@ export class MeTokensSubgraphClient {
 
       console.log('⚠️ MeToken not found in subgraph');
       return null;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to check MeToken existence:', error);
       // Handle indexing_error gracefully
-      if (error instanceof Error && error.message.includes('indexing_error')) {
+      if (this.isIndexingError(error)) {
         console.warn('⚠️ Subgraph indexing error - cannot check MeToken existence');
       }
       return null;
