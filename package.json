@@ -63,6 +63,8 @@
     "@radix-ui/react-toast": "^1.2.11",
     "@radix-ui/react-tooltip": "^1.2.3",
     "@radix-ui/react-visually-hidden": "^1.1.2",
+    "@reality.eth/contracts": "^3.2.21",
+    "@reality.eth/reality-eth-lib": "^3.4.23",
     "@simplewebauthn/browser": "^13.1.0",
     "@snapshot-labs/snapshot.js": "^0.14.18",
     "@stackso/js-core": "^0.5.11",

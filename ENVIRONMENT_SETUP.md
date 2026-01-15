@@ -71,14 +71,36 @@ Your Supabase service role key (server-side only).
 
 ### 4. Subgraph Configuration (Goldsky)
 
-The application uses **Goldsky** for blockchain indexing. No configuration is required as these are public endpoints:
+The application uses **Goldsky** for blockchain indexing:
 
-- **MeTokens Subgraph**: `https://api.goldsky.com/api/public/project_cmh0iv6s500dbw2p22vsxcfo6/subgraphs/metokens/v0.0.1/gn`
+#### MeTokens Subgraphs (Existing Project)
+No configuration is required as these are public endpoints:
+
+- **MeTokens Subgraph (Primary - Goldsky)**: `https://api.goldsky.com/api/public/project_cmh0iv6s500dbw2p22vsxcfo6/subgraphs/metokens/v0.0.1/gn`
   - Deployment ID: `QmVaWYhk4HKhk9rNQi11RKujTVS4KHF1uHGNVUF4f7xJ53`
+- **MeTokens Subgraph (Backup - envio.dev)**: `https://indexer.dev.hyperindex.xyz/5becbbb/v1/graphql`
+  - Automatically used if Goldsky experiences server errors
+  - Can be customized via `ENVIO_METOKENS_SUBGRAPH_URL` environment variable
 - **Creative TV Subgraph**: `https://api.goldsky.com/api/public/project_cmh0iv6s500dbw2p22vsxcfo6/subgraphs/creative_tv/0.1/gn`
   - Deployment ID: `QmbDp8Wfy82g8L7Mv6RCAZHRcYUQB4prQfqchvexfZR8yZ`
 
-**Note:** These endpoints are accessed via the API proxy at `/api/metokens-subgraph` to handle CORS.
+**Note:** These endpoints are accessed via the API proxy at `/api/metokens-subgraph` to handle CORS. The proxy automatically falls back to envio.dev if Goldsky is unavailable.
+
+#### Reality.eth Subgraph (Separate Project)
+
+**`GOLDSKY_REALITY_ETH_PROJECT_ID`** (Optional but recommended)
+- Project ID for the Reality.eth subgraph (separate from MeTokens project)
+- Create a new Goldsky project for Reality.eth to keep it isolated
+- After creating the project, set this environment variable with your new project ID
+- If not set, will fallback to the MeTokens project ID (not recommended)
+
+**How to get it:**
+1. Go to [Goldsky Dashboard](https://app.goldsky.com/dashboard)
+2. Create a new project (e.g., "Creative TV - Reality.eth")
+3. Copy the project ID (format: `project_xxxxxxxxxxxxx`)
+4. Add to your `.env.local` file
+
+**Note:** The Reality.eth subgraph endpoint is accessed via `/api/reality-eth-subgraph` to handle CORS.
 
 ### 5. Coinbase CDP Configuration (Onramp/Offramp)
 

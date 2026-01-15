@@ -35,6 +35,7 @@ import {
   RadioTower,
   Bot,
   ShieldUser,
+  TrendingUp,
 } from "lucide-react";
 import type { User as AccountUser } from "@account-kit/signer";
 import useModularAccount from "@/lib/hooks/accountkit/useModularAccount";
@@ -610,6 +611,15 @@ export default function Navbar() {
                             onClick={handleLinkClick}
                           >
                             <Plus className="mr-2 h-4 w-4 text-green-500" /> Poll
+                          </Link>
+                          <Link
+                            href="/predict/create"
+                            className="flex w-full items-center rounded-md p-2 text-sm font-medium
+                              hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors
+                              text-blue-600 dark:text-blue-400"
+                            onClick={handleLinkClick}
+                          >
+                            <TrendingUp className="mr-2 h-4 w-4 text-blue-500" /> Predict
                           </Link>
                         </>
                       )}

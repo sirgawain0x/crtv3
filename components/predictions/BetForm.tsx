@@ -1,0 +1,222 @@
+"use client";
+
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import { useSmartAccountClient } from "@account-kit/react";
+import { base } from "@account-kit/infra";
+import { createPublicClient, http, parseEther, keccak256, stringToHex } from "viem";
+import {
+  Form,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormControl,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
+import { Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import { submitAnswer } from "@/lib/sdk/reality-eth/reality-eth-question-wrapper";
+import { useWalletStatus } from "@/lib/hooks/accountkit/useWalletStatus";
+import { useMembershipVerification } from "@/lib/hooks/unlock/useMembershipVerification";
+
+const betSchema = z.object({
+  answer: z.string().min(1, "Please select an answer"),
+  bond: z.string().min(1, "Bond amount is required"),
+});
+
+type BetFormData = z.infer<typeof betSchema>;
+
+interface BetFormProps {
+  questionId: string;
+  questionType: "bool" | "single-select" | "multiple-select" | "uint";
+  outcomes?: string[];
+}
+
+export function BetForm({ questionId, questionType, outcomes }: BetFormProps) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const { isConnected, walletAddress } = useWalletStatus();
+  const { isVerified, hasMembership, isLoading: isMembershipLoading } =
+    useMembershipVerification();
+  const { client: accountKitClient } = useSmartAccountClient({});
+
+  const canBet = isVerified && hasMembership;
+
+  const form = useForm<BetFormData>({
+    resolver: zodResolver(betSchema),
+    defaultValues: {
+      answer: "",
+      bond: "0.01", // Default 0.01 ETH
+    },
+  });
+
+  async function onSubmit(values: BetFormData) {
+    setError(null);
+
+    if (!canBet) {
+      setError(
+        "You need a Creative Pass membership to place bets. Please purchase a membership."
+      );
+      return;
+    }
+
+    if (!isConnected || !walletAddress) {
+      setError("Please connect your wallet.");
+      return;
+    }
+
+    if (!accountKitClient) {
+      setError("Wallet client not ready. Please try again.");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const publicClient = createPublicClient({
+        chain: base,
+        transport: http(),
+      });
+
+      // Convert answer to bytes32
+      // For bool: 0x0000...0001 for true, 0x0000...0000 for false
+      // For single-select: keccak256 of the selected outcome
+      let answerBytes32: `0x${string}`;
+
+      if (questionType === "bool") {
+        answerBytes32 =
+          values.answer === "true"
+            ? ("0x0000000000000000000000000000000000000000000000000000000000000001" as `0x${string}`)
+            : ("0x0000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`);
+      } else if (questionType === "single-select" && outcomes) {
+        // Hash the selected outcome
+        const selectedOutcome = outcomes[parseInt(values.answer)];
+        answerBytes32 = keccak256(stringToHex(selectedOutcome)) as `0x${string}`;
+      } else {
+        throw new Error("Unsupported question type for betting");
+      }
+
+      const bond = parseEther(values.bond);
+      const maxPrevious = 0n; // Start with 0, can be increased for higher bonds
+
+      const hash = await submitAnswer(publicClient, accountKitClient as any, {
+        questionId,
+        answer: answerBytes32,
+        maxPrevious,
+        bond,
+      });
+
+      toast.success("Bet placed successfully!");
+      form.reset();
+    } catch (err: any) {
+      console.error("Error placing bet:", err);
+      setError(err?.message || "Failed to place bet. Please try again.");
+      toast.error("Failed to place bet");
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        <FormField
+          name="answer"
+          control={form.control}
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Your Answer</FormLabel>
+              <FormControl>
+                {questionType === "bool" ? (
+                  <RadioGroup
+                    onValueChange={field.onChange}
+                    value={field.value}
+                    className="flex gap-4"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="true" id="answer-true" />
+                      <Label htmlFor="answer-true">Yes</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <RadioGroupItem value="false" id="answer-false" />
+                      <Label htmlFor="answer-false">No</Label>
+                    </div>
+                  </RadioGroup>
+                ) : questionType === "single-select" && outcomes ? (
+                  <RadioGroup
+                    onValueChange={field.onChange}
+                    value={field.value}
+                    className="flex flex-col gap-2"
+                  >
+                    {outcomes.map((outcome, idx) => (
+                      <div key={idx} className="flex items-center space-x-2">
+                        <RadioGroupItem
+                          value={idx.toString()}
+                          id={`answer-${idx}`}
+                        />
+                        <Label htmlFor={`answer-${idx}`}>{outcome}</Label>
+                      </div>
+                    ))}
+                  </RadioGroup>
+                ) : (
+                  <Input {...field} placeholder="Enter your answer" />
+                )}
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          name="bond"
+          control={form.control}
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Bond Amount (ETH)</FormLabel>
+              <FormControl>
+                <Input
+                  type="number"
+                  step="0.001"
+                  placeholder="0.01"
+                  {...field}
+                />
+              </FormControl>
+              <FormMessage />
+              <p className="text-xs text-gray-500">
+                The bond amount you're staking on this answer. Higher bonds
+                have more weight.
+              </p>
+            </FormItem>
+          )}
+        />
+
+        {error && (
+          <div className="text-red-500 text-sm font-medium whitespace-pre-line">
+            {error}
+          </div>
+        )}
+
+        <Button
+          type="submit"
+          className="w-full"
+          disabled={isSubmitting || !canBet || isMembershipLoading}
+        >
+          {isSubmitting ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Placing Bet...
+            </>
+          ) : (
+            "Place Bet"
+          )}
+        </Button>
+      </form>
+    </Form>
+  );
+}
