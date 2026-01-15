@@ -21,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2, Clock, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
-import { useChain, useAuthModal, useSigner } from "@account-kit/react";
+import { useChain, useAuthModal, useSignTypedData } from "@account-kit/react";
 import { useWalletStatus } from "@/lib/hooks/accountkit/useWalletStatus";
 import { createVote } from "@/app/vote/[id]/actions";
 import { SNAPSHOT_SPACE } from "@/context/context";
@@ -239,20 +239,40 @@ function VotingForm({ proposal }: { proposal: Proposal }) {
   const [error, setError] = useState<string | null>(null);
 
   const { chain } = useChain();
-  const { isConnected, walletAddress, smartAccountAddress } = useWalletStatus();
+  const { isConnected, walletAddress, smartAccountAddress, smartAccountClient } = useWalletStatus();
   const { openAuthModal } = useAuthModal();
   const { isVerified, hasMembership, isLoading: isMembershipLoading } = useMembershipVerification();
   
   /**
    * IDENTITY STRATEGY:
    * - Smart Wallet: Primary public identity (what users see) - holds membership NFT
-   * - EOA (walletAddress): Background signing identity for Snapshot
-   * 
-   * Voting power comes from membership NFT in the smart account, so we use
-   * smartAccountAddress in the vote message. The signature is still from the EOA
-   * (walletAddress) as required by Snapshot.
+   * - We must sign with the smart account because:
+   *   1. Voting power comes from membership NFT in the smart account
+   *   2. The signature must match the 'from' address in the vote message
+   *   3. Snapshot validates signatures against the 'from' address
    */
-  const signer = useSigner();
+  const [signaturePromise, setSignaturePromise] = useState<{
+    resolve: (value: string) => void;
+    reject: (error: Error) => void;
+  } | null>(null);
+
+  const { signTypedData } = useSignTypedData({
+    client: smartAccountClient || undefined,
+    onSuccess: (signature) => {
+      console.log("Smart account vote signature created successfully:", signature);
+      if (signaturePromise) {
+        signaturePromise.resolve(signature);
+        setSignaturePromise(null);
+      }
+    },
+    onError: (error) => {
+      console.error("Error signing vote with smart account:", error);
+      if (signaturePromise) {
+        signaturePromise.reject(error);
+        setSignaturePromise(null);
+      }
+    },
+  });
 
   // Check if user has creative membership (one of the three tiers)
   const canVote = isVerified && hasMembership;
@@ -278,32 +298,16 @@ function VotingForm({ proposal }: { proposal: Proposal }) {
       return;
     }
 
-    // Snapshot requires EOA signature
-    if (!signer) {
-      console.error("Signer is null or undefined. User may need to sign in again.");
-      setError("Signer not available. Please sign in again.");
-      openAuthModal();
-      return;
-    }
-
-    // Check if signer has signTypedData method
-    if (typeof signer.signTypedData !== "function") {
-      console.error("Signer does not have signTypedData method:", {
-        signer,
-        signerType: typeof signer,
-        signerKeys: signer ? Object.keys(signer) : [],
-        hasSignTypedData: "signTypedData" in signer,
+    // Smart account client is required for signing
+    if (!smartAccountClient) {
+      console.error("Smart account client is not available:", {
+        smartAccountAddress,
+        walletAddress,
+        isConnected,
       });
-      setError("Signer is not properly configured. Please try signing in again.");
-      openAuthModal();
+      setError("Smart account not available. Please ensure your wallet is properly connected and your smart account is initialized.");
       return;
     }
-
-    console.log("Signer is available and has signTypedData method:", {
-      signerType: typeof signer,
-      hasGetAddress: typeof signer.getAddress === "function",
-      hasSignTypedData: typeof signer.signTypedData === "function",
-    });
 
     // Find the choice index (Snapshot uses 1-based indexing)
     const choiceIndex = proposal.choices.findIndex((c) => c === values.choice);
@@ -369,45 +373,37 @@ function VotingForm({ proposal }: { proposal: Proposal }) {
         return;
       }
 
-      // Verify signer is ready and has the required method
-      try {
-        // Check if signer has getAddress method (optional check)
-        if (typeof signer.getAddress === "function") {
-          const signerAddr = await Promise.race([
-            signer.getAddress(),
-            new Promise<never>((_, reject) =>
-              setTimeout(() => reject(new Error("getAddress timed out")), 10000),
-            ),
-          ]);
-          console.log("Signer getAddress():", signerAddr);
-          if (signerAddr?.toLowerCase?.() !== walletAddress.toLowerCase()) {
-            console.warn("Signer address mismatch - expected:", walletAddress, "got:", signerAddr);
-            // This is a warning, not an error - continue anyway as the signer might still work
-          }
-        }
-      } catch (e) {
-        console.warn("Signer getAddress check failed/timed out:", e);
-        // Continue anyway - the signer might still work for signing
-      }
+      console.log("Using smart account signTypedData (signature will match smart account address)...");
 
-      console.log("Using EOA signer.signTypedData (Snapshot-compatible)...");
-
-      // Sign the typed data using the signer
+      // Sign the typed data using the smart account
+      // This is required because the 'from' address is the smart account, so the signature must match
       let signature: string;
       try {
-        signature = await Promise.race([
-          signer.signTypedData({
+        // Create a promise that will be resolved by the hook's onSuccess callback
+        const signPromise = new Promise<string>((resolve, reject) => {
+          setSignaturePromise({ resolve, reject });
+          
+          // Set a timeout to reject if signing takes too long
+          setTimeout(() => {
+            reject(new Error("Signing timed out after 120s - user may have cancelled"));
+          }, 120000);
+        });
+
+        // Trigger the signing with the smart account
+        signTypedData({
+          typedData: {
             domain,
             types,
             primaryType: "Vote",
             message: typedMessage,
-          } as any),
-          new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error("Signing timed out after 120s")), 120000),
-          ),
-        ]);
+          },
+        });
+
+        // Wait for the signature from the callback
+        signature = await signPromise;
       } catch (signError) {
         console.error("Error during signing:", signError);
+        setSignaturePromise(null); // Clean up
         if (signError instanceof Error) {
           if (signError.message.includes("cancelled") || signError.message.includes("rejected")) {
             setError("Signing was cancelled. Please try again.");
@@ -422,7 +418,7 @@ function VotingForm({ proposal }: { proposal: Proposal }) {
         return;
       }
 
-      console.log("✅ Vote Typed Data Signed successfully:", signature);
+      console.log("✅ Vote Typed Data Signed successfully with smart account:", signature);
 
       // Prepare EIP-712 envelope for submission
       // Use smart account address in the message (for voting power check)
@@ -444,7 +440,7 @@ function VotingForm({ proposal }: { proposal: Proposal }) {
 
       console.log("Submitting vote to server...");
       console.log("Vote message 'from' address (smart account):", smartAccountAddress);
-      console.log("Signature from EOA address:", walletAddress);
+      console.log("Signature from smart account (matches 'from' address):", smartAccountAddress);
 
       const result = await createVote({
         proposalId: proposal.id,
