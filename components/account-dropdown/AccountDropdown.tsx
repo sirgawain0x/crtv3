@@ -62,6 +62,7 @@ import {
   Plus,
   ArrowRight,
   AlertTriangle,
+  TrendingUp,
 } from "lucide-react";
 import { CheckIcon } from "@radix-ui/react-icons";
 import Image from "next/image";
@@ -1501,7 +1502,20 @@ export function AccountDropdown() {
                           onClick={() => setIsDropdownOpen(false)}
                         >
                           <Plus className="h-3 w-3 mb-1" />
-                          <span className="text-xs">Start Vote</span>
+                          <span className="text-xs">Poll</span>
+                        </Button>
+                      </Link>
+                      <Link href="/predict/create" className="w-full">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full flex flex-col items-center justify-center p-2 h-12 hover:bg-blue-50 
+                          dark:hover:bg-blue-900 transition-colors text-blue-600 dark:text-blue-400 
+                          font-medium border-blue-200 dark:border-blue-800"
+                          onClick={() => setIsDropdownOpen(false)}
+                        >
+                          <TrendingUp className="h-3 w-3 mb-1" />
+                          <span className="text-xs">Predict</span>
                         </Button>
                       </Link>
                     </div>

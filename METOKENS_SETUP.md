@@ -10,21 +10,27 @@ The MeTokens subgraph endpoint has CORS restrictions that prevent direct access 
 
 ### 1. Subgraph Configuration
 
-The application now uses **Goldsky** for subgraph indexing, which provides public endpoints that don't require authentication keys.
+The application now uses **Goldsky** for subgraph indexing, which provides public endpoints that don't require authentication keys. **envio.dev** is configured as an automatic backup endpoint if Goldsky experiences server errors.
 
-**Subgraph Endpoints:**
+**Primary Subgraph Endpoints (Goldsky):**
 - **MeTokens**: `https://api.goldsky.com/api/public/project_cmh0iv6s500dbw2p22vsxcfo6/subgraphs/metokens/v0.0.1/gn`
   - Deployment ID: `QmVaWYhk4HKhk9rNQi11RKujTVS4KHF1uHGNVUF4f7xJ53`
 - **Creative TV**: `https://api.goldsky.com/api/public/project_cmh0iv6s500dbw2p22vsxcfo6/subgraphs/creative_tv/0.1/gn`
   - Deployment ID: `QmbDp8Wfy82g8L7Mv6RCAZHRcYUQB4prQfqchvexfZR8yZ`
 
-**Note:** No environment variables are required for basic subgraph access since these are public Goldsky endpoints.
+**Backup Subgraph Endpoint (envio.dev):**
+- **MeTokens Backup**: `https://indexer.dev.hyperindex.xyz/5becbbb/v1/graphql`
+  - Automatically used if Goldsky experiences server errors (5xx)
+  - Can be customized via `ENVIO_METOKENS_SUBGRAPH_URL` environment variable
+
+**Note:** No environment variables are required for basic subgraph access since these are public Goldsky endpoints. The backup endpoint is automatically used when needed.
 
 ### 2. API Proxy
 
 The application includes an API proxy route at `/api/metokens-subgraph` that:
 - Handles CORS issues by making server-side requests
-- Forwards GraphQL queries to the Goldsky MeTokens subgraph
+- Forwards GraphQL queries to the Goldsky MeTokens subgraph (primary)
+- Automatically falls back to envio.dev if Goldsky experiences server errors
 - Provides better error handling and logging
 
 ### 3. Testing the Integration
@@ -101,3 +107,12 @@ If you get network errors:
 2. Verify the Goldsky endpoint is accessible
 3. Check if there are any firewall restrictions
 4. Monitor Goldsky status at their status page
+5. The system will automatically try envio.dev backup if Goldsky is down
+
+### Backup Endpoint
+The system automatically uses envio.dev as a backup when:
+- Goldsky returns server errors (5xx status codes)
+- Goldsky is unreachable or experiencing downtime
+- Network timeouts occur
+
+The backup endpoint can be customized by setting the `ENVIO_METOKENS_SUBGRAPH_URL` environment variable.

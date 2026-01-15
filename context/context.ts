@@ -84,6 +84,12 @@ export const APP_BASE_URL = "https://app.poap.xyz";
 // SPACE
 export const SNAPSHOT_SPACE = "vote.thecreative.eth";
 
+// Reality.eth Configuration
+export const REALITY_ETH_CHAIN_ID = 8453; // Base network
+export const REALITY_ETH_TOKEN = "ETH"; // Native token for Base
+export const REALITY_ETH_VERSION = "3.0"; // Reality.eth v3
+export const REALITY_ETH_DAPP_URL = "https://reality.eth.link/app/index.html";
+
 // STATES
 export const NO_POAP = "NO_POAP";
 export const NOT_VOTED = "NOT_VOTED";
