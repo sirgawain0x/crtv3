@@ -511,9 +511,9 @@ function VotingForm({ proposal }: { proposal: Proposal }) {
             You need a Creative Pass membership to participate in voting. Choose from one of our three tiers:
           </p>
           <ul className="text-sm text-yellow-700 dark:text-yellow-300 list-disc list-inside space-y-1 mb-3">
-            <li>Creative Pass</li>
-            <li>Creative Pass Plus</li>
-            <li>Creative Pass Pro</li>
+            <li>Creative Creator Pass</li>
+            <li>Creative Investor Pass</li>
+            <li>Creative Brand Pass</li>
           </ul>
           <p className="text-sm text-yellow-700 dark:text-yellow-300">
             You can view all proposals and results, but voting requires an active membership NFT.
