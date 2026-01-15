@@ -86,19 +86,16 @@ No configuration is required as these are public endpoints:
 
 **Note:** These endpoints are accessed via the API proxy at `/api/metokens-subgraph` to handle CORS. The proxy automatically falls back to envio.dev if Goldsky is unavailable.
 
-#### Reality.eth Subgraph (Separate Project)
+#### Reality.eth Subgraph
 
-**`GOLDSKY_REALITY_ETH_PROJECT_ID`** (Optional but recommended)
-- Project ID for the Reality.eth subgraph (separate from MeTokens project)
-- Create a new Goldsky project for Reality.eth to keep it isolated
-- After creating the project, set this environment variable with your new project ID
-- If not set, will fallback to the MeTokens project ID (not recommended)
+**Public Endpoint:**
+- **Reality.eth Subgraph**: `https://api.goldsky.com/api/public/project_cmh0iv6s500dbw2p22vsxcfo6/subgraphs/reality-eth/1.0.0/gn`
+- Uses the same Goldsky project as MeTokens subgraphs by default
 
-**How to get it:**
-1. Go to [Goldsky Dashboard](https://app.goldsky.com/dashboard)
-2. Create a new project (e.g., "Creative TV - Reality.eth")
-3. Copy the project ID (format: `project_xxxxxxxxxxxxx`)
-4. Add to your `.env.local` file
+**`GOLDSKY_REALITY_ETH_PROJECT_ID`** (Optional)
+- Project ID for the Reality.eth subgraph if you want to use a separate project
+- If not set, will use the MeTokens project ID (`project_cmh0iv6s500dbw2p22vsxcfo6`)
+- Set this environment variable only if you want to use a different Goldsky project
 
 **Note:** The Reality.eth subgraph endpoint is accessed via `/api/reality-eth-subgraph` to handle CORS.
 

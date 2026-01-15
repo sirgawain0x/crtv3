@@ -94,13 +94,14 @@ export const GET_ANSWERS = gql`
 
 /**
  * Get subgraph endpoint URL
- * Uses separate project ID from MeTokens subgraphs
+ * Public URL: https://api.goldsky.com/api/public/project_cmh0iv6s500dbw2p22vsxcfo6/subgraphs/reality-eth/1.0.0/gn
+ * Uses the same project as MeTokens subgraphs by default
  */
 export function getRealityEthSubgraphUrl(
   version: string = "1.0.0",
   accessType: "public" | "private" = "public"
 ): string {
-  // Use separate project ID for Reality.eth subgraph
+  // Use GOLDSKY_REALITY_ETH_PROJECT_ID if set, otherwise fallback to MeTokens project ID
   const projectId = process.env.GOLDSKY_REALITY_ETH_PROJECT_ID || process.env.GOLDSKY_PROJECT_ID || "project_cmh0iv6s500dbw2p22vsxcfo6";
   return `https://api.goldsky.com/api/${accessType}/${projectId}/subgraphs/reality-eth/${version}/gn`;
 }

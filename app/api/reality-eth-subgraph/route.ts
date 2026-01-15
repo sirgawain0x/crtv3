@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 // Reality.eth subgraph endpoint - using Goldsky
-// Uses a separate project from MeTokens subgraphs
-// Set GOLDSKY_REALITY_ETH_PROJECT_ID environment variable after creating the project
-const DEFAULT_PROJECT_ID = 'project_cmh0iv6s500dbw2p22vsxcfo6'; // Fallback - replace with your new project ID
+// Public URL: https://api.goldsky.com/api/public/project_cmh0iv6s500dbw2p22vsxcfo6/subgraphs/reality-eth/1.0.0/gn
+// Uses the same project as MeTokens subgraphs
+// Set GOLDSKY_REALITY_ETH_PROJECT_ID environment variable to use a different project
+const DEFAULT_PROJECT_ID = 'project_cmh0iv6s500dbw2p22vsxcfo6';
 const PROJECT_ID = process.env.GOLDSKY_REALITY_ETH_PROJECT_ID || DEFAULT_PROJECT_ID;
 
 const getSubgraphUrl = (subgraphName: string, version: string, specificAccessType?: 'public' | 'private') => {
