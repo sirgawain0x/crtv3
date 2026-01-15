@@ -1,7 +1,7 @@
 /**
  * Submits a vote to Snapshot using a pre-signed EIP-712 signature.
- * @param address - Wallet address (EOA address that signed the vote)
- * @param signature - Pre-signed EIP-712 signature
+ * @param address - Wallet address (Smart account address for voting power, signature may be from EOA)
+ * @param signature - Pre-signed EIP-712 signature (from EOA, but vote is for smart account)
  * @param vote - Vote data (space, proposal, choice, etc.)
  * @param hubUrl - Snapshot hub URL (default: https://hub.snapshot.org)
  * @returns Vote receipt or error
@@ -38,7 +38,9 @@ export async function submitSnapshotVote({
     return { error: "Vote must be in EIP-712 envelope format" };
   }
 
-  // Verify the 'from' field in the message matches the signer address
+  // Verify the 'from' field in the message matches the provided address
+  // Note: The address should be the smart account address (for voting power),
+  // and the signature may be from the EOA (if space supports EIP-1271)
   const message = (vote as any).message || {};
   const payloadAddress = message.from;
 
@@ -48,7 +50,7 @@ export async function submitSnapshotVote({
 
   if (payloadAddress.toLowerCase() !== address.toLowerCase()) {
     return {
-      error: "Address mismatch: message.from does not match provided address",
+      error: `Address mismatch: message.from (${payloadAddress}) does not match provided address (${address}). The 'from' field should be the smart account address that holds the membership NFT.`,
     };
   }
 
@@ -57,9 +59,12 @@ export async function submitSnapshotVote({
 
   // Snapshot expects: { address, sig, data }
   // where 'data' is the EIP-712 envelope { domain, types, message }
+  // The 'address' should be the smart account address (for voting power check)
+  // The signature is from the EOA, but Snapshot will validate it using EIP-1271
+  // if the space is configured to support smart accounts
   const requestBody = {
-    address: address,
-    sig: signature,
+    address: address, // Smart account address (holds membership NFT)
+    sig: signature, // EOA signature (validated via EIP-1271 if needed)
     data: vote,
   };
 
@@ -102,7 +107,17 @@ export async function submitSnapshotVote({
 
       if (errorJson.error_description) {
         errorMessage = errorJson.error_description;
-        if (errorJson.error_description === "validation failed" && errorJson.details) {
+        if (errorJson.error_description === "no voting power") {
+          errorMessage =
+            "You don't have voting power in this Snapshot space.\n\n" +
+            "Voting power is determined by the space's voting strategy, which may require:\n" +
+            "• Holding specific tokens (ERC-20)\n" +
+            "• Owning specific NFTs\n" +
+            "• Meeting other criteria defined by the space\n\n" +
+            "To vote, you need to meet the space's voting requirements. " +
+            "Check the space settings at https://snapshot.org/#/vote.thecreative.eth/settings " +
+            "to see what gives voting power.";
+        } else if (errorJson.error_description === "validation failed" && errorJson.details) {
           errorMessage = `Validation failed: ${JSON.stringify(errorJson.details)}`;
         } else if (errorJson.error_description === "validation failed") {
           errorMessage =

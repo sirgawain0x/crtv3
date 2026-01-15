@@ -239,17 +239,18 @@ function VotingForm({ proposal }: { proposal: Proposal }) {
   const [error, setError] = useState<string | null>(null);
 
   const { chain } = useChain();
-  const { isConnected, walletAddress } = useWalletStatus();
+  const { isConnected, walletAddress, smartAccountAddress } = useWalletStatus();
   const { openAuthModal } = useAuthModal();
   const { isVerified, hasMembership, isLoading: isMembershipLoading } = useMembershipVerification();
   
   /**
    * IDENTITY STRATEGY:
-   * - Smart Wallet: Primary public identity (what users see)
+   * - Smart Wallet: Primary public identity (what users see) - holds membership NFT
    * - EOA (walletAddress): Background signing identity for Snapshot
    * 
-   * Snapshot requires EOA signatures, so we use walletAddress (EOA) for signing,
-   * but the Smart Wallet remains the user's primary identity on Creative TV.
+   * Voting power comes from membership NFT in the smart account, so we use
+   * smartAccountAddress in the vote message. The signature is still from the EOA
+   * (walletAddress) as required by Snapshot.
    */
   const signer = useSigner();
 
@@ -271,12 +272,38 @@ function VotingForm({ proposal }: { proposal: Proposal }) {
       return;
     }
 
+    // Smart account address is required for voting (membership NFT is stored there)
+    if (!smartAccountAddress) {
+      setError("Smart account not available. Please ensure your wallet is properly connected.");
+      return;
+    }
+
     // Snapshot requires EOA signature
     if (!signer) {
+      console.error("Signer is null or undefined. User may need to sign in again.");
       setError("Signer not available. Please sign in again.");
       openAuthModal();
       return;
     }
+
+    // Check if signer has signTypedData method
+    if (typeof signer.signTypedData !== "function") {
+      console.error("Signer does not have signTypedData method:", {
+        signer,
+        signerType: typeof signer,
+        signerKeys: signer ? Object.keys(signer) : [],
+        hasSignTypedData: "signTypedData" in signer,
+      });
+      setError("Signer is not properly configured. Please try signing in again.");
+      openAuthModal();
+      return;
+    }
+
+    console.log("Signer is available and has signTypedData method:", {
+      signerType: typeof signer,
+      hasGetAddress: typeof signer.getAddress === "function",
+      hasSignTypedData: typeof signer.signTypedData === "function",
+    });
 
     // Find the choice index (Snapshot uses 1-based indexing)
     const choiceIndex = proposal.choices.findIndex((c) => c === values.choice);
@@ -291,7 +318,8 @@ function VotingForm({ proposal }: { proposal: Proposal }) {
 
     try {
       console.log("Starting vote submission...");
-      console.log("Using wallet address:", walletAddress);
+      console.log("Using EOA address (for signing):", walletAddress);
+      console.log("Using Smart Account address (for voting power):", smartAccountAddress);
       console.log("Proposal ID:", proposal.id);
       console.log("Choice:", values.choice, "Index:", snapshotChoice);
 
@@ -318,8 +346,12 @@ function VotingForm({ proposal }: { proposal: Proposal }) {
       const now = Math.floor(Date.now() / 1000);
 
       // Build the message for signing
+      // IMPORTANT: Use smart account address in 'from' field because voting power
+      // comes from membership NFT stored in the smart account. The signature will
+      // still be from the EOA (walletAddress), but Snapshot will check voting power
+      // for the smart account address.
       const typedMessage = {
-        from: walletAddress, // EOA address (Snapshot requires EOA signature)
+        from: smartAccountAddress, // Smart account address (holds membership NFT for voting power)
         space: SNAPSHOT_SPACE,
         timestamp: BigInt(now),
         proposal: proposal.id,
@@ -331,47 +363,75 @@ function VotingForm({ proposal }: { proposal: Proposal }) {
 
       console.log("Signing Vote Typed Data:", { domain, types, message: typedMessage });
 
-      // Verify signer is ready
+      // Verify wallet address is available
+      if (!walletAddress) {
+        setError("Wallet address not available. Please connect your wallet.");
+        return;
+      }
+
+      // Verify signer is ready and has the required method
       try {
-        const signerAddr = await Promise.race([
-          signer.getAddress(),
-          new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error("getAddress timed out")), 10000),
-          ),
-        ]);
-        console.log("Signer getAddress():", signerAddr);
-        if (signerAddr?.toLowerCase?.() !== walletAddress.toLowerCase()) {
-          console.warn("Signer address mismatch");
+        // Check if signer has getAddress method (optional check)
+        if (typeof signer.getAddress === "function") {
+          const signerAddr = await Promise.race([
+            signer.getAddress(),
+            new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error("getAddress timed out")), 10000),
+            ),
+          ]);
+          console.log("Signer getAddress():", signerAddr);
+          if (signerAddr?.toLowerCase?.() !== walletAddress.toLowerCase()) {
+            console.warn("Signer address mismatch - expected:", walletAddress, "got:", signerAddr);
+            // This is a warning, not an error - continue anyway as the signer might still work
+          }
         }
       } catch (e) {
-        console.warn("Signer getAddress failed/timed out:", e);
-        setError("Wallet signer is not ready. Please sign in again.");
-        openAuthModal();
-        return;
+        console.warn("Signer getAddress check failed/timed out:", e);
+        // Continue anyway - the signer might still work for signing
       }
 
       console.log("Using EOA signer.signTypedData (Snapshot-compatible)...");
 
-      const signature = await Promise.race([
-        signer.signTypedData({
-          domain,
-          types,
-          primaryType: "Vote",
-          message: typedMessage,
-        } as any),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("Signing timed out after 120s")), 120000),
-        ),
-      ]);
+      // Sign the typed data using the signer
+      let signature: string;
+      try {
+        signature = await Promise.race([
+          signer.signTypedData({
+            domain,
+            types,
+            primaryType: "Vote",
+            message: typedMessage,
+          } as any),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("Signing timed out after 120s")), 120000),
+          ),
+        ]);
+      } catch (signError) {
+        console.error("Error during signing:", signError);
+        if (signError instanceof Error) {
+          if (signError.message.includes("cancelled") || signError.message.includes("rejected")) {
+            setError("Signing was cancelled. Please try again.");
+          } else if (signError.message.includes("timed out")) {
+            setError("Signing timed out. Please try again.");
+          } else {
+            setError(`Failed to sign vote: ${signError.message}`);
+          }
+        } else {
+          setError("Failed to sign vote. Please try again.");
+        }
+        return;
+      }
 
       console.log("✅ Vote Typed Data Signed successfully:", signature);
 
       // Prepare EIP-712 envelope for submission
+      // Use smart account address in the message (for voting power check)
+      // but pass EOA address for signature validation
       const envelope = {
         domain,
         types,
         message: {
-          from: walletAddress,
+          from: smartAccountAddress, // Smart account address (for voting power)
           space: SNAPSHOT_SPACE,
           timestamp: now, // number for JSON
           proposal: proposal.id,
@@ -383,11 +443,13 @@ function VotingForm({ proposal }: { proposal: Proposal }) {
       };
 
       console.log("Submitting vote to server...");
+      console.log("Vote message 'from' address (smart account):", smartAccountAddress);
+      console.log("Signature from EOA address:", walletAddress);
 
       const result = await createVote({
         proposalId: proposal.id,
         choice: snapshotChoice,
-        address: walletAddress,
+        address: smartAccountAddress, // Use smart account address for the vote
         signature,
         votePayload: envelope,
       });
@@ -395,7 +457,17 @@ function VotingForm({ proposal }: { proposal: Proposal }) {
       if (result?.serverError) {
         console.error("Server error:", result.serverError);
         let errorMsg = result.serverError;
-        if (errorMsg.includes("validation failed")) {
+        if (errorMsg.includes("no voting power")) {
+          errorMsg =
+            "You don't have voting power in this Snapshot space.\n\n" +
+            "Voting power is determined by the space's voting strategy. " +
+            "You may need to:\n" +
+            "• Hold specific tokens (ERC-20)\n" +
+            "• Own specific NFTs\n" +
+            "• Meet other criteria defined by the space\n\n" +
+            "Check the space settings to see what gives voting power: " +
+            "https://snapshot.org/#/vote.thecreative.eth/settings";
+        } else if (errorMsg.includes("validation failed")) {
           errorMsg =
             "Vote validation failed. Possible reasons:\n• You don't have permission to vote in this space\n• You don't meet the minimum voting power requirement\n• The voting period has ended\n• You've already voted on this proposal";
         }
