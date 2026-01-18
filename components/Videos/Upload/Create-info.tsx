@@ -170,8 +170,9 @@ const CreateInfo = ({ onPressNext }: TCreateInfoProps) => {
                     <SelectItem value="Reggae">Reggae</SelectItem>
                     <SelectItem value="Latin">Latin</SelectItem>
                     <SelectItem value="Metal">Metal</SelectItem>
+                    <SelectItem value="Original">Original</SelectItem>
                     <SelectItem value="Podcast">Podcast</SelectItem>
-                    <SelectItem value="Other">World Music</SelectItem>
+                    <SelectItem value="World">World Music</SelectItem>
                   </SelectContent>
                 </Select>
               )}

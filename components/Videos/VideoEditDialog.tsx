@@ -59,8 +59,9 @@ const GENRES = [
   "Reggae",
   "Latin",
   "Metal",
+  "Original",
   "Podcast",
-  "Other",
+  "World",
 ];
 
 export function VideoEditDialog({
@@ -358,7 +359,7 @@ export function VideoEditDialog({
                 <SelectContent>
                   {GENRES.map((genre) => (
                     <SelectItem key={genre} value={genre}>
-                      {genre === "Other" ? "World Music" : genre}
+                      {genre === "World" ? "World Music" : genre}
                     </SelectItem>
                   ))}
                 </SelectContent>
