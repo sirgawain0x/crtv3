@@ -194,14 +194,14 @@ export class MeTokensSubgraphClient {
           err?.message === 'indexing_error' || err?.message?.includes('indexing_error')
         );
         if (hasIndexingError) {
-          console.warn('⚠️ Subgraph indexing error - the subgraph may be syncing or experiencing issues. Returning empty array.');
-          return [];
+          console.warn('⚠️ Subgraph indexing error - falling back to Supabase (Turbo pipeline data)');
+          return await this.getAllMeTokensFromSupabase(first, skip);
         }
         throw new Error(`GraphQL error: ${JSON.stringify(data.errors)}`);
       }
 
       const subscribeEvents = data.subscribes || [];
-      console.log(`✅ Successfully fetched ${subscribeEvents.length} subscribe events`);
+      console.log(`✅ Successfully fetched ${subscribeEvents.length} subscribe events from subgraph`);
 
       // Convert Subscribe events to MeToken format
       // Note: This is a simplified conversion - in practice, you'd need to fetch
@@ -223,8 +223,8 @@ export class MeTokensSubgraphClient {
 
       // Handle indexing_error - subgraph is syncing or has indexing issues
       if (this.isIndexingError(error)) {
-        console.warn('⚠️ Subgraph indexing error - the subgraph may be syncing or experiencing issues. Returning empty array.');
-        return []; // Return empty array instead of throwing - allows app to continue
+        console.warn('⚠️ Subgraph indexing error - falling back to Supabase (Turbo pipeline data)');
+        return await this.getAllMeTokensFromSupabase(first, skip);
       }
 
       // Provide more helpful error messages for other errors
@@ -239,6 +239,46 @@ export class MeTokensSubgraphClient {
       }
 
       throw new Error('Failed to fetch MeTokens from subgraph');
+    }
+  }
+
+  /**
+   * Fallback method to get MeTokens from Supabase when subgraph fails
+   * Uses data from the Turbo pipeline that reads directly from blockchain
+   */
+  private async getAllMeTokensFromSupabase(first: number, skip: number): Promise<MeToken[]> {
+    try {
+      // Dynamically import to avoid SSR issues
+      const { MeTokenSupabaseService } = await import('@/lib/sdk/supabase/metokens');
+      const supabaseService = new MeTokenSupabaseService();
+
+      console.log('📊 Fetching Subscribe events from Supabase (Turbo pipeline)...');
+      const subscribeEvents = await supabaseService.getSubscribeEvents({
+        limit: first,
+        offset: skip,
+        sortBy: 'block_timestamp',
+        sortOrder: 'desc',
+      });
+
+      console.log(`✅ Successfully fetched ${subscribeEvents.length} subscribe events from Supabase`);
+
+      // Convert Subscribe events to MeToken format (matching subgraph format)
+      return subscribeEvents.map((event) => ({
+        id: event.me_token,
+        owner: event.owner,
+        hubId: event.hub_id,
+        balancePooled: '0', // This would need to be fetched from Diamond contract
+        balanceLocked: '0', // This would need to be fetched from Diamond contract
+        startTime: event.block_timestamp,
+        endTime: '0',
+        endCooldown: '0',
+        targetHubId: '0',
+        migration: '',
+      }));
+    } catch (supabaseError: any) {
+      console.error('❌ Failed to fetch MeTokens from Supabase fallback:', supabaseError);
+      // Return empty array to allow app to continue
+      return [];
     }
   }
 
