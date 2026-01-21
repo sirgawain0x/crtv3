@@ -41,9 +41,20 @@ const predictionSchema = z.object({
     .optional(),
   category: z.string().optional(),
   description: z.string().optional(),
-  timeout: z.string().min(1, "Timeout is required"),
+  closeDate: z.string().min(1, "Close date is required"),
+  closeTime: z.string().min(1, "Close time is required"),
   bond: z.string().optional(),
 });
+
+function getUnixTimestamp(date: string, time: string) {
+  if (!date || !time) return 0;
+  // Interpret the date/time inputs as **local time** (what the user picked in the UI),
+  // then convert to a unix timestamp (seconds).
+  const d = new Date(`${date}T${time}:00`);
+  const ms = d.getTime();
+  if (Number.isNaN(ms)) return 0;
+  return Math.floor(ms / 1000);
+}
 
 type PredictionForm = z.infer<typeof predictionSchema>;
 
@@ -72,7 +83,8 @@ function CreatePrediction() {
       outcomes: [{ value: "" }, { value: "" }],
       category: "general",
       description: "",
-      timeout: "604800", // 7 days default
+      closeDate: "",
+      closeTime: "",
       bond: "0",
     },
   });
@@ -123,9 +135,25 @@ function CreatePrediction() {
         language: "en_US",
       };
 
-      const timeout = parseInt(values.timeout, 10);
-      const bond = values.bond ? parseEther(values.bond) : 0n;
       const openingTs = Math.floor(Date.now() / 1000);
+      const closeTs = getUnixTimestamp(values.closeDate, values.closeTime);
+      const nowTs = Math.floor(Date.now() / 1000);
+
+      // Validate that close date/time is in the future
+      if (closeTs <= nowTs) {
+        setFormError("Close date and time must be in the future.");
+        return;
+      }
+
+      // Calculate timeout as the difference between opening time and close time (in seconds)
+      const timeout = closeTs - openingTs;
+
+      if (timeout <= 0) {
+        setFormError("Close date and time must be after the current time.");
+        return;
+      }
+
+      const bond = values.bond ? parseEther(values.bond) : 0n;
       const nonce = BigInt(Date.now());
 
       // Use a default arbitrator address (Reality.eth's default arbitrator)
@@ -285,23 +313,34 @@ function CreatePrediction() {
             )}
           />
 
-          <FormField
-            name="timeout"
-            control={form.control}
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Timeout (seconds)</FormLabel>
-                <FormControl>
-                  <Input
-                    type="number"
-                    placeholder="604800 (7 days)"
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+          <div className="grid grid-cols-2 gap-4">
+            <FormField
+              name="closeDate"
+              control={form.control}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Close Date</FormLabel>
+                  <FormControl>
+                    <Input type="date" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              name="closeTime"
+              control={form.control}
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Close Time</FormLabel>
+                  <FormControl>
+                    <Input type="time" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
 
           <FormField
             name="bond"

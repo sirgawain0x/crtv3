@@ -118,6 +118,116 @@ export class MeTokenSupabaseService {
     return data || [];
   }
 
+  // Get Subscribe events from metoken_subscribes table (populated by Turbo pipeline)
+  async getSubscribeEvents(options: {
+    limit?: number;
+    offset?: number;
+    sortBy?: 'block_timestamp' | 'block_number';
+    sortOrder?: 'asc' | 'desc';
+    meToken?: string;
+  } = {}): Promise<Array<{
+    id: string;
+    me_token: string;
+    owner: string;
+    hub_id: string;
+    assets_deposited: string;
+    minted: string;
+    asset: string;
+    name: string;
+    symbol: string;
+    block_timestamp: string;
+    block_number: number;
+    transaction_hash: string;
+    log_index: number;
+  }>> {
+    const {
+      limit = 100,
+      offset = 0,
+      sortBy = 'block_timestamp',
+      sortOrder = 'desc',
+      meToken
+    } = options;
+
+    let query = supabase
+      .from('metoken_subscribes')
+      .select('*')
+      .range(offset, offset + limit - 1);
+
+    // Filter by meToken if provided
+    // Note: me_token is stored as bytea in the database
+    // Supabase PostgREST should handle hex string to bytea conversion automatically
+    // If this doesn't work, we may need to use a raw SQL query or RPC function
+    if (meToken) {
+      const normalizedMeToken = meToken.toLowerCase();
+      // Try direct comparison first - Supabase may auto-convert
+      // If this fails, we'll need to use a different approach (RPC function or raw SQL)
+      query = query.eq('me_token', normalizedMeToken);
+    }
+
+    // Add sorting
+    query = query.order(sortBy, { ascending: sortOrder === 'asc' });
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Supabase error fetching Subscribe events:', error);
+      throw new Error(`Failed to fetch Subscribe events: ${error.message}`);
+    }
+
+    return (data || []).map((row: any) => {
+      // Helper to convert bytea to hex string
+      const byteaToHex = (value: any): string => {
+        if (!value) return '';
+        // If it's already a string (hex), return it
+        if (typeof value === 'string') {
+          return value.startsWith('0x') ? value : `0x${value}`;
+        }
+        // If it's a Buffer or Uint8Array, convert to hex
+        if (value instanceof Uint8Array || Buffer.isBuffer(value)) {
+          return '0x' + Array.from(value)
+            .map(b => b.toString(16).padStart(2, '0'))
+            .join('');
+        }
+        // Try to convert to string
+        return String(value);
+      };
+
+      // Helper to convert numeric to string
+      const numToString = (value: any): string => {
+        if (value == null) return '0';
+        return value.toString();
+      };
+
+      // Helper to convert timestamp (numeric Unix timestamp) to ISO string
+      const timestampToString = (value: any): string => {
+        if (!value) return '';
+        // If it's already a string, return it
+        if (typeof value === 'string') return value;
+        // If it's a number (Unix timestamp), convert to ISO string
+        if (typeof value === 'number') {
+          return new Date(value * 1000).toISOString();
+        }
+        return String(value);
+      };
+
+      return {
+        id: byteaToHex(row.id),
+        me_token: byteaToHex(row.me_token || row.meToken),
+        owner: byteaToHex(row.owner),
+        hub_id: numToString(row.hub_id || row.hubId),
+        assets_deposited: numToString(row.assets_deposited || row.assetsDeposited),
+        minted: numToString(row.minted),
+        asset: byteaToHex(row.asset),
+        name: row.name || '',
+        symbol: row.symbol || '',
+        block_timestamp: timestampToString(row.block_timestamp || row.blockTimestamp),
+        block_number: typeof row.block_number === 'number' ? row.block_number : parseInt(numToString(row.block_number || row.blockNumber), 10),
+        transaction_hash: byteaToHex(row.transaction_hash || row.transactionHash),
+        log_index: typeof row.log_index === 'number' ? row.log_index : parseInt(numToString(row.log_index || row.logIndex), 10) || 0,
+      };
+    });
+  }
+
   // Create a new MeToken
   async createMeToken(meTokenData: CreateMeTokenData): Promise<MeToken> {
     const { data, error } = await supabase

@@ -1,0 +1,170 @@
+[
+  {
+    "anonymous": false,
+    "name": "Register",
+    "type": "event",
+    "inputs": [
+      {
+        "type": "uint256",
+        "name": "id",
+        "indexed": false
+      },
+      {
+        "type": "address",
+        "name": "owner",
+        "indexed": false
+      },
+      {
+        "type": "address",
+        "name": "asset",
+        "indexed": false
+      },
+      {
+        "type": "address",
+        "name": "vault",
+        "indexed": false
+      },
+      {
+        "type": "uint256",
+        "name": "refundRatio",
+        "indexed": false
+      },
+      {
+        "type": "uint256",
+        "name": "baseY",
+        "indexed": false
+      },
+      {
+        "type": "uint32",
+        "name": "reserveWeight",
+        "indexed": false
+      },
+      {
+        "type": "bytes",
+        "name": "encodedVaultArgs",
+        "indexed": false
+      }
+    ]
+  },
+  {
+    "anonymous": false,
+    "name": "Burn",
+    "type": "event",
+    "inputs": [
+      {
+        "type": "address",
+        "name": "meToken",
+        "indexed": false
+      },
+      {
+        "type": "address",
+        "name": "asset",
+        "indexed": false
+      },
+      {
+        "type": "address",
+        "name": "burner",
+        "indexed": false
+      },
+      {
+        "type": "address",
+        "name": "recipient",
+        "indexed": false
+      },
+      {
+        "type": "uint256",
+        "name": "meTokensBurned",
+        "indexed": false
+      },
+      {
+        "type": "uint256",
+        "name": "assetsReturned",
+        "indexed": false
+      }
+    ]
+  },
+  {
+    "anonymous": false,
+    "name": "Mint",
+    "type": "event",
+    "inputs": [
+      {
+        "type": "address",
+        "name": "meToken",
+        "indexed": false
+      },
+      {
+        "type": "address",
+        "name": "asset",
+        "indexed": false
+      },
+      {
+        "type": "address",
+        "name": "depositor",
+        "indexed": false
+      },
+      {
+        "type": "address",
+        "name": "recipient",
+        "indexed": false
+      },
+      {
+        "type": "uint256",
+        "name": "assetsDeposited",
+        "indexed": false
+      },
+      {
+        "type": "uint256",
+        "name": "meTokensMinted",
+        "indexed": false
+      }
+    ]
+  },
+  {
+    "anonymous": false,
+    "name": "Subscribe",
+    "type": "event",
+    "inputs": [
+      {
+        "type": "address",
+        "name": "meToken",
+        "indexed": true
+      },
+      {
+        "type": "address",
+        "name": "owner",
+        "indexed": true
+      },
+      {
+        "type": "uint256",
+        "name": "minted",
+        "indexed": false
+      },
+      {
+        "type": "address",
+        "name": "asset",
+        "indexed": false
+      },
+      {
+        "type": "uint256",
+        "name": "assetsDeposited",
+        "indexed": false
+      },
+      {
+        "type": "string",
+        "name": "name",
+        "indexed": false
+      },
+      {
+        "type": "string",
+        "name": "symbol",
+        "indexed": false
+      },
+      {
+        "type": "uint256",
+        "name": "hubId",
+        "indexed": false
+      }
+    ]
+  }
+]
