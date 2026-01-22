@@ -42,12 +42,37 @@ export function PredictionDetails({ questionId }: PredictionDetailsProps) {
     async function fetchQuestion() {
       try {
         setIsLoading(true);
-        const publicClient = createPublicClient({
-          chain: base,
-          transport: http(),
-        });
+        
+        // Create public client with proper error handling
+        let publicClient;
+        try {
+          publicClient = createPublicClient({
+            chain: base,
+            transport: http(),
+          });
+        } catch (clientError) {
+          console.error("Error creating public client:", clientError);
+          throw new Error("Failed to initialize blockchain client");
+        }
 
-        const questionDataRaw = await getQuestion(publicClient, questionId);
+        // Wrap getQuestion in try-catch to handle reality.eth library errors
+        let questionDataRaw;
+        try {
+          questionDataRaw = await getQuestion(publicClient, questionId);
+        } catch (questionError: any) {
+          console.error("Error fetching question from contract:", questionError);
+          
+          // Check if it's the reality.eth config error
+          if (questionError?.message?.includes("is_native") || 
+              questionError?.message?.includes("Cannot set properties")) {
+            throw new Error(
+              "Reality.eth configuration error. " +
+              "The question may not exist or the contract configuration is invalid."
+            );
+          }
+          
+          throw questionError;
+        }
         
         // Convert bigint to number for state management
         const questionData: QuestionData = {

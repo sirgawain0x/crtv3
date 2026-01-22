@@ -38,10 +38,15 @@ interface Question {
  * Displays a list of active Reality.eth prediction questions.
  * Fetches questions from the Reality.eth subgraph hosted on Goldsky.
  */
+const ITEMS_PER_PAGE = 20;
+
 export function PredictionList() {
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [allQuestions, setAllQuestions] = useState<Question[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [showOnlyAppQuestions, setShowOnlyAppQuestions] = useState(true);
 
   useEffect(() => {
     async function fetchQuestions() {
@@ -103,10 +108,10 @@ export function PredictionList() {
           }
         `;
 
-        // Query for questions - fetch all questions
-        // You can add filters later by adding where parameter back to the query
+        // Query for questions - fetch more to allow filtering
+        // Fetch up to 200 questions to allow filtering and pagination
         const variables = {
-          first: 50,
+          first: 200,
           skip: 0,
         };
 
@@ -209,7 +214,22 @@ export function PredictionList() {
         });
 
         console.log(`✅ Successfully fetched ${parsedQuestions.length} questions from Reality.eth subgraph`);
-        setQuestions(parsedQuestions);
+        
+        // Filter to only show questions from this app if enabled
+        // Questions created through this app use arbitrator: 0x0000000000000000000000000000000000000000
+        const APP_ARBITRATOR = "0x0000000000000000000000000000000000000000";
+        const filteredQuestions = showOnlyAppQuestions
+          ? parsedQuestions.filter((q) => 
+              q.arbitrator?.toLowerCase() === APP_ARBITRATOR.toLowerCase()
+            )
+          : parsedQuestions;
+        
+        setAllQuestions(filteredQuestions);
+        
+        // Apply pagination
+        const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+        const endIndex = startIndex + ITEMS_PER_PAGE;
+        setQuestions(filteredQuestions.slice(startIndex, endIndex));
       } catch (err: any) {
         console.error('❌ Failed to fetch questions from Reality.eth subgraph:', err);
         
@@ -242,7 +262,7 @@ export function PredictionList() {
     }
 
     fetchQuestions();
-  }, [])
+  }, [currentPage, showOnlyAppQuestions])
 
   if (isLoading) {
     return (
@@ -278,9 +298,51 @@ export function PredictionList() {
     );
   }
 
+  const totalPages = Math.ceil(allQuestions.length / ITEMS_PER_PAGE);
+  const hasNextPage = currentPage < totalPages;
+  const hasPrevPage = currentPage > 1;
+
+  const handleNextPage = () => {
+    if (hasNextPage) {
+      setCurrentPage((prev) => prev + 1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const handlePrevPage = () => {
+    if (hasPrevPage) {
+      setCurrentPage((prev) => prev - 1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
   return (
-    <div className="grid gap-4 w-full overflow-x-auto">
-      {questions.map((question) => {
+    <div className="space-y-4">
+      {/* Filter toggle */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            id="filter-app-questions"
+            checked={showOnlyAppQuestions}
+            onChange={(e) => {
+              setShowOnlyAppQuestions(e.target.checked);
+              setCurrentPage(1); // Reset to first page when filter changes
+            }}
+            className="h-4 w-4 rounded border-gray-300"
+          />
+          <label htmlFor="filter-app-questions" className="text-sm text-gray-600 dark:text-gray-400 cursor-pointer">
+            Show only questions from this app
+          </label>
+        </div>
+        <div className="text-sm text-gray-500">
+          Showing {questions.length} of {allQuestions.length} questions
+        </div>
+      </div>
+
+      {/* Questions list */}
+      <div className="grid gap-4 w-full overflow-x-auto">
+        {questions.map((question) => {
         const now = Math.floor(Date.now() / 1000);
         const openingTs = Number(question.opening_ts);
         const timeout = Number(question.timeout);
@@ -327,6 +389,34 @@ export function PredictionList() {
           </Card>
         );
       })}
+      </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-4 pt-4">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handlePrevPage}
+            disabled={!hasPrevPage || isLoading}
+          >
+            Previous
+          </Button>
+          
+          <div className="flex items-center gap-2 text-sm text-gray-500">
+            <span>Page {currentPage} of {totalPages}</span>
+          </div>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleNextPage}
+            disabled={!hasNextPage || isLoading}
+          >
+            Next
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
