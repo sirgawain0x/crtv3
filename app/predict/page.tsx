@@ -45,7 +45,7 @@ export default function PredictPage() {
         </p>
       </div>
       <div className="p-4">
-        <div className="grid gap-4 w-full max-w-full">
+        <div className="flex flex-col gap-4 w-full max-w-full">
           <Suspense fallback={<PredictionListSkeleton />}>
             <PredictionList />
           </Suspense>

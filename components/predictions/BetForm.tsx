@@ -6,7 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useSmartAccountClient } from "@account-kit/react";
 import { base } from "@account-kit/infra";
-import { createPublicClient, http, parseEther, keccak256, stringToHex } from "viem";
+import { createPublicClient, http, fallback, parseEther, keccak256, stringToHex } from "viem";
 import {
   Form,
   FormField,
@@ -82,7 +82,12 @@ export function BetForm({ questionId, questionType, outcomes }: BetFormProps) {
     try {
       const publicClient = createPublicClient({
         chain: base,
-        transport: http("https://base-mainnet.g.alchemy.com/v2/_wqOpwbI6KMgU_e-SmN3OuBQCz4kwrTr"),
+        transport: fallback([
+          http(process.env.NEXT_PUBLIC_ALCHEMY_API_KEY
+            ? `https://base-mainnet.g.alchemy.com/v2/${process.env.NEXT_PUBLIC_ALCHEMY_API_KEY}`
+            : undefined),
+          http("https://mainnet.base.org"),
+        ]),
       });
 
       // Convert answer to bytes32
@@ -224,6 +229,10 @@ export function BetForm({ questionId, questionType, outcomes }: BetFormProps) {
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Placing Bet...
             </>
+          ) : !isConnected ? (
+            "Connect Wallet to Bet"
+          ) : !canBet ? (
+            "Membership Required"
           ) : (
             "Place Bet"
           )}

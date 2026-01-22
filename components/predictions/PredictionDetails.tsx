@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSmartAccountClient } from "@account-kit/react";
 import { base } from "@account-kit/infra";
-import { createPublicClient, http, formatEther } from "viem";
+import { createPublicClient, http, fallback, formatEther } from "viem";
 import { getQuestion, getFinalAnswer, type RealityEthQuestion } from "@/lib/sdk/reality-eth/reality-eth-question-wrapper";
 import { parseQuestionText, formatQuestionForDisplay } from "@/lib/sdk/reality-eth/reality-eth-utils";
 import { BetForm } from "./BetForm";
@@ -48,7 +48,12 @@ export function PredictionDetails({ questionId }: PredictionDetailsProps) {
         try {
           publicClient = createPublicClient({
             chain: base,
-            transport: http("https://base-mainnet.g.alchemy.com/v2/_wqOpwbI6KMgU_e-SmN3OuBQCz4kwrTr"),
+            transport: fallback([
+              http(process.env.NEXT_PUBLIC_ALCHEMY_API_KEY
+                ? `https://base-mainnet.g.alchemy.com/v2/${process.env.NEXT_PUBLIC_ALCHEMY_API_KEY}`
+                : undefined),
+              http("https://mainnet.base.org"),
+            ]),
           });
         } catch (clientError) {
           console.error("Error creating public client:", clientError);

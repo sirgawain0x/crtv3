@@ -349,7 +349,7 @@ export function PredictionList() {
       </div>
 
       {/* Questions list */}
-      <div className="grid gap-4 w-full overflow-x-auto">
+      <div className="flex flex-col gap-4 w-full">
         {questions.map((question) => {
           const now = Math.floor(Date.now() / 1000);
           const openingTs = Number(question.opening_ts);
@@ -358,12 +358,14 @@ export function PredictionList() {
           const isClosed = timeout > 0 && (openingTs + timeout) <= now;
 
           return (
-            <Card key={question.id} className="p-6 hover:shadow-md transition-shadow">
+            <Card key={question.id} className="p-4 sm:p-6 hover:shadow-md transition-shadow">
               <div className="flex flex-col md:flex-row items-start justify-between gap-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <h3 className="text-lg font-semibold">{question.title || "Untitled Prediction"}</h3>
-                    <Badge variant={isActive ? "default" : isClosed ? "secondary" : "outline"}>
+                <div className="flex-1 min-w-0 w-full">
+                  <div className="flex justify-between items-start gap-2 mb-2">
+                    <h3 className="text-lg font-semibold break-all leading-tight min-w-0 pr-1">
+                      {question.title || "Untitled Prediction"}
+                    </h3>
+                    <Badge className="shrink-0 mt-0.5" variant={isActive ? "default" : isClosed ? "secondary" : "outline"}>
                       {isActive ? "Active" : isClosed ? "Closed" : "Pending"}
                     </Badge>
                   </div>
@@ -372,7 +374,7 @@ export function PredictionList() {
                       {question.description}
                     </p>
                   )}
-                  <div className="flex items-center gap-4 text-xs text-gray-500">
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs text-gray-500">
                     <div className="flex items-center gap-1">
                       <Clock className="h-3 w-3" />
                       <span>
