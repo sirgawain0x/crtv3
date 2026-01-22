@@ -83,12 +83,13 @@ export function PredictionList() {
 
         // GraphQL query for fetching questions
         // The subgraph uses event-based entities, so we query log_new_question events
+        // Only query fields that actually exist in the LogNewQuestion entity
         const GET_QUESTIONS_QUERY = gql`
           query GetQuestions($first: Int!, $skip: Int!) {
             logNewQuestions(
               first: $first
               skip: $skip
-              orderBy: blockTimestamp
+              orderBy: opening_ts
               orderDirection: desc
             ) {
               id
@@ -98,12 +99,6 @@ export function PredictionList() {
               arbitrator
               opening_ts
               timeout
-              finalize_ts
-              bounty
-              min_bond
-              blockNumber
-              blockTimestamp
-              transactionHash
             }
           }
         `;
@@ -188,20 +183,21 @@ export function PredictionList() {
           }
 
           // Map the event-based entity to our Question interface
+          // Note: log_new_question event only has basic fields, not all question data
           return {
             id: q.question_id || q.id,
             template_id: q.template_id?.toString() || "0",
             question: q.question || "",
-            created: q.blockTimestamp?.toString() || "0",
+            created: q.id || "0", // Use id as timestamp fallback since blockTimestamp isn't available
             opening_ts: q.opening_ts?.toString() || "0",
             timeout: q.timeout?.toString() || "0",
-            finalize_ts: q.finalize_ts?.toString(),
+            finalize_ts: undefined, // Not available in log_new_question event - would need to query log_finalize
             is_pending_arbitration: false, // Not available in log_new_question event
-            bounty: q.bounty?.toString() || "0",
+            bounty: "0", // Not available in log_new_question event - would need to query separately
             best_answer: undefined, // Not available in log_new_question event
             history_hash: "", // Not available in log_new_question event
             arbitrator: q.arbitrator || "",
-            min_bond: q.min_bond?.toString() || "0",
+            min_bond: "0", // Not available in log_new_question event
             last_bond: "0", // Not available in log_new_question event
             last_bond_ts: undefined,
             category: undefined,
