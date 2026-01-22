@@ -57,34 +57,53 @@ export function PredictionList() {
         const endpoint = `${window.location.origin}/api/reality-eth-subgraph`;
         console.log('🔗 Fetching Reality.eth questions from:', endpoint);
 
+        // First, try to introspect the schema to see what fields are available
+        const INTROSPECTION_QUERY = gql`
+          query IntrospectSchema {
+            __schema {
+              queryType {
+                fields {
+                  name
+                  type {
+                    name
+                    kind
+                  }
+                }
+              }
+            }
+          }
+        `;
+
+        try {
+          const introspectionData = await request(endpoint, INTROSPECTION_QUERY) as any;
+          console.log('📋 Available query fields:', introspectionData?.__schema?.queryType?.fields);
+        } catch (introError) {
+          console.warn('⚠️ Could not introspect schema:', introError);
+        }
+
         // GraphQL query for fetching questions
-        // Removed where parameter to avoid input type validation issues
+        // The subgraph uses event-based entities, so we query log_new_question events
         const GET_QUESTIONS_QUERY = gql`
           query GetQuestions($first: Int!, $skip: Int!) {
-            questions(
+            logNewQuestions(
               first: $first
               skip: $skip
-              orderBy: created
+              orderBy: blockTimestamp
               orderDirection: desc
             ) {
               id
+              question_id
               template_id
               question
-              created
+              arbitrator
               opening_ts
               timeout
               finalize_ts
-              is_pending_arbitration
               bounty
-              best_answer
-              history_hash
-              arbitrator
               min_bond
-              last_bond
-              last_bond_ts
-              category
-              language
-              outcomes
+              blockNumber
+              blockTimestamp
+              transactionHash
             }
           }
         `;
@@ -96,19 +115,63 @@ export function PredictionList() {
           skip: 0,
         };
 
-        const data = await request(endpoint, GET_QUESTIONS_QUERY, variables) as any;
+        let data = await request(endpoint, GET_QUESTIONS_QUERY, variables) as any;
 
         // Check for GraphQL errors
         if (data.errors) {
           console.error('GraphQL errors:', data.errors);
-          throw new Error(`GraphQL error: ${JSON.stringify(data.errors)}`);
+          
+          // Try alternative field names if logNewQuestions doesn't work
+          const alternativeQueries = [
+            { field: 'log_new_questions', query: gql`query GetQuestions($first: Int!, $skip: Int!) { log_new_questions(first: $first, skip: $skip, orderBy: blockTimestamp, orderDirection: desc) { id question_id template_id question arbitrator opening_ts timeout finalize_ts bounty min_bond blockNumber blockTimestamp transactionHash } }` },
+            { field: 'logNewQuestion', query: gql`query GetQuestions($first: Int!, $skip: Int!) { logNewQuestion(first: $first, skip: $skip, orderBy: blockTimestamp, orderDirection: desc) { id question_id template_id question arbitrator opening_ts timeout finalize_ts bounty min_bond blockNumber blockTimestamp transactionHash } }` },
+          ];
+
+          let foundAlternative = false;
+          for (const alt of alternativeQueries) {
+            try {
+              console.log(`🔄 Trying alternative field name: ${alt.field}`);
+              data = await request(endpoint, alt.query, variables) as any;
+              if (!data.errors && data[alt.field]) {
+                console.log(`✅ Found working field: ${alt.field}`);
+                foundAlternative = true;
+                break;
+              }
+            } catch (e) {
+              console.log(`❌ ${alt.field} didn't work:`, e);
+            }
+          }
+
+          if (!foundAlternative && data.errors) {
+            const hasQuestionsError = data.errors.some((err: any) => 
+              err.message?.includes('no field') || 
+              err.message?.includes('Type `Query` has no field')
+            );
+
+            if (hasQuestionsError) {
+              const errorMsg = 
+                "The Reality.eth subgraph doesn't have the expected query fields. " +
+                "Available entities: log_new_question, log_new_answer, etc.\n\n" +
+                "Please check the Goldsky dashboard GraphQL schema to see the exact field names.";
+              throw new Error(errorMsg);
+            }
+            
+            throw new Error(`GraphQL error: ${JSON.stringify(data.errors)}`);
+          }
         }
 
-        const fetchedQuestions = (data.questions || []) as Question[];
+        // Try different possible field names
+        const fetchedQuestions = (
+          data.logNewQuestions || 
+          data.log_new_questions || 
+          data.logNewQuestion || 
+          data.log_new_question ||
+          []
+        ) as any[];
 
         // Parse question text to extract title and description
         const parsedQuestions = fetchedQuestions.map((q) => {
-          let title = q.question;
+          let title = q.question || "Untitled Prediction";
           let description: string | undefined;
 
           try {
@@ -124,18 +187,59 @@ export function PredictionList() {
             console.warn('Could not parse question text for question', q.id, e);
           }
 
+          // Map the event-based entity to our Question interface
           return {
-            ...q,
+            id: q.question_id || q.id,
+            template_id: q.template_id?.toString() || "0",
+            question: q.question || "",
+            created: q.blockTimestamp?.toString() || "0",
+            opening_ts: q.opening_ts?.toString() || "0",
+            timeout: q.timeout?.toString() || "0",
+            finalize_ts: q.finalize_ts?.toString(),
+            is_pending_arbitration: false, // Not available in log_new_question event
+            bounty: q.bounty?.toString() || "0",
+            best_answer: undefined, // Not available in log_new_question event
+            history_hash: "", // Not available in log_new_question event
+            arbitrator: q.arbitrator || "",
+            min_bond: q.min_bond?.toString() || "0",
+            last_bond: "0", // Not available in log_new_question event
+            last_bond_ts: undefined,
+            category: undefined,
+            language: undefined,
+            outcomes: undefined,
             title,
             description,
-          };
+          } as Question;
         });
 
         console.log(`✅ Successfully fetched ${parsedQuestions.length} questions from Reality.eth subgraph`);
         setQuestions(parsedQuestions);
       } catch (err: any) {
         console.error('❌ Failed to fetch questions from Reality.eth subgraph:', err);
-        setError(err?.message || 'Failed to load predictions. The subgraph may still be syncing.');
+        
+        let errorMessage = err?.message || 'Failed to load predictions.';
+        
+        // Provide helpful error messages based on the error type
+        if (err?.message?.includes("no field `questions`") || 
+            err?.message?.includes("Type `Query` has no field `questions`")) {
+          errorMessage = 
+            "The Reality.eth subgraph schema doesn't match. " +
+            "This usually means:\n\n" +
+            "• The subgraph hasn't been deployed to Goldsky yet\n" +
+            "• The subgraph is still syncing/indexing data\n" +
+            "• The subgraph schema uses different field names\n\n" +
+            "Please check:\n" +
+            "1. Goldsky dashboard - verify the 'reality-eth' subgraph exists\n" +
+            "2. Subgraph status - ensure it's synced and indexed\n" +
+            "3. Subgraph schema - verify it includes a 'questions' query field";
+        } else if (err?.message?.includes("404") || err?.message?.includes("not found")) {
+          errorMessage = 
+            "Reality.eth subgraph not found. " +
+            "Please deploy the subgraph to Goldsky first. " +
+            "See REALITY_ETH_SUBGRAPH_HOSTING.md for deployment instructions.";
+        }
+        
+        setError(errorMessage);
       } finally {
         setIsLoading(false);
       }
