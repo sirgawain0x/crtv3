@@ -113,6 +113,7 @@ import { useMeTokenHoldings } from "@/lib/hooks/metokens/useMeTokenHoldings";
 import { chains } from "@/config";
 import { HydrationSafe } from "@/components/ui/hydration-safe";
 import { useMembershipNFTs, type MembershipNFT } from "@/lib/hooks/unlock/useMembershipNFTs";
+import { LOCK_ADDRESSES } from "@/lib/sdk/unlock/services";
 
 const chainIconMap: Record<number, string> = {
   [base.id]: "/images/chains/base.svg",
@@ -296,7 +297,9 @@ export function AccountDropdown() {
     ? (client?.extend(installValidationActions as any) as any)
     : undefined;
 
-  const { isVerified, hasMembership, isLoading: isMembershipLoading, error: membershipError } = useMembershipVerification();
+  const { isVerified, hasMembership, isLoading: isMembershipLoading, error: membershipError, membershipDetails } = useMembershipVerification();
+
+  const isBrandMember = membershipDetails?.some((m) => m.isValid && m.address === LOCK_ADDRESSES.BASE_CREATIVE_PASS_3);
 
   // Check for MeTokens to conditionally render the section
   const { userMeToken, loading: meTokenLoading } = useMeTokensSupabase();
@@ -673,7 +676,7 @@ export function AccountDropdown() {
       console.log("Transaction hash:", txHash);
       toast({
         title: "Transaction Successful!",
-        description: sendType === 'nft' 
+        description: sendType === 'nft'
           ? "Your membership NFT has been transferred."
           : "Your transaction has been confirmed.",
         action: (
@@ -1492,19 +1495,21 @@ export function AccountDropdown() {
                           </span>
                         </Button>
                       </Link>
-                      <Link href="/vote/create" className="w-full">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="w-full flex flex-col items-center justify-center p-2 h-12 hover:bg-green-50 
+                      {isBrandMember && (
+                        <Link href="/vote/create" className="w-full">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full flex flex-col items-center justify-center p-2 h-12 hover:bg-green-50 
                           dark:hover:bg-green-900 transition-colors text-green-600 dark:text-green-400 
                           font-medium border-green-200 dark:border-green-800"
-                          onClick={() => setIsDropdownOpen(false)}
-                        >
-                          <Plus className="h-3 w-3 mb-1" />
-                          <span className="text-xs">Poll</span>
-                        </Button>
-                      </Link>
+                            onClick={() => setIsDropdownOpen(false)}
+                          >
+                            <Plus className="h-3 w-3 mb-1" />
+                            <span className="text-xs">Poll</span>
+                          </Button>
+                        </Link>
+                      )}
                       <Link href="/predict/create" className="w-full">
                         <Button
                           variant="outline"

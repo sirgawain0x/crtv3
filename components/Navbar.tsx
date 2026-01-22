@@ -428,8 +428,11 @@ export default function Navbar() {
               <Link href="/market" className={navLinkClass} id="nav-trade-link">
                 Trade
               </Link>
+              <Link href="/predict" className={navLinkClass} id="nav-predict-link">
+                Predictions
+              </Link>
               <Link href="/vote" prefetch={false} className={navLinkClass}>
-                Vote
+                Campaigns
               </Link>
             </nav>
           </div>
@@ -547,11 +550,19 @@ export default function Navbar() {
                     Trade
                   </Link>
                   <Link
+                    href="/predict"
+                    className={mobileNavLinkClass}
+                    onClick={handleLinkClick}
+                    id="mobile-nav-predict-link"
+                  >
+                    Predictions
+                  </Link>
+                  <Link
                     href="/vote"
                     className={mobileNavLinkClass}
                     onClick={handleLinkClick}
                   >
-                    Vote
+                    Campaigns
                   </Link>
 
                   {/* Member/User Options */}

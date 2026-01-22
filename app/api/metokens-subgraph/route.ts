@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// MeTokens subgraph endpoint - now using Goldsky with envio.dev as backup
+// MeTokens subgraph endpoint - now using Goldsky
 // Deployment ID: QmVaWYhk4HKhk9rNQi11RKujTVS4KHF1uHGNVUF4f7xJ53
 const DEFAULT_PROJECT_ID = 'project_cmh0iv6s500dbw2p22vsxcfo6';
 const PROJECT_ID = process.env.GOLDSKY_PROJECT_ID || DEFAULT_PROJECT_ID;
@@ -13,8 +13,7 @@ const getSubgraphUrl = (subgraphName: string, version: string, specificAccessTyp
 
 const METOKENS_SUBGRAPH_URL = getSubgraphUrl('metokens', 'v0.0.1');
 
-// Envio.dev backup endpoint for MeTokens subgraph
-const ENVIO_METOKENS_SUBGRAPH_URL = process.env.ENVIO_METOKENS_SUBGRAPH_URL || 'https://indexer.dev.hyperindex.xyz/5becbbb/v1/graphql';
+
 
 // Creative TV subgraph endpoint - now using Goldsky
 // Deployment ID: QmbDp8Wfy82g8L7Mv6RCAZHRcYUQB4prQfqchvexfZR8yZ
@@ -81,47 +80,13 @@ export async function POST(request: NextRequest) {
       response = await performFetch(subgraphEndpoint, publicHeaders);
     }
 
-    // If Goldsky fails with server error (5xx) or network issue, try envio.dev as backup
-    // Don't try backup for client errors (4xx) as those are likely configuration issues
-    let goldskyErrorText: string | null = null;
-    let endpointUsed: 'Goldsky' | 'envio.dev' = 'Goldsky';
-    if (!response.ok && response.status >= 500) {
-      goldskyErrorText = await response.text();
-      console.warn(`⚠️ Goldsky subgraph request failed with server error (status: ${response.status}), trying envio.dev backup...`);
-      
-      try {
-        const envioHeaders = {
-          'Content-Type': 'application/json',
-        };
-        const envioResponse = await performFetch(ENVIO_METOKENS_SUBGRAPH_URL, envioHeaders);
-        
-        if (envioResponse.ok) {
-          console.log('✅ Successfully using envio.dev backup endpoint');
-          response = envioResponse;
-          endpointUsed = 'envio.dev';
-          goldskyErrorText = null; // Clear error text since we succeeded
-        } else {
-          // If envio also fails, log but continue to return the original Goldsky error
-          console.error('❌ Both Goldsky and envio.dev endpoints failed');
-          const envioErrorText = await envioResponse.text();
-          console.error('❌ Envio.dev error:', {
-            status: envioResponse.status,
-            statusText: envioResponse.statusText,
-            error: envioErrorText,
-          });
-        }
-      } catch (envioError) {
-        console.error('❌ Error connecting to envio.dev backup:', envioError);
-        // Continue to return the original Goldsky error
-      }
-    }
 
     console.log('📊 Subgraph response status:', response.status);
 
     if (!response.ok) {
       // Use stored error text if available, otherwise read from response
-      const errorText = goldskyErrorText || await response.text();
-      console.error('❌ Subgraph request failed (tried both Goldsky and envio.dev):', {
+      const errorText = await response.text();
+      console.error('❌ Subgraph request failed:', {
         status: response.status,
         statusText: response.statusText,
         error: errorText,
@@ -136,7 +101,7 @@ export async function POST(request: NextRequest) {
             ? 'Subgraph not found. Verify the Goldsky deployment ID and subgraph name.'
             : response.status === 429
               ? 'Rate limit exceeded. Please try again later.'
-              : 'Subgraph server error. Both Goldsky and envio.dev endpoints may be down or experiencing issues.',
+              : 'Subgraph server error.',
         },
         { status: response.status }
       );
@@ -150,7 +115,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(data); // Return errors to client
     }
 
-    console.log(`✅ Subgraph query successful (${endpointUsed}):`, {
+    console.log('✅ Subgraph query successful:', {
       hasData: !!data.data,
       dataKeys: data.data ? Object.keys(data.data) : [],
     });
@@ -159,33 +124,12 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('💥 Error proxying subgraph request:', error);
-    
-    // Try envio.dev as last resort if we haven't tried it yet
-    try {
-      console.log('🔄 Attempting envio.dev backup due to exception...');
-      const envioHeaders = {
-        'Content-Type': 'application/json',
-      };
-      const envioResponse = await fetch(ENVIO_METOKENS_SUBGRAPH_URL, {
-        method: 'POST',
-        headers: envioHeaders,
-        body: JSON.stringify(body),
-      });
-      
-      if (envioResponse.ok) {
-        const envioData = await envioResponse.json();
-        console.log('✅ Successfully recovered using envio.dev backup');
-        return NextResponse.json(envioData);
-      }
-    } catch (envioError) {
-      console.error('❌ Envio.dev backup also failed:', envioError);
-    }
-    
+
     return NextResponse.json(
       {
         error: 'Internal Server Error',
         message: error instanceof Error ? error.message : 'Unknown error',
-        hint: 'Check server logs for more details. Tried both Goldsky (Deployment ID: QmVaWYhk4HKhk9rNQi11RKujTVS4KHF1uHGNVUF4f7xJ53) and envio.dev backup.',
+        hint: 'Check server logs for more details. Using Goldsky (Deployment ID: QmVaWYhk4HKhk9rNQi11RKujTVS4KHF1uHGNVUF4f7xJ53).',
       },
       { status: 500 }
     );

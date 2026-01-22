@@ -1,6 +1,14 @@
 declare module '@reality.eth/contracts' {
   interface RealityETHConfig {
     address: string;
+    abi?: any[];
+    chainId: number;
+    version: string;
+    tokenTicker: string;
+  }
+
+  interface RealityETHInstance {
+    address: string;
     abi: any[];
     chainId: number;
     version: string;
@@ -14,6 +22,7 @@ declare module '@reality.eth/contracts' {
       tokenTicker: string,
       version: string
     ): RealityETHConfig | null;
+    realityETHInstance?(config: RealityETHConfig): RealityETHInstance;
     defaultTokenForChain(chainId: number): string;
   }
 

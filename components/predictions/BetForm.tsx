@@ -82,7 +82,7 @@ export function BetForm({ questionId, questionType, outcomes }: BetFormProps) {
     try {
       const publicClient = createPublicClient({
         chain: base,
-        transport: http(),
+        transport: http("https://base-mainnet.g.alchemy.com/v2/_wqOpwbI6KMgU_e-SmN3OuBQCz4kwrTr"),
       });
 
       // Convert answer to bytes32
@@ -117,12 +117,24 @@ export function BetForm({ questionId, questionType, outcomes }: BetFormProps) {
       form.reset();
     } catch (err: any) {
       console.error("Error placing bet:", err);
-      setError(err?.message || "Failed to place bet. Please try again.");
+      let errorMessage = err?.message || "Failed to place bet. Please try again.";
+
+      // Improve error message for common issues
+      if (errorMessage.includes("ABI encoding params")) {
+        errorMessage = "Contract interaction error. Please contact support.";
+      } else if (errorMessage.includes("insufficient funds")) {
+        errorMessage = "Insufficient funds to place bet.";
+      }
+
+      setError(errorMessage);
       toast.error("Failed to place bet");
     } finally {
       setIsSubmitting(false);
     }
   }
+
+  // Debug logging
+  console.log("🎲 BetForm Rendering:", { questionId, questionType, outcomes, canBet });
 
   return (
     <Form {...form}>

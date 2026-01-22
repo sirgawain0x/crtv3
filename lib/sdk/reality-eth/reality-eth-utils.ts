@@ -31,7 +31,7 @@ export function encodeQuestionText(questionData: QuestionData): string {
   }
 
   if (type === "single-select" || type === "multiple-select") {
-    if (!outcomes || outcomes.length === 0) {
+    if (!outcomes || !Array.isArray(outcomes) || outcomes.length === 0) {
       throw new Error(`Outcomes are required for ${type} questions`);
     }
     return realityQuestion.encodeText(type, title, outcomes, category, language);

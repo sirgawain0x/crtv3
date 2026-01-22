@@ -78,13 +78,11 @@ No configuration is required as these are public endpoints:
 
 - **MeTokens Subgraph (Primary - Goldsky)**: `https://api.goldsky.com/api/public/project_cmh0iv6s500dbw2p22vsxcfo6/subgraphs/metokens/v0.0.1/gn`
   - Deployment ID: `QmVaWYhk4HKhk9rNQi11RKujTVS4KHF1uHGNVUF4f7xJ53`
-- **MeTokens Subgraph (Backup - envio.dev)**: `https://indexer.dev.hyperindex.xyz/5becbbb/v1/graphql`
-  - Automatically used if Goldsky experiences server errors
-  - Can be customized via `ENVIO_METOKENS_SUBGRAPH_URL` environment variable
+
 - **Creative TV Subgraph**: `https://api.goldsky.com/api/public/project_cmh0iv6s500dbw2p22vsxcfo6/subgraphs/creative_tv/0.1/gn`
   - Deployment ID: `QmbDp8Wfy82g8L7Mv6RCAZHRcYUQB4prQfqchvexfZR8yZ`
 
-**Note:** These endpoints are accessed via the API proxy at `/api/metokens-subgraph` to handle CORS. The proxy automatically falls back to envio.dev if Goldsky is unavailable.
+**Note:** These endpoints are accessed via the API proxy at `/api/metokens-subgraph` to handle CORS.
 
 #### Reality.eth Subgraph
 

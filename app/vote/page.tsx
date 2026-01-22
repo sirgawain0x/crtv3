@@ -34,18 +34,18 @@ export default function VotePage() {
             </BreadcrumbSeparator>
             <BreadcrumbItem>
               <BreadcrumbLink>
-                <BreadcrumbPage>Vote</BreadcrumbPage>
+                <BreadcrumbPage>Brand Campaigns</BreadcrumbPage>
               </BreadcrumbLink>
             </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
       </div>
       <div>
-        <h1 className="text-lg sm:text-xl font-bold">Voting</h1>
+        <h1 className="text-lg sm:text-xl font-bold">Brand Campaigns</h1>
       </div>
       <div className="mt-5">
         <p className="text-base sm:text-lg">
-          Have your say in the future of the Creative ecosystem.
+          Have your say in the creation of brand campaigns.
         </p>
       </div>
       <div className="p-4">

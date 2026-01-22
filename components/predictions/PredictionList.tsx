@@ -46,7 +46,7 @@ export function PredictionList() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [showOnlyAppQuestions, setShowOnlyAppQuestions] = useState(true);
+  const [showOnlyAppQuestions, setShowOnlyAppQuestions] = useState(false); // Default to false to show all questions
 
   useEffect(() => {
     async function fetchQuestions() {
@@ -170,7 +170,8 @@ export function PredictionList() {
         ) as any[];
 
         // Parse question text to extract title and description
-        const parsedQuestions = fetchedQuestions.map((q) => {
+        const safeFetchedQuestions = fetchedQuestions || [];
+        const parsedQuestions = safeFetchedQuestions.map((q) => {
           let title = q.question || "Untitled Prediction";
           let description: string | undefined;
 
@@ -227,9 +228,10 @@ export function PredictionList() {
         setAllQuestions(filteredQuestions);
         
         // Apply pagination
+        const safeFilteredQuestions = filteredQuestions || [];
         const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
         const endIndex = startIndex + ITEMS_PER_PAGE;
-        setQuestions(filteredQuestions.slice(startIndex, endIndex));
+        setQuestions(safeFilteredQuestions.slice(startIndex, endIndex));
       } catch (err: any) {
         console.error('❌ Failed to fetch questions from Reality.eth subgraph:', err);
         
@@ -256,6 +258,9 @@ export function PredictionList() {
         }
         
         setError(errorMessage);
+        // Set empty arrays on error to prevent undefined errors
+        setAllQuestions([]);
+        setQuestions([]);
       } finally {
         setIsLoading(false);
       }
@@ -292,14 +297,17 @@ export function PredictionList() {
       <div className="p-4">
         <div>No predictions found.</div>
         <div className="text-sm text-gray-500 mt-2">
-          Create your first prediction to get started!
+          {showOnlyAppQuestions 
+            ? "No predictions found from this app. Try unchecking the filter to see all predictions."
+            : "Create your first prediction to get started!"}
         </div>
       </div>
     );
   }
 
-  const totalPages = Math.ceil(allQuestions.length / ITEMS_PER_PAGE);
-  const hasNextPage = currentPage < totalPages;
+  const totalQuestions = allQuestions?.length || 0;
+  const totalPages = totalQuestions > 0 ? Math.ceil(totalQuestions / ITEMS_PER_PAGE) : 1;
+  const hasNextPage = totalQuestions > 0 && currentPage < totalPages;
   const hasPrevPage = currentPage > 1;
 
   const handleNextPage = () => {
@@ -336,7 +344,7 @@ export function PredictionList() {
           </label>
         </div>
         <div className="text-sm text-gray-500">
-          Showing {questions.length} of {allQuestions.length} questions
+          Showing {questions?.length || 0} of {allQuestions?.length || 0} questions
         </div>
       </div>
 

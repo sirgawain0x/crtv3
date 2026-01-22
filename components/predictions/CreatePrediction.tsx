@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -44,6 +44,20 @@ const predictionSchema = z.object({
   closeDate: z.string().min(1, "Close date is required"),
   closeTime: z.string().min(1, "Close time is required"),
   bond: z.string().optional(),
+}).refine((data) => {
+  // For bool and uint types, outcomes are optional (will be auto-generated)
+  if (data.type === "bool" || data.type === "uint") {
+    return true;
+  }
+  // For select types, outcomes are required and must have at least 2 non-empty values
+  if (data.type === "single-select" || data.type === "multiple-select") {
+    return data.outcomes && data.outcomes.length >= 2 && 
+           data.outcomes.every(o => o.value && o.value.trim().length > 0);
+  }
+  return true;
+}, {
+  message: "At least 2 outcomes with values are required for select questions",
+  path: ["outcomes"],
 });
 
 function getUnixTimestamp(date: string, time: string) {
@@ -79,8 +93,8 @@ function CreatePrediction() {
     resolver: zodResolver(predictionSchema),
     defaultValues: {
       title: "",
-      type: "single-select",
-      outcomes: [{ value: "" }, { value: "" }],
+      type: "bool",
+      outcomes: [{ value: "Yes" }, { value: "No" }], // Default to Yes/No for bool type
       category: "general",
       description: "",
       closeDate: "",
@@ -95,6 +109,19 @@ function CreatePrediction() {
   });
 
   const questionType = form.watch("type");
+
+  // Auto-populate outcomes when type changes to bool
+  useEffect(() => {
+    if (questionType === "bool") {
+      form.setValue("outcomes", [{ value: "Yes" }, { value: "No" }]);
+    } else if (questionType === "single-select" || questionType === "multiple-select") {
+      // Ensure at least 2 empty outcomes for select types
+      const currentOutcomes = form.getValues("outcomes");
+      if (!currentOutcomes || currentOutcomes.length < 2) {
+        form.setValue("outcomes", [{ value: "" }, { value: "" }]);
+      }
+    }
+  }, [questionType, form]);
 
   async function onSubmit(values: PredictionForm) {
     setFormError(null);
@@ -118,9 +145,9 @@ function CreatePrediction() {
     // Validate outcomes for select types
     if (
       (values.type === "single-select" || values.type === "multiple-select") &&
-      (!values.outcomes || values.outcomes.length < 2)
+      (!values.outcomes || values.outcomes.length < 2 || values.outcomes.some(o => !o?.value || o.value.trim() === ""))
     ) {
-      setFormError("At least 2 outcomes are required for select questions.");
+      setFormError("At least 2 outcomes are required for select questions, and all outcomes must have values.");
       return;
     }
 
@@ -139,10 +166,30 @@ function CreatePrediction() {
         transport: http(),
       });
 
+      // Ensure outcomes are set for bool type
+      let finalOutcomes: string[] | undefined = undefined;
+      
+      if (values.type === "bool") {
+        // For bool type, always use Yes/No
+        finalOutcomes = ["Yes", "No"];
+      } else if (values.type === "single-select" || values.type === "multiple-select") {
+        // For select types, use the provided outcomes
+        finalOutcomes = values.outcomes
+          ?.map((o) => o?.value)
+          .filter((o): o is string => !!o && typeof o === 'string' && o.trim().length > 0);
+        
+        if (!finalOutcomes || finalOutcomes.length === 0) {
+          setFormError("At least 2 outcomes are required for select questions.");
+          setIsSubmitting(false);
+          return;
+        }
+      }
+      // For uint type, outcomes can be undefined
+
       const questionData: QuestionData = {
         type: values.type,
         title: values.title,
-        outcomes: values.outcomes?.map((o) => o.value),
+        outcomes: finalOutcomes,
         category: values.category || "general",
         description: values.description,
         language: "en_US",
@@ -262,11 +309,29 @@ function CreatePrediction() {
     }
   }
 
+  const handleFormSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    console.log("📋 Form submit triggered");
+    console.log("📋 Form values:", form.getValues());
+    console.log("📋 Form errors:", form.formState.errors);
+    
+    // Check form validation
+    const isValid = await form.trigger();
+    console.log("📋 Form is valid:", isValid);
+    
+    if (!isValid) {
+      console.log("❌ Form validation failed:", form.formState.errors);
+      return;
+    }
+    
+    await form.handleSubmit(onSubmit)(e);
+  };
+
   return (
     <div className="flex flex-wrap items-start justify-center p-2">
       <Form {...form}>
         <form
-          onSubmit={form.handleSubmit(onSubmit)}
+          onSubmit={handleFormSubmit}
           className="w-full p-5 md:w-2/5 space-y-6"
         >
           <FormField
@@ -433,6 +498,12 @@ function CreatePrediction() {
             type="submit"
             className="w-full"
             disabled={isSubmitting || !isConnected || isLoadingClient}
+            onClick={(e) => {
+              console.log("🔘 Create Prediction button clicked");
+              console.log("🔘 isSubmitting:", isSubmitting);
+              console.log("🔘 isConnected:", isConnected);
+              console.log("🔘 isLoadingClient:", isLoadingClient);
+            }}
           >
             {isSubmitting ? (
               <>
