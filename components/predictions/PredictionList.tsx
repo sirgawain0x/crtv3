@@ -120,7 +120,7 @@ export function PredictionList() {
         // Check for GraphQL errors
         if (data.errors) {
           console.error('GraphQL errors:', data.errors);
-          
+
           // Try alternative field names if logNewQuestions doesn't work
           const alternativeQueries = [
             { field: 'log_new_questions', query: gql`query GetQuestions($first: Int!, $skip: Int!) { log_new_questions(first: $first, skip: $skip, orderBy: blockTimestamp, orderDirection: desc) { id question_id template_id question arbitrator opening_ts timeout finalize_ts bounty min_bond blockNumber blockTimestamp transactionHash } }` },
@@ -143,28 +143,28 @@ export function PredictionList() {
           }
 
           if (!foundAlternative && data.errors) {
-            const hasQuestionsError = data.errors.some((err: any) => 
-              err.message?.includes('no field') || 
+            const hasQuestionsError = data.errors.some((err: any) =>
+              err.message?.includes('no field') ||
               err.message?.includes('Type `Query` has no field')
             );
 
             if (hasQuestionsError) {
-              const errorMsg = 
+              const errorMsg =
                 "The Reality.eth subgraph doesn't have the expected query fields. " +
                 "Available entities: log_new_question, log_new_answer, etc.\n\n" +
                 "Please check the Goldsky dashboard GraphQL schema to see the exact field names.";
               throw new Error(errorMsg);
             }
-            
+
             throw new Error(`GraphQL error: ${JSON.stringify(data.errors)}`);
           }
         }
 
         // Try different possible field names
         const fetchedQuestions = (
-          data.logNewQuestions || 
-          data.log_new_questions || 
-          data.logNewQuestion || 
+          data.logNewQuestions ||
+          data.log_new_questions ||
+          data.logNewQuestion ||
           data.log_new_question ||
           []
         ) as any[];
@@ -215,18 +215,18 @@ export function PredictionList() {
         });
 
         console.log(`✅ Successfully fetched ${parsedQuestions.length} questions from Reality.eth subgraph`);
-        
+
         // Filter to only show questions from this app if enabled
         // Questions created through this app use arbitrator: 0x0000000000000000000000000000000000000000
         const APP_ARBITRATOR = "0x0000000000000000000000000000000000000000";
         const filteredQuestions = showOnlyAppQuestions
-          ? parsedQuestions.filter((q) => 
-              q.arbitrator?.toLowerCase() === APP_ARBITRATOR.toLowerCase()
-            )
+          ? parsedQuestions.filter((q) =>
+            q.arbitrator?.toLowerCase() === APP_ARBITRATOR.toLowerCase()
+          )
           : parsedQuestions;
-        
+
         setAllQuestions(filteredQuestions);
-        
+
         // Apply pagination
         const safeFilteredQuestions = filteredQuestions || [];
         const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -234,13 +234,13 @@ export function PredictionList() {
         setQuestions(safeFilteredQuestions.slice(startIndex, endIndex));
       } catch (err: any) {
         console.error('❌ Failed to fetch questions from Reality.eth subgraph:', err);
-        
+
         let errorMessage = err?.message || 'Failed to load predictions.';
-        
+
         // Provide helpful error messages based on the error type
-        if (err?.message?.includes("no field `questions`") || 
-            err?.message?.includes("Type `Query` has no field `questions`")) {
-          errorMessage = 
+        if (err?.message?.includes("no field `questions`") ||
+          err?.message?.includes("Type `Query` has no field `questions`")) {
+          errorMessage =
             "The Reality.eth subgraph schema doesn't match. " +
             "This usually means:\n\n" +
             "• The subgraph hasn't been deployed to Goldsky yet\n" +
@@ -251,12 +251,12 @@ export function PredictionList() {
             "2. Subgraph status - ensure it's synced and indexed\n" +
             "3. Subgraph schema - verify it includes a 'questions' query field";
         } else if (err?.message?.includes("404") || err?.message?.includes("not found")) {
-          errorMessage = 
+          errorMessage =
             "Reality.eth subgraph not found. " +
             "Please deploy the subgraph to Goldsky first. " +
             "See REALITY_ETH_SUBGRAPH_HOSTING.md for deployment instructions.";
         }
-        
+
         setError(errorMessage);
         // Set empty arrays on error to prevent undefined errors
         setAllQuestions([]);
@@ -297,7 +297,7 @@ export function PredictionList() {
       <div className="p-4">
         <div>No predictions found.</div>
         <div className="text-sm text-gray-500 mt-2">
-          {showOnlyAppQuestions 
+          {showOnlyAppQuestions
             ? "No predictions found from this app. Try unchecking the filter to see all predictions."
             : "Create your first prediction to get started!"}
         </div>
@@ -327,7 +327,7 @@ export function PredictionList() {
   return (
     <div className="space-y-4">
       {/* Filter toggle */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center gap-2">
           <input
             type="checkbox"
@@ -351,52 +351,52 @@ export function PredictionList() {
       {/* Questions list */}
       <div className="grid gap-4 w-full overflow-x-auto">
         {questions.map((question) => {
-        const now = Math.floor(Date.now() / 1000);
-        const openingTs = Number(question.opening_ts);
-        const timeout = Number(question.timeout);
-        const isActive = openingTs <= now && (timeout === 0 || (openingTs + timeout) > now);
-        const isClosed = timeout > 0 && (openingTs + timeout) <= now;
+          const now = Math.floor(Date.now() / 1000);
+          const openingTs = Number(question.opening_ts);
+          const timeout = Number(question.timeout);
+          const isActive = openingTs <= now && (timeout === 0 || (openingTs + timeout) > now);
+          const isClosed = timeout > 0 && (openingTs + timeout) <= now;
 
-        return (
-          <Card key={question.id} className="p-6 hover:shadow-md transition-shadow">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2">
-                  <h3 className="text-lg font-semibold">{question.title || "Untitled Prediction"}</h3>
-                  <Badge variant={isActive ? "default" : isClosed ? "secondary" : "outline"}>
-                    {isActive ? "Active" : isClosed ? "Closed" : "Pending"}
-                  </Badge>
-                </div>
-                {question.description && (
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">
-                    {question.description}
-                  </p>
-                )}
-                <div className="flex items-center gap-4 text-xs text-gray-500">
-                  <div className="flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    <span>
-                      {Number(question.timeout) > 0
-                        ? `Closes: ${new Date((Number(question.opening_ts) + Number(question.timeout)) * 1000).toLocaleString()}`
-                        : "No timeout"}
-                    </span>
+          return (
+            <Card key={question.id} className="p-6 hover:shadow-md transition-shadow">
+              <div className="flex flex-col md:flex-row items-start justify-between gap-4">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <h3 className="text-lg font-semibold">{question.title || "Untitled Prediction"}</h3>
+                    <Badge variant={isActive ? "default" : isClosed ? "secondary" : "outline"}>
+                      {isActive ? "Active" : isClosed ? "Closed" : "Pending"}
+                    </Badge>
                   </div>
-                  {question.bounty && Number(question.bounty) > 0 && (
-                    <div>Bounty: {(Number(question.bounty) / 1e18).toFixed(4)} ETH</div>
+                  {question.description && (
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">
+                      {question.description}
+                    </p>
                   )}
+                  <div className="flex items-center gap-4 text-xs text-gray-500">
+                    <div className="flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      <span>
+                        {Number(question.timeout) > 0
+                          ? `Closes: ${new Date((Number(question.opening_ts) + Number(question.timeout)) * 1000).toLocaleString()}`
+                          : "No timeout"}
+                      </span>
+                    </div>
+                    {question.bounty && Number(question.bounty) > 0 && (
+                      <div>Bounty: {(Number(question.bounty) / 1e18).toFixed(4)} ETH</div>
+                    )}
+                  </div>
+                </div>
+                <div className="flex flex-col gap-2 w-full md:w-auto mt-2 md:mt-0">
+                  <Link href={`/predict/${question.id}`}>
+                    <Button variant="outline" size="sm" className="w-full md:w-auto">
+                      View Details
+                    </Button>
+                  </Link>
                 </div>
               </div>
-              <div className="flex flex-col gap-2">
-                <Link href={`/predict/${question.id}`}>
-                  <Button variant="outline" size="sm">
-                    View Details
-                  </Button>
-                </Link>
-              </div>
-            </div>
-          </Card>
-        );
-      })}
+            </Card>
+          );
+        })}
       </div>
 
       {/* Pagination */}
@@ -410,7 +410,7 @@ export function PredictionList() {
           >
             Previous
           </Button>
-          
+
           <div className="flex items-center gap-2 text-sm text-gray-500">
             <span>Page {currentPage} of {totalPages}</span>
           </div>
