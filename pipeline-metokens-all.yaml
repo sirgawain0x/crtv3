@@ -6,48 +6,80 @@ sources:
     name: subscribe
     subgraphs:
       - name: metokens
-        version: v1.0.2
+        version: 1.0.2
     type: subgraph_entity
   metoken_mints_source:
     name: mint
     subgraphs:
       - name: metokens
-        version: v1.0.2
+        version: 1.0.2
     type: subgraph_entity
   metoken_burns_source:
     name: burn
     subgraphs:
       - name: metokens
-        version: v1.0.2
+        version: 1.0.2
     type: subgraph_entity
   metoken_registers_source:
     name: register
     subgraphs:
       - name: metokens
-        version: v1.0.2
+        version: 1.0.2
     type: subgraph_entity
-transforms: {}
+transforms:
+  metoken_subscribes_transform:
+    type: sql
+    primary_key: id
+    sql: >-
+      SELECT 
+        *,
+        `timestamp` AS block_timestamp
+      FROM metoken_subscribes_source
+  metoken_mints_transform:
+    type: sql
+    primary_key: id
+    sql: >-
+      SELECT 
+        *,
+        `timestamp` AS block_timestamp
+      FROM metoken_mints_source
+  metoken_burns_transform:
+    type: sql
+    primary_key: id
+    sql: >-
+      SELECT 
+        *,
+        `timestamp` AS block_timestamp
+      FROM metoken_burns_source
+  metoken_registers_transform:
+    type: sql
+    primary_key: id
+    sql: >-
+      SELECT 
+        *,
+        `timestamp` AS block_timestamp
+      FROM metoken_registers_source
 sinks:
   postgres_metoken_subscribes:
-    from: metoken_subscribes_source
+    from: metoken_subscribes_transform
     schema: public
     secret_name: POSTGRES_SECRET_CMJIQCIFZ0
     table: metoken_subscribes
     type: postgres
   postgres_metoken_mints:
-    from: metoken_mints_source
+    from: metoken_mints_transform
     schema: public
     secret_name: POSTGRES_SECRET_CMJIQCIFZ0
     table: metoken_mints
     type: postgres
   postgres_metoken_burns:
-    from: metoken_burns_source
+    from: metoken_burns_transform
     schema: public
     secret_name: POSTGRES_SECRET_CMJIQCIFZ0
     table: metoken_burns
     type: postgres
   postgres_metoken_registers:
-    from: metoken_registers_source
+    from: metoken_registers_transform
     schema: public
     secret_name: POSTGRES_SECRET_CMJIQCIFZ0
     table: metoken_registers
