@@ -109,6 +109,12 @@ function CreatePrediction() {
       return;
     }
 
+    // Validate date and time fields
+    if (!values.closeDate || !values.closeTime) {
+      setFormError("Please select both a close date and close time.");
+      return;
+    }
+
     // Validate outcomes for select types
     if (
       (values.type === "single-select" || values.type === "multiple-select") &&
@@ -121,6 +127,13 @@ function CreatePrediction() {
     setIsSubmitting(true);
 
     try {
+      console.log("🚀 Starting prediction creation...", {
+        title: values.title,
+        type: values.type,
+        closeDate: values.closeDate,
+        closeTime: values.closeTime,
+      });
+
       const publicClient = createPublicClient({
         chain: base,
         transport: http(),
@@ -139,9 +152,24 @@ function CreatePrediction() {
       const closeTs = getUnixTimestamp(values.closeDate, values.closeTime);
       const nowTs = Math.floor(Date.now() / 1000);
 
+      console.log("⏰ Time calculations:", {
+        openingTs,
+        closeTs,
+        nowTs,
+        closeDate: values.closeDate,
+        closeTime: values.closeTime,
+      });
+
       // Validate that close date/time is in the future
+      if (closeTs === 0) {
+        setFormError("Invalid date or time. Please check your selections.");
+        setIsSubmitting(false);
+        return;
+      }
+
       if (closeTs <= nowTs) {
         setFormError("Close date and time must be in the future.");
+        setIsSubmitting(false);
         return;
       }
 
@@ -150,8 +178,11 @@ function CreatePrediction() {
 
       if (timeout <= 0) {
         setFormError("Close date and time must be after the current time.");
+        setIsSubmitting(false);
         return;
       }
+
+      console.log("✅ Validation passed, timeout:", timeout);
 
       const bond = values.bond ? parseEther(values.bond) : 0n;
       const nonce = BigInt(Date.now());
@@ -163,6 +194,21 @@ function CreatePrediction() {
       // Template ID 0 is typically used for custom questions
       // You may need to register a template first for production use
       const templateId = 0;
+
+      console.log("📝 Creating question with params:", {
+        templateId,
+        arbitrator,
+        timeout,
+        openingTs,
+        nonce: nonce.toString(),
+        bond: bond.toString(),
+        questionData,
+      });
+
+      console.log("🔐 Account Kit Client:", {
+        hasClient: !!accountKitClient,
+        account: accountKitClient?.account?.address,
+      });
 
       const hash = await createQuestionWithData(
         publicClient,
@@ -178,18 +224,39 @@ function CreatePrediction() {
         }
       );
 
-      toast.success("Prediction created successfully!");
+      console.log("✅ Transaction hash:", hash);
+
+      toast.success("Prediction created successfully! Transaction submitted.");
       
       // Extract question ID from transaction receipt
       // Note: In production, you'd parse the question ID from the transaction logs
       // For now, we'll redirect to the predictions list
       router.push("/predict");
     } catch (error: any) {
-      console.error("Error creating prediction:", error);
-      setFormError(
-        error?.message || "Failed to create prediction. Please try again."
-      );
-      toast.error("Failed to create prediction");
+      console.error("❌ Error creating prediction:", error);
+      
+      // Provide more detailed error messages
+      let errorMessage = "Failed to create prediction. Please try again.";
+      
+      if (error?.message) {
+        errorMessage = error.message;
+      } else if (error?.cause?.message) {
+        errorMessage = error.cause.message;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+      }
+
+      // Check for common error patterns
+      if (errorMessage.includes("user rejected") || errorMessage.includes("User rejected")) {
+        errorMessage = "Transaction was cancelled. Please try again.";
+      } else if (errorMessage.includes("insufficient funds") || errorMessage.includes("balance")) {
+        errorMessage = "Insufficient funds. Please ensure you have enough ETH for gas and bond.";
+      } else if (errorMessage.includes("network") || errorMessage.includes("chain")) {
+        errorMessage = "Network error. Please check your connection and try again.";
+      }
+
+      setFormError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }

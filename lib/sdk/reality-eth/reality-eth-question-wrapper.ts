@@ -30,13 +30,13 @@ export interface SubmitAnswerParams {
  * Create a new question on Reality.eth
  * 
  * @param publicClient - Viem public client
- * @param walletClient - Viem wallet client
+ * @param walletClient - Viem wallet client or Account Kit smart account client
  * @param params - Question creation parameters
  * @returns Transaction hash
  */
 export async function createQuestion(
   publicClient: PublicClient,
-  walletClient: WalletClient,
+  walletClient: WalletClient | any, // Allow Account Kit client
   params: CreateQuestionParams
 ): Promise<`0x${string}`> {
   const contractAddress = getRealityEthContractAddress();
@@ -55,6 +55,33 @@ export async function createQuestion(
     args: [BigInt(templateId), questionText, arbitrator, timeout, openingTs, nonce],
   });
 
+  // Check if this is an Account Kit smart account client (has sendUserOperation)
+  if (walletClient.sendUserOperation && typeof walletClient.sendUserOperation === 'function') {
+    console.log("📦 Using Account Kit sendUserOperation");
+    
+    // Use Account Kit's sendUserOperation
+    const operation = await walletClient.sendUserOperation({
+      uo: {
+        target: contractAddress,
+        data: data as `0x${string}`,
+        value: bond,
+      },
+    });
+
+    // Wait for the transaction to be mined
+    if (walletClient.waitForUserOperationTransaction) {
+      const receipt = await walletClient.waitForUserOperationTransaction({
+        hash: operation.hash,
+      });
+      return receipt.receipt.transactionHash as `0x${string}`;
+    }
+
+    // If no wait method, return the operation hash
+    return operation.hash as `0x${string}`;
+  }
+
+  // Fallback to regular wallet client sendTransaction
+  console.log("📝 Using regular wallet sendTransaction");
   const hash = await walletClient.sendTransaction({
     chain: walletClient.chain || base,
     to: contractAddress,

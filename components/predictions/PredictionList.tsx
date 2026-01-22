@@ -58,12 +58,12 @@ export function PredictionList() {
         console.log('🔗 Fetching Reality.eth questions from:', endpoint);
 
         // GraphQL query for fetching questions
+        // Removed where parameter to avoid input type validation issues
         const GET_QUESTIONS_QUERY = gql`
-          query GetQuestions($first: Int!, $skip: Int!, $where: Question_filter) {
+          query GetQuestions($first: Int!, $skip: Int!) {
             questions(
               first: $first
               skip: $skip
-              where: $where
               orderBy: created
               orderDirection: desc
             ) {
@@ -89,12 +89,11 @@ export function PredictionList() {
           }
         `;
 
-        // Query for questions - fetch all questions for now
-        // You can add filters later if needed (e.g., filter by finalize_ts, opening_ts, etc.)
+        // Query for questions - fetch all questions
+        // You can add filters later by adding where parameter back to the query
         const variables = {
           first: 50,
           skip: 0,
-          where: {}, // Empty filter to get all questions
         };
 
         const data = await request(endpoint, GET_QUESTIONS_QUERY, variables) as any;
