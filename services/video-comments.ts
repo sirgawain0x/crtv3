@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/sdk/supabase/server";
+import { supabaseService } from "@/lib/sdk/supabase/service";
 import type { 
   VideoComment, 
   CreateCommentInput, 
@@ -10,9 +11,12 @@ import type {
 
 /**
  * Create a new comment on a video
+ * Uses service role client to bypass RLS, but ownership is validated by the caller
  */
 export async function createComment(input: CreateCommentInput): Promise<VideoComment> {
-  const supabase = await createClient();
+  // Use service role client for writes (bypasses RLS)
+  // Ownership validation happens in the application layer (caller verifies commenter_address)
+  const supabase = supabaseService || await createClient();
   
   const { data, error } = await supabase
     .from('video_comments')
@@ -106,13 +110,15 @@ export async function getCommentCount(video_asset_id: number): Promise<number> {
 
 /**
  * Update a comment
+ * Uses service role client for writes, but validates ownership first
  */
 export async function updateComment(
   commentId: number,
   input: UpdateCommentInput,
   commenterAddress: string
 ): Promise<VideoComment> {
-  const supabase = await createClient();
+  // Use service role client for writes (bypasses RLS)
+  const supabase = supabaseService || await createClient();
   
   // First verify ownership
   const { data: existing } = await supabase
@@ -150,12 +156,14 @@ export async function updateComment(
 
 /**
  * Soft delete a comment
+ * Uses service role client for writes, but validates ownership first
  */
 export async function deleteComment(
   commentId: number,
   commenterAddress: string
 ): Promise<void> {
-  const supabase = await createClient();
+  // Use service role client for writes (bypasses RLS)
+  const supabase = supabaseService || await createClient();
   
   // First verify ownership
   const { data: existing } = await supabase
@@ -184,12 +192,14 @@ export async function deleteComment(
 
 /**
  * Like or unlike a comment
+ * Uses service role client for writes (bypasses RLS)
  */
 export async function toggleCommentLike(
   commentId: number,
   likerAddress: string
 ): Promise<{ is_liked: boolean; likes_count: number }> {
-  const supabase = await createClient();
+  // Use service role client for writes (bypasses RLS)
+  const supabase = supabaseService || await createClient();
   
   // Check if already liked
   const { data: existing } = await supabase
