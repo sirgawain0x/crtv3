@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseService } from '@/lib/sdk/supabase/service';
 import { createClient } from '@/lib/sdk/supabase/server';
+import { serverLogger } from '@/lib/utils/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -115,7 +116,7 @@ export async function GET(request: NextRequest) {
       });
     }
   } catch (error) {
-    console.error('Error fetching creator profiles:', error);
+    serverLogger.error('Error fetching creator profiles:', error);
     return NextResponse.json(
       { 
         success: false, 
@@ -128,7 +129,21 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    // Handle JSON parsing errors
+    let body;
+    try {
+      body = await request.json();
+    } catch (jsonError) {
+      serverLogger.error('Invalid JSON in request body:', jsonError);
+      return NextResponse.json(
+        { 
+          success: false,
+          error: 'Invalid JSON in request body'
+        },
+        { status: 400 }
+      );
+    }
+    
     const { owner_address, username, bio, avatar_url } = body;
 
     if (!owner_address) {
@@ -180,7 +195,7 @@ export async function POST(request: NextRequest) {
       data: data[0] 
     });
   } catch (error) {
-    console.error('Error creating creator profile:', error);
+    serverLogger.error('Error creating creator profile:', error);
     return NextResponse.json(
       { 
         success: false, 
@@ -193,7 +208,21 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const body = await request.json();
+    // Handle JSON parsing errors
+    let body;
+    try {
+      body = await request.json();
+    } catch (jsonError) {
+      serverLogger.error('Invalid JSON in request body:', jsonError);
+      return NextResponse.json(
+        { 
+          success: false,
+          error: 'Invalid JSON in request body'
+        },
+        { status: 400 }
+      );
+    }
+    
     const { owner_address, username, bio, avatar_url } = body;
 
     if (!owner_address) {
@@ -251,7 +280,7 @@ export async function PUT(request: NextRequest) {
       data: data[0] 
     });
   } catch (error) {
-    console.error('Error updating creator profile:', error);
+    serverLogger.error('Error updating creator profile:', error);
     return NextResponse.json(
       { 
         success: false, 
@@ -292,7 +321,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     if (error) {
-      console.error('Delete operation failed:', error);
+      serverLogger.error('Delete operation failed:', error);
       return NextResponse.json(
         { 
           success: false, 
@@ -307,7 +336,7 @@ export async function DELETE(request: NextRequest) {
       message: 'Creator profile deleted successfully' 
     });
   } catch (error) {
-    console.error('Error deleting creator profile:', error);
+    serverLogger.error('Error deleting creator profile:', error);
     return NextResponse.json(
       { 
         success: false, 

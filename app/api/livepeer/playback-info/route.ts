@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fullLivepeer } from '@/lib/sdk/livepeer/fullClient';
+import { serverLogger } from '@/lib/utils/logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -46,7 +47,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(playbackInfo);
   } catch (error: any) {
-    console.error('Error fetching playback info:', error);
+    serverLogger.error('Error fetching playback info:', error);
     
     // Extract error message from Livepeer API response if available
     let errorMessage = 'Failed to fetch playback info';

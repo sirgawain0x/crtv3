@@ -76,7 +76,7 @@ The application uses **Goldsky** for blockchain indexing:
 #### MeTokens Subgraphs (Existing Project)
 No configuration is required as these are public endpoints:
 
-- **MeTokens Subgraph (Primary - Goldsky)**: `https://api.goldsky.com/api/public/project_cmh0iv6s500dbw2p22vsxcfo6/subgraphs/metokens/v0.0.1/gn`
+- **MeTokens Subgraph (Primary - Goldsky)**: `https://api.goldsky.com/api/public/project_cmh0iv6s500dbw2p22vsxcfo6/subgraphs/metokens/1.0.2/gn`
   - Deployment ID: `QmVaWYhk4HKhk9rNQi11RKujTVS4KHF1uHGNVUF4f7xJ53`
 
 - **Creative TV Subgraph**: `https://api.goldsky.com/api/public/project_cmh0iv6s500dbw2p22vsxcfo6/subgraphs/creative_tv/0.1/gn`

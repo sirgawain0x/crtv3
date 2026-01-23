@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { generateJwt } from "@coinbase/cdp-sdk/auth";
 import { verifyMessage } from "viem";
+import { serverLogger } from "@/lib/utils/logger";
 
 /**
  * Coinbase CDP Session Token API
@@ -63,7 +64,7 @@ function cleanupExpiredEntries(): void {
   });
 
   if (entriesToDelete.length > 0) {
-    console.log(`Cleaned up ${entriesToDelete.length} expired rate limit entries`);
+    serverLogger.debug(`Cleaned up ${entriesToDelete.length} expired rate limit entries`);
   }
 }
 
@@ -118,7 +119,7 @@ async function verifyAddressOwnership(
     });
     return isValid;
   } catch (error) {
-    console.error("Signature verification error:", error);
+    serverLogger.error("Signature verification error:", error);
     return false;
   }
 }
@@ -390,7 +391,7 @@ export async function POST(req: NextRequest) {
       }
     } else {
       // Log warning if signature is not provided (for monitoring)
-      console.warn(
+      serverLogger.warn(
         `Session token request without signature verification for address ${address} from IP ${ip}. ` +
         `Consider implementing signature verification for enhanced security.`
       );
@@ -401,7 +402,7 @@ export async function POST(req: NextRequest) {
     try {
       jwtToken = await generateJWT();
     } catch (error) {
-      console.error("JWT generation error:", error);
+      serverLogger.error("JWT generation error:", error);
       
       // Provide more specific error messages for debugging
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
@@ -456,7 +457,7 @@ export async function POST(req: NextRequest) {
     } else {
       // Log in development that we're omitting the private IP
       if (process.env.NODE_ENV === "development") {
-        console.log(
+        serverLogger.debug(
           `Omitting private IP ${ip} from Coinbase API request (private IPs are not allowed)`
         );
       }
@@ -477,7 +478,7 @@ export async function POST(req: NextRequest) {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("Coinbase API error:", errorText);
+      serverLogger.error("Coinbase API error:", errorText);
       
       let errorMessage = "Failed to create session token";
       try {
@@ -510,7 +511,7 @@ export async function POST(req: NextRequest) {
       }
     );
   } catch (error) {
-    console.error("Session token error:", error);
+    serverLogger.error("Session token error:", error);
     return NextResponse.json(
       {
         error:

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { IPFSService } from '@/lib/sdk/ipfs/service';
+import { serverLogger } from '@/lib/utils/logger';
 
 // Initialize IPFS service with hybrid storage
 // Lighthouse (Primary) - Better CDN distribution, especially for West Coast
@@ -35,7 +36,7 @@ function dataUrlToFile(dataUrl: string, filename: string): File | null {
     const blob = new Blob([buffer], { type: mimeType });
     return new File([blob], filename, { type: mimeType });
   } catch (error) {
-    console.error('Error converting data URL to file:', error);
+    serverLogger.error('Error converting data URL to file:', error);
     return null;
   }
 }
@@ -56,14 +57,26 @@ async function urlToFile(url: string, filename: string): Promise<File | null> {
     
     return new File([blob], filename, { type: blob.type });
   } catch (error) {
-    console.error('Error fetching image from URL:', error);
+    serverLogger.error('Error fetching image from URL:', error);
     return null;
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const { imageUrl, filename } = await request.json();
+    // Handle JSON parsing errors
+    let body;
+    try {
+      body = await request.json();
+    } catch (jsonError) {
+      serverLogger.error('Invalid JSON in request body:', jsonError);
+      return NextResponse.json({
+        success: false,
+        error: "Invalid JSON in request body",
+      }, { status: 400 });
+    }
+    
+    const { imageUrl, filename } = body;
     
     if (!imageUrl) {
       return NextResponse.json({
@@ -118,11 +131,33 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('IPFS Upload Error:', error);
+    serverLogger.error('IPFS Upload Error:', error);
+    
+    // Handle specific error types
+    if (error instanceof Error) {
+      // Check for network/connection errors
+      if (error.message.includes('network') || error.message.includes('fetch') || error.message.includes('ECONNREFUSED')) {
+        return NextResponse.json({
+          success: false,
+          error: 'Network error',
+          details: 'Unable to connect to IPFS service. Please check your network connection and try again.'
+        }, { status: 503 });
+      }
+      
+      // Check for file conversion errors
+      if (error.message.includes('convert') || error.message.includes('file')) {
+        return NextResponse.json({
+          success: false,
+          error: 'File conversion error',
+          details: error.message
+        }, { status: 400 });
+      }
+    }
     
     return NextResponse.json({
       success: false,
       error: error instanceof Error ? error.message : "Failed to upload to IPFS",
+      details: process.env.NODE_ENV === 'development' && error instanceof Error ? error.stack : undefined
     }, { status: 500 });
   }
 }

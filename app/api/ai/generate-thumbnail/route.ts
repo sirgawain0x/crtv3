@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI, PersonGeneration, SafetyFilterLevel } from '@google/genai';
+import { serverLogger } from '@/lib/utils/logger';
 
 export async function POST(request: NextRequest) {
   try {
@@ -95,7 +96,7 @@ export async function POST(request: NextRequest) {
               });
             } else {
               // Fallback to data URL if IPFS upload fails
-              console.warn('IPFS upload failed, using data URL:', uploadResult.error);
+              serverLogger.warn('IPFS upload failed, using data URL:', uploadResult.error);
               images.push({
                 url: dataUrl,
                 id: imageId,
@@ -106,7 +107,7 @@ export async function POST(request: NextRequest) {
             }
           } catch (ipfsError) {
             // If IPFS upload fails, use data URL
-            console.warn('IPFS upload error:', ipfsError);
+            serverLogger.warn('IPFS upload error:', ipfsError);
             images.push({
               url: dataUrl,
               id: imageId,
@@ -129,7 +130,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Gemini API Error:', error);
+    serverLogger.error('Gemini API Error:', error);
 
     // Handle specific Gemini API errors
     let errorMessage = "AI generation failed";

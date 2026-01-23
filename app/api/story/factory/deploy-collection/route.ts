@@ -15,6 +15,7 @@ import { privateKeyToAccount } from "viem/accounts";
 import { getStoryRpcUrl } from "@/lib/sdk/story/client";
 import { deployCreatorCollection, getCollectionBytecode, getFactoryContractAddress } from "@/lib/sdk/story/factory-contract-service";
 import type { Address } from "viem";
+import { serverLogger } from "@/lib/utils/logger";
 
 /**
  * Story Protocol chain configuration
@@ -106,7 +107,7 @@ export async function POST(request: NextRequest) {
       txHash: result.txHash,
     });
   } catch (error) {
-    console.error("Factory collection deployment error:", error);
+    serverLogger.error("Factory collection deployment error:", error);
     return NextResponse.json(
       {
         error: "Collection deployment failed",

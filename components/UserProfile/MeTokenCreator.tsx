@@ -9,6 +9,7 @@ import { useMeTokensSupabase } from '@/lib/hooks/metokens/useMeTokensSupabase';
 import { useUser } from '@account-kit/react';
 import { useToast } from '@/components/ui/use-toast';
 import { Loader2, CheckCircle, AlertCircle, Info } from 'lucide-react';
+import { logger } from '@/lib/utils/logger';
 
 interface MeTokenCreatorProps {
   onMeTokenCreated?: (meTokenAddress: string) => void;
@@ -26,7 +27,7 @@ export function MeTokenCreator({ onMeTokenCreated }: MeTokenCreatorProps) {
 
   // Debug: Log user state
   useEffect(() => {
-    console.log('👤 User state:', { user, address: user?.address });
+    logger.debug('👤 User state:', { user, address: user?.address });
   }, [user]);
 
   // Toast notifications for transaction states
@@ -72,7 +73,7 @@ export function MeTokenCreator({ onMeTokenCreated }: MeTokenCreatorProps) {
   }, [transactionError, toast]);
 
   const handleCreateMeToken = async () => {
-    console.log('🚀 handleCreateMeToken called', { name, symbol, daiAmount });
+    logger.debug('🚀 handleCreateMeToken called', { name, symbol, daiAmount });
 
     if (!name.trim() || !symbol.trim()) {
       setLocalError('Please fill in all fields');
@@ -94,7 +95,7 @@ export function MeTokenCreator({ onMeTokenCreated }: MeTokenCreatorProps) {
 
     try {
       // First check if user already has a MeToken
-      console.log('🔍 Checking for existing MeToken before creation...');
+      logger.debug('🔍 Checking for existing MeToken before creation...');
       try {
         await checkUserMeToken();
         if (userMeToken) {
@@ -103,10 +104,10 @@ export function MeTokenCreator({ onMeTokenCreated }: MeTokenCreatorProps) {
         }
 
         // Also check subgraph for any MeTokens that might not be in database yet
-        console.log('🔍 Checking subgraph for existing MeTokens...');
+        logger.debug('🔍 Checking subgraph for existing MeTokens...');
         const { meTokensSubgraph } = await import('@/lib/sdk/metokens/subgraph');
         const allMeTokens = await meTokensSubgraph.getAllMeTokens(20, 0);
-        console.log(`📋 Found ${allMeTokens.length} recent MeTokens in subgraph`);
+        logger.debug(`Found ${allMeTokens.length} recent MeTokens in subgraph`);
 
         // Check if any of these MeTokens belong to our user
         const recentTokens = allMeTokens.slice(0, 5);
@@ -114,31 +115,31 @@ export function MeTokenCreator({ onMeTokenCreated }: MeTokenCreatorProps) {
           try {
             const { getBulkMeTokenInfo } = await import('@/lib/utils/metokenUtils');
             const recentTokenIds = recentTokens.map(t => t.id);
-            console.log('📦 Bulk checking ownership for:', recentTokenIds);
+            logger.debug('📦 Bulk checking ownership for:', recentTokenIds);
             const results = await getBulkMeTokenInfo(recentTokenIds);
 
             for (const id of recentTokenIds) {
               const info = results[id];
               if (info && info.owner.toLowerCase() === user?.address?.toLowerCase()) {
-                console.log('✅ Found existing MeToken for user via bulk check:', id);
+                logger.debug('✅ Found existing MeToken for user via bulk check:', id);
                 setLocalError('You already have a MeToken. Please use the "Sync Existing MeToken" button to load it.');
                 return;
               }
             }
           } catch (err) {
-            console.warn('Failed to check MeToken ownership via bulk info:', err);
+            logger.warn('Failed to check MeToken ownership via bulk info:', err);
           }
         }
       } catch (checkErr) {
-        console.log('ℹ️ No existing MeToken found, proceeding with creation...');
+        logger.debug('ℹ️ No existing MeToken found, proceeding with creation...');
       }
 
-      console.log('📝 Calling createMeToken with:', name.trim(), symbol.trim().toUpperCase(), daiAmount);
+      logger.debug('📝 Calling createMeToken with:', name.trim(), symbol.trim().toUpperCase(), daiAmount);
       await createMeToken(name.trim(), symbol.trim().toUpperCase(), 1, daiAmount);
-      console.log('✅ createMeToken completed successfully');
+      logger.debug('✅ createMeToken completed successfully');
       // Don't set success here - let the hook handle the state
     } catch (err) {
-      console.error('❌ Error in createMeToken:', err);
+      logger.error('❌ Error in createMeToken:', err);
 
       // Handle specific error cases with user-friendly messages
       let errorMessage = 'Failed to create MeToken';

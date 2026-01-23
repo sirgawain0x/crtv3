@@ -15,7 +15,7 @@ The application has been successfully migrated from Satsuma to **Goldsky** for s
 **New Goldsky Endpoints:**
 
 #### MeTokens Subgraph
-- **URL**: `https://api.goldsky.com/api/public/project_cmh0iv6s500dbw2p22vsxcfo6/subgraphs/metokens/v0.0.1/gn`
+- **URL**: `https://api.goldsky.com/api/public/project_cmh0iv6s500dbw2p22vsxcfo6/subgraphs/metokens/1.0.2/gn`
 - **Deployment ID**: `QmVaWYhk4HKhk9rNQi11RKujTVS4KHF1uHGNVUF4f7xJ53`
 - **Purpose**: Indexes MeToken creation, minting, and burning events
 
@@ -135,7 +135,7 @@ The application has been successfully migrated from Satsuma to **Goldsky** for s
 
 ### Test Goldsky Endpoint Directly
 ```bash
-curl -X POST https://api.goldsky.com/api/public/project_cmh0iv6s500dbw2p22vsxcfo6/subgraphs/metokens/v0.0.1/gn \
+curl -X POST https://api.goldsky.com/api/public/project_cmh0iv6s500dbw2p22vsxcfo6/subgraphs/metokens/1.0.2/gn \
   -H "Content-Type: application/json" \
   -d '{
     "query": "{ subscribes(first: 1) { id meToken hubId blockTimestamp } }"

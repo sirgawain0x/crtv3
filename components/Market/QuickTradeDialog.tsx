@@ -27,6 +27,7 @@ import { creatorProfileSupabaseService } from '@/lib/sdk/supabase/creator-profil
 import { convertFailingGateway } from '@/lib/utils/image-gateway';
 import { MarketToken } from '@/app/api/market/tokens/route';
 import { useVideoContribution } from '@/lib/hooks/metokens/useVideoContribution';
+import { logger } from '@/lib/utils/logger';
 
 interface QuickTradeDialogProps {
   open: boolean;
@@ -105,7 +106,7 @@ export function QuickTradeDialog({
 
       setDaiBalance(balance);
     } catch (err) {
-      console.error('Failed to check DAI balance:', err);
+      logger.error('Failed to check DAI balance:', err);
       setDaiBalance(BigInt(0));
     }
   }, [client]);
@@ -125,7 +126,7 @@ export function QuickTradeDialog({
 
       setMeTokenBalance(balance);
     } catch (err) {
-      console.error('Failed to check MeToken balance:', err);
+      logger.error('Failed to check MeToken balance:', err);
       setMeTokenBalance(BigInt(0));
     }
   }, [client, token]);
@@ -151,7 +152,7 @@ export function QuickTradeDialog({
             setPreview(preview);
           }
         } catch (err) {
-          console.error('Failed to calculate preview:', err);
+          logger.error('Failed to calculate preview:', err);
           setPreview('0');
         }
       } else {
@@ -164,7 +165,7 @@ export function QuickTradeDialog({
 
 
   const handleBuy = async () => {
-    console.log('🛒 Buy button clicked', { amount, token });
+    logger.debug('🛒 Buy button clicked', { amount, token });
 
     // Check if wallet is connected first
     if (!isConnected) {
@@ -192,7 +193,7 @@ export function QuickTradeDialog({
     }
 
     if (!token) {
-      console.error('❌ Token not available', { token });
+      logger.error('❌ Token not available', { token });
       setError('Token information not available');
       toast({
         title: "Error",
@@ -203,7 +204,7 @@ export function QuickTradeDialog({
     }
 
     if (!client) {
-      console.error('❌ Smart account client not initialized');
+      logger.error('❌ Smart account client not initialized');
       setError('Wallet not connected. Please connect your wallet.');
       toast({
         title: "Error",
@@ -219,7 +220,7 @@ export function QuickTradeDialog({
     setActiveOperation('buy');
 
     try {
-      console.log('💰 Starting purchase...', {
+      logger.debug('💰 Starting purchase...', {
         meTokenAddress: token.address,
         amount,
         videoId: token.video_id,
@@ -227,7 +228,7 @@ export function QuickTradeDialog({
       });
 
       // Pass video tracking information when buying (if content coin)
-      console.log('🔄 Calling buyMeTokens...');
+      logger.debug('🔄 Calling buyMeTokens...');
       const trackingInfo = token.type === 'content_coin' && token.playback_id
         ? {
           video_id: token.video_id,
@@ -236,7 +237,7 @@ export function QuickTradeDialog({
         : undefined;
 
       await buyMeTokens(token.address, amount, trackingInfo);
-      console.log('✅ Buy order submitted successfully!');
+      logger.debug('✅ Buy order submitted successfully!');
       setSuccess('Buy order submitted successfully!');
       setAmount('');
 
@@ -257,7 +258,7 @@ export function QuickTradeDialog({
         setActiveOperation(null);
       }, 2000);
     } catch (err) {
-      console.error('❌ Error in handleBuy:', err);
+      logger.error('❌ Error in handleBuy:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to buy MeTokens';
       setError(errorMessage);
       setSuccess(null);
@@ -331,7 +332,7 @@ export function QuickTradeDialog({
         setActiveOperation(null);
       }, 2000);
     } catch (err) {
-      console.error('Error in handleSell:', err);
+      logger.error('Error in handleSell:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to sell tokens';
       setError(errorMessage);
       setSuccess(null);

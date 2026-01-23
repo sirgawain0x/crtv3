@@ -27,6 +27,7 @@ import Image from 'next/image';
 import { creatorProfileSupabaseService } from '@/lib/sdk/supabase/creator-profiles';
 import { convertFailingGateway } from '@/lib/utils/image-gateway';
 import { useVideoContribution } from '@/lib/hooks/metokens/useVideoContribution';
+import { logger } from '@/lib/utils/logger';
 
 interface VideoMeTokenBuyDialogProps {
   open: boolean;
@@ -159,12 +160,12 @@ export function VideoMeTokenBuyDialog({
               setCreatorAvatarUrl(creatorProfile.avatar_url);
             }
           } catch (profileError) {
-            console.warn('Failed to fetch creator profile for avatar:', profileError);
+            logger.warn('Failed to fetch creator profile for avatar:', profileError);
             // Don't set error - avatar is optional
           }
         }
       } catch (err) {
-        console.error('Error fetching MeToken:', err);
+        logger.error('Error fetching MeToken:', err);
         setError(err instanceof Error ? err.message : 'Failed to load MeToken information');
       } finally {
         setIsLoadingMeToken(false);
@@ -192,7 +193,7 @@ export function VideoMeTokenBuyDialog({
 
       setDaiBalance(balance);
     } catch (err) {
-      console.error('Failed to check DAI balance:', err);
+      logger.error('Failed to check DAI balance:', err);
       setDaiBalance(BigInt(0));
     }
   }, [client]);
@@ -218,7 +219,7 @@ export function VideoMeTokenBuyDialog({
 
       setMeTokenBalance(balance);
     } catch (err) {
-      console.error('Failed to check MeToken balance:', err);
+      logger.error('Failed to check MeToken balance:', err);
       setMeTokenBalance(BigInt(0));
     }
   }, [client, meToken]);
@@ -244,7 +245,7 @@ export function VideoMeTokenBuyDialog({
             setPreview(preview);
           }
         } catch (err) {
-          console.error('Failed to calculate preview:', err);
+          logger.error('Failed to calculate preview:', err);
           setPreview('0');
         }
       } else {
@@ -256,7 +257,7 @@ export function VideoMeTokenBuyDialog({
   }, [amount, mode, calculateMeTokensMinted, calculateAssetsReturned, meToken]);
 
   const handleBuy = async () => {
-    console.log('🛒 Buy button clicked', { amount, meToken });
+    logger.debug('🛒 Buy button clicked', { amount, meToken });
 
     // Check if wallet is connected first
     if (!isConnected) {
@@ -284,7 +285,7 @@ export function VideoMeTokenBuyDialog({
     }
 
     if (!meToken) {
-      console.error('❌ MeToken not available', { meToken });
+      logger.error(' MeToken not available', { meToken });
       setError('MeToken information not available');
       toast({
         title: "Error",
@@ -295,7 +296,7 @@ export function VideoMeTokenBuyDialog({
     }
 
     if (!client) {
-      console.error('❌ Smart account client not initialized');
+      logger.error(' Smart account client not initialized');
       setError('Wallet not connected. Please connect your wallet.');
       toast({
         title: "Error",
@@ -310,7 +311,7 @@ export function VideoMeTokenBuyDialog({
     setSuccess(null);
 
     try {
-      console.log('💰 Starting purchase...', {
+      logger.debug('💰 Starting purchase...', {
         meTokenAddress: meToken.address,
         amount,
         videoId: videoAsset?.id,
@@ -320,12 +321,12 @@ export function VideoMeTokenBuyDialog({
       // const buyAmountWei = parseEther(amount); // removed unused var
 
       // Pass video tracking information when buying
-      console.log('🔄 Calling buyMeTokens...');
+      logger.debug('🔄 Calling buyMeTokens...');
       await buyMeTokens(meToken.address, amount, {
         video_id: videoAsset?.id,
         playback_id: playbackId,
       });
-      console.log('✅ Buy order submitted successfully!');
+      logger.debug('✅ Buy order submitted successfully!');
       setSuccess('Buy order submitted successfully!');
       setAmount('');
 
@@ -345,7 +346,7 @@ export function VideoMeTokenBuyDialog({
         setSuccess(null);
       }, 2000);
     } catch (err) {
-      console.error('❌ Error in handleBuy:', err);
+      logger.error(' Error in handleBuy:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to buy MeTokens';
       setError(errorMessage);
       setSuccess(null);
@@ -360,7 +361,7 @@ export function VideoMeTokenBuyDialog({
   };
 
   const handleSell = async () => {
-    console.log('💸 Sell button clicked', { amount, meToken, meTokenBalance });
+    logger.debug('💸 Sell button clicked', { amount, meToken, meTokenBalance });
 
     // Check if wallet is connected first
     if (!isConnected) {
@@ -388,7 +389,7 @@ export function VideoMeTokenBuyDialog({
     }
 
     if (!meToken) {
-      console.error('❌ MeToken not available', { meToken });
+      logger.error(' MeToken not available', { meToken });
       setError('MeToken information not available');
       toast({
         title: "Error",
@@ -399,7 +400,7 @@ export function VideoMeTokenBuyDialog({
     }
 
     if (!client) {
-      console.error('❌ Smart account client not initialized');
+      logger.error(' Smart account client not initialized');
       setError('Wallet not connected. Please connect your wallet.');
       toast({
         title: "Error",
@@ -425,7 +426,7 @@ export function VideoMeTokenBuyDialog({
     setSuccess(null);
 
     try {
-      console.log('💸 Starting sale...', {
+      logger.debug('💸 Starting sale...', {
         meTokenAddress: meToken.address,
         amount,
         meTokenBalance: meTokenBalance.toString(),
@@ -434,9 +435,9 @@ export function VideoMeTokenBuyDialog({
       });
 
       // Pass video tracking information when selling
-      console.log('🔄 Calling sellMeTokens...');
+      logger.debug('🔄 Calling sellMeTokens...');
       await sellMeTokens(meToken.address, amount);
-      console.log('✅ Sell order submitted successfully!');
+      logger.debug('✅ Sell order submitted successfully!');
       setSuccess('Sell order submitted successfully!');
       setAmount('');
 
@@ -456,7 +457,7 @@ export function VideoMeTokenBuyDialog({
         setSuccess(null);
       }, 2000);
     } catch (err) {
-      console.error('❌ Error in handleSell:', err);
+      logger.error(' Error in handleSell:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to sell MeTokens';
       setError(errorMessage);
       setSuccess(null);

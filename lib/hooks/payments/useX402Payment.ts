@@ -12,6 +12,8 @@ import { useSmartAccountClient } from '@account-kit/react';
 import { wrapFetchWithPayment, decodeXPaymentResponse } from 'x402-fetch';
 import { USDC_TOKEN_ADDRESSES, USDC_TOKEN_DECIMALS } from '@/lib/contracts/USDCToken';
 import { base } from '@account-kit/infra';
+import { erc20Abi } from 'viem';
+import { logger } from '@/lib/utils/logger';
 
 // x402 Payment Configuration for USDC on Base
 const X402_CONFIG = {
@@ -83,11 +85,11 @@ export function useX402Payment() {
         additionalData = {},
       } = options;
 
-      console.log(`Processing x402 payment for ${service}`);
-      console.log(`Amount: ${amount} (${Number(amount) / 10 ** X402_CONFIG.token.decimals} ${X402_CONFIG.token.symbol})`);
-      console.log(`Token: ${X402_CONFIG.token.address} on Base`);
+      logger.debug(`Processing x402 payment for ${service}`);
+      logger.debug(`Amount: ${amount} (${Number(amount) / 10 ** X402_CONFIG.token.decimals} ${X402_CONFIG.token.symbol})`);
+      logger.debug(`Token: ${X402_CONFIG.token.address} on Base`);
       if (recipientAddress) {
-        console.log(`Recipient: ${recipientAddress}`);
+        logger.debug(`Recipient: ${recipientAddress}`);
       }
 
       // Wrap fetch with x402 payment capability
@@ -122,11 +124,11 @@ export function useX402Payment() {
 
       // Wait for transaction receipt if we have a transaction hash
       if (paymentResponse.transaction) {
-        console.log(`Waiting for transaction receipt: ${paymentResponse.transaction}`);
+        logger.debug(`Waiting for transaction receipt: ${paymentResponse.transaction}`);
         await client.waitForTransactionReceipt({
           hash: paymentResponse.transaction as `0x${string}`
         });
-        console.log('Transaction confirmed');
+        logger.debug('Transaction confirmed');
       }
 
       // Parse the response data
@@ -150,7 +152,7 @@ export function useX402Payment() {
       return result;
 
     } catch (error) {
-      console.error('x402 payment failed:', error);
+      logger.error('x402 payment failed:', error);
 
       const errorResult: X402PaymentResponse = {
         success: false,
@@ -173,16 +175,39 @@ export function useX402Payment() {
    */
   const checkBalance = useCallback(async (amount: string = X402_CONFIG.defaultAmount): Promise<boolean> => {
     try {
-      if (!client) return false;
+      if (!client || !client.account?.address) {
+        logger.debug('Balance check: No client or account address');
+        return false;
+      }
 
-      // TODO: Implement balance check using viem
-      // This would query the USDC token contract for the user's balance
-      // For now, return true to allow the payment to proceed
-      // The actual payment will fail if insufficient balance
-      return true;
+      const requiredAmount = BigInt(amount);
+      const userAddress = client.account.address;
+
+      logger.debug('Checking USDC balance', {
+        userAddress,
+        requiredAmount: amount,
+        tokenAddress: X402_CONFIG.token.address,
+      });
+
+      // Query USDC balance from contract
+      const balance = await client.readContract({
+        address: X402_CONFIG.token.address,
+        abi: erc20Abi,
+        functionName: 'balanceOf',
+        args: [userAddress],
+      }) as bigint;
+
+      logger.debug('USDC balance check result', {
+        balance: balance.toString(),
+        required: amount,
+        sufficient: balance >= requiredAmount,
+      });
+
+      return balance >= requiredAmount;
 
     } catch (error) {
-      console.error('Balance check failed:', error);
+      logger.error('Balance check failed:', error);
+      // Return false on error to be safe (payment will fail anyway if balance is insufficient)
       return false;
     }
   }, [client]);

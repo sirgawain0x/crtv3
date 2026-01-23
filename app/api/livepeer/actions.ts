@@ -5,6 +5,7 @@ import {
   NewAssetFromUrlPayload,
   NewAssetPayload,
 } from "livepeer/models/components";
+import { serverLogger } from "@/lib/utils/logger";
 
 // FETCH ALL ASSETS
 export const fetchAllAssets = async (options?: {
@@ -28,7 +29,7 @@ export const fetchAllAssets = async (options?: {
       total: allAssets.length,
     };
   } catch (error) {
-    console.error("Error fetching assets:", error);
+    serverLogger.error("Error fetching assets:", error);
     throw new Error(
       `Failed to fetch assets: ${
         error instanceof Error ? error.message : "Unknown error"

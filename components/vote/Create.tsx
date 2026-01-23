@@ -28,6 +28,7 @@ import { useWalletStatus } from "@/lib/hooks/accountkit/useWalletStatus";
 import { useLinkedIdentity } from "@/lib/hooks/useLinkedIdentity";
 import { formatProposalAuthor } from "@/lib/utils/linked-identity";
 import { shortenAddress } from "@/lib/utils/utils";
+import { logger } from "@/lib/utils/logger";
 
 const proposalSchema = z.object({
   title: z.string().min(3, "Title is required"),
@@ -110,11 +111,11 @@ function Create() {
 
   // Debug info on mount
   useEffect(() => {
-    console.log("=== Wallet Debug Info ===");
-    console.log("Smart account client:", smartAccountClient ? "exists" : "null");
-    console.log("Smart account address:", address || "not available");
-    console.log("Wallet address:", walletAddress || "not available");
-    console.log("=========================");
+    logger.debug("Wallet Debug Info:", {
+      smartAccountClient: smartAccountClient ? "exists" : "null",
+      smartAccountAddress: address || "not available",
+      walletAddress: walletAddress || "not available",
+    });
   }, [smartAccountClient, address, walletAddress]);
 
   const form = useForm<ProposalForm>({
@@ -191,12 +192,13 @@ function Create() {
     setIsSubmitting(true);
 
     try {
-      console.log("Starting proposal creation...");
-      console.log("Using wallet address:", walletAddress);
-      console.log("Smart account address:", address);
+      logger.debug("Starting proposal creation:", {
+        walletAddress,
+        smartAccountAddress: address,
+      });
 
       // Get current block number before signing
-      console.log("Fetching block number...");
+      logger.debug("Fetching block number...");
       const publicClient = createPublicClient({
         chain: base,
         transport: alchemy({
@@ -205,7 +207,7 @@ function Create() {
       });
       const block = await publicClient.getBlockNumber();
       const blockNumber = Number(block);
-      console.log("Block number fetched:", blockNumber);
+      logger.debug("Block number fetched:", blockNumber);
 
       // Create POAP event if requested
       let poapEventId: string | null = null;
@@ -213,7 +215,7 @@ function Create() {
 
       if (values.createPoap && values.poapName && values.poapDescription) {
         try {
-          console.log("Creating POAP event...");
+          logger.debug("Creating POAP event...");
           const poapResponse = await fetch("/api/poap/create-event", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -232,21 +234,21 @@ function Create() {
             const poapData = await poapResponse.json();
             poapEventId = poapData.data?.id || poapData.data?.fancy_id;
             poapTokenId = poapData.data?.token_id || "1";
-            console.log("POAP event created:", poapEventId);
+            logger.debug("POAP event created:", poapEventId);
           } else {
             const error = await poapResponse.json();
-            console.warn("Failed to create POAP event:", error);
+            logger.warn("Failed to create POAP event:", error);
             // Continue with proposal creation even if POAP creation fails
           }
         } catch (poapError) {
-          console.error("Error creating POAP event:", poapError);
+          logger.error("Error creating POAP event:", poapError);
           // Continue with proposal creation even if POAP creation fails
         }
       }
 
       // Prepare EIP-712 typed data for signing
       // Using Snapshot's exact proposal types from @snapshot-labs/snapshot.js
-      console.log("Preparing typed data to sign...");
+      logger.debug("Preparing typed data to sign...");
 
       const domain = {
         name: "snapshot",
@@ -311,7 +313,7 @@ function Create() {
         app: "creative-tv",
       };
 
-      console.log("Signing Typed Data:", { domain, types, message: typedMessage });
+      logger.debug("Signing Typed Data:", { domain, types, message: typedMessage });
 
       // Best-effort: verify signer is responsive and bound to the expected EOA.
       // Some environments report waitForConnected timeouts even when signing works, so do not hard-fail on it.
@@ -322,9 +324,9 @@ function Create() {
             setTimeout(() => reject(new Error("getAddress timed out")), 10000),
           ),
         ]);
-        console.log("Signer getAddress():", signerAddr);
+        logger.debug("Signer getAddress():", signerAddr);
         if (signerAddr?.toLowerCase?.() !== walletAddress.toLowerCase()) {
-          console.warn(
+          logger.warn(
             "Signer address mismatch; expected walletAddress",
             walletAddress,
             "got",
@@ -332,7 +334,7 @@ function Create() {
           );
         }
       } catch (e) {
-        console.warn("Signer getAddress failed/timed out:", e);
+        logger.warn("Signer getAddress failed/timed out:", e);
         setFormError("Wallet signer is not ready. Please sign in again.");
         openAuthModal();
         return;
@@ -346,14 +348,14 @@ function Create() {
               setTimeout(() => reject(new Error("waitForConnected timed out")), 30000),
             ),
           ]);
-          console.log("Signer waitForConnected(): connected");
+          logger.debug("Signer waitForConnected(): connected");
         } catch (e) {
-          console.warn("Signer waitForConnected failed/timed out:", e);
+          logger.warn("Signer waitForConnected failed/timed out:", e);
           // Continue anyway; signing may still succeed.
         }
       }
 
-      console.log("Using EOA signer.signTypedData (Snapshot-compatible)...");
+      logger.debug("Using EOA signer.signTypedData (Snapshot-compatible)...");
 
       const signature = await Promise.race([
         signer.signTypedData({
@@ -367,9 +369,9 @@ function Create() {
         ),
       ]);
 
-      console.log("✅ Typed Data Signed successfully:", signature);
+      logger.debug("Typed Data Signed successfully:", signature);
 
-      console.log("Submitting proposal to server...");
+      logger.debug("Submitting proposal to server...");
 
       // Snapshot.js expects the EIP-712 envelope format: { domain, types, message }
       // The 'message' contains the actual signed data structure
@@ -422,7 +424,7 @@ function Create() {
       });
 
       if (result?.serverError) {
-        console.error("Server error:", result.serverError);
+        logger.error("Server error:", result.serverError);
         // Format the error message to be more user-friendly
         let errorMsg = result.serverError;
         if (errorMsg.includes("validation failed")) {
@@ -433,27 +435,27 @@ function Create() {
         return;
       }
       if (result?.validationErrors) {
-        console.error("Validation errors:", result.validationErrors);
+        logger.error("Validation errors:", result.validationErrors);
         setFormError("Validation failed. Please check your input.");
         return;
       }
       if (!result?.data) {
-        console.error("No data in result:", result);
+        logger.error("No data in result:", result);
         setFormError("Failed to create proposal.");
         return;
       }
 
-      console.log("Proposal created successfully:", result.data);
+      logger.debug("Proposal created successfully:", result.data);
       
       // Show success message with linked identity
       const authorDisplay = linkedIdentity?.isLinked
         ? formatProposalAuthor(address || null, walletAddress)
         : shortenAddress(walletAddress);
       
-      console.log(`Proposal submitted by: ${authorDisplay}`);
+      logger.debug(`Proposal submitted by: ${authorDisplay}`);
       router.push("/vote");
     } catch (error) {
-      console.error("Error creating proposal:", error);
+      logger.error("Error creating proposal:", error);
       setFormError(
         error instanceof Error
           ? error.message

@@ -1,10 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseService } from '@/lib/sdk/supabase/service';
 import { createClient } from '@/lib/sdk/supabase/server';
+import { serverLogger } from '@/lib/utils/logger';
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    // Handle JSON parsing errors
+    let body;
+    try {
+      body = await request.json();
+    } catch (jsonError) {
+      serverLogger.error('Invalid JSON in request body:', jsonError);
+      return NextResponse.json(
+        { 
+          success: false,
+          error: 'Invalid JSON in request body'
+        },
+        { status: 400 }
+      );
+    }
+    
     const { owner_address, username, bio, avatar_url } = body;
 
     if (!owner_address) {
@@ -54,7 +69,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (error) {
-      console.error('Supabase upsert error:', error);
+      serverLogger.error('Supabase upsert error:', error);
       
       // Provide helpful error message for RLS issues
       if (error.message.includes('row-level security policy')) {
@@ -92,7 +107,7 @@ export async function POST(request: NextRequest) {
       data: data[0] 
     });
   } catch (error) {
-    console.error('Error upserting creator profile:', error);
+    serverLogger.error('Error upserting creator profile:', error);
     return NextResponse.json(
       { 
         success: false, 

@@ -207,8 +207,29 @@ export function useMeTokenHoldings(targetAddress?: string): UseMeTokenHoldingsRe
 
       // (Removed initial array declaration as we map results directly now)
 
-      // NOTE: This is an inefficient temporary solution (O(N) loop).
-      // TODO: Update Subgraph to index ERC20 'Transfer' events so we can query `meTokenBalances(where: {user: $address})`.
+      // PERFORMANCE NOTE: This is an inefficient temporary solution (O(N) loop).
+      // 
+      // Current Implementation:
+      // - Fetches all MeTokens from subgraph
+      // - For each MeToken, makes 2 on-chain calls (getMeTokenInfo + balanceOf)
+      // - Time complexity: O(N) where N = total number of MeTokens
+      // 
+      // Optimization Options:
+      // 1. [RECOMMENDED] Update Subgraph to index ERC20 'Transfer' events
+      //    - Add `meTokenBalances` entity to subgraph schema
+      //    - Index Transfer events to track balances per user
+      //    - Query: `meTokenBalances(where: {user: $address})` - O(1) lookup
+      // 
+      // 2. [ALTERNATIVE] Add client-side caching
+      //    - Cache balance results for a short period (e.g., 30 seconds)
+      //    - Reduces redundant on-chain calls for repeated queries
+      // 
+      // 3. [FUTURE] Implement server-side aggregation
+      //    - Create API endpoint that aggregates balances server-side
+      //    - Cache results in database or Redis
+      //    - Client fetches pre-aggregated data
+      // 
+      // TODO: Implement subgraph optimization (Option 1) for production scalability
 
       // Optimize: Run checks in parallel to speed up loading
       const holdingsResults = await Promise.all(

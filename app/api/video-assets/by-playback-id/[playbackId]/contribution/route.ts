@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/sdk/supabase/server';
+import { serverLogger } from '@/lib/utils/logger';
 
 // GET /api/video-assets/by-playback-id/[playbackId]/contribution - Get video contribution by playback ID
 export async function GET(
@@ -52,7 +53,7 @@ export async function GET(
       .or(`video_id.eq.${videoAsset.id},playback_id.eq.${playbackId}`);
 
     if (txError) {
-      console.error('Error fetching transactions:', txError);
+      serverLogger.error('Error fetching transactions:', txError);
       return NextResponse.json(
         { error: 'Failed to fetch contribution data' },
         { status: 500 }
@@ -73,9 +74,27 @@ export async function GET(
       },
     });
   } catch (error) {
-    console.error('Error calculating video contribution:', error);
+    serverLogger.error('Error calculating video contribution:', error);
+    
+    // Handle specific error types
+    if (error instanceof Error) {
+      // Check for database connection errors
+      if (error.message.includes('connection') || error.message.includes('timeout')) {
+        return NextResponse.json(
+          { 
+            error: 'Database connection error',
+            details: 'Unable to connect to the database. Please try again later.'
+          },
+          { status: 503 }
+        );
+      }
+    }
+    
     return NextResponse.json(
-      { error: 'Failed to calculate contribution' },
+      { 
+        error: 'Failed to calculate contribution',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }

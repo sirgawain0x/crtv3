@@ -7,6 +7,7 @@ import type { Chain } from "viem";
 import { generateAccessKey, validateAccessKey } from "@/lib/access-key";
 import { getSmartAccountClient } from "@account-kit/core";
 import { config } from "@/config";
+import { serverLogger } from "@/lib/utils/logger";
 
 // Import ERC1155 ABI
 const erc1155ABI = [
@@ -42,9 +43,22 @@ export interface WebhookContext {
 
 export async function POST(request: NextRequest) {
   try {
-    const payload: WebhookPayload = await request.json();
+    // Handle JSON parsing errors
+    let payload: WebhookPayload;
+    try {
+      payload = await request.json();
+    } catch (jsonError) {
+      serverLogger.error('Invalid JSON in request body:', jsonError);
+      return NextResponse.json(
+        {
+          allowed: false,
+          message: "Invalid JSON in request body",
+        },
+        { status: 400 }
+      );
+    }
 
-    console.log({ payload });
+    serverLogger.debug('Token gate payload:', payload);
 
     if (
       !payload.accessKey ||
@@ -80,7 +94,7 @@ export async function POST(request: NextRequest) {
     // Implement custom access control logic here
     const isAccessAllowed = await validateAccess(payload);
 
-    console.log({ isAccessAllowed });
+    serverLogger.debug('Access allowed:', isAccessAllowed);
 
     if (isAccessAllowed) {
       return NextResponse.json(
@@ -100,11 +114,27 @@ export async function POST(request: NextRequest) {
       );
     }
   } catch (error) {
-    console.error("Access control error:", error);
+    serverLogger.error("Access control error:", error);
+    
+    // Handle specific error types
+    if (error instanceof Error) {
+      // Check for network/connection errors
+      if (error.message.includes('network') || error.message.includes('fetch') || error.message.includes('ECONNREFUSED')) {
+        return NextResponse.json(
+          {
+            allowed: false,
+            message: "Network error. Unable to verify access.",
+          },
+          { status: 503 }
+        );
+      }
+    }
+    
     return NextResponse.json(
       {
         allowed: false,
-        message: "Internal server error",
+        message: error instanceof Error ? error.message : "Internal server error",
+        details: process.env.NODE_ENV === 'development' && error instanceof Error ? error.stack : undefined
       },
       { status: 500 }
     );
@@ -123,7 +153,7 @@ export async function GET(request: NextRequest) {
     ) as string;
     const chain = parseInt(request.nextUrl.searchParams.get("chain") as string);
 
-    console.log({
+    serverLogger.debug('Token gate GET request:', {
       address,
       creatorAddress,
       tokenId,
@@ -151,7 +181,7 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    console.log({ accessKey });
+    serverLogger.debug('Generated access key:', accessKey);
 
     if (accessKey) {
       return NextResponse.json(
@@ -171,11 +201,27 @@ export async function GET(request: NextRequest) {
       );
     }
   } catch (error) {
-    console.error("Generate access key error:", error);
+    serverLogger.error("Generate access key error:", error);
+    
+    // Handle specific error types
+    if (error instanceof Error) {
+      // Check for validation errors
+      if (error.message.includes('invalid') || error.message.includes('required')) {
+        return NextResponse.json(
+          {
+            allowed: false,
+            message: error.message,
+          },
+          { status: 400 }
+        );
+      }
+    }
+    
     return NextResponse.json(
       {
         allowed: false,
-        message: "Internal server error",
+        message: error instanceof Error ? error.message : "Internal server error",
+        details: process.env.NODE_ENV === 'development' && error instanceof Error ? error.stack : undefined
       },
       { status: 500 }
     );
@@ -221,7 +267,7 @@ async function validateAccess(payload: WebhookPayload): Promise<boolean> {
 
     return true;
   } catch (error) {
-    console.error("Validate access error:", error);
+    serverLogger.error("Validate access error:", error);
     return false;
   }
 }
@@ -236,7 +282,7 @@ async function checkUserTokenBalances(
 
     // If the chain is not supported, return false
     if (!chain) {
-      console.error("Chain not supported");
+      serverLogger.error("Chain not supported");
       return false;
     }
 
@@ -256,11 +302,11 @@ async function checkUserTokenBalances(
       args: [address as Address, BigInt(context.tokenId)],
     })) as bigint;
 
-    console.log({ videoTokenBalance });
+    serverLogger.debug('Video token balance:', videoTokenBalance.toString());
 
     return videoTokenBalance > BigInt(0);
   } catch (error) {
-    console.error("Error checking token balances...", error);
+    serverLogger.error("Error checking token balances:", error);
     return false;
   }
 }

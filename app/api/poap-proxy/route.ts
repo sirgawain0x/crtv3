@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCachedPoapAccessToken } from "@/lib/utils/poap-auth";
+import { serverLogger } from "@/lib/utils/logger";
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
@@ -14,7 +15,7 @@ export async function GET(req: Request) {
     // Fetch access token from Auth0 using new endpoint
     accessToken = await getCachedPoapAccessToken();
   } catch (error) {
-    console.error("Error fetching POAP access token:", error);
+    serverLogger.error("Error fetching POAP access token:", error);
     // Return a more descriptive error message
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(
@@ -55,7 +56,7 @@ export async function POST(req: Request) {
     // Fetch access token from Auth0 using new endpoint
     accessToken = await getCachedPoapAccessToken();
   } catch (error) {
-    console.error("Error fetching POAP access token:", error);
+    serverLogger.error("Error fetching POAP access token:", error);
     return NextResponse.json(
       { error: "Failed to authenticate with POAP API" },
       { status: 500 }

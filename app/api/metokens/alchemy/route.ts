@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/sdk/supabase/server';
 import { MeTokenCreationParams } from '@/lib/sdk/alchemy/metoken-service';
+import { serverLogger } from '@/lib/utils/logger';
 
 // Force dynamic route to avoid build-time evaluation
 export const dynamic = 'force-dynamic';
@@ -14,7 +15,18 @@ export async function POST(request: NextRequest) {
   const alchemyMeTokenService = await getAllchemyService();
   try {
     const supabase = await createClient();
-    const body = await request.json();
+    
+    // Handle JSON parsing errors
+    let body;
+    try {
+      body = await request.json();
+    } catch (jsonError) {
+      serverLogger.error('Invalid JSON in request body:', jsonError);
+      return NextResponse.json(
+        { error: 'Invalid JSON in request body' },
+        { status: 400 }
+      );
+    }
     
     // Verify the user is authenticated
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -33,8 +45,55 @@ export async function POST(request: NextRequest) {
 
     // Validate required fields
     if (!name || !symbol || !hubId || !assetsDeposited || !creatorAddress) {
+      const missingFields = [];
+      if (!name) missingFields.push('name');
+      if (!symbol) missingFields.push('symbol');
+      if (!hubId) missingFields.push('hubId');
+      if (!assetsDeposited) missingFields.push('assetsDeposited');
+      if (!creatorAddress) missingFields.push('creatorAddress');
+      
       return NextResponse.json(
-        { error: 'Missing required fields: name, symbol, hubId, assetsDeposited, creatorAddress' },
+        { 
+          error: 'Missing required fields',
+          missingFields,
+          hint: 'All of the following fields are required: name, symbol, hubId, assetsDeposited, creatorAddress'
+        },
+        { status: 400 }
+      );
+    }
+    
+    // Validate hubId is a positive number
+    const hubIdNum = typeof hubId === 'string' ? parseInt(hubId, 10) : Number(hubId);
+    if (isNaN(hubIdNum) || hubIdNum <= 0) {
+      return NextResponse.json(
+        { 
+          error: 'Invalid hubId',
+          details: 'hubId must be a positive number'
+        },
+        { status: 400 }
+      );
+    }
+    
+    // Validate assetsDeposited is a non-negative number
+    const assetsDepositedNum = typeof assetsDeposited === 'string' ? parseFloat(assetsDeposited) : Number(assetsDeposited);
+    if (isNaN(assetsDepositedNum) || assetsDepositedNum < 0) {
+      return NextResponse.json(
+        { 
+          error: 'Invalid assetsDeposited',
+          details: 'assetsDeposited must be a non-negative number'
+        },
+        { status: 400 }
+      );
+    }
+    
+    // Validate creatorAddress format
+    const addressRegex = /^0x[a-fA-F0-9]{40}$/;
+    if (!addressRegex.test(creatorAddress)) {
+      return NextResponse.json(
+        { 
+          error: 'Invalid creatorAddress format',
+          details: 'creatorAddress must be a valid Ethereum address (0x followed by 40 hex characters)'
+        },
         { status: 400 }
       );
     }
@@ -47,7 +106,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('🚀 Processing Alchemy MeToken creation:', {
+    serverLogger.debug('Processing Alchemy MeToken creation:', {
       name,
       symbol,
       hubId,
@@ -64,7 +123,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (checkError && checkError.code !== 'PGRST116') { // PGRST116 = no rows found
-      console.error('Error checking existing MeToken:', checkError);
+      serverLogger.error('Error checking existing MeToken:', checkError);
       return NextResponse.json(
         { error: 'Failed to check existing MeToken' },
         { status: 500 }
@@ -87,7 +146,7 @@ export async function POST(request: NextRequest) {
 
     // If transaction hash is provided, track the existing transaction
     if (transactionHash) {
-      console.log('📝 Tracking existing MeToken creation transaction:', transactionHash);
+      serverLogger.debug('Tracking existing MeToken creation transaction:', transactionHash);
       
       // Wait for blockchain confirmation and extract MeToken address
       const meTokenAddress = await waitForMeTokenCreation(transactionHash);
@@ -133,7 +192,7 @@ export async function POST(request: NextRequest) {
         .single();
 
       if (createError) {
-        console.error('Error creating MeToken record:', createError);
+        serverLogger.error('Error creating MeToken record:', createError);
         return NextResponse.json(
           { error: 'Failed to create MeToken record in database' },
           { status: 500 }
@@ -180,9 +239,60 @@ export async function POST(request: NextRequest) {
     }, { status: 400 });
 
   } catch (error) {
-    console.error('❌ Alchemy MeToken creation error:', error);
+    serverLogger.error('Alchemy MeToken creation error:', error);
+    
+    // Handle specific error types
+    if (error instanceof Error) {
+      // Check for authentication errors
+      if (error.message.includes('Unauthorized') || error.message.includes('authentication')) {
+        return NextResponse.json(
+          { 
+            error: 'Authentication failed',
+            details: 'User authentication is required to create MeTokens'
+          },
+          { status: 401 }
+        );
+      }
+      
+      // Check for network/connection errors
+      if (error.message.includes('network') || error.message.includes('fetch') || error.message.includes('ECONNREFUSED')) {
+        return NextResponse.json(
+          { 
+            error: 'Network error',
+            details: 'Unable to connect to blockchain or Alchemy service. Please check your network connection and try again.'
+          },
+          { status: 503 }
+        );
+      }
+      
+      // Check for transaction errors
+      if (error.message.includes('transaction') || error.message.includes('revert') || error.message.includes('execution reverted')) {
+        return NextResponse.json(
+          { 
+            error: 'Transaction failed',
+            details: error.message
+          },
+          { status: 400 }
+        );
+      }
+      
+      // Check for insufficient funds errors
+      if (error.message.includes('insufficient') || error.message.includes('balance') || error.message.includes('gas')) {
+        return NextResponse.json(
+          { 
+            error: 'Insufficient funds',
+            details: 'Insufficient balance to create MeToken or pay for gas fees'
+          },
+          { status: 400 }
+        );
+      }
+    }
+    
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown error occurred' },
+      { 
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
+        details: process.env.NODE_ENV === 'development' && error instanceof Error ? error.stack : undefined
+      },
       { status: 500 }
     );
   }
@@ -194,7 +304,7 @@ export async function POST(request: NextRequest) {
  */
 async function waitForMeTokenCreation(transactionHash: string): Promise<string | null> {
   try {
-    console.log('⏳ Waiting for transaction confirmation:', transactionHash);
+    serverLogger.debug('Waiting for transaction confirmation:', transactionHash);
     
     const alchemyMeTokenService = await getAllchemyService();
     
@@ -202,11 +312,11 @@ async function waitForMeTokenCreation(transactionHash: string): Promise<string |
     const receipt = await alchemyMeTokenService['alchemy'].core.getTransactionReceipt(transactionHash);
     
     if (!receipt) {
-      console.error('Transaction receipt not found');
+      serverLogger.error('Transaction receipt not found');
       return null;
     }
 
-    console.log('✅ Transaction confirmed, extracting MeToken address...');
+    serverLogger.debug('Transaction confirmed, extracting MeToken address...');
     
     // Parse logs to find the Subscribe event
     const diamondAddress = '0xba5502db2aC2cBff189965e991C07109B14eB3f5';
@@ -223,20 +333,20 @@ async function waitForMeTokenCreation(transactionHash: string): Promise<string |
             // The MeToken address is in the second topic (first indexed parameter)
             // Remove '0x' prefix and first 24 characters (12 bytes of padding)
             const meTokenAddress = '0x' + topic.slice(26);
-            console.log('🎯 Extracted MeToken address:', meTokenAddress);
+            serverLogger.debug('Extracted MeToken address:', meTokenAddress);
             return meTokenAddress;
           } else {
-            console.warn('⚠️ Invalid topic format, skipping log:', { topic, length: topic?.length });
+            serverLogger.warn('Invalid topic format, skipping log:', { topic, length: topic?.length });
           }
         }
       }
     }
     
-    console.error('MeToken address not found in transaction logs');
+    serverLogger.error('MeToken address not found in transaction logs');
     return null;
     
   } catch (error) {
-    console.error('Failed to wait for MeToken creation:', error);
+    serverLogger.error('Failed to wait for MeToken creation:', error);
     return null;
   }
 }

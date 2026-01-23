@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/sdk/supabase/service';
 import { getMeTokenProtocolInfo } from '@/lib/utils/metokenUtils';
 import { createPublicClient, http, formatEther } from 'viem';
 import { base } from 'viem/chains';
+import { serverLogger } from '@/lib/utils/logger';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300; // 5 minutes for cron jobs
@@ -31,12 +32,12 @@ export async function GET(request: NextRequest) {
     // Verify the request is from Vercel Cron
     const authHeader = request.headers.get('authorization');
     if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-      console.error('Unauthorized cron job attempt');
+      serverLogger.error('Unauthorized cron job attempt');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const startTime = Date.now();
-    console.log('[Cron] Starting market token data sync');
+    serverLogger.debug('[Cron] Starting market token data sync');
 
     const supabase = createServiceClient();
     const publicClient = createPublicClient({
@@ -50,7 +51,7 @@ export async function GET(request: NextRequest) {
       .select('id, address, tvl, total_supply');
 
     if (error) {
-      console.error('[Cron] Failed to fetch MeTokens:', error);
+      serverLogger.error('[Cron] Failed to fetch MeTokens:', error);
       return NextResponse.json(
         { error: 'Database error', details: error.message },
         { status: 500 }
@@ -65,7 +66,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    console.log(`[Cron] Found ${meTokens.length} tokens to sync`);
+    serverLogger.debug(`[Cron] Found ${meTokens.length} tokens to sync`);
 
     // Process in batches to avoid rate limits and timeouts
     const BATCH_SIZE = 5;
@@ -81,7 +82,7 @@ export async function GET(request: NextRequest) {
       const batchNumber = Math.floor(i / BATCH_SIZE) + 1;
       const totalBatches = Math.ceil(meTokens.length / BATCH_SIZE);
       
-      console.log(`[Cron] Processing batch ${batchNumber}/${totalBatches}`);
+      serverLogger.debug(`[Cron] Processing batch ${batchNumber}/${totalBatches}`);
 
       await Promise.all(
         batch.map(async (token) => {
@@ -98,7 +99,7 @@ export async function GET(request: NextRequest) {
             ]);
 
             if (!protocolInfo) {
-              console.warn(`[Cron] No protocol info for token ${token.address}`);
+              serverLogger.warn(`[Cron] No protocol info for token ${token.address}`);
               return;
             }
 
@@ -127,14 +128,14 @@ export async function GET(request: NextRequest) {
                 throw updateError;
               }
 
-              console.log(`[Cron] Updated token ${token.address}: TVL=${tvl.toFixed(4)}, Supply=${supply.toFixed(4)}`);
+              serverLogger.debug(`[Cron] Updated token ${token.address}: TVL=${tvl.toFixed(4)}, Supply=${supply.toFixed(4)}`);
               updatedCount++;
             }
 
             successCount++;
           } catch (err) {
             const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-            console.error(`[Cron] Failed to sync token ${token.address}:`, err);
+            serverLogger.error(`[Cron] Failed to sync token ${token.address}:`, err);
             errorCount++;
             errors.push(`${token.address}: ${errorMessage}`);
           }
@@ -159,12 +160,12 @@ export async function GET(request: NextRequest) {
       errors: errorCount > 0 ? errors.slice(0, 10) : undefined, // Only include first 10 errors
     };
 
-    console.log('[Cron] Market token sync completed:', result);
+    serverLogger.debug('[Cron] Market token sync completed:', result);
     return NextResponse.json(result);
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[Cron] Fatal error in cron job:', error);
+    serverLogger.error('[Cron] Fatal error in cron job:', error);
     return NextResponse.json(
       { 
         success: false,

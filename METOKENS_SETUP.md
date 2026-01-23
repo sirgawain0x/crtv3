@@ -13,7 +13,7 @@ The MeTokens subgraph endpoint has CORS restrictions that prevent direct access 
 The application now uses **Goldsky** for subgraph indexing, which provides public endpoints that don't require authentication keys.
 
 **Primary Subgraph Endpoints (Goldsky):**
-- **MeTokens**: `https://api.goldsky.com/api/public/project_cmh0iv6s500dbw2p22vsxcfo6/subgraphs/metokens/v0.0.1/gn`
+- **MeTokens**: `https://api.goldsky.com/api/public/project_cmh0iv6s500dbw2p22vsxcfo6/subgraphs/metokens/1.0.2/gn`
   - Deployment ID: `QmVaWYhk4HKhk9rNQi11RKujTVS4KHF1uHGNVUF4f7xJ53`
 - **Creative TV**: `https://api.goldsky.com/api/public/project_cmh0iv6s500dbw2p22vsxcfo6/subgraphs/creative_tv/0.1/gn`
   - Deployment ID: `QmbDp8Wfy82g8L7Mv6RCAZHRcYUQB4prQfqchvexfZR8yZ`
@@ -47,7 +47,7 @@ The subgraph endpoints are now using **Goldsky** public APIs:
 
 **MeTokens Subgraph:**
 ```
-https://api.goldsky.com/api/public/project_cmh0iv6s500dbw2p22vsxcfo6/subgraphs/metokens/v0.0.1/gn
+https://api.goldsky.com/api/public/project_cmh0iv6s500dbw2p22vsxcfo6/subgraphs/metokens/1.0.2/gn
 ```
 
 **Creative TV Subgraph:**

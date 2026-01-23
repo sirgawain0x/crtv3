@@ -12,16 +12,37 @@ import { NextRequest, NextResponse } from "next/server";
 import { createStoryPublicClient } from "@/lib/sdk/story/client";
 import { createWalletClient, http, formatEther, type Address } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
+import { serverLogger } from "@/lib/utils/logger";
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    // Handle JSON parsing errors
+    let body;
+    try {
+      body = await request.json();
+    } catch (jsonError) {
+      serverLogger.error('Invalid JSON in request body:', jsonError);
+      return NextResponse.json(
+        { error: "Invalid JSON in request body" },
+        { status: 400 }
+      );
+    }
+    
     const { fromAddress, toAddress, amount } = body;
 
     // Validate required fields
     if (!fromAddress || !toAddress || !amount) {
+      const missingFields = [];
+      if (!fromAddress) missingFields.push('fromAddress');
+      if (!toAddress) missingFields.push('toAddress');
+      if (!amount) missingFields.push('amount');
+      
       return NextResponse.json(
-        { error: "Missing required fields: fromAddress, toAddress, and amount are required" },
+        { 
+          error: "Missing required fields",
+          missingFields,
+          hint: "All of the following fields are required: fromAddress, toAddress, amount"
+        },
         { status: 400 }
       );
     }
@@ -96,7 +117,7 @@ export async function POST(request: NextRequest) {
         }
       }
     } catch (e) {
-      console.error("Could not verify private key address:", e);
+      serverLogger.error("Could not verify private key address:", e);
       return NextResponse.json(
         { 
           error: "Invalid private key",
@@ -114,7 +135,7 @@ export async function POST(request: NextRequest) {
     
     // If using Alchemy RPC, force use of public RPC for transactions
     if (rpcUrl && rpcUrl.includes('alchemy.com')) {
-      console.warn("⚠️ Alchemy RPC doesn't support eth_sendTransaction for Story Protocol. Using public RPC for transactions.");
+      serverLogger.warn("Alchemy RPC doesn't support eth_sendTransaction for Story Protocol. Using public RPC for transactions.");
       rpcUrl = network === "mainnet" 
         ? "https://rpc.story.foundation" 
         : "https://rpc.aeneid.story.foundation";
@@ -166,7 +187,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Send the transaction
-    console.log("Sending IP transfer:", {
+    serverLogger.debug("Sending IP transfer:", {
       from: keyAddress, // Use the actual address from the private key
       to: toAddress,
       amount: amountBigInt.toString(),
@@ -195,10 +216,59 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("Story Protocol transfer error:", error);
+    serverLogger.error("Story Protocol transfer error:", error);
+    
+    // Handle specific error types
+    if (error instanceof Error) {
+      // Check for network/connection errors
+      if (error.message.includes('network') || error.message.includes('fetch') || error.message.includes('ECONNREFUSED')) {
+        return NextResponse.json(
+          {
+            error: 'Network error',
+            details: 'Unable to connect to Story Protocol. Please check your network connection and try again.'
+          },
+          { status: 503 }
+        );
+      }
+      
+      // Check for transaction errors
+      if (error.message.includes('transaction') || error.message.includes('revert') || error.message.includes('execution reverted')) {
+        return NextResponse.json(
+          {
+            error: 'Transaction failed',
+            details: error.message
+          },
+          { status: 400 }
+        );
+      }
+      
+      // Check for insufficient funds errors
+      if (error.message.includes('insufficient') || error.message.includes('balance') || error.message.includes('gas')) {
+        return NextResponse.json(
+          {
+            error: 'Insufficient funds',
+            details: 'The funding wallet does not have enough IP tokens to complete the transfer'
+          },
+          { status: 400 }
+        );
+      }
+      
+      // Check for invalid private key errors
+      if (error.message.includes('private key') || error.message.includes('invalid key')) {
+        return NextResponse.json(
+          {
+            error: 'Invalid private key',
+            details: 'The STORY_PROTOCOL_PRIVATE_KEY environment variable contains an invalid private key'
+          },
+          { status: 500 }
+        );
+      }
+    }
+    
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : "Failed to transfer IP tokens",
+        details: process.env.NODE_ENV === 'development' && error instanceof Error ? error.stack : undefined
       },
       { status: 500 }
     );

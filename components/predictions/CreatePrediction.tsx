@@ -32,6 +32,7 @@ import {
 import { createQuestionWithData } from "@/lib/sdk/reality-eth/reality-eth-question-wrapper";
 import type { QuestionData } from "@/lib/sdk/reality-eth/reality-eth-utils";
 import { REALITY_ETH_CHAIN_ID } from "@/context/context";
+import { logger } from "@/lib/utils/logger";
 
 const predictionSchema = z.object({
   title: z.string().min(3, "Title is required"),
@@ -154,7 +155,7 @@ function CreatePrediction() {
     setIsSubmitting(true);
 
     try {
-      console.log("🚀 Starting prediction creation...", {
+      logger.debug("🚀 Starting prediction creation...", {
         title: values.title,
         type: values.type,
         closeDate: values.closeDate,
@@ -199,7 +200,7 @@ function CreatePrediction() {
       const closeTs = getUnixTimestamp(values.closeDate, values.closeTime);
       const nowTs = Math.floor(Date.now() / 1000);
 
-      console.log("⏰ Time calculations:", {
+      logger.debug("⏰ Time calculations:", {
         openingTs,
         closeTs,
         nowTs,
@@ -229,7 +230,7 @@ function CreatePrediction() {
         return;
       }
 
-      console.log("✅ Validation passed, timeout:", timeout);
+      logger.debug("✅ Validation passed, timeout:", timeout);
 
       const bond = values.bond ? parseEther(values.bond) : 0n;
       const nonce = BigInt(Date.now());
@@ -242,7 +243,7 @@ function CreatePrediction() {
       // You may need to register a template first for production use
       const templateId = 0;
 
-      console.log("📝 Creating question with params:", {
+      logger.debug("📝 Creating question with params:", {
         templateId,
         arbitrator,
         timeout,
@@ -252,7 +253,7 @@ function CreatePrediction() {
         questionData,
       });
 
-      console.log("🔐 Account Kit Client:", {
+      logger.debug("🔐 Account Kit Client:", {
         hasClient: !!accountKitClient,
         account: accountKitClient?.account?.address,
       });
@@ -271,7 +272,7 @@ function CreatePrediction() {
         }
       );
 
-      console.log("✅ Transaction hash:", hash);
+      logger.debug("✅ Transaction hash:", hash);
 
       toast.success("Prediction created successfully! Transaction submitted.");
       
@@ -280,7 +281,7 @@ function CreatePrediction() {
       // For now, we'll redirect to the predictions list
       router.push("/predict");
     } catch (error: any) {
-      console.error("❌ Error creating prediction:", error);
+      logger.error("❌ Error creating prediction:", error);
       
       // Provide more detailed error messages
       let errorMessage = "Failed to create prediction. Please try again.";
@@ -311,16 +312,17 @@ function CreatePrediction() {
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("📋 Form submit triggered");
-    console.log("📋 Form values:", form.getValues());
-    console.log("📋 Form errors:", form.formState.errors);
+    logger.debug("Form submit triggered:", {
+      values: form.getValues(),
+      errors: form.formState.errors,
+    });
     
     // Check form validation
     const isValid = await form.trigger();
-    console.log("📋 Form is valid:", isValid);
+    logger.debug("Form is valid:", isValid);
     
     if (!isValid) {
-      console.log("❌ Form validation failed:", form.formState.errors);
+      logger.debug("❌ Form validation failed:", form.formState.errors);
       return;
     }
     
@@ -499,10 +501,10 @@ function CreatePrediction() {
             className="w-full"
             disabled={isSubmitting || !isConnected || isLoadingClient}
             onClick={(e) => {
-              console.log("🔘 Create Prediction button clicked");
-              console.log("🔘 isSubmitting:", isSubmitting);
-              console.log("🔘 isConnected:", isConnected);
-              console.log("🔘 isLoadingClient:", isLoadingClient);
+              logger.debug("🔘 Create Prediction button clicked");
+              logger.debug("🔘 isSubmitting:", isSubmitting);
+              logger.debug("🔘 isConnected:", isConnected);
+              logger.debug("🔘 isLoadingClient:", isLoadingClient);
             }}
           >
             {isSubmitting ? (

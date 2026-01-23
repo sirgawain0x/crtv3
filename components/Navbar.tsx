@@ -58,6 +58,7 @@ import makeBlockie from "ethereum-blockies-base64";
 import { type Address, erc20Abi, formatUnits } from 'viem';
 import { BASE_TOKENS, TOKEN_INFO, type TokenSymbol, alchemySwapService, AlchemySwapService } from '@/lib/sdk/alchemy/swap-service';
 import { AlchemySwapWidget } from './wallet/swap/AlchemySwapWidget';
+import { logger } from '@/lib/utils/logger';
 
 type UseUserResult = (AccountUser & { type: "eoa" | "sca" }) | null;
 
@@ -197,9 +198,9 @@ export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
 
   useEffect(() => {
-    console.log("Current Chain:", currentChain);
-    console.log("Current Chain Name:", currentChain.name);
-    console.log("Current Chain ID:", currentChain.id);
+    logger.debug("Current Chain:", currentChain);
+    logger.debug("Current Chain Name:", currentChain.name);
+    logger.debug("Current Chain ID:", currentChain.id);
     setCurrentChainName(currentChain?.name || "Unknown Chain");
   }, [currentChain]);
 
@@ -263,7 +264,7 @@ export default function Navbar() {
         toast.success("Address copied to clipboard!");
         setTimeout(() => setCopySuccess(false), 2000);
       } catch (err) {
-        console.error("Failed to copy address: ", err);
+        logger.error("Failed to copy address: ", err);
         toast.error("Failed to copy address");
       }
     }

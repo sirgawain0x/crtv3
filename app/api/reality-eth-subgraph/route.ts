@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { serverLogger } from '@/lib/utils/logger';
 
 // Reality.eth subgraph endpoint - using Goldsky
 // Public URL: https://api.goldsky.com/api/public/project_cmh0iv6s500dbw2p22vsxcfo6/subgraphs/reality-eth/1.0.0/gn
@@ -18,7 +19,7 @@ const REALITY_ETH_SUBGRAPH_URL = getSubgraphUrl('reality-eth', '1.0.0');
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    console.log('📥 Reality.eth subgraph proxy received request:', {
+    serverLogger.debug('Reality.eth subgraph proxy received request:', {
       query: body.query?.substring(0, 100) + '...',
       variables: body.variables,
     });
@@ -30,7 +31,7 @@ export async function POST(request: NextRequest) {
 
     // Default to private if key exists, otherwise public
     let subgraphEndpoint = isPrivate ? privateEndpoint : publicEndpoint;
-    console.log(`🔗 Forwarding to Goldsky Reality.eth subgraph endpoint: ${subgraphEndpoint}`);
+    serverLogger.debug(`Forwarding to Goldsky Reality.eth subgraph endpoint: ${subgraphEndpoint}`);
 
     // Prepare headers
     const headers: Record<string, string> = {
@@ -54,7 +55,7 @@ export async function POST(request: NextRequest) {
 
     // Fallback logic: If private endpoint fails with 404 (not enabled) or 5xx (server error), try public
     if (isPrivate && (response.status === 404 || response.status >= 500)) {
-      console.warn(`⚠️ Private endpoint returned ${response.status}, falling back to public endpoint...`);
+      serverLogger.warn(`Private endpoint returned ${response.status}, falling back to public endpoint...`);
       subgraphEndpoint = publicEndpoint;
       const publicHeaders = { ...headers };
       delete publicHeaders['Authorization'];
@@ -62,11 +63,11 @@ export async function POST(request: NextRequest) {
       response = await performFetch(subgraphEndpoint, publicHeaders);
     }
 
-    console.log('📊 Reality.eth subgraph response status:', response.status);
+    serverLogger.debug('Reality.eth subgraph response status:', response.status);
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('❌ Goldsky Reality.eth subgraph request failed:', {
+      serverLogger.error('Goldsky Reality.eth subgraph request failed:', {
         status: response.status,
         statusText: response.statusText,
         error: errorText,
@@ -91,11 +92,11 @@ export async function POST(request: NextRequest) {
 
     // Check for GraphQL errors in the response
     if (data.errors && data.errors.length > 0) {
-      console.error('⚠️ GraphQL errors in response:', data.errors);
+      serverLogger.error('GraphQL errors in response:', data.errors);
       return NextResponse.json(data);
     }
 
-    console.log('✅ Reality.eth subgraph query successful:', {
+    serverLogger.debug('Reality.eth subgraph query successful:', {
       hasData: !!data.data,
       dataKeys: data.data ? Object.keys(data.data) : [],
     });
@@ -103,7 +104,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(data);
 
   } catch (error) {
-    console.error('💥 Error proxying Reality.eth subgraph request:', error);
+    serverLogger.error('Error proxying Reality.eth subgraph request:', error);
     return NextResponse.json(
       {
         error: 'Internal Server Error',

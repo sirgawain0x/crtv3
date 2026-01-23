@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/sdk/supabase/service';
+import { serverLogger } from '@/lib/utils/logger';
 
 // GET /api/video-assets/[id]/collaborators - Get collaborators for a video
 export async function GET(
@@ -32,7 +33,7 @@ export async function GET(
       .eq('video_id', videoId);
 
     if (error) {
-      console.error('Error fetching collaborators:', error);
+      serverLogger.error('Error fetching collaborators:', error);
       return NextResponse.json(
         { error: 'Failed to fetch collaborators' },
         { status: 500 }
@@ -43,9 +44,27 @@ export async function GET(
       data: data || [],
     });
   } catch (error) {
-    console.error('Error in collaborators route:', error);
+    serverLogger.error('Error in collaborators route:', error);
+    
+    // Handle specific error types
+    if (error instanceof Error) {
+      // Check for database connection errors
+      if (error.message.includes('connection') || error.message.includes('timeout')) {
+        return NextResponse.json(
+          { 
+            error: 'Database connection error',
+            details: 'Unable to connect to the database. Please try again later.'
+          },
+          { status: 503 }
+        );
+      }
+    }
+    
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { 
+        error: 'Internal server error',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }

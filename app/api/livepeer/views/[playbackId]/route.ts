@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchAllViews } from '@/app/api/livepeer/views';
+import { serverLogger } from '@/lib/utils/logger';
 
 /**
  * Read-only endpoint to fetch view metrics from Livepeer
@@ -35,7 +36,7 @@ export async function GET(
     });
 
   } catch (error) {
-    console.error('Error fetching view metrics:', error);
+    serverLogger.error('Error fetching view metrics:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

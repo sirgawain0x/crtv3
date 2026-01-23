@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/sdk/supabase/service';
 import { fetchAllViews } from '@/app/api/livepeer/views';
+import { serverLogger } from '@/lib/utils/logger';
 
 export const maxDuration = 300; // 5 minutes for cron jobs
 export const dynamic = 'force-dynamic';
@@ -16,12 +17,12 @@ export async function GET(request: NextRequest) {
     // Verify the request is from Vercel Cron or authorized source
     const authHeader = request.headers.get('authorization');
     if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-      console.error('Unauthorized cron job attempt');
+      serverLogger.error('Unauthorized cron job attempt');
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const startTime = Date.now();
-    console.log('[Cron] Starting view count sync job');
+    serverLogger.debug('[Cron] Starting view count sync job');
 
     const supabase = createServiceClient();
     
@@ -33,7 +34,7 @@ export async function GET(request: NextRequest) {
       .not('playback_id', 'is', null);
 
     if (error) {
-      console.error('[Cron] Failed to fetch videos:', error);
+      serverLogger.error('[Cron] Failed to fetch videos:', error);
       return NextResponse.json(
         { error: 'Database error', details: error.message },
         { status: 500 }
@@ -41,7 +42,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (!videos || videos.length === 0) {
-      console.log('[Cron] No published videos found');
+      serverLogger.debug('[Cron] No published videos found');
       return NextResponse.json({
         success: true,
         message: 'No videos to sync',
@@ -49,7 +50,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    console.log(`[Cron] Found ${videos.length} published videos to sync`);
+    serverLogger.debug(`[Cron] Found ${videos.length} published videos to sync`);
 
     // Process in batches to avoid rate limits and timeouts
     const BATCH_SIZE = 10;
@@ -65,7 +66,7 @@ export async function GET(request: NextRequest) {
       const batchNumber = Math.floor(i / BATCH_SIZE) + 1;
       const totalBatches = Math.ceil(videos.length / BATCH_SIZE);
       
-      console.log(`[Cron] Processing batch ${batchNumber}/${totalBatches}`);
+      serverLogger.debug(`[Cron] Processing batch ${batchNumber}/${totalBatches}`);
       
       await Promise.all(
         batch.map(async (video) => {
@@ -83,11 +84,11 @@ export async function GET(request: NextRequest) {
                   .eq('id', video.id);
                 
                 if (updateError) {
-                  console.error(`[Cron] Failed to update ${video.playback_id}:`, updateError);
+                  serverLogger.error(`[Cron] Failed to update ${video.playback_id}:`, updateError);
                   errorCount++;
                   errors.push(`${video.title}: ${updateError.message}`);
                 } else {
-                  console.log(`[Cron] Updated ${video.title}: ${video.views_count} → ${totalViews} views`);
+                  serverLogger.debug(`[Cron] Updated ${video.title}: ${video.views_count} → ${totalViews} views`);
                   updatedCount++;
                   successCount++;
                 }
@@ -96,13 +97,13 @@ export async function GET(request: NextRequest) {
                 successCount++;
               }
             } else {
-              console.warn(`[Cron] No metrics returned for ${video.playback_id}`);
+              serverLogger.warn(`[Cron] No metrics returned for ${video.playback_id}`);
               errorCount++;
               errors.push(`${video.title}: No metrics returned`);
             }
           } catch (err) {
             const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-            console.error(`[Cron] Failed to sync ${video.playback_id}:`, err);
+            serverLogger.error(`[Cron] Failed to sync ${video.playback_id}:`, err);
             errorCount++;
             errors.push(`${video.title}: ${errorMessage}`);
           }
@@ -127,13 +128,13 @@ export async function GET(request: NextRequest) {
       errors: errorCount > 0 ? errors.slice(0, 10) : undefined, // Only include first 10 errors
     };
 
-    console.log('[Cron] View count sync completed:', result);
+    serverLogger.debug('[Cron] View count sync completed:', result);
 
     return NextResponse.json(result);
 
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error('[Cron] Fatal error in cron job:', error);
+    serverLogger.error('[Cron] Fatal error in cron job:', error);
     return NextResponse.json(
       { 
         success: false,

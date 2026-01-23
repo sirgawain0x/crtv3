@@ -11,10 +11,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createCollectionAndMintVideoNFTOnStory } from "@/lib/sdk/nft/minting-service";
 import type { Address } from "viem";
+import { serverLogger } from "@/lib/utils/logger";
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    // Handle JSON parsing errors
+    let body;
+    try {
+      body = await request.json();
+    } catch (jsonError) {
+      serverLogger.error('Invalid JSON in request body:', jsonError);
+      return NextResponse.json(
+        { 
+          error: 'Invalid JSON in request body'
+        },
+        { status: 400 }
+      );
+    }
+    
     const {
       creatorAddress,
       recipient,
@@ -25,8 +39,54 @@ export async function POST(request: NextRequest) {
 
     // Validate required fields
     if (!creatorAddress || !recipient || !metadataURI || !collectionName || !collectionSymbol) {
+      const missingFields = [];
+      if (!creatorAddress) missingFields.push('creatorAddress');
+      if (!recipient) missingFields.push('recipient');
+      if (!metadataURI) missingFields.push('metadataURI');
+      if (!collectionName) missingFields.push('collectionName');
+      if (!collectionSymbol) missingFields.push('collectionSymbol');
+      
       return NextResponse.json(
-        { error: "Missing required fields" },
+        { 
+          error: "Missing required fields",
+          missingFields,
+          hint: 'All of the following fields are required: creatorAddress, recipient, metadataURI, collectionName, collectionSymbol'
+        },
+        { status: 400 }
+      );
+    }
+    
+    // Validate address formats
+    const addressRegex = /^0x[a-fA-F0-9]{40}$/;
+    if (!addressRegex.test(creatorAddress)) {
+      return NextResponse.json(
+        { 
+          error: "Invalid creatorAddress format",
+          details: "creatorAddress must be a valid Ethereum address (0x followed by 40 hex characters)"
+        },
+        { status: 400 }
+      );
+    }
+    
+    if (!addressRegex.test(recipient)) {
+      return NextResponse.json(
+        { 
+          error: "Invalid recipient format",
+          details: "recipient must be a valid Ethereum address (0x followed by 40 hex characters)"
+        },
+        { status: 400 }
+      );
+    }
+    
+    // Validate metadataURI is a valid URL
+    try {
+      new URL(metadataURI);
+    } catch {
+      return NextResponse.json(
+        { 
+          error: "Invalid metadataURI format",
+          details: "metadataURI must be a valid URL"
+        },
         { status: 400 }
       );
     }
@@ -63,7 +123,7 @@ export async function POST(request: NextRequest) {
       const account = privateKeyToAccount(privateKey as `0x${string}`);
       fundingWalletAddress = await account.address;
       
-      console.log("📝 Using funding wallet for Story Protocol transactions:", {
+      serverLogger.debug("Using funding wallet for Story Protocol transactions:", {
         fundingWallet: fundingWalletAddress,
         creatorAddress: creatorAddress,
         recipient: recipient,
@@ -72,7 +132,7 @@ export async function POST(request: NextRequest) {
       // Note: The funding wallet address doesn't need to match the creator address
       // The funding wallet pays for gas, but the creator/recipient are used for NFT ownership
     } catch (e) {
-      console.error("Could not get funding wallet address from private key:", e);
+      serverLogger.error("Could not get funding wallet address from private key:", e);
       return NextResponse.json(
         { 
           error: "Invalid private key",
@@ -102,10 +162,48 @@ export async function POST(request: NextRequest) {
       ...result,
     });
   } catch (error) {
-    console.error("Story Protocol minting error:", error);
+    serverLogger.error("Story Protocol minting error:", error);
+    
+    // Handle specific error types
+    if (error instanceof Error) {
+      // Check for network/connection errors
+      if (error.message.includes('network') || error.message.includes('fetch') || error.message.includes('ECONNREFUSED')) {
+        return NextResponse.json(
+          {
+            error: 'Network error',
+            details: 'Unable to connect to Story Protocol. Please check your network connection and try again.'
+          },
+          { status: 503 }
+        );
+      }
+      
+      // Check for transaction errors
+      if (error.message.includes('transaction') || error.message.includes('revert') || error.message.includes('execution reverted')) {
+        return NextResponse.json(
+          {
+            error: 'Transaction failed',
+            details: error.message
+          },
+          { status: 400 }
+        );
+      }
+      
+      // Check for insufficient funds errors
+      if (error.message.includes('insufficient') || error.message.includes('balance') || error.message.includes('gas')) {
+        return NextResponse.json(
+          {
+            error: 'Insufficient funds',
+            details: 'The funding wallet does not have enough IP tokens to pay for gas fees on Story Protocol'
+          },
+          { status: 400 }
+        );
+      }
+    }
+    
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : "Failed to mint on Story Protocol",
+        details: process.env.NODE_ENV === 'development' && error instanceof Error ? error.stack : undefined
       },
       { status: 500 }
     );

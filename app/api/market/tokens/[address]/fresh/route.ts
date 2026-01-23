@@ -3,6 +3,7 @@ import { createPublicClient, http, formatEther } from 'viem';
 import { base } from 'viem/chains';
 import { meTokensSubgraph } from '@/lib/sdk/metokens/subgraph';
 import { getMeTokenInfoFromBlockchain, getMeTokenProtocolInfo } from '@/lib/utils/metokenUtils';
+import { serverLogger } from '@/lib/utils/logger';
 
 // ERC20 ABI for totalSupply
 const ERC20_ABI = [
@@ -86,14 +87,11 @@ export async function GET(
       const subgraphData = await meTokensSubgraph.checkMeTokenExists(meTokenAddress);
       if (subgraphData) {
         creationData = {
-          blockTimestamp: subgraphData.blockTimestamp,
-          blockNumber: subgraphData.blockNumber,
-          transactionHash: subgraphData.transactionHash,
           assetsDeposited: subgraphData.assetsDeposited,
         };
       }
     } catch (error) {
-      console.warn('Failed to fetch subgraph data:', error);
+      serverLogger.warn('Failed to fetch subgraph data:', error);
       // Continue without subgraph data
     }
 
@@ -119,7 +117,7 @@ export async function GET(
       },
     });
   } catch (error) {
-    console.error('Error fetching fresh MeToken data:', error);
+    serverLogger.error('Error fetching fresh MeToken data:', error);
     return NextResponse.json(
       { 
         error: 'Failed to fetch fresh MeToken data',

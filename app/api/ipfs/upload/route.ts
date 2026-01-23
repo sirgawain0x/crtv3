@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ipfsService } from '@/lib/sdk/ipfs/service';
+import { serverLogger } from '@/lib/utils/logger';
 
 export async function POST(request: NextRequest) {
     try {
@@ -31,7 +32,7 @@ export async function POST(request: NextRequest) {
             hash: result.hash,
         });
     } catch (error) {
-        console.error('API IPFS Upload Error:', error);
+        serverLogger.error('API IPFS Upload Error:', error);
         return NextResponse.json(
             { success: false, error: error instanceof Error ? error.message : 'Internal Server Error' },
             { status: 500 }

@@ -27,6 +27,7 @@ import { createVote } from "@/app/vote/[id]/actions";
 import { SNAPSHOT_SPACE } from "@/context/context";
 import { LinkedIdentityDisplay } from "@/components/vote/LinkedIdentityDisplay";
 import { useMembershipVerification } from "@/lib/hooks/unlock/useMembershipVerification";
+import { logger } from "@/lib/utils/logger";
 
 /**
  * Extract Smart Wallet address from proposal plugins metadata
@@ -52,7 +53,7 @@ function ProposalList({ space }: ProposalListProps) {
 
   // Log for debugging
   if (typeof window !== "undefined") {
-    console.log("ProposalList query:", {
+    logger.debug("ProposalList query:", {
       space,
       hasData: !!data,
       proposalCount: data?.proposals?.length || 0,
@@ -61,7 +62,7 @@ function ProposalList({ space }: ProposalListProps) {
   }
 
   if (error) {
-    console.error("ProposalList error:", error);
+    logger.error("ProposalList error:", error);
     return (
       <div className="p-4 text-red-500">
         <div className="font-semibold">Failed to load proposals</div>
@@ -259,14 +260,14 @@ function VotingForm({ proposal }: { proposal: Proposal }) {
   const { signTypedData } = useSignTypedData({
     client: smartAccountClient || undefined,
     onSuccess: (signature) => {
-      console.log("Smart account vote signature created successfully:", signature);
+      logger.debug("Smart account vote signature created successfully:", signature);
       if (signaturePromise) {
         signaturePromise.resolve(signature);
         setSignaturePromise(null);
       }
     },
     onError: (error) => {
-      console.error("Error signing vote with smart account:", error);
+      logger.error("Error signing vote with smart account:", error);
       if (signaturePromise) {
         signaturePromise.reject(error);
         setSignaturePromise(null);
@@ -300,7 +301,7 @@ function VotingForm({ proposal }: { proposal: Proposal }) {
 
     // Smart account client is required for signing
     if (!smartAccountClient) {
-      console.error("Smart account client is not available:", {
+      logger.error("Smart account client is not available:", {
         smartAccountAddress,
         walletAddress,
         isConnected,
@@ -321,11 +322,13 @@ function VotingForm({ proposal }: { proposal: Proposal }) {
     setIsSubmitting(true);
 
     try {
-      console.log("Starting vote submission...");
-      console.log("Using EOA address (for signing):", walletAddress);
-      console.log("Using Smart Account address (for voting power):", smartAccountAddress);
-      console.log("Proposal ID:", proposal.id);
-      console.log("Choice:", values.choice, "Index:", snapshotChoice);
+      logger.debug("Starting vote submission:", {
+        walletAddress,
+        smartAccountAddress,
+        proposalId: proposal.id,
+        choice: values.choice,
+        snapshotChoice,
+      });
 
       // Prepare EIP-712 typed data for signing (similar to proposal creation)
       const domain = {
@@ -365,7 +368,7 @@ function VotingForm({ proposal }: { proposal: Proposal }) {
         metadata: JSON.stringify({}),
       };
 
-      console.log("Signing Vote Typed Data:", { domain, types, message: typedMessage });
+      logger.debug("Signing Vote Typed Data:", { domain, types, message: typedMessage });
 
       // Verify wallet address is available
       if (!walletAddress) {
@@ -373,7 +376,7 @@ function VotingForm({ proposal }: { proposal: Proposal }) {
         return;
       }
 
-      console.log("Using smart account signTypedData (signature will match smart account address)...");
+      logger.debug("Using smart account signTypedData (signature will match smart account address)...");
 
       // Sign the typed data using the smart account
       // This is required because the 'from' address is the smart account, so the signature must match
@@ -402,7 +405,7 @@ function VotingForm({ proposal }: { proposal: Proposal }) {
         // Wait for the signature from the callback
         signature = await signPromise;
       } catch (signError) {
-        console.error("Error during signing:", signError);
+        logger.error("Error during signing:", signError);
         setSignaturePromise(null); // Clean up
         if (signError instanceof Error) {
           if (signError.message.includes("cancelled") || signError.message.includes("rejected")) {
@@ -418,7 +421,7 @@ function VotingForm({ proposal }: { proposal: Proposal }) {
         return;
       }
 
-      console.log("✅ Vote Typed Data Signed successfully with smart account:", signature);
+      logger.debug("Vote Typed Data Signed successfully with smart account:", signature);
 
       // Prepare EIP-712 envelope for submission
       // Use smart account address in the message (for voting power check)
@@ -438,9 +441,10 @@ function VotingForm({ proposal }: { proposal: Proposal }) {
         },
       };
 
-      console.log("Submitting vote to server...");
-      console.log("Vote message 'from' address (smart account):", smartAccountAddress);
-      console.log("Signature from smart account (matches 'from' address):", smartAccountAddress);
+      logger.debug("Submitting vote to server:", {
+        fromAddress: smartAccountAddress,
+        signature: signature,
+      });
 
       const result = await createVote({
         proposalId: proposal.id,
@@ -451,7 +455,7 @@ function VotingForm({ proposal }: { proposal: Proposal }) {
       });
 
       if (result?.serverError) {
-        console.error("Server error:", result.serverError);
+        logger.error("Server error:", result.serverError);
         let errorMsg = result.serverError;
         if (errorMsg.includes("no voting power")) {
           errorMsg =
@@ -472,24 +476,24 @@ function VotingForm({ proposal }: { proposal: Proposal }) {
       }
 
       if (result?.validationErrors) {
-        console.error("Validation errors:", result.validationErrors);
+        logger.error("Validation errors:", result.validationErrors);
         setError("Validation failed. Please check your input.");
         return;
       }
 
       if (!result?.data) {
-        console.error("No data in result:", result);
+        logger.error("No data in result:", result);
         setError("Failed to submit vote.");
         return;
       }
 
-      console.log("Vote submitted successfully:", result.data);
+      logger.debug("Vote submitted successfully:", result.data);
       toast.success("Vote submitted successfully!");
       reset();
       // Optionally refresh the page to show updated results
       window.location.reload();
     } catch (error) {
-      console.error("Error submitting vote:", error);
+      logger.error("Error submitting vote:", error);
       setError(
         error instanceof Error ? error.message : "Failed to submit vote. Please try again."
       );

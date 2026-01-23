@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
 import { Clock } from "lucide-react";
 import { request, gql } from "graphql-request";
+import { logger } from "@/lib/utils/logger";
 
 interface Question {
   id: string;
@@ -60,7 +61,7 @@ export function PredictionList() {
         setError(null);
 
         const endpoint = `${window.location.origin}/api/reality-eth-subgraph`;
-        console.log('🔗 Fetching Reality.eth questions from:', endpoint);
+        logger.debug('🔗 Fetching Reality.eth questions from:', endpoint);
 
         // First, try to introspect the schema to see what fields are available
         const INTROSPECTION_QUERY = gql`
@@ -81,9 +82,9 @@ export function PredictionList() {
 
         try {
           const introspectionData = await request(endpoint, INTROSPECTION_QUERY) as any;
-          console.log('📋 Available query fields:', introspectionData?.__schema?.queryType?.fields);
+          logger.debug('📋 Available query fields:', introspectionData?.__schema?.queryType?.fields);
         } catch (introError) {
-          console.warn('⚠️ Could not introspect schema:', introError);
+          logger.warn('⚠️ Could not introspect schema:', introError);
         }
 
         // GraphQL query for fetching questions
@@ -119,7 +120,7 @@ export function PredictionList() {
 
         // Check for GraphQL errors
         if (data.errors) {
-          console.error('GraphQL errors:', data.errors);
+          logger.error('GraphQL errors:', data.errors);
 
           // Try alternative field names if logNewQuestions doesn't work
           const alternativeQueries = [
@@ -130,15 +131,15 @@ export function PredictionList() {
           let foundAlternative = false;
           for (const alt of alternativeQueries) {
             try {
-              console.log(`🔄 Trying alternative field name: ${alt.field}`);
+              logger.debug(`Trying alternative field name: ${alt.field}`);
               data = await request(endpoint, alt.query, variables) as any;
               if (!data.errors && data[alt.field]) {
-                console.log(`✅ Found working field: ${alt.field}`);
+                logger.debug(`Found working field: ${alt.field}`);
                 foundAlternative = true;
                 break;
               }
             } catch (e) {
-              console.log(`❌ ${alt.field} didn't work:`, e);
+              logger.debug(`${alt.field} didn't work:`, e);
             }
           }
 
@@ -185,7 +186,7 @@ export function PredictionList() {
               title = q.question;
             }
           } catch (e) {
-            console.warn('Could not parse question text for question', q.id, e);
+            logger.warn('Could not parse question text for question', q.id, e);
           }
 
           // Map the event-based entity to our Question interface
@@ -214,7 +215,7 @@ export function PredictionList() {
           } as Question;
         });
 
-        console.log(`✅ Successfully fetched ${parsedQuestions.length} questions from Reality.eth subgraph`);
+        logger.debug(`Successfully fetched ${parsedQuestions.length} questions from Reality.eth subgraph`);
 
         // Filter to only show questions from this app if enabled
         // Questions created through this app use arbitrator: 0x0000000000000000000000000000000000000000
@@ -233,7 +234,7 @@ export function PredictionList() {
         const endIndex = startIndex + ITEMS_PER_PAGE;
         setQuestions(safeFilteredQuestions.slice(startIndex, endIndex));
       } catch (err: any) {
-        console.error('❌ Failed to fetch questions from Reality.eth subgraph:', err);
+        logger.error('Failed to fetch questions from Reality.eth subgraph:', err);
 
         let errorMessage = err?.message || 'Failed to load predictions.';
 

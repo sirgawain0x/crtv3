@@ -3,6 +3,8 @@
 import { shortenAddress } from "@/lib/utils/utils";
 import { formatProposalAuthor } from "@/lib/utils/linked-identity";
 import { useWalletStatus } from "@/lib/hooks/accountkit/useWalletStatus";
+import { useMemo } from "react";
+import { logger } from "@/lib/utils/logger";
 
 /**
  * Component to display linked identity for proposals
@@ -54,16 +56,51 @@ export function LinkedIdentityDisplay({
 /**
  * Hook to get Smart Wallet address from EOA
  * 
- * In the future, this could query a database or use Delegate.cash
- * to find the Smart Wallet associated with an EOA
+ * This implementation:
+ * 1. Checks if the EOA matches the current user's EOA (returns their smart wallet)
+ * 2. Future enhancements could:
+ *    - Query a database mapping table
+ *    - Use Delegate.cash to find delegations
+ *    - Check on-chain registry for EOA -> Smart Wallet mappings
+ *    - Use Account Kit's factory to compute smart wallet address deterministically
+ * 
+ * @param eoaAddress - The EOA address to find the smart wallet for
+ * @returns Smart wallet address if found, null otherwise
  */
 export function useSmartWalletFromEOA(eoaAddress: string | null) {
-  // TODO: Implement mapping from EOA to Smart Wallet
-  // This could:
-  // 1. Query a database mapping table
-  // 2. Use Delegate.cash to find delegations
-  // 3. Check on-chain if EOA is owner of a Smart Wallet
+  const { walletAddress, smartAccountAddress } = useWalletStatus();
   
-  // For now, return null (we'll enhance this later)
-  return null;
+  return useMemo(() => {
+    if (!eoaAddress) {
+      return null;
+    }
+
+    // Normalize addresses for comparison
+    const normalizedEOA = eoaAddress.toLowerCase();
+    const normalizedWalletAddress = walletAddress?.toLowerCase();
+    const normalizedSmartAccount = smartAccountAddress?.toLowerCase();
+
+    // If the EOA matches the current user's EOA, return their smart wallet
+    if (normalizedWalletAddress === normalizedEOA && normalizedSmartAccount) {
+      logger.debug('Found smart wallet for current user EOA', {
+        eoa: eoaAddress,
+        smartWallet: smartAccountAddress,
+      });
+      return smartAccountAddress;
+    }
+
+    // If addresses are the same, it's not a smart wallet
+    if (normalizedEOA === normalizedSmartAccount) {
+      return null;
+    }
+
+    // TODO: Future enhancements
+    // 1. Query database for EOA -> Smart Wallet mappings
+    // 2. Use Delegate.cash API to find delegations
+    // 3. Check on-chain registry contracts
+    // 4. Use Account Kit factory to compute deterministic address
+    
+    logger.debug('Could not find smart wallet for EOA', { eoa: eoaAddress });
+    return null;
+  }, [eoaAddress, walletAddress, smartAccountAddress]);
 }

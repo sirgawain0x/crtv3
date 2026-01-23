@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { privateKeyToAccount } from "viem/accounts";
+import { serverLogger } from "@/lib/utils/logger";
 
 export async function GET(request: NextRequest) {
   try {
@@ -31,7 +32,7 @@ export async function GET(request: NextRequest) {
       address,
     });
   } catch (error) {
-    console.error("Error getting funding wallet address:", error);
+    serverLogger.error("Error getting funding wallet address:", error);
     return NextResponse.json(
       {
         error: error instanceof Error ? error.message : "Failed to get funding wallet address",

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { serverLogger } from '@/lib/utils/logger';
 
 // MeTokens subgraph endpoint - now using Goldsky
 // Deployment ID: QmVaWYhk4HKhk9rNQi11RKujTVS4KHF1uHGNVUF4f7xJ53
@@ -11,7 +12,7 @@ const getSubgraphUrl = (subgraphName: string, version: string, specificAccessTyp
   return `https://api.goldsky.com/api/${accessType}/${PROJECT_ID}/subgraphs/${subgraphName}/${version}/gn`;
 };
 
-const METOKENS_SUBGRAPH_URL = getSubgraphUrl('metokens', 'v0.0.1');
+const METOKENS_SUBGRAPH_URL = getSubgraphUrl('metokens', '1.0.2');
 
 
 
@@ -35,19 +36,19 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    console.log('📥 Subgraph proxy received request:', {
+    serverLogger.debug('Subgraph proxy received request:', {
       query: body.query?.substring(0, 100) + '...',
       variables: body.variables,
     });
 
     // Determine endpoints
     const isPrivate = !!process.env.GOLDSKY_API_KEY;
-    const privateEndpoint = getSubgraphUrl('metokens', 'v0.0.1', 'private');
-    const publicEndpoint = getSubgraphUrl('metokens', 'v0.0.1', 'public');
+    const privateEndpoint = getSubgraphUrl('metokens', '1.0.2', 'private');
+    const publicEndpoint = getSubgraphUrl('metokens', '1.0.2', 'public');
 
     // Default to private if key exists, otherwise public
     let subgraphEndpoint = isPrivate ? privateEndpoint : publicEndpoint;
-    console.log(`🔗 Forwarding to Goldsky subgraph endpoint: ${subgraphEndpoint}`);
+    serverLogger.debug(`Forwarding to Goldsky subgraph endpoint: ${subgraphEndpoint}`);
 
     // Prepare headers
     const headers: Record<string, string> = {
@@ -71,7 +72,7 @@ export async function POST(request: NextRequest) {
 
     // Fallback logic: If private endpoint fails with 404 (not enabled) or 5xx (server error), try public
     if (isPrivate && (response.status === 404 || response.status >= 500)) {
-      console.warn(`⚠️ Private endpoint returned ${response.status}, falling back to public endpoint...`);
+      serverLogger.warn(`Private endpoint returned ${response.status}, falling back to public endpoint...`);
       subgraphEndpoint = publicEndpoint;
       // Remove auth header for public request (optional, but cleaner)
       const publicHeaders = { ...headers };
@@ -81,12 +82,12 @@ export async function POST(request: NextRequest) {
     }
 
 
-    console.log('📊 Subgraph response status:', response.status);
+    serverLogger.debug('Subgraph response status:', response.status);
 
     if (!response.ok) {
       // Use stored error text if available, otherwise read from response
       const errorText = await response.text();
-      console.error('❌ Subgraph request failed:', {
+      serverLogger.error('Subgraph request failed:', {
         status: response.status,
         statusText: response.statusText,
         error: errorText,
@@ -111,11 +112,11 @@ export async function POST(request: NextRequest) {
 
     // Check for GraphQL errors in the response
     if (data.errors && data.errors.length > 0) {
-      console.error('⚠️ GraphQL errors in response:', data.errors);
+      serverLogger.error('GraphQL errors in response:', data.errors);
       return NextResponse.json(data); // Return errors to client
     }
 
-    console.log('✅ Subgraph query successful:', {
+    serverLogger.debug('Subgraph query successful:', {
       hasData: !!data.data,
       dataKeys: data.data ? Object.keys(data.data) : [],
     });
@@ -123,7 +124,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(data);
 
   } catch (error) {
-    console.error('💥 Error proxying subgraph request:', error);
+    serverLogger.error('Error proxying subgraph request:', error);
 
     return NextResponse.json(
       {

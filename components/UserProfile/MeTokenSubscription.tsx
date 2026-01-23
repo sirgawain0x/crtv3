@@ -13,6 +13,7 @@ import { useMeTokensSupabase, MeTokenData } from '@/lib/hooks/metokens/useMeToke
 import { getHubVaultAddress } from '@/lib/utils/metokenSubscriptionUtils';
 import { DaiFundingOptions } from '@/components/wallet/funding/DaiFundingOptions';
 import { parseBundlerError, shouldRetryError } from '@/lib/utils/bundlerErrorParser';
+import { logger } from '@/lib/utils/logger';
 
 interface MeTokenSubscriptionProps {
   meToken: MeTokenData;
@@ -84,7 +85,7 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
 
       setDaiBalance(balance);
     } catch (err) {
-      console.error('Failed to check DAI balance:', err);
+      logger.error('Failed to check DAI balance:', err);
       setDaiBalance(BigInt(0));
     }
   }, [client]);
@@ -103,7 +104,7 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
       // Get the correct spender address (Vault)
       const hubIdBigInt = hubId ? BigInt(hubId) : BigInt(1); // Default to hub 1
       const vaultAddress = await getHubVaultAddress(hubIdBigInt);
-      console.log('🔍 Checking allowance for spender (Vault):', vaultAddress);
+      logger.debug('🔍 Checking allowance for spender (Vault):', vaultAddress);
 
       const currentAllowance = await client.readContract({
         address: daiAddress,
@@ -126,12 +127,12 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
       const hasUnlimitedAllowance = currentAllowance >= (maxUint256 / BigInt(2));
       setApprovalComplete(hasUnlimitedAllowance);
 
-      console.log('📊 Allowance status checked:', {
+      logger.debug('📊 Allowance status checked:', {
         hasUnlimited: hasUnlimitedAllowance,
         allowance: formatEther(currentAllowance),
       });
     } catch (err) {
-      console.error('Failed to check allowance status:', err);
+      logger.error('Failed to check allowance status:', err);
       setApprovalComplete(false);
     }
   }, [client]);
@@ -155,7 +156,7 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
       // Get the correct spender address (Vault)
       const hubIdBigInt = hubId ? BigInt(hubId) : BigInt(1); // Default to hub 1
       const vaultAddress = await getHubVaultAddress(hubIdBigInt);
-      console.log('📝 Step 1: Approving unlimited DAI for Vault:', vaultAddress);
+      logger.debug('📝 Step 1: Approving unlimited DAI for Vault:', vaultAddress);
 
       setSuccess('Approving unlimited DAI... Please sign the transaction in your wallet.');
 
@@ -177,15 +178,15 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
         args: [vaultAddress as `0x${string}`, maxUint256],
       });
 
-      console.log('🔍 Approve operation details:', {
+      logger.debug('🔍 Approve operation details:', {
         target: daiAddress,
         spender: vaultAddress,
         dataLength: approveData.length,
         value: '0',
       });
 
-      console.log('⏳ Calling client.sendUserOperation (waiting for wallet signature)...');
-      console.log('💡 If this hangs, check your wallet - you may need to approve the transaction');
+      logger.debug('⏳ Calling client.sendUserOperation (waiting for wallet signature)...');
+      logger.debug('💡 If this hangs, check your wallet - you may need to approve the transaction');
 
       // Add timeout wrapper
       const approvePromise = client.sendUserOperation({
@@ -204,19 +205,19 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
 
       const approveOperation = await Promise.race([approvePromise, timeoutPromise]) as Awaited<ReturnType<typeof client.sendUserOperation>>;
 
-      console.log('✅ Approve UserOperation sent:', approveOperation.hash);
-      console.log('⏳ Waiting for approval confirmation...');
+      logger.debug('✅ Approve UserOperation sent:', approveOperation.hash);
+      logger.debug('⏳ Waiting for approval confirmation...');
       setSuccess('Approval transaction sent! Waiting for confirmation...');
 
       const approveTxHash = await client.waitForUserOperationTransaction({
         hash: approveOperation.hash,
       });
 
-      console.log('✅ Approve transaction confirmed:', approveTxHash);
+      logger.debug('✅ Approve transaction confirmed:', approveTxHash);
       setApprovalTxHash(approveTxHash);
 
       // Validate allowance propagation
-      console.log('🔍 Starting aggressive multi-node validation...');
+      logger.debug('🔍 Starting aggressive multi-node validation...');
       setSuccess('Approval confirmed! Validating across network nodes...');
 
       const allowanceAbi = [
@@ -248,7 +249,7 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
         attempts++;
         const elapsedSeconds = attempts * (waitTime / 1000);
 
-        console.log(`🔍 Validation attempt ${attempts}/${maxAttempts} (${elapsedSeconds}s elapsed)...`);
+        logger.debug(`Validation attempt Validation attempt ${attempts}/${maxAttempts} (${elapsedSeconds}s elapsed)...`);
         setSuccess(`Validating allowance... (${elapsedSeconds}s)`);
 
         try {
@@ -260,7 +261,7 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
           ]) as bigint[];
 
           const allowances = checks.map(a => formatEther(a));
-          console.log(`📊 Allowance checks:`, allowances);
+          logger.debug(`Allowance checks: Allowance checks:`, allowances);
 
           // All 3 checks must pass
           const allPassed = checks.every(allowance => allowance >= (maxUint256 / BigInt(2)));
@@ -268,17 +269,17 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
           if (allPassed) {
             validated = true;
             const avgAllowance = checks.reduce((a, b) => a + b, BigInt(0)) / BigInt(checks.length);
-            console.log(`✅ Validation passed after ${elapsedSeconds} seconds!`);
-            console.log(`📊 Average allowance across nodes: ${formatEther(avgAllowance)} DAI`);
+            logger.debug(`Validation passed Validation passed after ${elapsedSeconds} seconds!`);
+            logger.debug(`Allowance checks: Average allowance across nodes: ${formatEther(avgAllowance)} DAI`);
             setSuccess('Allowance validated across network! Ready to mint.');
             setApprovalComplete(true);
           } else {
             const passedCount = checks.filter(a => a >= (maxUint256 / BigInt(2))).length;
-            console.log(`⚠️ Only ${passedCount}/3 nodes see the allowance, waiting ${waitTime / 1000}s...`);
+            logger.debug(`Only Only ${passedCount}/3 nodes see the allowance, waiting ${waitTime / 1000}s...`);
             await new Promise(resolve => setTimeout(resolve, waitTime));
           }
         } catch (checkError) {
-          console.warn(`⚠️ Validation check ${attempts} failed:`, checkError);
+          logger.warn(`Validation check ${attempts} failed:`, checkError);
           await new Promise(resolve => setTimeout(resolve, waitTime));
         }
       }
@@ -291,10 +292,10 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
         );
       }
 
-      console.log('✅ Approval complete and validated!');
+      logger.debug('✅ Approval complete and validated!');
 
     } catch (err) {
-      console.error('❌ Approval failed:', err);
+      logger.error('❌ Approval failed:', err);
       setError(err instanceof Error ? err.message : 'Failed to approve DAI');
       throw err;
     } finally {
@@ -321,7 +322,7 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
 
     try {
       // Double-check subscription status
-      console.log('🔍 Double-checking subscription status before minting...');
+      logger.debug('🔍 Double-checking subscription status before minting...');
       const { checkMeTokenSubscriptionFromBlockchain } = await import('@/lib/utils/metokenSubscriptionUtils');
       const currentStatus = await checkMeTokenSubscriptionFromBlockchain(meToken.address);
 
@@ -332,7 +333,7 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
         return;
       }
 
-      console.log('✅ Confirmed not subscribed, proceeding with mint...');
+      logger.debug('✅ Confirmed not subscribed, proceeding with mint...');
 
       const diamondAddress = '0xba5502db2aC2cBff189965e991C07109B14eB3f5' as `0x${string}`;
       const daiAddress = '0x50c5725949a6f0c72e6c4a641f24049a917db0cb' as `0x${string}`;
@@ -343,17 +344,17 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
       let vaultAddress: string;
       try {
         vaultAddress = await getHubVaultAddress(hubIdBigInt);
-        console.log('🔍 Mint flow: Spender (Vault) address:', vaultAddress);
+        logger.debug('🔍 Mint flow: Spender (Vault) address:', vaultAddress);
       } catch (err) {
-        console.error('❌ Failed to get vault address, falling back to Diamond:', err);
+        logger.error('❌ Failed to get vault address, falling back to Diamond:', err);
         vaultAddress = diamondAddress;
       }
 
       // CRITICAL: Refresh and verify smart account has DAI balance BEFORE attempting transaction
-      console.log('🔍 Verifying smart account DAI balance...');
+      logger.debug('🔍 Verifying smart account DAI balance...');
       await checkDaiBalance(); // Refresh balance first to get latest state
 
-      console.log('📊 Balance check:', {
+      logger.debug('📊 Balance check:', {
         smartAccount: client.account?.address,
         daiBalance: formatEther(daiBalance),
         required: formatEther(depositAmount),
@@ -365,17 +366,17 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
           `You have ${formatEther(daiBalance)} DAI but need ${formatEther(depositAmount)} DAI. ` +
           `Please transfer DAI to your smart account (${client.account?.address}) first. ` +
           `DAI must be in your smart account, not your EOA wallet.`;
-        console.error('❌', errorMsg);
+        logger.error('❌', errorMsg);
         setError(errorMsg);
         setIsMinting(false);
         return;
       }
 
-      console.log('✅ Smart account has sufficient DAI balance');
+      logger.debug('✅ Smart account has sufficient DAI balance');
 
       // Try batched operations with client.sendUserOperation first
       // This bypasses wallet_prepareCalls and uses eth_estimateUserOperationGas directly
-      console.log('📝 Attempting batched approve + mint with client.sendUserOperation...');
+      logger.debug('📝 Attempting batched approve + mint with client.sendUserOperation...');
       setSuccess('Batching approval and mint in single transaction... Please sign in your wallet.');
 
       // Build approve operation using Vault address
@@ -427,11 +428,11 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
       //    - Step 2: Mint MeTokens (uses confirmed allowance)
       //
       // This approach is more reliable than batching when dealing with RPC node state sync issues
-      console.log('📝 Using separate transactions (approve first, then mint)');
-      console.log('💡 This approach avoids bundler RPC node state sync issues');
+      logger.debug('📝 Using separate transactions (approve first, then mint)');
+      logger.debug('💡 This approach avoids bundler RPC node state sync issues');
 
       // CRITICAL: Check current allowance first - if sufficient, skip approval
-      console.log('🔍 Checking current allowance before attempting approval...');
+      logger.debug('🔍 Checking current allowance before attempting approval...');
       let currentAllowance: bigint;
       try {
         currentAllowance = await client.readContract({
@@ -452,7 +453,7 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
           args: [client.account?.address as `0x${string}`, vaultAddress as `0x${string}`] as const,
         }) as bigint;
 
-        console.log('📊 Current allowance check:', {
+        logger.debug('📊 Current allowance check:', {
           allowance: currentAllowance.toString(),
           formatted: formatEther(currentAllowance),
           required: depositAmount.toString(),
@@ -460,7 +461,7 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
           hasSufficient: currentAllowance >= depositAmount,
         });
       } catch (allowanceCheckError) {
-        console.warn('⚠️ Failed to check allowance, proceeding with approval:', allowanceCheckError);
+        logger.warn('Failed to check allowance Failed to check allowance, proceeding with approval:', allowanceCheckError);
         currentAllowance = BigInt(0);
       }
 
@@ -472,10 +473,10 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
       // Only approve if allowance is insufficient
       // If allowance exists, we'll try minting first and handle bundler sync issues via retry logic
       if (!hasUnlimitedAllowance && !hasSufficientAllowance) {
-        console.log('📝 Allowance insufficient, sending approve transaction...');
+        logger.debug('📝 Allowance insufficient, sending approve transaction...');
         setSuccess('Step 1: Approving DAI... Please sign in your wallet.');
 
-        console.log('📋 Approve transaction details:', {
+        logger.debug('📋 Approve transaction details:', {
           target: daiAddress,
           dataLength: approveData.length,
           data: approveData,
@@ -487,7 +488,7 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
         let approveOperation;
         try {
           // Add timeout wrapper to prevent hanging
-          console.log('⏳ Sending approve UserOperation (this may require wallet signature)...');
+          logger.debug('⏳ Sending approve UserOperation (this may require wallet signature)...');
           const approvePromise = client.sendUserOperation({
             uo: {
               target: daiAddress,
@@ -504,13 +505,13 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
 
           approveOperation = await Promise.race([approvePromise, timeoutPromise]);
 
-          console.log('✅ Approve UserOperation sent:', approveOperation.hash);
+          logger.debug('✅ Approve UserOperation sent:', approveOperation.hash);
           setSuccess('Approval sent! Waiting for confirmation...');
         } catch (approveSendError) {
           const approveSendErrorMessage = approveSendError instanceof Error ? approveSendError.message : String(approveSendError);
-          console.error('❌ Failed to send approve UserOperation:', approveSendErrorMessage);
-          console.error('❌ Full error details:', approveSendError);
-          console.error('❌ Error stack:', approveSendError instanceof Error ? approveSendError.stack : 'No stack trace');
+          logger.error('❌ Failed to send approve UserOperation:', approveSendErrorMessage);
+          logger.error('❌ Full error details:', approveSendError);
+          logger.error('❌ Error stack:', approveSendError instanceof Error ? approveSendError.stack : 'No stack trace');
 
           // Re-throw with more context
           throw new Error(
@@ -521,27 +522,27 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
         }
 
         try {
-          console.log('⏳ Waiting for approve transaction confirmation...');
+          logger.debug('⏳ Waiting for approve transaction confirmation...');
           approveTxHash = await client.waitForUserOperationTransaction({
             hash: approveOperation.hash,
           });
         } catch (approveWaitError) {
           const approveWaitErrorMessage = approveWaitError instanceof Error ? approveWaitError.message : String(approveWaitError);
-          console.error('❌ Failed to wait for approve transaction:', approveWaitErrorMessage);
+          logger.error('❌ Failed to wait for approve transaction:', approveWaitErrorMessage);
           throw new Error(
             `Approval transaction was sent (${approveOperation.hash}) but failed to confirm: ${approveWaitErrorMessage}. ` +
             `Please check the transaction on a block explorer.`
           );
         }
 
-        console.log('✅ Approve transaction confirmed:', approveTxHash);
+        logger.debug('✅ Approve transaction confirmed:', approveTxHash);
         setApprovalTxHash(approveTxHash);
         setSuccess('Approval confirmed! Waiting for state propagation...');
       } else {
         // Allowance exists - log it but proceed to mint
         // If bundler doesn't see it, retry logic will handle sending fresh approval
-        console.log('✅ Sufficient allowance already exists, proceeding to mint');
-        console.log('📊 Allowance details:', {
+        logger.debug('✅ Sufficient allowance already exists, proceeding to mint');
+        logger.debug('📊 Allowance details:', {
           allowance: currentAllowance.toString(),
           formatted: formatEther(currentAllowance),
           hasUnlimited: hasUnlimitedAllowance,
@@ -555,12 +556,12 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
         // CRITICAL: Wait for transaction to be included in multiple blocks
         // Base has ~2 second block time, so 5 blocks = ~10 seconds
         // This ensures the transaction is fully propagated across all nodes
-        console.log('⏳ Waiting for approval transaction to be included in multiple blocks (10 seconds)...');
+        logger.debug('⏳ Waiting for approval transaction to be included in multiple blocks (10 seconds)...');
         await new Promise(resolve => setTimeout(resolve, 10000));
 
         // CRITICAL: Poll allowance on-chain until it's actually set
         // This ensures the bundler sees the updated state before attempting mint
-        console.log('🔍 Polling allowance on-chain until set...');
+        logger.debug('🔍 Polling allowance on-chain until set...');
         setSuccess('Verifying allowance on-chain...');
         const maxAttempts = 15; // Increased from 10 to 15
         const initialDelay = 3000; // Start with 3 seconds (increased from 2)
@@ -589,7 +590,7 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
             const hasUnlimitedAllowance = polledAllowance >= (maxUint256 / BigInt(2));
             const hasSufficientAllowance = polledAllowance >= depositAmount;
 
-            console.log(`📊 Allowance check attempt ${attempt}/${maxAttempts}:`, {
+            logger.debug(`Allowance checks: Allowance check attempt ${attempt}/${maxAttempts}:`, {
               allowance: polledAllowance.toString(),
               formatted: formatEther(polledAllowance),
               hasUnlimited: hasUnlimitedAllowance,
@@ -599,18 +600,18 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
 
             if (hasUnlimitedAllowance || hasSufficientAllowance) {
               allowanceSet = true;
-              console.log('✅ Allowance verified on-chain!');
+              logger.debug('✅ Allowance verified on-chain!');
               break;
             }
 
             // Exponential backoff: wait longer each attempt (capped at 15 seconds)
             const delay = Math.min(initialDelay * Math.pow(2, attempt - 1), 15000);
-            console.log(`⏳ Allowance not yet set, waiting ${delay}ms before retry...`);
+            logger.debug(`Allowance not yet set Allowance not yet set, waiting ${delay}ms before retry...`);
             setSuccess(`Verifying allowance... (attempt ${attempt}/${maxAttempts})`);
             await new Promise(resolve => setTimeout(resolve, delay));
 
           } catch (allowanceError) {
-            console.warn(`⚠️ Error checking allowance (attempt ${attempt}):`, allowanceError);
+            logger.warn(`Error checking allowance (attempt ${attempt}):`, allowanceError);
             // Continue to next attempt with exponential backoff (capped at 15 seconds)
             const delay = Math.min(initialDelay * Math.pow(2, attempt - 1), 15000);
             await new Promise(resolve => setTimeout(resolve, delay));
@@ -628,19 +629,19 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
         // CRITICAL: Additional delay to ensure bundler state is fully updated
         // The bundler might be using a different RPC node that needs more time to sync
         // Waiting 15 seconds ensures all nodes in Alchemy's load balancer have synced
-        console.log('⏳ Waiting additional 15 seconds for bundler state propagation...');
+        logger.debug('⏳ Waiting additional 15 seconds for bundler state propagation...');
         setSuccess('Allowance verified! Waiting for bundler state update (this may take up to 15 seconds)...');
         await new Promise(resolve => setTimeout(resolve, 15000));
       } else {
         // If we skipped approval, we still need to wait a bit for bundler state sync
         // The allowance exists but bundler might need time to see it
-        console.log('⏳ Allowance already exists, waiting 5 seconds for bundler state sync...');
+        logger.debug('⏳ Allowance already exists, waiting 5 seconds for bundler state sync...');
         setSuccess('Allowance verified! Waiting for bundler state update...');
         await new Promise(resolve => setTimeout(resolve, 5000));
       }
 
       // Step 2: Mint MeTokens (with retry logic)
-      console.log('📝 Sending mint transaction...');
+      logger.debug('📝 Sending mint transaction...');
       setSuccess('Step 2: Minting MeTokens... Please sign in your wallet.');
 
       const maxMintRetries = 3;
@@ -650,7 +651,7 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
 
       for (let mintAttempt = 1; mintAttempt <= maxMintRetries; mintAttempt++) {
         try {
-          console.log(`🔄 Mint attempt ${mintAttempt}/${maxMintRetries}...`);
+          logger.debug(`Mint attempt Mint attempt ${mintAttempt}/${maxMintRetries}...`);
           const mintOperation = await client.sendUserOperation({
             uo: {
               target: diamondAddress,
@@ -659,15 +660,15 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
             },
           });
 
-          console.log('✅ Mint UserOperation sent:', mintOperation.hash);
+          logger.debug('✅ Mint UserOperation sent:', mintOperation.hash);
           setSuccess('Mint sent! Waiting for confirmation...');
 
           const mintTxHash = await client.waitForUserOperationTransaction({
             hash: mintOperation.hash,
           });
 
-          console.log('✅ Mint transaction completed:', mintTxHash);
-          console.log('🎉 MeToken subscription completed! Transaction ID:', mintTxHash);
+          logger.debug('✅ Mint transaction completed:', mintTxHash);
+          logger.debug('🎉 MeToken subscription completed! Transaction ID:', mintTxHash);
           setSuccess('Successfully added liquidity to your MeToken!');
           setAssetsDeposited('');
           setApprovalComplete(true);
@@ -686,7 +687,7 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
           // Parse the error to determine if it's a contract error or RPC/infrastructure error
           const parsedMintError = parseBundlerError(mintError instanceof Error ? mintError : new Error(mintErrorMessage));
 
-          console.log('🔍 Mint Error Analysis:', {
+          logger.debug('🔍 Mint Error Analysis:', {
             code: parsedMintError.code,
             message: parsedMintError.message,
             isContractError: parsedMintError.code?.startsWith('AA') && ['AA23', 'AA24'].includes(parsedMintError.code),
@@ -696,7 +697,7 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
           // If it's a contract error (AA23: validation reverted, AA24: invalid signature), throw it immediately
           // These are actual contract issues, not infrastructure
           if (parsedMintError.code === 'AA23' || parsedMintError.code === 'AA24') {
-            console.error('❌ Contract Error Detected during mint:', parsedMintError);
+            logger.error('❌ Contract Error Detected during mint:', parsedMintError);
             throw new Error(
               `Contract Error [${parsedMintError.code}]: ${parsedMintError.message}\n\n` +
               `💡 ${parsedMintError.suggestion}\n\n` +
@@ -711,7 +712,7 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
           if (!isAllowanceError || mintAttempt === maxMintRetries) {
             // If it's not an allowance/RPC error, or we've exhausted retries, show the parsed error
             if (!isAllowanceError) {
-              console.warn('⚠️ Non-allowance error during mint:', parsedMintError);
+              logger.warn('⚠️ Non-allowance error during mint:', parsedMintError);
               setError(
                 `Error [${parsedMintError.code || 'Unknown'}]: ${parsedMintError.message}\n\n` +
                 `💡 ${parsedMintError.suggestion}\n\n` +
@@ -722,7 +723,7 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
           }
 
           // Log that this is an RPC/infrastructure error, NOT a contract error
-          console.log('ℹ️ RPC/Infrastructure Error Detected during mint (NOT contract error):', {
+          logger.debug('ℹ️ RPC/Infrastructure Error Detected during mint (NOT contract error):', {
             message: parsedMintError.message,
             explanation: 'This error is caused by RPC node state synchronization issues, not your contract.',
             attempt: `${mintAttempt}/${maxMintRetries}`,
@@ -731,12 +732,12 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
           // CRITICAL: If bundler doesn't see allowance, send a fresh approval to force bundler's node to see it
           // This is necessary because the bundler uses a different RPC node that may not have synced
           if (isAllowanceError && !hasSentFreshApproval && mintAttempt === 1) {
-            console.warn('⚠️ Bundler doesn\'t see allowance even though it exists. Sending fresh approval to force bundler sync...');
+            logger.warn('⚠️ Bundler doesn\'t see allowance even though it exists. Sending fresh approval to force bundler sync...');
             setSuccess('Bundler state sync issue detected. Sending fresh approval to sync bundler...');
 
             try {
               // Send a fresh approval transaction to force the bundler's node to see the allowance
-              console.log('📝 Sending fresh approval to sync bundler state...');
+              logger.debug('📝 Sending fresh approval to sync bundler state...');
               const freshApproveOperation = await client.sendUserOperation({
                 uo: {
                   target: daiAddress,
@@ -745,26 +746,26 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
                 },
               });
 
-              console.log('✅ Fresh approve UserOperation sent:', freshApproveOperation.hash);
+              logger.debug('✅ Fresh approve UserOperation sent:', freshApproveOperation.hash);
               setSuccess('Fresh approval sent! Waiting for confirmation...');
 
               const freshApproveTxHash = await client.waitForUserOperationTransaction({
                 hash: freshApproveOperation.hash,
               });
 
-              console.log('✅ Fresh approve transaction confirmed:', freshApproveTxHash);
+              logger.debug('✅ Fresh approve transaction confirmed:', freshApproveTxHash);
               setApprovalTxHash(freshApproveTxHash);
               setSuccess('Fresh approval confirmed! Waiting for bundler state sync...');
 
               // Wait for bundler state to sync after fresh approval
-              console.log('⏳ Waiting 15 seconds for bundler state sync after fresh approval...');
+              logger.debug('⏳ Waiting 15 seconds for bundler state sync after fresh approval...');
               await new Promise(resolve => setTimeout(resolve, 15000));
 
               hasSentFreshApproval = true;
               // Continue to next mint attempt (don't increment retry delay since we just sent approval)
               continue;
             } catch (freshApproveError) {
-              console.error('❌ Failed to send fresh approval:', freshApproveError);
+              logger.error('❌ Failed to send fresh approval:', freshApproveError);
               // Continue with retry logic below
             }
           }
@@ -772,13 +773,13 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
           // If it's an allowance error and we have retries left, wait and retry
           // Increase retry delays to give bundler more time to sync
           const retryDelay = 10000 * Math.pow(2, mintAttempt - 1); // Exponential backoff: 10s, 20s, 40s
-          console.warn(`⚠️ Mint failed with allowance error (attempt ${mintAttempt}/${maxMintRetries}):`, mintErrorMessage);
-          console.log(`⏳ Waiting ${retryDelay}ms before retry (bundler may need more time to sync)...`);
+          logger.warn(`⚠️ Mint failed with allowance error (attempt ${mintAttempt}/${maxMintRetries}):`, mintErrorMessage);
+          logger.debug(`Waiting ${retryDelay}ms before retry (bundler may need more time to sync)...`);
           setSuccess(`Mint failed, retrying... (attempt ${mintAttempt}/${maxMintRetries}, waiting ${retryDelay / 1000}s for bundler sync)`);
           await new Promise(resolve => setTimeout(resolve, retryDelay));
 
           // Re-verify allowance before retry
-          console.log('🔍 Re-verifying allowance before retry...');
+          logger.debug('🔍 Re-verifying allowance before retry...');
           try {
             const retryAllowance = await client.readContract({
               address: daiAddress,
@@ -798,7 +799,7 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
               args: [client.account?.address as `0x${string}`, vaultAddress as `0x${string}`] as const,
             }) as bigint;
 
-            console.log('📊 Allowance before retry:', {
+            logger.debug('📊 Allowance before retry:', {
               allowance: retryAllowance.toString(),
               formatted: formatEther(retryAllowance),
               required: depositAmount.toString(),
@@ -806,7 +807,7 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
               hasSufficient: retryAllowance >= depositAmount,
             });
           } catch (retryAllowanceError) {
-            console.warn('⚠️ Error checking allowance before retry:', retryAllowanceError);
+            logger.warn('⚠️ Error checking allowance before retry:', retryAllowanceError);
           }
         }
       }
@@ -816,7 +817,7 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
       }
 
     } catch (err) {
-      console.error('❌ Mint error:', err);
+      logger.error('❌ Mint error:', err);
 
       // Parse the error to provide better error messages
       const parsedError = parseBundlerError(err instanceof Error ? err : new Error(String(err)));
@@ -846,7 +847,7 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
           `💡 ${parsedError.suggestion}`;
       }
 
-      console.log('📊 Error Summary:', {
+      logger.debug('📊 Error Summary:', {
         code: parsedError.code,
         isContractError,
         isRpcError,
@@ -870,11 +871,11 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
 
     setIsCheckingStatus(true);
     try {
-      console.log('🔍 Checking real subscription status for:', meToken.address);
+      logger.debug('🔍 Checking real subscription status for:', meToken.address);
       const { checkMeTokenSubscriptionFromBlockchain } = await import('@/lib/utils/metokenSubscriptionUtils');
       const status = await checkMeTokenSubscriptionFromBlockchain(meToken.address);
 
-      console.log('✅ Real subscription status:', status);
+      logger.debug('✅ Real subscription status:', status);
       setRealSubscriptionStatus({
         isSubscribed: status.isSubscribed,
         balancePooled: status.balancePooled,
@@ -889,13 +890,13 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
       } else if (status.error) {
         // Log as debug info (not warning) - this is expected for some MeTokens
         // The Diamond contract function may not be available or the MeToken may not be registered yet
-        console.debug('ℹ️ Subscription status check:', status.error);
+        logger.debug('Subscription status check: Subscription status check:', status.error);
         setError(null); // Don't show error to user, just log it
       } else {
         setError(null);
       }
     } catch (err) {
-      console.error('❌ Failed to check real subscription status:', err);
+      logger.error('❌ Failed to check real subscription status:', err);
       setRealSubscriptionStatus(null);
     } finally {
       setIsCheckingStatus(false);

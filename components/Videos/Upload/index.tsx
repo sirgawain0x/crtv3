@@ -24,6 +24,7 @@ import { getLivepeerAsset } from "@/app/api/livepeer/assetUploadActions";
 import { useAutoDeployContentCoin } from "@/lib/hooks/marketplace/useAutoDeployContentCoin";
 import { useSmartAccountClient } from "@account-kit/react";
 import { createSplitForVideo } from "@/services/splits";
+import { logger } from "@/lib/utils/logger";
 
 const HookMultiStepForm = () => {
   const [activeStep, setActiveStep] = useState(1);
@@ -62,7 +63,7 @@ const HookMultiStepForm = () => {
   }, [erroredInputName]);
 
   const handleStep1Submit = async (data: TVideoMetaForm, asset: Asset) => {
-    console.log('🎬 Step 1 Submit:', { data, assetId: asset.id });
+    logger.debug('Step 1 Submit:', { data, assetId: asset.id });
 
     if (!asset?.id || !asset?.playbackId) {
       toast.error("Video asset invalid. Please try again.");
@@ -84,7 +85,7 @@ const HookMultiStepForm = () => {
           setCreatorMeToken(creatorMeTokenId);
         }
       } catch (error) {
-        console.debug('MeToken lookup skipped');
+        logger.debug('MeToken lookup skipped');
       }
     }
 
@@ -128,11 +129,11 @@ const HookMultiStepForm = () => {
         splits_address: null,
       }, data.collaborators);
 
-      console.log('✅ Video asset created in DB:', dbAsset);
+      logger.debug('Step 1 Submit:✅ Video asset created in DB:', dbAsset);
       setVideoAsset(dbAsset as VideoAsset);
       setActiveStep(2); // Move to Thumbnail step
     } catch (error) {
-      console.error('❌ Failed to create video asset in DB:', error);
+      logger.error('Failed to create video asset in DB:', error);
       toast.error("Failed to save video data. Please try again.");
     }
   };
@@ -194,7 +195,7 @@ const HookMultiStepForm = () => {
 
             if (!videoAsset?.id) {
               toast.error("Video asset not found. Please try uploading again.");
-              console.error("Video asset is null or missing ID:", videoAsset);
+              logger.error("Video asset is null or missing ID:", videoAsset);
               return;
             }
 
@@ -230,12 +231,12 @@ const HookMultiStepForm = () => {
                       description: `Split address: ${splitResult.splitAddress.slice(0, 10)}...`,
                     });
                   } else if (!splitResult) {
-                    console.warn("Split creation timed out");
+                    logger.warn("Split creation timed out");
                     toast.warning("Split creation timed out", {
                       description: "Video will be published without revenue splits.",
                     });
                   } else {
-                    console.error("Split creation failed:", splitResult.error);
+                    logger.error("Split creation failed:", splitResult.error);
                     toast.warning("Failed to create split contract", {
                       description: splitResult.error || "Split creation failed. Video will be published without splits.",
                     });
@@ -243,7 +244,7 @@ const HookMultiStepForm = () => {
                   }
                 }
               } catch (splitError) {
-                console.error("Error creating split contract:", splitError);
+                logger.error("Error creating split contract:", splitError);
                 toast.warning("Split creation error", {
                   description: "Video will be published without revenue splits. You can add them later.",
                 });
@@ -277,12 +278,12 @@ const HookMultiStepForm = () => {
                       description: "Video metadata URI is required for IP registration. Please ensure the video has been processed and metadata is available.",
                       duration: 8000,
                     });
-                    console.warn("Story Protocol registration skipped: No metadata URI available");
+                    logger.warn("Story Protocol registration skipped: No metadata URI available");
                   } else {
                     // Check if user already minted an NFT via NFTMintingStep
                     if (data.nftMintResult?.tokenId && data.nftMintResult?.contractAddress) {
                       // User already minted an NFT - register the existing NFT on Story Protocol
-                      console.log("Using existing NFT for Story Protocol registration:", data.nftMintResult);
+                      logger.debug("Using existing NFT for Story Protocol registration:", data.nftMintResult);
 
                       // First, update the video asset with the NFT info
                       await updateVideoAsset(videoAsset.id, {
@@ -363,15 +364,15 @@ const HookMultiStepForm = () => {
                             );
 
                             if (royaltyResult.success && royaltyResult.txHash) {
-                              console.log("Royalty set to split contract:", royaltyResult.txHash);
+                              logger.debug("Royalty set to split contract:", royaltyResult.txHash);
                             } else {
-                              console.warn("Failed to set royalty to split:", royaltyResult.error);
+                              logger.warn("Failed to set royalty to split:", royaltyResult.error);
                               toast.warning("Failed to set royalties to split contract", {
                                 description: royaltyResult.error || "You can set this manually later",
                               });
                             }
                           } catch (royaltyError) {
-                            console.error("Error setting royalty to split:", royaltyError);
+                            logger.error("Error setting royalty to split:", royaltyError);
                             toast.warning("Error setting royalties to split contract", {
                               description: "You can set this manually later",
                             });
@@ -391,7 +392,7 @@ const HookMultiStepForm = () => {
                     }
                   }
                 } catch (storyError) {
-                  console.error("Story Protocol registration error:", storyError);
+                  logger.error("Story Protocol registration error:", storyError);
                   toast.error("Failed to register IP on Story Protocol. You can try again later.");
                 }
               })(); // Execute as side effect slightly decoupled, OR keep awaited but limited by timeout above
@@ -417,13 +418,13 @@ const HookMultiStepForm = () => {
                 // The hook handles its own toasts usually, but we ensure we don't hang
                 // Note: handleUploadSuccess logs success
               } catch (ccError) {
-                console.error("Content Coin deployment error:", ccError);
+                logger.error("Content Coin deployment error:", ccError);
                 // Swallowed to allow redirect
               }
             }
 
             // Ensure redirect happens
-            console.log("Redirecting to discover page...");
+            logger.debug("Redirecting to discover page...");
             router.push("/discover");
           }}
         />

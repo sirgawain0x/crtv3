@@ -3,6 +3,7 @@
 import { Type, InputCreatorIdType } from "livepeer/models/components";
 import { fullLivepeer } from "@/lib/sdk/livepeer/fullClient";
 import { WebhookContext } from "./token-gate/route";
+import { serverLogger } from "@/lib/utils/logger";
 
 export const getLivepeerUploadUrl = async (
   fileName: string,
@@ -73,13 +74,13 @@ export const getLivepeerAsset = async (livePeerAssetId: string) => {
     const result = await fullLivepeer.asset.get(livePeerAssetId);
 
     if (!result?.asset) {
-      console.error('No asset found in result:', result);
+      serverLogger.error('No asset found in result:', result);
       throw new Error('Asset not found or invalid response from Livepeer');
     }
 
     return result.asset;
   } catch (error: any) {
-    console.error('Error fetching Livepeer asset:', {
+    serverLogger.error('Error fetching Livepeer asset:', {
       assetId: livePeerAssetId,
       error: error?.message,
       statusCode: error?.statusCode,

@@ -15,6 +15,7 @@ import { erc20Abi } from 'viem';
 import { MeTokenSubscription } from './MeTokenSubscription';
 import { DaiFundingOptions } from '@/components/wallet/funding/DaiFundingOptions';
 import { useToast } from '@/components/ui/use-toast';
+import { logger } from '@/lib/utils/logger';
 
 interface MeTokenTradingProps {
   meToken: MeTokenData;
@@ -71,7 +72,7 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
     // First, check subscription status from meToken prop data (fast, from database)
     const { isMeTokenSubscribed } = await import('@/lib/utils/metokenSubscriptionUtils');
     const propSubscriptionStatus = isMeTokenSubscribed(meToken);
-    console.log('🔍 Subscription status from prop data:', propSubscriptionStatus, {
+    logger.debug('🔍 Subscription status from prop data:', propSubscriptionStatus, {
       balancePooled: meToken.info?.balancePooled?.toString(),
       balanceLocked: meToken.info?.balanceLocked?.toString(),
       hubId: meToken.hubId
@@ -83,22 +84,22 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
     // Then verify with blockchain check (slower, but more accurate)
     setIsCheckingSubscription(true);
     try {
-      console.log('🔍 Verifying subscription status from blockchain:', meToken.address);
+      logger.debug('🔍 Verifying subscription status from blockchain:', meToken.address);
       const { checkMeTokenSubscriptionFromBlockchain } = await import('@/lib/utils/metokenSubscriptionUtils');
       const status = await checkMeTokenSubscriptionFromBlockchain(meToken.address);
-      console.log('✅ Blockchain subscription status:', status);
+      logger.debug('✅ Blockchain subscription status:', status);
 
       // Use blockchain result if available, otherwise keep prop data result
       if (!status.error) {
         setIsSubscribed(status.isSubscribed);
       } else {
-        console.warn('⚠️ Blockchain check failed, using prop data:', status.error);
+        logger.warn('⚠️ Blockchain check failed, using prop data:', status.error);
         // Keep the prop data result we set earlier
       }
     } catch (err) {
-      console.error('Failed to check subscription status from blockchain:', err);
+      logger.error('Failed to check subscription status from blockchain:', err);
       // Keep the prop data result we set earlier instead of defaulting to false
-      console.log('ℹ️ Using subscription status from prop data due to blockchain check failure');
+      logger.debug('ℹ️ Using subscription status from prop data due to blockchain check failure');
     } finally {
       setIsCheckingSubscription(false);
     }
@@ -120,7 +121,7 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
 
       setDaiBalance(balance);
     } catch (err) {
-      console.error('Failed to check DAI balance:', err);
+      logger.error('Failed to check DAI balance:', err);
       setDaiBalance(BigInt(0));
     }
   }, [client]);
@@ -144,7 +145,7 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
           const preview = await calculateMeTokensMinted(meToken.address, buyAmount);
           setBuyPreview(preview);
         } catch (err) {
-          console.error('Failed to calculate buy preview:', err);
+          logger.error('Failed to calculate buy preview:', err);
         }
       } else {
         setBuyPreview('0');
@@ -162,7 +163,7 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
           const preview = await calculateAssetsReturned(meToken.address, sellAmount);
           setSellPreview(preview);
         } catch (err) {
-          console.error('Failed to calculate sell preview:', err);
+          logger.error('Failed to calculate sell preview:', err);
         }
       } else {
         setSellPreview('0');
@@ -173,7 +174,7 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
   }, [sellAmount, calculateAssetsReturned, meToken.address]);
 
   const handleBuy = async () => {
-    console.log('🛒 Buy button clicked', { buyAmount, meToken });
+    logger.debug('🛒 Buy button clicked', { buyAmount, meToken });
 
     // Check if wallet is connected first
     if (!isConnected) {
@@ -197,7 +198,7 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
     }
 
     if (!meToken) {
-      console.error('❌ MeToken not available', { meToken });
+      logger.error('❌ MeToken not available', { meToken });
       setError('MeToken information not available');
       toast({
         title: "Error",
@@ -208,7 +209,7 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
     }
 
     if (!client) {
-      console.error('❌ Smart account client not initialized');
+      logger.error('❌ Smart account client not initialized');
       setError('Wallet not connected. Please connect your wallet.');
       toast({
         title: "Error",
@@ -223,14 +224,14 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
     setSuccess(null);
 
     try {
-      console.log('💰 Starting purchase...', {
+      logger.debug('💰 Starting purchase...', {
         meTokenAddress: meToken.address,
         amount: buyAmount,
       });
 
-      console.log('🔄 Calling buyMeTokens...');
+      logger.debug('🔄 Calling buyMeTokens...');
       const hash = await buyMeTokens(meToken.address, buyAmount);
-      console.log('✅ Buy order submitted successfully!');
+      logger.debug('✅ Buy order submitted successfully!');
       setSuccess(
         <div className="flex flex-col gap-1">
           <span>Buy order submitted!</span>
@@ -263,7 +264,7 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
         setTimeout(() => onRefresh(), 2000);
       }
     } catch (err) {
-      console.error('❌ Error in handleBuy:', err);
+      logger.error('❌ Error in handleBuy:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to buy MeTokens';
       setError(errorMessage);
       setSuccess(null);
@@ -278,7 +279,7 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
   };
 
   const handleSell = async () => {
-    console.log('💸 Sell button clicked', { sellAmount, meToken, balance: meToken.balance });
+    logger.debug('💸 Sell button clicked', { sellAmount, meToken, balance: meToken.balance });
 
     // Check if wallet is connected first
     if (!isConnected) {
@@ -302,7 +303,7 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
     }
 
     if (!meToken) {
-      console.error('❌ MeToken not available', { meToken });
+      logger.error('❌ MeToken not available', { meToken });
       setError('MeToken information not available');
       toast({
         title: "Error",
@@ -313,7 +314,7 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
     }
 
     if (!client) {
-      console.error('❌ Smart account client not initialized');
+      logger.error('❌ Smart account client not initialized');
       setError('Wallet not connected. Please connect your wallet.');
       toast({
         title: "Error",
@@ -339,15 +340,15 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
     setSuccess(null);
 
     try {
-      console.log('💸 Starting sale...', {
+      logger.debug('💸 Starting sale...', {
         meTokenAddress: meToken.address,
         amount: sellAmount,
         meTokenBalance: meToken.balance.toString(),
       });
 
-      console.log('🔄 Calling sellMeTokens...');
+      logger.debug('🔄 Calling sellMeTokens...');
       const hash = await sellMeTokens(meToken.address, sellAmount);
-      console.log('✅ Sell order submitted successfully!');
+      logger.debug('✅ Sell order submitted successfully!');
       setSuccess(
         <div className="flex flex-col gap-1">
           <span>Sell order submitted!</span>
@@ -380,7 +381,7 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
         setTimeout(() => onRefresh(), 2000);
       }
     } catch (err) {
-      console.error('❌ Error in handleSell:', err);
+      logger.error('❌ Error in handleSell:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to sell MeTokens';
       setError(errorMessage);
       setSuccess(null);

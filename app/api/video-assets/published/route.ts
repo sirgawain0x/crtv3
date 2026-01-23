@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPublishedVideoAssets } from "@/services/video-assets";
+import { serverLogger } from "@/lib/utils/logger";
 
 export const runtime = "edge";
 
@@ -68,7 +69,32 @@ export async function GET(request: NextRequest) {
 
     return response;
   } catch (error) {
-    console.error("Error fetching published videos:", error);
+    serverLogger.error("Error fetching published videos:", error);
+    
+    // Handle specific error types
+    if (error instanceof Error) {
+      // Check for database connection errors
+      if (error.message.includes('connection') || error.message.includes('timeout')) {
+        return NextResponse.json(
+          { 
+            error: 'Database connection error',
+            details: 'Unable to connect to the database. Please try again later.'
+          },
+          { status: 503 }
+        );
+      }
+      
+      // Check for validation errors
+      if (error.message.includes('validation') || error.message.includes('invalid')) {
+        return NextResponse.json(
+          { 
+            error: 'Validation error',
+            details: error.message
+          },
+          { status: 400 }
+        );
+      }
+    }
     
     return NextResponse.json(
       { 

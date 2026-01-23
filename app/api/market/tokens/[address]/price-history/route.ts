@@ -3,6 +3,7 @@ import { createClient } from '@/lib/sdk/supabase/server';
 import { formatEther, createPublicClient, http, parseAbi } from 'viem';
 import { base } from 'viem/chains';
 import { METOKEN_ABI } from '@/lib/contracts/MeToken';
+import { serverLogger } from '@/lib/utils/logger';
 
 const DIAMOND = '0xba5502db2aC2cBff189965e991C07109B14eB3f5';
 
@@ -42,7 +43,7 @@ export async function GET(
       .single();
 
     if (meTokenError) {
-      console.error('Error fetching MeToken:', meTokenError);
+      serverLogger.error('Error fetching MeToken:', meTokenError);
       // If it's a "not found" error, return 404
       if (meTokenError.code === 'PGRST116') {
         return NextResponse.json(
@@ -99,7 +100,7 @@ export async function GET(
     // This ensures we show the correct price even if the DB indexer is lagging
     if (currentTotalSupply === BigInt(0) || currentTvl === 0) {
       try {
-        console.log('� DB data missing/zero, fetching from blockchain for:', meToken.address);
+        serverLogger.debug('� DB data missing/zero, fetching from blockchain for:', meToken.address);
         const apiKey = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY;
         const transportUrl = apiKey
           ? `https://base-mainnet.g.alchemy.com/v2/${apiKey}`
@@ -139,13 +140,13 @@ export async function GET(
           currentTvl = parseFloat(formatEther(balancePooled + balanceLocked));
         }
 
-        console.log('✅ Fetched live data:', {
+        serverLogger.debug('Fetched live data:', {
           supply: currentTotalSupply.toString(),
           tvl: currentTvl
         });
 
       } catch (chainErr) {
-        console.warn('⚠️ Failed to fetch live blockchain data:', chainErr);
+        serverLogger.warn('Failed to fetch live blockchain data:', chainErr);
       }
     }
 
@@ -153,7 +154,7 @@ export async function GET(
       ? currentTvl / parseFloat(formatEther(currentTotalSupply))
       : 0;
 
-    console.log('💾 Final price values (DB + Chain fallback):', {
+    serverLogger.debug('Final price values (DB + Chain fallback):', {
       address: meToken.address,
       dbSupply: meToken.total_supply,
       dbTvl: meToken.tvl,
@@ -163,7 +164,7 @@ export async function GET(
     });
 
     if (txError) {
-      console.error('Error fetching transactions:', txError);
+      serverLogger.error('Error fetching transactions:', txError);
       // Return empty history instead of error if query fails
       return NextResponse.json({
         data: [],
@@ -244,7 +245,7 @@ export async function GET(
     runningSupply = replaySupply > 0n ? replaySupply : 0n;
     runningTvl = replayTvl > 0 ? replayTvl : 0;
 
-    console.log('⏮️ Reverse Replay Result:', {
+    serverLogger.debug('Reverse Replay Result:', {
       currentSupply: currentTotalSupply.toString(),
       currentTvl,
       startSupply: runningSupply.toString(),
@@ -252,7 +253,7 @@ export async function GET(
       txCount: transactions?.length
     });
 
-    console.log('📝 Processing transactions (Forward):', {
+    serverLogger.debug('Processing transactions (Forward):', {
       totalTxCount: transactions?.length || 0,
       firstTx: transactions?.[0],
       lastTx: transactions?.[transactions.length - 1],
@@ -367,7 +368,7 @@ export async function GET(
       },
     });
   } catch (error) {
-    console.error('Error fetching price history:', error);
+    serverLogger.error('Error fetching price history:', error);
     return NextResponse.json(
       { error: 'Failed to fetch price history', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fullLivepeer } from '@/lib/sdk/livepeer/fullClient';
+import { serverLogger } from '@/lib/utils/logger';
 
 export async function GET(
   request: NextRequest,
@@ -47,7 +48,7 @@ export async function GET(
 
     return NextResponse.json(assetResponse);
   } catch (error: any) {
-    console.error('Error fetching asset:', error);
+    serverLogger.error('Error fetching asset:', error);
     
     // Extract error message from Livepeer API response if available
     let errorMessage = 'Failed to fetch asset';

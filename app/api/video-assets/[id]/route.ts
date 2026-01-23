@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getVideoAssetById } from "@/services/video-assets";
+import { serverLogger } from "@/lib/utils/logger";
 
 export async function GET(
   request: NextRequest,
@@ -27,7 +28,7 @@ export async function GET(
 
     return NextResponse.json(asset, { status: 200 });
   } catch (error) {
-    console.error("[API] Error fetching video asset by ID:", error);
+    serverLogger.error("Error fetching video asset by ID:", error);
     return NextResponse.json(
       {
         error: "Failed to fetch video asset",

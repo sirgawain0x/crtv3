@@ -13,6 +13,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useInterval } from "@/lib/hooks/useInterval";
 import CreateThumbnailForm from "./CreateThumbnailForm";
 import { toast } from "sonner";
+import { logger } from "@/lib/utils/logger";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 
@@ -71,7 +72,7 @@ export default function CreateThumbnail({
 
   // Log component initialization
   useEffect(() => {
-    console.log('✅ CreateThumbnail mounted with asset ID:', livePeerAssetId);
+    logger.debug('✅ CreateThumbnail mounted with asset ID:', livePeerAssetId);
   }, [livePeerAssetId]);
 
   useInterval(
@@ -80,12 +81,12 @@ export default function CreateThumbnail({
         getLivepeerAsset(livePeerAssetId)
           .then((data) => {
             if (!data) {
-              console.error('No asset data returned for ID:', livePeerAssetId);
+              logger.error('No asset data returned for ID:', livePeerAssetId);
               toast.error("Failed to retrieve video information. Please refresh the page.");
               return;
             }
 
-            console.log('Livepeer asset status:', {
+            logger.debug('Livepeer asset status:', {
               assetId: livePeerAssetId,
               phase: data?.status?.phase,
               progress: data?.status?.progress,
@@ -97,7 +98,7 @@ export default function CreateThumbnail({
             setLivepeerAssetData(data);
 
             if (data?.status?.phase === "failed") {
-              console.error('Transcoding failed. Full asset data:', JSON.stringify(data, null, 2));
+              logger.error('Transcoding failed. Full asset data:', JSON.stringify(data, null, 2));
               const errorMsg = data.status.errorMessage || "Unknown error during video processing";
 
               // Check if it's a codec/container error
@@ -129,7 +130,7 @@ export default function CreateThumbnail({
             }
           })
           .catch((e) => {
-            console.error("Error retrieving livepeer asset:", {
+            logger.error("Error retrieving livepeer asset:", {
               assetId: livePeerAssetId,
               error: e?.message,
               stack: e?.stack,
@@ -140,7 +141,7 @@ export default function CreateThumbnail({
             );
           });
       } else {
-        console.warn('No livePeerAssetId provided to polling interval');
+        logger.warn('No livePeerAssetId provided to polling interval');
       }
     },
     livepeerAssetData?.status?.phase !== "ready" &&
@@ -152,11 +153,11 @@ export default function CreateThumbnail({
   // Initial fetch on mount
   useEffect(() => {
     if (livePeerAssetId && !livepeerAssetData) {
-      console.log('Initial fetch for asset:', livePeerAssetId);
+      logger.debug('Initial fetch for asset:', livePeerAssetId);
       getLivepeerAsset(livePeerAssetId)
         .then((data) => {
           if (data) {
-            console.log('Initial asset data fetched:', {
+            logger.debug('Initial asset data fetched:', {
               phase: data?.status?.phase,
               progress: data?.status?.progress,
             });
@@ -164,7 +165,7 @@ export default function CreateThumbnail({
           }
         })
         .catch((e) => {
-          console.error("Error on initial asset fetch:", e);
+          logger.error("Error on initial asset fetch:", e);
           toast.error(
             "Failed to load video information. Please check if the video was uploaded successfully.",
             { duration: 5000 }
@@ -224,7 +225,7 @@ export default function CreateThumbnail({
         nftMintResult: nftMintResult || undefined,
       });
     } catch (error) {
-      console.error("Publication failed:", error);
+      logger.error("Publication failed:", error);
       toast.error("Failed to publish video. Please try again.");
     } finally {
       setIsPublishing(false);

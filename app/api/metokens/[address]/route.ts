@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { meTokenSupabaseService } from '@/lib/sdk/supabase/metokens';
+import { serverLogger } from '@/lib/utils/logger';
 
 // GET /api/metokens/[address] - Get specific MeToken
 export async function GET(
@@ -27,9 +28,27 @@ export async function GET(
 
     return NextResponse.json({ data: meToken });
   } catch (error) {
-    console.error('Error fetching MeToken:', error);
+    serverLogger.error('Error fetching MeToken:', error);
+    
+    // Handle specific error types
+    if (error instanceof Error) {
+      // Check for database connection errors
+      if (error.message.includes('connection') || error.message.includes('timeout')) {
+        return NextResponse.json(
+          { 
+            error: 'Database connection error',
+            details: 'Unable to connect to the database. Please try again later.'
+          },
+          { status: 503 }
+        );
+      }
+    }
+    
     return NextResponse.json(
-      { error: 'Failed to fetch MeToken' },
+      { 
+        error: 'Failed to fetch MeToken',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }
@@ -40,9 +59,22 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ address: string }> }
 ) {
+  let address: string | undefined;
   try {
-    const { address } = await params;
-    const body = await request.json();
+    const resolvedParams = await params;
+    address = resolvedParams.address;
+    
+    // Handle JSON parsing errors
+    let body;
+    try {
+      body = await request.json();
+    } catch (jsonError) {
+      serverLogger.error('Invalid JSON in request body:', jsonError);
+      return NextResponse.json(
+        { error: 'Invalid JSON in request body' },
+        { status: 400 }
+      );
+    }
     
     if (!address) {
       return NextResponse.json(
@@ -64,9 +96,27 @@ export async function PUT(
     
     return NextResponse.json({ data: result });
   } catch (error) {
-    console.error('Error updating MeToken:', error);
+    serverLogger.error('Error updating MeToken:', error);
+    
+    // Handle specific error types
+    if (error instanceof Error) {
+      // Check for not found errors
+      if (error.message.includes('not found') || error.message.includes('does not exist')) {
+        return NextResponse.json(
+          { 
+            error: 'MeToken not found',
+            details: address ? `No MeToken found with address: ${address}` : 'MeToken not found'
+          },
+          { status: 404 }
+        );
+      }
+    }
+    
     return NextResponse.json(
-      { error: 'Failed to update MeToken' },
+      { 
+        error: 'Failed to update MeToken',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }

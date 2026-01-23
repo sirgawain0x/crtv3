@@ -36,9 +36,6 @@ export interface SubscribeEvent {
   meToken: string;
   hubId: string;
   assetsDeposited: string;
-  blockTimestamp: string;
-  blockNumber: string;
-  transactionHash: string;
 }
 
 export interface MeTokenWithHub extends MeToken {
@@ -48,14 +45,11 @@ export interface MeTokenWithHub extends MeToken {
 // GraphQL query to get all Subscribe events (which create MeTokens)
 const GET_ALL_SUBSCRIBES = gql`
   query GetAllSubscribes($first: Int = 100, $skip: Int = 0) {
-    subscribes(first: $first, skip: $skip, orderBy: blockTimestamp, orderDirection: desc) {
+    subscribes(first: $first, skip: $skip, orderBy: id, orderDirection: desc) {
       id
       meToken
       hubId
       assetsDeposited
-      blockTimestamp
-      blockNumber
-      transactionHash
     }
   }
 `;
@@ -68,9 +62,6 @@ const GET_SUBSCRIBE_BY_METOKEN = gql`
       meToken
       hubId
       assetsDeposited
-      blockTimestamp
-      blockNumber
-      transactionHash
     }
   }
 `;
@@ -83,9 +74,6 @@ const CHECK_METOKEN_EXISTS = gql`
       meToken
       hubId
       assetsDeposited
-      blockTimestamp
-      blockNumber
-      transactionHash
     }
   }
 `;
@@ -93,7 +81,7 @@ const CHECK_METOKEN_EXISTS = gql`
 // GraphQL query to get all MeToken addresses from Subscribe events
 const GET_ALL_METOKEN_ADDRESSES = gql`
   query GetAllMeTokenAddresses($first: Int = 100, $skip: Int = 0) {
-    subscribes(first: $first, skip: $skip, orderBy: blockTimestamp, orderDirection: desc) {
+    subscribes(first: $first, skip: $skip, orderBy: id, orderDirection: desc) {
       meToken
     }
   }
@@ -212,7 +200,7 @@ export class MeTokensSubgraphClient {
         hubId: event.hubId,
         balancePooled: '0', // This would need to be fetched from Diamond contract
         balanceLocked: '0', // This would need to be fetched from Diamond contract
-        startTime: event.blockTimestamp,
+        startTime: '0', // Timestamp not available in subgraph, will be fetched from blockchain if needed
         endTime: '0',
         endCooldown: '0',
         targetHubId: '0',
@@ -321,7 +309,7 @@ export class MeTokensSubgraphClient {
         hubId: event.hubId,
         balancePooled: '0', // This would need to be fetched from Diamond contract
         balanceLocked: '0', // This would need to be fetched from Diamond contract
-        startTime: event.blockTimestamp,
+        startTime: '0', // Timestamp not available in subgraph, will be fetched from blockchain if needed
         endTime: '0',
         endCooldown: '0',
         targetHubId: '0',

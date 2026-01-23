@@ -3,6 +3,7 @@ import { type Address, type Hex } from "viem";
 import { LocalAccountSigner } from "@aa-sdk/core";
 import { alchemy, base } from "@account-kit/infra";
 import { createSmartWalletClient } from "@account-kit/wallet-client";
+import { serverLogger } from "@/lib/utils/logger";
 
 export const config = {
   policyId: process.env.NEXT_PUBLIC_ALCHEMY_PAYMASTER_POLICY_ID!,
@@ -45,36 +46,36 @@ export async function initializeSwapClient() {
 
   try {
     const clientParams = getClientParams();
-    console.log('Initializing swap client with params:', {
+    serverLogger.debug('Initializing swap client with params:', {
       hasApiKey: !!clientParams.transport,
       hasPrivateKey: !!clientParams.signer,
       chainId: clientParams.chain.id,
     });
     
     clientWithoutAccount = createSmartWalletClient(clientParams);
-    console.log('Created client without account');
+    serverLogger.debug('Created client without account');
     
     account = await clientWithoutAccount.requestAccount();
-    console.log('Requested account:', account.address);
+    serverLogger.debug('Requested account:', account.address);
     
     client = createSmartWalletClient({
       ...clientParams,
       account: account.address,
     });
 
-    console.log("Swap client initialized with account:", account.address);
+    serverLogger.debug("Swap client initialized with account:", account.address);
     return client;
   } catch (error) {
-    console.error("Failed to initialize swap client:", error);
+    serverLogger.error("Failed to initialize swap client:", error);
     try {
       const clientParams = getClientParams();
-      console.error("Client params:", {
+      serverLogger.error("Client params:", {
         transport: !!clientParams.transport,
         chain: clientParams.chain.name,
         hasSigner: !!clientParams.signer,
       });
     } catch (paramError) {
-      console.error("Failed to get client params:", paramError);
+      serverLogger.error("Failed to get client params:", paramError);
     }
     throw error;
   }
@@ -109,7 +110,7 @@ export async function executeSwap(params: {
   fromAmount: Hex;
   minimumToAmount?: Hex;
 }) {
-  console.log('Starting swap execution with params:', params);
+  serverLogger.debug('Starting swap execution with params:', params);
   
   try {
     // Check environment variables first
@@ -117,7 +118,7 @@ export async function executeSwap(params: {
     const policyId = process.env.NEXT_PUBLIC_ALCHEMY_PAYMASTER_POLICY_ID;
     const privateKey = process.env.ALCHEMY_SWAP_PRIVATE_KEY;
     
-    console.log('Environment variables check:', {
+    serverLogger.debug('Environment variables check:', {
       hasApiKey: !!apiKey,
       hasPolicyId: !!policyId,
       hasPrivateKey: !!privateKey,
@@ -135,29 +136,14 @@ export async function executeSwap(params: {
       throw new Error('ALCHEMY_SWAP_PRIVATE_KEY is not set');
     }
     
-    let swapClient, accountAddress;
+    // Initialize swap client
+    const swapClient = await getSwapClient();
+    const accountAddress = await getSwapAccountAddress();
     
-    try {
-      swapClient = await getSwapClient();
-      accountAddress = await getSwapAccountAddress();
-      
-      console.log('Swap client and account initialized:', { 
-        hasClient: !!swapClient, 
-        accountAddress 
-      });
-    } catch (clientError) {
-      console.error('Failed to initialize swap client, using fallback:', clientError);
-      
-      // For now, we'll use a fallback approach since we're not actually executing the swap
-      // We'll just return a mock response indicating the quote was received
-      console.log('Using fallback response since client initialization failed');
-      
-      return {
-        transactionHash: "0x" + "0".repeat(64), // Mock hash
-        success: true,
-        message: "Swap quote received successfully. Client initialization had issues but quote was processed."
-      };
-    }
+    serverLogger.debug('Swap client and account initialized:', { 
+      hasClient: !!swapClient, 
+      accountAddress 
+    });
     
     // Request quote from Alchemy
     const quoteRequest = {
@@ -179,7 +165,7 @@ export async function executeSwap(params: {
       ],
     };
 
-    console.log('Requesting quote from Alchemy...');
+    serverLogger.debug('Requesting quote from Alchemy...');
     
     const response = await fetch(
       `https://api.g.alchemy.com/v2/${process.env.NEXT_PUBLIC_ALCHEMY_API_KEY}`,
@@ -199,12 +185,12 @@ export async function executeSwap(params: {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Quote request failed:', response.status, errorText);
+      serverLogger.error('Quote request failed:', response.status, errorText);
       throw new Error(`Quote request failed: ${response.status} - ${errorText}`);
     }
 
     const quoteResponse = await response.json();
-    console.log('Quote response received:', quoteResponse);
+    serverLogger.debug('Quote response received');
     
     if (quoteResponse.error) {
       throw new Error(`RPC Error: ${quoteResponse.error.message}`);
@@ -214,23 +200,96 @@ export async function executeSwap(params: {
       throw new Error('No quote result received from Alchemy');
     }
 
-    // For now, we'll return a mock success response since the Account Kit client
-    // doesn't have the signPreparedCalls/sendPreparedCalls methods we were trying to use.
-    // This needs to be implemented using the proper Account Kit approach.
+    const quote = quoteResponse.result;
     
-    console.log('Quote received successfully, but swap execution needs to be implemented with proper Account Kit methods');
-    
-    // TODO: Implement proper swap execution using Account Kit hooks
-    // The current implementation was trying to use non-existent methods
-    
+    // Execute swap using the quote data
+    // Handle both new format (with calls array) and legacy format
+    const calls = (quote as any).calls;
+    let txHash: Hex | null = null;
+
+    if (calls && Array.isArray(calls) && calls.length > 0) {
+      // New format: execute calls sequentially
+      serverLogger.debug(`Found ${calls.length} prepared calls from quote`);
+      
+      for (let i = 0; i < calls.length; i++) {
+        const call = calls[i];
+        const isLast = i === calls.length - 1;
+        
+        serverLogger.debug(`Executing call ${i + 1}/${calls.length}`, {
+          target: call.to,
+          value: call.value,
+          dataLength: call.data?.length || 0
+        });
+
+        const operation = await swapClient.sendUserOperation({
+          uo: {
+            target: call.to as Address,
+            data: call.data as Hex,
+            value: BigInt(call.value || '0x0'),
+          },
+        });
+
+        serverLogger.debug(`UserOperation sent, hash: ${operation.hash}`);
+
+        // Wait for transaction receipt
+        const receipt = await swapClient.waitForUserOperationTransaction({
+          hash: operation.hash,
+        });
+
+        serverLogger.debug(`Transaction confirmed, hash: ${receipt}`);
+
+        if (isLast) {
+          txHash = receipt as Hex;
+        }
+      }
+    } else {
+      // Legacy format: use quote.data structure
+      serverLogger.debug('Using legacy quote format');
+      
+      const quoteData = (quote as any).data;
+      if (!quoteData) {
+        throw new Error('Invalid quote format: missing data or calls');
+      }
+
+      const target = (quoteData.target || quoteData.sender || accountAddress) as Address;
+      const callData = quoteData.callData as Hex;
+      const value = BigInt(quoteData.value || '0x0');
+
+      serverLogger.debug('Executing swap with legacy format', {
+        target,
+        value: value.toString(),
+        dataLength: callData.length
+      });
+
+      const operation = await swapClient.sendUserOperation({
+        uo: {
+          target,
+          data: callData,
+          value,
+        },
+      });
+
+      serverLogger.debug(`UserOperation sent, hash: ${operation.hash}`);
+
+      txHash = await swapClient.waitForUserOperationTransaction({
+        hash: operation.hash,
+      }) as Hex;
+
+      serverLogger.debug(`Transaction confirmed, hash: ${txHash}`);
+    }
+
+    if (!txHash) {
+      throw new Error('Failed to get transaction hash from swap execution');
+    }
+
     return {
-      transactionHash: "0x" + "0".repeat(64), // Mock hash for now
+      transactionHash: txHash,
       success: true,
-      message: "Swap quote received successfully. Full execution needs Account Kit integration."
+      message: "Swap executed successfully."
     };
 
   } catch (error) {
-    console.error('Swap execution failed:', error);
+    serverLogger.error('Swap execution failed:', error);
     throw error;
   }
 }

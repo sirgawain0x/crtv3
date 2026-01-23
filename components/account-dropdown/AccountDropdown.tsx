@@ -98,6 +98,7 @@ import {
   installValidationActions,
 } from "@account-kit/smart-contracts/experimental";
 import { parseEther, type Address, type Hex, encodeFunctionData, parseAbi, parseUnits, formatUnits, erc20Abi } from "viem";
+import { logger } from "@/lib/utils/logger";
 import { useToast } from "@/components/ui/use-toast";
 import { ToastAction } from "@/components/ui/toast";
 import { USDC_TOKEN_ADDRESSES, USDC_TOKEN_DECIMALS } from "@/lib/contracts/USDCToken";
@@ -308,7 +309,7 @@ export function AccountDropdown() {
   const shouldShowMetokens = hasMetokens || meTokenLoading || holdingsLoading;
 
   useEffect(() => {
-    console.log({
+    logger.debug('Account state:', {
       "EOA Address (user.address)": user?.address,
       "Smart Contract Account Address": smartAccountAddress,
     });
@@ -395,7 +396,7 @@ export function AccountDropdown() {
           DAI: formatUnits(dai, DAI_TOKEN_DECIMALS),
         });
       } catch (error) {
-        console.error('Error fetching token balances:', error);
+        logger.error('Error fetching token balances:', error);
       }
     };
 
@@ -530,7 +531,7 @@ export function AccountDropdown() {
         addSessionKey(newSessionKey);
       }
     } catch (error) {
-      console.error("Error creating session key:", error);
+      logger.error("Error creating session key:", error);
     }
   };
 
@@ -580,7 +581,7 @@ export function AccountDropdown() {
           ],
         });
 
-        console.log('Sending ERC-721 transfer:', {
+        logger.debug('Sending ERC-721 transfer:', {
           contract: selectedNFT.lockAddress,
           tokenId: selectedNFT.tokenId,
           recipient: recipientAddress,
@@ -649,7 +650,7 @@ export function AccountDropdown() {
             args: [recipientAddress as Address, tokenAmount],
           });
 
-          console.log('Sending ERC-20 transfer:', {
+          logger.debug('Sending ERC-20 transfer:', {
             token: selectedToken,
             tokenAddress: tokenInfo.address,
             recipient: recipientAddress,
@@ -673,7 +674,7 @@ export function AccountDropdown() {
 
       // Success handling
       const explorerUrl = `${chain.blockExplorers?.default.url}/tx/${txHash}`;
-      console.log("Transaction hash:", txHash);
+      logger.debug("Transaction hash:", txHash);
       toast({
         title: "Transaction Successful!",
         description: sendType === 'nft'
@@ -702,7 +703,7 @@ export function AccountDropdown() {
       // Refresh balances - refetch on next render
       // Token balances will be refreshed on next component update
     } catch (error: unknown) {
-      console.error("Error sending transaction:", error);
+      logger.error("Error sending transaction:", error);
       toast({
         variant: "destructive",
         title: "Transaction Failed",
@@ -757,7 +758,7 @@ export function AccountDropdown() {
         ),
       });
     } catch (error) {
-      console.error("Error removing session key:", error);
+      logger.error("Error removing session key:", error);
       toast({
         variant: "destructive",
         title: "Error Removing Session Key",
@@ -1571,13 +1572,13 @@ export function AccountDropdown() {
                 onClick={async () => {
                   try {
                     await logout();
-                    console.log('Logged out successfully');
+                    logger.debug('Logged out successfully');
                     // Small delay to ensure logout completes
                     setTimeout(() => {
                       setIsDropdownOpen(false);
                     }, 100);
                   } catch (error) {
-                    console.error('Logout error:', error);
+                    logger.error('Logout error:', error);
                     setIsDropdownOpen(false);
                   }
                 }}

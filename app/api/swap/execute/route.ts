@@ -1,13 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { executeSwap } from '@/lib/sdk/alchemy/swap-client';
 import { BASE_TOKENS, type TokenSymbol } from '@/lib/sdk/alchemy/swap-service';
+import { serverLogger } from '@/lib/utils/logger';
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    // Handle JSON parsing errors
+    let body;
+    try {
+      body = await request.json();
+    } catch (jsonError) {
+      serverLogger.error('Invalid JSON in request body:', jsonError);
+      return NextResponse.json(
+        { 
+          error: 'Invalid JSON in request body',
+          success: false
+        },
+        { status: 400 }
+      );
+    }
+    
     const { fromToken, toToken, fromAmount, minimumToAmount } = body;
 
-    console.log('Swap request received:', { fromToken, toToken, fromAmount, minimumToAmount });
+    serverLogger.debug('Swap request received:', { fromToken, toToken, fromAmount, minimumToAmount });
 
     // Validate required fields
     if (!fromToken || !toToken || !fromAmount) {
@@ -20,8 +35,30 @@ export async function POST(request: NextRequest) {
     // Validate token symbols
     const validTokens = Object.keys(BASE_TOKENS) as Array<keyof typeof BASE_TOKENS>;
     if (!validTokens.includes(fromToken) || !validTokens.includes(toToken)) {
+      const invalidTokens = [];
+      if (!validTokens.includes(fromToken)) invalidTokens.push(`fromToken: ${fromToken}`);
+      if (!validTokens.includes(toToken)) invalidTokens.push(`toToken: ${toToken}`);
+      
       return NextResponse.json(
-        { error: 'Invalid token symbols' },
+        { 
+          error: 'Invalid token symbols',
+          invalidTokens,
+          validTokens: validTokens,
+          success: false
+        },
+        { status: 400 }
+      );
+    }
+    
+    // Validate amount is a positive number
+    const fromAmountNum = parseFloat(fromAmount);
+    if (isNaN(fromAmountNum) || fromAmountNum <= 0) {
+      return NextResponse.json(
+        { 
+          error: 'Invalid fromAmount',
+          details: 'fromAmount must be a positive number',
+          success: false
+        },
         { status: 400 }
       );
     }
@@ -31,7 +68,7 @@ export async function POST(request: NextRequest) {
     const policyId = process.env.NEXT_PUBLIC_ALCHEMY_PAYMASTER_POLICY_ID;
     const privateKey = process.env.ALCHEMY_SWAP_PRIVATE_KEY;
 
-    console.log('Environment check:', {
+    serverLogger.debug('Environment check:', {
       hasApiKey: !!apiKey,
       hasPolicyId: !!policyId,
       hasPrivateKey: !!privateKey,
@@ -39,7 +76,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (!apiKey) {
-      console.error('Missing NEXT_PUBLIC_ALCHEMY_API_KEY');
+      serverLogger.error('Missing NEXT_PUBLIC_ALCHEMY_API_KEY');
       return NextResponse.json(
         { error: 'Alchemy API key not configured. Please set NEXT_PUBLIC_ALCHEMY_API_KEY environment variable.' },
         { status: 500 }
@@ -47,7 +84,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!policyId) {
-      console.error('Missing NEXT_PUBLIC_ALCHEMY_PAYMASTER_POLICY_ID');
+      serverLogger.error('Missing NEXT_PUBLIC_ALCHEMY_PAYMASTER_POLICY_ID');
       return NextResponse.json(
         { error: 'Alchemy paymaster policy ID not configured. Please set NEXT_PUBLIC_ALCHEMY_PAYMASTER_POLICY_ID environment variable.' },
         { status: 500 }
@@ -55,7 +92,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (!privateKey) {
-      console.error('Missing ALCHEMY_SWAP_PRIVATE_KEY');
+      serverLogger.error('Missing ALCHEMY_SWAP_PRIVATE_KEY');
       return NextResponse.json(
         { error: 'Alchemy swap private key not configured. Please set ALCHEMY_SWAP_PRIVATE_KEY environment variable.' },
         { status: 500 }
@@ -63,7 +100,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Execute the swap
-    console.log('Executing swap with params:', {
+    serverLogger.debug('Executing swap with params:', {
       fromToken: BASE_TOKENS[fromToken as TokenSymbol],
       toToken: BASE_TOKENS[toToken as TokenSymbol],
       fromAmount,
@@ -77,7 +114,7 @@ export async function POST(request: NextRequest) {
       minimumToAmount,
     });
 
-    console.log('Swap executed successfully:', result);
+    serverLogger.debug('Swap executed successfully:', result);
 
     return NextResponse.json({
       success: true,
@@ -85,14 +122,53 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Swap execution error:', error);
-    console.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+    serverLogger.error('Swap execution error:', error);
+    serverLogger.error('Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+    
+    // Handle specific error types
+    if (error instanceof Error) {
+      // Check for network/connection errors
+      if (error.message.includes('network') || error.message.includes('fetch') || error.message.includes('ECONNREFUSED')) {
+        return NextResponse.json(
+          { 
+            error: 'Network error',
+            details: 'Unable to connect to the swap service. Please check your network connection and try again.',
+            success: false
+          },
+          { status: 503 }
+        );
+      }
+      
+      // Check for insufficient balance errors
+      if (error.message.includes('insufficient') || error.message.includes('balance')) {
+        return NextResponse.json(
+          { 
+            error: 'Insufficient balance',
+            details: error.message,
+            success: false
+          },
+          { status: 400 }
+        );
+      }
+      
+      // Check for transaction errors
+      if (error.message.includes('transaction') || error.message.includes('revert')) {
+        return NextResponse.json(
+          { 
+            error: 'Transaction failed',
+            details: error.message,
+            success: false
+          },
+          { status: 400 }
+        );
+      }
+    }
     
     return NextResponse.json(
       { 
         error: error instanceof Error ? error.message : 'Swap execution failed',
         success: false,
-        details: error instanceof Error ? error.stack : undefined
+        details: process.env.NODE_ENV === 'development' && error instanceof Error ? error.stack : undefined
       },
       { status: 500 }
     );

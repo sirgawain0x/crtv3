@@ -11,6 +11,7 @@ import { formatEther, parseEther, encodeFunctionData, maxUint256 } from 'viem';
 import { useSmartAccountClient, useChain } from '@account-kit/react';
 import { useToast } from '@/components/ui/use-toast';
 import { DaiFundingOptions } from '@/components/wallet/funding/DaiFundingOptions';
+import { logger } from '@/lib/utils/logger';
 
 // Contract addresses and ABIs
 const METOKEN_CONTRACTS = {
@@ -107,7 +108,7 @@ export function AlchemyMeTokenCreator({ onMeTokenCreated }: AlchemyMeTokenCreato
       
       setDaiBalance(balance);
     } catch (err) {
-      console.error('Failed to check DAI balance:', err);
+      logger.error('Failed to check DAI balance:', err);
       setDaiBalance(BigInt(0));
     }
   }, [client]);
@@ -137,7 +138,7 @@ export function AlchemyMeTokenCreator({ onMeTokenCreated }: AlchemyMeTokenCreato
     setSuccess(null);
 
     try {
-      console.log('🚀 Creating MeToken with Alchemy SDK approach...');
+      logger.debug('🚀 Creating MeToken with Alchemy SDK approach...');
 
       // Step 1: Check current DAI allowance
       setSuccess('Checking DAI allowance...');
@@ -148,7 +149,7 @@ export function AlchemyMeTokenCreator({ onMeTokenCreated }: AlchemyMeTokenCreato
         args: [client.account.address, METOKEN_CONTRACTS.DIAMOND],
       }) as bigint;
 
-      console.log('📊 Current DAI allowance:', {
+      logger.debug('📊 Current DAI allowance:', {
         current: currentAllowance.toString(),
         required: depositAmount.toString(),
         hasEnough: currentAllowance >= depositAmount,
@@ -157,7 +158,7 @@ export function AlchemyMeTokenCreator({ onMeTokenCreated }: AlchemyMeTokenCreato
       });
 
       // Step 2: Approve DAI first
-      console.log('🔓 Approving DAI for MeToken creation...');
+      logger.debug('🔓 Approving DAI for MeToken creation...');
       setSuccess('Approving DAI...');
       
       const approveOperation = await client.sendUserOperation({
@@ -172,19 +173,19 @@ export function AlchemyMeTokenCreator({ onMeTokenCreated }: AlchemyMeTokenCreato
         },
       });
       
-      console.log('⏳ Waiting for approval confirmation...');
+      logger.debug('⏳ Waiting for approval confirmation...');
       const approveTxHash = await client.waitForUserOperationTransaction({ 
         hash: approveOperation.hash 
       });
       
-      console.log('✅ DAI approval confirmed:', approveTxHash);
+      logger.debug('✅ DAI approval confirmed:', approveTxHash);
       setSuccess('Approval confirmed! Creating MeToken...');
       
       // Wait a moment for state to settle
       await new Promise(resolve => setTimeout(resolve, 2000));
       
       // Step 3: Create MeToken
-      console.log('🪙 Creating MeToken...');
+      logger.debug('🪙 Creating MeToken...');
       setSuccess('Creating MeToken...');
       setIsConfirming(true);
       
@@ -200,12 +201,12 @@ export function AlchemyMeTokenCreator({ onMeTokenCreated }: AlchemyMeTokenCreato
         },
       });
       
-      console.log('⏳ Waiting for MeToken creation confirmation...');
+      logger.debug('⏳ Waiting for MeToken creation confirmation...');
       const txHash = await client.waitForUserOperationTransaction({ 
         hash: createOperation.hash 
       });
       
-      console.log('✅ MeToken creation completed:', txHash);
+      logger.debug('✅ MeToken creation completed:', txHash);
       setTransactionHash(txHash);
       setIsConfirming(false);
       setIsConfirmed(true);
@@ -245,7 +246,7 @@ export function AlchemyMeTokenCreator({ onMeTokenCreated }: AlchemyMeTokenCreato
       setHubId('1');
 
     } catch (err) {
-      console.error('❌ MeToken creation failed:', err);
+      logger.error(' MeToken creation failed:', err);
       
       // Handle different error types
       if (err instanceof Error) {
@@ -278,13 +279,13 @@ export function AlchemyMeTokenCreator({ onMeTokenCreated }: AlchemyMeTokenCreato
       // 2. Parse the logs to find the Subscribe event
       // 3. Extract the MeToken address from the event data
       
-      console.log('🔍 Extracting MeToken address from transaction:', txHash);
+      logger.debug('🔍 Extracting MeToken address from transaction:', txHash);
       
       // For demonstration, we'll return a placeholder
       // In production, implement proper log parsing
       return null;
     } catch (error) {
-      console.error('Failed to extract MeToken address:', error);
+      logger.error('Failed to extract MeToken address:', error);
       return null;
     }
   };
@@ -300,7 +301,7 @@ export function AlchemyMeTokenCreator({ onMeTokenCreated }: AlchemyMeTokenCreato
     meTokenAddress: string | null;
   }) => {
     try {
-      console.log('💾 Storing MeToken in Supabase...');
+      logger.debug('💾 Storing MeToken in Supabase...');
       
       const response = await fetch('/api/metokens', {
         method: 'POST',
@@ -322,9 +323,9 @@ export function AlchemyMeTokenCreator({ onMeTokenCreated }: AlchemyMeTokenCreato
         throw new Error('Failed to store MeToken in database');
       }
 
-      console.log('✅ MeToken stored in Supabase successfully');
+      logger.debug('✅ MeToken stored in Supabase successfully');
     } catch (error) {
-      console.error('Failed to store MeToken in Supabase:', error);
+      logger.error('Failed to store MeToken in Supabase:', error);
       // Don't throw here - the MeToken was created successfully on-chain
     }
   };

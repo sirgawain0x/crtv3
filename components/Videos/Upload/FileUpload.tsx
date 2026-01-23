@@ -14,6 +14,7 @@ import Link from "next/link";
 import { updateVideoAsset } from "@/services/video-assets";
 import { useUniversalAccount } from "@/lib/hooks/accountkit/useUniversalAccount";
 import { useTranscoder } from "@/lib/hooks/useTranscoder";
+import { logger } from "@/lib/utils/logger";
 
 const truncateUri = (uri: string): string => {
   if (uri.length <= 30) return uri;
@@ -94,10 +95,10 @@ const FileUpload: React.FC<FileUploadProps> = ({
         address,
       };
       localStorage.setItem('upload-in-progress', JSON.stringify(uploadData));
-      console.log('Upload state saved:', uploadData);
+      logger.debug('Upload state saved:', uploadData);
     } else if (uploadState === 'complete' && livepeerAsset?.id) {
       localStorage.removeItem('upload-in-progress');
-      console.log('Upload completed, state cleared');
+      logger.debug('Upload completed, state cleared');
     }
   }, [uploadState, livepeerAsset, progress, metadata, address]);
 
@@ -111,12 +112,12 @@ const FileUpload: React.FC<FileUploadProps> = ({
 
           // Only recover if same user and upload was within last 30 minutes
           if (savedAddress === address && Date.now() - timestamp < 30 * 60 * 1000) {
-            console.log('Attempting to recover interrupted upload:', assetId);
+            logger.debug('Attempting to recover interrupted upload:', assetId);
             toast.info('Checking previous upload status...');
 
             const asset = await getLivepeerAsset(assetId);
             if (asset) {
-              console.log('Recovered asset:', asset);
+              logger.debug('Recovered asset:', asset);
               setLivepeerAsset(asset);
 
               if (asset.status?.phase === 'ready') {
@@ -139,7 +140,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
             localStorage.removeItem('upload-in-progress');
           }
         } catch (error) {
-          console.error('Failed to recover upload:', error);
+          logger.error('Failed to recover upload:', error);
           localStorage.removeItem('upload-in-progress');
         }
       }
@@ -206,7 +207,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
 
     setSelectedFile(file);
     onFileSelect(file);
-    console.log("Selected file:", file?.name, "Address:", address, "Type:", type, "Needs Transcoding:", needsTranscoding);
+    logger.debug("Selected file:", file?.name, "Address:", address, "Type:", type, "Needs Transcoding:", needsTranscoding);
   };
 
   const handleFileUpload = async () => {
@@ -234,7 +235,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
 
     if (needsTranscoding) {
       setUploadState("transcoding");
-      console.log("Starting transcoding...");
+      logger.debug("Starting transcoding...");
       const transcodedFile = await transcode(selectedFile);
 
       if (!transcodedFile || transcodeError) {
@@ -244,12 +245,12 @@ const FileUpload: React.FC<FileUploadProps> = ({
       }
 
       fileToUpload = transcodedFile;
-      console.log("Transcoding complete. New file:", fileToUpload.name);
+      logger.debug("Transcoding complete. New file:", fileToUpload.name);
       setUploadState("loading");
     }
 
     try {
-      console.log("Start upload - using smart account address:", address, "type:", type);
+      logger.debug("Start upload - using smart account address:", address, "type:", type);
 
       const uploadRequestResult = await getLivepeerUploadUrl(
         newAssetTitle || fileToUpload.name || "new file name",
@@ -258,11 +259,11 @@ const FileUpload: React.FC<FileUploadProps> = ({
 
       // Store asset in both state and ref for persistence
       if (uploadRequestResult?.asset) {
-        console.log("Setting livepeer asset:", uploadRequestResult.asset);
+        logger.debug("Setting livepeer asset:", uploadRequestResult.asset);
         setLivepeerAsset(uploadRequestResult.asset);
         livepeerAssetRef.current = uploadRequestResult.asset;
       } else {
-        console.error("No asset in upload request result");
+        logger.error("No asset in upload request result");
         setError("Failed to get asset information");
         setUploadState("idle");
         return;
@@ -277,7 +278,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
         },
         uploadSize: fileToUpload.size,
         onError(err: any) {
-          console.error("Error uploading file:", err);
+          logger.error("Error uploading file:", err);
           setError("Failed to upload file. Please try again.");
           setUploadState("idle");
         },
@@ -286,7 +287,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
           setProgress(percentage);
         },
         onSuccess() {
-          console.log("Upload completed");
+          logger.debug("Upload completed");
           setUploadComplete(true);
           setUploadState("complete");
 
@@ -303,7 +304,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
                 const metadataUri = await pollForMetadataUri(uploadRequestResult.asset.id);
                 setUploadedUri(metadataUri);
               } catch (pollErr) {
-                console.warn("Failed to resolve metadata URI:", pollErr);
+                logger.warn("Failed to resolve metadata URI:", pollErr);
               }
             })();
 
@@ -318,7 +319,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
 
       tusUpload.start();
     } catch (err) {
-      console.error("Error uploading file:", err);
+      logger.error("Error uploading file:", err);
       setError("Failed to upload file. Please try again.");
       setUploadState("idle");
     }
@@ -339,7 +340,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
       toast.success("Database updated with metadata URI!");
     } catch (err) {
       toast.error("Failed to update database with metadata URI");
-      console.error(err);
+      logger.error(err);
     } finally {
       setIsPolling(false);
     }
@@ -503,7 +504,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
               onClick={() => {
                 // Use ref as fallback if state is lost
                 const asset = livepeerAsset || livepeerAssetRef.current;
-                console.log('Next clicked - Asset data:', {
+                logger.debug('Next clicked - Asset data:', {
                   hasState: !!livepeerAsset,
                   hasRef: !!livepeerAssetRef.current,
                   assetId: asset?.id
@@ -512,7 +513,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
                 if (asset?.id) {
                   onPressNext(asset);
                 } else {
-                  console.error('Missing asset data:', {
+                  logger.error('Missing asset data:', {
                     state: livepeerAsset,
                     ref: livepeerAssetRef.current
                   });

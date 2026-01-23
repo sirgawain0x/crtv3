@@ -14,6 +14,7 @@ import { alchemySwapService, AlchemySwapService, type TokenSymbol, BASE_TOKENS, 
 import { priceService, PriceService } from '@/lib/sdk/alchemy/price-service';
 import { CurrencyConverter } from '@/lib/utils/currency-converter';
 import { useGasSponsorship } from '@/lib/hooks/wallet/useGasSponsorship';
+import { logger } from '@/lib/utils/logger';
 
 const getTokenIcon = (symbol: string, chainId?: number) => {
   const isBase = chainId === 8453;
@@ -96,7 +97,7 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
         const tokenPrices = await priceService.getTokenPrices(['ETH', 'USDC', 'DAI']);
         setPrices(tokenPrices);
       } catch (error) {
-        console.error('Error fetching prices:', error);
+        logger.error('Error fetching prices:', error);
       }
     };
 
@@ -139,14 +140,14 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
 
     const fetchBalances = async () => {
       try {
-        console.log('Fetching balances for address:', address);
+        logger.debug('Fetching balances for address:', address);
 
         // Get ETH balance
         const ethBalance = await client.getBalance({
           address: address as Address,
         });
 
-        console.log('ETH balance (wei):', ethBalance.toString());
+        logger.debug('ETH balance (wei):', ethBalance.toString());
 
         // Get USDC balance (ERC20)
         let usdcBalance = 0n;
@@ -164,7 +165,7 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
             args: [address as Address],
           }) as bigint;
         } catch (e) {
-          console.warn('Failed to fetch USDC balance:', e);
+          logger.warn('Failed to fetch USDC balance:', e);
         }
 
         // Get DAI balance (ERC20)
@@ -183,7 +184,7 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
             args: [address as Address],
           }) as bigint;
         } catch (e) {
-          console.warn('Failed to fetch DAI balance:', e);
+          logger.warn('Failed to fetch DAI balance:', e);
         }
 
         const newBalances: Record<TokenSymbol, string> = {
@@ -192,12 +193,12 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
           DAI: AlchemySwapService.parseAmount(`0x${daiBalance.toString(16)}` as Hex, 'DAI'),
         };
 
-        console.log('Parsed balances:', newBalances);
+        logger.debug('Parsed balances:', newBalances);
         setBalances(newBalances);
 
         // Check if the account has any ETH at all
         if (ethBalance === 0n) {
-          console.warn('Account has zero ETH balance. This may cause swap failures.');
+          logger.warn('Account has zero ETH balance. This may cause swap failures.');
           setSwapState(prev => ({
             ...prev,
             error: 'Account has zero ETH balance. You need ETH for gas fees to perform swaps. Please add some ETH to your account first.'
@@ -211,7 +212,7 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
         }
 
       } catch (error) {
-        console.error('Error fetching balances:', error);
+        logger.error('Error fetching balances:', error);
       }
     };
 
@@ -229,7 +230,7 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
 
       const fromAmountHex = AlchemySwapService.formatAmount(amount, fromToken);
 
-      console.log('Requesting swap quote:', {
+      logger.debug('Requesting swap quote:', {
         from: address,
         fromToken,
         toToken,
@@ -261,7 +262,7 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
         setSwapState(prev => ({ ...prev, isLoading: false, quote: null }));
       }
     } catch (error) {
-      console.error('Error getting quote:', error);
+      logger.error('Error getting quote:', error);
       setSwapState(prev => ({
         ...prev,
         isLoading: false,
@@ -354,7 +355,7 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
       // Update the token amount and trigger quote
       await handleFromAmountChange(tokenAmount.toFixed(6));
     } catch (error) {
-      console.error('Error converting USD to token:', error);
+      logger.error('Error converting USD to token:', error);
       setSwapState(prev => ({
         ...prev,
         isLoading: false,
@@ -434,7 +435,7 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
     try {
       setSwapState(prev => ({ ...prev, isSwapping: true, error: null }));
 
-      console.log('Executing swap with structure:', swapState.quote);
+      logger.debug('Executing swap with structure:', swapState.quote);
 
       // ========== GAS SPONSORSHIP ==========
       // Determine gas sponsorship context (Member=Sponsored, Non-Member=USDC/ETH)
@@ -445,12 +446,12 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
       // For now, we'll assume we pass the context manually to the sendUserOperation
       // But we need the values from the hook. Let's rely on the component scope variables.
       const gasContext = getGasContext('usdc');
-      console.log('Gas Sponsorship Context:', gasContext);
+      logger.debug('Gas Sponsorship Context:', gasContext);
 
       // ========== PRE-FLIGHT CHECKS ==========
 
       const ethBalance = await client.getBalance({ address });
-      console.log('ETH Balance:', formatEther(ethBalance), 'ETH');
+      logger.debug('ETH Balance:', formatEther(ethBalance), 'ETH');
 
       let isDeployed = true;
       try {
@@ -459,17 +460,17 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
           params: [address, "latest"],
         }) as Hex;
         isDeployed = code && code.length > 2 && code !== '0x' && code !== '0x0';
-        if (!isDeployed) console.warn('⚠️ Account appears not deployed.');
+        if (!isDeployed) logger.warn('Account appears not deployed.');
       } catch (error) {
-        console.warn('⚠️ Deployment check failed:', error);
+        logger.warn('Deployment check failed:', error);
       }
 
       const minGasEth = parseEther('0.001');
       if (ethBalance < minGasEth) {
-        console.warn(`Low ETH balance (${formatEther(ethBalance)} ETH). Swap might fail if not sponsored.`);
+        logger.warn(`Low ETH balance (${formatEther(ethBalance)} ETH). Swap might fail if not sponsored.`);
       }
 
-      console.log('✓ Pre-flight checks passed');
+      logger.debug('Pre-flight checks passed');
 
       // ========== EXECUTE CALLS ==========
 
@@ -478,7 +479,7 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
       const calls = (swapState.quote as any).calls;
 
       if (calls && Array.isArray(calls) && calls.length > 0) {
-        console.log(`📦 Found ${calls.length} prepared calls from API`);
+        logger.debug(`Found ${calls.length} prepared calls from API`);
 
         let txHash: Hex | null = null;
 
@@ -488,7 +489,7 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
           const isLast = i === calls.length - 1;
           const description = i === 0 && calls.length > 1 ? 'Approval' : 'Swap';
 
-          console.log(`🚀 Sending ${description} UserOperation (${i + 1}/${calls.length})...`, {
+          logger.debug(`Sending ${description} UserOperation (${i + 1}/${calls.length})...`, {
             target: call.to,
             value: call.value,
             dataLength: call.data.length
@@ -513,26 +514,26 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
           const primaryContext = gasContext.context;
 
           try {
-            console.log(`🚀 Sending ${description} UserOperation (${i + 1}/${calls.length}) with context:`, primaryContext ? 'Custom' : 'Standard');
+            logger.debug(`Sending ${description} UserOperation (${i + 1}/${calls.length}) with context:`, primaryContext ? 'Custom' : 'Standard');
             operation = await executeOperation(primaryContext);
           } catch (err) {
             // If primary method fails (e.g. USDC payment fails), try fallback if it was a custom context
             if (primaryContext) {
-              console.warn(`⚠️ Primary gas method failed, falling back to standard ETH payment...`, err);
+              logger.warn(`Primary gas method failed, falling back to standard ETH payment...`, err);
               operation = await executeOperation(undefined);
             } else {
               throw err;
             }
           }
 
-          console.log(`🎉 ${description} UserOperation sent! Hash:`, operation.hash);
+          logger.debug(`${description} UserOperation sent! Hash:`, operation.hash);
 
           // Wait for confirmation
           const receipt = await client.waitForUserOperationTransaction({
             hash: operation.hash,
           });
 
-          console.log(`✅ ${description} confirmed! TxHash:`, receipt);
+          logger.debug(`${description} confirmed! TxHash:`, receipt);
 
           if (isLast) {
             txHash = receipt;
@@ -550,7 +551,7 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
 
       } else {
         // Fallback for legacy quote structure (UserOperation object)
-        console.warn('⚠️ No raw calls found, attempting legacy UserOperation execution...');
+        logger.warn('No raw calls found, attempting legacy UserOperation execution...');
 
         const quoteData = swapState.quote.data;
         const target = (quoteData.target || quoteData.sender || address) as Address;
@@ -577,7 +578,7 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
       }
 
     } catch (error) {
-      console.error('❌ Swap failed:', error);
+      logger.error('Swap failed:', error);
       setIsApprovingToken(false);
 
       let userMessage = 'Swap execution failed';

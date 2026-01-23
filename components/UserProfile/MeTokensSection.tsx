@@ -17,6 +17,7 @@ import { MeTokenHistory } from './MeTokenHistory';
 import { TokenPriceChart } from '@/components/Market/TokenPriceChart';
 import { Loader2, AlertCircle, Plus, TrendingUp, Info, RefreshCw, Search, Wallet, User, History, Copy, Check, Coins, DollarSign, BarChart3 } from 'lucide-react';
 import { formatEther } from 'viem';
+import { logger } from '@/lib/utils/logger';
 
 interface MeTokensSectionProps {
   walletAddress?: string;
@@ -55,7 +56,7 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
 
   const handleMeTokenCreated = (meTokenAddress: string) => {
     // Refresh the MeToken data
-    console.log('MeToken created:', meTokenAddress);
+    logger.debug('MeToken created:', meTokenAddress);
     setActiveTab('overview');
   };
 
@@ -103,7 +104,7 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
     setIsSyncing(true);
 
     try {
-      console.log('🔄 Attempting to sync existing MeToken from subgraph...');
+      logger.debug('🔄 Attempting to sync existing MeToken from subgraph...');
 
       toast({
         title: "Syncing MeToken",
@@ -115,13 +116,13 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
 
       // Get recent MeTokens from subgraph
       const allMeTokens = await meTokensSubgraph.getAllMeTokens(50, 0);
-      console.log(`📋 Found ${allMeTokens.length} recent MeTokens in subgraph`);
+      logger.debug(`Found ${allMeTokens.length} recent MeTokens in subgraph`);
 
       if (allMeTokens.length > 0) {
         // Try to sync the most recent ones to database
         for (const meToken of allMeTokens.slice(0, 10)) {
           try {
-            console.log('💾 Attempting to sync MeToken:', meToken.id);
+            logger.debug('💾 Attempting to sync MeToken:', meToken.id);
             const syncResponse = await fetch('/api/metokens/sync', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -130,11 +131,11 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
 
             if (syncResponse.ok) {
               const syncData = await syncResponse.json();
-              console.log('✅ Synced MeToken:', syncData);
+              logger.debug('✅ Synced MeToken:', syncData);
 
               // Check if this one belongs to our user
               if (syncData.data?.owner_address?.toLowerCase() === walletAddress.toLowerCase()) {
-                console.log('🎯 Found our MeToken!');
+                logger.debug('🎯 Found our MeToken!');
                 toast({
                   title: "MeToken Found!",
                   description: "Your MeToken has been synced successfully.",
@@ -144,7 +145,7 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
               }
             }
           } catch (syncErr) {
-            console.warn('Failed to sync MeToken:', meToken.id, syncErr);
+            logger.warn('Failed to sync MeToken:', meToken.id, syncErr);
           }
         }
       }
@@ -155,7 +156,7 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
         variant: "destructive",
       });
     } catch (err) {
-      console.error('Failed to sync existing MeToken:', err);
+      logger.error('Failed to sync existing MeToken:', err);
       toast({
         title: "Sync Failed",
         description: "Failed to sync existing MeToken. Please try again or contact support.",
@@ -198,7 +199,7 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
 
       if (syncResponse.ok) {
         const syncData = await syncResponse.json();
-        console.log('MeToken synced:', syncData);
+        logger.debug('MeToken synced:', syncData);
 
         // Now check if it belongs to this user
         const result = await checkSpecificMeToken(manualMeTokenAddress.trim());
@@ -218,7 +219,7 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
         }
       } else {
         const error = await syncResponse.json();
-        console.error('Sync failed:', error);
+        logger.error('Sync failed:', error);
         toast({
           title: "Sync Failed",
           description: `Failed to sync MeToken: ${error.error || 'Unknown error'}`,
@@ -226,7 +227,7 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
         });
       }
     } catch (err) {
-      console.error('Failed to check manual MeToken:', err);
+      logger.error('Failed to check manual MeToken:', err);
       toast({
         title: "Check Failed",
         description: "Failed to check MeToken. Please try again.",

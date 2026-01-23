@@ -6,7 +6,7 @@
 The application now uses **Goldsky** public endpoints for subgraph access!
 
 **No API keys required** - The endpoints are publicly accessible:
-- MeTokens: `https://api.goldsky.com/api/public/project_cmh0iv6s500dbw2p22vsxcfo6/subgraphs/metokens/v0.0.1/gn`
+- MeTokens: `https://api.goldsky.com/api/public/project_cmh0iv6s500dbw2p22vsxcfo6/subgraphs/metokens/1.0.2/gn`
 - Creative TV: `https://api.goldsky.com/api/public/project_cmh0iv6s500dbw2p22vsxcfo6/subgraphs/creative_tv/0.1/gn`
 
 ### Quick Fix

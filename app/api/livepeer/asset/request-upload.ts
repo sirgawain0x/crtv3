@@ -2,6 +2,7 @@
 
 import { NextApiRequest, NextApiResponse } from "next";
 import { fullLivepeer } from "@/lib/sdk/livepeer/fullClient";
+import { serverLogger } from "@/lib/utils/logger";
 
 export default async function handler(
   req: NextApiRequest,
@@ -16,7 +17,7 @@ export default async function handler(
         uploadUrl: asset.data?.tusEndpoint,
       });
     } catch (error) {
-      console.error("Error creating Livepeer upload URL:", error);
+      serverLogger.error("Error creating Livepeer upload URL:", error);
       res.status(500).json({ error: "Failed to create upload URL" });
     }
   } else {

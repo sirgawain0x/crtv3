@@ -17,6 +17,7 @@ import { TrendingUpIcon } from "lucide-react";
 import VideoThumbnail from "@/components/Videos/VideoThumbnail";
 import { ViewsComponent } from "@/components/Player/ViewsComponent";
 import { HERO_VIDEO_ASSET_ID } from "@/context/context";
+import { logger } from "@/lib/utils/logger";
 
 export function TopVideos() {
   const [videos, setVideos] = React.useState<VideoAsset[]>([]);
@@ -42,7 +43,7 @@ export function TopVideos() {
 
         // Step 1: Fetch trending videos from database (ordered by views_count)
         // Fetch 11 videos to ensure we have 10 after excluding the hero video
-        console.log("Fetching trending videos from database...");
+        logger.debug("Fetching trending videos from database...");
         const { data: trendingVideos } = await fetchPublishedVideos({
           limit: 11, // Fetch 11 to ensure we have 10 after excluding hero video
           offset: 0,
@@ -53,7 +54,7 @@ export function TopVideos() {
         if (!isMounted || signal.aborted) return;
 
         if (!trendingVideos || trendingVideos.length === 0) {
-          console.warn("No trending videos found");
+          logger.warn("No trending videos found");
           setVideos([]);
           setPlaybackSources({});
           setLoading(false);
@@ -66,19 +67,19 @@ export function TopVideos() {
         ).slice(0, 10); // Take top 10 after filtering
 
         if (filteredVideos.length === 0) {
-          console.warn("No trending videos found after filtering hero video");
+          logger.warn("No trending videos found after filtering hero video");
           setVideos([]);
           setPlaybackSources({});
           setLoading(false);
           return;
         }
 
-        console.log(`Found ${filteredVideos.length} trending videos (excluding hero video)`);
+        logger.debug(`Found ${filteredVideos.length} trending videos (excluding hero video)`);
 
         // Step 2: Fetch playback sources for each video
         // Don't set videos state until playback sources are ready to avoid rendering videos without sources
         const sources: Record<string, Src[] | null> = {};
-        console.log("Starting to fetch playback sources...");
+        logger.debug("Starting to fetch playback sources...");
 
         for (const video of filteredVideos) {
           if (!isMounted || signal.aborted) {
@@ -87,13 +88,13 @@ export function TopVideos() {
           }
           
           if (!video.playback_id) {
-            console.warn(`Video ${video.asset_id} has no playback_id`);
+            logger.warn(`Video ${video.asset_id} has no playback_id`);
             sources[video.asset_id] = null;
             continue;
           }
 
           try {
-            console.log(
+            logger.debug(
               `Fetching playback source for video ${video.playback_id}...`
             );
 
@@ -107,10 +108,10 @@ export function TopVideos() {
               return;
             }
             
-            console.log(`Playback source for ${video.playback_id}:`, src);
+            logger.debug(`Playback source for ${video.playback_id}:`, src);
 
             if (!src || src.length === 0) {
-              console.error(
+              logger.error(
                 `No valid source found for video ${video.playback_id}`
               );
               sources[video.asset_id] = null;
@@ -130,12 +131,12 @@ export function TopVideos() {
               error.message.includes('aborted') ||
               error.message.includes('signal is aborted')
             )) {
-              console.warn(`Video ${video.playback_id} fetch was aborted:`, error.message);
+              logger.warn(`Video ${video.playback_id} fetch was aborted:`, error.message);
               // If aborted, don't set any state - component is unmounting
               return;
             }
             
-            console.error(
+            logger.error(
               `Error fetching playback source for video ${video.playback_id}:`,
               error
             );
@@ -150,7 +151,7 @@ export function TopVideos() {
         
         // Only set both videos and playback sources together after all sources are fetched
         // This ensures videos are never rendered without their playback sources
-        console.log("Final playback sources:", sources);
+        logger.debug("Final playback sources:", sources);
         setVideos(filteredVideos);
         setPlaybackSources(sources);
       } catch (error) {
@@ -162,11 +163,11 @@ export function TopVideos() {
           error.message.includes('aborted') ||
           error.message.includes('signal is aborted')
         )) {
-          console.warn('TopVideos fetch was aborted:', error.message);
+          logger.warn('TopVideos fetch was aborted:', error.message);
           return; // Don't set error for abort signals
         }
         
-        console.error("Error in fetchTrendingVideos:", error);
+        logger.error("Error in fetchTrendingVideos:", error);
         setError("Failed to load trending videos");
         toast.error("Failed to load trending videos");
       } finally {

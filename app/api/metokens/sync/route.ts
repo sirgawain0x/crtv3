@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { meTokenSupabaseService } from '@/lib/sdk/supabase/metokens';
 import { meTokensSubgraph } from '@/lib/sdk/metokens/subgraph';
+import { createServiceClient } from '@/lib/sdk/supabase/service';
 import { 
   extractMeTokenAddressFromTransaction, 
   getMeTokenInfoFromBlockchain, 
   getMeTokenProtocolInfo 
 } from '@/lib/utils/metokenUtils';
+import { serverLogger } from '@/lib/utils/logger';
 
 // POST /api/metokens/sync - Sync a MeToken from blockchain to database
 export async function POST(request: NextRequest) {
@@ -13,7 +15,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { transactionHash, meTokenAddress } = body;
 
-    console.log('📥 Sync request:', { transactionHash, meTokenAddress });
+    serverLogger.debug('Sync request:', { transactionHash, meTokenAddress });
 
     if (!transactionHash && !meTokenAddress) {
       return NextResponse.json(
@@ -43,12 +45,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    console.log('🎯 Target MeToken address:', targetMeTokenAddress);
+    serverLogger.debug('Target MeToken address:', targetMeTokenAddress);
 
     // Check if MeToken already exists in database
     const existingMeToken = await meTokenSupabaseService.getMeTokenByAddress(targetMeTokenAddress);
     if (existingMeToken) {
-      console.log('✅ MeToken already in database');
+      serverLogger.debug('MeToken already in database');
       return NextResponse.json(
         { 
           message: 'MeToken already exists in database',
@@ -58,19 +60,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // First, check if the MeToken exists in the subgraph
-    console.log('📊 Checking subgraph for MeToken...');
+    // Check if the MeToken exists in the subgraph (informational, not required)
+    // For newly created MeTokens, the subgraph may not have indexed them yet
+    serverLogger.debug('Checking subgraph for MeToken...');
     const subgraphData = await meTokensSubgraph.checkMeTokenExists(targetMeTokenAddress);
     
-    if (!subgraphData) {
-      console.log('⚠️ MeToken not found in subgraph - may not be registered yet');
-      return NextResponse.json(
-        { error: 'MeToken not found in subgraph. It may not be registered yet or the subgraph may not be synced.' },
-        { status: 404 }
-      );
+    if (subgraphData) {
+      serverLogger.debug('Found MeToken in subgraph');
+    } else {
+      serverLogger.warn('MeToken not found in subgraph - will sync from blockchain (subgraph may not have indexed it yet)');
     }
 
-    console.log('✅ Found MeToken in subgraph, fetching blockchain data...');
+    serverLogger.debug('Fetching blockchain data...');
 
     // Get MeToken information from blockchain
     // Note: For newly created MeTokens, the Diamond might not be fully synced yet
@@ -83,11 +84,11 @@ export async function POST(request: NextRequest) {
         getMeTokenProtocolInfo(targetMeTokenAddress)
       ]);
     } catch (error) {
-      console.warn('⚠️ Failed to get full blockchain data, using subgraph data:', error);
+      serverLogger.warn('Failed to get full blockchain data, using subgraph data:', error);
     }
 
     if (!tokenInfo) {
-      console.error('❌ Token info not available from blockchain - cannot proceed');
+      serverLogger.error('Token info not available from blockchain - cannot proceed');
       return NextResponse.json(
         { error: 'Unable to fetch token information from blockchain. The MeToken may not be fully registered yet. Please try again in a few moments.' },
         { status: 503 }
@@ -95,10 +96,13 @@ export async function POST(request: NextRequest) {
     }
 
     if (!protocolInfo) {
-      console.warn('⚠️ Protocol info not available from blockchain, using defaults');
+      serverLogger.warn('Protocol info not available from blockchain, using defaults');
+      // Use subgraph data if available, otherwise use defaults
+      const hubId = subgraphData?.hubId ? parseInt(subgraphData.hubId) : 1;
+      const assetsDeposited = subgraphData?.assetsDeposited || '0';
       protocolInfo = {
-        hubId: parseInt(subgraphData?.hubId || '1'),
-        balancePooled: subgraphData?.assetsDeposited || '0',
+        hubId: hubId,
+        balancePooled: assetsDeposited,
         balanceLocked: '0',
         startTime: 0,
         endTime: 0,
@@ -108,7 +112,7 @@ export async function POST(request: NextRequest) {
       };
     }
 
-    console.log('✅ Got blockchain data:', { tokenInfo, protocolInfo });
+    serverLogger.debug('Got blockchain data:', { tokenInfo, protocolInfo });
 
     // Calculate TVL (Total Value Locked)
     const balancePooled = BigInt(protocolInfo.balancePooled);
@@ -136,22 +140,47 @@ export async function POST(request: NextRequest) {
       migration_address: protocolInfo.migration !== '0x0000000000000000000000000000000000000000' ? protocolInfo.migration : undefined,
     };
 
-    // Create the MeToken in the database
-    const result = await meTokenSupabaseService.createMeToken(meTokenData);
+    // Create the MeToken in the database using service client to bypass RLS
+    // This is a server-side operation, so we use the service role client
+    const supabase = createServiceClient();
+    const { data: result, error: createError } = await supabase
+      .from('metokens')
+      .insert({
+        ...meTokenData,
+        address: meTokenData.address.toLowerCase(),
+        owner_address: meTokenData.owner_address.toLowerCase(),
+      })
+      .select()
+      .single();
+
+    if (createError) {
+      serverLogger.error('Error creating MeToken record:', createError);
+      return NextResponse.json(
+        { error: 'Failed to create MeToken record in database', details: createError.message },
+        { status: 500 }
+      );
+    }
 
     // Record the creation transaction if we have a transaction hash
     if (transactionHash) {
       try {
-        await meTokenSupabaseService.recordTransaction({
-          metoken_id: result.id,
-          user_address: tokenInfo.owner.toLowerCase(),
-          transaction_type: 'create',
-          amount: 0,
-          transaction_hash: transactionHash,
-          block_number: 0, // We could get this from the transaction receipt if needed
-        });
+        const { error: txError } = await supabase
+          .from('metoken_transactions')
+          .insert({
+            metoken_id: result.id,
+            user_address: tokenInfo.owner.toLowerCase(),
+            transaction_type: 'create',
+            amount: 0,
+            transaction_hash: transactionHash,
+            block_number: 0, // We could get this from the transaction receipt if needed
+          });
+        
+        if (txError) {
+          serverLogger.error('Failed to record creation transaction:', txError);
+          // Don't fail the whole operation if we can't record the transaction
+        }
       } catch (error) {
-        console.error('Failed to record creation transaction:', error);
+        serverLogger.error('Failed to record creation transaction:', error);
         // Don't fail the whole operation if we can't record the transaction
       }
     }
@@ -162,7 +191,7 @@ export async function POST(request: NextRequest) {
     }, { status: 201 });
 
   } catch (error) {
-    console.error('Error syncing MeToken:', error);
+    serverLogger.error('Error syncing MeToken:', error);
     return NextResponse.json(
       { error: 'Failed to sync MeToken', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }

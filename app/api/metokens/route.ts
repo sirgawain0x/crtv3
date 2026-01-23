@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/sdk/supabase/server';
 import { meTokenSupabaseService } from '@/lib/sdk/supabase/metokens';
+import { serverLogger } from '@/lib/utils/logger';
 
 // GET /api/metokens - Get MeTokens with optional filtering
 export async function GET(request: NextRequest) {
@@ -40,7 +41,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ data: result });
     }
   } catch (error) {
-    console.error('Error fetching MeTokens:', error);
+    serverLogger.error('Error fetching MeTokens:', error);
     
     // Handle specific error cases
     if (error instanceof Error) {
@@ -63,7 +64,18 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
-    const body = await request.json();
+    
+    // Handle JSON parsing errors
+    let body;
+    try {
+      body = await request.json();
+    } catch (jsonError) {
+      serverLogger.error('Invalid JSON in request body:', jsonError);
+      return NextResponse.json(
+        { error: 'Invalid JSON in request body' },
+        { status: 400 }
+      );
+    }
     
     // Verify the user is authenticated (optional - depends on your auth setup)
     // const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -90,8 +102,18 @@ export async function POST(request: NextRequest) {
 
     // Validate required fields
     if (!address || !owner_address || !name || !symbol) {
+      const missingFields = [];
+      if (!address) missingFields.push('address');
+      if (!owner_address) missingFields.push('owner_address');
+      if (!name) missingFields.push('name');
+      if (!symbol) missingFields.push('symbol');
+      
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { 
+          error: 'Missing required fields',
+          missingFields,
+          hint: 'All of the following fields are required: address, owner_address, name, symbol'
+        },
         { status: 400 }
       );
     }
@@ -117,9 +139,38 @@ export async function POST(request: NextRequest) {
     
     return NextResponse.json({ data: result }, { status: 201 });
   } catch (error) {
-    console.error('Error creating MeToken:', error);
+    serverLogger.error('Error creating MeToken:', error);
+    
+    // Handle specific error types
+    if (error instanceof Error) {
+      // Check for duplicate key errors (common in Supabase)
+      if (error.message.includes('duplicate key') || error.message.includes('unique constraint')) {
+        return NextResponse.json(
+          { 
+            error: 'MeToken already exists',
+            details: 'A MeToken with this address already exists in the database'
+          },
+          { status: 409 }
+        );
+      }
+      
+      // Check for validation errors
+      if (error.message.includes('validation') || error.message.includes('invalid')) {
+        return NextResponse.json(
+          { 
+            error: 'Validation error',
+            details: error.message
+          },
+          { status: 400 }
+        );
+      }
+    }
+    
     return NextResponse.json(
-      { error: 'Failed to create MeToken' },
+      { 
+        error: 'Failed to create MeToken',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }
