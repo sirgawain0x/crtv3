@@ -7,12 +7,12 @@
  * @see https://github.com/x402-protocol/x402-fetch
  */
 
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useMemo } from 'react';
 import { useSmartAccountClient } from '@account-kit/react';
 import { wrapFetchWithPayment, decodeXPaymentResponse } from 'x402-fetch';
 import { USDC_TOKEN_ADDRESSES, USDC_TOKEN_DECIMALS } from '@/lib/contracts/USDCToken';
-import { base } from '@account-kit/infra';
-import { erc20Abi } from 'viem';
+import { base, alchemy } from '@account-kit/infra';
+import { erc20Abi, createPublicClient } from 'viem';
 import { logger } from '@/lib/utils/logger';
 
 // x402 Payment Configuration for USDC on Base
@@ -54,6 +54,17 @@ export function useX402Payment() {
   const { client } = useSmartAccountClient({ type: 'MultiOwnerModularAccount' });
   const [isProcessing, setIsProcessing] = useState(false);
   const [lastPayment, setLastPayment] = useState<X402PaymentResponse | null>(null);
+
+  // Create a public client for reading contract state
+  // SmartAccountClient doesn't reliably expose readContract, so we use a separate PublicClient
+  const publicClient = useMemo(() => {
+    return createPublicClient({
+      chain: base,
+      transport: alchemy({
+        apiKey: process.env.NEXT_PUBLIC_ALCHEMY_API_KEY as string,
+      }),
+    });
+  }, []);
 
   /**
    * Make an x402 payment using the user's connected smart account
@@ -189,8 +200,9 @@ export function useX402Payment() {
         tokenAddress: X402_CONFIG.token.address,
       });
 
-      // Query USDC balance from contract
-      const balance = await client.readContract({
+      // Query USDC balance from contract using PublicClient
+      // SmartAccountClient doesn't reliably expose readContract, so we use a separate PublicClient
+      const balance = await publicClient.readContract({
         address: X402_CONFIG.token.address,
         abi: erc20Abi,
         functionName: 'balanceOf',
@@ -210,7 +222,7 @@ export function useX402Payment() {
       // Return false on error to be safe (payment will fail anyway if balance is insufficient)
       return false;
     }
-  }, [client]);
+  }, [client, publicClient]);
 
   return {
     makePayment,
