@@ -129,7 +129,7 @@ const HookMultiStepForm = () => {
         splits_address: null,
       }, data.collaborators);
 
-      logger.debug('Step 1 Submit:✅ Video asset created in DB:', dbAsset);
+      logger.debug('Video asset created in DB:', dbAsset);
       setVideoAsset(dbAsset as VideoAsset);
       setActiveStep(2); // Move to Thumbnail step
     } catch (error) {
