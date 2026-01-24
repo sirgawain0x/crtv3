@@ -130,6 +130,9 @@ export function TradingViewChart({
       volumeSeriesRef.current = volumeSeries;
     }
 
+    // Auto-fit content
+    chart.timeScale().fitContent();
+
     // Handle resize
     const handleResize = () => {
       if (chartContainerRef.current && chartRef.current) {
@@ -171,6 +174,11 @@ export function TradingViewChart({
     if (showVolume && volumeSeriesRef.current) {
       const volumeData = convertToVolumeData(data);
       volumeSeriesRef.current.setData(volumeData);
+    }
+
+    // Auto-fit content
+    if (chartRef.current) {
+      chartRef.current.timeScale().fitContent();
     }
   }, [data, showVolume]);
 

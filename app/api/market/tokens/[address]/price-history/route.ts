@@ -319,11 +319,31 @@ export async function GET(
       bucket.prices.push(price);
       bucket.tvls.push(runningTvl);
 
-      // Calculate volume for this transaction
       const volume = tx.transaction_type === 'mint'
         ? parseFloat(tx.collateral_amount?.toString() || tx.amount?.toString() || '0')
         : parseFloat(tx.amount?.toString() || '0') * preTxPrice; // Estimate volume in DAI
       bucket.volumes.push(volume);
+    }
+
+    // Add Start Point (Crucial for Charts/Gains)
+    // We use the state calculated after Reverse Replay (runningSupply, runningTvl)
+    // This represents the state at 'startDate'
+    const startTimestamp = Math.floor(startDate.getTime() / 1000);
+    const startBucketKey = interval === 'hour'
+      ? startDate.toISOString().slice(0, 13) + ':00:00'
+      : startDate.toISOString().slice(0, 10);
+
+    if (!historyMap.has(startBucketKey)) {
+      const startPrice = runningSupply > 0n
+        ? runningTvl / parseFloat(formatEther(runningSupply))
+        : 0;
+
+      historyMap.set(startBucketKey, {
+        timestamp: startTimestamp,
+        prices: [startPrice],
+        volumes: [0], // No volume at the exact start snapshot
+        tvls: [runningTvl],
+      });
     }
 
     // Convert map to array and aggregate by bucket
