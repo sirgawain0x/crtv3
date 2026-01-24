@@ -6,7 +6,7 @@ import { fetchVideoAssetByPlaybackId } from '@/lib/utils/video-assets-client';
 import { Player } from '@/components/Player/Player';
 import { PlayIcon, Volume2, VolumeX } from 'lucide-react';
 import { Src } from '@livepeer/react';
-import { convertFailingGateway, isIpfsUrl } from '@/lib/utils/image-gateway';
+import { convertFailingGateway, isIpfsUrl, getAllIpfsGateways } from '@/lib/utils/image-gateway';
 import { Skeleton } from '@/components/ui/skeleton';
 import { GatewayImage } from '@/components/ui/gateway-image';
 import { logger } from '@/lib/utils/logger';
@@ -46,9 +46,11 @@ const VideoThumbnail: React.FC<VideoThumbnailProps> = ({
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
   const [isMuted, setIsMuted] = useState(false); // Start unmuted as requested
+  const [retryCount, setRetryCount] = useState(0);
   const showPlayerRef = React.useRef(showPlayer);
   const observerRef = React.useRef<IntersectionObserver | null>(null);
   const previewVideoRef = useRef<HTMLVideoElement>(null);
+  const thumbnailCacheRef = useRef<Map<string, string>>(new Map());
 
   useEffect(() => {
     async function fetchThumbnail() {
@@ -59,7 +61,19 @@ const VideoThumbnail: React.FC<VideoThumbnailProps> = ({
 
       // Use initialThumbnailUrl when provided to avoid extra fetch and show immediately
       if (hasInitial && initialThumbnailUrl?.trim()) {
-        setThumbnailUrl(convertFailingGateway(initialThumbnailUrl.trim()));
+        const converted = convertFailingGateway(initialThumbnailUrl.trim());
+        // Cache the successful thumbnail URL
+        thumbnailCacheRef.current.set(playbackId, converted);
+        setThumbnailUrl(converted);
+        setIsLoading(false);
+        return;
+      }
+
+      // Check cache first
+      const cachedUrl = thumbnailCacheRef.current.get(playbackId);
+      if (cachedUrl) {
+        logger.debug(`[Thumbnail] ${title || playbackId} - Using cached thumbnail URL`);
+        setThumbnailUrl(cachedUrl);
         setIsLoading(false);
         return;
       }
@@ -88,8 +102,11 @@ const VideoThumbnail: React.FC<VideoThumbnailProps> = ({
               logger.debug(`[Thumbnail] ${videoTitle} - Converted gateway: ${originalUrl} -> ${convertedUrl}`);
             }
             
+            // Cache the successful thumbnail URL
+            thumbnailCacheRef.current.set(playbackId, convertedUrl);
             setThumbnailUrl(convertedUrl);
             setIsLoading(false);
+            setRetryCount(0);
             const totalTime = performance.now() - startTime;
             logger.debug(`[Thumbnail] ${videoTitle} - Thumbnail loaded in ${totalTime.toFixed(0)}ms (source: database)`);
             return;
@@ -120,7 +137,10 @@ const VideoThumbnail: React.FC<VideoThumbnailProps> = ({
             logger.debug(`[Thumbnail] ${videoTitle} - Converted VTT gateway: ${url} -> ${convertedUrl}`);
           }
           logger.debug(`[Thumbnail] ${videoTitle} - Using Livepeer VTT thumbnail (${vttTime.toFixed(0)}ms):`, convertedUrl);
+          // Cache the successful thumbnail URL
+          thumbnailCacheRef.current.set(playbackId, convertedUrl);
           setThumbnailUrl(convertedUrl);
+          setRetryCount(0);
         }
       } catch (error) {
         const totalTime = performance.now() - startTime;
@@ -374,15 +394,37 @@ const VideoThumbnail: React.FC<VideoThumbnailProps> = ({
               showSkeleton={false}
               onLoad={() => {
                 setImageLoading(false);
+                setRetryCount(0); // Reset retry count on successful load
+                // Cache successful thumbnail URL
+                if (thumbnailUrl) {
+                  thumbnailCacheRef.current.set(playbackId, thumbnailUrl);
+                }
                 logger.debug(`[Thumbnail] ${title || playbackId} - Image loaded successfully`);
               }}
               onError={(e) => {
                 setImageLoading(false);
-                logger.error(`[Thumbnail] ${title || playbackId} - Image failed to load:`, thumbnailUrl, e);
-                // Fallback to default thumbnail on image load error (only if not already the default)
+                logger.warn(`[Thumbnail] ${title || playbackId} - Image failed to load:`, thumbnailUrl);
+                
+                // If it's an IPFS URL, try alternative gateways
+                if (isIpfsUrl(thumbnailUrl) && retryCount < 3) {
+                  const gateways = getAllIpfsGateways(thumbnailUrl);
+                  const currentIndex = gateways.findIndex(g => g === thumbnailUrl);
+                  
+                  if (currentIndex < gateways.length - 1) {
+                    const nextGateway = gateways[currentIndex + 1];
+                    logger.debug(`[Thumbnail] ${title || playbackId} - Retrying with alternative gateway: ${nextGateway}`);
+                    setRetryCount(prev => prev + 1);
+                    setThumbnailUrl(nextGateway);
+                    setImageLoading(true);
+                    return;
+                  }
+                }
+                
+                // If retries exhausted or not IPFS, fallback to default thumbnail
                 if (thumbnailUrl !== "/Creative_TV.png") {
-                  logger.debug(`[Thumbnail] ${title || playbackId} - Falling back to default thumbnail`);
+                  logger.debug(`[Thumbnail] ${title || playbackId} - All retries exhausted, falling back to default thumbnail`);
                   setThumbnailUrl("/Creative_TV.png");
+                  setRetryCount(0);
                 }
               }}
             />

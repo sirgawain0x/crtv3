@@ -24,12 +24,14 @@ import {
 import { useToast } from "@/components/ui/use-toast";
 import { updateVideoAsset } from "@/services/video-assets";
 import type { VideoAsset } from "@/lib/types/video-asset";
-import { Loader2, X } from "lucide-react";
+import { Loader2, X, RefreshCw, Link as LinkIcon } from "lucide-react";
 import { compressImage } from "@/lib/utils/image-compression";
 import { uploadThumbnailToIPFS } from "@/lib/services/thumbnail-upload";
 import { convertFailingGateway, parseIpfsUriWithFallback } from "@/lib/utils/image-gateway";
 import { GatewayImage } from "@/components/ui/gateway-image";
 import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { regenerateThumbnailFromLivepeer } from "@/lib/utils/thumbnail-regeneration";
 import { logger } from '@/lib/utils/logger';
 
 
@@ -79,6 +81,10 @@ export function VideoEditDialog({
   const [isUploadingThumbnail, setIsUploadingThumbnail] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [newThumbnailUrl, setNewThumbnailUrl] = useState<string | null>(null);
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [manualThumbnailUrl, setManualThumbnailUrl] = useState<string>("");
+  const [manualUrlError, setManualUrlError] = useState<string>("");
+  const [thumbnailTab, setThumbnailTab] = useState<"upload" | "regenerate" | "manual">("upload");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const blobUrlRef = useRef<string | null>(null);
 
@@ -113,6 +119,10 @@ export function VideoEditDialog({
       setThumbnailFile(null);
       setNewThumbnailUrl(null);
       setUploadProgress(0);
+      setIsRegenerating(false);
+      setManualThumbnailUrl("");
+      setManualUrlError("");
+      setThumbnailTab("upload");
       if (blobUrlRef.current) {
         URL.revokeObjectURL(blobUrlRef.current);
         blobUrlRef.current = null;
@@ -238,12 +248,85 @@ export function VideoEditDialog({
     setThumbnailFile(null);
     setNewThumbnailUrl(null);
     setThumbnailPreview(null);
+    setManualThumbnailUrl("");
+    setManualUrlError("");
     if (blobUrlRef.current) {
       URL.revokeObjectURL(blobUrlRef.current);
       blobUrlRef.current = null;
     }
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
+    }
+  };
+
+  const handleRegenerateThumbnail = async () => {
+    if (!videoAsset.playback_id) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Video does not have a playback ID.",
+      });
+      return;
+    }
+
+    setIsRegenerating(true);
+    setUploadProgress(0);
+
+    try {
+      setUploadProgress(20);
+      const result = await regenerateThumbnailFromLivepeer(
+        videoAsset.playback_id,
+        videoAsset.asset_id
+      );
+
+      setUploadProgress(80);
+
+      if (result.success && result.thumbnailUrl) {
+        setNewThumbnailUrl(result.thumbnailUrl);
+        setUploadProgress(100);
+        
+        toast({
+          title: "Thumbnail Regenerated",
+          description: "Thumbnail has been successfully regenerated from Livepeer.",
+        });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Regeneration Failed",
+          description: result.error || "Failed to regenerate thumbnail. The video may not have Livepeer VTT thumbnails available.",
+        });
+      }
+    } catch (error) {
+      logger.error("Error regenerating thumbnail:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to regenerate thumbnail. Please try again.",
+      });
+    } finally {
+      setIsRegenerating(false);
+      setUploadProgress(0);
+    }
+  };
+
+  const handleManualUrlChange = (url: string) => {
+    setManualThumbnailUrl(url);
+    setManualUrlError("");
+
+    // Basic URL validation
+    if (url.trim() === "") {
+      setManualUrlError("");
+      setNewThumbnailUrl(null);
+      return;
+    }
+
+    try {
+      new URL(url);
+      setNewThumbnailUrl(url);
+      setManualUrlError("");
+    } catch (error) {
+      setManualUrlError("Please enter a valid URL");
+      setNewThumbnailUrl(null);
     }
   };
 
@@ -263,7 +346,7 @@ export function VideoEditDialog({
         location: data.location.trim() || "",
       };
 
-      // Include thumbnail URL if a new one was uploaded
+      // Include thumbnail URL if a new one was set (uploaded, regenerated, or manual)
       if (newThumbnailUrl) {
         updateData.thumbnailUri = newThumbnailUrl;
       }
@@ -407,65 +490,173 @@ export function VideoEditDialog({
                   </div>
                 )}
 
-                {/* New Thumbnail Upload */}
-                {thumbnailPreview ? (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-sm text-muted-foreground">New Thumbnail</Label>
+                {/* Thumbnail Update Options Tabs */}
+                <Tabs value={thumbnailTab} onValueChange={(value) => setThumbnailTab(value as "upload" | "regenerate" | "manual")}>
+                  <TabsList className="grid w-full grid-cols-3">
+                    <TabsTrigger value="upload">Upload</TabsTrigger>
+                    <TabsTrigger value="regenerate">Regenerate</TabsTrigger>
+                    <TabsTrigger value="manual">Manual URL</TabsTrigger>
+                  </TabsList>
+
+                  {/* Upload Tab */}
+                  <TabsContent value="upload" className="space-y-2">
+                    {thumbnailPreview ? (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-sm text-muted-foreground">New Thumbnail</Label>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleThumbnailRemove}
+                            className="h-8 w-8 p-0"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <div className="relative aspect-video w-full max-w-md rounded-lg overflow-hidden border">
+                          <img
+                            src={thumbnailPreview}
+                            alt="Thumbnail preview"
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        {isUploadingThumbnail && (
+                          <div className="space-y-2">
+                            <Progress value={uploadProgress} className="w-full" />
+                            <p className="text-xs text-muted-foreground">Uploading thumbnail...</p>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <Input
+                          id="thumbnail"
+                          type="file"
+                          accept="image/*"
+                          ref={fileInputRef}
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              handleThumbnailSelect(file);
+                            }
+                          }}
+                          disabled={isUploadingThumbnail || isRegenerating}
+                          className="cursor-pointer"
+                        />
+                        {isUploadingThumbnail && (
+                          <div className="space-y-2">
+                            <Progress value={uploadProgress} className="w-full" />
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <span>Processing thumbnail...</span>
+                            </div>
+                          </div>
+                        )}
+                        <p className="text-xs text-muted-foreground">
+                          Upload a new thumbnail image (JPG, PNG, or WebP). Max 5MB.
+                        </p>
+                      </div>
+                    )}
+                  </TabsContent>
+
+                  {/* Regenerate Tab */}
+                  <TabsContent value="regenerate" className="space-y-2">
+                    <div className="space-y-2">
+                      <p className="text-sm text-muted-foreground">
+                        Regenerate thumbnail from Livepeer VTT. This will fetch the thumbnail from Livepeer, upload it to IPFS, and update your video.
+                      </p>
                       <Button
                         type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleThumbnailRemove}
-                        className="h-8 w-8 p-0"
+                        variant="outline"
+                        onClick={handleRegenerateThumbnail}
+                        disabled={isRegenerating || isUploadingThumbnail || !videoAsset.playback_id}
+                        className="w-full"
                       >
-                        <X className="h-4 w-4" />
+                        {isRegenerating ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Regenerating...
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCw className="h-4 w-4 mr-2" />
+                            Regenerate from Livepeer
+                          </>
+                        )}
                       </Button>
-                    </div>
-                    <div className="relative aspect-video w-full max-w-md rounded-lg overflow-hidden border">
-                      <img
-                        src={thumbnailPreview}
-                        alt="Thumbnail preview"
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                    {isUploadingThumbnail && (
-                      <div className="space-y-2">
-                        <Progress value={uploadProgress} className="w-full" />
-                        <p className="text-xs text-muted-foreground">Uploading thumbnail...</p>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <Input
-                      id="thumbnail"
-                      type="file"
-                      accept="image/*"
-                      ref={fileInputRef}
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          handleThumbnailSelect(file);
-                        }
-                      }}
-                      disabled={isUploadingThumbnail}
-                      className="cursor-pointer"
-                    />
-                    {isUploadingThumbnail && (
-                      <div className="space-y-2">
-                        <Progress value={uploadProgress} className="w-full" />
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                          <span>Processing thumbnail...</span>
+                      {isRegenerating && (
+                        <div className="space-y-2">
+                          <Progress value={uploadProgress} className="w-full" />
+                          <p className="text-xs text-muted-foreground">Regenerating thumbnail...</p>
                         </div>
+                      )}
+                      {newThumbnailUrl && thumbnailTab === "regenerate" && (
+                        <div className="space-y-2">
+                          <Label className="text-sm text-muted-foreground">Regenerated Thumbnail</Label>
+                          <div className="relative aspect-video w-full max-w-md rounded-lg overflow-hidden border">
+                            <GatewayImage
+                              src={newThumbnailUrl}
+                              alt="Regenerated thumbnail"
+                              fill
+                              className="object-cover"
+                              showSkeleton={true}
+                              fallbackSrc="/Creative_TV.png"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </TabsContent>
+
+                  {/* Manual URL Tab */}
+                  <TabsContent value="manual" className="space-y-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="manual-thumbnail-url">Thumbnail URL</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          id="manual-thumbnail-url"
+                          type="url"
+                          placeholder="https://example.com/thumbnail.jpg"
+                          value={manualThumbnailUrl}
+                          onChange={(e) => handleManualUrlChange(e.target.value)}
+                          disabled={isUploadingThumbnail || isRegenerating}
+                          className={manualUrlError ? "border-destructive" : ""}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          onClick={handleThumbnailRemove}
+                          disabled={!manualThumbnailUrl}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
                       </div>
-                    )}
-                    <p className="text-xs text-muted-foreground">
-                      Upload a new thumbnail image (JPG, PNG, or WebP). Max 5MB.
-                    </p>
-                  </div>
-                )}
+                      {manualUrlError && (
+                        <p className="text-sm text-destructive">{manualUrlError}</p>
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        Enter a direct URL to an image file (JPG, PNG, or WebP).
+                      </p>
+                      {newThumbnailUrl && thumbnailTab === "manual" && manualThumbnailUrl && (
+                        <div className="space-y-2">
+                          <Label className="text-sm text-muted-foreground">Preview</Label>
+                          <div className="relative aspect-video w-full max-w-md rounded-lg overflow-hidden border">
+                            <GatewayImage
+                              src={newThumbnailUrl}
+                              alt="Manual thumbnail"
+                              fill
+                              className="object-cover"
+                              showSkeleton={true}
+                              fallbackSrc="/Creative_TV.png"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </TabsContent>
+                </Tabs>
               </div>
             </div>
           </div>
@@ -474,11 +665,11 @@ export function VideoEditDialog({
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
-              disabled={isSaving || isUploadingThumbnail}
+              disabled={isSaving || isUploadingThumbnail || isRegenerating}
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isSaving || isUploadingThumbnail}>
+            <Button type="submit" disabled={isSaving || isUploadingThumbnail || isRegenerating}>
               {isSaving ? "Saving..." : "Save Changes"}
             </Button>
           </DialogFooter>
