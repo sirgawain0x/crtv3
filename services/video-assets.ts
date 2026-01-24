@@ -25,7 +25,7 @@ export async function createVideoAsset(
   // If asset already exists, return it instead of creating a duplicate
   if (existingAsset) {
     console.log(`Video asset with asset_id ${data.asset_id} already exists, returning existing asset`);
-    
+
     // Update collaborators if provided and different from existing
     if (collaborators && collaborators.length > 0 && existingAsset.id) {
       // Check if collaborators need to be updated
@@ -37,11 +37,11 @@ export async function createVideoAsset(
       // Only update if collaborators are different
       // Note: share_percentage is stored in basis points (0-10000), where 10000 = 100%
       // collab.percentage is a percentage (0-100), so we convert to basis points for comparison
-      const needsUpdate = !existingCollaborators || 
+      const needsUpdate = !existingCollaborators ||
         existingCollaborators.length !== collaborators.length ||
         collaborators.some((collab, index) => {
           const existing = existingCollaborators[index];
-          return !existing || 
+          return !existing ||
             existing.collaborator_address.toLowerCase() !== collab.address.toLowerCase() ||
             existing.share_percentage !== Math.round(collab.percentage * 100);
         });
@@ -56,7 +56,7 @@ export async function createVideoAsset(
         // Insert new collaborators
         const collaboratorInserts = collaborators.map((collab, index) => {
           let sharePercentage = Math.round(collab.percentage * 100);
-          
+
           if (index === collaborators.length - 1) {
             const previousTotal = collaborators
               .slice(0, -1)
@@ -65,7 +65,7 @@ export async function createVideoAsset(
             if (sharePercentage < 0) sharePercentage = 0;
             if (sharePercentage > 10000) sharePercentage = 10000;
           }
-          
+
           return {
             video_id: existingAsset.id,
             collaborator_address: collab.address,
@@ -138,7 +138,7 @@ export async function createVideoAsset(
     const collaboratorInserts = collaborators.map((collab, index) => {
       // Convert to basis points (0-10000)
       let sharePercentage = Math.round(collab.percentage * 100);
-      
+
       // For the last collaborator, adjust to ensure total equals exactly 10000
       // This compensates for rounding errors in previous collaborators
       if (index === collaborators.length - 1) {
@@ -146,15 +146,15 @@ export async function createVideoAsset(
         const previousTotal = collaborators
           .slice(0, -1)
           .reduce((sum, c) => sum + Math.round(c.percentage * 100), 0);
-        
+
         // Set the last collaborator's share to make the total exactly 10000
         sharePercentage = 10000 - previousTotal;
-        
+
         // Ensure it's within valid range (0-10000)
         if (sharePercentage < 0) sharePercentage = 0;
         if (sharePercentage > 10000) sharePercentage = 10000;
       }
-      
+
       return {
         video_id: result.id,
         collaborator_address: collab.address,
@@ -688,3 +688,47 @@ export async function deleteMultistreamTarget({
   }
 }
 
+
+/**
+ * Delete a video asset from both Livepeer and the database
+ */
+export async function deleteVideoAsset(assetId: string, creatorId: string) {
+  // Use service client to bypass RLS for deletion
+  const supabase = createServiceClient();
+
+  // 1. Verify ownership
+  const { data: asset } = await supabase
+    .from('video_assets')
+    .select('creator_id')
+    .eq('asset_id', assetId)
+    .single();
+
+  if (!asset) {
+    throw new Error('Asset not found');
+  }
+
+  // Normalize IDs for comparison (handle case differences)
+  if (asset.creator_id.toLowerCase() !== creatorId.toLowerCase()) {
+    throw new Error('Unauthorized: You can only delete your own videos');
+  }
+
+  // 2. Delete from Livepeer
+  try {
+    await fullLivepeer.asset.delete(assetId);
+  } catch (error: any) {
+    console.error('Error deleting from Livepeer:', error);
+    // Proceed to delete from DB even if Livepeer fails (e.g. if already deleted)
+  }
+
+  // 3. Delete from DB
+  const { error: dbError } = await supabase
+    .from('video_assets')
+    .delete()
+    .eq('asset_id', assetId);
+
+  if (dbError) {
+    throw new Error(`Failed to delete from database: ${dbError.message}`);
+  }
+
+  return { success: true };
+}

@@ -56,10 +56,10 @@ export class IPFSService {
     this.proof = config.proof;
     this.email = config.email;
     // Use Lighthouse gateway as default if API key is provided
-    this.gateway = config.gateway || (config.lighthouseApiKey 
-      ? 'https://gateway.lighthouse.storage/ipfs' 
+    this.gateway = config.gateway || (config.lighthouseApiKey
+      ? 'https://gateway.lighthouse.storage/ipfs'
       : 'https://w3s.link/ipfs');
-    
+
     // Following helia-nextjs pattern: use provided Helia instance from context if available
     if (config.helia && config.fs) {
       this.helia = config.helia;
@@ -67,7 +67,7 @@ export class IPFSService {
       this.initialized = true;
       serverLogger.debug('[IPFSService] Using Helia instance from context');
     }
-    
+
     // Initialize Lighthouse service if API key is provided
     if (this.lighthouseApiKey) {
       this.lighthouseService = new LighthouseService({
@@ -187,36 +187,54 @@ export class IPFSService {
 
       // Add to Helia (following helia-nextjs pattern)
       const cid = await this.fs.addBytes(content);
-      const hash = cid.toString();
-      const url = `${this.gateway}/${hash}`;
+      const heliaHash = cid.toString();
+      serverLogger.debug('[IPFSService] ✅ Helia upload successful (local):', heliaHash);
 
-      serverLogger.debug('[IPFSService] ✅ Helia upload successful:', hash);
-      serverLogger.debug('[IPFSService] 📍 Accessible via:', url);
+      // Default to Helia result
+      let finalHash = heliaHash;
+      let finalUrl = `${this.gateway}/${heliaHash}`;
 
-      // 2. Background: Upload to Lighthouse (CDN distribution, non-blocking)
+      // 2. Critical: Upload to Lighthouse (CDN distribution)
+      // We await this because we rely on Lighthouse Gateway for immediate access
       if (this.lighthouseService) {
-        this.lighthouseService.uploadFile(file).then((result) => {
-          if (result.success && result.hash) {
-            serverLogger.debug('[IPFSService] ✅ Lighthouse backup complete:', result.hash);
+        try {
+          // Upload to Lighthouse
+          const lighthouseResult = await this.lighthouseService.uploadFile(file);
+
+          if (lighthouseResult.success && lighthouseResult.hash) {
+            serverLogger.debug('[IPFSService] ✅ Lighthouse upload successful:', lighthouseResult.hash);
+
+            // Prefer Lighthouse hash/URL since we use their gateway
+            // This ensures immediate availability without propagation delay
+            finalHash = lighthouseResult.hash;
+            finalUrl = lighthouseResult.url || `${this.gateway}/${finalHash}`;
+          } else {
+            serverLogger.warn('[IPFSService] ⚠️ Lighthouse upload returned no hash:', lighthouseResult.error);
           }
-        }).catch((err) => {
-          serverLogger.warn('[IPFSService] ⚠️ Lighthouse backup failed (non-critical):', err);
-        });
+        } catch (err) {
+          serverLogger.warn('[IPFSService] ⚠️ Lighthouse upload failed:', err);
+          // Fallback to Helia hash is already set
+        }
       }
+
+      // 3. Background: Upload to Storacha (Backup/Persistence, non-blocking)
+      // ... (rest of the code)
+
+      serverLogger.debug('[IPFSService] 📍 Accessible via:', finalUrl);
 
       // 3. Background: Upload to Storacha (Backup/Persistence, non-blocking)
       if (this.storachaClient) {
         this.storachaClient.uploadFile(file).then((result: any) => {
-          serverLogger.debug(`[IPFSService] ✅ Storacha backup complete for ${hash}:`, result);
+          serverLogger.debug(`[IPFSService] ✅ Storacha backup complete for ${finalHash}:`, result);
         }).catch((err: any) => {
-          serverLogger.warn(`[IPFSService] ⚠️ Storacha backup failed for ${hash}:`, err);
+          serverLogger.warn(`[IPFSService] ⚠️ Storacha backup failed for ${finalHash}:`, err);
         });
       } else {
         // Try to initialize Storacha in background
         this.initializeStoracha().then(() => {
           if (this.storachaClient) {
             this.storachaClient.uploadFile(file).catch((err: any) => {
-              serverLogger.warn(`[IPFSService] ⚠️ Storacha backup failed for ${hash}:`, err);
+              serverLogger.warn(`[IPFSService] ⚠️ Storacha backup failed for ${finalHash}:`, err);
             });
           }
         }).catch(() => {
@@ -226,9 +244,9 @@ export class IPFSService {
 
       // 4. Background: Create Filecoin deal for long-term archival (fire and forget)
       if (this.filecoinFirstService && this.enableFilecoinArchival) {
-        this.createFilecoinDeal(hash).then((result) => {
+        this.createFilecoinDeal(finalHash).then((result) => {
           if (result.success && result.dealId) {
-            serverLogger.debug(`[IPFSService] ✅ Filecoin deal created for ${hash}:`, result.dealId);
+            serverLogger.debug(`[IPFSService] ✅ Filecoin deal created for ${finalHash}:`, result.dealId);
           }
         }).catch((err) => {
           serverLogger.warn('[IPFSService] ⚠️ Filecoin archival failed (non-critical):', err);
@@ -237,8 +255,8 @@ export class IPFSService {
 
       return {
         success: true,
-        url,
-        hash,
+        url: finalUrl,
+        hash: finalHash,
       };
     } catch (error) {
       serverLogger.error('[IPFSService] ❌ IPFS upload error:', error);
@@ -316,8 +334,8 @@ export const ipfsService = new IPFSService({
   proof: process.env.STORACHA_PROOF,
   // We intentionally OMIT email here to prevent fallback to interactive mode
   // email: process.env.NEXT_PUBLIC_STORACHA_EMAIL, 
-  gateway: process.env.NEXT_PUBLIC_IPFS_GATEWAY || 
-    (process.env.NEXT_PUBLIC_LIGHTHOUSE_API_KEY 
-      ? 'https://gateway.lighthouse.storage/ipfs' 
+  gateway: process.env.NEXT_PUBLIC_IPFS_GATEWAY ||
+    (process.env.NEXT_PUBLIC_LIGHTHOUSE_API_KEY
+      ? 'https://gateway.lighthouse.storage/ipfs'
       : 'https://w3s.link/ipfs'),
 });

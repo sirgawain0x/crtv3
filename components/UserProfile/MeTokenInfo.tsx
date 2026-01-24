@@ -37,20 +37,17 @@ export function MeTokenInfo({ meToken }: MeTokenInfoProps) {
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
 
-  const formatTimestamp = (timestamp: bigint) => {
-    const date = new Date(Number(timestamp) * 1000);
-    return date.toLocaleDateString();
-  };
+
 
   // Format token amount with proper precision and responsive display
   // Returns an object with formatted number and symbol for better visual presentation
   const formatTokenAmount = (value: bigint, symbol: string): { number: string; symbol: string } => {
     const num = parseFloat(formatEther(value));
-    
+
     if (num === 0) return { number: '0', symbol };
-    
+
     let formattedNumber: string;
-    
+
     // If number is very small, use more precision
     if (num < 0.00001) {
       formattedNumber = num.toExponential(3);
@@ -66,12 +63,12 @@ export function MeTokenInfo({ meToken }: MeTokenInfoProps) {
       }
     } else {
       // For larger numbers, format with locale string
-      formattedNumber = num.toLocaleString(undefined, { 
+      formattedNumber = num.toLocaleString(undefined, {
         maximumFractionDigits: 6,
-        minimumFractionDigits: 0 
+        minimumFractionDigits: 0
       }).replace(/\.?0+$/, '');
     }
-    
+
     return { number: formattedNumber, symbol };
   };
 
@@ -127,28 +124,6 @@ export function MeTokenInfo({ meToken }: MeTokenInfoProps) {
               })()}
             </div>
           </div>
-
-          <div>
-            <p className="text-xs sm:text-sm font-medium text-muted-foreground mb-2">Contract Address</p>
-            <div className="flex items-center gap-2 flex-wrap">
-              <code className="relative rounded bg-muted px-2 py-1.5 font-mono text-xs sm:text-sm break-all sm:break-normal overflow-wrap-anywhere">
-                {formatAddress(meToken.address)}
-              </code>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 sm:h-6 sm:w-6 flex-shrink-0"
-                onClick={() => copyToClipboard(meToken.address, 'Contract')}
-              >
-                {copiedAddress === 'Contract' ? (
-                  <Check className="h-3.5 w-3.5 sm:h-3 sm:w-3 text-green-500" />
-                ) : (
-                  <Copy className="h-3.5 w-3.5 sm:h-3 sm:w-3" />
-                )}
-                <span className="sr-only">Copy address</span>
-              </Button>
-            </div>
-          </div>
         </CardContent>
       </Card>
 
@@ -191,17 +166,19 @@ export function MeTokenInfo({ meToken }: MeTokenInfoProps) {
                 );
               })()}
             </div>
-            <div className="space-y-1">
-              <p className="text-xs sm:text-sm font-medium text-muted-foreground">Locked Balance</p>
-              {(() => {
-                const { number, symbol } = formatTokenAmount(meToken.info.balanceLocked, 'DAI');
-                return (
-                  <p className="text-sm sm:text-base break-all sm:break-normal overflow-wrap-anywhere">
-                    {number} {symbol}
-                  </p>
-                );
-              })()}
-            </div>
+            {meToken.info.balanceLocked > BigInt(0) && (
+              <div className="space-y-1">
+                <p className="text-xs sm:text-sm font-medium text-muted-foreground">Locked Balance</p>
+                {(() => {
+                  const { number, symbol } = formatTokenAmount(meToken.info.balanceLocked, 'DAI');
+                  return (
+                    <p className="text-sm sm:text-base break-all sm:break-normal overflow-wrap-anywhere">
+                      {number} {symbol}
+                    </p>
+                  );
+                })()}
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -240,21 +217,7 @@ export function MeTokenInfo({ meToken }: MeTokenInfoProps) {
             </div>
           </div>
 
-          <div className="space-y-1">
-            <p className="text-xs sm:text-sm font-medium text-muted-foreground">Start Time</p>
-            <p className="text-sm sm:text-base">
-              {formatTimestamp(meToken.info.startTime)}
-            </p>
-          </div>
 
-          {meToken.info.endTime > 0 && (
-            <div className="space-y-1">
-              <p className="text-xs sm:text-sm font-medium text-muted-foreground">End Time</p>
-              <p className="text-sm sm:text-base">
-                {formatTimestamp(meToken.info.endTime)}
-              </p>
-            </div>
-          )}
 
           {meToken.info.migration !== '0x0000000000000000000000000000000000000000' && (
             <div className="space-y-1">
