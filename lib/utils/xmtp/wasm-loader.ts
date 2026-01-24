@@ -1,3 +1,5 @@
+
+import { logger } from '@/lib/utils/logger';
 /**
  * WASM Loader Utility for XMTP
  * 
@@ -55,7 +57,7 @@ export function patchWasmFetch(): void {
         absoluteUrl = new URL(url, window.location.origin).href;
       }
 
-      console.log('[WASM Loader] Converting relative WASM URL:', url, '->', absoluteUrl);
+      logger.debug('[WASM Loader] Converting relative WASM URL:', url, '->', absoluteUrl);
       
       // Use original fetch with absolute URL
       return originalFetch(absoluteUrl, init);
@@ -143,7 +145,7 @@ export function patchWorkerWasmFetch(): void {
         absoluteUrl = new URL(url, appOrigin).href;
       }
 
-      console.log('[WASM Loader] Worker: Converting relative WASM URL:', url, '->', absoluteUrl);
+      logger.debug('[WASM Loader] Worker: Converting relative WASM URL:', url, '->', absoluteUrl);
       
       // Use original fetch with absolute URL
       return originalFetch(absoluteUrl, init);

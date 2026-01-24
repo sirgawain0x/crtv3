@@ -1,5 +1,6 @@
 import { supabase, MeToken, MeTokenBalance, MeTokenTransaction, CreateMeTokenData, UpdateMeTokenData } from './client';
 import { createServiceClient } from './service';
+import { serverLogger } from '@/lib/utils/logger';
 
 // Re-export types for external use
 export type { MeToken, MeTokenBalance, MeTokenTransaction, CreateMeTokenData, UpdateMeTokenData };
@@ -16,13 +17,13 @@ export class MeTokenSupabaseService {
 
       if (error) {
         if (error.code === 'PGRST116') return null; // Not found
-        console.error('Supabase error fetching MeToken by address:', error);
+        serverLogger.error('Supabase error fetching MeToken by address:', error);
         throw new Error(`Failed to fetch MeToken: ${error.message}`);
       }
 
       return data;
     } catch (error) {
-      console.error('Error in getMeTokenByAddress:', error);
+      serverLogger.error('Error in getMeTokenByAddress:', error);
       if (error instanceof Error) {
         throw error;
       }
@@ -41,13 +42,13 @@ export class MeTokenSupabaseService {
 
       if (error) {
         if (error.code === 'PGRST116') return null; // Not found
-        console.error('Supabase error fetching MeToken by owner:', error);
+        serverLogger.error('Supabase error fetching MeToken by owner:', error);
         throw new Error(`Failed to fetch MeToken by owner: ${error.message}`);
       }
 
       return data;
     } catch (error) {
-      console.error('Error in getMeTokenByOwner:', error);
+      serverLogger.error('Error in getMeTokenByOwner:', error);
       if (error instanceof Error) {
         throw error;
       }
@@ -66,13 +67,13 @@ export class MeTokenSupabaseService {
 
       if (error) {
         if (error.code === 'PGRST116') return null; // Not found
-        console.error('Supabase error fetching MeToken by ID:', error);
+        serverLogger.error('Supabase error fetching MeToken by ID:', error);
         throw new Error(`Failed to fetch MeToken by ID: ${error.message}`);
       }
 
       return data;
     } catch (error) {
-      console.error('Error in getMeTokenById:', error);
+      serverLogger.error('Error in getMeTokenById:', error);
       if (error instanceof Error) {
         throw error;
       }
@@ -170,7 +171,7 @@ export class MeTokenSupabaseService {
     const { data, error } = await query;
 
     if (error) {
-      console.error('Supabase error fetching Subscribe events:', error);
+      serverLogger.error('Supabase error fetching Subscribe events:', error);
       throw new Error(`Failed to fetch Subscribe events: ${error.message}`);
     }
 
@@ -307,7 +308,7 @@ export class MeTokenSupabaseService {
     try {
       serviceClient = createServiceClient();
     } catch (error) {
-      console.error('Failed to create service client for balance update:', error);
+      serverLogger.error('Failed to create service client for balance update:', error);
       throw new Error('Service configuration error: Unable to authenticate as service role');
     }
     const client = serviceClient;
@@ -322,7 +323,7 @@ export class MeTokenSupabaseService {
 
     // If checkError is not a "not found" error, log it but continue
     if (checkError && checkError.code !== 'PGRST116') {
-      console.warn('Error checking existing balance:', checkError);
+      serverLogger.warn('Error checking existing balance:', checkError);
     }
 
     let data, error;
@@ -394,7 +395,7 @@ export class MeTokenSupabaseService {
     try {
       serviceClient = createServiceClient();
     } catch (error) {
-      console.error('Failed to create service client for transaction record:', error);
+      serverLogger.error('Failed to create service client for transaction record:', error);
       throw new Error('Service configuration error: Unable to authenticate as service role');
     }
     const client = serviceClient;

@@ -1,6 +1,8 @@
 import { getSrc } from "@livepeer/react/external";
 import { Src } from "@livepeer/react";
 import { LIVEPEER_HERO_PLAYBACK_ID, HERO_VIDEO_ASSET_ID } from "../../../context/context";
+import { logger } from '@/lib/utils/logger';
+
 
 export const getHeroPlaybackSource = async (): Promise<Src[] | null> => {
   try {
@@ -16,10 +18,10 @@ export const getHeroPlaybackSource = async (): Promise<Src[] | null> => {
             playbackId = assetResponse.asset.playbackId;
           }
         } else {
-          console.warn(`Failed to fetch hero video asset: ${response.status} ${response.statusText}`);
+          logger.warn(`Failed to fetch hero video asset: ${response.status} ${response.statusText}`);
         }
       } catch (error) {
-        console.warn("Error fetching hero video asset by ID, falling back to default playback ID:", error);
+        logger.warn("Error fetching hero video asset by ID, falling back to default playback ID:", error);
       }
     }
     
@@ -38,7 +40,7 @@ export const getHeroPlaybackSource = async (): Promise<Src[] | null> => {
     const src = getSrc(playbackInfo?.playbackInfo) as Src[];
     return src;
   } catch (error) {
-    console.error("Error fetching playback source:", error);
+    logger.error("Error fetching playback source:", error);
     return null;
   }
 };

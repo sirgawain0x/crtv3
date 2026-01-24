@@ -7,6 +7,8 @@ import { ParagraphAPI } from "@paragraph-com/sdk";
 import { DearCreativeTradeButton } from "@/components/home-page/DearCreativeTradeButton";
 import { Button } from "@/components/ui/button";
 import { NewsletterModal } from "@/components/home-page/NewsletterModal";
+import { logger } from '@/lib/utils/logger';
+
 
 export default function MusicNewsPage() {
     const [posts, setPosts] = useState<any[]>([]);
@@ -38,7 +40,7 @@ export default function MusicNewsPage() {
                     setPosts(musicPosts);
                 }
             } catch (error) {
-                console.error("Failed to fetch music news:", error);
+                logger.error("Failed to fetch music news:", error);
             } finally {
                 setLoading(false);
             }

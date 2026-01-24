@@ -8,6 +8,7 @@ import { METOKEN_ABI } from '@/lib/contracts/MeToken';
 import { DAI_TOKEN_ADDRESSES, getDaiTokenContract } from '@/lib/contracts/DAIToken';
 import { useToast } from '@/components/ui/use-toast';
 import { useGasSponsorship } from '@/lib/hooks/wallet/useGasSponsorship';
+import { logger } from '@/lib/utils/logger';
 
 // MeTokens contract addresses on Base
 const METOKEN_FACTORY = '0xb31Ae2583d983faa7D8C8304e6A16E414e721A0B';
@@ -117,19 +118,19 @@ export function useMeTokensSupabase(targetAddress?: string) {
     let userBalance = BigInt(0);
     try {
       if (client) {
-        console.log('🔍 Fetching user balance for MeToken:', supabaseMeToken.address);
+        logger.debug('🔍 Fetching user balance for MeToken:', supabaseMeToken.address);
         userBalance = await client.readContract({
           address: supabaseMeToken.address as `0x${string}`,
           abi: ERC20_ABI,
           functionName: 'balanceOf',
           args: [userAddress as `0x${string}`],
         }) as bigint;
-        console.log('✅ User balance fetched:', userBalance.toString());
+        logger.debug('✅ User balance fetched:', userBalance.toString());
       } else {
-        console.warn('⚠️ No client available for balance check');
+        logger.warn('⚠️ No client available for balance check');
       }
     } catch (err) {
-      console.warn('⚠️ Failed to fetch user balance from contract (this is OK, will use 0):', err);
+      logger.warn('⚠️ Failed to fetch user balance from contract (this is OK, will use 0):', err);
       // Set balance to 0 if we can't fetch it - this is fine for display purposes
       userBalance = BigInt(0);
     }
@@ -150,7 +151,7 @@ export function useMeTokensSupabase(targetAddress?: string) {
 
     try {
       if (client && supabaseMeToken?.address) {
-        console.log('🔍 Fetching fresh contract data for MeToken:', supabaseMeToken.address);
+        logger.debug('🔍 Fetching fresh contract data for MeToken:', supabaseMeToken.address);
 
         // Fetch total supply
         const supplyData = await client.readContract({
@@ -183,7 +184,7 @@ export function useMeTokensSupabase(targetAddress?: string) {
         }
       }
     } catch (err) {
-      console.warn('⚠️ Failed to fetch fresh contract data, using Supabase fallback:', err);
+      logger.warn('⚠️ Failed to fetch fresh contract data, using Supabase fallback:', err);
     }
 
     // Calculate TVL (simplified: pooled DAI + locked DAI)
@@ -224,7 +225,7 @@ export function useMeTokensSupabase(targetAddress?: string) {
         const subgraphTokens = await meTokensSubgraph.getMeTokensByOwner(address);
 
         if (subgraphTokens.length > 0) {
-          console.log('✅ Found MeToken in Subgraph:', subgraphTokens[0]);
+          logger.debug('✅ Found MeToken in Subgraph:', subgraphTokens[0]);
           const latestToken = subgraphTokens[0];
 
           if (client) {
@@ -272,7 +273,7 @@ export function useMeTokensSupabase(targetAddress?: string) {
                 };
               }
             } catch (e) {
-              console.warn('⚠️ Failed to refresh info from contract, using subgraph data', e);
+              logger.warn('⚠️ Failed to refresh info from contract, using subgraph data', e);
             }
 
             // Calculate TVL
@@ -310,7 +311,7 @@ export function useMeTokensSupabase(targetAddress?: string) {
           }
         }
       } catch (subgraphErr) {
-        console.warn('⚠️ Subgraph check failed, falling back to API:', subgraphErr);
+        logger.warn('⚠️ Subgraph check failed, falling back to API:', subgraphErr);
       }
 
       if (foundInSubgraph) {
@@ -319,7 +320,7 @@ export function useMeTokensSupabase(targetAddress?: string) {
       }
 
       // 2. Fallback to API/Supabase if not found in subgraph
-      console.log('🔄 Checking Supabase API...');
+      logger.debug('🔄 Checking Supabase API...');
       // Try primary address first
       let response = await fetch(`/api/metokens?owner=${address}`);
       let result = await response.json();
@@ -327,7 +328,7 @@ export function useMeTokensSupabase(targetAddress?: string) {
 
       // If not found, try the smart account address (if we have a client)
       if (!supabaseMeToken && client?.account?.address && client.account.address !== address) {
-        console.log('🔍 Checking smart account address for MeToken:', client.account.address);
+        logger.debug('🔍 Checking smart account address for MeToken:', client.account.address);
         response = await fetch(`/api/metokens?owner=${client.account.address}`);
         result = await response.json();
         supabaseMeToken = result.data;
@@ -335,28 +336,28 @@ export function useMeTokensSupabase(targetAddress?: string) {
 
       // If still not found and we have a user with different EOA, try that too
       if (!supabaseMeToken && user?.address && user.address !== address) {
-        console.log('🔍 Checking EOA address for MeToken:', user.address);
+        logger.debug('🔍 Checking EOA address for MeToken:', user.address);
         response = await fetch(`/api/metokens?owner=${user.address}`);
         result = await response.json();
         supabaseMeToken = result.data;
       }
 
       if (supabaseMeToken) {
-        console.log('✅ Found MeToken via API:', supabaseMeToken);
+        logger.debug('✅ Found MeToken via API:', supabaseMeToken);
         const meTokenData = await convertToMeTokenData(supabaseMeToken, address);
         setUserMeToken(meTokenData);
       } else {
-        console.log('❌ No MeToken found for any address');
+        logger.debug('❌ No MeToken found for any address');
         setUserMeToken(null);
       }
     } catch (err) {
-      console.error('❌ Error checking MeToken:', err);
+      logger.error('❌ Error checking MeToken:', err);
 
       // Handle specific error cases
       if (err instanceof Error) {
         if (err.message.includes('MeToken not found') || err.message.includes('404')) {
           // This is expected when no MeToken exists for the user
-          console.log('ℹ️ No MeToken found for user - this is normal');
+          logger.debug('ℹ️ No MeToken found for user - this is normal');
           setUserMeToken(null);
           setError(null); // Don't show error for missing MeToken
         } else {
@@ -374,41 +375,41 @@ export function useMeTokensSupabase(targetAddress?: string) {
 
   // Internal function to create MeToken (used for retries)
   const createMeTokenInternal = async (name: string, symbol: string, hubId: number = 1, assetsDeposited: string = "0", isRetry: boolean = false) => {
-    console.log('🔧 createMeToken called', { name, symbol, hubId, assetsDeposited, address, user });
+    logger.debug('🔧 createMeToken called', { name, symbol, hubId, assetsDeposited, address, user });
 
     if (!address) {
       const errorMsg = 'No wallet address available';
-      console.error('❌', errorMsg);
+      logger.error('❌', errorMsg);
       throw new Error(errorMsg);
     }
 
     if (!user) {
       const errorMsg = 'No user connected - please ensure your smart account is properly initialized';
-      console.error('❌', errorMsg);
+      logger.error('❌', errorMsg);
       throw new Error(errorMsg);
     }
 
     if (!client) {
       const errorMsg = 'Smart account client not initialized';
-      console.error('❌', errorMsg);
+      logger.error('❌', errorMsg);
       throw new Error(errorMsg);
     }
 
     // First, check if user already has a MeToken to prevent the "already owns" error
-    console.log('🔍 Checking if user already has a MeToken...');
+    logger.debug('🔍 Checking if user already has a MeToken...');
     try {
       // Check database first
       await checkUserMeToken();
       if (userMeToken) {
-        console.log('⚠️ User already has a MeToken in database:', userMeToken.address);
+        logger.debug('⚠️ User already has a MeToken in database:', userMeToken.address);
         throw new Error('You already have a MeToken. Please use the existing one or contact support if you need to create a new one.');
       }
 
       // Also check subgraph for any MeTokens that might not be in database yet
-      console.log('🔍 Checking subgraph for existing MeTokens...');
+      logger.debug('🔍 Checking subgraph for existing MeTokens...');
       const { meTokensSubgraph } = await import('@/lib/sdk/metokens/subgraph');
       const allMeTokens = await meTokensSubgraph.getAllMeTokens(50, 0);
-      console.log(`📋 Found ${allMeTokens.length} recent MeTokens in subgraph`);
+      logger.debug(`📋 Found ${allMeTokens.length} recent MeTokens in subgraph`);
 
       // Check if any of these MeTokens belong to our user
       // Check if any of these MeTokens belong to our user
@@ -417,13 +418,13 @@ export function useMeTokensSupabase(targetAddress?: string) {
         try {
           const { getBulkMeTokenInfo } = await import('@/lib/utils/metokenUtils');
           const recentTokenIds = recentTokens.map(t => t.id);
-          console.log('📦 Bulk checking ownership for:', recentTokenIds);
+          logger.debug('📦 Bulk checking ownership for:', recentTokenIds);
           const results = await getBulkMeTokenInfo(recentTokenIds);
 
           for (const id of recentTokenIds) {
             const info = results[id];
             if (info && info.owner.toLowerCase() === address.toLowerCase()) {
-              console.log('⚠️ User already has a MeToken in subgraph (via bulk check):', id);
+              logger.debug('⚠️ User already has a MeToken in subgraph (via bulk check):', id);
               throw new Error('You already have a MeToken. Please use the existing one or contact support if you need to create a new one.');
             }
           }
@@ -431,12 +432,12 @@ export function useMeTokensSupabase(targetAddress?: string) {
           if (err instanceof Error && err.message.includes('already have a MeToken')) {
             throw err;
           }
-          console.warn('Failed to check MeToken ownership via bulk info:', err);
+          logger.warn('Failed to check MeToken ownership via bulk info:', err);
         }
       }
 
       // Additional check: Query the Diamond contract directly to see if user already owns a meToken
-      console.log('🔍 Checking Diamond contract for existing MeToken ownership...');
+      logger.debug('🔍 Checking Diamond contract for existing MeToken ownership...');
       try {
         const { getLatestMeTokenByOwner } = await import('@/lib/utils/metokenUtils');
 
@@ -449,30 +450,30 @@ export function useMeTokensSupabase(targetAddress?: string) {
           addressesToCheck.push(user.address);
         }
 
-        console.log('🔍 Checking addresses for existing MeTokens:', addressesToCheck);
+        logger.debug('🔍 Checking addresses for existing MeTokens:', addressesToCheck);
 
         for (const checkAddress of addressesToCheck) {
           const existingMeTokenAddress = await getLatestMeTokenByOwner(checkAddress);
           if (existingMeTokenAddress) {
-            console.log('⚠️ User already has a MeToken according to Diamond contract:', existingMeTokenAddress, 'for address:', checkAddress);
+            logger.debug('⚠️ User already has a MeToken according to Diamond contract:', existingMeTokenAddress, 'for address:', checkAddress);
             throw new Error('You already have a MeToken. Please use the "Sync Existing MeToken" button to load it.');
           }
         }
       } catch (diamondErr) {
         // This is expected if the user doesn't have a meToken, so we continue
-        console.log('✅ No existing MeToken found in Diamond contract (this is expected for new users)');
+        logger.debug('✅ No existing MeToken found in Diamond contract (this is expected for new users)');
       }
 
-      console.log('✅ No existing MeToken found, proceeding with creation...');
+      logger.debug('✅ No existing MeToken found, proceeding with creation...');
     } catch (checkErr) {
       if (checkErr instanceof Error && checkErr.message.includes('already have a MeToken')) {
         throw checkErr; // Re-throw the "already have" error
       }
-      console.log('ℹ️ No existing MeToken found, proceeding with creation...');
+      logger.debug('ℹ️ No existing MeToken found, proceeding with creation...');
     }
 
     // Debug: Log address information
-    console.log('🔍 Address debugging:', {
+    logger.debug('🔍 Address debugging:', {
       smartAccountAddress: address,
       userEOAAddress: user.address,
       clientAccountAddress: client.account?.address,
@@ -482,17 +483,17 @@ export function useMeTokensSupabase(targetAddress?: string) {
     // Check if smart account is deployed
     try {
       const code = await client.getCode({ address: address as `0x${string}` });
-      console.log('🏗️ Smart account deployment status:', {
+      logger.debug('🏗️ Smart account deployment status:', {
         address: address,
         hasCode: code !== '0x',
         codeLength: code ? code.length : 0
       });
 
       if (code === '0x') {
-        console.warn('⚠️ Smart account appears to be undeployed. This might cause issues with token interactions.');
+        logger.warn('⚠️ Smart account appears to be undeployed. This might cause issues with token interactions.');
       }
     } catch (deployErr) {
-      console.warn('⚠️ Could not check smart account deployment status:', deployErr);
+      logger.warn('⚠️ Could not check smart account deployment status:', deployErr);
     }
 
     setIsPending(true);
@@ -504,22 +505,22 @@ export function useMeTokensSupabase(targetAddress?: string) {
     try {
       // COMBINED STEP: Create AND Subscribe in one transaction
       // This is more efficient and ensures the MeToken is registered with the protocol
-      console.log('📦 Creating and subscribing MeToken...');
+      logger.debug('📦 Creating and subscribing MeToken...');
 
       const depositAmount = parseEther(assetsDeposited);
 
       // If depositing DAI, we need to approve the vault contract (not Diamond!)
       // The subscribe function calls IVault(vault).handleDeposit() which calls transferFrom
       if (depositAmount > BigInt(0)) {
-        console.log('💰 Depositing DAI, checking approval...');
+        logger.debug('💰 Depositing DAI, checking approval...');
 
         // DAI contract address on Base
         const DAI_ADDRESS = DAI_TOKEN_ADDRESSES.base;
         const daiContract = getDaiTokenContract('base');
 
         // First, check if user has sufficient DAI balance
-        console.log('💳 Checking DAI balance...');
-        console.log('🔍 DAI balance check details:', {
+        logger.debug('💳 Checking DAI balance...');
+        logger.debug('🔍 DAI balance check details:', {
           daiContractAddress: DAI_ADDRESS,
           smartAccountAddress: address,
           userEOAAddress: user?.address,
@@ -535,13 +536,13 @@ export function useMeTokensSupabase(targetAddress?: string) {
             args: [address as `0x${string}`]
           }) as bigint;
 
-          console.log('✅ DAI balance check successful');
+          logger.debug('✅ DAI balance check successful');
         } catch (balanceErr) {
-          console.error('❌ DAI balance check failed:', balanceErr);
+          logger.error('❌ DAI balance check failed:', balanceErr);
           throw new Error(`Failed to check DAI balance: ${balanceErr instanceof Error ? balanceErr.message : 'Unknown error'}`);
         }
 
-        console.log('📊 DAI balance result:', {
+        logger.debug('📊 DAI balance result:', {
           balanceWei: daiBalance.toString(),
           balanceDAI: formatEther(daiBalance),
           requiredWei: depositAmount.toString(),
@@ -552,7 +553,7 @@ export function useMeTokensSupabase(targetAddress?: string) {
         if (daiBalance < depositAmount) {
           // If smart account has no DAI, check if EOA has DAI (in case of address confusion)
           if (user?.address && user.address !== address) {
-            console.log('🔍 Smart account has no DAI, checking EOA balance...');
+            logger.debug('🔍 Smart account has no DAI, checking EOA balance...');
             try {
               const eoaBalance = await client.readContract({
                 address: daiContract.address as `0x${string}`,
@@ -561,7 +562,7 @@ export function useMeTokensSupabase(targetAddress?: string) {
                 args: [user.address as `0x${string}`]
               }) as bigint;
 
-              console.log('📊 EOA DAI balance:', {
+              logger.debug('📊 EOA DAI balance:', {
                 balanceWei: eoaBalance.toString(),
                 balanceDAI: formatEther(eoaBalance),
                 eoaAddress: user.address
@@ -574,7 +575,7 @@ export function useMeTokensSupabase(targetAddress?: string) {
                 );
               }
             } catch (eoaErr) {
-              console.warn('⚠️ Failed to check EOA balance:', eoaErr);
+              logger.warn('⚠️ Failed to check EOA balance:', eoaErr);
             }
           }
 
@@ -585,7 +586,7 @@ export function useMeTokensSupabase(targetAddress?: string) {
         }
 
         // Get the vault address for this hub (the actual spender for subscribe)
-        console.log('🔍 Fetching Vault address for Hub ID:', hubId);
+        logger.debug('🔍 Fetching Vault address for Hub ID:', hubId);
         let vaultAddress: string | null = null;
         try {
           const hubInfo = await client.readContract({
@@ -606,13 +607,13 @@ export function useMeTokensSupabase(targetAddress?: string) {
 
           // Validate vault address - if zero or invalid, skip vault approval (DIAMOND approval will handle it)
           if (!vaultAddress || vaultAddress === '0x0000000000000000000000000000000000000000') {
-            console.warn('⚠️ Vault address is zero or invalid, skipping vault approval (will rely on DIAMOND approval)');
+            logger.warn('⚠️ Vault address is zero or invalid, skipping vault approval (will rely on DIAMOND approval)');
             vaultAddress = null;
           } else {
-            console.log('✅ Vault address for Hub ID', hubId, ':', vaultAddress);
+            logger.debug('✅ Vault address for Hub ID', hubId, ':', vaultAddress);
           }
         } catch (vaultErr) {
-          console.error('❌ Failed to get vault address, skipping vault approval (will rely on DIAMOND approval):', vaultErr);
+          logger.error('❌ Failed to get vault address, skipping vault approval (will rely on DIAMOND approval):', vaultErr);
           vaultAddress = null;
         }
 
@@ -620,7 +621,7 @@ export function useMeTokensSupabase(targetAddress?: string) {
         // If vault address retrieval failed, skip this block and rely on DIAMOND approval only
         if (vaultAddress) {
           // Check current allowance for vault (the actual spender)
-          console.log('🔍 Checking DAI allowance for vault...');
+          logger.debug('🔍 Checking DAI allowance for vault...');
         const currentAllowance = await client.readContract({
           address: daiContract.address as `0x${string}`,
           abi: daiContract.abi,
@@ -628,7 +629,7 @@ export function useMeTokensSupabase(targetAddress?: string) {
           args: [address as `0x${string}`, vaultAddress as `0x${string}`]
         }) as bigint;
 
-        console.log('📊 Current DAI allowance for vault:', {
+        logger.debug('📊 Current DAI allowance for vault:', {
           vaultAddress,
           currentAllowance: currentAllowance.toString(),
           required: depositAmount.toString(),
@@ -636,7 +637,7 @@ export function useMeTokensSupabase(targetAddress?: string) {
         });
 
         if (currentAllowance < depositAmount) {
-          console.log('🔓 Approving DAI for vault...', vaultAddress);
+          logger.debug('🔓 Approving DAI for vault...', vaultAddress);
 
           const approveData = encodeFunctionData({
             abi: daiContract.abi,
@@ -644,8 +645,8 @@ export function useMeTokensSupabase(targetAddress?: string) {
             args: [vaultAddress as `0x${string}`, depositAmount],
           });
 
-          console.log('📤 Sending DAI approval user operation...');
-          console.log('📊 Approval details:', {
+          logger.debug('📤 Sending DAI approval user operation...');
+          logger.debug('📊 Approval details:', {
             target: DAI_ADDRESS,
             spender: vaultAddress,
             hubId,
@@ -670,8 +671,8 @@ export function useMeTokensSupabase(targetAddress?: string) {
             });
           } catch (approveGasError) {
             if (approvePrimaryContext) {
-              console.warn("⚠️ DAI approval primary gas payment failed, falling back to standard gas:", approveGasError);
-              console.log('🔄 Attempting fallback with standard ETH gas for approval...');
+              logger.warn("⚠️ DAI approval primary gas payment failed, falling back to standard gas:", approveGasError);
+              logger.debug('🔄 Attempting fallback with standard ETH gas for approval...');
               const fallbackApprovePromise = client.sendUserOperation({
                 uo: {
                   target: daiContract.address as `0x${string}`,
@@ -695,19 +696,19 @@ export function useMeTokensSupabase(targetAddress?: string) {
             }
           }
 
-          console.log('🎉 Approval UserOperation sent! Hash:', approveOp.hash);
-          console.log('⏳ Waiting for approval confirmation...');
+          logger.debug('🎉 Approval UserOperation sent! Hash:', approveOp.hash);
+          logger.debug('⏳ Waiting for approval confirmation...');
 
           const approvalTxHash = await client.waitForUserOperationTransaction({
             hash: approveOp.hash,
           });
 
-          console.log('✅ Approval transaction confirmed! Hash:', approvalTxHash);
+          logger.debug('✅ Approval transaction confirmed! Hash:', approvalTxHash);
 
-          console.log('✅ DAI approved!');
+          logger.debug('✅ DAI approved!');
 
           // Wait for the approval state to propagate with retry logic
-          console.log('⏳ Waiting for approval state to update...');
+          logger.debug('⏳ Waiting for approval state to update...');
           let newAllowance = BigInt(0);
           let retryCount = 0;
           const maxRetries = 5;
@@ -715,7 +716,7 @@ export function useMeTokensSupabase(targetAddress?: string) {
           while (retryCount < maxRetries && newAllowance < depositAmount) {
             // Wait progressively longer between retries
             const waitTime = 2000 + (retryCount * 1000); // 2s, 3s, 4s, 5s, 6s
-            console.log(`⏳ Waiting ${waitTime}ms for approval state to update... (attempt ${retryCount + 1}/${maxRetries})`);
+            logger.debug(`⏳ Waiting ${waitTime}ms for approval state to update... (attempt ${retryCount + 1}/${maxRetries})`);
             await new Promise(resolve => setTimeout(resolve, waitTime));
 
             try {
@@ -727,26 +728,26 @@ export function useMeTokensSupabase(targetAddress?: string) {
                 args: [address as `0x${string}`, vaultAddress as `0x${string}`]
               }) as bigint;
 
-              console.log(`📊 DAI allowance check ${retryCount + 1}: ${newAllowance.toString()} (expected: ${depositAmount.toString()})`);
+              logger.debug(`📊 DAI allowance check ${retryCount + 1}: ${newAllowance.toString()} (expected: ${depositAmount.toString()})`);
 
               if (newAllowance >= depositAmount) {
-                console.log('✅ DAI allowance confirmed!');
+                logger.debug('✅ DAI allowance confirmed!');
                 break;
               }
             } catch (err) {
-              console.warn(`⚠️ Allowance check failed on attempt ${retryCount + 1}:`, err);
+              logger.warn(`⚠️ Allowance check failed on attempt ${retryCount + 1}:`, err);
             }
 
             retryCount++;
           }
 
           if (newAllowance < depositAmount) {
-            console.error('❌ DAI approval verification failed after all retries');
-            console.error('📊 Final allowance:', newAllowance.toString());
-            console.error('📊 Expected allowance:', depositAmount.toString());
-            console.error('📊 Smart account address:', address);
-            console.error('📊 Vault address:', vaultAddress);
-            console.error('📊 Hub ID:', hubId);
+            logger.error('❌ DAI approval verification failed after all retries');
+            logger.error('📊 Final allowance:', newAllowance.toString());
+            logger.error('📊 Expected allowance:', depositAmount.toString());
+            logger.error('📊 Smart account address:', address);
+            logger.error('📊 Vault address:', vaultAddress);
+            logger.error('📊 Hub ID:', hubId);
 
             // Provide helpful error message with suggestions
             const errorMsg = `DAI approval failed after ${maxRetries} retries. This could be due to:
@@ -763,13 +764,13 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
             throw new Error(errorMsg);
           }
         } else {
-          console.log('✅ Sufficient DAI allowance already exists for vault');
+          logger.debug('✅ Sufficient DAI allowance already exists for vault');
         }
         } // End of vault approval block (only executed if vaultAddress is valid)
 
         // 3b. ALSO Check/Approve DAI for the DIAMOND (Just in case Diamond calls transferFrom directly)
         // This covers the case where Diamond is the spender, or Vault is the spender.
-        console.log('🔍 Checking DAI allowance for DIAMOND (fallback)...');
+        logger.debug('🔍 Checking DAI allowance for DIAMOND (fallback)...');
         const diamondAllowance = await client.readContract({
           address: daiContract.address as `0x${string}`,
           abi: daiContract.abi,
@@ -777,17 +778,17 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
           args: [address as `0x${string}`, DIAMOND as `0x${string}`]
         }) as bigint;
 
-        console.log('📊 Current DAI allowance for DIAMOND:', diamondAllowance.toString());
+        logger.debug('📊 Current DAI allowance for DIAMOND:', diamondAllowance.toString());
 
         if (diamondAllowance < depositAmount) {
-          console.log('🔓 Approving DAI for DIAMOND (fallback)...');
+          logger.debug('🔓 Approving DAI for DIAMOND (fallback)...');
           const diamondApproveData = encodeFunctionData({
             abi: daiContract.abi,
             functionName: 'approve',
             args: [DIAMOND as `0x${string}`, depositAmount],
           });
 
-          console.log('📤 Sending DAI approval for DIAMOND user operation...');
+          logger.debug('📤 Sending DAI approval for DIAMOND user operation...');
           
           // Apply gas sponsorship for DIAMOND approval (consistent with vault approval)
           const diamondApproveGasContext = getGasContext('usdc');
@@ -805,8 +806,8 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
             });
           } catch (diamondApproveGasError) {
             if (diamondApprovePrimaryContext) {
-              console.warn("⚠️ DAI approval for DIAMOND primary gas payment failed, falling back to standard gas:", diamondApproveGasError);
-              console.log('🔄 Attempting fallback with standard ETH gas for DIAMOND approval...');
+              logger.warn("⚠️ DAI approval for DIAMOND primary gas payment failed, falling back to standard gas:", diamondApproveGasError);
+              logger.debug('🔄 Attempting fallback with standard ETH gas for DIAMOND approval...');
               const fallbackDiamondApprovePromise = client.sendUserOperation({
                 uo: {
                   target: daiContract.address as `0x${string}`,
@@ -830,15 +831,15 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
             }
           }
 
-          console.log('⏳ Waiting for DIAMOND approval confirmation...', diamondApproveOp.hash);
+          logger.debug('⏳ Waiting for DIAMOND approval confirmation...', diamondApproveOp.hash);
           const diamondApprovalTxHash = await client.waitForUserOperationTransaction({
             hash: diamondApproveOp.hash,
           });
 
-          console.log('✅ DIAMOND approval transaction confirmed! Hash:', diamondApprovalTxHash);
+          logger.debug('✅ DIAMOND approval transaction confirmed! Hash:', diamondApprovalTxHash);
 
           // Wait for the approval state to propagate with retry logic
-          console.log('⏳ Waiting for DIAMOND approval state to update...');
+          logger.debug('⏳ Waiting for DIAMOND approval state to update...');
           let diamondNewAllowance = BigInt(0);
           let diamondRetryCount = 0;
           const diamondMaxRetries = 5;
@@ -846,7 +847,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
           while (diamondRetryCount < diamondMaxRetries && diamondNewAllowance < depositAmount) {
             // Wait progressively longer between retries
             const waitTime = 2000 + (diamondRetryCount * 1000); // 2s, 3s, 4s, 5s, 6s
-            console.log(`⏳ Waiting ${waitTime}ms for DIAMOND approval state to update... (attempt ${diamondRetryCount + 1}/${diamondMaxRetries})`);
+            logger.debug(`⏳ Waiting ${waitTime}ms for DIAMOND approval state to update... (attempt ${diamondRetryCount + 1}/${diamondMaxRetries})`);
             await new Promise(resolve => setTimeout(resolve, waitTime));
 
             try {
@@ -858,25 +859,25 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
                 args: [address as `0x${string}`, DIAMOND as `0x${string}`]
               }) as bigint;
 
-              console.log(`📊 DAI allowance for DIAMOND check ${diamondRetryCount + 1}: ${diamondNewAllowance.toString()} (expected: ${depositAmount.toString()})`);
+              logger.debug(`📊 DAI allowance for DIAMOND check ${diamondRetryCount + 1}: ${diamondNewAllowance.toString()} (expected: ${depositAmount.toString()})`);
 
               if (diamondNewAllowance >= depositAmount) {
-                console.log('✅ DAI allowance for DIAMOND confirmed!');
+                logger.debug('✅ DAI allowance for DIAMOND confirmed!');
                 break;
               }
             } catch (err) {
-              console.warn(`⚠️ DIAMOND allowance check failed on attempt ${diamondRetryCount + 1}:`, err);
+              logger.warn(`⚠️ DIAMOND allowance check failed on attempt ${diamondRetryCount + 1}:`, err);
             }
 
             diamondRetryCount++;
           }
 
           if (diamondNewAllowance < depositAmount) {
-            console.error('❌ DAI approval for DIAMOND verification failed after all retries');
-            console.error('📊 Final allowance:', diamondNewAllowance.toString());
-            console.error('📊 Expected allowance:', depositAmount.toString());
-            console.error('📊 Smart account address:', address);
-            console.error('📊 DIAMOND address:', DIAMOND);
+            logger.error('❌ DAI approval for DIAMOND verification failed after all retries');
+            logger.error('📊 Final allowance:', diamondNewAllowance.toString());
+            logger.error('📊 Expected allowance:', depositAmount.toString());
+            logger.error('📊 Smart account address:', address);
+            logger.error('📊 DIAMOND address:', DIAMOND);
 
             // Provide helpful error message with suggestions
             const errorMsg = `DAI approval for DIAMOND failed after ${diamondMaxRetries} retries. This could be due to:
@@ -893,9 +894,9 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
             throw new Error(errorMsg);
           }
 
-          console.log('✅ DAI approved for DIAMOND');
+          logger.debug('✅ DAI approved for DIAMOND');
         } else {
-          console.log('✅ Sufficient DAI allowance already exists for DIAMOND');
+          logger.debug('✅ Sufficient DAI allowance already exists for DIAMOND');
         }
       }
 
@@ -918,14 +919,14 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         args: [name, symbol, BigInt(hubId), depositAmount],
       });
 
-      console.log('🔨 Encoded subscribe data');
+      logger.debug('🔨 Encoded subscribe data');
 
       // Apply gas sponsorship: Members get sponsored, Non-members pay in USDC or ETH
       const gasContext = getGasContext('usdc');
       const primaryContext = gasContext.context;
 
-      console.log(`📤 Sending subscribe user operation via client with ${gasContext.isSponsored ? 'Sponsored' : (primaryContext ? 'USDC' : 'Standard ETH')} gas...`);
-      console.log('🔍 Operation details:', {
+      logger.debug(`📤 Sending subscribe user operation via client with ${gasContext.isSponsored ? 'Sponsored' : (primaryContext ? 'USDC' : 'Standard ETH')} gas...`);
+      logger.debug('🔍 Operation details:', {
         target: DIAMOND,
         hasData: !!subscribeData,
         dataLength: subscribeData?.length,
@@ -935,7 +936,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
 
       let operation;
       try {
-        console.log('⏳ Calling sendUserOperation (this may take a moment)...');
+        logger.debug('⏳ Calling sendUserOperation (this may take a moment)...');
         const sendOpPromise = client.sendUserOperation({
           uo: {
             target: DIAMOND, // Subscribe is called on the Diamond contract
@@ -950,24 +951,24 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
           setTimeout(() => reject(new Error('sendUserOperation timed out after 60 seconds')), 60000);
         });
 
-        console.log('⏳ Waiting for sendUserOperation to complete...');
+        logger.debug('⏳ Waiting for sendUserOperation to complete...');
         operation = await Promise.race([sendOpPromise, timeoutPromise]) as any;
-        console.log('✅ sendUserOperation completed!');
+        logger.debug('✅ sendUserOperation completed!');
       } catch (gasError) {
         // Detect timeout errors - DO NOT retry on timeout to avoid duplicate transactions
         // The original operation may still complete in the background
         const isTimeoutError = gasError instanceof Error && gasError.message.includes('timed out after 60 seconds');
         
         if (isTimeoutError) {
-          console.error('❌ sendUserOperation timed out after 60 seconds');
-          console.error('⚠️ The original operation may still be pending and could complete later.');
-          console.error('⚠️ NOT retrying to avoid creating duplicate MeToken subscriptions.');
-          console.error('💡 Please wait a few moments and check if the transaction completed, then retry if needed.');
+          logger.error('❌ sendUserOperation timed out after 60 seconds');
+          logger.error('⚠️ The original operation may still be pending and could complete later.');
+          logger.error('⚠️ NOT retrying to avoid creating duplicate MeToken subscriptions.');
+          logger.error('💡 Please wait a few moments and check if the transaction completed, then retry if needed.');
           throw new Error('Transaction timed out. Please wait a few moments to check if it completed, then retry if necessary. This prevents duplicate transactions.');
         }
 
-        console.error('❌ Error sending user operation:', gasError);
-        console.error('❌ Error details:', {
+        logger.error('❌ Error sending user operation:', gasError);
+        logger.error('❌ Error details:', {
           message: gasError instanceof Error ? gasError.message : String(gasError),
           stack: gasError instanceof Error ? gasError.stack : undefined,
           name: gasError instanceof Error ? gasError.name : undefined,
@@ -976,8 +977,8 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
 
         // Only retry on actual operation errors (not timeouts)
         if (primaryContext) {
-          console.warn("⚠️ Primary gas payment failed, falling back to standard gas:", gasError);
-          console.log('🔄 Attempting fallback with standard ETH gas...');
+          logger.warn("⚠️ Primary gas payment failed, falling back to standard gas:", gasError);
+          logger.debug('🔄 Attempting fallback with standard ETH gas...');
           try {
             const fallbackSubscribePromise = client.sendUserOperation({
               uo: {
@@ -997,9 +998,9 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
             });
 
             operation = await Promise.race([fallbackSubscribePromise, fallbackSubscribeTimeoutPromise]) as any;
-            console.log('✅ Fallback to standard gas succeeded!');
+            logger.debug('✅ Fallback to standard gas succeeded!');
           } catch (fallbackError) {
-            console.error('❌ Fallback to standard gas also failed:', fallbackError);
+            logger.error('❌ Fallback to standard gas also failed:', fallbackError);
             throw new Error(`Failed to send user operation with both primary (${gasContext.isSponsored ? 'Sponsored' : 'USDC'}) and fallback (ETH) gas methods. Last error: ${fallbackError instanceof Error ? fallbackError.message : String(fallbackError)}`);
           }
         } else {
@@ -1007,11 +1008,11 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         }
       }
 
-      console.log('🎉 UserOperation sent! Hash:', operation.hash);
+      logger.debug('🎉 UserOperation sent! Hash:', operation.hash);
       setIsPending(false);
       setIsConfirming(true);
 
-      console.log('⏳ Waiting for transaction confirmation...');
+      logger.debug('⏳ Waiting for transaction confirmation...');
 
       let txHash: string;
       try {
@@ -1022,12 +1023,12 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         throw waitError;
       }
 
-      console.log('✅ Transaction mined! Hash:', txHash);
+      logger.debug('✅ Transaction mined! Hash:', txHash);
 
       // For UserOperations (EIP-4337), we need to use the subgraph to find the MeToken
       // The subgraph indexes Subscribe events which contain the MeToken address
 
-      console.log('🔍 Querying subgraph for newly created MeToken...');
+      logger.debug('🔍 Querying subgraph for newly created MeToken...');
 
       let meTokenAddress: string | null = null;
 
@@ -1036,26 +1037,26 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         const { meTokensSubgraph } = await import('@/lib/sdk/metokens/subgraph');
 
         // Wait for subgraph to index the event (usually takes a few seconds)
-        console.log('⏳ Waiting 3s for subgraph indexing...');
+        logger.debug('⏳ Waiting 3s for subgraph indexing...');
         await new Promise(resolve => setTimeout(resolve, 3000));
 
         // Get all recent MeTokens from subgraph
-        console.log('📊 Fetching recent MeTokens from subgraph...');
+        logger.debug('📊 Fetching recent MeTokens from subgraph...');
         const allMeTokens = await meTokensSubgraph.getAllMeTokens(20, 0);
-        console.log(`📋 Found ${allMeTokens.length} recent MeTokens from subgraph`);
+        logger.debug(`📋 Found ${allMeTokens.length} recent MeTokens from subgraph`);
 
         if (allMeTokens.length > 0) {
-          console.log('Recent MeTokens:', allMeTokens.slice(0, 3).map(mt => mt.id));
+          logger.debug('Recent MeTokens:', allMeTokens.slice(0, 3).map(mt => mt.id));
 
           // The most recent one (first in the list) is most likely ours since we just created it
           // Skip ownership verification from Diamond as it may not be fully registered yet
           meTokenAddress = allMeTokens[0].id;
-          console.log('✅ Using most recent MeToken from subgraph:', meTokenAddress);
+          logger.debug('✅ Using most recent MeToken from subgraph:', meTokenAddress);
         }
 
         if (meTokenAddress) {
           // Sync the MeToken to the database
-          console.log('💾 Syncing MeToken to database...');
+          logger.debug('💾 Syncing MeToken to database...');
           const syncResponse = await fetch('/api/metokens/sync', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1066,7 +1067,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
           });
 
           if (syncResponse.ok) {
-            console.log('✅ MeToken synced to database successfully');
+            logger.debug('✅ MeToken synced to database successfully');
             setIsConfirming(false);
             setIsConfirmed(true);
 
@@ -1075,17 +1076,17 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
             return;
           } else {
             const error = await syncResponse.json();
-            console.warn('⚠️ Failed to sync MeToken:', error);
+            logger.warn('⚠️ Failed to sync MeToken:', error);
           }
         }
       } catch (error) {
-        console.error('❌ Error querying subgraph:', error);
+        logger.error('❌ Error querying subgraph:', error);
       }
 
       // If we couldn't find/sync the MeToken, still show success and auto-refresh
-      console.log('🎉 MeToken created successfully!');
-      console.log('💡 Transaction hash:', txHash);
-      console.log('🔄 Refreshing page in 5 seconds to pick up your MeToken...');
+      logger.debug('🎉 MeToken created successfully!');
+      logger.debug('💡 Transaction hash:', txHash);
+      logger.debug('🔄 Refreshing page in 5 seconds to pick up your MeToken...');
 
       setIsConfirming(false);
       setIsConfirmed(true);
@@ -1098,19 +1099,19 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
       return;
 
     } catch (err) {
-      console.error('❌ Error in createMeToken:', err);
+      logger.error('❌ Error in createMeToken:', err);
 
       setIsPending(false);
       setIsConfirming(false);
 
       // Handle specific error cases
       if (err instanceof Error) {
-        console.error('❌ Error message:', err.message);
-        console.error('❌ Error stack:', err.stack);
+        logger.error('❌ Error message:', err.message);
+        logger.error('❌ Error stack:', err.stack);
 
         // Check if it's a DAI approval error and offer fallback
         if (err.message.includes('DAI approval failed') && parseFloat(assetsDeposited) > 0) {
-          console.log('💡 DAI approval failed, but user can still create MeToken with 0 DAI');
+          logger.debug('💡 DAI approval failed, but user can still create MeToken with 0 DAI');
 
           toast({
             title: "DAI Approval Failed",
@@ -1120,11 +1121,11 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
 
           // Retry with 0 DAI deposit
           try {
-            console.log('🔄 Retrying MeToken creation with 0 DAI deposit...');
+            logger.debug('🔄 Retrying MeToken creation with 0 DAI deposit...');
             await createMeTokenInternal(name, symbol, hubId, "0", true);
             return; // Exit successfully
           } catch (retryErr) {
-            console.error('❌ Retry with 0 DAI also failed:', retryErr);
+            logger.error('❌ Retry with 0 DAI also failed:', retryErr);
             // Fall through to original error handling
           }
         }
@@ -1143,15 +1144,15 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
           errorCause.toLowerCase().includes('already owns');
 
         if (hasAlreadyOwnsError) {
-          console.log('💡 User already owns a MeToken! Finding and syncing it...');
-          console.log('📋 Error details:', { errorMessage, errorDetails, errorCause });
+          logger.debug('💡 User already owns a MeToken! Finding and syncing it...');
+          logger.debug('📋 Error details:', { errorMessage, errorDetails, errorCause });
 
           try {
             let foundUserMeToken = false;
             let meTokenAddress: string | null = null;
 
             // Step 1: Check Supabase first (fastest)
-            console.log('🔍 Step 1: Checking Supabase for existing MeToken...');
+            logger.debug('🔍 Step 1: Checking Supabase for existing MeToken...');
             const addressesToCheck = [address];
             if (client?.account?.address && client.account.address !== address) {
               addressesToCheck.push(client.account.address);
@@ -1166,40 +1167,40 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
                 if (response.ok) {
                   const result = await response.json();
                   if (result.data) {
-                    console.log('✅ Found MeToken in Supabase for address:', checkAddress);
+                    logger.debug('✅ Found MeToken in Supabase for address:', checkAddress);
                     meTokenAddress = result.data.address;
                     foundUserMeToken = true;
                     break;
                   }
                 }
               } catch (apiErr) {
-                console.warn('Failed to check Supabase for address:', checkAddress, apiErr);
+                logger.warn('Failed to check Supabase for address:', checkAddress, apiErr);
               }
             }
 
             // Step 2: If not in Supabase, query blockchain directly
             if (!foundUserMeToken) {
-              console.log('🔍 Step 2: Querying blockchain directly for user MeToken...');
+              logger.debug('🔍 Step 2: Querying blockchain directly for user MeToken...');
               const { getLatestMeTokenByOwner } = await import('@/lib/utils/metokenUtils');
 
               for (const checkAddress of addressesToCheck) {
                 try {
                   const existingMeTokenAddress = await getLatestMeTokenByOwner(checkAddress);
                   if (existingMeTokenAddress) {
-                    console.log('✅ Found MeToken on blockchain for address:', checkAddress, existingMeTokenAddress);
+                    logger.debug('✅ Found MeToken on blockchain for address:', checkAddress, existingMeTokenAddress);
                     meTokenAddress = existingMeTokenAddress;
                     foundUserMeToken = true;
                     break;
                   }
                 } catch (blockchainErr) {
-                  console.warn('Failed to query blockchain for address:', checkAddress, blockchainErr);
+                  logger.warn('Failed to query blockchain for address:', checkAddress, blockchainErr);
                 }
               }
             }
 
             // Step 3: If we found the MeToken, sync it
             if (foundUserMeToken && meTokenAddress) {
-              console.log('💾 Syncing found MeToken:', meTokenAddress);
+              logger.debug('💾 Syncing found MeToken:', meTokenAddress);
               try {
                 const syncResponse = await fetch('/api/metokens/sync', {
                   method: 'POST',
@@ -1209,10 +1210,10 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
 
                 if (syncResponse.ok) {
                   const syncData = await syncResponse.json();
-                  console.log('✅ Successfully synced MeToken:', syncData);
+                  logger.debug('✅ Successfully synced MeToken:', syncData);
 
                   // Refresh to load the MeToken from database
-                  console.log('🔄 Refreshing to display your MeToken...');
+                  logger.debug('🔄 Refreshing to display your MeToken...');
                   await checkUserMeToken();
 
                   setIsConfirmed(true);
@@ -1230,26 +1231,26 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
                   return;
                 } else {
                   const errorData = await syncResponse.json().catch(() => ({}));
-                  console.warn('⚠️ Failed to sync MeToken:', errorData);
+                  logger.warn('⚠️ Failed to sync MeToken:', errorData);
                 }
               } catch (syncErr) {
-                console.error('❌ Error syncing MeToken:', syncErr);
+                logger.error('❌ Error syncing MeToken:', syncErr);
               }
             }
 
             // Step 4: Fallback to subgraph search (if we still haven't found it)
             if (!foundUserMeToken) {
-              console.log('🔍 Step 3: Falling back to subgraph search...');
+              logger.debug('🔍 Step 3: Falling back to subgraph search...');
               const { meTokensSubgraph } = await import('@/lib/sdk/metokens/subgraph');
-              console.log('📊 Fetching recent MeTokens from subgraph...');
+              logger.debug('📊 Fetching recent MeTokens from subgraph...');
               const allMeTokens = await meTokensSubgraph.getAllMeTokens(100, 0);
-              console.log(`📋 Found ${allMeTokens.length} recent MeTokens in subgraph`);
+              logger.debug(`📋 Found ${allMeTokens.length} recent MeTokens in subgraph`);
 
               if (allMeTokens.length > 0) {
                 // Try to sync the most recent ones to database
                 for (const meToken of allMeTokens.slice(0, 20)) {
                   try {
-                    console.log('💾 Attempting to sync MeToken:', meToken.id);
+                    logger.debug('💾 Attempting to sync MeToken:', meToken.id);
                     const syncResponse = await fetch('/api/metokens/sync', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
@@ -1258,24 +1259,24 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
 
                     if (syncResponse.ok) {
                       const syncData = await syncResponse.json();
-                      console.log('✅ Synced MeToken:', syncData);
+                      logger.debug('✅ Synced MeToken:', syncData);
 
                       // Check if this one belongs to our user
                       if (syncData.data?.owner_address?.toLowerCase() === address.toLowerCase()) {
-                        console.log('🎯 Found our MeToken!');
+                        logger.debug('🎯 Found our MeToken!');
                         foundUserMeToken = true;
                         break;
                       }
                     }
                   } catch (syncErr) {
-                    console.warn('Failed to sync MeToken:', meToken.id, syncErr);
+                    logger.warn('Failed to sync MeToken:', meToken.id, syncErr);
                   }
                 }
               }
 
               if (foundUserMeToken) {
                 // Refresh to load the MeToken from database
-                console.log('🔄 Refreshing to display your MeToken...');
+                logger.debug('🔄 Refreshing to display your MeToken...');
                 await checkUserMeToken();
 
                 setIsConfirmed(true);
@@ -1295,11 +1296,11 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
             }
 
             // If we still couldn't find the user's MeToken, provide helpful instructions
-            console.log('⚠️ Could not find user MeToken after all attempts');
+            logger.debug('⚠️ Could not find user MeToken after all attempts');
             throw new Error('You already have a MeToken, but we could not locate it automatically. ' +
               'Please use the "Sync Existing MeToken" button to load it manually, or contact support for assistance.');
           } catch (syncErr) {
-            console.error('❌ Failed to find existing MeToken:', syncErr);
+            logger.error('❌ Failed to find existing MeToken:', syncErr);
             if (syncErr instanceof Error && syncErr.message.includes('already have a MeToken')) {
               throw syncErr; // Re-throw our custom error
             }
@@ -1314,7 +1315,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         }
         throw err;
       }
-      console.error('❌ Unknown error type:', typeof err);
+      logger.error('❌ Unknown error type:', typeof err);
       const error = new Error('Failed to create MeToken');
       setTransactionError(error);
       throw error;
@@ -1352,7 +1353,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
       const hubId = meTokenInfo.hubId || meTokenInfo[1] || BigInt(1);
 
       // 2. Get vault address for this hub
-      console.log('🔍 Fetching Vault address for Hub ID:', hubId.toString());
+      logger.debug('🔍 Fetching Vault address for Hub ID:', hubId.toString());
       const hubInfo = await client.readContract({
         address: DIAMOND,
         abi: METOKEN_ABI,
@@ -1360,7 +1361,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         args: [hubId],
       }) as any;
 
-      console.log('🔍 Raw Hub Info:', hubInfo);
+      logger.debug('🔍 Raw Hub Info:', hubInfo);
 
       // Extract vault address (index 6 in the tuple)
       let vaultAddress: string;
@@ -1374,17 +1375,17 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
 
       // Fallback to Diamond if vault is zero address (shouldn't happen, but safe)
       if (!vaultAddress || vaultAddress === '0x0000000000000000000000000000000000000000') {
-        console.warn('⚠️ Vault address is zero, falling back to Diamond');
+        logger.warn('⚠️ Vault address is zero, falling back to Diamond');
         vaultAddress = DIAMOND;
       }
 
-      console.log('🔍 Mint flow: Using vault address:', vaultAddress, 'for Hub ID:', hubId.toString());
+      logger.debug('🔍 Mint flow: Using vault address:', vaultAddress, 'for Hub ID:', hubId.toString());
 
       // 3. Check and approve DAI for the vault (not Diamond!)
       const daiContract = getDaiTokenContract('base');
       const collateralAmountWei = parseEther(collateralAmount);
 
-      console.log('🔍 Checking DAI allowance for vault...');
+      logger.debug('🔍 Checking DAI allowance for vault...');
       const currentAllowance = await client.readContract({
         address: daiContract.address as `0x${string}`,
         abi: daiContract.abi,
@@ -1392,7 +1393,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         args: [address as `0x${string}`, vaultAddress as `0x${string}`],
       }) as bigint;
 
-      console.log('📊 Current DAI allowance for vault:', {
+      logger.debug('📊 Current DAI allowance for vault:', {
         vaultAddress,
         currentAllowance: currentAllowance.toString(),
         required: collateralAmountWei.toString(),
@@ -1400,14 +1401,14 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
       });
 
       if (currentAllowance < collateralAmountWei) {
-        console.log('🔓 Approving DAI for vault...', vaultAddress);
+        logger.debug('🔓 Approving DAI for vault...', vaultAddress);
         const approveData = encodeFunctionData({
           abi: daiContract.abi,
           functionName: 'approve',
           args: [vaultAddress as `0x${string}`, collateralAmountWei],
         });
 
-        console.log('📤 Sending DAI approve UserOp...');
+        logger.debug('📤 Sending DAI approve UserOp...');
         const approveOp = await client.sendUserOperation({
           uo: {
             target: daiContract.address as `0x${string}`,
@@ -1416,19 +1417,19 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
           },
         });
 
-        console.log('⏳ Waiting for approval confirmation...', approveOp.hash);
+        logger.debug('⏳ Waiting for approval confirmation...', approveOp.hash);
         await client.waitForUserOperationTransaction({
           hash: approveOp.hash,
         });
 
-        console.log('✅ DAI approved for vault');
+        logger.debug('✅ DAI approved for vault');
       } else {
-        console.log('✅ Sufficient DAI allowance already exists for vault');
+        logger.debug('✅ Sufficient DAI allowance already exists for vault');
       }
 
       // 3b. ALSO Check/Approve DAI for the DIAMOND (Just in case Diamond calls transferFrom directly)
       // This covers the case where Diamond is the spender, or Vault is the spender.
-      console.log('🔍 Checking DAI allowance for DIAMOND...');
+      logger.debug('🔍 Checking DAI allowance for DIAMOND...');
       const diamondAllowance = await client.readContract({
         address: daiContract.address as `0x${string}`,
         abi: daiContract.abi,
@@ -1436,7 +1437,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         args: [address as `0x${string}`, DIAMOND as `0x${string}`],
       }) as bigint;
 
-      console.log('📊 Current DAI allowance for DIAMOND:', {
+      logger.debug('📊 Current DAI allowance for DIAMOND:', {
         DIAMOND,
         currentAllowance: diamondAllowance.toString(),
         required: collateralAmountWei.toString(),
@@ -1444,7 +1445,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
       });
 
       if (diamondAllowance < collateralAmountWei) {
-        console.log('🔓 Approving DAI for DIAMOND...');
+        logger.debug('🔓 Approving DAI for DIAMOND...');
         const approveData = encodeFunctionData({
           abi: daiContract.abi,
           functionName: 'approve',
@@ -1459,18 +1460,18 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
           },
         });
 
-        console.log('⏳ Waiting for DIAMOND approval confirmation...', approveOp.hash);
+        logger.debug('⏳ Waiting for DIAMOND approval confirmation...', approveOp.hash);
         await client.waitForUserOperationTransaction({
           hash: approveOp.hash,
         });
-        console.log('✅ DAI approved for DIAMOND');
+        logger.debug('✅ DAI approved for DIAMOND');
       } else {
-        console.log('✅ Sufficient DAI allowance already exists for DIAMOND');
+        logger.debug('✅ Sufficient DAI allowance already exists for DIAMOND');
       }
 
 
       // 4. Now mint with retry logic for timeout errors
-      console.log('📤 Sending Mint UserOp to DIAMOND...');
+      logger.debug('📤 Sending Mint UserOp to DIAMOND...');
 
       const mintOperation = {
         uo: {
@@ -1493,7 +1494,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
       while (mintAttempts < maxMintAttempts) {
         mintAttempts++;
         try {
-          console.log(`🔄 Mint attempt ${mintAttempts}/${maxMintAttempts}...`);
+          logger.debug(`🔄 Mint attempt ${mintAttempts}/${maxMintAttempts}...`);
 
           // Create a timeout promise (90 seconds per attempt)
           const timeoutPromise = new Promise((_, reject) => {
@@ -1513,7 +1514,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
           if (isTimeoutError && mintAttempts < maxMintAttempts) {
             // Calculate exponential backoff delay
             const retryDelay = baseRetryDelay * Math.pow(2, mintAttempts - 1);
-            console.log(`⏳ Mint attempt ${mintAttempts} timed out. Retrying in ${retryDelay}ms...`);
+            logger.debug(`⏳ Mint attempt ${mintAttempts} timed out. Retrying in ${retryDelay}ms...`);
             await new Promise(resolve => setTimeout(resolve, retryDelay));
             continue;
           } else {
@@ -1526,15 +1527,15 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         }
       }
 
-      console.log('🎉 Mint UserOp sent! Hash:', operation.hash);
+      logger.debug('🎉 Mint UserOp sent! Hash:', operation.hash);
       setIsPending(false);
       setIsConfirming(true);
 
-      console.log('⏳ Waiting for Mint transaction confirmation...');
+      logger.debug('⏳ Waiting for Mint transaction confirmation...');
       const txHash = await client.waitForUserOperationTransaction({
         hash: operation.hash,
       });
-      console.log('✅ Mint transaction confirmed! Hash:', txHash);
+      logger.debug('✅ Mint transaction confirmed! Hash:', txHash);
 
       setIsConfirming(false);
       setIsConfirmed(true);
@@ -1561,11 +1562,11 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
 
           if (!response.ok) {
             const error = await response.json();
-            console.error('Failed to record transaction:', error);
+            logger.error('Failed to record transaction:', error);
             // Don't throw - transaction succeeded on-chain, just logging failed
           }
         } catch (error) {
-          console.error('Error recording transaction:', error);
+          logger.error('Error recording transaction:', error);
           // Don't throw - transaction succeeded on-chain, just logging failed
         }
 
@@ -1580,7 +1581,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
           }) as bigint;
 
           const newBalance = parseFloat(formatEther(actualBalance));
-          console.log(`📊 Syncing balance to Supabase: ${newBalance} (Chain balance: ${actualBalance.toString()})`);
+          logger.debug(`📊 Syncing balance to Supabase: ${newBalance} (Chain balance: ${actualBalance.toString()})`);
 
           const balanceResponse = await fetch(`/api/metokens/${meTokenAddress}/balance`, {
             method: 'PUT',
@@ -1603,13 +1604,13 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
             } catch (readErr) {
               errorMsg = `Could not read response body: ${readErr}`;
             }
-            console.error(`Failed to update user balance (Status: ${balanceResponse.status}): ${errorMsg}`);
+            logger.error(`Failed to update user balance (Status: ${balanceResponse.status}): ${errorMsg}`);
             // Don't throw - transaction succeeded on-chain, just logging failed
           } else {
-            console.log('✅ User balance synced to Supabase successfully');
+            logger.debug('✅ User balance synced to Supabase successfully');
           }
         } catch (error) {
-          console.warn('⚠️ Error updating user balance in Supabase:', error);
+          logger.warn('⚠️ Error updating user balance in Supabase:', error);
           // Don't throw - transaction succeeded on-chain, just logging failed
         }
       }
@@ -1621,7 +1622,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
       await checkUserMeToken();
       return txHash;
     } catch (err) {
-      console.error('❌ Error in buyMeTokens:', err);
+      logger.error('❌ Error in buyMeTokens:', err);
       setIsPending(false);
       setIsConfirming(false);
       const error = err instanceof Error ? err : new Error('Failed to buy MeTokens');
@@ -1637,7 +1638,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
     try {
       // Get the vault address that will actually perform transferFrom
       // 1. Get meToken's hubId
-      console.log('🔍 ensureDaiApproval: Fetching Hub ID for token:', meTokenAddress);
+      logger.debug('🔍 ensureDaiApproval: Fetching Hub ID for token:', meTokenAddress);
       const meTokenInfo = await client.readContract({
         address: DIAMOND,
         abi: METOKEN_ABI,
@@ -1648,7 +1649,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
       const hubId = meTokenInfo.hubId || meTokenInfo[1] || BigInt(1);
 
       // 2. Get vault address for this hub
-      console.log('🔍 ensureDaiApproval: Fetching Vault for Hub ID:', hubId.toString());
+      logger.debug('🔍 ensureDaiApproval: Fetching Vault for Hub ID:', hubId.toString());
       const hubInfo = await client.readContract({
         address: DIAMOND,
         abi: METOKEN_ABI,
@@ -1668,11 +1669,11 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
 
       // Fallback to Diamond if vault is zero address (shouldn't happen, but safe)
       if (!vaultAddress || vaultAddress === '0x0000000000000000000000000000000000000000') {
-        console.warn('⚠️ Vault address is zero, falling back to Diamond');
+        logger.warn('⚠️ Vault address is zero, falling back to Diamond');
         vaultAddress = DIAMOND;
       }
 
-      console.log('🔍 ensureDaiApproval: Using vault address:', vaultAddress, 'for Hub ID:', hubId.toString());
+      logger.debug('🔍 ensureDaiApproval: Using vault address:', vaultAddress, 'for Hub ID:', hubId.toString());
 
       const daiContract = getDaiTokenContract('base');
       const requiredAmount = parseEther(collateralAmount);
@@ -1685,7 +1686,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         args: [address as `0x${string}`, vaultAddress as `0x${string}`],
       }) as bigint;
 
-      console.log('📊 Current DAI allowance for vault:', {
+      logger.debug('📊 Current DAI allowance for vault:', {
         vaultAddress,
         currentAllowance: currentAllowance.toString(),
         required: requiredAmount.toString(),
@@ -1694,7 +1695,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
 
       // If allowance is insufficient, approve the vault to spend DAI
       if (currentAllowance < requiredAmount) {
-        console.log('🔓 Approving DAI for vault...', vaultAddress);
+        logger.debug('🔓 Approving DAI for vault...', vaultAddress);
         const operation = await client.sendUserOperation({
           uo: {
             target: daiContract.address as `0x${string}`,
@@ -1707,17 +1708,17 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
           },
         });
 
-        console.log('⏳ Waiting for approval confirmation...', operation.hash);
+        logger.debug('⏳ Waiting for approval confirmation...', operation.hash);
         await client.waitForUserOperationTransaction({
           hash: operation.hash,
         });
 
-        console.log('✅ DAI approved for vault');
+        logger.debug('✅ DAI approved for vault');
       } else {
-        console.log('✅ Sufficient DAI allowance already exists for vault');
+        logger.debug('✅ Sufficient DAI allowance already exists for vault');
       }
     } catch (err) {
-      console.error('Failed to ensure DAI approval:', err);
+      logger.error('Failed to ensure DAI approval:', err);
       throw new Error('Failed to approve DAI spending');
     }
   };
@@ -1726,11 +1727,11 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
   const calculateAssetsReturned = async (meTokenAddress: string, meTokenAmount: string): Promise<string> => {
     try {
       if (!client || !address) {
-        console.warn('⚠️ calculateAssetsReturned: Missing client or address', { hasClient: !!client, address });
+        logger.warn('⚠️ calculateAssetsReturned: Missing client or address', { hasClient: !!client, address });
         return '0';
       }
 
-      console.log('📊 calculateAssetsReturned input:', {
+      logger.debug('📊 calculateAssetsReturned input:', {
         meTokenAddress,
         meTokenAmount,
         meTokenAmountWei: parseEther(meTokenAmount).toString(),
@@ -1746,7 +1747,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
       });
 
       const assetsReturned = formatEther(result as bigint);
-      console.log('✅ calculateAssetsReturned result:', {
+      logger.debug('✅ calculateAssetsReturned result:', {
         resultWei: (result as bigint).toString(),
         assetsReturned,
         meTokenAmount
@@ -1754,8 +1755,8 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
 
       return assetsReturned;
     } catch (err) {
-      console.error('❌ Failed to calculate assets returned:', err);
-      console.error('❌ Error details:', {
+      logger.error('❌ Failed to calculate assets returned:', err);
+      logger.error('❌ Error details:', {
         meTokenAddress,
         meTokenAmount,
         address,
@@ -1775,7 +1776,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
     setTransactionError(null);
 
     try {
-      console.log('💸 Sell requested:', { meTokenAddress, meTokenAmount });
+      logger.debug('💸 Sell requested:', { meTokenAddress, meTokenAmount });
       const sellAmountWei = parseEther(meTokenAmount);
 
       // Get the vault address that will actually perform transferFrom (same pattern as buyMeTokens)
@@ -1790,7 +1791,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
       const hubId = meTokenInfo.hubId || meTokenInfo[1] || BigInt(1);
 
       // 2. Get vault address for this hub
-      console.log('🔍 Fetching Vault address for Hub ID:', hubId.toString());
+      logger.debug('🔍 Fetching Vault address for Hub ID:', hubId.toString());
       const hubInfo = await client.readContract({
         address: DIAMOND,
         abi: METOKEN_ABI,
@@ -1798,7 +1799,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         args: [hubId],
       }) as any;
 
-      console.log('🔍 Raw Hub Info:', hubInfo);
+      logger.debug('🔍 Raw Hub Info:', hubInfo);
 
       // Extract vault address (index 6 in the tuple)
       let vaultAddress: string;
@@ -1812,14 +1813,14 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
 
       // Fallback to Diamond if vault is zero address (shouldn't happen, but safe)
       if (!vaultAddress || vaultAddress === '0x0000000000000000000000000000000000000000') {
-        console.warn('⚠️ Vault address is zero, falling back to Diamond');
+        logger.warn('⚠️ Vault address is zero, falling back to Diamond');
         vaultAddress = DIAMOND;
       }
 
-      console.log('🔍 Burn flow: Using vault address:', vaultAddress, 'for Hub ID:', hubId.toString());
+      logger.debug('🔍 Burn flow: Using vault address:', vaultAddress, 'for Hub ID:', hubId.toString());
 
       // 3. Check and approve MeToken for the vault (not Diamond!)
-      console.log('🔍 Checking MeToken allowance for vault...');
+      logger.debug('🔍 Checking MeToken allowance for vault...');
       const currentAllowance = await client.readContract({
         address: meTokenAddress as `0x${string}`,
         abi: ERC20_ABI,
@@ -1827,7 +1828,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         args: [address as `0x${string}`, vaultAddress as `0x${string}`],
       }) as bigint;
 
-      console.log('📊 Current MeToken allowance for vault:', {
+      logger.debug('📊 Current MeToken allowance for vault:', {
         vaultAddress,
         currentAllowance: currentAllowance.toString(),
         required: sellAmountWei.toString(),
@@ -1835,14 +1836,14 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
       });
 
       if (currentAllowance < sellAmountWei) {
-        console.log('🔓 Approving MeToken for vault...', vaultAddress);
+        logger.debug('🔓 Approving MeToken for vault...', vaultAddress);
         const approveData = encodeFunctionData({
           abi: ERC20_ABI,
           functionName: 'approve',
           args: [vaultAddress as `0x${string}`, BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff')],
         });
 
-        console.log('📤 Sending MeToken approve UserOp...');
+        logger.debug('📤 Sending MeToken approve UserOp...');
         const approveOp = await client.sendUserOperation({
           uo: {
             target: meTokenAddress as `0x${string}`,
@@ -1851,19 +1852,19 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
           },
         });
 
-        console.log('⏳ Waiting for approval confirmation...', approveOp.hash);
+        logger.debug('⏳ Waiting for approval confirmation...', approveOp.hash);
         await client.waitForUserOperationTransaction({
           hash: approveOp.hash,
         });
 
-        console.log('✅ MeToken approved for vault');
+        logger.debug('✅ MeToken approved for vault');
       } else {
-        console.log('✅ Sufficient MeToken allowance already exists for vault');
+        logger.debug('✅ Sufficient MeToken allowance already exists for vault');
       }
 
       // 3b. ALSO Check/Approve MeToken for the DIAMOND (Just in case Diamond calls transferFrom directly)
       // This covers the case where Diamond is the spender, or Vault is the spender.
-      console.log('🔍 Checking MeToken allowance for DIAMOND...');
+      logger.debug('🔍 Checking MeToken allowance for DIAMOND...');
       const diamondAllowance = await client.readContract({
         address: meTokenAddress as `0x${string}`,
         abi: ERC20_ABI,
@@ -1871,7 +1872,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         args: [address as `0x${string}`, DIAMOND as `0x${string}`],
       }) as bigint;
 
-      console.log('📊 Current MeToken allowance for DIAMOND:', {
+      logger.debug('📊 Current MeToken allowance for DIAMOND:', {
         DIAMOND,
         currentAllowance: diamondAllowance.toString(),
         required: sellAmountWei.toString(),
@@ -1879,7 +1880,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
       });
 
       if (diamondAllowance < sellAmountWei) {
-        console.log('🔓 Approving MeToken for DIAMOND...');
+        logger.debug('🔓 Approving MeToken for DIAMOND...');
         const approveData = encodeFunctionData({
           abi: ERC20_ABI,
           functionName: 'approve',
@@ -1894,13 +1895,13 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
           },
         });
 
-        console.log('⏳ Waiting for DIAMOND approval confirmation...', approveOp.hash);
+        logger.debug('⏳ Waiting for DIAMOND approval confirmation...', approveOp.hash);
         await client.waitForUserOperationTransaction({
           hash: approveOp.hash,
         });
-        console.log('✅ MeToken approved for DIAMOND');
+        logger.debug('✅ MeToken approved for DIAMOND');
       } else {
-        console.log('✅ Sufficient MeToken allowance already exists for DIAMOND');
+        logger.debug('✅ Sufficient MeToken allowance already exists for DIAMOND');
       }
 
       // Calculate collateral amount returned BEFORE the burn (more accurate)
@@ -1909,14 +1910,14 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
       try {
         const assetsReturnedStr = await calculateAssetsReturned(meTokenAddress, meTokenAmount);
         collateralAmountReturned = parseFloat(assetsReturnedStr) || 0;
-        console.log('📊 Calculated collateral amount to be returned:', collateralAmountReturned);
+        logger.debug('📊 Calculated collateral amount to be returned:', collateralAmountReturned);
       } catch (calcError) {
-        console.warn('⚠️ Failed to calculate collateral amount returned before burn:', calcError);
+        logger.warn('⚠️ Failed to calculate collateral amount returned before burn:', calcError);
         // Continue - we'll try to calculate it again after if needed
       }
 
       // Send burn operation with retry logic for timeout errors
-      console.log('📤 Sending Burn UserOp to DIAMOND...');
+      logger.debug('📤 Sending Burn UserOp to DIAMOND...');
 
       const burnOperation = {
         uo: {
@@ -1939,7 +1940,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
       while (burnAttempts < maxBurnAttempts) {
         burnAttempts++;
         try {
-          console.log(`🔄 Burn attempt ${burnAttempts}/${maxBurnAttempts}...`);
+          logger.debug(`🔄 Burn attempt ${burnAttempts}/${maxBurnAttempts}...`);
 
           // Create a timeout promise (90 seconds per attempt)
           const timeoutPromise = new Promise((_, reject) => {
@@ -1959,7 +1960,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
           if (isTimeoutError && burnAttempts < maxBurnAttempts) {
             // Calculate exponential backoff delay
             const retryDelay = baseRetryDelay * Math.pow(2, burnAttempts - 1);
-            console.log(`⏳ Burn attempt ${burnAttempts} timed out. Retrying in ${retryDelay}ms...`);
+            logger.debug(`⏳ Burn attempt ${burnAttempts} timed out. Retrying in ${retryDelay}ms...`);
             await new Promise(resolve => setTimeout(resolve, retryDelay));
             continue;
           } else {
@@ -1972,15 +1973,15 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         }
       }
 
-      console.log('🎉 Burn UserOp sent! Hash:', operation.hash);
+      logger.debug('🎉 Burn UserOp sent! Hash:', operation.hash);
       setIsPending(false);
       setIsConfirming(true);
 
-      console.log('⏳ Waiting for Burn transaction confirmation...');
+      logger.debug('⏳ Waiting for Burn transaction confirmation...');
       const txHash = await client.waitForUserOperationTransaction({
         hash: operation.hash,
       });
-      console.log('✅ Burn transaction confirmed! Hash:', txHash);
+      logger.debug('✅ Burn transaction confirmed! Hash:', txHash);
 
       setIsConfirming(false);
       setIsConfirmed(true);
@@ -2006,11 +2007,11 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
 
           if (!response.ok) {
             const error = await response.json();
-            console.error('Failed to record transaction:', error);
+            logger.error('Failed to record transaction:', error);
             // Don't throw - transaction succeeded on-chain, just logging failed
           }
         } catch (error) {
-          console.error('Error recording transaction:', error);
+          logger.error('Error recording transaction:', error);
           // Don't throw - transaction succeeded on-chain, just logging failed
         }
 
@@ -2025,7 +2026,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
           }) as bigint;
 
           const newBalance = parseFloat(formatEther(actualBalance));
-          console.log(`📊 Syncing balance to Supabase: ${newBalance} (Chain balance: ${actualBalance.toString()})`);
+          logger.debug(`📊 Syncing balance to Supabase: ${newBalance} (Chain balance: ${actualBalance.toString()})`);
 
           const balanceResponse = await fetch(`/api/metokens/${meTokenAddress}/balance`, {
             method: 'PUT',
@@ -2048,13 +2049,13 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
             } catch (readErr) {
               errorMsg = `Could not read response body: ${readErr}`;
             }
-            console.error(`Failed to update user balance (Status: ${balanceResponse.status}): ${errorMsg}`);
+            logger.error(`Failed to update user balance (Status: ${balanceResponse.status}): ${errorMsg}`);
             // Don't throw - transaction succeeded on-chain, just logging failed
           } else {
-            console.log('✅ User balance synced to Supabase successfully');
+            logger.debug('✅ User balance synced to Supabase successfully');
           }
         } catch (error) {
-          console.error('Error updating user balance:', error);
+          logger.error('Error updating user balance:', error);
           // Don't throw - transaction succeeded on-chain, just logging failed
         }
       }
@@ -2066,7 +2067,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
       await checkUserMeToken();
       return txHash;
     } catch (err) {
-      console.error('❌ Error in sellMeTokens:', err);
+      logger.error('❌ Error in sellMeTokens:', err);
       setIsPending(false);
       setIsConfirming(false);
       const error = err instanceof Error ? err : new Error('Failed to sell MeTokens');
@@ -2089,7 +2090,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
 
       return formatEther(result as bigint);
     } catch (err) {
-      console.error('Failed to calculate MeTokens minted:', err);
+      logger.error('Failed to calculate MeTokens minted:', err);
       return '0';
     }
   };
@@ -2108,13 +2109,13 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
 
         // Check if the MeToken belongs to either the current address OR the user's EOA
         if (ownerLower === addressLower || (eoaLower && ownerLower === eoaLower)) {
-          console.log('✅ MeToken belongs to user (owner:', supabaseMeToken.owner_address, ')');
+          logger.debug('✅ MeToken belongs to user (owner:', supabaseMeToken.owner_address, ')');
           const meTokenData = await convertToMeTokenData(supabaseMeToken, address || '');
           setUserMeToken(meTokenData);
           return meTokenData;
         }
 
-        console.log('❌ MeToken owner mismatch:', {
+        logger.debug('❌ MeToken owner mismatch:', {
           meTokenOwner: supabaseMeToken.owner_address,
           profileAddress: address,
           userEOA: user?.address
@@ -2123,7 +2124,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
 
       return null;
     } catch (err) {
-      console.error(`Failed to check MeToken ${meTokenAddress}:`, err);
+      logger.error(`Failed to check MeToken ${meTokenAddress}:`, err);
       return null;
     }
   };
@@ -2140,7 +2141,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
     if (!address) return;
 
     const subscription = meTokenSupabaseService.subscribeToBalanceUpdates(address, (payload) => {
-      console.log('Balance update received:', payload);
+      logger.debug('Balance update received:', payload);
       // Use the ref to call the latest version without causing re-subscriptions
       checkUserMeTokenRef.current();
     });
@@ -2191,7 +2192,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         });
         return (hubInfo as any).vault as string;
       } catch (error) {
-        console.error('Failed to get vault address:', error);
+        logger.error('Failed to get vault address:', error);
         return null;
       }
     },

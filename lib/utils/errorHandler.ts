@@ -1,3 +1,5 @@
+
+import { logger } from '@/lib/utils/logger';
 /**
  * Utility functions for handling common development errors and warnings
  */
@@ -63,7 +65,7 @@ export async function fetchWithAbortHandler<T>(
       onAbort?.();
       // Optionally log in development
       if (process.env.NODE_ENV === 'development') {
-        console.debug('Request aborted:', input);
+        logger.debug('Request aborted:', input);
       }
       throw error; // Re-throw so calling code can handle
     }

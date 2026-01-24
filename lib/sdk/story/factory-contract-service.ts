@@ -25,6 +25,8 @@ import type { Address, Hex, Log } from "viem";
 import { encodeFunctionData, parseAbi, getAddress } from "viem";
 import { createStoryPublicClient } from "./client";
 import { createServiceClient } from "@/lib/sdk/supabase/service";
+import { serverLogger } from '@/lib/utils/logger';
+
 
 /**
  * Factory contract ABI - matches CreatorIPCollectionFactory.sol
@@ -63,7 +65,7 @@ export function getFactoryContractAddress(): Address | null {
   try {
     return getAddress(address);
   } catch {
-    console.warn("Invalid factory contract address format:", address);
+    serverLogger.warn("Invalid factory contract address format:", address);
     return null;
   }
 }
@@ -109,7 +111,7 @@ export async function computeCollectionAddress(
 
     return predictedAddress;
   } catch (error) {
-    console.error("Failed to compute collection address:", error);
+    serverLogger.error("Failed to compute collection address:", error);
     return null;
   }
 }
@@ -218,7 +220,7 @@ export async function deployCreatorCollection(
       txHash: hash,
     };
   } catch (error) {
-    console.error("Failed to deploy creator collection:", error);
+    serverLogger.error("Failed to deploy creator collection:", error);
     throw new Error(
       `Collection deployment failed: ${error instanceof Error ? error.message : "Unknown error"}`
     );
@@ -262,7 +264,7 @@ export async function getCreatorCollectionAddress(
 
     return collectionAddress;
   } catch (error) {
-    console.error("Failed to get creator collection:", error);
+    serverLogger.error("Failed to get creator collection:", error);
     // Fallback to database on error
     const supabase = createServiceClient();
     const { data } = await supabase
@@ -308,7 +310,7 @@ export async function getFactoryOwner(): Promise<Address | null> {
 
     return owner;
   } catch (error) {
-    console.error("Failed to get factory owner:", error);
+    serverLogger.error("Failed to get factory owner:", error);
     return null;
   }
 }

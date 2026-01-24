@@ -14,6 +14,8 @@ import {
 import { cn } from "@/lib/utils";
 import { getDetailPlaybackSource } from "@/lib/hooks/livepeer/useDetailPlaybackSources";
 import { Src } from "@livepeer/react";
+import { logger } from '@/lib/utils/logger';
+
 
 interface OrbisPlayerProps {
   playerId: string;
@@ -64,7 +66,7 @@ export function OrbisPlayer({
       try {
         setIsLoading(true);
         setError(null);
-        console.log("Fetching playback sources for ID:", playbackId);
+        logger.debug("Fetching playback sources for ID:", playbackId);
         const sources = await getDetailPlaybackSource(playbackId);
 
         if (!sources) {
@@ -74,7 +76,7 @@ export function OrbisPlayer({
 
         setPlaybackSources(sources);
       } catch (err) {
-        console.error("Error loading video:", err);
+        logger.error("Error loading video:", err);
         setError("Failed to load video");
       } finally {
         setIsLoading(false);

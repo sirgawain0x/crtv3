@@ -12,6 +12,8 @@ import type { VideoAsset } from "@/lib/types/video-asset";
 import useModularAccount from "@/lib/hooks/accountkit/useModularAccount";
 import type { Address } from "viem";
 import { Badge } from "@/components/ui/badge";
+import { logger } from '@/lib/utils/logger';
+
 
 interface VideoSplitDistributeButtonProps {
   videoAssetId: string; // asset_id (UUID) - used to fetch video asset
@@ -71,11 +73,11 @@ export function VideoSplitDistributeButton({
             const assetSplitsAddress = providedSplitsAddress || (asset as VideoAsset)?.splits_address;
             setSplitsAddress(assetSplitsAddress || null);
           } catch (error) {
-            console.error("Error fetching video asset:", error);
+            logger.error("Error fetching video asset:", error);
           }
         }
       } catch (error) {
-        console.error("Error checking ownership:", error);
+        logger.error("Error checking ownership:", error);
         setIsOwner(false);
       } finally {
         setIsChecking(false);
@@ -136,7 +138,7 @@ export function VideoSplitDistributeButton({
         setAvailableBalance(balanceResult.balance);
       }
     } catch (error) {
-      console.error("Error fetching split balance:", error);
+      logger.error("Error fetching split balance:", error);
     } finally {
       setIsLoadingBalance(false);
     }
@@ -200,7 +202,7 @@ export function VideoSplitDistributeButton({
         });
       }
     } catch (error) {
-      console.error("Error distributing revenue:", error);
+      logger.error("Error distributing revenue:", error);
       toast.error("Failed to distribute revenue", {
         description: error instanceof Error ? error.message : "Unknown error",
       });

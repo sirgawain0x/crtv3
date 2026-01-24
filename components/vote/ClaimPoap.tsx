@@ -2,6 +2,8 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import Image from "next/image";
+import { logger } from '@/lib/utils/logger';
+
 
 // Constants and Types
 import {
@@ -56,7 +58,7 @@ const ClaimPoap = ({ address, proposalId, snapshot }: Props) => {
           const errorData = await response.json().catch(() => ({}));
           if (response.status === 500 && errorData.error?.includes("authenticate")) {
             // POAP authentication not configured - silently show NO_POAP
-            console.warn("POAP authentication not configured. POAP features disabled.");
+            logger.warn("POAP authentication not configured. POAP features disabled.");
             setCurrentState(NO_POAP);
             return;
           }
@@ -69,7 +71,7 @@ const ClaimPoap = ({ address, proposalId, snapshot }: Props) => {
         setPoapImg(image_url || "");
         setCurrentState(currentState);
       } catch (error) {
-        console.error("Error fetching current state:", error);
+        logger.error("Error fetching current state:", error);
         // Set to NO_POAP state on error so UI doesn't break
         setCurrentState(NO_POAP);
       }
@@ -84,7 +86,7 @@ const ClaimPoap = ({ address, proposalId, snapshot }: Props) => {
         const newState = await claim(proposalId, address);
         setCurrentState(newState);
       } catch (error) {
-        console.error("Error during claim action:", error);
+        logger.error("Error during claim action:", error);
       } finally {
         setLoadButton(false);
       }
@@ -134,7 +136,7 @@ async function claim(proposalId: string, address: string): Promise<State> {
     if (!response.ok) throw new Error("Claim request failed");
     return "LOADING"; // Assuming immediate transition to loading upon a successful claim request
   } catch (error) {
-    console.error("Error claiming POAP:", error);
+    logger.error("Error claiming POAP:", error);
     return "UNCLAIMED"; // Fallback state in case of error
   }
 }

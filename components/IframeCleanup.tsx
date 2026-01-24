@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from 'react';
+import { logger } from '@/lib/utils/logger';
+
 
 /**
  * Utility function to clean up DUPLICATE iframes only
@@ -20,13 +22,13 @@ export const cleanupExistingIframes = () => {
     const iframes = container.querySelectorAll('iframe');
     // Only clean up if there are more than 1 iframe (keep the first one)
     if (iframes.length > 1) {
-      console.log(`[IframeCleanup] Found ${iframes.length} iframes, removing duplicates...`);
+      logger.debug(`[IframeCleanup] Found ${iframes.length} iframes, removing duplicates...`);
       // Keep the first iframe, remove the rest
       for (let i = 1; i < iframes.length; i++) {
         try {
           iframes[i].remove();
         } catch (error) {
-          console.warn("Failed to remove duplicate iframe:", error);
+          logger.warn("Failed to remove duplicate iframe:", error);
         }
       }
     }
@@ -35,13 +37,13 @@ export const cleanupExistingIframes = () => {
   // For orphaned iframes outside the container, check for duplicates
   const turnkeyIframes = document.querySelectorAll('iframe[id*="turnkey"], iframe[src*="turnkey"]');
   if (turnkeyIframes.length > 1) {
-    console.log(`[IframeCleanup] Found ${turnkeyIframes.length} Turnkey iframes, removing duplicates...`);
+    logger.debug(`[IframeCleanup] Found ${turnkeyIframes.length} Turnkey iframes, removing duplicates...`);
     // Keep the first one, remove duplicates
     for (let i = 1; i < turnkeyIframes.length; i++) {
       try {
         turnkeyIframes[i].remove();
       } catch (error) {
-        console.warn("Failed to remove duplicate Turnkey iframe:", error);
+        logger.warn("Failed to remove duplicate Turnkey iframe:", error);
       }
     }
   }
@@ -66,7 +68,7 @@ export const cleanupAllIframes = () => {
     try {
       iframe.remove();
     } catch (error) {
-      console.warn("Failed to remove Turnkey iframe:", error);
+      logger.warn("Failed to remove Turnkey iframe:", error);
     }
   });
 };

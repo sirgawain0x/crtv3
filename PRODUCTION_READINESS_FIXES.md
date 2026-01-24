@@ -132,26 +132,28 @@ export async function POST(request: NextRequest) {
 }
 ```
 
-**Priority routes**:
-- `/api/swap/execute` - Financial transactions
-- `/api/coinbase/session-token` - Already has rate limiting
-- `/api/livepeer/token-gate` - Access control
-- `/api/story/*` - IP asset operations
-- `/api/metokens/*` - Token operations
+**Priority routes** (now implemented):
+- `/api/swap/execute`, `/api/story/*`, `/api/metokens/*`, AI, IPFS, creator-profiles, POAP, membership, unlock, video-assets sync-views, livepeer, etc. use `rateLimiters.strict` / `standard` / `generous`
+- `/api/coinbase/session-token` - Keeps its own rate limiting
+- `/api/livepeer/token-gate` - Skipped (Livepeer webhook); relies on `accessKey` + timestamp
+
+## ✅ Additional Fixes (January 2025)
+
+1. **Rate limiting applied** to ~20 mutating/sensitive API routes (see `PRODUCTION_READINESS_ASSESSMENT.md`).
+2. **Console → logger migration** complete for lib, components, app, context (excludes scripts, examples, services, supabase/functions, logger.ts, webpack, *.md).
+3. **NFT minting config**: `GET /api/story/mint-configured`, `useNftMintingConfigured` hook; upload flow hides NFT step or shows "NFT minting unavailable" when `STORY_PROTOCOL_PRIVATE_KEY` is not set.
+4. **MeToken holdings**: Client-side cache (45s TTL) in `useMeTokenHoldings`; smart-wallet limitation documented in `LinkedIdentityDisplay`.
 
 ## 🔍 Verification
 
-To verify these fixes:
-
-1. **Logger**: Check that `lib/utils/logger.ts` exists and exports `logger` and `serverLogger`
-2. **Config**: Run the app and check for environment variable validation errors
-3. **Rate Limiting**: Test an API route with rapid requests to see rate limit response
-4. **Build**: Run `yarn build` to ensure no errors from removed debug code
+1. **Logger**: `lib/utils/logger.ts` exports `logger` and `serverLogger`; used across app/lib/components.
+2. **Config**: Env validation in `config/index.ts`; dev warns, production fails fast if required vars missing.
+3. **Rate limiting**: Rapid requests to e.g. `/api/swap/execute` return 429 when exceeded.
+4. **Build**: `yarn build` runs without debug logging in config.
 
 ## 📝 Notes
 
-- The logger utility is ready but not yet integrated throughout the codebase
-- Rate limiting middleware is ready but needs to be applied to API routes
-- Environment variable validation will fail in production if required vars are missing (this is intentional)
+- Logger is integrated across lib, components, app, context
+- Rate limiting is applied to the listed API routes
 - PWA is disabled on Vercel by design to avoid build issues
 

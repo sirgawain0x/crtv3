@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
 import { Loader2, DollarSign } from "lucide-react";
+import { logger } from '@/lib/utils/logger';
+
 
 interface SellContentSettingsProps {
     videoId: number;
@@ -43,7 +45,7 @@ export function SellContentSettings({ videoId, initialPrice = "", onSave }: Sell
 
             onSave?.(price);
         } catch (error) {
-            console.error("Error updating price:", error);
+            logger.error("Error updating price:", error);
             toast({
                 title: "Error",
                 description: "Failed to save price settings.",

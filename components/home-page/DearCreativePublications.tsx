@@ -7,6 +7,8 @@ import { NewsletterModal } from "./NewsletterModal";
 import { getPublicationPosts, getSubscriberCount, getCoinData } from "@/app/actions/paragraph";
 import { useUser } from "@account-kit/react";
 import { Newspaper } from "lucide-react";
+import { logger } from '@/lib/utils/logger';
+
 
 const COIN_ADDRESS = "0x81ced3c6e7058c1fe8d9b6c5a2435a65a4593292";
 
@@ -44,7 +46,7 @@ export default function DearCreativePublications() {
                     }
                 }
             } catch (error) {
-                console.error("Failed to fetch Paragraph data:", error);
+                logger.error("Failed to fetch Paragraph data:", error);
             } finally {
                 if (isMounted) {
                     setLoading(false);

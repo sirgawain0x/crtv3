@@ -20,15 +20,18 @@ export interface MintNFTResult {
 
 /**
  * Mint an NFT for a video asset
- * 
- * This function supports two minting modes:
- * 1. Story Protocol SPG minting (if collectionAddress is provided)
- * 2. Base chain ERC-721 minting (if NEXT_PUBLIC_NFT_CONTRACT_ADDRESS is configured)
- * 
- * @param client - Story Protocol client instance (used for Story Protocol minting)
+ *
+ * Reserved for future use when minting from a context that has a Story client + collection
+ * address directly (e.g. server-side SDK calls). The main upload flow uses
+ * /api/story/mint → createCollectionAndMintVideoNFTOnStory instead.
+ *
+ * Supports: (1) Story Protocol SPG minting if collectionAddress provided,
+ * (2) Base ERC-721 minting if NEXT_PUBLIC_NFT_CONTRACT_ADDRESS is set.
+ *
+ * @param client - Story Protocol client instance
  * @param metadataURI - IPFS metadata URI for the NFT
  * @param recipient - Address to receive the NFT
- * @param collectionAddress - Optional Story Protocol collection address (if using Story Protocol)
+ * @param collectionAddress - Optional Story Protocol collection address
  * @param smartAccountClient - Optional smart account client for Base chain minting
  * @returns Mint result with token ID, contract address, and transaction hash
  */

@@ -1,6 +1,7 @@
 import { formatEther } from 'viem';
 import { publicClient } from '@/lib/viem';
 import { parseAbi } from 'viem';
+import { logger } from '@/lib/utils/logger';
 
 // Official MeTokens Protocol Contract Addresses
 export const METOKEN_CONTRACTS = {
@@ -49,14 +50,14 @@ export async function checkMeTokenSubscriptionStatus(
   meTokenAddress: string,
   network: keyof typeof METOKEN_CONTRACTS = 'BASE'
 ) {
-  console.log(`\n🔍 Checking MeToken subscription status using Diamond Standard...`);
-  console.log(`📍 MeToken Address: ${meTokenAddress}`);
-  console.log(`🌐 Network: ${network}`);
-  console.log(`💎 Diamond Contract: ${METOKEN_CONTRACTS[network].DIAMOND}\n`);
+  logger.debug(`\n🔍 Checking MeToken subscription status using Diamond Standard...`);
+  logger.debug(`📍 MeToken Address: ${meTokenAddress}`);
+  logger.debug(`🌐 Network: ${network}`);
+  logger.debug(`💎 Diamond Contract: ${METOKEN_CONTRACTS[network].DIAMOND}\n`);
 
   try {
     // Step 1: Get MeToken info from Diamond contract
-    console.log(`📊 Querying Diamond contract for MeToken info...`);
+    logger.debug(`📊 Querying Diamond contract for MeToken info...`);
     const meTokenInfo = await publicClient.readContract({
       address: METOKEN_CONTRACTS[network].DIAMOND,
       abi: DIAMOND_ABI,
@@ -64,7 +65,7 @@ export async function checkMeTokenSubscriptionStatus(
       args: [meTokenAddress as `0x${string}`]
     });
 
-    console.log(`✅ MeToken info retrieved:`, meTokenInfo);
+    logger.debug(`✅ MeToken info retrieved:`, meTokenInfo);
 
     // Extract values from the returned tuple
     const [
@@ -80,7 +81,7 @@ export async function checkMeTokenSubscriptionStatus(
     ] = meTokenInfo as [string, bigint, bigint, bigint, bigint, bigint, bigint, bigint, string];
 
     // Step 2: Get basic ERC20 info from MeToken contract
-    console.log(`📝 Getting ERC20 token information...`);
+    logger.debug(`📝 Getting ERC20 token information...`);
     const [name, symbol, totalSupply] = await Promise.all([
       publicClient.readContract({
         address: meTokenAddress as `0x${string}`,
@@ -103,28 +104,28 @@ export async function checkMeTokenSubscriptionStatus(
     const isSubscribed = balancePooled > BigInt(0) || balanceLocked > BigInt(0);
     const totalLocked = balancePooled + balanceLocked;
 
-    console.log(`\n📊 MeToken Information:`);
-    console.log(`   Name: ${name}`);
-    console.log(`   Symbol: ${symbol}`);
-    console.log(`   Owner: ${owner}`);
-    console.log(`   Total Supply: ${formatEther(totalSupply)} tokens`);
+    logger.debug(`\n📊 MeToken Information:`);
+    logger.debug(`   Name: ${name}`);
+    logger.debug(`   Symbol: ${symbol}`);
+    logger.debug(`   Owner: ${owner}`);
+    logger.debug(`   Total Supply: ${formatEther(totalSupply)} tokens`);
     
-    console.log(`\n🔗 Subscription Status:`);
-    console.log(`   Status: ${isSubscribed ? '✅ Subscribed' : '❌ Not Subscribed'}`);
-    console.log(`   Hub ID: ${hubId.toString()}`);
+    logger.debug(`\n🔗 Subscription Status:`);
+    logger.debug(`   Status: ${isSubscribed ? '✅ Subscribed' : '❌ Not Subscribed'}`);
+    logger.debug(`   Hub ID: ${hubId.toString()}`);
     
     if (isSubscribed) {
-      console.log(`   📈 Pooled Balance: ${formatEther(balancePooled)} DAI`);
-      console.log(`   🔒 Locked Balance: ${formatEther(balanceLocked)} DAI`);
-      console.log(`   💰 Total Locked: ${formatEther(totalLocked)} DAI`);
+      logger.debug(`   📈 Pooled Balance: ${formatEther(balancePooled)} DAI`);
+      logger.debug(`   🔒 Locked Balance: ${formatEther(balanceLocked)} DAI`);
+      logger.debug(`   💰 Total Locked: ${formatEther(totalLocked)} DAI`);
       
       // Step 4: Calculate TVL (Total Value Locked)
-      console.log(`\n💰 TVL Calculation:`);
-      console.log(`   Total Collateral: ${formatEther(totalLocked)} DAI`);
-      console.log(`   TVL: $${formatEther(totalLocked)} (assuming 1 DAI = $1)`);
+      logger.debug(`\n💰 TVL Calculation:`);
+      logger.debug(`   Total Collateral: ${formatEther(totalLocked)} DAI`);
+      logger.debug(`   TVL: $${formatEther(totalLocked)} (assuming 1 DAI = $1)`);
     }
 
-    console.log(`\n${isSubscribed ? 
+    logger.debug(`\n${isSubscribed ? 
       '✅ MeToken is subscribed and ready for trading!' : 
       '❌ MeToken needs to be subscribed before trading is enabled.'}`);
     
@@ -151,7 +152,7 @@ export async function checkMeTokenSubscriptionStatus(
       tvl: formatEther(totalLocked)
     };
   } catch (error) {
-    console.error(`❌ Failed to check MeToken subscription status:`, error);
+    logger.error(`❌ Failed to check MeToken subscription status:`, error);
     return {
       isSubscribed: false,
       error: error instanceof Error ? error.message : 'Unknown error occurred'
@@ -170,7 +171,7 @@ export async function quickSubscriptionCheck(
     const result = await checkMeTokenSubscriptionStatus(meTokenAddress, network);
     return result.isSubscribed;
   } catch (error) {
-    console.error('Quick subscription check failed:', error);
+    logger.error('Quick subscription check failed:', error);
     return false;
   }
 }
@@ -183,7 +184,7 @@ export async function calculateMeTokenPrice(
   network: keyof typeof METOKEN_CONTRACTS = 'BASE'
 ) {
   try {
-    console.log(`\n💰 Calculating MeToken price...`);
+    logger.debug(`\n💰 Calculating MeToken price...`);
     
     // Get current supply
     const totalSupply = await publicClient.readContract({
@@ -203,7 +204,7 @@ export async function calculateMeTokenPrice(
     const [, hubId, balancePooled] = meTokenInfo as [string, bigint, bigint, bigint, bigint, bigint, bigint, bigint, string];
 
     if (totalSupply === BigInt(0)) {
-      console.log(`❌ MeToken has no supply yet`);
+      logger.debug(`❌ MeToken has no supply yet`);
       return { price: '0', priceInUSD: '$0' };
     }
 
@@ -211,10 +212,10 @@ export async function calculateMeTokenPrice(
     // Price = (balancePooled / totalSupply) * hub configuration
     const price = Number(balancePooled) / Number(totalSupply);
     
-    console.log(`📊 Price calculation:`);
-    console.log(`   Balance Pooled: ${formatEther(balancePooled)} DAI`);
-    console.log(`   Total Supply: ${formatEther(totalSupply)} tokens`);
-    console.log(`   Calculated Price: ${price.toFixed(6)} DAI per token`);
+    logger.debug(`📊 Price calculation:`);
+    logger.debug(`   Balance Pooled: ${formatEther(balancePooled)} DAI`);
+    logger.debug(`   Total Supply: ${formatEther(totalSupply)} tokens`);
+    logger.debug(`   Calculated Price: ${price.toFixed(6)} DAI per token`);
     
     return {
       price: price.toFixed(6),
@@ -223,7 +224,7 @@ export async function calculateMeTokenPrice(
       totalSupply: formatEther(totalSupply)
     };
   } catch (error) {
-    console.error(`❌ Failed to calculate MeToken price:`, error);
+    logger.error(`❌ Failed to calculate MeToken price:`, error);
     return { price: '0', priceInUSD: '$0', error: error instanceof Error ? error.message : 'Unknown error' };
   }
 }

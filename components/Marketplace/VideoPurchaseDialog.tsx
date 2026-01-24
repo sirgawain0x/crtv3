@@ -11,6 +11,8 @@ import { formatEther, parseEther } from "viem";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { VideoMeTokenBuyDialog } from "@/components/Videos/VideoMeTokenBuyDialog";
 import { Separator } from "@/components/ui/separator";
+import { logger } from '@/lib/utils/logger';
+
 
 interface VideoPurchaseDialogProps {
     videoId: number;
@@ -72,7 +74,7 @@ export function VideoPurchaseDialog({
             }) as bigint;
             setBalance(formatEther(bal));
         } catch (e) {
-            console.error("Failed to check balance", e);
+            logger.error("Failed to check balance", e);
         } finally {
             setCheckingBalance(false);
         }

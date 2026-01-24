@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode, useRef } from "react";
 import { createHelia, Helia } from "helia";
 import { unixfs, UnixFS } from "@helia/unixfs";
+import { logger } from "@/lib/utils/logger";
 
 /**
  * HeliaContext Type Definition
@@ -48,7 +49,7 @@ const HeliaContext = createContext<HeliaContextType>({
  *     const buffer = await file.arrayBuffer();
  *     const content = new Uint8Array(buffer);
  *     const cid = await fs.addBytes(content);
- *     console.log('Uploaded:', cid.toString());
+ *     logger.debug('Uploaded:', cid.toString());
  *   };
  *
  *   return <button onClick={() => handleUpload(file)} disabled={!isReady}>Upload</button>;
@@ -102,7 +103,7 @@ export const HeliaProvider: React.FC<{ children: ReactNode }> = ({
       isInitializing.current = true;
 
       try {
-        console.log("[HeliaProvider] Initializing Helia...");
+        logger.debug("[HeliaProvider] Initializing Helia...");
 
         // Create Helia instance
         heliaInstance = await createHelia();
@@ -116,13 +117,13 @@ export const HeliaProvider: React.FC<{ children: ReactNode }> = ({
           setFs(fsInstance);
           setIsReady(true);
           setError(null);
-          console.log("[HeliaProvider] Helia initialized successfully");
+          logger.debug("[HeliaProvider] Helia initialized successfully");
         } else {
           // Clean up if component unmounted during initialization
           await heliaInstance.stop();
         }
       } catch (err) {
-        console.error("[HeliaProvider] Failed to initialize Helia:", err);
+        logger.error("[HeliaProvider] Failed to initialize Helia:", err);
         if (mounted) {
           setError(err instanceof Error ? err : new Error(String(err)));
           setIsReady(false);
@@ -140,9 +141,9 @@ export const HeliaProvider: React.FC<{ children: ReactNode }> = ({
     return () => {
       mounted = false;
       if (heliaInstance) {
-        console.log("[HeliaProvider] Stopping Helia instance...");
+        logger.debug("[HeliaProvider] Stopping Helia instance...");
         heliaInstance.stop().catch((err) => {
-          console.error("[HeliaProvider] Error stopping Helia:", err);
+          logger.error("[HeliaProvider] Error stopping Helia:", err);
         });
         heliaInstance = null;
       }

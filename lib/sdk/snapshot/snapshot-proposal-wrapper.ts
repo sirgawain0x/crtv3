@@ -1,3 +1,5 @@
+import { serverLogger } from '@/lib/utils/logger';
+
 /**
  * Submits a proposal to Snapshot using either a signer or a pre-signed signature.
  * @param signer - Optional adapter with getAddress and signMessage (for server-side signing)
@@ -99,12 +101,12 @@ export async function submitSnapshotProposal({
     };
   }
   
-  console.log(`Signature length: ${sig.length} chars (standard is 132)`);
-  console.log(`Signature: ${sig.substring(0, 30)}...${sig.substring(sig.length - 10)}`);
+  serverLogger.debug(`Signature length: ${sig.length} chars (standard is 132)`);
+  serverLogger.debug(`Signature: ${sig.substring(0, 30)}...${sig.substring(sig.length - 10)}`);
   
   // Minimum length check for standard ECDSA signature
   if (sig.length < 132) {
-    console.warn(`Warning: Signature is shorter than standard (${sig.length} < 132 chars)`);
+    serverLogger.warn(`Warning: Signature is shorter than standard (${sig.length} < 132 chars)`);
   }
 
   // Snapshot expects: { address, sig, data }
@@ -121,7 +123,7 @@ export async function submitSnapshotProposal({
   // Extract message fields for logging (handle both EIP-712 and personal_sign formats)
   const messageData = isEip712 ? (payload as any).message : payload;
   
-  console.log("Submitting to Snapshot:", {
+  serverLogger.debug("Submitting to Snapshot:", {
     url: `${hubUrl}/api/msg`,
     address: finalAddress,
     signatureLength: sig.length,
@@ -149,7 +151,7 @@ export async function submitSnapshotProposal({
   });
 
   const responseText = await res.text();
-  console.log("Snapshot response:", {
+  serverLogger.debug("Snapshot response:", {
     status: res.status,
     statusText: res.statusText,
     body: responseText,
@@ -164,7 +166,7 @@ export async function submitSnapshotProposal({
       const errorJson = JSON.parse(responseText);
 
       // Log full error for debugging
-      console.error("Full Snapshot error response:", JSON.stringify(errorJson, null, 2));
+      serverLogger.error("Full Snapshot error response:", JSON.stringify(errorJson, null, 2));
 
       // Extract error message with priority order
       if (errorJson.error_description) {
@@ -197,7 +199,7 @@ export async function submitSnapshotProposal({
     }
 
     // Log error details for debugging
-    console.error("Snapshot error details:", errorDetails || responseText);
+    serverLogger.error("Snapshot error details:", errorDetails || responseText);
 
     return { error: errorMessage };
   }
@@ -206,7 +208,7 @@ export async function submitSnapshotProposal({
   try {
     json = JSON.parse(responseText);
   } catch (parseError) {
-    console.error("Failed to parse Snapshot response as JSON:", {
+    serverLogger.error("Failed to parse Snapshot response as JSON:", {
       responseText: responseText.substring(0, 500),
       parseError,
     });
@@ -214,7 +216,7 @@ export async function submitSnapshotProposal({
   }
 
   if (json.id) {
-    console.log("Proposal created successfully:", json.id);
+    serverLogger.debug("Proposal created successfully:", json.id);
     return { id: json.id };
   }
 
@@ -222,7 +224,7 @@ export async function submitSnapshotProposal({
   const errorMessage = json.error || json.message || json.reason || "Unknown error from Snapshot API";
 
   // Log the full response for debugging if it's not a success
-  console.error("Snapshot returned error in successful response:", {
+  serverLogger.error("Snapshot returned error in successful response:", {
     status: res.status,
     response: json,
     errorMessage,

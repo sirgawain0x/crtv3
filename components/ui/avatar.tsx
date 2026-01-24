@@ -5,6 +5,8 @@ import * as AvatarPrimitive from "@radix-ui/react-avatar";
 
 import { cn } from "@/lib/utils/utils";
 import { convertFailingGateway, getImageUrlWithFallback } from "@/lib/utils/image-gateway";
+import { logger } from '@/lib/utils/logger';
+
 
 const Avatar = React.forwardRef<
   React.ElementRef<typeof AvatarPrimitive.Root>,
@@ -76,7 +78,7 @@ const AvatarImage = React.forwardRef<
     
     // Try fallback gateways if available
     if (fallbacks.length > currentIndex) {
-      console.log(`Avatar image failed, trying fallback gateway ${currentIndex + 1}/${fallbacks.length}`);
+      logger.debug(`Avatar image failed, trying fallback gateway ${currentIndex + 1}/${fallbacks.length}`);
       setImageSrc(fallbacks[currentIndex]);
       const nextIndex = currentIndex + 1;
       setFallbackIndex(nextIndex);

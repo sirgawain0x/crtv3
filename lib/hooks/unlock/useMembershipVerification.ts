@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { useUser, useSmartAccountClient } from "@account-kit/react";
 import type { UseSmartAccountClientResult } from "@account-kit/react";
+import { logger } from '@/lib/utils/logger';
+
 import {
   unlockService,
   type LockAddress,
@@ -157,7 +159,7 @@ export function useUnlockNFT({
   }, [lockAddress, userAddress, network]);
 
   const DEBUG = process.env.NODE_ENV === "development";
-  if (DEBUG) console.log("message", data);
+  if (DEBUG) logger.debug("message", data);
 
   return { data, isLoading, error };
 }

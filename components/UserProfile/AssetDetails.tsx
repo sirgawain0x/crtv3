@@ -2,6 +2,8 @@
 
 import React from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
+import { logger } from '@/lib/utils/logger';
+
 
 export default function AssetDetails() {
   const params = useParams();
@@ -14,7 +16,7 @@ export default function AssetDetails() {
   try {
     videoData = videoParam ? JSON.parse(videoParam) : null;
   } catch (error) {
-    console.error('Failed to parse video query parameter:', error);
+    logger.error('Failed to parse video query parameter:', error);
   }
 
   const setPermission = () => {

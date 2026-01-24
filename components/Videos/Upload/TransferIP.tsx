@@ -11,6 +11,8 @@ import { Loader2, Send, CheckCircle, XCircle, ExternalLink } from "lucide-react"
 import { createStoryPublicClient } from "@/lib/sdk/story/client";
 import { formatEther, parseEther, type Address } from "viem";
 import { toast } from "sonner";
+import { logger } from '@/lib/utils/logger';
+
 
 interface TransferIPProps {
   onTransferSuccess?: () => void;
@@ -57,7 +59,7 @@ export function TransferIP({ onTransferSuccess }: TransferIPProps) {
           }
         }
       } catch (err) {
-        console.error("Error fetching funding wallet:", err);
+        logger.error("Error fetching funding wallet:", err);
       } finally {
         setIsLoadingFundingWallet(false);
       }
@@ -79,13 +81,13 @@ export function TransferIP({ onTransferSuccess }: TransferIPProps) {
       
       const formatted = formatEther(balance);
       setIpBalance(formatted);
-      console.log("✅ IP Balance checked:", {
+      logger.debug("✅ IP Balance checked:", {
         address: client.account.address,
         balance: formatted,
         rawBalance: balance.toString(),
       });
     } catch (err) {
-      console.error("Error checking IP balance:", err);
+      logger.error("Error checking IP balance:", err);
       setError(err instanceof Error ? err.message : "Failed to check balance");
     } finally {
       setIsCheckingBalance(false);
@@ -191,7 +193,7 @@ export function TransferIP({ onTransferSuccess }: TransferIPProps) {
           });
           setFundingWalletBalance(formatEther(balance));
         } catch (err) {
-          console.error("Error refreshing funding wallet balance:", err);
+          logger.error("Error refreshing funding wallet balance:", err);
         }
       }
       
@@ -204,7 +206,7 @@ export function TransferIP({ onTransferSuccess }: TransferIPProps) {
         onTransferSuccess();
       }
     } catch (err) {
-      console.error("Transfer failed:", err);
+      logger.error("Transfer failed:", err);
       const errorMessage = err instanceof Error ? err.message : "Transfer failed";
       setError(errorMessage);
       toast.error(`Transfer failed: ${errorMessage}`);

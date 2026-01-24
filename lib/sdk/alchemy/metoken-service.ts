@@ -2,6 +2,7 @@ import { Alchemy, Network, Utils } from "alchemy-sdk";
 import { createPublicClient, createWalletClient, http, parseEther, formatEther, encodeFunctionData } from "viem";
 import { base } from "viem/chains";
 import { privateKeyToAccount } from "viem/accounts";
+import { serverLogger } from "@/lib/utils/logger";
 
 // Alchemy SDK configuration
 const alchemyConfig = {
@@ -199,7 +200,7 @@ export class AlchemyMeTokenService {
    */
   async createMeToken(params: MeTokenCreationParams): Promise<MeTokenCreationResult> {
     try {
-      console.log('🚀 Starting MeToken creation with Alchemy SDK:', params);
+      serverLogger.debug('🚀 Starting MeToken creation with Alchemy SDK:', params);
 
       // Step 1: Validate inputs
       this.validateCreationParams(params);
@@ -210,11 +211,11 @@ export class AlchemyMeTokenService {
       // Step 3: Create the MeToken using the subscribe function
       const result = await this.executeMeTokenCreation(params);
 
-      console.log('✅ MeToken creation completed:', result);
+      serverLogger.debug('✅ MeToken creation completed:', result);
       return result;
 
     } catch (error) {
-      console.error('❌ MeToken creation failed:', error);
+      serverLogger.error('❌ MeToken creation failed:', error);
       throw new Error(`Failed to create MeToken: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -242,7 +243,7 @@ export class AlchemyMeTokenService {
         migration: result[7],
       };
     } catch (error) {
-      console.error('Failed to get MeToken info:', error);
+      serverLogger.error('Failed to get MeToken info:', error);
       return null;
     }
   }
@@ -269,7 +270,7 @@ export class AlchemyMeTokenService {
 
       return formatEther(balance as bigint);
     } catch (error) {
-      console.error('Failed to get DAI balance:', error);
+      serverLogger.error('Failed to get DAI balance:', error);
       return '0';
     }
   }
@@ -288,7 +289,7 @@ export class AlchemyMeTokenService {
 
       return formatEther(allowance as bigint);
     } catch (error) {
-      console.error('Failed to get DAI allowance:', error);
+      serverLogger.error('Failed to get DAI allowance:', error);
       return '0';
     }
   }
@@ -310,7 +311,7 @@ export class AlchemyMeTokenService {
 
       return gasEstimate;
     } catch (error) {
-      console.error('Failed to estimate gas:', error);
+      serverLogger.error('Failed to estimate gas:', error);
       throw new Error('Failed to estimate gas for MeToken creation');
     }
   }
@@ -332,7 +333,7 @@ export class AlchemyMeTokenService {
         fast: formatEther(feeData.maxFeePerGas ? BigInt(feeData.maxFeePerGas.toString()) : BigInt(0)),
       };
     } catch (error) {
-      console.error('Failed to get gas prices:', error);
+      serverLogger.error('Failed to get gas prices:', error);
       return {
         slow: '0',
         standard: '0',
@@ -420,7 +421,7 @@ export class AlchemyMeTokenService {
     const currentAllowanceWei = parseEther(currentAllowance);
 
     if (currentAllowanceWei < amount) {
-      console.log('🔓 Approving DAI for MeToken creation...');
+      serverLogger.debug('🔓 Approving DAI for MeToken creation...');
       
       const approveHash = await this.walletClient.writeContract({
         address: METOKEN_CONTRACTS.DAI,
@@ -431,7 +432,7 @@ export class AlchemyMeTokenService {
       });
 
       await this.publicClient.waitForTransactionReceipt({ hash: approveHash });
-      console.log('✅ DAI approved successfully');
+      serverLogger.debug('✅ DAI approved successfully');
     }
   }
 
@@ -450,7 +451,7 @@ export class AlchemyMeTokenService {
             return meTokenAddress;
           }
         } catch (error) {
-          console.error('Failed to parse MeToken address from log:', error);
+          serverLogger.error('Failed to parse MeToken address from log:', error);
         }
       }
     }

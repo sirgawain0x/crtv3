@@ -8,6 +8,8 @@ import { VideoCardSkeleton } from "./VideoCardSkeleton";
 import { Pagination } from "@/components/ui/pagination";
 import { fetchPublishedVideos } from "@/lib/utils/published-videos-client";
 import type { VideoAsset } from "@/lib/types/video-asset";
+import { logger } from '@/lib/utils/logger';
+
 
 const ITEMS_PER_PAGE = 12; // Number of videos per page
 
@@ -61,14 +63,14 @@ const VideoCardGrid: React.FC<VideoCardGridProps> = ({
           return detailedSrc;
         } catch (err) {
           if (retries > 0) {
-            console.warn(
+            logger.warn(
               `Retrying playback source fetch for ${playbackId}. Attempts remaining: ${retries - 1
               }`
             );
             await new Promise((resolve) => setTimeout(resolve, 1000));
             return fetchPlaybackSourceWithRetry(playbackId, retries - 1);
           }
-          console.error(
+          logger.error(
             `Failed to fetch playback source for ${playbackId} after all retries:`,
             err
           );
@@ -143,7 +145,7 @@ const VideoCardGrid: React.FC<VideoCardGridProps> = ({
 
       setPlaybackSources(validPlaybackSources);
     } catch (err) {
-      console.error("Error fetching videos:", err);
+      logger.error("Error fetching videos:", err);
       setError("Failed to load videos. Please try again later.");
       setValidVideosCount(0);
       setPlaybackSources([]);

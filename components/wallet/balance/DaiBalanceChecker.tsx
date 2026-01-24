@@ -4,6 +4,8 @@ import { useSmartAccountClient } from '@account-kit/react';
 import { formatEther } from 'viem';
 import { erc20Abi } from 'viem';
 import { DAI_TOKEN_ADDRESSES } from '@/lib/contracts/DAIToken';
+import { logger } from '@/lib/utils/logger';
+
 
 interface DaiBalanceCheckerProps {
   onBalanceUpdate?: (balance: bigint) => void;
@@ -39,7 +41,7 @@ export function DaiBalanceChecker({ onBalanceUpdate, className }: DaiBalanceChec
       setDaiBalance(balance);
       onBalanceUpdate?.(balance);
     } catch (err) {
-      console.error('Failed to check DAI balance:', err);
+      logger.error('Failed to check DAI balance:', err);
       setError('Failed to fetch DAI balance');
     } finally {
       setIsLoading(false);

@@ -13,6 +13,8 @@ import { BASE_TOKENS } from '@/lib/sdk/alchemy/swap-service';
 import { useGasSponsorship } from '@/lib/hooks/wallet/useGasSponsorship';
 import { AlchemySwapWidget } from '@/components/wallet/swap/AlchemySwapWidget';
 import { Dialog, DialogContent, DialogTrigger, DialogTitle } from '@/components/ui/dialog';
+import { logger } from '@/lib/utils/logger';
+
 
 export function CreativeBankTab() {
     const { address: userAddress, client } = useSmartAccountClient({});
@@ -45,7 +47,7 @@ export function CreativeBankTab() {
             setUsdcBalance(balance);
             setIsLoadingBalance(false);
         } catch (err) {
-            console.warn('Failed to fetch USDC balance:', err);
+            logger.warn('Failed to fetch USDC balance:', err);
             setIsLoadingBalance(false);
         }
     };
@@ -96,7 +98,7 @@ export function CreativeBankTab() {
                 context: gasContext.context
             });
 
-            console.log('UserOp sent:', operation.hash);
+            logger.debug('UserOp sent:', operation.hash);
 
             const tx = await client.waitForUserOperationTransaction({
                 hash: operation.hash
@@ -107,7 +109,7 @@ export function CreativeBankTab() {
             fetchBalance(); // Refresh balance
 
         } catch (err: any) {
-            console.error('Transfer failed:', err);
+            logger.error('Transfer failed:', err);
             setError(err.message || "Failed to send USDC");
         } finally {
             setIsSending(false);

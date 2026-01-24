@@ -6,6 +6,8 @@ import { useMembershipVerification } from "@/lib/hooks/unlock/useMembershipVerif
 import { Loader2 } from "lucide-react";
 import { createContext, useContext } from "react";
 import type { MembershipStatus } from "@/lib/hooks/unlock/useMembershipVerification";
+import { logger } from '@/lib/utils/logger';
+
 
 interface MembershipGuardProps {
   children: React.ReactNode;
@@ -19,7 +21,7 @@ export function MembershipGuard({ children }: MembershipGuardProps) {
   const { isVerified, hasMembership, isLoading } = membership;
 
   useEffect(() => {
-    console.log("MembershipGuard:", membership);
+    logger.debug("MembershipGuard:", membership);
     if (!isLoading && (!isVerified || !hasMembership)) {
       router.push("/");
     }

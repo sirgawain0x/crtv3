@@ -12,6 +12,8 @@
 
 import { StoryClient } from "@story-protocol/core-sdk";
 import type { Address, Log } from "viem";
+import { serverLogger } from '@/lib/utils/logger';
+
 
 /**
  * Parameters for creating an NFT collection via SPG
@@ -170,7 +172,7 @@ export async function createCollection(
       txHash: result.txHash,
     };
   } catch (error) {
-    console.error("Failed to create collection:", error);
+    serverLogger.error("Failed to create collection:", error);
     throw new Error(
       `Collection creation failed: ${error instanceof Error ? error.message : "Unknown error"}`
     );
@@ -230,7 +232,7 @@ export async function mintAndRegisterIp(
       txHash: result.txHash,
     };
   } catch (error) {
-    console.error("Failed to mint and register IP Asset:", error);
+    serverLogger.error("Failed to mint and register IP Asset:", error);
     throw new Error(
       `Mint and register failed: ${error instanceof Error ? error.message : "Unknown error"}`
     );
@@ -291,7 +293,7 @@ export async function mintAndRegisterIpAndAttachPilTerms(
       txHash: result.txHash,
     };
   } catch (error) {
-    console.error("Failed to mint, register, and attach license terms:", error);
+    serverLogger.error("Failed to mint, register, and attach license terms:", error);
     throw new Error(
       `Mint, register, and attach license failed: ${error instanceof Error ? error.message : "Unknown error"}`
     );

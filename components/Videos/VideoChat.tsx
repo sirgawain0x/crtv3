@@ -13,6 +13,8 @@ import { cn } from "@/lib/utils";
 import { formatAddress } from "@/lib/helpers";
 import { VideoTipButton } from "./VideoTipButton";
 import { getExplorerUrl } from "@/lib/utils/video-tip";
+import { logger } from '@/lib/utils/logger';
+
 
 interface VideoChatProps {
   videoId: string;
@@ -52,7 +54,7 @@ export function VideoChat({ videoId, videoName, creatorAddress, className }: Vid
       await sendMessage(messageToSend);
     } catch (err) {
       // Error is already handled in useVideoChat hook
-      console.error("Failed to send message:", err);
+      logger.error("Failed to send message:", err);
     }
   };
 

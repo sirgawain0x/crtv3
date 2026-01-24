@@ -6,6 +6,8 @@ import { MeTokenData } from '@/lib/hooks/metokens/useMeTokensSupabase';
 import { Loader2, ExternalLink, ArrowUpRight, ArrowDownLeft, Plus } from 'lucide-react';
 import { formatEther } from 'viem';
 import { Button } from '@/components/ui/button';
+import { logger } from '@/lib/utils/logger';
+
 
 interface MeTokenHistoryProps {
     meToken: MeTokenData;
@@ -24,7 +26,7 @@ export function MeTokenHistory({ meToken }: MeTokenHistoryProps) {
                 const data = await meTokenSupabaseService.getMeTokenTransactions(meToken.address, { limit: 50 });
                 setTransactions(data);
             } catch (err) {
-                console.error('Failed to fetch transactions:', err);
+                logger.error('Failed to fetch transactions:', err);
                 setError('Failed to load transaction history');
             } finally {
                 setLoading(false);

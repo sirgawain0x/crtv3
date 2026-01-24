@@ -19,6 +19,8 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { Slash } from "lucide-react";
+import { logger } from '@/lib/utils/logger';
+
 
 export default function WatchLivePage() {
   const params = useParams();
@@ -50,7 +52,7 @@ export default function WatchLivePage() {
         
         setPlaybackSources(sources);
       } catch (err) {
-        console.error("Error fetching playback sources:", err);
+        logger.error("Error fetching playback sources:", err);
         setError(err instanceof Error ? err.message : "Failed to load stream");
       } finally {
         setIsLoading(false);

@@ -10,6 +10,8 @@ import { erc20Abi } from 'viem';
 import { DAI_TOKEN_ADDRESSES } from '@/lib/contracts/DAIToken';
 import { DaiFundButton } from '@/components/wallet/buy/dai-fund-button';
 import { DaiSwapButton } from '@/components/wallet/swap/DaiSwapButton';
+import { logger } from '@/lib/utils/logger';
+
 
 interface DaiFundingOptionsProps {
   requiredAmount?: string;
@@ -46,7 +48,7 @@ export function DaiFundingOptions({ requiredAmount, onBalanceUpdate, className }
       setDaiBalance(balance);
       onBalanceUpdate?.(balance);
     } catch (err) {
-      console.error('Failed to check DAI balance:', err);
+      logger.error('Failed to check DAI balance:', err);
       setError('Failed to fetch DAI balance');
     } finally {
       setIsLoading(false);

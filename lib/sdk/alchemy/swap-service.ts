@@ -1,4 +1,5 @@
 import { type Hex, type Address } from "viem";
+import { serverLogger } from "@/lib/utils/logger";
 
 // Base chain token addresses
 export const BASE_TOKENS = {
@@ -173,7 +174,7 @@ export class AlchemySwapService {
       throw new Error("Either fromAmount or minimumToAmount must be provided");
     }
 
-    console.log('Making swap quote request with:', {
+    serverLogger.debug('Making swap quote request with:', {
       apiKey: this.apiKey ? `${this.apiKey.slice(0, 10)}...` : 'MISSING',
       quoteRequest: {
         ...quoteRequest,
@@ -210,7 +211,7 @@ export class AlchemySwapService {
 
     const result = await response.json() as SwapQuoteResponse;
 
-    console.log('Swap quote response:', {
+    serverLogger.debug('Swap quote response:', {
       hasResult: !!result.result,
       hasError: !!result.error,
       error: result.error,
@@ -218,7 +219,7 @@ export class AlchemySwapService {
     });
 
     if (result.error) {
-      console.error('Swap quote error details:', {
+      serverLogger.error('Swap quote error details:', {
         code: result.error.code,
         message: result.error.message,
         fullError: result.error

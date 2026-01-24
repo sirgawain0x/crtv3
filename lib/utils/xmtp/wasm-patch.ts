@@ -1,3 +1,5 @@
+
+import { logger } from '@/lib/utils/logger';
 /**
  * WASM Patch for XMTP - Direct URL Resolution
  * 
@@ -99,7 +101,7 @@ function getAppOrigin(): string {
     } catch (e) {
       // Fall through to default
       if (process.env.NODE_ENV === 'development') {
-        console.warn('[WASM Patch] Error getting origin from worker location:', e);
+        logger.warn('[WASM Patch] Error getting origin from worker location:', e);
       }
     }
   }
@@ -107,7 +109,7 @@ function getAppOrigin(): string {
   // Fallback - try to infer from common development ports
   // This is a last resort and should rarely be used
   if (process.env.NODE_ENV === 'development') {
-    console.warn('[WASM Patch] Using fallback origin. This may cause issues.');
+    logger.warn('[WASM Patch] Using fallback origin. This may cause issues.');
   }
   return typeof window !== 'undefined' && window.location
     ? window.location.origin
@@ -191,7 +193,7 @@ export function patchGlobalFetch(): void {
         const absoluteUrl = resolveWasmUrl(url, appOrigin);
 
         if (process.env.NODE_ENV === 'development') {
-          console.log('[WASM Patch] Converting WASM URL:', url, '->', absoluteUrl, '(context:', typeof window !== 'undefined' ? 'main' : 'worker', ', origin:', appOrigin, ')');
+          logger.debug('[WASM Patch] Converting WASM URL:', url, '->', absoluteUrl, '(context:', typeof window !== 'undefined' ? 'main' : 'worker', ', origin:', appOrigin, ')');
         }
 
         // Use original fetch with absolute URL
@@ -208,7 +210,7 @@ export function patchGlobalFetch(): void {
       return originalFetch(input, init);
     } catch (error) {
       // If patching fails, try original fetch as fallback
-      console.error('[WASM Patch] Error in fetch patch:', error);
+      logger.error('[WASM Patch] Error in fetch patch:', error);
       return originalFetch(input, init);
     }
   };
@@ -275,7 +277,7 @@ function createWorkerPatchScript(appOrigin: string): string {
       
       return originalFetch(input, init);
     } catch (error) {
-      console.error('[WASM Patch] Error in worker fetch patch:', error);
+      logger.error('[WASM Patch] Error in worker fetch patch:', error);
       return originalFetch(input, init);
     }
   };
@@ -331,7 +333,7 @@ function interceptWorkerCreation(): void {
     }
   } as typeof Worker;
 
-  console.log('[WASM Patch] Worker interception enabled, origin:', appOrigin);
+  logger.debug('[WASM Patch] Worker interception enabled, origin:', appOrigin);
 }
 
 /**
@@ -392,7 +394,7 @@ function patchURLConstructor(): void {
             if (urlString.startsWith('/')) {
               super(urlString, appOrigin);
               if (process.env.NODE_ENV === 'development') {
-                console.log('[WASM Patch] URL constructor: Fixed absolute WASM path', {
+                logger.debug('[WASM Patch] URL constructor: Fixed absolute WASM path', {
                   original: urlString,
                   base: base ? (typeof base === 'string' ? base : base.href) : 'none',
                   resolved: new URL(urlString, appOrigin).href,
@@ -407,7 +409,7 @@ function patchURLConstructor(): void {
             const absolutePath = cleanPath.startsWith('/') ? cleanPath : `/_next/static/media/${cleanPath}`;
             super(absolutePath, appOrigin);
             if (process.env.NODE_ENV === 'development') {
-              console.log('[WASM Patch] URL constructor: Fixed relative WASM path', {
+              logger.debug('[WASM Patch] URL constructor: Fixed relative WASM path', {
                 original: urlString,
                 resolved: new URL(absolutePath, appOrigin).href,
                 context: typeof window !== 'undefined' ? 'main' : 'worker',
@@ -448,7 +450,7 @@ function patchURLConstructor(): void {
             const absolutePath = urlString.startsWith('/') ? urlString : `/_next/static/media/${urlString}`;
             super(absolutePath, appOrigin);
             if (process.env.NODE_ENV === 'development') {
-              console.log('[WASM Patch] URL constructor: Fallback resolution', {
+              logger.debug('[WASM Patch] URL constructor: Fallback resolution', {
                 original: urlString,
                 resolved: new URL(absolutePath, appOrigin).href,
               });
@@ -459,7 +461,7 @@ function patchURLConstructor(): void {
           // Last resort: throw original error with more context
           const isDev = process.env.NODE_ENV === 'development';
           if (isDev) {
-            console.error('[WASM Patch] URL construction failed:', {
+            logger.error('[WASM Patch] URL construction failed:', {
               url: typeof url === 'string' ? url : url.href,
               base: base ? (typeof base === 'string' ? base : base.href) : 'none',
               error: error,
@@ -520,7 +522,7 @@ export function initWasmPatch(): void {
     if ((self as any).__WASM_APP_ORIGIN__) {
       appOrigin = (self as any).__WASM_APP_ORIGIN__;
       if (process.env.NODE_ENV === 'development') {
-        console.log('[WASM Patch] Worker: Using stored origin:', appOrigin);
+        logger.debug('[WASM Patch] Worker: Using stored origin:', appOrigin);
       }
     }
 
@@ -532,7 +534,7 @@ export function initWasmPatch(): void {
           appOrigin = blobMatch[1];
           (self as any).__WASM_APP_ORIGIN__ = appOrigin;
           if (process.env.NODE_ENV === 'development') {
-            console.log('[WASM Patch] Worker: Extracted origin from blob URL:', appOrigin);
+            logger.debug('[WASM Patch] Worker: Extracted origin from blob URL:', appOrigin);
           }
         }
       } else {
@@ -540,7 +542,7 @@ export function initWasmPatch(): void {
           appOrigin = new URL(self.location.href).origin;
           (self as any).__WASM_APP_ORIGIN__ = appOrigin;
           if (process.env.NODE_ENV === 'development') {
-            console.log('[WASM Patch] Worker: Using location origin:', appOrigin);
+            logger.debug('[WASM Patch] Worker: Using location origin:', appOrigin);
           }
         } catch (e) {
           // Ignore
@@ -555,7 +557,7 @@ export function initWasmPatch(): void {
           const receivedOrigin = event.data.origin;
           (self as any).__WASM_APP_ORIGIN__ = receivedOrigin;
           if (process.env.NODE_ENV === 'development') {
-            console.log('[WASM Patch] Worker: Received origin from main thread:', receivedOrigin);
+            logger.debug('[WASM Patch] Worker: Received origin from main thread:', receivedOrigin);
           }
           // Re-patch with correct origin
           patchURLConstructor();
@@ -568,7 +570,7 @@ export function initWasmPatch(): void {
     }
 
     if (process.env.NODE_ENV === 'development') {
-      console.log('[WASM Patch] Worker: Patches applied, origin:', appOrigin || 'pending');
+      logger.debug('[WASM Patch] Worker: Patches applied, origin:', appOrigin || 'pending');
     }
   }
 }

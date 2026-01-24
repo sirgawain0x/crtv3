@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { meTokensSubgraph, MeToken } from '@/lib/sdk/metokens/subgraph';
+import { logger } from '@/lib/utils/logger';
+
 
 export default function MeTokensTest() {
   const [meTokens, setMeTokens] = useState<MeToken[]>([]);
@@ -16,11 +18,11 @@ export default function MeTokensTest() {
       // Test fetching all MeTokens
       const tokens = await meTokensSubgraph.getAllMeTokens(10, 0);
       setMeTokens(tokens);
-      console.log('MeTokens fetched successfully:', tokens);
+      logger.debug('MeTokens fetched successfully:', tokens);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       setError(errorMessage);
-      console.error('Failed to fetch MeTokens:', err);
+      logger.error('Failed to fetch MeTokens:', err);
     } finally {
       setLoading(false);
     }

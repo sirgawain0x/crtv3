@@ -2,8 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseService } from '@/lib/sdk/supabase/service';
 import { createClient } from '@/lib/sdk/supabase/server';
 import { serverLogger } from '@/lib/utils/logger';
+import { rateLimiters } from '@/lib/middleware/rateLimit';
 
 export async function POST(request: NextRequest) {
+  const rl = await rateLimiters.standard(request);
+  if (rl) return rl;
+
   try {
     // Handle JSON parsing errors
     let body;

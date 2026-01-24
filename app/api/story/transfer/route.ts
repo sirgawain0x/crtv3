@@ -13,8 +13,12 @@ import { createStoryPublicClient } from "@/lib/sdk/story/client";
 import { createWalletClient, http, formatEther, type Address } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { serverLogger } from "@/lib/utils/logger";
+import { rateLimiters } from "@/lib/middleware/rateLimit";
 
 export async function POST(request: NextRequest) {
+  const rl = await rateLimiters.strict(request);
+  if (rl) return rl;
+
   try {
     // Handle JSON parsing errors
     let body;

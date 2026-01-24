@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useUser } from '@account-kit/react';
+import { logger } from '@/lib/utils/logger';
+
 import { 
   creatorProfileSupabaseService, 
   CreatorProfile, 
@@ -153,7 +155,7 @@ export function useCreatorProfile(targetAddress?: string): UseCreatorProfileResu
     const subscription = creatorProfileSupabaseService.subscribeToCreatorProfileUpdates(
       address,
       (payload) => {
-        console.log('Creator profile update received:', payload);
+        logger.debug('Creator profile update received:', payload);
         
         if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
           setProfile(payload.new);

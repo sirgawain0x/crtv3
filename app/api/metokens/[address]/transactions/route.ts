@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { meTokenSupabaseService } from '@/lib/sdk/supabase/metokens';
 import { serverLogger } from '@/lib/utils/logger';
+import { rateLimiters } from '@/lib/middleware/rateLimit';
 
 // GET /api/metokens/[address]/transactions - Get MeToken transactions
 export async function GET(
@@ -61,6 +62,9 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ address: string }> }
 ) {
+  const rl = await rateLimiters.standard(request);
+  if (rl) return rl;
+
   let address: string | undefined;
   try {
     const resolvedParams = await params;

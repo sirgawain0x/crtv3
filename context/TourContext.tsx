@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, ReactNode, useEffect } from "react";
+import { logger } from "@/lib/utils/logger";
 
 interface TourContextType {
     run: boolean;
@@ -22,29 +23,29 @@ export const TourProvider = ({ children }: { children: ReactNode }) => {
         const tourCompleted = localStorage.getItem("crtv3_tour_completed");
         const storedStep = localStorage.getItem("crtv3_tour_step");
 
-        console.log("TourContext: Checking localStorage:", { tourCompleted, storedStep });
+        logger.debug("TourContext: Checking localStorage:", { tourCompleted, storedStep });
 
         if (storedStep) {
             setStepIndex(parseInt(storedStep, 10));
         }
 
         if (!tourCompleted) {
-            console.log("TourContext: No completion found, setting run=true");
+            logger.debug("TourContext: No completion found, setting run=true");
             setRun(true);
         } else {
-            console.log("TourContext: Tour previously completed.");
+            logger.debug("TourContext: Tour previously completed.");
         }
     }, []);
 
     useEffect(() => {
-        console.log("TourContext: State updated - run:", run, "stepIndex:", stepIndex);
+        logger.debug("TourContext: State updated - run:", run, "stepIndex:", stepIndex);
         if (run) {
             localStorage.setItem("crtv3_tour_step", stepIndex.toString());
         }
     }, [run, stepIndex]);
 
     const startTour = () => {
-        console.log("TourContext: startTour called!");
+        logger.debug("TourContext: startTour called!");
         setRun(true);
         setStepIndex(0);
         // Clear completion and saved step
@@ -53,7 +54,7 @@ export const TourProvider = ({ children }: { children: ReactNode }) => {
     };
 
     const resetTour = () => {
-        console.log("TourContext: resetTour called");
+        logger.debug("TourContext: resetTour called");
         setRun(false);
         setStepIndex(0);
     };

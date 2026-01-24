@@ -7,18 +7,20 @@ import { useUser } from "@account-kit/react";
 import { useXmtpClient } from "./useXmtpClient";
 import { parseTipMessage } from "@/lib/utils/video-tip";
 import useModularAccount from "@/lib/hooks/accountkit/useModularAccount";
+import { logger } from '@/lib/utils/logger';
+
 
 // Production-safe logging utility
 const isDev = process.env.NODE_ENV === 'development';
 const log = (...args: any[]) => {
-  if (isDev) console.log(...args);
+  if (isDev) logger.debug(...args);
 };
 const logError = (...args: any[]) => {
   // Always log errors, but can be enhanced with error tracking service
-  console.error(...args);
+  logger.error(...args);
 };
 const logWarn = (...args: any[]) => {
-  if (isDev) console.warn(...args);
+  if (isDev) logger.warn(...args);
 };
 
 export interface VideoChatMessage {

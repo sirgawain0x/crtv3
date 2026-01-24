@@ -3,6 +3,8 @@
 import { useCallback } from "react";
 import { useIpfsService } from "./useIpfsService";
 import { uploadThumbnailToIPFS, uploadThumbnailFromBlob, ThumbnailUploadResult } from "@/lib/services/thumbnail-upload";
+import { logger } from '@/lib/utils/logger';
+
 
 /**
  * Hook for uploading thumbnails using Helia (following helia-nextjs pattern)
@@ -22,7 +24,7 @@ import { uploadThumbnailToIPFS, uploadThumbnailFromBlob, ThumbnailUploadResult }
  *     
  *     const result = await uploadThumbnail(file, 'playback-id');
  *     if (result.success) {
- *       console.log('Thumbnail uploaded:', result.thumbnailUrl);
+ *       logger.debug('Thumbnail uploaded:', result.thumbnailUrl);
  *     }
  *   };
  *   

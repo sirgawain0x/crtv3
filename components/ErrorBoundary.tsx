@@ -1,6 +1,8 @@
 "use client";
 
 import React, { Component, ErrorInfo, ReactNode } from 'react';
+import { logger } from '@/lib/utils/logger';
+
 
 interface Props {
   children: ReactNode;
@@ -23,13 +25,13 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
+    logger.error('ErrorBoundary caught an error:', error, errorInfo);
     
     // Check if it's an abort signal error
     if (error.message?.includes('signal is aborted') || 
         error.message?.includes('aborted without reason') ||
         error.name === 'AbortError') {
-      console.warn('Abort signal error caught by ErrorBoundary - this is usually safe to ignore');
+      logger.warn('Abort signal error caught by ErrorBoundary - this is usually safe to ignore');
       // Don't show error UI for abort signals, just log it
       this.setState({ hasError: false });
     }
@@ -73,13 +75,13 @@ export class ErrorBoundary extends Component<Props, State> {
 // Hook version for functional components
 export function useErrorHandler() {
   return (error: Error, errorInfo?: ErrorInfo) => {
-    console.error('Error caught by useErrorHandler:', error, errorInfo);
+    logger.error('Error caught by useErrorHandler:', error, errorInfo);
     
     // Check if it's an abort signal error
     if (error.message?.includes('signal is aborted') || 
         error.message?.includes('aborted without reason') ||
         error.name === 'AbortError') {
-      console.warn('Abort signal error caught by useErrorHandler - this is usually safe to ignore');
+      logger.warn('Abort signal error caught by useErrorHandler - this is usually safe to ignore');
       return; // Don't throw for abort signals
     }
     

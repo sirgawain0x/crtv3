@@ -1,3 +1,5 @@
+import { serverLogger } from '@/lib/utils/logger';
+
 /**
  * Check voting power for an address in a Snapshot space
  * Uses Snapshot's Score API to calculate voting power based on space strategies
@@ -78,7 +80,7 @@ export async function checkVotingPower(
       hasPower,
     };
   } catch (error) {
-    console.error("Error checking voting power:", error);
+    serverLogger.error("Error checking voting power:", error);
     return {
       error: error instanceof Error ? error.message : "Unknown error checking voting power",
     };

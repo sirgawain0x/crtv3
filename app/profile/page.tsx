@@ -4,6 +4,8 @@ import { useUser, useSmartAccountClient } from "@account-kit/react";
 import { useRouter } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
 import useModularAccount from "@/lib/hooks/accountkit/useModularAccount";
+import { logger } from '@/lib/utils/logger';
+
 
 function ProfileRedirect() {
   const router = useRouter();
@@ -16,12 +18,12 @@ function ProfileRedirect() {
   const smartAccountAddress = account?.address || scaAddress;
 
   useEffect(() => {
-    console.log('Profile redirect - EOA:', eoaAddress, 'SCA (client):', scaAddress, 'SCA (account):', account?.address);
+    logger.debug('Profile redirect - EOA:', eoaAddress, 'SCA (client):', scaAddress, 'SCA (account):', account?.address);
     if (smartAccountAddress) {
-      console.log('Redirecting to Smart Account profile:', smartAccountAddress);
+      logger.debug('Redirecting to Smart Account profile:', smartAccountAddress);
       router.replace(`/profile/${smartAccountAddress}`);
     } else if (eoaAddress) {
-      console.log('Redirecting to EOA profile:', eoaAddress);
+      logger.debug('Redirecting to EOA profile:', eoaAddress);
       router.replace(`/profile/${eoaAddress}`);
     }
   }, [eoaAddress, smartAccountAddress, router, account?.address, scaAddress]);

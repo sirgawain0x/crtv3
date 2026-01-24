@@ -1,4 +1,5 @@
 import { type TokenSymbol } from './swap-service';
+import { serverLogger } from '@/lib/utils/logger';
 
 // Price data interface
 export interface TokenPrice {
@@ -51,7 +52,7 @@ export class PriceService {
 
       return price;
     } catch (error) {
-      console.error(`Failed to fetch price for ${symbol}:`, error);
+      serverLogger.error(`Failed to fetch price for ${symbol}:`, error);
 
       // Return cached price if available, even if expired
       if (cached) {
@@ -162,7 +163,7 @@ export class PriceService {
           }
         }
       } catch (error) {
-        console.error('Failed to fetch multiple prices:', error);
+        serverLogger.error('Failed to fetch multiple prices:', error);
 
         // Fallback to individual requests
         for (const symbol of uncachedSymbols) {

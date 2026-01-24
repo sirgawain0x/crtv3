@@ -3,6 +3,8 @@ import { base } from "@account-kit/infra";
 import type { Address, PublicClient } from "viem";
 import reality_eth_contracts from "@reality.eth/contracts";
 import localABI from "./reality-eth-abi.json";
+import { serverLogger } from '@/lib/utils/logger';
+
 
 /**
  * Reality.eth Client
@@ -72,7 +74,7 @@ export function getRealityEthABI(): any[] {
 
   // Method 1: Try to get ABI from config first (if available)
   if (config.abi && Array.isArray(config.abi) && config.abi.length > 0) {
-    console.log("✅ Got ABI from config.abi");
+    serverLogger.debug("✅ Got ABI from config.abi");
     return config.abi;
   }
 
@@ -81,17 +83,17 @@ export function getRealityEthABI(): any[] {
     try {
       const instance = (reality_eth_contracts as any).realityETHInstance(config);
       if (instance && instance.abi && Array.isArray(instance.abi) && instance.abi.length > 0) {
-        console.log("✅ Got ABI from realityETHInstance");
+        serverLogger.debug("✅ Got ABI from realityETHInstance");
         return instance.abi;
       }
     } catch (error) {
-      console.warn("⚠️ Failed to get ABI from realityETHInstance:", error);
+      serverLogger.warn("⚠️ Failed to get ABI from realityETHInstance:", error);
     }
   }
 
   // Method 3: Use local ABI file as fallback (most reliable)
   if (localABI && Array.isArray(localABI) && localABI.length > 0) {
-    console.log("✅ Using local ABI file as fallback");
+    serverLogger.debug("✅ Using local ABI file as fallback");
     return localABI as any[];
   }
 
@@ -105,7 +107,7 @@ export function getRealityEthABI(): any[] {
     configKeys: Object.keys(config),
   };
 
-  console.error("❌ Failed to get ABI using all methods:", errorDetails);
+  serverLogger.error("❌ Failed to get ABI using all methods:", errorDetails);
   throw new Error(
     `Reality.eth ABI is not available. Tried: config.abi, realityETHInstance, and file loading. ` +
     `Details: ${JSON.stringify(errorDetails)}`

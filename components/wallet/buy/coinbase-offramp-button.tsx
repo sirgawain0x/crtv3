@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { useSmartAccountClient, useUser } from "@account-kit/react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
+import { logger } from '@/lib/utils/logger';
+
 
 /**
  * CoinbaseOfframpButton Component
@@ -187,7 +189,7 @@ function CoinbaseOfframpButton({
                 invokeSuccess();
               }
             } catch (error) {
-              console.warn(
+              logger.warn(
                 "Cannot access window.closed due to COOP policy, using alternative detection"
               );
               cleanup();
@@ -196,7 +198,7 @@ function CoinbaseOfframpButton({
             }
           }, 1000);
         } catch (error) {
-          console.warn(
+          logger.warn(
             "Cannot set up window.closed check due to COOP policy, using alternative detection"
           );
           fallbackActive = true;
@@ -224,7 +226,7 @@ function CoinbaseOfframpButton({
         }
       }
     } catch (err) {
-      console.error("Failed to start Coinbase offramp:", err);
+      logger.error("Failed to start Coinbase offramp:", err);
       setError("Failed to start Coinbase offramp. Please try again.");
     } finally {
       setLoading(false);

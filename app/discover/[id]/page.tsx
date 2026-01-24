@@ -29,6 +29,8 @@ import { VideoBuyButton } from "@/components/Videos/VideoBuyButton";
 import { VideoEditButton } from "@/components/Videos/VideoEditButton";
 import { VideoSplitDistributeButton } from "@/components/Videos/VideoSplitDistributeButton";
 import { CreatorDisplay } from "@/components/Creator/CreatorDisplay";
+import { logger } from '@/lib/utils/logger';
+
 
 type VideoDetailsPageProps = {
   params: Promise<{
@@ -42,7 +44,7 @@ const fetchAssetData = async (id: string): Promise<Asset | null> => {
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
     if (!uuidRegex.test(id)) {
-      console.error("Invalid video asset ID format:", id);
+      logger.error("Invalid video asset ID format:", id);
       return null;
     }
 
@@ -50,7 +52,7 @@ const fetchAssetData = async (id: string): Promise<Asset | null> => {
     const videoAsset = await getVideoAssetByAssetId(id);
 
     if (!videoAsset) {
-      console.error("Video asset not found in database");
+      logger.error("Video asset not found in database");
       return null;
     }
 
@@ -63,7 +65,7 @@ const fetchAssetData = async (id: string): Promise<Asset | null> => {
 
     return null;
   } catch (error) {
-    console.error("Error fetching asset:", error);
+    logger.error("Error fetching asset:", error);
     return null;
   }
 };
@@ -83,7 +85,7 @@ export default async function VideoDetailsPage({
   try {
     videoAsset = await getVideoAssetByAssetId(id);
   } catch (error) {
-    console.error("Error fetching video asset from database:", error);
+    logger.error("Error fetching video asset from database:", error);
     // Continue with null videoAsset - page can still render with assetData
   }
   const creatorAddress = videoAsset?.creator_id || null;
@@ -106,7 +108,7 @@ export default async function VideoDetailsPage({
           creatorProfile = null;
         } else {
           // Real database error - log it
-          console.error('Error fetching creator profile:', error);
+          logger.error('Error fetching creator profile:', error);
           creatorProfile = null;
         }
       } else {
@@ -114,7 +116,7 @@ export default async function VideoDetailsPage({
       }
     } catch (error) {
       // Handle unexpected errors (network failures, etc.)
-      console.error('Unexpected error fetching creator profile:', error);
+      logger.error('Unexpected error fetching creator profile:', error);
       creatorProfile = null;
     }
   }
@@ -246,7 +248,7 @@ export async function generateMetadata({
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
     if (!uuidRegex.test(id)) {
-      console.error("Invalid video asset ID format for metadata:", id);
+      logger.error("Invalid video asset ID format for metadata:", id);
       return { title: "Video Not Found" };
     }
 
@@ -333,7 +335,7 @@ export async function generateMetadata({
       },
     };
   } catch (error) {
-    console.error("Error generating metadata:", error);
+    logger.error("Error generating metadata:", error);
     return { title: "Video Not Found" };
   }
 }

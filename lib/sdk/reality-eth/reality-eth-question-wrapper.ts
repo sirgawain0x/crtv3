@@ -2,6 +2,8 @@ import { type Address, type PublicClient, type WalletClient, encodeFunctionData,
 import { base } from "@account-kit/infra";
 import { getRealityEthContract, getRealityEthContractAddress, getRealityEthABI } from "./reality-eth-client";
 import { encodeQuestionText, validateQuestionData, type QuestionData } from "./reality-eth-utils";
+import { serverLogger } from '@/lib/utils/logger';
+
 
 /**
  * Reality.eth Question Wrapper
@@ -65,7 +67,7 @@ export async function createQuestion(
     throw new Error("Opening timestamp is required and must be a valid number");
   }
 
-  console.log("🔍 Encoding function data with params:", {
+  serverLogger.debug("🔍 Encoding function data with params:", {
     templateId,
     questionText: questionText.substring(0, 50) + "...",
     arbitrator,
@@ -78,12 +80,12 @@ export async function createQuestion(
   try {
     abi = getRealityEthABI();
   } catch (abiError: any) {
-    console.error("❌ Failed to get Reality.eth ABI:", abiError);
+    serverLogger.error("❌ Failed to get Reality.eth ABI:", abiError);
     throw new Error(`Failed to load Reality.eth ABI: ${abiError?.message || 'Unknown error'}`);
   }
 
   if (!abi || !Array.isArray(abi) || abi.length === 0) {
-    console.error("❌ ABI validation failed:", {
+    serverLogger.error("❌ ABI validation failed:", {
       abiType: typeof abi,
       abiIsArray: Array.isArray(abi),
       abiLength: Array.isArray(abi) ? abi.length : 'N/A',
@@ -92,7 +94,7 @@ export async function createQuestion(
     throw new Error("Reality.eth ABI is not available or invalid");
   }
 
-  console.log("✅ ABI loaded successfully, length:", abi.length);
+  serverLogger.debug("✅ ABI loaded successfully, length:", abi.length);
 
   // Verify the function exists in the ABI
   const askQuestionFunction = abi.find(
@@ -101,13 +103,13 @@ export async function createQuestion(
   );
 
   if (!askQuestionFunction) {
-    console.error("❌ askQuestion function not found in ABI. Available functions:",
+    serverLogger.error("❌ askQuestion function not found in ABI. Available functions:",
       abi.filter((item: any) => item.type === "function").map((item: any) => item.name)
     );
     throw new Error("askQuestion function not found in Reality.eth ABI. The ABI may be incorrect or the function name may be different.");
   }
 
-  console.log("✅ Found askQuestion function in ABI:", {
+  serverLogger.debug("✅ Found askQuestion function in ABI:", {
     name: askQuestionFunction.name,
     inputs: askQuestionFunction.inputs?.length || 0,
   });
@@ -122,10 +124,10 @@ export async function createQuestion(
       args: [BigInt(templateId), questionText, arbitrator, Number(timeout), Number(openingTs), nonce],
     });
 
-    console.log("✅ Function data encoded successfully, length:", data?.length || 0);
+    serverLogger.debug("✅ Function data encoded successfully, length:", data?.length || 0);
   } catch (encodeError: any) {
-    console.error("❌ Error encoding function data:", encodeError);
-    console.error("❌ Error details:", {
+    serverLogger.error("❌ Error encoding function data:", encodeError);
+    serverLogger.error("❌ Error details:", {
       abiLength: abi?.length,
       templateId,
       questionTextType: typeof questionText,
@@ -140,7 +142,7 @@ export async function createQuestion(
 
   // Check if this is an Account Kit smart account client (has sendUserOperation)
   if (walletClient.sendUserOperation && typeof walletClient.sendUserOperation === 'function') {
-    console.log("📦 Using Account Kit sendUserOperation");
+    serverLogger.debug("📦 Using Account Kit sendUserOperation");
 
     try {
       // Use Account Kit's sendUserOperation
@@ -152,14 +154,14 @@ export async function createQuestion(
         },
       });
 
-      console.log("✅ User operation sent, hash:", operation.hash);
+      serverLogger.debug("✅ User operation sent, hash:", operation.hash);
 
       // Wait for the transaction to be mined
       if (walletClient.waitForUserOperationTransaction) {
         const receipt = await walletClient.waitForUserOperationTransaction({
           hash: operation.hash,
         });
-        console.log("✅ Transaction receipt received:", receipt);
+        serverLogger.debug("✅ Transaction receipt received:", receipt);
 
         if (typeof receipt === 'string') {
           return receipt as `0x${string}`;
@@ -176,20 +178,20 @@ export async function createQuestion(
           }
         }
 
-        console.error("❌ Invalid receipt format:", receipt);
+        serverLogger.error("❌ Invalid receipt format:", receipt);
         throw new Error("Failed to retrieve transaction hash from user operation receipt");
       }
 
       // If no wait method, return the operation hash
       return operation.hash as `0x${string}`;
     } catch (uoError: any) {
-      console.error("❌ Error sending user operation:", uoError);
+      serverLogger.error("❌ Error sending user operation:", uoError);
       throw new Error(`Failed to send user operation: ${uoError?.message || 'Unknown error'}`);
     }
   }
 
   // Fallback to regular wallet client sendTransaction
-  console.log("📝 Using regular wallet sendTransaction");
+  serverLogger.debug("📝 Using regular wallet sendTransaction");
   try {
     const hash = await walletClient.sendTransaction({
       chain: walletClient.chain || base,
@@ -201,7 +203,7 @@ export async function createQuestion(
 
     return hash;
   } catch (txError: any) {
-    console.error("❌ Error sending transaction:", txError);
+    serverLogger.error("❌ Error sending transaction:", txError);
     throw new Error(`Failed to send transaction: ${txError?.message || 'Unknown error'}`);
   }
 }
@@ -237,7 +239,7 @@ export async function submitAnswer(
 
   // Check if this is an Account Kit smart account client (has sendUserOperation)
   if (walletClient.sendUserOperation && typeof walletClient.sendUserOperation === 'function') {
-    console.log("📦 Using Account Kit sendUserOperation for submitAnswer");
+    serverLogger.debug("📦 Using Account Kit sendUserOperation for submitAnswer");
 
     try {
       const operation = await walletClient.sendUserOperation({
@@ -248,13 +250,13 @@ export async function submitAnswer(
         },
       });
 
-      console.log("✅ User operation sent, hash:", operation.hash);
+      serverLogger.debug("✅ User operation sent, hash:", operation.hash);
 
       if (walletClient.waitForUserOperationTransaction) {
         const receipt = await walletClient.waitForUserOperationTransaction({
           hash: operation.hash,
         });
-        console.log("✅ Transaction receipt received:", receipt);
+        serverLogger.debug("✅ Transaction receipt received:", receipt);
 
         if (typeof receipt === 'string') {
           return receipt as `0x${string}`;
@@ -275,13 +277,13 @@ export async function submitAnswer(
 
       return operation.hash as `0x${string}`;
     } catch (uoError: any) {
-      console.error("❌ Error sending user operation:", uoError);
+      serverLogger.error("❌ Error sending user operation:", uoError);
       throw new Error(`Failed to send user operation: ${uoError?.message || 'Unknown error'}`);
     }
   }
 
   // Fallback to regular wallet client sendTransaction
-  console.log("📝 Using regular wallet sendTransaction");
+  serverLogger.debug("📝 Using regular wallet sendTransaction");
   const hash = await walletClient.sendTransaction({
     chain: walletClient.chain || base,
     to: contractAddress,
@@ -384,10 +386,10 @@ export async function getQuestion(
         const logArgs = logs[0].args as any;
         questionText = logArgs.question;
       } else {
-        console.warn(`No LogNewQuestion event found for ${questionId}. Title might be missing.`);
+        serverLogger.warn(`No LogNewQuestion event found for ${questionId}. Title might be missing.`);
       }
     } catch (logError) {
-      console.warn("⚠️ Failed to fetch question text logs (likely RPC 503 or timeout). Returning Untitled.", logError);
+      serverLogger.warn("⚠️ Failed to fetch question text logs (likely RPC 503 or timeout). Returning Untitled.", logError);
       // Fallback to untitled, do not crash
       questionText = "Untitled Prediction (Error loading valid title)";
     }
@@ -399,7 +401,7 @@ export async function getQuestion(
     } as RealityEthQuestion;
 
   } catch (error) {
-    console.error("Error fetching question:", error);
+    serverLogger.error("Error fetching question:", error);
     throw new Error("Failed to fetch question from contract");
   }
 }
@@ -427,7 +429,7 @@ export async function getFinalAnswer(
       return null;
     }
 
-    console.error("Error fetching final answer:", error);
+    serverLogger.error("Error fetching final answer:", error);
     throw new Error("Failed to fetch final answer");
   }
 }
@@ -458,10 +460,10 @@ export async function createQuestionWithData(
       throw new Error("Failed to encode question text: result is empty or invalid");
     }
 
-    console.log("✅ Question text encoded successfully, length:", questionText.length);
+    serverLogger.debug("✅ Question text encoded successfully, length:", questionText.length);
   } catch (encodeError: any) {
-    console.error("❌ Error encoding question text:", encodeError);
-    console.error("❌ Question data:", questionData);
+    serverLogger.error("❌ Error encoding question text:", encodeError);
+    serverLogger.error("❌ Question data:", questionData);
     throw new Error(`Failed to encode question text: ${encodeError?.message || 'Unknown error'}`);
   }
 

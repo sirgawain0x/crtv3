@@ -5,6 +5,8 @@ import { Client } from "@xmtp/browser-sdk";
 import { useUser, useSignMessage, useSmartAccountClient } from "@account-kit/react";
 import { createXmtpSigner } from "@/lib/utils/xmtp/signer";
 import useModularAccount from "@/lib/hooks/accountkit/useModularAccount";
+import { logger } from '@/lib/utils/logger';
+
 // Import WASM patch early to ensure it's applied before XMTP initialization
 import "@/lib/utils/xmtp/wasm-patch";
 // Import debug utility (only in development)
@@ -137,13 +139,13 @@ export function useXmtpClient(): UseXmtpClientReturn {
     // Prevent concurrent initialization attempts
     if (isInitializingRef.current) {
       if (isDev) {
-        console.log("useXmtpClient: Initialization already in progress, skipping");
+        logger.debug("useXmtpClient: Initialization already in progress, skipping");
       }
       return;
     }
 
     if (isDev) {
-      console.log("useXmtpClient: Checking initialization prerequisites", {
+      logger.debug("useXmtpClient: Checking initialization prerequisites", {
         hasWalletAddress: !!walletAddress,
         hasSignMessage: !!signMessage,
         hasAccountClient: !!accountClient,
@@ -154,7 +156,7 @@ export function useXmtpClient(): UseXmtpClientReturn {
 
     if (!walletAddress || !signMessage || !accountClient) {
       if (isDev) {
-        console.log("useXmtpClient: Missing prerequisites, clearing client");
+        logger.debug("useXmtpClient: Missing prerequisites, clearing client");
       }
       setClient(null);
       cleanupInit();
@@ -172,7 +174,7 @@ export function useXmtpClient(): UseXmtpClientReturn {
 
     try {
       if (isDev) {
-        console.log(`useXmtpClient: Starting client initialization (attempt ${attempt + 1}/${MAX_RETRIES + 1})`);
+        logger.debug(`useXmtpClient: Starting client initialization (attempt ${attempt + 1}/${MAX_RETRIES + 1})`);
       }
 
       // WASM patching is handled by wasm-patch.ts import above
@@ -226,7 +228,7 @@ export function useXmtpClient(): UseXmtpClientReturn {
       cleanupInit();
 
       if (isDev) {
-        console.log("useXmtpClient: Client created successfully");
+        logger.debug("useXmtpClient: Client created successfully");
       }
 
       setClient(xmtpClient);
@@ -248,14 +250,14 @@ export function useXmtpClient(): UseXmtpClientReturn {
 
       // Only log errors in development or if they're critical
       if (isDev || errorMessage.includes('wasm') || errorMessage.includes('WASM')) {
-        console.error(`Error initializing XMTP client (attempt ${attempt + 1}):`, err);
+        logger.error(`Error initializing XMTP client (attempt ${attempt + 1}):`, err);
       }
 
       // Retry logic for retryable errors
       if (isRetryable && attempt < MAX_RETRIES) {
         const delay = calculateRetryDelay(attempt);
         if (isDev) {
-          console.log(`useXmtpClient: Retrying initialization after ${delay}ms (attempt ${attempt + 1}/${MAX_RETRIES})`);
+          logger.debug(`useXmtpClient: Retrying initialization after ${delay}ms (attempt ${attempt + 1}/${MAX_RETRIES})`);
         }
         
         // Wait before retrying
@@ -268,7 +270,7 @@ export function useXmtpClient(): UseXmtpClientReturn {
       // No more retries or non-retryable error - set error state
       if (errorMessage.includes('wasm') || errorMessage.includes('WASM') || errorMessage.includes('fetch')) {
         if (isDev) {
-          console.error("WASM loading error detected. This may be due to Web Worker initialization issues.");
+          logger.error("WASM loading error detected. This may be due to Web Worker initialization issues.");
         }
         setError(new Error("Failed to load chat (WASM error). Please refresh the page and try again."));
       } else if (errorMessage.includes('timeout')) {

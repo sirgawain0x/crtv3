@@ -34,6 +34,8 @@ import { useSmartAccountClient, useChain } from '@account-kit/react';
 import { useToast } from '@/components/ui/use-toast';
 import { useMeTokenCreation, PendingMeTokenTransaction, CreationStatus } from '@/lib/hooks/metokens/useMeTokenCreation';
 import { getDaiTokenContract } from '@/lib/contracts/DAIToken';
+import { logger } from '@/lib/utils/logger';
+
 
 interface RobustMeTokenCreatorProps {
   onMeTokenCreated?: (meTokenAddress: string, transactionHash?: string) => void;
@@ -88,7 +90,7 @@ export function RobustMeTokenCreator({ onMeTokenCreated }: RobustMeTokenCreatorP
       
       setDaiBalance(balance);
     } catch (err) {
-      console.error('Failed to check DAI balance:', err);
+      logger.error('Failed to check DAI balance:', err);
       setDaiBalance(BigInt(0));
     }
   }, [client]);

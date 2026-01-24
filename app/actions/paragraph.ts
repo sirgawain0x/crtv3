@@ -1,6 +1,8 @@
 "use server";
 
 import { paragraph } from "@/lib/paragraph-client";
+import { serverLogger } from '@/lib/utils/logger';
+
 
 const DOMAIN = "news.creativeplatform.xyz";
 
@@ -20,7 +22,7 @@ export async function getPublicationData() {
             // Add other needed fields
         };
     } catch (error) {
-        console.error("Error fetching publication:", error);
+        serverLogger.error("Error fetching publication:", error);
         return null;
     }
 }
@@ -39,7 +41,7 @@ export async function getPublicationPosts(limit = 6) {
         // Sort or filter if needed. The API should return recent by default.
         return items.slice(0, limit);
     } catch (error) {
-        console.error("Error fetching posts:", error);
+        serverLogger.error("Error fetching posts:", error);
         return [];
     }
 }
@@ -64,10 +66,10 @@ export async function getSubscriberCount() {
             return data.count || 0;
         }
 
-        console.error("Failed to fetch subscriber count:", response.status, await response.text());
+        serverLogger.error("Failed to fetch subscriber count:", response.status, await response.text());
         return 0;
     } catch (error) {
-        console.error("Error fetching subscribers:", error);
+        serverLogger.error("Error fetching subscribers:", error);
         return 0;
     }
 }
@@ -79,7 +81,7 @@ export async function getCoinData(contractAddress: string) {
 
         return coin;
     } catch (error) {
-        console.error("Error fetching coin data:", error);
+        serverLogger.error("Error fetching coin data:", error);
         return null;
     }
 }
@@ -104,7 +106,7 @@ export async function getBuyArgs(contractAddress: string, walletAddress: string,
 
         return await response.json();
     } catch (error) {
-        console.error("Error fetching buy args:", error);
+        serverLogger.error("Error fetching buy args:", error);
         return null;
     }
 }
@@ -129,7 +131,7 @@ export async function getSellArgs(contractAddress: string, walletAddress: string
 
         return await response.json();
     } catch (error) {
-        console.error("Error fetching sell args:", error);
+        serverLogger.error("Error fetching sell args:", error);
         return null;
     }
 }
@@ -155,7 +157,7 @@ export async function getQuote(contractAddress: string, amount: string, side: 'b
         const data = await response.json();
         return data.quote; // Returns the amount of tokens (wei)
     } catch (error) {
-        console.error("Error fetching quote:", error);
+        serverLogger.error("Error fetching quote:", error);
         return null;
     }
 }

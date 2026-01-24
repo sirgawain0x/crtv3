@@ -6,6 +6,8 @@ import { formatAddress, stack } from "@/lib/sdk/stack/stackClient";
 import Unlock from "@/lib/contracts/Unlock.json";
 import { toast } from "sonner";
 import type { ProfileState } from "../../lib/types/profile";
+import { logger } from '@/lib/utils/logger';
+
 
 const contractAddress = "0xf7c4cd399395d80f9d61fde833849106775269c6";
 
@@ -83,7 +85,7 @@ export function useProfile(account: Account | null) {
         });
         dispatch({ type: "SET_VALID_KEY", payload: hasKey as boolean });
       } catch (error) {
-        console.error("Error reading contract:", error);
+        logger.error("Error reading contract:", error);
         toast.error("Failed to check membership status");
       } finally {
         dispatch({ type: "SET_LOADING", payload: false });
@@ -101,7 +103,7 @@ export function useProfile(account: Account | null) {
         dispatch({ type: "SET_POINTS", payload: Number(userPoints) });
         dispatch({ type: "SET_BALANCE", payload: userPoints.toString() });
       } catch (error) {
-        console.error("Error fetching points:", error);
+        logger.error("Error fetching points:", error);
         toast.error("Failed to fetch points");
         dispatch({ type: "SET_BALANCE", payload: "0" });
       }
@@ -145,7 +147,7 @@ export function useProfile(account: Account | null) {
 
         dispatch({ type: "SET_MEMBER_DATA", payload: account });
       } catch (error) {
-        console.error("Error fetching NFT data:", error);
+        logger.error("Error fetching NFT data:", error);
         toast.error("Failed to fetch NFT data");
       }
     };
@@ -163,7 +165,7 @@ export function useProfile(account: Account | null) {
       // Implement renewal logic
       toast.success("Membership renewed successfully");
     } catch (error) {
-      console.error("Error renewing membership:", error);
+      logger.error("Error renewing membership:", error);
       toast.error("Failed to renew membership");
     } finally {
       dispatch({ type: "SET_LOADING", payload: false });
@@ -181,7 +183,7 @@ export function useProfile(account: Account | null) {
       // Implement cancellation logic
       toast.success("Membership cancelled successfully");
     } catch (error) {
-      console.error("Error cancelling membership:", error);
+      logger.error("Error cancelling membership:", error);
       toast.error("Failed to cancel membership");
     } finally {
       dispatch({ type: "SET_LOADING", payload: false });

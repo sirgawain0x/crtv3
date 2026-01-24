@@ -1,4 +1,6 @@
 import { supabase, CreatorProfile, CreateCreatorProfileData, UpdateCreatorProfileData } from './client';
+import { serverLogger } from '@/lib/utils/logger';
+
 
 // Re-export types for external use
 export type { CreatorProfile, CreateCreatorProfileData, UpdateCreatorProfileData };
@@ -26,7 +28,7 @@ export class CreatorProfileSupabaseService {
     } catch (error) {
       // Handle case where creator_profiles table doesn't exist
       if (error instanceof Error && error.message.includes('relation "public.creator_profiles" does not exist')) {
-        console.warn('Creator profiles table does not exist. Please run the database migration to create the table.');
+        serverLogger.warn('Creator profiles table does not exist. Please run the database migration to create the table.');
         return null;
       }
       throw error;
@@ -51,7 +53,7 @@ export class CreatorProfileSupabaseService {
     } catch (error) {
       // Handle case where creator_profiles table doesn't exist
       if (error instanceof Error && error.message.includes('relation "public.creator_profiles" does not exist')) {
-        console.warn('Creator profiles table does not exist. Please run the database migration to create the table.');
+        serverLogger.warn('Creator profiles table does not exist. Please run the database migration to create the table.');
         return null;
       }
       throw error;

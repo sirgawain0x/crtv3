@@ -8,6 +8,8 @@ import { VideoEditDialog } from "./VideoEditDialog";
 import { getVideoAssetByAssetId } from "@/services/video-assets";
 import type { VideoAsset } from "@/lib/types/video-asset";
 import useModularAccount from "@/lib/hooks/accountkit/useModularAccount";
+import { logger } from '@/lib/utils/logger';
+
 
 interface VideoEditButtonProps {
   videoAssetId: string; // asset_id (UUID)
@@ -59,11 +61,11 @@ export function VideoEditButton({
             const asset = await getVideoAssetByAssetId(videoAssetId);
             setVideoAsset(asset as VideoAsset);
           } catch (error) {
-            console.error("Error fetching video asset:", error);
+            logger.error("Error fetching video asset:", error);
           }
         }
       } catch (error) {
-        console.error("Error checking ownership:", error);
+        logger.error("Error checking ownership:", error);
         setIsOwner(false);
       } finally {
         setIsChecking(false);

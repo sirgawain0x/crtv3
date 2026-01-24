@@ -1,3 +1,5 @@
+
+import { logger } from '@/lib/utils/logger';
 /**
  * Utilities for converting AI-generated images to IPFS storage
  * Handles data URLs, blob URLs, and remote URLs
@@ -14,7 +16,7 @@ export function dataUrlToFile(dataUrl: string, filename: string): File | null {
     // Extract the base64 data and mime type
     const matches = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
     if (!matches || matches.length !== 3) {
-      console.error('Invalid data URL format');
+      logger.error('Invalid data URL format');
       return null;
     }
 
@@ -32,7 +34,7 @@ export function dataUrlToFile(dataUrl: string, filename: string): File | null {
     const blob = new Blob([bytes], { type: mimeType });
     return new File([blob], filename, { type: mimeType });
   } catch (error) {
-    console.error('Error converting data URL to file:', error);
+    logger.error('Error converting data URL to file:', error);
     return null;
   }
 }
@@ -47,14 +49,14 @@ export async function urlToFile(url: string, filename: string): Promise<File | n
   try {
     const response = await fetch(url);
     if (!response.ok) {
-      console.error(`Failed to fetch image from ${url}: ${response.status}`);
+      logger.error(`Failed to fetch image from ${url}: ${response.status}`);
       return null;
     }
 
     const blob = await response.blob();
     return new File([blob], filename, { type: blob.type });
   } catch (error) {
-    console.error('Error fetching image from URL:', error);
+    logger.error('Error fetching image from URL:', error);
     return null;
   }
 }
@@ -71,7 +73,7 @@ export async function blobUrlToFile(blobUrl: string, filename: string): Promise<
     const blob = await response.blob();
     return new File([blob], filename, { type: blob.type });
   } catch (error) {
-    console.error('Error converting blob URL to file:', error);
+    logger.error('Error converting blob URL to file:', error);
     return null;
   }
 }

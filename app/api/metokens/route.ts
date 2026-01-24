@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/sdk/supabase/server';
 import { meTokenSupabaseService } from '@/lib/sdk/supabase/metokens';
 import { serverLogger } from '@/lib/utils/logger';
+import { rateLimiters } from '@/lib/middleware/rateLimit';
 
 // GET /api/metokens - Get MeTokens with optional filtering
 export async function GET(request: NextRequest) {
@@ -62,6 +63,9 @@ export async function GET(request: NextRequest) {
 
 // POST /api/metokens - Create a new MeToken
 export async function POST(request: NextRequest) {
+  const rl = await rateLimiters.standard(request);
+  if (rl) return rl;
+
   try {
     const supabase = await createClient();
     

@@ -1,3 +1,5 @@
+
+import { logger } from '@/lib/utils/logger';
 /**
  * Utility functions for handling AbortController and abort signals safely
  */
@@ -42,7 +44,7 @@ export async function safeAsync<T>(
       error.message.includes('aborted') ||
       error.message.includes('signal is aborted')
     )) {
-      console.warn('Operation was aborted:', error.message);
+      logger.warn('Operation was aborted:', error.message);
       throw new Error('Operation was cancelled');
     }
     throw error;
@@ -93,7 +95,7 @@ export async function safeFetch(
     return await fetch(url, options);
   } catch (error) {
     if (isAbortError(error)) {
-      console.warn('Fetch request was aborted:', url);
+      logger.warn('Fetch request was aborted:', url);
       throw new Error('Request was cancelled');
     }
     throw error;

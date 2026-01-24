@@ -9,6 +9,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
+import { logger } from '@/lib/utils/logger';
+
 
 interface LoginButtonProps {
   className?: string;
@@ -37,7 +39,7 @@ export function LoginButton({
         });
         setIsDeploying(code === "0x");
       } catch (error) {
-        console.error("Error checking deployment:", error);
+        logger.error("Error checking deployment:", error);
       }
     }
     checkDeployment();
@@ -51,11 +53,11 @@ export function LoginButton({
   }, [user]);
 
   const handleLogin = () => {
-    console.log('Opening auth modal...', { hasUser: !!user });
+    logger.debug('Opening auth modal...', { hasUser: !!user });
     try {
       openAuthModal();
     } catch (error) {
-      console.error('Failed to open auth modal:', error);
+      logger.error('Failed to open auth modal:', error);
       toast.error('Failed to open login. Please refresh the page.');
     }
   };

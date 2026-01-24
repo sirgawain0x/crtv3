@@ -55,15 +55,14 @@ export function LinkedIdentityDisplay({
 
 /**
  * Hook to get Smart Wallet address from EOA
- * 
+ *
+ * Known limitation: EOA → smart wallet is only resolved for the current user.
+ * Other users' EOAs return null until DB / Delegate.cash / on-chain registry support is added.
+ *
  * This implementation:
  * 1. Checks if the EOA matches the current user's EOA (returns their smart wallet)
- * 2. Future enhancements could:
- *    - Query a database mapping table
- *    - Use Delegate.cash to find delegations
- *    - Check on-chain registry for EOA -> Smart Wallet mappings
- *    - Use Account Kit's factory to compute smart wallet address deterministically
- * 
+ * 2. Future enhancements: DB mapping, Delegate.cash API, on-chain registry, Account Kit factory
+ *
  * @param eoaAddress - The EOA address to find the smart wallet for
  * @returns Smart wallet address if found, null otherwise
  */

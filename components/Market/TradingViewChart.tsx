@@ -14,6 +14,8 @@ import {
   getVolumeSeriesOptions,
 } from '@/lib/utils/chart-utils';
 import { PriceHistoryPoint } from '@/app/api/market/tokens/[address]/price-history/route';
+import { logger } from '@/lib/utils/logger';
+
 
 export type ChartType = 'line' | 'area';
 
@@ -149,7 +151,7 @@ export function TradingViewChart({
           chartRef.current.remove();
         } catch (e) {
           // Ignore errors during cleanup to prevent "Assertion failed"
-          console.debug('Chart cleanup error:', e);
+          logger.debug('Chart cleanup error:', e);
         }
         chartRef.current = null;
         seriesRef.current = null;

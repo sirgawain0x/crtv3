@@ -1,5 +1,6 @@
 import { createPublicClient, http, parseAbi, formatEther } from 'viem';
 import { base } from 'viem/chains';
+import { logger } from '@/lib/utils/logger';
 
 // MeTokenFactory ABI - we only need the MeTokenCreated event
 const METOKEN_FACTORY_ABI = parseAbi([
@@ -45,16 +46,16 @@ export async function getTransactionReturnValue(transactionHash: string): Promis
       if (result.data && result.data.length === 66) {
         // 0x + 64 chars = address (with leading zeros)
         const address = '0x' + result.data.slice(-40);
-        console.log('✅ Extracted address from return value:', address);
+        logger.debug('✅ Extracted address from return value:', address);
         return address;
       }
     } catch (error) {
-      console.warn('Could not simulate call:', error);
+      logger.warn('Could not simulate call:', error);
     }
 
     return null;
   } catch (error) {
-    console.error('Error getting transaction return value:', error);
+    logger.error('Error getting transaction return value:', error);
     return null;
   }
 }
@@ -66,12 +67,12 @@ export async function getTransactionReturnValue(transactionHash: string): Promis
  */
 export async function extractMeTokenAddressFromTransaction(transactionHash: string): Promise<string | null> {
   try {
-    console.log('🔍 Extracting MeToken address from transaction:', transactionHash);
+    logger.debug('🔍 Extracting MeToken address from transaction:', transactionHash);
 
     // First try to get the return value directly
     const returnValue = await getTransactionReturnValue(transactionHash);
     if (returnValue) {
-      console.log('✅ Found MeToken address from return value:', returnValue);
+      logger.debug('✅ Found MeToken address from return value:', returnValue);
       return returnValue;
     }
 
@@ -81,26 +82,26 @@ export async function extractMeTokenAddressFromTransaction(transactionHash: stri
     });
 
     if (!receipt) {
-      console.error('No receipt found for transaction:', transactionHash);
+      logger.error('No receipt found for transaction:', transactionHash);
       return null;
     }
 
-    console.log('📋 Receipt logs count:', receipt.logs.length);
+    logger.debug('📋 Receipt logs count:', receipt.logs.length);
 
     // First, check if the transaction created a contract (contractAddress field)
     if (receipt.contractAddress) {
-      console.log('✅ Found contract address in receipt:', receipt.contractAddress);
+      logger.debug('✅ Found contract address in receipt:', receipt.contractAddress);
       return receipt.contractAddress;
     }
 
     // For UserOperations and smart account transactions, we need to parse all logs
     // Look for any contract creation events
     if (receipt.logs && receipt.logs.length > 0) {
-      console.log('🔎 Searching through', receipt.logs.length, 'logs...');
+      logger.debug('🔎 Searching through', receipt.logs.length, 'logs...');
 
       for (let i = 0; i < receipt.logs.length; i++) {
         const log = receipt.logs[i];
-        console.log(`Log ${i}:`, {
+        logger.debug(`Log ${i}:`, {
           address: log.address,
           topics: log.topics,
           data: log.data
@@ -115,7 +116,7 @@ export async function extractMeTokenAddressFromTransaction(transactionHash: stri
           if (meTokenAddress) {
             // Convert from 32-byte format to 20-byte address format
             const address = '0x' + meTokenAddress.slice(-40);
-            console.log('✅ Found MeToken address in MeTokenCreated event:', address);
+            logger.debug('✅ Found MeToken address in MeTokenCreated event:', address);
             return address;
           }
         }
@@ -126,13 +127,13 @@ export async function extractMeTokenAddressFromTransaction(transactionHash: stri
       const METOKEN_FACTORY = '0xb31Ae2583d983faa7D8C8304e6A16E414e721A0B';
       for (const log of receipt.logs) {
         if (log.address.toLowerCase() === METOKEN_FACTORY.toLowerCase()) {
-          console.log('📍 Found log from MeTokenFactory:', log);
+          logger.debug('📍 Found log from MeTokenFactory:', log);
           // If there's any topic with an address, it might be the deployed contract
           for (let i = 1; i < log.topics.length; i++) {
             const topic = log.topics[i];
             if (topic && topic.length === 66) { // 0x + 64 chars = address in 32 bytes
               const potentialAddress = '0x' + topic.slice(-40);
-              console.log('🤔 Potential contract address from topic:', potentialAddress);
+              logger.debug('🤔 Potential contract address from topic:', potentialAddress);
               // We'll return the first one we find from the factory
               return potentialAddress;
             }
@@ -141,13 +142,13 @@ export async function extractMeTokenAddressFromTransaction(transactionHash: stri
       }
     }
 
-    console.error('❌ No contract address found in transaction receipt or logs:', transactionHash);
-    console.log('Full receipt:', JSON.stringify(receipt, (key, value) =>
+    logger.error('❌ No contract address found in transaction receipt or logs:', transactionHash);
+    logger.debug('Full receipt:', JSON.stringify(receipt, (key, value) =>
       typeof value === 'bigint' ? value.toString() : value
       , 2));
     return null;
   } catch (error) {
-    console.error('Failed to extract MeToken address from transaction:', error);
+    logger.error('Failed to extract MeToken address from transaction:', error);
     return null;
   }
 }
@@ -162,13 +163,13 @@ export async function getLatestMeTokenByOwner(ownerAddress: string): Promise<str
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      console.log(`🔎 Searching for MeTokens created by: ${ownerAddress} (attempt ${attempt + 1}/${maxRetries})`);
+      logger.debug(`🔎 Searching for MeTokens created by: ${ownerAddress} (attempt ${attempt + 1}/${maxRetries})`);
 
       // Get the current block
       const currentBlock = await publicClient.getBlockNumber();
       const fromBlock = currentBlock - 10000n; // Search last ~10k blocks (~2 hours on Base)
 
-      console.log(`📊 Searching blocks ${fromBlock} to ${currentBlock}`);
+      logger.debug(`📊 Searching blocks ${fromBlock} to ${currentBlock}`);
 
       // First, query ALL MeTokenCreated events to see if any were created
       const allLogs = await publicClient.getLogs({
@@ -178,9 +179,9 @@ export async function getLatestMeTokenByOwner(ownerAddress: string): Promise<str
         toBlock: currentBlock
       });
 
-      console.log(`📊 Total MeTokenCreated events in range: ${allLogs.length}`);
+      logger.debug(`📊 Total MeTokenCreated events in range: ${allLogs.length}`);
       if (allLogs.length > 0) {
-        console.log('Recent events:', allLogs.slice(-3).map(log => ({
+        logger.debug('Recent events:', allLogs.slice(-3).map(log => ({
           meToken: log.args.meToken,
           owner: log.args.owner,
           block: log.blockNumber
@@ -198,28 +199,28 @@ export async function getLatestMeTokenByOwner(ownerAddress: string): Promise<str
         toBlock: currentBlock
       });
 
-      console.log(`📋 Found ${logs.length} MeToken creation events for owner ${ownerAddress}`);
+      logger.debug(`📋 Found ${logs.length} MeToken creation events for owner ${ownerAddress}`);
 
       if (logs.length > 0) {
         // Get the most recent one
         const latestLog = logs[logs.length - 1];
         const meTokenAddress = latestLog.args.meToken as string;
-        console.log('✅ Latest MeToken address:', meTokenAddress);
+        logger.debug('✅ Latest MeToken address:', meTokenAddress);
         return meTokenAddress;
       }
 
-      console.log('⚠️ No MeTokens found for this owner');
+      logger.debug('⚠️ No MeTokens found for this owner');
       return null;
     } catch (error) {
       const isAbortError = error instanceof Error && (error.name === 'AbortError' || error.message.includes('aborted'));
 
       if (isAbortError && attempt < maxRetries - 1) {
-        console.warn(`⏱️ Request aborted, retrying... (${attempt + 1}/${maxRetries})`);
+        logger.warn(`⏱️ Request aborted, retrying... (${attempt + 1}/${maxRetries})`);
         await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1))); // Exponential backoff
         continue;
       }
 
-      console.error('Failed to get latest MeToken:', error);
+      logger.error('Failed to get latest MeToken:', error);
       return null;
     }
   }
@@ -239,7 +240,7 @@ export async function getMeTokenInfoFromBlockchain(meTokenAddress: string): Prom
   owner: string;
 } | null> {
   try {
-    console.log('🔍 Getting MeToken info for:', meTokenAddress);
+    logger.debug('🔍 Getting MeToken info for:', meTokenAddress);
 
     // ERC20 ABI for basic token info
     const ERC20_ABI = parseAbi([
@@ -289,7 +290,7 @@ export async function getMeTokenInfoFromBlockchain(meTokenAddress: string): Prom
 
     // Check for critical failures (Diamond info is critical for owner)
     if (infoResult.status !== 'success') {
-      console.error('❌ Failed to get MeToken info from Diamond:', infoResult.error);
+      logger.error('❌ Failed to get MeToken info from Diamond:', infoResult.error);
       throw new Error('Failed to get MeToken info from Diamond');
     }
 
@@ -298,7 +299,7 @@ export async function getMeTokenInfoFromBlockchain(meTokenAddress: string): Prom
     const totalSupply = supplyResult.status === 'success' ? (supplyResult.result as bigint).toString() : '0';
     const meTokenInfo = infoResult.result as any;
 
-    console.log('✅ Fetched MeToken info:', { name, symbol, totalSupply, owner: meTokenInfo.owner });
+    logger.debug('✅ Fetched MeToken info:', { name, symbol, totalSupply, owner: meTokenInfo.owner });
 
     return {
       name,
@@ -307,7 +308,7 @@ export async function getMeTokenInfoFromBlockchain(meTokenAddress: string): Prom
       owner: meTokenInfo.owner
     };
   } catch (error) {
-    console.error('❌ Failed to get MeToken info from blockchain:', error);
+    logger.error('❌ Failed to get MeToken info from blockchain:', error);
     return null;
   }
 }
@@ -357,7 +358,7 @@ export async function getMeTokenProtocolInfo(meTokenAddress: string): Promise<{
       migration: info.migration
     };
   } catch (error) {
-    console.error('Failed to get MeToken protocol info:', error);
+    logger.error('Failed to get MeToken protocol info:', error);
     return null;
   }
 }
@@ -377,7 +378,7 @@ export async function getBulkMeTokenInfo(meTokenAddresses: string[]): Promise<Re
   if (meTokenAddresses.length === 0) return {};
 
   try {
-    console.log(`📦 Bulk fetching info for ${meTokenAddresses.length} MeTokens...`);
+    logger.debug(`📦 Bulk fetching info for ${meTokenAddresses.length} MeTokens...`);
 
     // ERC20 ABI for basic token info
     const ERC20_ABI = parseAbi([
@@ -449,7 +450,7 @@ export async function getBulkMeTokenInfo(meTokenAddresses: string[]): Promise<Re
 
     return parsedResults;
   } catch (err) {
-    console.error('❌ Failed to bulk fetch MeToken info:', err);
+    logger.error('❌ Failed to bulk fetch MeToken info:', err);
     return {};
   }
 }

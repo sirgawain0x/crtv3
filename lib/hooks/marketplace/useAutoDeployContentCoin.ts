@@ -1,6 +1,8 @@
 import { useContentCoin } from '@/lib/hooks/marketplace/useContentCoin';
 import { updateVideoAsset } from '@/services/video-assets';
 import { fetchVideoAssetByPlaybackId } from '@/lib/utils/video-assets-client';
+import { logger } from '@/lib/utils/logger';
+
 
 /**
  * Hook wrapper around deployment to be used in upload forms.
@@ -11,7 +13,7 @@ export function useAutoDeployContentCoin() {
 
     const handleUploadSuccess = async (videoTitle: string, symbol: string, creatorMeToken: string, creatorAddress: string, playbackId?: string) => {
         try {
-            console.log("Auto-deploying Content Coin for:", videoTitle);
+            logger.debug("Auto-deploying Content Coin for:", videoTitle);
 
             // Add a timeout race for the deployment promise
             const timeoutPromise = new Promise((_, reject) =>
@@ -23,14 +25,14 @@ export function useAutoDeployContentCoin() {
                 timeoutPromise
             ]);
 
-            console.log("Content Coin Deployment Initiated:", deployTx);
+            logger.debug("Content Coin Deployment Initiated:", deployTx);
 
             if (playbackId && typeof deployTx === 'string') {
                 // Fetch the video asset ID first
                 const videoAsset = await fetchVideoAssetByPlaybackId(playbackId);
 
                 if (videoAsset && videoAsset.id) {
-                    console.log("Saving Content Coin ID to video asset:", videoAsset.id);
+                    logger.debug("Saving Content Coin ID to video asset:", videoAsset.id);
                     // Use server action to update the asset
                     await updateVideoAsset(videoAsset.id, {
                         thumbnailUri: videoAsset.thumbnail_url || '',
@@ -39,16 +41,16 @@ export function useAutoDeployContentCoin() {
                             content_coin_id: deployTx
                         }
                     });
-                    console.log("Content Coin ID saved successfully");
+                    logger.debug("Content Coin ID saved successfully");
                 }
             }
 
             return deployTx;
         } catch (e: any) {
-            console.error("Auto-deploy failed:", e);
+            logger.error("Auto-deploy failed:", e);
 
             if (e.message === "Content coin deployment timed out") {
-                console.warn("Continuing despite deployment timeout");
+                logger.warn("Continuing despite deployment timeout");
                 // Return null or similar to indicate partial failure but don't throw
                 return null;
             }

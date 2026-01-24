@@ -1,3 +1,5 @@
+
+import { logger } from '@/lib/utils/logger';
 /**
  * Utility function for sending analytics/metrics data using navigator.sendBeacon
  * with improved error handling for ERR_NETWORK_IO_SUSPENDED scenarios.
@@ -30,7 +32,7 @@ export function sendBeaconSafely(
   // Check if sendBeacon is available
   if (typeof window === 'undefined' || !window.navigator?.sendBeacon) {
     const message = 'sendBeacon is not available in this environment';
-    console.warn(message, { url, data });
+    logger.warn(message, { url, data });
     
     if (options?.throwOnFailure) {
       throw new Error(message);
@@ -48,7 +50,7 @@ export function sendBeaconSafely(
     if (success === false) {
       // Check for explicit 'false'
       const errorMessage = options?.errorMessage || 'Beacon request could not be queued by the browser.';
-      console.error('Failed to queue beacon request for analytics.', { url, data });
+      logger.error('Failed to queue beacon request for analytics.', { url, data });
 
       // You might still want to throw here if queuing is critical,
       // or just log the error.
@@ -65,7 +67,7 @@ export function sendBeaconSafely(
     return true;
   } catch (error) {
     // Handle any unexpected errors during the sendBeacon call
-    console.error('Unexpected error while calling sendBeacon:', error, { url, data });
+    logger.error('Unexpected error while calling sendBeacon:', error, { url, data });
     
     if (options?.throwOnFailure) {
       throw error instanceof Error 

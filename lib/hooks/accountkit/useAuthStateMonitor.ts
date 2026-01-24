@@ -3,6 +3,8 @@
 import { useEffect, useRef } from 'react';
 import { useUser } from '@account-kit/react';
 import { toast } from 'sonner';
+import { logger } from '@/lib/utils/logger';
+
 
 /**
  * Monitor auth state transitions and handle cleanup
@@ -18,7 +20,7 @@ export function useAuthStateMonitor() {
 
     // User transitioned from logged in to logged out
     if (previousUser && !user) {
-      console.log('🔴 User logged out/timed out');
+      logger.debug('🔴 User logged out/timed out');
 
       // Show toast only once
       if (!logoutToastShownRef.current) {
@@ -32,7 +34,7 @@ export function useAuthStateMonitor() {
 
     // User logged in
     if (!previousUser && user) {
-      console.log('🟢 User logged in:', user.address);
+      logger.debug('🟢 User logged in:', user.address);
       logoutToastShownRef.current = false;
     }
 

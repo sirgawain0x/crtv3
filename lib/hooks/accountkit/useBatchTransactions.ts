@@ -5,6 +5,8 @@ import {
   useSmartAccountClient,
 } from "@account-kit/react";
 import { toast } from "sonner";
+import { logger } from '@/lib/utils/logger';
+
 
 export type Transaction = {
   target: string; // Ethereum address (0x-prefixed)
@@ -80,7 +82,7 @@ export function useBatchTransactions() {
       // Clear transactions after successful execution
       setTransactions([]);
     } catch (err) {
-      console.error("Error sending batch transactions:", err);
+      logger.error("Error sending batch transactions:", err);
       const errorMessage = err instanceof Error ? err.message : "Failed to send batch transactions";
       toast.error(errorMessage);
       setError(err instanceof Error ? err : new Error(errorMessage));

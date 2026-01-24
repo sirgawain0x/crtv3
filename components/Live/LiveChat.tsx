@@ -13,6 +13,8 @@ import { cn } from "@/lib/utils";
 import { formatAddress } from "@/lib/helpers";
 import { VideoTipButton } from "../Videos/VideoTipButton";
 import { getExplorerUrl } from "@/lib/utils/video-tip";
+import { logger } from '@/lib/utils/logger';
+
 
 interface LiveChatProps {
   streamId: string;
@@ -101,7 +103,7 @@ export function LiveChat({
     try {
       await sendMessage(messageToSend);
     } catch (err) {
-      console.error("Failed to send message:", err);
+      logger.error("Failed to send message:", err);
     }
   };
 

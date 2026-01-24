@@ -3,6 +3,8 @@ import { useSmartAccountClient } from '@account-kit/react';
 import { encodeFunctionData, parseEther } from 'viem';
 import { useToast } from '@/components/ui/use-toast';
 import { useGasSponsorship } from '@/lib/hooks/wallet/useGasSponsorship';
+import { logger } from '@/lib/utils/logger';
+
 
 const ERC20_ABI = [
     {
@@ -77,7 +79,7 @@ export function useMeTokenPurchase() {
                 uo = await executeOperation(primaryContext);
             } catch (err) {
                 if (primaryContext) {
-                    console.warn("Primary gas payment failed, retrying with standard gas...", err);
+                    logger.warn("Primary gas payment failed, retrying with standard gas...", err);
                     uo = await executeOperation(undefined);
                 } else {
                     throw err;
@@ -115,7 +117,7 @@ export function useMeTokenPurchase() {
 
             return txHash;
         } catch (error) {
-            console.error("Purchase failed:", error);
+            logger.error("Purchase failed:", error);
             setIsPending(false);
             setIsConfirming(false);
             toast({

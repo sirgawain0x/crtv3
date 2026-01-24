@@ -12,6 +12,8 @@ import { getQuestion, getFinalAnswer, type RealityEthQuestion } from "@/lib/sdk/
 import { parseQuestionText, formatQuestionForDisplay } from "@/lib/sdk/reality-eth/reality-eth-utils";
 import { BetForm } from "./BetForm";
 import { Clock, TrendingUp } from "lucide-react";
+import { logger } from '@/lib/utils/logger';
+
 
 interface PredictionDetailsProps {
   questionId: string;
@@ -56,7 +58,7 @@ export function PredictionDetails({ questionId }: PredictionDetailsProps) {
             ]),
           });
         } catch (clientError) {
-          console.error("Error creating public client:", clientError);
+          logger.error("Error creating public client:", clientError);
           throw new Error("Failed to initialize blockchain client");
         }
 
@@ -65,7 +67,7 @@ export function PredictionDetails({ questionId }: PredictionDetailsProps) {
         try {
           questionDataRaw = await getQuestion(publicClient, questionId);
         } catch (questionError: any) {
-          console.error("Error fetching question from contract:", questionError);
+          logger.error("Error fetching question from contract:", questionError);
 
           // Check if it's the reality.eth config error
           if (questionError?.message?.includes("is_native") ||
@@ -98,7 +100,7 @@ export function PredictionDetails({ questionId }: PredictionDetailsProps) {
               type: "bool" as QuestionType, // Default, should be determined from template
             };
           } catch (e) {
-            console.error("Error parsing question:", e);
+            logger.error("Error parsing question:", e);
             parsedQuestion = {
               title: questionData.question,
               type: "bool" as QuestionType,
@@ -122,10 +124,10 @@ export function PredictionDetails({ questionId }: PredictionDetailsProps) {
           }
         } catch (e) {
           // Question might not be resolved yet
-          console.log("Question not yet resolved or error fetching answer");
+          logger.debug("Question not yet resolved or error fetching answer");
         }
       } catch (err: any) {
-        console.error("Error fetching question:", err);
+        logger.error("Error fetching question:", err);
         setError(err?.message || "Failed to load prediction");
       } finally {
         setIsLoading(false);
@@ -178,7 +180,7 @@ export function PredictionDetails({ questionId }: PredictionDetailsProps) {
   const isResolved = finalAnswer !== null;
 
   /* Debug State */
-  console.log("🔍 PredictionDetails:", {
+  logger.debug("🔍 PredictionDetails:", {
     isActive,
     isResolved,
     isFinalizing,

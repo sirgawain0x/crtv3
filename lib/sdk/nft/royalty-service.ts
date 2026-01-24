@@ -8,6 +8,8 @@
 
 import type { Address } from "viem";
 import { encodeFunctionData, parseAbi } from "viem";
+import { serverLogger } from '@/lib/utils/logger';
+
 
 /**
  * ABI for EIP-2981 royalty functions
@@ -89,7 +91,7 @@ export async function setTokenRoyaltyToSplit(
       txHash: txHash as string,
     };
   } catch (error) {
-    console.error("Failed to set token royalty to split:", error);
+    serverLogger.error("Failed to set token royalty to split:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown error setting royalty",
@@ -120,7 +122,7 @@ export async function supportsEIP2981(
 
     return supports as boolean;
   } catch (error) {
-    console.warn("Error checking EIP-2981 support:", error);
+    serverLogger.warn("Error checking EIP-2981 support:", error);
     return false;
   }
 }

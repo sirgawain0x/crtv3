@@ -1,13 +1,15 @@
 import { fullLivepeer } from "@/lib/sdk/livepeer/fullClient";
 import { getSrc } from "@livepeer/react/external";
 import { Src } from "@livepeer/react";
+import { logger } from '@/lib/utils/logger';
+
 
 export const getDetailPlaybackSource = async (
   id: string,
   opts?: { signal?: AbortSignal }
 ): Promise<Src[] | null> => {
   try {
-    console.log("[getDetailPlaybackSource] Fetching for ID:", id);
+    logger.debug("[getDetailPlaybackSource] Fetching for ID:", id);
     
     // Use direct fetch with signal support instead of SDK
     const response = await fetch(`https://livepeer.studio/api/playback/${id}`, {
@@ -22,12 +24,12 @@ export const getDetailPlaybackSource = async (
     }
 
     const res = await response.json();
-    console.log("[getDetailPlaybackSource] Playback info:", res);
+    logger.debug("[getDetailPlaybackSource] Playback info:", res);
     
     const src = getSrc(res) as Src[];
-    console.log("[getDetailPlaybackSource] Generated sources:", src);
+    logger.debug("[getDetailPlaybackSource] Generated sources:", src);
     if (!src?.length) {
-      console.error(
+      logger.error(
         "[getDetailPlaybackSource] No valid sources generated for ID:",
         id
       );
@@ -55,7 +57,7 @@ export const getDetailPlaybackSource = async (
       throw error;
     }
     
-    console.error(
+    logger.error(
       "[getDetailPlaybackSource] Error fetching playback source for ID:",
       id,
       error

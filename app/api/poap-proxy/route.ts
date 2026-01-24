@@ -1,8 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getCachedPoapAccessToken } from "@/lib/utils/poap-auth";
 import { serverLogger } from "@/lib/utils/logger";
+import { rateLimiters } from "@/lib/middleware/rateLimit";
 
-export async function GET(req: Request) {
+export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const proposalId = searchParams.get("proposalId");
   if (!proposalId)
@@ -47,7 +48,10 @@ export async function GET(req: Request) {
   return NextResponse.json(data);
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+  const rl = await rateLimiters.generous(req);
+  if (rl) return rl;
+
   // Example: get data from request body if needed
   // const { address, eventId } = await req.json()
 

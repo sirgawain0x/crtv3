@@ -1,6 +1,8 @@
 import { createSafeActionClient } from "next-safe-action";
 import { z } from "zod";
 import { submitSnapshotVote } from "@/lib/sdk/snapshot/snapshot-vote-wrapper";
+import { serverLogger } from '@/lib/utils/logger';
+
 
 const actionClient = createSafeActionClient();
 
@@ -29,7 +31,7 @@ export const createVote = actionClient
     });
 
     if ("error" in result) {
-      console.error("Snapshot vote error:", result.error);
+      serverLogger.error("Snapshot vote error:", result.error);
       throw new Error(result.error);
     }
 

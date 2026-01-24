@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseService } from '@/lib/sdk/supabase/service';
 import { createClient } from '@/lib/sdk/supabase/server';
 import { serverLogger } from '@/lib/utils/logger';
+import { rateLimiters } from '@/lib/middleware/rateLimit';
 
 export async function GET(request: NextRequest) {
   try {
@@ -128,6 +129,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const rl = await rateLimiters.standard(request);
+  if (rl) return rl;
+
   try {
     // Handle JSON parsing errors
     let body;
@@ -207,6 +211,9 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
+  const rl = await rateLimiters.standard(request);
+  if (rl) return rl;
+
   try {
     // Handle JSON parsing errors
     let body;
@@ -292,6 +299,9 @@ export async function PUT(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
+  const rl = await rateLimiters.standard(request);
+  if (rl) return rl;
+
   try {
     const { searchParams } = new URL(request.url);
     const owner = searchParams.get('owner');

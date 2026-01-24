@@ -1,6 +1,7 @@
 "use server";
 
 import { NextRequest, NextResponse } from "next/server";
+import { rateLimiters } from "@/lib/middleware/rateLimit";
 
 export async function GET(request: NextRequest) {
   const baseUrl = process.env.LIVEPEER_FULL_API_URL ?? "https://livepeer.studio";
@@ -30,6 +31,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const rl = await rateLimiters.standard(request);
+  if (rl) return rl;
+
   const baseUrl = process.env.LIVEPEER_FULL_API_URL ?? "https://livepeer.studio";
   const livepeerUpload = `${baseUrl}/api/asset/request-upload`;
 

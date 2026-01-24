@@ -7,6 +7,8 @@ import { USDC_TOKEN_ADDRESSES, USDC_TOKEN_DECIMALS } from "@/lib/contracts/USDCT
 import { useGasSponsorship } from "@/lib/hooks/wallet/useGasSponsorship";
 import { DAI_TOKEN_ADDRESSES, DAI_TOKEN_DECIMALS } from "@/lib/contracts/DAIToken";
 import { toast } from "sonner";
+import { logger } from '@/lib/utils/logger';
+
 
 export type TokenSymbol = 'ETH' | 'USDC' | 'DAI';
 
@@ -90,7 +92,7 @@ export function useVideoTip(): UseVideoTipReturn {
         DAI: formatUnits(daiBalance, DAI_TOKEN_DECIMALS),
       });
     } catch (err) {
-      console.error("Error fetching balances:", err);
+      logger.error("Error fetching balances:", err);
     }
   }, [address, client]);
 
@@ -163,7 +165,7 @@ export function useVideoTip(): UseVideoTipReturn {
         try {
           operation = await executeOperation(primaryContext);
         } catch (err) {
-          console.warn("Primary gas payment failed, retrying with standard gas...", err);
+          logger.warn("Primary gas payment failed, retrying with standard gas...", err);
           // Fallback to standard gas if primary fails (e.g. USDC paymaster failure)
           if (primaryContext) {
             operation = await executeOperation(undefined);
@@ -189,7 +191,7 @@ export function useVideoTip(): UseVideoTipReturn {
           token,
         };
       } catch (err) {
-        console.error("Error sending tip:", err);
+        logger.error("Error sending tip:", err);
         const errorMsg = err instanceof Error ? err.message : "Failed to send tip";
         setError(new Error(errorMsg));
         toast.error(`Failed to send tip: ${errorMsg}`);

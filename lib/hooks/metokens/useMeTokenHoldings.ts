@@ -6,6 +6,7 @@ import { useSmartAccountClient } from '@account-kit/react';
 import { formatEther } from 'viem';
 import { meTokensSubgraph } from '@/lib/sdk/metokens/subgraph';
 import { creatorProfileSupabaseService, CreatorProfile } from '@/lib/sdk/supabase/creator-profiles';
+import { logger } from '@/lib/utils/logger';
 
 // MeTokens contract addresses on Base
 const DIAMOND = '0xba5502db2aC2cBff189965e991C07109B14eB3f5';
@@ -166,6 +167,10 @@ export interface UseMeTokenHoldingsResult {
   refreshHoldings: () => Promise<void>;
 }
 
+/** Client-side cache for holdings by address. TTL 45 seconds. */
+const HOLDINGS_CACHE_TTL_MS = 45 * 1000;
+const holdingsCache = new Map<string, { holdings: MeTokenHolding[]; timestamp: number }>();
+
 export function useMeTokenHoldings(targetAddress?: string): UseMeTokenHoldingsResult {
   const user = useUser();
   const { client, address: scaAddress } = useSmartAccountClient({});
@@ -181,11 +186,20 @@ export function useMeTokenHoldings(targetAddress?: string): UseMeTokenHoldingsRe
       return;
     }
 
+    const cacheKey = address.toLowerCase();
+    const cached = holdingsCache.get(cacheKey);
+    if (cached && Date.now() - cached.timestamp < HOLDINGS_CACHE_TTL_MS) {
+      setHoldings(cached.holdings);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
     try {
-      console.log('🔍 Fetching MeToken holdings for address:', {
+      logger.debug('Fetching MeToken holdings for address:', {
         resolvedAddress: address,
         scaAddress,
         userAddress: user?.address,
@@ -196,9 +210,9 @@ export function useMeTokenHoldings(targetAddress?: string): UseMeTokenHoldingsRe
       let allMeTokens;
       try {
         allMeTokens = await meTokensSubgraph.getAllMeTokens(100, 0);
-        console.log(`📋 Found ${allMeTokens.length} MeTokens in subgraph`);
+        logger.debug(`Found ${allMeTokens.length} MeTokens in subgraph`);
       } catch (subgraphError) {
-        console.warn('⚠️ Subgraph query failed, this is non-critical:', subgraphError);
+        logger.warn('Subgraph query failed, this is non-critical:', subgraphError);
         // Return empty holdings but don't throw - subgraph is optional
         setHoldings([]);
         setLoading(false);
@@ -259,7 +273,7 @@ export function useMeTokenHoldings(targetAddress?: string): UseMeTokenHoldingsRe
 
             // Only include if user has a balance > 0 OR if it's their own MeToken with some activity (to avoid clutter)
             if (balance > BigInt(0) || (isOwnMeToken && (info.balancePooled > BigInt(0) || info.balanceLocked > BigInt(0)))) {
-              console.log(`💰 Found ${isOwnMeToken ? 'own MeToken' : 'balance'} for ${meToken.id}:`, balance.toString());
+              logger.debug(`Found ${isOwnMeToken ? 'own MeToken' : 'balance'} for ${meToken.id}:`, balance.toString());
 
               // Get ERC20 token details
               const [name, symbol, totalSupply] = await Promise.all([
@@ -289,7 +303,7 @@ export function useMeTokenHoldings(targetAddress?: string): UseMeTokenHoldingsRe
                 // Fetch profile in parallel if possible, but for now strict await is okay inside this map
                 creatorProfile = await creatorProfileSupabaseService.getCreatorProfileByOwner(info.owner);
               } catch (profileError) {
-                console.warn(`Failed to fetch creator profile for ${info.owner}:`, profileError);
+                logger.warn(`Failed to fetch creator profile for ${info.owner}:`, profileError);
               }
 
               return {
@@ -314,7 +328,7 @@ export function useMeTokenHoldings(targetAddress?: string): UseMeTokenHoldingsRe
               } as MeTokenHolding;
             }
           } catch (tokenError) {
-            console.warn(`Failed to check MeToken ${meToken.id}:`, tokenError);
+            logger.warn(`Failed to check MeToken ${meToken.id}:`, tokenError);
           }
           return null;
         })
@@ -330,13 +344,14 @@ export function useMeTokenHoldings(targetAddress?: string): UseMeTokenHoldingsRe
         return Number(b.balance) - Number(a.balance);
       });
 
-      console.log(`✅ Found ${userHoldings.length} MeToken holdings`);
+      logger.debug(`Found ${userHoldings.length} MeToken holdings`);
       if (userHoldings.length === 0) {
-        console.log('📭 No MeToken holdings found for user');
+        logger.debug('No MeToken holdings found for user');
       }
+      holdingsCache.set(cacheKey, { holdings: userHoldings, timestamp: Date.now() });
       setHoldings(userHoldings);
     } catch (err) {
-      console.error('Error fetching MeToken holdings:', err);
+      logger.error('Error fetching MeToken holdings:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch holdings');
       setHoldings([]);
     } finally {

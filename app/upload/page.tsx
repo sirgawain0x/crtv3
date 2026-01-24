@@ -4,6 +4,8 @@ import { useUser, useSmartAccountClient } from "@account-kit/react";
 import { useRouter } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
 import useModularAccount from "@/lib/hooks/accountkit/useModularAccount";
+import { logger } from '@/lib/utils/logger';
+
 
 function UploadRedirect() {
   const router = useRouter();
@@ -16,12 +18,12 @@ function UploadRedirect() {
   const smartAccountAddress = account?.address || scaAddress;
 
   useEffect(() => {
-    console.log('Upload redirect - EOA:', eoaAddress, 'SCA (client):', scaAddress, 'SCA (account):', account?.address);
+    logger.debug('Upload redirect - EOA:', eoaAddress, 'SCA (client):', scaAddress, 'SCA (account):', account?.address);
     if (smartAccountAddress) {
-      console.log('Redirecting to Smart Account upload:', smartAccountAddress);
+      logger.debug('Redirecting to Smart Account upload:', smartAccountAddress);
       router.replace(`/upload/${smartAccountAddress}`);
     } else if (eoaAddress) {
-      console.log('Redirecting to EOA upload:', eoaAddress);
+      logger.debug('Redirecting to EOA upload:', eoaAddress);
       router.replace(`/upload/${eoaAddress}`);
     }
   }, [eoaAddress, smartAccountAddress, router, account?.address, scaAddress]);

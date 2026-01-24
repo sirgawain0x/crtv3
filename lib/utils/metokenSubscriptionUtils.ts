@@ -1,6 +1,7 @@
 import { MeTokenData, MeTokenInfo } from '@/lib/hooks/metokens/useMeTokensSupabase';
 import { publicClient } from '@/lib/viem';
 import { parseAbi } from 'viem';
+import { logger } from '@/lib/utils/logger';
 
 // Base mainnet Diamond contract address
 const DIAMOND_ADDRESS = '0xba5502db2aC2cBff189965e991C07109B14eB3f5' as const;
@@ -157,7 +158,7 @@ export async function checkMeTokenSubscriptionFromBlockchain(meTokenAddress: str
   error?: string;
 }> {
   try {
-    console.log('🔍 Checking MeToken subscription status for:', meTokenAddress);
+    logger.debug('🔍 Checking MeToken subscription status for:', meTokenAddress);
 
     // Use the standardized ABI from contracts
     const { METOKEN_ABI } = await import('@/lib/contracts/MeToken');
@@ -165,20 +166,20 @@ export async function checkMeTokenSubscriptionFromBlockchain(meTokenAddress: str
     let meTokenInfo: any = null;
 
     try {
-      console.log('🔍 Fetching getMeTokenInfo from Diamond...');
+      logger.debug('🔍 Fetching getMeTokenInfo from Diamond...');
       meTokenInfo = await publicClient.readContract({
         address: DIAMOND_ADDRESS,
         abi: METOKEN_ABI,
         functionName: 'getMeTokenInfo',
         args: [meTokenAddress as `0x${string}`]
       });
-      console.log('✅ getMeTokenInfo succeeded:', meTokenInfo);
+      logger.debug('✅ getMeTokenInfo succeeded:', meTokenInfo);
     } catch (err) {
-      console.warn('❌ getMeTokenInfo failed with standard ABI:', err instanceof Error ? err.message : 'Unknown error');
+      logger.warn('❌ getMeTokenInfo failed with standard ABI:', err instanceof Error ? err.message : 'Unknown error');
 
       // Fallback: Check if MeToken exists and return safe defaults if we can't read subscription info
       // This handles cases where the contract exists but might not be fully registered or ABI issues persist
-      console.log('🔍 Fallback: Checking if MeToken contract code exists...');
+      logger.debug('🔍 Fallback: Checking if MeToken contract code exists...');
       const code = await publicClient.getCode({
         address: meTokenAddress as `0x${string}`
       });
@@ -187,7 +188,7 @@ export async function checkMeTokenSubscriptionFromBlockchain(meTokenAddress: str
         throw new Error('MeToken contract does not exist');
       }
 
-      console.log('✅ MeToken code exists, returning default unsubscribed state');
+      logger.debug('✅ MeToken code exists, returning default unsubscribed state');
       // Return a default structure indicating existence but no subscription info
       // [owner, hubId, balancePooled, balanceLocked, startTime, endTime, targetHubId, migration]
       // Note: standard ABI returns 8 components (no endCooldown)
@@ -205,7 +206,7 @@ export async function checkMeTokenSubscriptionFromBlockchain(meTokenAddress: str
 
     // If all approaches failed (meTokenInfo is still null), return error state
     if (!meTokenInfo) {
-      console.error('❌ Failed to retrieve MeToken info');
+      logger.error('❌ Failed to retrieve MeToken info');
       return {
         isSubscribed: false,
         status: 'not-subscribed',
@@ -223,7 +224,7 @@ export async function checkMeTokenSubscriptionFromBlockchain(meTokenAddress: str
     const isFallbackResult = meTokenInfo[1] === BigInt(0) && meTokenInfo[2] === BigInt(0) && meTokenInfo[3] === BigInt(0);
 
     if (isFallbackResult) {
-      console.debug('ℹ️ Using fallback result - MeToken exists but subscription info not available via Diamond contract');
+      logger.debug('Using fallback result - MeToken exists but subscription info not available via Diamond contract');
       return {
         isSubscribed: false,
         status: 'not-subscribed',
@@ -284,7 +285,7 @@ export async function checkMeTokenSubscriptionFromBlockchain(meTokenAddress: str
     const isSubscribed = balancePooled > BigInt(0) || balanceLocked > BigInt(0);
     const totalLocked = balancePooled + balanceLocked;
 
-    console.log('📊 Subscription status:', {
+    logger.debug('📊 Subscription status:', {
       isSubscribed,
       balancePooled: balancePooled.toString(),
       balanceLocked: balanceLocked.toString(),
@@ -303,7 +304,7 @@ export async function checkMeTokenSubscriptionFromBlockchain(meTokenAddress: str
       requiresSubscription: !isSubscribed
     };
   } catch (error) {
-    console.error('❌ Failed to check MeToken subscription status:', error);
+    logger.error('❌ Failed to check MeToken subscription status:', error);
     return {
       isSubscribed: false,
       status: 'not-subscribed',
@@ -344,7 +345,7 @@ export async function getMeTokenSubscriptionInfo(meTokenAddress: string): Promis
   error?: string;
 }> {
   try {
-    console.log('🔍 Getting comprehensive MeToken subscription info for:', meTokenAddress);
+    logger.debug('🔍 Getting comprehensive MeToken subscription info for:', meTokenAddress);
 
     // Check subscription status from blockchain
     const subscriptionStatus = await checkMeTokenSubscriptionFromBlockchain(meTokenAddress);
@@ -355,7 +356,7 @@ export async function getMeTokenSubscriptionInfo(meTokenAddress: string): Promis
       const { getMeTokenInfoFromBlockchain } = await import('@/lib/utils/metokenUtils');
       basicInfo = await getMeTokenInfoFromBlockchain(meTokenAddress);
     } catch (err) {
-      console.warn('Failed to get basic MeToken info:', err);
+      logger.warn('Failed to get basic MeToken info:', err);
     }
 
     return {
@@ -365,7 +366,7 @@ export async function getMeTokenSubscriptionInfo(meTokenAddress: string): Promis
       error: subscriptionStatus.error
     };
   } catch (error) {
-    console.error('❌ Failed to get MeToken subscription info:', error);
+    logger.error('❌ Failed to get MeToken subscription info:', error);
     return {
       address: meTokenAddress,
       subscriptionStatus: {
@@ -390,7 +391,7 @@ export async function getMeTokenSubscriptionInfo(meTokenAddress: string): Promis
  */
 export async function getHubVaultAddress(hubId: bigint | number): Promise<string> {
   try {
-    console.log(`🔍 fetching Vault address for Hub ${hubId}...`);
+    logger.debug(`🔍 fetching Vault address for Hub ${hubId}...`);
 
     // Default to Hub 1 if invalid
     const cleanHubId = hubId ? BigInt(hubId) : BigInt(1);
@@ -498,20 +499,20 @@ export async function getHubVaultAddress(hubId: bigint | number): Promise<string
     } else if (typeof hubInfo === 'object' && 'vault' in hubInfo) {
       vaultAddress = hubInfo.vault as string;
     } else {
-      console.warn('⚠️ Unexpected hubInfo format:', hubInfo);
+      logger.warn('⚠️ Unexpected hubInfo format:', hubInfo);
       // Fallback: try to access by index if it's an object behaving like array
       vaultAddress = (hubInfo as any)[6] || (hubInfo as any).vault;
     }
 
     if (!vaultAddress || vaultAddress === '0x0000000000000000000000000000000000000000') {
-      console.warn(`⚠️ Vault address for Hub ${cleanHubId} is zero address`);
+      logger.warn(`⚠️ Vault address for Hub ${cleanHubId} is zero address`);
       return DIAMOND_ADDRESS; // Fallback to Diamond if vault is missing (should verify this behavior)
     }
 
-    console.log(`✅ Vault address for Hub ${cleanHubId}:`, vaultAddress);
+    logger.debug(`✅ Vault address for Hub ${cleanHubId}:`, vaultAddress);
     return vaultAddress;
   } catch (error) {
-    console.error(`❌ Failed to get vault address:`, error);
+    logger.error(`❌ Failed to get vault address:`, error);
     // Fallback to Diamond address to assume it's the spender if we fail (safe default for legacy behavior)
     return DIAMOND_ADDRESS;
   }

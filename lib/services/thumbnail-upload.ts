@@ -1,5 +1,7 @@
 import { ipfsService } from '@/lib/sdk/ipfs/service';
 import { IPFSService } from '@/lib/sdk/ipfs/service';
+import { serverLogger } from '@/lib/utils/logger';
+
 
 export interface ThumbnailUploadResult {
   success: boolean;
@@ -33,7 +35,7 @@ export async function uploadThumbnailToIPFS(
       };
     }
 
-    console.log('[ThumbnailUpload] Starting upload with Helia (following helia-nextjs pattern)...');
+    serverLogger.debug('[ThumbnailUpload] Starting upload with Helia (following helia-nextjs pattern)...');
 
     // Use provided service or default IPFS service instance
     // Following helia-nextjs pattern: uses Helia from context if available via hook
@@ -51,8 +53,8 @@ export async function uploadThumbnailToIPFS(
       };
     }
 
-    console.log('[ThumbnailUpload] ✅ Thumbnail upload successful:', result.hash);
-    console.log('[ThumbnailUpload] 📍 Accessible via:', result.url);
+    serverLogger.debug('[ThumbnailUpload] ✅ Thumbnail upload successful:', result.hash);
+    serverLogger.debug('[ThumbnailUpload] 📍 Accessible via:', result.url);
 
     // Return the CID format expected by the app (IPFS URI)
     return {
@@ -61,7 +63,7 @@ export async function uploadThumbnailToIPFS(
     };
 
   } catch (error) {
-    console.error('[ThumbnailUpload] ❌ Error uploading thumbnail to IPFS:', error);
+    serverLogger.error('[ThumbnailUpload] ❌ Error uploading thumbnail to IPFS:', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error occurred'
@@ -84,7 +86,7 @@ export async function blobUrlToFile(blobUrl: string, filename: string): Promise<
     const file = new File([blob], filename, { type: blob.type });
     return file;
   } catch (error) {
-    console.error('Error converting blob URL to file:', error);
+    serverLogger.error('Error converting blob URL to file:', error);
     return null;
   }
 }
@@ -118,7 +120,7 @@ export async function uploadThumbnailFromBlob(
     return await uploadThumbnailToIPFS(file, playbackId, service);
 
   } catch (error) {
-    console.error('[ThumbnailUpload] ❌ Error uploading thumbnail from blob:', error);
+    serverLogger.error('[ThumbnailUpload] ❌ Error uploading thumbnail from blob:', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error occurred'

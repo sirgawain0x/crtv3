@@ -6,6 +6,7 @@
 // the Turnkey iframe lifecycle automatically.
 
 import { AlchemyWebSigner } from "@account-kit/signer";
+import { logger } from "@/lib/utils/logger";
 
 /**
  * Clean up DUPLICATE iframes only.
@@ -26,7 +27,7 @@ export function cleanupExistingIframes() {
     const iframes = container.querySelectorAll("iframe");
     // Only clean up if there are more than 1 iframe (keep the first one)
     if (iframes.length > 1) {
-      console.log(
+      logger.debug(
         `[IframeCleanup] Found ${iframes.length} iframes, removing duplicates...`
       );
       // Keep the first iframe, remove the rest
@@ -34,7 +35,7 @@ export function cleanupExistingIframes() {
         try {
           iframes[i].remove();
         } catch (error) {
-          console.warn("Failed to remove duplicate iframe:", error);
+          logger.warn("Failed to remove duplicate iframe:", error);
         }
       }
     }
@@ -45,7 +46,7 @@ export function cleanupExistingIframes() {
     'iframe[id*="turnkey"], iframe[src*="turnkey"]'
   );
   if (turnkeyIframes.length > 1) {
-    console.log(
+    logger.debug(
       `[IframeCleanup] Found ${turnkeyIframes.length} Turnkey iframes, removing duplicates...`
     );
     // Keep the first one, remove duplicates
@@ -53,7 +54,7 @@ export function cleanupExistingIframes() {
       try {
         turnkeyIframes[i].remove();
       } catch (error) {
-        console.warn("Failed to remove duplicate Turnkey iframe:", error);
+        logger.warn("Failed to remove duplicate Turnkey iframe:", error);
       }
     }
   }
@@ -92,7 +93,7 @@ function createSigner(): AlchemyWebSigner {
     signerInstance = newSigner;
     return newSigner;
   } catch (error) {
-    console.error("Failed to create AlchemyWebSigner:", error);
+    logger.error("Failed to create AlchemyWebSigner:", error);
     // If signer creation fails, try cleanup and retry once
     cleanupExistingIframes();
     
@@ -111,7 +112,7 @@ function createSigner(): AlchemyWebSigner {
       signerInstance = retrySigner;
       return retrySigner;
     } catch (retryError) {
-      console.error("Failed to create AlchemyWebSigner after retry:", retryError);
+      logger.error("Failed to create AlchemyWebSigner after retry:", retryError);
       throw retryError;
     }
   }

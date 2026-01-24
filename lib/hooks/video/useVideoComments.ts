@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from "react";
 import { useUser } from "@account-kit/react";
 import useModularAccount from "@/lib/hooks/accountkit/useModularAccount";
 import type { VideoComment, CreateCommentInput } from "@/lib/types/video-comments";
+import { logger } from '@/lib/utils/logger';
+
 import {
   createComment,
   getComments,
@@ -93,7 +95,7 @@ export function useVideoComments(videoAssetId: number): UseVideoCommentsReturn {
       const count = await getCommentCount(videoAssetId);
       setCommentCount(count);
     } catch (err) {
-      console.error('Error loading comments:', err);
+      logger.error('Error loading comments:', err);
       setError(err instanceof Error ? err : new Error('Failed to load comments'));
     } finally {
       setIsLoading(false);
@@ -139,7 +141,7 @@ export function useVideoComments(videoAssetId: number): UseVideoCommentsReturn {
           setCommentCount(prev => prev + 1);
         }
       } catch (err) {
-        console.error('Error creating comment:', err);
+        logger.error('Error creating comment:', err);
         setError(err instanceof Error ? err : new Error('Failed to create comment'));
         throw err;
       }
@@ -166,7 +168,7 @@ export function useVideoComments(videoAssetId: number): UseVideoCommentsReturn {
           )
         );
       } catch (err) {
-        console.error('Error updating comment:', err);
+        logger.error('Error updating comment:', err);
         setError(err instanceof Error ? err : new Error('Failed to update comment'));
         throw err;
       }
@@ -188,7 +190,7 @@ export function useVideoComments(videoAssetId: number): UseVideoCommentsReturn {
         setComments(prev => prev.filter(comment => comment.id !== commentId));
         setCommentCount(prev => Math.max(0, prev - 1));
       } catch (err) {
-        console.error('Error deleting comment:', err);
+        logger.error('Error deleting comment:', err);
         setError(err instanceof Error ? err : new Error('Failed to delete comment'));
         throw err;
       }
@@ -215,7 +217,7 @@ export function useVideoComments(videoAssetId: number): UseVideoCommentsReturn {
           )
         );
       } catch (err) {
-        console.error('Error toggling like:', err);
+        logger.error('Error toggling like:', err);
         setError(err instanceof Error ? err : new Error('Failed to like comment'));
         throw err;
       }

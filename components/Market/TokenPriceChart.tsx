@@ -7,6 +7,8 @@ import { PriceHistoryPoint } from '@/app/api/market/tokens/[address]/price-histo
 import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils/utils';
 import { TradingViewChart } from './TradingViewChart';
+import { logger } from '@/lib/utils/logger';
+
 
 interface TokenPriceChartProps {
   tokenAddress: string;
@@ -56,7 +58,7 @@ export function TokenPriceChart({
 
           // For 404, just return empty data (token might not have transactions yet)
           if (response.status === 404) {
-            console.log('Token not found or no price history available');
+            logger.debug('Token not found or no price history available');
             setData([]);
             setCurrentPrice(null);
             setError(null);
@@ -67,14 +69,14 @@ export function TokenPriceChart({
         }
 
         const result = await response.json();
-        console.log('📊 Price History API Response:', result);
-        console.log('📈 History Data Points:', result.data?.length || 0);
-        console.log('💰 Current Price from API:', result.token?.current_price);
+        logger.debug('📊 Price History API Response:', result);
+        logger.debug('📈 History Data Points:', result.data?.length || 0);
+        logger.debug('💰 Current Price from API:', result.token?.current_price);
 
         setData(result.data || []);
         setCurrentPrice(result.token?.current_price || null);
       } catch (err) {
-        console.error('Error fetching price history:', err);
+        logger.error('Error fetching price history:', err);
         setError(err instanceof Error ? err.message : 'Failed to load chart');
         setData([]); // Set empty data on error
         setCurrentPrice(null);
@@ -88,7 +90,7 @@ export function TokenPriceChart({
 
   // Calculate price change for display
   const priceInfo = useMemo(() => {
-    console.log('🔍 Calculating priceInfo:', {
+    logger.debug('🔍 Calculating priceInfo:', {
       dataLength: data.length,
       currentPrice,
       firstDataPoint: data[0],
@@ -110,7 +112,7 @@ export function TokenPriceChart({
     const firstPrice = data[0]?.price || 0;
     const lastPrice = data[data.length - 1]?.price || 0;
 
-    console.log('💵 Price values:', { firstPrice, lastPrice, currentPrice });
+    logger.debug('💵 Price values:', { firstPrice, lastPrice, currentPrice });
 
     // If lastPrice is 0 but we have currentPrice from API, use that instead
     const displayPrice = (lastPrice > 0) ? lastPrice : (currentPrice || 0);

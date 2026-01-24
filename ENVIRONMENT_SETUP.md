@@ -183,6 +183,8 @@ Address of the deployed CreatorIPCollectionFactory contract on Story Protocol. I
 #### `STORY_PROTOCOL_PRIVATE_KEY` (Optional, Server-side only)
 Private key for a wallet that will fund Story Protocol transactions (minting NFTs, IP registration, etc.). This wallet must have IP tokens for gas fees on Story Protocol.
 
+**NFT minting step:** The upload flow checks `/api/story/mint-configured`. When `STORY_PROTOCOL_PRIVATE_KEY` is not set, the NFT minting step shows "NFT minting unavailable" instead of the mint UI. Set this variable to enable the step.
+
 **Important:**
 - This is a **funding wallet** - it pays for gas fees but doesn't need to match the creator's address
 - The wallet must have IP tokens on Story Protocol (testnet or mainnet depending on your configuration)

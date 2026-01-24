@@ -1,3 +1,5 @@
+
+import { logger } from '@/lib/utils/logger';
 /**
  * WASM Initialization Patch
  * 
@@ -108,7 +110,7 @@ export function patchWasmInit(): void {
         }
         
         if (process.env.NODE_ENV === 'development') {
-          console.log('[WASM Init Patch] Converting URL:', url, '->', absoluteUrl);
+          logger.debug('[WASM Init Patch] Converting URL:', url, '->', absoluteUrl);
         }
         
         if (typeof input === 'string') {
@@ -122,7 +124,7 @@ export function patchWasmInit(): void {
       
       return originalFetch(input, init);
     } catch (error) {
-      console.error('[WASM Init Patch] Error:', error);
+      logger.error('[WASM Init Patch] Error:', error);
       return originalFetch(input, init);
     }
   };

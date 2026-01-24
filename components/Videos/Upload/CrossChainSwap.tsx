@@ -13,6 +13,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Loader2, ArrowRightLeft, CheckCircle, Wallet } from "lucide-react";
 import { toHex, parseUnits, formatUnits, formatEther, parseEther, type Address } from "viem";
+import { logger } from '@/lib/utils/logger';
+
 
 /**
  * Supported Chain IDs
@@ -90,7 +92,7 @@ export function CrossChainSwap({ onSwapSuccess, requiredAmount, recipientAddress
 
             setEthBalance(formatEther(balance));
         } catch (err) {
-            console.error("Error fetching ETH balance:", err);
+            logger.error("Error fetching ETH balance:", err);
             setEthBalance(null);
         }
     }, [client]);
@@ -154,7 +156,7 @@ export function CrossChainSwap({ onSwapSuccess, requiredAmount, recipientAddress
 
             // If target recipient is different from sender, try to use it
             if (targetRecipient && targetRecipient.toLowerCase() !== client.account.address.toLowerCase()) {
-                console.log("🎯 Using custom recipient address for swap:", targetRecipient);
+                logger.debug("🎯 Using custom recipient address for swap:", targetRecipient);
                 // Try standard 'to' parameter (API specific support)
                 swapParams.to = targetRecipient;
             }
@@ -163,7 +165,7 @@ export function CrossChainSwap({ onSwapSuccess, requiredAmount, recipientAddress
 
             const { quote: swapQuote, ...calls } = result;
 
-            console.log("🔍 Full swap quote response:", {
+            logger.debug("🔍 Full swap quote response:", {
                 quote: swapQuote,
                 recipient: targetRecipient,
                 fullResult: result,
@@ -177,19 +179,19 @@ export function CrossChainSwap({ onSwapSuccess, requiredAmount, recipientAddress
                 // Warn if the quote seems unreasonably low
                 if (ipAmount < 0.01) {
                     const expectedAmount = parseFloat(amountStr) * 500; // Conservative estimate
-                    console.warn(`⚠️ Quote seems very low! Expected ~${expectedAmount.toFixed(2)} IP for ${amountStr} ETH, got:`, formattedAmount);
+                    logger.warn(`⚠️ Quote seems very low! Expected ~${expectedAmount.toFixed(2)} IP for ${amountStr} ETH, got:`, formattedAmount);
                 }
 
                 // If the amount is actually zero, this route doesn't exist
                 if (rawAmount === 0n) {
-                    console.error("❌ Quote returned ZERO - This swap route does not exist!");
+                    logger.error("❌ Quote returned ZERO - This swap route does not exist!");
                 }
             }
 
             setQuote({ quote: swapQuote, calls });
 
         } catch (err) {
-            console.error("Swap quote error:", err);
+            logger.error("Swap quote error:", err);
             let errorMessage = "Failed to get swap quote";
 
             if (err instanceof Error) {
@@ -221,7 +223,7 @@ export function CrossChainSwap({ onSwapSuccess, requiredAmount, recipientAddress
         try {
             await signAndSendPreparedCallsAsync(quote.calls);
         } catch (err) {
-            console.error("Swap execution error:", err);
+            logger.error("Swap execution error:", err);
             setError(err instanceof Error ? err.message : "Failed to execute swap");
         }
     };

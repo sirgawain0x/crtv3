@@ -1,4 +1,5 @@
 import { request, gql } from 'graphql-request';
+import { logger } from '@/lib/utils/logger';
 
 // MeTokens subgraph endpoint - using local API proxy to avoid CORS issues
 const getSubgraphEndpoint = () => {
@@ -170,26 +171,26 @@ export class MeTokensSubgraphClient {
 
     try {
       const endpoint = this.getEndpoint();
-      console.log('🔗 Querying subgraph at:', endpoint);
+      logger.debug('🔗 Querying subgraph at:', endpoint);
 
       const data = await request(endpoint, GET_ALL_SUBSCRIBES, { first, skip }) as any;
 
       // Check for GraphQL errors in the response
       if (data.errors) {
-        console.error('GraphQL errors:', data.errors);
+        logger.error('GraphQL errors:', data.errors);
         // Check if it's an indexing error
         const hasIndexingError = data.errors.some((err: any) => 
           err?.message === 'indexing_error' || err?.message?.includes('indexing_error')
         );
         if (hasIndexingError) {
-          console.warn('⚠️ Subgraph indexing error - falling back to Supabase (Turbo pipeline data)');
+          logger.warn('⚠️ Subgraph indexing error - falling back to Supabase (Turbo pipeline data)');
           return await this.getAllMeTokensFromSupabase(first, skip);
         }
         throw new Error(`GraphQL error: ${JSON.stringify(data.errors)}`);
       }
 
       const subscribeEvents = data.subscribes || [];
-      console.log(`✅ Successfully fetched ${subscribeEvents.length} subscribe events from subgraph`);
+      logger.debug(`✅ Successfully fetched ${subscribeEvents.length} subscribe events from subgraph`);
 
       // Convert Subscribe events to MeToken format
       // Note: This is a simplified conversion - in practice, you'd need to fetch
@@ -207,11 +208,11 @@ export class MeTokensSubgraphClient {
         migration: '',
       }));
     } catch (error: any) {
-      console.error('❌ Failed to fetch MeTokens from subgraph:', error);
+      logger.error('❌ Failed to fetch MeTokens from subgraph:', error);
 
       // Handle indexing_error - subgraph is syncing or has indexing issues
       if (this.isIndexingError(error)) {
-        console.warn('⚠️ Subgraph indexing error - falling back to Supabase (Turbo pipeline data)');
+        logger.warn('⚠️ Subgraph indexing error - falling back to Supabase (Turbo pipeline data)');
         return await this.getAllMeTokensFromSupabase(first, skip);
       }
 
@@ -240,7 +241,7 @@ export class MeTokensSubgraphClient {
       const { MeTokenSupabaseService } = await import('@/lib/sdk/supabase/metokens');
       const supabaseService = new MeTokenSupabaseService();
 
-      console.log('📊 Fetching Subscribe events from Supabase (Turbo pipeline)...');
+      logger.debug('📊 Fetching Subscribe events from Supabase (Turbo pipeline)...');
       const subscribeEvents = await supabaseService.getSubscribeEvents({
         limit: first,
         offset: skip,
@@ -248,7 +249,7 @@ export class MeTokensSubgraphClient {
         sortOrder: 'desc',
       });
 
-      console.log(`✅ Successfully fetched ${subscribeEvents.length} subscribe events from Supabase`);
+      logger.debug(`✅ Successfully fetched ${subscribeEvents.length} subscribe events from Supabase`);
 
       // Convert Subscribe events to MeToken format (matching subgraph format)
       return subscribeEvents.map((event) => ({
@@ -264,7 +265,7 @@ export class MeTokensSubgraphClient {
         migration: '',
       }));
     } catch (supabaseError: any) {
-      console.error('❌ Failed to fetch MeTokens from Supabase fallback:', supabaseError);
+      logger.error('❌ Failed to fetch MeTokens from Supabase fallback:', supabaseError);
       // Return empty array to allow app to continue
       return [];
     }
@@ -281,7 +282,7 @@ export class MeTokensSubgraphClient {
     // Therefore, we cannot determine MeToken ownership through the subgraph alone.
     // This function returns an empty array, and the caller should rely on
     // Supabase or direct contract queries for owner-based filtering.
-    console.log('⚠️ Subgraph does not support querying MeTokens by owner (hub queries unavailable). Returning empty array. Use Supabase or contract queries instead.');
+    logger.debug('⚠️ Subgraph does not support querying MeTokens by owner (hub queries unavailable). Returning empty array. Use Supabase or contract queries instead.');
     return [];
   }
 
@@ -316,10 +317,10 @@ export class MeTokensSubgraphClient {
         migration: '',
       };
     } catch (error: any) {
-      console.error('Failed to fetch MeToken:', error);
+      logger.error('Failed to fetch MeToken:', error);
       // Handle indexing_error gracefully
       if (this.isIndexingError(error)) {
-        console.warn('⚠️ Subgraph indexing error - returning null');
+        logger.warn('⚠️ Subgraph indexing error - returning null');
         return null;
       }
       throw new Error('Failed to fetch MeToken from subgraph');
@@ -336,7 +337,7 @@ export class MeTokensSubgraphClient {
       return data.hub || null;
     } catch (error) {
       // The subgraph doesn't support hub queries or has indexing issues - return null gracefully
-      console.warn(`⚠️ Subgraph query failed (hub ${id}):`, error instanceof Error ? error.message : String(error));
+      logger.warn(`⚠️ Subgraph query failed (hub ${id}):`, error instanceof Error ? error.message : String(error));
       return null;
     }
   }
@@ -350,10 +351,10 @@ export class MeTokensSubgraphClient {
       const data = await request(this.getEndpoint(), GET_RECENT_MINTS, { first }) as any;
       return data.mints || [];
     } catch (error: any) {
-      console.error('Failed to fetch recent mints:', error);
+      logger.error('Failed to fetch recent mints:', error);
       // Handle indexing_error gracefully - return empty array instead of throwing
       if (this.isIndexingError(error)) {
-        console.warn('⚠️ Subgraph indexing error - returning empty array');
+        logger.warn('⚠️ Subgraph indexing error - returning empty array');
         return [];
       }
       throw new Error('Failed to fetch recent mints from subgraph');
@@ -369,10 +370,10 @@ export class MeTokensSubgraphClient {
       const data = await request(this.getEndpoint(), GET_RECENT_BURNS, { first }) as any;
       return data.burns || [];
     } catch (error: any) {
-      console.error('Failed to fetch recent burns:', error);
+      logger.error('Failed to fetch recent burns:', error);
       // Handle indexing_error gracefully - return empty array instead of throwing
       if (this.isIndexingError(error)) {
-        console.warn('⚠️ Subgraph indexing error - returning empty array');
+        logger.warn('⚠️ Subgraph indexing error - returning empty array');
         return [];
       }
       throw new Error('Failed to fetch recent burns from subgraph');
@@ -387,7 +388,7 @@ export class MeTokensSubgraphClient {
       const hub = await this.getHub(meToken.hubId);
       // Return null if hub cannot be fetched (subgraph doesn't support hub queries)
       if (!hub) {
-        console.warn(`⚠️ Cannot fetch hub ${meToken.hubId} for MeToken ${id} - subgraph doesn't support hub queries`);
+        logger.warn(`⚠️ Cannot fetch hub ${meToken.hubId} for MeToken ${id} - subgraph doesn't support hub queries`);
         return null;
       }
 
@@ -396,7 +397,7 @@ export class MeTokensSubgraphClient {
         hub,
       };
     } catch (error) {
-      console.error('Failed to fetch MeToken with Hub:', error);
+      logger.error('Failed to fetch MeToken with Hub:', error);
       return null; // Return null instead of throwing to allow fallback to other data sources
     }
   }
@@ -407,26 +408,26 @@ export class MeTokensSubgraphClient {
     }
 
     try {
-      console.log('🔍 Checking if MeToken exists in subgraph:', meTokenAddress);
+      logger.debug('🔍 Checking if MeToken exists in subgraph:', meTokenAddress);
       const data = await request(this.getEndpoint(), CHECK_METOKEN_EXISTS, {
         meToken: meTokenAddress.toLowerCase()
       }) as any;
 
       const subscribes = data.subscribes || [];
-      console.log('📊 Subgraph found', subscribes.length, 'Subscribe events for this address');
+      logger.debug('📊 Subgraph found', subscribes.length, 'Subscribe events for this address');
 
       if (subscribes.length > 0) {
-        console.log('✅ MeToken found in subgraph:', subscribes[0]);
+        logger.debug('✅ MeToken found in subgraph:', subscribes[0]);
         return subscribes[0];
       }
 
-      console.log('⚠️ MeToken not found in subgraph');
+      logger.debug('⚠️ MeToken not found in subgraph');
       return null;
     } catch (error: any) {
-      console.error('Failed to check MeToken existence:', error);
+      logger.error('Failed to check MeToken existence:', error);
       // Handle indexing_error gracefully
       if (this.isIndexingError(error)) {
-        console.warn('⚠️ Subgraph indexing error - cannot check MeToken existence');
+        logger.warn('⚠️ Subgraph indexing error - cannot check MeToken existence');
       }
       return null;
     }

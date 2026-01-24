@@ -24,6 +24,8 @@ import {
 import { useParams } from "next/navigation";
 import { LivestreamThumbnail } from "@/components/Live/LivestreamThumbnail";
 import { getThumbnailUrl } from "@/services/livepeer-thumbnails";
+import { logger } from '@/lib/utils/logger';
+
 
 export default function LivePage() {
   const user = useUser();
@@ -58,7 +60,7 @@ export default function LivePage() {
       if (result.targets) {
         setMultistreamTargets(result.targets);
       } else if (result.error) {
-        console.error("Error fetching multistream targets:", result.error);
+        logger.error("Error fetching multistream targets:", result.error);
       }
     }
     fetchTargets();

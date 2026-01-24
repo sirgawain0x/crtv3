@@ -1,4 +1,6 @@
 import { question as realityQuestion, template as realityTemplate } from "@reality.eth/reality-eth-lib";
+import { serverLogger } from '@/lib/utils/logger';
+
 
 /**
  * Reality.eth Utility Functions
@@ -55,7 +57,7 @@ export function parseQuestionText(templateText: string, questionText: string) {
   try {
     return realityQuestion.populatedJSONForTemplate(templateText, questionText);
   } catch (error) {
-    console.error("Error parsing question text:", error);
+    serverLogger.error("Error parsing question text:", error);
     throw new Error("Failed to parse question text");
   }
 }

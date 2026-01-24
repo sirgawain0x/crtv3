@@ -1,3 +1,5 @@
+
+import { logger } from '@/lib/utils/logger';
 export interface ThumbnailInfo {
   thumbnailUrl: string;
   vttUrl: string;
@@ -18,7 +20,7 @@ export async function getThumbnailInfo(playbackId: string): Promise<ThumbnailInf
     const response = await fetch(`/api/livepeer/playback-info?playbackId=${playbackId}`);
     
     if (!response.ok) {
-      console.warn(`Failed to fetch playback info for ${playbackId}:`, response.status);
+      logger.warn(`Failed to fetch playback info for ${playbackId}:`, response.status);
       return null;
     }
 
@@ -30,14 +32,14 @@ export async function getThumbnailInfo(playbackId: string): Promise<ThumbnailInf
     );
 
     if (!vttSource?.url) {
-      console.warn(`No VTT thumbnail source found for ${playbackId}`);
+      logger.warn(`No VTT thumbnail source found for ${playbackId}`);
       return null;
     }
 
     // Fetch the VTT file content
     const vttResponse = await fetch(vttSource.url);
     if (!vttResponse.ok) {
-      console.warn(`Failed to fetch VTT file for ${playbackId}:`, vttResponse.status);
+      logger.warn(`Failed to fetch VTT file for ${playbackId}:`, vttResponse.status);
       return null;
     }
 
@@ -47,7 +49,7 @@ export async function getThumbnailInfo(playbackId: string): Promise<ThumbnailInf
     const keyframes = parseVTTContent(vttContent);
     
     if (keyframes.length === 0) {
-      console.warn(`No keyframes found in VTT for ${playbackId}`);
+      logger.warn(`No keyframes found in VTT for ${playbackId}`);
       return null;
     }
 
@@ -65,7 +67,7 @@ export async function getThumbnailInfo(playbackId: string): Promise<ThumbnailInf
     };
 
   } catch (error) {
-    console.error(`Error fetching thumbnail info for ${playbackId}:`, error);
+    logger.error(`Error fetching thumbnail info for ${playbackId}:`, error);
     return null;
   }
 }
@@ -123,7 +125,7 @@ export async function getThumbnailUrl(playbackId: string, timeSeconds: number = 
     return `${baseUrl}/${targetKeyframe.filename}`;
 
   } catch (error) {
-    console.error(`Error getting thumbnail URL for ${playbackId}:`, error);
+    logger.error(`Error getting thumbnail URL for ${playbackId}:`, error);
     return null;
   }
 }

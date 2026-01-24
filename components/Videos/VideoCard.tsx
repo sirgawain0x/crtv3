@@ -26,6 +26,8 @@ import VideoThumbnail from './VideoThumbnail';
 import { ShareDialog } from "./ShareDialog";
 import { useCreatorProfile } from "@/lib/hooks/metokens/useCreatorProfile";
 import { VideoBuyButton } from "./VideoBuyButton";
+import { logger } from '@/lib/utils/logger';
+
 
 interface VideoCardProps {
   asset: Asset;
@@ -47,7 +49,7 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources, priority 
     try {
       setCurrentPlayingId(asset?.id || null);
     } catch (error) {
-      console.error("Error setting current playing ID:", error);
+      logger.error("Error setting current playing ID:", error);
     }
   };
 
@@ -99,7 +101,7 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources, priority 
         }
       } catch (e) {
         // Reset state on error to prevent stale data from previous video
-        console.error('Error fetching video asset:', e);
+        logger.error('Error fetching video asset:', e);
         setVideoAssetId(null);
         setHasMeToken(false);
         setVideoTitle(null);
@@ -141,7 +143,7 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources, priority 
           }
         }
       } catch (error) {
-        console.error('Failed to sync view count:', error);
+        logger.error('Failed to sync view count:', error);
       }
     }
 
@@ -153,20 +155,20 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources, priority 
 
   // Early return if asset is not provided or invalid
   if (!asset) {
-    console.warn("VideoCard: No asset provided");
+    logger.warn("VideoCard: No asset provided");
     return null;
   }
 
   // Early return if asset is not ready
   if (asset.status?.phase !== "ready") {
-    console.debug(
+    logger.debug(
       `VideoCard: Asset ${asset.id} not ready, status: ${asset.status?.phase}`
     );
     return null;
   }
 
   if (!address) {
-    console.warn(`VideoCard: No creator address for asset ${asset.id}`, asset);
+    logger.warn(`VideoCard: No creator address for asset ${asset.id}`, asset);
     return null;
   }
 

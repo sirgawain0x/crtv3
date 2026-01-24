@@ -4,6 +4,7 @@ import { generatePrivateKey } from "viem/accounts";
 import { type Chain } from "viem";
 import { modularAccountFactoryAddresses } from "@/lib/utils/modularAccount";
 import { signer } from "./signer";
+import { serverLogger } from "@/lib/utils/logger";
 
 interface CreateModularAccountClientParams {
   chain?: Chain;
@@ -72,7 +73,7 @@ export async function sendUserOperation({
       success: true,
     };
   } catch (error) {
-    console.error("Error sending user operation:", error);
+    serverLogger.error("Error sending user operation:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown error",

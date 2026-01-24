@@ -9,6 +9,8 @@ import { type Hex } from 'viem';
 import { CurrencyConverter } from '@/lib/utils/currency-converter';
 import { priceService, PriceService } from '@/lib/sdk/alchemy/price-service';
 import { AlchemySwapService, type TokenSymbol } from '@/lib/sdk/alchemy/swap-service';
+import { logger } from '@/lib/utils/logger';
+
 
 /**
  * Example component demonstrating hex ↔ USD conversions
@@ -40,7 +42,7 @@ export function ConversionExample() {
           setUsdValue(display.usdValue);
         }
       } catch (error) {
-        console.error('Conversion error:', error);
+        logger.error('Conversion error:', error);
       }
     };
 
@@ -59,7 +61,7 @@ export function ConversionExample() {
         const usd = await priceService.convertToUSD(parseFloat(value), token);
         setUsdValue(usd);
       } catch (error) {
-        console.error('Error converting token to hex:', error);
+        logger.error('Error converting token to hex:', error);
       }
     }
   };
@@ -80,7 +82,7 @@ export function ConversionExample() {
         setTokenAmount(amount.toFixed(6));
         setUsdValue(parseFloat(value));
       } catch (error) {
-        console.error('Error converting USD to hex:', error);
+        logger.error('Error converting USD to hex:', error);
       }
     }
   };

@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { useUser, useSmartAccountClient } from "@account-kit/react";
 import { unlockService } from "@/lib/sdk/unlock/services";
 import type { LockAddress } from "@/lib/sdk/unlock/services";
+import { logger } from '@/lib/utils/logger';
+
 
 export interface MembershipNFT {
   lockName: LockAddress;
@@ -54,7 +56,7 @@ export function useMembershipNFTs() {
         const membershipNFTs = await unlockService.getAllMembershipNFTs(address);
         setNfts(membershipNFTs);
       } catch (err) {
-        console.error("Error fetching membership NFTs:", err);
+        logger.error("Error fetching membership NFTs:", err);
         setError(err instanceof Error ? err : new Error("Failed to fetch membership NFTs"));
         setNfts([]);
       } finally {

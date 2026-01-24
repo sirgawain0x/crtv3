@@ -2,6 +2,8 @@
 
 import { createServiceClient } from '@/lib/sdk/supabase/service';
 import type { Address } from 'viem';
+import { serverLogger } from '@/lib/utils/logger';
+
 
 /**
  * Get a creator's collection address from the database
@@ -45,7 +47,7 @@ export async function saveCreatorCollectionAction(
         );
 
     if (error) {
-        console.error('Failed to save creator collection:', error);
+        serverLogger.error('Failed to save creator collection:', error);
         throw new Error(`Failed to save collection: ${error.message}`);
     }
 }

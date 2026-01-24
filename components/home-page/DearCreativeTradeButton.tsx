@@ -20,6 +20,8 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils/utils";
 import Image from "next/image";
+import { logger } from '@/lib/utils/logger';
+
 
 const DEARCRTV_ADDRESS = "0x81ced3c6e7058c1fe8d9b6c5a2435a65a4593292";
 const UNIVERSAL_ROUTER_ADDRESS = "0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD";
@@ -55,7 +57,7 @@ export function DearCreativeTradeButton() {
                     }
                 }
             } catch (error) {
-                console.error("Failed to fetch token metadata:", error);
+                logger.error("Failed to fetch token metadata:", error);
             }
         };
 
@@ -84,7 +86,7 @@ export function DearCreativeTradeButton() {
                     setQuote(null);
                 }
             } catch (error) {
-                console.error("Failed to get quote:", error);
+                logger.error("Failed to get quote:", error);
                 setQuote(null);
             } finally {
                 setIsQuoting(false);
@@ -150,7 +152,7 @@ export function DearCreativeTradeButton() {
             setIsOpen(false);
 
         } catch (error) {
-            console.error("Trade failed:", error);
+            logger.error("Trade failed:", error);
             toast.error(`Failed to ${mode}: ` + (error as Error).message);
         } finally {
             setIsLoading(false);
@@ -164,9 +166,9 @@ export function DearCreativeTradeButton() {
                     if (!user) {
                         try {
                             if (openAuthModal) openAuthModal();
-                            else console.error("openAuthModal is not defined in useAuthModal()");
+                            else logger.error("openAuthModal is not defined in useAuthModal()");
                         } catch (err) {
-                            console.error("Error opening auth modal:", err);
+                            logger.error("Error opening auth modal:", err);
                         }
                         return;
                     }

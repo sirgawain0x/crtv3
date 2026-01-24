@@ -1,3 +1,5 @@
+import { serverLogger } from '@/lib/utils/logger';
+
 /**
  * Submits a vote to Snapshot using a pre-signed EIP-712 signature.
  * @param address - Wallet address (Smart account address for voting power, signature may be from EOA)
@@ -54,8 +56,8 @@ export async function submitSnapshotVote({
     };
   }
 
-  console.log(`Signature length: ${signature.length} chars (standard is 132)`);
-  console.log(`Signature: ${signature.substring(0, 30)}...${signature.substring(signature.length - 10)}`);
+  serverLogger.debug(`Signature length: ${signature.length} chars (standard is 132)`);
+  serverLogger.debug(`Signature: ${signature.substring(0, 30)}...${signature.substring(signature.length - 10)}`);
 
   // Snapshot expects: { address, sig, data }
   // where 'data' is the EIP-712 envelope { domain, types, message }
@@ -69,7 +71,7 @@ export async function submitSnapshotVote({
   };
 
   // Extract message fields for logging
-  console.log("Submitting vote to Snapshot:", {
+  serverLogger.debug("Submitting vote to Snapshot:", {
     url: `${hubUrl}/api/msg`,
     address: address,
     signatureLength: signature.length,
@@ -91,7 +93,7 @@ export async function submitSnapshotVote({
   });
 
   const responseText = await res.text();
-  console.log("Snapshot vote response:", {
+  serverLogger.debug("Snapshot vote response:", {
     status: res.status,
     statusText: res.statusText,
     body: responseText,
@@ -103,7 +105,7 @@ export async function submitSnapshotVote({
 
     try {
       const errorJson = JSON.parse(responseText);
-      console.error("Full Snapshot error response:", JSON.stringify(errorJson, null, 2));
+      serverLogger.error("Full Snapshot error response:", JSON.stringify(errorJson, null, 2));
 
       if (errorJson.error_description) {
         errorMessage = errorJson.error_description;
@@ -142,7 +144,7 @@ export async function submitSnapshotVote({
       errorMessage = `Snapshot vote failed: ${res.statusText} - ${responseText.substring(0, 200)}`;
     }
 
-    console.error("Snapshot vote error details:", errorDetails || responseText);
+    serverLogger.error("Snapshot vote error details:", errorDetails || responseText);
     return { error: errorMessage };
   }
 
@@ -150,7 +152,7 @@ export async function submitSnapshotVote({
   try {
     json = JSON.parse(responseText);
   } catch (parseError) {
-    console.error("Failed to parse Snapshot response as JSON:", {
+    serverLogger.error("Failed to parse Snapshot response as JSON:", {
       responseText: responseText.substring(0, 500),
       parseError,
     });
@@ -158,14 +160,14 @@ export async function submitSnapshotVote({
   }
 
   if (json.id) {
-    console.log("Vote submitted successfully:", json.id);
+    serverLogger.debug("Vote submitted successfully:", json.id);
     return { id: json.id };
   }
 
   // Response was OK but doesn't contain an ID - check for error fields
   const errorMessage = json.error || json.message || json.reason || "Unknown error from Snapshot API";
 
-  console.error("Snapshot returned error in successful response:", {
+  serverLogger.error("Snapshot returned error in successful response:", {
     status: res.status,
     response: json,
     errorMessage,

@@ -39,6 +39,8 @@ import { toast } from "sonner";
 import { type Address, type Hex, encodeFunctionData, parseAbi, parseUnits, formatUnits, erc20Abi } from "viem";
 import { USDC_TOKEN_ADDRESSES, USDC_TOKEN_DECIMALS } from "@/lib/contracts/USDCToken";
 import { DAI_TOKEN_ADDRESSES, DAI_TOKEN_DECIMALS } from "@/lib/contracts/DAIToken";
+import { logger } from '@/lib/utils/logger';
+
 
 // Token configuration
 type TokenSymbol = 'ETH' | 'USDC' | 'DAI';
@@ -85,7 +87,7 @@ export default function SendTransaction() {
     if (!address || !client) return;
 
     try {
-      console.log('Fetching balances for address:', address);
+      logger.debug('Fetching balances for address:', address);
       
       // Get ETH balance
       const ethBalance = await client.getBalance({
@@ -114,11 +116,11 @@ export default function SendTransaction() {
         DAI: formatUnits(daiBalance, DAI_TOKEN_DECIMALS),
       };
 
-      console.log('Fetched balances:', newBalances);
+      logger.debug('Fetched balances:', newBalances);
       setBalances(newBalances);
       
     } catch (error) {
-      console.error('Error fetching balances:', error);
+      logger.error('Error fetching balances:', error);
     }
   }, [address, client]);
 
@@ -185,7 +187,7 @@ export default function SendTransaction() {
           args: [recipient as Address, tokenAmount],
         });
 
-        console.log('Sending ERC-20 transfer:', {
+        logger.debug('Sending ERC-20 transfer:', {
           token: selectedToken,
           tokenAddress: tokenInfo.address,
           recipient,
@@ -208,14 +210,14 @@ export default function SendTransaction() {
 
       // Success handling
       toast.success("Transaction sent successfully!");
-      console.log("Transaction hash:", txHash);
+      logger.debug("Transaction hash:", txHash);
       setTransactionHash(txHash);
       setRecipient("");
       setAmount("");
       // Refresh balances
       fetchBalances();
     } catch (error) {
-      console.error("Error preparing transaction:", error);
+      logger.error("Error preparing transaction:", error);
       const errorMsg = `Error preparing transaction: ${error instanceof Error ? error.message : 'Unknown error'}`;
       toast.error(errorMsg);
       setError(errorMsg);

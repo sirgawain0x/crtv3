@@ -2,6 +2,8 @@ import { Button } from "@/components/ui/button";
 import { getOnrampBuyUrl } from "@coinbase/onchainkit/fund";
 import { useSmartAccountClient } from "@account-kit/react";
 import { useState } from "react";
+import { logger } from '@/lib/utils/logger';
+
 
 function CdpFundButton() {
   const { address } = useSmartAccountClient({});
@@ -42,7 +44,7 @@ function CdpFundButton() {
 
       window.open(onrampBuyUrl, "_blank");
     } catch (error) {
-      console.error("Failed to fund:", error);
+      logger.error("Failed to fund:", error);
       alert(error instanceof Error ? error.message : "Failed to get session token");
     } finally {
       setIsLoading(false);

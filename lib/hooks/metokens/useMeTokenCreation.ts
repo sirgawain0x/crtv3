@@ -17,6 +17,8 @@ import { useGasSponsorship } from '@/lib/hooks/wallet/useGasSponsorship';
 import { parseEther, formatEther, encodeFunctionData, decodeEventLog } from 'viem';
 import { parseBundlerError, shouldRetryError } from '@/lib/utils/bundlerErrorParser';
 import { getDaiTokenContract, DAI_TOKEN_ADDRESSES } from '@/lib/contracts/DAIToken';
+import { logger } from '@/lib/utils/logger';
+
 
 // MeTokens contract addresses on Base
 const DIAMOND = '0xba5502db2aC2cBff189965e991C07109B14eB3f5' as const;
@@ -155,7 +157,7 @@ function savePendingTransaction(tx: PendingMeTokenTransaction): void {
     updated.push(tx);
     localStorage.setItem(PENDING_TX_KEY, JSON.stringify(updated));
   } catch (e) {
-    console.error('Failed to save pending transaction:', e);
+    logger.error('Failed to save pending transaction:', e);
   }
 }
 
@@ -167,7 +169,7 @@ function getPendingTransactions(): PendingMeTokenTransaction[] {
     const stored = localStorage.getItem(PENDING_TX_KEY);
     return stored ? JSON.parse(stored) : [];
   } catch (e) {
-    console.error('Failed to get pending transactions:', e);
+    logger.error('Failed to get pending transactions:', e);
     return [];
   }
 }
@@ -181,7 +183,7 @@ function removePendingTransaction(userOpHash: string): void {
     const updated = existing.filter(t => t.userOpHash !== userOpHash);
     localStorage.setItem(PENDING_TX_KEY, JSON.stringify(updated));
   } catch (e) {
-    console.error('Failed to remove pending transaction:', e);
+    logger.error('Failed to remove pending transaction:', e);
   }
 }
 
@@ -237,7 +239,7 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
     return new Promise((resolve) => {
       const poll = async () => {
         attempts++;
-        console.log(`🔄 Polling for MeToken (attempt ${attempts}/${maxAttempts})...`);
+        logger.debug(`🔄 Polling for MeToken (attempt ${attempts}/${maxAttempts})...`);
         
         try {
           // Query subgraph for MeTokens owned by this address
@@ -277,7 +279,7 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
                 }) as { owner: string };
                 
                 if (info.owner.toLowerCase() === tx.creatorAddress.toLowerCase()) {
-                  console.log('✅ Found MeToken via polling:', meToken.id);
+                  logger.debug('✅ Found MeToken via polling:', meToken.id);
                   if (pollingRef.current) {
                     clearInterval(pollingRef.current);
                     pollingRef.current = null;
@@ -292,7 +294,7 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
           }
           
           if (attempts >= maxAttempts) {
-            console.log('⏰ Polling timed out after max attempts');
+            logger.debug('⏰ Polling timed out after max attempts');
             if (pollingRef.current) {
               clearInterval(pollingRef.current);
               pollingRef.current = null;
@@ -300,7 +302,7 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
             resolve(null);
           }
         } catch (err) {
-          console.error('❌ Polling error:', err);
+          logger.error('❌ Polling error:', err);
           if (attempts >= maxAttempts) {
             if (pollingRef.current) {
               clearInterval(pollingRef.current);
@@ -334,7 +336,7 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
       
       return hubInfo.vault;
     } catch (err) {
-      console.error('Failed to get vault address:', err);
+      logger.error('Failed to get vault address:', err);
       return null;
     }
   }, [client]);
@@ -359,11 +361,11 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
     }) as bigint;
     
     if (currentAllowance >= amount) {
-      console.log('✅ Sufficient DAI allowance already exists');
+      logger.debug('✅ Sufficient DAI allowance already exists');
       return 'skipped';
     }
     
-    console.log('🔓 Approving DAI for vault...');
+    logger.debug('🔓 Approving DAI for vault...');
     
     const approveData = encodeFunctionData({
       abi: DAI_APPROVE_ABI,
@@ -389,7 +391,7 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
     
     const approveOp = await Promise.race([approvePromise, timeoutPromise]);
     
-    console.log('⏳ Waiting for approval confirmation...');
+    logger.debug('⏳ Waiting for approval confirmation...');
     
     // Wait with timeout
     const waitPromise = client.waitForUserOperationTransaction({
@@ -402,7 +404,7 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
     
     const txHash = await Promise.race([waitPromise, waitTimeoutPromise]);
     
-    console.log('✅ DAI approval confirmed:', txHash);
+    logger.debug('✅ DAI approval confirmed:', txHash);
     
     // Verify the approval with retries
     let verified = false;
@@ -517,8 +519,8 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
 
       const gasContext = getGasContext('usdc');
 
-      console.log('📤 Sending subscribe user operation...');
-      console.log('🔍 Gas sponsorship context:', {
+      logger.debug('📤 Sending subscribe user operation...');
+      logger.debug('🔍 Gas sponsorship context:', {
         isMember,
         isSponsored: gasContext.isSponsored,
         hasContext: !!gasContext.context,
@@ -553,7 +555,7 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
         
         // Handle account deployment - paymasters can't sponsor deployment transactions
         if (isDeploymentError && gasContext.context) {
-          console.log('⚠️ Account deployment detected. Paymasters cannot sponsor deployment transactions. Retrying without paymaster...');
+          logger.debug('⚠️ Account deployment detected. Paymasters cannot sponsor deployment transactions. Retrying without paymaster...');
           
           // Check ETH balance before deploying without paymaster
           const ethBalance = await client.getBalance({ address });
@@ -575,7 +577,7 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
           }
           
           // Try deployment without paymaster
-          console.log('🔄 Retrying account deployment without paymaster...');
+          logger.debug('🔄 Retrying account deployment without paymaster...');
           try {
             const deployPromise = client.sendUserOperation({
               uo: {
@@ -590,7 +592,7 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
             });
 
             operation = await Promise.race([deployPromise, deployTimeoutPromise]);
-            console.log('✅ Account deployment succeeded!');
+            logger.debug('✅ Account deployment succeeded!');
           } catch (deployError) {
             // Deployment failed even without paymaster
             const deployFailMessage = `Account deployment failed. This may require manual funding. ` +
@@ -646,7 +648,7 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
           }
           
           // USDC paymaster failed but user has ETH - retry with ETH
-          console.log('🔄 USDC paymaster failed, retrying with ETH...');
+          logger.debug('🔄 USDC paymaster failed, retrying with ETH...');
           const fallbackPromise = client.sendUserOperation({
             uo: {
               target: DIAMOND,
@@ -666,7 +668,7 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
         }
       }
 
-      console.log('🎉 UserOperation sent! Hash:', operation.hash);
+      logger.debug('🎉 UserOperation sent! Hash:', operation.hash);
 
       // Save pending transaction for recovery
       const pendingTx: PendingMeTokenTransaction = {
@@ -703,14 +705,14 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
         });
 
         txHash = await Promise.race([waitPromise, waitTimeoutPromise]);
-        console.log('✅ Transaction confirmed:', txHash);
+        logger.debug('✅ Transaction confirmed:', txHash);
         
         pendingTx.txHash = txHash;
         pendingTx.status = 'confirmed';
         savePendingTransaction(pendingTx);
 
       } catch (waitError) {
-        console.log('⏰ Confirmation wait timed out, switching to polling...');
+        logger.debug('⏰ Confirmation wait timed out, switching to polling...');
         
         updateState({
           status: 'polling_status',
@@ -751,10 +753,10 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
           });
 
           if (syncResponse.ok) {
-            console.log('✅ MeToken synced to database');
+            logger.debug('✅ MeToken synced to database');
           }
         } catch (syncErr) {
-          console.error('Failed to sync MeToken to database:', syncErr);
+          logger.error('Failed to sync MeToken to database:', syncErr);
         }
 
         // Update pending transaction
@@ -799,7 +801,7 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
       }
 
     } catch (err) {
-      console.error('❌ MeToken creation failed:', err);
+      logger.error('❌ MeToken creation failed:', err);
       
       const parsed = parseBundlerError(err as Error);
       
@@ -822,7 +824,7 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
     
     if (pending.length === 0) return;
     
-    console.log(`🔍 Checking ${pending.length} pending transactions...`);
+    logger.debug(`🔍 Checking ${pending.length} pending transactions...`);
     
     for (const tx of pending) {
       // Skip old transactions (older than 24 hours)
@@ -846,7 +848,7 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
         setPendingTransactions(prev => 
           prev.map(t => t.userOpHash === tx.userOpHash ? tx : t)
         );
-        console.log(`✅ Found MeToken for pending tx: ${meTokenAddress}`);
+        logger.debug(`✅ Found MeToken for pending tx: ${meTokenAddress}`);
       }
     }
     

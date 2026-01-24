@@ -5,6 +5,8 @@
  * to standard 65-byte ECDSA signatures that can be verified by services like Snapshot.
  */
 
+import { serverLogger } from "@/lib/utils/logger";
+
 const ALCHEMY_API_KEY = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY;
 
 interface FormatSignatureParams {
@@ -25,7 +27,7 @@ interface FormatSignatureResult {
  */
 export async function formatSignature(params: FormatSignatureParams): Promise<string> {
   if (!ALCHEMY_API_KEY) {
-    console.warn("No Alchemy API key found, returning original signature");
+    serverLogger.warn("No Alchemy API key found, returning original signature");
     return params.signature;
   }
 
@@ -50,7 +52,7 @@ export async function formatSignature(params: FormatSignatureParams): Promise<st
     ],
   };
 
-  console.log("Calling wallet_formatSign API...", {
+  serverLogger.debug("Calling wallet_formatSign API...", {
     from: params.from,
     chainId: chainIdHex,
     signatureLength: params.signature.length,
@@ -68,25 +70,25 @@ export async function formatSignature(params: FormatSignatureParams): Promise<st
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("wallet_formatSign API error:", response.status, errorText);
+      serverLogger.error("wallet_formatSign API error:", response.status, errorText);
       throw new Error(`wallet_formatSign failed: ${response.status} ${errorText}`);
     }
 
     const result = await response.json();
     
     if (result.error) {
-      console.error("wallet_formatSign RPC error:", result.error);
+      serverLogger.error("wallet_formatSign RPC error:", result.error);
       throw new Error(`wallet_formatSign RPC error: ${JSON.stringify(result.error)}`);
     }
 
     const formattedSignature = result.result?.signature;
     
     if (!formattedSignature) {
-      console.error("No signature in wallet_formatSign response:", result);
+      serverLogger.error("No signature in wallet_formatSign response:", result);
       throw new Error("No signature returned from wallet_formatSign");
     }
 
-    console.log("✅ wallet_formatSign success!", {
+    serverLogger.debug("✅ wallet_formatSign success!", {
       originalLength: params.signature.length,
       formattedLength: formattedSignature.length,
       formattedPrefix: formattedSignature.substring(0, 20) + "...",
@@ -94,9 +96,9 @@ export async function formatSignature(params: FormatSignatureParams): Promise<st
 
     return formattedSignature;
   } catch (error) {
-    console.error("Failed to format signature:", error);
+    serverLogger.error("Failed to format signature:", error);
     // Return original signature as fallback
-    console.warn("Returning original signature as fallback");
+    serverLogger.warn("Returning original signature as fallback");
     return params.signature;
   }
 }

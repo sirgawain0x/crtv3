@@ -1,4 +1,6 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { serverLogger } from '@/lib/utils/logger';
+
 
 /**
  * Creates a Supabase client with service role privileges
@@ -52,7 +54,7 @@ function initializeServiceClient(): SupabaseClient | null {
       },
     });
   } catch (error) {
-    console.error('Failed to create supabase service client:', error);
+    serverLogger.error('Failed to create supabase service client:', error);
     return null;
   }
 }

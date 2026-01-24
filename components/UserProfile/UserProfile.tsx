@@ -25,6 +25,8 @@ import type { MembershipDetails } from "@/lib/hooks/unlock/useMembershipVerifica
 import { MeTokensSection } from "./MeTokensSection";
 import { UserDisplay } from "@/components/User/UserDisplay";
 import { CreativeBankTab } from "./CreativeBankTab";
+import { logger } from '@/lib/utils/logger';
+
 
 function useServerMembership(address?: string) {
   const [data, setData] = useState<any>(null);
@@ -75,7 +77,7 @@ function useServerMembership(address?: string) {
         
         if (isConnectionError) {
           // Log but don't set error state - server may be restarting
-          console.debug("Membership API not available:", e.message);
+          logger.debug("Membership API not available:", e.message);
           return;
         }
         setError(e.message);

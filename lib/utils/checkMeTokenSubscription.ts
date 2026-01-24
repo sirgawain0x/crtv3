@@ -1,4 +1,5 @@
 import { checkMeTokenSubscriptionFromBlockchain, getMeTokenSubscriptionInfo } from './metokenSubscriptionUtils';
+import { logger } from '@/lib/utils/logger';
 
 /**
  * Simple utility to check if a MeToken is subscribed
@@ -10,7 +11,7 @@ export async function isMeTokenSubscribed(meTokenAddress: string): Promise<boole
     const result = await checkMeTokenSubscriptionFromBlockchain(meTokenAddress);
     return result.isSubscribed;
   } catch (error) {
-    console.error('Error checking MeToken subscription:', error);
+    logger.error('Error checking MeToken subscription:', error);
     return false;
   }
 }

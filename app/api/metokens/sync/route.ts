@@ -8,9 +8,13 @@ import {
   getMeTokenProtocolInfo 
 } from '@/lib/utils/metokenUtils';
 import { serverLogger } from '@/lib/utils/logger';
+import { rateLimiters } from '@/lib/middleware/rateLimit';
 
 // POST /api/metokens/sync - Sync a MeToken from blockchain to database
 export async function POST(request: NextRequest) {
+  const rl = await rateLimiters.standard(request);
+  if (rl) return rl;
+
   try {
     const body = await request.json();
     const { transactionHash, meTokenAddress } = body;

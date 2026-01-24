@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI, PersonGeneration, SafetyFilterLevel } from '@google/genai';
 import { serverLogger } from '@/lib/utils/logger';
+import { rateLimiters } from '@/lib/middleware/rateLimit';
 
 export async function POST(request: NextRequest) {
+  const rl = await rateLimiters.standard(request);
+  if (rl) return rl;
+
   try {
     const { prompt, model } = await request.json();
 

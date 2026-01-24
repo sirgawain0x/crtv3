@@ -1,5 +1,7 @@
 import type { Signer, Identifier } from "@xmtp/browser-sdk";
 import { hexToBytes } from "viem";
+import { logger } from '@/lib/utils/logger';
+
 
 /**
  * Creates an XMTP Signer implementation for Account Kit wallets
@@ -34,7 +36,7 @@ export function createXmtpSigner(
         
         return bytes;
       } catch (error) {
-        console.error("Error signing message for XMTP:", error);
+        logger.error("Error signing message for XMTP:", error);
         throw error;
       }
     },

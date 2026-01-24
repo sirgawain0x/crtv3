@@ -36,6 +36,8 @@ import { privateKeyToAccount } from "viem/accounts";
 import { getStoryRpcUrl } from "./client";
 import type { Address } from "viem";
 import { createServiceClient } from "@/lib/sdk/supabase/service";
+import { serverLogger } from '@/lib/utils/logger';
+
 
 /**
  * Get or create a collection for a creator
@@ -78,7 +80,7 @@ export async function getOrCreateCreatorCollection(
         return existingCollection.collection_address as Address;
       }
     } catch (error) {
-      console.warn("Failed to verify collection on-chain, will create new one:", error);
+      serverLogger.warn("Failed to verify collection on-chain, will create new one:", error);
     }
   }
 
@@ -88,7 +90,7 @@ export async function getOrCreateCreatorCollection(
 
   if (factoryAddress) {
     // Use factory contract directly (server-side deployment)
-    console.log(`🏭 Creating new collection via factory for creator ${creatorAddress}...`, {
+    serverLogger.debug(`🏭 Creating new collection via factory for creator ${creatorAddress}...`, {
       factory: factoryAddress,
       owner: creatorAddress, // Creator owns from day one
     });
@@ -146,7 +148,7 @@ export async function getOrCreateCreatorCollection(
         collectionAddress = result.collectionAddress;
       }
     } catch (factoryError) {
-      console.warn("Factory deployment failed, falling back to SPG:", factoryError);
+      serverLogger.warn("Factory deployment failed, falling back to SPG:", factoryError);
       // Fallback to SPG if factory deployment fails
       const result = await createCollection(client, {
         name: collectionName,
@@ -158,7 +160,7 @@ export async function getOrCreateCreatorCollection(
     }
   } else {
     // Factory not configured, use SPG
-    console.log(`Creating new collection via SPG for creator ${creatorAddress}...`, {
+    serverLogger.debug(`Creating new collection via SPG for creator ${creatorAddress}...`, {
       owner: creatorAddress, // Creator owns from day one
       signer: (client as any).config?.account, // Platform signs (pays gas)
     });
@@ -198,7 +200,7 @@ export async function getOrCreateCreatorCollection(
 
   // If upsert failed due to unique constraint (race condition), retrieve existing collection
   if (upsertError) {
-    console.warn("Collection upsert failed (likely race condition), retrieving existing collection:", upsertError);
+    serverLogger.warn("Collection upsert failed (likely race condition), retrieving existing collection:", upsertError);
 
     const { data: existing } = await supabase
       .from("creator_collections")

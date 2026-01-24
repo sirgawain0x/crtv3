@@ -5,6 +5,8 @@
 
 import { StoryClient } from "@story-protocol/core-sdk";
 import type { Address } from "viem";
+import { serverLogger } from '@/lib/utils/logger';
+
 import type {
   StoryIPRegistrationResult,
   StoryLicenseTerms,
@@ -46,7 +48,7 @@ export async function registerIPAsset(
       txHash: result.txHash!,
     };
   } catch (error) {
-    console.error("Failed to register IP Asset:", error);
+    serverLogger.error("Failed to register IP Asset:", error);
     throw new Error(
       `IP Asset registration failed: ${error instanceof Error ? error.message : "Unknown error"}`
     );
@@ -122,7 +124,7 @@ export async function attachLicenseTerms(
       txHash: result.txHash!,
     };
   } catch (error) {
-    console.error("Failed to attach license terms:", error);
+    serverLogger.error("Failed to attach license terms:", error);
     throw new Error(
       `License terms attachment failed: ${error instanceof Error ? error.message : "Unknown error"}`
     );
@@ -163,7 +165,7 @@ export async function verifyIPAssetRegistration(
       isRegistered: isRegistered,
     };
   } catch (error) {
-    console.error("Failed to verify IP Asset registration:", error);
+    serverLogger.error("Failed to verify IP Asset registration:", error);
     return null;
   }
 }

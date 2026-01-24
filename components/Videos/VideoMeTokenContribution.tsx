@@ -2,6 +2,8 @@
 import { useState, useEffect } from 'react';
 import { TrendingUp, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { logger } from '@/lib/utils/logger';
+
 
 interface VideoMeTokenContributionProps {
   videoId?: number;
@@ -53,7 +55,7 @@ export function VideoMeTokenContribution({
         const result = await response.json();
         setContribution(result.data);
       } catch (err) {
-        console.error('Error fetching video contribution:', err);
+        logger.error('Error fetching video contribution:', err);
         setError(err instanceof Error ? err.message : 'Failed to load contribution');
       } finally {
         setIsLoading(false);

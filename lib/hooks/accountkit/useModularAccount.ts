@@ -2,6 +2,8 @@ import { useSmartAccountClient, useUser, useChain } from "@account-kit/react";
 import { base } from "@account-kit/infra";
 import { modularAccountFactoryAddresses } from "@/lib/utils/modularAccount";
 import { Chain } from "viem";
+import { logger } from '@/lib/utils/logger';
+
 
 interface UseModularAccountProps {
   chain?: Chain;
@@ -48,7 +50,7 @@ export default function useModularAccount(props?: UseModularAccountProps) {
     try {
       return address as string;
     } catch (err) {
-      console.error("Error getting account address:", err);
+      logger.error("Error getting account address:", err);
       return null;
     }
   };

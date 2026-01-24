@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { serverLogger } from '@/lib/utils/logger';
+import { rateLimiters } from '@/lib/middleware/rateLimit';
 
 // Reality.eth subgraph endpoint - using Goldsky
 // Public URL: https://api.goldsky.com/api/public/project_cmh0iv6s500dbw2p22vsxcfo6/subgraphs/reality-eth/1.0.0/gn
@@ -17,6 +18,9 @@ const getSubgraphUrl = (subgraphName: string, version: string, specificAccessTyp
 const REALITY_ETH_SUBGRAPH_URL = getSubgraphUrl('reality-eth', '1.0.0');
 
 export async function POST(request: NextRequest) {
+  const rl = await rateLimiters.generous(request);
+  if (rl) return rl;
+
   try {
     const body = await request.json();
     serverLogger.debug('Reality.eth subgraph proxy received request:', {

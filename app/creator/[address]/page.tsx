@@ -18,6 +18,8 @@ import { AddressWithCopy } from "@/components/Creator/AddressWithCopy";
 import { convertFailingGateway } from "@/lib/utils/image-gateway";
 import { meTokenSupabaseService } from "@/lib/sdk/supabase/metokens";
 import { CreatorProfileHeader } from "@/components/Creator/CreatorProfileHeader";
+import { logger } from '@/lib/utils/logger';
+
 
 
 type CreatorPageProps = {
@@ -40,13 +42,13 @@ async function fetchCreatorProfile(address: string) {
         // Profile doesn't exist, that's okay
         return null;
       }
-      console.error("Error fetching creator profile:", error);
+      logger.error("Error fetching creator profile:", error);
       return null;
     }
 
     return data;
   } catch (error) {
-    console.error("Unexpected error fetching creator profile:", error);
+    logger.error("Unexpected error fetching creator profile:", error);
     return null;
   }
 }
@@ -59,7 +61,7 @@ async function fetchVideoCount(creatorAddress: string) {
     });
     return result.total || 0;
   } catch (error) {
-    console.error("Error fetching video count:", error);
+    logger.error("Error fetching video count:", error);
     return 0;
   }
 }

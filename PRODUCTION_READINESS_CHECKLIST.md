@@ -79,6 +79,13 @@ NEXT_PUBLIC_IPFS_GATEWAY=https://gateway.lighthouse.storage/ipfs
 
 ## 🚀 Production Readiness
 
+### ✅ Production Hardening (January 2025)
+
+- **Rate limiting**: Applied to swap, story, metokens, AI, IPFS, creator-profiles, POAP, membership, unlock, video-assets, livepeer, subgraph proxies. See `PRODUCTION_READINESS_ASSESSMENT.md`.
+- **Console → logger**: Migration complete for lib, components, app, context. Excluded: scripts, examples, services, supabase/functions, logger.ts, webpack, *.md.
+- **NFT minting**: `GET /api/story/mint-configured`; upload flow hides NFT step or shows "NFT minting unavailable" when `STORY_PROTOCOL_PRIVATE_KEY` is not set.
+- **MeToken holdings**: Client-side cache (45s TTL). Smart-wallet mapping limitation documented.
+
 ### ✅ Ready for Production IF:
 
 1. **Environment Variables Set**:

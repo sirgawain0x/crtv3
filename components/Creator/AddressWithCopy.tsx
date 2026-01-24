@@ -5,6 +5,8 @@ import { useState } from "react";
 import { shortenAddress } from "@/lib/utils/utils";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import { logger } from '@/lib/utils/logger';
+
 
 interface AddressWithCopyProps {
   address: string;
@@ -21,7 +23,7 @@ export function AddressWithCopy({ address, className }: AddressWithCopyProps) {
       toast.success("Address copied to clipboard!");
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
-      console.error("Failed to copy:", err);
+      logger.error("Failed to copy:", err);
       toast.error("Failed to copy address");
     }
   };

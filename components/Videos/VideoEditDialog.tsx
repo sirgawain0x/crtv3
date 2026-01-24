@@ -30,6 +30,8 @@ import { uploadThumbnailToIPFS } from "@/lib/services/thumbnail-upload";
 import { convertFailingGateway, parseIpfsUriWithFallback } from "@/lib/utils/image-gateway";
 import { GatewayImage } from "@/components/ui/gateway-image";
 import { Progress } from "@/components/ui/progress";
+import { logger } from '@/lib/utils/logger';
+
 
 interface VideoEditDialogProps {
   open: boolean;
@@ -214,7 +216,7 @@ export function VideoEditDialog({
         }
       }
     } catch (error) {
-      console.error("Error processing thumbnail:", error);
+      logger.error("Error processing thumbnail:", error);
       toast({
         variant: "destructive",
         title: "Error",
@@ -278,7 +280,7 @@ export function VideoEditDialog({
       onOpenChange(false);
       onSuccess?.();
     } catch (error) {
-      console.error("Error updating video:", error);
+      logger.error("Error updating video:", error);
       toast({
         variant: "destructive",
         title: "Error",

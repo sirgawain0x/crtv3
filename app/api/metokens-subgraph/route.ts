@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { serverLogger } from '@/lib/utils/logger';
+import { rateLimiters } from '@/lib/middleware/rateLimit';
 
 // MeTokens subgraph endpoint - now using Goldsky
 // Deployment ID: QmVaWYhk4HKhk9rNQi11RKujTVS4KHF1uHGNVUF4f7xJ53
@@ -21,6 +22,9 @@ const METOKENS_SUBGRAPH_URL = getSubgraphUrl('metokens', '1.0.2');
 const CREATIVE_TV_SUBGRAPH_URL = getSubgraphUrl('creative_tv', '0.1');
 
 export async function POST(request: NextRequest) {
+  const rl = await rateLimiters.generous(request);
+  if (rl) return rl;
+
   // Read body once at the start so we can reuse it in error handlers
   let body: any;
   try {

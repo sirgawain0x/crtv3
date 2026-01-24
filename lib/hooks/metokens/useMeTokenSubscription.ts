@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { MeTokenData } from './useMeTokensSupabase';
+import { logger } from '@/lib/utils/logger';
+
 import { 
   isMeTokenSubscribed, 
   isMeTokenNotSubscribed, 
@@ -34,13 +36,13 @@ export function useMeTokenSubscription(meToken: MeTokenData | null) {
 
     setIsLoading(true);
     try {
-      console.log('🔍 useMeTokenSubscription: Checking real blockchain status for:', meToken.address);
+      logger.debug('🔍 useMeTokenSubscription: Checking real blockchain status for:', meToken.address);
       
       // Use the blockchain utility function to get real subscription status
       const { checkMeTokenSubscriptionFromBlockchain } = await import('@/lib/utils/metokenSubscriptionUtils');
       const blockchainStatus = await checkMeTokenSubscriptionFromBlockchain(meToken.address);
       
-      console.log('✅ useMeTokenSubscription: Real blockchain status:', blockchainStatus);
+      logger.debug('✅ useMeTokenSubscription: Real blockchain status:', blockchainStatus);
       
       const state: MeTokenSubscriptionState = {
         isSubscribed: blockchainStatus.isSubscribed,
@@ -59,7 +61,7 @@ export function useMeTokenSubscription(meToken: MeTokenData | null) {
 
       setSubscriptionState(state);
     } catch (error) {
-      console.error('❌ useMeTokenSubscription: Failed to check real subscription status:', error);
+      logger.error('❌ useMeTokenSubscription: Failed to check real subscription status:', error);
       
       // Fallback to local data if blockchain check fails
       try {
@@ -80,7 +82,7 @@ export function useMeTokenSubscription(meToken: MeTokenData | null) {
 
         setSubscriptionState(state);
       } catch (fallbackError) {
-        console.error('❌ useMeTokenSubscription: Fallback also failed:', fallbackError);
+        logger.error('❌ useMeTokenSubscription: Fallback also failed:', fallbackError);
         setSubscriptionState(null);
       }
     } finally {

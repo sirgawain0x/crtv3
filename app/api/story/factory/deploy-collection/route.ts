@@ -16,6 +16,7 @@ import { getStoryRpcUrl } from "@/lib/sdk/story/client";
 import { deployCreatorCollection, getCollectionBytecode, getFactoryContractAddress } from "@/lib/sdk/story/factory-contract-service";
 import type { Address } from "viem";
 import { serverLogger } from "@/lib/utils/logger";
+import { rateLimiters } from "@/lib/middleware/rateLimit";
 
 /**
  * Story Protocol chain configuration
@@ -26,6 +27,9 @@ const STORY_MAINNET_CHAIN_ID = 1514; // Story mainnet
 const CHAIN_ID = STORY_NETWORK === "mainnet" ? STORY_MAINNET_CHAIN_ID : STORY_TESTNET_CHAIN_ID;
 
 export async function POST(request: NextRequest) {
+  const rl = await rateLimiters.strict(request);
+  if (rl) return rl;
+
   try {
     const body = await request.json();
     const {

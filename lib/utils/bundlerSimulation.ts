@@ -1,3 +1,5 @@
+
+import { logger } from '@/lib/utils/logger';
 /**
  * Bundler Simulation Utilities
  * Use Alchemy's simulation APIs to validate UserOperations before sending
@@ -54,7 +56,7 @@ export async function simulateUserOperationAssetChanges(
     
     return data.result;
   } catch (error) {
-    console.error('Failed to simulate UserOperation:', error);
+    logger.error('Failed to simulate UserOperation:', error);
     throw error;
   }
 }
@@ -83,13 +85,13 @@ export async function getOptimalPriorityFee(
     const data = await response.json();
     
     if (data.error) {
-      console.warn('Failed to get optimal priority fee, using default');
+      logger.warn('Failed to get optimal priority fee, using default');
       return BigInt(0); // Fallback to 0
     }
     
     return BigInt(data.result);
   } catch (error) {
-    console.warn('Failed to get optimal priority fee:', error);
+    logger.warn('Failed to get optimal priority fee:', error);
     return BigInt(0); // Fallback to 0
   }
 }
@@ -119,7 +121,7 @@ export async function getEntryPointNonce(
     
     return nonce as bigint;
   } catch (error) {
-    console.error('Failed to get EntryPoint nonce:', error);
+    logger.error('Failed to get EntryPoint nonce:', error);
     throw error;
   }
 }

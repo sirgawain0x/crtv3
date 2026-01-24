@@ -4,6 +4,8 @@ import { useMemo } from "react";
 import { useWalletStatus } from "./accountkit/useWalletStatus";
 import { getLinkedIdentity, isPermittedSigner, type LinkedIdentity } from "@/lib/utils/linked-identity";
 import { useState, useEffect } from "react";
+import { logger } from '@/lib/utils/logger';
+
 
 /**
  * Hook to get linked identity information
@@ -51,7 +53,7 @@ export function useLinkedIdentity() {
         const permitted = await isPermittedSigner(walletAddress, smartAccountAddress);
         setIsPermitted(permitted);
       } catch (error) {
-        console.error("Error verifying permitted signer:", error);
+        logger.error("Error verifying permitted signer:", error);
         setIsPermitted(false);
       } finally {
         setIsVerifying(false);

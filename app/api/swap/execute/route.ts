@@ -2,8 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { executeSwap } from '@/lib/sdk/alchemy/swap-client';
 import { BASE_TOKENS, type TokenSymbol } from '@/lib/sdk/alchemy/swap-service';
 import { serverLogger } from '@/lib/utils/logger';
+import { rateLimiters } from '@/lib/middleware/rateLimit';
 
 export async function POST(request: NextRequest) {
+  const rl = await rateLimiters.strict(request);
+  if (rl) return rl;
+
   try {
     // Handle JSON parsing errors
     let body;

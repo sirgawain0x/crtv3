@@ -61,6 +61,8 @@ export interface IPNSRemoveResponse {
   error?: string;
 }
 
+import { serverLogger } from '@/lib/utils/logger';
+
 export interface FilecoinDealStatus {
   pieceCID: string;
   payloadCid: string;
@@ -117,7 +119,7 @@ export class LighthouseService {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Lighthouse upload error:', errorText);
+        serverLogger.error('Lighthouse upload error:', errorText);
         return {
           success: false,
           error: `Lighthouse upload failed: ${response.status} ${errorText}`,
@@ -141,7 +143,7 @@ export class LighthouseService {
         url: `${this.gateway}/${hash}`,
       };
     } catch (error) {
-      console.error('Lighthouse upload error:', error);
+      serverLogger.error('Lighthouse upload error:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -205,7 +207,7 @@ export class LighthouseService {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Lighthouse IPNS generate key error:', errorText);
+        serverLogger.error('Lighthouse IPNS generate key error:', errorText);
         return {
           success: false,
           error: `Failed to generate IPNS key: ${response.status} ${errorText}`,
@@ -223,7 +225,7 @@ export class LighthouseService {
         },
       };
     } catch (error) {
-      console.error('Lighthouse IPNS generate key error:', error);
+      serverLogger.error('Lighthouse IPNS generate key error:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -254,7 +256,7 @@ export class LighthouseService {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Lighthouse IPNS publish error:', errorText);
+        serverLogger.error('Lighthouse IPNS publish error:', errorText);
         return {
           success: false,
           error: `Failed to publish IPNS record: ${response.status} ${errorText}`,
@@ -272,7 +274,7 @@ export class LighthouseService {
         },
       };
     } catch (error) {
-      console.error('Lighthouse IPNS publish error:', error);
+      serverLogger.error('Lighthouse IPNS publish error:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -307,7 +309,7 @@ export class LighthouseService {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Lighthouse IPNS get all keys error:', errorText);
+        serverLogger.error('Lighthouse IPNS get all keys error:', errorText);
         return {
           success: false,
           error: `Failed to get IPNS keys: ${response.status} ${errorText}`,
@@ -331,7 +333,7 @@ export class LighthouseService {
         })),
       };
     } catch (error) {
-      console.error('Lighthouse IPNS get all keys error:', error);
+      serverLogger.error('Lighthouse IPNS get all keys error:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -358,7 +360,7 @@ export class LighthouseService {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Lighthouse IPNS remove key error:', errorText);
+        serverLogger.error('Lighthouse IPNS remove key error:', errorText);
         return {
           success: false,
           error: `Failed to remove IPNS key: ${response.status} ${errorText}`,
@@ -378,7 +380,7 @@ export class LighthouseService {
         },
       };
     } catch (error) {
-      console.error('Lighthouse IPNS remove key error:', error);
+      serverLogger.error('Lighthouse IPNS remove key error:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -452,7 +454,7 @@ export class LighthouseService {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Lighthouse file retrieval error:', errorText);
+        serverLogger.error('Lighthouse file retrieval error:', errorText);
         return {
           success: false,
           error: `Failed to retrieve file: ${response.status} ${errorText}`,
@@ -468,7 +470,7 @@ export class LighthouseService {
         contentType,
       };
     } catch (error) {
-      console.error('Lighthouse file retrieval error:', error);
+      serverLogger.error('Lighthouse file retrieval error:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -521,7 +523,7 @@ export class LighthouseService {
         contentType: result.contentType,
       };
     } catch (error) {
-      console.error('Lighthouse file download error:', error);
+      serverLogger.error('Lighthouse file download error:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -556,7 +558,7 @@ export class LighthouseService {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Lighthouse deal status error:', errorText);
+        serverLogger.error('Lighthouse deal status error:', errorText);
         return {
           success: false,
           error: `Failed to get deal status: ${response.status} ${errorText}`,
@@ -589,7 +591,7 @@ export class LighthouseService {
         })),
       };
     } catch (error) {
-      console.error('Lighthouse deal status error:', error);
+      serverLogger.error('Lighthouse deal status error:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',

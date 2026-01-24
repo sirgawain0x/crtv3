@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/sdk/supabase/server';
 import { MeTokenCreationParams } from '@/lib/sdk/alchemy/metoken-service';
 import { serverLogger } from '@/lib/utils/logger';
+import { rateLimiters } from '@/lib/middleware/rateLimit';
 
 // Force dynamic route to avoid build-time evaluation
 export const dynamic = 'force-dynamic';
@@ -12,6 +13,9 @@ async function getAllchemyService() {
 }
 
 export async function POST(request: NextRequest) {
+  const rl = await rateLimiters.standard(request);
+  if (rl) return rl;
+
   const alchemyMeTokenService = await getAllchemyService();
   try {
     const supabase = await createClient();

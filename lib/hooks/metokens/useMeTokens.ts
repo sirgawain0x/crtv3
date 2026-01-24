@@ -3,6 +3,8 @@ import { useUser, useSendUserOperation, useSmartAccountClient } from '@account-k
 import { useGasSponsorship } from "@/lib/hooks/wallet/useGasSponsorship";
 import { parseEther, formatEther, encodeFunctionData } from 'viem';
 import { meTokensSubgraph, MeToken } from '@/lib/sdk/metokens/subgraph';
+import { logger } from '@/lib/utils/logger';
+
 
 // MeTokens contract addresses on Base
 const METOKEN_FACTORY = '0xb31Ae2583d983faa7D8C8304e6A16E414e721A0B';
@@ -428,7 +430,7 @@ export function useMeTokens() {
           }
         } catch (err) {
           // Continue checking other MeTokens if this one fails
-          console.warn(`Failed to check MeToken ${meToken.id}:`, err);
+          logger.warn(`Failed to check MeToken ${meToken.id}:`, err);
         }
       }
 
@@ -485,11 +487,11 @@ export function useMeTokens() {
       let result;
 
       try {
-        console.log(`Attempting to create MeToken with ${gasContext.isSponsored ? 'Sponsored' : (primaryContext ? 'USDC' : 'Standard')} gas...`);
+        logger.debug(`Attempting to create MeToken with ${gasContext.isSponsored ? 'Sponsored' : (primaryContext ? 'USDC' : 'Standard')} gas...`);
         result = await executeCreation(primaryContext);
       } catch (error) {
         if (primaryContext) {
-          console.warn("Primary gas payment failed, falling back to standard gas:", error);
+          logger.warn("Primary gas payment failed, falling back to standard gas:", error);
           // Fallback to standard gas (ETH)
           result = await executeCreation(undefined);
         } else {
@@ -532,7 +534,7 @@ export function useMeTokens() {
       // Implementation depends on your contract setup
       return null;
     } catch (err) {
-      console.error('Failed to get MeToken info:', err);
+      logger.error('Failed to get MeToken info:', err);
       return null;
     }
   };
@@ -621,7 +623,7 @@ export function useMeTokens() {
 
       return null;
     } catch (err) {
-      console.error(`Failed to check MeToken ${meTokenAddress}:`, err);
+      logger.error(`Failed to check MeToken ${meTokenAddress}:`, err);
       return null;
     }
   };
@@ -682,7 +684,7 @@ export function useMeTokens() {
 
       return formatEther(result as bigint);
     } catch (err) {
-      console.error('Failed to calculate MeTokens minted:', err);
+      logger.error('Failed to calculate MeTokens minted:', err);
       return '0';
     }
   };
@@ -701,7 +703,7 @@ export function useMeTokens() {
 
       return formatEther(result as bigint);
     } catch (err) {
-      console.error('Failed to calculate assets returned:', err);
+      logger.error('Failed to calculate assets returned:', err);
       return '0';
     }
   };

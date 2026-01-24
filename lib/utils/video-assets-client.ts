@@ -1,3 +1,5 @@
+
+import { logger } from '@/lib/utils/logger';
 /**
  * Client-side utilities for fetching video assets
  * These functions can be safely called from client components
@@ -19,7 +21,7 @@ export async function fetchVideoAssetByPlaybackId(
 ): Promise<VideoAssetResponse | null> {
   try {
     const url = `/api/video-assets/by-playback-id/${playbackId}`;
-    console.log(`[fetchVideoAssetByPlaybackId] Fetching from: ${url}`);
+    logger.debug(`[fetchVideoAssetByPlaybackId] Fetching from: ${url}`);
 
     const response = await fetch(url, {
       method: "GET",
@@ -28,13 +30,13 @@ export async function fetchVideoAssetByPlaybackId(
       },
     }).catch((fetchError) => {
       // Catch network-level fetch errors (ECONNREFUSED, DNS issues, etc.)
-      console.error(`[fetchVideoAssetByPlaybackId] Network fetch failed for ${url}:`, fetchError);
+      logger.error(`[fetchVideoAssetByPlaybackId] Network fetch failed for ${url}:`, fetchError);
       throw new Error(`Network error: Unable to connect to API. ${fetchError.message || 'fetch failed'}`);
     });
 
     if (!response.ok) {
       if (response.status === 404) {
-        console.log(`[fetchVideoAssetByPlaybackId] Video asset not found (404) for playbackId: ${playbackId}`);
+        logger.debug(`[fetchVideoAssetByPlaybackId] Video asset not found (404) for playbackId: ${playbackId}`);
         return null;
       }
 
@@ -53,7 +55,7 @@ export async function fetchVideoAssetByPlaybackId(
           }
         } catch (parseError) {
           // JSON parsing failed, use default error message
-          console.warn("Failed to parse error response as JSON:", parseError);
+          logger.warn("Failed to parse error response as JSON:", parseError);
         }
       } else {
         // Response is not JSON (likely HTML error page from Cloudflare/Supabase)
@@ -80,7 +82,7 @@ export async function fetchVideoAssetByPlaybackId(
           }
         } catch (textError) {
           // Failed to read response text, use default error message
-          console.warn("Failed to read error response text:", textError);
+          logger.warn("Failed to read error response text:", textError);
         }
       }
 
@@ -88,10 +90,10 @@ export async function fetchVideoAssetByPlaybackId(
     }
 
     const data = await response.json();
-    console.log(`[fetchVideoAssetByPlaybackId] Successfully fetched asset for playbackId: ${playbackId}`);
+    logger.debug(`[fetchVideoAssetByPlaybackId] Successfully fetched asset for playbackId: ${playbackId}`);
     return data;
   } catch (error) {
-    console.error(
+    logger.error(
       `[fetchVideoAssetByPlaybackId] Error fetching asset for playbackId ${playbackId}:`,
       error
     );
@@ -128,7 +130,7 @@ export async function fetchVideoAssetByAssetId(
           errorMessage = errorData.details || errorData.error || errorMessage;
         } catch (parseError) {
           // JSON parsing failed, use default error message
-          console.warn("Failed to parse error response as JSON:", parseError);
+          logger.warn("Failed to parse error response as JSON:", parseError);
         }
       } else {
         // Response is not JSON (likely HTML error page from Cloudflare/Supabase)
@@ -144,7 +146,7 @@ export async function fetchVideoAssetByAssetId(
           }
         } catch (textError) {
           // Failed to read response text, use default error message
-          console.warn("Failed to read error response text:", textError);
+          logger.warn("Failed to read error response text:", textError);
         }
       }
 
@@ -153,7 +155,7 @@ export async function fetchVideoAssetByAssetId(
 
     return await response.json();
   } catch (error) {
-    console.error(`[fetchVideoAssetByAssetId] Error fetching asset:`, error);
+    logger.error(`[fetchVideoAssetByAssetId] Error fetching asset:`, error);
     throw error;
   }
 }
@@ -187,7 +189,7 @@ export async function fetchVideoAssetById(
           errorMessage = errorData.details || errorData.error || errorMessage;
         } catch (parseError) {
           // JSON parsing failed, use default error message
-          console.warn("Failed to parse error response as JSON:", parseError);
+          logger.warn("Failed to parse error response as JSON:", parseError);
         }
       } else {
         // Response is not JSON (likely HTML error page from Cloudflare/Supabase)
@@ -203,7 +205,7 @@ export async function fetchVideoAssetById(
           }
         } catch (textError) {
           // Failed to read response text, use default error message
-          console.warn("Failed to read error response text:", textError);
+          logger.warn("Failed to read error response text:", textError);
         }
       }
 
@@ -212,7 +214,7 @@ export async function fetchVideoAssetById(
 
     return await response.json();
   } catch (error) {
-    console.error(`[fetchVideoAssetById] Error fetching asset:`, error);
+    logger.error(`[fetchVideoAssetById] Error fetching asset:`, error);
     throw error;
   }
 }

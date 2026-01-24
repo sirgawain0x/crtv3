@@ -9,6 +9,8 @@ import { FaSpinner, FaTrophy } from "react-icons/fa";
 import Link from "next/link";
 import { useUser } from "@account-kit/react";
 import { Address, getAddress } from "viem";
+import { logger } from '@/lib/utils/logger';
+
 
 interface LeaderboardItem {
   uniqueId: number;
@@ -144,11 +146,11 @@ export function TopChart() {
           err.message.includes('aborted') ||
           err.message.includes('signal is aborted')
         )) {
-          console.warn('User rank fetch was aborted:', err.message);
+          logger.warn('User rank fetch was aborted:', err.message);
           return;
         }
         
-        console.error("Failed to fetch user rank:", err);
+        logger.error("Failed to fetch user rank:", err);
       }
     };
 
@@ -184,7 +186,7 @@ export function TopChart() {
         if (!isMounted || signal.aborted) return;
 
         if (!leaderboard || !leaderboard.leaderboard) {
-          console.warn("Leaderboard data is missing or empty.");
+          logger.warn("Leaderboard data is missing or empty.");
           setErrorMessage("Leaderboard data is missing or empty.");
           setData([]);
           return;
@@ -206,11 +208,11 @@ export function TopChart() {
         if (error.name === 'AbortError' || 
             error.message?.includes('aborted') ||
             error.message?.includes('signal is aborted')) {
-          console.warn('Leaderboard fetch was aborted:', error.message);
+          logger.warn('Leaderboard fetch was aborted:', error.message);
           return;
         }
         
-        console.error("Error fetching leaderboard data:", error);
+        logger.error("Error fetching leaderboard data:", error);
         setErrorMessage("Failed to load leaderboard. Please try again later.");
         setData([]);
       } finally {

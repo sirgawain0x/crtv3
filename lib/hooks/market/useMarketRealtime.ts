@@ -2,6 +2,8 @@ import { useEffect, useRef } from 'react';
 import { alchemyClient } from '@/lib/sdk/alchemy/alchemy-client';
 import { MarketToken } from '@/app/api/market/tokens/route';
 import { Utils } from 'alchemy-sdk';
+import { logger } from '@/lib/utils/logger';
+
 
 interface UseMarketRealtimeOptions {
     enabled?: boolean;
@@ -30,7 +32,7 @@ export function useMarketRealtime(
 
         if (newAddresses.length === 0) return;
 
-        console.log(`🔌 Connecting WSS for ${newAddresses.length} tokens...`);
+        logger.debug(`🔌 Connecting WSS for ${newAddresses.length} tokens...`);
 
         const handleLog = (log: any) => {
             try {
@@ -39,7 +41,7 @@ export function useMarketRealtime(
                     onUpdate(address);
                 }
             } catch (err) {
-                console.error('Error handling WSS log:', err);
+                logger.error('Error handling WSS log:', err);
             }
         };
 
@@ -81,7 +83,7 @@ export function useMarketRealtime(
     useEffect(() => {
         return () => {
             if (subscribedAddresses.current.size > 0) {
-                console.log('🔌 Disconnecting WSS...');
+                logger.debug('🔌 Disconnecting WSS...');
                 alchemyClient.ws.removeAllListeners(); // aggressive but safe for this page
                 subscribedAddresses.current.clear();
             }

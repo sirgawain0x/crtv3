@@ -1,5 +1,7 @@
 import { Address, createPublicClient, getAddress } from "viem";
 import { alchemy, base } from "@account-kit/infra";
+import { logger } from '@/lib/utils/logger';
+
 
 /**
  * Linked Identity Utilities
@@ -73,7 +75,7 @@ export async function isPermittedSigner(
     
     return true; // Simplified: assume EOA is permitted if Smart Wallet exists
   } catch (error) {
-    console.error("Error checking permitted signer:", error);
+    logger.error("Error checking permitted signer:", error);
     // On error, assume not permitted for security
     return false;
   }

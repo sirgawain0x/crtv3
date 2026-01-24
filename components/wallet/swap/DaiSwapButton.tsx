@@ -9,6 +9,8 @@ import { Loader2, ArrowRightLeft, CheckCircle, XCircle, ExternalLink } from 'luc
 import { useSmartAccountClient } from '@account-kit/react';
 import { type Address, type Hex } from 'viem';
 import { alchemySwapService, AlchemySwapService, type TokenSymbol } from '@/lib/sdk/alchemy/swap-service';
+import { logger } from '@/lib/utils/logger';
+
 
 interface DaiSwapButtonProps {
   onSwapSuccess?: () => void;
@@ -57,7 +59,7 @@ export function DaiSwapButton({ onSwapSuccess, className }: DaiSwapButtonProps) 
         setQuote(quoteResponse.result);
       }
     } catch (error) {
-      console.error('Error getting quote:', error);
+      logger.error('Error getting quote:', error);
       setError(error instanceof Error ? error.message : 'Failed to get quote');
     } finally {
       setIsLoading(false);
@@ -109,14 +111,14 @@ export function DaiSwapButton({ onSwapSuccess, className }: DaiSwapButtonProps) 
 
       // Show message if this is a mock response
       if (result.message) {
-        console.log('Swap result message:', result.message);
+        logger.debug('Swap result message:', result.message);
       }
 
       // Call success callback
       onSwapSuccess?.();
 
     } catch (err) {
-      console.error('Swap execution failed:', err);
+      logger.error('Swap execution failed:', err);
       setError(err instanceof Error ? err.message : 'Swap execution failed');
     } finally {
       setIsSwapping(false);

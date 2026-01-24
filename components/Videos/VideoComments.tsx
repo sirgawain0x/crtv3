@@ -31,6 +31,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { UserDisplayCompact, UserNameDisplay } from "@/components/User/UserDisplay";
+import { logger } from '@/lib/utils/logger';
+
 
 interface VideoCommentsProps {
   videoAssetId: number;
@@ -158,7 +160,7 @@ export function VideoComments({ videoAssetId, videoName, className }: VideoComme
       setReplies(prev => ({ ...prev, [commentId]: replyComments }));
       setExpandedReplies(prev => new Set(prev).add(commentId));
     } catch (err) {
-      console.error('Error loading replies:', err);
+      logger.error('Error loading replies:', err);
     } finally {
       setLoadingReplies(prev => {
         const next = new Set(prev);

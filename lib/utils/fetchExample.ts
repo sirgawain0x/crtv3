@@ -22,7 +22,7 @@ export async function fetchWithTimeout<T>(
     return await fetchWithAbortHandler<T>(url, {
       signal: controller.signal,
       onAbort: () => {
-        console.warn(`Request to ${url} was aborted`);
+        logger.warn(`Request to ${url} was aborted`);
       },
     });
   } catch (error) {
@@ -53,7 +53,7 @@ export class CancellableRequest<T> {
       });
     } catch (error) {
       if (isAbortError(error)) {
-        console.debug('Request was cancelled:', url);
+        logger.debug('Request was cancelled:', url);
         throw new Error('Request cancelled by user');
       }
       throw error;
@@ -69,6 +69,8 @@ export class CancellableRequest<T> {
  * Example 3: React hook with abort handling
  */
 import { useEffect, useState } from 'react';
+import { logger } from '@/lib/utils/logger';
+
 
 export function useFetchData<T>(url: string | null) {
   const [data, setData] = useState<T | null>(null);
@@ -86,7 +88,7 @@ export function useFetchData<T>(url: string | null) {
       signal: controller.signal,
       onAbort: () => {
         // Component unmounted or url changed
-        console.debug('Fetch aborted:', url);
+        logger.debug('Fetch aborted:', url);
       },
     })
       .then((result) => {
@@ -122,7 +124,7 @@ export async function fetchMultiple<T>(urls: string[]): Promise<T[]> {
       signal: controller.signal,
     }).catch((error) => {
       if (isAbortError(error)) {
-        console.warn(`Request to ${url} timed out`);
+        logger.warn(`Request to ${url} timed out`);
         return null; // Return null for failed requests
       }
       throw error;
@@ -165,7 +167,7 @@ export async function fetchWithRetry<T>(
 
       // Exponential backoff
       const delay = baseDelay * Math.pow(2, attempt);
-      console.warn(
+      logger.warn(
         `Request failed, retrying in ${delay}ms... (attempt ${attempt + 1}/${maxRetries})`
       );
       await new Promise((resolve) => setTimeout(resolve, delay));

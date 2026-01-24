@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { MarketToken, MarketStats } from '@/app/api/market/tokens/route';
 import { useMarketRealtime } from './useMarketRealtime';
+import { logger } from '@/lib/utils/logger';
+
 
 export interface MarketFilters {
   type: 'all' | 'metoken' | 'content_coin';
@@ -100,7 +102,7 @@ export function useMarketData(options: UseMarketDataOptions = {}): UseMarketData
         hasMore: data.pagination?.hasMore || false,
       });
     } catch (err) {
-      console.error('Error fetching market data:', err);
+      logger.error('Error fetching market data:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch market data');
       setTokens([]);
       setStats(null);
@@ -177,7 +179,7 @@ export function useMarketData(options: UseMarketDataOptions = {}): UseMarketData
   // Real-time updates
   const handleRealtimeUpdate = useCallback(async (tokenAddress: string) => {
     // Debounce or throttle could be added here
-    console.log(`⚡ Real-time update for ${tokenAddress}`);
+    logger.debug(`⚡ Real-time update for ${tokenAddress}`);
 
     try {
       // Fetch fresh data for this specific token
@@ -195,7 +197,7 @@ export function useMarketData(options: UseMarketDataOptions = {}): UseMarketData
         }
       }
     } catch (error) {
-      console.error('Failed to fetch fresh token data:', error);
+      logger.error('Failed to fetch fresh token data:', error);
     }
   }, []);
 

@@ -12,6 +12,8 @@ import { HeroPlayer } from "../Player/HeroPlayer";
 import { PlayerLoading } from "../Player/Player";
 import { getHeroPlaybackSource } from "../../lib/hooks/livepeer/useHeroPlaybackSource";
 import { useTour } from "@/context/TourContext";
+import { logger } from '@/lib/utils/logger';
+
 
 // Custom PlayIcon component
 const PlayIcon = (props: React.SVGProps<SVGSVGElement>) => {
@@ -69,11 +71,11 @@ const HeroSection: React.FC = () => {
           err.message.includes('aborted') ||
           err.message.includes('signal is aborted')
         )) {
-          console.warn('Hero video fetch was aborted:', err.message);
+          logger.warn('Hero video fetch was aborted:', err.message);
           return; // Don't set error for abort signals
         }
 
-        console.error("Error fetching playback source:", err);
+        logger.error("Error fetching playback source:", err);
         setError("Failed to load video.");
       } finally {
         if (isMounted && !signal.aborted) {

@@ -28,6 +28,8 @@ import {
 } from "@/services/video-assets";
 import { MultistreamTargetsList } from "./multicast/MultistreamTargetList";
 import { MultistreamTargetsForm } from "./multicast/MultistreamTargetsForm";
+import { logger } from '@/lib/utils/logger';
+
 
 interface BroadcastProps {
   streamKey: string | null;
@@ -138,11 +140,11 @@ function BroadcastWithControls({ streamKey }: BroadcastProps) {
             multistream: undefined,
           });
 
-          console.log("Stream created:", result);
+          logger.debug("Stream created:", result);
           setStreamData(result);
           toast.success("Stream created successfully!");
         } catch (error) {
-          console.error("Error creating stream:", error);
+          logger.error("Error creating stream:", error);
           toast.error("Failed to create stream. Please try again.");
         } finally {
           setIsCreatingStream(false);
@@ -191,7 +193,7 @@ function BroadcastWithControls({ streamKey }: BroadcastProps) {
       if (result.targets) {
         setMultistreamTargets(result.targets);
       } else if (result.error) {
-        console.error("Error fetching multistream targets:", result.error);
+        logger.error("Error fetching multistream targets:", result.error);
       }
     }
     fetchTargets();
@@ -445,7 +447,7 @@ export const Settings = React.forwardRef(
         if (result.targets) {
           setMultistreamTargets(result.targets);
         } else if (result.error) {
-          console.error("Error fetching multistream targets:", result.error);
+          logger.error("Error fetching multistream targets:", result.error);
         }
       }
       fetchTargets();
@@ -464,7 +466,7 @@ export const Settings = React.forwardRef(
         await navigator.clipboard.writeText(text);
         toast.success(`${label} copied to clipboard!`);
       } catch (err) {
-        console.error("Failed to copy:", err);
+        logger.error("Failed to copy:", err);
         toast.error("Failed to copy to clipboard");
       }
     };

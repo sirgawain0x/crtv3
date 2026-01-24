@@ -19,6 +19,8 @@ import { StoryClient } from "@story-protocol/core-sdk";
 import type { Address } from "viem";
 import { createCollection, type CreateCollectionParams } from "./spg-service";
 import { createServiceClient } from "@/lib/sdk/supabase/service";
+import { serverLogger } from '@/lib/utils/logger';
+
 
 /**
  * Parameters for creating a creator-owned collection via Factory
@@ -86,13 +88,13 @@ export async function createCreatorCollection(
         };
       }
     } catch (error) {
-      console.warn("Failed to verify collection on-chain, will create new one:", error);
+      serverLogger.warn("Failed to verify collection on-chain, will create new one:", error);
     }
   }
 
   // Create new collection with creator as owner
   // The client is signed by the platform (accountAddress), but we set owner to creator
-  console.log(`🏭 Factory: Creating creator-owned collection for ${params.creatorAddress}...`, {
+  serverLogger.debug(`🏭 Factory: Creating creator-owned collection for ${params.creatorAddress}...`, {
     name: params.collectionName,
     symbol: params.collectionSymbol,
     owner: params.creatorAddress, // Creator owns from day one
@@ -126,7 +128,7 @@ export async function createCreatorCollection(
     );
 
   if (upsertError) {
-    console.warn("Failed to store collection in database:", upsertError);
+    serverLogger.warn("Failed to store collection in database:", upsertError);
     // Don't throw - collection was created successfully on-chain
   }
 

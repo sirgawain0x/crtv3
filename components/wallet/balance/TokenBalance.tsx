@@ -8,6 +8,8 @@ import { getUsdcTokenContract } from "@/lib/contracts/USDCToken";
 import { getDaiTokenContract } from "@/lib/contracts/DAIToken";
 import { Skeleton } from "@/components/ui/skeleton";
 import Image from "next/image";
+import { logger } from '@/lib/utils/logger';
+
 
 interface TokenBalanceData {
   symbol: string;
@@ -83,7 +85,7 @@ export function TokenBalance() {
         let chainKey: keyof typeof import("@/lib/contracts/USDCToken").USDC_TOKEN_ADDRESSES;
         if (chain.id === 8453) chainKey = "base";
         else {
-          console.warn(`Unsupported chain ID: ${chain.id}`);
+          logger.warn(`Unsupported chain ID: ${chain.id}`);
           if (isMounted && !signal.aborted) {
             setError(`Unsupported chain (ID: ${chain.id})`);
             setEthBalance(null);
@@ -110,7 +112,7 @@ export function TokenBalance() {
           }
         } catch (error) {
           if (isMounted && !signal.aborted) {
-            console.error("Error fetching ETH balance:", error);
+            logger.error("Error fetching ETH balance:", error);
             setEthBalance(null);
           }
         }
@@ -131,7 +133,7 @@ export function TokenBalance() {
           }
         } catch (error) {
           if (isMounted && !signal.aborted) {
-            console.error("Error fetching USDC balance:", error);
+            logger.error("Error fetching USDC balance:", error);
             setUsdcBalance(null);
           }
         }
@@ -152,13 +154,13 @@ export function TokenBalance() {
           }
         } catch (error) {
           if (isMounted && !signal.aborted) {
-            console.error("Error fetching DAI balance:", error);
+            logger.error("Error fetching DAI balance:", error);
             setDaiBalance(null);
           }
         }
       } catch (error) {
         if (isMounted && !signal.aborted) {
-          console.error("Error fetching balances:", error);
+          logger.error("Error fetching balances:", error);
           setError(error instanceof Error ? error.message : "Unknown error");
           setEthBalance(null);
           setUsdcBalance(null);

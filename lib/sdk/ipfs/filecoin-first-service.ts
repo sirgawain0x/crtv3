@@ -1,3 +1,5 @@
+
+import { serverLogger } from '@/lib/utils/logger';
 /**
  * Lighthouse Filecoin First Service
  * Allows creating Filecoin deals directly from CIDs without uploading to Lighthouse IPFS
@@ -49,7 +51,7 @@ export class FilecoinFirstService {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Filecoin First pin error:', errorText);
+        serverLogger.error('Filecoin First pin error:', errorText);
         return {
           success: false,
           error: `Filecoin First pin failed: ${response.status} ${errorText}`,
@@ -63,7 +65,7 @@ export class FilecoinFirstService {
         dealId: data.dealId || data.deal_id || undefined,
       };
     } catch (error) {
-      console.error('Filecoin First pin error:', error);
+      serverLogger.error('Filecoin First pin error:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
@@ -93,7 +95,7 @@ export class FilecoinFirstService {
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('Filecoin First deal status error:', errorText);
+        serverLogger.error('Filecoin First deal status error:', errorText);
         return {
           success: false,
           error: `Failed to get deal status: ${response.status} ${errorText}`,
@@ -107,7 +109,7 @@ export class FilecoinFirstService {
         deals: Array.isArray(data) ? data : data.deals || [],
       };
     } catch (error) {
-      console.error('Filecoin First deal status error:', error);
+      serverLogger.error('Filecoin First deal status error:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',

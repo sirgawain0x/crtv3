@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { serverLogger } from "@/lib/utils/logger";
 
 const isProduction = process.env.NODE_ENV === "production";
 
@@ -48,7 +49,7 @@ if (!validationResult.success) {
     throw new Error(errorMessage);
   } else {
     // Warn in development but don't crash
-    console.warn('⚠️  Environment variable validation warning:\n', errorMessage);
-    console.warn('⚠️  Some features may not work correctly. Please check your .env.local file.');
+    serverLogger.warn('Environment variable validation warning:', errorMessage);
+    serverLogger.warn('Some features may not work correctly. Please check your .env.local file.');
   }
 }

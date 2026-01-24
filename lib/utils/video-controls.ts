@@ -1,3 +1,5 @@
+
+import { logger } from '@/lib/utils/logger';
 /**
  * Utility functions for safely controlling video playback
  * Prevents AbortError when play() is interrupted by pause()
@@ -24,7 +26,7 @@ export async function safelyPauseVideo(
     if (error instanceof Error && error.name === "AbortError") {
       return;
     }
-    console.error("Error pausing video:", error);
+    logger.error("Error pausing video:", error);
   }
 }
 
@@ -55,7 +57,7 @@ export async function safelyPlayVideo(
 
     // Handle NotAllowedError (autoplay policy)
     if (error instanceof Error && error.name === "NotAllowedError") {
-      console.warn("Video play was prevented by browser autoplay policy");
+      logger.warn("Video play was prevented by browser autoplay policy");
       return;
     }
 

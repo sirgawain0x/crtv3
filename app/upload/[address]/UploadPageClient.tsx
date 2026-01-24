@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { useUser, useSmartAccountClient } from "@account-kit/react";
 import useModularAccount from "@/lib/hooks/accountkit/useModularAccount";
 import { isAddress } from "viem";
+import { logger } from '@/lib/utils/logger';
+
 
 interface UploadPageClientProps {
   urlAddress: string;
@@ -36,7 +38,7 @@ export function UploadPageClient({ urlAddress, children }: UploadPageClientProps
 
     // Validate URL address format
     if (urlAddress && !isAddress(urlAddress)) {
-      console.warn("Invalid address format in URL, redirecting...");
+      logger.warn("Invalid address format in URL, redirecting...");
       if (smartAddr) {
         router.replace(`/upload/${smartAccountAddress}`);
       } else if (eoaAddr) {
@@ -50,7 +52,7 @@ export function UploadPageClient({ urlAddress, children }: UploadPageClientProps
     // If we have a smart account address, use that as the primary address
     if (smartAddr) {
       if (urlAddr !== smartAddr) {
-        console.log("URL address mismatch, redirecting to Smart Account upload:", smartAccountAddress);
+        logger.debug("URL address mismatch, redirecting to Smart Account upload:", smartAccountAddress);
         router.replace(`/upload/${smartAccountAddress}`);
         return;
       }
@@ -58,7 +60,7 @@ export function UploadPageClient({ urlAddress, children }: UploadPageClientProps
     // Fallback to EOA address if no smart account
     else if (eoaAddr) {
       if (urlAddr !== eoaAddr) {
-        console.log("URL address mismatch, redirecting to EOA upload:", eoaAddress);
+        logger.debug("URL address mismatch, redirecting to EOA upload:", eoaAddress);
         router.replace(`/upload/${eoaAddress}`);
         return;
       }

@@ -1,3 +1,5 @@
+
+import { logger } from '@/lib/utils/logger';
 /**
  * IPFS Gateway utilities with fallback support
  * Handles conversion of IPFS URLs to alternative gateways when primary gateway fails
@@ -121,7 +123,7 @@ export function convertFailingGateway(url: string): string {
   // Handle Google Cloud Storage URLs (these are not IPFS, so we can't convert them)
   // These Livepeer AI images are temporary and expired - should be uploaded to IPFS
   if (url.includes('storage.googleapis.com/lp-ai-generate-com')) {
-    console.warn('⚠️ Deprecated: Livepeer AI temporary storage URL detected. AI-generated images are now automatically saved to IPFS.');
+    logger.warn('⚠️ Deprecated: Livepeer AI temporary storage URL detected. AI-generated images are now automatically saved to IPFS.');
     return url; // Keep original for now, but it will likely fail with 404
   }
 

@@ -14,6 +14,8 @@ import "./Player.css";
 import { ViewsComponent } from "./ViewsComponent";
 import { useVideo } from "@/context/VideoContext";
 import { safelyPauseVideo, safelyPlayVideo } from "@/lib/utils/video-controls";
+import { logger } from '@/lib/utils/logger';
+
 
 export const PreviewPlayer: React.FC<{ src: Src[]; title: string }> = ({
   src,
@@ -172,7 +174,7 @@ export const PreviewPlayer: React.FC<{ src: Src[]; title: string }> = ({
         safelyPlayVideo(videoRef.current).catch((error) => {
           // Ignore AbortError as it's expected when interrupted
           if (error instanceof Error && error.name !== "AbortError") {
-            console.error("Error playing video:", error);
+            logger.error("Error playing video:", error);
           }
         });
       } else {
@@ -195,7 +197,7 @@ export const PreviewPlayer: React.FC<{ src: Src[]; title: string }> = ({
         volume={0}
         aspectRatio={16 / 9}
         onError={(error) => {
-          console.error("Player error:", error);
+          logger.error("Player error:", error);
         }}
       >
         <Player.Container className="relative h-full w-full">

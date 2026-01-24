@@ -11,6 +11,8 @@ import { createStoryPublicClient } from "@/lib/sdk/story/client";
 import { getNFTContractAddress, mintVideoNFT } from "@/lib/sdk/nft/minting-service";
 import { formatEther, type Address } from "viem";
 import { STORY_CHAIN_ID } from "@/lib/sdk/story/constants";
+import { logger } from '@/lib/utils/logger';
+
 
 export interface NFTMintingStepProps {
   videoAssetId: number;
@@ -82,13 +84,13 @@ export function NFTMintingStep({
         const formattedBalance = formatEther(balance);
         setFundingWalletBalance(formattedBalance);
 
-        console.log("✅ Funding Wallet Status:", {
+        logger.debug("✅ Funding Wallet Status:", {
           address: data.address,
           balance: formattedBalance
         });
       }
     } catch (error) {
-      console.error("Error checking funding wallet:", error);
+      logger.error("Error checking funding wallet:", error);
       // Retry logic
       if (retryCount < 2) {
         setTimeout(() => checkFundingWallet(retryCount + 1), 2000);
@@ -166,7 +168,7 @@ export function NFTMintingStep({
         });
       }
     } catch (e) {
-      console.error("Minting failed:", e);
+      logger.error("Minting failed:", e);
       const errorMessage = e instanceof Error ? e.message : "Minting failed";
       setMintError(errorMessage);
     } finally {
@@ -236,7 +238,7 @@ export function NFTMintingStep({
             <CrossChainSwap
               recipientAddress={fundingWalletAddress}
               onSwapSuccess={() => {
-                console.log("🔄 Swap completed, checking funding balance in 3 seconds...");
+                logger.debug("🔄 Swap completed, checking funding balance in 3 seconds...");
                 setTimeout(() => {
                   checkFundingWallet(0);
                 }, 3000);

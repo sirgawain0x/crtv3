@@ -1,6 +1,8 @@
 import { createSafeActionClient } from "next-safe-action";
 import { z } from "zod";
 import { submitSnapshotProposal } from "@/lib/sdk/snapshot/snapshot-proposal-wrapper";
+import { serverLogger } from '@/lib/utils/logger';
+
 
 const actionClient = createSafeActionClient();
 
@@ -38,7 +40,7 @@ export const createProposal = actionClient
     });
 
     if ("error" in result) {
-      console.error("Snapshot proposal error:", result.error);
+      serverLogger.error("Snapshot proposal error:", result.error);
       throw new Error(result.error);
     }
 

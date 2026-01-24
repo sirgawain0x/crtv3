@@ -6,6 +6,7 @@ import { createHelia, Helia } from 'helia';
 import { unixfs, UnixFS } from '@helia/unixfs';
 import { LighthouseService } from './lighthouse-service';
 import { FilecoinFirstService } from './filecoin-first-service';
+import { serverLogger } from '@/lib/utils/logger';
 
 export interface IPFSUploadResult {
   success: boolean;
@@ -64,7 +65,7 @@ export class IPFSService {
       this.helia = config.helia;
       this.fs = config.fs;
       this.initialized = true;
-      console.log('[IPFSService] Using Helia instance from context');
+      serverLogger.debug('[IPFSService] Using Helia instance from context');
     }
     
     // Initialize Lighthouse service if API key is provided
@@ -92,7 +93,7 @@ export class IPFSService {
     try {
       // Initialize fallback Helia instance (following helia-nextjs pattern)
       if (!fallbackHeliaInstance) {
-        console.log('[IPFSService] Initializing fallback Helia instance...');
+        serverLogger.debug('[IPFSService] Initializing fallback Helia instance...');
         fallbackHeliaInstance = await createHelia();
         fallbackHeliaFs = unixfs(fallbackHeliaInstance);
       }
@@ -102,7 +103,7 @@ export class IPFSService {
       // Mark as initialized immediately after Helia is ready (before optional Storacha)
       // This prevents infinite retry loops if Storacha initialization fails
       this.initialized = true;
-      console.log('[IPFSService] Fallback Helia initialized successfully');
+      serverLogger.debug('[IPFSService] Fallback Helia initialized successfully');
 
       // Initialize Storacha (Backup/Persistence) - optional, can fail without affecting service
       // This is done after setting initialized=true to ensure Helia is usable even if Storacha fails
@@ -110,15 +111,15 @@ export class IPFSService {
         await this.initializeStoracha();
       } catch (storachaError) {
         // Log but don't throw - Storacha is optional backup
-        console.warn('[IPFSService] Storacha initialization failed (non-critical):', storachaError);
+        serverLogger.warn('[IPFSService] Storacha initialization failed (non-critical):', storachaError);
       }
     } catch (error) {
-      console.error('[IPFSService] Failed to initialize fallback IPFS clients:', error);
+      serverLogger.error('[IPFSService] Failed to initialize fallback IPFS clients:', error);
       // Only set initialized if Helia was successfully created
       // If Helia creation itself failed, leave initialized=false to allow retry
       if (this.helia && this.fs) {
         this.initialized = true;
-        console.warn('[IPFSService] Helia initialized but some optional services failed');
+        serverLogger.warn('[IPFSService] Helia initialized but some optional services failed');
       }
     }
   }
@@ -137,19 +138,19 @@ export class IPFSService {
         try {
           proof = await Proof.parse(this.proof);
         } catch (error: any) {
-          console.warn('Invalid Storacha proof, skipping Storacha backup:', error.message);
+          serverLogger.warn('Invalid Storacha proof, skipping Storacha backup:', error.message);
           return;
         }
 
         const space = await this.storachaClient.addSpace(proof);
         await this.storachaClient.setCurrentSpace(space.did());
-        console.log('Storacha client initialized (Backup Mode)');
+        serverLogger.debug('Storacha client initialized (Backup Mode)');
       } else {
         // Log that Storacha is skipped
-        console.log('Storacha credentials (KEY/PROOF) not missing. Skipping Storacha backup layer.');
+        serverLogger.debug('Storacha credentials (KEY/PROOF) not missing. Skipping Storacha backup layer.');
       }
     } catch (error) {
-      console.error('Failed to initialize Storacha client:', error);
+      serverLogger.error('Failed to initialize Storacha client:', error);
       // Don't fail the whole service, just backup might fail
     }
   }
@@ -189,33 +190,33 @@ export class IPFSService {
       const hash = cid.toString();
       const url = `${this.gateway}/${hash}`;
 
-      console.log('[IPFSService] ✅ Helia upload successful:', hash);
-      console.log('[IPFSService] 📍 Accessible via:', url);
+      serverLogger.debug('[IPFSService] ✅ Helia upload successful:', hash);
+      serverLogger.debug('[IPFSService] 📍 Accessible via:', url);
 
       // 2. Background: Upload to Lighthouse (CDN distribution, non-blocking)
       if (this.lighthouseService) {
         this.lighthouseService.uploadFile(file).then((result) => {
           if (result.success && result.hash) {
-            console.log('[IPFSService] ✅ Lighthouse backup complete:', result.hash);
+            serverLogger.debug('[IPFSService] ✅ Lighthouse backup complete:', result.hash);
           }
         }).catch((err) => {
-          console.warn('[IPFSService] ⚠️ Lighthouse backup failed (non-critical):', err);
+          serverLogger.warn('[IPFSService] ⚠️ Lighthouse backup failed (non-critical):', err);
         });
       }
 
       // 3. Background: Upload to Storacha (Backup/Persistence, non-blocking)
       if (this.storachaClient) {
         this.storachaClient.uploadFile(file).then((result: any) => {
-          console.log(`[IPFSService] ✅ Storacha backup complete for ${hash}:`, result);
+          serverLogger.debug(`[IPFSService] ✅ Storacha backup complete for ${hash}:`, result);
         }).catch((err: any) => {
-          console.warn(`[IPFSService] ⚠️ Storacha backup failed for ${hash}:`, err);
+          serverLogger.warn(`[IPFSService] ⚠️ Storacha backup failed for ${hash}:`, err);
         });
       } else {
         // Try to initialize Storacha in background
         this.initializeStoracha().then(() => {
           if (this.storachaClient) {
             this.storachaClient.uploadFile(file).catch((err: any) => {
-              console.warn(`[IPFSService] ⚠️ Storacha backup failed for ${hash}:`, err);
+              serverLogger.warn(`[IPFSService] ⚠️ Storacha backup failed for ${hash}:`, err);
             });
           }
         }).catch(() => {
@@ -227,10 +228,10 @@ export class IPFSService {
       if (this.filecoinFirstService && this.enableFilecoinArchival) {
         this.createFilecoinDeal(hash).then((result) => {
           if (result.success && result.dealId) {
-            console.log(`[IPFSService] ✅ Filecoin deal created for ${hash}:`, result.dealId);
+            serverLogger.debug(`[IPFSService] ✅ Filecoin deal created for ${hash}:`, result.dealId);
           }
         }).catch((err) => {
-          console.warn('[IPFSService] ⚠️ Filecoin archival failed (non-critical):', err);
+          serverLogger.warn('[IPFSService] ⚠️ Filecoin archival failed (non-critical):', err);
         });
       }
 
@@ -240,7 +241,7 @@ export class IPFSService {
         hash,
       };
     } catch (error) {
-      console.error('[IPFSService] ❌ IPFS upload error:', error);
+      serverLogger.error('[IPFSService] ❌ IPFS upload error:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Upload failed',
@@ -258,9 +259,9 @@ export class IPFSService {
     if (this.storachaClient) {
       try {
         await this.storachaClient.uploadFile(file);
-        console.log(`✅ Storacha backup complete for ${hash}`);
+        serverLogger.debug(`✅ Storacha backup complete for ${hash}`);
       } catch (error) {
-        console.warn(`⚠️ Storacha backup failed for ${hash}:`, error);
+        serverLogger.warn(`⚠️ Storacha backup failed for ${hash}:`, error);
         // Non-critical, don't throw
       }
     }
@@ -275,11 +276,11 @@ export class IPFSService {
     try {
       const result = await this.filecoinFirstService.pinCid(cid);
       if (result.success) {
-        console.log(`📦 Filecoin deal initiated for CID: ${cid}`);
+        serverLogger.debug(`📦 Filecoin deal initiated for CID: ${cid}`);
       }
       return result;
     } catch (error) {
-      console.error(`Filecoin deal creation error for ${cid}:`, error);
+      serverLogger.error(`Filecoin deal creation error for ${cid}:`, error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',

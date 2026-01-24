@@ -1,6 +1,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { CurrencyConverter } from '@/lib/utils/currency-converter';
+import { logger } from '@/lib/utils/logger';
+
 
 interface VideoContributionData {
     video_id: number;
@@ -53,7 +55,7 @@ export function useVideoContribution({ videoId, playbackId, pollInterval }: UseV
                 setFormattedContribution(formatted);
             }
         } catch (err) {
-            console.error('Error fetching video contribution:', err);
+            logger.error('Error fetching video contribution:', err);
             setError(err instanceof Error ? err.message : 'Failed to load contribution');
         } finally {
             setIsLoading(false);

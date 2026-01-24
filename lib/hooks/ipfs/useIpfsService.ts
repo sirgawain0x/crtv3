@@ -3,6 +3,8 @@
 import { useMemo } from "react";
 import { useHelia } from "@/context/HeliaContext";
 import { IPFSService, IPFSConfig } from "@/lib/sdk/ipfs/service";
+import { logger } from '@/lib/utils/logger';
+
 
 /**
  * Hook to get an IPFS service instance with Helia from context
@@ -24,7 +26,7 @@ import { IPFSService, IPFSConfig } from "@/lib/sdk/ipfs/service";
  *   const handleUpload = async (file: File) => {
  *     const result = await ipfsService.uploadFile(file);
  *     if (result.success) {
- *       console.log('Uploaded:', result.hash);
+ *       logger.debug('Uploaded:', result.hash);
  *     }
  *   };
  *   

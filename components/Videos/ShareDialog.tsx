@@ -13,6 +13,8 @@ import { Share2, Twitter, Globe, ExternalLink, Loader2 } from "lucide-react";
 import { fetchVideoAssetByPlaybackId } from "@/lib/utils/video-assets-client";
 import { getThumbnailUrl } from "@/lib/utils/thumbnail";
 import { convertFailingGateway } from "@/lib/utils/image-gateway";
+import { logger } from '@/lib/utils/logger';
+
 
 interface ShareDialogProps {
   open: boolean;
@@ -71,7 +73,7 @@ export function ShareDialog({
 
         setThumbnailUrl(thumbnail);
       } catch (error) {
-        console.error("Error fetching thumbnail for share:", error);
+        logger.error("Error fetching thumbnail for share:", error);
         setThumbnailUrl("/Creative_TV.png");
       } finally {
         setIsLoadingThumbnail(false);
@@ -131,7 +133,7 @@ export function ShareDialog({
       // You could add a toast notification here
       onOpenChange(false);
     } catch (error) {
-      console.error("Failed to copy link:", error);
+      logger.error("Failed to copy link:", error);
     }
   };
 

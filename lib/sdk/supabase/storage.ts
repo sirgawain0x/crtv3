@@ -1,4 +1,6 @@
 import { supabase } from './client';
+import { serverLogger } from '@/lib/utils/logger';
+
 
 export interface UploadResult {
   success: boolean;
@@ -51,12 +53,12 @@ export class SupabaseStorageService {
           throw new Error(`Failed to create bucket: ${error.message}`);
         }
 
-        console.log(`✅ Created storage bucket: ${this.bucketName}`);
+        serverLogger.debug(`✅ Created storage bucket: ${this.bucketName}`);
       } else {
-        console.log(`✅ Storage bucket already exists: ${this.bucketName}`);
+        serverLogger.debug(`✅ Storage bucket already exists: ${this.bucketName}`);
       }
     } catch (error) {
-      console.error('❌ Failed to initialize storage bucket:', error);
+      serverLogger.error('❌ Failed to initialize storage bucket:', error);
       throw error;
     }
   }
@@ -186,7 +188,7 @@ export class SupabaseStorageService {
 
       return (data as unknown as StorageFile[]) || [];
     } catch (error) {
-      console.error('Error listing user avatars:', error);
+      serverLogger.error('Error listing user avatars:', error);
       return [];
     }
   }
@@ -231,7 +233,7 @@ export class SupabaseStorageService {
         bucketName: this.bucketName,
       };
     } catch (error) {
-      console.error('Error getting storage info:', error);
+      serverLogger.error('Error getting storage info:', error);
       return {
         totalFiles: 0,
         totalSize: 0,

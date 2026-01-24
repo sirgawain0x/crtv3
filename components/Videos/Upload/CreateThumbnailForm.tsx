@@ -22,8 +22,11 @@ import { convertFailingGateway, parseIpfsUriWithFallback } from "@/lib/utils/ima
 import { GatewayImage } from "@/components/ui/gateway-image";
 import { StoryLicenseSelector } from "./StoryLicenseSelector";
 import { NFTMintingStep } from "./NFTMintingStep";
+import { useNftMintingConfigured } from "@/lib/hooks/story/useNftMintingConfigured";
 import type { StoryLicenseTerms } from "@/lib/types/story-protocol";
 import type { Address } from "viem";
+import { logger } from '@/lib/utils/logger';
+
 
 interface FormValues {
   thumbnailType: "custom" | "ai";
@@ -112,6 +115,7 @@ const CreateThumbnailForm = ({
   const customImage = watch("customImage");
   const [storyIPEnabled, setStoryIPEnabled] = useState(false);
   const [selectedStoryLicense, setSelectedStoryLicense] = useState<StoryLicenseTerms | null>(null);
+  const { configured: nftMintingConfigured, loading: nftMintingConfigLoading } = useNftMintingConfigured();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -239,7 +243,7 @@ const CreateThumbnailForm = ({
             return;
           }
 
-          console.error("Error processing thumbnail:", error);
+          logger.error("Error processing thumbnail:", error);
           toast.error("Failed to process thumbnail. Please try again.");
           // Clear blob URL and selected image to prevent submission with invalid URL
           if (blobUrlRef.current) {
@@ -506,7 +510,7 @@ const CreateThumbnailForm = ({
       }
 
     } catch (error) {
-      console.error('AI Generation Error:', error);
+      logger.error('AI Generation Error:', error);
       toast.error(error instanceof Error ? error.message : "Failed to generate AI thumbnail");
       setError("root", {
         message: error instanceof Error ? error.message : "Failed to generate AI thumbnail with Gemini",
@@ -575,7 +579,7 @@ const CreateThumbnailForm = ({
           // Don't call onSelectThumbnailImages with blob URL - it's invalid for server use
         }
       } catch (error) {
-        console.error("Error uploading AI thumbnail:", error);
+        logger.error("Error uploading AI thumbnail:", error);
         toast.error("Failed to upload AI thumbnail. Please try selecting again.");
         // Clear selection - blob URLs can't be used on server
         setSelectedImage(undefined);
@@ -693,7 +697,7 @@ const CreateThumbnailForm = ({
                       alt="Custom thumbnail preview"
                       className="w-full h-full object-cover"
                       onError={(e) => {
-                        console.error("Preview image failed to load:", e);
+                        logger.error("Preview image failed to load:", e);
                         setCustomPreviewUrl(null);
                       }}
                     />
@@ -992,17 +996,29 @@ const CreateThumbnailForm = ({
           }}
         />
 
-        {/* NFT Minting Step - Show when Story Protocol is enabled */}
+        {/* NFT Minting Step - Show when Story Protocol is enabled and minting is configured */}
         {storyIPEnabled && videoAssetId && creatorAddress && metadataURI && (
           <div className="mt-4">
-            <NFTMintingStep
-              videoAssetId={videoAssetId}
-              metadataURI={metadataURI}
-              recipientAddress={creatorAddress}
-              onMintSuccess={(result) => {
-                onNFTMinted?.(result);
-              }}
-            />
+            {nftMintingConfigLoading ? (
+              <Skeleton className="h-24 w-full" />
+            ) : !nftMintingConfigured ? (
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>NFT minting unavailable</AlertTitle>
+                <AlertDescription>
+                  Set STORY_PROTOCOL_PRIVATE_KEY in your environment to enable Story Protocol NFT minting.
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <NFTMintingStep
+                videoAssetId={videoAssetId}
+                metadataURI={metadataURI}
+                recipientAddress={creatorAddress}
+                onMintSuccess={(result) => {
+                  onNFTMinted?.(result);
+                }}
+              />
+            )}
           </div>
         )}
       </div>

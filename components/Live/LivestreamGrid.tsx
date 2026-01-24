@@ -7,6 +7,8 @@ import { Stream } from "livepeer/models/components";
 import { VideoCardSkeleton } from "../Videos/VideoCardSkeleton";
 import { LivestreamThumbnail } from "./LivestreamThumbnail";
 import { getThumbnailUrl } from "@/services/livepeer-thumbnails";
+import { logger } from '@/lib/utils/logger';
+
 
 async function fetchStreamsFromApi(): Promise<Stream[]> {
   const res = await fetch("/api/livepeer");
@@ -49,7 +51,7 @@ export default function LivestreamGrid() {
           }
         });
       } catch (error) {
-        console.error("Error fetching streams:", error);
+        logger.error("Error fetching streams:", error);
         setLoading(false);
       }
     };

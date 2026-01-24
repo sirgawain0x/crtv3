@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { MeToken } from '@/lib/sdk/supabase/client';
+import { logger } from '@/lib/utils/logger';
+
 
 /**
  * Hook to fetch MeToken by owner address
@@ -36,7 +38,7 @@ export function useMeTokenByOwner(ownerAddress?: string | null) {
         setMeToken(result.data || null);
       })
       .catch((err) => {
-        console.error('Error fetching MeToken by owner:', err);
+        logger.error('Error fetching MeToken by owner:', err);
         setError(err instanceof Error ? err.message : 'Failed to fetch MeToken');
         setMeToken(null);
       })

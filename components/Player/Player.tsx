@@ -16,6 +16,8 @@ import "./Player.css";
 import { Src } from "@livepeer/react";
 import { SubtitlesControl } from "./Subtitles";
 import { safelyPauseVideo } from "@/lib/utils/video-controls";
+import { logger } from '@/lib/utils/logger';
+
 
 export const PlayerLoading: React.FC<{ title: string }> = ({ title }) => {
   return (
@@ -115,12 +117,12 @@ export function Player(props: {
   const sourceArray = [...mp4Sources, ...hlsSources, ...otherSources];
 
   // Log the src array for debugging
-  console.log("[Player] src array:", sourceArray);
+  logger.debug("[Player] src array:", sourceArray);
 
   const isInvalidSrc = !src || !Array.isArray(src) || src.length === 0;
 
   if (isInvalidSrc) {
-    console.error("[Player] No valid video source provided:", src);
+    logger.error("[Player] No valid video source provided:", src);
     return (
       <div className="flex h-64 w-full items-center justify-center bg-gray-900 md:h-96">
         <p className="text-lg font-medium text-white">

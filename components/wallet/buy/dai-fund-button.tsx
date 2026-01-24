@@ -3,6 +3,8 @@ import { useSmartAccountClient } from "@account-kit/react";
 import { useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
+import { logger } from '@/lib/utils/logger';
+
 
 interface DaiFundButtonProps {
   onSuccess?: () => void;
@@ -165,7 +167,7 @@ export function DaiFundButton({ onSuccess, presetAmount = 50, className }: DaiFu
             } catch (error) {
               // COOP policy blocked access to window.closed
               // Fall back to alternative detection methods
-              console.warn("Cannot access window.closed due to COOP policy, using alternative detection");
+              logger.warn("Cannot access window.closed due to COOP policy, using alternative detection");
               cleanup();
               // Use focus-based detection as fallback
               fallbackActive = true;
@@ -173,7 +175,7 @@ export function DaiFundButton({ onSuccess, presetAmount = 50, className }: DaiFu
             }
           }, 1000);
         } catch (error) {
-          console.warn("Cannot set up window.closed check due to COOP policy, using alternative detection");
+          logger.warn("Cannot set up window.closed check due to COOP policy, using alternative detection");
           // Use focus-based detection as fallback
           fallbackActive = true;
           handlePopupCloseFallback(newWindow, cleanup, invokeSuccess);
@@ -198,7 +200,7 @@ export function DaiFundButton({ onSuccess, presetAmount = 50, className }: DaiFu
         }
       }
     } catch (error) {
-      console.error('Failed to fund DAI:', error);
+      logger.error('Failed to fund DAI:', error);
       setError(error instanceof Error ? error.message : 'Failed to fund DAI');
     } finally {
       // Set loading to false after all operations complete (or fail)

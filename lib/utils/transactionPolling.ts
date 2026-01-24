@@ -7,6 +7,8 @@
 
 import { createPublicClient, http, decodeEventLog, Log, TransactionReceipt } from 'viem';
 import { base } from 'viem/chains';
+import { logger } from '@/lib/utils/logger';
+
 
 // Base RPC endpoints with fallbacks
 const RPC_ENDPOINTS = [
@@ -62,7 +64,7 @@ async function getPublicClient() {
       await client.getBlockNumber();
       return client;
     } catch (err) {
-      console.warn(`RPC endpoint failed: ${rpcUrl}`, err);
+      logger.warn(`RPC endpoint failed: ${rpcUrl}`, err);
     }
   }
   throw new Error('All RPC endpoints failed');
@@ -92,7 +94,7 @@ export async function pollUserOperationReceipt(
   
   while (attempts < maxAttempts) {
     attempts++;
-    console.log(`🔍 Polling for UserOperation (attempt ${attempts}/${maxAttempts})...`);
+    logger.debug(`🔍 Polling for UserOperation (attempt ${attempts}/${maxAttempts})...`);
     
     try {
       const client = await getPublicClient();
@@ -124,7 +126,7 @@ export async function pollUserOperationReceipt(
               topics: log.topics,
             });
 
-            console.log(`✅ Found UserOperation in ${version} EntryPoint:`, {
+            logger.debug(`✅ Found UserOperation in ${version} EntryPoint:`, {
               txHash: log.transactionHash,
               blockNumber: log.blockNumber,
               success: (decoded.args as any).success,
@@ -140,11 +142,11 @@ export async function pollUserOperationReceipt(
             };
           }
         } catch (err) {
-          console.warn(`Failed to query ${version} EntryPoint:`, err);
+          logger.warn(`Failed to query ${version} EntryPoint:`, err);
         }
       }
     } catch (err) {
-      console.error('Polling error:', err);
+      logger.error('Polling error:', err);
     }
 
     // Wait before next poll
@@ -173,7 +175,7 @@ export async function getTransactionReceiptWithRetry(
       });
       return receipt;
     } catch (err) {
-      console.warn(`Failed to get receipt (attempt ${i + 1}/${maxAttempts}):`, err);
+      logger.warn(`Failed to get receipt (attempt ${i + 1}/${maxAttempts}):`, err);
       await new Promise(resolve => setTimeout(resolve, 2000 + i * 1000));
     }
   }
@@ -201,7 +203,7 @@ export function parseMeTokenAddressFromLogs(logs: Log[]): string | null {
             
             // Basic validation - check if it looks like an address
             if (possibleAddress.length === 42) {
-              console.log('📍 Possible MeToken address from logs:', possibleAddress);
+              logger.debug('📍 Possible MeToken address from logs:', possibleAddress);
               return possibleAddress;
             }
           }
@@ -254,7 +256,7 @@ export async function waitForUserOperationWithFallback(
       },
     };
   } catch (waitError) {
-    console.log('⏰ Standard wait timed out, falling back to polling...');
+    logger.debug('⏰ Standard wait timed out, falling back to polling...');
   }
 
   // Fallback to polling
@@ -314,7 +316,7 @@ export async function findRecentMeTokenForAddress(
         }) as { owner: string };
         
         if (info.owner.toLowerCase() === ownerAddress.toLowerCase()) {
-          console.log('✅ Found MeToken for address:', meToken.id);
+          logger.debug('✅ Found MeToken for address:', meToken.id);
           return meToken.id;
         }
       } catch (err) {
@@ -324,7 +326,7 @@ export async function findRecentMeTokenForAddress(
     
     return null;
   } catch (err) {
-    console.error('Error finding MeToken for address:', err);
+    logger.error('Error finding MeToken for address:', err);
     return null;
   }
 }

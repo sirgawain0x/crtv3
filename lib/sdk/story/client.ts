@@ -12,6 +12,8 @@ import { story } from "viem/chains";
 import { alchemy, base } from "@account-kit/infra";
 import { privateKeyToAccount } from "viem/accounts";
 import type { Address } from "viem";
+import { serverLogger } from '@/lib/utils/logger';
+
 
 /**
  * Create a Story Protocol client instance
@@ -88,7 +90,7 @@ export function createStoryClient(
           request: async (args: any) => {
             // Log all requests for debugging
             if (args.method === 'eth_sendTransaction') {
-              console.log("🔄 Intercepting eth_sendTransaction, converting to signed eth_sendRawTransaction", {
+              serverLogger.debug("🔄 Intercepting eth_sendTransaction, converting to signed eth_sendRawTransaction", {
                 method: args.method,
                 params: args.params,
               });
@@ -110,10 +112,10 @@ export function createStoryClient(
                   nonce: txParams.nonce ? Number(txParams.nonce) : undefined,
                 });
                 
-                console.log("✅ Transaction signed and sent as raw transaction:", hash);
+                serverLogger.debug("✅ Transaction signed and sent as raw transaction:", hash);
                 return hash;
               } catch (error) {
-                console.error("❌ Failed to sign and send transaction:", error);
+                serverLogger.error("❌ Failed to sign and send transaction:", error);
                 throw error;
               }
             }
@@ -124,9 +126,9 @@ export function createStoryClient(
         };
       };
       
-      console.log("✅ Created custom transport with private key signing for Story Protocol");
+      serverLogger.debug("✅ Created custom transport with private key signing for Story Protocol");
     } catch (error) {
-      console.error("Failed to create custom transport with private key:", error);
+      serverLogger.error("Failed to create custom transport with private key:", error);
       // Fall back to base transport
       storyTransport = baseHttpTransport;
     }
@@ -136,7 +138,7 @@ export function createStoryClient(
       storyTransport = transport;
     } else {
       if (transport) {
-        console.warn("Story Protocol: Ignoring incompatible transport, using default HTTP transport");
+        serverLogger.warn("Story Protocol: Ignoring incompatible transport, using default HTTP transport");
       }
       storyTransport = baseHttpTransport;
     }
@@ -159,7 +161,7 @@ export function createStoryClient(
     const client = StoryClient.newClient(config);
     return client;
   } catch (error) {
-    console.error("Failed to create Story Protocol client:", error);
+    serverLogger.error("Failed to create Story Protocol client:", error);
     throw new Error(
       `Story Protocol client initialization failed: ${error instanceof Error ? error.message : "Unknown error"}`
     );
@@ -199,9 +201,9 @@ export function getStoryRpcUrl(): string {
     const isMainnetUrl = customUrl.includes('mainnet') || (customUrl.includes('story.foundation') && !customUrl.includes('aeneid'));
     
     if (network === "mainnet" && isTestnetUrl) {
-      console.warn(`⚠️ Network mismatch: NEXT_PUBLIC_STORY_NETWORK=mainnet but RPC URL appears to be testnet: ${customUrl}`);
+      serverLogger.warn(`⚠️ Network mismatch: NEXT_PUBLIC_STORY_NETWORK=mainnet but RPC URL appears to be testnet: ${customUrl}`);
     } else if (network === "testnet" && isMainnetUrl) {
-      console.warn(`⚠️ Network mismatch: NEXT_PUBLIC_STORY_NETWORK=testnet but RPC URL appears to be mainnet: ${customUrl}`);
+      serverLogger.warn(`⚠️ Network mismatch: NEXT_PUBLIC_STORY_NETWORK=testnet but RPC URL appears to be mainnet: ${customUrl}`);
     }
     
     return customUrl;
@@ -216,7 +218,7 @@ export function getStoryRpcUrl(): string {
   
   // Last resort: Try public endpoints (these may not exist or be accessible)
   // Note: rpc.story.foundation may not be available - Alchemy RPC is preferred
-  console.warn("⚠️ No custom RPC URL or Alchemy key configured. Using public RPC endpoints (may not be available).");
+  serverLogger.warn("⚠️ No custom RPC URL or Alchemy key configured. Using public RPC endpoints (may not be available).");
   return network === "mainnet" 
     ? "https://rpc.story.foundation" 
     : "https://rpc.aeneid.story.foundation";
@@ -255,7 +257,7 @@ export function createStoryPublicClient() {
       });
     } catch (e) {
       // Fallback to custom chain definition if story chain not available
-      console.warn("viem story chain not available, using custom chain definition");
+      serverLogger.warn("viem story chain not available, using custom chain definition");
     }
   }
   

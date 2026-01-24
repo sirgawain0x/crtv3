@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { useSmartAccountClient } from "@account-kit/react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
+import { logger } from '@/lib/utils/logger';
+
 
 /**
  * CoinbaseFundButton Component
@@ -207,7 +209,7 @@ function CoinbaseFundButton({
               
               // Only set up fallback if not already active to prevent duplicate handlers
               if (!fallbackActive) {
-                console.warn(
+                logger.warn(
                   "Cannot access window.closed due to COOP policy, using alternative detection"
                 );
                 fallbackActive = true;
@@ -216,7 +218,7 @@ function CoinbaseFundButton({
             }
           }, 1000);
         } catch (error) {
-          console.warn(
+          logger.warn(
             "Cannot set up window.closed check due to COOP policy, using alternative detection"
           );
           // Use focus-based detection as fallback
@@ -249,7 +251,7 @@ function CoinbaseFundButton({
         }
       }
     } catch (err) {
-      console.error("Failed to start Coinbase onramp:", err);
+      logger.error("Failed to start Coinbase onramp:", err);
       setError("Failed to start Coinbase onramp. Please try again.");
       setLoading(false); // Set loading to false on error
     }

@@ -1,3 +1,5 @@
+
+import { logger } from '@/lib/utils/logger';
 /**
  * Suppress development-mode console warnings that are safe to ignore
  * Only runs in development mode
@@ -29,7 +31,7 @@ if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
     const message = args.join(' ');
     if (shouldSuppress(message)) {
       // Optionally log to a different level for debugging
-      // console.debug('[Suppressed Error]:', ...args);
+      // logger.debug('[Suppressed Error]:', ...args);
       return;
     }
     originalError.apply(console, args);
@@ -42,14 +44,14 @@ if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
     const message = args.join(' ');
     if (shouldSuppress(message)) {
       // Optionally log to a different level for debugging
-      // console.debug('[Suppressed Warning]:', ...args);
+      // logger.debug('[Suppressed Warning]:', ...args);
       return;
     }
     originalWarn.apply(console, args);
   };
 
   // Log that suppressions are active
-  console.debug(
+  logger.debug(
     '%c[Dev Mode] Warning suppression active',
     'color: #888; font-style: italic;'
   );

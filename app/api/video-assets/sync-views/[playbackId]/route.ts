@@ -2,11 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/sdk/supabase/server';
 import { fetchAllViews } from '@/app/api/livepeer/views';
 import { serverLogger } from '@/lib/utils/logger';
+import { rateLimiters } from '@/lib/middleware/rateLimit';
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ playbackId: string }> }
 ) {
+  const rl = await rateLimiters.standard(request);
+  if (rl) return rl;
+
   try {
     const { playbackId } = await params;
     

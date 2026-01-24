@@ -5,6 +5,8 @@ import Image from 'next/image';
 import { convertFailingGateway, getImageUrlWithFallback, isIpfsUrl } from '@/lib/utils/image-gateway';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { ImageProps } from 'next/image';
+import { logger } from '@/lib/utils/logger';
+
 
 interface GatewayImageProps extends Omit<ImageProps, 'src' | 'onLoad'> {
   src: string;
@@ -120,12 +122,12 @@ export function GatewayImage({
 
     if (nextGateway) {
       const triedCount = triedGatewaysRef.current.size;
-      console.log(`Trying fallback gateway ${triedCount}/${fallbacks.length + 1} for IPFS image:`, nextGateway);
+      logger.debug(`Trying fallback gateway ${triedCount}/${fallbacks.length + 1} for IPFS image:`, nextGateway);
       
       // If we've tried 2+ gateways and all failed, warn that content might not exist
       if (consecutiveFailuresRef.current >= 2 && isIpfs) {
         const hash = src.match(/\/ipfs\/([a-zA-Z0-9]+)/)?.[1] || src.match(/ipfs:\/\/([a-zA-Z0-9]+)/)?.[1] || 'unknown';
-        console.warn(`[GatewayImage] Multiple gateways failed for IPFS hash ${hash.substring(0, 10)}... This may indicate the content doesn't exist on IPFS.`);
+        logger.warn(`[GatewayImage] Multiple gateways failed for IPFS hash ${hash.substring(0, 10)}... This may indicate the content doesn't exist on IPFS.`);
       }
       
       // Mark it as tried before setting it as the new source
@@ -142,7 +144,7 @@ export function GatewayImage({
     // Log warning about missing content if all IPFS gateways failed
     if (isIpfs && consecutiveFailuresRef.current >= 2) {
       const hash = src.match(/\/ipfs\/([a-zA-Z0-9]+)/)?.[1] || src.match(/ipfs:\/\/([a-zA-Z0-9]+)/)?.[1] || 'unknown';
-      console.error(`[GatewayImage] All IPFS gateways failed for hash ${hash}. Content appears to not exist on IPFS. Consider re-uploading the image.`);
+      logger.error(`[GatewayImage] All IPFS gateways failed for hash ${hash}. Content appears to not exist on IPFS. Consider re-uploading the image.`);
     }
 
     // If all fallbacks exhausted, try the fallbackSrc prop
@@ -155,7 +157,7 @@ export function GatewayImage({
 
     // All options exhausted - stop trying
     setIsLoading(false);
-    console.warn('[GatewayImage] All IPFS gateways exhausted for image:', src);
+    logger.warn('[GatewayImage] All IPFS gateways exhausted for image:', src);
 
     // Call original onError handler if provided
     if (onError) {

@@ -1,12 +1,16 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getCachedPoapAccessToken } from "@/lib/utils/poap-auth";
 import { serverLogger } from "@/lib/utils/logger";
+import { rateLimiters } from "@/lib/middleware/rateLimit";
 
 /**
  * POST /api/poap/create-event
  * Creates a POAP event for a Snapshot proposal
  */
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+  const rl = await rateLimiters.standard(req);
+  if (rl) return rl;
+
   try {
     // Handle JSON parsing errors
     let body;

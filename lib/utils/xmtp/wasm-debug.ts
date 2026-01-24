@@ -1,3 +1,5 @@
+
+import { logger } from '@/lib/utils/logger';
 /**
  * WASM Debugging Utility
  * 
@@ -67,12 +69,12 @@ export function getWasmDebugInfo(): WasmDebugInfo {
 export function logWasmDebugInfo(): void {
   const info = getWasmDebugInfo();
   console.group('[WASM Debug] Patch Status');
-  console.log('Context:', info.context);
-  console.log('Origin:', info.origin || 'NOT SET');
-  console.log('URL Constructor Patched:', info.urlConstructorPatched);
-  console.log('Fetch Patched:', info.fetchPatched);
-  console.log('Worker Interception Enabled:', info.workerInterceptionEnabled);
-  console.log('Overall Patch Applied:', info.patchApplied);
+  logger.debug('Context:', info.context);
+  logger.debug('Origin:', info.origin || 'NOT SET');
+  logger.debug('URL Constructor Patched:', info.urlConstructorPatched);
+  logger.debug('Fetch Patched:', info.fetchPatched);
+  logger.debug('Worker Interception Enabled:', info.workerInterceptionEnabled);
+  logger.debug('Overall Patch Applied:', info.patchApplied);
   console.groupEnd();
 }
 
@@ -84,30 +86,30 @@ export function testWasmUrlResolution(): void {
   const testUrl = '/_next/static/media/bindings_wasm_bg.317efc09.wasm';
   
   console.group('[WASM Debug] URL Resolution Test');
-  console.log('Test URL:', testUrl);
-  console.log('Origin:', info.origin);
+  logger.debug('Test URL:', testUrl);
+  logger.debug('Origin:', info.origin);
   
   if (!info.origin) {
-    console.error('❌ No origin available - patches may not work!');
+    logger.error('❌ No origin available - patches may not work!');
     console.groupEnd();
     return;
   }
 
   try {
     const resolved = new URL(testUrl, info.origin);
-    console.log('✅ URL Resolution Success:', resolved.href);
+    logger.debug('✅ URL Resolution Success:', resolved.href);
   } catch (e) {
-    console.error('❌ URL Resolution Failed:', e);
+    logger.error('❌ URL Resolution Failed:', e);
   }
   
   try {
     const fetchResult = fetch(testUrl).catch(e => {
-      console.error('❌ Fetch Failed:', e);
+      logger.error('❌ Fetch Failed:', e);
       return null;
     });
-    console.log('Fetch test initiated (check network tab)');
+    logger.debug('Fetch test initiated (check network tab)');
   } catch (e) {
-    console.error('❌ Fetch Test Error:', e);
+    logger.error('❌ Fetch Test Error:', e);
   }
   
   console.groupEnd();

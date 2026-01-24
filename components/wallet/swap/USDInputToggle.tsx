@@ -6,6 +6,8 @@ import { Input } from '@/components/ui/input';
 import { DollarSign } from 'lucide-react';
 import { type TokenSymbol } from '@/lib/sdk/alchemy/swap-service';
 import { priceService } from '@/lib/sdk/alchemy/price-service';
+import { logger } from '@/lib/utils/logger';
+
 
 interface USDInputToggleProps {
   token: TokenSymbol;
@@ -37,7 +39,7 @@ export function USDInputToggle({
           const usd = await priceService.convertToUSD(parseFloat(value), token);
           setUsdValue(usd.toFixed(2));
         } catch (error) {
-          console.error('Error converting to USD:', error);
+          logger.error('Error converting to USD:', error);
         }
       };
       updateUSD();
@@ -63,7 +65,7 @@ export function USDInputToggle({
       );
       onChange(tokenAmount.toFixed(6));
     } catch (error) {
-      console.error('Error converting USD to token:', error);
+      logger.error('Error converting USD to token:', error);
     }
   };
 

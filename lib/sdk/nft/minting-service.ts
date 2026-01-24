@@ -16,6 +16,7 @@ import { createStoryClient } from "@/lib/sdk/story/client";
 import { mintAndRegisterIp, mintAndRegisterIpAndAttachPilTerms, createCollection } from "@/lib/sdk/story/spg-service";
 import { PILFlavor } from "@story-protocol/core-sdk";
 import { WIP_TOKEN_ADDRESS } from "@/lib/sdk/story/constants";
+import { serverLogger } from "@/lib/utils/logger";
 
 // Standard ERC721 ABI for minting
 const ERC721_MINT_ABI = parseAbi([
@@ -53,7 +54,7 @@ export async function mintVideoNFT(
       });
       estimatedTokenId = BigInt(totalSupply as bigint);
     } catch (error) {
-      console.warn("Could not read totalSupply, will extract token ID from Transfer event:", error);
+      serverLogger.warn("Could not read totalSupply, will extract token ID from Transfer event:", error);
     }
 
     // Try safeMint first (more common), fallback to mint if needed
@@ -122,10 +123,10 @@ export async function mintVideoNFT(
       } else {
         // Fallback: try to read the token ID by checking balance change
         // This is less reliable but better than nothing
-        console.warn("Could not extract token ID from Transfer event, using estimated value");
+        serverLogger.warn("Could not extract token ID from Transfer event, using estimated value");
       }
     } catch (error) {
-      console.warn("Could not extract token ID from receipt, using estimated value:", error);
+      serverLogger.warn("Could not extract token ID from receipt, using estimated value:", error);
     }
 
     return {
@@ -134,7 +135,7 @@ export async function mintVideoNFT(
       txHash: txHash as string,
     };
   } catch (error) {
-    console.error("Failed to mint NFT:", error);
+    serverLogger.error("Failed to mint NFT:", error);
     throw new Error(
       `NFT minting failed: ${error instanceof Error ? error.message : "Unknown error"}`
     );
@@ -152,7 +153,7 @@ export function getNFTContractAddress(): Address | null {
   }
   // Basic validation
   if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
-    console.warn("Invalid NFT contract address format:", address);
+    serverLogger.warn("Invalid NFT contract address format:", address);
     return null;
   }
   return address as Address;
@@ -211,7 +212,7 @@ export async function mintVideoNFTOnStory(
     const storyClient = createStoryClient(creatorAddress, undefined, customTransport);
 
     if (licenseParams) {
-      console.log("Minting with license terms:", licenseParams);
+      serverLogger.debug("Minting with license terms:", licenseParams);
       // Mint, register, and attach PIL terms
       const result = await mintAndRegisterIpAndAttachPilTerms(storyClient, {
         collectionAddress,
@@ -253,7 +254,7 @@ export async function mintVideoNFTOnStory(
       };
     }
   } catch (error) {
-    console.error("Failed to mint NFT on Story Protocol:", error);
+    serverLogger.error("Failed to mint NFT on Story Protocol:", error);
     throw new Error(
       `Story Protocol NFT minting failed: ${error instanceof Error ? error.message : "Unknown error"}`
     );
@@ -293,7 +294,7 @@ export async function createCollectionAndMintVideoNFTOnStory(
     // These can be different: platform pays gas, creator owns collection
     const collectionOwner = creatorAddress || accountAddress;
 
-    console.log("Creating collection...", { 
+    serverLogger.debug("Creating collection...", { 
       name, 
       symbol, 
       accountAddress, // Address used for signing (funding wallet - pays gas)
@@ -317,7 +318,7 @@ export async function createCollectionAndMintVideoNFTOnStory(
       owner: accountAddress, // Funding wallet owns collection (needed for minting authorization)
       mintFeeRecipient: collectionOwner, // Creator receives mint fees
     });
-    console.log("Collection created at:", collectionAddress);
+    serverLogger.debug("Collection created at:", collectionAddress);
 
     let result;
     if (licenseParams) {
@@ -349,7 +350,7 @@ export async function createCollectionAndMintVideoNFTOnStory(
     };
 
   } catch (error) {
-    console.error("Failed to create collection and mint on Story:", error);
+    serverLogger.error("Failed to create collection and mint on Story:", error);
     throw new Error(
       `Story Protocol create & mint failed: ${error instanceof Error ? error.message : "Unknown error"}`
     );

@@ -5,6 +5,8 @@ import Joyride, { CallBackProps, STATUS, Step, EVENTS } from 'react-joyride';
 import { usePathname, useRouter } from 'next/navigation';
 import { useUser } from '@account-kit/react';
 import { useTour } from '@/context/TourContext';
+import { logger } from '@/lib/utils/logger';
+
 
 const DESKTOP_STEPS: Step[] = [
     {
@@ -121,7 +123,7 @@ export const Tour = () => {
         const currentStep = steps[index];
         const currentId = (currentStep?.data as any)?.id;
 
-        console.log("Tour: Callback", { index, status, type, action, currentId });
+        logger.debug("Tour: Callback", { index, status, type, action, currentId });
 
         if ([STATUS.FINISHED, STATUS.SKIPPED].includes(status as any)) {
             setRun(false);

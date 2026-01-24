@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { EyeIcon } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { logger } from '@/lib/utils/logger';
+
 
 interface ViewsComponentProps {
   playbackId: string;
@@ -52,7 +54,7 @@ export const ViewsComponent: React.FC<ViewsComponentProps> = ({
         }
       } catch (err) {
         setError((err as Error).message || "Failed to fetch view metrics");
-        console.error("Error fetching view metrics:", err);
+        logger.error("Error fetching view metrics:", err);
       } finally {
         setLoading(false);
       }

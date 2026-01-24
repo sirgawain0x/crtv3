@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { IPFSService } from '@/lib/sdk/ipfs/service';
 import { serverLogger } from '@/lib/utils/logger';
+import { rateLimiters } from '@/lib/middleware/rateLimit';
 
 // Initialize IPFS service with hybrid storage
 // Lighthouse (Primary) - Better CDN distribution, especially for West Coast
@@ -63,6 +64,9 @@ async function urlToFile(url: string, filename: string): Promise<File | null> {
 }
 
 export async function POST(request: NextRequest) {
+  const rl = await rateLimiters.standard(request);
+  if (rl) return rl;
+
   try {
     // Handle JSON parsing errors
     let body;

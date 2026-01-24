@@ -2,6 +2,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
+import { logger } from '@/lib/utils/logger';
+
 
 export type TranscodeStatus = 'idle' | 'loading' | 'transcoding' | 'complete' | 'error';
 
@@ -18,7 +20,7 @@ export const useTranscoder = () => {
 
         // Handle log messages
         ffmpeg.on('log', ({ message }) => {
-            console.log('FFmpeg log:', message);
+            logger.debug('FFmpeg log:', message);
         });
 
         ffmpeg.on('progress', ({ progress, time }) => {
@@ -75,7 +77,7 @@ export const useTranscoder = () => {
             return transcodFile;
 
         } catch (err: any) {
-            console.error('Transcoding error:', err);
+            logger.error('Transcoding error:', err);
             setError(err.message || 'Failed to transcode video');
             setStatus('error');
             return null;

@@ -24,6 +24,8 @@ import { toast } from "sonner";
 import { submitAnswer } from "@/lib/sdk/reality-eth/reality-eth-question-wrapper";
 import { useWalletStatus } from "@/lib/hooks/accountkit/useWalletStatus";
 import { useMembershipVerification } from "@/lib/hooks/unlock/useMembershipVerification";
+import { logger } from '@/lib/utils/logger';
+
 
 const betSchema = z.object({
   answer: z.string().min(1, "Please select an answer"),
@@ -121,7 +123,7 @@ export function BetForm({ questionId, questionType, outcomes }: BetFormProps) {
       toast.success("Bet placed successfully!");
       form.reset();
     } catch (err: any) {
-      console.error("Error placing bet:", err);
+      logger.error("Error placing bet:", err);
       let errorMessage = err?.message || "Failed to place bet. Please try again.";
 
       // Improve error message for common issues
@@ -139,7 +141,7 @@ export function BetForm({ questionId, questionType, outcomes }: BetFormProps) {
   }
 
   // Debug logging
-  console.log("🎲 BetForm Rendering:", { questionId, questionType, outcomes, canBet });
+  logger.debug("🎲 BetForm Rendering:", { questionId, questionType, outcomes, canBet });
 
   return (
     <Form {...form}>

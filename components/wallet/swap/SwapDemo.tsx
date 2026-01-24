@@ -4,6 +4,8 @@ import { AlchemySwapWidget } from './AlchemySwapWidget';
 import { DaiSwapButton } from './DaiSwapButton';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { logger } from '@/lib/utils/logger';
+
 
 export function SwapDemo() {
   return (
@@ -25,7 +27,7 @@ export function SwapDemo() {
             <TabsContent value="full-widget" className="mt-6">
               <AlchemySwapWidget 
                 onSwapSuccess={() => {
-                  console.log('Full widget swap completed!');
+                  logger.debug('Full widget swap completed!');
                 }}
               />
             </TabsContent>
@@ -33,7 +35,7 @@ export function SwapDemo() {
             <TabsContent value="dai-swap" className="mt-6">
               <DaiSwapButton 
                 onSwapSuccess={() => {
-                  console.log('DAI swap completed!');
+                  logger.debug('DAI swap completed!');
                 }}
               />
             </TabsContent>
