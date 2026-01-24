@@ -256,8 +256,13 @@ export function PredictionDetails({ questionId }: PredictionDetailsProps) {
       {isResolved && finalAnswer ? (
         <>
           <Card className="p-4 bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800">
-            <div className="font-semibold text-green-800 dark:text-green-200">
-              Final Answer: {finalAnswer}
+            <div className="grid grid-cols-1 md:grid-cols-[auto_1fr] gap-2 items-baseline">
+              <span className="font-semibold text-green-800 dark:text-green-200 whitespace-nowrap">
+                Final Answer:
+              </span>
+              <span className="font-mono text-sm text-green-700 dark:text-green-300 break-all">
+                {finalAnswer}
+              </span>
             </div>
           </Card>
           <ClaimWinningsCard questionId={questionId} />

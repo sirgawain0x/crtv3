@@ -34,7 +34,7 @@ export function ShareDialog({
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
   const [isLoadingThumbnail, setIsLoadingThumbnail] = useState(true);
   const [shareUrl, setShareUrl] = useState<string>("");
-  
+
   // Remove .mp4 extension from title if present
   const cleanTitle = videoTitle.endsWith('.mp4') ? videoTitle.slice(0, -4) : videoTitle;
 
@@ -199,7 +199,7 @@ export function ShareDialog({
               variant="outline"
               className="flex items-center justify-center gap-2 h-auto py-3"
             >
-              <ExternalLink className="h-5 w-5" />
+              <img src="/icons/Bluesky_butterfly-logo.svg" alt="Bluesky" className="h-5 w-5" />
               <span>Bluesky</span>
             </Button>
           </div>

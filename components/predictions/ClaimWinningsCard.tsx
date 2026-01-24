@@ -89,36 +89,47 @@ export function ClaimWinningsCard({ questionId }: ClaimWinningsCardProps) {
       const { history_hashes, addrs, bonds, answers } = buildClaimWinningsParams(history);
 
       setStep("claiming");
-      await claimWinningsTx(publicClient, accountKitClient as any, {
-        questionId,
-        history_hashes,
-        addrs,
-        bonds,
-        answers,
-      });
-      toast.success("Winnings distributed.");
+      try {
+        await claimWinningsTx(publicClient, accountKitClient as any, {
+          questionId,
+          history_hashes,
+          addrs,
+          bonds,
+          answers,
+        });
+        toast.success("Winnings distributed.");
+      } catch (claimError: any) {
+        // If claim fails, we check if it was because it's already claimed or similar
+        const msg = claimError?.message || "";
+        logger.warn("Claim warning (might be already claimed):", claimError);
 
+        if (msg.toLowerCase().includes("already") || msg.toLowerCase().includes("revert")) {
+          toast.info("Winnings might already be distributed. Checking balance...");
+        } else {
+          // If it's a real unknown error, we stop here? 
+          // Or we continues to check balance just in case.
+          toast.error("Distribution step failed, but checking for withdrawable funds...");
+        }
+      }
+
+      // Always check balance after claim attempt
       const bal = await getBalanceOf(publicClient, walletAddress as `0x${string}`);
       if (bal > 0n) {
         setStep("withdrawing");
         await withdraw(publicClient, accountKitClient as any);
         toast.success("Withdrawal successful!");
       } else {
-        toast.success("You had no balance to withdraw (e.g. you weren’t a winner).");
+        toast.info("No funds to withdraw.");
       }
 
       setStep("done");
       await fetchBalanceAndClaimability();
     } catch (e: unknown) {
-      logger.error("Claim/withdraw error:", e);
-      const msg = (e as { message?: string })?.message ?? "Claim or withdrawal failed.";
+      logger.error("Claim/withdraw process error:", e);
+      const msg = (e as { message?: string })?.message ?? "Process failed.";
       setError(msg);
       setStep("error");
-      if (msg.toLowerCase().includes("already") || msg.toLowerCase().includes("claimed")) {
-        toast.error("Winnings already claimed. Try withdrawing only.");
-      } else {
-        toast.error(msg);
-      }
+      toast.error("Failed to complete claim process.");
     }
   };
 
