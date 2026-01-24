@@ -208,10 +208,10 @@ const CreateThumbnailForm = ({
             // This ensures the URL is in a format that can be accessed from any region
             // convertFailingGateway handles ipfs:// protocol and converts to Lighthouse gateway
             const ipfsUrl = convertFailingGateway(result.thumbnailUrl);
-            
+
             // Ensure we have a valid gateway URL (not ipfs:// protocol)
             // If conversion didn't work, use parseIpfsUriWithFallback as backup
-            const finalUrl = ipfsUrl.startsWith('ipfs://') 
+            const finalUrl = ipfsUrl.startsWith('ipfs://')
               ? parseIpfsUriWithFallback(ipfsUrl, 0) // Use Lighthouse (index 0)
               : ipfsUrl;
 
@@ -566,7 +566,7 @@ const CreateThumbnailForm = ({
           // Convert ipfs:// protocol to gateway URL for database storage
           const ipfsUrl = convertFailingGateway(result.thumbnailUrl);
           // Ensure we have a valid gateway URL (not ipfs:// protocol)
-          const finalUrl = ipfsUrl.startsWith('ipfs://') 
+          const finalUrl = ipfsUrl.startsWith('ipfs://')
             ? parseIpfsUriWithFallback(ipfsUrl, 0) // Use Lighthouse (index 0)
             : ipfsUrl;
           setSelectedImage(finalUrl);
@@ -591,7 +591,7 @@ const CreateThumbnailForm = ({
       // It's already a persistent URL (IPFS or other), use it directly
       const persistentUrl = convertFailingGateway(imageUrl);
       // Ensure we have a valid gateway URL (not ipfs:// protocol)
-      const finalUrl = persistentUrl.startsWith('ipfs://') 
+      const finalUrl = persistentUrl.startsWith('ipfs://')
         ? parseIpfsUriWithFallback(persistentUrl, 0) // Use Lighthouse (index 0)
         : persistentUrl;
       setSelectedImage(finalUrl);
@@ -707,8 +707,8 @@ const CreateThumbnailForm = ({
                       alt="Custom thumbnail preview"
                       fill
                       className="object-cover"
-                      unoptimized
-                      showSkeleton={false}
+                      unoptimized={true} // Always unoptimized for uploads to prevent timeouts
+                      showSkeleton={true}
                     />
                   )}
                   {/* Show loading overlay during compression/upload */}

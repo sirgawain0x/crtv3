@@ -206,15 +206,15 @@ export function MeTokenPortfolio({ targetAddress, className }: MeTokenPortfolioP
       {/* Other Holdings */}
       {otherHoldings.length > 0 && (
         <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Users className="h-4 w-4" />
               MeToken Holdings
             </CardTitle>
-            <CardDescription>MeTokens from other creators</CardDescription>
+            <CardDescription className="text-xs">MeTokens from other creators</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
+            <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
               {otherHoldings.map((holding) => (
                 <MeTokenHoldingCard
                   key={holding.address}
