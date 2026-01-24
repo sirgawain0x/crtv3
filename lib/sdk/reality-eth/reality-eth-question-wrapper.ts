@@ -435,6 +435,209 @@ export async function getFinalAnswer(
 }
 
 /**
+ * Answer history entry from LogNewAnswer events (chronological order)
+ */
+export interface AnswerHistoryEntry {
+  answer: `0x${string}`;
+  history_hash: `0x${string}`;
+  user: Address;
+  bond: bigint;
+  ts: bigint;
+  is_commitment: boolean;
+}
+
+/**
+ * Fetches answer history for a question from LogNewAnswer events.
+ * Used to build claimWinnings params. Entries are in chronological order (oldest first).
+ */
+export async function getAnswerHistory(
+  publicClient: PublicClient,
+  questionId: string
+): Promise<AnswerHistoryEntry[]> {
+  const contractAddress = getRealityEthContractAddress();
+
+  const logNewAnswerAbi = parseAbi([
+    "event LogNewAnswer(bytes32 answer, bytes32 indexed question_id, bytes32 history_hash, address indexed user, uint256 bond, uint256 ts, bool is_commitment)",
+  ])[0] as any;
+
+  const logs = await publicClient.getLogs({
+    address: contractAddress,
+    event: logNewAnswerAbi,
+    args: { question_id: questionId as `0x${string}` },
+    fromBlock: 0n,
+  });
+
+  const withMeta = logs.map((log) => {
+    const a = (log as { args?: Record<string, unknown> }).args;
+    if (!a || typeof a !== "object") throw new Error("LogNewAnswer: missing args");
+    return {
+      answer: a.answer as `0x${string}`,
+      history_hash: a.history_hash as `0x${string}`,
+      user: a.user as Address,
+      bond: BigInt(String(a.bond)),
+      ts: BigInt(String(a.ts)),
+      is_commitment: Boolean(a.is_commitment),
+      blockNumber: log.blockNumber,
+      logIndex: log.logIndex,
+    };
+  });
+
+  withMeta.sort((x, y) => {
+    if (x.blockNumber !== y.blockNumber) return x.blockNumber < y.blockNumber ? -1 : 1;
+    return x.logIndex < y.logIndex ? -1 : x.logIndex > y.logIndex ? 1 : 0;
+  });
+
+  return withMeta.map(({ blockNumber: _, logIndex: __, ...e }) => e);
+}
+
+/**
+ * Build arrays for claimWinnings from answer history.
+ * Order: chronological (oldest first). history_hashes[i] = hash before entry i.
+ */
+export function buildClaimWinningsParams(entries: AnswerHistoryEntry[]): {
+  history_hashes: `0x${string}`[];
+  addrs: Address[];
+  bonds: bigint[];
+  answers: `0x${string}`[];
+} {
+  const history_hashes: `0x${string}`[] = [];
+  const addrs: Address[] = [];
+  const bonds: bigint[] = [];
+  const answers: `0x${string}`[] = [];
+
+  const zero = "0x0000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`;
+  for (let i = 0; i < entries.length; i++) {
+    history_hashes.push(i === 0 ? zero : entries[i - 1].history_hash);
+    addrs.push(entries[i].user);
+    bonds.push(entries[i].bond);
+    answers.push(entries[i].answer);
+  }
+  return { history_hashes, addrs, bonds, answers };
+}
+
+/**
+ * Claim winnings for a finalized question. Distributes bounty and bonds to winners' contract balances.
+ * Anyone can call this. Winners must then call withdraw() to receive ETH.
+ */
+export async function claimWinnings(
+  publicClient: PublicClient,
+  walletClient: WalletClient | any,
+  params: {
+    questionId: string;
+    history_hashes: `0x${string}`[];
+    addrs: Address[];
+    bonds: bigint[];
+    answers: `0x${string}`[];
+  }
+): Promise<`0x${string}`> {
+  const contractAddress = getRealityEthContractAddress();
+  const account = walletClient.account?.address;
+  if (!account) throw new Error("Wallet account not found");
+
+  const abi = getRealityEthABI();
+  const data = encodeFunctionData({
+    abi,
+    functionName: "claimWinnings",
+    args: [
+      params.questionId as `0x${string}`,
+      params.history_hashes,
+      params.addrs,
+      params.bonds,
+      params.answers,
+    ],
+  });
+
+  if (walletClient.sendUserOperation && typeof walletClient.sendUserOperation === "function") {
+    const op = await walletClient.sendUserOperation({
+      uo: { target: contractAddress, data: data as `0x${string}`, value: 0n },
+    });
+    if (walletClient.waitForUserOperationTransaction) {
+      const receipt = await walletClient.waitForUserOperationTransaction({ hash: op.hash });
+      if (typeof receipt === "string") return receipt as `0x${string}`;
+      if (receipt && typeof receipt === "object") {
+        if ("transactionHash" in receipt) return (receipt as any).transactionHash as `0x${string}`;
+        if ("receipt" in receipt && (receipt as any).receipt?.transactionHash)
+          return (receipt as any).receipt.transactionHash as `0x${string}`;
+      }
+    }
+    return op.hash as `0x${string}`;
+  }
+
+  const hash = await walletClient.sendTransaction({
+    chain: walletClient.chain || base,
+    to: contractAddress,
+    data,
+    value: 0n,
+    account,
+  });
+  return hash;
+}
+
+/**
+ * Withdraw your balance from the Reality.eth contract to your wallet.
+ * Call after claimWinnings (or when you have balance from other questions).
+ */
+export async function withdraw(
+  publicClient: PublicClient,
+  walletClient: WalletClient | any
+): Promise<`0x${string}`> {
+  const contractAddress = getRealityEthContractAddress();
+  const account = walletClient.account?.address;
+  if (!account) throw new Error("Wallet account not found");
+
+  const abi = getRealityEthABI();
+  const data = encodeFunctionData({ abi, functionName: "withdraw", args: [] });
+
+  if (walletClient.sendUserOperation && typeof walletClient.sendUserOperation === "function") {
+    const op = await walletClient.sendUserOperation({
+      uo: { target: contractAddress, data: data as `0x${string}`, value: 0n },
+    });
+    if (walletClient.waitForUserOperationTransaction) {
+      const receipt = await walletClient.waitForUserOperationTransaction({ hash: op.hash });
+      if (typeof receipt === "string") return receipt as `0x${string}`;
+      if (receipt && typeof receipt === "object") {
+        if ("transactionHash" in receipt) return (receipt as any).transactionHash as `0x${string}`;
+        if ("receipt" in receipt && (receipt as any).receipt?.transactionHash)
+          return (receipt as any).receipt.transactionHash as `0x${string}`;
+      }
+    }
+    return op.hash as `0x${string}`;
+  }
+
+  return walletClient.sendTransaction({
+    chain: walletClient.chain || base,
+    to: contractAddress,
+    data,
+    value: 0n,
+    account,
+  });
+}
+
+/**
+ * Get a user's balance held in the Reality.eth contract (claimable via withdraw).
+ */
+export async function getBalanceOf(
+  publicClient: PublicClient,
+  address: Address
+): Promise<bigint> {
+  const contract = getRealityEthContract(publicClient);
+  const r = await contract.read.balanceOf([address]);
+  return typeof r === "bigint" ? r : (r as unknown as bigint[])[0];
+}
+
+/**
+ * Check if a question is finalized.
+ */
+export async function isQuestionFinalized(
+  publicClient: PublicClient,
+  questionId: string
+): Promise<boolean> {
+  const contract = getRealityEthContract(publicClient);
+  const r = await contract.read.isFinalized([questionId as `0x${string}`]);
+  return typeof r === "boolean" ? r : (r as unknown as boolean[])[0];
+}
+
+/**
  * Create question with encoded text
  * 
  * Helper function that combines question encoding with creation

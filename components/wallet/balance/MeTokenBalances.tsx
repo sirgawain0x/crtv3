@@ -5,7 +5,7 @@ import { useSmartAccountClient, useUser } from "@account-kit/react";
 import { formatEther } from "viem";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMeTokensSupabase, MeTokenData } from "@/lib/hooks/metokens/useMeTokensSupabase";
-import { useMeTokenHoldings } from "@/lib/hooks/metokens/useMeTokenHoldings";
+import { useMeTokenHoldings, type MeTokenHolding } from "@/lib/hooks/metokens/useMeTokenHoldings";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Coins, TrendingUp, Lock, ExternalLink, Wallet, Users, Crown } from "lucide-react";
@@ -64,6 +64,7 @@ export function MeTokenBalances() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showPortfolio, setShowPortfolio] = useState(false);
+  const [maxVisibleItems] = useState(3); // Show max 3 items in dropdown, then scroll
 
   // Get the user's MeToken data
   const { userMeToken, loading: meTokenLoading, error: meTokenError } = useMeTokensSupabase();
@@ -71,11 +72,39 @@ export function MeTokenBalances() {
   // Get all MeToken holdings
   const { holdings, loading: holdingsLoading } = useMeTokenHoldings();
 
-  // Determine if user has multiple holdings
-  const hasMultipleHoldings = holdings.length > 1 || (holdings.length === 1 && !holdings[0]?.isOwnMeToken);
+  // Combine user's own MeToken with holdings for display
+  const allMeTokens: MeTokenHolding[] = [
+    ...(userMeToken ? [{
+      address: userMeToken.address,
+      name: userMeToken.name,
+      symbol: userMeToken.symbol,
+      balance: typeof userMeToken.balance === 'bigint' 
+        ? formatEther(userMeToken.balance) 
+        : (userMeToken.balance || "0"),
+      balanceRaw: typeof userMeToken.balance === 'bigint' ? userMeToken.balance : BigInt(0),
+      totalSupply: BigInt(0),
+      tvl: userMeToken.tvl,
+      creatorProfile: null,
+      ownerAddress: scaAddress || user?.address || "",
+      isOwnMeToken: true,
+      hubId: 0,
+      balancePooled: BigInt(0),
+      balanceLocked: BigInt(0),
+      startTime: BigInt(0),
+      endTime: BigInt(0),
+      endCooldown: BigInt(0),
+      targetHubId: 0,
+      migration: false,
+    } as MeTokenHolding] : []),
+    ...holdings.filter(h => !h.isOwnMeToken || !userMeToken) // Avoid duplicates
+  ];
 
-  // Show portfolio view if user has multiple holdings or specifically requests it
-  if (showPortfolio || hasMultipleHoldings) {
+  const totalCount = allMeTokens.length;
+  const visibleMeTokens = allMeTokens.slice(0, maxVisibleItems);
+  const hasMore = totalCount > maxVisibleItems;
+
+  // Show portfolio view in a dialog/modal if user clicks "View All"
+  if (showPortfolio) {
     return <MeTokenPortfolio />;
   }
 
@@ -84,7 +113,7 @@ export function MeTokenBalances() {
     return (
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <span className="text-sm font-medium text-gray-500">MeTokens</span>
+          <span className="text-sm font-medium text-gray-500">MeToken Portfolio</span>
         </div>
         <div className="space-y-2">
           <div className="flex items-center justify-between">
@@ -104,7 +133,7 @@ export function MeTokenBalances() {
     return (
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <span className="text-sm font-medium text-gray-500">MeTokens</span>
+          <span className="text-sm font-medium text-gray-500">MeToken Portfolio</span>
         </div>
         <div className="text-xs text-red-500">
           Error loading MeTokens: {error || meTokenError}
@@ -113,75 +142,26 @@ export function MeTokenBalances() {
     );
   }
 
-  // Show no MeTokens state - only show this if we're not loading and have no holdings or user MeToken
-  if (!isLoading && !meTokenLoading && !holdingsLoading && holdings.length === 0 && !userMeToken) {
+  // Show no MeTokens state
+  if (!isLoading && !meTokenLoading && !holdingsLoading && totalCount === 0) {
     return null;
   }
 
-  // If user has their own MeToken but no holdings (0 balance), show the MeToken
-  if (!isLoading && !meTokenLoading && !holdingsLoading && holdings.length === 0 && userMeToken) {
-    return (
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-sm font-medium text-gray-500">MeTokens</span>
-        </div>
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1">
-                <Coins className="h-3 w-3 text-blue-500" />
-                <span className="text-sm font-medium">{userMeToken.symbol}</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <Badge variant="default" className="text-xs px-1 py-0 bg-primary">
-                  <Crown className="h-2 w-2 mr-1" />
-                  Yours
-                </Badge>
-              </div>
-            </div>
-            <div className="text-right">
-              <div className="text-sm font-medium">
-                {formatBalance(
-                  typeof userMeToken.balance === 'bigint'
-                    ? formatEther(userMeToken.balance)
-                    : (userMeToken.balance || "0"),
-                  userMeToken.symbol
-                )}
-              </div>
-              <div className="text-xs text-gray-500">
-                TVL: {formatTVL(userMeToken.tvl)}
-              </div>
-            </div>
-          </div>
-
-          {/* Link to profile for MeToken management */}
-          <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
-            <Link
-              href={`/profile/${scaAddress || user?.address}`}
-              className={`flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors`}
-            >
-              <ExternalLink className="h-3 w-3" />
-              Manage MeToken
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Show single MeToken balance (simple view)
-  const singleHolding = holdings[0];
-
-  // Safety check - if no holdings, return empty state
-  if (!singleHolding) {
-    return null;
-  }
+  // Calculate total value
+  const totalValue = allMeTokens.reduce((sum, token) => sum + token.tvl, 0);
+  const uniqueCreators = new Set(allMeTokens.map(t => t.ownerAddress)).size;
 
   return (
     <div className="space-y-2">
+      {/* Portfolio Summary Header */}
       <div className="flex items-center justify-between">
-        <span className="text-sm font-medium text-gray-500">MeTokens</span>
-        {holdings.length > 1 && (
+        <div className="flex flex-col">
+          <span className="text-sm font-medium text-gray-500">MeToken Portfolio</span>
+          <span className="text-xs text-gray-400">
+            {totalCount} MeToken{totalCount !== 1 ? 's' : ''} • {uniqueCreators} Creator{uniqueCreators !== 1 ? 's' : ''}
+          </span>
+        </div>
+        {totalCount > maxVisibleItems && (
           <Button
             variant="ghost"
             size="sm"
@@ -189,51 +169,65 @@ export function MeTokenBalances() {
             className="text-xs h-6 px-2"
           >
             <Wallet className="h-3 w-3 mr-1" />
-            View All ({holdings.length})
+            View All
           </Button>
         )}
       </div>
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1">
-              <Coins className="h-3 w-3 text-blue-500" />
-              <span className="text-sm font-medium">{singleHolding.symbol}</span>
-            </div>
-            <div className="flex items-center gap-1">
-              {singleHolding.isOwnMeToken ? (
-                <Badge variant="default" className="text-xs px-1 py-0 bg-primary">
-                  <Crown className="h-2 w-2 mr-1" />
-                  Yours
-                </Badge>
-              ) : (
-                <Badge variant="secondary" className="text-xs px-1 py-0">
-                  <Users className="h-2 w-2 mr-1" />
-                  Held
-                </Badge>
-              )}
-            </div>
-          </div>
-          <div className="text-right">
-            <div className="text-sm font-medium">
-              {formatBalance(singleHolding.balance, singleHolding.symbol)}
-            </div>
-            <div className="text-xs text-gray-500">
-              TVL: {formatTVL(singleHolding.tvl)}
-            </div>
-          </div>
-        </div>
 
-        {/* Link to profile for MeToken management */}
-        <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
+      {/* Total Value */}
+      <div className="pb-2 border-b border-gray-200 dark:border-gray-700">
+        <div className="text-xs text-gray-500 mb-1">Total Value</div>
+        <div className="text-lg font-semibold">{formatTVL(totalValue)}</div>
+      </div>
+
+      {/* Scrollable MeToken List */}
+      <div className="space-y-1.5 max-h-[200px] overflow-y-auto pr-1">
+        {visibleMeTokens.map((token) => (
           <Link
-            href={`/profile/${singleHolding.isOwnMeToken ? (scaAddress || user?.address) : singleHolding.ownerAddress}`}
-            className={`flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors`}
+            key={token.address}
+            href={`/profile/${token.isOwnMeToken ? (scaAddress || user?.address) : token.ownerAddress}`}
+            className="flex items-center justify-between p-2 rounded hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors group"
           >
-            <ExternalLink className="h-3 w-3" />
-            {singleHolding.isOwnMeToken ? 'Manage MeToken' : 'View Creator Profile'}
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <Coins className="h-3.5 w-3.5 text-blue-500 flex-shrink-0" />
+              <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                <span className="text-sm font-medium truncate">{token.symbol}</span>
+                {token.isOwnMeToken ? (
+                  <Badge variant="default" className="text-xs px-1 py-0 bg-primary flex-shrink-0">
+                    <Crown className="h-2 w-2 mr-0.5" />
+                    Yours
+                  </Badge>
+                ) : (
+                  <Badge variant="secondary" className="text-xs px-1 py-0 flex-shrink-0">
+                    <Users className="h-2 w-2 mr-0.5" />
+                    Held
+                  </Badge>
+                )}
+              </div>
+            </div>
+            <div className="text-right flex-shrink-0 ml-2">
+              <div className="text-sm font-medium">
+                {formatBalance(token.balance, token.symbol)}
+              </div>
+              <div className="text-xs text-gray-500">
+                {formatTVL(token.tvl)}
+              </div>
+            </div>
+            <ExternalLink className="h-3 w-3 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity ml-1 flex-shrink-0" />
           </Link>
-        </div>
+        ))}
+        
+        {/* Show more indicator */}
+        {hasMore && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowPortfolio(true)}
+            className="w-full text-xs h-7 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+          >
+            View {totalCount - maxVisibleItems} more...
+          </Button>
+        )}
       </div>
     </div>
   );

@@ -11,6 +11,7 @@ import { createPublicClient, http, fallback, formatEther } from "viem";
 import { getQuestion, getFinalAnswer, type RealityEthQuestion } from "@/lib/sdk/reality-eth/reality-eth-question-wrapper";
 import { parseQuestionText, formatQuestionForDisplay } from "@/lib/sdk/reality-eth/reality-eth-utils";
 import { BetForm } from "./BetForm";
+import { ClaimWinningsCard } from "./ClaimWinningsCard";
 import { Clock, TrendingUp } from "lucide-react";
 import { logger } from '@/lib/utils/logger';
 
@@ -253,11 +254,14 @@ export function PredictionDetails({ questionId }: PredictionDetailsProps) {
       )}
 
       {isResolved && finalAnswer ? (
-        <Card className="p-4 bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800">
-          <div className="font-semibold text-green-800 dark:text-green-200">
-            Final Answer: {finalAnswer}
-          </div>
-        </Card>
+        <>
+          <Card className="p-4 bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800">
+            <div className="font-semibold text-green-800 dark:text-green-200">
+              Final Answer: {finalAnswer}
+            </div>
+          </Card>
+          <ClaimWinningsCard questionId={questionId} />
+        </>
       ) : (
         /* Show Current Best Answer if available and not resolved */
         question.best_answer &&
