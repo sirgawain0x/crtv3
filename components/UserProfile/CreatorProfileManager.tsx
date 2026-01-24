@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,7 +13,6 @@ import { useToast } from '@/components/ui/use-toast';
 import { useWalletStatus } from '@/lib/hooks/accountkit/useWalletStatus';
 import { AvatarUpload } from './AvatarUpload';
 import { Loader2, CheckCircle, AlertCircle, User, Save, Edit3 } from 'lucide-react';
-import { convertFailingGateway, isIpfsUrl } from '@/lib/utils/image-gateway';
 
 interface CreatorProfileManagerProps {
   targetAddress?: string;
@@ -147,7 +145,8 @@ export function CreatorProfileManager({ targetAddress, onProfileUpdated }: Creat
           <AvatarUpload
             targetAddress={targetAddress}
             size="md"
-            showUploadButton={isOwner && isEditing}
+            showUploadButton={isOwner}
+            overrideAvatarUrl={formData.avatar_url || undefined}
             onUploadComplete={(url) => {
               setFormData(prev => ({ ...prev, avatar_url: url }));
             }}
@@ -188,32 +187,6 @@ export function CreatorProfileManager({ targetAddress, onProfileUpdated }: Creat
                 </div>
               )}
             </div>
-
-            {!isEditing && (
-              <div className="space-y-2">
-                <Label>Avatar</Label>
-                <div className="p-2 border rounded-md bg-muted">
-                  {formData.avatar_url ? (
-                    <div className="flex items-center gap-2">
-                      <Image
-                        src={convertFailingGateway(formData.avatar_url)}
-                        alt="Avatar"
-                        width={32}
-                        height={32}
-                        className="h-8 w-8 rounded-full object-cover"
-                        unoptimized={isIpfsUrl(formData.avatar_url)}
-                      />
-                      <span className="text-sm">Avatar uploaded</span>
-                    </div>
-                  ) : (
-                    <span className="text-muted-foreground">No avatar set</span>
-                  )}
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Use the upload button above to manage your avatar.
-                </p>
-              </div>
-            )}
           </div>
         </div>
 

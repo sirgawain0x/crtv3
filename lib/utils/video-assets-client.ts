@@ -46,6 +46,11 @@ export async function fetchVideoAssetByPlaybackId(
         try {
           const errorData = await response.json();
           errorMessage = errorData.details || errorData.error || errorMessage;
+          
+          // Check if error message itself contains HTML (shouldn't happen, but handle it)
+          if (errorMessage.includes('<!DOCTYPE html>') || errorMessage.includes('<html')) {
+            errorMessage = "Supabase service temporarily unavailable. Please try again in a few minutes.";
+          }
         } catch (parseError) {
           // JSON parsing failed, use default error message
           console.warn("Failed to parse error response as JSON:", parseError);
@@ -55,7 +60,18 @@ export async function fetchVideoAssetByPlaybackId(
         try {
           const text = await response.text();
           // Try to extract meaningful error info from HTML if possible
-          if (text.includes("500") || text.includes("Internal server error")) {
+          if (text.includes("<!DOCTYPE html>") || text.includes("<html")) {
+            // Cloudflare error page detected
+            if (text.includes("500") || text.includes("Internal server error")) {
+              errorMessage = "Supabase server error (500). Please try again in a few minutes.";
+            } else if (text.includes("502") || text.includes("Bad Gateway")) {
+              errorMessage = "Supabase service temporarily unavailable. Please try again later.";
+            } else if (text.includes("503") || text.includes("Service Unavailable")) {
+              errorMessage = "Supabase service is temporarily unavailable. Please try again later.";
+            } else {
+              errorMessage = "Supabase service temporarily unavailable. Please try again in a few minutes.";
+            }
+          } else if (text.includes("500") || text.includes("Internal server error")) {
             errorMessage = "Supabase server error (500). Please try again in a few minutes.";
           } else if (text.includes("502") || text.includes("Bad Gateway")) {
             errorMessage = "Supabase service temporarily unavailable. Please try again later.";

@@ -18,7 +18,7 @@ export interface UseAvatarUploadResult {
 export function useAvatarUpload(targetAddress?: string): UseAvatarUploadResult {
   const user = useUser();
   const { toast } = useToast();
-  const { updateProfile, upsertProfile } = useCreatorProfile(targetAddress);
+  const { updateProfile, upsertProfile, refreshProfile } = useCreatorProfile(targetAddress);
 
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -70,6 +70,8 @@ export function useAvatarUpload(targetAddress?: string): UseAvatarUploadResult {
           owner_address: address,
           avatar_url: result.url
         });
+        // Refetch profile so UI updates immediately (realtime can be delayed)
+        await refreshProfile();
 
         toast({
           title: "Avatar Updated",
@@ -99,7 +101,7 @@ export function useAvatarUpload(targetAddress?: string): UseAvatarUploadResult {
       setIsUploading(false);
       setUploadProgress(0);
     }
-  }, [address, toast, upsertProfile]);
+  }, [address, toast, upsertProfile, refreshProfile]);
 
   const deleteAvatar = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
     if (!address) {
@@ -124,6 +126,7 @@ export function useAvatarUpload(targetAddress?: string): UseAvatarUploadResult {
         description: "Your profile avatar has been removed successfully",
       });
 
+      await refreshProfile();
       return { success: true };
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Delete failed';
@@ -137,7 +140,7 @@ export function useAvatarUpload(targetAddress?: string): UseAvatarUploadResult {
     } finally {
       setIsUploading(false);
     }
-  }, [address, toast, upsertProfile]);
+  }, [address, toast, upsertProfile, refreshProfile]);
 
   const getAvatarUrl = useCallback((ownerAddress: string): string => {
     // This method is no longer needed since we store the full IPFS URL in the database

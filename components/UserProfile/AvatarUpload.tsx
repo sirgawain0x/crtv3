@@ -16,6 +16,8 @@ interface AvatarUploadProps {
   targetAddress?: string;
   size?: 'sm' | 'md' | 'lg';
   showUploadButton?: boolean;
+  /** When provided (e.g. just-uploaded URL), shown immediately before profile refetch */
+  overrideAvatarUrl?: string;
   onUploadComplete?: (url: string) => void;
 }
 
@@ -23,6 +25,7 @@ export function AvatarUpload({
   targetAddress, 
   size = 'md', 
   showUploadButton = true,
+  overrideAvatarUrl,
   onUploadComplete 
 }: AvatarUploadProps) {
   const user = useUser();
@@ -33,7 +36,8 @@ export function AvatarUpload({
   const [dragOver, setDragOver] = useState(false);
 
   const isOwner = !targetAddress || targetAddress === user?.address || targetAddress === smartAccountAddress;
-  const currentAvatarUrl = profile?.avatar_url ? convertFailingGateway(profile.avatar_url) : undefined;
+  const resolvedUrl = overrideAvatarUrl ?? profile?.avatar_url;
+  const currentAvatarUrl = resolvedUrl ? convertFailingGateway(resolvedUrl) : undefined;
 
   const sizeClasses = {
     sm: 'h-16 w-16',

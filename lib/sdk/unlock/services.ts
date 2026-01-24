@@ -3,22 +3,51 @@ import { Web3Service } from "@unlock-protocol/unlock-js";
 import PublicLockV14Json from "@unlock-protocol/contracts/dist/abis/PublicLock/PublicLockV14.json";
 import {
   type PublicClient,
+  createPublicClient,
   getContract,
+  http,
   type GetContractReturnType,
 } from "viem";
-import { alchemy, base } from "@account-kit/infra";
-import { createAlchemyPublicRpcClient } from "@account-kit/infra";
+import { base } from "@account-kit/infra";
 import { parseIpfsUriWithFallback } from "@/lib/utils/image-gateway";
 
-// Use environment variables for sensitive data
-const alchemyRpcUrl = process.env.NEXT_PUBLIC_ALCHEMY_BASE_RPC_URL;
+/** Resolve Base mainnet RPC URL. Avoids Alchemy client when key is missing (returns non-JSON → parse error). */
+function getBaseRpcUrl(): string {
+  const apiKey = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY;
+  
+  // Only use Alchemy URL if we have a valid, non-empty API key
+  if (apiKey && typeof apiKey === 'string' && apiKey.trim().length > 0) {
+    const trimmedKey = apiKey.trim();
+    // Ensure the URL includes the API key
+    const alchemyUrl = `https://base-mainnet.g.alchemy.com/v2/${trimmedKey}`;
+    console.log('[RPC] Using Alchemy RPC with API key');
+    return alchemyUrl;
+  }
+  
+  // Fallback to other RPC URLs if Alchemy key is missing
+  const alchemyRpc = process.env.NEXT_PUBLIC_ALCHEMY_RPC_URL;
+  if (alchemyRpc && typeof alchemyRpc === 'string' && alchemyRpc.trim().length > 0) {
+    console.log('[RPC] Using NEXT_PUBLIC_ALCHEMY_RPC_URL');
+    return alchemyRpc.trim();
+  }
+  
+  const baseRpc = process.env.NEXT_PUBLIC_BASE_RPC_URL;
+  if (baseRpc && typeof baseRpc === 'string' && baseRpc.trim().length > 0) {
+    console.log('[RPC] Using NEXT_PUBLIC_BASE_RPC_URL');
+    return baseRpc.trim();
+  }
+  
+  // Final fallback to public Base RPC
+  console.warn('[RPC] No Alchemy API key found, falling back to public Base RPC');
+  return "https://mainnet.base.org";
+}
 
-// Create the Account Kit client
-const accountKitClient = createAlchemyPublicRpcClient({
-  transport: alchemy({
-    apiKey: process.env.NEXT_PUBLIC_ALCHEMY_API_KEY as string,
-  }),
+const baseRpcUrl = getBaseRpcUrl();
+console.log('[RPC] Base RPC URL configured:', baseRpcUrl.replace(/\/v2\/[^/]+/, '/v2/***'));
+
+const accountKitClient = createPublicClient({
   chain: base,
+  transport: http(baseRpcUrl),
 });
 
 // Use the official PublicLockV14 ABI from Unlock Protocol
@@ -313,12 +342,37 @@ export class UnlockService {
 
       return hasValidKey;
     } catch (error) {
+      const errorMessage = (error as Error).message || String(error);
+      
+      // Check for RPC configuration errors
+      if (
+        errorMessage.includes('Unexpected token') ||
+        errorMessage.includes('Unspecifie') ||
+        errorMessage.includes('not valid JSON') ||
+        (errorMessage.includes('HTTP request failed') && errorMessage.includes('base-mainnet.g.alchemy.com'))
+      ) {
+        console.error(
+          `RPC configuration error when checking membership for ${userAddress} at ${lockAddress}:`,
+          error
+        );
+        throw this.createError(
+          `RPC configuration error: Alchemy API key may be missing or invalid. Please check NEXT_PUBLIC_ALCHEMY_API_KEY environment variable.`,
+          "RPC_CONFIG_ERROR",
+          { 
+            lockAddress, 
+            userAddress, 
+            originalError: error,
+            rpcUrl: baseRpcUrl.replace(/\/v2\/[^/]+/, '/v2/***')
+          }
+        );
+      }
+      
       console.error(
         `Error checking membership for ${userAddress} at ${lockAddress}:`,
         error
       );
       throw this.createError(
-        `Failed to check membership: ${(error as Error).message}`,
+        `Failed to check membership: ${errorMessage}`,
         "MEMBERSHIP_CHECK_ERROR",
         { lockAddress, userAddress, originalError: error }
       );

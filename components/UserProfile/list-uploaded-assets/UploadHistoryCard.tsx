@@ -31,9 +31,13 @@ export function UploadHistoryCard({ asset, index }: UploadHistoryCardProps) {
               src={null}
               title={asset.title}
               assetId={asset.asset_id}
+              initialThumbnailUrl={
+                (asset as { thumbnail_url?: string }).thumbnail_url ??
+                asset.thumbnailUri
+              }
               className="h-full w-full"
-              priority={index < 4} // Priority for first 4 cards
-              hidePlayOverlay={true} // Hide play overlay in upload history
+              priority={index < 4}
+              hidePlayOverlay={true}
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center bg-muted text-muted-foreground">

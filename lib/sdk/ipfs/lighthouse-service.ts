@@ -87,7 +87,8 @@ export interface FilecoinDealStatusResponse {
 export class LighthouseService {
   private apiKey: string;
   private gateway: string;
-  private baseUrl = 'https://api.lighthouse.storage/api/v0';
+  /** Upload API: https://upload.lighthouse.storage/api/v0/add (per Lighthouse docs) */
+  private uploadBaseUrl = 'https://upload.lighthouse.storage/api/v0';
   private ipnsBaseUrl = 'https://api.lighthouse.storage/api/ipns';
 
   constructor(config: LighthouseConfig) {
@@ -97,6 +98,7 @@ export class LighthouseService {
 
   /**
    * Uploads a file to Lighthouse IPFS
+   * Uses https://upload.lighthouse.storage/api/v0/add (max 24GB per request)
    * @param file - File or Blob to upload
    * @returns Promise with IPFS hash and URL
    */
@@ -105,10 +107,10 @@ export class LighthouseService {
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await fetch(`${this.baseUrl}/upload`, {
+      const response = await fetch(`${this.uploadBaseUrl}/add`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
+          Authorization: `Bearer ${this.apiKey}`,
         },
         body: formData,
       });
@@ -123,7 +125,8 @@ export class LighthouseService {
       }
 
       const data = await response.json();
-      const hash = data.Hash || data.hash;
+      const inner = data.data ?? data;
+      const hash = inner.Hash ?? inner.hash;
 
       if (!hash) {
         return {
@@ -144,6 +147,35 @@ export class LighthouseService {
         error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
+  }
+
+  /**
+   * Uploads text or JSON to Lighthouse (lighthouse-text rule).
+   * For JSON, pass an object and it will be JSON.stringified.
+   * @param text - Raw text or object (JSON.stringify applied if object)
+   * @param name - Optional name for the content (defaults to Hash in response)
+   */
+  async uploadText(
+    text: string | object,
+    name?: string
+  ): Promise<LighthouseUploadResult> {
+    const str = typeof text === 'object' ? JSON.stringify(text) : text;
+    const mime = typeof text === 'object' ? 'application/json' : 'text/plain';
+    const filename = name ?? `text-${Date.now()}.${typeof text === 'object' ? 'json' : 'txt'}`;
+    const blob = new Blob([str], { type: mime });
+    const file = new File([blob], filename, { type: mime });
+    return this.uploadFile(file);
+  }
+
+  /**
+   * Uploads a buffer or typed array to Lighthouse (lighthouse-buffer rule).
+   * @param buffer - ArrayBuffer, Buffer, or Uint8Array
+   */
+  async uploadBuffer(
+    buffer: ArrayBuffer | Buffer | Uint8Array
+  ): Promise<LighthouseUploadResult> {
+    const blob = new Blob([buffer]);
+    return this.uploadFile(blob);
   }
 
   /**

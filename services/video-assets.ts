@@ -191,18 +191,94 @@ export async function getVideoAssetById(id: number) {
   return result; // This will be null if no record found
 }
 
+/**
+ * Helper function to execute Supabase query with timeout and retry logic
+ */
+async function executeWithTimeoutAndRetry<T>(
+  queryFn: () => Promise<{ data: T | null; error: any }>,
+  timeoutMs: number = 10000, // 10 seconds default timeout
+  maxRetries: number = 2
+): Promise<T | null> {
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      // Create a timeout promise
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => {
+          reject(new Error(`Query timeout after ${timeoutMs}ms`));
+        }, timeoutMs);
+      });
+
+      // Race between query and timeout
+      const { data, error } = await Promise.race([
+        queryFn(),
+        timeoutPromise,
+      ]);
+
+      // Check for Supabase errors
+      if (error) {
+        // Check if error message contains HTML (Cloudflare error page)
+        const errorMessage = error.message || String(error);
+        if (errorMessage.includes('<!DOCTYPE html>') || errorMessage.includes('<html')) {
+          throw new Error('Supabase service temporarily unavailable (500). Please try again in a few minutes.');
+        }
+
+        // Check for connection/timeout errors
+        if (
+          errorMessage.includes('timeout') ||
+          errorMessage.includes('ECONNREFUSED') ||
+          errorMessage.includes('ENOTFOUND') ||
+          errorMessage.includes('ETIMEDOUT') ||
+          error.code === 'PGRST116' // PostgREST connection error
+        ) {
+          lastError = new Error(`Database connection error: ${errorMessage}`);
+          // Retry on connection errors
+          if (attempt < maxRetries) {
+            // Exponential backoff: 500ms, 1000ms
+            await new Promise(resolve => setTimeout(resolve, 500 * Math.pow(2, attempt)));
+            continue;
+          }
+        }
+
+        throw new Error(`Database query error: ${errorMessage}`);
+      }
+
+      return data;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+
+      // Don't retry on timeout or non-retryable errors
+      if (
+        lastError.message.includes('timeout') ||
+        lastError.message.includes('Supabase service temporarily unavailable') ||
+        attempt >= maxRetries
+      ) {
+        throw lastError;
+      }
+
+      // Exponential backoff for retries
+      await new Promise(resolve => setTimeout(resolve, 500 * Math.pow(2, attempt)));
+    }
+  }
+
+  throw lastError || new Error('Failed to execute query after retries');
+}
+
 export async function getVideoAssetByPlaybackId(playbackId: string) {
   const supabase = await createClient();
 
-  const { data: result, error } = await supabase
-    .from('video_assets')
-    .select('id, status, thumbnail_url, creator_metoken_id, attributes')
-    .eq('playback_id', playbackId)
-    .maybeSingle(); // Use maybeSingle() instead of single()
-
-  if (error) {
-    throw new Error(`Failed to get video asset by playback ID: ${error.message}`);
-  }
+  const result = await executeWithTimeoutAndRetry(
+    async () => {
+      return await supabase
+        .from('video_assets')
+        .select('id, status, thumbnail_url, creator_metoken_id, attributes')
+        .eq('playback_id', playbackId)
+        .maybeSingle();
+    },
+    10000, // 10 second timeout
+    2 // 2 retries
+  );
 
   return result; // This will be null if no record found, or the single record if found
 }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/sdk/supabase/server';
-import { formatEther, createPublicClient, http, parseAbi } from 'viem';
+import { formatEther, createPublicClient, http, fallback, parseAbi } from 'viem';
 import { base } from 'viem/chains';
 import { METOKEN_ABI } from '@/lib/contracts/MeToken';
 import { serverLogger } from '@/lib/utils/logger';
@@ -100,15 +100,19 @@ export async function GET(
     // This ensures we show the correct price even if the DB indexer is lagging
     if (currentTotalSupply === BigInt(0) || currentTvl === 0) {
       try {
-        serverLogger.debug('� DB data missing/zero, fetching from blockchain for:', meToken.address);
+        serverLogger.debug('DB data missing/zero, fetching from blockchain for:', meToken.address);
         const apiKey = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY;
-        const transportUrl = apiKey
-          ? `https://base-mainnet.g.alchemy.com/v2/${apiKey}`
-          : undefined;
+        const alchemyRpc = process.env.NEXT_PUBLIC_ALCHEMY_RPC_URL;
+        const baseRpc = process.env.NEXT_PUBLIC_BASE_RPC_URL;
+        const rpcUrls: string[] = [];
+        if (apiKey) rpcUrls.push(`https://base-mainnet.g.alchemy.com/v2/${apiKey}`);
+        if (alchemyRpc) rpcUrls.push(alchemyRpc);
+        if (baseRpc) rpcUrls.push(baseRpc);
+        rpcUrls.push('https://mainnet.base.org');
 
         const publicClient = createPublicClient({
           chain: base,
-          transport: http(transportUrl)
+          transport: fallback(rpcUrls.map((url) => http(url))),
         });
 
         // Fetch fresh data

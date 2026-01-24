@@ -16,6 +16,8 @@ interface VideoThumbnailProps {
   src: Src[] | null;
   title: string;
   assetId?: string;
+  /** When provided (e.g. from list response), used immediately to avoid extra fetch and improve display */
+  initialThumbnailUrl?: string;
   onPlay?: () => void;
   className?: string;
   enablePreview?: boolean;
@@ -28,14 +30,18 @@ const VideoThumbnail: React.FC<VideoThumbnailProps> = ({
   src,
   title,
   assetId,
+  initialThumbnailUrl,
   onPlay,
   className = "",
   enablePreview = false,
   priority = false,
   hidePlayOverlay = false
 }) => {
-  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const hasInitial = Boolean(initialThumbnailUrl && initialThumbnailUrl.trim() !== "");
+  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(() =>
+    hasInitial ? convertFailingGateway(initialThumbnailUrl!.trim()) : null
+  );
+  const [isLoading, setIsLoading] = useState(!hasInitial);
   const [showPlayer, setShowPlayer] = useState(false);
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
@@ -47,6 +53,13 @@ const VideoThumbnail: React.FC<VideoThumbnailProps> = ({
   useEffect(() => {
     async function fetchThumbnail() {
       if (!playbackId) {
+        setIsLoading(false);
+        return;
+      }
+
+      // Use initialThumbnailUrl when provided to avoid extra fetch and show immediately
+      if (hasInitial && initialThumbnailUrl?.trim()) {
+        setThumbnailUrl(convertFailingGateway(initialThumbnailUrl.trim()));
         setIsLoading(false);
         return;
       }
@@ -124,7 +137,7 @@ const VideoThumbnail: React.FC<VideoThumbnailProps> = ({
     }
 
     fetchThumbnail();
-  }, [playbackId]);
+  }, [playbackId, hasInitial, initialThumbnailUrl]);
 
   // Reset showPlayer when playbackId changes or component unmounts
   useEffect(() => {
