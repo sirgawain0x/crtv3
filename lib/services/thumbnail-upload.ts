@@ -1,30 +1,26 @@
-import { ipfsService } from '@/lib/sdk/ipfs/service';
-import { IPFSService } from '@/lib/sdk/ipfs/service';
+import { groveService } from '@/lib/sdk/grove/service';
 import { serverLogger } from '@/lib/utils/logger';
 
 
 export interface ThumbnailUploadResult {
   success: boolean;
-  thumbnailUrl?: string;
+  thumbnailUrl?: string; // This will trigger the GatewayImage component which handles IPFS/Arweave/HTTP
   error?: string;
 }
 
 /**
- * Uploads a thumbnail image file using Helia (following helia-nextjs pattern):
- * - Helia (Primary) - Following helia-nextjs pattern
- * - Lighthouse (Background) - Better CDN distribution
- * - Storacha (Background) - Ensures long-term persistence
- * - Filecoin First (Background, Optional) - Long-term archival if enabled
+ * Uploads a thumbnail image file using Grove (Lens Storage):
+ * - Grove (Primary) - Decentralized storage with instant gateway
  * 
  * @param file - The image file to upload
- * @param playbackId - The video's playback ID (unused but kept for signature compatibility)
- * @param service - Optional IPFS service instance (defaults to global instance with fallback)
+ * @param playbackId - The video's playback ID (unused for upload but kept for signature)
  * @returns Promise<ThumbnailUploadResult>
  */
 export async function uploadThumbnailToIPFS(
   file: File,
   playbackId: string,
-  service?: IPFSService
+  // service param removed but kept compatible if passed as any/ignored, 
+  // though we change signature here as we confirmed callsites don't pass it.
 ): Promise<ThumbnailUploadResult> {
   try {
     // Validate file type
@@ -35,35 +31,29 @@ export async function uploadThumbnailToIPFS(
       };
     }
 
-    serverLogger.debug('[ThumbnailUpload] Starting upload with Helia (following helia-nextjs pattern)...');
+    serverLogger.debug('[ThumbnailUpload] Starting upload with Grove...');
 
-    // Use provided service or default IPFS service instance
-    // Following helia-nextjs pattern: uses Helia from context if available via hook
-    const ipfs = service || ipfsService;
-    
-    const result = await ipfs.uploadFile(file, {
-      pin: true,
-      wrapWithDirectory: false
-    });
+    const result = await groveService.uploadFile(file);
 
-    if (!result.success || !result.hash) {
+    if (!result.success || !result.url) {
       return {
         success: false,
         error: result.error || 'Upload failed'
       };
     }
 
-    serverLogger.debug('[ThumbnailUpload] ✅ Thumbnail upload successful:', result.hash);
+    serverLogger.debug('[ThumbnailUpload] ✅ Thumbnail upload successful via Grove:', result.hash);
     serverLogger.debug('[ThumbnailUpload] 📍 Accessible via:', result.url);
 
-    // Return the CID format expected by the app (IPFS URI)
+    // Return the URL directly (Grove gateway URL)
+    // The existing app handles ipfs:// but generic URLs are better supported
     return {
       success: true,
-      thumbnailUrl: `ipfs://${result.hash}`
+      thumbnailUrl: result.url
     };
 
   } catch (error) {
-    serverLogger.error('[ThumbnailUpload] ❌ Error uploading thumbnail to IPFS:', error);
+    serverLogger.error('[ThumbnailUpload] ❌ Error uploading thumbnail to Grove:', error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error occurred'
@@ -92,18 +82,15 @@ export async function blobUrlToFile(blobUrl: string, filename: string): Promise<
 }
 
 /**
- * Uploads a thumbnail from a blob URL to IPFS
- * Following helia-nextjs pattern with Helia as primary method
+ * Uploads a thumbnail from a blob URL to Grove
  * 
  * @param blobUrl - The blob URL of the thumbnail
  * @param playbackId - The video's playback ID for naming
- * @param service - Optional IPFS service instance (defaults to global instance with fallback)
  * @returns Promise<ThumbnailUploadResult>
  */
 export async function uploadThumbnailFromBlob(
   blobUrl: string,
-  playbackId: string,
-  service?: IPFSService
+  playbackId: string
 ): Promise<ThumbnailUploadResult> {
   try {
     // Convert blob URL to file
@@ -116,8 +103,8 @@ export async function uploadThumbnailFromBlob(
       };
     }
 
-    // Upload to IPFS (following helia-nextjs pattern)
-    return await uploadThumbnailToIPFS(file, playbackId, service);
+    // Upload to Grove
+    return await uploadThumbnailToIPFS(file, playbackId);
 
   } catch (error) {
     serverLogger.error('[ThumbnailUpload] ❌ Error uploading thumbnail from blob:', error);

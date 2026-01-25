@@ -3766,6 +3766,16 @@
   resolved "https://registry.npmjs.org/@leichtgewicht/ip-codec/-/ip-codec-2.0.5.tgz"
   integrity sha512-Vo+PSpZG2/fmgmiNzYK9qWRh8h/CHrwD0mo1h1DzL4yzHNSfWYujGTYsWGreD000gcgmZ7K4Ys6Tx9TxtsKdDw==
 
+"@lens-chain/sdk@^1.0.3":
+  version "1.0.3"
+  resolved "https://registry.npmjs.org/@lens-chain/sdk/-/sdk-1.0.3.tgz#785c8cb4372bd40b1a3d5efb89c0d0735c0317e8"
+  integrity sha512-ysfCKyhC2CouFQbysnduwKGQU8L6MI1VVBcClMLisKAJAunHFowsBaUp+j8nuQyWmUETpokqpe2Mk0P9bSGhfw==
+
+"@lens-chain/storage-client@^1.0.6":
+  version "1.0.6"
+  resolved "https://registry.npmjs.org/@lens-chain/storage-client/-/storage-client-1.0.6.tgz#c9aa7b7f49856c2940031119b661b280d558a651"
+  integrity sha512-CchjEt3vKAj5RlHd9sWOGFlHZ9WvQm6edHrn0a2BBPXxOZ0gZwbK6aKOSCySEk0gmDvmy7LB6dGdtNLSFzutHg==
+
 "@libp2p/autonat@^3.0.5":
   version "3.0.9"
   resolved "https://registry.npmjs.org/@libp2p/autonat/-/autonat-3.0.9.tgz"

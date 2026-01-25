@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { ipfsService } from '@/lib/sdk/ipfs/service';
+import { groveService } from '@/lib/sdk/grove/service';
 import { serverLogger } from '@/lib/utils/logger';
 import { rateLimiters } from '@/lib/middleware/rateLimit';
 
@@ -18,10 +18,8 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Upload to IPFS (Helia -> Storacha Backup)
-        const result = await ipfsService.uploadFile(file, {
-            pin: true, // This triggers the backup logic inside service if keys are present
-        });
+        // Upload to Grove
+        const result = await groveService.uploadFile(file);
 
         if (!result.success) {
             return NextResponse.json(
@@ -36,7 +34,7 @@ export async function POST(request: NextRequest) {
             hash: result.hash,
         });
     } catch (error) {
-        serverLogger.error('API IPFS Upload Error:', error);
+        serverLogger.error('API Grove Upload Error:', error);
         return NextResponse.json(
             { success: false, error: error instanceof Error ? error.message : 'Internal Server Error' },
             { status: 500 }

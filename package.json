@@ -44,6 +44,8 @@
     "@helia/unixfs": "^6.0.4",
     "@hookform/resolvers": "^5.0.1",
     "@kreisler/js-google-translate-free": "^4.0.2",
+    "@lens-chain/sdk": "^1.0.3",
+    "@lens-chain/storage-client": "^1.0.6",
     "@livepeer/ai": "^0.6.2",
     "@livepeer/react": "^4.3.2",
     "@neondatabase/serverless": "^1.0.0",

@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback } from "react";
-import { useIpfsService } from "./useIpfsService";
 import { uploadThumbnailToIPFS, uploadThumbnailFromBlob, ThumbnailUploadResult } from "@/lib/services/thumbnail-upload";
 import { logger } from '@/lib/utils/logger';
 
@@ -33,20 +32,23 @@ import { logger } from '@/lib/utils/logger';
  * ```
  */
 export function useThumbnailUpload() {
-  const { ipfsService, isReady, error } = useIpfsService();
+  // Grove service is initialized synchronously and doesn't require waiting
+  const isReady = true;
+  const error = null;
 
   const uploadThumbnail = useCallback(
     async (file: File, playbackId: string): Promise<ThumbnailUploadResult> => {
-      return uploadThumbnailToIPFS(file, playbackId, ipfsService);
+      return uploadThumbnailToIPFS(file, playbackId);
     },
-    [ipfsService]
+    []
   );
 
   const uploadFromBlob = useCallback(
     async (blobUrl: string, playbackId: string): Promise<ThumbnailUploadResult> => {
-      return uploadThumbnailFromBlob(blobUrl, playbackId, ipfsService);
+      // Pass only 2 arguments as the service param is removed
+      return uploadThumbnailFromBlob(blobUrl, playbackId);
     },
-    [ipfsService]
+    []
   );
 
   return {
