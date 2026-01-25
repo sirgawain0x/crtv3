@@ -622,135 +622,135 @@ export function useMeTokensSupabase(targetAddress?: string) {
         if (vaultAddress) {
           // Check current allowance for vault (the actual spender)
           logger.debug('🔍 Checking DAI allowance for vault...');
-        const currentAllowance = await client.readContract({
-          address: daiContract.address as `0x${string}`,
-          abi: daiContract.abi,
-          functionName: 'allowance',
-          args: [address as `0x${string}`, vaultAddress as `0x${string}`]
-        }) as bigint;
-
-        logger.debug('📊 Current DAI allowance for vault:', {
-          vaultAddress,
-          currentAllowance: currentAllowance.toString(),
-          required: depositAmount.toString(),
-          hasEnough: currentAllowance >= depositAmount
-        });
-
-        if (currentAllowance < depositAmount) {
-          logger.debug('🔓 Approving DAI for vault...', vaultAddress);
-
-          const approveData = encodeFunctionData({
+          const currentAllowance = await client.readContract({
+            address: daiContract.address as `0x${string}`,
             abi: daiContract.abi,
-            functionName: 'approve',
-            args: [vaultAddress as `0x${string}`, depositAmount],
+            functionName: 'allowance',
+            args: [address as `0x${string}`, vaultAddress as `0x${string}`]
+          }) as bigint;
+
+          logger.debug('📊 Current DAI allowance for vault:', {
+            vaultAddress,
+            currentAllowance: currentAllowance.toString(),
+            required: depositAmount.toString(),
+            hasEnough: currentAllowance >= depositAmount
           });
 
-          logger.debug('📤 Sending DAI approval user operation...');
-          logger.debug('📊 Approval details:', {
-            target: DAI_ADDRESS,
-            spender: vaultAddress,
-            hubId,
-            amount: depositAmount.toString(),
-            smartAccountAddress: address,
-            approvalData: approveData
-          });
+          if (currentAllowance < depositAmount) {
+            logger.debug('🔓 Approving DAI for vault...', vaultAddress);
 
-          // Apply gas sponsorship for approval too
-          const approveGasContext = getGasContext('usdc');
-          const approvePrimaryContext = approveGasContext.context;
-
-          let approveOp;
-          try {
-            approveOp = await client.sendUserOperation({
-              uo: {
-                target: daiContract.address as `0x${string}`,
-                data: approveData,
-                value: BigInt(0),
-              },
-              context: approvePrimaryContext, // Apply gas sponsorship
+            const approveData = encodeFunctionData({
+              abi: daiContract.abi,
+              functionName: 'approve',
+              args: [vaultAddress as `0x${string}`, depositAmount],
             });
-          } catch (approveGasError) {
-            if (approvePrimaryContext) {
-              logger.warn("⚠️ DAI approval primary gas payment failed, falling back to standard gas:", approveGasError);
-              logger.debug('🔄 Attempting fallback with standard ETH gas for approval...');
-              const fallbackApprovePromise = client.sendUserOperation({
+
+            logger.debug('📤 Sending DAI approval user operation...');
+            logger.debug('📊 Approval details:', {
+              target: DAI_ADDRESS,
+              spender: vaultAddress,
+              hubId,
+              amount: depositAmount.toString(),
+              smartAccountAddress: address,
+              approvalData: approveData
+            });
+
+            // Apply gas sponsorship for approval too
+            const approveGasContext = getGasContext('usdc');
+            const approvePrimaryContext = approveGasContext.context;
+
+            let approveOp;
+            try {
+              approveOp = await client.sendUserOperation({
                 uo: {
                   target: daiContract.address as `0x${string}`,
                   data: approveData,
                   value: BigInt(0),
                 },
-                // No context = standard ETH payment
-                overrides: {
-                  paymasterAndData: undefined,
-                },
+                context: approvePrimaryContext, // Apply gas sponsorship
               });
+            } catch (approveGasError) {
+              if (approvePrimaryContext) {
+                logger.warn("⚠️ DAI approval primary gas payment failed, falling back to standard gas:", approveGasError);
+                logger.debug('🔄 Attempting fallback with standard ETH gas for approval...');
+                const fallbackApprovePromise = client.sendUserOperation({
+                  uo: {
+                    target: daiContract.address as `0x${string}`,
+                    data: approveData,
+                    value: BigInt(0),
+                  },
+                  // No context = standard ETH payment
+                  overrides: {
+                    paymasterAndData: undefined,
+                  },
+                });
 
-              // Add timeout to prevent indefinite hanging (60 seconds)
-              const fallbackTimeoutPromise = new Promise((_, reject) => {
-                setTimeout(() => reject(new Error('Vault approval fallback timed out after 60 seconds')), 60000);
-              });
+                // Add timeout to prevent indefinite hanging (60 seconds)
+                const fallbackTimeoutPromise = new Promise((_, reject) => {
+                  setTimeout(() => reject(new Error('Vault approval fallback timed out after 60 seconds')), 60000);
+                });
 
-              approveOp = await Promise.race([fallbackApprovePromise, fallbackTimeoutPromise]) as any;
-            } else {
-              throw approveGasError;
-            }
-          }
-
-          logger.debug('🎉 Approval UserOperation sent! Hash:', approveOp.hash);
-          logger.debug('⏳ Waiting for approval confirmation...');
-
-          const approvalTxHash = await client.waitForUserOperationTransaction({
-            hash: approveOp.hash,
-          });
-
-          logger.debug('✅ Approval transaction confirmed! Hash:', approvalTxHash);
-
-          logger.debug('✅ DAI approved!');
-
-          // Wait for the approval state to propagate with retry logic
-          logger.debug('⏳ Waiting for approval state to update...');
-          let newAllowance = BigInt(0);
-          let retryCount = 0;
-          const maxRetries = 5;
-
-          while (retryCount < maxRetries && newAllowance < depositAmount) {
-            // Wait progressively longer between retries
-            const waitTime = 2000 + (retryCount * 1000); // 2s, 3s, 4s, 5s, 6s
-            logger.debug(`⏳ Waiting ${waitTime}ms for approval state to update... (attempt ${retryCount + 1}/${maxRetries})`);
-            await new Promise(resolve => setTimeout(resolve, waitTime));
-
-            try {
-              // Verify the approval was successful
-              newAllowance = await client.readContract({
-                address: daiContract.address as `0x${string}`,
-                abi: daiContract.abi,
-                functionName: 'allowance',
-                args: [address as `0x${string}`, vaultAddress as `0x${string}`]
-              }) as bigint;
-
-              logger.debug(`📊 DAI allowance check ${retryCount + 1}: ${newAllowance.toString()} (expected: ${depositAmount.toString()})`);
-
-              if (newAllowance >= depositAmount) {
-                logger.debug('✅ DAI allowance confirmed!');
-                break;
+                approveOp = await Promise.race([fallbackApprovePromise, fallbackTimeoutPromise]) as any;
+              } else {
+                throw approveGasError;
               }
-            } catch (err) {
-              logger.warn(`⚠️ Allowance check failed on attempt ${retryCount + 1}:`, err);
             }
 
-            retryCount++;
-          }
+            logger.debug('🎉 Approval UserOperation sent! Hash:', approveOp.hash);
+            logger.debug('⏳ Waiting for approval confirmation...');
 
-          if (newAllowance < depositAmount) {
-            logger.error('❌ DAI approval verification failed after all retries');
-            logger.error('📊 Final allowance:', newAllowance.toString());
-            logger.error('📊 Expected allowance:', depositAmount.toString());
-            logger.error('📊 Smart account address:', address);
-            logger.error('📊 Vault address:', vaultAddress);
-            logger.error('📊 Hub ID:', hubId);
+            const approvalTxHash = await client.waitForUserOperationTransaction({
+              hash: approveOp.hash,
+            });
 
-            // Provide helpful error message with suggestions
-            const errorMsg = `DAI approval failed after ${maxRetries} retries. This could be due to:
+            logger.debug('✅ Approval transaction confirmed! Hash:', approvalTxHash);
+
+            logger.debug('✅ DAI approved!');
+
+            // Wait for the approval state to propagate with retry logic
+            logger.debug('⏳ Waiting for approval state to update...');
+            let newAllowance = BigInt(0);
+            let retryCount = 0;
+            const maxRetries = 5;
+
+            while (retryCount < maxRetries && newAllowance < depositAmount) {
+              // Wait progressively longer between retries
+              const waitTime = 2000 + (retryCount * 1000); // 2s, 3s, 4s, 5s, 6s
+              logger.debug(`⏳ Waiting ${waitTime}ms for approval state to update... (attempt ${retryCount + 1}/${maxRetries})`);
+              await new Promise(resolve => setTimeout(resolve, waitTime));
+
+              try {
+                // Verify the approval was successful
+                newAllowance = await client.readContract({
+                  address: daiContract.address as `0x${string}`,
+                  abi: daiContract.abi,
+                  functionName: 'allowance',
+                  args: [address as `0x${string}`, vaultAddress as `0x${string}`]
+                }) as bigint;
+
+                logger.debug(`📊 DAI allowance check ${retryCount + 1}: ${newAllowance.toString()} (expected: ${depositAmount.toString()})`);
+
+                if (newAllowance >= depositAmount) {
+                  logger.debug('✅ DAI allowance confirmed!');
+                  break;
+                }
+              } catch (err) {
+                logger.warn(`⚠️ Allowance check failed on attempt ${retryCount + 1}:`, err);
+              }
+
+              retryCount++;
+            }
+
+            if (newAllowance < depositAmount) {
+              logger.error('❌ DAI approval verification failed after all retries');
+              logger.error('📊 Final allowance:', newAllowance.toString());
+              logger.error('📊 Expected allowance:', depositAmount.toString());
+              logger.error('📊 Smart account address:', address);
+              logger.error('📊 Vault address:', vaultAddress);
+              logger.error('📊 Hub ID:', hubId);
+
+              // Provide helpful error message with suggestions
+              const errorMsg = `DAI approval failed after ${maxRetries} retries. This could be due to:
 1. Network congestion - try again in a few minutes
 2. Smart account deployment issue - ensure your account is properly deployed
 3. Insufficient gas - the approval transaction may have failed
@@ -761,11 +761,11 @@ Actual allowance: ${formatEther(newAllowance)} DAI
 
 You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
 
-            throw new Error(errorMsg);
+              throw new Error(errorMsg);
+            }
+          } else {
+            logger.debug('✅ Sufficient DAI allowance already exists for vault');
           }
-        } else {
-          logger.debug('✅ Sufficient DAI allowance already exists for vault');
-        }
         } // End of vault approval block (only executed if vaultAddress is valid)
 
         // 3b. ALSO Check/Approve DAI for the DIAMOND (Just in case Diamond calls transferFrom directly)
@@ -789,7 +789,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
           });
 
           logger.debug('📤 Sending DAI approval for DIAMOND user operation...');
-          
+
           // Apply gas sponsorship for DIAMOND approval (consistent with vault approval)
           const diamondApproveGasContext = getGasContext('usdc');
           const diamondApprovePrimaryContext = diamondApproveGasContext.context;
@@ -958,7 +958,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         // Detect timeout errors - DO NOT retry on timeout to avoid duplicate transactions
         // The original operation may still complete in the background
         const isTimeoutError = gasError instanceof Error && gasError.message.includes('timed out after 60 seconds');
-        
+
         if (isTimeoutError) {
           logger.error('❌ sendUserOperation timed out after 60 seconds');
           logger.error('⚠️ The original operation may still be pending and could complete later.');
@@ -1135,7 +1135,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         const errorMessage = err.message || '';
         const errorDetails = (err as any).details || '';
         const errorCause = (err as any).cause?.message || '';
-        const hasAlreadyOwnsError = 
+        const hasAlreadyOwnsError =
           errorMessage.toLowerCase().includes('already owns a metoken') ||
           errorMessage.toLowerCase().includes('already owns') ||
           errorDetails.toLowerCase().includes('already owns a metoken') ||
@@ -1469,8 +1469,18 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         logger.debug('✅ Sufficient DAI allowance already exists for DIAMOND');
       }
 
+      // Calculate expected mint amount BEFORE sending the transaction
+      // This ensures we record the correct token amount in the DB (not the DAI amount)
+      let expectedMintAmount = '0';
+      try {
+        expectedMintAmount = await calculateMeTokensMinted(meTokenAddress, collateralAmount);
+        logger.debug(`📊 Calculated expected mint amount: ${expectedMintAmount} MeTokens for ${collateralAmount} DAI`);
+      } catch (calcErr) {
+        logger.warn('⚠️ Failed to calculate expected mint amount:', calcErr);
+      }
 
       // 4. Now mint with retry logic for timeout errors
+
       logger.debug('📤 Sending Mint UserOp to DIAMOND...');
 
       const mintOperation = {
@@ -1551,7 +1561,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
             body: JSON.stringify({
               user_address: address,
               transaction_type: 'mint',
-              amount: parseFloat(collateralAmount),
+              amount: parseFloat(expectedMintAmount),
               collateral_amount: parseFloat(collateralAmount),
               transaction_hash: txHash,
               block_number: 0,

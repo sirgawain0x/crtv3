@@ -3,7 +3,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { MeTokenData } from '@/lib/hooks/metokens/useMeTokens';
 import { formatEther } from 'viem';
-import { TrendingUp, Users, DollarSign, Clock, Copy, Check, Coins, BarChart3 } from 'lucide-react';
+import { TrendingUp, TrendingDown, Users, DollarSign, Clock, Copy, Check, Coins, BarChart3 } from 'lucide-react';
+import { useMeTokenMarketStats } from '@/lib/hooks/market/useMeTokenMarketStats';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
 
@@ -260,7 +261,22 @@ export function MeTokenInfo({ meToken }: MeTokenInfoProps) {
             </div>
           </div>
 
-          <div className="pt-2 space-y-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 pt-2">
+            <div className="space-y-1">
+              <p className="text-xs sm:text-sm font-medium text-muted-foreground">24h Change</p>
+              {(() => {
+                const { stats } = useMeTokenMarketStats(meToken.address);
+                const priceChange = stats?.price_change_24h || 0;
+                const isPositive = priceChange >= 0;
+
+                return (
+                  <div className={`flex items-center gap-1 text-lg sm:text-xl font-semibold ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
+                    {isPositive ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                    {isPositive ? '+' : ''}{priceChange.toFixed(2)}%
+                  </div>
+                );
+              })()}
+            </div>
             <p className="text-xs sm:text-sm font-medium text-muted-foreground">Your Holdings Value</p>
             <p className="text-lg sm:text-xl font-semibold text-green-600 break-all sm:break-normal">
               ${meToken.totalSupply > 0

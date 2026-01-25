@@ -66,9 +66,11 @@ export function useMarketData(options: UseMarketDataOptions = {}): UseMarketData
   });
   const [currentPage, setCurrentPage] = useState(0);
 
-  const fetchMarketData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const fetchMarketData = useCallback(async (isBackground = false) => {
+    if (!isBackground) {
+      setLoading(true);
+      setError(null);
+    }
 
     try {
       const params = new URLSearchParams({
@@ -103,11 +105,16 @@ export function useMarketData(options: UseMarketDataOptions = {}): UseMarketData
       });
     } catch (err) {
       logger.error('Error fetching market data:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch market data');
-      setTokens([]);
-      setStats(null);
+      // Only set error if it's not a background refresh (to avoid annoying transient errors)
+      if (!isBackground) {
+        setError(err instanceof Error ? err.message : 'Failed to fetch market data');
+        setTokens([]);
+        setStats(null);
+      }
     } finally {
-      setLoading(false);
+      if (!isBackground) {
+        setLoading(false);
+      }
     }
   }, [filters.type, filters.search, filters.sortBy, filters.sortOrder, currentPage, limit]);
 
@@ -152,7 +159,7 @@ export function useMarketData(options: UseMarketDataOptions = {}): UseMarketData
     const intervalId = setInterval(() => {
       // Only refresh if not currently loading to avoid overlapping requests
       if (shouldRefreshRef.current) {
-        fetchMarketData();
+        fetchMarketData(true);
       }
     }, refreshInterval);
 
