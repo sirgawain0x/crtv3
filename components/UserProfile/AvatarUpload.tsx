@@ -11,6 +11,7 @@ import { useUser } from '@account-kit/react';
 import { useWalletStatus } from '@/lib/hooks/accountkit/useWalletStatus';
 import { Upload, X, User, AlertCircle, CheckCircle } from 'lucide-react';
 import { convertFailingGateway } from '@/lib/utils/image-gateway';
+import imageCompression from 'browser-image-compression';
 
 interface AvatarUploadProps {
   targetAddress?: string;
@@ -21,12 +22,12 @@ interface AvatarUploadProps {
   onUploadComplete?: (url: string) => void;
 }
 
-export function AvatarUpload({ 
-  targetAddress, 
-  size = 'md', 
+export function AvatarUpload({
+  targetAddress,
+  size = 'md',
   showUploadButton = true,
   overrideAvatarUrl,
-  onUploadComplete 
+  onUploadComplete
 }: AvatarUploadProps) {
   const user = useUser();
   const { smartAccountAddress } = useWalletStatus();
@@ -54,15 +55,33 @@ export function AvatarUpload({
       return;
     }
 
-    // Validate file size (2MB limit)
-    if (file.size > 2 * 1024 * 1024) {
-      alert('File size must be less than 2MB');
+    // Validate file size (5MB limit)
+    const MAX_SIZE_MB = 5;
+    if (file.size > MAX_SIZE_MB * 1024 * 1024) {
+      alert(`File size must be less than ${MAX_SIZE_MB}MB`);
       return;
     }
 
-    const result = await uploadAvatar(file);
-    if (result.success && result.url && onUploadComplete) {
-      onUploadComplete(result.url);
+    try {
+      const options = {
+        maxSizeMB: 1, // Target size in MB
+        maxWidthOrHeight: 1920,
+        useWebWorker: true,
+      };
+
+      const compressedFile = await imageCompression(file, options);
+
+      const result = await uploadAvatar(compressedFile);
+      if (result.success && result.url && onUploadComplete) {
+        onUploadComplete(result.url);
+      }
+    } catch (error) {
+      console.error('Error compressing image:', error);
+      // Fallback to uploading original file if compression fails
+      const result = await uploadAvatar(file);
+      if (result.success && result.url && onUploadComplete) {
+        onUploadComplete(result.url);
+      }
     }
   };
 
@@ -76,7 +95,7 @@ export function AvatarUpload({
   const handleDrop = (event: React.DragEvent) => {
     event.preventDefault();
     setDragOver(false);
-    
+
     const file = event.dataTransfer.files[0];
     if (file) {
       handleFileSelect(file);
@@ -99,7 +118,7 @@ export function AvatarUpload({
     }
   };
 
-  const displayName = profile?.username || 
+  const displayName = profile?.username ||
     `${(targetAddress || user?.address || '').slice(0, 6)}...${(targetAddress || user?.address || '').slice(-4)}`;
 
   return (
@@ -117,7 +136,7 @@ export function AvatarUpload({
               {profile?.username ? profile.username.charAt(0).toUpperCase() : <User className="h-8 w-8" />}
             </AvatarFallback>
           </Avatar>
-          
+
           {isUploading && (
             <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center">
               <div className="text-white text-xs text-center">
@@ -137,7 +156,7 @@ export function AvatarUpload({
               onChange={handleFileInputChange}
               className="hidden"
             />
-            
+
             <div className="flex gap-2">
               <Button
                 variant="outline"
@@ -149,7 +168,7 @@ export function AvatarUpload({
                 <Upload className="h-4 w-4" />
                 {currentAvatarUrl ? 'Change' : 'Upload'}
               </Button>
-              
+
               {currentAvatarUrl && (
                 <Button
                   variant="outline"
@@ -163,11 +182,11 @@ export function AvatarUpload({
                 </Button>
               )}
             </div>
-            
+
             <p className="text-xs text-muted-foreground">
               Drag & drop or click to upload
               <br />
-              Max 2MB • JPEG, PNG, GIF, WebP
+              Max 5MB • JPEG, PNG, GIF, WebP
             </p>
           </div>
         )}

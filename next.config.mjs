@@ -278,6 +278,11 @@ const nextConfig = {
         hostname: "storage.unlock-protocol.com",
         pathname: "/**",
       },
+      {
+        protocol: "https",
+        hostname: "i.postimg.cc",
+        pathname: "/**",
+      },
     ],
   },
   async headers() {
