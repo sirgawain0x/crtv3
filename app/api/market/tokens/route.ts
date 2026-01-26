@@ -110,7 +110,7 @@ export async function GET(request: NextRequest) {
           // Continue with existing Supabase data - this is a fallback, not critical
         } else {
           const subgraphData = await subgraphResponse.json() as any;
-          
+
           // Check for GraphQL errors in response
           if (subgraphData.errors && subgraphData.errors.length > 0) {
             serverLogger.warn('Market API: GraphQL errors in subgraph response:', subgraphData.errors);
@@ -296,6 +296,12 @@ export async function GET(request: NextRequest) {
         return { ...token, price };
       });
     }
+
+    // Filter out tokens with negligible value (Price < 0.01 AND TVL < 0.01 AND Market Cap < 0.01)
+    allTokens = allTokens.filter(token => {
+      // Keep token if ANY of these metrics is at least 0.01
+      return token.price >= 0.01 || token.tvl >= 0.01 || token.market_cap >= 0.01;
+    });
 
     // Apply search filter if provided
     if (search) {
