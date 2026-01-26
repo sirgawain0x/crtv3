@@ -183,13 +183,15 @@ export function useMarketData(options: UseMarketDataOptions = {}): UseMarketData
     await fetchMarketData();
   }, [fetchMarketData]);
 
+  // Debounce ref for global refresh
+  const globalRefreshTimeoutRef = useRef<any>(null);
+
   // Real-time updates
   const handleRealtimeUpdate = useCallback(async (tokenAddress: string) => {
-    // Debounce or throttle could be added here
     logger.debug(`⚡ Real-time update for ${tokenAddress}`);
 
     try {
-      // Fetch fresh data for this specific token
+      // 1. Fetch fresh data for this specific token immediately (fast UI update for the token)
       const response = await fetch(`/api/market/tokens/${tokenAddress}/fresh`);
       if (response.ok) {
         const result = await response.json();
@@ -203,13 +205,35 @@ export function useMarketData(options: UseMarketDataOptions = {}): UseMarketData
           );
         }
       }
+
+      // 2. Schedule a global refresh to update "stats" (Top Gainers/Losers, Total TVL/Volume)
+      // We debounce this to avoid hammering the API if multiple tokens update at once (e.g. during high activity)
+      if (globalRefreshTimeoutRef.current) {
+        clearTimeout(globalRefreshTimeoutRef.current);
+      }
+
+      globalRefreshTimeoutRef.current = setTimeout(() => {
+        logger.debug('⚡ Triggering global market data refresh from real-time event');
+        // Pass true to indicate this is a background refresh (no loading spinner)
+        fetchMarketData(true);
+      }, 5000); // 5 second debounce
+
     } catch (error) {
       logger.error('Failed to fetch fresh token data:', error);
     }
+  }, [fetchMarketData]);
+
+  // Cleanup timeout
+  useEffect(() => {
+    return () => {
+      if (globalRefreshTimeoutRef.current) {
+        clearTimeout(globalRefreshTimeoutRef.current);
+      }
+    };
   }, []);
 
   useMarketRealtime(tokens, {
-    enabled: autoRefresh, // Only use WSS if auto-refresh is on (or add specific flag)
+    enabled: autoRefresh,
     onUpdate: handleRealtimeUpdate
   });
 
