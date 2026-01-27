@@ -2,7 +2,7 @@
  * Mock utilities for testing Story Protocol factory contract service
  */
 
-import { vi } from 'vitest';
+import { vi, beforeEach, afterEach } from 'vitest';
 import type { Address } from 'viem';
 
 /**
@@ -67,6 +67,7 @@ export const testData = {
   metadataURI: 'ipfs://QmTest123456789012345678901234567890123456789012345678901234567890',
   txHash: '0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef' as const,
   tokenId: '1',
+  bytecode: '0x1234567890' as const,
 };
 
 /**
@@ -75,7 +76,7 @@ export const testData = {
 export function createMockTransactionReceipt(collectionAddress: Address) {
   // Event signature: keccak256("CollectionCreated(address,address,string,string)")
   const eventSignature = '0x4f51faf6c4561ff95f067657e43439f0f856d97c04d9eb9075eb457ab0d5e1f1';
-  
+
   return {
     status: 'success' as const,
     transactionHash: testData.txHash,
@@ -99,7 +100,7 @@ export function createMockTransactionReceipt(collectionAddress: Address) {
  */
 export function mockEnvVars(overrides: Record<string, string> = {}) {
   const originalEnv = process.env;
-  
+
   beforeEach(() => {
     process.env = {
       ...originalEnv,

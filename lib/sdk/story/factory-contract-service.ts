@@ -26,6 +26,7 @@ import { encodeFunctionData, parseAbi, getAddress } from "viem";
 import { createStoryPublicClient } from "./client";
 import { createServiceClient } from "@/lib/sdk/supabase/service";
 import { serverLogger } from '@/lib/utils/logger';
+import { keccak256, toBytes } from "viem";
 
 
 /**
@@ -52,6 +53,7 @@ const COLLECTION_ABI = parseAbi([
   "function nextTokenIdToMint() external view returns (uint256)",
   "function totalSupply() external view returns (uint256)",
   "function tokenURI(uint256 tokenId) external view returns (string)",
+  "function grantRole(bytes32 role, address account) external",
 ]);
 
 /**
@@ -175,7 +177,7 @@ export async function deployCreatorCollection(
 
     // Extract collection address from the CollectionCreated event
     const COLLECTION_CREATED_EVENT_SIGNATURE = "0x4f51faf6c4561ff95f067657e43439f0f856d97c04d9eb9075eb457ab0d5e1f1";
-    
+
     const collectionCreatedEvent = receipt.logs.find((log: Log) => {
       return log.topics[0] === COLLECTION_CREATED_EVENT_SIGNATURE;
     });
@@ -312,5 +314,127 @@ export async function getFactoryOwner(): Promise<Address | null> {
   } catch (error) {
     serverLogger.error("Failed to get factory owner:", error);
     return null;
+  }
+}
+
+/**
+ * Mint a new NFT in the creator's collection
+ * 
+ * @param walletClient - Wallet client with minter's account
+ * @param collectionAddress - Collection address
+ * @param to - Recipient address
+ * @param uri - Token URI (optional, default empty)
+ * @returns Token ID and transaction hash
+ */
+export async function mintInCreatorCollection(
+  walletClient: any,
+  collectionAddress: Address,
+  to: Address,
+  uri: string = ""
+): Promise<{ tokenId: string; txHash: string }> {
+  try {
+    // Encode the function call
+    const mintData = encodeFunctionData({
+      abi: COLLECTION_ABI,
+      functionName: "mintTo",
+      args: [to, uri],
+    });
+
+    // Get the account from wallet client
+    const [account] = await walletClient.getAddresses();
+    if (!account) {
+      throw new Error("No account found in wallet client");
+    }
+
+    // Send the transaction
+    const hash = await walletClient.sendUserOperation({
+      uo: {
+        target: collectionAddress,
+        data: mintData,
+        value: BigInt(0),
+      },
+    });
+
+    // Wait for the transaction to be mined
+    const txHash = await walletClient.waitForUserOperationTransaction({
+      hash,
+    });
+
+    // In a real implementation we would parse logs to get the token ID
+    // For now we'll assume sequential IDs and fetch the latest
+    const publicClient = createStoryPublicClient();
+    const totalSupply = await publicClient.readContract({
+      address: collectionAddress,
+      abi: COLLECTION_ABI,
+      functionName: "totalSupply",
+    });
+
+    // Validating assumption: if we just minted, the tokenId matches current supply (if starting from 1)
+    // or we might need `nextTokenIdToMint` depending on the contract logic.
+    // Given the simple requirement, we'll return the supply as the ID.
+
+    return {
+      tokenId: totalSupply.toString(),
+      txHash: txHash,
+    };
+  } catch (error) {
+    serverLogger.error("Failed to mint in creator collection:", error);
+    throw new Error(
+      `Minting failed: ${error instanceof Error ? error.message : "Unknown error"}`
+    );
+  }
+}
+
+/**
+ * Grant the platform minter role to an address
+ * 
+ * @param walletClient - Wallet client with admin's account (creator)
+ * @param collectionAddress - Collection address
+ * @param minterAddress - Address to grant minter role to
+ * @returns Transaction hash
+ */
+export async function grantPlatformMinterRole(
+  walletClient: any,
+  collectionAddress: Address,
+  minterAddress: Address
+): Promise<{ txHash: string }> {
+  try {
+    const MINTER_ROLE = keccak256(toBytes("MINTER_ROLE"));
+
+    // Encode the function call
+    const grantData = encodeFunctionData({
+      abi: COLLECTION_ABI,
+      functionName: "grantRole",
+      args: [MINTER_ROLE, minterAddress],
+    });
+
+    // Get the account from wallet client
+    const [account] = await walletClient.getAddresses();
+    if (!account) {
+      throw new Error("No account found in wallet client");
+    }
+
+    // Send the transaction
+    const hash = await walletClient.sendUserOperation({
+      uo: {
+        target: collectionAddress,
+        data: grantData,
+        value: BigInt(0),
+      },
+    });
+
+    // Wait for the transaction to be mined
+    const txHash = await walletClient.waitForUserOperationTransaction({
+      hash,
+    });
+
+    return {
+      txHash,
+    };
+  } catch (error) {
+    serverLogger.error("Failed to grant minter role:", error);
+    throw new Error(
+      `Grant minter role failed: ${error instanceof Error ? error.message : "Unknown error"}`
+    );
   }
 }

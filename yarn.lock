@@ -2,10 +2,18 @@
 # yarn lockfile v1
 
 
-"@0no-co/graphql.web@^1.0.1":
+"@0no-co/graphql.web@^1.0.1", "@0no-co/graphql.web@^1.0.13", "@0no-co/graphql.web@^1.0.5":
   version "1.2.0"
   resolved "https://registry.npmjs.org/@0no-co/graphql.web/-/graphql.web-1.2.0.tgz"
   integrity sha512-/1iHy9TTr63gE1YcR5idjx8UREz1s0kFhydf3bBLCXyqjhkIc6igAzTOx3zPifCwFR87tsh/4Pa9cNts6d2otw==
+
+"@0no-co/graphqlsp@^1.12.13":
+  version "1.15.2"
+  resolved "https://registry.npmjs.org/@0no-co/graphqlsp/-/graphqlsp-1.15.2.tgz#275132804037f4a7f1fa09ea6d37cb046c8a1c1e"
+  integrity sha512-Ys031WnS3sTQQBtRTkQsYnw372OlW72ais4sp0oh2UMPRNyxxnq85zRfU4PIdoy9kWriysPT5BYAkgIxhbonFA==
+  dependencies:
+    "@gql.tada/internal" "^1.0.0"
+    graphql "^15.5.0 || ^16.0.0 || ^17.0.0"
 
 "@0xsplits/splits-kit@^2.2.0":
   version "2.2.0"
@@ -2857,6 +2865,22 @@
     lit "^2.2.3"
     three "^0.146.0"
 
+"@gql.tada/cli-utils@1.7.2":
+  version "1.7.2"
+  resolved "https://registry.npmjs.org/@gql.tada/cli-utils/-/cli-utils-1.7.2.tgz#3dcdc4baacaed8f499b65b4202fdccdaf7340273"
+  integrity sha512-Qbc7hbLvCz6IliIJpJuKJa9p05b2Jona7ov7+qofCsMRxHRZE1kpAmZMvL8JCI4c0IagpIlWNaMizXEQUe8XjQ==
+  dependencies:
+    "@0no-co/graphqlsp" "^1.12.13"
+    "@gql.tada/internal" "1.0.8"
+    graphql "^15.5.0 || ^16.0.0 || ^17.0.0"
+
+"@gql.tada/internal@1.0.8", "@gql.tada/internal@^1.0.0":
+  version "1.0.8"
+  resolved "https://registry.npmjs.org/@gql.tada/internal/-/internal-1.0.8.tgz#3ba9fa6534809788bbbe103492f70b8e9d754027"
+  integrity sha512-XYdxJhtHC5WtZfdDqtKjcQ4d7R1s0d1rnlSs3OcBEUbYiPoJJfZU7tWsVXuv047Z6msvmr4ompJ7eLSK5Km57g==
+  dependencies:
+    "@0no-co/graphql.web" "^1.0.5"
+
 "@graphql-typed-document-node/core@^3.1.1", "@graphql-typed-document-node/core@^3.2.0":
   version "3.2.0"
   resolved "https://registry.npmjs.org/@graphql-typed-document-node/core/-/core-3.2.0.tgz"
@@ -3766,7 +3790,7 @@
   resolved "https://registry.npmjs.org/@leichtgewicht/ip-codec/-/ip-codec-2.0.5.tgz"
   integrity sha512-Vo+PSpZG2/fmgmiNzYK9qWRh8h/CHrwD0mo1h1DzL4yzHNSfWYujGTYsWGreD000gcgmZ7K4Ys6Tx9TxtsKdDw==
 
-"@lens-chain/sdk@^1.0.3":
+"@lens-chain/sdk@^1.0.0", "@lens-chain/sdk@^1.0.3":
   version "1.0.3"
   resolved "https://registry.npmjs.org/@lens-chain/sdk/-/sdk-1.0.3.tgz#785c8cb4372bd40b1a3d5efb89c0d0735c0317e8"
   integrity sha512-ysfCKyhC2CouFQbysnduwKGQU8L6MI1VVBcClMLisKAJAunHFowsBaUp+j8nuQyWmUETpokqpe2Mk0P9bSGhfw==
@@ -3775,6 +3799,64 @@
   version "1.0.6"
   resolved "https://registry.npmjs.org/@lens-chain/storage-client/-/storage-client-1.0.6.tgz#c9aa7b7f49856c2940031119b661b280d558a651"
   integrity sha512-CchjEt3vKAj5RlHd9sWOGFlHZ9WvQm6edHrn0a2BBPXxOZ0gZwbK6aKOSCySEk0gmDvmy7LB6dGdtNLSFzutHg==
+
+"@lens-protocol/client@^0.0.0-canary-20250820102520":
+  version "0.0.0-canary-20250820102520"
+  resolved "https://registry.npmjs.org/@lens-protocol/client/-/client-0.0.0-canary-20250820102520.tgz#8c2af2d2c768f64305f99b23aba32a324880615e"
+  integrity sha512-Y7lCJe8gO5+OkLJWHj1SQhlj8nzubYowXI3X4FV1vhXt+RziogC/8IzUgmF5kBeR2f0gh+e5LPtst5O+VL2ZgQ==
+  dependencies:
+    "@lens-chain/sdk" "^1.0.0"
+    "@lens-protocol/env" "0.0.0-canary-20250820102520"
+    "@lens-protocol/graphql" "0.0.0-canary-20250820102520"
+    "@lens-protocol/storage" "0.0.0-canary-20250820102520"
+    "@lens-protocol/types" "0.0.0-canary-20250820102520"
+    "@urql/core" "^5.0.8"
+    "@urql/exchange-auth" "^2.2.0"
+    "@urql/exchange-graphcache" "^7.2.4"
+    graphql "^16.9.0"
+    jwt-decode "^4.0.0"
+
+"@lens-protocol/env@0.0.0-canary-20250820102520":
+  version "0.0.0-canary-20250820102520"
+  resolved "https://registry.npmjs.org/@lens-protocol/env/-/env-0.0.0-canary-20250820102520.tgz#8bb6f55d5d5b73e7db97d324210b5b0ffbdadad7"
+  integrity sha512-PkAA3LpyZ/p7NLcpQqnxhjBc2B2+S+37KaXXms4oWfDsSo/pivor+g+CbTDX5kQo5f0fpmC0fZQIVSAz5cbNJw==
+  dependencies:
+    "@lens-protocol/types" "0.0.0-canary-20250820102520"
+
+"@lens-protocol/graphql@0.0.0-canary-20250820102520":
+  version "0.0.0-canary-20250820102520"
+  resolved "https://registry.npmjs.org/@lens-protocol/graphql/-/graphql-0.0.0-canary-20250820102520.tgz#c9ba2323d8e634c502ed8c129d7d87b68eafc977"
+  integrity sha512-9oxo4pMA/oqiNbQCJco3SGu/JqSXFAgOB8jrrAzu8dXFsv88449SsezS8QSwnP6Yz7Bu6q5EREmHWCFm9ISVOw==
+  dependencies:
+    "@lens-protocol/types" "0.0.0-canary-20250820102520"
+    gql.tada "^1.8.10"
+    graphql "^16.9.0"
+    type-fest "^4.26.1"
+
+"@lens-protocol/metadata@^2.1.0":
+  version "2.1.0"
+  resolved "https://registry.npmjs.org/@lens-protocol/metadata/-/metadata-2.1.0.tgz#f08022ec09acdbfa6003ead20995c97ad51b05ae"
+  integrity sha512-aQOqs/SFLKgFRQLyyOlZtDqni0LtRzOf0W+zfxtovxOCyjFKkhxRvlw+qLqVlaYM1dS50lDZ+7/uVMQ+PH5wIQ==
+  dependencies:
+    abitype "^1.0.8"
+    json-stable-stringify "^1.1.1"
+    uuid "^9.0.1"
+
+"@lens-protocol/storage@0.0.0-canary-20250820102520":
+  version "0.0.0-canary-20250820102520"
+  resolved "https://registry.npmjs.org/@lens-protocol/storage/-/storage-0.0.0-canary-20250820102520.tgz#4bcd3d87768c62beef2e339ac5d2bb334a636e03"
+  integrity sha512-uGOQA8QrE6FBrT2a88II8Qis+GCsXGRXfW834c9B6wT4BkwnyovsZJSUwe3tiO2CvooNZOHhs0spEyF+q3ukuw==
+  dependencies:
+    "@lens-protocol/types" "0.0.0-canary-20250820102520"
+    zod "^3.23.8"
+
+"@lens-protocol/types@0.0.0-canary-20250820102520":
+  version "0.0.0-canary-20250820102520"
+  resolved "https://registry.npmjs.org/@lens-protocol/types/-/types-0.0.0-canary-20250820102520.tgz#d48e370f6e1267377e33bff139464bbdc3deab37"
+  integrity sha512-V7TUHCckOca1hXmcmLFHUqYMw54OPuaNna4QWjQW5L0oGVIw+5QNoj7uHlgJwbGMQ7lVN/k6F+4EG6sBEEZJYQ==
+  dependencies:
+    neverthrow "^8.0.0"
+    type-fest "^4.26.1"
 
 "@libp2p/autonat@^3.0.5":
   version "3.0.9"
@@ -6618,6 +6700,11 @@
   version "4.54.0"
   resolved "https://registry.npmjs.org/@rollup/rollup-linux-x64-gnu/-/rollup-linux-x64-gnu-4.54.0.tgz#ab140b356569601f57ab8727bd7306463841894f"
   integrity sha512-WGt5J8Ij/rvyqpFexxk3ffKqqbLf9AqrTBbWDk7ApGUzaIs6V+s2s84kAxklFwmMF/vBNGrVdYgbblCOFFezMQ==
+
+"@rollup/rollup-linux-x64-gnu@^4.24.0":
+  version "4.57.0"
+  resolved "https://registry.npmjs.org/@rollup/rollup-linux-x64-gnu/-/rollup-linux-x64-gnu-4.57.0.tgz#0da46a644c87e1d8b13da5e2901037193caea8d3"
+  integrity sha512-OR5p5yG5OKSxHReWmwvM0P+VTPMwoBS45PXTMYaskKQqybkS3Kmugq1W+YbNWArF8/s7jQScgzXUhArzEQ7x0A==
 
 "@rollup/rollup-linux-x64-musl@4.54.0":
   version "4.54.0"
@@ -10176,6 +10263,31 @@
     "@0no-co/graphql.web" "^1.0.1"
     wonka "^6.3.2"
 
+"@urql/core@^5.0.8", "@urql/core@^5.1.1", "@urql/core@^5.1.2":
+  version "5.2.0"
+  resolved "https://registry.npmjs.org/@urql/core/-/core-5.2.0.tgz#77ee41e192e261fea30c2ca6c2f340410b45d214"
+  integrity sha512-/n0ieD0mvvDnVAXEQgX/7qJiVcvYvNkOHeBvkwtylfjydar123caCXcl58PXFY11oU1oquJocVXHxLAbtv4x1A==
+  dependencies:
+    "@0no-co/graphql.web" "^1.0.13"
+    wonka "^6.3.2"
+
+"@urql/exchange-auth@^2.2.0":
+  version "2.2.1"
+  resolved "https://registry.npmjs.org/@urql/exchange-auth/-/exchange-auth-2.2.1.tgz#2e6f7b4ff008f0a3f6e5a1c80f0659d1d0856321"
+  integrity sha512-n4xUxxjvY36GJh539sLaPFyvFzreADOv8EFQdTiXOCIRVoXXhWVVI7DjY/HNtLICfbg1+UlbvQ7sNkwaBouDHg==
+  dependencies:
+    "@urql/core" "^5.1.1"
+    wonka "^6.3.2"
+
+"@urql/exchange-graphcache@^7.2.4":
+  version "7.2.4"
+  resolved "https://registry.npmjs.org/@urql/exchange-graphcache/-/exchange-graphcache-7.2.4.tgz#c2e8d2a634906b2535d77b2e1c5c8717fa2e30fd"
+  integrity sha512-kiKbT0ZrtyQmmgNLYR0qkZAJjWHQOtrd+6Dt9JMtm3L/A8r3D6ptcJn668BADP6J+vkxcfNFtdI+0OdmBBkRgw==
+  dependencies:
+    "@0no-co/graphql.web" "^1.0.13"
+    "@urql/core" "^5.1.2"
+    wonka "^6.3.2"
+
 "@vercel/analytics@^1.6.1":
   version "1.6.1"
   resolved "https://registry.npmjs.org/@vercel/analytics/-/analytics-1.6.1.tgz#b4e16daf445cf6cd365a91e43d86e9e5b3428ddc"
@@ -11450,7 +11562,7 @@ abitype@1.1.0:
   resolved "https://registry.npmjs.org/abitype/-/abitype-1.1.0.tgz"
   integrity sha512-6Vh4HcRxNMLA0puzPjM5GBgT4aAcFGKZzSgAXvuZ27shJP6NEpielTuqbBmZILR5/xd0PizkBGy5hReKz9jl5A==
 
-abitype@1.2.3, abitype@^1.2.3:
+abitype@1.2.3, abitype@^1.0.8, abitype@^1.2.3:
   version "1.2.3"
   resolved "https://registry.npmjs.org/abitype/-/abitype-1.2.3.tgz"
   integrity sha512-Ofer5QUnuUdTFsBRwARMoWKOH1ND5ehwYhJ3OJ/BQO+StkwQjHw0XyVh4vDttzHB7QOFhPHa/o413PJ82gU/Tg==
@@ -15763,6 +15875,16 @@ gopd@^1.0.1, gopd@^1.2.0:
   resolved "https://registry.npmjs.org/gopd/-/gopd-1.2.0.tgz"
   integrity sha512-ZUKRh6/kUFoAiTAtTYPZJ3hw9wNxx+BIBOijnlG9PnrJsCcSjs1wyyD6vJpaYtgnzDrKYRSqf3OO6Rfa93xsRg==
 
+gql.tada@^1.8.10:
+  version "1.9.0"
+  resolved "https://registry.npmjs.org/gql.tada/-/gql.tada-1.9.0.tgz#94555d50cf6e969db25c8e88bf0b3fe603732bf4"
+  integrity sha512-1LMiA46dRs5oF7Qev6vMU32gmiNvM3+3nHoQZA9K9j2xQzH8xOAWnnJrLSbZOFHTSdFxqn86TL6beo1/7ja/aA==
+  dependencies:
+    "@0no-co/graphql.web" "^1.0.5"
+    "@0no-co/graphqlsp" "^1.12.13"
+    "@gql.tada/cli-utils" "1.7.2"
+    "@gql.tada/internal" "1.0.8"
+
 graceful-fs@^4.1.6, graceful-fs@^4.2.0, graceful-fs@^4.2.10, graceful-fs@^4.2.4, graceful-fs@^4.2.9:
   version "4.2.11"
   resolved "https://registry.npmjs.org/graceful-fs/-/graceful-fs-4.2.11.tgz"
@@ -15812,7 +15934,7 @@ graphql@16.10.0:
   resolved "https://registry.npmjs.org/graphql/-/graphql-16.11.0.tgz"
   integrity sha512-mS1lbMsxgQj6hge1XZ6p7GPhbrtFwUFYi3wRzXAC/FmYnyXMTvvI3td3rjmQ2u8ewXueaSvRPWaEcgVVOT9Jnw==
 
-graphql@^16.8.1:
+"graphql@^15.5.0 || ^16.0.0 || ^17.0.0", graphql@^16.8.1, graphql@^16.9.0:
   version "16.12.0"
   resolved "https://registry.npmjs.org/graphql/-/graphql-16.12.0.tgz"
   integrity sha512-DKKrynuQRne0PNpEbzuEdHlYOMksHSUI8Zc9Unei5gTsMNA2/vMpoMz/yKba50pejK56qj98qM0SjYxAKi13gQ==
@@ -19387,6 +19509,13 @@ netmask@^2.0.2:
   version "2.0.2"
   resolved "https://registry.npmjs.org/netmask/-/netmask-2.0.2.tgz"
   integrity sha512-dBpDMdxv9Irdq66304OLfEmQ9tbNRFnFTuZiLo+bD+r332bBmMJ8GBLXklIXXgxd3+v9+KUnZaUR5PJMa75Gsg==
+
+neverthrow@^8.0.0:
+  version "8.2.0"
+  resolved "https://registry.npmjs.org/neverthrow/-/neverthrow-8.2.0.tgz#925d988295758534d01fb7468f998680b62064f2"
+  integrity sha512-kOCT/1MCPAxY5iUV3wytNFUMUolzuwd/VF/1KCx7kf6CutrOsTie+84zTGTpgQycjvfLdBBdvBvFLqFD2c0wkQ==
+  optionalDependencies:
+    "@rollup/rollup-linux-x64-gnu" "^4.24.0"
 
 new-date@^1.0.3:
   version "1.0.3"
@@ -23190,7 +23319,7 @@ type-fest@^2.11.2:
   resolved "https://registry.npmjs.org/type-fest/-/type-fest-2.19.0.tgz"
   integrity sha512-RAH822pAdBgcNMAfWnCBU3CFZcfZ/i1eZjwFU/dsLKumyuuP3niueg2UAukXYF0E2AAoc82ZSSf9J0WQBinzHA==
 
-type-fest@^4.27.0, type-fest@^4.41.0, type-fest@^4.9.0:
+type-fest@^4.26.1, type-fest@^4.27.0, type-fest@^4.41.0, type-fest@^4.9.0:
   version "4.41.0"
   resolved "https://registry.npmjs.org/type-fest/-/type-fest-4.41.0.tgz"
   integrity sha512-TeTSQ6H5YHvpqVwBRcnLDCBnDOHWYu7IvGbHT6N8AOymcr9PJGjc1GTtiWZTYg0NCgYwvnYWEkVChQAr9bjfwA==
@@ -24998,15 +25127,15 @@ zod@^3.22.4, zod@^3.24.3:
   resolved "https://registry.npmjs.org/zod/-/zod-3.24.4.tgz"
   integrity sha512-OdqJE9UDRPwWsrHjLN2F8bPxvwJBK22EHLWtanu0LSYr5YqzsaaW3RMgmjwr8Rypg5k+meEJdSPXJZXE/yqOMg==
 
+zod@^3.23.8, zod@^3.24.2, zod@^3.24.4:
+  version "3.25.76"
+  resolved "https://registry.npmjs.org/zod/-/zod-3.25.76.tgz"
+  integrity sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==
+
 zod@^3.24.1, zod@^3.25.1:
   version "3.25.62"
   resolved "https://registry.npmjs.org/zod/-/zod-3.25.62.tgz"
   integrity sha512-YCxsr4DmhPcrKPC9R1oBHQNlQzlJEyPAId//qTau/vBee9uO8K6prmRq4eMkOyxvBfH4wDPIPdLx9HVMWIY3xA==
-
-zod@^3.24.2, zod@^3.24.4:
-  version "3.25.76"
-  resolved "https://registry.npmjs.org/zod/-/zod-3.25.76.tgz"
-  integrity sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==
 
 zod@^4.1.5:
   version "4.1.12"

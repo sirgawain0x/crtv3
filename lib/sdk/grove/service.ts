@@ -58,6 +58,41 @@ export class GroveService {
             };
         }
     }
+
+    /**
+     * Uploads a JSON object to Grove.
+     * Useful for metadata uploads.
+     * 
+     * @param json - The JSON object to upload
+     * @returns GroveUploadResult
+     */
+    async uploadJson(json: unknown): Promise<GroveUploadResult> {
+        try {
+            const acl = immutable(chains.testnet.id);
+
+            const response = await this.client.uploadAsJson(json, { acl });
+
+            if (response && response.gatewayUrl) {
+                serverLogger.debug('[GroveService] ✅ JSON Upload successful:', response.gatewayUrl);
+                return {
+                    success: true,
+                    url: response.gatewayUrl,
+                    hash: response.storageKey,
+                };
+            }
+
+            return {
+                success: false,
+                error: "Upload response missing gateway URL"
+            };
+        } catch (error) {
+            serverLogger.error('[GroveService] ❌ JSON Upload error:', error);
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : "Unknown Grove JSON upload error"
+            };
+        }
+    }
 }
 
 export const groveService = new GroveService();
