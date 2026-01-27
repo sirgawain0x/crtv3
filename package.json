@@ -46,6 +46,8 @@
     "@kreisler/js-google-translate-free": "^4.0.2",
     "@lens-chain/sdk": "^1.0.3",
     "@lens-chain/storage-client": "^1.0.6",
+    "@lens-protocol/client": "^0.0.0-canary-20250820102520",
+    "@lens-protocol/metadata": "^2.1.0",
     "@livepeer/ai": "^0.6.2",
     "@livepeer/react": "^4.3.2",
     "@neondatabase/serverless": "^1.0.0",

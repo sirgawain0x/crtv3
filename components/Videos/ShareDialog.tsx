@@ -14,6 +14,8 @@ import { fetchVideoAssetByPlaybackId } from "@/lib/utils/video-assets-client";
 import { getThumbnailUrl } from "@/lib/utils/thumbnail";
 import { convertFailingGateway } from "@/lib/utils/image-gateway";
 import { logger } from '@/lib/utils/logger';
+import { useLens } from "@/hooks/useLens";
+import { Loader2 as Spinner } from "lucide-react";
 
 
 interface ShareDialogProps {
@@ -34,6 +36,7 @@ export function ShareDialog({
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
   const [isLoadingThumbnail, setIsLoadingThumbnail] = useState(true);
   const [shareUrl, setShareUrl] = useState<string>("");
+  const { isLoggedIn, isPosting, login, createPost } = useLens();
 
   // Remove .mp4 extension from title if present
   const cleanTitle = videoTitle.endsWith('.mp4') ? videoTitle.slice(0, -4) : videoTitle;
@@ -102,9 +105,23 @@ export function ShareDialog({
       }
 
       case "lens": {
-        // Lens Protocol - Uses lens.xyz/share
-        const lensUrl = `https://lens.xyz/share?text=${encodeURIComponent(text)}&url=${encodeURIComponent(shareUrl)}`;
-        window.open(lensUrl, "_blank", "width=550,height=600");
+        if (!isLoggedIn) {
+          await login();
+          return;
+        }
+
+        // Use the proper video source URL for Lens
+        // This endpoint serves the source MP4 file
+        const videoSourceUrl = playbackId
+          ? `https://livepeercdn.studio/asset/${playbackId}/video`
+          : shareUrl;
+
+        await createPost({
+          content: `${text}\n\n${shareUrl}`,
+          mediaUrl: videoSourceUrl,
+          title: cleanTitle,
+          coverUrl: thumbnailUrl || undefined
+        });
         break;
       }
 
@@ -182,7 +199,8 @@ export function ShareDialog({
               className="flex items-center justify-center gap-2 h-auto py-3"
             >
               <Globe className="h-5 w-5" />
-              <span>Lens</span>
+              <span>{isPosting ? "Posting..." : isLoggedIn ? "Share to Lens" : "Sign in to Lens"}</span>
+              {isPosting && <Spinner className="h-4 w-4 animate-spin ml-2" />}
             </Button>
 
             <Button

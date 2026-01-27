@@ -60,7 +60,8 @@ describe('Integration Tests', () => {
         mockSmartAccountClient as any,
         testData.creatorAddress,
         testData.collectionName,
-        testData.collectionSymbol
+        testData.collectionSymbol,
+        testData.bytecode
       );
 
       expect(deployResult.collectionAddress).toBe(testData.collectionAddress);
@@ -111,7 +112,8 @@ describe('Integration Tests', () => {
           mockSmartAccountClient as any,
           testData.creatorAddress,
           testData.collectionName,
-          testData.collectionSymbol
+          testData.collectionSymbol,
+          testData.bytecode
         )
       ).rejects.toThrow('Collection deployment failed');
 
@@ -143,7 +145,8 @@ describe('Integration Tests', () => {
         mockSmartAccountClient as any,
         testData.creatorAddress,
         testData.collectionName,
-        testData.collectionSymbol
+        testData.collectionSymbol,
+        testData.bytecode
       );
 
       expect(mockSmartAccountClient.sendUserOperation).toHaveBeenCalledWith({
@@ -172,7 +175,8 @@ describe('Integration Tests', () => {
         mockSmartAccountClient as any,
         testData.creatorAddress,
         testData.collectionName,
-        testData.collectionSymbol
+        testData.collectionSymbol,
+        testData.bytecode
       );
 
       // Mint (could be batched in real scenario)
@@ -199,7 +203,8 @@ describe('Integration Tests', () => {
         mockSmartAccountClient as any,
         testData.creatorAddress,
         testData.collectionName,
-        testData.collectionSymbol
+        testData.collectionSymbol,
+        testData.bytecode
       );
 
       // Verify database upsert was called
@@ -254,7 +259,8 @@ describe('Integration Tests', () => {
           mockSmartAccountClient as any,
           testData.creatorAddress,
           testData.collectionName,
-          testData.collectionSymbol
+          testData.collectionSymbol,
+          testData.bytecode
         )
       ).rejects.toThrow();
     });
@@ -303,14 +309,16 @@ describe('Integration Tests', () => {
         mockSmartAccountClient as any,
         testData.creatorAddress,
         testData.collectionName,
-        testData.collectionSymbol
+        testData.collectionSymbol,
+        testData.bytecode
       );
 
       await deployCreatorCollection(
         mockSmartAccountClient as any,
         creator2,
         'Collection 2',
-        'COL2'
+        'COL2',
+        testData.bytecode
       );
 
       // Verify both collections exist

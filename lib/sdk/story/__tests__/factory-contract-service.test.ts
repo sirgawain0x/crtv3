@@ -60,7 +60,8 @@ describe('factory-contract-service', () => {
         mockSmartAccountClient as any,
         testData.creatorAddress,
         testData.collectionName,
-        testData.collectionSymbol
+        testData.collectionSymbol,
+        testData.bytecode
       );
 
       expect(result.collectionAddress).toBe(testData.collectionAddress);
@@ -78,7 +79,8 @@ describe('factory-contract-service', () => {
         mockSmartAccountClient as any,
         testData.creatorAddress,
         testData.collectionName,
-        testData.collectionSymbol
+        testData.collectionSymbol,
+        testData.bytecode
       );
 
       expect(result.collectionAddress).toBe(testData.collectionAddress);
@@ -97,7 +99,8 @@ describe('factory-contract-service', () => {
         mockSmartAccountClient as any,
         testData.creatorAddress,
         testData.collectionName,
-        testData.collectionSymbol
+        testData.collectionSymbol,
+        testData.bytecode
       );
 
       expect(mockPublicClient.readContract).toHaveBeenCalled();
@@ -112,7 +115,8 @@ describe('factory-contract-service', () => {
           mockSmartAccountClient as any,
           testData.creatorAddress,
           testData.collectionName,
-          testData.collectionSymbol
+          testData.collectionSymbol,
+          testData.bytecode
         )
       ).rejects.toThrow('Factory contract address not configured');
     });
@@ -127,7 +131,8 @@ describe('factory-contract-service', () => {
           mockSmartAccountClient as any,
           testData.creatorAddress,
           testData.collectionName,
-          testData.collectionSymbol
+          testData.collectionSymbol,
+          testData.bytecode
         )
       ).rejects.toThrow('Collection deployment failed');
     });
