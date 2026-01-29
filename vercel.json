@@ -2,7 +2,8 @@
   "framework": "nextjs",
   "build": {
     "env": {
-      "NODE_ENV": "production"
+      "NODE_ENV": "production",
+      "NODE_OPTIONS": "--max-old-space-size=6144 --no-deprecation"
     }
   },
   "installCommand": "yarn install --network-timeout 600000",

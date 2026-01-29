@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "NODE_OPTIONS='--max-old-space-size=4096 --no-deprecation' next dev",
     "dev:turbo": "NODE_OPTIONS='--max-old-space-size=4096 --no-deprecation' next dev --turbo",
-    "build": "NODE_OPTIONS='--no-deprecation' next build",
+    "build": "NODE_OPTIONS='--max-old-space-size=6144 --no-deprecation' next build",
     "start": "next start",
     "lint": "next lint",
     "knip": "knip",
