@@ -9,13 +9,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Share2, Twitter, Globe, ExternalLink, Loader2 } from "lucide-react";
+import { Share2, Twitter, ExternalLink, Loader2 } from "lucide-react";
 import { fetchVideoAssetByPlaybackId } from "@/lib/utils/video-assets-client";
 import { getThumbnailUrl } from "@/lib/utils/thumbnail";
 import { convertFailingGateway } from "@/lib/utils/image-gateway";
 import { logger } from '@/lib/utils/logger';
-import { useLens } from "@/hooks/useLens";
-import { Loader2 as Spinner } from "lucide-react";
 
 
 interface ShareDialogProps {
@@ -36,7 +34,6 @@ export function ShareDialog({
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
   const [isLoadingThumbnail, setIsLoadingThumbnail] = useState(true);
   const [shareUrl, setShareUrl] = useState<string>("");
-  const { isLoggedIn, isPosting, login, createPost } = useLens();
 
   // Remove .mp4 extension from title if present
   const cleanTitle = videoTitle.endsWith('.mp4') ? videoTitle.slice(0, -4) : videoTitle;
@@ -86,7 +83,7 @@ export function ShareDialog({
     fetchThumbnail();
   }, [open, videoId, playbackId]);
 
-  const handleShare = async (platform: "x" | "lens" | "farcaster" | "bluesky") => {
+  const handleShare = async (platform: "x" | "farcaster" | "bluesky") => {
     const fullThumbnailUrl = thumbnailUrl
       ? thumbnailUrl.startsWith("http")
         ? thumbnailUrl
@@ -101,27 +98,6 @@ export function ShareDialog({
         const tweetText = encodeURIComponent(`${text}\n\n${shareUrl}`);
         const twitterUrl = `https://twitter.com/intent/tweet?text=${tweetText}&url=${encodeURIComponent(shareUrl)}`;
         window.open(twitterUrl, "_blank", "width=550,height=420");
-        break;
-      }
-
-      case "lens": {
-        if (!isLoggedIn) {
-          await login();
-          return;
-        }
-
-        // Use the proper video source URL for Lens
-        // This endpoint serves the source MP4 file
-        const videoSourceUrl = playbackId
-          ? `https://livepeercdn.studio/asset/${playbackId}/video`
-          : shareUrl;
-
-        await createPost({
-          content: `${text}\n\n${shareUrl}`,
-          mediaUrl: videoSourceUrl,
-          title: cleanTitle,
-          coverUrl: thumbnailUrl || undefined
-        });
         break;
       }
 
@@ -191,16 +167,6 @@ export function ShareDialog({
             >
               <Twitter className="h-5 w-5" />
               <span>X (Twitter)</span>
-            </Button>
-
-            <Button
-              onClick={() => handleShare("lens")}
-              variant="outline"
-              className="flex items-center justify-center gap-2 h-auto py-3"
-            >
-              <Globe className="h-5 w-5" />
-              <span>{isPosting ? "Posting..." : isLoggedIn ? "Share to Lens" : "Sign in to Lens"}</span>
-              {isPosting && <Spinner className="h-4 w-4 animate-spin ml-2" />}
             </Button>
 
             <Button

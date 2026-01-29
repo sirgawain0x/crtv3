@@ -165,14 +165,43 @@ export async function getOrCreateCreatorCollection(
       signer: (client as any).config?.account, // Platform signs (pays gas)
     });
     
-    const result = await createCollection(client, {
-      name: collectionName,
-      symbol: collectionSymbol,
-      owner: creatorAddress, // CRITICAL: Creator owns the collection
-      mintFeeRecipient: creatorAddress, // Creator receives mint fees
-    });
+    try {
+      const result = await createCollection(client, {
+        name: collectionName,
+        symbol: collectionSymbol,
+        owner: creatorAddress, // CRITICAL: Creator owns the collection
+        mintFeeRecipient: creatorAddress, // Creator receives mint fees
+      });
 
-    collectionAddress = result.collectionAddress;
+      collectionAddress = result.collectionAddress;
+    } catch (error) {
+      // Enhanced error handling for collection creation failures
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      
+      // Check if it's an RPC error
+      if (errorMessage.includes('RPC endpoint') || errorMessage.includes('HTTP request failed') || errorMessage.includes('is not valid JSON')) {
+        serverLogger.error("RPC connection error during collection creation:", {
+          creatorAddress,
+          collectionName,
+          collectionSymbol,
+          error: errorMessage,
+          rpcUrl: getStoryRpcUrl(),
+        });
+        
+        throw new Error(
+          `Failed to create collection due to RPC connection issue. ` +
+          `Please verify:\n` +
+          `1. NEXT_PUBLIC_STORY_ALCHEMY_API_KEY is set correctly\n` +
+          `2. NEXT_PUBLIC_STORY_RPC_URL is valid (if using custom RPC)\n` +
+          `3. NEXT_PUBLIC_STORY_NETWORK matches your RPC endpoint (mainnet/testnet)\n` +
+          `4. The RPC endpoint is accessible and responding\n\n` +
+          `Original error: ${errorMessage}`
+        );
+      }
+      
+      // Re-throw the original error if it's not an RPC error
+      throw error;
+    }
   }
 
   // Store collection in database with conflict handling

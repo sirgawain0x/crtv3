@@ -116,6 +116,16 @@ export async function createCollection(
     // These can be different: platform pays gas, creator owns collection
     const collectionOwner = params.owner || accountAddress;
 
+    // Log collection creation parameters for debugging
+    serverLogger.debug("Creating SPG NFT collection:", {
+      name: params.name,
+      symbol: params.symbol,
+      owner: collectionOwner,
+      mintFeeRecipient: params.mintFeeRecipient || collectionOwner,
+      signer: accountAddress,
+      maxSupply: params.maxSupply || 4294967295,
+    });
+
     // Use nftClient.createNFTCollection() to create a new SPG NFT collection
     const result = await client.nftClient.createNFTCollection({
       name: params.name,
@@ -172,10 +182,72 @@ export async function createCollection(
       txHash: result.txHash,
     };
   } catch (error) {
-    serverLogger.error("Failed to create collection:", error);
-    throw new Error(
-      `Collection creation failed: ${error instanceof Error ? error.message : "Unknown error"}`
-    );
+    // Enhanced error handling for RPC errors
+    let errorMessage = "Unknown error";
+    let errorDetails: any = {};
+
+    if (error instanceof Error) {
+      errorMessage = error.message;
+      
+      // Check for HTTP/RPC errors
+      if (error.message.includes("HTTP request failed") || error.message.includes("is not valid JSON")) {
+        errorDetails.type = "RPC_ERROR";
+        errorDetails.message = "The RPC endpoint returned an invalid response. This may indicate:";
+        errorDetails.possibleCauses = [
+          "RPC endpoint is down or unreachable",
+          "Invalid API key or authentication issue",
+          "Rate limiting or quota exceeded",
+          "Network connectivity issues",
+          "Contract call failed on-chain (check contract address and parameters)",
+        ];
+        
+        // Try to extract more details from the error
+        if (error.stack) {
+          errorDetails.stack = error.stack;
+        }
+        
+        // Check if it's a JSON parsing error
+        if (error.message.includes("Unexpected token")) {
+          errorDetails.jsonParseError = true;
+          errorDetails.hint = "The RPC endpoint returned a non-JSON response. Check the RPC URL and API key.";
+        }
+      }
+      
+      // Check for contract-specific errors
+      if (error.message.includes("execution reverted") || error.message.includes("revert")) {
+        errorDetails.type = "CONTRACT_ERROR";
+        errorDetails.message = "The contract call was reverted. Possible reasons:";
+        errorDetails.possibleCauses = [
+          "Insufficient permissions (caller is not authorized)",
+          "Invalid parameters passed to the contract",
+          "Contract state prevents the operation",
+          "Insufficient gas or balance",
+        ];
+      }
+      
+      // Check for network errors
+      if (error.message.includes("network") || error.message.includes("ECONNREFUSED") || error.message.includes("fetch")) {
+        errorDetails.type = "NETWORK_ERROR";
+        errorDetails.message = "Network connectivity issue";
+      }
+    }
+
+    serverLogger.error("Failed to create collection:", {
+      error: errorMessage,
+      details: errorDetails,
+      params: {
+        name: params.name,
+        symbol: params.symbol,
+        owner: params.owner,
+      },
+    });
+
+    // Construct a more helpful error message
+    const fullErrorMessage = errorDetails.type 
+      ? `Collection creation failed (${errorDetails.type}): ${errorMessage}\n\n${errorDetails.message}\n\nPossible causes:\n${errorDetails.possibleCauses?.map((cause: string) => `- ${cause}`).join("\n") || "Unknown"}`
+      : `Collection creation failed: ${errorMessage}`;
+
+    throw new Error(fullErrorMessage);
   }
 }
 
