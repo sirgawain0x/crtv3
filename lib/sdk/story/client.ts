@@ -40,7 +40,11 @@ export function createStoryClient(
   // our project's viem and Story Protocol SDK's bundled viem
   
   // Create base HTTP transport
-  const baseHttpTransport = http(rpcUrl);
+  // If using proxy endpoint (client-side), create a custom transport
+  // Otherwise, use standard HTTP transport (server-side)
+  const baseHttpTransport: any = rpcUrl.startsWith('/api/')
+    ? createProxyTransport(rpcUrl)
+    : http(rpcUrl);
   
   // If privateKey is provided, wrap the transport to intercept eth_sendTransaction
   // and convert it to eth_sendRawTransaction with local signing
@@ -120,8 +124,54 @@ export function createStoryClient(
               }
             }
             
-            // For all other methods, use the original transport
-            return originalRequest(args);
+            // For all other methods, wrap with error handling to catch RPC errors
+            try {
+              const result = await originalRequest(args);
+              return result;
+            } catch (error: any) {
+              // Enhanced error handling for RPC errors
+              if (error && typeof error === 'object') {
+                // Check for JSON parsing errors
+                if (error.message && (error.message.includes('Unexpected token') || error.message.includes('is not valid JSON'))) {
+                  serverLogger.error("❌ RPC returned non-JSON response:", {
+                    method: args.method,
+                    url: rpcUrl,
+                    error: error.message,
+                  });
+                  
+                  // Try to extract more information from the error
+                  const enhancedError = new Error(
+                    `RPC endpoint returned invalid JSON response. ` +
+                    `Method: ${args.method}, URL: ${rpcUrl}. ` +
+                    `This may indicate the RPC endpoint is down, returning an error page, or the API key is invalid. ` +
+                    `Original error: ${error.message}`
+                  );
+                  (enhancedError as any).cause = error;
+                  throw enhancedError;
+                }
+                
+                // Check for HTTP errors
+                if (error.message && error.message.includes('HTTP request failed')) {
+                  serverLogger.error("❌ HTTP request failed:", {
+                    method: args.method,
+                    url: rpcUrl,
+                    error: error.message,
+                  });
+                  
+                  const enhancedError = new Error(
+                    `HTTP request to RPC endpoint failed. ` +
+                    `Method: ${args.method}, URL: ${rpcUrl}. ` +
+                    `Check your network connection and RPC endpoint configuration. ` +
+                    `Original error: ${error.message}`
+                  );
+                  (enhancedError as any).cause = error;
+                  throw enhancedError;
+                }
+              }
+              
+              // Re-throw the original error if we can't enhance it
+              throw error;
+            }
           },
         };
       };
@@ -133,14 +183,71 @@ export function createStoryClient(
       storyTransport = baseHttpTransport;
     }
   } else {
-    // No private key - use standard HTTP transport
+    // No private key - use standard HTTP transport with error handling
     if (transport && typeof transport === 'function') {
       storyTransport = transport;
     } else {
       if (transport) {
         serverLogger.warn("Story Protocol: Ignoring incompatible transport, using default HTTP transport");
       }
-      storyTransport = baseHttpTransport;
+      
+      // Wrap the base transport with error handling
+      storyTransport = (opts: any) => {
+        const transportInstance = baseHttpTransport(opts);
+        const originalRequest = transportInstance.request?.bind(transportInstance) || transportInstance.request;
+        
+        return {
+          ...transportInstance,
+          request: async (args: any) => {
+            try {
+              const result = await originalRequest(args);
+              return result;
+            } catch (error: any) {
+              // Enhanced error handling for RPC errors
+              if (error && typeof error === 'object') {
+                // Check for JSON parsing errors
+                if (error.message && (error.message.includes('Unexpected token') || error.message.includes('is not valid JSON'))) {
+                  serverLogger.error("❌ RPC returned non-JSON response:", {
+                    method: args.method,
+                    url: rpcUrl,
+                    error: error.message,
+                  });
+                  
+                  const enhancedError = new Error(
+                    `RPC endpoint returned invalid JSON response. ` +
+                    `Method: ${args.method}, URL: ${rpcUrl}. ` +
+                    `This may indicate the RPC endpoint is down, returning an error page, or the API key is invalid. ` +
+                    `Original error: ${error.message}`
+                  );
+                  (enhancedError as any).cause = error;
+                  throw enhancedError;
+                }
+                
+                // Check for HTTP errors
+                if (error.message && error.message.includes('HTTP request failed')) {
+                  serverLogger.error("❌ HTTP request failed:", {
+                    method: args.method,
+                    url: rpcUrl,
+                    error: error.message,
+                  });
+                  
+                  const enhancedError = new Error(
+                    `HTTP request to RPC endpoint failed. ` +
+                    `Method: ${args.method}, URL: ${rpcUrl}. ` +
+                    `Check your network connection and RPC endpoint configuration. ` +
+                    `Original error: ${error.message}`
+                  );
+                  (enhancedError as any).cause = error;
+                  throw enhancedError;
+                }
+              }
+              
+              // Re-throw the original error if we can't enhance it
+              throw error;
+            }
+          },
+        };
+      };
     }
   }
 
@@ -177,51 +284,123 @@ export function createStoryClientWithAccount(accountAddress: Address): StoryClie
 }
 
 /**
- * Get the Story Protocol RPC URL
- * Handles both custom URLs and Alchemy endpoints
- * 
- * Note: For Story Protocol SDK transactions, we use public RPC endpoints
- * because Alchemy's Story endpoints don't support eth_sendTransaction.
- * Alchemy endpoints can still be used for read operations.
+ * Check if code is running server-side
+ */
+function isServerSide(): boolean {
+  return typeof window === 'undefined';
+}
+
+/**
+ * Get the Story Protocol RPC URL for server-side operations
+ * Uses server-only environment variables to keep API keys secure
  */
 export function getStoryRpcUrl(): string {
   const network = process.env.NEXT_PUBLIC_STORY_NETWORK || "testnet";
-  const storyAlchemyKey = process.env.NEXT_PUBLIC_STORY_ALCHEMY_API_KEY;
   
-  // If custom RPC URL is provided, use it
-  if (process.env.NEXT_PUBLIC_STORY_RPC_URL) {
-    const customUrl = process.env.NEXT_PUBLIC_STORY_RPC_URL;
-    
-    // Alchemy RPC works fine for read operations (getBalance, getChainId, etc.)
-    // For write operations, we sign transactions locally and send as raw transactions
-    // So we can use Alchemy RPC for everything
-    
-    // Check if the URL matches the expected network
-    const isTestnetUrl = customUrl.includes('aeneid') || customUrl.includes('testnet');
-    const isMainnetUrl = customUrl.includes('mainnet') || (customUrl.includes('story.foundation') && !customUrl.includes('aeneid'));
-    
-    if (network === "mainnet" && isTestnetUrl) {
-      serverLogger.warn(`⚠️ Network mismatch: NEXT_PUBLIC_STORY_NETWORK=mainnet but RPC URL appears to be testnet: ${customUrl}`);
-    } else if (network === "testnet" && isMainnetUrl) {
-      serverLogger.warn(`⚠️ Network mismatch: NEXT_PUBLIC_STORY_NETWORK=testnet but RPC URL appears to be mainnet: ${customUrl}`);
+  // For server-side: Use server-only environment variables (no NEXT_PUBLIC_ prefix)
+  // This keeps API keys secure and not exposed to the client
+  if (isServerSide()) {
+    // Check for server-only custom RPC URL first
+    if (process.env.STORY_RPC_URL) {
+      return process.env.STORY_RPC_URL;
     }
     
-    return customUrl;
+    // Use server-only Alchemy API key
+    const serverAlchemyKey = process.env.STORY_ALCHEMY_API_KEY;
+    if (serverAlchemyKey) {
+      return network === "mainnet"
+        ? `https://story-mainnet.g.alchemy.com/v2/${serverAlchemyKey}`
+        : `https://story-testnet.g.alchemy.com/v2/${serverAlchemyKey}`;
+    }
   }
   
-  // Default fallback: Use Alchemy if key is available
-  if (storyAlchemyKey) {
-    return network === "mainnet"
-      ? `https://story-mainnet.g.alchemy.com/v2/${storyAlchemyKey}`
-      : `https://story-testnet.g.alchemy.com/v2/${storyAlchemyKey}`;
+  // For client-side OR fallback: Use proxy endpoint or public RPC
+  // Client-side code should use the proxy to avoid exposing API keys
+  if (!isServerSide()) {
+    // Use the RPC proxy endpoint for client-side operations
+    // This keeps the API key secure on the server
+    return "/api/story/rpc-proxy";
   }
   
-  // Last resort: Try public endpoints (these may not exist or be accessible)
+  // Server-side fallback: Try public endpoints
   // Note: rpc.story.foundation may not be available - Alchemy RPC is preferred
-  serverLogger.warn("⚠️ No custom RPC URL or Alchemy key configured. Using public RPC endpoints (may not be available).");
+  if (isServerSide()) {
+    serverLogger.warn("⚠️ No STORY_ALCHEMY_API_KEY or STORY_RPC_URL configured. Using public RPC endpoints (may not be available).");
+  }
+  
   return network === "mainnet" 
     ? "https://rpc.story.foundation" 
     : "https://rpc.aeneid.story.foundation";
+}
+
+/**
+ * Create a custom HTTP transport that uses the proxy for client-side operations
+ * This ensures API keys are never exposed to the browser
+ * 
+ * The proxy endpoint expects JSON-RPC 2.0 format:
+ * { jsonrpc: "2.0", method: string, params: array, id: number }
+ */
+function createProxyTransport(proxyUrl: string) {
+  // Return a transport function that matches viem's transport interface
+  return (opts: any) => {
+    // Create a base HTTP transport to get the proper config structure
+    // We'll use a dummy URL since we're overriding the request method
+    const baseTransport = http('http://localhost')(opts);
+    
+    return {
+      ...baseTransport,
+      request: async (args: any) => {
+        // Extract method and params from viem's request format
+        const method = args.method || (args as any).method;
+        const params = args.params !== undefined ? args.params : (args as any).params || [];
+        
+        // Create JSON-RPC 2.0 request
+        const jsonRpcRequest = {
+          jsonrpc: "2.0",
+          method,
+          params: Array.isArray(params) ? params : [params],
+          id: Math.floor(Math.random() * 1000000),
+        };
+        
+        try {
+          const response = await fetch(proxyUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(jsonRpcRequest),
+          });
+          
+          if (!response.ok) {
+            const errorText = await response.text();
+            let errorData;
+            try {
+              errorData = JSON.parse(errorText);
+            } catch {
+              errorData = { error: errorText };
+            }
+            throw new Error(`RPC proxy error (${response.status}): ${errorData.error?.message || errorData.error || response.statusText}`);
+          }
+          
+          const data = await response.json();
+          
+          // Handle JSON-RPC error responses
+          if (data.error) {
+            const errorMessage = data.error.message || JSON.stringify(data.error);
+            throw new Error(`RPC error: ${errorMessage}`);
+          }
+          
+          // Return the result
+          return data.result;
+        } catch (error) {
+          if (error instanceof Error) {
+            throw error;
+          }
+          throw new Error(`Failed to call RPC proxy: ${String(error)}`);
+        }
+      },
+    };
+  };
 }
 
 /**

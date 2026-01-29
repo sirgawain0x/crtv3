@@ -218,6 +218,7 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources, priority 
             src={playbackSources}
             assetId={asset?.id}
             title={asset?.name}
+            initialThumbnailUrl={(asset as any).thumbnail_url || (asset as any).thumbnailUri || null}
             enablePreview={true}
             priority={priority}
           />

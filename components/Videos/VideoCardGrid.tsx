@@ -117,6 +117,8 @@ const VideoCardGrid: React.FC<VideoCardGridProps> = ({
               value: video.creator_id,
             },
             createdAt: video.created_at,
+            // Include thumbnail_url for VideoThumbnail component
+            thumbnail_url: (video as any).thumbnail_url || video.thumbnailUri || null,
             detailedSrc,
           };
         })
