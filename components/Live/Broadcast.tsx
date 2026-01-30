@@ -53,6 +53,7 @@ interface CreateStreamProxyParams {
   record: boolean;
   playbackPolicy: any;
   multistream?: any;
+  latencyMode?: "low" | "standard";
 }
 
 export async function createStreamViaProxy(params: CreateStreamProxyParams) {
@@ -62,6 +63,7 @@ export async function createStreamViaProxy(params: CreateStreamProxyParams) {
     profiles,
     record,
     playbackPolicy,
+    latencyMode: params.latencyMode,
   };
   if (multistream !== undefined) {
     body.multistream = multistream;
@@ -138,6 +140,7 @@ function BroadcastWithControls({ streamKey }: BroadcastProps) {
             // Don't include multistream targets during initial creation
             // Targets can be added after stream creation using the API
             multistream: undefined,
+            latencyMode: "low",
           });
 
           logger.debug("Stream created:", result);
@@ -186,7 +189,7 @@ function BroadcastWithControls({ streamKey }: BroadcastProps) {
         setMultistreamTargets([]);
         return;
       }
-      
+
       setIsLoadingTargets(true);
       const result = await listMultistreamTargets({ streamId: streamData.id });
       setIsLoadingTargets(false);
@@ -220,8 +223,8 @@ function BroadcastWithControls({ streamKey }: BroadcastProps) {
         onError={(error) =>
           error?.type === "permissions"
             ? toast.error(
-                "You must accept permissions to broadcast. Please try again."
-              )
+              "You must accept permissions to broadcast. Please try again."
+            )
             : null
         }
         aspectRatio={16 / 9}
@@ -419,9 +422,9 @@ export const Settings = React.forwardRef(
       streamId,
       streamKey,
       ingestUrl,
-    }: { 
-      className?: string; 
-      children?: React.ReactNode; 
+    }: {
+      className?: string;
+      children?: React.ReactNode;
       streamId: string;
       streamKey?: string | null;
       ingestUrl?: string | null;
@@ -440,7 +443,7 @@ export const Settings = React.forwardRef(
           setMultistreamTargets([]);
           return;
         }
-        
+
         setIsLoadingTargets(true);
         const result = await listMultistreamTargets({ streamId });
         setIsLoadingTargets(false);
@@ -475,7 +478,7 @@ export const Settings = React.forwardRef(
     // Format is typically: rtmp://ingest.livepeer.studio/live/{streamKey}
     const rtmpServerUrl = ingestUrl && streamKey
       ? ingestUrl.replace(streamKey, '').replace(/\/$/, '') + '/'
-      : ingestUrl 
+      : ingestUrl
         ? ingestUrl.split('/').slice(0, -1).join('/') + '/'
         : null;
 
