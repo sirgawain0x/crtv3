@@ -1,4 +1,5 @@
 "use client";
+import "@/lib/utils/xmtp/wasm-patch";
 import { config, queryClient } from "@/config";
 import { AlchemyAccountProvider } from "@account-kit/react";
 import { AlchemyClientState } from "@account-kit/core";
@@ -16,8 +17,6 @@ import { RadixProvider } from "@/components/ui/radix-provider";
 import { cleanupExistingIframes } from "@/components/IframeCleanup";
 // Import dev warning suppression (only active in development)
 import "@/lib/utils/suppressDevWarnings";
-// Import WASM patch early to fix XMTP WASM loading in Web Workers
-import "@/lib/utils/xmtp/wasm-patch";
 
 function ErrorFallback({ error }: { error: Error }) {
   return (
