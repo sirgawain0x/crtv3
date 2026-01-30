@@ -1,5 +1,8 @@
 import createPWA from "next-pwa";
 import { withAxiom } from "next-axiom";
+import { createRequire } from "module";
+
+const require = createRequire(import.meta.url);
 
 const withPWA = createPWA({
   dest: "public",
@@ -8,14 +11,8 @@ const withPWA = createPWA({
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Turbopack configuration (Next.js 16 uses Turbopack by default)
-  turbopack: {
-    // Exclude test files and other non-essential files from processing
-    resolveAlias: {
-      // This helps prevent processing of test files
-    },
-  },
   // Optimize memory usage in development
+  turbopack: {},
   experimental: {
     // Reduce memory usage by optimizing compilation
     optimizePackageImports: ['@account-kit/react', '@account-kit/core', '@apollo/client', 'lucide-react', 'framer-motion'],
@@ -35,7 +32,19 @@ const nextConfig = {
     config.resolve = config.resolve || {};
     config.resolve.alias = {
       ...config.resolve.alias,
+      'node:stream': require.resolve('stream-browserify'),
+      'stream': require.resolve('stream-browserify'),
     };
+
+    // Replace node:stream with stream-browserify using plugin to ensure it catches all imports
+    config.plugins.push(
+      new webpack.NormalModuleReplacementPlugin(
+        /^node:stream$/,
+        (resource) => {
+          resource.request = require.resolve('stream-browserify');
+        }
+      )
+    );
     // Prevent webpack from resolving test files and benchmarks
     config.resolve.modules = config.resolve.modules || ['node_modules'];
 
@@ -64,8 +73,6 @@ const nextConfig = {
     // Pattern 1: Ignore test directory imports
     config.plugins.push(
       new webpack.IgnorePlugin({
-        resourceRegExp: /^\.\/test\//,
-        contextRegExp: /thread-stream/,
         checkResource(resource, context) {
           return /^\.\/test\//.test(resource) && /thread-stream/.test(context || '');
         },
@@ -75,7 +82,6 @@ const nextConfig = {
     // Pattern 2: Ignore all files in thread-stream/test directory
     config.plugins.push(
       new webpack.IgnorePlugin({
-        resourceRegExp: /thread-stream[\/\\]test[\/\\]/,
         checkResource(resource) {
           return /thread-stream[\/\\]test[\/\\]/.test(resource || '');
         },
@@ -85,7 +91,6 @@ const nextConfig = {
     // Pattern 3: Ignore bench.js file
     config.plugins.push(
       new webpack.IgnorePlugin({
-        resourceRegExp: /thread-stream[\/\\]bench\.js$/,
         checkResource(resource) {
           return /thread-stream[\/\\]bench\.js$/.test(resource || '');
         },
@@ -95,7 +100,6 @@ const nextConfig = {
     // Pattern 4: Ignore test files by extension
     config.plugins.push(
       new webpack.IgnorePlugin({
-        resourceRegExp: /thread-stream.*\.(test|spec)\.(js|mjs|ts)$/,
         checkResource(resource) {
           return /thread-stream.*\.(test|spec)\.(js|mjs|ts)$/.test(resource || '');
         },
@@ -104,7 +108,7 @@ const nextConfig = {
 
     // Use NormalModuleReplacementPlugin to replace problematic test file imports with empty module
     // This catches imports that reference test files directly
-    const emptyModulePath = require.resolve('./lib/webpack/empty-module.js');
+    const emptyModulePath = require.resolve('./lib/webpack/empty-module.cjs');
     config.plugins.push(
       new webpack.NormalModuleReplacementPlugin(
         /thread-stream[\/\\]test[\/\\].*\.(js|mjs|ts)$/,
@@ -152,13 +156,15 @@ const nextConfig = {
         'pino-pretty': false,
         'lokijs': false,
         'encoding': false,
+        'stream': require.resolve('stream-browserify'),
+        'node:stream': require.resolve('stream-browserify'),
       };
 
       // Note: Webpack plugins may not work with Turbopack
       // The runtime patch in wasm-patch.ts should handle this
       // But we can try to add the plugin for non-Turbopack builds
       try {
-        const WasmWorkerPlugin = require('./lib/webpack/wasm-worker-plugin.js');
+        const WasmWorkerPlugin = require('./lib/webpack/wasm-worker-plugin.cjs');
         config.plugins.push(new WasmWorkerPlugin());
       } catch (e) {
         // Plugin not available or not needed (Turbopack mode)

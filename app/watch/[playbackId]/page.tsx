@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { Player } from "@/components/Player/Player";
 import { getDetailPlaybackSource } from "@/lib/hooks/livepeer/useDetailPlaybackSources";
+import { getStreamByPlaybackId } from "@/services/streams";
 import { LiveChat } from "@/components/Live/LiveChat";
 import { ClipCreator } from "@/components/Live/ClipCreator";
 import { Src } from "@livepeer/react";
@@ -24,10 +25,10 @@ import { logger } from '@/lib/utils/logger';
 
 export default function WatchLivePage() {
   const params = useParams();
-  const playbackId = Array.isArray(params.playbackId) 
-    ? params.playbackId[0] 
+  const playbackId = Array.isArray(params.playbackId)
+    ? params.playbackId[0]
     : params.playbackId;
-  
+
   const [playbackSources, setPlaybackSources] = useState<Src[] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -43,14 +44,24 @@ export default function WatchLivePage() {
       try {
         setIsLoading(true);
         setError(null);
-        const sources = await getDetailPlaybackSource(playbackId);
-        
+
+        // Parallel fetch: Livepeer sources + Our persistent stream metadata
+        const [sources, streamRecord] = await Promise.all([
+          getDetailPlaybackSource(playbackId),
+          getStreamByPlaybackId(playbackId)
+        ]);
+
         if (!sources || sources.length === 0) {
           setError("No playback sources found for this stream");
           return;
         }
-        
+
         setPlaybackSources(sources);
+
+        // If we have a custom thumbnail, we could potentially pass it to the Player
+        // as a poster. The current Player component might need updating to accept 'poster'.
+        // For now, we mainly ensure we're confirming the stream exists.
+
       } catch (err) {
         logger.error("Error fetching playback sources:", err);
         setError(err instanceof Error ? err.message : "Failed to load stream");
@@ -121,8 +132,8 @@ export default function WatchLivePage() {
               </Alert>
             ) : playbackSources ? (
               <div className="aspect-video bg-black rounded-lg overflow-hidden">
-                <Player 
-                  src={playbackSources} 
+                <Player
+                  src={playbackSources}
                   title="Live Stream"
                 />
               </div>

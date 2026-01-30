@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { Broadcast, createStreamViaProxy } from "@/components/Live/Broadcast";
+import { getStreamByCreator, createStreamRecord, updateStream } from "@/services/streams";
 import { useUser } from "@account-kit/react";
 import {
   Breadcrumb,
@@ -23,6 +24,7 @@ import {
 } from "@/services/video-assets";
 import { useParams } from "next/navigation";
 import { LivestreamThumbnail } from "@/components/Live/LivestreamThumbnail";
+import { StreamThumbnailUploader } from "@/components/Live/StreamThumbnailUploader";
 import { getThumbnailUrl } from "@/services/livepeer-thumbnails";
 import { logger } from '@/lib/utils/logger';
 
@@ -40,31 +42,51 @@ export default function LivePage() {
   const [thumbnailLoading, setThumbnailLoading] = useState(false);
   const [streamKey, setStreamKey] = useState<string | null>(null);
   const [streamId, setStreamId] = useState<string | null>(null);
+  const [playbackId, setPlaybackId] = useState<string | null>(null);
   const [isCreatingStream, setIsCreatingStream] = useState(false);
   const [streamCreateError, setStreamCreateError] = useState<string | null>(
     null
   );
 
-  // Fetch multistream targets only after stream is created
-  useEffect(() => {
-    async function fetchTargets() {
-      if (!streamId) {
-        // Clear targets if no stream exists
-        setMultistreamTargets([]);
-        return;
-      }
 
-      setIsLoadingTargets(true);
-      const result = await listMultistreamTargets({ streamId });
-      setIsLoadingTargets(false);
-      if (result.targets) {
-        setMultistreamTargets(result.targets);
-      } else if (result.error) {
-        logger.error("Error fetching multistream targets:", result.error);
+  // Fetch existing stream and multistream targets
+  useEffect(() => {
+    async function fetchStreamAndTargets() {
+      if (!user?.address) return;
+
+      try {
+        // 1. Fetch persistent stream
+        const stream = await getStreamByCreator(user.address);
+
+        if (stream) {
+          setStreamKey(stream.stream_key);
+          setStreamId(stream.stream_id);
+          setPlaybackId(stream.playback_id);
+          setThumbnailUrl(stream.thumbnail_url || null);
+        }
+
+        // 2. Fetch targets (only if we have a streamId, which we might have just set)
+        const currentStreamId = stream?.stream_id || streamId;
+        if (!currentStreamId) {
+          setMultistreamTargets([]);
+          return;
+        }
+
+        setIsLoadingTargets(true);
+        const result = await listMultistreamTargets({ streamId: currentStreamId });
+        setIsLoadingTargets(false);
+        if (result.targets) {
+          setMultistreamTargets(result.targets);
+        } else if (result.error) {
+          logger.error("Error fetching multistream targets:", result.error);
+        }
+      } catch (err) {
+        logger.error("Error fetching stream data:", err);
       }
     }
-    fetchTargets();
-  }, [streamId]);
+
+    fetchStreamAndTargets();
+  }, [user?.address, streamId]);
 
   useEffect(() => {
     async function fetchThumbnail() {
@@ -102,6 +124,10 @@ export default function LivePage() {
 
   function handleTargetRemoved(id: string) {
     setMultistreamTargets((prev) => prev.filter((t) => t.id !== id));
+  }
+
+  function handleThumbnailUpdated(url: string) {
+    setThumbnailUrl(url);
   }
 
   async function handleCreateStream() {
@@ -158,11 +184,30 @@ export default function LivePage() {
       // 2. Nested in stream object: result.stream.streamKey, result.stream.id
       const streamKeyValue = result.streamKey || result.stream?.streamKey;
       const streamIdValue = result.id || result.stream?.id;
+      const playbackIdValue = result.playbackId || result.stream?.playbackId;
 
       if (streamKeyValue) {
         setStreamKey(streamKeyValue);
         if (streamIdValue) {
           setStreamId(streamIdValue);
+          if (playbackIdValue) setPlaybackId(playbackIdValue);
+
+          // Persist the stream to database
+          if (user?.address) {
+            try {
+              await createStreamRecord({
+                creator_id: user.address,
+                stream_key: streamKeyValue,
+                stream_id: streamIdValue,
+                playback_id: result.playbackId || result.stream?.playbackId,
+                name: `Channel-${user.address.slice(0, 6)}`,
+                is_live: false
+              });
+            } catch (persistErr) {
+              logger.error("Failed to persist stream record:", persistErr);
+              // Don't block UI, but warn
+            }
+          }
         }
       } else {
         setStreamCreateError("Stream key not found in response");
@@ -237,6 +282,18 @@ export default function LivePage() {
             ) : thumbnailUrl ? (
               <LivestreamThumbnail thumbnailUrl={thumbnailUrl} />
             ) : null}
+
+            {streamKey && streamId && user?.address && (
+              <div className="my-6 flex justify-center">
+                <StreamThumbnailUploader
+                  creatorAddress={user.address}
+                  playbackId={playbackId || streamId} // Fallback to streamId if playbackId missing, though unlikely
+                  currentThumbnailUrl={thumbnailUrl}
+                  onThumbnailUpdated={handleThumbnailUpdated}
+                />
+              </div>
+            )}
+
             {!streamKey ? (
               <div className="flex flex-col items-center justify-center my-8">
                 <button
