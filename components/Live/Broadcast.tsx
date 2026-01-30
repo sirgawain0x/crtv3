@@ -33,6 +33,7 @@ import { logger } from '@/lib/utils/logger';
 
 interface BroadcastProps {
   streamKey: string | null;
+  streamId?: string | null;
 }
 
 interface StreamProfile {
@@ -53,6 +54,7 @@ interface CreateStreamProxyParams {
   record: boolean;
   playbackPolicy: any;
   multistream?: any;
+  latencyMode?: "low" | "standard";
 }
 
 export async function createStreamViaProxy(params: CreateStreamProxyParams) {
@@ -62,6 +64,7 @@ export async function createStreamViaProxy(params: CreateStreamProxyParams) {
     profiles,
     record,
     playbackPolicy,
+    latencyMode: params.latencyMode,
   };
   if (multistream !== undefined) {
     body.multistream = multistream;
@@ -75,7 +78,7 @@ export async function createStreamViaProxy(params: CreateStreamProxyParams) {
   return res.json();
 }
 
-function BroadcastWithControls({ streamKey }: BroadcastProps) {
+function BroadcastWithControls({ streamKey, streamId: propStreamId }: BroadcastProps) {
   const [isCreatingStream, setIsCreatingStream] = React.useState(false);
   const [streamData, setStreamData] = React.useState<any>(null);
   const settingsButtonRef = React.useRef<HTMLButtonElement>(null);
@@ -138,6 +141,7 @@ function BroadcastWithControls({ streamKey }: BroadcastProps) {
             // Don't include multistream targets during initial creation
             // Targets can be added after stream creation using the API
             multistream: undefined,
+            latencyMode: "low",
           });
 
           logger.debug("Stream created:", result);
@@ -156,28 +160,6 @@ function BroadcastWithControls({ streamKey }: BroadcastProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [streamKey, isCreatingStream]); // Removed multistreamTargets to prevent circular updates
 
-  useEffect(() => {
-    async function startCamera() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: true,
-        });
-        streamRef.current = stream;
-        // Attach stream to video element, etc.
-      } catch (error) {
-        // Handle error
-      }
-    }
-
-    startCamera();
-
-    return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
-      }
-    };
-  }, []);
-
   // Fetch multistream targets only after stream is created
   React.useEffect(() => {
     async function fetchTargets() {
@@ -186,7 +168,7 @@ function BroadcastWithControls({ streamKey }: BroadcastProps) {
         setMultistreamTargets([]);
         return;
       }
-      
+
       setIsLoadingTargets(true);
       const result = await listMultistreamTargets({ streamId: streamData.id });
       setIsLoadingTargets(false);
@@ -217,13 +199,16 @@ function BroadcastWithControls({ streamKey }: BroadcastProps) {
   ) : (
     <div className="scale-120 transform-gpu">
       <Broadcast.Root
-        onError={(error) =>
-          error?.type === "permissions"
-            ? toast.error(
-                "You must accept permissions to broadcast. Please try again."
-              )
-            : null
-        }
+        onError={(error) => {
+          logger.error("Broadcast Error:", error);
+          if (error?.type === "permissions") {
+            toast.error(
+              "You must accept permissions to broadcast. Please try again."
+            );
+          } else {
+            toast.error(`Broadcast error: ${error?.message || "Unknown error"}`);
+          }
+        }}
         aspectRatio={16 / 9}
         ingestUrl={ingestUrl}
       >
@@ -245,7 +230,7 @@ function BroadcastWithControls({ streamKey }: BroadcastProps) {
               matcher="not-permissions"
               className="absolute inset-0 flex select-none flex-col items-center justify-center 
               gap-4 bg-gray-950 text-center duration-1000 data-[visible=true]:animate-in data-[visible=false]:animate-out 
-              data-[visible=false]:fade-out-0 data-[visible=true]:fade-in-0"
+              data-[visible=false]:fade-out-0 data-[visible=true]:fade-in-0 data-[visible=false]:pointer-events-none"
             >
               <OfflineErrorIcon className="hidden h-[120px] w-full text-white sm:flex" />
               <div className="flex flex-col gap-1">
@@ -261,13 +246,6 @@ function BroadcastWithControls({ streamKey }: BroadcastProps) {
 
             <Broadcast.Controls
               className="flex flex-col-reverse gap-1 bg-gradient-to-b from-black/20 via-black/30 via-80% to-black/60 px-2 py-1.5 duration-1000"
-              onTouchStart={(e) => {
-                e.preventDefault();
-                e.currentTarget.style.opacity = "1";
-              }}
-              onTouchEnd={(e) => {
-                e.preventDefault();
-              }}
               style={{ opacity: 1 }}
             >
               <div className="flex justify-between gap-2">
@@ -293,7 +271,7 @@ function BroadcastWithControls({ streamKey }: BroadcastProps) {
                   <Settings
                     ref={settingsButtonRef}
                     className="h-5 w-5 flex-shrink-0 transition hover:scale-110"
-                    streamId={streamData?.id || ""}
+                    streamId={streamData?.id || propStreamId || ""}
                     streamKey={streamKey}
                     ingestUrl={ingestUrl}
                   >
@@ -419,9 +397,9 @@ export const Settings = React.forwardRef(
       streamId,
       streamKey,
       ingestUrl,
-    }: { 
-      className?: string; 
-      children?: React.ReactNode; 
+    }: {
+      className?: string;
+      children?: React.ReactNode;
       streamId: string;
       streamKey?: string | null;
       ingestUrl?: string | null;
@@ -440,7 +418,7 @@ export const Settings = React.forwardRef(
           setMultistreamTargets([]);
           return;
         }
-        
+
         setIsLoadingTargets(true);
         const result = await listMultistreamTargets({ streamId });
         setIsLoadingTargets(false);
@@ -475,7 +453,7 @@ export const Settings = React.forwardRef(
     // Format is typically: rtmp://ingest.livepeer.studio/live/{streamKey}
     const rtmpServerUrl = ingestUrl && streamKey
       ? ingestUrl.replace(streamKey, '').replace(/\/$/, '') + '/'
-      : ingestUrl 
+      : ingestUrl
         ? ingestUrl.split('/').slice(0, -1).join('/') + '/'
         : null;
 

@@ -53,7 +53,7 @@ export default function LivePage() {
         setMultistreamTargets([]);
         return;
       }
-      
+
       setIsLoadingTargets(true);
       const result = await listMultistreamTargets({ streamId });
       setIsLoadingTargets(false);
@@ -69,9 +69,9 @@ export default function LivePage() {
   useEffect(() => {
     async function fetchThumbnail() {
       if (!addressParam) return;
-      
+
       const id = Array.isArray(addressParam) ? addressParam[0] : addressParam;
-      
+
       // Skip thumbnail fetch if streamId is an Ethereum address
       // Livepeer playback IDs don't start with 0x
       if (id.startsWith('0x')) {
@@ -80,7 +80,7 @@ export default function LivePage() {
         setThumbnailUrl(null);
         return;
       }
-      
+
       setThumbnailLoading(true);
       setThumbnailError(null);
       const res = (await getThumbnailUrl({
@@ -147,25 +147,19 @@ export default function LivePage() {
         ],
         record: false,
         playbackPolicy: { type: "jwt" },
-        // Only include multistream config if we have targets
-        // Targets are typically added after stream creation
-        // But we support inline creation if targets are provided
-        ...(multistreamTargets.length > 0 && multistreamTargets.some(t => t.id) ? {
-          multistream: {
-            targets: multistreamTargets
-              .filter((t) => t.id)
-              .map((t) => ({ id: t.id, profile: "source" })),
-          }
-        } : {}),
+        // Don't include multistream targets during initial creation
+        // Targets can be added after stream creation using the API
+        multistream: undefined,
+        latencyMode: "low",
       });
-      
+
       // Extract stream key and stream ID from response
       // Livepeer API can return data in different formats:
       // 1. Direct property: result.streamKey, result.id
       // 2. Nested in stream object: result.stream.streamKey, result.stream.id
       const streamKeyValue = result.streamKey || result.stream?.streamKey;
       const streamIdValue = result.id || result.stream?.id;
-      
+
       if (streamKeyValue) {
         setStreamKey(streamKeyValue);
         if (streamIdValue) {
@@ -259,7 +253,7 @@ export default function LivePage() {
               </div>
             ) : (
               <>
-                <Broadcast streamKey={streamKey} />
+                <Broadcast streamKey={streamKey} streamId={streamId} />
               </>
             )}
             <div className="mt-4 border-t border-white/20 pt-3 max-w-[576px] mx-auto">
