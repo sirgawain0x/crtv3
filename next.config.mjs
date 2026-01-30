@@ -280,6 +280,21 @@ const nextConfig = {
       },
       {
         protocol: "https",
+        hostname: "api.grove.storage",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "cloudflare-ipfs.com",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
+        hostname: "gateway.ipfscdn.io",
+        pathname: "/**",
+      },
+      {
+        protocol: "https",
         hostname: "i.postimg.cc",
         pathname: "/**",
       },

@@ -8,13 +8,20 @@ import { logger } from '@/lib/utils/logger';
 // List of IPFS gateways to try (in order of preference)
 // Lighthouse first for better CDN distribution (especially West Coast)
 // Using actual IPFS gateways for proper decentralized access
+// List of IPFS gateways to try (in order of preference)
+// Grove - Primary (User specified)
+// Cloudflare - Very fast, reliable public gateway
+// Lighthouse - Good fallback
 const IPFS_GATEWAYS = [
-  'https://gateway.lighthouse.storage/ipfs', // Lighthouse - Primary (better CDN, works well on West Coast)
-  'https://w3s.link/ipfs', // Storacha (web3.storage) - fast and reliable fallback
-  'https://gateway.pinata.cloud/ipfs', // Pinata gateway - reliable fallback
-  'https://dweb.link/ipfs', // Protocol Labs - standard IPFS gateway
-  'https://4everland.io/ipfs', // 4everland - decentralized
-  'https://ipfs.io/ipfs', // Public gateway - last resort fallback
+  'https://api.grove.storage/ipfs', // Grove (Primary)
+  'https://cloudflare-ipfs.com/ipfs', // Cloudflare - High availability
+  'https://gateway.ipfscdn.io/ipfs', // IPFS CDN - Optimized for media
+  'https://gateway.lighthouse.storage/ipfs', // Lighthouse
+  'https://w3s.link/ipfs', // Storacha
+  'https://gateway.pinata.cloud/ipfs', // Pinata
+  'https://dweb.link/ipfs', // Protocol Labs
+  'https://4everland.io/ipfs', // 4everland
+  'https://ipfs.io/ipfs', // Public gateway
 ];
 
 /**
@@ -133,25 +140,29 @@ export function convertFailingGateway(url: string): string {
   // Handle ipfs:// protocol - convert to Lighthouse gateway URL
   // This is critical for thumbnails and other uploads that return ipfs:// format
   if (url.startsWith('ipfs://')) {
-    return `https://gateway.lighthouse.storage/ipfs/${hash}`;
+    return `${IPFS_GATEWAYS[0]}/${hash}`;
   }
 
-  // Note: Lighthouse is now the PRIMARY gateway and should be tried first
-  // Do NOT convert Lighthouse URLs proactively - let them try first
-  // Actual failures will be handled by the error handler trying fallback gateways
-  
-  // Handle known slow/unreliable gateways - convert to Lighthouse (primary) for better CDN
+  // Note: Grove is now the PRIMARY gateway and should be tried first
+  // Do NOT convert Grove URLs proactively - let them try first
+
+  // Handle known slow/unreliable gateways - convert to Primary (Grove) for better performance
   if (url.includes('ipfs.io/ipfs')) {
-    // ipfs.io can be slow/unreliable, prefer Lighthouse for better performance
-    return `https://gateway.lighthouse.storage/ipfs/${hash}`;
+    // ipfs.io can be slow/unreliable, prefer Primary for better performance
+    return `${IPFS_GATEWAYS[0]}/${hash}`;
   }
 
-  // If it's already an IPFS URL but not using a known gateway, prefer Lighthouse for better CDN
-  if (!url.includes('lighthouse.storage') && !url.includes('w3s.link') && !url.includes('pinata.cloud') && !url.includes('dweb.link') && !url.includes('4everland.io')) {
-    return `https://gateway.lighthouse.storage/ipfs/${hash}`;
+  // If it's already an IPFS URL but not using a known good gateway, prefer Primary
+  const isKnownGood = IPFS_GATEWAYS.some(g => url.startsWith(g));
+  if (!isKnownGood) {
+    // If it's not one of our known good gateways, force upgrade to Primary
+    // But check if it matches the pattern of a gateway URL first to be safe
+    if (url.includes('/ipfs/')) {
+      return `${IPFS_GATEWAYS[0]}/${hash}`;
+    }
   }
 
-  // For Lighthouse URLs (and other known good gateways), return as-is
+  // For known good gateways, return as-is
   // The error handler will handle actual failures by trying fallback gateways
   return url;
 }

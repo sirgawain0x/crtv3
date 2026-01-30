@@ -49,7 +49,7 @@
     "@lens-protocol/client": "^0.0.0-canary-20250820102520",
     "@lens-protocol/metadata": "^2.1.0",
     "@livepeer/ai": "^0.6.2",
-    "@livepeer/react": "^4.3.2",
+    "@livepeer/react": "^4.3.6",
     "@neondatabase/serverless": "^1.0.0",
     "@paragraph-com/sdk": "^1.1.0",
     "@radix-ui/react-avatar": "^1.1.3",
