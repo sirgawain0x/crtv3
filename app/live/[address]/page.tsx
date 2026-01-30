@@ -150,7 +150,6 @@ export default function LivePage() {
         // Don't include multistream targets during initial creation
         // Targets can be added after stream creation using the API
         multistream: undefined,
-        latencyMode: "low",
       });
 
       // Extract stream key and stream ID from response

@@ -54,7 +54,6 @@ interface CreateStreamProxyParams {
   record: boolean;
   playbackPolicy: any;
   multistream?: any;
-  latencyMode?: "low" | "standard";
 }
 
 export async function createStreamViaProxy(params: CreateStreamProxyParams) {
@@ -64,7 +63,6 @@ export async function createStreamViaProxy(params: CreateStreamProxyParams) {
     profiles,
     record,
     playbackPolicy,
-    latencyMode: params.latencyMode,
   };
   if (multistream !== undefined) {
     body.multistream = multistream;
@@ -141,7 +139,6 @@ function BroadcastWithControls({ streamKey, streamId: propStreamId }: BroadcastP
             // Don't include multistream targets during initial creation
             // Targets can be added after stream creation using the API
             multistream: undefined,
-            latencyMode: "low",
           });
 
           logger.debug("Stream created:", result);
