@@ -153,9 +153,18 @@ export function patchGlobalFetch(): void {
 
       if (typeof input === 'string') {
         url = input;
+
+        // CRITICAL FIX: The Livepeer SDK has a bug where it requests 'playback.livepeer.studio/whip'
+        // instead of 'ingest.livepeer.studio/whip'. We intercept and fix this here.
+        if (url.includes('playback.livepeer.studio/whip')) {
+          const fixedUrl = url.replace('playback.livepeer.studio', 'ingest.livepeer.studio');
+          logger.warn('[WASM Patch] Repairing incorrect Livepeer URL:', url, '->', fixedUrl);
+          return originalFetch(fixedUrl, init);
+        }
+
         // CRITICAL: Skip patching for ANY fully-qualified URL
         // Only patch relative paths to .wasm files
-        if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('blob:')) {
+        if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('blob:') || url.includes('livepeer.studio')) {
           return originalFetch(input, init);
         }
         // Check if it's a relative or absolute path that needs conversion
@@ -165,7 +174,7 @@ export function patchGlobalFetch(): void {
       } else if (input instanceof URL) {
         url = input.href;
         // Skip patching for ANY fully-qualified URL
-        if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('blob:')) {
+        if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('blob:') || url.includes('livepeer.studio')) {
           return originalFetch(input, init);
         }
         // Check if URL object has a relative path
@@ -175,7 +184,7 @@ export function patchGlobalFetch(): void {
       } else if (input instanceof Request) {
         url = input.url;
         // Skip patching for ANY fully-qualified URL
-        if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('blob:')) {
+        if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('blob:') || url.includes('livepeer.studio')) {
           return originalFetch(input, init);
         }
         if (url.endsWith('.wasm')) {

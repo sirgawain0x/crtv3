@@ -25,42 +25,41 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch playback info from Livepeer
-    const playbackInfo = await fullLivepeer.playback.get(playbackId);
-    
-    // Check if the response contains errors (Livepeer API format)
-    if (playbackInfo && 'errors' in playbackInfo && Array.isArray(playbackInfo.errors) && playbackInfo.errors.length > 0) {
+    const response = await fullLivepeer.playback.get(playbackId);
+
+    // Check if the response contains errors
+    if (response.error) {
+      // Extract error message from Livepeer API response if available
+      // The error object might differ based on the SDK version, assuming it matches ErrorT
       return NextResponse.json(
-        { 
+        {
           error: 'Playback info not found',
-          details: playbackInfo.errors 
+          details: response.error
         },
         { status: 404 }
       );
     }
-    
-    if (!playbackInfo) {
+
+    if (!response.playbackInfo) {
       return NextResponse.json(
         { error: 'Playback info not found' },
         { status: 404 }
       );
     }
 
-    return NextResponse.json(playbackInfo);
+    return NextResponse.json(response.playbackInfo);
   } catch (error: any) {
     serverLogger.error('Error fetching playback info:', error);
-    
+
     // Extract error message from Livepeer API response if available
     let errorMessage = 'Failed to fetch playback info';
-    if (error?.errors && Array.isArray(error.errors)) {
-      errorMessage = error.errors.join(', ');
-    } else if (error?.message) {
+    if (error?.message) {
       errorMessage = error.message;
     }
-    
+
     return NextResponse.json(
-      { 
+      {
         error: errorMessage,
-        details: error?.errors || undefined
       },
       { status: 500 }
     );

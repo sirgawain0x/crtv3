@@ -10,9 +10,10 @@ export const getDetailPlaybackSource = async (
 ): Promise<Src[] | null> => {
   try {
     logger.debug("[getDetailPlaybackSource] Fetching for ID:", id);
-    
+
     // Use direct fetch with signal support instead of SDK
-    const response = await fetch(`https://livepeer.studio/api/playback/${id}`, {
+    // Proxy through our internal API to avoid CORS issues
+    const response = await fetch(`/api/livepeer/playback-info?playbackId=${id}`, {
       signal: opts?.signal,
       headers: {
         'Content-Type': 'application/json',
@@ -25,7 +26,7 @@ export const getDetailPlaybackSource = async (
 
     const res = await response.json();
     logger.debug("[getDetailPlaybackSource] Playback info:", res);
-    
+
     const src = getSrc(res) as Src[];
     logger.debug("[getDetailPlaybackSource] Generated sources:", src);
     if (!src?.length) {
@@ -38,10 +39,10 @@ export const getDetailPlaybackSource = async (
     return src;
   } catch (error) {
     // Check if this is an abort-related error and re-throw it silently
-    const isAbortError = 
+    const isAbortError =
       error instanceof DOMException && error.name === 'AbortError' ||
       (error instanceof Error && (
-        error.name === 'AbortError' || 
+        error.name === 'AbortError' ||
         error.message?.includes('aborted') ||
         error.message?.includes('signal is aborted') ||
         error.message?.includes('Component unmounted')
@@ -51,12 +52,12 @@ export const getDetailPlaybackSource = async (
         error.includes('aborted') ||
         error.includes('Component unmounted')
       ));
-    
+
     if (isAbortError) {
       // Silently re-throw abort errors - they're expected during cleanup
       throw error;
     }
-    
+
     logger.error(
       "[getDetailPlaybackSource] Error fetching playback source for ID:",
       id,

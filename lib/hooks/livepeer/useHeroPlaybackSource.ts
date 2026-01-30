@@ -8,7 +8,7 @@ export const getHeroPlaybackSource = async (): Promise<Src[] | null> => {
   try {
     // First, try to fetch the asset by asset ID via our API route (server-side, avoids CORS)
     let playbackId: string | null = null;
-    
+
     if (HERO_VIDEO_ASSET_ID) {
       try {
         const response = await fetch(`/api/livepeer/asset/${HERO_VIDEO_ASSET_ID}`);
@@ -24,20 +24,20 @@ export const getHeroPlaybackSource = async (): Promise<Src[] | null> => {
         logger.warn("Error fetching hero video asset by ID, falling back to default playback ID:", error);
       }
     }
-    
+
     // Fallback to default playback ID if asset fetch failed
     if (!playbackId) {
       playbackId = LIVEPEER_HERO_PLAYBACK_ID;
     }
-    
+
     // Fetch playback info via our API route (server-side, avoids CORS)
     const playbackResponse = await fetch(`/api/livepeer/playback-info?playbackId=${playbackId}`);
     if (!playbackResponse.ok) {
       throw new Error(`Failed to fetch playback info: ${playbackResponse.status} ${playbackResponse.statusText}`);
     }
-    
+
     const playbackInfo = await playbackResponse.json();
-    const src = getSrc(playbackInfo?.playbackInfo) as Src[];
+    const src = getSrc(playbackInfo) as Src[];
     return src;
   } catch (error) {
     logger.error("Error fetching playback source:", error);
