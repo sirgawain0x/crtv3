@@ -135,9 +135,10 @@ export function Player(props: {
   return (
     <LivepeerPlayer.Root
       src={src}
-      autoPlay={false}
-      volume={0}
+      autoPlay={true} // Autoplay for live streams
+      volume={0.5} // Start unmuted but low volume if possible, or muted if browser blocks
       aspectRatio={16 / 9}
+      lowLatency={true} // Force low latency for livestream
     >
       <LivepeerPlayer.Container
         ref={containerRef}
@@ -175,15 +176,13 @@ export function Player(props: {
 
         <div
           className={`pointer-events-none absolute inset-0 bg-gradient-to-t from-black/60 
-              via-transparent to-black/60 transition-opacity duration-300 ${
-                controlsVisible ? "opacity-100" : "opacity-0"
-              }`}
+              via-transparent to-black/60 transition-opacity duration-300 ${controlsVisible ? "opacity-100" : "opacity-0"
+            }`}
         />
 
         <div
-          className={`absolute inset-0 z-30 touch-none transition-opacity duration-300 ${
-            controlsVisible ? "opacity-100" : "opacity-0"
-          }`}
+          className={`absolute inset-0 z-30 touch-none transition-opacity duration-300 ${controlsVisible ? "opacity-100" : "opacity-0"
+            }`}
         >
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="flex items-center gap-6">
