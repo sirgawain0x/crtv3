@@ -79,6 +79,13 @@ export default function WatchLivePage() {
 
         // Fetch JWT for playback
         try {
+          // If no user logic is handled in the effect dependency, but here we can check explicitly
+          if (!user?.address) {
+            // We can either error here, or let the API return 401. 
+            // Let's rely on API for consistency or simple check.
+            // Actually, the API call happens below.
+          }
+
           const jwtRes = await fetch("/api/livepeer/sign-jwt", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -87,11 +94,20 @@ export default function WatchLivePage() {
               userAddress: user?.address
             }),
           });
+
           if (jwtRes.ok) {
             const { token } = await jwtRes.json();
             setJwt(token);
-          } else {
-            logger.warn("Failed to sign JWT for stream");
+            // Clear any previous access errors
+            if (error && error.includes("required")) {
+              setError(null);
+            }
+            const errData = await jwtRes.json();
+            logger.warn("Failed to sign JWT for stream:", errData);
+
+            if (jwtRes.status === 401) {
+              setError("Authentication required: Please connect your wallet");
+            }
           }
         } catch (jwtErr) {
           logger.error("Error signing JWT:", jwtErr);
@@ -110,7 +126,7 @@ export default function WatchLivePage() {
     }
 
     fetchPlaybackSources();
-  }, [playbackId]);
+  }, [playbackId, user?.address]);
 
   // Generate a consistent sessionId based on playbackId
   // This ensures all viewers of the same stream are in the same chat session
