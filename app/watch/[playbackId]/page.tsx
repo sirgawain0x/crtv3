@@ -23,6 +23,8 @@ import { Slash } from "lucide-react";
 import { logger } from '@/lib/utils/logger';
 
 
+import { LivestreamThumbnail } from "@/components/Live/LivestreamThumbnail";
+
 export default function WatchLivePage() {
   const params = useParams();
   const playbackId = Array.isArray(params.playbackId)
@@ -30,7 +32,9 @@ export default function WatchLivePage() {
     : params.playbackId;
 
   const [playbackSources, setPlaybackSources] = useState<Src[] | null>(null);
+  const [streamData, setStreamData] = useState<import("@/services/streams").Stream | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isOffline, setIsOffline] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -44,6 +48,7 @@ export default function WatchLivePage() {
       try {
         setIsLoading(true);
         setError(null);
+        setIsOffline(false);
 
         // Parallel fetch: Livepeer sources + Our persistent stream metadata
         const [sources, streamRecord] = await Promise.all([
@@ -51,11 +56,22 @@ export default function WatchLivePage() {
           getStreamByPlaybackId(playbackId)
         ]);
 
+        if (streamRecord) {
+          setStreamData(streamRecord as import("@/services/streams").Stream);
+        }
+
         if (!sources || sources.length === 0) {
-          setError("No playback sources found for this stream");
+          // If we have a stream record, it just means it's offline, not necessarily an error
+          if (streamRecord) {
+            setIsOffline(true);
+            setPlaybackSources(null);
+          } else {
+            setError("No playback sources found for this stream");
+          }
           return;
         }
 
+        setIsOffline(false);
         setPlaybackSources(sources);
 
         // If we have a custom thumbnail, we could potentially pass it to the Player
@@ -130,11 +146,38 @@ export default function WatchLivePage() {
                 <AlertTitle>Error</AlertTitle>
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
+            ) : isOffline ? (
+              <div className="aspect-video bg-gray-900 rounded-lg overflow-hidden flex flex-col items-center justify-center relative group">
+                {/* Thumbnail Background */}
+                {streamData?.thumbnail_url && (
+                  <div className="absolute inset-0 z-0 opacity-50">
+                    <img
+                      src={streamData.thumbnail_url}
+                      alt="Stream Offline"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                )}
+
+                <div className="z-10 flex flex-col items-center gap-4 p-6 bg-black/60 rounded-xl backdrop-blur-sm">
+                  <div className="flex flex-col items-center gap-2 text-center">
+                    <AlertCircle className="h-10 w-10 text-gray-400" />
+                    <h3 className="text-xl font-bold text-white">Stream is Offline</h3>
+                    <p className="text-gray-300">The broadcaster is not currently live.</p>
+                  </div>
+                  <button
+                    onClick={() => window.location.reload()} // Simple reload for now, or re-trigger fetch
+                    className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-md transition-colors font-medium border border-white/20"
+                  >
+                    Check Again
+                  </button>
+                </div>
+              </div>
             ) : playbackSources ? (
               <div className="aspect-video bg-black rounded-lg overflow-hidden">
                 <Player
                   src={playbackSources}
-                  title="Live Stream"
+                  title={streamData?.name || "Live Stream"}
                 />
               </div>
             ) : null}

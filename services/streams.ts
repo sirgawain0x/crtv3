@@ -109,3 +109,35 @@ export async function updateStream(creatorId: string, updates: UpdateStreamParam
 
     return data as Stream;
 }
+
+export interface ActiveStream {
+    id: string;
+    creator_id: string;
+    playback_id: string;
+    thumbnail_url?: string | null;
+    name?: string | null;
+    is_live: boolean;
+    last_live_at?: string | null;
+    created_at: string;
+}
+
+/**
+ * Get all active streams from the database
+ */
+export async function getActiveStreams() {
+    const supabase = await createClient(); // Use regular client for public read
+
+    const { data, error } = await supabase
+        .from("streams")
+        .select("id, creator_id, playback_id, thumbnail_url, name, is_live, last_live_at, created_at")
+        .eq("is_live", true)
+        .order("last_live_at", { ascending: false });
+
+    if (error) {
+        console.error("Error fetching active streams:", error);
+        // Return empty array instead of throwing to avoid breaking UI
+        return [];
+    }
+
+    return data as ActiveStream[];
+}

@@ -309,7 +309,7 @@ export default function LivePage() {
               </div>
             ) : (
               <>
-                <Broadcast streamKey={streamKey} streamId={streamId} />
+                <Broadcast streamKey={streamKey} streamId={streamId} creatorAddress={user.address} />
               </>
             )}
             <div className="mt-4 border-t border-white/20 pt-3 max-w-[576px] mx-auto">

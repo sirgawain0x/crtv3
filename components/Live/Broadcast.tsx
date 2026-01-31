@@ -32,10 +32,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { updateStream } from "@/services/streams";
 
 interface BroadcastProps {
   streamKey: string | null;
   streamId?: string | null;
+  creatorAddress: string;
 }
 
 interface StreamProfile {
@@ -78,7 +80,7 @@ export async function createStreamViaProxy(params: CreateStreamProxyParams) {
   return res.json();
 }
 
-function BroadcastWithControls({ streamKey, streamId: propStreamId }: BroadcastProps) {
+function BroadcastWithControls({ streamKey, streamId: propStreamId, creatorAddress }: BroadcastProps) {
   const [isCreatingStream, setIsCreatingStream] = React.useState(false);
   const [streamData, setStreamData] = React.useState<any>(null);
   const streamCreationInitiatedRef = React.useRef(false);
@@ -183,6 +185,30 @@ function BroadcastWithControls({ streamKey, streamId: propStreamId }: BroadcastP
       toast.error(broadcastError);
     }
   }, [broadcastError]);
+
+  // Sync is_live status with DB
+  useEffect(() => {
+    if (!creatorAddress) return;
+
+    const syncStatus = async () => {
+      try {
+        if (status === 'live') {
+          await updateStream(creatorAddress, { is_live: true, last_live_at: new Date().toISOString() });
+          logger.info("Stream marked as live in DB");
+        } else if (status === 'idle' || status === 'error') {
+          // Only unmark if we were previously tracking it or just as a cleanup
+          // We might want to be careful not to unmark if just loading.
+          // But 'idle' and 'error' are terminal states for the broadcast session usually.
+          await updateStream(creatorAddress, { is_live: false });
+          logger.info("Stream marked as offline in DB");
+        }
+      } catch (err) {
+        logger.error("Failed to sync stream status:", err);
+      }
+    };
+
+    syncStatus();
+  }, [status, creatorAddress]);
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);

@@ -3,54 +3,35 @@
 import React, { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import Link from "next/link";
-import { Stream } from "livepeer/models/components";
+// import { Stream } from "livepeer/models/components"; // Removing unused import
 import { VideoCardSkeleton } from "../Videos/VideoCardSkeleton";
 import { LivestreamThumbnail } from "./LivestreamThumbnail";
 import { getThumbnailUrl } from "@/services/livepeer-thumbnails";
 import { logger } from '@/lib/utils/logger';
 
 
-async function fetchStreamsFromApi(): Promise<Stream[]> {
-  const res = await fetch("/api/livepeer");
-  if (!res.ok) throw new Error("Failed to fetch streams");
-  return res.json();
-}
+import { getActiveStreams, ActiveStream } from "@/services/streams";
+
+// Removed fetchStreamsFromApi since we use getActiveStreams now
 
 export default function LivestreamGrid() {
-  const [streams, setStreams] = useState<Stream[]>([]);
+  const [streams, setStreams] = useState<ActiveStream[]>([]); // Use ActiveStream type
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [thumbnails, setThumbnails] = useState<Record<string, string>>({});
+  // const [thumbnails, setThumbnails] = useState<Record<string, string>>({}); // valid thumbnails are now in stream obj
 
   const fetchStreams = async () => {
     try {
-      const result = await fetchStreamsFromApi();
-      // Only include streams that are currently active
-      const activeStreams = (result ?? []).filter(
-        (stream) => stream.isActive === true
-      );
-      const mappedStreams =
-        activeStreams.map((stream) => ({
-          ...stream,
-          name: stream.name || `Stream ${stream.id}`,
-        })) ?? [];
-      setStreams(mappedStreams);
+      const activeStreams = await getActiveStreams();
 
-      // Fetch thumbnails for new streams
-      mappedStreams.forEach(async (stream) => {
-        if (!stream.playbackId || !stream.id) return;
-        const res = (await getThumbnailUrl({
-          playbackId: stream.playbackId,
-        })) as import("@/lib/types/actions").ActionResponse<{
-          thumbnailUrl: string;
-        }>;
-        if (res.success && res.data?.thumbnailUrl) {
-          setThumbnails((prev) => ({
-            ...prev,
-            [String(stream.id)]: res.data!.thumbnailUrl,
-          }));
-        }
+      // Sort: Live streams first (though query handles this), then by date
+      const sortedStreams = activeStreams.sort((a, b) => {
+        return new Date(b.last_live_at || b.created_at).getTime() - new Date(a.last_live_at || a.created_at).getTime();
       });
+
+      setStreams(sortedStreams);
+
+      // Thumbnails are now directly on the stream object
     } catch (error) {
       logger.error("Error fetching streams:", error);
     } finally {
@@ -113,16 +94,20 @@ export default function LivestreamGrid() {
       ) : (
         <div className="grid grid-cols-1 gap-y-4 sm:grid-cols-1 sm:gap-4 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
           {streams.map((stream) => (
-            <Link key={stream.id} href={`/watch/${stream.playbackId}`}>
+            // Use playback_id for URL, id for key
+            <Link key={stream.id} href={`/watch/${stream.playback_id}`}>
               <Card className="overflow-hidden transition-shadow hover:shadow-lg">
                 <div className="relative aspect-video bg-gray-100 dark:bg-gray-800/40">
-                  {thumbnails?.[String(stream.id)] ? (
+                  {stream.thumbnail_url ? (
                     <LivestreamThumbnail
-                      thumbnailUrl={thumbnails[String(stream.id)]}
+                      thumbnailUrl={stream.thumbnail_url}
                     />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center text-gray-400 dark:text-gray-500">
-                      Loading thumbnail...
+                      <div className="flex flex-col items-center gap-2">
+                        {/* Fallback pattern or icon could go here */}
+                        <span className="text-xs">No Thumbnail</span>
+                      </div>
                     </div>
                   )}
                   <div className="absolute right-2 top-2 rounded-full bg-red-500 px-2 py-1 text-xs text-white">
@@ -133,9 +118,11 @@ export default function LivestreamGrid() {
                   <h3 className="truncate font-semibold">{stream.name}</h3>
                   <p className="text-sm text-gray-500 dark:text-gray-400">
                     Started{" "}
-                    {stream.createdAt
-                      ? new Date(stream.createdAt).toLocaleDateString()
-                      : "Unknown date"}
+                    {stream.last_live_at
+                      ? new Date(stream.last_live_at).toLocaleDateString()
+                      : stream.created_at
+                        ? new Date(stream.created_at).toLocaleDateString()
+                        : "Unknown date"}
                   </p>
                 </div>
               </Card>
