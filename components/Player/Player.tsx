@@ -34,9 +34,10 @@ export function Player(props: {
   src: Src[] | null;
   title: string;
   assetId?: string;
+  jwt?: string;
   onPlay?: () => void;
 }) {
-  const { src, title, assetId, onPlay } = props;
+  const { src, title, assetId, jwt, onPlay } = props;
 
   const [controlsVisible, setControlsVisible] = useState(true);
   const fadeTimeoutRef = useRef<NodeJS.Timeout>();
@@ -135,6 +136,7 @@ export function Player(props: {
   return (
     <LivepeerPlayer.Root
       src={src}
+      jwt={jwt}
       autoPlay={true} // Autoplay for live streams
       volume={0.5} // Start unmuted but low volume if possible, or muted if browser blocks
       aspectRatio={16 / 9}

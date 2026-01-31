@@ -8,6 +8,7 @@ import { getStreamByPlaybackId } from "@/services/streams";
 import { LiveChat } from "@/components/Live/LiveChat";
 import { ClipCreator } from "@/components/Live/ClipCreator";
 import { Src } from "@livepeer/react";
+import { useUser } from "@account-kit/react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
@@ -31,11 +32,13 @@ export default function WatchLivePage() {
     ? params.playbackId[0]
     : params.playbackId;
 
+  const user = useUser();
   const [playbackSources, setPlaybackSources] = useState<Src[] | null>(null);
   const [streamData, setStreamData] = useState<import("@/services/streams").Stream | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isOffline, setIsOffline] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [jwt, setJwt] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     async function fetchPlaybackSources() {
@@ -73,6 +76,26 @@ export default function WatchLivePage() {
 
         setIsOffline(false);
         setPlaybackSources(sources);
+
+        // Fetch JWT for playback
+        try {
+          const jwtRes = await fetch("/api/livepeer/sign-jwt", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              playbackId,
+              userAddress: user?.address
+            }),
+          });
+          if (jwtRes.ok) {
+            const { token } = await jwtRes.json();
+            setJwt(token);
+          } else {
+            logger.warn("Failed to sign JWT for stream");
+          }
+        } catch (jwtErr) {
+          logger.error("Error signing JWT:", jwtErr);
+        }
 
         // If we have a custom thumbnail, we could potentially pass it to the Player
         // as a poster. The current Player component might need updating to accept 'poster'.
@@ -178,6 +201,7 @@ export default function WatchLivePage() {
                 <Player
                   src={playbackSources}
                   title={streamData?.name || "Live Stream"}
+                  jwt={jwt}
                 />
               </div>
             ) : null}
