@@ -9,6 +9,7 @@ import {
   SITE_ORG,
   SITE_PRODUCT,
 } from "@/context/context"; // Correct import path
+import { HydrationSafe } from "@/components/ui/hydration-safe";
 import { Button } from "@/components/ui/button"; // Corrected import
 import {
   Dialog as AccountKitDialog,
@@ -482,55 +483,57 @@ export default function Navbar() {
                 }
               >
                 {/* User Account Section or Get Started */}
-                {user ? (
-                  <div className="space-y-4 border-b border-gray-200 dark:border-gray-700 pb-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <Avatar className="h-8 w-8">
-                          <AvatarImage
-                            src={makeBlockie(modularAccount?.address || user?.address || "0x")}
-                            alt="Wallet avatar"
-                          />
-                        </Avatar>
-                        <div>
-                          <p className="text-sm font-medium">
-                            {displayAddress}
-                          </p>
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
-                            {getChainName(currentChain)}
-                          </p>
+                <HydrationSafe>
+                  {user ? (
+                    <div className="space-y-4 border-b border-gray-200 dark:border-gray-700 pb-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <Avatar className="h-8 w-8">
+                            <AvatarImage
+                              src={makeBlockie(modularAccount?.address || user?.address || "0x")}
+                              alt="Wallet avatar"
+                            />
+                          </Avatar>
+                          <div>
+                            <p className="text-sm font-medium">
+                              {displayAddress}
+                            </p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              {getChainName(currentChain)}
+                            </p>
+                          </div>
                         </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={copyToClipboard}
+                          className="h-8 w-8 p-0"
+                        >
+                          {copySuccess ? (
+                            <CheckIcon className="h-4 w-4 text-green-500" />
+                          ) : (
+                            <Copy className="h-4 w-4" />
+                          )}
+                        </Button>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={copyToClipboard}
-                        className="h-8 w-8 p-0"
-                      >
-                        {copySuccess ? (
-                          <CheckIcon className="h-4 w-4 text-green-500" />
-                        ) : (
-                          <Copy className="h-4 w-4" />
-                        )}
-                      </Button>
                     </div>
-                  </div>
-                ) : (
-                  <div className="pb-4 border-b border-gray-200 dark:border-gray-700">
-                    <Button
-                      className="w-full bg-gradient-to-r from-blue-600 to-purple-600 
+                  ) : (
+                    <div className="pb-4 border-b border-gray-200 dark:border-gray-700">
+                      <Button
+                        className="w-full bg-gradient-to-r from-blue-600 to-purple-600 
                         hover:from-blue-700 hover:to-purple-700 text-white 
                         transition-all duration-300 hover:shadow-lg"
-                      onClick={() => {
-                        openAuthModal();
-                        setIsMenuOpen(false);
-                      }}
-                      id="connect-wallet-btn"
-                    >
-                      Get Started
-                    </Button>
-                  </div>
-                )}
+                        onClick={() => {
+                          openAuthModal();
+                          setIsMenuOpen(false);
+                        }}
+                        id="connect-wallet-btn"
+                      >
+                        Get Started
+                      </Button>
+                    </div>
+                  )}
+                </HydrationSafe>
 
                 {/* Navigation Links */}
                 <nav className="grid grid-flow-row gap-2 auto-rows-max text-sm pb-4 border-b border-gray-200 dark:border-gray-700">
@@ -567,76 +570,78 @@ export default function Navbar() {
                   </Link>
 
                   {/* Member/User Options */}
-                  {user && (
-                    <>
-                      <div className="mt-4 mb-1 text-xs text-muted-foreground font-semibold">
-                        Options
-                      </div>
-                      <Link
-                        href="/profile"
-                        className={mobileMemberNavLinkClass}
-                        onClick={handleLinkClick}
-                      >
-                        <ShieldUser className="mr-2 h-4 w-4" /> Profile
-                      </Link>
-                      <Link
-                        href="/upload"
-                        className={mobileMemberNavLinkClass}
-                        onClick={handleLinkClick}
-                        id="nav-upload-link"
-                      >
-                        <CloudUpload className="mr-2 h-4 w-4" /> Upload
-                      </Link>
+                  <HydrationSafe>
+                    {user && (
+                      <>
+                        <div className="mt-4 mb-1 text-xs text-muted-foreground font-semibold">
+                          Options
+                        </div>
+                        <Link
+                          href="/profile"
+                          className={mobileMemberNavLinkClass}
+                          onClick={handleLinkClick}
+                        >
+                          <ShieldUser className="mr-2 h-4 w-4" /> Profile
+                        </Link>
+                        <Link
+                          href="/upload"
+                          className={mobileMemberNavLinkClass}
+                          onClick={handleLinkClick}
+                          id="nav-upload-link"
+                        >
+                          <CloudUpload className="mr-2 h-4 w-4" /> Upload
+                        </Link>
 
-                      {/* Membership Status Section */}
-                      <div className="mt-4">
-                        <MembershipSection />
-                      </div>
+                        {/* Membership Status Section */}
+                        <div className="mt-4">
+                          <MembershipSection />
+                        </div>
 
-                      {isVerified && hasMembership && (
-                        <>
-                          <div className="mt-4 mb-1 text-xs text-muted-foreground font-semibold">
-                            Member Access
-                          </div>
-                          <Link
-                            href="/live"
-                            className={mobileMemberNavLinkClass}
-                            onClick={handleLinkClick}
-                          >
-                            <RadioTower className="mr-2 h-4 w-4" /> Live
-                          </Link>
-                          <Link
-                            href="https://create.creativeplatform.xyz"
-                            className={mobileMemberNavLinkClass}
-                            onClick={handleLinkClick}
-                          >
-                            <Bot className="mr-2 h-4 w-4" /> Pixels
-                            <span className="ml-2 px-2 py-0.5 rounded bg-muted-foreground/10 text-xs text-muted-foreground">
-                              Beta
-                            </span>
-                          </Link>
-                          <Link
-                            href="/vote/create"
-                            className="flex w-full items-center rounded-md p-2 text-sm font-medium
-                              hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors
-                              text-green-600 dark:text-green-400"
-                            onClick={handleLinkClick}
-                          >
-                            <Plus className="mr-2 h-4 w-4 text-green-500" /> Poll
-                          </Link>
-                          <Link
-                            href="/predict/create"
-                            className="flex w-full items-center rounded-md p-2 text-sm font-medium
-                              hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors
-                              text-blue-600 dark:text-blue-400"
-                            onClick={handleLinkClick}
-                          >
-                            <TrendingUp className="mr-2 h-4 w-4 text-blue-500" /> Predict
-                          </Link>
-                        </>
-                      )}
-                    </>
-                  )}
+                        {isVerified && hasMembership && (
+                          <>
+                            <div className="mt-4 mb-1 text-xs text-muted-foreground font-semibold">
+                              Member Access
+                            </div>
+                            <Link
+                              href="/live"
+                              className={mobileMemberNavLinkClass}
+                              onClick={handleLinkClick}
+                            >
+                              <RadioTower className="mr-2 h-4 w-4" /> Live
+                            </Link>
+                            <Link
+                              href="https://create.creativeplatform.xyz"
+                              className={mobileMemberNavLinkClass}
+                              onClick={handleLinkClick}
+                            >
+                              <Bot className="mr-2 h-4 w-4" /> Pixels
+                              <span className="ml-2 px-2 py-0.5 rounded bg-muted-foreground/10 text-xs text-muted-foreground">
+                                Beta
+                              </span>
+                            </Link>
+                            <Link
+                              href="/vote/create"
+                              className="flex w-full items-center rounded-md p-2 text-sm font-medium
+                                hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors
+                                text-green-600 dark:text-green-400"
+                              onClick={handleLinkClick}
+                            >
+                              <Plus className="mr-2 h-4 w-4 text-green-500" /> Poll
+                            </Link>
+                            <Link
+                              href="/predict/create"
+                              className="flex w-full items-center rounded-md p-2 text-sm font-medium
+                                hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors
+                                text-blue-600 dark:text-blue-400"
+                              onClick={handleLinkClick}
+                            >
+                              <TrendingUp className="mr-2 h-4 w-4 text-blue-500" /> Predict
+                            </Link>
+                          </>
+                        )}
+                      </>
+                    )}
+                  </HydrationSafe>
 
                   {/* Feedback Link */}
                   <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
@@ -654,82 +659,84 @@ export default function Navbar() {
                 </nav>
 
                 {/* User Specific Bottom Sections */}
-                {user && (
-                  <>
-                    {/* Network Selection */}
-                    <div className="mt-4 pt-4">
-                      <p className="text-sm font-medium mb-2">Network</p>
-                      <ChainSelect className="w-full" />
-                    </div>
-
-                    {/* Wallet Actions */}
-                    <div className="mt-4 grid grid-cols-3 gap-2 pb-4 border-b border-gray-200 dark:border-gray-700">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          handleActionClick("buy");
-                          setIsMenuOpen(false);
-                        }}
-                        className="flex items-center justify-center"
-                      >
-                        <Plus className="mr-2 h-4 w-4 text-green-500" />
-                        Buy
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          handleActionClick("send");
-                          setIsMenuOpen(false);
-                        }}
-                        className="flex items-center justify-center"
-                      >
-                        <ArrowUpRight className="mr-2 h-4 w-4 text-blue-500" />
-                        Send
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          handleActionClick("swap");
-                          setIsMenuOpen(false);
-                        }}
-                        className="flex items-center justify-center"
-                      >
-                        <ArrowUpDown className="mr-2 h-4 w-4 text-purple-500" />
-                        Swap
-                      </Button>
-                    </div>
-
-                    {/* Add TokenBalance here */}
-                    <div className="mt-4">
-                      <TokenBalance />
-                    </div>
-
-                    {/* Add MeTokenBalances here */}
-                    {shouldShowMetokens && (
-                      <div className="mt-4">
-                        <MeTokenBalances />
+                <HydrationSafe>
+                  {user && (
+                    <>
+                      {/* Network Selection */}
+                      <div className="mt-4 pt-4">
+                        <p className="text-sm font-medium mb-2">Network</p>
+                        <ChainSelect className="w-full" />
                       </div>
-                    )}
 
-                    {/* Logout Button */}
-                    <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                      <button
-                        onClick={() => {
-                          logout();
-                          setIsMenuOpen(false);
-                        }}
-                        className="flex w-full items-center rounded-md p-2 text-sm font-medium
-                          hover:bg-red-50 dark:hover:bg-red-900 transition-colors text-red-500"
-                      >
-                        <LogOut className="mr-2 h-4 w-4" />
-                        Logout
-                      </button>
-                    </div>
-                  </>
-                )}
+                      {/* Wallet Actions */}
+                      <div className="mt-4 grid grid-cols-3 gap-2 pb-4 border-b border-gray-200 dark:border-gray-700">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            handleActionClick("buy");
+                            setIsMenuOpen(false);
+                          }}
+                          className="flex items-center justify-center"
+                        >
+                          <Plus className="mr-2 h-4 w-4 text-green-500" />
+                          Buy
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            handleActionClick("send");
+                            setIsMenuOpen(false);
+                          }}
+                          className="flex items-center justify-center"
+                        >
+                          <ArrowUpRight className="mr-2 h-4 w-4 text-blue-500" />
+                          Send
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            handleActionClick("swap");
+                            setIsMenuOpen(false);
+                          }}
+                          className="flex items-center justify-center"
+                        >
+                          <ArrowUpDown className="mr-2 h-4 w-4 text-purple-500" />
+                          Swap
+                        </Button>
+                      </div>
+
+                      {/* Add TokenBalance here */}
+                      <div className="mt-4">
+                        <TokenBalance />
+                      </div>
+
+                      {/* Add MeTokenBalances here */}
+                      {shouldShowMetokens && (
+                        <div className="mt-4">
+                          <MeTokenBalances />
+                        </div>
+                      )}
+
+                      {/* Logout Button */}
+                      <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                        <button
+                          onClick={() => {
+                            logout();
+                            setIsMenuOpen(false);
+                          }}
+                          className="flex w-full items-center rounded-md p-2 text-sm font-medium
+                            hover:bg-red-50 dark:hover:bg-red-900 transition-colors text-red-500"
+                        >
+                          <LogOut className="mr-2 h-4 w-4" />
+                          Logout
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </HydrationSafe>
 
                 {/* Navigation Links */}
 

@@ -23,26 +23,23 @@ function formatBalance(balance: string): string {
   // Convert to number for comparison
   const num = parseFloat(balance);
   if (num <= 0) return "0";
+  if (num < 0.000001) return "< 0.000001"; // Very small non-zero
 
-  // If number is very small (less than 0.001), use scientific notation
-  if (num < 0.001) return num.toExponential(3);
-
-  // For regular numbers, preserve significant digits up to 3 decimal places
-  const [integerPart, decimalPart = ""] = balance.split(".");
-
-  // If decimal part is shorter than significant digits, use it as is
-  if (decimalPart.length <= 3) {
-    const cleanDecimal = decimalPart.replace(/0+$/, "");
-    return cleanDecimal
-      ? `${integerPart}.${cleanDecimal}`
-      : integerPart;
+  // For small numbers (less than 1), show up to 6 decimals
+  if (num < 1) {
+    return new Intl.NumberFormat('en-US', {
+      maximumFractionDigits: 6,
+      minimumFractionDigits: 0,
+      useGrouping: false // Don't use commas for decimals
+    }).format(num);
   }
 
-  // Otherwise, truncate to significant digits and remove trailing zeros
-  const truncatedDecimal = decimalPart.slice(0, 3).replace(/0+$/, "");
-  return truncatedDecimal
-    ? `${integerPart}.${truncatedDecimal}`
-    : integerPart;
+  // For larger numbers, show up to 4 decimals
+  return new Intl.NumberFormat('en-US', {
+    maximumFractionDigits: 4,
+    minimumFractionDigits: 0,
+    useGrouping: true
+  }).format(num);
 }
 
 export function TokenBalance() {
