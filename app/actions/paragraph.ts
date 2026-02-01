@@ -4,12 +4,24 @@ import { paragraph } from "@/lib/paragraph-client";
 import { serverLogger } from '@/lib/utils/logger';
 
 
+import { unstable_cache } from "next/cache";
+
 const DOMAIN = "news.creativeplatform.xyz";
+
+// Cache the publication ID lookup since the domain is constant
+const getCachedPublication = unstable_cache(
+    async () => {
+        // @ts-ignore
+        const pub = await paragraph.publications.get({ domain: DOMAIN }).single();
+        return pub;
+    },
+    ['paragraph-publication-id'],
+    { revalidate: 3600, tags: ['paragraph-publication'] } // Cache for 1 hour
+);
 
 export async function getPublicationData() {
     try {
-        // @ts-ignore
-        const pub = await paragraph.publications.get({ domain: DOMAIN }).single();
+        const pub = await getCachedPublication();
 
         if (!pub?.id) {
             throw new Error("Publication not found");
@@ -29,9 +41,8 @@ export async function getPublicationData() {
 
 export async function getPublicationPosts(limit = 6) {
     try {
-        // 1. Get Pub ID first (could be cached or passed, but looking up by domain is safest if ID changes)
-        // @ts-ignore
-        const pub = await paragraph.publications.get({ domain: DOMAIN }).single();
+        // 1. Get Pub ID first (cached)
+        const pub = await getCachedPublication();
 
         if (!pub?.id) return [];
 
@@ -48,8 +59,7 @@ export async function getPublicationPosts(limit = 6) {
 
 export async function getSubscriberCount() {
     try {
-        // @ts-ignore
-        const pub = await paragraph.publications.get({ domain: DOMAIN }).single();
+        const pub = await getCachedPublication();
         if (!pub?.id) return 0;
 
         const url = `https://public.api.paragraph.com/api/v1/publications/${pub.id}/subscribers/count`;

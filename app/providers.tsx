@@ -17,6 +17,7 @@ import { RadixProvider } from "@/components/ui/radix-provider";
 import { cleanupExistingIframes } from "@/components/IframeCleanup";
 // Import dev warning suppression (only active in development)
 import "@/lib/utils/suppressDevWarnings";
+import { MembershipGuard } from "@/components/auth/MembershipGuard";
 
 function ErrorFallback({ error }: { error: Error }) {
   return (
@@ -72,7 +73,9 @@ export const Providers = (
                   <HeliaProvider>
                     <TourProvider>
                       <VideoProvider>
-                        {props.children}
+                        <MembershipGuard>
+                          {props.children}
+                        </MembershipGuard>
                         <Toaster position="top-right" richColors />
                       </VideoProvider>
                     </TourProvider>

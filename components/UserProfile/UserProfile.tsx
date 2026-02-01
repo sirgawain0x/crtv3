@@ -1,5 +1,6 @@
 "use client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 import { NextPage } from "next";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -35,11 +36,11 @@ function useServerMembership(address?: string) {
 
   useEffect(() => {
     if (!address) return;
-    
+
     const abortController = new AbortController();
     setLoading(true);
     setError(null);
-    
+
     fetch("/api/membership", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -69,12 +70,12 @@ function useServerMembership(address?: string) {
         }
         // Connection errors are common during development hot reload
         // Don't set error state for network/connection errors to avoid noise
-        const isConnectionError = 
-          e.message.includes("ERR_CONNECTION_REFUSED") || 
+        const isConnectionError =
+          e.message.includes("ERR_CONNECTION_REFUSED") ||
           e.message.includes("Failed to fetch") ||
           e.message.includes("NetworkError") ||
           e.message.includes("Network request failed");
-        
+
         if (isConnectionError) {
           // Log but don't set error state - server may be restarting
           logger.debug("Membership API not available:", e.message);
@@ -176,6 +177,14 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
             >
               Bank
             </TabsTrigger>
+            {validMembership && (
+              <TabsTrigger
+                value="Membership"
+                className="flex-shrink-0 rounded-t-lg px-4 py-2 text-sm font-medium"
+              >
+                Membership
+              </TabsTrigger>
+            )}
             {/* <TabsTrigger
                 value="Revenue"
                 className="flex-shrink-0 rounded-t-lg px-4 py-2 text-sm font-medium"
@@ -243,6 +252,33 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
                   </CardContent>
                 </Card>
               </TabsContent> */}
+
+            {/* Membership Tab Content */}
+            {validMembership && (
+              <TabsContent value="Membership">
+                <Card>
+                  <CardHeader className="space-y-1">
+                    <CardTitle className="text-2xl">Membership</CardTitle>
+                    <CardDescription>
+                      Manage your membership details and view benefits
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between p-4 border rounded-lg bg-secondary/10">
+                      <div>
+                        <p className="font-medium">Current Status</p>
+                        <p className="text-sm text-muted-foreground">
+                          You have an active membership
+                        </p>
+                      </div>
+                      <Link href="/memberships">
+                        <Button variant="outline">Manage Membership</Button>
+                      </Link>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            )}
           </div>
         </Tabs>
       </div>
