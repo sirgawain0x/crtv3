@@ -26,6 +26,7 @@ import type { MembershipDetails } from "@/lib/hooks/unlock/useMembershipVerifica
 import { MeTokensSection } from "./MeTokensSection";
 import { UserDisplay } from "@/components/User/UserDisplay";
 import { CreativeBankTab } from "./CreativeBankTab";
+import { MembershipHome } from "@/components/memberships/MembershipHome";
 import { logger } from '@/lib/utils/logger';
 
 
@@ -177,14 +178,12 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
             >
               Bank
             </TabsTrigger>
-            {validMembership && (
-              <TabsTrigger
-                value="Membership"
-                className="flex-shrink-0 rounded-t-lg px-4 py-2 text-sm font-medium"
-              >
-                Membership
-              </TabsTrigger>
-            )}
+            <TabsTrigger
+              value="Membership"
+              className="flex-shrink-0 rounded-t-lg px-4 py-2 text-sm font-medium"
+            >
+              Membership
+            </TabsTrigger>
             {/* <TabsTrigger
                 value="Revenue"
                 className="flex-shrink-0 rounded-t-lg px-4 py-2 text-sm font-medium"
@@ -254,31 +253,96 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
               </TabsContent> */}
 
             {/* Membership Tab Content */}
-            {validMembership && (
-              <TabsContent value="Membership">
+            <TabsContent value="Membership">
+              {validMembership ? (
                 <Card>
                   <CardHeader className="space-y-1">
                     <CardTitle className="text-2xl">Membership</CardTitle>
                     <CardDescription>
-                      Manage your membership details and view benefits
+                      Manage your membership details and benefits
                     </CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center justify-between p-4 border rounded-lg bg-secondary/10">
-                      <div>
-                        <p className="font-medium">Current Status</p>
-                        <p className="text-sm text-muted-foreground">
-                          You have an active membership
-                        </p>
+                  <CardContent className="space-y-6">
+                    <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between p-6 border rounded-xl bg-card">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold text-lg">
+                            {validMembership.lock?.name || validMembership.name}
+                          </p>
+                          <span className="inline-flex items-center rounded-full bg-green-500/15 px-2.5 py-0.5 text-xs font-medium text-green-500">
+                            Active
+                          </span>
+                        </div>
+                        {validMembership.expiration ? (
+                          <div className="space-y-1">
+                            <p className="text-sm text-muted-foreground">
+                              Expires on {new Date(validMembership.expiration * 1000).toLocaleDateString(undefined, {
+                                year: 'numeric',
+                                month: 'long',
+                                day: 'numeric'
+                              })}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {(() => {
+                                const now = Date.now();
+                                const exp = validMembership.expiration * 1000;
+                                const diff = exp - now;
+                                const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+                                if (days < 0) return "Expired";
+                                if (days === 0) return "Expires today";
+                                return `${days} day${days === 1 ? '' : 's'} remaining`;
+                              })()}
+                            </p>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-muted-foreground">
+                            Lifetime Membership
+                          </p>
+                        )}
                       </div>
-                      <Link href="/memberships">
-                        <Button variant="outline">Manage Membership</Button>
-                      </Link>
+
+                      <div className="flex gap-3">
+                        {/* Show renewal options if needed */}
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            // Toggle renewal view locally if we want, or just scroll/show the options
+                            // For now, simpler to just show the tiers below this card if they click renew?
+                            // Or simpler: Just render MembershipHome below this card with a "Renew / Upgrade" header
+                            const element = document.getElementById("membership-renewal-options");
+                            if (element) {
+                              element.scrollIntoView({ behavior: 'smooth' });
+                            }
+                          }}
+                        >
+                          Extend Membership
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div id="membership-renewal-options" className="space-y-4 pt-4 border-t">
+                      <h3 className="text-lg font-medium">Renewal Options</h3>
+                      <MembershipHome
+                        setActiveTab={(tab) => {
+                          if (tab === "fund") {
+                            const bankTrigger = document.querySelector('[value="Bank"]') as HTMLElement;
+                            if (bankTrigger) bankTrigger.click();
+                          }
+                        }}
+                      />
                     </div>
                   </CardContent>
                 </Card>
-              </TabsContent>
-            )}
+              ) : (
+                <MembershipHome setActiveTab={(tab) => {
+                  if (tab === "fund") {
+                    // Switch to Bank tab if funding is needed
+                    const bankTrigger = document.querySelector('[value="Bank"]') as HTMLElement;
+                    if (bankTrigger) bankTrigger.click();
+                  }
+                }} />
+              )}
+            </TabsContent>
           </div>
         </Tabs>
       </div>

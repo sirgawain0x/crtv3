@@ -15,7 +15,7 @@ import { serverLogger } from "@/lib/utils/logger";
 /** Resolve Base mainnet RPC URL. Avoids Alchemy client when key is missing (returns non-JSON → parse error). */
 function getBaseRpcUrl(): string {
   const apiKey = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY;
-  
+
   // Only use Alchemy URL if we have a valid, non-empty API key
   if (apiKey && typeof apiKey === 'string' && apiKey.trim().length > 0) {
     const trimmedKey = apiKey.trim();
@@ -24,20 +24,20 @@ function getBaseRpcUrl(): string {
     serverLogger.debug('[RPC] Using Alchemy RPC with API key');
     return alchemyUrl;
   }
-  
+
   // Fallback to other RPC URLs if Alchemy key is missing
   const alchemyRpc = process.env.NEXT_PUBLIC_ALCHEMY_RPC_URL;
   if (alchemyRpc && typeof alchemyRpc === 'string' && alchemyRpc.trim().length > 0) {
     serverLogger.debug('[RPC] Using NEXT_PUBLIC_ALCHEMY_RPC_URL');
     return alchemyRpc.trim();
   }
-  
+
   const baseRpc = process.env.NEXT_PUBLIC_BASE_RPC_URL;
   if (baseRpc && typeof baseRpc === 'string' && baseRpc.trim().length > 0) {
     serverLogger.debug('[RPC] Using NEXT_PUBLIC_BASE_RPC_URL');
     return baseRpc.trim();
   }
-  
+
   // Final fallback to public Base RPC
   serverLogger.warn('[RPC] No Alchemy API key found, falling back to public Base RPC');
   return "https://mainnet.base.org";
@@ -344,7 +344,7 @@ export class UnlockService {
       return hasValidKey;
     } catch (error) {
       const errorMessage = (error as Error).message || String(error);
-      
+
       // Check for RPC configuration errors
       if (
         errorMessage.includes('Unexpected token') ||
@@ -359,15 +359,15 @@ export class UnlockService {
         throw this.createError(
           `RPC configuration error: Alchemy API key may be missing or invalid. Please check NEXT_PUBLIC_ALCHEMY_API_KEY environment variable.`,
           "RPC_CONFIG_ERROR",
-          { 
-            lockAddress, 
-            userAddress, 
+          {
+            lockAddress,
+            userAddress,
             originalError: error,
             rpcUrl: baseRpcUrl.replace(/\/v2\/[^/]+/, '/v2/***')
           }
         );
       }
-      
+
       serverLogger.error(
         `Error checking membership for ${userAddress} at ${lockAddress}:`,
         error
@@ -403,10 +403,10 @@ export class UnlockService {
       Object.entries(LOCK_ADDRESSES).map(async ([name, address]) => {
         try {
           const tokens = await this.getTokensOfOwner(address, userAddress);
-          
+
           // Limit to maximum of 4 NFTs per tier/lock
           const limitedTokens = tokens.slice(0, MAX_NFTS_PER_TIER);
-          
+
           for (const tokenId of limitedTokens) {
             let metadata = null;
             try {
@@ -459,6 +459,7 @@ export class UnlockService {
           let lock = null;
           let tokenId = null;
           let metadata = null;
+          let expiration: number | undefined;
 
           if (hasValid) {
             try {
@@ -467,12 +468,23 @@ export class UnlockService {
 
               // Get token IDs for the user
               const tokens = await this.getTokensOfOwner(address, userAddress);
+
               if (tokens.length > 0) {
                 // Return all token IDs, not just the first one
                 // The caller can use any of them
                 tokenId = tokens[0].toString();
                 // Get metadata for the first token
                 metadata = await this.getNftMetadata(address, tokenId);
+
+                try {
+                  const contract = this.getContract(address);
+                  // Get expiration for the token
+                  const expirationResult = await contract.read.keyExpirationTimestampFor([BigInt(tokenId)]);
+                  expiration = Number(expirationResult);
+                } catch (e) {
+                  serverLogger.warn(`Failed to get expiration for token ${tokenId} at ${address}`, e);
+                }
+
                 if (metadata) {
                   lock = {
                     ...lock,
@@ -496,6 +508,7 @@ export class UnlockService {
             isValid: hasValid,
             lock,
             tokenId,
+            expiration,
           };
         } catch (error) {
           serverLogger.error(

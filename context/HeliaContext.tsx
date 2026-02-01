@@ -1,7 +1,8 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState, ReactNode, useRef } from "react";
-import { createHelia, Helia } from "helia";
+import { Helia } from "helia";
+import { createNode } from "../lib/sdk/ipfs/helia-config";
 import { unixfs, UnixFS } from "@helia/unixfs";
 import { logger } from "@/lib/utils/logger";
 
@@ -106,10 +107,10 @@ export const HeliaProvider: React.FC<{ children: ReactNode }> = ({
         logger.debug("[HeliaProvider] Initializing Helia...");
 
         // Create Helia instance
-        heliaInstance = await createHelia();
-        
+        heliaInstance = await createNode();
+
         // Create UnixFS instance
-        const fsInstance = unixfs(heliaInstance);
+        const fsInstance = unixfs(heliaInstance!);
 
         // Only update state if component is still mounted
         if (mounted) {

@@ -22,16 +22,16 @@ interface TokenBalanceData {
 function formatBalance(balance: string): string {
   // Convert to number for comparison
   const num = parseFloat(balance);
-  if (num === 0) return "0";
+  if (num <= 0) return "0";
 
-  // If number is very small (less than 0.00001), use scientific notation
-  if (num < 0.00001) return num.toExponential(5);
+  // If number is very small (less than 0.001), use scientific notation
+  if (num < 0.001) return num.toExponential(3);
 
-  // For regular numbers, preserve significant digits up to 5 decimal places
+  // For regular numbers, preserve significant digits up to 3 decimal places
   const [integerPart, decimalPart = ""] = balance.split(".");
 
   // If decimal part is shorter than significant digits, use it as is
-  if (decimalPart.length <= 5) {
+  if (decimalPart.length <= 3) {
     const cleanDecimal = decimalPart.replace(/0+$/, "");
     return cleanDecimal
       ? `${integerPart}.${cleanDecimal}`
@@ -39,7 +39,7 @@ function formatBalance(balance: string): string {
   }
 
   // Otherwise, truncate to significant digits and remove trailing zeros
-  const truncatedDecimal = decimalPart.slice(0, 5).replace(/0+$/, "");
+  const truncatedDecimal = decimalPart.slice(0, 3).replace(/0+$/, "");
   return truncatedDecimal
     ? `${integerPart}.${truncatedDecimal}`
     : integerPart;

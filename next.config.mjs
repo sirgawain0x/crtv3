@@ -139,6 +139,13 @@ const nextConfig = {
     });
 
     // Ensure proper public path resolution for WASM files
+    // Ignore problematic network discovery packages that cause runtime errors in serverless
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@achingbrain/ssdp': false,
+      '@libp2p/mdns': false,
+    };
+
     if (!isServer) {
       config.resolve.alias = {
         ...config.resolve.alias,

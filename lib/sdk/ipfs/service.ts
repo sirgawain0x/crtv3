@@ -2,7 +2,8 @@ import * as Client from '@storacha/client';
 import { StoreMemory } from '@storacha/client/stores/memory';
 import * as Proof from '@storacha/client/proof';
 import { Signer } from '@storacha/client/principal/ed25519';
-import { createHelia, Helia } from 'helia';
+import { Helia } from 'helia';
+import { createNode } from './helia-config';
 import { unixfs, UnixFS } from '@helia/unixfs';
 import { LighthouseService } from './lighthouse-service';
 import { FilecoinFirstService } from './filecoin-first-service';
@@ -94,8 +95,8 @@ export class IPFSService {
       // Initialize fallback Helia instance (following helia-nextjs pattern)
       if (!fallbackHeliaInstance) {
         serverLogger.debug('[IPFSService] Initializing fallback Helia instance...');
-        fallbackHeliaInstance = await createHelia();
-        fallbackHeliaFs = unixfs(fallbackHeliaInstance);
+        fallbackHeliaInstance = await createNode();
+        fallbackHeliaFs = unixfs(fallbackHeliaInstance!);
       }
       this.helia = fallbackHeliaInstance;
       this.fs = fallbackHeliaFs!;

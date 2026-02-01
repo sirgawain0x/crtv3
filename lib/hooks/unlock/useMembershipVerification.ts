@@ -18,6 +18,7 @@ export interface MembershipDetails {
   address: LockAddressValue;
   isValid: boolean;
   lock: any | null; // Type from Unlock Protocol
+  expiration?: number;
 }
 
 export interface MembershipStatus {
