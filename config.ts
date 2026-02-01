@@ -39,17 +39,15 @@ const customStorage = (config?: { sessionLength?: number; domain?: string }) => 
     // Set cookie with 30-day expiration (2592000 seconds)
     // SameSite=Lax is standard for auth cookies
     // Path=/ ensures it works across the entire site
-    document.cookie = `${key}=${encodeURIComponent(value)}; max-age=2592000; path=/; SameSite=Lax${
-      isHttps ? "; Secure" : ""
-    }`;
+    document.cookie = `${key}=${encodeURIComponent(value)}; max-age=2592000; path=/; SameSite=Lax${isHttps ? "; Secure" : ""
+      }`;
   },
   removeItem: (key: string) => {
     if (typeof document === "undefined") return;
     const isHttps =
       typeof window !== "undefined" && window.location?.protocol === "https:";
-    document.cookie = `${key}=; max-age=0; path=/; SameSite=Lax${
-      isHttps ? "; Secure" : ""
-    }`;
+    document.cookie = `${key}=; max-age=0; path=/; SameSite=Lax${isHttps ? "; Secure" : ""
+      }`;
   },
   clear: () => {
     if (typeof document === "undefined") return;
@@ -60,9 +58,8 @@ const customStorage = (config?: { sessionLength?: number; domain?: string }) => 
       const cookie = cookies[i];
       const eqPos = cookie.indexOf("=");
       const name = eqPos > -1 ? cookie.substr(0, eqPos) : cookie;
-      document.cookie = `${name}=; max-age=0; path=/; SameSite=Lax${
-        isHttps ? "; Secure" : ""
-      }`;
+      document.cookie = `${name}=; max-age=0; path=/; SameSite=Lax${isHttps ? "; Secure" : ""
+        }`;
     }
   },
   length: 0, // Placeholder
@@ -101,14 +98,7 @@ export const queryClient = new QueryClient({
 const uiConfig: AlchemyAccountsUIConfig = {
   illustrationStyle: "linear",
   auth: {
-    sections: [
-      [{ type: "email", emailMode: "otp" }],
-      [
-        { type: "passkey" },
-        { type: "social", authProviderId: "google", mode: "popup" },
-        { type: "social", authProviderId: "facebook", mode: "popup" },
-      ],
-    ],
+    sections: [[{ type: "email", emailMode: "otp" }, { type: "passkey" }]],
     addPasskeyOnSignup: true,
     header: React.createElement(Image, {
       src: SITE_TOPIC_LOGO,

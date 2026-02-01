@@ -7,7 +7,15 @@ export async function POST(req: NextRequest) {
   const rl = await rateLimiters.standard(req);
   if (rl) return rl;
 
-  const { address } = await req.json();
+  let address: string | undefined;
+
+  try {
+    const body = await req.json();
+    address = body.address;
+  } catch (error) {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
+
   if (!address) {
     return NextResponse.json({ error: "Missing address" }, { status: 400 });
   }
