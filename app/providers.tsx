@@ -18,6 +18,7 @@ import { cleanupExistingIframes } from "@/components/IframeCleanup";
 // Import dev warning suppression (only active in development)
 import "@/lib/utils/suppressDevWarnings";
 import { MembershipGuard } from "@/components/auth/MembershipGuard";
+import NoSSR from "@/components/NoSSR";
 
 function ErrorFallback({ error }: { error: Error }) {
   return (
@@ -64,24 +65,26 @@ export const Providers = (
         <QueryClientProvider client={queryClient}>
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
             <ApolloNextAppProvider makeClient={makeClient}>
-              <AlchemyAccountProvider
-                config={config}
-                queryClient={queryClient}
-                initialState={props.initialState}
-              >
-                <RadixProvider>
-                  <HeliaProvider>
-                    <TourProvider>
-                      <VideoProvider>
-                        <MembershipGuard>
-                          {props.children}
-                        </MembershipGuard>
-                        <Toaster position="top-right" richColors />
-                      </VideoProvider>
-                    </TourProvider>
-                  </HeliaProvider>
-                </RadixProvider>
-              </AlchemyAccountProvider>
+              <NoSSR>
+                <AlchemyAccountProvider
+                  config={config}
+                  queryClient={queryClient}
+                  initialState={props.initialState}
+                >
+                  <RadixProvider>
+                    <HeliaProvider>
+                      <TourProvider>
+                        <VideoProvider>
+                          <MembershipGuard>
+                            {props.children}
+                          </MembershipGuard>
+                          <Toaster position="top-right" richColors />
+                        </VideoProvider>
+                      </TourProvider>
+                    </HeliaProvider>
+                  </RadixProvider>
+                </AlchemyAccountProvider>
+              </NoSSR>
             </ApolloNextAppProvider>
           </ThemeProvider>
         </QueryClientProvider>
