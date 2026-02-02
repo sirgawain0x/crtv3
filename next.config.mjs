@@ -185,6 +185,9 @@ const nextConfig = {
       }
     }
 
+    // Exclude node server-side libraries from client bundle
+    config.externals.push("pino-pretty", "lokijs", "encoding");
+
     return config;
   },
   // Reduce unnecessary rebuilds
