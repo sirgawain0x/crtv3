@@ -19,7 +19,7 @@ export interface MembershipDetails {
   isValid: boolean;
   lock: any | null; // Type from Unlock Protocol
   expiration?: number;
-  tokenId?: string;
+  tokenId?: string | null;
 }
 
 export interface MembershipStatus {
