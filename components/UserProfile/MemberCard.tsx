@@ -13,7 +13,11 @@ export type MemberCardProps = {
 
 function fromTimestampToDate(timestamp: number): string {
   if (!timestamp) return "";
+  // Check for unreasonably large expiration dates (likely MAX_UINT or similar "lifetime" markers)
+  // 32503680000 is roughly year 3000
+  if (timestamp > 32503680000) return "Never";
   const date = new Date(timestamp * 1000);
+  if (date.toString() === "Invalid Date") return "Never";
   return date.toLocaleDateString();
 }
 
@@ -71,7 +75,7 @@ const MemberCard = ({ member, nft, points }: MemberCardProps) => {
                 {member?.address?.slice(0, 6)}...{member?.address?.slice(-4)}
               </span>
             </div>
-            Uncomment when ready to use
+            {/* Uncomment when ready to use */}
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Member ID</span>
               <span className="font-mono text-sm">{nft.metadata?.id}</span>

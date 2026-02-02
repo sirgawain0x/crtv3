@@ -11,6 +11,7 @@ import { logger } from '@/lib/utils/logger';
 
 
 import { getActiveStreams, ActiveStream } from "@/services/streams";
+import { RefreshCcw } from "lucide-react";
 
 // Removed fetchStreamsFromApi since we use getActiveStreams now
 
@@ -67,22 +68,7 @@ export default function LivestreamGrid() {
           disabled={refreshing}
           className="flex items-center gap-2 rounded-md bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200 disabled:opacity-50 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className={`${refreshing ? "animate-spin" : ""}`}
-          >
-            <path d="M3 12a9 9 0 1 1 2.5 5.2" />
-            <path d="M21 12H3" />
-            <path d="M21 3v9" />
-          </svg>
+          <RefreshCcw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
           {refreshing ? "Refreshing..." : "Refresh"}
         </button>
       </div>
@@ -93,7 +79,7 @@ export default function LivestreamGrid() {
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-y-4 sm:grid-cols-1 sm:gap-4 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-          {streams.map((stream) => (
+          {streams.map((stream, index) => (
             // Use playback_id for URL, id for key
             <Link key={stream.id} href={`/watch/${stream.playback_id}`}>
               <Card className="overflow-hidden transition-shadow hover:shadow-lg">
@@ -101,6 +87,7 @@ export default function LivestreamGrid() {
                   {stream.thumbnail_url ? (
                     <LivestreamThumbnail
                       thumbnailUrl={stream.thumbnail_url}
+                      priority={index < 4}
                     />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center text-gray-400 dark:text-gray-500">

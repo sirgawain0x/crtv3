@@ -127,18 +127,22 @@ export default async function VideoDetailsPage({
         <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem>
-              <BreadcrumbLink href="/">
-                <span role="img" aria-label="home">
-                  🏠
-                </span>{" "}
-                Home
+              <BreadcrumbLink asChild>
+                <Link href="/">
+                  <span role="img" aria-label="home">
+                    🏠
+                  </span>{" "}
+                  Home
+                </Link>
               </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator>
               <Slash />
             </BreadcrumbSeparator>
             <BreadcrumbItem>
-              <BreadcrumbLink href="/discover">Discover</BreadcrumbLink>
+              <BreadcrumbLink asChild>
+                <Link href="/discover">Discover</Link>
+              </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator>
               <Slash />

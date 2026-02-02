@@ -23,6 +23,7 @@ import {
   MultistreamTarget,
 } from "@/services/video-assets";
 import { useParams } from "next/navigation";
+import Link from "next/link";
 import { LivestreamThumbnail } from "@/components/Live/LivestreamThumbnail";
 import { StreamThumbnailUploader } from "@/components/Live/StreamThumbnailUploader";
 import { getThumbnailUrl } from "@/services/livepeer-thumbnails";
@@ -252,11 +253,13 @@ export default function LivePage() {
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem>
-                  <BreadcrumbLink href="/">
-                    <span role="img" aria-label="home">
-                      🏠
-                    </span>{" "}
-                    Home
+                  <BreadcrumbLink asChild>
+                    <Link href="/">
+                      <span role="img" aria-label="home">
+                        🏠
+                      </span>{" "}
+                      Home
+                    </Link>
                   </BreadcrumbLink>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator>

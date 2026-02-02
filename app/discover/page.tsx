@@ -4,6 +4,7 @@ import { useState } from "react";
 import VideoCardGrid from "@/components/Videos/VideoCardGrid";
 import { VideoSearch } from "@/components/Videos/VideoSearch";
 import LivestreamGrid from "@/components/Live/LivestreamGrid";
+import Link from "next/link";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -34,19 +35,21 @@ const AllVideosContent: React.FC = () => {
         <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem>
-              <BreadcrumbLink href="/">
-                <span role="img" aria-label="home">
-                  🏠
-                </span>{" "}
-                Home
+              <BreadcrumbLink asChild>
+                <Link href="/">
+                  <span role="img" aria-label="home">
+                    🏠
+                  </span>{" "}
+                  Home
+                </Link>
               </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator>
               <Slash />
             </BreadcrumbSeparator>
             <BreadcrumbItem>
-              <BreadcrumbLink>
-                <BreadcrumbPage>Discover</BreadcrumbPage>
+              <BreadcrumbLink asChild>
+                <Link href="/discover">Discover</Link>
               </BreadcrumbLink>
             </BreadcrumbItem>
           </BreadcrumbList>

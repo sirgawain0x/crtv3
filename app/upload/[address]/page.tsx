@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/breadcrumb";
 import { Slash } from "lucide-react";
 import { UploadPageClient } from "./UploadPageClient";
+import Link from "next/link";
 
 interface UploadPageProps {
   params: Promise<{ address: string }>;
@@ -34,11 +35,13 @@ export default async function UploadPage({ params }: UploadPageProps) {
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem>
-                  <BreadcrumbLink href="/" className="text-xs sm:text-sm">
-                    <span role="img" aria-label="home">
-                      🏠
-                    </span>{" "}
-                    Home
+                  <BreadcrumbLink asChild>
+                    <Link href="/" className="text-xs sm:text-sm">
+                      <span role="img" aria-label="home">
+                        🏠
+                      </span>{" "}
+                      Home
+                    </Link>
                   </BreadcrumbLink>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator>

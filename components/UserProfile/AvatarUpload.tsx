@@ -150,6 +150,8 @@ export function AvatarUpload({
         {isOwner && showUploadButton && (
           <div className="space-y-2">
             <input
+              id="avatar-upload"
+              name="avatarUpload"
               ref={fileInputRef}
               type="file"
               accept="image/*"

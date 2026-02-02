@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useMembershipVerification } from "@/lib/hooks/unlock/useMembershipVerification";
 import { Loader2 } from "lucide-react";
 import { createContext, useContext } from "react";
@@ -17,15 +17,30 @@ export const MembershipContext = createContext<MembershipStatus | null>(null);
 
 export function MembershipGuard({ children }: MembershipGuardProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const membership = useMembershipVerification();
   const { isVerified, hasMembership, isLoading } = membership;
+  const isHomePage = pathname === "/";
+
+  const PUBLIC_PATHS = [
+    '/discover',
+    '/market',
+    '/predict',
+    '/vote',
+    '/news',
+    '/live',
+    '/watch',
+  ];
+
+  const isPublicPath = PUBLIC_PATHS.some(path => pathname?.startsWith(path));
 
   useEffect(() => {
     logger.debug("MembershipGuard:", membership);
-    if (!isLoading && (!isVerified || !hasMembership)) {
+    // Don't redirect if we are on the home page or a public page
+    if (!isLoading && (!isVerified || !hasMembership) && !isHomePage && !isPublicPath) {
       router.push("/");
     }
-  }, [isLoading, isVerified, hasMembership, router, membership]);
+  }, [isLoading, isVerified, hasMembership, router, membership, isHomePage, isPublicPath]);
 
   if (isLoading) {
     return (
@@ -35,7 +50,11 @@ export function MembershipGuard({ children }: MembershipGuardProps) {
     );
   }
 
-  if (!isVerified || !hasMembership) {
+  // Allow rendering children if:
+  // 1. User has verified membership
+  // 2. OR User is on the home page (which has its own non-logged-in view)
+  // 3. OR User is on a public page
+  if ((!isVerified || !hasMembership) && !isHomePage && !isPublicPath) {
     return null;
   }
 

@@ -8,6 +8,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { Slash } from "lucide-react";
+import Link from "next/link";
 import { CreatePrediction } from "@/components/predictions/CreatePrediction";
 import { MembershipGuard } from "@/components/auth/MembershipGuard";
 
@@ -18,18 +19,22 @@ const CreatePredictionPage = () => {
         <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem>
-              <BreadcrumbLink href="/">
-                <span role="img" aria-label="home">
-                  🏠
-                </span>{" "}
-                Home
+              <BreadcrumbLink asChild>
+                <Link href="/">
+                  <span role="img" aria-label="home">
+                    🏠
+                  </span>{" "}
+                  Home
+                </Link>
               </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator>
               <Slash />
             </BreadcrumbSeparator>
             <BreadcrumbItem>
-              <BreadcrumbLink href="/predict">Predict</BreadcrumbLink>
+              <BreadcrumbLink asChild>
+                <Link href="/predict">Predict</Link>
+              </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator>
               <Slash />

@@ -91,7 +91,13 @@ export function VideoSearch({
       {/* Search Bar */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+        <label htmlFor="video-search-input" className="sr-only">
+          Search videos
+        </label>
         <Input
+          id="video-search-input"
+          name="search"
+          aria-label="Search videos"
           type="text"
           placeholder="Search videos by title or description..."
           value={searchInput}
@@ -125,9 +131,9 @@ export function VideoSearch({
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
           {/* Category Filter */}
           <div className="flex-1">
-            <label className="mb-2 block text-sm font-medium">Genre</label>
+            <label htmlFor="genre-select" className="mb-2 block text-sm font-medium">Genre</label>
             <Select value={category} onValueChange={handleCategoryChange}>
-              <SelectTrigger>
+              <SelectTrigger id="genre-select">
                 <SelectValue placeholder="Select genre" />
               </SelectTrigger>
               <SelectContent>
@@ -142,9 +148,9 @@ export function VideoSearch({
 
           {/* Sort Filter */}
           <div className="flex-1">
-            <label className="mb-2 block text-sm font-medium">Sort By</label>
+            <label htmlFor="sort-select" className="mb-2 block text-sm font-medium">Sort By</label>
             <Select value={sort} onValueChange={handleSortChange}>
-              <SelectTrigger>
+              <SelectTrigger id="sort-select">
                 <SelectValue placeholder="Sort by" />
               </SelectTrigger>
               <SelectContent>

@@ -28,6 +28,7 @@ import { UserDisplay } from "@/components/User/UserDisplay";
 import { CreativeBankTab } from "./CreativeBankTab";
 import { MembershipHome } from "@/components/memberships/MembershipHome";
 import { logger } from '@/lib/utils/logger';
+import { CancelMembershipButton } from "./CancelMembershipButton";
 
 
 function useServerMembership(address?: string) {
@@ -273,7 +274,7 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
                             Active
                           </span>
                         </div>
-                        {validMembership.expiration ? (
+                        {validMembership.expiration && validMembership.expiration < 32503680000 ? (
                           <div className="space-y-1">
                             <p className="text-sm text-muted-foreground">
                               Expires on {new Date(validMembership.expiration * 1000).toLocaleDateString(undefined, {
@@ -285,7 +286,7 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
                             <p className="text-xs text-muted-foreground">
                               {(() => {
                                 const now = Date.now();
-                                const exp = validMembership.expiration * 1000;
+                                const exp = validMembership.expiration! * 1000;
                                 const diff = exp - now;
                                 const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
                                 if (days < 0) return "Expired";
@@ -317,6 +318,12 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
                         >
                           Extend Membership
                         </Button>
+                        {validMembership.tokenId && (
+                          <CancelMembershipButton
+                            lockAddress={validMembership.address}
+                            tokenId={validMembership.tokenId}
+                          />
+                        )}
                       </div>
                     </div>
 

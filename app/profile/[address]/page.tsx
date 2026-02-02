@@ -7,7 +7,8 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { Slash } from "lucide-react";
-import ProfilePage from "@/components/UserProfile/UserProfile";
+import Link from "next/link";
+import UserProfile from "@/components/UserProfile/UserProfile";
 
 interface ProfilePageProps {
   params: Promise<{ address: string }>;
@@ -15,21 +16,20 @@ interface ProfilePageProps {
 
 export default async function Profile({ params }: ProfilePageProps) {
   const { address } = await params;
-  
+
   return (
     <div className="min-h-screen bg-background px-4 py-6 md:px-6 lg:px-8">
       <div className="mb-6 md:mb-8">
         <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem>
-              <BreadcrumbLink
-                href="/"
-                className="flex items-center hover:text-primary"
-              >
-                <span role="img" aria-label="home" className="mr-1">
-                  🏠
-                </span>{" "}
-                Home
+              <BreadcrumbLink asChild>
+                <Link href="/" className="flex items-center hover:text-primary">
+                  <span role="img" aria-label="home" className="mr-1">
+                    🏠
+                  </span>{" "}
+                  Home
+                </Link>
               </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator>
@@ -44,7 +44,7 @@ export default async function Profile({ params }: ProfilePageProps) {
         </Breadcrumb>
       </div>
       <div className="mx-auto max-w-7xl">
-        <ProfilePage targetAddress={address} />
+        <UserProfile targetAddress={address} />
       </div>
     </div>
   );

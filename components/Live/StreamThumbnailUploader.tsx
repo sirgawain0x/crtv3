@@ -88,6 +88,8 @@ export function StreamThumbnailUploader({
 
             <div className="flex gap-2">
                 <input
+                    id="stream-thumbnail-upload"
+                    name="streamThumbnail"
                     ref={fileInputRef}
                     type="file"
                     accept="image/*"

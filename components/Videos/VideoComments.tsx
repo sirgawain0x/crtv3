@@ -290,7 +290,11 @@ export function VideoComments({ videoAssetId, videoName, className }: VideoComme
 
                       {isEditing ? (
                         <div className="space-y-2">
+                          <label htmlFor={`edit-comment-${comment.id}`} className="sr-only">
+                            Edit comment
+                          </label>
                           <Textarea
+                            id={`edit-comment-${comment.id}`}
                             value={editContent}
                             onChange={(e) => setEditContent(e.target.value)}
                             className="min-h-[80px]"
@@ -383,7 +387,11 @@ export function VideoComments({ videoAssetId, videoName, className }: VideoComme
                               </AlertDescription>
                             </Alert>
                           )}
+                          <label htmlFor={`reply-comment-${comment.id}`} className="sr-only">
+                            Reply to comment
+                          </label>
                           <Textarea
+                            id={`reply-comment-${comment.id}`}
                             value={replyContent}
                             onChange={(e) => setReplyContent(e.target.value)}
                             placeholder={userAddress ? "Write a reply..." : "Connect your wallet to reply..."}
@@ -501,7 +509,11 @@ export function VideoComments({ videoAssetId, videoName, className }: VideoComme
         )}
         <form onSubmit={handleSubmitComment}>
           <div className="space-y-2">
+            <label htmlFor="new-comment" className="sr-only">
+              Add a comment
+            </label>
             <Textarea
+              id="new-comment"
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
               placeholder={

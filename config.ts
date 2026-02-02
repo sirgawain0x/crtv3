@@ -98,7 +98,14 @@ export const queryClient = new QueryClient({
 const uiConfig: AlchemyAccountsUIConfig = {
   illustrationStyle: "linear",
   auth: {
-    sections: [[{ type: "email", emailMode: "otp" }, { type: "passkey" }]],
+    sections: [
+      [{ type: "email", emailMode: "otp" }, { type: "passkey" }],
+      [
+        { type: "social", authProviderId: "google", mode: "popup" },
+        { type: "social", authProviderId: "facebook", mode: "popup" },
+        { type: "social", authProviderId: "twitch", mode: "popup" },
+      ],
+    ],
     addPasskeyOnSignup: true,
     header: React.createElement(Image, {
       src: SITE_TOPIC_LOGO,

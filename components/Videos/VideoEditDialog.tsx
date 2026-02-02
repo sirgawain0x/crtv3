@@ -197,9 +197,9 @@ export function VideoEditDialog({
         const finalUrl = ipfsUrl.startsWith('ipfs://')
           ? parseIpfsUriWithFallback(ipfsUrl, 0)
           : ipfsUrl;
-        
+
         setNewThumbnailUrl(finalUrl);
-        
+
         // Clear preview and revoke blob URL after successful upload to prevent memory leak
         // The uploaded IPFS thumbnail will be shown in the current thumbnail preview section
         setThumbnailPreview(null);
@@ -207,7 +207,7 @@ export function VideoEditDialog({
           URL.revokeObjectURL(blobUrlRef.current);
           blobUrlRef.current = null;
         }
-        
+
         toast({
           title: "Thumbnail Uploaded",
           description: "Thumbnail has been uploaded successfully.",
@@ -284,7 +284,7 @@ export function VideoEditDialog({
       if (result.success && result.thumbnailUrl) {
         setNewThumbnailUrl(result.thumbnailUrl);
         setUploadProgress(100);
-        
+
         toast({
           title: "Thumbnail Regenerated",
           description: "Thumbnail has been successfully regenerated from Livepeer.",
@@ -438,7 +438,7 @@ export function VideoEditDialog({
                 value={categoryValue}
                 onValueChange={(value) => setValue("category", value)}
               >
-                <SelectTrigger>
+                <SelectTrigger id="category">
                   <SelectValue placeholder="Select a Genre" />
                 </SelectTrigger>
                 <SelectContent>

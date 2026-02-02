@@ -68,7 +68,7 @@ export function VideoSplitDistributeButton({
           try {
             const asset = await getVideoAssetByAssetId(videoAssetId);
             setVideoAsset(asset as VideoAsset);
-            
+
             // Use provided splits address or fetch from asset
             const assetSplitsAddress = providedSplitsAddress || (asset as VideoAsset)?.splits_address;
             setSplitsAddress(assetSplitsAddress || null);
@@ -103,7 +103,7 @@ export function VideoSplitDistributeButton({
       }
       const videoResult = await videoResponse.json();
       const videoData = videoResult.data || videoResult;
-      
+
       if (!videoData?.creator_metoken_id) {
         setIsLoadingBalance(false);
         return;
@@ -118,7 +118,7 @@ export function VideoSplitDistributeButton({
       const meTokenResult = await meTokenResponse.json();
       const meToken = meTokenResult.data || meTokenResult;
       const meTokenAddress = meToken?.address;
-      
+
       if (!meTokenAddress) {
         setIsLoadingBalance(false);
         return;
@@ -142,7 +142,7 @@ export function VideoSplitDistributeButton({
     } finally {
       setIsLoadingBalance(false);
     }
-  }, [videoAsset, splitsAddress, smartAccountClient]);
+  }, [videoAsset, splitsAddress, smartAccountClient?.account?.address]);
 
   // Fetch balance when component is ready and periodically
   useEffect(() => {
@@ -159,7 +159,7 @@ export function VideoSplitDistributeButton({
     }, 30000);
 
     return () => clearInterval(interval);
-  }, [isOwner, splitsAddress, videoAsset, smartAccountClient, fetchBalance]);
+  }, [isOwner, splitsAddress, videoAsset, smartAccountClient?.account?.address, fetchBalance]);
 
   const handleDistribute = async () => {
     if (!videoAsset || !splitsAddress || !smartAccountClient) {
@@ -171,7 +171,7 @@ export function VideoSplitDistributeButton({
     try {
       // Get the creator's meToken address
       const meTokenAddress = await getCreatorMeTokenAddress(videoAsset.id);
-      
+
       if (!meTokenAddress) {
         toast.error("Creator must have a meToken to distribute revenue");
         setIsDistributing(false);
@@ -190,9 +190,9 @@ export function VideoSplitDistributeButton({
       if (result.success) {
         // Refresh balance after successful distribution
         await fetchBalance();
-        
+
         toast.success("Revenue distributed successfully!", {
-          description: result.txHash 
+          description: result.txHash
             ? `Transaction: ${result.txHash.slice(0, 10)}...`
             : "Collaborators have been paid in your meToken",
         });
@@ -224,26 +224,26 @@ export function VideoSplitDistributeButton({
     if (balance === null || balance === undefined) return "0";
     const formatted = formatEther(balance);
     const num = parseFloat(formatted);
-    
+
     if (num === 0) return "0";
     if (num < 0.00001) return num.toExponential(3);
     if (num < 1) return num.toFixed(6).replace(/\.?0+$/, '');
-    return num.toLocaleString(undefined, { 
+    return num.toLocaleString(undefined, {
       maximumFractionDigits: 4,
-      minimumFractionDigits: 0 
+      minimumFractionDigits: 0
     });
   };
 
-  const balanceDisplay = isLoadingBalance 
-    ? "Loading..." 
+  const balanceDisplay = isLoadingBalance
+    ? "Loading..."
     : formatBalance(availableBalance);
   const hasBalance = availableBalance !== null && availableBalance > 0n;
 
   return (
     <div className="flex flex-col items-end gap-2">
       {hasBalance && (
-        <Badge 
-          variant="secondary" 
+        <Badge
+          variant="secondary"
           className="text-xs font-semibold"
         >
           {balanceDisplay} {meTokenSymbol || "tokens"} available

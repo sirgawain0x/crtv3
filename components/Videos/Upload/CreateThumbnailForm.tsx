@@ -628,6 +628,8 @@ const CreateThumbnailForm = ({
                 }`}
             >
               <input
+                id="custom-image-upload"
+                name="customImage"
                 ref={fileInputRef}
                 type="file"
                 accept="image/*"
@@ -768,8 +770,9 @@ const CreateThumbnailForm = ({
             </div>
 
             <div className="space-y-2">
-              <Label>AI Prompt</Label>
+              <Label htmlFor="ai-prompt">AI Prompt</Label>
               <Textarea
+                id="ai-prompt"
                 {...register("aiPrompt", { required: "Prompt is required for AI generation" })}
                 placeholder="Describe the thumbnail you want to generate... (e.g., 'A cyberpunk cityscape with neon lights', 'A person riding a camel in the desert')"
                 rows={4}

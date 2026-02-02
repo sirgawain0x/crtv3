@@ -264,7 +264,7 @@ const VideoCardGrid: React.FC<VideoCardGridProps> = ({
             key={video.id}
             asset={video as any} // Type assertion needed due to Asset interface mismatch
             playbackSources={video.detailedSrc}
-            priority={index === 0} // First video gets priority for LCP optimization
+            priority={index < 4} // First 4 videos get priority for LCP optimization (covers first row on all screen sizes)
           />
         ))}
       </div>

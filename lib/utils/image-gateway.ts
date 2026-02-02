@@ -9,19 +9,19 @@ import { logger } from '@/lib/utils/logger';
 // Lighthouse first for better CDN distribution (especially West Coast)
 // Using actual IPFS gateways for proper decentralized access
 // List of IPFS gateways to try (in order of preference)
-// Grove - Primary (User specified)
+// Storacha (w3s.link) - Primary (Fast, reliable, redirects to subdomain)
 // Cloudflare - Very fast, reliable public gateway
 // Lighthouse - Good fallback
 const IPFS_GATEWAYS = [
-  'https://api.grove.storage/ipfs', // Grove (Primary)
+  'https://w3s.link/ipfs', // Storacha (Primary)
   'https://cloudflare-ipfs.com/ipfs', // Cloudflare - High availability
   'https://gateway.ipfscdn.io/ipfs', // IPFS CDN - Optimized for media
   'https://gateway.lighthouse.storage/ipfs', // Lighthouse
-  'https://w3s.link/ipfs', // Storacha
   'https://gateway.pinata.cloud/ipfs', // Pinata
   'https://dweb.link/ipfs', // Protocol Labs
   'https://4everland.io/ipfs', // 4everland
   'https://ipfs.io/ipfs', // Public gateway
+  'https://api.grove.storage/ipfs', // Grove (Backup)
 ];
 
 /**
@@ -93,7 +93,7 @@ export function getAllIpfsGateways(url: string): string[] {
 export function isFailingGateway(url: string): boolean {
   if (!url) return false;
 
-  // Note: Lighthouse is now primary, so we don't mark it as failing by default
+  // Note: Storacha is now primary, so we don't mark it as failing by default
   // Only mark as failing if we detect actual failures (handled in components)
 
   // Google Cloud Storage from Livepeer AI (404 errors)
@@ -137,16 +137,16 @@ export function convertFailingGateway(url: string): string {
   const hash = extractIpfsHash(url);
   if (!hash) return url; // Not an IPFS URL
 
-  // Handle ipfs:// protocol - convert to Lighthouse gateway URL
+  // Handle ipfs:// protocol - convert to Storacha gateway URL
   // This is critical for thumbnails and other uploads that return ipfs:// format
   if (url.startsWith('ipfs://')) {
     return `${IPFS_GATEWAYS[0]}/${hash}`;
   }
 
-  // Note: Grove is now the PRIMARY gateway and should be tried first
-  // Do NOT convert Grove URLs proactively - let them try first
+  // Note: Storacha is now the PRIMARY gateway and should be tried first
+  // Do NOT convert Storacha URLs proactively - let them try first
 
-  // Handle known slow/unreliable gateways - convert to Primary (Grove) for better performance
+  // Handle known slow/unreliable gateways - convert to Primary (Storacha) for better performance
   if (url.includes('ipfs.io/ipfs')) {
     // ipfs.io can be slow/unreliable, prefer Primary for better performance
     return `${IPFS_GATEWAYS[0]}/${hash}`;
@@ -226,7 +226,7 @@ export function getImageUrlWithFallback(url: string): {
   if (hash) {
     const allGateways = getAllIpfsGateways(url);
     return {
-      primary: allGateways[0], // Lighthouse - better CDN distribution (especially West Coast)
+      primary: allGateways[0], // Storacha - better CDN distribution
       fallbacks: allGateways.slice(1),
     };
   }

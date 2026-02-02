@@ -80,11 +80,10 @@ export function SubtitlesControl() {
     <button
       onClick={toggleSubtitles}
       aria-label={showSubtitles ? "Disable subtitles" : "Enable subtitles"}
-      className={`flex h-8 w-8 items-center justify-center rounded-full ${
-        showSubtitles
+      className={`flex h-8 w-8 items-center justify-center rounded-full ${showSubtitles
           ? "bg-background text-foreground"
           : "bg-primary text-primary-foreground"
-      }`}
+        }`}
     >
       <FaClosedCaptioning className="h-4 w-4" />
     </button>
@@ -109,6 +108,7 @@ export function SubtitlesLanguageSelect() {
       <Select onValueChange={(value) => setLanguage(value)}>
         <FormControl>
           <SelectTrigger
+            id="languageSelect"
             className={`inline-flex h-7 items-center justify-between gap-1 rounded-sm 
             bg-gray-400 px-1 text-xs leading-none outline-none outline-1 outline-transparent/50`}
           >

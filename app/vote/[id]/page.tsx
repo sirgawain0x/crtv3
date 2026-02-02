@@ -36,22 +36,22 @@ function extractSmartWalletFromPlugins(plugins: string | null | undefined): stri
 
 const GET_PROPOSAL = gql`
   query Proposal($id: String!) {
-    proposal(id: $id) {
-      id
-      title
-      body
-      choices
-      start
-      end
-      snapshot
-      state
-      author
-      scores
-      scores_total
-      votes
-      plugins
-    }
+  proposal(id: $id) {
+    id
+    title
+    body
+    choices
+    start
+    end
+    snapshot
+    state
+    author
+    scores
+    scores_total
+    votes
+    plugins
   }
+}
 `;
 
 interface ProposalDetailsPageProps {
@@ -132,18 +132,22 @@ export default async function ProposalDetailsPage({
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem>
-                  <BreadcrumbLink href="/">
-                    <span role="img" aria-label="home">
-                      🏠
-                    </span>{" "}
-                    Home
+                  <BreadcrumbLink asChild>
+                    <Link href="/">
+                      <span role="img" aria-label="home">
+                        🏠
+                      </span>{" "}
+                      Home
+                    </Link>
                   </BreadcrumbLink>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator>
                   <Slash />
                 </BreadcrumbSeparator>
                 <BreadcrumbItem>
-                  <BreadcrumbLink href="/vote">Vote</BreadcrumbLink>
+                  <BreadcrumbLink asChild>
+                    <Link href="/vote">Vote</Link>
+                  </BreadcrumbLink>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator>
                   <Slash />
@@ -184,10 +188,10 @@ export default async function ProposalDetailsPage({
                 className="inline-flex items-center gap-1 text-blue-500 hover:text-blue-700 underline font-mono"
               >
                 {proposal.snapshot}
-                <ExternalLink className="h-3 w-3" />
-              </Link>
-            </div>
-          </Card>
+                < ExternalLink className="h-3 w-3" />
+              </Link >
+            </div >
+          </Card >
           <Card className="p-6 mb-6">
             <h2 className="text-lg font-bold mb-2">Voting</h2>
             {isVotingActive ? (
@@ -253,8 +257,8 @@ export default async function ProposalDetailsPage({
               />
             </div>
           </Card>
-        </div>
-      </div>
-    </Suspense>
+        </div >
+      </div >
+    </Suspense >
   );
 }

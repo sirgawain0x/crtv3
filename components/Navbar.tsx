@@ -341,16 +341,20 @@ export default function Navbar() {
                 </div>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-900 dark:text-gray-100">Recipient Address</label>
+                <label htmlFor="recipient-address" className="text-sm font-medium text-gray-900 dark:text-gray-100">Recipient Address</label>
                 <input
+                  id="recipient-address"
+                  name="recipientAddress"
                   type="text"
                   placeholder="0x..."
                   className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 bg-white border-gray-200 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-900 dark:text-gray-100">Amount ({selectedToken})</label>
+                <label htmlFor="send-amount" className="text-sm font-medium text-gray-900 dark:text-gray-100">Amount ({selectedToken})</label>
                 <input
+                  id="send-amount"
+                  name="sendAmount"
                   type="number"
                   placeholder="0.0"
                   step="any"

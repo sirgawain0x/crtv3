@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, forwardRef } from "react";
+import React, { useState, useEffect, forwardRef, useMemo } from "react";
 import {
   CheckIcon,
   ChevronDownIcon,
@@ -55,7 +55,7 @@ export default function VideoDetails({ asset, videoTitle }: VideoDetailsProps) {
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
 
   const user = useUser();
-  const account = userToAccount(user);
+  const account = useMemo(() => userToAccount(user), [user]);
   const { openAuthModal } = useAuthModal();
   const isConnected = !!user;
 
@@ -221,6 +221,7 @@ export default function VideoDetails({ asset, videoTitle }: VideoDetailsProps) {
                   </label>
                   <Player.RateSelect name="speedSelect">
                     <Player.SelectTrigger
+                      id="speedSelect"
                       className="inline-flex h-7 items-center justify-between gap-1 rounded-sm bg-gray-400 px-1 
                       text-xs leading-none outline-none outline-1 outline-white/50"
                       aria-label="Playback speed"
@@ -261,6 +262,7 @@ export default function VideoDetails({ asset, videoTitle }: VideoDetailsProps) {
                     defaultValue="1.0"
                   >
                     <Player.SelectTrigger
+                      id="qualitySelect"
                       className="inline-flex h-7 items-center justify-between gap-1 rounded-sm  bg-gray-400 px-1 
                       text-xs leading-none outline-none outline-1 outline-white/50"
                       aria-label="Playback quality"

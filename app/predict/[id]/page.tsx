@@ -32,18 +32,22 @@ export default async function PredictionDetailsPage({
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem>
-                <BreadcrumbLink href="/">
-                  <span role="img" aria-label="home">
-                    🏠
-                  </span>{" "}
-                  Home
+                <BreadcrumbLink asChild>
+                  <Link href="/">
+                    <span role="img" aria-label="home">
+                      🏠
+                    </span>{" "}
+                    Home
+                  </Link>
                 </BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator>
                 <Slash />
               </BreadcrumbSeparator>
               <BreadcrumbItem>
-                <BreadcrumbLink href="/predict">Predict</BreadcrumbLink>
+                <BreadcrumbLink asChild>
+                  <Link href="/predict">Predict</Link>
+                </BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator>
                 <Slash />
