@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { updateVideoAsset } from "@/services/video-assets";
 import { useUniversalAccount } from "@/lib/hooks/accountkit/useUniversalAccount";
-import { useTranscoder } from "@/lib/hooks/useTranscoder";
+// import { useTranscoder } from "@/lib/hooks/useTranscoder";
 import { logger } from "@/lib/utils/logger";
 
 const truncateUri = (uri: string): string => {
@@ -64,13 +64,12 @@ const FileUpload: React.FC<FileUploadProps> = ({
   onAssetReady,
 }) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState<boolean>(false);
   const [uploadedUri, setUploadedUri] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<number>(0);
   const [uploadComplete, setUploadComplete] = useState<boolean>(false);
   const [uploadState, setUploadState] = useState<
-    "idle" | "loading" | "transcoding" | "complete"
+    "idle" | "loading" | "complete"
   >("idle");
 
   const [livepeerAsset, setLivepeerAsset] = useState<any>();
@@ -81,8 +80,6 @@ const FileUpload: React.FC<FileUploadProps> = ({
 
   // Use Universal Account to get smart account address (SCA), not controller wallet
   const { address, type, loading } = useUniversalAccount();
-
-  const { transcode, status: transcodeStatus, progress: transcodeProgress, error: transcodeError } = useTranscoder();
 
   // Persist upload state to recover from page reloads
   useEffect(() => {
@@ -151,30 +148,6 @@ const FileUpload: React.FC<FileUploadProps> = ({
     }
   }, [loading, address]);
 
-  // Livepeer supported video formats
-  // Containers: MP4, MOV, MKV, WebM, FLV, TS
-  // Video codecs: H.264, H.265 (HEVC), VP8, VP9, AV1
-  const SUPPORTED_VIDEO_FORMATS = [
-    'video/mp4',
-    'video/quicktime', // .mov
-    'video/x-matroska', // .mkv
-    'video/webm',
-    'video/x-flv',
-    'video/mp2t', // .ts
-    'video/mpeg',
-  ];
-
-  const SUPPORTED_VIDEO_EXTENSIONS = [
-    '.mp4',
-    '.mov',
-    '.mkv',
-    '.webm',
-    '.flv',
-    '.ts',
-    '.mpeg',
-    '.mpg',
-  ];
-
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] || null;
 
@@ -190,24 +163,9 @@ const FileUpload: React.FC<FileUploadProps> = ({
       return;
     }
 
-    // Check if transcoding is needed
-    // Simple check: if not mp4/mov or codec check fails (though we can't easily check codec in JS without parsing)
-    // For now, we rely on the file extension/type. 
-    // If it's MKV, AVI, WEBM, we assume we want to transcode to ensure compatibility.
-    // If it is MP4/MOV but fails Livepeer processing later, user might need to retry manually or we force transcode.
-    // Here we will offer auto-transcode for containers that are often problematic or not supported by direct playback in some browsers.
-    const needsTranscoding = !['video/mp4', 'video/quicktime'].includes(file.type) ||
-      file.name.endsWith('.mkv') ||
-      file.name.endsWith('.avi') ||
-      file.name.endsWith('.webm');
-
-    if (needsTranscoding) {
-      toast.info("This video format requires conversion. It will be transcoded automatically before upload.");
-    }
-
     setSelectedFile(file);
     onFileSelect(file);
-    logger.debug("Selected file:", file?.name, "Address:", address, "Type:", type, "Needs Transcoding:", needsTranscoding);
+    logger.debug("Selected file:", file?.name, "Address:", address, "Type:", type);
   };
 
   const handleFileUpload = async () => {
@@ -225,29 +183,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
     setUploadState("loading");
     setProgress(0);
 
-    let fileToUpload = selectedFile;
-
-    // Transcode if needed
-    const needsTranscoding = !['video/mp4', 'video/quicktime'].includes(selectedFile.type) ||
-      selectedFile.name.endsWith('.mkv') ||
-      selectedFile.name.endsWith('.avi') ||
-      selectedFile.name.endsWith('.webm');
-
-    if (needsTranscoding) {
-      setUploadState("transcoding");
-      logger.debug("Starting transcoding...");
-      const transcodedFile = await transcode(selectedFile);
-
-      if (!transcodedFile || transcodeError) {
-        setError("Transcoding failed: " + (transcodeError || "Unknown error"));
-        setUploadState("idle");
-        return;
-      }
-
-      fileToUpload = transcodedFile;
-      logger.debug("Transcoding complete. New file:", fileToUpload.name);
-      setUploadState("loading");
-    }
+    const fileToUpload = selectedFile;
 
     try {
       logger.debug("Start upload - using smart account address:", address, "type:", type);
@@ -378,7 +314,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
             <input
               type="file"
               id="file-upload"
-              accept="video/mp4,video/quicktime,video/x-matroska,video/webm,video/x-flv,video/mp2t,.mp4,.mov,.mkv,.webm,.flv,.ts"
+              accept="video/mp4,video/quicktime,video/x-matroska,video/webm,video/x-flv,video/mp2t,video/avi,video/x-msvideo,video/x-ms-wmv,.mp4,.mov,.mkv,.webm,.flv,.ts,.avi,.wmv,.mpg,.mpeg"
               className="file:border-1 block w-full rounded-lg border border-input bg-background text-sm text-[#EC407A] 
               file:mr-2 file:cursor-pointer file:rounded-full file:border-0 file:bg-card file:px-3 file:py-2 file:text-xs 
               sm:file:mr-4 sm:file:px-4 sm:file:text-sm file:font-semibold file:text-[#EC407A] hover:file:bg-accent"
@@ -387,10 +323,10 @@ const FileUpload: React.FC<FileUploadProps> = ({
             />
             <div className="mt-2 space-y-1">
               <p className="text-xs text-muted-foreground font-medium">
-                📹 Supported formats: MP4, MOV, MKV, WebM, FLV, TS
+                📹 Supported: MP4, MOV, AVI, WMV, MKV, WebM, FLV
               </p>
               <p className="text-xs text-muted-foreground">
-                ✅ <strong>Required codecs:</strong> H.264 or H.265 (HEVC) • Max size: 5GB
+                ✅ Max size: 10GB
               </p>
             </div>
           </div>
@@ -430,22 +366,19 @@ const FileUpload: React.FC<FileUploadProps> = ({
                 ) : (
                   <div className="w-full max-w-md space-y-2">
                     <Progress
-                      value={uploadState === "transcoding" ? transcodeProgress : progress}
+                      value={progress}
                       max={100}
                       className="h-2 w-full overflow-hidden rounded-full bg-muted"
                     >
                       <div
-                        className={`h-full transition-all duration-500 ease-in-out ${uploadState === "transcoding" ? "bg-amber-500" : "bg-[#EC407A]"
-                          }`}
-                        style={{ width: `${uploadState === "transcoding" ? transcodeProgress : progress}%` }}
+                        className="h-full transition-all duration-500 ease-in-out bg-[#EC407A]"
+                        style={{ width: `${progress}%` }}
                       />
                     </Progress>
                     <p className="text-center text-xs text-muted-foreground sm:text-sm">
                       {uploadState === "complete"
                         ? "Upload Complete!"
-                        : uploadState === "transcoding"
-                          ? `Converting video format... ${transcodeProgress}%`
-                          : `${progress}% uploaded`}
+                        : `${progress}% uploaded`}
                     </p>
                   </div>
                 )}
@@ -491,7 +424,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
           {onPressBack && (
             <Button
               variant="outline"
-              disabled={uploadState === "loading" || uploadState === "transcoding"}
+              disabled={uploadState === "loading"}
               onClick={onPressBack}
               className="w-full min-w-[120px] text-sm sm:w-auto sm:text-base touch-manipulation"
             >
