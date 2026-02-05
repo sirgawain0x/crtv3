@@ -105,7 +105,8 @@ function ProfilePageGuard({ children }: { children: React.ReactNode }) {
   const account = userToAccount(activeAccount);
 
   useEffect(() => {
-    if (!account?.address && typeof window !== "undefined") router.replace("/");
+    // Relaxed guard to prevent aggressive redirects
+    // if (!account?.address && typeof window !== "undefined") router.replace("/");
   }, [account?.address, router]);
 
   if (!account?.address) return null;

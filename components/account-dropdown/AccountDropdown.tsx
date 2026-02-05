@@ -1338,67 +1338,13 @@ export function AccountDropdown() {
 
             <DropdownMenuSeparator />
 
-            {/* Balances Section */}
-            <div className="px-2 py-2">
-              <TokenBalance />
-            </div>
-
-            {shouldShowMetokens && (
-              <>
-                <DropdownMenuSeparator />
-                {/* MeToken Balances Section */}
-                <div className="px-2 py-2">
-                  <MeTokenBalances />
-                </div>
-              </>
-            )}
-
-            <DropdownMenuSeparator />
-
-            {/* Wallet Actions Section - Grid Layout */}
-            <div className="px-2 py-2 w-full">
-              <p className="text-xs text-muted-foreground mb-2">Actions</p>
-              <div className="grid grid-cols-3 gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleActionClick("buy")}
-                  className="flex flex-col items-center justify-center p-3 h-16 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                >
-                  <Plus className="h-4 w-4 text-green-500 mb-1" />
-                  <span className="text-xs">Add</span>
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleActionClick("send")}
-                  className="flex flex-col items-center justify-center p-3 h-16 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                >
-                  <ArrowUpRight className="h-4 w-4 text-blue-500 mb-1" />
-                  <span className="text-xs">Send</span>
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleActionClick("swap")}
-                  className="flex flex-col items-center justify-center p-3 h-16 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                >
-                  <ArrowUpDown className="h-4 w-4 text-purple-500 mb-1" />
-                  <span className="text-xs">Swap</span>
-                </Button>
-              </div>
-            </div>
-
-            <DropdownMenuSeparator />
-
-
-            {/* Profile & Upload Access - Always Available */}
+            {/* Profile & Upload Access - Moved to Top */}
             <div className="px-2 py-2 w-full">
               <p className="text-xs text-muted-foreground mb-2">
                 Options
               </p>
               <div className="grid grid-cols-2 gap-2">
-                <Link href="/profile" className="w-full">
+                <Link href={`/profile/${smartAccountAddress || user?.address}`} className="w-full">
                   <Button
                     variant="outline"
                     size="sm"
@@ -1411,7 +1357,7 @@ export function AccountDropdown() {
                     <span className="text-xs">Profile</span>
                   </Button>
                 </Link>
-                <Link href="/upload" className="w-full" id="nav-upload-link">
+                <Link href={`/upload/${smartAccountAddress || user?.address}`} className="w-full" id="nav-upload-link">
                   <Button
                     variant="outline"
                     size="sm"
@@ -1426,7 +1372,9 @@ export function AccountDropdown() {
                 </Link>
               </div>
             </div>
+
             <DropdownMenuSeparator />
+
             {/* Membership Section */}
             <div className="px-2 py-2 w-full">
               <MembershipSection />
@@ -1454,7 +1402,6 @@ export function AccountDropdown() {
             {/* Member Access Links - Only for Members (hide if error or loading) */}
             {!membershipError && !isMembershipLoading && isVerified && hasMembership && (
               <>
-
                 <div className="px-2 py-2 w-full">
                   <p className="text-xs text-muted-foreground mb-2">
                     Member Access
@@ -1529,6 +1476,7 @@ export function AccountDropdown() {
                 </div>
               </>
             )}
+
             <DropdownMenuSeparator />
 
             {/* Session Keys Section - Compact */}
@@ -1563,6 +1511,61 @@ export function AccountDropdown() {
                 </Link>
               </DropdownMenuItem>
             </div>
+
+            <DropdownMenuSeparator />
+
+            {/* Wallet Actions and Balances - Moved to Bottom */}
+
+            {/* Wallet Actions Section - Grid Layout */}
+            <div className="px-2 py-2 w-full">
+              <p className="text-xs text-muted-foreground mb-2">Actions</p>
+              <div className="grid grid-cols-3 gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleActionClick("buy")}
+                  className="flex flex-col items-center justify-center p-3 h-16 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                >
+                  <Plus className="h-4 w-4 text-green-500 mb-1" />
+                  <span className="text-xs">Add</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleActionClick("send")}
+                  className="flex flex-col items-center justify-center p-3 h-16 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                >
+                  <ArrowUpRight className="h-4 w-4 text-blue-500 mb-1" />
+                  <span className="text-xs">Send</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleActionClick("swap")}
+                  className="flex flex-col items-center justify-center p-3 h-16 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                >
+                  <ArrowUpDown className="h-4 w-4 text-purple-500 mb-1" />
+                  <span className="text-xs">Swap</span>
+                </Button>
+              </div>
+            </div>
+
+            <DropdownMenuSeparator />
+
+            {/* Balances Section */}
+            <div className="px-2 py-2">
+              <TokenBalance />
+            </div>
+
+            {shouldShowMetokens && (
+              <>
+                <DropdownMenuSeparator />
+                {/* MeToken Balances Section */}
+                <div className="px-2 py-2">
+                  <MeTokenBalances />
+                </div>
+              </>
+            )}
 
             <DropdownMenuSeparator />
 

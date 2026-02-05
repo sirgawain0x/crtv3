@@ -82,17 +82,19 @@ export function MembershipSection({ className }: MembershipSectionProps) {
   }
 
   if (!hasMembership) {
-    <div className={`px-2 py-2 space-y-2 ${className || ""}`}>
-      <div className="flex items-center gap-2 text-sm text-yellow-500">
-        <LockKeyhole className="h-4 w-4" />
-        <span>No active membership</span>
+    return (
+      <div className={`px-2 py-2 space-y-2 ${className || ""}`}>
+        <div className="flex items-center gap-2 text-sm text-yellow-500">
+          <LockKeyhole className="h-4 w-4" />
+          <span>No active membership</span>
+        </div>
+        <Link href="/memberships" className="w-full block">
+          <Button className="w-full bg-black hover:bg-gray-900 text-white">
+            Get Membership
+          </Button>
+        </Link>
       </div>
-      <Link href="/memberships" className="w-full block">
-        <Button className="w-full bg-black hover:bg-gray-900 text-white">
-          Get Membership
-        </Button>
-      </Link>
-    </div>
+    );
   }
 
   return (
