@@ -254,7 +254,7 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources, priority 
               <Link href={`/discover/${asset.id}`}>
                 <h1
                   className="max-w-full overflow-hidden text-ellipsis 
-                whitespace-nowrap text-xl font-bold hover:text-orange-500 focus:text-orange-500"
+                whitespace-nowrap text-xl font-bold hover:text-orange-600 focus:text-orange-600"
                 >
                   {videoTitle || asset?.name}
                 </h1>

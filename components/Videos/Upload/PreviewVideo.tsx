@@ -17,7 +17,7 @@ const PreviewVideo: FC<PreviewVideoProps> = ({ video }) => {
       setIsLoading(true);
       setHasError(false);
       setErrorMessage("");
-      
+
       try {
         const objectUrl = URL.createObjectURL(video);
         setVideoUrl(objectUrl);
@@ -46,10 +46,10 @@ const PreviewVideo: FC<PreviewVideoProps> = ({ video }) => {
   const handleVideoError = (e: React.SyntheticEvent<HTMLVideoElement, Event>) => {
     setIsLoading(false);
     setHasError(true);
-    
+
     const target = e.target as HTMLVideoElement;
     const error = target.error;
-    
+
     if (error) {
       switch (error.code) {
         case MediaError.MEDIA_ERR_ABORTED:
@@ -94,7 +94,7 @@ const PreviewVideo: FC<PreviewVideoProps> = ({ video }) => {
               </div>
             </div>
           )}
-          
+
           {hasError && (
             <div className="absolute inset-0 flex items-center justify-center bg-muted">
               <div className="text-center p-4">
@@ -105,7 +105,7 @@ const PreviewVideo: FC<PreviewVideoProps> = ({ video }) => {
                 </p>
                 <button
                   onClick={handleRetry}
-                  className="px-3 py-1 text-xs bg-pink-500 text-white rounded hover:bg-pink-600 transition-colors"
+                  className="px-3 py-1 text-xs bg-pink-600 text-white rounded hover:bg-pink-700 transition-colors"
                 >
                   Retry
                 </button>
