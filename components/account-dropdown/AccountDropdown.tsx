@@ -1344,32 +1344,34 @@ export function AccountDropdown() {
                 Options
               </p>
               <div className="grid grid-cols-2 gap-2">
-                <Link href={`/profile/${smartAccountAddress || user?.address}`} className="w-full">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className={
-                      "w-full flex flex-col items-center justify-center p-2 h-12 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                    }
-                    onClick={() => setIsDropdownOpen(false)}
-                  >
+                <Button
+                  asChild
+                  variant="outline"
+                  size="sm"
+                  className={
+                    "w-full flex flex-col items-center justify-center p-2 h-12 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+                  }
+                  onClick={() => setIsDropdownOpen(false)}
+                >
+                  <Link href={`/profile/${smartAccountAddress || user?.address}`}>
                     <ShieldUser className="h-3 w-3 mb-1" />
                     <span className="text-xs">Profile</span>
-                  </Button>
-                </Link>
-                <Link href={`/upload/${smartAccountAddress || user?.address}`} className="w-full" id="nav-upload-link">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className={
-                      "w-full flex flex-col items-center justify-center p-2 h-12 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                    }
-                    onClick={() => setIsDropdownOpen(false)}
-                  >
+                  </Link>
+                </Button>
+                <Button
+                  asChild
+                  variant="outline"
+                  size="sm"
+                  className={
+                    "w-full flex flex-col items-center justify-center p-2 h-12 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+                  }
+                  onClick={() => setIsDropdownOpen(false)}
+                >
+                  <Link href={`/upload/${smartAccountAddress || user?.address}`} id="nav-upload-link">
                     <CloudUpload className="h-3 w-3 mb-1" />
                     <span className="text-xs">Upload</span>
-                  </Button>
-                </Link>
+                  </Link>
+                </Button>
               </div>
             </div>
 
