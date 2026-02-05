@@ -30,6 +30,7 @@
     "@account-kit/react": "^4.82.0",
     "@account-kit/signer": "^4.82.0",
     "@account-kit/smart-contracts": "^4.82.0",
+    "@account-kit/wallet-client": "^4.82.0",
     "@apollo/client": "^3.13.8",
     "@apollo/client-integration-nextjs": "^0.12.2",
     "@axiomhq/js": "^1.3.1",

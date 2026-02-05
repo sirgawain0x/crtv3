@@ -17,13 +17,13 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
-import { 
-  Loader2, 
-  AlertCircle, 
-  CheckCircle, 
-  ExternalLink, 
-  Info, 
-  Clock, 
+import {
+  Loader2,
+  AlertCircle,
+  CheckCircle,
+  ExternalLink,
+  Info,
+  Clock,
   RefreshCw,
   Wallet,
   ArrowRight,
@@ -38,7 +38,8 @@ import { logger } from '@/lib/utils/logger';
 
 
 interface RobustMeTokenCreatorProps {
-  onMeTokenCreated?: (meTokenAddress: string, transactionHash?: string) => void;
+  onMeTokenCreated?: (meTokenAddress: string, transactionHash?: string, meTokenId?: string) => void;
+  onClose?: () => void;
 }
 
 // Status step configuration
@@ -54,7 +55,7 @@ const STATUS_STEPS: Record<CreationStatus, { label: string; icon: React.ReactNod
   error: { label: 'Error', icon: <AlertCircle className="h-4 w-4" />, color: 'text-red-500' },
 };
 
-export function RobustMeTokenCreator({ onMeTokenCreated }: RobustMeTokenCreatorProps) {
+export function RobustMeTokenCreator({ onMeTokenCreated, onClose }: RobustMeTokenCreatorProps) {
   const [name, setName] = useState('');
   const [symbol, setSymbol] = useState('');
   const [hubId, setHubId] = useState('1');
@@ -65,7 +66,7 @@ export function RobustMeTokenCreator({ onMeTokenCreated }: RobustMeTokenCreatorP
   const { client } = useSmartAccountClient({});
   const { chain } = useChain();
   const { toast } = useToast();
-  
+
   const {
     state,
     createMeToken,
@@ -78,7 +79,7 @@ export function RobustMeTokenCreator({ onMeTokenCreated }: RobustMeTokenCreatorP
   // Check DAI balance
   const checkDaiBalance = useCallback(async () => {
     if (!client?.account?.address) return;
-    
+
     try {
       const daiContract = getDaiTokenContract('base');
       const balance = await client.readContract({
@@ -87,7 +88,7 @@ export function RobustMeTokenCreator({ onMeTokenCreated }: RobustMeTokenCreatorP
         functionName: 'balanceOf',
         args: [client.account.address],
       }) as bigint;
-      
+
       setDaiBalance(balance);
     } catch (err) {
       logger.error('Failed to check DAI balance:', err);
@@ -107,16 +108,16 @@ export function RobustMeTokenCreator({ onMeTokenCreated }: RobustMeTokenCreatorP
         title: "MeToken Created Successfully!",
         description: `Your MeToken "${name}" (${symbol}) is ready for trading.`,
       });
-      
-      onMeTokenCreated?.(state.meTokenAddress, state.txHash);
-      
+
+      onMeTokenCreated?.(state.meTokenAddress, state.txHash, state.meTokenId);
+
       // Reset form
       setName('');
       setSymbol('');
       setAssetsDeposited('');
       setHubId('1');
     }
-  }, [state.status, state.meTokenAddress, state.txHash, name, symbol, toast, onMeTokenCreated]);
+  }, [state.status, state.meTokenAddress, state.txHash, state.meTokenId, name, symbol, toast, onMeTokenCreated]);
 
   // Handle creation
   const handleCreate = async () => {
@@ -130,7 +131,7 @@ export function RobustMeTokenCreator({ onMeTokenCreated }: RobustMeTokenCreatorP
     }
 
     const depositAmount = parseEther(assetsDeposited || '0');
-    
+
     if (depositAmount > BigInt(0) && daiBalance < depositAmount) {
       toast({
         title: "Insufficient DAI",
@@ -176,8 +177,8 @@ export function RobustMeTokenCreator({ onMeTokenCreated }: RobustMeTokenCreatorP
             <p className="mb-2">
               You have {pendingTransactions.length} pending MeToken transaction(s) that may have been interrupted.
             </p>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               size="sm"
               onClick={() => setShowPendingTransactions(!showPendingTransactions)}
             >
@@ -226,7 +227,7 @@ export function RobustMeTokenCreator({ onMeTokenCreated }: RobustMeTokenCreatorP
                 <span className="text-sm font-medium">{state.message || currentStep.label}</span>
               </div>
               <Progress value={state.progress} className="h-2" />
-              
+
               {/* Show transaction hashes when available */}
               {state.userOpHash && (
                 <p className="text-xs text-muted-foreground">
@@ -236,134 +237,146 @@ export function RobustMeTokenCreator({ onMeTokenCreated }: RobustMeTokenCreatorP
             </div>
           )}
 
-          {/* Success Message */}
-          {state.status === 'success' && (
-            <Alert className="border-green-500 bg-green-50 dark:bg-green-950">
-              <CheckCircle className="h-4 w-4 text-green-500" />
-              <AlertTitle>Success!</AlertTitle>
-              <AlertDescription>
-                <div className="space-y-2">
-                  <p>{state.message}</p>
-                  {state.txHash && (
-                    <a
-                      href={getExplorerUrl('tx', state.txHash)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800"
-                    >
-                      View Transaction <ExternalLink className="h-3 w-3" />
-                    </a>
-                  )}
-                  {state.meTokenAddress && (
-                    <a
-                      href={getExplorerUrl('address', state.meTokenAddress)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800"
-                    >
-                      View MeToken Contract <ExternalLink className="h-3 w-3" />
-                    </a>
-                  )}
-                </div>
-              </AlertDescription>
-            </Alert>
-          )}
+          {state.status === 'success' ? (
+            /* Success View */
+            <div className="space-y-4">
+              <Alert className="border-green-500 bg-green-50 dark:bg-green-950">
+                <CheckCircle className="h-4 w-4 text-green-500" />
+                <AlertTitle>Success!</AlertTitle>
+                <AlertDescription>
+                  <div className="space-y-2">
+                    <p>{state.message || "Your MeToken has been created successfully."}</p>
+                    {state.txHash && (
+                      <a
+                        href={getExplorerUrl('tx', state.txHash)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800"
+                      >
+                        View Transaction <ExternalLink className="h-3 w-3" />
+                      </a>
+                    )}
+                    {state.meTokenAddress && (
+                      <a
+                        href={getExplorerUrl('address', state.meTokenAddress)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800"
+                      >
+                        View MeToken Contract <ExternalLink className="h-3 w-3" />
+                      </a>
+                    )}
+                  </div>
+                </AlertDescription>
+              </Alert>
 
-          {/* Error Message */}
-          {state.status === 'error' && state.error && (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Error</AlertTitle>
-              <AlertDescription className="whitespace-pre-line">
-                {state.error}
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {/* Form */}
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">MeToken Name</Label>
-                <Input
-                  id="name"
-                  placeholder="My Creative Token"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  disabled={isProcessing}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="symbol">Symbol</Label>
-                <Input
-                  id="symbol"
-                  placeholder="MCT"
-                  value={symbol}
-                  onChange={(e) => setSymbol(e.target.value.toUpperCase())}
-                  disabled={isProcessing}
-                  maxLength={10}
-                />
-              </div>
+              <Button
+                onClick={() => onClose?.()}
+                className="w-full bg-green-600 hover:bg-green-700 text-white"
+                size="lg"
+              >
+                Done
+              </Button>
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="hubId">Hub ID</Label>
-              <Input
-                id="hubId"
-                type="number"
-                placeholder="1"
-                value={hubId}
-                onChange={(e) => setHubId(e.target.value)}
-                disabled={isProcessing}
-                min="1"
-              />
-              <p className="text-xs text-muted-foreground">
-                Hub ID determines the bonding curve parameters. Default is 1.
-              </p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="assetsDeposited">Initial DAI Deposit (Optional)</Label>
-              <Input
-                id="assetsDeposited"
-                type="number"
-                placeholder="0.00"
-                value={assetsDeposited}
-                onChange={(e) => setAssetsDeposited(e.target.value)}
-                disabled={isProcessing}
-                step="0.01"
-                min="0"
-              />
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>Your DAI balance: {formatEther(daiBalance)} DAI</span>
-                {assetsDeposited && parseFloat(assetsDeposited) > 0 && (
-                  <span className={hasEnoughDai ? 'text-green-600' : 'text-red-600'}>
-                    {hasEnoughDai ? '✓ Sufficient' : '✗ Insufficient'}
-                  </span>
-                )}
-              </div>
-            </div>
-
-            <Button 
-              onClick={handleCreate}
-              disabled={isProcessing || !name || !symbol || (parseFloat(assetsDeposited || '0') > 0 && !hasEnoughDai)}
-              className="w-full"
-              size="lg"
-            >
-              {isProcessing ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {currentStep.label}
-                </>
-              ) : (
-                <>
-                  Create MeToken
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </>
+          ) : (
+            /* Form View */
+            <div className="space-y-4">
+              {/* Error Message */}
+              {state.status === 'error' && state.error && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Error</AlertTitle>
+                  <AlertDescription className="whitespace-pre-line">
+                    {state.error}
+                  </AlertDescription>
+                </Alert>
               )}
-            </Button>
-          </div>
+
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="name">MeToken Name</Label>
+                    <Input
+                      id="name"
+                      placeholder="My Creative Token"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      disabled={isProcessing}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="symbol">Symbol</Label>
+                    <Input
+                      id="symbol"
+                      placeholder="MCT"
+                      value={symbol}
+                      onChange={(e) => setSymbol(e.target.value.toUpperCase())}
+                      disabled={isProcessing}
+                      maxLength={10}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="hubId">Hub ID</Label>
+                  <Input
+                    id="hubId"
+                    type="number"
+                    placeholder="1"
+                    value={hubId}
+                    onChange={(e) => setHubId(e.target.value)}
+                    disabled={isProcessing}
+                    min="1"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Hub ID determines the bonding curve parameters. Default is 1.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="assetsDeposited">Initial DAI Deposit (Optional)</Label>
+                  <Input
+                    id="assetsDeposited"
+                    type="number"
+                    placeholder="0.00"
+                    value={assetsDeposited}
+                    onChange={(e) => setAssetsDeposited(e.target.value)}
+                    disabled={isProcessing}
+                    step="0.01"
+                    min="0"
+                  />
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>Your DAI balance: {formatEther(daiBalance)} DAI</span>
+                    {assetsDeposited && parseFloat(assetsDeposited) > 0 && (
+                      <span className={hasEnoughDai ? 'text-green-600' : 'text-red-600'}>
+                        {hasEnoughDai ? '✓ Sufficient' : '✗ Insufficient'}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <Button
+                  onClick={handleCreate}
+                  disabled={isProcessing || !name || !symbol || (parseFloat(assetsDeposited || '0') > 0 && !hasEnoughDai)}
+                  className="w-full"
+                  size="lg"
+                >
+                  {isProcessing ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      {currentStep.label}
+                    </>
+                  ) : (
+                    <>
+                      Create MeToken
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
 
           {/* Info Section */}
           <div className="rounded-lg bg-muted/50 p-4 text-sm text-muted-foreground space-y-2">

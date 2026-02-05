@@ -108,14 +108,14 @@ const HeroSection: React.FC = () => {
               {HERO_NAME.top}
             </span>
             <br />
-            <span className="text-orange-500">{HERO_NAME.bottom}</span>
+            <span className="text-orange-600">{HERO_NAME.bottom}</span>
           </h1>
           <p className="text-gray-500">{HERO_DESCRIPTION}</p>
           <div className="flex flex-col items-center space-y-4 sm:flex-row sm:justify-center sm:space-x-6 sm:space-y-0 md:justify-start">
             <button
               className={
-                "flex items-center space-x-2 rounded-full bg-pink-500 px-6 py-2 text-lg font-normal text-white " +
-                "transition duration-200 hover:bg-pink-600 lg:py-3"
+                "flex items-center space-x-2 rounded-full bg-pink-600 px-6 py-2 text-lg font-normal text-white " +
+                "transition duration-200 hover:bg-pink-700 lg:py-3"
               }
               onClick={handleWatchDemo}
             >

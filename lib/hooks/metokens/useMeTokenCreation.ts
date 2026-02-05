@@ -112,11 +112,11 @@ export interface PendingMeTokenTransaction {
 const PENDING_TX_KEY = 'metoken_pending_transactions';
 
 // Creation status
-export type CreationStatus = 
-  | 'idle' 
-  | 'checking_balance' 
-  | 'approving_dai' 
-  | 'waiting_approval' 
+export type CreationStatus =
+  | 'idle'
+  | 'checking_balance'
+  | 'approving_dai'
+  | 'waiting_approval'
   | 'creating_metoken'
   | 'waiting_confirmation'
   | 'polling_status'
@@ -130,6 +130,7 @@ export interface MeTokenCreationState {
   userOpHash?: string;
   txHash?: string;
   meTokenAddress?: string;
+  meTokenId?: string;
   error?: string;
 }
 
@@ -194,16 +195,16 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
   const user = useUser();
   const { client } = useSmartAccountClient({});
   const { getGasContext, isMember } = useGasSponsorship();
-  
+
   const [state, setState] = useState<MeTokenCreationState>({
     status: 'idle',
     message: '',
     progress: 0,
   });
-  
+
   const [pendingTransactions, setPendingTransactions] = useState<PendingMeTokenTransaction[]>([]);
   const pollingRef = useRef<NodeJS.Timeout | null>(null);
-  
+
   const address = user?.address;
 
   // Load pending transactions on mount
@@ -235,17 +236,17 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
     maxAttempts: number = 30 // 5 minutes at 10s intervals
   ): Promise<string | null> => {
     let attempts = 0;
-    
+
     return new Promise((resolve) => {
       const poll = async () => {
         attempts++;
         logger.debug(`🔄 Polling for MeToken (attempt ${attempts}/${maxAttempts})...`);
-        
+
         try {
           // Query subgraph for MeTokens owned by this address
           const { meTokensSubgraph } = await import('@/lib/sdk/metokens/subgraph');
           const allMeTokens = await meTokensSubgraph.getAllMeTokens(50, 0);
-          
+
           // Check if any MeToken matches our creator address
           for (const meToken of allMeTokens) {
             try {
@@ -277,7 +278,7 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
                   functionName: 'getMeTokenInfo',
                   args: [meToken.id as `0x${string}`],
                 }) as { owner: string };
-                
+
                 if (info.owner.toLowerCase() === tx.creatorAddress.toLowerCase()) {
                   logger.debug('✅ Found MeToken via polling:', meToken.id);
                   if (pollingRef.current) {
@@ -292,7 +293,7 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
               // Continue checking other tokens
             }
           }
-          
+
           if (attempts >= maxAttempts) {
             logger.debug('⏰ Polling timed out after max attempts');
             if (pollingRef.current) {
@@ -312,7 +313,7 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
           }
         }
       };
-      
+
       // Poll every 10 seconds
       pollingRef.current = setInterval(poll, 10000);
       // Also poll immediately
@@ -325,7 +326,7 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
    */
   const getVaultAddress = useCallback(async (hubId: number): Promise<string | null> => {
     if (!client) return null;
-    
+
     try {
       const hubInfo = await client.readContract({
         address: DIAMOND,
@@ -333,7 +334,7 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
         functionName: 'getHubInfo',
         args: [BigInt(hubId)],
       }) as { vault: string };
-      
+
       return hubInfo.vault;
     } catch (err) {
       logger.error('Failed to get vault address:', err);
@@ -349,9 +350,9 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
     amount: bigint
   ): Promise<string> => {
     if (!client || !address) throw new Error('Client or address not available');
-    
+
     const daiContract = getDaiTokenContract('base');
-    
+
     // Check current allowance
     const currentAllowance = await client.readContract({
       address: daiContract.address as `0x${string}`,
@@ -359,22 +360,22 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
       functionName: 'allowance',
       args: [address as `0x${string}`, vaultAddress as `0x${string}`],
     }) as bigint;
-    
+
     if (currentAllowance >= amount) {
       logger.debug('✅ Sufficient DAI allowance already exists');
       return 'skipped';
     }
-    
+
     logger.debug('🔓 Approving DAI for vault...');
-    
+
     const approveData = encodeFunctionData({
       abi: DAI_APPROVE_ABI,
       functionName: 'approve',
       args: [vaultAddress as `0x${string}`, amount],
     });
-    
+
     const gasContext = getGasContext('usdc');
-    
+
     // Send approval with timeout
     const approvePromise = client.sendUserOperation({
       uo: {
@@ -384,50 +385,50 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
       },
       context: gasContext.context,
     });
-    
+
     const timeoutPromise = new Promise<never>((_, reject) => {
       setTimeout(() => reject(new Error('DAI approval timed out after 90 seconds')), 90000);
     });
-    
+
     const approveOp = await Promise.race([approvePromise, timeoutPromise]);
-    
+
     logger.debug('⏳ Waiting for approval confirmation...');
-    
+
     // Wait with timeout
     const waitPromise = client.waitForUserOperationTransaction({
       hash: approveOp.hash,
     });
-    
+
     const waitTimeoutPromise = new Promise<never>((_, reject) => {
       setTimeout(() => reject(new Error('Approval confirmation timed out after 120 seconds')), 120000);
     });
-    
+
     const txHash = await Promise.race([waitPromise, waitTimeoutPromise]);
-    
+
     logger.debug('✅ DAI approval confirmed:', txHash);
-    
+
     // Verify the approval with retries
     let verified = false;
     for (let i = 0; i < 5; i++) {
       await new Promise(resolve => setTimeout(resolve, 2000 + i * 1000));
-      
+
       const newAllowance = await client.readContract({
         address: daiContract.address as `0x${string}`,
         abi: daiContract.abi,
         functionName: 'allowance',
         args: [address as `0x${string}`, vaultAddress as `0x${string}`],
       }) as bigint;
-      
+
       if (newAllowance >= amount) {
         verified = true;
         break;
       }
     }
-    
+
     if (!verified) {
       throw new Error('DAI approval verification failed after multiple attempts');
     }
-    
+
     return txHash;
   }, [client, address, getGasContext]);
 
@@ -441,11 +442,11 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
     assetsDeposited: string;
   }) => {
     if (!client || !address) {
-      updateState({ 
-        status: 'error', 
+      updateState({
+        status: 'error',
         message: 'Wallet not connected',
         error: 'Please connect your wallet to create a MeToken.',
-        progress: 0 
+        progress: 0
       });
       throw new Error('Wallet not connected');
     }
@@ -463,7 +464,7 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
 
       if (depositAmount > BigInt(0)) {
         const daiContract = getDaiTokenContract('base');
-        
+
         const balance = await client.readContract({
           address: daiContract.address as `0x${string}`,
           abi: daiContract.abi,
@@ -483,7 +484,7 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
         });
 
         const vaultAddress = await getVaultAddress(hubId);
-        
+
         if (vaultAddress && vaultAddress !== '0x0000000000000000000000000000000000000000') {
           updateState({
             status: 'approving_dai',
@@ -529,7 +530,7 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
       });
 
       // Send the operation without blocking on a long timeout
-      let operation;
+      let operation: { hash: `0x${string}` };
       try {
         const sendPromise = client.sendUserOperation({
           uo: {
@@ -549,33 +550,33 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
       } catch (sendError) {
         // Check if this is an account deployment error (AA13)
         const errorMessage = sendError instanceof Error ? sendError.message : String(sendError);
-        const isDeploymentError = errorMessage.includes('AA13') || 
-                                  errorMessage.includes('initCode') || 
-                                  errorMessage.includes('account not deployed');
-        
+        const isDeploymentError = errorMessage.includes('AA13') ||
+          errorMessage.includes('initCode') ||
+          errorMessage.includes('account not deployed');
+
         // Handle account deployment - paymasters can't sponsor deployment transactions
         if (isDeploymentError && gasContext.context) {
           logger.debug('⚠️ Account deployment detected. Paymasters cannot sponsor deployment transactions. Retrying without paymaster...');
-          
+
           // Check ETH balance before deploying without paymaster
           const ethBalance = await client.getBalance({ address });
           const minGasEth = parseEther('0.001');
-          
+
           if (ethBalance < minGasEth) {
             const deployErrorMessage = `Your smart account needs to be deployed first, but deployment requires ETH for gas. ` +
               `Your account has ${formatEther(ethBalance)} ETH but needs at least ${formatEther(minGasEth)} ETH for deployment. ` +
               `Please send at least ${formatEther(minGasEth)} ETH to your account address: ${address}`;
-            
+
             updateState({
               status: 'error',
               message: 'Account deployment required',
               error: deployErrorMessage,
               progress: 50,
             });
-            
+
             throw new Error(deployErrorMessage);
           }
-          
+
           // Try deployment without paymaster
           logger.debug('🔄 Retrying account deployment without paymaster...');
           try {
@@ -597,14 +598,14 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
             // Deployment failed even without paymaster
             const deployFailMessage = `Account deployment failed. This may require manual funding. ` +
               `Please send at least ${formatEther(minGasEth)} ETH to your account: ${address}`;
-            
+
             updateState({
               status: 'error',
               message: 'Account deployment failed',
               error: deployFailMessage,
               progress: 50,
             });
-            
+
             throw new Error(deployFailMessage);
           }
         } else if (gasContext.context) {
@@ -614,39 +615,39 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
             const errorMessage = `Paymaster failed for member account. ` +
               `As a member, your gas should be fully sponsored. ` +
               `Please contact support - this appears to be a paymaster configuration issue.`;
-            
+
             updateState({
               status: 'error',
               message: 'Paymaster configuration error',
               error: errorMessage,
               progress: 50,
             });
-            
+
             throw new Error(errorMessage);
           }
-          
+
           // For non-members: USDC paymaster failed, try ETH fallback
           // Only check ETH balance if we're going to retry with ETH
           const ethBalance = await client.getBalance({ address });
           const minGasEth = parseEther('0.001');
-          
+
           if (ethBalance < minGasEth) {
             // USDC paymaster failed AND user doesn't have ETH
             const errorMessage = `Gas payment failed. ` +
               `USDC paymaster failed and your account has insufficient ETH (${formatEther(ethBalance)} ETH). ` +
               `You need either USDC for the paymaster or at least ${formatEther(minGasEth)} ETH for gas fees. ` +
               `Please fund your account with USDC or ETH.`;
-            
+
             updateState({
               status: 'error',
               message: 'Insufficient balance for transaction',
               error: errorMessage,
               progress: 50,
             });
-            
+
             throw new Error(errorMessage);
           }
-          
+
           // USDC paymaster failed but user has ETH - retry with ETH
           logger.debug('🔄 USDC paymaster failed, retrying with ETH...');
           const fallbackPromise = client.sendUserOperation({
@@ -693,7 +694,7 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
 
       // Step 4: Wait for confirmation with a moderate timeout, then fall back to polling
       let txHash: string | null = null;
-      
+
       try {
         const waitPromise = client.waitForUserOperationTransaction({
           hash: operation.hash,
@@ -706,14 +707,14 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
 
         txHash = await Promise.race([waitPromise, waitTimeoutPromise]);
         logger.debug('✅ Transaction confirmed:', txHash);
-        
+
         pendingTx.txHash = txHash;
         pendingTx.status = 'confirmed';
         savePendingTransaction(pendingTx);
 
       } catch (waitError) {
         logger.debug('⏰ Confirmation wait timed out, switching to polling...');
-        
+
         updateState({
           status: 'polling_status',
           message: 'Transaction is processing. Checking for your MeToken...',
@@ -742,6 +743,7 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
 
       if (meTokenAddress) {
         // Sync to database
+        let meTokenId: string | undefined;
         try {
           const syncResponse = await fetch('/api/metokens/sync', {
             method: 'POST',
@@ -753,7 +755,9 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
           });
 
           if (syncResponse.ok) {
-            logger.debug('✅ MeToken synced to database');
+            const syncData = await syncResponse.json();
+            meTokenId = syncData.id || syncData.data?.id;
+            logger.debug('✅ MeToken synced to database, ID:', meTokenId);
           }
         } catch (syncErr) {
           logger.error('Failed to sync MeToken to database:', syncErr);
@@ -777,6 +781,7 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
           userOpHash: operation.hash,
           txHash: txHash || undefined,
           meTokenAddress,
+          meTokenId, // Include ID in state
         });
 
         return;
@@ -802,9 +807,9 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
 
     } catch (err) {
       logger.error('❌ MeToken creation failed:', err);
-      
+
       const parsed = parseBundlerError(err as Error);
-      
+
       updateState({
         status: 'error',
         message: parsed.message,
@@ -821,37 +826,37 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
    */
   const checkPendingTransactions = useCallback(async () => {
     const pending = getPendingTransactions();
-    
+
     if (pending.length === 0) return;
-    
+
     logger.debug(`🔍 Checking ${pending.length} pending transactions...`);
-    
+
     for (const tx of pending) {
       // Skip old transactions (older than 24 hours)
       if (Date.now() - tx.createdAt > 24 * 60 * 60 * 1000) {
         removePendingTransaction(tx.userOpHash);
         continue;
       }
-      
+
       // Skip already confirmed
       if (tx.status === 'confirmed' && tx.meTokenAddress) {
         continue;
       }
-      
+
       // Try to find the MeToken
       const meTokenAddress = await pollForMeToken(tx, 3);
-      
+
       if (meTokenAddress) {
         tx.meTokenAddress = meTokenAddress;
         tx.status = 'confirmed';
         savePendingTransaction(tx);
-        setPendingTransactions(prev => 
+        setPendingTransactions(prev =>
           prev.map(t => t.userOpHash === tx.userOpHash ? tx : t)
         );
         logger.debug(`✅ Found MeToken for pending tx: ${meTokenAddress}`);
       }
     }
-    
+
     setPendingTransactions(getPendingTransactions());
   }, [pollForMeToken]);
 
@@ -869,7 +874,7 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
   const retryPendingTransaction = useCallback(async (tx: PendingMeTokenTransaction) => {
     // First check if MeToken was already created
     const existing = await pollForMeToken(tx, 3);
-    
+
     if (existing) {
       tx.meTokenAddress = existing;
       tx.status = 'confirmed';
@@ -877,17 +882,17 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
       setPendingTransactions(prev =>
         prev.map(t => t.userOpHash === tx.userOpHash ? tx : t)
       );
-      
+
       updateState({
         status: 'success',
         message: 'Found your existing MeToken!',
         progress: 100,
         meTokenAddress: existing,
       });
-      
+
       return;
     }
-    
+
     // Otherwise create new
     await createMeToken({
       name: tx.name,

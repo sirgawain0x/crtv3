@@ -80,6 +80,13 @@ export function CreatorProfileHeader({
         <div className="mb-4">
           <AddressWithCopy address={address} />
         </div>
+
+        {creatorProfile?.username && (
+          <p className="text-lg font-medium mb-2">
+            {creatorProfile.username}
+          </p>
+        )}
+
         {bio && (
           <p className="text-sm text-muted-foreground max-w-2xl">
             {bio}

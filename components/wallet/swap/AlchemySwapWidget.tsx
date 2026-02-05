@@ -15,6 +15,7 @@ import { priceService, PriceService } from '@/lib/sdk/alchemy/price-service';
 import { CurrencyConverter } from '@/lib/utils/currency-converter';
 import { useGasSponsorship } from '@/lib/hooks/wallet/useGasSponsorship';
 import { logger } from '@/lib/utils/logger';
+import { swapActions } from "@account-kit/wallet-client/experimental";
 
 const getTokenIcon = (symbol: string, chainId?: number) => {
   const isBase = chainId === 8453;
@@ -430,117 +431,62 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
 
 
   const handleExecuteSwap = async () => {
-    if (!address || !swapState.quote || !client) return;
+    if (!address || !client) return;
 
     try {
       setSwapState(prev => ({ ...prev, isSwapping: true, error: null }));
 
-      logger.debug('Executing swap with structure:', swapState.quote);
 
-      // ========== GAS SPONSORSHIP ==========
-      // Determine gas sponsorship context (Member=Sponsored, Non-Member=USDC/ETH)
-      // We need to fetch this outside the loop if possible, or inside if hook usage allows
-      // Since this is an event handler, we rely on the hook values passed in
-      // Note: We need to refactor slightly to access the getGasContext result
+      // Extend the client with swap actions
+      const swapClient = (client as any).extend(swapActions);
 
-      // For now, we'll assume we pass the context manually to the sendUserOperation
-      // But we need the values from the hook. Let's rely on the component scope variables.
-      const gasContext = getGasContext('usdc');
-      logger.debug('Gas Sponsorship Context:', gasContext);
+      logger.debug('Requesting fresh quote for execution...');
 
-      // ========== PRE-FLIGHT CHECKS ==========
+      const fromAmountHex = AlchemySwapService.formatAmount(swapState.fromAmount, swapState.fromToken);
 
-      const ethBalance = await client.getBalance({ address });
-      logger.debug('ETH Balance:', formatEther(ethBalance), 'ETH');
+      // Request a fresh quote using the SDK
+      // This ensures we have the correct object structure for sign/send
+      const { quote, ...calls } = await swapClient.requestQuoteV0({
+        from: address,
+        fromToken: BASE_TOKENS[swapState.fromToken],
+        toToken: BASE_TOKENS[swapState.toToken],
+        fromAmount: fromAmountHex,
+        slippage: "50", // 0.5%
+      });
 
-      let isDeployed = true;
-      try {
-        const code = await client.transport.request({
-          method: "eth_getCode",
-          params: [address, "latest"],
-        }) as Hex;
-        isDeployed = code && code.length > 2 && code !== '0x' && code !== '0x0';
-        if (!isDeployed) logger.warn('Account appears not deployed.');
-      } catch (error) {
-        logger.warn('Deployment check failed:', error);
+      logger.debug('Quote received:', quote);
+
+      // Verify calls are not raw (we expect UserOperations)
+      if (calls.rawCalls) {
+        throw new Error("Expected user operation calls, got raw calls");
       }
 
-      const minGasEth = parseEther('0.001');
-      if (ethBalance < minGasEth) {
-        logger.warn(`Low ETH balance (${formatEther(ethBalance)} ETH). Swap might fail if not sponsored.`);
+      // Sign the prepared calls
+      logger.debug('Signing prepared calls...');
+      const signedCalls = await swapClient.signPreparedCalls(calls);
+
+      // Send the prepared calls
+      logger.debug('Sending prepared calls...');
+      const { preparedCallIds } = await swapClient.sendPreparedCalls(signedCalls);
+
+      if (!preparedCallIds || preparedCallIds.length === 0) {
+        throw new Error("No prepared call IDs returned");
       }
 
-      logger.debug('Pre-flight checks passed');
+      const callId = preparedCallIds[0];
+      logger.debug('Swap initiated, Call ID:', callId);
 
-      // ========== EXECUTE CALLS ==========
+      // Wait for the call to resolve
+      logger.debug('Waiting for call status...');
+      const callStatusResult = await swapClient.waitForCallsStatus({
+        id: callId,
+      });
 
-      // Use the raw calls returned by the API (includes Approval + Swap)
-      // Note: We need to cast to any because the type definition update might not be picked up yet
-      const calls = (swapState.quote as any).calls;
+      // Filter through success or failure cases
+      if (callStatusResult.status === "success" && callStatusResult.receipts && callStatusResult.receipts[0]) {
+        const txHash = callStatusResult.receipts[0].transactionHash;
+        logger.debug('Swap confirmed! TxHash:', txHash);
 
-      if (calls && Array.isArray(calls) && calls.length > 0) {
-        logger.debug(`Found ${calls.length} prepared calls from API`);
-
-        let txHash: Hex | null = null;
-
-        // Execute calls sequentially to ensure Approval confirms before Swap checks
-        for (let i = 0; i < calls.length; i++) {
-          const call = calls[i];
-          const isLast = i === calls.length - 1;
-          const description = i === 0 && calls.length > 1 ? 'Approval' : 'Swap';
-
-          logger.debug(`Sending ${description} UserOperation (${i + 1}/${calls.length})...`, {
-            target: call.to,
-            value: call.value,
-            dataLength: call.data.length
-          });
-
-          const executeOperation = async (context: any) => {
-            return await client.sendUserOperation({
-              uo: {
-                target: call.to,
-                data: call.data,
-                value: BigInt(call.value || '0x0'),
-              },
-              context: context,
-              overrides: {
-                paymasterAndData: context ? undefined : undefined, // Explicit undefined to trigger default behavior if no context
-              }
-            });
-          };
-
-          let operation;
-          // Try with preferred context (Sponsored or USDC)
-          const primaryContext = gasContext.context;
-
-          try {
-            logger.debug(`Sending ${description} UserOperation (${i + 1}/${calls.length}) with context:`, primaryContext ? 'Custom' : 'Standard');
-            operation = await executeOperation(primaryContext);
-          } catch (err) {
-            // If primary method fails (e.g. USDC payment fails), try fallback if it was a custom context
-            if (primaryContext) {
-              logger.warn(`Primary gas method failed, falling back to standard ETH payment...`, err);
-              operation = await executeOperation(undefined);
-            } else {
-              throw err;
-            }
-          }
-
-          logger.debug(`${description} UserOperation sent! Hash:`, operation.hash);
-
-          // Wait for confirmation
-          const receipt = await client.waitForUserOperationTransaction({
-            hash: operation.hash,
-          });
-
-          logger.debug(`${description} confirmed! TxHash:`, receipt);
-
-          if (isLast) {
-            txHash = receipt;
-          }
-        }
-
-        // Update state with success (use the last hash)
         setSwapState(prev => ({
           ...prev,
           transactionHash: txHash,
@@ -548,33 +494,11 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
         }));
 
         onSwapSuccess?.();
-
       } else {
-        // Fallback for legacy quote structure (UserOperation object)
-        logger.warn('No raw calls found, attempting legacy UserOperation execution...');
-
-        const quoteData = swapState.quote.data;
-        const target = (quoteData.target || quoteData.sender || address) as Address;
-
-        const operation = await client.sendUserOperation({
-          uo: {
-            target,
-            data: quoteData.callData as Hex,
-            value: BigInt(quoteData.value || '0x0'),
-          },
-        });
-
-        const txHash = await client.waitForUserOperationTransaction({
-          hash: operation.hash,
-        });
-
-        setSwapState(prev => ({
-          ...prev,
-          transactionHash: txHash,
-          isSwapping: false,
-        }));
-
-        onSwapSuccess?.();
+        logger.error('Swap failed status:', callStatusResult);
+        throw new Error(
+          `Transaction failed with status ${callStatusResult.status}`
+        );
       }
 
     } catch (error) {
@@ -588,6 +512,8 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
         userMessage = 'Transaction validation failed (AA23). Check balances and gas.';
       } else if (errorStr.includes('Multicall3')) {
         userMessage = 'Swap failed (Multicall3). This often means the Swap Validation failed. Ensure you have USDC/ETH and the account is properly deployed.';
+      } else if (errorStr.includes('User rejected')) {
+        userMessage = 'User rejected the request.';
       } else {
         userMessage = errorStr;
       }

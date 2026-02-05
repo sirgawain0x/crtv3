@@ -69,7 +69,7 @@ export const Card = ({
         snapshot ?? ""
       )}&scores=${encodeURIComponent(scores ?? "")}&score=${score}`}
     >
-      <div className="flex cursor-pointer items-center justify-between border-t border-pink-500 p-5">
+      <div className="flex cursor-pointer items-center justify-between border-t border-pink-600 p-5">
         <div>
           <div className="mb-5">
             <h2 className="text-lg font-bold">{title}</h2>
@@ -79,10 +79,10 @@ export const Card = ({
               {state === "closed"
                 ? `Ended: ${end}`
                 : state === "pending"
-                ? `Opens: ${start}`
-                : state === "active"
-                ? `Ends: ${end}`
-                : null}
+                  ? `Opens: ${start}`
+                  : state === "active"
+                    ? `Ends: ${end}`
+                    : null}
             </h3>
           </div>
           <div className="flex">
@@ -97,17 +97,16 @@ export const Card = ({
               <p className="ml-1">{state}</p>
             </div>
             <Badge
-              className={`m-5 flex min-w-[40px] max-w-[80] items-center justify-center rounded-lg border-4 p-2 ${
-                core ? "border-pink-500" : "border-orange-500"
-              }`}
+              className={`m-5 flex min-w-[40px] max-w-[80] items-center justify-center rounded-lg border-4 p-2 ${core ? "border-pink-600" : "border-orange-600"
+                }`}
             >
               {core ? (
-                <FaCertificate color={core ? "#ec407a" : "#EE774D"} />
+                <FaCertificate color={core ? "#db2777" : "#ea580c"} />
               ) : (
-                <FaUsers color={core ? "#ec407a" : "#EE774D"} />
+                <FaUsers color={core ? "#db2777" : "#ea580c"} />
               )}
               <p
-                className={`ml-1 ${core ? "text-pink-500" : "text-orange-500"}`}
+                className={`ml-1 ${core ? "text-pink-600" : "text-orange-600"}`}
               >
                 {core ? "core" : "community"}
               </p>

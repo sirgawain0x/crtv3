@@ -22,6 +22,10 @@ interface CreateThumbnailWrapperProps {
       contractAddress: string;
       txHash: string;
     };
+    createdMeToken?: {
+      address: string;
+      id: string;
+    };
   }) => Promise<void> | void;
 }
 
