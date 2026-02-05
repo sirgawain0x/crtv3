@@ -30,6 +30,8 @@ export function MembershipGuard({ children }: MembershipGuardProps) {
     '/news',
     '/live',
     '/watch',
+    '/profile',
+    '/upload',
   ];
 
   const isPublicPath = PUBLIC_PATHS.some(path => pathname?.startsWith(path));
