@@ -1341,6 +1341,10 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
     setTransactionError(null);
 
     try {
+      // Get gas sponsorship context (sponsored for members, USDC for non-members)
+      const { context: gasContext } = getGasContext('usdc');
+      logger.debug('🔧 Gas context for buyMeTokens:', { gasContext, isMember });
+
       // Get the vault address that will actually perform transferFrom
       // 1. Get meToken's hubId
       const meTokenInfo = await client.readContract({
@@ -1415,6 +1419,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
             data: approveData,
             value: BigInt(0),
           },
+          context: gasContext,
         });
 
         logger.debug('⏳ Waiting for approval confirmation...', approveOp.hash);
@@ -1458,6 +1463,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
             data: approveData,
             value: BigInt(0),
           },
+          context: gasContext,
         });
 
         logger.debug('⏳ Waiting for DIAMOND approval confirmation...', approveOp.hash);
@@ -1512,7 +1518,10 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
           });
 
           // Race the sendUserOperation with timeout
-          const sendMintOpPromise = client.sendUserOperation(mintOperation);
+          const sendMintOpPromise = client.sendUserOperation({
+            ...mintOperation,
+            context: gasContext,
+          });
           operation = await Promise.race([sendMintOpPromise, timeoutPromise]) as any;
 
           // Success - break out of retry loop

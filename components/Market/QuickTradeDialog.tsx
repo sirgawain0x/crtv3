@@ -566,7 +566,7 @@ export function QuickTradeDialog({
           {error && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
+              <AlertDescription className="break-words">{error}</AlertDescription>
             </Alert>
           )}
 

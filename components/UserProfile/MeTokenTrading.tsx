@@ -526,14 +526,14 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
         {error && (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
+            <AlertDescription className="break-words">{error}</AlertDescription>
           </Alert>
         )}
 
         {transactionError && (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
+            <AlertDescription className="break-words">
               Transaction failed: {transactionError.message}
             </AlertDescription>
           </Alert>
