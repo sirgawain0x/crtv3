@@ -15,8 +15,9 @@ interface GasSponsorshipContext {
 export function useGasSponsorship() {
     const { isMember } = useIsMember();
 
-    const SPONSORED_POLICY_ID = process.env.NEXT_PUBLIC_ALCHEMY_PAYMASTER_POLICY_ID;
-    const USDC_POLICY_ID = process.env.NEXT_PUBLIC_ANYTOKEN_POLICY_ID;
+    // Strip quotes from environment variables (they may have quotes in .env.local)
+    const SPONSORED_POLICY_ID = process.env.NEXT_PUBLIC_ALCHEMY_PAYMASTER_POLICY_ID?.replace(/^["']|["']$/g, '');
+    const USDC_POLICY_ID = process.env.NEXT_PUBLIC_ANYTOKEN_POLICY_ID?.replace(/^["']|["']$/g, '');
 
     /**
      * Returns the appropriate UserOperation context based on membership status and target payment method.
