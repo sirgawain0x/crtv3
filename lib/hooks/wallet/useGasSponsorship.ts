@@ -25,8 +25,19 @@ export function useGasSponsorship() {
      */
     const getGasContext = (preferredMethod: 'sponsored' | 'usdc' = 'usdc'): { context: GasSponsorshipContext | undefined, isSponsored: boolean } => {
 
+        // Debug logging
+        console.log('🔧 useGasSponsorship.getGasContext called:', {
+            isMember,
+            preferredMethod,
+            hasSponsoredPolicy: !!SPONSORED_POLICY_ID,
+            hasUsdcPolicy: !!USDC_POLICY_ID,
+            sponsoredPolicyId: SPONSORED_POLICY_ID?.slice(0, 8) + '...', // Log first 8 chars only
+            usdcPolicyId: USDC_POLICY_ID?.slice(0, 8) + '...',
+        });
+
         // 1. Members get Full Sponsorship
         if (isMember && SPONSORED_POLICY_ID) {
+            console.log('✅ Using SPONSORED gas (member)');
             return {
                 context: {
                     paymasterService: {
@@ -39,6 +50,7 @@ export function useGasSponsorship() {
 
         // 2. Non-Members: Try USDC Policy
         if (USDC_POLICY_ID && preferredMethod === 'usdc') {
+            console.log('✅ Using USDC gas payment (non-member)');
             return {
                 context: {
                     paymasterService: {
@@ -51,6 +63,7 @@ export function useGasSponsorship() {
         }
 
         // 3. Fallback / No Policy: Undefined context (Standard ETH payment)
+        console.warn('⚠️ No gas sponsorship available - falling back to ETH payment');
         return {
             context: undefined,
             isSponsored: false

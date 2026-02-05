@@ -1342,8 +1342,15 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
 
     try {
       // Get gas sponsorship context (sponsored for members, USDC for non-members)
-      const { context: gasContext } = getGasContext('usdc');
-      logger.debug('🔧 Gas context for buyMeTokens:', { gasContext, isMember });
+      const { context: gasContext, isSponsored } = getGasContext('usdc');
+      logger.debug('🔧 Gas context for buyMeTokens:', {
+        gasContext,
+        isMember,
+        isSponsored,
+        hasPolicyId: !!gasContext?.paymasterService?.policyId,
+        policyId: gasContext?.paymasterService?.policyId,
+        token: gasContext?.paymasterService?.token
+      });
 
       // Get the vault address that will actually perform transferFrom
       // 1. Get meToken's hubId
