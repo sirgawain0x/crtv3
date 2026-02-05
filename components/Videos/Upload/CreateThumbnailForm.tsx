@@ -59,6 +59,7 @@ interface CreateThumbnailFormProps {
     contractAddress: Address;
     txHash: string;
   }) => void;
+  onMeTokenCreated?: (meTokenAddress: string, transactionHash?: string, meTokenId?: string) => void;
 }
 
 const CreateThumbnailForm = ({
@@ -71,6 +72,7 @@ const CreateThumbnailForm = ({
   onMeTokenConfigChange,
   onStoryConfigChange,
   onNFTMinted,
+  onMeTokenCreated,
 }: CreateThumbnailFormProps) => {
   const {
     control,
@@ -906,7 +908,14 @@ const CreateThumbnailForm = ({
             </CardHeader>
             <CardContent>
               <RobustMeTokenCreator
-                onMeTokenCreated={(meToken) => {
+                onMeTokenCreated={(meTokenAddress, txHash, meTokenId) => {
+                  // Don't close immediately - let user see success state
+                  // Just update parent state/data
+                  checkUserMeToken();
+                  onMeTokenCreated?.(meTokenAddress, txHash, meTokenId);
+                }}
+                onClose={() => {
+                  // Close when user clicks "Done"
                   setShowMeTokenCreator(false);
                   checkUserMeToken();
                 }}

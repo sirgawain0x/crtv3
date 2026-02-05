@@ -38,6 +38,11 @@ type CreateThumbnailProps = {
       contractAddress: string;
       txHash: string;
     };
+    createdMeToken?: {
+      address: string;
+      id: string;
+    };
+
   }) => Promise<void> | void;
 };
 
@@ -66,6 +71,10 @@ export default function CreateThumbnail({
     tokenId: string;
     contractAddress: string;
     txHash: string;
+  } | null>(null);
+  const [createdMeToken, setCreatedMeToken] = useState<{
+    address: string;
+    id: string;
   } | null>(null);
 
   const [isPublishing, setIsPublishing] = useState(false);
@@ -223,6 +232,7 @@ export default function CreateThumbnail({
         meTokenConfig: meTokenConfig,
         storyConfig: storyConfig,
         nftMintResult: nftMintResult || undefined,
+        createdMeToken: createdMeToken || undefined,
       });
     } catch (error) {
       logger.error("Publication failed:", error);
@@ -356,6 +366,11 @@ export default function CreateThumbnail({
                   contractAddress: result.contractAddress,
                   txHash: result.txHash,
                 });
+              }}
+              onMeTokenCreated={(address, txHash, id) => {
+                if (address && id) {
+                  setCreatedMeToken({ address, id });
+                }
               }}
             />
           </div>

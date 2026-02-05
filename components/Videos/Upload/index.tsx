@@ -180,8 +180,32 @@ const HookMultiStepForm = () => {
               contractAddress: string;
               txHash: string;
             };
+            createdMeToken?: {
+              address: string;
+              id: string;
+            };
           }) => {
             setThumbnailUri(data.thumbnailUri);
+
+            // If a new MeToken was created in this step, update our local state and the video asset
+            let finalMeTokenId = creatorMeToken;
+            if (data.createdMeToken?.id) {
+              logger.debug("New MeToken created during upload:", data.createdMeToken);
+              setCreatorMeToken(data.createdMeToken.id);
+              finalMeTokenId = data.createdMeToken.id;
+
+              // Update the video asset in DB to associate it with this new MeToken
+              if (videoAsset?.id) {
+                try {
+                  await updateVideoAsset(videoAsset.id, {
+                    creator_metoken_id: data.createdMeToken.id
+                  } as any);
+                  logger.debug("Updated video asset with new MeToken ID");
+                } catch (err) {
+                  logger.error("Failed to update video asset with new MeToken:", err);
+                }
+              }
+            }
 
             if (!livepeerAsset || !metadata) {
               toast.error("Missing asset metadata. Please try again.");
@@ -346,7 +370,7 @@ const HookMultiStepForm = () => {
 
                       if (mintResult && mintResult.success && mintResult.collectionAddress && mintResult.tokenId) {
                         // Set royalty recipient to split contract if available
-                        const splitsAddress = updatedAsset?.splits_address 
+                        const splitsAddress = updatedAsset?.splits_address
                           ? (updatedAsset.splits_address as `0x${string}`)
                           : undefined;
 
@@ -354,7 +378,7 @@ const HookMultiStepForm = () => {
                           try {
                             const { setTokenRoyaltyToSplit } = await import("@/lib/sdk/nft/royalty-service");
                             toast.info("Setting royalties to split contract...");
-                            
+
                             const royaltyResult = await setTokenRoyaltyToSplit(
                               smartAccountClient,
                               mintResult.collectionAddress,
@@ -402,7 +426,7 @@ const HookMultiStepForm = () => {
             }
 
             // --- AUTO DEPLOY CONTENT COIN ---
-            if (creatorMeToken && address && metadata?.ticker) {
+            if (finalMeTokenId && address && metadata?.ticker) {
               toast.info("Deploying Content Coin Market...");
               try {
                 // 15s timeout for content coin
@@ -410,7 +434,7 @@ const HookMultiStepForm = () => {
                   handleUploadSuccess(
                     metadata.title,
                     metadata.ticker,
-                    creatorMeToken,
+                    finalMeTokenId,
                     address
                   ),
                   15000
@@ -426,6 +450,13 @@ const HookMultiStepForm = () => {
             // Ensure redirect happens
             logger.debug("Redirecting to discover page...");
             router.push("/discover");
+
+            // Fallback
+            setTimeout(() => {
+              if (window.location.pathname !== '/discover') {
+                window.location.href = "/discover";
+              }
+            }, 1000);
           }}
         />
       )}
