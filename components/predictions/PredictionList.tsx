@@ -47,7 +47,7 @@ export function PredictionList() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [showOnlyAppQuestions, setShowOnlyAppQuestions] = useState(false); // Default to false to show all questions
+  const [showOnlyAppQuestions, setShowOnlyAppQuestions] = useState(true); // Default to true to show only app questions
 
   useEffect(() => {
     async function fetchQuestions() {
@@ -217,6 +217,59 @@ export function PredictionList() {
 
         logger.debug(`Successfully fetched ${parsedQuestions.length} questions from Reality.eth subgraph`);
 
+        // Fetch bounties for these questions
+        const questionIds = parsedQuestions.map(q => q.id);
+
+        if (questionIds.length > 0) {
+          const GET_BOUNTIES_QUERY = gql`
+            query GetBounties($questionIds: [String!]) {
+              logFundAnswerBounties(
+                where: { question_id_in: $questionIds }
+                orderBy: timestamp_
+                orderDirection: desc
+              ) {
+                question_id
+                bounty
+              }
+            }
+          `;
+
+          try {
+            logger.debug('💰 Fetching bounties for questions');
+            const bountyData = await request(endpoint, GET_BOUNTIES_QUERY, { questionIds }) as any;
+            const bounties = bountyData.logFundAnswerBounties || [];
+
+            // Create a map of question_id -> bounty
+            // Since we ordered by desc, the first entry for each question is the latest event
+            // NOTE: Ideally we should sum them up if there are multiple funding events, 
+            // but for now let's assume the latest event might have the accumulated value 
+            // OR we just take the latest funding event. 
+            // Actually, LogFundAnswerBounty emits 'bounty' which is the *amount added*.
+            // So we need to sum them up by question_id.
+
+            const bountyMap = new Map<string, bigint>();
+
+            bounties.forEach((b: any) => {
+              const qId = b.question_id;
+              const amount = BigInt(b.bounty || 0);
+              const current = bountyMap.get(qId) || BigInt(0);
+              bountyMap.set(qId, current + amount);
+            });
+
+            // Update questions with bounty data
+            parsedQuestions.forEach(q => {
+              if (bountyMap.has(q.id)) {
+                q.bounty = bountyMap.get(q.id)?.toString() || "0";
+              }
+            });
+
+            logger.debug(`Updated ${bountyMap.size} questions with bounty data`);
+          } catch (bountyError) {
+            logger.warn('Failed to fetch bounties:', bountyError);
+            // Continue without bounties, they will default to "0"
+          }
+        }
+
         // Filter to only show questions from this app if enabled
         // Questions created through this app use arbitrator: 0x0000000000000000000000000000000000000000
         const APP_ARBITRATOR = "0x0000000000000000000000000000000000000000";
@@ -325,6 +378,8 @@ export function PredictionList() {
     }
   };
 
+
+
   return (
     <div className="space-y-4">
       {/* Filter toggle */}
@@ -333,15 +388,15 @@ export function PredictionList() {
           <input
             type="checkbox"
             id="filter-app-questions"
-            checked={showOnlyAppQuestions}
+            checked={!showOnlyAppQuestions}
             onChange={(e) => {
-              setShowOnlyAppQuestions(e.target.checked);
+              setShowOnlyAppQuestions(!e.target.checked);
               setCurrentPage(1); // Reset to first page when filter changes
             }}
             className="h-4 w-4 rounded border-gray-300"
           />
           <label htmlFor="filter-app-questions" className="text-sm text-gray-600 dark:text-gray-400 cursor-pointer">
-            Show only questions from this app
+            Show all Reality.eth predictions
           </label>
         </div>
         <div className="text-sm text-gray-500">

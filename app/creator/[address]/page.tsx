@@ -20,6 +20,8 @@ import { meTokenSupabaseService } from "@/lib/sdk/supabase/metokens";
 import { CreatorProfileHeader } from "@/components/Creator/CreatorProfileHeader";
 import Link from "next/link";
 import { logger } from '@/lib/utils/logger';
+import { getTokenMarketData } from "@/lib/services/market";
+import { Metadata, ResolvingMetadata } from "next";
 
 
 
@@ -65,6 +67,63 @@ async function fetchVideoCount(creatorAddress: string) {
     logger.error("Error fetching video count:", error);
     return 0;
   }
+}
+
+export async function generateMetadata(
+  { params }: CreatorPageProps,
+  parent: ResolvingMetadata
+): Promise<Metadata> {
+  const { address } = await params;
+  const normalizedAddress = address.toLowerCase();
+
+  // Fetch creator profile and MeToken
+  const [creatorProfile, meToken] = await Promise.all([
+    fetchCreatorProfile(normalizedAddress),
+    meTokenSupabaseService.getMeTokenByOwner(normalizedAddress).catch(() => null)
+  ]);
+
+  if (!meToken) {
+    const displayName = creatorProfile?.username || shortenAddress(address);
+    return {
+      title: `${displayName} on Creative TV`,
+      description: creatorProfile?.bio || `Check out ${displayName}'s profile and videos on Creative TV.`,
+    };
+  }
+
+  // Fetch market data for the token
+  const marketData = await getTokenMarketData(meToken.address);
+
+  const price = marketData?.price ? `$${marketData.price.toFixed(4)}` : 'N/A';
+  // Format TVL: e.g. $1.5K
+  const tvl = marketData?.tvl
+    ? marketData.tvl >= 1000
+      ? `$${(marketData.tvl / 1000).toFixed(1)}K`
+      : `$${marketData.tvl.toFixed(2)}`
+    : 'N/A';
+
+  const name = meToken.name;
+  const symbol = meToken.symbol;
+  const displayName = creatorProfile?.username || name;
+
+  const title = `${symbol} ($${price}) - ${displayName}`;
+  const description = `Trade ${symbol} on Creative TV. TVL: ${tvl}. ${creatorProfile?.bio || ''}`.trim();
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      type: "profile",
+      images: creatorProfile?.avatar_url ? [convertFailingGateway(creatorProfile.avatar_url)] : [],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: creatorProfile?.avatar_url ? [convertFailingGateway(creatorProfile.avatar_url)] : [],
+    }
+  };
 }
 
 export default async function CreatorPage({ params }: CreatorPageProps) {

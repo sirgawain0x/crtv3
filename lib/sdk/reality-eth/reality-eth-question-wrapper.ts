@@ -1,4 +1,4 @@
-import { type Address, type PublicClient, type WalletClient, encodeFunctionData, parseAbi } from "viem";
+import { type Address, type PublicClient, type WalletClient, encodeFunctionData, parseAbi, keccak256, encodePacked } from "viem";
 import { base } from "@account-kit/infra";
 import { getRealityEthContract, getRealityEthContractAddress, getRealityEthABI } from "./reality-eth-client";
 import { encodeQuestionText, validateQuestionData, type QuestionData } from "./reality-eth-utils";
@@ -447,47 +447,217 @@ export interface AnswerHistoryEntry {
 }
 
 /**
- * Fetches answer history for a question from LogNewAnswer events.
- * Used to build claimWinnings params. Entries are in chronological order (oldest first).
+ * Attempt to reconstruct missing initial history entry by brute-force hashing common values.
+ * Useful if the first answer log is missing but we know its resulting hash (the history_hash of the next answer).
  */
+function reconstructMissingEntry(targetHash: string, questionCreator: Address, arbitrator: Address, minBond: bigint): AnswerHistoryEntry | null {
+  const zero = "0x0000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`;
+  const potentialAnswers: `0x${string}`[] = [
+    zero, // 0 (No / Unresolved)
+    "0x0000000000000000000000000000000000000000000000000000000000000001", // 1 (Yes)
+    "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" // Invalid
+  ];
+  // Try 0, minBond, and common bond amounts (0.001, 0.01, 0.1, 1 ETH)
+  const potentialBonds = [0n, minBond, 1000000000000000n, 10000000000000000n, 100000000000000000n, 1000000000000000000n];
+  // Deduplicate bonds
+  const uniqueBonds = [...new Set(potentialBonds)];
+
+  const potentialUsers = [questionCreator, arbitrator, "0x0000000000000000000000000000000000000000" as Address];
+
+  for (const ans of potentialAnswers) {
+    for (const bond of uniqueBonds) {
+      for (const user of potentialUsers) {
+        for (const isCommitment of [false, true]) {
+          try {
+            const hash = keccak256(
+              encodePacked(
+                ['bytes32', 'bytes32', 'uint256', 'address', 'bool'],
+                [zero, ans, bond, user, isCommitment]
+              )
+            );
+            if (hash === targetHash) {
+              serverLogger.info(`🔧 RECONSTRUCTED MISSING HISTORY! Answer: ${ans}, Bond: ${bond}, User: ${user}, Commit: ${isCommitment}`);
+              return {
+                answer: ans,
+                history_hash: zero,
+                user: user,
+                bond: bond,
+                ts: 0n, // Unknown
+                is_commitment: isCommitment
+              };
+            }
+          } catch (e) { /* ignore */ }
+        }
+      }
+    }
+  }
+  return null;
+}
+
+
 export async function getAnswerHistory(
   publicClient: PublicClient,
   questionId: string
 ): Promise<AnswerHistoryEntry[]> {
   const contractAddress = getRealityEthContractAddress();
 
+  // 0. CRITICAL CHECK: Verify on-chain history hash first.
+  // If the contract says history_hash is 0, we MUST provide an empty history for claimWinnings to succeed.
+  // This handles edge cases where state might be paradoxical (e.g. Best Answer set but History 0).
+  try {
+    const questionAbi = parseAbi(["function questions(bytes32) view returns (bytes32, address, uint32, uint32, uint32, bool, uint256, bytes32, bytes32, uint256, uint256)"]);
+    const qData = await publicClient.readContract({
+      address: contractAddress,
+      abi: questionAbi,
+      functionName: 'questions',
+      args: [questionId as `0x${string}`]
+    }) as any;
+
+    // qData[8] is history_hash
+    if (Array.isArray(qData) && qData.length >= 9) {
+      const onChainHistoryHash = qData[8];
+      const zeroHash = "0x0000000000000000000000000000000000000000000000000000000000000000";
+      if (onChainHistoryHash === zeroHash) {
+        serverLogger.warn(`⚠️ On-chain history hash is ZERO for ${questionId}. Returning empty history to match contract state.`);
+        return [];
+      }
+    }
+  } catch (e) {
+    serverLogger.warn("Could not fetch on-chain history hash, proceeding with logs...", e);
+  }
+
+  // 1. Try fetching from RPC logs
   const logNewAnswerAbi = parseAbi([
     "event LogNewAnswer(bytes32 answer, bytes32 indexed question_id, bytes32 history_hash, address indexed user, uint256 bond, uint256 ts, bool is_commitment)",
   ])[0] as any;
 
-  const logs = await publicClient.getLogs({
-    address: contractAddress,
-    event: logNewAnswerAbi,
-    args: { question_id: questionId as `0x${string}` },
-    fromBlock: 0n,
-  });
+  let entries: AnswerHistoryEntry[] = [];
 
-  const withMeta = logs.map((log) => {
-    const a = (log as { args?: Record<string, unknown> }).args;
-    if (!a || typeof a !== "object") throw new Error("LogNewAnswer: missing args");
-    return {
-      answer: a.answer as `0x${string}`,
-      history_hash: a.history_hash as `0x${string}`,
-      user: a.user as Address,
-      bond: BigInt(String(a.bond)),
-      ts: BigInt(String(a.ts)),
-      is_commitment: Boolean(a.is_commitment),
-      blockNumber: log.blockNumber,
-      logIndex: log.logIndex,
-    };
-  });
+  try {
+    const logs = await publicClient.getLogs({
+      address: contractAddress,
+      event: logNewAnswerAbi,
+      args: { question_id: questionId as `0x${string}` },
+      fromBlock: 'earliest', // Ensure we look from the beginning
+    });
 
-  withMeta.sort((x, y) => {
-    if (x.blockNumber !== y.blockNumber) return x.blockNumber < y.blockNumber ? -1 : 1;
-    return x.logIndex < y.logIndex ? -1 : x.logIndex > y.logIndex ? 1 : 0;
-  });
+    const withMeta = logs.map((log) => {
+      const a = (log as { args?: Record<string, unknown> }).args;
+      if (!a || typeof a !== "object") throw new Error("LogNewAnswer: missing args");
+      return {
+        answer: a.answer as `0x${string}`,
+        history_hash: a.history_hash as `0x${string}`,
+        user: a.user as Address,
+        bond: BigInt(String(a.bond)),
+        ts: BigInt(String(a.ts)),
+        is_commitment: Boolean(a.is_commitment),
+        blockNumber: log.blockNumber,
+        logIndex: log.logIndex,
+      };
+    });
 
-  return withMeta.map(({ blockNumber: _, logIndex: __, ...e }) => e);
+    withMeta.sort((x, y) => {
+      if (x.blockNumber !== y.blockNumber) return x.blockNumber < y.blockNumber ? -1 : 1;
+      return x.logIndex < y.logIndex ? -1 : x.logIndex > y.logIndex ? 1 : 0;
+    });
+
+    entries = withMeta.map(({ blockNumber: _, logIndex: __, ...e }) => e);
+  } catch (err) {
+    serverLogger.warn("Error fetching logs from RPC, trying subgraph...", err);
+  }
+
+  // 2. Check for missing start or empty logs -> Fallback to Subgraph
+  const zeroHash = "0x0000000000000000000000000000000000000000000000000000000000000000";
+
+  if (entries.length === 0 || entries[0].history_hash !== zeroHash) {
+    serverLogger.info(`⚠️ RPC logs incomplete for ${questionId} (Start hash: ${entries[0]?.history_hash || 'none'}). Fetching from Subgraph...`);
+
+    // Public Goldsky endpoint for Reality.eth on Base
+    const GRAPH_URL = "https://api.goldsky.com/api/public/project_cmh0iv6s500dbw2p22vsxcfo6/subgraphs/reality-eth/1.0.0/gn";
+
+    const query = `
+      query GetHistory($qId: String!) {
+        logNewQuestions(where: { question_id: $qId }) {
+           user
+           arbitrator
+        }
+        logNewAnswers(where: { question_id: $qId }, orderBy: ts, orderDirection: asc) {
+          answer
+          history_hash
+          user
+          bond
+          ts
+          is_commitment
+        }
+      }
+    `;
+
+    try {
+      const response = await fetch(GRAPH_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query, variables: { qId: questionId } }),
+      });
+
+      const result = await response.json();
+      const answerLogs = result.data?.logNewAnswers;
+      const questionLog = result.data?.logNewQuestions?.[0]; // Get creator/arbitrator info
+
+      if (answerLogs && Array.isArray(answerLogs)) {
+        entries = answerLogs.map((a: any) => ({
+          answer: a.answer as `0x${string}`,
+          history_hash: a.history_hash as `0x${string}`,
+          user: a.user as Address,
+          bond: BigInt(a.bond),
+          ts: BigInt(a.ts),
+          is_commitment: Boolean(a.is_commitment),
+        }));
+
+        serverLogger.info(`✅ Fetched ${entries.length} entries from Subgraph`);
+
+        // 3. Attempt Reconstruction if STILL missing start
+        if (entries.length > 0 && entries[0].history_hash !== zeroHash) {
+          serverLogger.warn("⚠️ Still missing initial history after Subgraph fetch. Attempting reconstruction...");
+
+          // Fetch min_bond from contract to help reconstruction
+          let minBond = 0n;
+          try {
+            const questionAbi = parseAbi(["function questions(bytes32) view returns (bytes32, address, uint32, uint32, uint32, bool, uint256, bytes32, bytes32, uint256, uint256)"]);
+            // Note: ABI might vary, using a generous read or standard
+            const qData = await publicClient.readContract({
+              address: contractAddress,
+              abi: questionAbi,
+              functionName: 'questions',
+              args: [questionId as `0x${string}`]
+            }) as any;
+            // min_bond is typically the last or near-last field
+            // Based on Realitio v2.1: ... bond, min_bond
+            if (Array.isArray(qData) && qData.length >= 11) {
+              minBond = qData[10];
+            }
+          } catch (e) {
+            serverLogger.warn("Could not fetch min_bond from contract", e);
+          }
+
+          const creator = questionLog?.user as Address || "0x0000000000000000000000000000000000000000";
+          const arbitrator = questionLog?.arbitrator as Address || "0x0000000000000000000000000000000000000000";
+
+          const reconstructed = reconstructMissingEntry(entries[0].history_hash, creator, arbitrator, minBond);
+
+          if (reconstructed) {
+            entries.unshift(reconstructed);
+          } else {
+            serverLogger.error("❌ Failed to reconstruct missing history entry. Claim will likely fail.");
+          }
+        }
+      }
+    } catch (graphErr) {
+      serverLogger.error("Error fetching from subgraph:", graphErr);
+      // Fallback: stick with what we have from RPC if subgraph fails, but likely doomed.
+    }
+  }
+
+  return entries;
 }
 
 /**
@@ -506,12 +676,43 @@ export function buildClaimWinningsParams(entries: AnswerHistoryEntry[]): {
   const answers: `0x${string}`[] = [];
 
   const zero = "0x0000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`;
+  let current_hash = zero;
+
+  serverLogger.debug(`🔨 Building claim params for ${entries.length} entries`);
+
   for (let i = 0; i < entries.length; i++) {
-    history_hashes.push(i === 0 ? zero : entries[i - 1].history_hash);
-    addrs.push(entries[i].user);
-    bonds.push(entries[i].bond);
-    answers.push(entries[i].answer);
+    const entry = entries[i];
+
+    // Check for consistency with event log (debug only)
+    if (current_hash !== entry.history_hash) {
+      serverLogger.warn(`⚠️ Hash mismatch at input ${i}! Comp: ${current_hash}, Event: ${entry.history_hash}`);
+      // We continue with *our* calculated hash to ensure the arrays are internally consistent 
+      // for the claimWinnings transaction loop.
+    }
+
+    history_hashes.push(current_hash);
+    addrs.push(entry.user);
+    bonds.push(entry.bond);
+    answers.push(entry.answer);
+
+    // Calculate next hash for next iteration
+    // Reality.eth 2.0/3.0 hash: keccak256(abi.encodePacked(history_hash, answer, bond, sender, is_commitment))
+    try {
+      current_hash = keccak256(
+        encodePacked(
+          ['bytes32', 'bytes32', 'uint256', 'address', 'bool'],
+          [current_hash, entry.answer, entry.bond, entry.user, entry.is_commitment]
+        )
+      );
+    } catch (e) {
+      serverLogger.error("Error calculating hash:", e);
+      // Fallback to event's next hash if calculation fails (unlikely)
+      // We can't know the *next* hash from the *current* entry's event data directly 
+      // (entry.history_hash is the *previous* hash). 
+      // We would need entries[i+1].history_hash, or just trust the loop will fail.
+    }
   }
+
   return { history_hashes, addrs, bonds, answers };
 }
 

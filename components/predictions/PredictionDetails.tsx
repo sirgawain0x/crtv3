@@ -12,8 +12,10 @@ import { getQuestion, getFinalAnswer, type RealityEthQuestion } from "@/lib/sdk/
 import { parseQuestionText, formatQuestionForDisplay } from "@/lib/sdk/reality-eth/reality-eth-utils";
 import { BetForm } from "./BetForm";
 import { ClaimWinningsCard } from "./ClaimWinningsCard";
-import { Clock, TrendingUp } from "lucide-react";
+import { Clock, TrendingUp, Share2 } from "lucide-react";
 import { logger } from '@/lib/utils/logger';
+import { useToast } from "@/components/ui/use-toast";
+import { EvidenceSubmissionModal } from "./EvidenceSubmissionModal";
 
 
 interface PredictionDetailsProps {
@@ -40,6 +42,7 @@ export function PredictionDetails({ questionId }: PredictionDetailsProps) {
   const [finalAnswer, setFinalAnswer] = useState<string | null>(null);
 
   const { client: accountKitClient } = useSmartAccountClient({});
+  const { toast } = useToast();
 
   useEffect(() => {
     async function fetchQuestion() {
@@ -199,7 +202,7 @@ export function PredictionDetails({ questionId }: PredictionDetailsProps) {
           <h1 className="text-2xl font-bold">
             {question.parsed?.title || (question.question ? question.question : "Untitled Prediction")}
           </h1>
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
             {isResolved ? (
               <Badge variant="secondary">Resolved</Badge>
             ) : isPendingArbitration ? (
@@ -211,6 +214,26 @@ export function PredictionDetails({ questionId }: PredictionDetailsProps) {
             ) : (
               <Badge variant="secondary">Closed</Badge>
             )}
+
+            {!isResolved && (
+              <EvidenceSubmissionModal questionId={questionId} />
+            )}
+
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => {
+                const url = window.location.href;
+                navigator.clipboard.writeText(url);
+                toast({
+                  title: "Link Copied",
+                  description: "Prediction URL copied to clipboard.",
+                });
+              }}
+              title="Share Prediction"
+            >
+              <Share2 className="h-4 w-4" />
+            </Button>
           </div>
         </div>
 
@@ -239,10 +262,10 @@ export function PredictionDetails({ questionId }: PredictionDetailsProps) {
           )}
 
           {question.bounty && Number(question.bounty) > 0 && (
-            <div>Bounty: {formatEther(question.bounty)} ETH</div>
+            <div>Bounty: {Number(formatEther(question.bounty)).toFixed(3)} ETH</div>
           )}
           {question.bond && Number(question.bond) > 0 && (
-            <div>Current Bond: {formatEther(question.bond)} ETH</div>
+            <div>Current Bond: {Number(formatEther(question.bond)).toFixed(3)} ETH</div>
           )}
         </div>
       </div>

@@ -1,4 +1,5 @@
 import React from "react";
+import { Metadata, ResolvingMetadata } from "next";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -13,9 +14,76 @@ import Link from "next/link";
 import { PredictionDetails } from "@/components/predictions/PredictionDetails";
 import { REALITY_ETH_DAPP_URL, REALITY_ETH_CHAIN_ID } from "@/context/context";
 import { getRealityEthContractAddress } from "@/lib/sdk/reality-eth/reality-eth-client";
+import { createPublicClient, http, fallback, formatEther } from "viem";
+import { base } from "viem/chains";
+import { getQuestion } from "@/lib/sdk/reality-eth/reality-eth-question-wrapper";
+import { logger } from "@/lib/utils/logger";
+
 
 interface PredictionDetailsPageProps {
   params: Promise<{ id: string }>;
+}
+
+export async function generateMetadata(
+  { params }: PredictionDetailsPageProps,
+  parent: ResolvingMetadata
+): Promise<Metadata> {
+  const { id } = await params;
+
+  // Default metadata
+  const defaultTitle = "Prediction Market";
+  const defaultDescription = "Predict the outcome of real-world events on Creative TV.";
+
+  try {
+    const publicClient = createPublicClient({
+      chain: base,
+      transport: fallback([
+        http(process.env.NEXT_PUBLIC_ALCHEMY_API_KEY
+          ? `https://base-mainnet.g.alchemy.com/v2/${process.env.NEXT_PUBLIC_ALCHEMY_API_KEY}`
+          : undefined),
+        http("https://mainnet.base.org"),
+      ]),
+    });
+
+    const questionData = await getQuestion(publicClient as any, id);
+    let title = defaultTitle;
+    let description = defaultDescription;
+
+    if (questionData) {
+      if (questionData.question) {
+        // Try to parse the question if it's a template
+        // For standard reality.eth questions, the question text is often the title
+        title = questionData.question;
+      }
+
+      // Add bounty to description if it exists
+      if (questionData.bounty && questionData.bounty > 0n) {
+        const bountyEth = formatEther(questionData.bounty);
+        description = `Reward: ${bountyEth} ETH - ${defaultDescription}`;
+      }
+    }
+
+    return {
+      title: `Prediction: ${title}`,
+      description: description,
+      openGraph: {
+        title: `Prediction: ${title}`,
+        description: description,
+        type: "website",
+      },
+      twitter: {
+        card: "summary_large_image",
+        title: `Prediction: ${title}`,
+        description: description,
+      }
+    };
+  } catch (error) {
+    logger.error("Error generating metadata:", error);
+    return {
+      title: defaultTitle,
+      description: defaultDescription,
+    };
+  }
 }
 
 export default async function PredictionDetailsPage({

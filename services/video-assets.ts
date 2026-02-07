@@ -265,14 +265,24 @@ async function executeWithTimeoutAndRetry<T>(
   throw lastError || new Error('Failed to execute query after retries');
 }
 
-export async function getVideoAssetByPlaybackId(playbackId: string) {
+export interface VideoAssetPlaybackData {
+  id: number;
+  status: string;
+  thumbnail_url: string | null;
+  creator_metoken_id: string | null;
+  attributes: Record<string, any> | null;
+  title: string;
+}
+
+export async function getVideoAssetByPlaybackId(playbackId: string): Promise<VideoAssetPlaybackData | null> {
   const supabase = await createClient();
 
-  const result = await executeWithTimeoutAndRetry(
+  // Cast supabase to any to resolve issue where missing Database types cause return to be inferred as 'never'
+  const result = await executeWithTimeoutAndRetry<VideoAssetPlaybackData>(
     async () => {
-      return await supabase
+      return await (supabase as any)
         .from('video_assets')
-        .select('id, status, thumbnail_url, creator_metoken_id, attributes')
+        .select('id, status, thumbnail_url, creator_metoken_id, attributes, title')
         .eq('playback_id', playbackId)
         .maybeSingle();
     },

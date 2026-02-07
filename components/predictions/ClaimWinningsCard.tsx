@@ -189,7 +189,7 @@ export function ClaimWinningsCard({ questionId }: ClaimWinningsCardProps) {
             {balance !== null && (
               <span className="inline-flex items-center gap-1 text-sm text-emerald-800 dark:text-emerald-200">
                 <Wallet className="h-4 w-4" aria-hidden />
-                Contract balance: {formatEther(balance)} ETH
+                Withdrawable Balance: {Number(formatEther(balance)).toFixed(3)} ETH
               </span>
             )}
           </div>

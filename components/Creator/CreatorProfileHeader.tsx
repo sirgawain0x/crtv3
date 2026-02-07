@@ -13,6 +13,7 @@ import { useState } from "react";
 import { QuickTradeDialog } from "@/components/Market/QuickTradeDialog";
 import { TokenChartDialog } from "@/components/Market/TokenChartDialog";
 import { MarketToken } from "@/app/api/market/tokens/route";
+import { MeTokenShareButton } from "@/components/Market/MeTokenShareButton";
 
 interface CreatorProfileHeaderProps {
   address: string;
@@ -110,6 +111,12 @@ export function CreatorProfileHeader({
               <BarChart3 className="h-4 w-4 mr-2" />
               View Chart
             </Button>
+            <MeTokenShareButton
+              address={marketToken.address}
+              symbol={marketToken.symbol}
+              name={marketToken.name}
+              type="creator"
+            />
           </div>
         )}
       </div>

@@ -12,6 +12,8 @@ import { LinkedIdentityDisplay } from "@/components/vote/LinkedIdentityDisplay";
 import { SNAPSHOT_SPACE } from "@/context/context";
 import Link from "next/link";
 import { ExternalLink, Slash } from "lucide-react";
+import { Metadata, ResolvingMetadata } from "next";
+import { CampaignShareButton } from "@/components/vote/CampaignShareButton";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -56,6 +58,58 @@ const GET_PROPOSAL = gql`
 
 interface ProposalDetailsPageProps {
   params: Promise<{ id: string }>;
+}
+
+export async function generateMetadata(
+  { params }: ProposalDetailsPageProps,
+  parent: ResolvingMetadata
+): Promise<Metadata> {
+  const { id } = await params;
+
+  try {
+    const client = makeServerClient();
+    const { data } = await client.query<{
+      proposal: Proposal & { author: string; plugins?: string };
+    }>({
+      query: GET_PROPOSAL,
+      variables: { id },
+      fetchPolicy: "no-cache",
+    });
+
+    if (!data?.proposal) {
+      return {
+        title: "Campaign Not Found",
+        description: "The requested campaign could not be found.",
+      };
+    }
+
+    const proposal = data.proposal;
+    const cleanDescription = proposal.body
+      ? proposal.body.replace(/[#*`]/g, '').slice(0, 160) + (proposal.body.length > 160 ? '...' : '')
+      : "View this campaign on Creative TV";
+
+    return {
+      title: proposal.title,
+      description: cleanDescription,
+      openGraph: {
+        title: proposal.title,
+        description: cleanDescription,
+        type: "website",
+        siteName: "Creative TV",
+      },
+      twitter: {
+        card: "summary_large_image",
+        title: proposal.title,
+        description: cleanDescription,
+      },
+    };
+  } catch (error) {
+    console.error("Error generating metadata:", error);
+    return {
+      title: "Campaign Details",
+      description: "View campaign details on Creative TV",
+    };
+  }
 }
 
 export default async function ProposalDetailsPage({
@@ -159,9 +213,17 @@ export default async function ProposalDetailsPage({
             </Breadcrumb>
           </div>
           <Card className="p-6 mb-6 overflow-x-auto">
-            <h1 className="text-2xl font-bold mb-2 break-words">
-              {proposal.title}
-            </h1>
+            <div className="flex justify-between items-start mb-2 gap-4">
+              <h1 className="text-2xl font-bold break-words flex-1">
+                {proposal.title}
+              </h1>
+              <div className="flex-shrink-0">
+                <CampaignShareButton
+                  campaignId={proposal.id}
+                  campaignTitle={proposal.title}
+                />
+              </div>
+            </div>
             <div className="mb-4 text-gray-500 space-y-1 break-all">
               <div className="truncate max-w-full">
                 <LinkedIdentityDisplay
