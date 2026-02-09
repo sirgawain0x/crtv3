@@ -162,6 +162,7 @@ export default async function VideoDetailsPage({
             <VideoDetails
               asset={assetData}
               videoTitle={videoAsset?.title || assetData?.name}
+              livepeerAttestationId={videoAsset?.livepeer_attestation_id ?? null}
             />
             {/* Uploader Section with Share Button */}
             <div className="flex items-center justify-between mt-4">
