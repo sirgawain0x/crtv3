@@ -107,8 +107,8 @@ const FileUpload: React.FC<FileUploadProps> = ({
         try {
           const { assetId, timestamp, address: savedAddress } = JSON.parse(savedUpload);
 
-          // Only recover if same user and upload was within last 30 minutes
-          if (savedAddress === address && Date.now() - timestamp < 30 * 60 * 1000) {
+          // Only recover if same user and upload was within last 24 hours (extended for mobile)
+          if (savedAddress === address && Date.now() - timestamp < 24 * 60 * 60 * 1000) {
             logger.debug('Attempting to recover interrupted upload:', assetId);
             toast.info('Checking previous upload status...');
 
@@ -207,9 +207,10 @@ const FileUpload: React.FC<FileUploadProps> = ({
 
       const tusUpload = new tus.Upload(fileToUpload, {
         endpoint: uploadRequestResult?.tusEndpoint,
+        retryDelays: [0, 1000, 3000, 5000], // Retry configuration for mobile reliability
+        chunkSize: 5 * 1024 * 1024, // 5MB chunks for better mobile handling
         metadata: {
           filename: fileToUpload.name,
-          // Validation should ensure type is always present, but use safe fallback as defensive measure
           filetype: fileToUpload.type || "application/octet-stream",
         },
         uploadSize: fileToUpload.size,
@@ -314,7 +315,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
             <input
               type="file"
               id="file-upload"
-              accept="video/mp4,video/quicktime,video/x-matroska,video/webm,video/x-flv,video/mp2t,video/avi,video/x-msvideo,video/x-ms-wmv,.mp4,.mov,.mkv,.webm,.flv,.ts,.avi,.wmv,.mpg,.mpeg"
+              accept="video/mp4,.mp4"
               className="file:border-1 block w-full rounded-lg border border-input bg-background text-sm text-[#EC407A] 
               file:mr-2 file:cursor-pointer file:rounded-full file:border-0 file:bg-card file:px-3 file:py-2 file:text-xs 
               sm:file:mr-4 sm:file:px-4 sm:file:text-sm file:font-semibold file:text-[#EC407A] hover:file:bg-accent"
@@ -323,7 +324,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
             />
             <div className="mt-2 space-y-1">
               <p className="text-xs text-muted-foreground font-medium">
-                📹 Supported: MP4, MOV, AVI, WMV, MKV, WebM, FLV
+                📹 Supported: MP4
               </p>
               <p className="text-xs text-muted-foreground">
                 ✅ Max size: 10GB
