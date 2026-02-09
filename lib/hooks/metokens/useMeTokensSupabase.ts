@@ -1349,7 +1349,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         isSponsored,
         hasPolicyId: !!gasContext?.paymasterService?.policyId,
         policyId: gasContext?.paymasterService?.policyId,
-        token: gasContext?.paymasterService?.token
+        tokenAddress: gasContext?.erc20?.tokenAddress,
       });
 
       // Get the vault address that will actually perform transferFrom

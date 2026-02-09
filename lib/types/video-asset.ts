@@ -52,6 +52,8 @@ export interface VideoAsset {
   story_license_template_id: string | null;  // ID of license template used
   // Splits.org fields
   splits_address: string | null;  // Address of the Splits contract for revenue distribution
+  // Livepeer Verifiable Video
+  livepeer_attestation_id: string | null;  // Livepeer attestation id (creator attestation)
   created_at: Date;
   updated_at: Date;
 }
