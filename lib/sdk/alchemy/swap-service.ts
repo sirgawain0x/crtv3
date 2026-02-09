@@ -28,6 +28,9 @@ interface SwapQuoteRequest {
     paymasterService?: {
       policyId: string;
     };
+    erc20?: {
+      tokenAddress: string;
+    };
   };
   slippage?: Hex;
 }
@@ -129,8 +132,9 @@ export class AlchemySwapService {
     fromAmount?: Hex;
     minimumToAmount?: Hex;
     slippage?: number; // in basis points (e.g., 50 = 0.5%)
+    capabilities?: Record<string, any>; // Allow overriding capabilities (e.g. for paymaster)
   }): Promise<SwapQuoteResponse> {
-    const { from, fromToken, toToken, fromAmount, minimumToAmount, slippage = 50 } = params;
+    const { from, fromToken, toToken, fromAmount, minimumToAmount, slippage = 50, capabilities } = params;
 
     if (!this.apiKey) {
       throw new Error("Alchemy API key is not configured. Please check your environment variables.");
@@ -156,11 +160,11 @@ export class AlchemySwapService {
       chainId: "0x2105", // Base mainnet chain ID
       fromToken: BASE_TOKENS[fromToken],
       toToken: BASE_TOKENS[toToken],
-      capabilities: this.paymasterPolicyId ? {
+      capabilities: capabilities !== undefined ? capabilities : (this.paymasterPolicyId ? {
         paymasterService: {
           policyId: this.paymasterPolicyId,
         },
-      } : undefined,
+      } : undefined),
       slippage: `0x${slippage.toString(16)}`,
       returnRawCalls: true,
     } as any;

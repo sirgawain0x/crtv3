@@ -13,7 +13,6 @@ import { type Hex, type Address, parseEther, formatEther, encodeFunctionData, er
 import { alchemySwapService, AlchemySwapService, type TokenSymbol, BASE_TOKENS, TOKEN_INFO } from '@/lib/sdk/alchemy/swap-service';
 import { priceService, PriceService } from '@/lib/sdk/alchemy/price-service';
 import { CurrencyConverter } from '@/lib/utils/currency-converter';
-import { useGasSponsorship } from '@/lib/hooks/wallet/useGasSponsorship';
 import { logger } from '@/lib/utils/logger';
 import { swapActions } from "@account-kit/wallet-client/experimental";
 
@@ -51,8 +50,8 @@ interface SwapState {
 }
 
 export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false, defaultToToken = 'USDC' }: AlchemySwapWidgetProps) {
+
   const { address, client } = useSmartAccountClient({});
-  const { getGasContext } = useGasSponsorship();
 
   const [swapState, setSwapState] = useState<SwapState>({
     fromToken: 'ETH',
@@ -451,7 +450,7 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
         fromToken: BASE_TOKENS[swapState.fromToken],
         toToken: BASE_TOKENS[swapState.toToken],
         fromAmount: fromAmountHex,
-        slippage: "50", // 0.5%
+        slippage: "0x32", // 0.5% (50 bps)
       });
 
       logger.debug('Quote received:', quote);
