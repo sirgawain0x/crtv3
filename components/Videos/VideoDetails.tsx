@@ -6,6 +6,7 @@ import {
   ChevronDownIcon,
   XIcon,
   PictureInPictureIcon,
+  ShieldCheck,
 } from "lucide-react";
 import { Src } from "@livepeer/react";
 import * as Popover from "@radix-ui/react-popover";
@@ -46,9 +47,11 @@ import { convertFailingGateway } from "@/lib/utils/image-gateway";
 type VideoDetailsProps = {
   asset: Asset;
   videoTitle?: string;
+  /** When set, shows a "Verifiable" badge (Livepeer creator attestation). */
+  livepeerAttestationId?: string | null;
 };
 
-export default function VideoDetails({ asset, videoTitle }: VideoDetailsProps) {
+export default function VideoDetails({ asset, videoTitle, livepeerAttestationId }: VideoDetailsProps) {
   const [playbackSources, setPlaybackSources] = useState<Src[] | null>(null);
   const [conditionalProps, setConditionalProps] = useState<any>({});
   const [dbStatus, setDbStatus] = useState<"draft" | "published" | "minted" | "archived" | null>(null);
@@ -377,11 +380,21 @@ export default function VideoDetails({ asset, videoTitle }: VideoDetailsProps) {
       <div className="w-full">
         <div className="w-full space-y-6">
           <h1 className="text-2xl font-bold">{videoTitle || asset?.name}</h1>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {asset?.status?.phase && (
               <Badge>{asset.status.phase}</Badge>
             )}
             {dbStatus && <Badge variant="secondary">{dbStatus}</Badge>}
+            {livepeerAttestationId && (
+              <Badge
+                variant="secondary"
+                className="gap-1"
+                title="Creator-attested (Livepeer Verifiable Video)"
+              >
+                <ShieldCheck className="h-3.5 w-3.5" aria-hidden />
+                Verifiable
+              </Badge>
+            )}
           </div>
           {/* Render other asset details */}
           {!isConnected ? (
