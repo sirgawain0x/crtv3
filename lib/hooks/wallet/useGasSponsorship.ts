@@ -8,7 +8,9 @@ const USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 interface GasSponsorshipContext {
     paymasterService?: {
         policyId: string;
-        token?: string;
+    };
+    erc20?: {
+        tokenAddress: string;
     };
 }
 
@@ -22,9 +24,9 @@ export function useGasSponsorship() {
     /**
      * Returns the appropriate UserOperation context based on membership status and target payment method.
      * 
-     * @param preferredMethod 'sponsored' | 'usdc' - Default preference if not member (usually 'usdc')
+     * @param preferredMethod 'sponsored' | 'usdc' | 'eth' - Explicitly requested gas payment method
      */
-    const getGasContext = (preferredMethod: 'sponsored' | 'usdc' = 'usdc'): { context: GasSponsorshipContext | undefined, isSponsored: boolean } => {
+    const getGasContext = (preferredMethod: 'sponsored' | 'usdc' | 'eth' = 'usdc'): { context: GasSponsorshipContext | undefined, isSponsored: boolean } => {
 
         // Debug logging
         console.log('🔧 useGasSponsorship.getGasContext called:', {
@@ -32,39 +34,56 @@ export function useGasSponsorship() {
             preferredMethod,
             hasSponsoredPolicy: !!SPONSORED_POLICY_ID,
             hasUsdcPolicy: !!USDC_POLICY_ID,
-            sponsoredPolicyId: SPONSORED_POLICY_ID?.slice(0, 8) + '...', // Log first 8 chars only
-            usdcPolicyId: USDC_POLICY_ID?.slice(0, 8) + '...',
         });
 
-        // 1. Members get Full Sponsorship
-        if (isMember && SPONSORED_POLICY_ID) {
-            console.log('✅ Using SPONSORED gas (member)');
+        // 0. Explicit ETH preference (no sponsorship)
+        if (preferredMethod === 'eth') {
+            console.log('✅ Using ETH gas payment (explicit request)');
             return {
-                context: {
-                    paymasterService: {
-                        policyId: SPONSORED_POLICY_ID,
-                    },
-                },
-                isSponsored: true
+                context: undefined,
+                isSponsored: false
             };
         }
 
-        // 2. Non-Members: Try USDC Policy
+        // 1. Sponsored Policy (Members Only or Explicit Request if Policy Exists)
+        if (preferredMethod === 'sponsored' && SPONSORED_POLICY_ID) {
+            // Only allow if member OR if we want to try it anyway (though member check is usually good)
+            // For now, let's respect the membership check for automatic sponsorship, 
+            // but if passed explicitly as 'sponsored', maybe we should try? 
+            // The original logic required membership. Let's keep it safe.
+            if (isMember) {
+                console.log('✅ Using SPONSORED gas (member)');
+                return {
+                    context: {
+                        paymasterService: {
+                            policyId: SPONSORED_POLICY_ID,
+                        },
+                    },
+                    isSponsored: true
+                };
+            } else {
+                console.warn('⚠️ Requested SPONSORED gas but user is not a member');
+            }
+        }
+
+        // 2. USDC Policy
         if (USDC_POLICY_ID && preferredMethod === 'usdc') {
-            console.log('✅ Using USDC gas payment (non-member)');
+            console.log('✅ Using USDC gas payment');
             return {
                 context: {
                     paymasterService: {
                         policyId: USDC_POLICY_ID,
-                        token: USDC_ADDRESS,
                     },
+                    erc20: {
+                        tokenAddress: USDC_ADDRESS,
+                    }
                 },
-                isSponsored: false // User pays in USDC
+                isSponsored: false // User pays in USDC, technically "sponsored" by paymaster but user pays
             };
         }
 
-        // 3. Fallback / No Policy: Undefined context (Standard ETH payment)
-        console.warn('⚠️ No gas sponsorship available - falling back to ETH payment');
+        // 3. Fallback / No Policy / ETH
+        console.warn(`⚠️ Gas sponsorship for ${preferredMethod} unavailable - falling back to ETH payment`);
         return {
             context: undefined,
             isSponsored: false
