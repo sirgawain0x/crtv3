@@ -127,6 +127,7 @@ const HookMultiStepForm = () => {
         story_license_terms_id: null,
         story_license_template_id: null,
         splits_address: null,
+        livepeer_attestation_id: null,
       }, data.collaborators);
 
       logger.debug('Video asset created in DB:', dbAsset);
@@ -184,6 +185,7 @@ const HookMultiStepForm = () => {
               address: string;
               id: string;
             };
+            livepeerAttestationId?: string;
           }) => {
             setThumbnailUri(data.thumbnailUri);
 
@@ -204,6 +206,17 @@ const HookMultiStepForm = () => {
                 } catch (err) {
                   logger.error("Failed to update video asset with new MeToken:", err);
                 }
+              }
+            }
+
+            if (data.livepeerAttestationId && videoAsset?.id) {
+              try {
+                await updateVideoAsset(videoAsset.id, {
+                  livepeer_attestation_id: data.livepeerAttestationId,
+                });
+                logger.debug("Updated video asset with Livepeer attestation ID");
+              } catch (err) {
+                logger.error("Failed to update video asset with attestation ID:", err);
               }
             }
 

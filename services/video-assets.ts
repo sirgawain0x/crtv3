@@ -119,6 +119,7 @@ export async function createVideoAsset(
       story_license_terms_id: data.story_license_terms_id || null,
       story_license_template_id: data.story_license_template_id || null,
       splits_address: null, // Will be set when split contract is created during publish
+      livepeer_attestation_id: data.livepeer_attestation_id ?? null,
     })
     .select()
     .single();
@@ -412,6 +413,8 @@ export async function updateVideoAsset(
     story_license_terms_id?: string | null;
     story_license_template_id?: string | null;
     splits_address?: string | null;
+    creator_metoken_id?: string | null;
+    livepeer_attestation_id?: string | null;
   }
 ) {
   // Use service client to bypass RLS
@@ -487,6 +490,12 @@ export async function updateVideoAsset(
   }
   if (data.splits_address !== undefined) {
     updateData.splits_address = data.splits_address;
+  }
+  if (data.creator_metoken_id !== undefined) {
+    updateData.creator_metoken_id = data.creator_metoken_id;
+  }
+  if (data.livepeer_attestation_id !== undefined) {
+    updateData.livepeer_attestation_id = data.livepeer_attestation_id;
   }
 
   const { data: result, error } = await supabase
