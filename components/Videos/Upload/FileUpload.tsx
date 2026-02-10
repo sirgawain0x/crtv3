@@ -209,6 +209,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
         endpoint: uploadRequestResult?.tusEndpoint,
         retryDelays: [0, 1000, 3000, 5000], // Retry configuration for mobile reliability
         chunkSize: 5 * 1024 * 1024, // 5MB chunks for better mobile handling
+        overridePatchMethod: true, // Use POST instead of PATCH for better mobile compatibility
         metadata: {
           filename: fileToUpload.name,
           filetype: fileToUpload.type || "application/octet-stream",
@@ -216,7 +217,16 @@ const FileUpload: React.FC<FileUploadProps> = ({
         uploadSize: fileToUpload.size,
         onError(err: any) {
           logger.error("Error uploading file:", err);
-          setError("Failed to upload file. Please try again.");
+          let errorMessage = "Failed to upload file. Please try again.";
+
+          // Enhance error message if possible
+          if (err.originalRequest) {
+            errorMessage += ` (Network error: ${err.originalRequest.status})`;
+          } else if (err.message) {
+            errorMessage += ` (${err.message})`;
+          }
+
+          setError(errorMessage);
           setUploadState("idle");
         },
         onProgress(bytesUploaded, bytesTotal) {
