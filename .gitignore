@@ -5,28 +5,19 @@
 /.pnp
 .pnp.js
 .yarn/install-state.gz
-/subgraphs/node_modules/*
-/subgraphs/music-indexer/node_modules/*
-/subgraphs/music-indexer/build/*
-/subgraphs/music-indexer/cache/*
-/subgraphs/music-indexer/codegen/*
-/subgraphs/music-indexer/generated/*
-/subgraphs/music-indexer/schema/*
-/subgraphs/music-indexer/src/*
-/subgraphs/music-indexer/test/*
-/subgraphs/music-indexer/test-results/*
-/subgraphs/music-indexer/tsconfig.json
-/subgraphs/music-indexer/tsconfig.build.json
-/subgraphs/build/*
-/subgraphs/cache/*
-/subgraphs/codegen/*
-/subgraphs/generated/*
-/subgraphs/schema/*
-/subgraphs/src/*
-/subgraphs/test/*
-/subgraphs/test-results/*
-/subgraphs/tsconfig.json
-/subgraphs/tsconfig.build.json
+# Subgraph build artifacts and deps (keep source code committed)
+/subgraphs/node_modules/
+/subgraphs/music-indexer/node_modules/
+/subgraphs/music-indexer/build/
+/subgraphs/music-indexer/cache/
+/subgraphs/music-indexer/codegen/
+/subgraphs/music-indexer/generated/
+/subgraphs/music-indexer/test-results/
+/subgraphs/build/
+/subgraphs/cache/
+/subgraphs/codegen/
+/subgraphs/generated/
+/subgraphs/test-results/
 
 # testing
 /coverage
