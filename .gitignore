@@ -5,6 +5,17 @@
 /.pnp
 .pnp.js
 .yarn/install-state.gz
+/subgraphs/node_modules/*
+/subgraphs/build/*
+/subgraphs/cache/*
+/subgraphs/codegen/*
+/subgraphs/generated/*
+/subgraphs/schema/*
+/subgraphs/src/*
+/subgraphs/test/*
+/subgraphs/test-results/*
+/subgraphs/tsconfig.json
+/subgraphs/tsconfig.build.json
 
 # testing
 /coverage
