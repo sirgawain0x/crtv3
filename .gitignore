@@ -6,6 +6,17 @@
 .pnp.js
 .yarn/install-state.gz
 /subgraphs/node_modules/*
+/subgraphs/music-indexer/node_modules/*
+/subgraphs/music-indexer/build/*
+/subgraphs/music-indexer/cache/*
+/subgraphs/music-indexer/codegen/*
+/subgraphs/music-indexer/generated/*
+/subgraphs/music-indexer/schema/*
+/subgraphs/music-indexer/src/*
+/subgraphs/music-indexer/test/*
+/subgraphs/music-indexer/test-results/*
+/subgraphs/music-indexer/tsconfig.json
+/subgraphs/music-indexer/tsconfig.build.json
 /subgraphs/build/*
 /subgraphs/cache/*
 /subgraphs/codegen/*
