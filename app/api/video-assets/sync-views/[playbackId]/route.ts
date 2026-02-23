@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { checkBotId } from 'botid/server';
 import { createClient } from '@/lib/sdk/supabase/server';
 import { fetchAllViews } from '@/app/api/livepeer/views';
 import { serverLogger } from '@/lib/utils/logger';
@@ -8,6 +9,10 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ playbackId: string }> }
 ) {
+  const verification = await checkBotId();
+  if (verification.isBot) {
+    return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+  }
   const rl = await rateLimiters.standard(request);
   if (rl) return rl;
 
