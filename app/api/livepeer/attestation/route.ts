@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { checkBotId } from "botid/server";
 
 const LIVEPEER_ATTESTATION_BASE = "https://livepeer.studio/api/experiment/-/attestation";
 
@@ -7,6 +8,10 @@ const LIVEPEER_ATTESTATION_BASE = "https://livepeer.studio/api/experiment/-/atte
  * Body: { primaryType, domain, message, signature } (message.timestamp as number for JSON).
  */
 export async function POST(request: NextRequest) {
+  const verification = await checkBotId();
+  if (verification.isBot) {
+    return NextResponse.json({ error: "Access denied" }, { status: 403 });
+  }
   try {
     const body = await request.json();
     const { primaryType, domain, message, signature } = body;

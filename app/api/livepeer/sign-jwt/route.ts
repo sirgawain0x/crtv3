@@ -1,9 +1,14 @@
 import { signAccessJwt } from "@livepeer/core/crypto";
 import { NextRequest, NextResponse } from "next/server";
+import { checkBotId } from "botid/server";
 import { rateLimiters } from "@/lib/middleware/rateLimit";
 import { unlockService } from "@/lib/sdk/unlock/services";
 
 export async function POST(req: NextRequest) {
+    const verification = await checkBotId();
+    if (verification.isBot) {
+      return NextResponse.json({ error: "Access denied" }, { status: 403 });
+    }
     const rl = await rateLimiters.standard(req);
     if (rl) return rl;
 

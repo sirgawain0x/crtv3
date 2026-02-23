@@ -1,5 +1,6 @@
 import createPWA from "next-pwa";
 import { withAxiom } from "next-axiom";
+import { withBotId } from "botid/next/config";
 import { createRequire } from "module";
 
 const require = createRequire(import.meta.url);
@@ -354,4 +355,4 @@ const nextConfig = {
   },
 };
 
-export default withAxiom(withPWA(nextConfig));
+export default withAxiom(withPWA(withBotId(nextConfig)));

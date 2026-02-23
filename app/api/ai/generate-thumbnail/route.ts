@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { checkBotId } from 'botid/server';
 import { GoogleGenAI, PersonGeneration, SafetyFilterLevel } from '@google/genai';
 import { serverLogger } from '@/lib/utils/logger';
 import { rateLimiters } from '@/lib/middleware/rateLimit';
 
 export async function POST(request: NextRequest) {
+  const verification = await checkBotId();
+  if (verification.isBot) {
+    return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+  }
   const rl = await rateLimiters.standard(request);
   if (rl) return rl;
 
