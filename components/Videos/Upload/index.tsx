@@ -302,6 +302,15 @@ const HookMultiStepForm = () => {
 
             toast.success("Video uploaded and published successfully!");
 
+            // Navigate to Discover immediately so the user can see their published video
+            logger.debug("Redirecting to discover page...");
+            router.replace("/discover");
+            setTimeout(() => {
+              if (typeof window !== "undefined" && window.location.pathname !== "/discover") {
+                window.location.href = "/discover";
+              }
+            }, 800);
+
             // --- STORY PROTOCOL IP REGISTRATION ---
             if (data.storyConfig?.registerIP && address) {
               // Non-blocking async operation (mostly)
@@ -456,20 +465,9 @@ const HookMultiStepForm = () => {
                 // Note: handleUploadSuccess logs success
               } catch (ccError) {
                 logger.error("Content Coin deployment error:", ccError);
-                // Swallowed to allow redirect
+                // Swallowed; user already redirected to Discover
               }
             }
-
-            // Ensure redirect happens
-            logger.debug("Redirecting to discover page...");
-            router.push("/discover");
-
-            // Fallback
-            setTimeout(() => {
-              if (window.location.pathname !== '/discover') {
-                window.location.href = "/discover";
-              }
-            }, 1000);
           }}
         />
       )}
