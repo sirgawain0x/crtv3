@@ -500,9 +500,16 @@ const CreateThumbnailForm = ({
 
       toast.success('Payment successful!');
 
-      // Step 2: Generate AI image with Gemini after successful payment
+      // Step 2: Generate AI image (server verifies USDC payment before calling generateImage)
+      const transactionHash = paymentResult.paymentResponse?.transactionHash;
+      if (!transactionHash) {
+        throw new Error('Payment succeeded but no transaction hash; please try again');
+      }
       toast.info(`Generating AI thumbnail with ${getModelName(selectedModel)}...`);
-      const aiResult = await generateAiImage(prompt);
+      const aiResult = await generateAiImage(prompt, {
+        transactionHash,
+        amount: price.toString(),
+      });
 
       if (aiResult.success) {
         setAiImages(aiResult.images);
@@ -523,7 +530,10 @@ const CreateThumbnailForm = ({
     }
   };
 
-  const generateAiImage = async (prompt: string) => {
+  const generateAiImage = async (
+    prompt: string,
+    paymentProof?: { transactionHash: string; amount: string }
+  ) => {
     try {
       const response = await fetch('/api/ai/generate-thumbnail', {
         method: 'POST',
@@ -531,8 +541,9 @@ const CreateThumbnailForm = ({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          prompt: prompt,
+          prompt,
           model: selectedModel,
+          paymentProof: paymentProof ?? undefined,
         }),
       });
 
