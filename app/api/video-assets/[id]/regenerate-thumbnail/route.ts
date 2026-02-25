@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { checkBotId } from "botid/server";
 import { getVideoAssetById, updateVideoAsset } from "@/services/video-assets";
 import { regenerateThumbnailFromLivepeer } from "@/lib/utils/thumbnail-regeneration";
 import { serverLogger } from "@/lib/utils/logger";
@@ -7,6 +8,10 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const verification = await checkBotId();
+  if (verification.isBot) {
+    return NextResponse.json({ error: "Access denied" }, { status: 403 });
+  }
   try {
     const { id } = await params;
     const videoId = parseInt(id, 10);

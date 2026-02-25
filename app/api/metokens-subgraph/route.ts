@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { checkBotId } from 'botid/server';
 import { serverLogger } from '@/lib/utils/logger';
 import { rateLimiters } from '@/lib/middleware/rateLimit';
 
@@ -22,6 +23,10 @@ const METOKENS_SUBGRAPH_URL = getSubgraphUrl('metokens', '1.0.2');
 const CREATIVE_TV_SUBGRAPH_URL = getSubgraphUrl('creative_tv', '0.1');
 
 export async function POST(request: NextRequest) {
+  const verification = await checkBotId();
+  if (verification.isBot) {
+    return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+  }
   const rl = await rateLimiters.generous(request);
   if (rl) return rl;
 

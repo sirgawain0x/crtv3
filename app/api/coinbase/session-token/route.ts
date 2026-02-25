@@ -1,5 +1,6 @@
 "use server";
 import { NextRequest, NextResponse } from "next/server";
+import { checkBotId } from "botid/server";
 import { generateJwt } from "@coinbase/cdp-sdk/auth";
 import { verifyMessage } from "viem";
 import { serverLogger } from "@/lib/utils/logger";
@@ -320,6 +321,10 @@ function getClientIp(request: NextRequest): string {
 }
 
 export async function POST(req: NextRequest) {
+  const verification = await checkBotId();
+  if (verification.isBot) {
+    return NextResponse.json({ error: "Access denied" }, { status: 403 });
+  }
   try {
     const body: SessionTokenRequest = await req.json();
     // Default to USDC and ETH - DAI is not available on Base for onramp

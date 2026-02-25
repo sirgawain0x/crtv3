@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { checkBotId } from 'botid/server';
 import { IPFSService } from '@/lib/sdk/ipfs/service';
 import { serverLogger } from '@/lib/utils/logger';
 import { rateLimiters } from '@/lib/middleware/rateLimit';
@@ -64,6 +65,10 @@ async function urlToFile(url: string, filename: string): Promise<File | null> {
 }
 
 export async function POST(request: NextRequest) {
+  const verification = await checkBotId();
+  if (verification.isBot) {
+    return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+  }
   const rl = await rateLimiters.standard(request);
   if (rl) return rl;
 

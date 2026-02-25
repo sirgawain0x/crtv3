@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { checkBotId } from 'botid/server';
 import { serverLogger } from '@/lib/utils/logger';
 import { rateLimiters } from '@/lib/middleware/rateLimit';
 
@@ -18,6 +19,10 @@ const getSubgraphUrl = (subgraphName: string, version: string, specificAccessTyp
 const REALITY_ETH_SUBGRAPH_URL = getSubgraphUrl('reality-eth', '1.0.0');
 
 export async function POST(request: NextRequest) {
+  const verification = await checkBotId();
+  if (verification.isBot) {
+    return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+  }
   const rl = await rateLimiters.generous(request);
   if (rl) return rl;
 

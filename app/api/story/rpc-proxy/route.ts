@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { checkBotId } from "botid/server";
 import { serverLogger } from "@/lib/utils/logger";
 
 /**
@@ -13,6 +14,10 @@ import { serverLogger } from "@/lib/utils/logger";
  * - Rate limiting and authentication can be added here if needed
  */
 export async function POST(request: NextRequest) {
+  const verification = await checkBotId();
+  if (verification.isBot) {
+    return NextResponse.json({ error: "Access denied" }, { status: 403 });
+  }
   try {
     const body = await request.json();
     
