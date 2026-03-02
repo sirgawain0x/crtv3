@@ -175,7 +175,7 @@ yarn install
 
 3. Set up environment variables:
 
-Create a `.env.local` file in the root directory with the required variables. See **[ENVIRONMENT_SETUP.md](./ENVIRONMENT_SETUP.md)** for detailed instructions on how to obtain and configure:
+Copy **`.env.example`** to `.env.local` and fill in values (see **[ENVIRONMENT_SETUP.md](./ENVIRONMENT_SETUP.md)** for how to obtain each). For Vercel deploys, set the same variables in Project → Settings → Environment Variables. To use values from Vercel locally, run `vercel env pull` in the project root (requires [Vercel CLI](https://vercel.com/docs/cli) and `vercel link`).
 
 - `NEXT_PUBLIC_ALCHEMY_API_KEY` - Your Alchemy API key
 - `NEXT_PUBLIC_ALCHEMY_PAYMASTER_POLICY_ID` - Your Gas Manager policy ID  

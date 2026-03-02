@@ -141,7 +141,7 @@
     "wagmi": "^2.15.3",
     "web-vitals": "^5.1.0",
     "x402-fetch": "^0.6.6",
-    "zod": "^3.24.3"
+    "zod": "^3.25.0"
   },
   "devDependencies": {
     "@thirdweb-dev/contracts": "^3.15.0",

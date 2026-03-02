@@ -1,6 +1,14 @@
 # Environment Variables Setup Guide
 
-This guide will help you set up the required environment variables for your application.
+This guide will help you set up the required environment variables for your application. The canonical list of variable names is in **`.env.example`** at the project root—copy it to `.env.local` and fill in values for local development.
+
+## Deploying on Vercel
+
+On Vercel, environment variables are set in the project, not in a file. No `.env` file is read at build or runtime.
+
+1. **Add variables:** In the [Vercel Dashboard](https://vercel.com/dashboard), open your project → **Settings** → **Environment Variables**. Add every variable your app needs, using the **exact names** from `.env.example`. Assign them to the right environments (Production, Preview, Development).
+2. **Public vs secret:** Variables prefixed with `NEXT_PUBLIC_` are exposed to the browser; all others are server-only. Do not put secrets in `NEXT_PUBLIC_` vars.
+3. **Local dev from Vercel:** To populate `.env.local` from the variables already set on Vercel, run `vercel env pull` in the project root (requires [Vercel CLI](https://vercel.com/docs/cli)). This creates or updates `.env.local`, which is gitignored and will not be committed.
 
 ## Required Environment Variables
 
@@ -345,6 +353,7 @@ curl http://localhost:3000/api/swap/debug
 - Make sure the policy has sufficient funds/limits
 
 ### Variables not loading
+- Use `.env.example` as the template; copy to `.env.local` and fill in values
 - Ensure `.env.local` is in the project root directory
 - Restart your development server
 - Check that variable names match exactly (case-sensitive)
