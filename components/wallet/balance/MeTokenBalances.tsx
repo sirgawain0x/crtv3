@@ -185,7 +185,7 @@ export function MeTokenBalances() {
         {visibleMeTokens.map((token) => (
           <Link
             key={token.address}
-            href={`/profile/${token.isOwnMeToken ? (scaAddress || user?.address) : token.ownerAddress}`}
+            href={token.isOwnMeToken ? `/profile/${scaAddress || user?.address}` : `/creator/${token.ownerAddress}`}
             className="flex items-center justify-between p-2 rounded hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors group"
           >
             <div className="flex items-center gap-2 flex-1 min-w-0">
