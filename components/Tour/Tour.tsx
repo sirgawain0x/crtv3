@@ -200,18 +200,6 @@ export const Tour = () => {
         isLastStep,
         size,
     }: any) => {
-        const stepId = (step.data as any)?.id;
-
-        // Hide "Next" button on interactive steps ONLY ON DESKTOP
-        // This preserves the "works great" interactive flow for desktop
-        // while giving mobile users the "slideshow" experience they requested.
-        const hideNext = !isMobile && [
-            'connect',
-            'user-menu',
-            'upload-form',
-            'publish-btn',
-        ].includes(stepId);
-
         return (
             <div {...tooltipProps} className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-2xl border border-indigo-100 dark:border-indigo-900 max-w-sm relative overflow-hidden">
                 {/* Decorative BG element */}
@@ -229,11 +217,9 @@ export const Tour = () => {
                     </div>
 
                     <div className="flex gap-2">
-                        {!hideNext && (
-                            <button {...primaryProps} className="px-4 py-2 bg-indigo-600 text-white text-sm font-bold rounded-full hover:bg-indigo-700 transition shadow-lg shadow-indigo-200 dark:shadow-none">
-                                {isLastStep ? 'Finish' : 'Next'}
-                            </button>
-                        )}
+                        <button {...primaryProps} className="px-4 py-2 bg-indigo-600 text-white text-sm font-bold rounded-full hover:bg-indigo-700 transition shadow-lg shadow-indigo-200 dark:shadow-none">
+                            {isLastStep ? 'Finish' : 'Next Step'}
+                        </button>
                     </div>
                 </div>
                 <div className="mt-2 text-center text-xs text-slate-400 font-medium">
