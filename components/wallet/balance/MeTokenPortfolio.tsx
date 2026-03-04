@@ -18,6 +18,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { useUser } from '@account-kit/react';
+import { useSmartAccountClient } from '@account-kit/react';
 import Link from 'next/link';
 import { convertFailingGateway } from '@/lib/utils/image-gateway';
 
@@ -236,6 +237,9 @@ interface MeTokenHoldingCardProps {
 }
 
 function MeTokenHoldingCard({ holding, showCreatorProfile }: MeTokenHoldingCardProps) {
+  const user = useUser();
+  const { address: scaAddress } = useSmartAccountClient({});
+
   const formatBalance = (balance: string) => {
     const num = parseFloat(balance);
     if (num >= 1000000) {
@@ -300,9 +304,11 @@ function MeTokenHoldingCard({ holding, showCreatorProfile }: MeTokenHoldingCardP
 
       <div className="flex items-center gap-2">
         <Button variant="outline" size="sm" asChild>
-          <Link href={`/profile/${holding.ownerAddress}`}>
+          <Link
+            href={holding.isOwnMeToken ? `/profile/${scaAddress || user?.address}` : `/creator/${holding.ownerAddress}`}
+          >
             <ExternalLink className="h-4 w-4 mr-2" />
-            View Profile
+            {holding.isOwnMeToken ? 'View Profile' : 'View Creator'}
           </Link>
         </Button>
       </div>

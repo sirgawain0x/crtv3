@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { checkBotId } from 'botid/server';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
-import { generateImage } from 'ai';
+import { generateText } from 'ai';
 import { decodeEventLog } from 'viem';
 import { serverLogger } from '@/lib/utils/logger';
 import { rateLimiters } from '@/lib/middleware/rateLimit';
@@ -162,10 +162,18 @@ export async function POST(request: NextRequest) {
     }
 
     const google = createGoogleGenerativeAI({ apiKey });
-    const imageModel =
+    const modelId =
       modelKey === 'gemini-3-pro'
-        ? google.image('gemini-3-pro-image-preview')
-        : google.image('gemini-2.5-flash-image');
+        ? 'gemini-3-pro-image-preview'
+        : 'gemini-2.5-flash-image';
+    const languageModel = google.chat(modelId, {
+      safetySettings: [
+        { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_LOW_AND_ABOVE' },
+        { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_LOW_AND_ABOVE' },
+        { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_LOW_AND_ABOVE' },
+        { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_LOW_AND_ABOVE' },
+      ],
+    });
 
     const enhancedPrompt = `
       Create a high-quality, eye-catching thumbnail image for a video platform in 16:9 aspect ratio. 
@@ -184,27 +192,30 @@ export async function POST(request: NextRequest) {
       Make it engaging and professional, suitable for a creative video platform.
     `;
 
-    const { image } = await generateImage({
-      model: imageModel,
+    const result = await generateText({
+      model: languageModel,
       prompt: enhancedPrompt,
-      aspectRatio: '16:9',
       providerOptions: {
         google: {
-          safetySettings: [
-            { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_LOW_AND_ABOVE' },
-            { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_LOW_AND_ABOVE' },
-            { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_LOW_AND_ABOVE' },
-            { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_LOW_AND_ABOVE' },
-          ],
+          responseModalities: ['TEXT', 'IMAGE'],
         },
       },
     });
 
-    const imageId = `gemini-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    const mimeType = 'image/png';
+    const imageFile = result.files?.find((f) => f.mimeType.startsWith('image/'));
+    if (!imageFile) {
+      return NextResponse.json({
+        success: false,
+        error: 'No image was generated. Please try a different prompt.',
+      });
+    }
 
-    const buffer = image.uint8Array;
-    const file = new File([buffer], `${imageId}.png`, { type: mimeType });
+    const imageId = `gemini-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    const mimeType = imageFile.mimeType;
+    const ext = mimeType === 'image/png' ? 'png' : mimeType === 'image/jpeg' ? 'jpg' : 'png';
+
+    const buffer = imageFile.uint8Array;
+    const file = new File([buffer], `${imageId}.${ext}`, { type: mimeType });
 
     let url: string;
     let ipfsHash: string | undefined;

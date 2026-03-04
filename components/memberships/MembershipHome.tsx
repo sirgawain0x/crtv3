@@ -1,17 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useAccount, useSendUserOperation, useSmartAccountClient } from "@account-kit/react";
-import { formatUnits, parseUnits, encodeFunctionData, encodeAbiParameters, type Abi, erc20Abi } from "viem";
+import { useSendUserOperation, useSmartAccountClient, useUser, useChain } from "@account-kit/react";
+import { formatUnits, parseUnits, encodeFunctionData, encodeAbiParameters, type Abi, erc20Abi, createPublicClient, http } from "viem";
 import { MembershipButton } from "./MembershipButton";
 import { MembershipCard } from "./MembershipCard";
 import { MembershipIcon } from "./MembershipIcon";
 import unlockAbiJson from "@/lib/abis/Unlock.json";
 import { toast } from "sonner";
-import { generateCheckoutUrlWithReferrer } from "@/lib/utils/unlock";
-
-// Constants
-const USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"; // Base Mainnet USDC
+import { getUsdcTokenContract, USDC_TOKEN_DECIMALS } from "@/lib/contracts/USDCToken";
 
 type HomeProps = {
     setActiveTab: (tab: string) => void;
@@ -20,6 +17,7 @@ type HomeProps = {
 type MembershipTier = {
     name: string;
     price: string;
+    periodLabel: string;
     decimals: number;
     address: string;
     features: string[];
@@ -27,8 +25,12 @@ type MembershipTier = {
 };
 
 export function MembershipHome({ setActiveTab }: HomeProps) {
-    const { address } = useAccount({ type: "LightAccount" });
-    const { client } = useSmartAccountClient({ type: "LightAccount" });
+    const user = useUser();
+    const { chain } = useChain();
+    const { client, address: clientAddress } = useSmartAccountClient({});
+    // Use same account as AccountDropdown/TokenBalance so balance matches
+    const address = client?.account?.address ?? clientAddress ?? user?.address;
+    const canPurchase = Boolean(address && client && chain?.id === 8453);
     const { sendUserOperation, isSendingUserOperation } = useSendUserOperation({
         client,
         waitForTxn: true,
@@ -44,16 +46,18 @@ export function MembershipHome({ setActiveTab }: HomeProps) {
     });
 
     const [usdcBalance, setUsdcBalance] = useState<string>("0");
+    const [isBalanceLoading, setIsBalanceLoading] = useState(true);
     const [selectedTier, setSelectedTier] = useState<MembershipTier | null>(null);
     const [isPurchaseModalOpen, setIsPurchaseModalOpen] = useState(false);
-    const [referrer, setReferrer] = useState<string>("0x0000000000000000000000000000000000000000"); // Default referrer
+    const [referrer, setReferrer] = useState<string>("0x1Fde40a4046Eda0cA0539Dd6c77ABF8933B94260"); // Default referrer
     const [email, setEmail] = useState<string>("");
 
-    // Membership Tiers Configuration
+    // Membership Tiers Configuration (prices in USDC; displayed as USD for clarity)
     const tiers: MembershipTier[] = [
         {
             name: "Creator",
-            price: "10",
+            price: "30",
+            periodLabel: "every 3 months",
             decimals: 6,
             address: "0x13b818daf7016b302383737ba60c3a39fef231cf",
             features: ["Community Access", "Weekly Challenges", "Resource Library"],
@@ -61,6 +65,7 @@ export function MembershipHome({ setActiveTab }: HomeProps) {
         {
             name: "Investor",
             price: "100",
+            periodLabel: "per month",
             decimals: 6,
             address: "0x9c3744c96200a52d05a630d4aec0db707d7509be",
             features: ["Priority Access", "Investment Reports", "Direct Creator Access"],
@@ -68,36 +73,59 @@ export function MembershipHome({ setActiveTab }: HomeProps) {
         },
         {
             name: "Brand",
-            price: "500",
+            price: "1000",
+            periodLabel: "per month",
             decimals: 6,
             address: "0xf7c4cd399395d80f9d61fde833849106775269c6",
             features: ["Partnership Opportunities", "Brand Showcase", "Strategic Consulting"],
         },
     ];
 
-    // Fetch USDC Balance
+    // Fetch USDC Balance (same account, chain, and contract as TokenBalance in AccountDropdown)
     useEffect(() => {
         async function fetchBalance() {
-            if (!address || !client) return;
+            if (!address || !chain) {
+                setUsdcBalance("0");
+                setIsBalanceLoading(false);
+                return;
+            }
+            const chainKey = chain.id === 8453 ? "base" : null;
+            if (!chainKey) {
+                setUsdcBalance("0");
+                setIsBalanceLoading(false);
+                return;
+            }
+            setIsBalanceLoading(true);
             try {
-                const balance = await client.readContract({
-                    address: USDC_ADDRESS,
-                    abi: erc20Abi,
-                    functionName: "balanceOf",
-                    args: [address],
+                const publicClient = createPublicClient({
+                    chain,
+                    transport: http(),
                 });
-                setUsdcBalance(formatUnits(balance, 6));
+                const usdcContract = getUsdcTokenContract(chainKey);
+                const balance = await publicClient.readContract({
+                    address: usdcContract.address as `0x${string}`,
+                    abi: usdcContract.abi,
+                    functionName: "balanceOf",
+                    args: [address as `0x${string}`],
+                });
+                setUsdcBalance(formatUnits(balance as bigint, USDC_TOKEN_DECIMALS));
             } catch (error) {
                 console.error("Error fetching USDC balance:", error);
+                setUsdcBalance("0");
+            } finally {
+                setIsBalanceLoading(false);
             }
         }
 
-        if (address && client) {
+        if (address && chain) {
             fetchBalance();
             const interval = setInterval(fetchBalance, 10000);
             return () => clearInterval(interval);
+        } else {
+            setUsdcBalance("0");
+            setIsBalanceLoading(false);
         }
-    }, [address, client]);
+    }, [address, chain]);
 
     // Handle Purchase Interaction
     const handlePurchase = (tier: MembershipTier) => {
@@ -107,8 +135,7 @@ export function MembershipHome({ setActiveTab }: HomeProps) {
         }
 
         if (parseFloat(usdcBalance) < parseFloat(tier.price)) {
-            toast.error("Insufficient USDC balance");
-            setActiveTab("fund");
+            toast.error("Insufficient USDC balance. Add funds via your wallet to continue.");
             return;
         }
 
@@ -120,8 +147,20 @@ export function MembershipHome({ setActiveTab }: HomeProps) {
     const executePurchase = () => {
         if (!selectedTier || !address) return;
 
+        if (!client) {
+            toast.error("Wallet not ready. Please try again in a moment.");
+            return;
+        }
+
         if (!email) {
             toast.error("Please enter your email address");
+            return;
+        }
+
+        const chainKey = chain?.id === 8453 ? "base" : null;
+        const usdcAddress = chainKey ? getUsdcTokenContract(chainKey).address : null;
+        if (!usdcAddress) {
+            toast.error("USDC is not supported on this network. Please switch to Base.");
             return;
         }
 
@@ -153,7 +192,7 @@ export function MembershipHome({ setActiveTab }: HomeProps) {
         sendUserOperation({
             uo: [
                 {
-                    target: USDC_ADDRESS,
+                    target: usdcAddress as `0x${string}`,
                     data: approvalData,
                     value: 0n,
                 },
@@ -174,7 +213,11 @@ export function MembershipHome({ setActiveTab }: HomeProps) {
                     <div>
                         <h2 className="text-lg font-semibold">Your Balance</h2>
                         <p className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-blue-600">
-                            ${parseFloat(usdcBalance).toFixed(2)} <span className="text-sm text-muted-foreground font-normal">USDC</span>
+                            {isBalanceLoading ? (
+                                <span className="text-muted-foreground">—</span>
+                            ) : (
+                                <>${Number.isFinite(parseFloat(usdcBalance)) ? parseFloat(usdcBalance).toFixed(2) : "0.00"} <span className="text-sm text-muted-foreground font-normal">USD (paid in USDC)</span></>
+                            )}
                         </p>
                     </div>
                 </div>
@@ -196,7 +239,7 @@ export function MembershipHome({ setActiveTab }: HomeProps) {
                             <div>
                                 <h3 className="text-xl font-bold">{tier.name}</h3>
                                 <p className="text-2xl font-bold mt-1">
-                                    ${tier.price} <span className="text-sm font-normal text-muted-foreground">/ lifetime</span>
+                                    ${tier.price} <span className="text-sm font-normal text-muted-foreground">{tier.periodLabel}</span>
                                 </p>
                             </div>
                             <div className="bg-secondary/50 p-2 rounded-full">
@@ -217,6 +260,7 @@ export function MembershipHome({ setActiveTab }: HomeProps) {
                             className="w-full"
                             variant={tier.recommended ? "primary" : "secondary"}
                             onClick={() => handlePurchase(tier)}
+                            disabled={!canPurchase}
                         >
                             Purchase Membership
                         </MembershipButton>
@@ -231,8 +275,10 @@ export function MembershipHome({ setActiveTab }: HomeProps) {
                         <div className="flex justify-between items-center mb-6">
                             <h3 className="text-xl font-bold">Confirm Purchase</h3>
                             <button
+                                type="button"
                                 onClick={() => setIsPurchaseModalOpen(false)}
                                 className="text-muted-foreground hover:text-foreground"
+                                aria-label="Close"
                             >
                                 <MembershipIcon name="x" />
                             </button>
@@ -246,7 +292,7 @@ export function MembershipHome({ setActiveTab }: HomeProps) {
                                 </div>
                                 <div className="flex justify-between">
                                     <span className="text-muted-foreground">Price</span>
-                                    <span className="font-medium">${selectedTier.price} USDC</span>
+                                    <span className="font-medium">${selectedTier.price} USD (paid in USDC)</span>
                                 </div>
                             </div>
 

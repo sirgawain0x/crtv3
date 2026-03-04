@@ -11,21 +11,24 @@ type FeaturesProps = {
 
 export function MembershipFeatures({ setActiveTab }: FeaturesProps) {
     const [activeTier, setActiveTier] = useState(0);
+    // Pricing must match MembershipHome tiers
     const tiers = [
         {
             name: "Creator",
+            priceLabel: "$30 USD every 3 months",
             icon: "star" as const,
             features: [
                 "Access to exclusive creative resources and events",
                 "Media exposure opportunities",
                 "Seasonal creative challenges and competitions",
-                "Competitve revenue sharing and earning opportunities",
+                "Competitive revenue sharing and earning opportunities",
                 "Access to creative Web3/AI software and tools",
                 "Community feedback and collaboration spaces",
             ],
         },
         {
             name: "Investor",
+            priceLabel: "$100 USD per month",
             icon: "star" as const,
             features: [
                 "Exclusive access to emerging creative talent",
@@ -39,6 +42,7 @@ export function MembershipFeatures({ setActiveTab }: FeaturesProps) {
         },
         {
             name: "Brand",
+            priceLabel: "$1,000 USD per month",
             icon: "star" as const,
             features: [
                 "Curated creator partnerships and collaborations",
@@ -78,7 +82,7 @@ export function MembershipFeatures({ setActiveTab }: FeaturesProps) {
                                 {tiers.map((tier, index) => (
                                     <div key={tier.name} className="w-full flex-shrink-0">
                                         <div className="bg-gradient-to-br from-card to-secondary/50 rounded-xl p-6 border border-border">
-                                            <div className="flex items-center justify-between mb-4">
+                                            <div className="flex items-center justify-between mb-2">
                                                 <h3 className="text-xl font-bold text-primary flex items-center">
                                                     <MembershipIcon name={tier.icon} className="mr-2" />
                                                     {tier.name} Tier
@@ -87,6 +91,9 @@ export function MembershipFeatures({ setActiveTab }: FeaturesProps) {
                                                     {index + 1} of {tiers.length}
                                                 </span>
                                             </div>
+                                            <p className="text-sm font-medium text-muted-foreground mb-4">
+                                                {tier.priceLabel}
+                                            </p>
 
                                             <ul className="space-y-3">
                                                 {tier.features.map((feature, featureIndex) => (
@@ -109,6 +116,7 @@ export function MembershipFeatures({ setActiveTab }: FeaturesProps) {
 
                         {/* Navigation Arrows */}
                         <button
+                            type="button"
                             onClick={prevTier}
                             className="absolute left-2 top-1/2 -translate-y-1/2 bg-popover hover:bg-accent p-2 rounded-full shadow-lg border border-border transition-colors text-popover-foreground"
                             aria-label="Previous tier"
@@ -129,6 +137,7 @@ export function MembershipFeatures({ setActiveTab }: FeaturesProps) {
                         </button>
 
                         <button
+                            type="button"
                             onClick={nextTier}
                             className="absolute right-2 top-1/2 -translate-y-1/2 bg-popover hover:bg-accent p-2 rounded-full shadow-lg border border-border transition-colors text-popover-foreground"
                             aria-label="Next tier"
@@ -153,6 +162,7 @@ export function MembershipFeatures({ setActiveTab }: FeaturesProps) {
                     <div className="flex justify-center space-x-2">
                         {tiers.map((_, index) => (
                             <button
+                                type="button"
                                 key={index}
                                 onClick={() => goToTier(index)}
                                 className={`w-2 h-2 rounded-full transition-colors ${index === activeTier
