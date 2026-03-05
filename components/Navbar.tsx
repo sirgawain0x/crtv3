@@ -428,6 +428,9 @@ export default function Navbar() {
               <Link href="/discover" className={navLinkClass} id="nav-discover-link">
                 Discover
               </Link>
+              <Link href="/music" className={navLinkClass} id="nav-music-link">
+                Music
+              </Link>
               {/* <Link href="/leaderboard" className={navLinkClass}>
                 Leaderboard
               </Link> */}
@@ -549,6 +552,14 @@ export default function Navbar() {
                   id="mobile-nav-discover-link"
                 >
                   Discover
+                </Link>
+                <Link
+                  href="/music"
+                  className={mobileNavLinkClass}
+                  onClick={handleLinkClick}
+                  id="mobile-nav-music-link"
+                >
+                  Music
                 </Link>
                 <Link
                   href="/market"

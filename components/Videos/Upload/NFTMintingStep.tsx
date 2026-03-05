@@ -195,10 +195,12 @@ export function NFTMintingStep({
       </CardHeader>
       <CardContent className="space-y-4">
         {/* System Gas Status */}
-        <div className={`flex items-center justify-between text-sm p-3 rounded-md border ${hasFundingFunds ? "bg-green-50 border-green-200" : "bg-amber-50 border-amber-200"
-          }`}>
+        <div className={`flex items-center justify-between text-sm p-3 rounded-md border ${hasFundingFunds
+          ? "bg-green-50 border-green-200 dark:bg-green-950/50 dark:border-green-800"
+          : "bg-amber-50 border-amber-200 dark:bg-amber-950/50 dark:border-amber-800"
+        }`}>
           <div className="flex items-center gap-2">
-            <FuelIcon className={`h-4 w-4 ${hasFundingFunds ? "text-green-600" : "text-amber-600"}`} />
+            <FuelIcon className={`h-4 w-4 ${hasFundingFunds ? "text-green-600 dark:text-green-400" : "text-amber-600 dark:text-amber-400"}`} />
             <div className="flex flex-col">
               <span className="font-medium text-foreground">
                 Story Protocol Gas Status
@@ -209,7 +211,7 @@ export function NFTMintingStep({
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <span className={`font-mono text-sm ${hasFundingFunds ? "text-green-700 font-medium" : "text-amber-700"}`}>
+            <span className={`font-mono text-sm ${hasFundingFunds ? "text-green-700 dark:text-green-200 font-medium" : "text-amber-700 dark:text-amber-200 font-medium"}`}>
               {fundingWalletBalance ? `${parseFloat(fundingWalletBalance).toFixed(4)} IP` : "Loading..."}
             </span>
             <Button
@@ -227,9 +229,9 @@ export function NFTMintingStep({
         {/* Swap Component if system funds are low */}
         {!hasFundingFunds && fundingWalletAddress && (
           <div className="animate-in fade-in slide-in-from-top-2 duration-300 space-y-3">
-            <Alert variant="destructive" className="bg-amber-50 border-amber-200 text-amber-800">
-              <InfoIcon className="h-4 w-4 text-amber-600" />
-              <AlertDescription>
+            <Alert className="bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-950/50 dark:border-amber-800 dark:text-amber-100">
+              <InfoIcon className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+              <AlertDescription className="text-amber-800 dark:text-amber-100">
                 The system gas wallet is low on IP tokens. You can help by swapping some ETH to IP.
                 The funds will be sent directly to the gas wallet to pay for your minting transaction.
               </AlertDescription>
