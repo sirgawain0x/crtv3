@@ -1,13 +1,21 @@
 #!/usr/bin/env python3
 """
 Scrape contract addresses created by music NFT factory contracts using Etherscan/Polygonscan APIs.
-Outputs JSON for the music indexer. Set ETHERSCAN_API_KEY and/or POLYGONSCAN_API_KEY (do not commit).
+Outputs JSON for the music indexer.
+
+API access for Polygon (and 60+ other EVM chains) is provided through Etherscan API V2. A single
+ETHERSCAN_API_KEY can be used for both Ethereum and Polygon. Set ETHERSCAN_API_KEY (and optionally
+POLYGONSCAN_API_KEY if you prefer a separate key). Do not commit keys.
 """
 import json
 import os
 import sys
 import time
+import warnings
 from pathlib import Path
+
+# Avoid urllib3 LibreSSL warning on macOS with system Python
+warnings.filterwarnings("ignore", message="urllib3 v2 only supports OpenSSL", category=UserWarning, module="urllib3")
 
 try:
     import requests
@@ -28,7 +36,7 @@ ETHERSCAN_BASE = "https://api.etherscan.io/api"
 POLYGONSCAN_BASE = "https://api.polygonscan.com/api"
 
 
-def get_created_contracts_etherscan(factory_address: str, api_key: str) -> list:
+def get_created_contracts_etherscan(factory_address: str, api_key: str, verbose: bool = False) -> list:
     url = f"{ETHERSCAN_BASE}?module=account&action=txlist&address={factory_address}&startblock=0&endblock=99999999&sort=asc&apikey={api_key}"
     try:
         resp = requests.get(url, timeout=30)
@@ -36,13 +44,20 @@ def get_created_contracts_etherscan(factory_address: str, api_key: str) -> list:
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
         return []
-    if data.get("status") != "1":
+    status = data.get("status")
+    result = data.get("result", [])
+    if status != "1":
+        msg = data.get("message", "Unknown error")
+        err = data.get("result") if isinstance(data.get("result"), str) else msg
+        print(f"Etherscan API: {msg}" + (f" — {err}" if err and err != msg else ""), file=sys.stderr)
         return []
-    created = [tx.get("contractAddress").strip() for tx in data.get("result", []) if tx.get("contractAddress") and tx.get("contractAddress") != "0x"]
+    if verbose:
+        print(f"Etherscan: {len(result)} txs for {factory_address}", file=sys.stderr)
+    created = [tx.get("contractAddress").strip() for tx in result if tx.get("contractAddress") and tx.get("contractAddress").strip() and tx.get("contractAddress") != "0x"]
     return list(dict.fromkeys(created))
 
 
-def get_created_contracts_polygonscan(factory_address: str, api_key: str) -> list:
+def get_created_contracts_polygonscan(factory_address: str, api_key: str, verbose: bool = False) -> list:
     url = f"{POLYGONSCAN_BASE}?module=account&action=txlist&address={factory_address}&startblock=0&endblock=99999999&sort=asc&apikey={api_key}"
     try:
         resp = requests.get(url, timeout=30)
@@ -50,9 +65,16 @@ def get_created_contracts_polygonscan(factory_address: str, api_key: str) -> lis
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
         return []
-    if data.get("status") != "1":
+    status = data.get("status")
+    result = data.get("result", [])
+    if status != "1":
+        msg = data.get("message", "Unknown error")
+        err = data.get("result") if isinstance(data.get("result"), str) else msg
+        print(f"Polygonscan API: {msg}" + (f" — {err}" if err and err != msg else ""), file=sys.stderr)
         return []
-    created = [tx.get("contractAddress").strip() for tx in data.get("result", []) if tx.get("contractAddress") and tx.get("contractAddress") != "0x"]
+    if verbose:
+        print(f"Polygonscan: {len(result)} txs for {factory_address}", file=sys.stderr)
+    created = [tx.get("contractAddress").strip() for tx in result if tx.get("contractAddress") and tx.get("contractAddress").strip() and tx.get("contractAddress") != "0x"]
     return list(dict.fromkeys(created))
 
 
@@ -64,17 +86,24 @@ def main():
     p.add_argument("-o", "--output", default=None)
     p.add_argument("--eth-only", action="store_true")
     p.add_argument("--poly-only", action="store_true")
+    p.add_argument("-v", "--verbose", action="store_true", help="Print API response details")
     args = p.parse_args()
+
+    if not args.etherscan_key and not args.polygonscan_key:
+        print("Set ETHERSCAN_API_KEY (or --etherscan-key). One key works for Ethereum and Polygon.", file=sys.stderr)
+        sys.exit(1)
 
     full_registry = {}
     if not args.poly_only and FACTORY_ADDRESSES_ETH and args.etherscan_key:
         for name, address in FACTORY_ADDRESSES_ETH.items():
-            full_registry[name] = get_created_contracts_etherscan(address, args.etherscan_key)
+            full_registry[name] = get_created_contracts_etherscan(address, args.etherscan_key, verbose=args.verbose)
             print(f"Found {len(full_registry[name])} contracts for {name}")
             time.sleep(0.2)
-    if not args.eth_only and FACTORY_ADDRESSES_POLY and args.polygonscan_key:
+    # Polygon: use POLYGONSCAN_API_KEY if set, else same ETHERSCAN_API_KEY (Etherscan API V2)
+    poly_key = args.polygonscan_key or args.etherscan_key
+    if not args.eth_only and FACTORY_ADDRESSES_POLY and poly_key:
         for name, address in FACTORY_ADDRESSES_POLY.items():
-            full_registry[name] = get_created_contracts_polygonscan(address, args.polygonscan_key)
+            full_registry[name] = get_created_contracts_polygonscan(address, poly_key, verbose=args.verbose)
             print(f"Found {len(full_registry[name])} contracts for {name}")
             time.sleep(0.2)
 

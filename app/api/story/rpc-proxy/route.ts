@@ -1,23 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { checkBotId } from "botid/server";
 import { serverLogger } from "@/lib/utils/logger";
 
 /**
  * RPC Proxy for Story Protocol
- * 
+ *
  * This endpoint proxies RPC requests to Story Protocol's RPC endpoint
  * without exposing the API key to the client-side code.
- * 
+ *
  * Security:
  * - API key is stored server-side only (STORY_ALCHEMY_API_KEY, not NEXT_PUBLIC_)
  * - Client-side code calls this proxy instead of the RPC directly
- * - Rate limiting and authentication can be added here if needed
+ * - Not protected by BotID so client-side RPC (e.g. eth_getBalance for funding wallet) works.
+ *   Sensitive actions (mint, transfer) use separate routes that are BotID-protected.
  */
 export async function POST(request: NextRequest) {
-  const verification = await checkBotId();
-  if (verification.isBot) {
-    return NextResponse.json({ error: "Access denied" }, { status: 403 });
-  }
   try {
     const body = await request.json();
     

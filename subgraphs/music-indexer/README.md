@@ -13,7 +13,7 @@ Static registry: `contracts-registry.json`. To discover more contracts from fact
 
 ```bash
 export ETHERSCAN_API_KEY="your_key"
-export POLYGONSCAN_API_KEY="your_key"
+# Optional: POLYGONSCAN_API_KEY for Polygon; if unset, ETHERSCAN_API_KEY is used (Etherscan API V2 supports Polygon and 60+ EVM chains)
 python3 scripts/music-contracts-scraper.py
 # Output: subgraphs/music-indexer/music_contracts_registry.json
 ```
@@ -47,7 +47,14 @@ yarn build:poly       # Polygon (after codegen:poly)
 
 ```bash
 yarn deploy:eth       # music-eth/1.0.0
-yarn deploy:poly      # music-poly/1.0.0 (use --config subgraph.poly.yaml if needed)
+yarn deploy:poly      # music-poly/1.0.0 (builds from subgraph.poly.yaml, deploys build/)
+```
+
+If a deployment with that name and version already exists, Goldsky will fail with "A deployment with this name & version already exists". To **replace** it (delete then redeploy):
+
+```bash
+yarn replace:eth      # delete music-eth/1.0.0, then deploy
+yarn replace:poly     # delete music-poly/1.0.0, then deploy
 ```
 
 Create a merged/cross-chain endpoint in the Goldsky dashboard if desired, then set `GOLDSKY_MUSIC_INDEXER_SUBGRAPH_NAME` (and optionally version) in Creative TV.
