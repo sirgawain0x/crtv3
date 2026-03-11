@@ -38,6 +38,11 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# Subgraph build & codegen (The Graph)
+subgraphs/**/build/
+subgraphs/**/generated/
+subgraphs/**/node_modules/
+
 # AI rules
 .windsurfrules
 .cursor/
