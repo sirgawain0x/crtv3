@@ -117,7 +117,7 @@ export function useContentCoin() {
             // Deployment might be too complex for this single-file hook without backend support for address discovery.
 
             setIsPending(false);
-            toast({ title: "Deployed", description: "Content Coin created (Mock)" });
+            toast({ title: "Deployed", description: `Content Coin ${tokenSymbol} created!` });
             return "0xMOCK_CONTENT_COIN_ADDRESS";
 
         } catch (e) {

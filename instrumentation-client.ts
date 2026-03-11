@@ -14,7 +14,8 @@ initBotId({
     { path: '/api/creator-profiles', method: 'DELETE' },
     { path: '/api/story/transfer', method: 'POST' },
     { path: '/api/story/mint', method: 'POST' },
-    { path: '/api/story/rpc-proxy', method: 'POST' },
+    // rpc-proxy omitted: BotID blocks legitimate client RPC (e.g. eth_getBalance for funding wallet).
+    // Mint/transfer remain protected; proxy is read/forward only.
     { path: '/api/story/factory/deploy-collection', method: 'POST' },
     { path: '/api/poap/create-event', method: 'POST' },
     { path: '/api/poap-proxy', method: 'POST' },
