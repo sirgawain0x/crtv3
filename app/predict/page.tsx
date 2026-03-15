@@ -1,4 +1,5 @@
 import React, { Suspense } from "react";
+import Image from "next/image";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -15,6 +16,15 @@ import { PredictionListSkeleton } from "@/components/predictions/PredictionListS
 export default function PredictPage() {
   return (
     <div className="min-h-screen px-2 sm:px-6 py-6">
+      <div className="relative w-full h-44 mb-8 overflow-hidden rounded-lg">
+        <Image
+          src="/images/prediction_banner.png"
+          alt="The best way to predict the future is to create it."
+          fill
+          style={{ objectFit: "cover" }}
+          priority
+        />
+      </div>
       <div className="my-5 p-4">
         <Breadcrumb>
           <BreadcrumbList>
