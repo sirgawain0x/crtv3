@@ -2694,6 +2694,11 @@
   resolved "https://registry.npmjs.org/@humanwhocodes/object-schema/-/object-schema-2.0.3.tgz"
   integrity sha512-93zYdMES/c1D69yZiKDBj0V24vqNzB/koF26KPaagAfd3P/4gUlh3Dys5ogAK+Exi9QyzlD8x/08Zt7wIKcDcA==
 
+"@hypelab/sdk-react@^1.0.4":
+  version "1.0.4"
+  resolved "https://registry.npmjs.org/@hypelab/sdk-react/-/sdk-react-1.0.4.tgz#959ab39b52f23ea77b662b0458fe075ad946faf2"
+  integrity sha512-avv6mNBrRURrh6MNomtgpDXrfc1THEX1byoIH79GYp/NXy/8sE51JDMp08it6ZHCFVag9Rih87Y9C973NAj0eg==
+
 "@img/colour@^1.0.0":
   version "1.0.0"
   resolved "https://registry.npmjs.org/@img/colour/-/colour-1.0.0.tgz"
