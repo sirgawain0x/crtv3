@@ -56,11 +56,16 @@ export function NFTMintingStep({
     ? "https://www.storyscan.io"
     : "https://aeneid.storyscan.io";
 
+  // When Alchemy Story Gas policy is set, gas is sponsored — don't gate on funding wallet balance
+  const hasStoryPolicy = Boolean(
+    (process.env.NEXT_PUBLIC_STORY_POLICY_ID ?? "").replace(/^["']|["']$/g, "").trim()
+  );
+
   useEffect(() => {
     const address = getNFTContractAddress();
     setNftContractAddress(address);
-    checkFundingWallet();
-  }, []);
+    if (!hasStoryPolicy) checkFundingWallet();
+  }, [hasStoryPolicy]);
 
   const checkFundingWallet = async (retryCount = 0) => {
     setIsCheckingFunding(true);
@@ -176,8 +181,10 @@ export function NFTMintingStep({
     }
   };
 
-  // Check if funding wallet has enough funds (Threshold: 0.5 IP)
-  const hasFundingFunds = fundingWalletBalance ? parseFloat(fundingWalletBalance) >= 0.5 : false;
+  // When policy is set, treat as sponsored (no balance required). Otherwise require >= 0.5 IP.
+  const hasFundingFunds = hasStoryPolicy
+    ? true
+    : (fundingWalletBalance ? parseFloat(fundingWalletBalance) >= 0.5 : false);
 
   const expectedChainId = network === "mainnet" ? 1514 : 1315;
 
@@ -194,40 +201,52 @@ export function NFTMintingStep({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* System Gas Status */}
-        <div className={`flex items-center justify-between text-sm p-3 rounded-md border ${hasFundingFunds
-          ? "bg-green-50 border-green-200 dark:bg-green-950/50 dark:border-green-800"
-          : "bg-amber-50 border-amber-200 dark:bg-amber-950/50 dark:border-amber-800"
-        }`}>
-          <div className="flex items-center gap-2">
-            <FuelIcon className={`h-4 w-4 ${hasFundingFunds ? "text-green-600 dark:text-green-400" : "text-amber-600 dark:text-amber-400"}`} />
-            <div className="flex flex-col">
-              <span className="font-medium text-foreground">
-                Story Protocol Gas Status
-              </span>
-              <span className="text-xs text-muted-foreground">
-                Network: {network}
-              </span>
+        {/* Gas status: when policy set show "Gas sponsored"; otherwise show funding wallet balance */}
+        {hasStoryPolicy ? (
+          <div className="flex items-center justify-between text-sm p-3 rounded-md border bg-green-50 border-green-200 dark:bg-green-950/50 dark:border-green-800">
+            <div className="flex items-center gap-2">
+              <FuelIcon className="h-4 w-4 text-green-600 dark:text-green-400" />
+              <div className="flex flex-col">
+                <span className="font-medium text-foreground">Story Protocol Gas</span>
+                <span className="text-xs text-muted-foreground">Gas sponsored by Alchemy</span>
+              </div>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className={`font-mono text-sm ${hasFundingFunds ? "text-green-700 dark:text-green-200 font-medium" : "text-amber-700 dark:text-amber-200 font-medium"}`}>
-              {fundingWalletBalance ? `${parseFloat(fundingWalletBalance).toFixed(4)} IP` : "Loading..."}
-            </span>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6"
-              onClick={() => checkFundingWallet()}
-              disabled={isCheckingFunding}
-            >
-              <Loader2 className={`h-3 w-3 ${isCheckingFunding ? "animate-spin" : ""}`} />
-            </Button>
-          </div>
-        </div>
+        ) : (
+          <>
+            <div className={`flex items-center justify-between text-sm p-3 rounded-md border ${hasFundingFunds
+              ? "bg-green-50 border-green-200 dark:bg-green-950/50 dark:border-green-800"
+              : "bg-amber-50 border-amber-200 dark:bg-amber-950/50 dark:border-amber-800"
+            }`}>
+              <div className="flex items-center gap-2">
+                <FuelIcon className={`h-4 w-4 ${hasFundingFunds ? "text-green-600 dark:text-green-400" : "text-amber-600 dark:text-amber-400"}`} />
+                <div className="flex flex-col">
+                  <span className="font-medium text-foreground">
+                    Story Protocol Gas Status
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    Network: {network}
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={`font-mono text-sm ${hasFundingFunds ? "text-green-700 dark:text-green-200 font-medium" : "text-amber-700 dark:text-amber-200 font-medium"}`}>
+                  {fundingWalletBalance ? `${parseFloat(fundingWalletBalance).toFixed(4)} IP` : "Loading..."}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6"
+                  onClick={() => checkFundingWallet()}
+                  disabled={isCheckingFunding}
+                >
+                  <Loader2 className={`h-3 w-3 ${isCheckingFunding ? "animate-spin" : ""}`} />
+                </Button>
+              </div>
+            </div>
 
-        {/* Swap Component if system funds are low */}
-        {!hasFundingFunds && fundingWalletAddress && (
+            {/* Swap Component if system funds are low */}
+            {!hasFundingFunds && fundingWalletAddress && (
           <div className="animate-in fade-in slide-in-from-top-2 duration-300 space-y-3">
             <Alert className="bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-950/50 dark:border-amber-800 dark:text-amber-100">
               <InfoIcon className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
@@ -247,6 +266,8 @@ export function NFTMintingStep({
               }}
             />
           </div>
+            )}
+          </>
         )}
 
         {/* Info Alert */}
@@ -255,7 +276,9 @@ export function NFTMintingStep({
           <AlertDescription>
             {nftContractAddress
               ? "Minting an NFT will create a unique token for your video."
-              : "We handle the gas fees! This action will register your video as an IP Asset on Story Protocol using our sponsored gas wallet."}
+              : hasStoryPolicy
+                ? "Gas is sponsored. This action will register your video as an IP Asset on Story Protocol."
+                : "We handle the gas fees! This action will register your video as an IP Asset on Story Protocol using our sponsored gas wallet."}
           </AlertDescription>
         </Alert>
 

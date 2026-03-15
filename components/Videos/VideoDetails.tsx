@@ -43,15 +43,130 @@ import { Button } from "../ui/button";
 import { fetchVideoAssetByPlaybackId } from "@/lib/utils/video-assets-client";
 import { getThumbnailUrl } from "@/lib/utils/thumbnail";
 import { convertFailingGateway } from "@/lib/utils/image-gateway";
+import Link from "next/link";
+
+const STORY_SCAN_IP_BASE =
+  process.env.NEXT_PUBLIC_STORY_NETWORK === "mainnet"
+    ? "https://www.storyscan.io"
+    : "https://aeneid.storyscan.io";
+
+const STORY_DISPUTE_DOCS_URL = "https://docs.story.foundation/concepts/dispute-module/overview";
+
+function StoryIPBlock({
+  storyIpId,
+  storyScanBase,
+}: {
+  storyIpId: string;
+  storyScanBase: string;
+}) {
+  const [attestationStatus, setAttestationStatus] = useState<
+    "idle" | "loading" | "ok" | "error"
+  >("idle");
+  const [infringementSummary, setInfringementSummary] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!storyIpId) return;
+    let cancelled = false;
+    setAttestationStatus("loading");
+    fetch(`/api/story/ip-status?ipId=${encodeURIComponent(storyIpId)}`)
+      .then((res) => {
+        if (cancelled) return res;
+        if (!res.ok) {
+          setAttestationStatus("error");
+          return null;
+        }
+        return res.json();
+      })
+      .then((data: { infringementStatus?: Array<{ status: string; isInfringing: boolean; providerName: string }> | null }) => {
+        if (cancelled || !data) return;
+        setAttestationStatus("ok");
+        const statuses = data.infringementStatus;
+        if (!statuses?.length) {
+          setInfringementSummary("No infringement detected");
+          return;
+        }
+        const infringing = statuses.filter((s) => s.isInfringing);
+        if (infringing.length > 0) {
+          setInfringementSummary(`Flagged (${infringing.map((s) => s.providerName).join(", ")})`);
+        } else {
+          const underReview = statuses.some((s) => (s.status || "").toLowerCase().includes("review"));
+          setInfringementSummary(underReview ? "Under review" : "No infringement detected");
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setAttestationStatus("error");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [storyIpId]);
+
+  return (
+    <div className="p-3 rounded-lg border bg-muted/50 space-y-2">
+      <p className="text-sm font-medium text-muted-foreground">
+        Registered as IP Asset
+      </p>
+      <p
+        className="text-xs font-mono truncate text-muted-foreground"
+        title={storyIpId}
+      >
+        {storyIpId}
+      </p>
+      {attestationStatus === "ok" && infringementSummary && (
+        <p className="text-xs text-muted-foreground">
+          Attestation: {infringementSummary}
+        </p>
+      )}
+      <div className="flex flex-wrap gap-2">
+        <a
+          href={`${storyScanBase}/ip/${storyIpId}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs text-primary hover:underline inline-flex items-center gap-1"
+        >
+          View on Story Protocol →
+        </a>
+        <Link
+          href="/marketplace/ip"
+          className="text-xs text-primary hover:underline inline-flex items-center gap-1"
+        >
+          Purchase IP →
+        </Link>
+        <a
+          href={STORY_DISPUTE_DOCS_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs text-primary hover:underline inline-flex items-center gap-1"
+        >
+          Report infringement →
+        </a>
+      </div>
+    </div>
+  );
+}
 
 type VideoDetailsProps = {
   asset: Asset;
   videoTitle?: string;
   /** When set, shows a "Verifiable" badge (Livepeer creator attestation). */
   livepeerAttestationId?: string | null;
+  /** Story Protocol: when true and storyIpId is set, shows "Registered as IP" block with View/Purchase CTAs. */
+  storyIpRegistered?: boolean;
+  storyIpId?: string | null;
+  /** Optional: NFT contract and token ID for Story/IP links. */
+  contractAddress?: string | null;
+  tokenId?: string | null;
 };
 
-export default function VideoDetails({ asset, videoTitle, livepeerAttestationId }: VideoDetailsProps) {
+export default function VideoDetails({
+  asset,
+  videoTitle,
+  livepeerAttestationId,
+  storyIpRegistered,
+  storyIpId,
+  contractAddress,
+  tokenId,
+}: VideoDetailsProps) {
   const [playbackSources, setPlaybackSources] = useState<Src[] | null>(null);
   const [conditionalProps, setConditionalProps] = useState<any>({});
   const [dbStatus, setDbStatus] = useState<"draft" | "published" | "minted" | "archived" | null>(null);
@@ -396,6 +511,12 @@ export default function VideoDetails({ asset, videoTitle, livepeerAttestationId 
               </Badge>
             )}
           </div>
+          {(storyIpRegistered && storyIpId) && (
+            <StoryIPBlock
+              storyIpId={storyIpId}
+              storyScanBase={STORY_SCAN_IP_BASE}
+            />
+          )}
           {/* Render other asset details */}
           {!isConnected ? (
             // Connect wallet prompt overlay

@@ -273,6 +273,8 @@ export interface VideoAssetPlaybackData {
   creator_metoken_id: string | null;
   attributes: Record<string, any> | null;
   title: string;
+  story_ip_registered?: boolean;
+  story_ip_id?: string | null;
 }
 
 export async function getVideoAssetByPlaybackId(playbackId: string): Promise<VideoAssetPlaybackData | null> {
@@ -283,7 +285,7 @@ export async function getVideoAssetByPlaybackId(playbackId: string): Promise<Vid
     async () => {
       return await (supabase as any)
         .from('video_assets')
-        .select('id, status, thumbnail_url, creator_metoken_id, attributes, title')
+        .select('id, status, thumbnail_url, creator_metoken_id, attributes, title, story_ip_registered, story_ip_id')
         .eq('playback_id', playbackId)
         .maybeSingle();
     },
@@ -576,6 +578,47 @@ export async function getPublishedVideoAssets(options: GetPublishedVideoAssetsOp
     data: data || [],
     total: count || 0,
     hasMore: options.limit ? (count || 0) > (options.offset || 0) + (options.limit || 0) : false
+  };
+}
+
+export interface GetStoryIPAssetsOptions {
+  limit?: number;
+  offset?: number;
+  orderBy?: 'created_at' | 'updated_at' | 'story_ip_registered_at';
+  order?: 'asc' | 'desc';
+}
+
+/**
+ * Fetch video assets that are registered as Story Protocol IP (Creative TV IP marketplace source).
+ */
+export async function getVideoAssetsWithStoryIP(options: GetStoryIPAssetsOptions = {}) {
+  const supabase = await createClient();
+
+  const orderBy = options.orderBy || 'story_ip_registered_at';
+  const order = options.order || 'desc';
+
+  let query = supabase
+    .from('video_assets')
+    .select('*', { count: 'exact' })
+    .eq('status', 'published')
+    .eq('story_ip_registered', true)
+    .order(orderBy, { ascending: order === 'asc' });
+
+  if (options.limit != null) {
+    const offset = options.offset ?? 0;
+    query = query.range(offset, offset + options.limit - 1);
+  }
+
+  const { data, error, count } = await query;
+
+  if (error) {
+    throw new Error(`Failed to fetch Story IP assets: ${error.message}`);
+  }
+
+  return {
+    data: data || [],
+    total: count ?? 0,
+    hasMore: options.limit != null ? (count ?? 0) > (options.offset ?? 0) + options.limit : false,
   };
 }
 

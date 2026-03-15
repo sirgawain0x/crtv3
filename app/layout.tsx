@@ -11,10 +11,9 @@ import { cn } from "@/lib/utils/utils";
 import { Toaster } from "@/components/ui/toaster";
 import Footer from "@/components/Footer";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { IframeCleanup } from "@/components/IframeCleanup";
-import { WebVitals } from "@/components/WebVitals";
 import { Analytics } from "@vercel/analytics/next";
 import Script from "next/script";
+import { LayoutClientChunks } from "@/components/LayoutClientChunks";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -86,8 +85,7 @@ export default async function RootLayout({
       >
         <div id="alchemy-signer-iframe-container" style={{ display: "none" }} />
         {/* Alchemy signer iframe container for modular account functionality */}
-        <IframeCleanup />
-        <WebVitals />
+        <LayoutClientChunks />
         <Providers initialState={initialState}>
           <ErrorBoundary>
             <Tour />

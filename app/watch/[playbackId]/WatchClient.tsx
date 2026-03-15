@@ -38,9 +38,15 @@ interface WatchClientProps {
     name: string;
   } | null;
   videoTitle?: string;
+  storyIpId?: string | null;
+  storyIpRegistered?: boolean;
 }
 
-export default function WatchClient({ initialMarketData, tokenInfo, videoTitle }: WatchClientProps) {
+const STORY_SCAN_IP_BASE = process.env.NEXT_PUBLIC_STORY_NETWORK === "mainnet"
+  ? "https://www.storyscan.io"
+  : "https://aeneid.storyscan.io";
+
+export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, storyIpId, storyIpRegistered }: WatchClientProps) {
   const params = useParams();
   const playbackId = Array.isArray(params.playbackId)
     ? params.playbackId[0]
@@ -187,6 +193,20 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle }
       </div>
 
       <div className="max-w-7xl mx-auto">
+        {(storyIpRegistered && storyIpId) && (
+          <div className="mb-4 p-3 rounded-lg border bg-muted/50">
+            <p className="text-sm font-medium text-muted-foreground">Registered as IP Asset</p>
+            <p className="text-xs font-mono mt-1 truncate" title={storyIpId}>{storyIpId}</p>
+            <a
+              href={`${STORY_SCAN_IP_BASE}/ip/${storyIpId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-primary hover:underline mt-1 inline-block"
+            >
+              View on Story Protocol →
+            </a>
+          </div>
+        )}
         {tokenInfo && (
           <div className="flex justify-end mb-4">
             <MeTokenShareButton

@@ -163,6 +163,10 @@ export default async function VideoDetailsPage({
               asset={assetData}
               videoTitle={videoAsset?.title || assetData?.name}
               livepeerAttestationId={videoAsset?.livepeer_attestation_id ?? null}
+              storyIpRegistered={videoAsset?.story_ip_registered ?? false}
+              storyIpId={videoAsset?.story_ip_id ?? null}
+              contractAddress={videoAsset?.contract_address ?? null}
+              tokenId={videoAsset?.token_id ?? null}
             />
             {/* Uploader Section with Share Button */}
             <div className="flex items-center justify-between mt-4">

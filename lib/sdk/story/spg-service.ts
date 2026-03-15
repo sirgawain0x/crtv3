@@ -46,7 +46,8 @@ export interface CreateCollectionResult {
 export interface MintAndRegisterParams {
   collectionAddress: Address; // SPG NFT collection address
   recipient: Address; // Address to receive the NFT
-  metadataURI?: string; // IPFS metadata URI (optional)
+  metadataURI?: string; // IPFS metadata URI (optional); use IPA-standard for attestation
+  metadataHash?: string; // Optional hash of metadata content for verification
   allowDuplicates?: boolean; // Allow duplicate registrations (default: false)
 }
 
@@ -268,8 +269,11 @@ export async function mintAndRegisterIp(
       recipient: params.recipient,
       ipMetadata: params.metadataURI
         ? {
-          ipMetadataURI: params.metadataURI,
-        }
+            ipMetadataURI: params.metadataURI,
+            ...(params.metadataHash
+              ? { ipMetadataHash: params.metadataHash as `0x${string}` }
+              : {}),
+          }
         : undefined,
       allowDuplicates: params.allowDuplicates ?? false,
     });
@@ -328,8 +332,11 @@ export async function mintAndRegisterIpAndAttachPilTerms(
       recipient: params.recipient,
       ipMetadata: params.metadataURI
         ? {
-          ipMetadataURI: params.metadataURI,
-        }
+            ipMetadataURI: params.metadataURI,
+            ...(params.metadataHash
+              ? { ipMetadataHash: params.metadataHash as `0x${string}` }
+              : {}),
+          }
         : undefined,
       licenseTermsData: params.licenseTermsData,
       allowDuplicates: params.allowDuplicates ?? false,

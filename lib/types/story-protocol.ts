@@ -27,6 +27,8 @@ export interface StoryLicenseTerms {
   derivativesReciprocal: boolean; // Require reciprocal licensing
   distributionMethod?: string; // Distribution method (if applicable)
   revenueShare?: number; // Revenue share percentage (0-100)
+  /** URI for the license terms (e.g. app video page or license doc). Links IP license back to source video. */
+  licenseTermsUri?: string;
 }
 
 /**
@@ -36,6 +38,8 @@ export interface StoryIPRegistrationOptions {
   registerIP: boolean; // Whether to register IP
   licenseTerms?: StoryLicenseTerms; // License terms to attach
   metadataURI?: string; // Custom metadata URI (optional)
+  /** Canonical URL of the source video (e.g. app watch page). Used for PIL terms uri and IP metadata reference. */
+  sourceVideoUrl?: string;
 }
 
 /**

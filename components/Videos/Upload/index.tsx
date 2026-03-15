@@ -342,6 +342,10 @@ const HookMultiStepForm = () => {
                       toast.info("Registering existing NFT as IP Asset on Story Protocol...");
                       const { registerVideoAsIPAsset } = await import("@/services/story-protocol");
 
+                      const sourceVideoUrl =
+                        typeof window !== "undefined" && updatedAsset?.playback_id
+                          ? `${window.location.origin}/watch/${updatedAsset.playback_id}`
+                          : undefined;
                       // 20s timeout for registration
                       const registrationResult = await withTimeout(
                         registerVideoAsIPAsset(
@@ -356,6 +360,7 @@ const HookMultiStepForm = () => {
                             registerIP: true,
                             licenseTerms: data.storyConfig?.licenseTerms,
                             metadataURI: metadataURI,
+                            sourceVideoUrl,
                           }
                         ),
                         20000
@@ -376,7 +381,17 @@ const HookMultiStepForm = () => {
                       // No existing NFT - mint and register on Story Protocol in one transaction
                       toast.info("Minting NFT and registering IP on Story Protocol...");
                       const { mintAndRegisterVideoIP } = await import("@/services/story-protocol");
-
+                      const sourceVideoUrl =
+                        typeof window !== "undefined" && updatedAsset?.playback_id
+                          ? `${window.location.origin}/watch/${updatedAsset.playback_id}`
+                          : undefined;
+                      const licenseTermsWithUri = data.storyConfig?.licenseTerms
+                        ? {
+                            ...data.storyConfig.licenseTerms,
+                            licenseTermsUri:
+                              data.storyConfig.licenseTerms.licenseTermsUri ?? sourceVideoUrl,
+                          }
+                        : undefined;
                       // 25s timeout for mint & register
                       const mintResult = await withTimeout(
                         mintAndRegisterVideoIP(
@@ -385,7 +400,7 @@ const HookMultiStepForm = () => {
                           metadataURI,
                           undefined, // collectionName - will use default
                           undefined, // collectionSymbol - will use default
-                          data.storyConfig?.licenseTerms
+                          licenseTermsWithUri
                         ),
                         25000
                       );
