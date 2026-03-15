@@ -7,13 +7,11 @@
 .yarn/install-state.gz
 # Subgraph build artifacts and deps (keep source code committed)
 /subgraphs/node_modules/
-/subgraphs/music-indexer/node_modules/
-/subgraphs/music-indexer/build/
-/subgraphs/music-indexer/cache/
-/subgraphs/music-indexer/codegen/
-/subgraphs/music-indexer/generated/
-/subgraphs/music-indexer/test-results/
 /subgraphs/build/
+/subgraphs/cache/
+/subgraphs/codegen/
+/subgraphs/generated/
+/subgraphs/test-results/
 /subgraphs/cache/
 /subgraphs/codegen/
 /subgraphs/generated/
