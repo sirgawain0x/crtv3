@@ -18,7 +18,7 @@ export default function PredictPage() {
     <div className="min-h-screen px-2 sm:px-6 py-6">
       <div className="relative w-full h-44 mb-8 overflow-hidden rounded-lg">
         <Image
-          src="/images/prediction_banner.png"
+          src="/images/prediction_banner.svg"
           alt="The best way to predict the future is to create it."
           fill
           style={{ objectFit: "cover" }}
