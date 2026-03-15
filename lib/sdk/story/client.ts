@@ -416,6 +416,20 @@ export function createBasePublicClient() {
   });
 }
 
+/** Client-side timeout for Story RPC (e.g. when using /api/story/rpc-proxy) to avoid ChunkLoadError/timeouts. */
+const STORY_RPC_CLIENT_TIMEOUT_MS = 20_000;
+
+function createStoryRpcTransport(rpcUrl: string) {
+  const isProxy = rpcUrl.startsWith("/") || rpcUrl.includes("rpc-proxy");
+  if (!isProxy) return http(rpcUrl);
+  const fetchWithTimeout: typeof fetch = (input, init) => {
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), STORY_RPC_CLIENT_TIMEOUT_MS);
+    return fetch(input, { ...init, signal: controller.signal }).finally(() => clearTimeout(t));
+  };
+  return http(rpcUrl, { fetch: fetchWithTimeout } as Parameters<typeof http>[1]);
+}
+
 /**
  * Create a public client for Story Protocol (testnet or mainnet)
  * Used for reading blockchain data on Story Protocol
@@ -423,27 +437,25 @@ export function createBasePublicClient() {
 export function createStoryPublicClient() {
   const rpcUrl = getStoryRpcUrl();
   const network = process.env.NEXT_PUBLIC_STORY_NETWORK || "testnet";
-  
+  const transport = createStoryRpcTransport(rpcUrl);
+
   // Use viem's story chain for mainnet if available, otherwise define custom chain
   // Story testnet (Aeneid): Chain ID 1315
   // Story mainnet: Chain ID 1514
   if (network === "mainnet") {
     try {
-      // Try to use viem's story chain definition
       return createPublicClient({
         chain: story,
-        transport: http(rpcUrl),
+        transport,
       });
     } catch (e) {
-      // Fallback to custom chain definition if story chain not available
       serverLogger.warn("viem story chain not available, using custom chain definition");
     }
   }
-  
-  // Custom chain definition for testnet or fallback
+
   const chainId = network === "mainnet" ? 1514 : 1315;
   return createPublicClient({
-    transport: http(rpcUrl),
+    transport,
     chain: {
       id: chainId,
       name: network === "mainnet" ? "Story Mainnet" : "Story Testnet (Aeneid)",

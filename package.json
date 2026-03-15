@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "NODE_OPTIONS='--max-old-space-size=4096 --no-deprecation' next dev --webpack",
-    "dev:turbo": "NODE_OPTIONS='--max-old-space-size=4096 --no-deprecation' next dev --turbo",
+    "dev": "NODE_OPTIONS='--max-old-space-size=6144 --no-deprecation' next dev --webpack",
+    "dev:turbo": "NODE_OPTIONS='--max-old-space-size=6144 --no-deprecation' next dev --turbo",
     "build": "NODE_OPTIONS='--max-old-space-size=6144 --no-deprecation' next build --webpack",
     "start": "next start",
     "lint": "eslint .",

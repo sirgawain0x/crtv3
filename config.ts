@@ -4,14 +4,17 @@ import {
   type CreateConfigProps,
 } from "@account-kit/react";
 import { alchemy, base } from "@account-kit/infra";
+import { http } from "viem";
 import { QueryClient } from "@tanstack/react-query";
 import { modularAccountFactoryAddresses } from "./lib/utils/modularAccount";
+import { getStoryChain } from "./lib/sdk/story/chains";
 import { SITE_TOPIC_LOGO } from "./context/context";
 import Image from "next/image";
 import React from "react";
 
-// Define the chains we want to support (Base only)
-export const chains = [base];
+// Define the chains we want to support (Base + Story Protocol for client-side signing)
+const storyChain = getStoryChain();
+export const chains = [base, storyChain];
 
 // Default chain for initial connection
 const defaultChain = base;
@@ -117,15 +120,18 @@ const uiConfig: AlchemyAccountsUIConfig = {
   supportUrl: process.env.NEXT_PUBLIC_SUPPORT_URL,
 };
 
+// Transport for Story Protocol (RPC only; client-side signing uses this chain)
+const storyTransport = http(storyChain.rpcUrls.default.http[0] as string);
+
 // Create the Account Kit config
 export const config = createConfig(
   {
     transport,
     chain: defaultChain,
-    chains: chains.map((chain) => ({
-      chain,
-      transport,
-    })),
+    chains: [
+      { chain: base, transport },
+      { chain: storyChain, transport: storyTransport },
+    ],
     ssr: true,
     enablePopupOauth: true,
     // Configure persistent sessions

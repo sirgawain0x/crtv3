@@ -94,6 +94,8 @@ export default async function WatchPage({ params }: WatchPageProps) {
             initialMarketData={marketData}
             tokenInfo={tokenInfo}
             videoTitle={videoAsset?.title}
+            storyIpId={videoAsset?.story_ip_id ?? null}
+            storyIpRegistered={videoAsset?.story_ip_registered ?? false}
         />
     );
 }

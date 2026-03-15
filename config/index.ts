@@ -14,6 +14,7 @@ const configSchema = z.object({
   
   // Optional but recommended
   alchemyPaymasterPolicyId: z.string().optional(),
+  storyPaymasterPolicyId: z.string().optional(),
   livepeerWebhookId: z.string().optional(),
   coinbaseCdpApiKeyId: z.string().optional(),
   coinbaseCdpApiKeySecret: z.string().optional(),
@@ -29,6 +30,7 @@ export const config: Config = {
   supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || "",
   livepeerApiKey: process.env.LIVEPEER_API_KEY || "",
   alchemyPaymasterPolicyId: process.env.NEXT_PUBLIC_ALCHEMY_PAYMASTER_POLICY_ID,
+  storyPaymasterPolicyId: process.env.NEXT_PUBLIC_STORY_POLICY_ID,
   livepeerWebhookId: process.env.LIVEPEER_WEBHOOK_ID,
   coinbaseCdpApiKeyId: process.env.COINBASE_CDP_API_KEY_ID,
   coinbaseCdpApiKeySecret: process.env.COINBASE_CDP_API_KEY_SECRET,

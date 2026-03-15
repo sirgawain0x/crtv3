@@ -42,6 +42,15 @@ Your Alchemy Gas Manager policy ID for sponsoring user transaction fees.
 
 **Documentation:** [Gas Manager Services](https://docs.alchemy.com/docs/gas-manager-services)
 
+#### Story Protocol (Alchemy)
+
+Alchemy supports **Story mainnet** (network ID **1514**) for RPC and gas sponsorship:
+
+- **RPC:** Use `https://story-mainnet.g.alchemy.com/v2/{apiKey}` by setting `NEXT_PUBLIC_STORY_ALCHEMY_API_KEY` (same key can be used for Base and Story, or use a separate key). For testnet (Aeneid), the app uses `https://story-testnet.g.alchemy.com/v2/{apiKey}` when the same env var is set.
+- **Gas sponsorship:** Create a Gas Manager policy for **Story** in the [Alchemy Gas Manager](https://dashboard.alchemy.com/gas-manager) (select Story mainnet and/or Aeneid testnet), then set `NEXT_PUBLIC_STORY_POLICY_ID`. When sending UserOperations on Story chain, the app uses this policy so gas can be sponsored without a funding wallet.
+
+**Documentation:** [Story API Overview](https://www.alchemy.com/docs/chains/story/story-api-endpoints/net-version) · [Story API Quickstart](https://www.alchemy.com/docs/reference/story-api-quickstart)
+
 ### 2. Livepeer Configuration
 
 #### `LIVEPEER_API_KEY`
@@ -188,8 +197,18 @@ Address of the deployed CreatorIPCollectionFactory contract on Story Protocol. I
 
 **Note:** If not provided, the system will fallback to using Story Protocol SPG for collection creation.
 
+#### `NEXT_PUBLIC_STORY_POLICY_ID` (Optional)
+Alchemy Gas Manager policy ID for Story Protocol (chain IDs 1315 testnet / 1514 mainnet). When set and when Story transactions are sent as UserOperations (e.g. client-signed creator-as-deployer flow), Alchemy sponsors gas so you do **not** need `STORY_PROTOCOL_PRIVATE_KEY` to pay for Story deploy/interactions.
+
+**How to get it:**
+1. Go to [Alchemy Gas Manager](https://dashboard.alchemy.com/gas-manager)
+2. Create a new policy and select **Story** (Aeneid testnet and/or Story mainnet)
+3. Configure spending rules and copy the Policy ID
+
+**Note:** This works when the Story tx is sent as a UserOp (e.g. via the prepare-mint flow and client-side signing on Story chain). If you use the server-side mint flow with `STORY_PROTOCOL_PRIVATE_KEY`, that wallet pays gas; set `NEXT_PUBLIC_STORY_POLICY_ID` to have Alchemy sponsor gas when using the creator-sign flow instead.
+
 #### `STORY_PROTOCOL_PRIVATE_KEY` (Optional, Server-side only)
-Private key for a wallet that will fund Story Protocol transactions (minting NFTs, IP registration, etc.). This wallet must have IP tokens for gas fees on Story Protocol.
+Private key for a wallet that will fund Story Protocol transactions (minting NFTs, IP registration, etc.). This wallet must have IP tokens for gas fees on Story Protocol. If you use `NEXT_PUBLIC_STORY_POLICY_ID` with the creator-sign (UserOp) flow, you can avoid setting this.
 
 **NFT minting step:** The upload flow checks `/api/story/mint-configured`. When `STORY_PROTOCOL_PRIVATE_KEY` is not set, the NFT minting step shows "NFT minting unavailable" instead of the mint UI. Set this variable to enable the step.
 

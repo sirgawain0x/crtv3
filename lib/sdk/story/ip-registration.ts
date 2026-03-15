@@ -17,14 +17,16 @@ import type {
  * @param client - Story Protocol client instance
  * @param nftContract - NFT contract address
  * @param tokenId - NFT token ID
- * @param metadataURI - IPFS metadata URI (optional)
+ * @param metadataURI - IPFS metadata URI (optional); use IPA-standard metadata for attestation
+ * @param metadataHash - Optional hash of metadata content (e.g. SHA-256 hex) for verification
  * @returns IP Asset registration result
  */
 export async function registerIPAsset(
   client: StoryClient,
   nftContract: Address,
   tokenId: string,
-  metadataURI?: string
+  metadataURI?: string,
+  metadataHash?: string
 ): Promise<{ ipId: string; txHash: string }> {
   try {
     // Register IP Asset using Story Protocol SDK
@@ -38,6 +40,7 @@ export async function registerIPAsset(
     if (metadataURI) {
       registerRequest.ipMetadata = {
         ipMetadataURI: metadataURI,
+        ...(metadataHash ? { ipMetadataHash: metadataHash } : {}),
       };
     }
 
@@ -102,7 +105,7 @@ export async function attachLicenseTerms(
             derivativesApproval: licenseTerms.derivativesApproval ?? false,
             derivativesReciprocal: licenseTerms.derivativesReciprocal ?? false,
             currency: "0x0000000000000000000000000000000000000000" as `0x${string}`, // Native token (ETH)
-            uri: "", // Empty URI for now
+            uri: licenseTerms.licenseTermsUri ?? "", // License terms URI (e.g. app video page) links IP back to source media
             // Required fields with sensible defaults
             defaultMintingFee: BigInt(0), // Free minting by default (in wei)
             expiration: BigInt(0), // No expiration (0 = never expires)

@@ -13,6 +13,7 @@ import {
   type MintAndRegisterWithLicenseParams,
 } from "@/lib/sdk/story/spg-service";
 import { getOrCreateCreatorCollection } from "@/lib/sdk/story/collection-service";
+import { buildAndUploadIpaMetadata } from "@/lib/sdk/story/ipa-metadata";
 import { updateVideoAssetStoryIPStatus } from "./video-assets";
 import type { VideoAsset } from "@/lib/types/video-asset";
 import type {
@@ -22,6 +23,13 @@ import type {
   StoryIPAssetStatus,
 } from "@/lib/types/story-protocol";
 import type { Address } from "viem";
+
+/** Build canonical source video URL for IP/license metadata (links back to app video). */
+function getStorySourceVideoUrl(videoAsset: { playback_id?: string }, baseUrl?: string): string {
+  const base = baseUrl ?? process.env.NEXT_PUBLIC_APP_URL ?? (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
+  const playbackId = videoAsset.playback_id ?? "";
+  return playbackId ? `${base.replace(/\/$/, "")}/watch/${playbackId}` : "";
+}
 
 /**
  * Register a video as an IP Asset on Story Protocol
@@ -74,15 +82,33 @@ export async function registerVideoAsIPAsset(
     tokenId = videoAsset.token_id;
 
     // Step 2: Register NFT as IP Asset on Story Protocol
+    // Use IPA-standard metadata (with mediaUrl, mediaType, etc.) when not provided so attestation can run
     let ipId: string;
     let registrationTx: string;
+
+    let ipMetadataURI: string | undefined = options.metadataURI ?? videoAsset.metadata_uri ?? undefined;
+    let ipMetadataHash: string | undefined;
+
+    if (!ipMetadataURI) {
+      try {
+        const uploaded = await buildAndUploadIpaMetadata(videoAsset, {
+          sourceVideoUrl: options.sourceVideoUrl ?? getStorySourceVideoUrl(videoAsset),
+          creatorAddress: creatorAddress,
+        });
+        ipMetadataURI = uploaded.ipMetadataURI;
+        ipMetadataHash = uploaded.ipMetadataHash;
+      } catch (uploadError) {
+        console.error("IPA metadata build/upload failed, registering without metadata:", uploadError);
+      }
+    }
 
     try {
       const registrationResult = await registerIPAsset(
         storyClient,
         nftContract,
         tokenId,
-        options.metadataURI || videoAsset.metadata_uri || undefined
+        ipMetadataURI,
+        ipMetadataHash
       );
 
       ipId = registrationResult.ipId;
@@ -95,15 +121,20 @@ export async function registerVideoAsIPAsset(
       };
     }
 
-    // Step 3: Attach license terms if provided
+    // Step 3: Attach license terms if provided (with source video URI so license points back to media)
     let licenseTermsId: string | undefined;
+    const sourceVideoUrl = options.sourceVideoUrl ?? getStorySourceVideoUrl(videoAsset);
 
     if (options.licenseTerms) {
       try {
+        const termsWithUri = {
+          ...options.licenseTerms,
+          licenseTermsUri: options.licenseTerms.licenseTermsUri ?? sourceVideoUrl,
+        };
         const licenseResult = await attachLicenseTerms(
           storyClient,
           ipId,
-          options.licenseTerms
+          termsWithUri
         );
 
         licenseTermsId = licenseResult.termsId;
@@ -275,7 +306,23 @@ export async function mintAndRegisterVideoIP(
       };
     }
 
-    // Step 2: Mint NFT and register as IP Asset (with optional license terms)
+    // Step 2: Build and upload IPA-standard metadata so attestation can run (unless caller provided URI)
+    let metadataURIToUse = metadataURI;
+    let metadataHashToUse: string | undefined;
+    if (!metadataURIToUse) {
+      try {
+        const uploaded = await buildAndUploadIpaMetadata(videoAsset, {
+          sourceVideoUrl: licenseTerms?.licenseTermsUri ?? getStorySourceVideoUrl(videoAsset),
+          creatorAddress: creatorAddress,
+        });
+        metadataURIToUse = uploaded.ipMetadataURI;
+        metadataHashToUse = uploaded.ipMetadataHash;
+      } catch (uploadError) {
+        console.error("IPA metadata build/upload failed, minting without IP metadata:", uploadError);
+      }
+    }
+
+    // Step 3: Mint NFT and register as IP Asset (with optional license terms)
     let result: {
       tokenId: string;
       ipId: string;
@@ -284,11 +331,13 @@ export async function mintAndRegisterVideoIP(
     };
 
     if (licenseTerms) {
-      // Mint, register, and attach license terms in one transaction
+      // Source video URL for PIL terms uri (links IP license back to app video)
+      const sourceVideoUrl = licenseTerms.licenseTermsUri ?? getStorySourceVideoUrl(videoAsset);
       const licenseParams: MintAndRegisterWithLicenseParams = {
         collectionAddress,
         recipient: creatorAddress,
-        metadataURI,
+        metadataURI: metadataURIToUse,
+        metadataHash: metadataHashToUse,
         allowDuplicates: false,
         licenseTermsData: [
           {
@@ -306,7 +355,7 @@ export async function mintAndRegisterVideoIP(
               derivativesApproval: licenseTerms.derivativesApproval ?? false,
               derivativesReciprocal: licenseTerms.derivativesReciprocal ?? false,
               currency: "0x0000000000000000000000000000000000000000" as Address,
-              uri: "", // Required by SDK, use empty string if not needed
+              uri: sourceVideoUrl, // License terms URI points back to source video
               defaultMintingFee: 0, // Required by SDK
               expiration: 0, // Required by SDK (0 = never expires)
               commercialRevCeiling: 0, // Required by SDK
@@ -332,7 +381,8 @@ export async function mintAndRegisterVideoIP(
       const mintResult = await mintAndRegisterIp(storyClient, {
         collectionAddress,
         recipient: creatorAddress,
-        metadataURI,
+        metadataURI: metadataURIToUse,
+        metadataHash: metadataHashToUse,
         allowDuplicates: false,
       });
 
@@ -343,7 +393,7 @@ export async function mintAndRegisterVideoIP(
       };
     }
 
-    // Step 3: Update video asset in database
+    // Step 4: Update video asset in database
     try {
       await updateVideoAssetStoryIPStatus(videoAsset.id, {
         story_ip_registered: true,
