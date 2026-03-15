@@ -30,6 +30,8 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Creative TV",
     description: "The Way Content Should Be.",
+    siteName: "Creative TV",
+    url: "https://tv.creativeplatform.xyz",
     images: [
       {
         url: "/images/Creative_TV_Logo.png",
