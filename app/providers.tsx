@@ -18,6 +18,7 @@ import { cleanupExistingIframes } from "@/components/IframeCleanup";
 // Import dev warning suppression (only active in development)
 import "@/lib/utils/suppressDevWarnings";
 import { MembershipGuard } from "@/components/auth/MembershipGuard";
+import { AccountKitStoreGuard } from "@/components/auth/AccountKitStoreGuard";
 import NoSSR from "@/components/NoSSR";
 
 function ErrorFallback({ error }: { error: Error }) {
@@ -75,9 +76,11 @@ export const Providers = (
                     <HeliaProvider>
                       <TourProvider>
                         <VideoProvider>
+                          <AccountKitStoreGuard>
                           <MembershipGuard>
                             {props.children}
                           </MembershipGuard>
+                        </AccountKitStoreGuard>
                           <Toaster position="top-right" richColors />
                         </VideoProvider>
                       </TourProvider>

@@ -479,7 +479,7 @@ export default function Navbar() {
               (isMenuOpen ? "animate-in slide-in-from-top-5" : "hidden")
             }
             aria-hidden={!isMenuOpen}
-            inert={!isMenuOpen ? ("" as any) : undefined}
+            inert={!isMenuOpen}
           >
             <div
               className={
