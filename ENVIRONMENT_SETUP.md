@@ -105,18 +105,6 @@ No configuration is required as these are public endpoints:
 
 **Note:** The Reality.eth subgraph endpoint is accessed via `/api/reality-eth-subgraph` to handle CORS.
 
-#### Music Indexer Subgraph (Universal On-Chain Music)
-
-Indexes music NFTs from Catalog, Sound, Mint Songs, Royal, EulerBeat, and Zora (Ethereum + Polygon). Creative TV uses it at `/music` (IPFS via Grove).
-
-**`GOLDSKY_MUSIC_INDEXER_PROJECT_ID`** (Optional) – Goldsky project ID; if not set, falls back to `GOLDSKY_PROJECT_ID`.
-
-**`GOLDSKY_MUSIC_INDEXER_SUBGRAPH_NAME`** (Optional) – Subgraph name (default: `music-eth`). Use a merged tag name if configured in Goldsky (e.g. `music-unified`).
-
-**`GOLDSKY_MUSIC_INDEXER_SUBGRAPH_VERSION`** (Optional) – Subgraph version (default: `1.0.0`).
-
-Deploy from `subgraphs/music-indexer/` (see `subgraphs/music-indexer/README.md`). Proxy: `/api/music-indexer-subgraph`.
-
 ### 5. Coinbase CDP Configuration (Onramp/Offramp)
 
 #### `COINBASE_CDP_API_KEY_ID`
