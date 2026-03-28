@@ -5,6 +5,8 @@ import { Asset } from "livepeer/models/components";
 import { fullLivepeer } from "@/lib/sdk/livepeer/fullClient";
 import VideoViewMetrics from "@/components/Videos/VideoViewMetrics";
 import { Skeleton } from "@/components/ui/skeleton";
+import { logger } from '@/lib/utils/logger';
+
 
 export default function VideoDetailsPage({
   params,
@@ -23,7 +25,7 @@ export default function VideoDetailsPage({
         await fetchAssetDetails(asset?.assetId);
       } catch (err) {
         setError("Failed to load video data");
-        console.error(err);
+        logger.error(err);
       }
       setIsLoading(false);
     };
@@ -38,7 +40,7 @@ export default function VideoDetailsPage({
       setAsset(assetData);
     } catch (err) {
       setError("Failed to load asset data");
-      console.error(err);
+      logger.error(err);
     }
     setAssetLoading(false);
   };

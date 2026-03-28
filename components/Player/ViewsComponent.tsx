@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { fetchAllViews } from "@/app/api/livepeer/views";
 import { EyeIcon } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { logger } from '@/lib/utils/logger';
+
 
 interface ViewsComponentProps {
   playbackId: string;
@@ -33,15 +34,27 @@ export const ViewsComponent: React.FC<ViewsComponentProps> = ({
 
       try {
         setLoading(true);
-        const result = await fetchAllViews(playbackId);
-        if (result) {
-          setViewMetrics(result);
+        const response = await fetch(`/api/livepeer/views/${playbackId}`);
+        
+        if (!response.ok) {
+          throw new Error("Failed to fetch view metrics");
+        }
+
+        const data = await response.json();
+        
+        if (data.success) {
+          setViewMetrics({
+            playbackId: data.playbackId,
+            viewCount: data.viewCount,
+            playtimeMins: data.playtimeMins,
+            legacyViewCount: data.legacyViewCount,
+          });
         } else {
           setError("Failed to fetch view metrics");
         }
       } catch (err) {
         setError((err as Error).message || "Failed to fetch view metrics");
-        console.error("Error fetching view metrics:", err);
+        logger.error("Error fetching view metrics:", err);
       } finally {
         setLoading(false);
       }

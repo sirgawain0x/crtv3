@@ -6,11 +6,21 @@ import { headers } from "next/headers";
 import "./globals.css";
 import { Providers } from "./providers";
 import Navbar from "@/components/Navbar";
+import { Tour } from '@/components/Tour/Tour';
 import { cn } from "@/lib/utils/utils";
 import { Toaster } from "@/components/ui/toaster";
 import Footer from "@/components/Footer";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { Analytics } from "@vercel/analytics/next";
+import Script from "next/script";
+import { LayoutClientChunks } from "@/components/LayoutClientChunks";
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({
+  subsets: ["latin"],
+  display: 'swap',
+  preload: true,
+  adjustFontFallback: true,
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://tv.creativeplatform.xyz"),
@@ -19,9 +29,11 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Creative TV",
     description: "The Way Content Should Be.",
+    siteName: "Creative TV",
+    url: "https://tv.creativeplatform.xyz",
     images: [
       {
-        url: "https://tv.creativeplatform.xyz/Creative_TV_Logo.png",
+        url: "/images/Creative_TV_Logo.png",
         width: 500,
         height: 500,
         alt: "Creative TV Logo",
@@ -33,7 +45,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Creative TV",
     description: "The Way Content Should Be.",
-    images: ["https://tv.creativeplatform.xyz/creative-banner.png"],
+    images: ["/Creative_TV.png"],
   },
 };
 
@@ -69,17 +81,30 @@ export default async function RootLayout({
           inter.className,
           "min-h-screen bg-background antialiased"
         )}
+        suppressHydrationWarning
       >
-        <div id="alchemy-signer-iframe-container" style={{ display: "none" }} />{" "}
+        <div id="alchemy-signer-iframe-container" style={{ display: "none" }} />
         {/* Alchemy signer iframe container for modular account functionality */}
+        <LayoutClientChunks />
         <Providers initialState={initialState}>
-          <Navbar />
-          <div className="min-h-screen flex flex-col">
-            <main className="flex-1">{children}</main>
-            <Footer />
-          </div>
+          <ErrorBoundary>
+            <Tour />
+            <Navbar />
+            <div className="min-h-screen flex flex-col">
+              <main className="flex-1">{children}</main>
+              <Footer />
+            </div>
+          </ErrorBoundary>
         </Providers>
         <Toaster />
+        <Analytics />
+        {/* HypeLab SDK: required for @hypelab/sdk-react Banner/Native. Property slug: 33e2e4fa10 */}
+        <Script
+          id="hypelab-sdk"
+          src="https://api.hypelab.com/v1/scripts/sdk.js"
+          strategy="afterInteractive"
+          data-property-slug="33e2e4fa10"
+        />
       </body>
     </html>
   );

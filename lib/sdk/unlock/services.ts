@@ -3,21 +3,52 @@ import { Web3Service } from "@unlock-protocol/unlock-js";
 import PublicLockV14Json from "@unlock-protocol/contracts/dist/abis/PublicLock/PublicLockV14.json";
 import {
   type PublicClient,
+  createPublicClient,
   getContract,
+  http,
   type GetContractReturnType,
 } from "viem";
-import { alchemy, base } from "@account-kit/infra";
-import { createAlchemyPublicRpcClient } from "@account-kit/infra";
+import { base } from "@account-kit/infra";
+import { parseIpfsUriWithFallback } from "@/lib/utils/image-gateway";
+import { serverLogger } from "@/lib/utils/logger";
 
-// Use environment variables for sensitive data
-const alchemyRpcUrl = process.env.NEXT_PUBLIC_ALCHEMY_BASE_RPC_URL;
+/** Resolve Base mainnet RPC URL. Avoids Alchemy client when key is missing (returns non-JSON → parse error). */
+function getBaseRpcUrl(): string {
+  const apiKey = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY;
 
-// Create the Account Kit client
-const accountKitClient = createAlchemyPublicRpcClient({
-  transport: alchemy({
-    apiKey: process.env.NEXT_PUBLIC_ALCHEMY_API_KEY as string,
-  }),
+  // Only use Alchemy URL if we have a valid, non-empty API key
+  if (apiKey && typeof apiKey === 'string' && apiKey.trim().length > 0) {
+    const trimmedKey = apiKey.trim();
+    // Ensure the URL includes the API key
+    const alchemyUrl = `https://base-mainnet.g.alchemy.com/v2/${trimmedKey}`;
+    serverLogger.debug('[RPC] Using Alchemy RPC with API key');
+    return alchemyUrl;
+  }
+
+  // Fallback to other RPC URLs if Alchemy key is missing
+  const alchemyRpc = process.env.NEXT_PUBLIC_ALCHEMY_RPC_URL;
+  if (alchemyRpc && typeof alchemyRpc === 'string' && alchemyRpc.trim().length > 0) {
+    serverLogger.debug('[RPC] Using NEXT_PUBLIC_ALCHEMY_RPC_URL');
+    return alchemyRpc.trim();
+  }
+
+  const baseRpc = process.env.NEXT_PUBLIC_BASE_RPC_URL;
+  if (baseRpc && typeof baseRpc === 'string' && baseRpc.trim().length > 0) {
+    serverLogger.debug('[RPC] Using NEXT_PUBLIC_BASE_RPC_URL');
+    return baseRpc.trim();
+  }
+
+  // Final fallback to public Base RPC
+  serverLogger.warn('[RPC] No Alchemy API key found, falling back to public Base RPC');
+  return "https://mainnet.base.org";
+}
+
+const baseRpcUrl = getBaseRpcUrl();
+serverLogger.debug('[RPC] Base RPC URL configured:', baseRpcUrl.replace(/\/v2\/[^/]+/, '/v2/***'));
+
+const accountKitClient = createPublicClient({
   chain: base,
+  transport: http(baseRpcUrl),
 });
 
 // Use the official PublicLockV14 ABI from Unlock Protocol
@@ -30,7 +61,7 @@ const provider = {
       // @ts-ignore - client.request is typed differently but compatible
       return await accountKitClient.request(args);
     } catch (error) {
-      console.error("Provider request error:", error);
+      serverLogger.error("Provider request error:", error);
       throw error;
     }
   },
@@ -64,6 +95,9 @@ export const LOCK_ADDRESSES = {
   BASE_CREATIVE_PASS_2: "0x13b818daf7016b302383737ba60c3a39fef231cf",
   BASE_CREATIVE_PASS_3: "0x9c3744c96200a52d05a630d4aec0db707d7509be",
 } as const;
+
+// Maximum number of NFTs per tier/lock that can be held in any wallet
+export const MAX_NFTS_PER_TIER = 4;
 
 export type LockAddress = keyof typeof LOCK_ADDRESSES;
 export type LockAddressValue = (typeof LOCK_ADDRESSES)[LockAddress];
@@ -121,7 +155,7 @@ export class UnlockService {
     userAddress: string
   ): Promise<boolean> {
     try {
-      console.log("Checking balance with chain:", {
+      serverLogger.debug("Checking balance with chain:", {
         id: this.client.chain?.id,
         name: this.client.chain?.name,
       });
@@ -135,14 +169,14 @@ export class UnlockService {
       const balance = BigInt(String(balanceResult));
 
       const hasBalance = balance > 0n;
-      console.log("Balance check result:", {
+      serverLogger.debug("Balance check result:", {
         balance: balance.toString(),
         hasBalance,
       });
 
       return hasBalance;
     } catch (error) {
-      console.error("Error checking balance:", error);
+      serverLogger.error("Error checking balance:", error);
       throw this.createError(
         `Failed to check balance: ${(error as Error).message}`,
         "BALANCE_CHECK_ERROR",
@@ -158,30 +192,40 @@ export class UnlockService {
     try {
       const contract = this.getContract(lockAddress);
 
-      // Check if user has any valid keys
-      const hasValidKey = await contract.read.getHasValidKey([
-        userAddress as `0x${string}`,
-      ]);
-
-      if (!hasValidKey) {
-        console.log("No valid key found for user");
-        return [];
-      }
-
-      // Get balance of valid keys
+      // Get balance of tokens
       const balanceResult = await contract.read.balanceOf([
         userAddress as `0x${string}`,
       ]);
       const balance = BigInt(String(balanceResult));
 
-      console.log(
+      if (balance === 0n) {
+        serverLogger.debug("No tokens found for user");
+        return [];
+      }
+
+      serverLogger.debug(
         `Balance for ${userAddress} at ${lockAddress}:`,
         balance.toString()
       );
 
-      return balance > 0n ? [1n] : []; // Return dummy token ID if user has balance
+      // Get all token IDs using tokenOfOwnerByIndex
+      const tokenIds: bigint[] = [];
+      for (let i = 0n; i < balance; i++) {
+        try {
+          const tokenId = await contract.read.tokenOfOwnerByIndex([
+            userAddress as `0x${string}`,
+            i,
+          ]);
+          tokenIds.push(BigInt(String(tokenId)));
+        } catch (error) {
+          serverLogger.warn(`Error getting token at index ${i}:`, error);
+          // Continue to next token
+        }
+      }
+
+      return tokenIds;
     } catch (error) {
-      console.error(
+      serverLogger.error(
         `Error getting tokens for ${userAddress} at ${lockAddress}:`,
         error
       );
@@ -208,28 +252,43 @@ export class UnlockService {
           ? result[0]?.toString()
           : String(result);
 
-      if (!tokenUri) {
-        console.warn(
+      // Validate that tokenUri is a non-empty string
+      if (!tokenUri || typeof tokenUri !== 'string') {
+        serverLogger.warn(
           `No tokenURI found for token ${tokenId} at ${lockAddress}`
         );
         return null;
       }
 
+      // Convert IPFS URI to HTTP gateway URL if needed
+      const httpTokenUri = parseIpfsUriWithFallback(tokenUri);
+
       // Fetch metadata from the token URI
-      const response = await fetch(tokenUri);
+      const response = await fetch(httpTokenUri);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const metadata = await response.json();
 
+      // Convert IPFS image URL to HTTP gateway URL if needed
+      // Validate that image is a string before processing
+      const imageUrl = metadata.image && typeof metadata.image === 'string'
+        ? parseIpfsUriWithFallback(metadata.image)
+        : "";
+
+      // Validate that external_url is a string before processing
+      const externalUrl = metadata.external_url && typeof metadata.external_url === 'string'
+        ? parseIpfsUriWithFallback(metadata.external_url)
+        : undefined;
+
       return {
         name: metadata.name || "",
         description: metadata.description || "",
-        image: metadata.image || "",
-        externalUrl: metadata.external_url,
+        image: imageUrl,
+        externalUrl,
       };
     } catch (error) {
-      console.error(
+      serverLogger.error(
         `Error fetching NFT metadata for token ${tokenId} at ${lockAddress}:`,
         error
       );
@@ -251,7 +310,7 @@ export class UnlockService {
         // Add other lock details as needed
       };
     } catch (error) {
-      console.error(`Error getting lock details for ${lockAddress}:`, error);
+      serverLogger.error(`Error getting lock details for ${lockAddress}:`, error);
       throw this.createError(
         `Failed to get lock details: ${(error as Error).message}`,
         "LOCK_FETCH_ERROR",
@@ -268,7 +327,7 @@ export class UnlockService {
     userAddress: string
   ): Promise<boolean> {
     try {
-      console.log(
+      serverLogger.debug(
         `Checking membership for ${userAddress} at lock ${lockAddress}`
       );
 
@@ -280,16 +339,41 @@ export class UnlockService {
       ]);
       const hasValidKey = Boolean(hasValidKeyResult);
 
-      console.log("getHasValidKey result:", hasValidKey);
+      serverLogger.debug("getHasValidKey result:", hasValidKey);
 
       return hasValidKey;
     } catch (error) {
-      console.error(
+      const errorMessage = (error as Error).message || String(error);
+
+      // Check for RPC configuration errors
+      if (
+        errorMessage.includes('Unexpected token') ||
+        errorMessage.includes('Unspecifie') ||
+        errorMessage.includes('not valid JSON') ||
+        (errorMessage.includes('HTTP request failed') && errorMessage.includes('base-mainnet.g.alchemy.com'))
+      ) {
+        serverLogger.error(
+          `RPC configuration error when checking membership for ${userAddress} at ${lockAddress}:`,
+          error
+        );
+        throw this.createError(
+          `RPC configuration error: Alchemy API key may be missing or invalid. Please check NEXT_PUBLIC_ALCHEMY_API_KEY environment variable.`,
+          "RPC_CONFIG_ERROR",
+          {
+            lockAddress,
+            userAddress,
+            originalError: error,
+            rpcUrl: baseRpcUrl.replace(/\/v2\/[^/]+/, '/v2/***')
+          }
+        );
+      }
+
+      serverLogger.error(
         `Error checking membership for ${userAddress} at ${lockAddress}:`,
         error
       );
       throw this.createError(
-        `Failed to check membership: ${(error as Error).message}`,
+        `Failed to check membership: ${errorMessage}`,
         "MEMBERSHIP_CHECK_ERROR",
         { lockAddress, userAddress, originalError: error }
       );
@@ -297,10 +381,67 @@ export class UnlockService {
   }
 
   /**
+   * Get all membership NFTs with token IDs for an address
+   */
+  async getAllMembershipNFTs(userAddress: string) {
+    serverLogger.debug("Getting all membership NFTs for address:", userAddress);
+
+    if (!userAddress) {
+      throw this.createError("User address is required", "INVALID_ADDRESS", {
+        userAddress,
+      });
+    }
+
+    const membershipNFTs: Array<{
+      lockName: LockAddress;
+      lockAddress: string;
+      tokenId: string;
+      metadata: LockMetadata | null;
+    }> = [];
+
+    await Promise.all(
+      Object.entries(LOCK_ADDRESSES).map(async ([name, address]) => {
+        try {
+          const tokens = await this.getTokensOfOwner(address, userAddress);
+
+          // Limit to maximum of 4 NFTs per tier/lock
+          const limitedTokens = tokens.slice(0, MAX_NFTS_PER_TIER);
+
+          for (const tokenId of limitedTokens) {
+            let metadata = null;
+            try {
+              metadata = await this.getNftMetadata(address, tokenId.toString());
+            } catch (error) {
+              serverLogger.warn(
+                `Failed to get metadata for token ${tokenId} at ${address}:`,
+                error
+              );
+            }
+
+            membershipNFTs.push({
+              lockName: name as LockAddress,
+              lockAddress: address,
+              tokenId: tokenId.toString(),
+              metadata,
+            });
+          }
+        } catch (error) {
+          serverLogger.error(
+            `Error getting membership NFTs for ${address}:`,
+            error
+          );
+        }
+      })
+    );
+
+    return membershipNFTs;
+  }
+
+  /**
    * Get all memberships for an address across multiple locks
    */
   async getAllMemberships(userAddress: string) {
-    console.log("Getting all memberships for address:", userAddress);
+    serverLogger.debug("Getting all memberships for address:", userAddress);
 
     if (!userAddress) {
       throw this.createError("User address is required", "INVALID_ADDRESS", {
@@ -311,13 +452,14 @@ export class UnlockService {
     const memberships = await Promise.all(
       Object.entries(LOCK_ADDRESSES).map(async ([name, address]) => {
         try {
-          console.log(`Checking lock ${name} at ${address}`);
+          serverLogger.debug(`Checking lock ${name} at ${address}`);
           const hasValid = await this.hasValidMembership(address, userAddress);
 
           // Only fetch lock details if membership is valid
           let lock = null;
           let tokenId = null;
           let metadata = null;
+          let expiration: number | undefined;
 
           if (hasValid) {
             try {
@@ -326,10 +468,23 @@ export class UnlockService {
 
               // Get token IDs for the user
               const tokens = await this.getTokensOfOwner(address, userAddress);
+
               if (tokens.length > 0) {
+                // Return all token IDs, not just the first one
+                // The caller can use any of them
                 tokenId = tokens[0].toString();
-                // Get metadata for the token
+                // Get metadata for the first token
                 metadata = await this.getNftMetadata(address, tokenId);
+
+                try {
+                  const contract = this.getContract(address);
+                  // Get expiration for the token
+                  const expirationResult = await contract.read.keyExpirationTimestampFor([BigInt(tokenId)]);
+                  expiration = Number(expirationResult);
+                } catch (e) {
+                  serverLogger.warn(`Failed to get expiration for token ${tokenId} at ${address}`, e);
+                }
+
                 if (metadata) {
                   lock = {
                     ...lock,
@@ -338,14 +493,14 @@ export class UnlockService {
                 }
               }
             } catch (error) {
-              console.warn(
+              serverLogger.warn(
                 `Failed to get complete lock details for ${address}, continuing with basic membership info:`,
                 error
               );
             }
           }
 
-          console.log(`Lock ${name} valid:`, hasValid);
+          serverLogger.debug(`Lock ${name} valid:`, hasValid);
 
           return {
             name: name as LockAddress,
@@ -353,9 +508,10 @@ export class UnlockService {
             isValid: hasValid,
             lock,
             tokenId,
+            expiration,
           };
         } catch (error) {
-          console.error(
+          serverLogger.error(
             `Error getting membership details for ${address}:`,
             error
           );
@@ -370,7 +526,7 @@ export class UnlockService {
       })
     );
 
-    console.log("All memberships:", memberships);
+    serverLogger.debug("All memberships:", memberships);
     return memberships;
   }
 }

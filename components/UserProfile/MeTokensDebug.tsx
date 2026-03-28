@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { request } from 'graphql-request';
+import { logger } from '@/lib/utils/logger';
+
 
 export default function MeTokensDebug() {
   const [debugInfo, setDebugInfo] = useState<any>(null);
@@ -29,10 +31,10 @@ export default function MeTokensDebug() {
         ? `${window.location.origin}/api/metokens-subgraph`
         : '/api/metokens-subgraph';
 
-      console.log('Testing endpoint:', endpoint);
+      logger.debug('Testing endpoint:', endpoint);
       
       const introspectionResult = await request(endpoint, introspectionQuery);
-      console.log('Introspection result:', introspectionResult);
+      logger.debug('Introspection result:', introspectionResult);
 
       // Test 2: Try a simple query to see what entities exist
       const simpleQuery = `
@@ -50,7 +52,7 @@ export default function MeTokensDebug() {
       `;
 
       const simpleResult = await request(endpoint, simpleQuery);
-      console.log('Simple query result:', simpleResult);
+      logger.debug('Simple query result:', simpleResult);
 
       setDebugInfo({
         introspection: introspectionResult,
@@ -60,7 +62,7 @@ export default function MeTokensDebug() {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       setError(errorMessage);
-      console.error('Debug failed:', err);
+      logger.error('Debug failed:', err);
     } finally {
       setLoading(false);
     }

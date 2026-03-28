@@ -1,0 +1,18 @@
+name: pipeline-metokens-subscribes
+resource_size: s
+apiVersion: 3
+sources:
+  metoken_subscribes_source:
+    name: subscribe
+    subgraphs:
+      - name: metokens
+        version: v0.0.1
+    type: subgraph_entity
+transforms: {}
+sinks:
+  postgres_metoken_subscribes:
+    from: metoken_subscribes_source
+    schema: public
+    secret_name: POSTGRES_SECRET_CMJIQCIFZ0
+    table: metoken_subscribes
+    type: postgres

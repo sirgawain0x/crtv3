@@ -77,3 +77,27 @@ export interface UpdateMeTokenData {
   end_time?: string;
   end_cooldown?: string;
 }
+
+// Types for Creator Profiles (replacing OrbisDB metadata)
+export interface CreatorProfile {
+  id: string;
+  owner_address: string;
+  username?: string;
+  bio?: string;
+  avatar_url?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateCreatorProfileData {
+  owner_address: string;
+  username?: string;
+  bio?: string;
+  avatar_url?: string;
+}
+
+export interface UpdateCreatorProfileData {
+  username?: string;
+  bio?: string;
+  avatar_url?: string;
+}

@@ -1,16 +1,17 @@
 "use client";
 
-import React, { useState, useEffect, forwardRef } from "react";
+import React, { useState, useEffect, forwardRef, useMemo } from "react";
 import {
   CheckIcon,
   ChevronDownIcon,
   XIcon,
   PictureInPictureIcon,
+  ShieldCheck,
 } from "lucide-react";
 import { Src } from "@livepeer/react";
 import * as Popover from "@radix-ui/react-popover";
 
-import { useUser } from "@account-kit/react";
+import { useUser, useAuthModal } from "@account-kit/react";
 import { userToAccount } from "@/lib/types/account";
 
 import {
@@ -38,19 +39,143 @@ import { getDetailPlaybackSource } from "@/lib/hooks/livepeer/useDetailPlaybackS
 import { generateAccessKey, WebhookContext } from "@/lib/access-key";
 import { Skeleton } from "../ui/skeleton";
 import { Badge } from "../ui/badge";
-import { getVideoAssetByPlaybackId } from "@/services/video-assets";
+import { Button } from "../ui/button";
+import { fetchVideoAssetByPlaybackId } from "@/lib/utils/video-assets-client";
+import { getThumbnailUrl } from "@/lib/utils/thumbnail";
+import { convertFailingGateway } from "@/lib/utils/image-gateway";
+import Link from "next/link";
+
+const STORY_SCAN_IP_BASE =
+  process.env.NEXT_PUBLIC_STORY_NETWORK === "mainnet"
+    ? "https://www.storyscan.io"
+    : "https://aeneid.storyscan.io";
+
+const STORY_DISPUTE_DOCS_URL = "https://docs.story.foundation/concepts/dispute-module/overview";
+
+function StoryIPBlock({
+  storyIpId,
+  storyScanBase,
+}: {
+  storyIpId: string;
+  storyScanBase: string;
+}) {
+  const [attestationStatus, setAttestationStatus] = useState<
+    "idle" | "loading" | "ok" | "error"
+  >("idle");
+  const [infringementSummary, setInfringementSummary] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!storyIpId) return;
+    let cancelled = false;
+    setAttestationStatus("loading");
+    fetch(`/api/story/ip-status?ipId=${encodeURIComponent(storyIpId)}`)
+      .then((res) => {
+        if (cancelled) return res;
+        if (!res.ok) {
+          setAttestationStatus("error");
+          return null;
+        }
+        return res.json();
+      })
+      .then((data: { infringementStatus?: Array<{ status: string; isInfringing: boolean; providerName: string }> | null }) => {
+        if (cancelled || !data) return;
+        setAttestationStatus("ok");
+        const statuses = data.infringementStatus;
+        if (!statuses?.length) {
+          setInfringementSummary("No infringement detected");
+          return;
+        }
+        const infringing = statuses.filter((s) => s.isInfringing);
+        if (infringing.length > 0) {
+          setInfringementSummary(`Flagged (${infringing.map((s) => s.providerName).join(", ")})`);
+        } else {
+          const underReview = statuses.some((s) => (s.status || "").toLowerCase().includes("review"));
+          setInfringementSummary(underReview ? "Under review" : "No infringement detected");
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setAttestationStatus("error");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [storyIpId]);
+
+  return (
+    <div className="p-3 rounded-lg border bg-muted/50 space-y-2">
+      <p className="text-sm font-medium text-muted-foreground">
+        Registered as IP Asset
+      </p>
+      <p
+        className="text-xs font-mono truncate text-muted-foreground"
+        title={storyIpId}
+      >
+        {storyIpId}
+      </p>
+      {attestationStatus === "ok" && infringementSummary && (
+        <p className="text-xs text-muted-foreground">
+          Attestation: {infringementSummary}
+        </p>
+      )}
+      <div className="flex flex-wrap gap-2">
+        <a
+          href={`${storyScanBase}/ip/${storyIpId}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs text-primary hover:underline inline-flex items-center gap-1"
+        >
+          View on Story Protocol →
+        </a>
+        <Link
+          href="/marketplace/ip"
+          className="text-xs text-primary hover:underline inline-flex items-center gap-1"
+        >
+          Purchase IP →
+        </Link>
+        <a
+          href={STORY_DISPUTE_DOCS_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-xs text-primary hover:underline inline-flex items-center gap-1"
+        >
+          Report infringement →
+        </a>
+      </div>
+    </div>
+  );
+}
 
 type VideoDetailsProps = {
   asset: Asset;
+  videoTitle?: string;
+  /** When set, shows a "Verifiable" badge (Livepeer creator attestation). */
+  livepeerAttestationId?: string | null;
+  /** Story Protocol: when true and storyIpId is set, shows "Registered as IP" block with View/Purchase CTAs. */
+  storyIpRegistered?: boolean;
+  storyIpId?: string | null;
+  /** Optional: NFT contract and token ID for Story/IP links. */
+  contractAddress?: string | null;
+  tokenId?: string | null;
 };
 
-export default function VideoDetails({ asset }: VideoDetailsProps) {
+export default function VideoDetails({
+  asset,
+  videoTitle,
+  livepeerAttestationId,
+  storyIpRegistered,
+  storyIpId,
+  contractAddress,
+  tokenId,
+}: VideoDetailsProps) {
   const [playbackSources, setPlaybackSources] = useState<Src[] | null>(null);
   const [conditionalProps, setConditionalProps] = useState<any>({});
   const [dbStatus, setDbStatus] = useState<"draft" | "published" | "minted" | "archived" | null>(null);
+  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
 
   const user = useUser();
-  const account = userToAccount(user);
+  const account = useMemo(() => userToAccount(user), [user]);
+  const { openAuthModal } = useAuthModal();
+  const isConnected = !!user;
 
   useEffect(() => {
     const fetchPlaybackSources = async () => {
@@ -60,12 +185,54 @@ export default function VideoDetails({ asset }: VideoDetailsProps) {
     const fetchDbStatus = async () => {
       try {
         if (!asset?.playbackId) return;
-        const row = await getVideoAssetByPlaybackId(asset.playbackId);
-        if (row?.status) setDbStatus(row.status);
-      } catch {}
+        const row = await fetchVideoAssetByPlaybackId(asset.playbackId);
+        if (row) {
+          if (row?.status) {
+            const validStatuses = ["draft", "published", "minted", "archived"] as const;
+            if (validStatuses.includes(row.status as any)) {
+              setDbStatus(row.status as "draft" | "published" | "minted" | "archived");
+            }
+          }
+        }
+      } catch { }
+    };
+    const fetchThumbnail = async () => {
+      if (!asset?.playbackId) return;
+
+      try {
+        // First, try to get thumbnail from database
+        const row = await fetchVideoAssetByPlaybackId(asset.playbackId);
+        if (row && (row as any).thumbnail_url && (row as any).thumbnail_url.trim() !== "") {
+          const convertedUrl = convertFailingGateway((row as any).thumbnail_url);
+          setThumbnailUrl(convertedUrl);
+          return;
+        }
+      } catch (error) {
+        // Silently fail - database thumbnail is optional
+      }
+
+      try {
+        // If no database thumbnail, try Livepeer VTT thumbnails
+        const url = await getThumbnailUrl(asset.playbackId);
+        if (url) {
+          const convertedUrl = convertFailingGateway(url);
+          setThumbnailUrl(convertedUrl);
+        } else {
+          // Fallback to default thumbnail if no thumbnail found
+          setThumbnailUrl("/Creative_TV.png");
+        }
+      } catch (error) {
+        // Silently fail - thumbnail is optional, video will still play
+        // Fallback to default thumbnail on error
+        setThumbnailUrl("/Creative_TV.png");
+      }
     };
     fetchPlaybackSources();
     fetchDbStatus();
+    // Wrap in try-catch to prevent unhandled promise rejection
+    fetchThumbnail().catch(() => {
+      // Silently handle - thumbnail is optional
+    });
     const conProps: Record<string, unknown> = {
       ...(asset.playbackPolicy && {
         accessKey: generateAccessKey(
@@ -147,7 +314,7 @@ export default function VideoDetails({ asset }: VideoDetailsProps) {
           </Popover.Trigger>
           <Popover.Portal>
             <Popover.Content
-              className="bg-gray/50 w-60 rounded-md border border-white/50 p-3 shadow-md 
+              className="bg-gray/50 w-60 rounded-md border border-white/50 p-3 shadow-md z-50
               outline-none backdrop-blur-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 
               data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 
               data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2"
@@ -172,6 +339,7 @@ export default function VideoDetails({ asset }: VideoDetailsProps) {
                   </label>
                   <Player.RateSelect name="speedSelect">
                     <Player.SelectTrigger
+                      id="speedSelect"
                       className="inline-flex h-7 items-center justify-between gap-1 rounded-sm bg-gray-400 px-1 
                       text-xs leading-none outline-none outline-1 outline-white/50"
                       aria-label="Playback speed"
@@ -182,7 +350,7 @@ export default function VideoDetails({ asset }: VideoDetailsProps) {
                       </Player.SelectIcon>
                     </Player.SelectTrigger>
                     <Player.SelectPortal>
-                      <Player.SelectContent className="overflow-hidden rounded-sm bg-gray-400">
+                      <Player.SelectContent className="overflow-hidden rounded-sm bg-gray-400 z-[60]">
                         <Player.SelectViewport className="p-1">
                           <Player.SelectGroup className="">
                             <RateSelectItem value={0.5}>0.5x</RateSelectItem>
@@ -212,6 +380,7 @@ export default function VideoDetails({ asset }: VideoDetailsProps) {
                     defaultValue="1.0"
                   >
                     <Player.SelectTrigger
+                      id="qualitySelect"
                       className="inline-flex h-7 items-center justify-between gap-1 rounded-sm  bg-gray-400 px-1 
                       text-xs leading-none outline-none outline-1 outline-white/50"
                       aria-label="Playback quality"
@@ -222,7 +391,7 @@ export default function VideoDetails({ asset }: VideoDetailsProps) {
                       </Player.SelectIcon>
                     </Player.SelectTrigger>
                     <Player.SelectPortal>
-                      <Player.SelectContent className="overflow-hidden rounded-sm bg-gray-400">
+                      <Player.SelectContent className="overflow-hidden rounded-sm bg-gray-400 z-[60]">
                         <Player.SelectViewport className="p-[5px]">
                           <Player.SelectGroup>
                             <VideoQualitySelectItem value="auto">
@@ -323,21 +492,74 @@ export default function VideoDetails({ asset }: VideoDetailsProps) {
   return (
     <SubtitlesProvider>
       <SubtitlesInitializer assetMetadata={null} />
-      <div className="mx-auto w-full max-w-screen-2xl px-4 py-8">
-        <div className="mx-auto w-full max-w-[1200px] space-y-6">
-          <h1 className="text-2xl font-bold">{asset?.name}</h1>
-          <div className="flex items-center gap-2">
+      <div className="w-full">
+        <div className="w-full space-y-6">
+          <h1 className="text-2xl font-bold">{videoTitle || asset?.name}</h1>
+          <div className="flex items-center gap-2 flex-wrap">
             {asset?.status?.phase && (
               <Badge>{asset.status.phase}</Badge>
             )}
             {dbStatus && <Badge variant="secondary">{dbStatus}</Badge>}
+            {livepeerAttestationId && (
+              <Badge
+                variant="secondary"
+                className="gap-1"
+                title="Creator-attested (Livepeer Verifiable Video)"
+              >
+                <ShieldCheck className="h-3.5 w-3.5" aria-hidden />
+                Verifiable
+              </Badge>
+            )}
           </div>
+          {(storyIpRegistered && storyIpId) && (
+            <StoryIPBlock
+              storyIpId={storyIpId}
+              storyScanBase={STORY_SCAN_IP_BASE}
+            />
+          )}
           {/* Render other asset details */}
-          {playbackSources ? (
+          {!isConnected ? (
+            // Connect wallet prompt overlay
+            <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-gray-800">
+              {thumbnailUrl && (
+                <img
+                  src={thumbnailUrl}
+                  alt={videoTitle || asset?.name}
+                  className="absolute inset-0 w-full h-full object-cover opacity-50"
+                />
+              )}
+              <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+                <div className="flex flex-col items-center gap-6 p-8 max-w-md text-center">
+                  <div className="flex flex-col gap-2">
+                    <h2 className="text-2xl font-bold text-white">
+                      Connect Your Wallet
+                    </h2>
+                    <p className="text-gray-300">
+                      Please connect your wallet to watch this video.
+                    </p>
+                  </div>
+                  <Button
+                    onClick={() => {
+                      openAuthModal();
+                    }}
+                    className="bg-gradient-to-r from-blue-600 to-purple-600 
+                      hover:from-blue-700 hover:to-purple-700 text-white 
+                      px-8 py-3 text-lg font-semibold transition-all duration-300 hover:shadow-lg"
+                  >
+                    Get Started
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : playbackSources ? (
             <>
               <Player.Root src={playbackSources} {...conditionalProps}>
                 <Player.Container className="aspect-video w-full overflow-hidden rounded-lg bg-gray-800">
-                  <Player.Video title={asset?.name} className="h-full w-full" />
+                  <Player.Video
+                    title={asset?.name}
+                    className="h-full w-full"
+                    poster={thumbnailUrl || undefined}
+                  />
                   <Player.LoadingIndicator
                     className="relative h-full w-full bg-black/50 backdrop-blur data-[visible=true]:animate-in 
                   data-[visible=false]:animate-out data-[visible=false]:fade-out-0 data-[visible=true]:fade-in-0"
@@ -400,8 +622,34 @@ export default function VideoDetails({ asset }: VideoDetailsProps) {
                       <LoadingIcon className="mx-auto h-6 w-6 animate-spin md:h-8 md:w-8" />
                     </div>
                   </Player.ErrorIndicator>
+
+                  {/* Play button overlay - shows when video is not playing */}
+                  <Player.PlayingIndicator
+                    matcher={false}
+                    className="absolute inset-0 z-20 flex items-center justify-center 
+                    data-[visible=true]:animate-in data-[visible=false]:animate-out 
+                    data-[visible=false]:fade-out-0 data-[visible=true]:fade-in-0 pointer-events-none"
+                  >
+                    <Player.PlayPauseTrigger className="group relative flex h-20 w-20 cursor-pointer 
+                      touch-none items-center justify-center rounded-full bg-black/50 
+                      hover:bg-black/70 transition-all duration-200 hover:scale-110 pointer-events-auto">
+                      <Player.PlayingIndicator asChild matcher={false}>
+                        <PlayIcon
+                          className="h-12 w-12 ml-1"
+                          style={{ color: "#EC407A" }}
+                        />
+                      </Player.PlayingIndicator>
+                      <Player.PlayingIndicator asChild>
+                        <PauseIcon
+                          className="h-12 w-12"
+                          style={{ color: "#EC407A" }}
+                        />
+                      </Player.PlayingIndicator>
+                    </Player.PlayPauseTrigger>
+                  </Player.PlayingIndicator>
+
                   <Player.Controls
-                    className="flex flex-col-reverse gap-1 bg-gradient-to-b 
+                    className="relative z-30 flex flex-col-reverse gap-1 bg-gradient-to-b 
                   from-black/5 via-black/30 via-80% to-black/60 px-3 py-2 duration-1000 
                   data-[visible=true]:animate-in data-[visible=false]:animate-out 
                   data-[visible=false]:fade-out-0 data-[visible=true]:fade-in-0 md:px-3"

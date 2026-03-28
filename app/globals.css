@@ -8,6 +8,7 @@
   src: url("/fonts/ConthraxSb-Regular.otf") format("opentype");
   font-weight: normal;
   font-style: normal;
+  font-display: swap; /* Prevents FOIT and ensures text is visible while font loads */
 }
 
 :root {

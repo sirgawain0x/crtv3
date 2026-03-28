@@ -6,6 +6,8 @@ import { getFeaturedPlaybackSource } from "@/lib/hooks/livepeer/useFeaturePlayba
 import { FEATURED_VIDEO_TITLE } from "@/context/context";
 import { Src } from "@livepeer/react";
 import { useVideo } from "@/context/VideoContext";
+import { logger } from '@/lib/utils/logger';
+
 
 const FeaturedVideo: React.FC = () => {
   const [playbackSource, setPlaybackSource] = useState<Src[] | null>(null);
@@ -27,7 +29,7 @@ const FeaturedVideo: React.FC = () => {
         setPlaybackSource(src);
       } catch (err) {
         setError("Failed to load featured video");
-        console.error("Error loading featured video:", err);
+        logger.error("Error loading featured video:", err);
       } finally {
         setIsLoading(false);
       }

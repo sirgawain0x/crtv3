@@ -1,5 +1,6 @@
 'use server';
 import { TextToImageParams } from 'livepeer/models/components';
+import { serverLogger } from '@/lib/utils/logger';
 
 export const getLivepeerAiGeneratedImages = async ({
   prompt,
@@ -28,14 +29,14 @@ export const getLivepeerAiGeneratedImages = async ({
     redirect: 'follow',
   };
 
-  console.log({ requestOptions });
+  serverLogger.debug('Livepeer AI request options:', requestOptions);
 
   const response = await fetch(
     'https://livepeer.studio/api/beta/generate/text-to-image',
     requestOptions,
   );
 
-  console.log({ response });
+  serverLogger.debug('Livepeer AI response:', { status: response.status, ok: response.ok });
 
   if (response.ok) {
     return {

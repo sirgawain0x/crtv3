@@ -6,6 +6,8 @@ import { createModularAccountV2Client } from "@account-kit/smart-contracts";
 import { type SmartAccountSigner } from "@aa-sdk/core";
 import { alchemy } from "@account-kit/infra";
 import { useSessionKeyStorage } from "./useSessionKeyStorage";
+import { logger } from '@/lib/utils/logger';
+
 
 export interface SessionKeyPermissions {
   isGlobal?: boolean;
@@ -78,7 +80,7 @@ export function useSessionKey(options: UseSessionKeyOptions = {}) {
         entityId: nextEntityId,
       };
     } catch (error) {
-      console.error("Error creating session key:", error);
+      logger.error("Error creating session key:", error);
       throw error;
     } finally {
       setIsInstalling(false);

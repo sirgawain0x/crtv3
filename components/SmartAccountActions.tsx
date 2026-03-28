@@ -46,6 +46,8 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { useWalletStatus } from "@/lib/hooks/accountkit/useWalletStatus";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { logger } from '@/lib/utils/logger';
+
 
 /**
  * Component showcasing different Account Kit actions
@@ -130,8 +132,8 @@ function SendTransactionTab({ client }: { client: any }) {
       waitForTxn: true, // Wait for the transaction to be mined
       onSuccess: ({ hash, request }) => {
         toast.success("Transaction sent successfully!");
-        console.log("Transaction hash:", hash);
-        console.log("Request:", request);
+        logger.debug("Transaction hash:", hash);
+        logger.debug("Request:", request);
         setRecipient("");
         setAmount("");
         setData("0x");
@@ -139,7 +141,7 @@ function SendTransactionTab({ client }: { client: any }) {
       },
       onError: (error) => {
         toast.error(`Transaction failed: ${error.message}`);
-        console.error("Transaction error:", error);
+        logger.error("Transaction error:", error);
         setIsPending(false);
       },
     });
@@ -281,7 +283,7 @@ function SignMessageTab({ client }: { client: any }) {
     try {
       await signMessage({ message });
     } catch (error) {
-      console.error("Error signing message:", error);
+      logger.error("Error signing message:", error);
     }
   };
 
@@ -372,7 +374,7 @@ function SignTypedDataTab({ client }: { client: any }) {
     },
     onError: (error) => {
       toast.error(`Signing failed: ${error.message}`);
-      console.error("Signing error:", error);
+      logger.error("Signing error:", error);
     },
   });
 
@@ -380,7 +382,7 @@ function SignTypedDataTab({ client }: { client: any }) {
     try {
       signTypedData({ typedData });
     } catch (error) {
-      console.error("Error signing typed data:", error);
+      logger.error("Error signing typed data:", error);
     }
   };
 

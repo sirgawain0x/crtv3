@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { toast } from "sonner";
 import { CopyIcon } from "lucide-react";
 import {
@@ -8,18 +8,13 @@ import {
 } from "@/app/api/livepeer/assetUploadActions";
 import * as tus from "tus-js-client";
 import PreviewVideo from "./PreviewVideo";
-import { useUser } from "@account-kit/react";
-import { userToAccount } from "@/lib/types/account";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
-import {
-  Subtitles,
-  Chunk,
-} from "../../../lib/sdk/orbisDB/models/AssetMetadata";
-import JsGoogleTranslateFree from "@kreisler/js-google-translate-free";
-import { getLivepeerAudioToText } from "@/app/api/livepeer/audioToText";
 import Link from "next/link";
 import { updateVideoAsset } from "@/services/video-assets";
+import { useUniversalAccount } from "@/lib/hooks/accountkit/useUniversalAccount";
+// import { useTranscoder } from "@/lib/hooks/useTranscoder";
+import { logger } from "@/lib/utils/logger";
 
 const truncateUri = (uri: string): string => {
   if (uri.length <= 30) return uri;
@@ -35,101 +30,12 @@ const copyToClipboard = (text: string) => {
 interface FileUploadProps {
   onFileSelect: (file: File | null) => void;
   onFileUploaded: (fileUrl: string) => void;
-  onSubtitlesUploaded: (subtitlesUri?: string) => void;
   onPressNext?: (livepeerAsset: any) => void;
   onPressBack?: () => void;
   metadata?: any;
   newAssetTitle?: string;
-}
-
-const translateText = async (
-  text: string,
-  language: string
-): Promise<string> => {
-  try {
-    const baseUrl = process.env.NEXT_PUBLIC_URL || "http://localhost:3000";
-    const res = await fetch(`${baseUrl}/api/livepeer/subtitles/translation`, {
-      method: "POST",
-      body: JSON.stringify({
-        text: text,
-        source: "English",
-        target: language,
-      }),
-    });
-
-    const data = await res.json();
-
-    console.log("Translation response:", data);
-
-    return data.response;
-  } catch (error) {
-    console.error("Translation error:", error);
-    return text; // Fallback to original text if translation fails
-  }
-};
-
-async function translateSubtitles(data: {
-  chunks: Chunk[];
-}): Promise<Subtitles> {
-  const subtitles: Subtitles = {
-    English: data.chunks,
-  };
-
-  const languages = ["Chinese", "German", "Spanish"];
-
-  // Create a single Promise.all for all language translations to reduce nested mapping
-  const translationPromises = languages.map(async (language) => {
-    try {
-      // Skip translation for English
-      if (language === "English") return null;
-      console.log("Translating to:", language);
-      // Perform translations concurrently for each chunk
-      const translatedChunks = await Promise.all(
-        data.chunks.map(async (chunk, i) => {
-          const to =
-            language === "Chinese" ? "zh" : language === "German" ? "de" : "es";
-          const translation = await JsGoogleTranslateFree.translate({
-            to,
-            text: chunk.text,
-          }); // a
-          const arr = {
-            text: translation,
-            timestamp: chunk.timestamp,
-          };
-          console.log("Translated chunk " + i + ":", arr);
-          return arr;
-        })
-      );
-
-      console.log("Translated chunks:", translatedChunks);
-
-      return { [language]: translatedChunks };
-    } catch (error) {
-      console.error("Error translating subtitles:", error);
-      return {};
-    }
-  });
-
-  // Filter out null results and combine translations
-  const translations = await Promise.all(translationPromises);
-  const languageTranslations = translations.filter(Boolean);
-
-  console.log("translations:", translations);
-  console.log("Language translations:", languageTranslations);
-
-  // Merge translations efficiently
-  return languageTranslations
-    .filter(
-      (translation): translation is { [key: string]: Chunk[] } =>
-        translation !== null
-    )
-    .reduce(
-      (acc, curr) => ({
-        ...acc,
-        ...curr,
-      }),
-      subtitles
-    );
+  hideNavigation?: boolean;
+  onAssetReady?: (asset: any) => void;
 }
 
 async function pollForMetadataUri(
@@ -150,14 +56,14 @@ async function pollForMetadataUri(
 const FileUpload: React.FC<FileUploadProps> = ({
   onFileSelect,
   onFileUploaded,
-  onSubtitlesUploaded,
   onPressNext,
   onPressBack,
   metadata,
   newAssetTitle,
+  hideNavigation = false,
+  onAssetReady,
 }) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState<boolean>(false);
   const [uploadedUri, setUploadedUri] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<number>(0);
@@ -165,20 +71,101 @@ const FileUpload: React.FC<FileUploadProps> = ({
   const [uploadState, setUploadState] = useState<
     "idle" | "loading" | "complete"
   >("idle");
-  const [subtitleProcessingComplete, setSubtitleProcessingComplete] =
-    useState<boolean>(false);
 
   const [livepeerAsset, setLivepeerAsset] = useState<any>();
   const [isPolling, setIsPolling] = useState(false);
 
-  const user = useUser();
-  const account = userToAccount(user);
+  // Use ref to persist asset data across re-renders
+  const livepeerAssetRef = useRef<any>(null);
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  // Use Universal Account to get smart account address (SCA), not controller wallet
+  const { address, type, loading } = useUniversalAccount();
+
+  // Persist upload state to recover from page reloads
+  useEffect(() => {
+    if (uploadState === 'loading' && livepeerAsset?.id) {
+      const uploadData = {
+        assetId: livepeerAsset.id,
+        progress,
+        timestamp: Date.now(),
+        metadata: metadata,
+        address,
+      };
+      localStorage.setItem('upload-in-progress', JSON.stringify(uploadData));
+      logger.debug('Upload state saved:', uploadData);
+    } else if (uploadState === 'complete' && livepeerAsset?.id) {
+      localStorage.removeItem('upload-in-progress');
+      logger.debug('Upload completed, state cleared');
+    }
+  }, [uploadState, livepeerAsset, progress, metadata, address]);
+
+  // Check for interrupted upload on mount and attempt recovery
+  useEffect(() => {
+    const checkInterruptedUpload = async () => {
+      const savedUpload = localStorage.getItem('upload-in-progress');
+      if (savedUpload && address) {
+        try {
+          const { assetId, timestamp, address: savedAddress } = JSON.parse(savedUpload);
+
+          // Only recover if same user and upload was within last 24 hours (extended for mobile)
+          if (savedAddress === address && Date.now() - timestamp < 24 * 60 * 60 * 1000) {
+            logger.debug('Attempting to recover interrupted upload:', assetId);
+            toast.info('Checking previous upload status...');
+
+            const asset = await getLivepeerAsset(assetId);
+            if (asset) {
+              logger.debug('Recovered asset:', asset);
+              setLivepeerAsset(asset);
+
+              if (asset.status?.phase === 'ready') {
+                setUploadState('complete');
+                setUploadComplete(true);
+                setProgress(100);
+                toast.success('Previous upload recovered successfully!');
+                localStorage.removeItem('upload-in-progress');
+              } else if (asset.status?.phase === 'processing') {
+                setUploadState('loading');
+                setProgress(75);
+                toast.info('Upload is still processing...');
+              } else if (asset.status?.phase === 'failed') {
+                toast.error('Previous upload failed. Please try again.');
+                localStorage.removeItem('upload-in-progress');
+              }
+            }
+          } else {
+            // Clear stale upload data
+            localStorage.removeItem('upload-in-progress');
+          }
+        } catch (error) {
+          logger.error('Failed to recover upload:', error);
+          localStorage.removeItem('upload-in-progress');
+        }
+      }
+    };
+
+    if (!loading && address) {
+      checkInterruptedUpload();
+    }
+  }, [loading, address]);
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] || null;
+
+    // Reset state
+    setUploadState("idle");
+    setProgress(0);
+    setUploadComplete(false);
+    setError(null);
+
+    if (!file) {
+      setSelectedFile(null);
+      onFileSelect(null);
+      return;
+    }
+
     setSelectedFile(file);
     onFileSelect(file);
-    console.log("Selected file:", file?.name);
+    logger.debug("Selected file:", file?.name, "Address:", address, "Type:", type);
   };
 
   const handleFileUpload = async () => {
@@ -187,30 +174,59 @@ const FileUpload: React.FC<FileUploadProps> = ({
       return;
     }
 
+    if (!address) {
+      setError("Please connect your wallet to upload videos.");
+      return;
+    }
+
     setError(null);
     setUploadState("loading");
     setProgress(0);
 
+    const fileToUpload = selectedFile;
+
     try {
-      console.log("Start upload #1");
+      logger.debug("Start upload - using smart account address:", address, "type:", type);
 
       const uploadRequestResult = await getLivepeerUploadUrl(
-        newAssetTitle || selectedFile.name || "new file name",
-        account?.address || "anonymous"
+        newAssetTitle || fileToUpload.name || "new file name",
+        address
       );
 
-      setLivepeerAsset(uploadRequestResult?.asset);
+      // Store asset in both state and ref for persistence
+      if (uploadRequestResult?.asset) {
+        logger.debug("Setting livepeer asset:", uploadRequestResult.asset);
+        setLivepeerAsset(uploadRequestResult.asset);
+        livepeerAssetRef.current = uploadRequestResult.asset;
+      } else {
+        logger.error("No asset in upload request result");
+        setError("Failed to get asset information");
+        setUploadState("idle");
+        return;
+      }
 
-      const tusUpload = new tus.Upload(selectedFile, {
+      const tusUpload = new tus.Upload(fileToUpload, {
         endpoint: uploadRequestResult?.tusEndpoint,
+        retryDelays: [0, 1000, 3000, 5000], // Retry configuration for mobile reliability
+        chunkSize: 5 * 1024 * 1024, // 5MB chunks for better mobile handling
+        overridePatchMethod: true, // Use POST instead of PATCH for better mobile compatibility
         metadata: {
-          filename: selectedFile.name,
-          filetype: "video/*",
+          filename: fileToUpload.name,
+          filetype: fileToUpload.type || "application/octet-stream",
         },
-        uploadSize: selectedFile.size,
+        uploadSize: fileToUpload.size,
         onError(err: any) {
-          console.error("Error uploading file:", err);
-          setError("Failed to upload file. Please try again.");
+          logger.error("Error uploading file:", err);
+          let errorMessage = "Failed to upload file. Please try again.";
+
+          // Enhance error message if possible
+          if (err.originalRequest) {
+            errorMessage += ` (Network error: ${err.originalRequest.status})`;
+          } else if (err.message) {
+            errorMessage += ` (${err.message})`;
+          }
+
+          setError(errorMessage);
           setUploadState("idle");
         },
         onProgress(bytesUploaded, bytesTotal) {
@@ -218,67 +234,41 @@ const FileUpload: React.FC<FileUploadProps> = ({
           setProgress(percentage);
         },
         onSuccess() {
-          console.log("Upload completed");
+          logger.debug("Upload completed");
           setUploadComplete(true);
           setUploadState("complete");
-          if (uploadRequestResult?.asset?.id)
+
+          // Ensure asset is still in ref
+          if (uploadRequestResult?.asset) {
+            livepeerAssetRef.current = uploadRequestResult.asset;
+          }
+
+          if (uploadRequestResult?.asset?.id) {
             onFileUploaded(uploadRequestResult.asset.id);
-          else setError("Upload succeeded but asset ID is missing.");
+
+            void (async () => {
+              try {
+                const metadataUri = await pollForMetadataUri(uploadRequestResult.asset.id);
+                setUploadedUri(metadataUri);
+              } catch (pollErr) {
+                logger.warn("Failed to resolve metadata URI:", pollErr);
+              }
+            })();
+
+            if (onAssetReady && uploadRequestResult?.asset) {
+              onAssetReady(uploadRequestResult.asset);
+            }
+          } else {
+            setError("Upload succeeded but asset ID is missing.");
+          }
         },
       });
 
       tusUpload.start();
     } catch (err) {
-      console.error("Error uploading file:", err);
+      logger.error("Error uploading file:", err);
       setError("Failed to upload file. Please try again.");
       setUploadState("idle");
-    }
-  };
-
-  const handleAudioToText = async () => {
-    if (!livepeerAsset?.id) {
-      console.error("No asset ID available");
-      return;
-    }
-
-    try {
-      const data = await getLivepeerAudioToText(livepeerAsset.id);
-      console.log("Audio to text data:", data);
-
-      if (data?.chunks) {
-        const subtitles = await translateSubtitles(data);
-        console.log("Translated subtitles:", subtitles);
-
-        // Store subtitles in IPFS
-        const subtitlesBlob = new Blob([JSON.stringify(subtitles)], {
-          type: "application/json",
-        });
-        const subtitlesFile = new File([subtitlesBlob], "subtitles.json", {
-          type: "application/json",
-        });
-
-        // Upload to IPFS using Livepeer's API
-        const formData = new FormData();
-        formData.append("file", subtitlesFile);
-
-        const response = await fetch("/api/livepeer/upload", {
-          method: "POST",
-          body: formData,
-        });
-
-        if (!response.ok) {
-          throw new Error("Failed to upload subtitles to IPFS");
-        }
-
-        const { ipfsHash } = await response.json();
-        const subtitlesUri = `ipfs://${ipfsHash}`;
-
-        onSubtitlesUploaded(subtitlesUri);
-        setSubtitleProcessingComplete(true);
-      }
-    } catch (error) {
-      console.error("Error processing audio to text:", error);
-      toast.error("Failed to process audio to text");
     }
   };
 
@@ -297,169 +287,157 @@ const FileUpload: React.FC<FileUploadProps> = ({
       toast.success("Database updated with metadata URI!");
     } catch (err) {
       toast.error("Failed to update database with metadata URI");
-      console.error(err);
+      logger.error(err);
     } finally {
       setIsPolling(false);
     }
   }
 
-  if (!account) {
+  // Show loading state while fetching account
+  if (loading) {
     return (
-      <div className="text-center">
-        <p>Please connect your wallet to upload videos</p>
+      <div className="text-center p-8">
+        <p className="text-foreground">Loading your wallet...</p>
+      </div>
+    );
+  }
+
+  if (!address) {
+    return (
+      <div className="text-center p-8">
+        <p className="text-foreground">Please connect your wallet to upload videos</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen w-full bg-white">
-      <div className="mx-auto flex min-h-[calc(100vh-200px)] max-w-4xl flex-col px-4 py-8">
-        <div className="flex-1 rounded-lg bg-white p-6 shadow-lg sm:p-8">
-          <h1 className="mb-8 text-center text-2xl font-semibold text-gray-900">
-            Upload A File
-          </h1>
-
-          <div className="mx-auto max-w-2xl space-y-8">
-            {/* File Input */}
-            <div className="space-y-2">
-              <label
-                htmlFor="file-upload"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Choose A File To Upload:
-              </label>
-              <input
-                type="file"
-                id="file-upload"
-                accept="video/*"
-                className="file:border-1 block w-full rounded-lg border border-gray-200 text-sm text-[#EC407A] 
-                file:mr-4 file:cursor-pointer file:rounded-full file:border-0 file:bg-white file:px-4 file:py-2 file:text-sm 
-                file:font-semibold file:text-[#EC407A] hover:file:bg-gray-50"
-                data-testid="file-upload-input"
-                onChange={handleFileChange}
-              />
+    <div className="w-full" id="upload-video-form">
+      <div className="flex flex-col space-y-6">
+        <div className="space-y-6 sm:space-y-8">
+          {/* File Input */}
+          <div className="space-y-2">
+            <label
+              htmlFor="file-upload"
+              className="block text-sm font-medium text-foreground"
+            >
+              Choose A File To Upload:
+            </label>
+            <input
+              type="file"
+              id="file-upload"
+              accept="video/mp4,.mp4"
+              className="file:border-1 block w-full rounded-lg border border-input bg-background text-sm text-[#EC407A] 
+              file:mr-2 file:cursor-pointer file:rounded-full file:border-0 file:bg-card file:px-3 file:py-2 file:text-xs 
+              sm:file:mr-4 sm:file:px-4 sm:file:text-sm file:font-semibold file:text-[#EC407A] hover:file:bg-accent"
+              data-testid="file-upload-input"
+              onChange={handleFileChange}
+            />
+            <div className="mt-2 space-y-1">
+              <p className="text-xs text-muted-foreground font-medium">
+                📹 Supported: MP4
+              </p>
+              <p className="text-xs text-muted-foreground">
+                ✅ Max size: 10GB
+              </p>
             </div>
+          </div>
 
-            {/* Selected File Section */}
-            {selectedFile && (
-              <div className="space-y-8">
-                <div className="text-center">
-                  <p className="text-sm font-medium text-gray-500">
-                    Selected File
-                  </p>
-                  <p className="mt-1 text-base text-gray-900">
-                    {selectedFile.name}
-                  </p>
-                </div>
-
-                {/* Video Preview */}
-                <div className="overflow-hidden rounded-lg border border-gray-200">
-                  <PreviewVideo video={selectedFile} />
-                </div>
-
-                {/* Upload Controls */}
-                <div className="flex flex-col items-center space-y-4">
-                  {uploadState === "idle" ? (
-                    <button
-                      onClick={handleFileUpload}
-                      disabled={!selectedFile}
-                      className={`${
-                        !selectedFile
-                          ? "cursor-not-allowed bg-[#D63A6A] opacity-50"
-                          : "bg-[#EC407A] hover:bg-[#D63A6A]"
-                      } w-full max-w-xs rounded-lg px-6 py-3 font-semibold text-white shadow-sm transition-colors sm:w-auto`}
-                      data-testid="file-input-upload-button"
-                    >
-                      Upload File
-                    </button>
-                  ) : (
-                    <div className="w-full max-w-md space-y-2">
-                      <Progress
-                        value={progress}
-                        max={100}
-                        className="h-2 w-full overflow-hidden rounded-full bg-gray-100"
-                      >
-                        <div
-                          className="h-full bg-[#EC407A] transition-all duration-500 ease-in-out"
-                          style={{ width: `${progress}%` }}
-                        />
-                      </Progress>
-                      <p className="text-center text-sm text-gray-600">
-                        {uploadState === "complete"
-                          ? "Upload Complete!"
-                          : `${progress}% uploaded`}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Error Message */}
-            {error && (
-              <div className="rounded-lg bg-red-50 p-4">
-                <p className="text-sm text-red-600">{error}</p>
-              </div>
-            )}
-
-            {/* Success Message */}
-            {uploadedUri && (
-              <div className="rounded-lg border border-green-200 bg-green-50 p-4">
-                <p className="flex items-center gap-2 text-sm text-green-700">
-                  <span>File uploaded successfully! IPFS URI:</span>
-                  <Link
-                    href={uploadedUri}
-                    target="_blank"
-                    className="text-green-600 underline hover:text-green-800"
-                  >
-                    {truncateUri(uploadedUri)}
-                  </Link>
-                  <button
-                    onClick={() => copyToClipboard(uploadedUri)}
-                    className="inline-flex items-center gap-1 rounded-md p-1 text-green-600 hover:bg-green-100 hover:text-green-800"
-                  >
-                    <CopyIcon className="h-4 w-4" />
-                    <span className="text-xs">Copy</span>
-                  </button>
+          {/* Selected File Section */}
+          {selectedFile && (
+            <div className="space-y-6 sm:space-y-8">
+              <div className="text-center">
+                <p className="text-sm font-medium text-muted-foreground">
+                  Selected File
+                </p>
+                <p className="mt-1 text-sm text-foreground break-words sm:text-base">
+                  {selectedFile.name}
                 </p>
               </div>
-            )}
-          </div>
+
+              {/* Video Preview */}
+              <div className="overflow-hidden rounded-lg border border-border">
+                <PreviewVideo video={selectedFile} />
+              </div>
+
+              {/* Upload Controls */}
+              <div className="flex flex-col items-center space-y-4">
+                {uploadState === "idle" ? (
+                  <button
+                    onClick={handleFileUpload}
+                    disabled={!selectedFile}
+                    className={`${!selectedFile
+                      ? "cursor-not-allowed bg-[#D63A6A] opacity-50"
+                      : "bg-[#EC407A] hover:bg-[#D63A6A] active:bg-[#C62C5A]"
+                      } w-full max-w-xs rounded-lg px-4 py-3 text-sm font-semibold text-white shadow-sm transition-colors sm:px-6 sm:text-base touch-manipulation`}
+                    data-testid="file-input-upload-button"
+                    style={{ WebkitTapHighlightColor: 'transparent' }}
+                  >
+                    Upload File
+                  </button>
+                ) : (
+                  <div className="w-full max-w-md space-y-2">
+                    <Progress
+                      value={progress}
+                      max={100}
+                      className="h-2 w-full overflow-hidden rounded-full bg-muted"
+                    >
+                      <div
+                        className="h-full transition-all duration-500 ease-in-out bg-[#EC407A]"
+                        style={{ width: `${progress}%` }}
+                      />
+                    </Progress>
+                    <p className="text-center text-xs text-muted-foreground sm:text-sm">
+                      {uploadState === "complete"
+                        ? "Upload Complete!"
+                        : `${progress}% uploaded`}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Error Message */}
+          {error && (
+            <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-4">
+              <p className="text-sm text-destructive">{error}</p>
+            </div>
+          )}
+
+          {/* Success Message */}
+          {uploadedUri && (
+            <div className="rounded-lg border border-green-500/20 bg-green-500/10 dark:bg-green-500/5 p-4">
+              <p className="flex items-center gap-2 text-sm text-green-700 dark:text-green-400">
+                <span>File uploaded successfully! IPFS URI:</span>
+                <Link
+                  href={uploadedUri}
+                  target="_blank"
+                  className="text-green-600 dark:text-green-400 underline hover:text-green-800 dark:hover:text-green-300"
+                >
+                  {truncateUri(uploadedUri)}
+                </Link>
+                <button
+                  onClick={() => copyToClipboard(uploadedUri)}
+                  className="inline-flex items-center gap-1 rounded-md p-1 text-green-600 dark:text-green-400 hover:bg-green-500/20 dark:hover:bg-green-500/10 hover:text-green-800 dark:hover:text-green-300"
+                >
+                  <CopyIcon className="h-4 w-4" />
+                  <span className="text-xs">Copy</span>
+                </button>
+              </p>
+            </div>
+          )}
         </div>
+      </div>
 
-        {/* Process Subtitles Button & Status */}
-        {uploadComplete && (
-          <div className="mt-4 flex flex-col items-center gap-2">
-            <Button
-              onClick={handleAudioToText}
-              disabled={uploadState === "loading" || subtitleProcessingComplete}
-              className="w-full max-w-xs"
-            >
-              {subtitleProcessingComplete
-                ? "Subtitles Processed"
-                : "Process Subtitles"}
-            </Button>
-            {subtitleProcessingComplete && (
-              <span className="text-green-600 text-sm">
-                Subtitles processed and uploaded.
-              </span>
-            )}
-            {!subtitleProcessingComplete && (
-              <span className="text-gray-500 text-xs">
-                You can process subtitles now or later.
-              </span>
-            )}
-          </div>
-        )}
-
-        {/* Navigation Buttons */}
-        <div className="mt-6 flex items-center justify-center gap-3">
+      {/* Navigation Buttons */}
+      {!hideNavigation && (
+        <div className="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
           {onPressBack && (
             <Button
               variant="outline"
               disabled={uploadState === "loading"}
               onClick={onPressBack}
-              className="min-w-[100px]"
+              className="w-full min-w-[120px] text-sm sm:w-auto sm:text-base touch-manipulation"
             >
               Back
             </Button>
@@ -468,26 +446,39 @@ const FileUpload: React.FC<FileUploadProps> = ({
             <Button
               disabled={uploadState !== "complete"}
               onClick={() => {
-                if (livepeerAsset) {
-                  onPressNext(livepeerAsset);
+                // Use ref as fallback if state is lost
+                const asset = livepeerAsset || livepeerAssetRef.current;
+                logger.debug('Next clicked - Asset data:', {
+                  hasState: !!livepeerAsset,
+                  hasRef: !!livepeerAssetRef.current,
+                  assetId: asset?.id
+                });
+
+                if (asset?.id) {
+                  onPressNext(asset);
                 } else {
-                  alert("Missing livepeer asset");
+                  logger.error('Missing asset data:', {
+                    state: livepeerAsset,
+                    ref: livepeerAssetRef.current
+                  });
+                  toast.error("Video data is missing. Please try uploading again.");
                 }
               }}
               data-testid="file-input-next"
-              className="min-w-[100px]"
+              className="w-full min-w-[120px] text-sm sm:w-auto sm:text-base touch-manipulation"
+              style={{ WebkitTapHighlightColor: 'transparent' }}
             >
               Next
             </Button>
           )}
         </div>
+      )}
 
-        {isPolling && (
-          <div className="text-center text-sm text-gray-500 mt-4">
-            Processing video and syncing metadata...
-          </div>
-        )}
-      </div>
+      {isPolling && (
+        <div className="text-center text-sm text-muted-foreground mt-4">
+          Processing video and syncing metadata...
+        </div>
+      )}
     </div>
   );
 };

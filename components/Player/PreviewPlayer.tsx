@@ -13,6 +13,9 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import "./Player.css";
 import { ViewsComponent } from "./ViewsComponent";
 import { useVideo } from "@/context/VideoContext";
+import { safelyPauseVideo, safelyPlayVideo } from "@/lib/utils/video-controls";
+import { logger } from '@/lib/utils/logger';
+
 
 export const PreviewPlayer: React.FC<{ src: Src[]; title: string }> = ({
   src,
@@ -65,16 +68,9 @@ export const PreviewPlayer: React.FC<{ src: Src[]; title: string }> = ({
     );
   };
 
-  const safelyPauseVideo = useCallback(async () => {
+  const safelyPauseCurrentVideo = useCallback(async () => {
     if (!videoRef.current || isUnmountingRef.current) return;
-
-    try {
-      if (!videoRef.current.paused) {
-        await videoRef.current.pause();
-      }
-    } catch (error) {
-      console.error("Error pausing video:", error);
-    }
+    await safelyPauseVideo(videoRef.current);
   }, []);
 
   useEffect(() => {
@@ -97,7 +93,7 @@ export const PreviewPlayer: React.FC<{ src: Src[]; title: string }> = ({
 
     const handlePlay = async () => {
       if (isUnmountingRef.current) {
-        await safelyPauseVideo();
+        await safelyPauseCurrentVideo();
         return;
       }
 
@@ -113,7 +109,7 @@ export const PreviewPlayer: React.FC<{ src: Src[]; title: string }> = ({
     };
 
     const handleBeforeUnload = () => {
-      safelyPauseVideo();
+      safelyPauseCurrentVideo();
     };
 
     videoRef.current.addEventListener("play", handlePlay);
@@ -124,21 +120,21 @@ export const PreviewPlayer: React.FC<{ src: Src[]; title: string }> = ({
       if (videoRef.current) {
         videoRef.current.removeEventListener("play", handlePlay);
         videoRef.current.removeEventListener("pause", handlePause);
-        safelyPauseVideo();
+        safelyPauseCurrentVideo();
       }
       window.removeEventListener("beforeunload", handleBeforeUnload);
       if (currentPlayingId === playerId) {
         setCurrentPlayingId("");
       }
     };
-  }, [playerId, currentPlayingId, setCurrentPlayingId, safelyPauseVideo]);
+  }, [playerId, currentPlayingId, setCurrentPlayingId, safelyPauseCurrentVideo]);
 
   useEffect(() => {
     if (!videoRef.current) return;
 
     const handleVisibilityChange = () => {
       if (document.hidden) {
-        safelyPauseVideo();
+        safelyPauseCurrentVideo();
       }
     };
 
@@ -147,7 +143,7 @@ export const PreviewPlayer: React.FC<{ src: Src[]; title: string }> = ({
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [safelyPauseVideo]);
+  }, [safelyPauseCurrentVideo]);
 
   useEffect(() => {
     if (!videoRef.current) return;
@@ -157,9 +153,9 @@ export const PreviewPlayer: React.FC<{ src: Src[]; title: string }> = ({
       currentPlayingId !== playerId &&
       !videoRef.current.paused
     ) {
-      safelyPauseVideo();
+      safelyPauseCurrentVideo();
     }
-  }, [currentPlayingId, playerId, safelyPauseVideo]);
+  }, [currentPlayingId, playerId, safelyPauseCurrentVideo]);
 
   const resetFadeTimeout = () => {
     if (fadeTimeoutRef.current) {
@@ -175,14 +171,17 @@ export const PreviewPlayer: React.FC<{ src: Src[]; title: string }> = ({
     resetFadeTimeout();
     if (videoRef.current) {
       if (videoRef.current.paused) {
-        videoRef.current.play().catch((error) => {
-          console.error("Error playing video:", error);
+        safelyPlayVideo(videoRef.current).catch((error) => {
+          // Ignore AbortError as it's expected when interrupted
+          if (error instanceof Error && error.name !== "AbortError") {
+            logger.error("Error playing video:", error);
+          }
         });
       } else {
-        videoRef.current.pause();
+        safelyPauseCurrentVideo();
       }
     }
-  }, []);
+  }, [safelyPauseCurrentVideo]);
 
   return (
     <div
@@ -195,10 +194,10 @@ export const PreviewPlayer: React.FC<{ src: Src[]; title: string }> = ({
       <Player.Root
         src={src}
         autoPlay={false}
-        volume={0.5}
+        volume={0}
         aspectRatio={16 / 9}
         onError={(error) => {
-          console.error("Player error:", error);
+          logger.error("Player error:", error);
         }}
       >
         <Player.Container className="relative h-full w-full">

@@ -1,4 +1,6 @@
 import { supabase, MeToken, MeTokenBalance, MeTokenTransaction, CreateMeTokenData, UpdateMeTokenData } from './client';
+import { createServiceClient } from './service';
+import { serverLogger } from '@/lib/utils/logger';
 
 // Re-export types for external use
 export type { MeToken, MeTokenBalance, MeTokenTransaction, CreateMeTokenData, UpdateMeTokenData };
@@ -6,34 +8,77 @@ export type { MeToken, MeTokenBalance, MeTokenTransaction, CreateMeTokenData, Up
 export class MeTokenSupabaseService {
   // Get MeToken by address
   async getMeTokenByAddress(address: string): Promise<MeToken | null> {
-    const { data, error } = await supabase
-      .from('metokens')
-      .select('*')
-      .eq('address', address.toLowerCase())
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from('metokens')
+        .select('*')
+        .eq('address', address.toLowerCase())
+        .single();
 
-    if (error) {
-      if (error.code === 'PGRST116') return null; // Not found
-      throw new Error(`Failed to fetch MeToken: ${error.message}`);
+      if (error) {
+        if (error.code === 'PGRST116') return null; // Not found
+        serverLogger.error('Supabase error fetching MeToken by address:', error);
+        throw new Error(`Failed to fetch MeToken: ${error.message}`);
+      }
+
+      return data;
+    } catch (error) {
+      serverLogger.error('Error in getMeTokenByAddress:', error);
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error('Unknown error occurred while fetching MeToken');
     }
-
-    return data;
   }
 
   // Get MeToken by owner address
   async getMeTokenByOwner(ownerAddress: string): Promise<MeToken | null> {
-    const { data, error } = await supabase
-      .from('metokens')
-      .select('*')
-      .eq('owner_address', ownerAddress.toLowerCase())
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from('metokens')
+        .select('*')
+        .eq('owner_address', ownerAddress.toLowerCase())
+        .single();
 
-    if (error) {
-      if (error.code === 'PGRST116') return null; // Not found
-      throw new Error(`Failed to fetch MeToken by owner: ${error.message}`);
+      if (error) {
+        if (error.code === 'PGRST116') return null; // Not found
+        serverLogger.error('Supabase error fetching MeToken by owner:', error);
+        throw new Error(`Failed to fetch MeToken by owner: ${error.message}`);
+      }
+
+      return data;
+    } catch (error) {
+      serverLogger.error('Error in getMeTokenByOwner:', error);
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error('Unknown error occurred while fetching MeToken by owner');
     }
+  }
 
-    return data;
+  // Get MeToken by ID (UUID)
+  async getMeTokenById(id: string): Promise<MeToken | null> {
+    try {
+      const { data, error } = await supabase
+        .from('metokens')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') return null; // Not found
+        serverLogger.error('Supabase error fetching MeToken by ID:', error);
+        throw new Error(`Failed to fetch MeToken by ID: ${error.message}`);
+      }
+
+      return data;
+    } catch (error) {
+      serverLogger.error('Error in getMeTokenById:', error);
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error('Unknown error occurred while fetching MeToken by ID');
+    }
   }
 
   // Get all MeTokens with pagination and sorting
@@ -72,6 +117,116 @@ export class MeTokenSupabaseService {
     }
 
     return data || [];
+  }
+
+  // Get Subscribe events from metoken_subscribes table (populated by Turbo pipeline)
+  async getSubscribeEvents(options: {
+    limit?: number;
+    offset?: number;
+    sortBy?: 'block_timestamp' | 'block_number';
+    sortOrder?: 'asc' | 'desc';
+    meToken?: string;
+  } = {}): Promise<Array<{
+    id: string;
+    me_token: string;
+    owner: string;
+    hub_id: string;
+    assets_deposited: string;
+    minted: string;
+    asset: string;
+    name: string;
+    symbol: string;
+    block_timestamp: string;
+    block_number: number;
+    transaction_hash: string;
+    log_index: number;
+  }>> {
+    const {
+      limit = 100,
+      offset = 0,
+      sortBy = 'block_timestamp',
+      sortOrder = 'desc',
+      meToken
+    } = options;
+
+    let query = supabase
+      .from('metoken_subscribes')
+      .select('*')
+      .range(offset, offset + limit - 1);
+
+    // Filter by meToken if provided
+    // Note: me_token is stored as bytea in the database
+    // Supabase PostgREST should handle hex string to bytea conversion automatically
+    // If this doesn't work, we may need to use a raw SQL query or RPC function
+    if (meToken) {
+      const normalizedMeToken = meToken.toLowerCase();
+      // Try direct comparison first - Supabase may auto-convert
+      // If this fails, we'll need to use a different approach (RPC function or raw SQL)
+      query = query.eq('me_token', normalizedMeToken);
+    }
+
+    // Add sorting
+    query = query.order(sortBy, { ascending: sortOrder === 'asc' });
+
+    const { data, error } = await query;
+
+    if (error) {
+      serverLogger.error('Supabase error fetching Subscribe events:', error);
+      throw new Error(`Failed to fetch Subscribe events: ${error.message}`);
+    }
+
+    return (data || []).map((row: any) => {
+      // Helper to convert bytea to hex string
+      const byteaToHex = (value: any): string => {
+        if (!value) return '';
+        // If it's already a string (hex), return it
+        if (typeof value === 'string') {
+          return value.startsWith('0x') ? value : `0x${value}`;
+        }
+        // If it's a Buffer or Uint8Array, convert to hex
+        if (value instanceof Uint8Array || Buffer.isBuffer(value)) {
+          return '0x' + Array.from(value)
+            .map(b => b.toString(16).padStart(2, '0'))
+            .join('');
+        }
+        // Try to convert to string
+        return String(value);
+      };
+
+      // Helper to convert numeric to string
+      const numToString = (value: any): string => {
+        if (value == null) return '0';
+        return value.toString();
+      };
+
+      // Helper to convert timestamp (numeric Unix timestamp) to ISO string
+      const timestampToString = (value: any): string => {
+        if (!value) return '';
+        // If it's already a string, return it
+        if (typeof value === 'string') return value;
+        // If it's a number (Unix timestamp), convert to ISO string
+        if (typeof value === 'number') {
+          return new Date(value * 1000).toISOString();
+        }
+        return String(value);
+      };
+
+      return {
+        id: byteaToHex(row.id),
+        me_token: byteaToHex(row.me_token || row.meToken),
+        owner: byteaToHex(row.owner),
+        hub_id: numToString(row.hub_id || row.hubId),
+        assets_deposited: numToString(row.assets_deposited || row.assetsDeposited),
+        minted: numToString(row.minted),
+        asset: byteaToHex(row.asset),
+        name: row.name || '',
+        symbol: row.symbol || '',
+        block_timestamp: timestampToString(row.block_timestamp || row.blockTimestamp),
+        block_number: typeof row.block_number === 'number' ? row.block_number : parseInt(numToString(row.block_number || row.blockNumber), 10),
+        transaction_hash: byteaToHex(row.transaction_hash || row.transactionHash),
+        log_index: typeof row.log_index === 'number' ? row.log_index : parseInt(numToString(row.log_index || row.logIndex), 10) || 0,
+      };
+    });
   }
 
   // Create a new MeToken
@@ -133,6 +288,7 @@ export class MeTokenSupabaseService {
   }
 
   // Update user's MeToken balance
+  // Uses service role client to bypass RLS (since app uses Account Kit, not Supabase Auth)
   async updateUserBalance(
     meTokenAddress: string,
     userAddress: string,
@@ -143,19 +299,72 @@ export class MeTokenSupabaseService {
       throw new Error('MeToken not found');
     }
 
-    const { data, error } = await supabase
+    // Use service client to bypass RLS (required for Account Kit authentication)
+    // Service client is only available server-side, so this method should be called from API routes
+    // Wrap in try-catch to gracefully fallback to regular client if service key is not configured
+    // Note: createServiceClient() throws an error if SUPABASE_SERVICE_ROLE_KEY is missing,
+    // so we catch it and fall back to the regular client (which will be subject to RLS)
+    let serviceClient: ReturnType<typeof createServiceClient>;
+    try {
+      serviceClient = createServiceClient();
+    } catch (error) {
+      serverLogger.error('Failed to create service client for balance update:', error);
+      throw new Error('Service configuration error: Unable to authenticate as service role');
+    }
+    const client = serviceClient;
+
+    // Check if balance record exists
+    const { data: existing, error: checkError } = await client
       .from('metoken_balances')
-      .upsert({
-        metoken_id: meToken.id,
-        user_address: userAddress.toLowerCase(),
-        balance,
-        updated_at: new Date().toISOString(),
-      })
-      .select(`
-        *,
-        metoken:metokens(*)
-      `)
-      .single();
+      .select('id')
+      .eq('metoken_id', meToken.id)
+      .eq('user_address', userAddress.toLowerCase())
+      .maybeSingle();
+
+    // If checkError is not a "not found" error, log it but continue
+    if (checkError && checkError.code !== 'PGRST116') {
+      serverLogger.warn('Error checking existing balance:', checkError);
+    }
+
+    let data, error;
+
+    if (existing) {
+      // Update existing record
+      const result = await client
+        .from('metoken_balances')
+        .update({
+          balance,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('metoken_id', meToken.id)
+        .eq('user_address', userAddress.toLowerCase())
+        .select(`
+          *,
+          metoken:metokens(*)
+        `)
+        .single();
+
+      data = result.data;
+      error = result.error;
+    } else {
+      // Insert new record
+      const result = await client
+        .from('metoken_balances')
+        .insert({
+          metoken_id: meToken.id,
+          user_address: userAddress.toLowerCase(),
+          balance,
+          updated_at: new Date().toISOString(),
+        })
+        .select(`
+          *,
+          metoken:metokens(*)
+        `)
+        .single();
+
+      data = result.data;
+      error = result.error;
+    }
 
     if (error) {
       throw new Error(`Failed to update user balance: ${error.message}`);
@@ -165,6 +374,7 @@ export class MeTokenSupabaseService {
   }
 
   // Record a MeToken transaction
+  // Uses service role client to bypass RLS (since app uses Account Kit, not Supabase Auth)
   async recordTransaction(transactionData: {
     metoken_id: string;
     user_address: string;
@@ -173,8 +383,24 @@ export class MeTokenSupabaseService {
     collateral_amount?: number;
     transaction_hash?: string;
     block_number?: number;
+    video_id?: number;
+    playback_id?: string;
   }): Promise<MeTokenTransaction> {
-    const { data, error } = await supabase
+    // Use service client to bypass RLS (required for Account Kit authentication)
+    // Service client is only available server-side, so this method should be called from API routes
+    // Wrap in try-catch to gracefully fallback to regular client if service key is not configured
+    // Note: createServiceClient() throws an error if SUPABASE_SERVICE_ROLE_KEY is missing,
+    // so we catch it and fall back to the regular client (which will be subject to RLS)
+    let serviceClient: ReturnType<typeof createServiceClient>;
+    try {
+      serviceClient = createServiceClient();
+    } catch (error) {
+      serverLogger.error('Failed to create service client for transaction record:', error);
+      throw new Error('Service configuration error: Unable to authenticate as service role');
+    }
+    const client = serviceClient;
+
+    const { data, error } = await client
       .from('metoken_transactions')
       .insert({
         ...transactionData,

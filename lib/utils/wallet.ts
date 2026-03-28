@@ -1,5 +1,7 @@
 import { createPublicClient, getAddress } from "viem";
 import { alchemy, base } from "@account-kit/infra";
+import { logger } from '@/lib/utils/logger';
+
 
 const publicClient = createPublicClient({
   chain: base,
@@ -22,7 +24,7 @@ export async function isEOA(signer: any): Promise<boolean> {
     const code = await publicClient.getCode({ address: checksummedAddress });
     return !code || code === "0x";
   } catch (error) {
-    console.error("Error checking if wallet is EOA:", error);
+    logger.error("Error checking if wallet is EOA:", error);
     return false;
   }
 }

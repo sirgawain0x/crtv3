@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import * as LivepeerPlayer from "@livepeer/react/player";
 import type { PlaybackError } from "@livepeer/react";
 import {
@@ -15,6 +15,9 @@ import { useVideo } from "@/context/VideoContext";
 import "./Player.css";
 import { Src } from "@livepeer/react";
 import { SubtitlesControl } from "./Subtitles";
+import { safelyPauseVideo } from "@/lib/utils/video-controls";
+import { logger } from '@/lib/utils/logger';
+
 
 export const PlayerLoading: React.FC<{ title: string }> = ({ title }) => {
   return (
@@ -31,9 +34,10 @@ export function Player(props: {
   src: Src[] | null;
   title: string;
   assetId?: string;
+  jwt?: string;
   onPlay?: () => void;
 }) {
-  const { src, title, assetId, onPlay } = props;
+  const { src, title, assetId, jwt, onPlay } = props;
 
   const [controlsVisible, setControlsVisible] = useState(true);
   const fadeTimeoutRef = useRef<NodeJS.Timeout>();
@@ -74,6 +78,12 @@ export function Player(props: {
     };
   }, [playerId, currentPlayingId, setCurrentPlayingId, assetId, onPlay]);
 
+  const safelyPauseCurrentVideo = useCallback(async () => {
+    if (videoRef.current) {
+      await safelyPauseVideo(videoRef.current);
+    }
+  }, []);
+
   useEffect(() => {
     if (!videoRef.current) return;
 
@@ -82,9 +92,9 @@ export function Player(props: {
       currentPlayingId !== (assetId || playerId) &&
       !videoRef.current.paused
     ) {
-      videoRef.current.pause();
+      safelyPauseCurrentVideo();
     }
-  }, [currentPlayingId, playerId, assetId]);
+  }, [currentPlayingId, playerId, assetId, safelyPauseCurrentVideo]);
 
   const resetFadeTimeout = () => {
     if (fadeTimeoutRef.current) {
@@ -108,12 +118,12 @@ export function Player(props: {
   const sourceArray = [...mp4Sources, ...hlsSources, ...otherSources];
 
   // Log the src array for debugging
-  console.log("[Player] src array:", sourceArray);
+  logger.debug("[Player] src array:", sourceArray);
 
   const isInvalidSrc = !src || !Array.isArray(src) || src.length === 0;
 
   if (isInvalidSrc) {
-    console.error("[Player] No valid video source provided:", src);
+    logger.error("[Player] No valid video source provided:", src);
     return (
       <div className="flex h-64 w-full items-center justify-center bg-gray-900 md:h-96">
         <p className="text-lg font-medium text-white">
@@ -126,9 +136,11 @@ export function Player(props: {
   return (
     <LivepeerPlayer.Root
       src={src}
-      autoPlay={false}
-      volume={0.5}
+      jwt={jwt}
+      autoPlay={true} // Autoplay for live streams
+      volume={0.5} // Start unmuted but low volume if possible, or muted if browser blocks
       aspectRatio={16 / 9}
+      lowLatency={true} // Force low latency for livestream
     >
       <LivepeerPlayer.Container
         ref={containerRef}
@@ -166,15 +178,13 @@ export function Player(props: {
 
         <div
           className={`pointer-events-none absolute inset-0 bg-gradient-to-t from-black/60 
-              via-transparent to-black/60 transition-opacity duration-300 ${
-                controlsVisible ? "opacity-100" : "opacity-0"
-              }`}
+              via-transparent to-black/60 transition-opacity duration-300 ${controlsVisible ? "opacity-100" : "opacity-0"
+            }`}
         />
 
         <div
-          className={`absolute inset-0 z-30 touch-none transition-opacity duration-300 ${
-            controlsVisible ? "opacity-100" : "opacity-0"
-          }`}
+          className={`absolute inset-0 z-30 touch-none transition-opacity duration-300 ${controlsVisible ? "opacity-100" : "opacity-0"
+            }`}
         >
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="flex items-center gap-6">

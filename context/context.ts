@@ -18,7 +18,7 @@
 // Site branding constants
 export const SITE_LOGO = "/creative.svg"; // Using the SVG logo
 export const SITE_TOPIC_LOGO =
-  "https://bafybeiesvinhgaqvr62rj77jbwkazg3w6bhcrsfyg6zyozasaud53nucnm.ipfs.w3s.link/Creative%20TV%20Logo.png";
+  "/images/Creative_TV_Logo.png";
 export const SITE_NAME = "Creative TV";
 export const SITE_ORG = "CREATIVE";
 export const SITE_PRODUCT = "TV";
@@ -35,7 +35,7 @@ export const HERO_NAME = {
  */
 export const HERO_DESCRIPTION =
   `${SITE_NAME} is a decentralized live-streaming platform that puts you in control of your content and earnings. ` +
-  `Get paid 100% of streaming revenue, have access to your own social token, and monetize your content into NFTs.`;
+  `Get paid 100% of streaming revenue, have access to your own token, and monetize your content into NFTs.`;
 
 /**
  * Primary call to action buttons on the hero section
@@ -63,7 +63,7 @@ export const STEPPER_FORM_KEYS = {
   3: ["thumbnail"],
 } as const;
 
-export const HERO_VIDEO_TITLE = "Creative TV Demo";
+export const HERO_VIDEO_TITLE = "Creative Intro";
 
 // Featured content configuration
 export const FEATURED_VIDEO_TITLE = "The Creative Podcast Episode 03";
@@ -74,14 +74,21 @@ export const LIVEPEER_FEATURED_PLAYBACK_ID = "5c2bzf537qbq0r7o";
  * These IDs connect to specific assets hosted on Livepeer's platform
  * CAUTION: Changing these values will affect what media is displayed to users
  */
-export const LIVEPEER_HERO_PLAYBACK_ID = "cbd1dw72qst9xmps"; // Default playback ID for hero section video
+export const LIVEPEER_HERO_PLAYBACK_ID = "cb8ekf9y8kaatrpu"; // Default playback ID for hero section video (fallback)
+export const HERO_VIDEO_ASSET_ID = "cb8eabe3-ed26-4a9a-91a5-949712f85030"; // Asset ID for hero section video
 
 // URLS
 export const API_BASE_URL = "https://api.poap.tech";
 export const APP_BASE_URL = "https://app.poap.xyz";
 
 // SPACE
-export const SNAPSHOT_SPACE = "thecreative.eth";
+export const SNAPSHOT_SPACE = "vote.thecreative.eth";
+
+// Reality.eth Configuration
+export const REALITY_ETH_CHAIN_ID = 8453; // Base network
+export const REALITY_ETH_TOKEN = "ETH"; // Native token for Base
+export const REALITY_ETH_VERSION = "3.0"; // Reality.eth v3
+export const REALITY_ETH_DAPP_URL = "https://reality.eth.link/app/index.html";
 
 // STATES
 export const NO_POAP = "NO_POAP";

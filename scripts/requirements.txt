@@ -1,0 +1,2 @@
+# Dependencies for scripts in this directory (e.g. music-contracts-scraper.py)
+requests>=2.28.0

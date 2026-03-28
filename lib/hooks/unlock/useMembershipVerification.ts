@@ -1,8 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { useUser, useSmartAccountClient } from "@account-kit/react";
 import type { UseSmartAccountClientResult } from "@account-kit/react";
+import { logger } from '@/lib/utils/logger';
+
 import {
   unlockService,
   type LockAddress,
@@ -16,6 +18,8 @@ export interface MembershipDetails {
   address: LockAddressValue;
   isValid: boolean;
   lock: any | null; // Type from Unlock Protocol
+  expiration?: number;
+  tokenId?: string | null;
 }
 
 export interface MembershipStatus {
@@ -78,7 +82,10 @@ export function useMembershipVerification() {
 
   useEffect(() => {
     const checkMembership = async () => {
-      if (!user) {
+      // If no user address is available (not logged in), reset status
+      const userAddress = user?.address;
+
+      if (!userAddress) {
         setStatus({
           isVerified: false,
           hasMembership: false,
@@ -90,20 +97,20 @@ export function useMembershipVerification() {
 
       try {
         // For EOA users, check their address directly
-        if (user.type === "eoa" && user.address) {
-          await verifyMembership(user.address, "eoa");
+        if (user?.type === "eoa") {
+          await verifyMembership(userAddress, "eoa");
           return;
         }
 
-        // For Account Kit users, wait for client and check the SCA address
-        if (user.type !== "eoa") {
-          if (!accountKit.client?.account?.address) {
-            return;
-          }
+        // For Account Kit users, check the SCA address
+        const scaAddress = accountKit?.client?.account?.address;
 
-          await verifyMembership(accountKit.client.account.address, "sca");
+        if (!scaAddress) {
           return;
         }
+
+        await verifyMembership(scaAddress, "sca");
+        return;
 
         setStatus({
           isVerified: false,
@@ -127,7 +134,8 @@ export function useMembershipVerification() {
     };
 
     checkMembership();
-  }, [user, accountKit, verifyMembership]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.address, user?.type, accountKit?.client?.account?.address, verifyMembership]);
 
   return status;
 }
@@ -157,7 +165,7 @@ export function useUnlockNFT({
   }, [lockAddress, userAddress, network]);
 
   const DEBUG = process.env.NODE_ENV === "development";
-  if (DEBUG) console.log("message", data);
+  if (DEBUG) logger.debug("message", data);
 
   return { data, isLoading, error };
 }

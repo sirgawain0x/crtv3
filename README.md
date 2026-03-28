@@ -175,13 +175,16 @@ yarn install
 
 3. Set up environment variables:
 
-```
-# Create a .env.local file with the following variables
-NEXT_PUBLIC_ALCHEMY_API_KEY=your_NEXT_PUBLIC_ALCHEMY_API_KEY
-LIVEPEER_API_KEY=your_livepeer_api_key
-LIVEPEER_WEBHOOK_ID=your_livepeer_webhook_id
-# Add other required environment variables
-```
+Copy **`.env.example`** to `.env.local` and fill in values (see **[ENVIRONMENT_SETUP.md](./ENVIRONMENT_SETUP.md)** for how to obtain each). For Vercel deploys, set the same variables in Project → Settings → Environment Variables. To use values from Vercel locally, run `vercel env pull` in the project root (requires [Vercel CLI](https://vercel.com/docs/cli) and `vercel link`).
+
+- `NEXT_PUBLIC_ALCHEMY_API_KEY` - Your Alchemy API key
+- `NEXT_PUBLIC_ALCHEMY_PAYMASTER_POLICY_ID` - Your Gas Manager policy ID  
+- `LIVEPEER_API_KEY` - Your Livepeer API key
+- `LIVEPEER_WEBHOOK_ID` - Your Livepeer webhook ID
+- `NEXT_PUBLIC_AXIOM_INGEST_ENDPOINT` - Your Axiom ingest endpoint (optional, for full-stack observability)
+- And other required variables
+
+**Quick start:** See the [Environment Variables Setup Guide](./ENVIRONMENT_SETUP.md) for step-by-step instructions.
 
 4. Run the development server:
 
@@ -195,9 +198,38 @@ yarn dev
 
 The application is configured through environment variables and the `config/index.ts` file. This ensures type-safe configuration with Zod validation.
 
+## 📊 Observability & Logging
+
+This application uses **next-axiom** for full-stack observability with Axiom. Logs and events can be sent from any part of the Next.js application - client, edge, or server-side.
+
+### Setup
+
+1. **Link Vercel Project to Axiom** (if deploying on Vercel):
+   - Automatic log flow from Vercel to Axiom when project is linked
+   - Logs will automatically start flowing once linked
+
+2. **Environment Variable**:
+   - Set `NEXT_PUBLIC_AXIOM_INGEST_ENDPOINT` to your Axiom ingest endpoint URL
+   - This endpoint is provided by Axiom after linking your project
+   - Get the endpoint URL from your Axiom dashboard
+
+3. **Usage**:
+   ```typescript
+   // Client components, API routes, server components, edge functions
+   import { log } from 'next-axiom';
+   
+   log.debug('debug message', { customerId: 123, auth: 'session' });
+   log.info('info message', { playbackId: 'abc123', userId: 'xyz' });
+   log.error('error message', { endpoint: '/api/livepeer', status: 500 });
+   ```
+
+### Web Vitals
+
+Web Vitals are automatically reported to Axiom via the `WebVitals` client component. This tracks Core Web Vitals metrics (LCP, FID, FCP, CLS, TTFB, INP) for performance monitoring. The component is automatically included in the root layout.
+
 ## 🌐 Deployment
 
-This application can be deployed on Vercel or any other Next.js-compatible hosting service.
+This application can be deployed on Vercel or any other Next.js-compatible hosting service. When deploying on Vercel, you can link your project to Axiom for automatic log collection.
 
 ## 📚 Additional Resources
 

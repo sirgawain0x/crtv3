@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { checkBotId } from 'botid/server';
 import { meTokenSupabaseService } from '@/lib/sdk/supabase/metokens';
+import { serverLogger } from '@/lib/utils/logger';
+import { rateLimiters } from '@/lib/middleware/rateLimit';
 
 // GET /api/metokens/[address]/transactions - Get MeToken transactions
 export async function GET(
@@ -9,11 +12,11 @@ export async function GET(
   try {
     const { address } = await params;
     const { searchParams } = new URL(request.url);
-    
+
     const limit = parseInt(searchParams.get('limit') || '50');
     const offset = parseInt(searchParams.get('offset') || '0');
     const userAddress = searchParams.get('userAddress');
-    
+
     if (!address) {
       return NextResponse.json(
         { error: 'MeToken address is required' },
@@ -29,9 +32,27 @@ export async function GET(
 
     return NextResponse.json({ data: transactions });
   } catch (error) {
-    console.error('Error fetching MeToken transactions:', error);
+    serverLogger.error('Error fetching MeToken transactions:', error);
+
+    // Handle specific error types
+    if (error instanceof Error) {
+      // Check for database connection errors
+      if (error.message.includes('connection') || error.message.includes('timeout')) {
+        return NextResponse.json(
+          {
+            error: 'Database connection error',
+            details: 'Unable to connect to the database. Please try again later.'
+          },
+          { status: 503 }
+        );
+      }
+    }
+
     return NextResponse.json(
-      { error: 'Failed to fetch transactions' },
+      {
+        error: 'Failed to fetch transactions',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }
@@ -42,10 +63,30 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ address: string }> }
 ) {
+  const verification = await checkBotId();
+  if (verification.isBot) {
+    return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+  }
+  const rl = await rateLimiters.standard(request);
+  if (rl) return rl;
+
+  let address: string | undefined;
   try {
-    const { address } = await params;
-    const body = await request.json();
-    
+    const resolvedParams = await params;
+    address = resolvedParams.address;
+
+    // Handle JSON parsing errors
+    let body;
+    try {
+      body = await request.json();
+    } catch (jsonError) {
+      serverLogger.error('Invalid JSON in request body:', jsonError);
+      return NextResponse.json(
+        { error: 'Invalid JSON in request body' },
+        { status: 400 }
+      );
+    }
+
     if (!address) {
       return NextResponse.json(
         { error: 'MeToken address is required' },
@@ -60,12 +101,60 @@ export async function POST(
       collateral_amount,
       transaction_hash,
       block_number,
+      video_id,
+      playback_id,
     } = body;
 
     // Validate required fields
     if (!user_address || !transaction_type || amount === undefined) {
+      const missingFields = [];
+      if (!user_address) missingFields.push('user_address');
+      if (!transaction_type) missingFields.push('transaction_type');
+      if (amount === undefined) missingFields.push('amount');
+
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        {
+          error: 'Missing required fields',
+          missingFields,
+          hint: 'All of the following fields are required: user_address, transaction_type, amount'
+        },
+        { status: 400 }
+      );
+    }
+
+    // Validate transaction_type is valid
+    const validTransactionTypes = ['mint', 'burn', 'buy', 'sell', 'subscribe', 'unsubscribe', 'contribute', 'create', 'transfer'];
+    if (!validTransactionTypes.includes(transaction_type)) {
+      return NextResponse.json(
+        {
+          error: 'Invalid transaction_type',
+          details: `transaction_type must be one of: ${validTransactionTypes.join(', ')}`,
+          received: transaction_type
+        },
+        { status: 400 }
+      );
+    }
+
+    // Validate amount is a valid number
+    const amountNum = typeof amount === 'string' ? parseFloat(amount) : Number(amount);
+    if (isNaN(amountNum) || amountNum < 0) {
+      return NextResponse.json(
+        {
+          error: 'Invalid amount',
+          details: 'amount must be a non-negative number'
+        },
+        { status: 400 }
+      );
+    }
+
+    // Validate user_address format
+    const addressRegex = /^0x[a-fA-F0-9]{40}$/;
+    if (!addressRegex.test(user_address)) {
+      return NextResponse.json(
+        {
+          error: 'Invalid user_address format',
+          details: 'user_address must be a valid Ethereum address (0x followed by 40 hex characters)'
+        },
         { status: 400 }
       );
     }
@@ -87,15 +176,46 @@ export async function POST(
       collateral_amount,
       transaction_hash,
       block_number,
+      video_id,
+      playback_id,
     };
 
     const result = await meTokenSupabaseService.recordTransaction(transactionData);
-    
+
     return NextResponse.json({ data: result }, { status: 201 });
   } catch (error) {
-    console.error('Error recording transaction:', error);
+    serverLogger.error('Error recording transaction:', error);
+
+    // Handle specific error types
+    if (error instanceof Error) {
+      // Check for not found errors
+      if (error.message.includes('not found') || error.message.includes('does not exist')) {
+        return NextResponse.json(
+          {
+            error: 'MeToken not found',
+            details: address ? `No MeToken found with address: ${address}` : 'MeToken not found'
+          },
+          { status: 404 }
+        );
+      }
+
+      // Check for duplicate transaction errors
+      if (error.message.includes('duplicate') || error.message.includes('unique constraint')) {
+        return NextResponse.json(
+          {
+            error: 'Transaction already recorded',
+            details: 'A transaction with this hash already exists'
+          },
+          { status: 409 }
+        );
+      }
+    }
+
     return NextResponse.json(
-      { error: 'Failed to record transaction' },
+      {
+        error: 'Failed to record transaction',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }

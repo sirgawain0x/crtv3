@@ -8,28 +8,108 @@ import type { Proposal } from "@/components/proposal-list/ProposalList";
 import { VotingForm } from "@/components/proposal-list/ProposalList";
 import ClaimPoap from "@/components/vote/ClaimPoap";
 import { shortenAddress } from "@/lib/utils/utils";
+import { LinkedIdentityDisplay } from "@/components/vote/LinkedIdentityDisplay";
+import { SNAPSHOT_SPACE } from "@/context/context";
+import Link from "next/link";
+import { ExternalLink, Slash } from "lucide-react";
+import { Metadata, ResolvingMetadata } from "next";
+import { CampaignShareButton } from "@/components/vote/CampaignShareButton";
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
+
+/**
+ * Extract Smart Wallet address from proposal plugins metadata
+ */
+function extractSmartWalletFromPlugins(plugins: string | null | undefined): string | null {
+  if (!plugins) return null;
+  try {
+    const parsed = typeof plugins === "string" ? JSON.parse(plugins) : plugins;
+    return parsed?.creativeTv?.smartWallet || null;
+  } catch {
+    return null;
+  }
+}
 
 const GET_PROPOSAL = gql`
   query Proposal($id: String!) {
-    proposal(id: $id) {
-      id
-      title
-      body
-      choices
-      start
-      end
-      snapshot
-      state
-      author
-      scores
-      scores_total
-      votes
-    }
+  proposal(id: $id) {
+    id
+    title
+    body
+    choices
+    start
+    end
+    snapshot
+    state
+    author
+    scores
+    scores_total
+    votes
+    plugins
   }
+}
 `;
 
 interface ProposalDetailsPageProps {
   params: Promise<{ id: string }>;
+}
+
+export async function generateMetadata(
+  { params }: ProposalDetailsPageProps,
+  parent: ResolvingMetadata
+): Promise<Metadata> {
+  const { id } = await params;
+
+  try {
+    const client = makeServerClient();
+    const { data } = await client.query<{
+      proposal: Proposal & { author: string; plugins?: string };
+    }>({
+      query: GET_PROPOSAL,
+      variables: { id },
+      fetchPolicy: "no-cache",
+    });
+
+    if (!data?.proposal) {
+      return {
+        title: "Campaign Not Found",
+        description: "The requested campaign could not be found.",
+      };
+    }
+
+    const proposal = data.proposal;
+    const cleanDescription = proposal.body
+      ? proposal.body.replace(/[#*`]/g, '').slice(0, 160) + (proposal.body.length > 160 ? '...' : '')
+      : "View this campaign on Creative TV";
+
+    return {
+      title: proposal.title,
+      description: cleanDescription,
+      openGraph: {
+        title: proposal.title,
+        description: cleanDescription,
+        type: "website",
+        siteName: "Creative TV",
+      },
+      twitter: {
+        card: "summary_large_image",
+        title: proposal.title,
+        description: cleanDescription,
+      },
+    };
+  } catch (error) {
+    console.error("Error generating metadata:", error);
+    return {
+      title: "Campaign Details",
+      description: "View campaign details on Creative TV",
+    };
+  }
 }
 
 export default async function ProposalDetailsPage({
@@ -38,7 +118,7 @@ export default async function ProposalDetailsPage({
   const { id } = await params;
   const client = makeServerClient();
   const { data } = await client.query<{
-    proposal: Proposal & { author: string };
+    proposal: Proposal & { author: string; plugins?: string };
   }>({
     query: GET_PROPOSAL,
     variables: { id },
@@ -102,13 +182,55 @@ export default async function ProposalDetailsPage({
     >
       <div className="min-h-screen p-6 flex flex-col items-center">
         <div className="w-full max-w-3xl">
+          <div className="my-5 mb-6">
+            <Breadcrumb>
+              <BreadcrumbList>
+                <BreadcrumbItem>
+                  <BreadcrumbLink asChild>
+                    <Link href="/">
+                      <span role="img" aria-label="home">
+                        🏠
+                      </span>{" "}
+                      Home
+                    </Link>
+                  </BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator>
+                  <Slash />
+                </BreadcrumbSeparator>
+                <BreadcrumbItem>
+                  <BreadcrumbLink asChild>
+                    <Link href="/vote">Vote</Link>
+                  </BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator>
+                  <Slash />
+                </BreadcrumbSeparator>
+                <BreadcrumbItem>
+                  <BreadcrumbPage>{proposal.title}</BreadcrumbPage>
+                </BreadcrumbItem>
+              </BreadcrumbList>
+            </Breadcrumb>
+          </div>
           <Card className="p-6 mb-6 overflow-x-auto">
-            <h1 className="text-2xl font-bold mb-2 break-words">
-              {proposal.title}
-            </h1>
+            <div className="flex justify-between items-start mb-2 gap-4">
+              <h1 className="text-2xl font-bold break-words flex-1">
+                {proposal.title}
+              </h1>
+              <div className="flex-shrink-0">
+                <CampaignShareButton
+                  campaignId={proposal.id}
+                  campaignTitle={proposal.title}
+                />
+              </div>
+            </div>
             <div className="mb-4 text-gray-500 space-y-1 break-all">
               <div className="truncate max-w-full">
-                By: {shortenAddress(proposal.author)}
+                <LinkedIdentityDisplay
+                  authorEOA={proposal.author}
+                  smartWalletAddress={extractSmartWalletFromPlugins(proposal.plugins)}
+                  showFull={false}
+                />
               </div>
               <div>
                 Start: {new Date(proposal.start * 1000).toLocaleString()}
@@ -121,9 +243,17 @@ export default async function ProposalDetailsPage({
             </div>
             <div className="mb-6">
               <span className="font-semibold">Snapshot:</span>{" "}
-              {proposal.snapshot}
-            </div>
-          </Card>
+              <Link
+                href={`https://snapshot.box/#/s:${SNAPSHOT_SPACE}/proposal/${proposal.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-blue-500 hover:text-blue-700 underline font-mono"
+              >
+                {proposal.snapshot}
+                < ExternalLink className="h-3 w-3" />
+              </Link >
+            </div >
+          </Card >
           <Card className="p-6 mb-6">
             <h2 className="text-lg font-bold mb-2">Voting</h2>
             {isVotingActive ? (
@@ -189,8 +319,8 @@ export default async function ProposalDetailsPage({
               />
             </div>
           </Card>
-        </div>
-      </div>
-    </Suspense>
+        </div >
+      </div >
+    </Suspense >
   );
 }

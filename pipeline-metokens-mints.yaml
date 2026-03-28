@@ -1,0 +1,18 @@
+name: pipeline-metokens-mints
+resource_size: s
+apiVersion: 3
+sources:
+  metoken_mints_source:
+    name: mint
+    subgraphs:
+      - name: metokens
+        version: v0.0.1
+    type: subgraph_entity
+transforms: {}
+sinks:
+  postgres_metoken_mints:
+    from: metoken_mints_source
+    schema: public
+    secret_name: POSTGRES_SECRET_CMJIQCIFZ0
+    table: metoken_mints
+    type: postgres

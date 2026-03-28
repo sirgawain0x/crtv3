@@ -10,6 +10,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { FaUsers, FaTrophy } from "react-icons/fa";
 import Image from "next/image";
 import { formatNumber } from "@/lib/utils/utils";
+import { logger } from '@/lib/utils/logger';
+
 
 // Define the type based on the actual Stack SDK return type
 interface LeaderboardRow {
@@ -53,7 +55,7 @@ export default function LeaderboardPage() {
         const rankData = await stack.getLeaderboardRank(userInfo.address);
         setUserRank(rankData as unknown as UserRank);
       } catch (err) {
-        console.error("Failed to fetch user rank:", err);
+        logger.error("Failed to fetch user rank:", err);
       }
     };
 
@@ -107,7 +109,7 @@ export default function LeaderboardPage() {
           setMetadata(leaderboard.metadatad as unknown as LeaderboardMetadata);
         }
       } catch (err: any) {
-        console.error("Failed to fetch leaderboard:", err);
+        logger.error("Failed to fetch leaderboard:", err);
         setError("Failed to fetch leaderboard. Please try again later.");
       } finally {
         setIsLoading(false);

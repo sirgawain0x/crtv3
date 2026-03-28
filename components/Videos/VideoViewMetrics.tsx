@@ -1,6 +1,5 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { fetchAllViews } from "@/app/api/livepeer/views";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface VideoViewMetricsProps {
@@ -20,10 +19,27 @@ const VideoViewMetrics: React.FC<VideoViewMetricsProps> = ({ playbackId }) => {
 
   useEffect(() => {
     async function fetchViewMetrics() {
+      if (!playbackId) {
+        setLoading(false);
+        return;
+      }
+
       try {
-        const result = await fetchAllViews(playbackId);
-        if (result) {
-          setViewMetrics(result);
+        const response = await fetch(`/api/livepeer/views/${playbackId}`);
+        
+        if (!response.ok) {
+          throw new Error("Failed to fetch view metrics");
+        }
+
+        const data = await response.json();
+        
+        if (data.success) {
+          setViewMetrics({
+            playbackId: data.playbackId,
+            viewCount: data.viewCount,
+            playtimeMins: data.playtimeMins,
+            legacyViewCount: data.legacyViewCount,
+          });
         } else {
           setError("Failed to fetch view metrics");
         }

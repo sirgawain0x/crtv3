@@ -5,14 +5,31 @@ import {
   NewAssetFromUrlPayload,
   NewAssetPayload,
 } from "livepeer/models/components";
+import { serverLogger } from "@/lib/utils/logger";
 
 // FETCH ALL ASSETS
-export const fetchAllAssets = async (): Promise<Asset[]> => {
+export const fetchAllAssets = async (options?: {
+  limit?: number;
+  offset?: number;
+}): Promise<{ data: Asset[]; total: number }> => {
   try {
-    const assets = await fullLivepeer.asset.getAll();
-    return assets.data as Asset[];
+    const limit = options?.limit || 20; // Default to 20 items per page
+    const offset = options?.offset || 0;
+    
+    // The Livepeer SDK's getAll() method retrieves all assets
+    const response = await fullLivepeer.asset.getAll();
+    
+    const allAssets = (response.data as Asset[]) || [];
+    
+    // Implement client-side pagination
+    const paginatedData = allAssets.slice(offset, offset + limit);
+    
+    return {
+      data: paginatedData,
+      total: allAssets.length,
+    };
   } catch (error) {
-    console.error("Error fetching assets:", error);
+    serverLogger.error("Error fetching assets:", error);
     throw new Error(
       `Failed to fetch assets: ${
         error instanceof Error ? error.message : "Unknown error"

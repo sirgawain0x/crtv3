@@ -8,8 +8,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export function VideoCardSkeleton() {
   return (
-    <div className="mx-auto">
-      <Card className="w-[360px] overflow-hidden">
+    <div className="w-full">
+      <Card className="w-full overflow-hidden">
         <CardHeader className="space-y-2">
           <div className="flex items-center space-x-2">
             <Skeleton className="h-10 w-10 rounded-full" />
@@ -26,8 +26,8 @@ export function VideoCardSkeleton() {
             <Skeleton className="h-5 w-16" />
           </div>
           <div className="mt-6 space-y-2">
-            <Skeleton className="h-6 w-3/4" />
             <Skeleton className="h-4 w-1/4" />
+            <Skeleton className="h-6 w-3/4" />
           </div>
         </CardContent>
         <CardFooter className="mx-auto flex items-center justify-center">

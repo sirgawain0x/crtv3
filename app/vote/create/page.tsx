@@ -11,7 +11,9 @@ function CreateVoteRedirect() {
   const eoaAddress = user?.address;
 
   useEffect(() => {
-    if (eoaAddress) router.replace(`/vote/create/${eoaAddress || scaAddress}`);
+    // Prioritize Smart Account address for the URL
+    const targetAddress = scaAddress || eoaAddress;
+    if (targetAddress) router.replace(`/vote/create/${targetAddress}`);
   }, [eoaAddress, scaAddress, router]);
 
   return (

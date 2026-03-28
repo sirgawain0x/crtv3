@@ -3,9 +3,13 @@
 import { useEffect, useState } from "react";
 import { useSmartAccountClient, useUser, useChain } from "@account-kit/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatEther, createPublicClient, http } from "viem";
+import { formatUnits, createPublicClient, http } from "viem";
 import { getUsdcTokenContract } from "@/lib/contracts/USDCToken";
+import { getDaiTokenContract } from "@/lib/contracts/DAIToken";
 import { Skeleton } from "@/components/ui/skeleton";
+import Image from "next/image";
+import { logger } from '@/lib/utils/logger';
+
 
 interface TokenBalanceData {
   symbol: string;
@@ -14,31 +18,28 @@ interface TokenBalanceData {
   error: string | null;
 }
 
-// Utility function to format balance with proper precision
-function formatBalance(balance: string, symbol: string): string {
+// Utility function to format balance with proper precision (without symbol)
+function formatBalance(balance: string): string {
   // Convert to number for comparison
   const num = parseFloat(balance);
-  if (num === 0) return `0 ${symbol}`;
+  if (num <= 0) return "0";
+  if (num < 0.000001) return "< 0.000001"; // Very small non-zero
 
-  // If number is very small (less than 0.00001), use scientific notation
-  if (num < 0.00001) return `${num.toExponential(5)} ${symbol}`;
-
-  // For regular numbers, preserve significant digits up to 5 decimal places
-  const [integerPart, decimalPart = ""] = balance.split(".");
-
-  // If decimal part is shorter than significant digits, use it as is
-  if (decimalPart.length <= 5) {
-    const cleanDecimal = decimalPart.replace(/0+$/, "");
-    return cleanDecimal
-      ? `${integerPart}.${cleanDecimal} ${symbol}`
-      : `${integerPart} ${symbol}`;
+  // For small numbers (less than 1), show up to 6 decimals
+  if (num < 1) {
+    return new Intl.NumberFormat('en-US', {
+      maximumFractionDigits: 6,
+      minimumFractionDigits: 0,
+      useGrouping: false // Don't use commas for decimals
+    }).format(num);
   }
 
-  // Otherwise, truncate to significant digits and remove trailing zeros
-  const truncatedDecimal = decimalPart.slice(0, 5).replace(/0+$/, "");
-  return truncatedDecimal
-    ? `${integerPart}.${truncatedDecimal} ${symbol}`
-    : `${integerPart} ${symbol}`;
+  // For larger numbers, show up to 4 decimals
+  return new Intl.NumberFormat('en-US', {
+    maximumFractionDigits: 4,
+    minimumFractionDigits: 0,
+    useGrouping: true
+  }).format(num);
 }
 
 export function TokenBalance() {
@@ -47,25 +48,50 @@ export function TokenBalance() {
   const { chain } = useChain();
   const [ethBalance, setEthBalance] = useState<bigint | null>(null);
   const [usdcBalance, setUsdcBalance] = useState<bigint | null>(null);
+  const [daiBalance, setDaiBalance] = useState<bigint | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let isMounted = true;
+    let abortController: AbortController | null = null;
+
     async function getBalances() {
+      if (!isMounted) return;
+
+      // Create a new AbortController for this effect
+      abortController = new AbortController();
+      const signal = abortController.signal;
+
       setIsLoading(true);
+      setError(null);
+
       try {
         const address = client?.account?.address || user?.address;
         if (!address || !chain) {
-          setEthBalance(null);
-          setUsdcBalance(null);
+          if (isMounted && !signal.aborted) {
+            setEthBalance(null);
+            setUsdcBalance(null);
+            setDaiBalance(null);
+            setIsLoading(false);
+          }
           return;
         }
 
-        // Map chain.id to key for getUsdcTokenContract
-        let chainKey: keyof typeof import("@/lib/contracts/USDCToken").USDC_TOKEN_ADDRESSES =
-          "base";
+        // Map chain.id to key for token contracts
+        let chainKey: keyof typeof import("@/lib/contracts/USDCToken").USDC_TOKEN_ADDRESSES;
         if (chain.id === 8453) chainKey = "base";
-        else if (chain.id === 10) chainKey = "optimism";
-        // Add more mappings as needed
+        else {
+          logger.warn(`Unsupported chain ID: ${chain.id}`);
+          if (isMounted && !signal.aborted) {
+            setError(`Unsupported chain (ID: ${chain.id})`);
+            setEthBalance(null);
+            setUsdcBalance(null);
+            setDaiBalance(null);
+            setIsLoading(false);
+          }
+          return;
+        }
 
         const publicClient = createPublicClient({
           chain,
@@ -73,30 +99,101 @@ export function TokenBalance() {
         });
 
         // Get ETH balance
-        const ethBalance = await publicClient.getBalance({
-          address: address as `0x${string}`,
-        });
-        setEthBalance(ethBalance);
+        try {
+          if (!isMounted || signal.aborted) return;
+          const ethBalance = await publicClient.getBalance({
+            address: address as `0x${string}`
+          });
+          if (isMounted && !signal.aborted) {
+            setEthBalance(ethBalance);
+          }
+        } catch (error) {
+          if (isMounted && !signal.aborted) {
+            logger.error("Error fetching ETH balance:", error);
+            setEthBalance(null);
+          }
+        }
 
         // Get USDC balance
-        const usdcTokenContract = getUsdcTokenContract(chainKey);
-        const usdcBalance = (await publicClient.readContract({
-          address: usdcTokenContract.address,
-          abi: usdcTokenContract.abi,
-          functionName: "balanceOf",
-          args: [address as `0x${string}`],
-        })) as bigint;
-        setUsdcBalance(usdcBalance);
+        try {
+          if (!isMounted || signal.aborted) return;
+
+          const usdcTokenContract = getUsdcTokenContract(chainKey);
+          const usdcBalance = (await publicClient.readContract({
+            address: usdcTokenContract.address,
+            abi: usdcTokenContract.abi,
+            functionName: "balanceOf",
+            args: [address as `0x${string}`],
+          })) as bigint;
+          if (isMounted && !signal.aborted) {
+            setUsdcBalance(usdcBalance);
+          }
+        } catch (error) {
+          if (isMounted && !signal.aborted) {
+            logger.error("Error fetching USDC balance:", error);
+            setUsdcBalance(null);
+          }
+        }
+
+        // Get DAI balance
+        try {
+          if (!isMounted || signal.aborted) return;
+
+          const daiTokenContract = getDaiTokenContract(chainKey);
+          const daiBalance = (await publicClient.readContract({
+            address: daiTokenContract.address,
+            abi: daiTokenContract.abi,
+            functionName: "balanceOf",
+            args: [address as `0x${string}`],
+          })) as bigint;
+          if (isMounted && !signal.aborted) {
+            setDaiBalance(daiBalance);
+          }
+        } catch (error) {
+          if (isMounted && !signal.aborted) {
+            logger.error("Error fetching DAI balance:", error);
+            setDaiBalance(null);
+          }
+        }
       } catch (error) {
-        console.error("Error fetching balances:", error);
-        setEthBalance(null);
-        setUsdcBalance(null);
+        if (isMounted && !signal.aborted) {
+          logger.error("Error fetching balances:", error);
+          setError(error instanceof Error ? error.message : "Unknown error");
+          setEthBalance(null);
+          setUsdcBalance(null);
+          setDaiBalance(null);
+        }
       } finally {
-        setIsLoading(false);
+        if (isMounted && !signal.aborted) {
+          setIsLoading(false);
+        }
       }
     }
+
     getBalances();
+
+    return () => {
+      isMounted = false;
+      if (abortController) {
+        abortController.abort("Component unmounted or dependencies changed");
+      }
+    };
   }, [client, user, chain]);
+
+  // Helper to get token icon based on chain
+  const getTokenIcon = (symbol: string) => {
+    const isBase = chain?.id === 8453;
+    switch (symbol) {
+      case "ETH":
+        return isBase ? "/images/tokens/ETH_on_Base.svg" : "/images/tokens/eth-logo.svg";
+      case "USDC":
+        return isBase ? "/images/tokens/USDC_on_Base.svg" : "/images/tokens/usdc-logo.svg";
+      case "DAI":
+        return isBase ? "/images/tokens/DAI_on_Base.svg" : "/images/tokens/dai-logo.svg";
+      default:
+        return "/images/tokens/eth-logo.svg";
+    }
+  };
 
   if (isLoading) {
     return (
@@ -106,12 +203,58 @@ export function TokenBalance() {
         </CardHeader>
         <CardContent className="space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-sm">ETH</span>
+            <div className="flex items-center space-x-2">
+              <Image
+                src={getTokenIcon("ETH")}
+                alt="ETH"
+                width={24}
+                height={24}
+                className="w-6 h-6"
+              />
+              <span className="text-sm">ETH</span>
+            </div>
             <Skeleton className="h-5 w-16" />
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-sm">USDC</span>
+            <div className="flex items-center space-x-2">
+              <Image
+                src={getTokenIcon("USDC")}
+                alt="USDC"
+                width={24}
+                height={24}
+                className="w-6 h-6"
+              />
+              <span className="text-sm">USDC</span>
+            </div>
             <Skeleton className="h-5 w-16" />
+          </div>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Image
+                src={getTokenIcon("DAI")}
+                alt="DAI"
+                width={24}
+                height={24}
+                className="w-6 h-6"
+              />
+              <span className="text-sm">DAI</span>
+            </div>
+            <Skeleton className="h-5 w-16" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-medium">Balances</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-sm text-red-500">
+            Error loading balances: {error}
           </div>
         </CardContent>
       </Card>
@@ -125,19 +268,54 @@ export function TokenBalance() {
       </CardHeader>
       <CardContent className="space-y-2">
         <div className="flex items-center justify-between">
-          <span className="text-sm">ETH</span>
+          <div className="flex items-center space-x-2">
+            <Image
+              src={getTokenIcon("ETH")}
+              alt="ETH"
+              width={24}
+              height={24}
+              className="w-6 h-6"
+            />
+            <span className="text-sm">ETH</span>
+          </div>
           <span className="text-sm font-medium">
             {ethBalance
-              ? formatBalance(formatEther(ethBalance), "ETH")
-              : "0 ETH"}
+              ? formatBalance(formatUnits(ethBalance, 18))
+              : "0"}
           </span>
         </div>
         <div className="flex items-center justify-between">
-          <span className="text-sm">USDC</span>
+          <div className="flex items-center space-x-2">
+            <Image
+              src={getTokenIcon("USDC")}
+              alt="USDC"
+              width={24}
+              height={24}
+              className="w-6 h-6"
+            />
+            <span className="text-sm">USDC</span>
+          </div>
           <span className="text-sm font-medium">
             {usdcBalance
-              ? formatBalance(formatEther(usdcBalance), "USDC")
-              : "0 USDC"}
+              ? formatBalance(formatUnits(usdcBalance, 6))
+              : "0"}
+          </span>
+        </div>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <Image
+              src={getTokenIcon("DAI")}
+              alt="DAI"
+              width={24}
+              height={24}
+              className="w-6 h-6"
+            />
+            <span className="text-sm">DAI</span>
+          </div>
+          <span className="text-sm font-medium">
+            {daiBalance
+              ? formatBalance(formatUnits(daiBalance, 18))
+              : "0"}
           </span>
         </div>
       </CardContent>

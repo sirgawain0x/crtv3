@@ -2,7 +2,19 @@
   "framework": "nextjs",
   "build": {
     "env": {
-      "NODE_ENV": "production"
+      "NODE_ENV": "production",
+      "NODE_OPTIONS": "--max-old-space-size=6144 --no-deprecation"
     }
-  }
+  },
+  "installCommand": "yarn install --network-timeout 600000",
+  "crons": [
+    {
+      "path": "/api/video-assets/sync-views/cron",
+      "schedule": "0 2 * * *"
+    },
+    {
+      "path": "/api/market/tokens/sync/cron",
+      "schedule": "0 3 * * *"
+    }
+  ]
 }

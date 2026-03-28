@@ -1,4 +1,5 @@
 'use server';
+import { serverLogger } from '@/lib/utils/logger';
 
 type TranslateParams = {
     text: string;
@@ -53,7 +54,7 @@ export const getLivepeerTranslation = async (
 
         return data;
     } catch (error: any) {
-        console.error('Translation error ', error);
+        serverLogger.error('Translation error:', error);
         if (error instanceof Error) throw error;
         throw new Error('Failed to translate text');
     }

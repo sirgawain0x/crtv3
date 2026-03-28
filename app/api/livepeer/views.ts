@@ -1,4 +1,5 @@
 'use server';
+import { serverLogger } from '@/lib/utils/logger';
 
 export const fetchAllViews = async (
   playbackId: string,
@@ -38,7 +39,7 @@ export const fetchAllViews = async (
       legacyViewCount: data.legacyViewCount,
     };
   } catch (error) {
-    console.error('Failed to fetch view metrics:', error);
+    serverLogger.error('Failed to fetch view metrics:', error);
     return null;
   }
 };

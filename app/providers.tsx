@@ -1,16 +1,25 @@
 "use client";
+import "@/lib/utils/xmtp/wasm-patch";
 import { config, queryClient } from "@/config";
 import { AlchemyAccountProvider } from "@account-kit/react";
 import { AlchemyClientState } from "@account-kit/core";
 import { QueryClientProvider } from "@tanstack/react-query";
-import { PropsWithChildren, useMemo, Suspense } from "react";
+import { PropsWithChildren, Suspense, useEffect, useState } from "react";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "sonner";
 import { VideoProvider } from "../context/VideoContext";
-import { ErrorBoundary } from "next/dist/client/components/error-boundary";
+import { TourProvider } from "../context/TourContext";
+import { HeliaProvider } from "../context/HeliaContext";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ApolloNextAppProvider } from "@apollo/client-integration-nextjs";
 import { makeClient } from "./apolloWrapper";
 import { RadixProvider } from "@/components/ui/radix-provider";
+import { cleanupExistingIframes } from "@/components/IframeCleanup";
+// Import dev warning suppression (only active in development)
+import "@/lib/utils/suppressDevWarnings";
+import { MembershipGuard } from "@/components/auth/MembershipGuard";
+import { AccountKitStoreGuard } from "@/components/auth/AccountKitStoreGuard";
+import NoSSR from "@/components/NoSSR";
 
 function ErrorFallback({ error }: { error: Error }) {
   return (
@@ -26,8 +35,27 @@ function ErrorFallback({ error }: { error: Error }) {
 export const Providers = (
   props: PropsWithChildren<{ initialState?: AlchemyClientState }>
 ) => {
+  const [isReady, setIsReady] = useState(false);
+
+  useEffect(() => {
+    // Only clean up DUPLICATE iframes, not the active one
+    // This prevents breaking the signer connection while still handling hot-reload duplicates
+    cleanupExistingIframes();
+    setIsReady(true);
+  }, []);
+
+  // Don't render providers until ready
+  // Note: We removed aggressive iframe cleanup to preserve the signer connection
+  if (!isReady) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        Loading...
+      </div>
+    );
+  }
+
   return (
-    <ErrorBoundary errorComponent={ErrorFallback}>
+    <ErrorBoundary fallback={(error) => <ErrorFallback error={error} />}>
       <Suspense
         fallback={
           <div className="flex min-h-screen items-center justify-center">
@@ -38,18 +66,28 @@ export const Providers = (
         <QueryClientProvider client={queryClient}>
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
             <ApolloNextAppProvider makeClient={makeClient}>
-              <AlchemyAccountProvider
-                config={config}
-                queryClient={queryClient}
-                initialState={props.initialState}
-              >
-                <RadixProvider>
-                  <VideoProvider>
-                    {props.children}
-                    <Toaster position="top-right" richColors />
-                  </VideoProvider>
-                </RadixProvider>
-              </AlchemyAccountProvider>
+              <NoSSR>
+                <AlchemyAccountProvider
+                  config={config}
+                  queryClient={queryClient}
+                  initialState={props.initialState}
+                >
+                  <RadixProvider>
+                    <HeliaProvider>
+                      <TourProvider>
+                        <VideoProvider>
+                          <AccountKitStoreGuard>
+                          <MembershipGuard>
+                            {props.children}
+                          </MembershipGuard>
+                        </AccountKitStoreGuard>
+                          <Toaster position="top-right" richColors />
+                        </VideoProvider>
+                      </TourProvider>
+                    </HeliaProvider>
+                  </RadixProvider>
+                </AlchemyAccountProvider>
+              </NoSSR>
             </ApolloNextAppProvider>
           </ThemeProvider>
         </QueryClientProvider>

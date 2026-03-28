@@ -1,22 +1,38 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { checkBotId } from "botid/server";
 import { unlockService } from "@/lib/sdk/unlock/services";
+import { rateLimiters } from "@/lib/middleware/rateLimit";
 
 // POST /api/membership
 export async function POST(req: NextRequest) {
-  const { address } = await req.json();
+  const verification = await checkBotId();
+  if (verification.isBot) {
+    return NextResponse.json({ error: "Access denied" }, { status: 403 });
+  }
+  const rl = await rateLimiters.standard(req);
+  if (rl) return rl;
+
+  let address: string | undefined;
+
+  try {
+    const body = await req.json();
+    address = body.address;
+  } catch (error) {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
+
   if (!address) {
-    return new Response(JSON.stringify({ error: "Missing address" }), {
-      status: 400,
-    });
+    return NextResponse.json({ error: "Missing address" }, { status: 400 });
   }
 
   try {
     // This runs server-side, so no CORS issues!
     const memberships = await unlockService.getAllMemberships(address);
-    return new Response(JSON.stringify({ memberships }), { status: 200 });
+    return NextResponse.json({ memberships }, { status: 200 });
   } catch (error) {
-    return new Response(JSON.stringify({ error: (error as Error).message }), {
-      status: 500,
-    });
+    return NextResponse.json(
+      { error: (error as Error).message },
+      { status: 500 }
+    );
   }
 }

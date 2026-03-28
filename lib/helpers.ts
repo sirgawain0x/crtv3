@@ -2,6 +2,8 @@
  * Helper functions for the application
  */
 
+import { parseIpfsUriWithFallback } from '@/lib/utils/image-gateway';
+
 export const claimConditionsOptions = {
   currency: {
     USDC: '0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174',
@@ -63,24 +65,16 @@ export function titleCase(str: string): string {
 }
 
 /**
- * Parses an IPFS URI and returns the HTTP gateway URL
+ * Parses an IPFS URI and returns the HTTP gateway URL with fallback support
+ * Automatically converts failing gateways (Lighthouse, etc.) to alternative gateways
  * @param uri - The IPFS URI to parse
- * @returns The HTTP gateway URL
+ * @returns The HTTP gateway URL (using Storacha w3s.link as primary gateway)
  */
 export function parseIpfsUri(uri: string): string {
   if (!uri) return '';
 
-  // Handle ipfs:// protocol
-  if (uri.startsWith('ipfs://')) {
-    return uri.replace('ipfs://', 'https://ipfs.io/ipfs/');
-  }
-
-  // Handle ipfs hash format
-  if (uri.startsWith('Qm') || uri.startsWith('bafy')) {
-    return `https://ipfs.io/ipfs/${uri}`;
-  }
-
-  return uri;
+  // Use the enhanced parser with fallback support
+  return parseIpfsUriWithFallback(uri, 0); // 0 = Storacha (w3s.link) - fast IPFS gateway
 }
 
 /**

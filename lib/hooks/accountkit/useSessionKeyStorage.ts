@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { useUser } from "@account-kit/react";
 import { type SessionKeyPermissions } from "./useSessionKey";
+import { logger } from '@/lib/utils/logger';
+
 
 export interface SessionKeyData {
   address: string;
@@ -36,7 +38,7 @@ export function useSessionKeyStorage() {
         });
         setSessionKeys(parsedKeys);
       } catch (error) {
-        console.error("Error parsing stored session keys:", error);
+        logger.error("Error parsing stored session keys:", error);
         localStorage.removeItem(storageKey);
       }
     }
@@ -76,7 +78,7 @@ export function useSessionKeyStorage() {
         })
       );
     } catch (error) {
-      console.error("Error storing session keys:", error);
+      logger.error("Error storing session keys:", error);
     }
   };
 

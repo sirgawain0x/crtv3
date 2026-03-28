@@ -1,0 +1,9 @@
+@openzeppelin/=node_modules/@openzeppelin/
+forge-std/=node_modules/forge-std/src/
+lib/openzeppelin-contracts-upgradeable/contracts/=node_modules/@openzeppelin/contracts-upgradeable/
+extension/=node_modules/@thirdweb-dev/contracts/extension/
+interface/=node_modules/@thirdweb-dev/contracts/prebuilts/interface/
+infra/=node_modules/@thirdweb-dev/contracts/infra/
+external-deps/=node_modules/@thirdweb-dev/contracts/external-deps/
+lib/=node_modules/@thirdweb-dev/contracts/lib/
+eip/=node_modules/@thirdweb-dev/contracts/eip/

@@ -3,7 +3,12 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 
-function LivestreamThumbnail({ thumbnailUrl }: LivestreamThumbnailProps) {
+interface LivestreamThumbnailProps {
+  thumbnailUrl: string;
+  priority?: boolean;
+}
+
+export function LivestreamThumbnail({ thumbnailUrl, priority = false }: LivestreamThumbnailProps) {
   const [refreshValue, setRefreshValue] = useState(Date.now());
 
   useEffect(() => {
@@ -18,15 +23,10 @@ function LivestreamThumbnail({ thumbnailUrl }: LivestreamThumbnailProps) {
       src={`${thumbnailUrl}?refresh=${refreshValue}`}
       alt="Live stream thumbnail"
       className="w-full h-auto rounded-md"
-      loading="lazy"
+      loading={priority ? "eager" : "lazy"}
+      priority={priority}
       width={320}
       height={180}
     />
   );
-}
-
-export { LivestreamThumbnail };
-
-interface LivestreamThumbnailProps {
-  thumbnailUrl: string;
 }

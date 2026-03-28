@@ -41,13 +41,15 @@ import { fullLivepeer } from "../../sdk/livepeer/fullClient";
 import { getSrc } from "@livepeer/react/external";
 import { Src } from "@livepeer/react";
 import { LIVEPEER_FEATURED_PLAYBACK_ID } from "../../../context/context";
+import { logger } from '@/lib/utils/logger';
+
 
 // You can replace this with your featured video playback ID
 // const FEATURED_PLAYBACK_ID = 'cbd1dw72qst9xmps';
 
 export const getFeaturedPlaybackSource = async (): Promise<Src[]> => {
   try {
-    console.log(
+    logger.debug(
       "Fetching featured playback source for ID:",
       LIVEPEER_FEATURED_PLAYBACK_ID
     );
@@ -56,21 +58,21 @@ export const getFeaturedPlaybackSource = async (): Promise<Src[]> => {
     );
 
     if (!playbackInfo?.playbackInfo) {
-      console.error("No playback info found for featured video");
+      logger.error("No playback info found for featured video");
       return [];
     }
 
     const src = getSrc(playbackInfo.playbackInfo) as Src[];
 
     if (!src || src.length === 0) {
-      console.error("No valid sources generated for featured video");
+      logger.error("No valid sources generated for featured video");
       return [];
     }
 
-    console.log("Successfully fetched featured playback source:", src);
+    logger.debug("Successfully fetched featured playback source:", src);
     return src;
   } catch (error) {
-    console.error("Error fetching featured playback source:", error);
+    logger.error("Error fetching featured playback source:", error);
     return [];
   }
 };
