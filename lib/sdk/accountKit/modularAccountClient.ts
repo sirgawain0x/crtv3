@@ -63,7 +63,7 @@ export async function sendUserOperation({
     const operation = await client.sendUserOperation({
       uo: {
         target,
-        data: data ? appendBuilderCode(data) : appendBuilderCode("0x"),
+        data: appendBuilderCode(data ?? "0x"),
         value,
       },
     });
