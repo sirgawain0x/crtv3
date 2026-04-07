@@ -47,6 +47,9 @@ export const metadata: Metadata = {
     description: "The Way Content Should Be.",
     images: ["/Creative_TV.png"],
   },
+  other: {
+    "base:app_id": "68ef186373010b72f49bc1b1",
+  },
 };
 
 export default async function RootLayout({
