@@ -302,14 +302,9 @@ const HookMultiStepForm = () => {
 
             toast.success("Video uploaded and published successfully!");
 
-            // Navigate to Discover immediately so the user can see their published video
+            // Navigate to Discover so the user can see their published video
             logger.debug("Redirecting to discover page...");
-            router.replace("/discover");
-            setTimeout(() => {
-              if (typeof window !== "undefined" && window.location.pathname !== "/discover") {
-                window.location.href = "/discover";
-              }
-            }, 800);
+            router.push("/discover");
 
             // --- STORY PROTOCOL IP REGISTRATION ---
             if (data.storyConfig?.registerIP && address) {
