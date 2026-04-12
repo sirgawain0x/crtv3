@@ -77,7 +77,8 @@ export function useLiveChat(
   
   const streamRef = useRef<AsyncIterable<DecodedMessage<any>> | null>(null);
   const isStreamingRef = useRef(false);
-  
+  const seenMessageIds = useRef(new Set<string>());
+
   // Rate limiting
   const rateLimit = options?.rateLimit || { count: 5, windowMs: 10000 }; // 5 messages per 10 seconds
   const messageTimestamps = useRef<number[]>([]);
@@ -167,7 +168,11 @@ export function useLiveChat(
         });
       
       formattedMessages.sort((a, b) => a.sentAt.getTime() - b.sentAt.getTime());
-      
+
+      // Populate dedup Set with initial message IDs
+      seenMessageIds.current.clear();
+      formattedMessages.forEach(msg => seenMessageIds.current.add(msg.id));
+
       setMessages(formattedMessages);
       setError(null);
       log("useLiveChat: Group initialization successful", {
@@ -206,8 +211,10 @@ export function useLiveChat(
       const cutoffTime = Date.now() - messageRetentionMs;
       setMessages((prev) => {
         const filtered = prev.filter(msg => msg.sentAt.getTime() > cutoffTime);
-        // Also limit to maxMessages
-        return filtered.slice(-maxMessages);
+        const trimmed = filtered.slice(-maxMessages);
+        // Rebuild dedup Set to match retained messages
+        seenMessageIds.current = new Set(trimmed.map(msg => msg.id));
+        return trimmed;
       });
     }, 30000); // Cleanup every 30 seconds
     
@@ -250,18 +257,15 @@ export function useLiveChat(
             };
 
             setMessages((prev) => {
-              // Avoid duplicates
-              if (prev.some((m) => m.id === newMessage.id)) {
+              // O(1) dedup check using Set
+              if (seenMessageIds.current.has(newMessage.id)) {
                 return prev;
               }
-              
-              // Add new message and keep only recent ones
-              const updated = [...prev, newMessage]
-                .filter(msg => msg.sentAt.getTime() > Date.now() - messageRetentionMs)
-                .slice(-maxMessages);
-              
-              updated.sort((a, b) => a.sentAt.getTime() - b.sentAt.getTime());
-              
+              seenMessageIds.current.add(newMessage.id);
+
+              // Append directly — messages arrive chronologically from XMTP.
+              // Retention cleanup is handled by the periodic 30s interval.
+              const updated = [...prev, newMessage].slice(-maxMessages);
               return updated;
             });
           }

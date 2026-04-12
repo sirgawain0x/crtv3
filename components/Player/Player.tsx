@@ -110,15 +110,8 @@ export function Player(props: {
     resetFadeTimeout();
   };
 
-  // Prefer MP4, then HLS, then others
-  const mp4Sources = src?.filter((s) => s.type === "video") ?? [];
-  const hlsSources = src?.filter((s) => s.type === "hls") ?? [];
-  const otherSources =
-    src?.filter((s) => s.type !== "video" && s.type !== "hls") ?? [];
-  const sourceArray = [...mp4Sources, ...hlsSources, ...otherSources];
-
   // Log the src array for debugging
-  logger.debug("[Player] src array:", sourceArray);
+  logger.debug("[Player] src array:", src);
 
   const isInvalidSrc = !src || !Array.isArray(src) || src.length === 0;
 

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
+import { useInterval } from "@/lib/hooks/useInterval";
 import { Player } from "@/components/Player/Player";
 import { getDetailPlaybackSource } from "@/lib/hooks/livepeer/useDetailPlaybackSources";
 import { getStreamByPlaybackId } from "@/services/streams";
@@ -59,94 +60,88 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
   const [isOffline, setIsOffline] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [jwt, setJwt] = useState<string | undefined>(undefined);
+  const [isChecking, setIsChecking] = useState(false);
 
-  useEffect(() => {
-    async function fetchPlaybackSources() {
-      if (!playbackId) {
-        setError("No playback ID provided");
-        setIsLoading(false);
+  const fetchPlaybackSources = useCallback(async (isInitial = false) => {
+    if (!playbackId) {
+      setError("No playback ID provided");
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      if (isInitial) setIsLoading(true);
+      setIsChecking(true);
+      setError(null);
+
+      // Parallel fetch: Livepeer sources + Our persistent stream metadata
+      const [sources, streamRecord] = await Promise.all([
+        getDetailPlaybackSource(playbackId),
+        getStreamByPlaybackId(playbackId)
+      ]);
+
+      if (streamRecord) {
+        setStreamData(streamRecord as import("@/services/streams").Stream);
+      }
+
+      if (!sources || sources.length === 0) {
+        if (streamRecord) {
+          setIsOffline(true);
+          setPlaybackSources(null);
+        } else {
+          setError("No playback sources found for this stream");
+        }
         return;
       }
 
+      setIsOffline(false);
+      setPlaybackSources(sources);
+
+      // Fetch JWT for playback
       try {
-        setIsLoading(true);
-        setError(null);
-        setIsOffline(false);
+        const jwtRes = await fetch("/api/livepeer/sign-jwt", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            playbackId,
+            userAddress: user?.address
+          }),
+        });
 
-        // Parallel fetch: Livepeer sources + Our persistent stream metadata
-        const [sources, streamRecord] = await Promise.all([
-          getDetailPlaybackSource(playbackId),
-          getStreamByPlaybackId(playbackId)
-        ]);
-
-        if (streamRecord) {
-          setStreamData(streamRecord as import("@/services/streams").Stream);
-        }
-
-        if (!sources || sources.length === 0) {
-          // If we have a stream record, it just means it's offline, not necessarily an error
-          if (streamRecord) {
-            setIsOffline(true);
-            setPlaybackSources(null);
-          } else {
-            setError("No playback sources found for this stream");
+        if (jwtRes.ok) {
+          const { token } = await jwtRes.json();
+          setJwt(token);
+          if (error && error.includes("required")) {
+            setError(null);
           }
-          return;
+        } else if (jwtRes.status === 401) {
+          setError("Authentication required: Please connect your wallet");
+        } else {
+          const errData = await jwtRes.json().catch(() => ({}));
+          logger.warn("Failed to sign JWT for stream:", errData);
         }
-
-        setIsOffline(false);
-        setPlaybackSources(sources);
-
-        // Fetch JWT for playback
-        try {
-          // If no user logic is handled in the effect dependency, but here we can check explicitly
-          if (!user?.address) {
-            // We can either error here, or let the API return 401. 
-            // Let's rely on API for consistency or simple check.
-            // Actually, the API call happens below.
-          }
-
-          const jwtRes = await fetch("/api/livepeer/sign-jwt", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              playbackId,
-              userAddress: user?.address
-            }),
-          });
-
-          if (jwtRes.ok) {
-            const { token } = await jwtRes.json();
-            setJwt(token);
-            // Clear any previous access errors
-            if (error && error.includes("required")) {
-              setError(null);
-            }
-            const errData = await jwtRes.json();
-            logger.warn("Failed to sign JWT for stream:", errData);
-
-            if (jwtRes.status === 401) {
-              setError("Authentication required: Please connect your wallet");
-            }
-          }
-        } catch (jwtErr) {
-          logger.error("Error signing JWT:", jwtErr);
-        }
-
-        // If we have a custom thumbnail, we could potentially pass it to the Player
-        // as a poster. The current Player component might need updating to accept 'poster'.
-        // For now, we mainly ensure we're confirming the stream exists.
-
-      } catch (err) {
-        logger.error("Error fetching playback sources:", err);
-        setError(err instanceof Error ? err.message : "Failed to load stream");
-      } finally {
-        setIsLoading(false);
+      } catch (jwtErr) {
+        logger.error("Error signing JWT:", jwtErr);
       }
+    } catch (err) {
+      logger.error("Error fetching playback sources:", err);
+      setError(err instanceof Error ? err.message : "Failed to load stream");
+    } finally {
+      setIsLoading(false);
+      setIsChecking(false);
     }
-
-    fetchPlaybackSources();
   }, [playbackId, user?.address]);
+
+  // Initial fetch
+  useEffect(() => {
+    fetchPlaybackSources(true);
+  }, [fetchPlaybackSources]);
+
+  // Auto-poll every 15 seconds when stream is offline
+  useInterval(
+    useCallback(() => fetchPlaybackSources(false), [fetchPlaybackSources]),
+    isOffline ? 15000 : null
+  );
 
   // Generate a consistent sessionId based on playbackId
   // This ensures all viewers of the same stream are in the same chat session
@@ -252,12 +247,14 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
                     <AlertCircle className="h-10 w-10 text-gray-400" />
                     <h3 className="text-xl font-bold text-white">Stream is Offline</h3>
                     <p className="text-gray-300">The broadcaster is not currently live.</p>
+                    <p className="text-xs text-gray-500 mt-1">Auto-checking every 15 seconds...</p>
                   </div>
                   <button
-                    onClick={() => window.location.reload()} // Simple reload for now, or re-trigger fetch
-                    className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-md transition-colors font-medium border border-white/20"
+                    onClick={() => fetchPlaybackSources(false)}
+                    disabled={isChecking}
+                    className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-md transition-colors font-medium border border-white/20 disabled:opacity-50"
                   >
-                    Check Again
+                    {isChecking ? "Checking..." : "Check Now"}
                   </button>
                 </div>
               </div>
