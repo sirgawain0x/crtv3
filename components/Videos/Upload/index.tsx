@@ -466,7 +466,8 @@ const HookMultiStepForm = () => {
                 metadata.title,
                 metadata.ticker,
                 finalMeTokenId,
-                address
+                address,
+                livepeerAsset.playbackId
               ).catch((ccError) => {
                 logger.error("Content Coin deployment error:", ccError);
               });
