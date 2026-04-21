@@ -26,7 +26,10 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { LivestreamThumbnail } from "@/components/Live/LivestreamThumbnail";
 import { StreamThumbnailUploader } from "@/components/Live/StreamThumbnailUploader";
+import { StreamIPRegistration } from "@/components/Live/StreamIPRegistration";
+import { CreatorClipsList } from "@/components/Live/CreatorClipsList";
 import { getThumbnailUrl } from "@/services/livepeer-thumbnails";
+import { Switch } from "@/components/ui/switch";
 import { logger } from '@/lib/utils/logger';
 
 
@@ -48,6 +51,12 @@ export default function LivePage() {
   const [streamCreateError, setStreamCreateError] = useState<string | null>(
     null
   );
+  const [allowClipping, setAllowClipping] = useState(true);
+  const [isUpdatingClipPref, setIsUpdatingClipPref] = useState(false);
+  const [streamName, setStreamName] = useState<string | null>(null);
+  const [storyIpId, setStoryIpId] = useState<string | null>(null);
+  const [storyLicenseTermsId, setStoryLicenseTermsId] = useState<string | null>(null);
+  const [storyRevShare, setStoryRevShare] = useState<number | null>(null);
 
 
   // Fetch existing stream and multistream targets
@@ -64,6 +73,11 @@ export default function LivePage() {
           setStreamId(stream.stream_id);
           setPlaybackId(stream.playback_id);
           setThumbnailUrl(stream.thumbnail_url || null);
+          setAllowClipping(stream.allow_clipping ?? true);
+          setStreamName(stream.name ?? null);
+          setStoryIpId(stream.story_ip_id ?? null);
+          setStoryLicenseTermsId(stream.story_license_terms_id ?? null);
+          setStoryRevShare(stream.story_commercial_rev_share ?? null);
         }
 
         // 2. Fetch targets (only if we have a streamId, which we might have just set)
@@ -129,6 +143,21 @@ export default function LivePage() {
 
   function handleThumbnailUpdated(url: string) {
     setThumbnailUrl(url);
+  }
+
+  async function handleToggleClipping(next: boolean) {
+    if (!user?.address) return;
+    const previous = allowClipping;
+    setAllowClipping(next);
+    setIsUpdatingClipPref(true);
+    try {
+      await updateStream(user.address, { allow_clipping: next });
+    } catch (err) {
+      logger.error("Failed to update clipping preference:", err);
+      setAllowClipping(previous);
+    } finally {
+      setIsUpdatingClipPref(false);
+    }
   }
 
   async function handleCreateStream() {
@@ -314,6 +343,42 @@ export default function LivePage() {
               <>
                 <Broadcast streamKey={streamKey} streamId={streamId} creatorAddress={user.address} />
               </>
+            )}
+            {streamId && user?.address && (
+              <StreamIPRegistration
+                creatorAddress={user.address}
+                streamName={streamName}
+                thumbnailUrl={thumbnailUrl}
+                storyIpId={storyIpId}
+                licenseTermsId={storyLicenseTermsId}
+                commercialRevShare={storyRevShare}
+                onRegistered={({ ipId, licenseTermsId, commercialRevShare }) => {
+                  setStoryIpId(ipId);
+                  setStoryLicenseTermsId(licenseTermsId);
+                  setStoryRevShare(commercialRevShare);
+                }}
+              />
+            )}
+            {streamId && (
+              <div className="mt-4 border-t border-white/20 pt-3 max-w-[576px] mx-auto">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold">Allow viewer clipping</p>
+                    <p className="text-xs text-gray-400">
+                      Let viewers create short clips from your stream and mint them as NFTs.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={allowClipping}
+                    onCheckedChange={handleToggleClipping}
+                    disabled={isUpdatingClipPref}
+                    aria-label="Allow viewer clipping"
+                  />
+                </div>
+              </div>
+            )}
+            {playbackId && (
+              <CreatorClipsList playbackId={playbackId} />
             )}
             <div className="mt-4 border-t border-white/20 pt-3 max-w-[576px] mx-auto">
               <p className="mb-2 text-sm font-semibold">Multistream Targets</p>
