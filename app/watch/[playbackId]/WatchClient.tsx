@@ -296,6 +296,9 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
             <ClipCreator
               playbackId={playbackId}
               sessionId={sessionId}
+              allowClipping={streamData?.allow_clipping ?? true}
+              parentStoryIpId={streamData?.story_ip_id ?? storyIpId ?? null}
+              parentCommercialRevShare={streamData?.story_commercial_rev_share ?? null}
             />
           </div>
         )}
