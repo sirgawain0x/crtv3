@@ -111,11 +111,6 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
         if (jwtRes.ok) {
           const { token } = await jwtRes.json();
           setJwt(token);
-          if (error && error.includes("required")) {
-            setError(null);
-          }
-        } else if (jwtRes.status === 401) {
-          setError("Authentication required: Please connect your wallet");
         } else {
           const errData = await jwtRes.json().catch(() => ({}));
           logger.warn("Failed to sign JWT for stream:", errData);
