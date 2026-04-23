@@ -169,6 +169,36 @@ export function Player(props: {
           </div>
         </LivepeerPlayer.LoadingIndicator>
 
+        <LivepeerPlayer.ErrorIndicator
+          matcher="offline"
+          className="absolute inset-0 z-30 flex select-none flex-col items-center justify-center gap-3 bg-black/70 text-center backdrop-blur-sm
+            data-[visible=true]:animate-in data-[visible=false]:animate-out data-[visible=false]:fade-out-0 data-[visible=true]:fade-in-0 duration-500"
+        >
+          <div className="flex flex-col gap-1 px-6">
+            <div className="text-lg font-bold text-white sm:text-2xl">
+              Stream went offline
+            </div>
+            <div className="text-xs text-gray-200 sm:text-sm">
+              Playback will resume automatically if the broadcaster returns.
+            </div>
+          </div>
+        </LivepeerPlayer.ErrorIndicator>
+
+        <LivepeerPlayer.ErrorIndicator
+          matcher="access-control"
+          className="absolute inset-0 z-30 flex select-none flex-col items-center justify-center gap-3 bg-black/70 text-center backdrop-blur-sm
+            data-[visible=true]:animate-in data-[visible=false]:animate-out data-[visible=false]:fade-out-0 data-[visible=true]:fade-in-0 duration-500"
+        >
+          <div className="flex flex-col gap-1 px-6">
+            <div className="text-lg font-bold text-white sm:text-2xl">
+              Stream is private
+            </div>
+            <div className="text-xs text-gray-200 sm:text-sm">
+              You don&apos;t have permission to view this content.
+            </div>
+          </div>
+        </LivepeerPlayer.ErrorIndicator>
+
         <div
           className={`pointer-events-none absolute inset-0 bg-gradient-to-t from-black/60 
               via-transparent to-black/60 transition-opacity duration-300 ${controlsVisible ? "opacity-100" : "opacity-0"
