@@ -88,7 +88,16 @@ export interface CreatorProfile {
   twin_enabled?: boolean;
   twin_address?: string | null;
   twin_avatar_glb_url?: string | null;
+  /** @deprecated superseded by twin_pinata_* fields, kept for backwards compatibility. */
   twin_chat_endpoint?: string | null;
+  twin_pinata_agent_id?: string | null;
+  twin_pinata_base_url?: string | null;
+  twin_pinata_ws_url?: string | null;
+  twin_pinata_snapshot_cid?: string | null;
+  twin_pinata_agent_name?: string | null;
+  twin_pinata_connected_at?: string | null;
+  // twin_pinata_gateway_token deliberately omitted from client-readable type;
+  // it's column-locked to service-role reads.
   created_at: string;
   updated_at: string;
 }

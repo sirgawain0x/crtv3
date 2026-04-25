@@ -8,6 +8,66 @@ interface TwinChatBody {
   creatorAddress?: string;
   message?: string;
   streamId?: string;
+  /** Optional session key for multi-turn conversations. */
+  session?: string;
+}
+
+interface TwinRouting {
+  baseUrl: string;
+  gatewayToken: string;
+  // Legacy fallback for profiles still on the old free-form endpoint field.
+  legacyEndpoint?: string | null;
+}
+
+async function loadRouting(creatorAddress: string): Promise<TwinRouting | null> {
+  const supabase = supabaseService ?? (await createClient());
+  const { data, error } = await supabase
+    .from("creator_profiles")
+    .select(
+      "twin_enabled, twin_pinata_base_url, twin_pinata_gateway_token, twin_chat_endpoint"
+    )
+    .eq("owner_address", creatorAddress.toLowerCase())
+    .maybeSingle();
+  if (error) throw error;
+  if (!data?.twin_enabled) return null;
+  if (data.twin_pinata_base_url && data.twin_pinata_gateway_token) {
+    return {
+      baseUrl: data.twin_pinata_base_url.replace(/\/+$/, ""),
+      gatewayToken: data.twin_pinata_gateway_token,
+      legacyEndpoint: null,
+    };
+  }
+  if (data.twin_chat_endpoint) {
+    return {
+      baseUrl: "",
+      gatewayToken: "",
+      legacyEndpoint: data.twin_chat_endpoint,
+    };
+  }
+  return null;
+}
+
+/**
+ * Walk a JSONL response and concatenate the text from every `content_delta`
+ * event. Other event types (tool_use_start, thinking_delta, etc.) are
+ * intentionally dropped — the viewer chat panel only renders the reply text.
+ */
+function extractReplyFromJsonl(body: string): string {
+  const lines = body.split("\n");
+  const parts: string[] = [];
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line) continue;
+    try {
+      const evt = JSON.parse(line);
+      if (evt && evt.type === "content_delta" && typeof evt.delta?.text === "string") {
+        parts.push(evt.delta.text);
+      }
+    } catch {
+      // Not JSON — ignore. Some servers send a heartbeat line or a stray comment.
+    }
+  }
+  return parts.join("");
 }
 
 export async function POST(request: NextRequest) {
@@ -24,7 +84,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { creatorAddress, message, streamId } = body;
+  const { creatorAddress, message, streamId, session } = body;
   if (!creatorAddress || !message) {
     return NextResponse.json(
       { success: false, error: "creatorAddress and message are required" },
@@ -32,49 +92,56 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Look up the creator's twin endpoint.
-  let endpoint: string | null = null;
+  let routing: TwinRouting | null;
   try {
-    const supabase = supabaseService ?? (await createClient());
-    const { data, error } = await supabase
-      .from("creator_profiles")
-      .select("twin_chat_endpoint, twin_enabled")
-      .eq("owner_address", creatorAddress.toLowerCase())
-      .maybeSingle();
-    if (error) throw error;
-    if (data?.twin_enabled && data.twin_chat_endpoint) {
-      endpoint = data.twin_chat_endpoint;
-    }
+    routing = await loadRouting(creatorAddress);
   } catch (err) {
-    serverLogger.error("Twin endpoint lookup failed:", err);
+    serverLogger.error("Twin routing lookup failed:", err);
     return NextResponse.json(
-      { success: false, error: "Failed to look up twin endpoint" },
+      { success: false, error: "Failed to look up twin routing" },
       { status: 500 }
     );
   }
 
-  if (!endpoint) {
+  if (!routing) {
     return NextResponse.json(
-      { success: false, error: "This creator has not configured a twin chat endpoint." },
+      {
+        success: false,
+        error: "This creator has not connected a twin yet.",
+      },
       { status: 503 }
     );
   }
 
-  // Forward to the agent's HTTP endpoint. The agent template documents a
-  // simple JSON POST contract; we don't assume a specific response shape and
-  // pass through whatever the endpoint returns.
-  try {
-    const upstream = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+  const url = routing.legacyEndpoint
+    ? routing.legacyEndpoint
+    : `${routing.baseUrl}/chat`;
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (routing.gatewayToken) {
+    headers.Authorization = `Bearer ${routing.gatewayToken}`;
+  }
+
+  const requestBody = routing.legacyEndpoint
+    ? {
         creatorAddress,
         viewerAddress: request.headers.get("x-viewer-address") || null,
         streamId: streamId || null,
         message,
-      }),
-      // Twin agents are external services; cap the wait to keep the UI snappy.
-      signal: AbortSignal.timeout(20_000),
+      }
+    : {
+        message,
+        ...(session ? { session } : {}),
+      };
+
+  try {
+    const upstream = await fetch(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(requestBody),
+      signal: AbortSignal.timeout(30_000),
     });
 
     if (!upstream.ok) {
@@ -89,21 +156,31 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Try JSON first, fall back to text. Either way, surface a `reply` field
-    // so the panel has a single shape to render.
     const contentType = upstream.headers.get("content-type") || "";
-    if (contentType.includes("application/json")) {
-      const json = await upstream.json();
-      return NextResponse.json({ success: true, ...json, reply: json.reply ?? json.message ?? json.content ?? "" });
+    const raw = await upstream.text();
+
+    // Pinata agent chat returns JSONL by default. Other content types fall
+    // back to legacy JSON / plain-text shapes for the deprecated path.
+    if (contentType.includes("ndjson") || contentType.includes("event-stream") || /\n\s*\{/.test(raw)) {
+      const reply = extractReplyFromJsonl(raw);
+      return NextResponse.json({ success: true, reply });
     }
-    const text = await upstream.text();
-    return NextResponse.json({ success: true, reply: text });
+    if (contentType.includes("application/json")) {
+      try {
+        const json = JSON.parse(raw);
+        return NextResponse.json({
+          success: true,
+          ...json,
+          reply: json.reply ?? json.message ?? json.content ?? "",
+        });
+      } catch {
+        return NextResponse.json({ success: true, reply: raw });
+      }
+    }
+    return NextResponse.json({ success: true, reply: raw });
   } catch (err) {
     serverLogger.error("Twin endpoint request failed:", err);
     const msg = err instanceof Error ? err.message : "Twin endpoint unreachable";
-    return NextResponse.json(
-      { success: false, error: msg },
-      { status: 503 }
-    );
+    return NextResponse.json({ success: false, error: msg }, { status: 503 });
   }
 }
