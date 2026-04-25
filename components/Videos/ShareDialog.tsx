@@ -22,6 +22,10 @@ interface ShareDialogProps {
   videoTitle: string;
   videoId: string;
   playbackId?: string;
+  shareUrlOverride?: string;
+  thumbnailUrlOverride?: string | null;
+  dialogTitle?: string;
+  dialogDescription?: string;
 }
 
 export function ShareDialog({
@@ -30,6 +34,10 @@ export function ShareDialog({
   videoTitle,
   videoId,
   playbackId,
+  shareUrlOverride,
+  thumbnailUrlOverride,
+  dialogTitle,
+  dialogDescription,
 }: ShareDialogProps) {
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
   const [isLoadingThumbnail, setIsLoadingThumbnail] = useState(true);
@@ -41,10 +49,16 @@ export function ShareDialog({
   useEffect(() => {
     if (!open) return;
 
-    // Get the full URL for sharing
+    // Caller-provided URL (e.g. livestream watch link) bypasses the videoId-based path.
     const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
-    const videoUrl = `${baseUrl}/discover/${videoId}`;
-    setShareUrl(videoUrl);
+    setShareUrl(shareUrlOverride || `${baseUrl}/discover/${videoId}`);
+
+    // Caller-provided thumbnail bypasses the video-asset lookup entirely.
+    if (shareUrlOverride !== undefined) {
+      setThumbnailUrl(thumbnailUrlOverride || "/Creative_TV.png");
+      setIsLoadingThumbnail(false);
+      return;
+    }
 
     // Fetch thumbnail URL
     async function fetchThumbnail() {
@@ -81,7 +95,7 @@ export function ShareDialog({
     }
 
     fetchThumbnail();
-  }, [open, videoId, playbackId]);
+  }, [open, videoId, playbackId, shareUrlOverride, thumbnailUrlOverride]);
 
   const handleShare = async (platform: "x" | "farcaster" | "bluesky") => {
     const fullThumbnailUrl = thumbnailUrl
@@ -90,7 +104,9 @@ export function ShareDialog({
         : `${typeof window !== "undefined" ? window.location.origin : ""}${thumbnailUrl}`
       : `${typeof window !== "undefined" ? window.location.origin : ""}/Creative_TV.png`;
 
-    const text = `Check out this video: ${cleanTitle}`;
+    const text = shareUrlOverride
+      ? `Check out this live stream: ${cleanTitle}`
+      : `Check out this video: ${cleanTitle}`;
 
     switch (platform) {
       case "x": {
@@ -134,9 +150,9 @@ export function ShareDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Share Video</DialogTitle>
+          <DialogTitle>{dialogTitle ?? "Share Video"}</DialogTitle>
           <DialogDescription>
-            Share "{cleanTitle}" on your favorite platform
+            {dialogDescription ?? `Share "${cleanTitle}" on your favorite platform`}
           </DialogDescription>
         </DialogHeader>
 

@@ -29,7 +29,16 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    const { owner_address, username, bio, avatar_url } = body;
+    const {
+      owner_address,
+      username,
+      bio,
+      avatar_url,
+      twin_enabled,
+      twin_address,
+      twin_avatar_glb_url,
+      twin_chat_endpoint,
+    } = body;
 
     if (!owner_address) {
       return NextResponse.json(
@@ -41,20 +50,30 @@ export async function POST(request: NextRequest) {
     let data, error;
 
     // Try service role client first (bypasses RLS)
+    const upsertPayload: Record<string, unknown> = {
+      owner_address: owner_address.toLowerCase(),
+      username,
+      bio,
+      avatar_url,
+      updated_at: new Date().toISOString(),
+    };
+    // Only include twin fields when the caller actually sent them, so a partial
+    // update from the existing profile form doesn't wipe them out.
+    if (twin_enabled !== undefined) upsertPayload.twin_enabled = twin_enabled;
+    if (twin_address !== undefined) {
+      upsertPayload.twin_address = twin_address
+        ? String(twin_address).toLowerCase()
+        : null;
+    }
+    if (twin_avatar_glb_url !== undefined) upsertPayload.twin_avatar_glb_url = twin_avatar_glb_url || null;
+    if (twin_chat_endpoint !== undefined) upsertPayload.twin_chat_endpoint = twin_chat_endpoint || null;
+
     if (supabaseService) {
       const result = await supabaseService
         .from('creator_profiles')
-        .upsert({
-          owner_address: owner_address.toLowerCase(),
-          username,
-          bio,
-          avatar_url,
-          updated_at: new Date().toISOString(),
-        }, {
-          onConflict: 'owner_address'
-        })
+        .upsert(upsertPayload, { onConflict: 'owner_address' })
         .select();
-      
+
       data = result.data;
       error = result.error;
     } else {
@@ -62,17 +81,9 @@ export async function POST(request: NextRequest) {
       const supabase = await createClient();
       const result = await supabase
         .from('creator_profiles')
-        .upsert({
-          owner_address: owner_address.toLowerCase(),
-          username,
-          bio,
-          avatar_url,
-          updated_at: new Date().toISOString(),
-        }, {
-          onConflict: 'owner_address'
-        })
+        .upsert(upsertPayload, { onConflict: 'owner_address' })
         .select();
-      
+
       data = result.data;
       error = result.error;
     }

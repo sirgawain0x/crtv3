@@ -85,6 +85,10 @@ export interface CreatorProfile {
   username?: string;
   bio?: string;
   avatar_url?: string;
+  twin_enabled?: boolean;
+  twin_address?: string | null;
+  twin_avatar_glb_url?: string | null;
+  twin_chat_endpoint?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -94,10 +98,18 @@ export interface CreateCreatorProfileData {
   username?: string;
   bio?: string;
   avatar_url?: string;
+  twin_enabled?: boolean;
+  twin_address?: string | null;
+  twin_avatar_glb_url?: string | null;
+  twin_chat_endpoint?: string | null;
 }
 
 export interface UpdateCreatorProfileData {
   username?: string;
   bio?: string;
   avatar_url?: string;
+  twin_enabled?: boolean;
+  twin_address?: string | null;
+  twin_avatar_glb_url?: string | null;
+  twin_chat_endpoint?: string | null;
 }

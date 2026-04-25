@@ -13,6 +13,7 @@ import { RobustMeTokenCreator } from './RobustMeTokenCreator';
 import { MeTokenTrading } from './MeTokenTrading';
 import { MeTokenInfo } from './MeTokenInfo';
 import { CreatorProfileManager } from './CreatorProfileManager';
+import { DigitalTwinSection } from './DigitalTwinSection';
 import { MeTokenHistory } from './MeTokenHistory';
 import { TokenPriceChart } from '@/components/Market/TokenPriceChart';
 import { Loader2, AlertCircle, Plus, TrendingUp, Info, RefreshCw, Search, Wallet, User, History, Copy, Check, Coins, DollarSign, BarChart3 } from 'lucide-react';
@@ -448,7 +449,10 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
           </TabsContent>
 
           <TabsContent value="profile">
-            <CreatorProfileManager targetAddress={walletAddress} onProfileUpdated={() => { }} />
+            <div className="space-y-6">
+              <CreatorProfileManager targetAddress={walletAddress} onProfileUpdated={() => { }} />
+              <DigitalTwinSection targetAddress={walletAddress} />
+            </div>
           </TabsContent>
 
           <TabsContent value="trading">

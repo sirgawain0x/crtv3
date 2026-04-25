@@ -1,5 +1,8 @@
 "use client";
 import { useState, useEffect } from "react";
+import { Share2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ShareDialog } from "@/components/Videos/ShareDialog";
 import { Broadcast, createStreamViaProxy } from "@/components/Live/Broadcast";
 import { getStreamByCreator, createStreamRecord, updateStream } from "@/services/streams";
 import { useUser } from "@account-kit/react";
@@ -28,6 +31,8 @@ import { LivestreamThumbnail } from "@/components/Live/LivestreamThumbnail";
 import { StreamThumbnailUploader } from "@/components/Live/StreamThumbnailUploader";
 import { StreamIPRegistration } from "@/components/Live/StreamIPRegistration";
 import { CreatorClipsList } from "@/components/Live/CreatorClipsList";
+import { LiveChat } from "@/components/Live/LiveChat";
+import { DigitalTwinOverlay } from "@/components/Live/DigitalTwinOverlay";
 import { getThumbnailUrl } from "@/services/livepeer-thumbnails";
 import { Switch } from "@/components/ui/switch";
 import { logger } from '@/lib/utils/logger';
@@ -57,6 +62,7 @@ export default function LivePage() {
   const [storyIpId, setStoryIpId] = useState<string | null>(null);
   const [storyLicenseTermsId, setStoryLicenseTermsId] = useState<string | null>(null);
   const [storyRevShare, setStoryRevShare] = useState<number | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
 
 
   // Fetch existing stream and multistream targets
@@ -302,48 +308,80 @@ export default function LivePage() {
               </BreadcrumbList>
             </Breadcrumb>
           </div>
-          <div>
-            {thumbnailLoading ? (
-              <div className="flex items-center justify-center h-40 text-gray-400">
-                Loading thumbnail...
-              </div>
-            ) : thumbnailError ? (
-              <div className="flex items-center justify-center h-40 text-red-400">
-                {thumbnailError}
-              </div>
-            ) : thumbnailUrl ? (
-              <LivestreamThumbnail thumbnailUrl={thumbnailUrl} />
-            ) : null}
+          <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2">
+              {thumbnailLoading ? (
+                <div className="flex items-center justify-center h-40 text-gray-400">
+                  Loading thumbnail...
+                </div>
+              ) : thumbnailError ? (
+                <div className="flex items-center justify-center h-40 text-red-400">
+                  {thumbnailError}
+                </div>
+              ) : thumbnailUrl ? (
+                <LivestreamThumbnail thumbnailUrl={thumbnailUrl} />
+              ) : null}
 
-            {streamKey && streamId && user?.address && (
-              <div className="my-6 flex justify-center">
-                <StreamThumbnailUploader
+              {streamKey && streamId && user?.address && (
+                <div className="my-6 flex justify-center">
+                  <StreamThumbnailUploader
+                    creatorAddress={user.address}
+                    playbackId={playbackId || streamId} // Fallback to streamId if playbackId missing, though unlikely
+                    currentThumbnailUrl={thumbnailUrl}
+                    onThumbnailUpdated={handleThumbnailUpdated}
+                  />
+                </div>
+              )}
+
+              {!streamKey ? (
+                <div className="flex flex-col items-center justify-center my-8">
+                  <button
+                    onClick={handleCreateStream}
+                    disabled={isCreatingStream}
+                    className="px-6 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+                  >
+                    {isCreatingStream ? "Creating Stream..." : "Create Stream"}
+                  </button>
+                  {streamCreateError && (
+                    <div className="text-red-500 mt-2">{streamCreateError}</div>
+                  )}
+                </div>
+              ) : (
+                <>
+                  {playbackId && (
+                    <div className="mx-auto max-w-[576px] mb-2 flex justify-end">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setShareOpen(true)}
+                        className="gap-2"
+                      >
+                        <Share2 className="h-4 w-4" />
+                        Share Stream
+                      </Button>
+                    </div>
+                  )}
+                  <Broadcast streamKey={streamKey} streamId={streamId} creatorAddress={user.address} />
+                </>
+              )}
+            </div>
+
+            <div className="lg:col-span-1">
+              {streamKey && playbackId && user?.address ? (
+                <LiveChat
+                  streamId={playbackId}
+                  sessionId={`session-${playbackId}`}
                   creatorAddress={user.address}
-                  playbackId={playbackId || streamId} // Fallback to streamId if playbackId missing, though unlikely
-                  currentThumbnailUrl={thumbnailUrl}
-                  onThumbnailUpdated={handleThumbnailUpdated}
                 />
-              </div>
-            )}
+              ) : (
+                <div className="border rounded-lg p-4 text-sm text-muted-foreground h-[500px] flex items-center justify-center text-center">
+                  Chat will appear here once your stream is created.
+                </div>
+              )}
+            </div>
+          </div>
 
-            {!streamKey ? (
-              <div className="flex flex-col items-center justify-center my-8">
-                <button
-                  onClick={handleCreateStream}
-                  disabled={isCreatingStream}
-                  className="px-6 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
-                >
-                  {isCreatingStream ? "Creating Stream..." : "Create Stream"}
-                </button>
-                {streamCreateError && (
-                  <div className="text-red-500 mt-2">{streamCreateError}</div>
-                )}
-              </div>
-            ) : (
-              <>
-                <Broadcast streamKey={streamKey} streamId={streamId} creatorAddress={user.address} />
-              </>
-            )}
+          <div className="max-w-7xl mx-auto">
             {streamId && user?.address && (
               <StreamIPRegistration
                 creatorAddress={user.address}
@@ -414,6 +452,28 @@ export default function LivePage() {
             </div>
           </div>
         </div>
+        {user?.address && playbackId && (
+          <DigitalTwinOverlay
+            creatorAddress={user.address}
+            streamId={playbackId}
+          />
+        )}
+        {playbackId && (
+          <ShareDialog
+            open={shareOpen}
+            onOpenChange={setShareOpen}
+            videoTitle={streamName ?? "Live Stream"}
+            videoId={playbackId}
+            shareUrlOverride={
+              typeof window !== "undefined"
+                ? `${window.location.origin}/watch/${playbackId}`
+                : `/watch/${playbackId}`
+            }
+            thumbnailUrlOverride={thumbnailUrl}
+            dialogTitle="Share Live Stream"
+            dialogDescription={`Share "${streamName ?? "your live stream"}" with your audience`}
+          />
+        )}
       </MembershipGuard>
     </ProfilePageGuard>
   );

@@ -8,6 +8,7 @@ import { getDetailPlaybackSource } from "@/lib/hooks/livepeer/useDetailPlaybackS
 import { getStreamByPlaybackId } from "@/services/streams";
 import { LiveChat } from "@/components/Live/LiveChat";
 import { ClipCreator } from "@/components/Live/ClipCreator";
+import { DigitalTwinOverlay } from "@/components/Live/DigitalTwinOverlay";
 import { Src } from "@livepeer/react";
 import { useUser } from "@account-kit/react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -374,6 +375,11 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
           </div>
         )}
       </div>
+
+      <DigitalTwinOverlay
+        creatorAddress={streamData?.creator_id ?? null}
+        streamId={playbackId ?? null}
+      />
     </div>
   );
 }

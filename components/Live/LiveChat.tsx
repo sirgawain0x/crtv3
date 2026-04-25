@@ -1,19 +1,21 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { useLiveChat } from "@/lib/hooks/xmtp/useLiveChat";
+import { useLiveChatModerated } from "@/lib/hooks/xmtp/useLiveChatModerated";
 import { useUser } from "@account-kit/react";
 import useModularAccount from "@/lib/hooks/accountkit/useModularAccount";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { MessageCircle, Send, AlertCircle, Coins, Users, ChevronDown } from "lucide-react";
+import { toast } from "sonner";
+import { MessageCircle, Send, AlertCircle, Coins, Users, ChevronDown, EyeOff, UserX, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatAddress } from "@/lib/helpers";
 import { VideoTipButton } from "../Videos/VideoTipButton";
 import { getExplorerUrl } from "@/lib/utils/video-tip";
 import { logger } from '@/lib/utils/logger';
+import { ModeratorsDialog } from "./ModeratorsDialog";
 
 
 interface LiveChatProps {
@@ -48,18 +50,25 @@ export function LiveChat({
   const user = useUser();
   const { address: smartAccountAddress } = useModularAccount();
 
-  const { 
-    messages, 
-    isLoading, 
-    error, 
-    sendMessage, 
-    sendTipMessage, 
-    isSending 
-  } = useLiveChat(streamId, sessionId, {
+  const {
+    messages,
+    isLoading,
+    error,
+    sendMessage,
+    sendTipMessage,
+    isSending,
+    canModerate,
+    isCreator,
+    isBannedSelf,
+    hideMessage,
+    banUser,
+  } = useLiveChatModerated(streamId, sessionId, {
     maxMessages: 200,
     messageRetentionMs: 10 * 60 * 1000, // 10 minutes
     rateLimit: { count: 5, windowMs: 10000 }, // 5 messages per 10 seconds
   });
+
+  const [moderatorsOpen, setModeratorsOpen] = useState(false);
 
   // Scroll tracking
   const shouldAutoScroll = useRef(true);
@@ -151,6 +160,18 @@ export function LiveChat({
           )}
         </div>
         <div className="flex items-center gap-2">
+          {isCreator && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-xs gap-1"
+              onClick={() => setModeratorsOpen(true)}
+              title="Manage moderators"
+            >
+              <Shield className="h-3.5 w-3.5" />
+              Mods
+            </Button>
+          )}
           {creatorAddress && user && user.address?.toLowerCase() !== creatorAddress.toLowerCase() && (
             <VideoTipButton
               creatorAddress={creatorAddress}
@@ -161,6 +182,14 @@ export function LiveChat({
           )}
         </div>
       </div>
+
+      {isCreator && (
+        <ModeratorsDialog
+          open={moderatorsOpen}
+          onOpenChange={setModeratorsOpen}
+          streamId={streamId}
+        />
+      )}
 
       {/* Messages Area */}
       {isExpanded && (
@@ -211,19 +240,21 @@ export function LiveChat({
                   );
                   const isTipMessage = msg.type === 'tip' && msg.tipData;
                   
+                  const showModControls = canModerate && !isTipMessage && !isOwnMessage;
+
                   return (
                     <div
                       key={msg.id}
                       className={cn(
-                        "flex gap-2 items-start",
+                        "group flex gap-2 items-start",
                         isOwnMessage && "flex-row-reverse"
                       )}
                     >
                       <div className="flex-shrink-0">
                         <div className={cn(
                           "h-7 w-7 rounded-full flex items-center justify-center text-[10px]",
-                          isTipMessage 
-                            ? "bg-yellow-500/20 border border-yellow-500/50" 
+                          isTipMessage
+                            ? "bg-yellow-500/20 border border-yellow-500/50"
                             : "bg-primary/10"
                         )}>
                           {isTipMessage ? (
@@ -251,6 +282,45 @@ export function LiveChat({
                               minute: "2-digit",
                             })}
                           </span>
+                          {showModControls && (
+                            <span className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity ml-auto">
+                              <button
+                                type="button"
+                                title="Hide message"
+                                className="p-0.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground"
+                                onClick={async () => {
+                                  try {
+                                    await hideMessage(msg.id);
+                                    toast.success("Message hidden");
+                                  } catch (err) {
+                                    toast.error(
+                                      err instanceof Error ? err.message : "Failed to hide message"
+                                    );
+                                  }
+                                }}
+                              >
+                                <EyeOff className="h-3 w-3" />
+                              </button>
+                              <button
+                                type="button"
+                                title="Ban user from chat"
+                                className="p-0.5 rounded hover:bg-muted text-muted-foreground hover:text-red-500"
+                                onClick={async () => {
+                                  if (!msg.senderAddress) return;
+                                  try {
+                                    await banUser(msg.senderAddress);
+                                    toast.success(`${formatAddress(msg.senderAddress)} banned`);
+                                  } catch (err) {
+                                    toast.error(
+                                      err instanceof Error ? err.message : "Failed to ban user"
+                                    );
+                                  }
+                                }}
+                              >
+                                <UserX className="h-3 w-3" />
+                              </button>
+                            </span>
+                          )}
                         </div>
                         {isTipMessage ? (
                           <div
@@ -298,32 +368,43 @@ export function LiveChat({
           </div>
 
           {/* Input Area */}
-          <form onSubmit={handleSend} className="p-3 border-t bg-muted/30">
-            <div className="flex gap-2">
-              <Input
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                placeholder="Type a message..."
-                disabled={isSending || isLoading}
-                className="flex-1 text-sm h-9"
-                maxLength={500}
-              />
-              <Button 
-                type="submit" 
-                size="sm"
-                disabled={!message.trim() || isSending || isLoading}
-                title={isLoading ? "Chat is initializing..." : undefined}
-              >
-                <Send className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-            {error && !isLoading && error.message.includes("Rate limit") && (
-              <Alert variant="destructive" className="mt-2 py-1.5">
+          {isBannedSelf ? (
+            <div className="p-3 border-t bg-muted/30">
+              <Alert variant="destructive" className="py-1.5">
                 <AlertCircle className="h-3 w-3" />
-                <AlertDescription className="text-xs">{error.message}</AlertDescription>
+                <AlertDescription className="text-xs">
+                  You've been banned from this chat by a moderator.
+                </AlertDescription>
               </Alert>
-            )}
-          </form>
+            </div>
+          ) : (
+            <form onSubmit={handleSend} className="p-3 border-t bg-muted/30">
+              <div className="flex gap-2">
+                <Input
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  placeholder="Type a message..."
+                  disabled={isSending || isLoading}
+                  className="flex-1 text-sm h-9"
+                  maxLength={500}
+                />
+                <Button
+                  type="submit"
+                  size="sm"
+                  disabled={!message.trim() || isSending || isLoading}
+                  title={isLoading ? "Chat is initializing..." : undefined}
+                >
+                  <Send className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+              {error && !isLoading && error.message.includes("Rate limit") && (
+                <Alert variant="destructive" className="mt-2 py-1.5">
+                  <AlertCircle className="h-3 w-3" />
+                  <AlertDescription className="text-xs">{error.message}</AlertDescription>
+                </Alert>
+              )}
+            </form>
+          )}
         </>
       )}
     </div>
