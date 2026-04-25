@@ -4,6 +4,7 @@ import { supabaseService } from '@/lib/sdk/supabase/service';
 import { createClient } from '@/lib/sdk/supabase/server';
 import { serverLogger } from '@/lib/utils/logger';
 import { rateLimiters } from '@/lib/middleware/rateLimit';
+import { requireWalletAuthFor, WalletAuthError } from '@/lib/auth/require-wallet';
 
 export async function POST(request: NextRequest) {
   const verification = await checkBotId();
@@ -21,14 +22,14 @@ export async function POST(request: NextRequest) {
     } catch (jsonError) {
       serverLogger.error('Invalid JSON in request body:', jsonError);
       return NextResponse.json(
-        { 
+        {
           success: false,
           error: 'Invalid JSON in request body'
         },
         { status: 400 }
       );
     }
-    
+
     const {
       owner_address,
       username,
@@ -45,6 +46,20 @@ export async function POST(request: NextRequest) {
         { success: false, error: 'owner_address is required' },
         { status: 400 }
       );
+    }
+
+    // Verify the caller actually controls owner_address. Without this, any
+    // client could overwrite any other creator's profile.
+    try {
+      await requireWalletAuthFor(request, owner_address);
+    } catch (authErr) {
+      if (authErr instanceof WalletAuthError) {
+        return NextResponse.json(
+          { success: false, error: authErr.message },
+          { status: authErr.status }
+        );
+      }
+      throw authErr;
     }
 
     // Build the update payload, only including fields the caller provided so

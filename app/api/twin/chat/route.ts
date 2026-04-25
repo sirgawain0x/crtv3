@@ -124,10 +124,14 @@ export async function POST(request: NextRequest) {
     headers.Authorization = `Bearer ${routing.gatewayToken}`;
   }
 
+  // We deliberately do NOT forward a viewerAddress here. Headers are
+  // spoofable by any client and the upstream agent has no way to verify the
+  // claim — passing one through is a classic impersonation footgun. If the
+  // agent ever needs viewer identity, it will require a signed proof and a
+  // first-class field, not a soft hint.
   const requestBody = routing.legacyEndpoint
     ? {
         creatorAddress,
-        viewerAddress: request.headers.get("x-viewer-address") || null,
         streamId: streamId || null,
         message,
       }

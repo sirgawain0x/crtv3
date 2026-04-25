@@ -20,7 +20,22 @@ import {
   type StoredChatMessage,
 } from "@/services/stream-chat-history";
 import { registerChatGroup } from "@/services/stream-chat-groups";
+import { useWalletAuth } from "@/lib/auth/useWalletAuth";
 import { logger } from "@/lib/utils/logger";
+
+interface AuthHeaders {
+  "X-Wallet-Address": string;
+  "X-Wallet-Timestamp": string;
+  "X-Wallet-Signature": string;
+}
+
+function headersToAuthArgs(headers: AuthHeaders) {
+  return {
+    address: headers["X-Wallet-Address"],
+    timestamp: Number(headers["X-Wallet-Timestamp"]),
+    signature: headers["X-Wallet-Signature"],
+  };
+}
 
 const MODERATION_BOT_INBOX_ID =
   process.env.NEXT_PUBLIC_MODERATION_BOT_INBOX_ID?.trim() || "";
@@ -85,27 +100,42 @@ export function useLiveChatModerated(
   options: UseLiveChatModeratedOptions = {}
 ): UseLiveChatModeratedReturn {
   const { creatorAddress, enabled = true, ...liveChatOptions } = options;
+  const { getAuthHeaders, isReady: walletAuthReady } = useWalletAuth();
 
   // Persist every observed message to Supabase so history survives even when
   // no server-side worker is running. The server worker (scripts/xmtp-
   // moderation-worker.ts) does the same thing from a long-lived process; both
   // calls are idempotent on (stream_id, message_id).
+  //
+  // Persistence requires a wallet signature (server enforces this in
+  // recordChatMessage). The viewer's cached signature unlocks every message
+  // for the next ~4 minutes, so the prompt only fires once per session.
   const persistObserved = useCallback(
     (msg: LiveChatMessage) => {
-      if (!enabled || !streamId) return;
-      void recordChatMessage({
-        streamId,
-        messageId: msg.id,
-        senderInboxId: msg.senderAddress,
-        content: msg.content,
-        sentAt: msg.sentAt,
-        messageType: msg.type === "tip" ? "tip" : "text",
-        tipData: msg.tipData ?? null,
-      }).catch((err) => {
-        logger.warn("Failed to persist chat message:", err);
-      });
+      if (!enabled || !streamId || !walletAuthReady) return;
+      (async () => {
+        try {
+          const headers = await getAuthHeaders();
+          await recordChatMessage(
+            {
+              streamId,
+              messageId: msg.id,
+              senderInboxId: msg.senderAddress,
+              content: msg.content,
+              sentAt: msg.sentAt,
+              messageType: msg.type === "tip" ? "tip" : "text",
+              tipData: msg.tipData ?? null,
+            },
+            headersToAuthArgs(headers as AuthHeaders)
+          );
+        } catch (err) {
+          // Best-effort: log and move on. The long-lived worker will catch
+          // any messages we miss here.
+          logger.warn("Failed to persist chat message:", err);
+        }
+      })();
     },
-    [enabled, streamId]
+    [enabled, streamId, walletAuthReady, getAuthHeaders]
   );
 
   const base = useLiveChat(streamId, sessionId, {
@@ -223,18 +253,28 @@ export function useLiveChatModerated(
         );
       }
 
-      // 2) groupId → streamId mapping for the worker.
+      // 2) groupId → streamId mapping for the worker. Requires a wallet
+      // signature so the server can verify the caller is the stream's
+      // creator before accepting the mapping.
       tasks.push(
-        registerChatGroup(streamId, group.id, MODERATION_BOT_INBOX_ID ? new Date() : null)
-          .then(() => undefined)
-          .catch((err) => {
+        (async () => {
+          try {
+            const headers = await getAuthHeaders();
+            await registerChatGroup(
+              streamId,
+              group.id,
+              headersToAuthArgs(headers as AuthHeaders),
+              MODERATION_BOT_INBOX_ID ? new Date() : null
+            );
+          } catch (err) {
             logger.warn("Failed to register chat group mapping:", err);
-          })
+          }
+        })()
       );
 
       await Promise.all(tasks);
     })();
-  }, [enabled, streamId, isCreator, base.group]);
+  }, [enabled, streamId, isCreator, base.group, getAuthHeaders]);
 
   const filteredMessages = useMemo<LiveChatMessage[]>(() => {
     if (!enabled) return base.messages;
@@ -250,17 +290,18 @@ export function useLiveChatModerated(
     });
   }, [base.messages, state, enabled]);
 
-  const requireActor = useCallback(() => {
+  const requireAuth = useCallback(async () => {
     if (!actorAddress) {
       throw new Error("Connect your wallet to moderate");
     }
-    return actorAddress;
-  }, [actorAddress]);
+    const headers = await getAuthHeaders();
+    return headersToAuthArgs(headers as AuthHeaders);
+  }, [actorAddress, getAuthHeaders]);
 
   const hideMessage = useCallback(
     async (messageId: string) => {
-      const actor = requireActor();
-      await hideMessageAction(streamId, messageId, actor);
+      const auth = await requireAuth();
+      await hideMessageAction(streamId, messageId, auth);
       // Optimistic add so the UI updates immediately.
       setState((prev) =>
         prev.hiddenIds.includes(messageId)
@@ -269,27 +310,27 @@ export function useLiveChatModerated(
       );
       refresh();
     },
-    [streamId, requireActor, refresh]
+    [streamId, requireAuth, refresh]
   );
 
   const unhideMessage = useCallback(
     async (messageId: string) => {
-      const actor = requireActor();
-      await unhideMessageAction(streamId, messageId, actor);
+      const auth = await requireAuth();
+      await unhideMessageAction(streamId, messageId, auth);
       setState((prev) => ({
         ...prev,
         hiddenIds: prev.hiddenIds.filter((id) => id !== messageId),
       }));
       refresh();
     },
-    [streamId, requireActor, refresh]
+    [streamId, requireAuth, refresh]
   );
 
   const banUser = useCallback(
     async (address: string) => {
-      const actor = requireActor();
+      const auth = await requireAuth();
       const lower = address.toLowerCase();
-      await banUserAction(streamId, lower, actor);
+      await banUserAction(streamId, lower, auth);
       setState((prev) =>
         prev.bannedAddresses.includes(lower)
           ? prev
@@ -310,27 +351,27 @@ export function useLiveChatModerated(
       }
       refresh();
     },
-    [streamId, requireActor, refresh, base.group]
+    [streamId, requireAuth, refresh, base.group]
   );
 
   const unbanUser = useCallback(
     async (address: string) => {
-      const actor = requireActor();
+      const auth = await requireAuth();
       const lower = address.toLowerCase();
-      await unbanUserAction(streamId, lower, actor);
+      await unbanUserAction(streamId, lower, auth);
       setState((prev) => ({
         ...prev,
         bannedAddresses: prev.bannedAddresses.filter((a) => a !== lower),
       }));
       refresh();
     },
-    [streamId, requireActor, refresh]
+    [streamId, requireAuth, refresh]
   );
 
   const addModerator = useCallback(
     async (address: string) => {
-      const actor = requireActor();
-      await addModeratorAction(streamId, address, actor);
+      const auth = await requireAuth();
+      await addModeratorAction(streamId, address, auth);
       const lower = address.toLowerCase();
       setState((prev) =>
         prev.moderators.includes(lower)
@@ -339,13 +380,13 @@ export function useLiveChatModerated(
       );
       refresh();
     },
-    [streamId, requireActor, refresh]
+    [streamId, requireAuth, refresh]
   );
 
   const removeModerator = useCallback(
     async (address: string) => {
-      const actor = requireActor();
-      await removeModeratorAction(streamId, address, actor);
+      const auth = await requireAuth();
+      await removeModeratorAction(streamId, address, auth);
       const lower = address.toLowerCase();
       setState((prev) => ({
         ...prev,
@@ -353,7 +394,7 @@ export function useLiveChatModerated(
       }));
       refresh();
     },
-    [streamId, requireActor, refresh]
+    [streamId, requireAuth, refresh]
   );
 
   return {

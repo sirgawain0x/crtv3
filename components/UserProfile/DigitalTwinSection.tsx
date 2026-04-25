@@ -21,11 +21,22 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/components/ui/use-toast";
 import {
   creatorProfileSupabaseService,
   type CreatorProfile,
 } from "@/lib/sdk/supabase/creator-profiles";
+import { useWalletAuth } from "@/lib/auth/useWalletAuth";
 import { logger } from "@/lib/utils/logger";
 
 interface DigitalTwinSectionProps {
@@ -109,6 +120,9 @@ export function DigitalTwinSection({
   const [testResult, setTestResult] = useState<{ ok: boolean; text: string } | null>(null);
 
   const [error, setError] = useState<string | null>(null);
+  const [disconnectOpen, setDisconnectOpen] = useState(false);
+
+  const { getAuthHeaders } = useWalletAuth();
 
   // Profile (avatar GLB + twin address fields).
   useEffect(() => {
@@ -204,12 +218,16 @@ export function DigitalTwinSection({
     setError(null);
     setSavingMeta(true);
     try {
-      await creatorProfileSupabaseService.upsertCreatorProfile({
-        owner_address: ownerAddress,
-        twin_enabled: twinEnabled,
-        twin_address: twinAddress.trim() ? twinAddress.trim().toLowerCase() : null,
-        twin_avatar_glb_url: glbUrl.trim() || null,
-      });
+      const authHeaders = await getAuthHeaders();
+      await creatorProfileSupabaseService.upsertCreatorProfile(
+        {
+          owner_address: ownerAddress,
+          twin_enabled: twinEnabled,
+          twin_address: twinAddress.trim() ? twinAddress.trim().toLowerCase() : null,
+          twin_avatar_glb_url: glbUrl.trim() || null,
+        },
+        authHeaders
+      );
       toast({ title: "Twin settings saved" });
       onSaved?.();
     } catch (err) {
@@ -230,9 +248,10 @@ export function DigitalTwinSection({
     }
     setConnecting(true);
     try {
+      const auth = await getAuthHeaders();
       const res = await fetch("/api/twin/connect", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...auth },
         body: JSON.stringify({
           ownerAddress,
           agentId: agentIdInput.trim(),
@@ -262,11 +281,12 @@ export function DigitalTwinSection({
   };
 
   const handleDisconnect = async () => {
-    if (!confirm("Disconnect this twin from your profile?")) return;
+    setDisconnectOpen(false);
     try {
+      const auth = await getAuthHeaders();
       const res = await fetch("/api/twin/disconnect", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...auth },
         body: JSON.stringify({ ownerAddress }),
       });
       const json = await res.json();
@@ -483,7 +503,7 @@ export function DigitalTwinSection({
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={handleDisconnect}
+                        onClick={() => setDisconnectOpen(true)}
                       >
                         Disconnect
                       </Button>
@@ -613,6 +633,23 @@ export function DigitalTwinSection({
           </>
         )}
       </CardContent>
+
+      <AlertDialog open={disconnectOpen} onOpenChange={setDisconnectOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Disconnect this twin?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes the stored Pinata gateway token from your profile. Your
+              agent on Pinata is unaffected — you can reconnect any time by pasting
+              your Agent ID + Pinata JWT again.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDisconnect}>Disconnect</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

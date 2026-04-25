@@ -3,6 +3,7 @@ import { supabaseService } from "@/lib/sdk/supabase/service";
 import { createClient } from "@/lib/sdk/supabase/server";
 import { serverLogger } from "@/lib/utils/logger";
 import { rateLimiters } from "@/lib/middleware/rateLimit";
+import { requireWalletAuthFor, WalletAuthError } from "@/lib/auth/require-wallet";
 
 export async function POST(request: NextRequest) {
   const rl = await rateLimiters.standard(request);
@@ -23,6 +24,19 @@ export async function POST(request: NextRequest) {
       { success: false, error: "ownerAddress is required" },
       { status: 400 }
     );
+  }
+
+  // Verify the caller actually controls ownerAddress.
+  try {
+    await requireWalletAuthFor(request, ownerAddress);
+  } catch (authErr) {
+    if (authErr instanceof WalletAuthError) {
+      return NextResponse.json(
+        { success: false, error: authErr.message },
+        { status: authErr.status }
+      );
+    }
+    throw authErr;
   }
 
   const supabase = supabaseService ?? (await createClient());

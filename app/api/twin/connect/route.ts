@@ -9,6 +9,7 @@ import {
   getGatewayToken,
   PinataApiError,
 } from "@/lib/pinata/api";
+import { requireWalletAuthFor, WalletAuthError } from "@/lib/auth/require-wallet";
 
 interface ConnectBody {
   ownerAddress?: string;
@@ -47,6 +48,20 @@ export async function POST(request: NextRequest) {
       },
       { status: 400 }
     );
+  }
+
+  // Verify the caller actually controls ownerAddress before persisting any
+  // Pinata credentials against their profile.
+  try {
+    await requireWalletAuthFor(request, ownerAddress);
+  } catch (authErr) {
+    if (authErr instanceof WalletAuthError) {
+      return NextResponse.json(
+        { success: false, error: authErr.message },
+        { status: authErr.status }
+      );
+    }
+    throw authErr;
   }
 
   let agent, gateway, template;

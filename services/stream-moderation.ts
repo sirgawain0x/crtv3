@@ -2,6 +2,11 @@
 
 import { createServiceClient } from "../lib/sdk/supabase/service";
 import { getStreamByCreator } from "./streams";
+import {
+  verifyWalletAuthArgs,
+  WalletAuthError,
+  type WalletAuthArgs,
+} from "../lib/auth/require-wallet";
 
 export interface ModerationState {
   hiddenIds: string[];
@@ -15,10 +20,6 @@ export interface ModeratorRecord {
   appointed_at: string;
 }
 
-/**
- * Returns true when `actor` is the creator of `streamId` or has been appointed
- * as a moderator. Used by every mutation in this module.
- */
 /**
  * Look up the streams row for the moderation key. The chat keys moderation by
  * playback_id (matches the URL/session id), so we check that first and fall
@@ -44,32 +45,52 @@ async function lookupStream(streamId: string) {
   return byStream;
 }
 
-async function assertCanModerate(streamId: string, actor: string) {
-  if (!actor) {
-    throw new Error("Missing actor address");
-  }
-  const supabase = createServiceClient();
-  const actorLower = actor.toLowerCase();
+/**
+ * Verify the caller's wallet signature, then confirm the verified address is
+ * either the stream's creator or an appointed moderator. Returns the verified
+ * lowercase address for use in audit columns (`hidden_by`, `banned_by`, etc.).
+ */
+async function authorizeModerator(
+  streamId: string,
+  auth: WalletAuthArgs | undefined
+): Promise<string> {
+  const { address: actor } = await verifyWalletAuthArgs(auth);
 
+  const supabase = createServiceClient();
   const stream = await lookupStream(streamId);
-  if (stream?.creator_id && stream.creator_id.toLowerCase() === actorLower) {
-    return;
+  if (stream?.creator_id && stream.creator_id.toLowerCase() === actor) {
+    return actor;
   }
 
   const { data: mod, error: modErr } = await supabase
     .from("stream_moderation_moderators")
     .select("moderator_address")
     .eq("stream_id", streamId)
-    .eq("moderator_address", actorLower)
+    .eq("moderator_address", actor)
     .maybeSingle();
-
   if (modErr) {
     throw new Error(`Failed to look up moderator: ${modErr.message}`);
   }
-
   if (!mod) {
-    throw new Error("Not authorized to moderate this stream");
+    throw new WalletAuthError(403, "Not authorized to moderate this stream");
   }
+  return actor;
+}
+
+/**
+ * Stream creator only. Used by addModerator/removeModerator below.
+ */
+async function authorizeCreator(
+  streamId: string,
+  auth: WalletAuthArgs | undefined
+): Promise<string> {
+  const { address: actor } = await verifyWalletAuthArgs(auth);
+  const stream = await lookupStream(streamId);
+  if (!stream) throw new Error("Stream not found");
+  if (stream.creator_id.toLowerCase() !== actor) {
+    throw new WalletAuthError(403, "Only the stream creator can do this");
+  }
+  return actor;
 }
 
 /**
@@ -108,9 +129,9 @@ export async function getModerationState(streamId: string): Promise<ModerationSt
 export async function hideMessage(
   streamId: string,
   messageId: string,
-  actor: string
+  auth: WalletAuthArgs
 ) {
-  await assertCanModerate(streamId, actor);
+  const actor = await authorizeModerator(streamId, auth);
   const supabase = createServiceClient();
   const { error } = await supabase
     .from("stream_moderation_hidden_messages")
@@ -118,7 +139,7 @@ export async function hideMessage(
       {
         stream_id: streamId,
         message_id: messageId,
-        hidden_by: actor.toLowerCase(),
+        hidden_by: actor,
       },
       { onConflict: "stream_id,message_id" }
     );
@@ -128,9 +149,9 @@ export async function hideMessage(
 export async function unhideMessage(
   streamId: string,
   messageId: string,
-  actor: string
+  auth: WalletAuthArgs
 ) {
-  await assertCanModerate(streamId, actor);
+  await authorizeModerator(streamId, auth);
   const supabase = createServiceClient();
   const { error } = await supabase
     .from("stream_moderation_hidden_messages")
@@ -140,8 +161,12 @@ export async function unhideMessage(
   if (error) throw new Error(error.message);
 }
 
-export async function banUser(streamId: string, address: string, actor: string) {
-  await assertCanModerate(streamId, actor);
+export async function banUser(
+  streamId: string,
+  address: string,
+  auth: WalletAuthArgs
+) {
+  const actor = await authorizeModerator(streamId, auth);
   const supabase = createServiceClient();
   const { error } = await supabase
     .from("stream_moderation_bans")
@@ -149,15 +174,19 @@ export async function banUser(streamId: string, address: string, actor: string) 
       {
         stream_id: streamId,
         banned_address: address.toLowerCase(),
-        banned_by: actor.toLowerCase(),
+        banned_by: actor,
       },
       { onConflict: "stream_id,banned_address" }
     );
   if (error) throw new Error(error.message);
 }
 
-export async function unbanUser(streamId: string, address: string, actor: string) {
-  await assertCanModerate(streamId, actor);
+export async function unbanUser(
+  streamId: string,
+  address: string,
+  auth: WalletAuthArgs
+) {
+  await authorizeModerator(streamId, auth);
   const supabase = createServiceClient();
   const { error } = await supabase
     .from("stream_moderation_bans")
@@ -175,24 +204,17 @@ export async function unbanUser(streamId: string, address: string, actor: string
 export async function addModerator(
   streamId: string,
   address: string,
-  actor: string
+  auth: WalletAuthArgs
 ) {
-  if (!actor) throw new Error("Missing actor address");
+  const actor = await authorizeCreator(streamId, auth);
   const supabase = createServiceClient();
-
-  const stream = await lookupStream(streamId);
-  if (!stream) throw new Error("Stream not found");
-  if (stream.creator_id.toLowerCase() !== actor.toLowerCase()) {
-    throw new Error("Only the stream creator can appoint moderators");
-  }
-
   const { error } = await supabase
     .from("stream_moderation_moderators")
     .upsert(
       {
         stream_id: streamId,
         moderator_address: address.toLowerCase(),
-        appointed_by: actor.toLowerCase(),
+        appointed_by: actor,
       },
       { onConflict: "stream_id,moderator_address" }
     );
@@ -202,17 +224,10 @@ export async function addModerator(
 export async function removeModerator(
   streamId: string,
   address: string,
-  actor: string
+  auth: WalletAuthArgs
 ) {
-  if (!actor) throw new Error("Missing actor address");
+  await authorizeCreator(streamId, auth);
   const supabase = createServiceClient();
-
-  const stream = await lookupStream(streamId);
-  if (!stream) throw new Error("Stream not found");
-  if (stream.creator_id.toLowerCase() !== actor.toLowerCase()) {
-    throw new Error("Only the stream creator can remove moderators");
-  }
-
   const { error } = await supabase
     .from("stream_moderation_moderators")
     .delete()

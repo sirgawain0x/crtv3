@@ -22,6 +22,7 @@ import {
   type ModeratorRecord,
 } from "@/services/stream-moderation";
 import { useCreatorProfile } from "@/lib/hooks/metokens/useCreatorProfile";
+import { useWalletAuth } from "@/lib/auth/useWalletAuth";
 import { logger } from "@/lib/utils/logger";
 
 interface ModeratorsDialogProps {
@@ -29,6 +30,20 @@ interface ModeratorsDialogProps {
   onOpenChange: (open: boolean) => void;
   streamId: string;
   creatorAddress: string;
+}
+
+interface AuthHeaders {
+  "X-Wallet-Address": string;
+  "X-Wallet-Timestamp": string;
+  "X-Wallet-Signature": string;
+}
+
+function headersToAuthArgs(headers: AuthHeaders) {
+  return {
+    address: headers["X-Wallet-Address"],
+    timestamp: Number(headers["X-Wallet-Timestamp"]),
+    signature: headers["X-Wallet-Signature"],
+  };
 }
 
 export function ModeratorsDialog({
@@ -43,6 +58,7 @@ export function ModeratorsDialog({
   const [error, setError] = useState<string | null>(null);
   const [newAddress, setNewAddress] = useState("");
   const { profile } = useCreatorProfile(creatorAddress);
+  const { getAuthHeaders } = useWalletAuth();
 
   const refresh = useCallback(async () => {
     if (!streamId) return;
@@ -73,7 +89,8 @@ export function ModeratorsDialog({
     setSubmitting(true);
     setError(null);
     try {
-      await addModerator(streamId, address, creatorAddress);
+      const headers = await getAuthHeaders();
+      await addModerator(streamId, address, headersToAuthArgs(headers as AuthHeaders));
       toast.success(`Added ${formatAddress(address)} as moderator`);
       setNewAddress("");
       refresh();
@@ -91,7 +108,8 @@ export function ModeratorsDialog({
     setSubmitting(true);
     setError(null);
     try {
-      await removeModerator(streamId, address, creatorAddress);
+      const headers = await getAuthHeaders();
+      await removeModerator(streamId, address, headersToAuthArgs(headers as AuthHeaders));
       toast.success(`Removed ${formatAddress(address)}`);
       refresh();
     } catch (err) {

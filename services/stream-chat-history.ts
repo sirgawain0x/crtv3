@@ -1,6 +1,10 @@
 "use server";
 
 import { createServiceClient } from "../lib/sdk/supabase/service";
+import {
+  verifyWalletAuthArgs,
+  type WalletAuthArgs,
+} from "../lib/auth/require-wallet";
 
 export interface StoredChatMessage {
   stream_id: string;
@@ -29,8 +33,19 @@ export interface RecordChatMessageInput {
 /**
  * Insert (or no-op on conflict) a single chat message. Idempotent so the
  * client and the server worker can both call it safely.
+ *
+ * Authorization: any authenticated wallet may record messages — the chat
+ * itself is open to any XMTP client that knows the group, so requiring more
+ * than "you can sign for *some* address" would be theatre. The signature
+ * gate prevents anonymous spam but doesn't try to verify XMTP membership.
+ * For stronger guarantees, the long-lived moderation worker (which runs as
+ * the platform bot inside each group) is the canonical writer.
  */
-export async function recordChatMessage(input: RecordChatMessageInput) {
+export async function recordChatMessage(
+  input: RecordChatMessageInput,
+  auth: WalletAuthArgs
+) {
+  await verifyWalletAuthArgs(auth);
   const supabase = createServiceClient();
   const sentAt =
     typeof input.sentAt === "string" ? input.sentAt : input.sentAt.toISOString();
@@ -53,8 +68,12 @@ export async function recordChatMessage(input: RecordChatMessageInput) {
   }
 }
 
-export async function recordChatMessages(inputs: RecordChatMessageInput[]) {
+export async function recordChatMessages(
+  inputs: RecordChatMessageInput[],
+  auth: WalletAuthArgs
+) {
   if (inputs.length === 0) return;
+  await verifyWalletAuthArgs(auth);
   const supabase = createServiceClient();
 
   const rows = inputs.map((input) => ({
@@ -80,7 +99,8 @@ export async function recordChatMessages(inputs: RecordChatMessageInput[]) {
 /**
  * Load chat history for a stream. Used at chat mount time to render messages
  * older than the XMTP "recent messages" window, and after a worker-side
- * pruning event.
+ * pruning event. Read is intentionally unauthenticated to match the public
+ * RLS policy on the table.
  */
 export async function listChatHistory(
   streamId: string,
