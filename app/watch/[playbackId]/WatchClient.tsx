@@ -8,6 +8,7 @@ import { getDetailPlaybackSource } from "@/lib/hooks/livepeer/useDetailPlaybackS
 import { getStreamByPlaybackId } from "@/services/streams";
 import { LiveChat } from "@/components/Live/LiveChat";
 import { ClipCreator } from "@/components/Live/ClipCreator";
+import { DigitalTwinOverlay } from "@/components/Live/DigitalTwinOverlay";
 import { Src } from "@livepeer/react";
 import { useUser } from "@account-kit/react";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -238,7 +239,10 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
         )}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Video Player Section */}
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-2 relative">
+            {streamData?.creator_id && (
+              <DigitalTwinOverlay creatorAddress={streamData.creator_id} />
+            )}
             {status.kind === "loading" && (
               <div className="aspect-video bg-black rounded-lg flex items-center justify-center">
                 <div className="flex flex-col items-center space-y-4">
