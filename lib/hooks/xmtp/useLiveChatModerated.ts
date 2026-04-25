@@ -19,7 +19,11 @@ import {
   recordChatMessage,
   type StoredChatMessage,
 } from "@/services/stream-chat-history";
+import { registerChatGroup } from "@/services/stream-chat-groups";
 import { logger } from "@/lib/utils/logger";
+
+const MODERATION_BOT_INBOX_ID =
+  process.env.NEXT_PUBLIC_MODERATION_BOT_INBOX_ID?.trim() || "";
 
 const MODERATION_POLL_MS = 10_000;
 const HISTORY_LIMIT = 100;
@@ -117,6 +121,7 @@ export function useLiveChatModerated(
   const [moderationError, setModerationError] = useState<Error | null>(null);
   const stopped = useRef(false);
   const historyLoaded = useRef(false);
+  const botProvisioned = useRef<string | null>(null);
 
   // One-shot: load older messages from Supabase once XMTP is initialized so
   // late joiners see context (XMTP's initial fetch is capped at ~5 minutes).
@@ -174,6 +179,62 @@ export function useLiveChatModerated(
   }, [state.moderators, actorAddress]);
 
   const canModerate = isCreator || isModerator;
+
+  // Once-per-group: from the host's browser, invite the moderation bot to
+  // the XMTP group, promote it to admin (so it can kick banned members),
+  // and register the (groupId → streamId) mapping the worker needs to
+  // resolve conversations. All three steps are idempotent and best-effort:
+  // if the bot inbox isn't configured we just skip silently and leave the
+  // browser fallback to handle moderation while the host's tab is open.
+  useEffect(() => {
+    if (!enabled || !streamId || !isCreator) return;
+    const group = base.group;
+    if (!group) return;
+    if (botProvisioned.current === group.id) return;
+    // Optimistically lock so we don't race; we'll reset on hard failure.
+    botProvisioned.current = group.id;
+
+    (async () => {
+      const tasks: Array<Promise<void>> = [];
+
+      // 1) Bot membership + admin role.
+      if (MODERATION_BOT_INBOX_ID) {
+        tasks.push(
+          (async () => {
+            try {
+              const botId = MODERATION_BOT_INBOX_ID;
+              const members = await group.members();
+              const alreadyMember = members.some(
+                (m) => m.inboxId.toLowerCase() === botId.toLowerCase()
+              );
+              if (!alreadyMember) {
+                await group.addMembers([botId]);
+              }
+              const adminCheck = group.isAdmin(botId);
+              const isBotAdmin =
+                typeof adminCheck === "boolean" ? adminCheck : await adminCheck;
+              if (!isBotAdmin) {
+                await group.addAdmin(botId);
+              }
+            } catch (err) {
+              logger.warn("Failed to invite moderation bot:", err);
+            }
+          })()
+        );
+      }
+
+      // 2) groupId → streamId mapping for the worker.
+      tasks.push(
+        registerChatGroup(streamId, group.id, MODERATION_BOT_INBOX_ID ? new Date() : null)
+          .then(() => undefined)
+          .catch((err) => {
+            logger.warn("Failed to register chat group mapping:", err);
+          })
+      );
+
+      await Promise.all(tasks);
+    })();
+  }, [enabled, streamId, isCreator, base.group]);
 
   const filteredMessages = useMemo<LiveChatMessage[]>(() => {
     if (!enabled) return base.messages;

@@ -20,12 +20,25 @@ worker is the always-on guarantor.
 
 ## Required env vars
 
+For the worker process:
+
 ```
 XMTP_MODERATION_BOT_PRIVATE_KEY=0x…   # EOA used as the bot identity
 XMTP_ENV=production                   # or "dev"
 NEXT_PUBLIC_SUPABASE_URL=…
 SUPABASE_SERVICE_ROLE_KEY=…
 ```
+
+For the Next.js app (so host browsers know which inbox to invite):
+
+```
+NEXT_PUBLIC_MODERATION_BOT_INBOX_ID=…  # from the worker's first boot log
+```
+
+If `NEXT_PUBLIC_MODERATION_BOT_INBOX_ID` is unset, the host page skips the
+bot invitation but still registers the group → stream mapping, so flipping
+the env var on later (after the worker is deployed) Just Works on the next
+host page load — no code change needed.
 
 ## Install + run
 
@@ -46,20 +59,27 @@ built-in restart policy).
 ## Inviting the bot to chat groups
 
 The bot can only enforce bans on groups it's a member of with admin rights.
-The host's browser is responsible for the invitation. The flow is:
+The host's browser handles the invitation automatically — the flow is:
 
-1. Worker boots, prints `inboxId: …`. Set this as `NEXT_PUBLIC_MODERATION_BOT_INBOX_ID`
-   in the app's env.
-2. On group creation in `useLiveChat`, the host calls
-   `group.addMembers([NEXT_PUBLIC_MODERATION_BOT_INBOX_ID])` and (for kick
-   rights) `group.addAdmin(NEXT_PUBLIC_MODERATION_BOT_INBOX_ID)`.
-3. The host POSTs `{ groupId, streamId }` to a `/api/streams/chat-group`
-   endpoint that upserts into `public.stream_chat_groups`. The worker uses
-   that table to resolve `conversationId → streamId`.
+1. Worker boots, prints `inboxId: …`. Set this as
+   `NEXT_PUBLIC_MODERATION_BOT_INBOX_ID` in the app's env.
+2. When the host (and only the host — the moderated hook gates this on
+   `isCreator`) loads the chat for their stream, `useLiveChatModerated`
+   runs a one-shot effect that:
+   - Calls `group.addMembers([NEXT_PUBLIC_MODERATION_BOT_INBOX_ID])` if the
+     bot isn't a member yet.
+   - Calls `group.addAdmin(NEXT_PUBLIC_MODERATION_BOT_INBOX_ID)` if it's
+     not an admin yet (so it can `removeMembers`).
+   - Calls `registerChatGroup(streamId, groupId)` to upsert the mapping
+     into `stream_chat_groups`. The worker reads from that table to
+     resolve `conversationId → streamId`.
+3. Each step is idempotent and best-effort: if the bot inbox isn't
+   configured, the moderated hook silently skips invitation and the
+   browser fallback continues to handle moderation while the host's tab
+   is open.
 
-Both wiring steps are TODOs — the worker scaffold is ready for them but the
-client hooks haven't been changed yet. See `useLiveChat.ts:initializeGroup`
-for the right insertion point.
+The wiring lives in `lib/hooks/xmtp/useLiveChatModerated.ts` (search for
+`botProvisioned`) and `services/stream-chat-groups.ts`.
 
 ## Operational notes
 
