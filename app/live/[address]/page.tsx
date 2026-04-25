@@ -12,7 +12,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Slash, VideoIcon } from "lucide-react";
+import { Slash, VideoIcon, Share2, ShieldCheck } from "lucide-react";
 import { FaExclamationTriangle } from "react-icons/fa";
 import { MembershipGuard } from "@/components/auth/MembershipGuard";
 import { ProfilePageGuard } from "@/components/UserProfile/UserProfile";
@@ -30,6 +30,11 @@ import { StreamIPRegistration } from "@/components/Live/StreamIPRegistration";
 import { CreatorClipsList } from "@/components/Live/CreatorClipsList";
 import { getThumbnailUrl } from "@/services/livepeer-thumbnails";
 import { Switch } from "@/components/ui/switch";
+import { Button } from "@/components/ui/button";
+import { LiveChat } from "@/components/Live/LiveChat";
+import { ShareDialog } from "@/components/Videos/ShareDialog";
+import { ModeratorsDialog } from "@/components/Live/ModeratorsDialog";
+import { DigitalTwinOverlay } from "@/components/Live/DigitalTwinOverlay";
 import { logger } from '@/lib/utils/logger';
 
 
@@ -57,6 +62,13 @@ export default function LivePage() {
   const [storyIpId, setStoryIpId] = useState<string | null>(null);
   const [storyLicenseTermsId, setStoryLicenseTermsId] = useState<string | null>(null);
   const [storyRevShare, setStoryRevShare] = useState<number | null>(null);
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [moderatorsDialogOpen, setModeratorsDialogOpen] = useState(false);
+
+  // Match the viewer-side derivation in WatchClient so host + viewers share the
+  // same XMTP group ID.
+  const chatStreamId = playbackId || "";
+  const chatSessionId = playbackId ? `session-${playbackId}` : "";
 
 
   // Fetch existing stream and multistream targets
@@ -340,9 +352,49 @@ export default function LivePage() {
                 )}
               </div>
             ) : (
-              <>
-                <Broadcast streamKey={streamKey} streamId={streamId} creatorAddress={user.address} />
-              </>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2 relative">
+                  <Broadcast streamKey={streamKey} streamId={streamId} creatorAddress={user.address} />
+                  {user?.address && (
+                    <DigitalTwinOverlay creatorAddress={user.address} />
+                  )}
+                  {playbackId && (
+                    <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShareDialogOpen(true)}
+                      >
+                        <Share2 className="h-4 w-4 mr-1.5" /> Share Stream
+                      </Button>
+                      {chatStreamId && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setModeratorsDialogOpen(true)}
+                        >
+                          <ShieldCheck className="h-4 w-4 mr-1.5" /> Manage Moderators
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <div className="lg:col-span-1">
+                  {chatStreamId && chatSessionId ? (
+                    <LiveChat
+                      streamId={chatStreamId}
+                      sessionId={chatSessionId}
+                      creatorAddress={user.address}
+                    />
+                  ) : (
+                    <div className="border rounded-lg p-4 text-sm text-muted-foreground">
+                      Chat will appear here once the stream is ready.
+                    </div>
+                  )}
+                </div>
+              </div>
             )}
             {streamId && user?.address && (
               <StreamIPRegistration
@@ -414,6 +466,27 @@ export default function LivePage() {
             </div>
           </div>
         </div>
+        {playbackId && (
+          <ShareDialog
+            open={shareDialogOpen}
+            onOpenChange={setShareDialogOpen}
+            videoTitle={streamName || "Live Stream"}
+            videoId={playbackId}
+            shareUrlOverride={`/watch/${playbackId}`}
+            titleOverride={streamName || "Live Stream"}
+            thumbnailUrlOverride={thumbnailUrl ?? undefined}
+            dialogTitle="Share Live Stream"
+            shareNoun="live stream"
+          />
+        )}
+        {chatStreamId && user?.address && (
+          <ModeratorsDialog
+            open={moderatorsDialogOpen}
+            onOpenChange={setModeratorsDialogOpen}
+            streamId={chatStreamId}
+            creatorAddress={user.address}
+          />
+        )}
       </MembershipGuard>
     </ProfilePageGuard>
   );

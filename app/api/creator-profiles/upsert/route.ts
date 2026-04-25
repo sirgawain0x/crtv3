@@ -29,7 +29,16 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    const { owner_address, username, bio, avatar_url } = body;
+    const {
+      owner_address,
+      username,
+      bio,
+      avatar_url,
+      twin_enabled,
+      twin_address,
+      twin_avatar_glb_url,
+      twin_chat_endpoint,
+    } = body;
 
     if (!owner_address) {
       return NextResponse.json(
@@ -38,23 +47,31 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Build the update payload, only including fields the caller provided so
+    // we don't overwrite existing values (e.g. twin fields) with undefined.
+    const payload: Record<string, unknown> = {
+      owner_address: owner_address.toLowerCase(),
+      updated_at: new Date().toISOString(),
+    };
+    if (username !== undefined) payload.username = username;
+    if (bio !== undefined) payload.bio = bio;
+    if (avatar_url !== undefined) payload.avatar_url = avatar_url;
+    if (twin_enabled !== undefined) payload.twin_enabled = twin_enabled;
+    if (twin_address !== undefined) {
+      payload.twin_address = twin_address ? String(twin_address).toLowerCase() : null;
+    }
+    if (twin_avatar_glb_url !== undefined) payload.twin_avatar_glb_url = twin_avatar_glb_url;
+    if (twin_chat_endpoint !== undefined) payload.twin_chat_endpoint = twin_chat_endpoint;
+
     let data, error;
 
     // Try service role client first (bypasses RLS)
     if (supabaseService) {
       const result = await supabaseService
         .from('creator_profiles')
-        .upsert({
-          owner_address: owner_address.toLowerCase(),
-          username,
-          bio,
-          avatar_url,
-          updated_at: new Date().toISOString(),
-        }, {
-          onConflict: 'owner_address'
-        })
+        .upsert(payload, { onConflict: 'owner_address' })
         .select();
-      
+
       data = result.data;
       error = result.error;
     } else {
@@ -62,17 +79,9 @@ export async function POST(request: NextRequest) {
       const supabase = await createClient();
       const result = await supabase
         .from('creator_profiles')
-        .upsert({
-          owner_address: owner_address.toLowerCase(),
-          username,
-          bio,
-          avatar_url,
-          updated_at: new Date().toISOString(),
-        }, {
-          onConflict: 'owner_address'
-        })
+        .upsert(payload, { onConflict: 'owner_address' })
         .select();
-      
+
       data = result.data;
       error = result.error;
     }

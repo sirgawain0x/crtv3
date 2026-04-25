@@ -1,16 +1,26 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { useLiveChat } from "@/lib/hooks/xmtp/useLiveChat";
+import { useLiveChatModerated } from "@/lib/hooks/xmtp/useLiveChatModerated";
 import { useUser } from "@account-kit/react";
 import useModularAccount from "@/lib/hooks/accountkit/useModularAccount";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { MessageCircle, Send, AlertCircle, Coins, Users, ChevronDown } from "lucide-react";
+import {
+  MessageCircle,
+  Send,
+  AlertCircle,
+  Coins,
+  Users,
+  ChevronDown,
+  EyeOff,
+  UserX,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatAddress } from "@/lib/helpers";
+import { toast } from "sonner";
 import { VideoTipButton } from "../Videos/VideoTipButton";
 import { getExplorerUrl } from "@/lib/utils/video-tip";
 import { logger } from '@/lib/utils/logger';
@@ -22,6 +32,9 @@ interface LiveChatProps {
   creatorAddress?: string | null;
   viewerCount?: number;
   className?: string;
+  /** Enable moderation overlay (poll for hidden/banned + show mod controls). */
+  enableModeration?: boolean;
+  headerActions?: React.ReactNode;
 }
 
 /**
@@ -34,12 +47,14 @@ interface LiveChatProps {
  * - Auto-cleanup of old messages
  * - Optimized performance for high message volume
  */
-export function LiveChat({ 
-  streamId, 
-  sessionId, 
-  creatorAddress, 
+export function LiveChat({
+  streamId,
+  sessionId,
+  creatorAddress,
   viewerCount,
-  className 
+  className,
+  enableModeration = true,
+  headerActions,
 }: LiveChatProps) {
   const [message, setMessage] = useState("");
   const [isExpanded, setIsExpanded] = useState(true);
@@ -48,17 +63,22 @@ export function LiveChat({
   const user = useUser();
   const { address: smartAccountAddress } = useModularAccount();
 
-  const { 
-    messages, 
-    isLoading, 
-    error, 
-    sendMessage, 
-    sendTipMessage, 
-    isSending 
-  } = useLiveChat(streamId, sessionId, {
+  const {
+    messages,
+    isLoading,
+    error,
+    sendMessage,
+    sendTipMessage,
+    isSending,
+    canModerate,
+    hideMessage: hideMessageMod,
+    banUser: banUserMod,
+  } = useLiveChatModerated(streamId, sessionId, {
     maxMessages: 200,
     messageRetentionMs: 10 * 60 * 1000, // 10 minutes
     rateLimit: { count: 5, windowMs: 10000 }, // 5 messages per 10 seconds
+    creatorAddress: creatorAddress ?? null,
+    enabled: enableModeration,
   });
 
   // Scroll tracking
@@ -151,6 +171,7 @@ export function LiveChat({
           )}
         </div>
         <div className="flex items-center gap-2">
+          {headerActions}
           {creatorAddress && user && user.address?.toLowerCase() !== creatorAddress.toLowerCase() && (
             <VideoTipButton
               creatorAddress={creatorAddress}
@@ -206,16 +227,38 @@ export function LiveChat({
                   const userSCA = smartAccountAddress?.toLowerCase();
                   const msgAddress = msg.senderAddress?.toLowerCase();
                   const isOwnMessage = msgAddress && (
-                    (userEOA && msgAddress === userEOA) || 
+                    (userEOA && msgAddress === userEOA) ||
                     (userSCA && msgAddress === userSCA)
                   );
                   const isTipMessage = msg.type === 'tip' && msg.tipData;
-                  
+                  const showModControls = canModerate && !isTipMessage && !isOwnMessage;
+
+                  const handleHide = async () => {
+                    try {
+                      await hideMessageMod(msg.id);
+                      toast.success("Message hidden");
+                    } catch (err) {
+                      logger.error("Failed to hide message:", err);
+                      toast.error(err instanceof Error ? err.message : "Failed to hide message");
+                    }
+                  };
+
+                  const handleBan = async () => {
+                    if (!msg.senderAddress) return;
+                    try {
+                      await banUserMod(msg.senderAddress);
+                      toast.success(`Banned ${formatAddress(msg.senderAddress)}`);
+                    } catch (err) {
+                      logger.error("Failed to ban user:", err);
+                      toast.error(err instanceof Error ? err.message : "Failed to ban user");
+                    }
+                  };
+
                   return (
                     <div
                       key={msg.id}
                       className={cn(
-                        "flex gap-2 items-start",
+                        "group/msg flex gap-2 items-start",
                         isOwnMessage && "flex-row-reverse"
                       )}
                     >
@@ -251,6 +294,31 @@ export function LiveChat({
                               minute: "2-digit",
                             })}
                           </span>
+                          {showModControls && (
+                            <div
+                              className={cn(
+                                "ml-auto flex items-center gap-0.5 opacity-0 group-hover/msg:opacity-100 transition-opacity",
+                                isOwnMessage && "ml-0 mr-auto"
+                              )}
+                            >
+                              <button
+                                type="button"
+                                onClick={handleHide}
+                                title="Hide this message"
+                                className="p-0.5 rounded hover:bg-muted-foreground/10 text-muted-foreground hover:text-foreground"
+                              >
+                                <EyeOff className="h-3 w-3" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={handleBan}
+                                title="Ban this user from chat"
+                                className="p-0.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
+                              >
+                                <UserX className="h-3 w-3" />
+                              </button>
+                            </div>
+                          )}
                         </div>
                         {isTipMessage ? (
                           <div
