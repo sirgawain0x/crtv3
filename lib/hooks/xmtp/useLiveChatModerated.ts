@@ -14,9 +14,26 @@ import {
   unhideMessage as unhideMessageAction,
   type ModerationState,
 } from "@/services/stream-moderation";
+import {
+  listChatHistory,
+  recordChatMessage,
+  type StoredChatMessage,
+} from "@/services/stream-chat-history";
 import { logger } from "@/lib/utils/logger";
 
 const MODERATION_POLL_MS = 10_000;
+const HISTORY_LIMIT = 100;
+
+function storedToLiveMessage(stored: StoredChatMessage): LiveChatMessage {
+  return {
+    id: stored.message_id,
+    content: stored.content,
+    senderAddress: stored.sender_inbox_id,
+    sentAt: new Date(stored.sent_at),
+    type: stored.message_type === "tip" ? "tip" : "text",
+    tipData: stored.tip_data ?? undefined,
+  };
+}
 
 export interface UseLiveChatModeratedReturn extends UseLiveChatReturn {
   isModerator: boolean;
@@ -64,7 +81,33 @@ export function useLiveChatModerated(
   options: UseLiveChatModeratedOptions = {}
 ): UseLiveChatModeratedReturn {
   const { creatorAddress, enabled = true, ...liveChatOptions } = options;
-  const base = useLiveChat(streamId, sessionId, liveChatOptions);
+
+  // Persist every observed message to Supabase so history survives even when
+  // no server-side worker is running. The server worker (scripts/xmtp-
+  // moderation-worker.ts) does the same thing from a long-lived process; both
+  // calls are idempotent on (stream_id, message_id).
+  const persistObserved = useCallback(
+    (msg: LiveChatMessage) => {
+      if (!enabled || !streamId) return;
+      void recordChatMessage({
+        streamId,
+        messageId: msg.id,
+        senderInboxId: msg.senderAddress,
+        content: msg.content,
+        sentAt: msg.sentAt,
+        messageType: msg.type === "tip" ? "tip" : "text",
+        tipData: msg.tipData ?? null,
+      }).catch((err) => {
+        logger.warn("Failed to persist chat message:", err);
+      });
+    },
+    [enabled, streamId]
+  );
+
+  const base = useLiveChat(streamId, sessionId, {
+    ...liveChatOptions,
+    onMessageObserved: persistObserved,
+  });
 
   const user = useUser();
   const { address: smartAccountAddress } = useModularAccount();
@@ -73,6 +116,25 @@ export function useLiveChatModerated(
   const [state, setState] = useState<ModerationState>(EMPTY_STATE);
   const [moderationError, setModerationError] = useState<Error | null>(null);
   const stopped = useRef(false);
+  const historyLoaded = useRef(false);
+
+  // One-shot: load older messages from Supabase once XMTP is initialized so
+  // late joiners see context (XMTP's initial fetch is capped at ~5 minutes).
+  useEffect(() => {
+    if (!enabled || !streamId || historyLoaded.current) return;
+    if (base.isLoading || !base.group) return;
+    historyLoaded.current = true;
+    (async () => {
+      try {
+        const history = await listChatHistory(streamId, { limit: HISTORY_LIMIT });
+        if (history.length > 0) {
+          base.prependMessages(history.map(storedToLiveMessage));
+        }
+      } catch (err) {
+        logger.warn("Failed to load chat history:", err);
+      }
+    })();
+  }, [enabled, streamId, base.isLoading, base.group, base.prependMessages]);
 
   const refresh = useCallback(async () => {
     if (!enabled || !streamId) return;
@@ -172,9 +234,22 @@ export function useLiveChatModerated(
           ? prev
           : { ...prev, bannedAddresses: [...prev.bannedAddresses, lower] }
       );
+      // Best-effort hard kick: removes the banned member from the XMTP group
+      // when the actor's client has admin rights (the host who created the
+      // group always does). Falls through silently otherwise — the long-lived
+      // server worker is the always-on guarantor; this branch just shortens
+      // the propagation delay when the host is online.
+      const group = base.group;
+      if (group) {
+        try {
+          await group.removeMembers([lower]);
+        } catch (err) {
+          logger.debug("Could not remove member from XMTP group (likely not admin):", err);
+        }
+      }
       refresh();
     },
-    [streamId, requireActor, refresh]
+    [streamId, requireActor, refresh, base.group]
   );
 
   const unbanUser = useCallback(

@@ -31,6 +31,21 @@ export interface UseLiveChatReturn {
   sendTipMessage: (amount: string, token: 'ETH' | 'USDC' | 'DAI', txHash: string) => Promise<void>;
   isSending: boolean;
   viewerCount?: number; // Optional: can be provided from stream stats
+  /** XMTP group reference. Exposed for moderation actions (e.g. removing a banned member). */
+  group: Group | null;
+  /** Hydrate the in-memory message list (used for catch-up loading from history). */
+  prependMessages: (msgs: LiveChatMessage[]) => void;
+}
+
+export interface UseLiveChatOptions {
+  maxMessages?: number;
+  messageRetentionMs?: number;
+  rateLimit?: { count: number; windowMs: number };
+  /**
+   * Called for every message the hook observes (initial load + streamed).
+   * Best-effort fan-out target for persistence; thrown errors are swallowed.
+   */
+  onMessageObserved?: (msg: LiveChatMessage) => void;
 }
 
 // Production-safe logging
@@ -58,11 +73,7 @@ const logWarn = (...args: any[]) => {
 export function useLiveChat(
   streamId: string,
   sessionId: string,
-  options?: {
-    maxMessages?: number; // Max messages to keep in memory (default: 200)
-    messageRetentionMs?: number; // How long to keep messages (default: 10 minutes)
-    rateLimit?: { count: number; windowMs: number }; // Rate limit config
-  }
+  options?: UseLiveChatOptions
 ): UseLiveChatReturn {
   const { client, isLoading: isClientLoading, isConnected, error: clientError } = useXmtpClient();
   const user = useUser();
@@ -78,6 +89,13 @@ export function useLiveChat(
   const streamRef = useRef<AsyncIterable<DecodedMessage<any>> | null>(null);
   const isStreamingRef = useRef(false);
   const seenMessageIds = useRef(new Set<string>());
+
+  // Keep observer callback in a ref so the streaming effect doesn't restart
+  // when the caller passes a new function instance every render.
+  const onMessageObservedRef = useRef(options?.onMessageObserved);
+  useEffect(() => {
+    onMessageObservedRef.current = options?.onMessageObserved;
+  }, [options?.onMessageObserved]);
 
   // Rate limiting
   const rateLimit = options?.rateLimit || { count: 5, windowMs: 10000 }; // 5 messages per 10 seconds
@@ -175,6 +193,19 @@ export function useLiveChat(
 
       setMessages(formattedMessages);
       setError(null);
+
+      // Best-effort: notify observer of every message we know about so far.
+      const cb = onMessageObservedRef.current;
+      if (cb) {
+        for (const m of formattedMessages) {
+          try {
+            cb(m);
+          } catch (e) {
+            logWarn("onMessageObserved threw during initial load:", e);
+          }
+        }
+      }
+
       log("useLiveChat: Group initialization successful", {
         groupId: targetGroup.id,
         messageCount: formattedMessages.length,
@@ -256,18 +287,31 @@ export function useLiveChat(
               tipData: tipData || undefined,
             };
 
+            let isNew = false;
             setMessages((prev) => {
               // O(1) dedup check using Set
               if (seenMessageIds.current.has(newMessage.id)) {
                 return prev;
               }
               seenMessageIds.current.add(newMessage.id);
+              isNew = true;
 
               // Append directly — messages arrive chronologically from XMTP.
               // Retention cleanup is handled by the periodic 30s interval.
               const updated = [...prev, newMessage].slice(-maxMessages);
               return updated;
             });
+
+            if (isNew) {
+              const cb = onMessageObservedRef.current;
+              if (cb) {
+                try {
+                  cb(newMessage);
+                } catch (e) {
+                  logWarn("onMessageObserved threw during stream:", e);
+                }
+              }
+            }
           }
         }
       } catch (err) {
@@ -415,6 +459,26 @@ export function useLiveChat(
     [group, walletAddress, maxMessages]
   );
 
+  // Splice older messages (e.g. from server-side history) ahead of whatever
+  // we already have. Dedupes on message id; preserves chronological order.
+  const prependMessages = useCallback((older: LiveChatMessage[]) => {
+    if (older.length === 0) return;
+    setMessages((prev) => {
+      const merged: LiveChatMessage[] = [];
+      const seen = new Set<string>();
+      for (const m of older) {
+        if (seenMessageIds.current.has(m.id) || seen.has(m.id)) continue;
+        seen.add(m.id);
+        merged.push(m);
+      }
+      if (merged.length === 0) return prev;
+      merged.forEach(m => seenMessageIds.current.add(m.id));
+      return [...merged, ...prev]
+        .sort((a, b) => a.sentAt.getTime() - b.sentAt.getTime())
+        .slice(-maxMessages);
+    });
+  }, [maxMessages]);
+
   return {
     messages,
     isLoading: isLoading || isClientLoading,
@@ -422,6 +486,8 @@ export function useLiveChat(
     sendMessage,
     sendTipMessage,
     isSending,
+    group,
+    prependMessages,
   };
 }
 
