@@ -2,7 +2,12 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Image from 'next/image';
-import { convertFailingGateway, getImageUrlWithFallback, isIpfsUrl } from '@/lib/utils/image-gateway';
+import {
+  convertFailingGateway,
+  extractIpfsHash,
+  getImageUrlWithFallback,
+  isIpfsUrl,
+} from '@/lib/utils/image-gateway';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { ImageProps } from 'next/image';
 import { logger } from '@/lib/utils/logger';
@@ -48,6 +53,7 @@ export function GatewayImage({
   const allGatewaysExhaustedRef = useRef(false);
   // Track consecutive failures to detect if content doesn't exist (404 from all gateways)
   const consecutiveFailuresRef = useRef(0);
+  const loggedAllGatewaysFailedRef = useRef(false);
 
   // Sync imageSrc state when src prop changes (e.g., when parent updates thumbnailUrl)
   useEffect(() => {
@@ -67,6 +73,7 @@ export function GatewayImage({
     allGatewaysExhaustedRef.current = false;
     // Reset failure counter when src changes
     consecutiveFailuresRef.current = 0;
+    loggedAllGatewaysFailedRef.current = false;
     // Mark the initial converted src as tried since we're using it
     if (convertedSrc) {
       triedGatewaysRef.current.add(convertedSrc);
@@ -124,10 +131,12 @@ export function GatewayImage({
       const triedCount = triedGatewaysRef.current.size;
       logger.debug(`Trying fallback gateway ${triedCount}/${fallbacks.length + 1} for IPFS image:`, nextGateway);
       
-      // If we've tried 2+ gateways and all failed, warn that content might not exist
-      if (consecutiveFailuresRef.current >= 2 && isIpfs) {
-        const hash = src.match(/\/ipfs\/([a-zA-Z0-9]+)/)?.[1] || src.match(/ipfs:\/\/([a-zA-Z0-9]+)/)?.[1] || 'unknown';
-        logger.warn(`[GatewayImage] Multiple gateways failed for IPFS hash ${hash.substring(0, 10)}... This may indicate the content doesn't exist on IPFS.`);
+      // One-time hint after the second failure (avoid spam on every further hop)
+      if (consecutiveFailuresRef.current === 2 && isIpfs) {
+        const hash = extractIpfsHash(src) ?? 'unknown';
+        logger.warn(
+          `[GatewayImage] Multiple gateways failed for IPFS hash ${hash.slice(0, 10)}… — content may be unpinned or gateways blocked.`
+        );
       }
       
       // Mark it as tried before setting it as the new source
@@ -141,23 +150,33 @@ export function GatewayImage({
     // All fallback gateways have been exhausted
     allGatewaysExhaustedRef.current = true;
 
-    // Log warning about missing content if all IPFS gateways failed
-    if (isIpfs && consecutiveFailuresRef.current >= 2) {
-      const hash = src.match(/\/ipfs\/([a-zA-Z0-9]+)/)?.[1] || src.match(/ipfs:\/\/([a-zA-Z0-9]+)/)?.[1] || 'unknown';
-      logger.error(`[GatewayImage] All IPFS gateways failed for hash ${hash}. Content appears to not exist on IPFS. Consider re-uploading the image.`);
-    }
-
     // If all fallbacks exhausted, try the fallbackSrc prop
     if (fallbackSrc && imageSrc !== fallbackSrc && !hasError) {
       setHasError(true);
       setImageSrc(fallbackSrc);
       setIsLoading(true); // Reset loading state for new URL
+      if (isIpfs && consecutiveFailuresRef.current >= 2) {
+        const hash = extractIpfsHash(src) ?? 'unknown';
+        logger.debug(
+          `[GatewayImage] All IPFS gateways failed for ${hash.slice(0, 12)}…; using fallbackSrc.`
+        );
+      }
       return;
     }
 
-    // All options exhausted - stop trying
+    // All options exhausted - stop trying (warn once; not console.error — avoids dev stack noise)
     setIsLoading(false);
-    logger.warn('[GatewayImage] All IPFS gateways exhausted for image:', src);
+    if (
+      isIpfs &&
+      consecutiveFailuresRef.current >= 2 &&
+      !loggedAllGatewaysFailedRef.current
+    ) {
+      loggedAllGatewaysFailedRef.current = true;
+      const hash = extractIpfsHash(src) ?? 'unknown';
+      logger.warn(
+        `[GatewayImage] All IPFS gateways failed for ${hash}. Content may be unpinned; re-upload or pin publicly if needed.`
+      );
+    }
 
     // Call original onError handler if provided
     if (onError) {
