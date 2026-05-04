@@ -1,4 +1,5 @@
 "use client";
+import "@/lib/utils/suppressDevWarnings";
 import "@/lib/utils/xmtp/wasm-patch";
 import { config, queryClient } from "@/config";
 import { AlchemyAccountProvider } from "@account-kit/react";
@@ -15,8 +16,6 @@ import { ApolloNextAppProvider } from "@apollo/client-integration-nextjs";
 import { makeClient } from "./apolloWrapper";
 import { RadixProvider } from "@/components/ui/radix-provider";
 import { cleanupExistingIframes } from "@/components/IframeCleanup";
-// Import dev warning suppression (only active in development)
-import "@/lib/utils/suppressDevWarnings";
 import { MembershipGuard } from "@/components/auth/MembershipGuard";
 import { AccountKitStoreGuard } from "@/components/auth/AccountKitStoreGuard";
 import NoSSR from "@/components/NoSSR";

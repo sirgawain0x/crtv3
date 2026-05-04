@@ -45,7 +45,7 @@ import { ArrowBigDown, ArrowBigUp, ChevronDown, Search, X } from "lucide-react";
 import CoinbaseFundButton from "./wallet/buy/coinbase-fund-button";
 import { TokenBalance } from "./wallet/balance/TokenBalance";
 import { MeTokenBalances } from "./wallet/balance/MeTokenBalances";
-import type { Chain as ViemChain } from "viem/chains";
+import type { Chain as ViemChain } from "viem";
 import { AccountDropdown } from "@/components/account-dropdown/AccountDropdown";
 import { useMembershipVerification } from "@/lib/hooks/unlock/useMembershipVerification";
 import { useMeTokensSupabase } from "@/lib/hooks/metokens/useMeTokensSupabase";

@@ -1,7 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Joyride, { CallBackProps, STATUS, Step, EVENTS } from 'react-joyride';
+import {
+    Joyride,
+    EVENTS,
+    STATUS,
+    type EventData,
+    type Step,
+} from 'react-joyride';
 import { usePathname, useRouter } from 'next/navigation';
 import { useUser } from '@account-kit/react';
 import { useTour } from '@/context/TourContext';
@@ -12,20 +18,17 @@ const DESKTOP_STEPS: Step[] = [
     {
         target: '#connect-wallet-btn',
         content: 'Sign in to get started! Click "Get Started" to create your account with just your email.',
-        disableBeacon: true,
-        disableOverlayClose: true,
-        hideCloseButton: true,
-        spotlightClicks: true,
-        floaterProps: {
-            hideArrow: false,
-        },
+        skipBeacon: true,
+        overlayClickAction: false,
+        buttons: ['primary', 'skip'],
+        blockTargetInteraction: false,
         data: { id: 'connect' }
     },
     {
         target: '#nav-user-menu',
         content: 'Click your profile to open the menu, then select "Upload" to start adding content.',
-        spotlightClicks: true,
-        disableOverlayClose: true,
+        overlayClickAction: false,
+        blockTargetInteraction: false,
         data: { id: 'user-menu' }
     },
     {
@@ -79,9 +82,9 @@ export const Tour = () => {
         {
             target: '#mobile-menu-btn',
             content: 'Tap the menu to get started by signing in.',
-            disableBeacon: true,
-            disableOverlayClose: true,
-            hideCloseButton: true,
+            skipBeacon: true,
+            overlayClickAction: false,
+            buttons: ['primary', 'skip'],
             data: { id: 'connect' }
         },
         {
@@ -118,7 +121,7 @@ export const Tour = () => {
         return steps.findIndex(s => (s.data as any)?.id === id);
     };
 
-    const handleJoyrideCallback = (data: CallBackProps) => {
+    const handleJoyrideCallback = (data: EventData) => {
         const { index, status, type, action } = data;
         const currentStep = steps[index];
         const currentId = (currentStep?.data as any)?.id;
@@ -234,17 +237,15 @@ export const Tour = () => {
             steps={steps}
             run={run}
             stepIndex={stepIndex}
-            callback={handleJoyrideCallback}
+            onEvent={handleJoyrideCallback}
             continuous
-            showProgress
-            showSkipButton
-            tooltipComponent={TourTooltip}
-            styles={{
-                options: {
-                    zIndex: 10000,
-                    primaryColor: '#4f46e5',
-                },
+            options={{
+                showProgress: true,
+                buttons: ['skip', 'back', 'primary', 'close'],
+                primaryColor: '#4f46e5',
+                zIndex: 10000,
             }}
+            tooltipComponent={TourTooltip}
         />
     );
 };
