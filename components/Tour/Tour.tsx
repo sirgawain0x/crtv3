@@ -5,7 +5,7 @@ import {
     Joyride,
     EVENTS,
     STATUS,
-    type EventData,
+    type CallBackProps,
     type Step,
 } from 'react-joyride';
 import { usePathname, useRouter } from 'next/navigation';
@@ -121,7 +121,7 @@ export const Tour = () => {
         return steps.findIndex(s => (s.data as any)?.id === id);
     };
 
-    const handleJoyrideCallback = (data: EventData) => {
+    const handleJoyrideCallback = (data: CallBackProps) => {
         const { index, status, type, action } = data;
         const currentStep = steps[index];
         const currentId = (currentStep?.data as any)?.id;
