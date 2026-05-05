@@ -18,7 +18,7 @@ const DESKTOP_STEPS: Step[] = [
     {
         target: '#connect-wallet-btn',
         content: 'Sign in to get started! Click "Get Started" to create your account with just your email.',
-        skipBeacon: true,
+        disableBeacon: true,
         overlayClickAction: false,
         buttons: ['primary', 'skip'],
         blockTargetInteraction: false,
@@ -82,7 +82,7 @@ export const Tour = () => {
         {
             target: '#mobile-menu-btn',
             content: 'Tap the menu to get started by signing in.',
-            skipBeacon: true,
+            disableBeacon: true,
             overlayClickAction: false,
             buttons: ['primary', 'skip'],
             data: { id: 'connect' }
