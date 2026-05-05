@@ -167,7 +167,6 @@ export function PredictionList() {
           data.log_new_question ||
           data.logNewQuestions ||
           data.log_new_questions ||
-          data.log_new_question ||
           []
         ) as any[];
 
