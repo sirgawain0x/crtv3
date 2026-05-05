@@ -8,27 +8,27 @@ import {
     type CallBackProps,
     type Step,
 } from 'react-joyride';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useUser } from '@account-kit/react';
 import { useTour } from '@/context/TourContext';
 import { logger } from '@/lib/utils/logger';
 
+type TourStep = Step & {
+    data?: { id: string };
+};
 
-const DESKTOP_STEPS: Step[] = [
+const DESKTOP_STEPS: TourStep[] = [
     {
         target: '#connect-wallet-btn',
         content: 'Sign in to get started! Click "Get Started" to create your account with just your email.',
         disableBeacon: true,
-        overlayClickAction: false,
-        buttons: ['primary', 'skip'],
-        blockTargetInteraction: false,
+        spotlightClicks: true,
         data: { id: 'connect' }
     },
     {
         target: '#nav-user-menu',
         content: 'Click your profile to open the menu, then select "Upload" to start adding content.',
-        overlayClickAction: false,
-        blockTargetInteraction: false,
+        spotlightClicks: true,
         data: { id: 'user-menu' }
     },
     {
@@ -60,7 +60,6 @@ const DESKTOP_STEPS: Step[] = [
 
 export const Tour = () => {
     const { run, stepIndex, setRun, setStepIndex } = useTour();
-    const router = useRouter();
     const pathname = usePathname();
     const user = useUser();
     const isConnected = !!user;
@@ -78,13 +77,11 @@ export const Tour = () => {
         return () => window.removeEventListener('resize', checkMobile);
     }, []);
 
-    const MOBILE_STEPS: Step[] = [
+    const MOBILE_STEPS: TourStep[] = [
         {
             target: '#mobile-menu-btn',
             content: 'Tap the menu to get started by signing in.',
             disableBeacon: true,
-            overlayClickAction: false,
-            buttons: ['primary', 'skip'],
             data: { id: 'connect' }
         },
         {
@@ -118,13 +115,13 @@ export const Tour = () => {
 
     // Helper to find step index by ID
     const getStepIndex = (id: string) => {
-        return steps.findIndex(s => (s.data as any)?.id === id);
+        return steps.findIndex(s => s.data?.id === id);
     };
 
     const handleJoyrideCallback = (data: CallBackProps) => {
         const { index, status, type, action } = data;
         const currentStep = steps[index];
-        const currentId = (currentStep?.data as any)?.id;
+        const currentId = currentStep?.data?.id;
 
         logger.debug("Tour: Callback", { index, status, type, action, currentId });
 
@@ -239,11 +236,14 @@ export const Tour = () => {
             stepIndex={stepIndex}
             callback={handleJoyrideCallback}
             continuous
-            options={{
-                showProgress: true,
-                buttons: ['skip', 'back', 'primary', 'close'],
-                primaryColor: '#4f46e5',
-                zIndex: 10000,
+            showProgress
+            showSkipButton
+            disableOverlayClose
+            styles={{
+                options: {
+                    primaryColor: '#4f46e5',
+                    zIndex: 10000,
+                },
             }}
             tooltipComponent={TourTooltip}
         />
