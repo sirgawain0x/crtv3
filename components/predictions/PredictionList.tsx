@@ -92,7 +92,7 @@ export function PredictionList() {
         // Only query fields that actually exist in the LogNewQuestion entity
         const GET_QUESTIONS_QUERY = gql`
           query GetQuestions($first: Int!, $skip: Int!) {
-            logNewQuestions(
+            logNewQuestion(
               first: $first
               skip: $skip
               orderBy: opening_ts
@@ -163,9 +163,10 @@ export function PredictionList() {
 
         // Try different possible field names
         const fetchedQuestions = (
+          data.logNewQuestion ||
+          data.log_new_question ||
           data.logNewQuestions ||
           data.log_new_questions ||
-          data.logNewQuestion ||
           data.log_new_question ||
           []
         ) as any[];
