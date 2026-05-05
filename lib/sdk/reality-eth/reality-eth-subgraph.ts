@@ -7,6 +7,37 @@ import { gql } from "@apollo/client";
  * from the Goldsky-hosted subgraph
  */
 
+/** List questions without filters (predictions page). */
+export const GET_QUESTIONS_LIST = gql`
+  query GetQuestionsList($first: Int!, $skip: Int!) {
+    questions(
+      first: $first
+      skip: $skip
+      orderBy: created
+      orderDirection: desc
+    ) {
+      id
+      template_id
+      question
+      created
+      opening_ts
+      timeout
+      finalize_ts
+      is_pending_arbitration
+      bounty
+      best_answer
+      history_hash
+      arbitrator
+      min_bond
+      last_bond
+      last_bond_ts
+      category
+      language
+      outcomes
+    }
+  }
+`;
+
 export const GET_QUESTIONS = gql`
   query GetQuestions($first: Int!, $skip: Int!, $where: Question_filter) {
     questions(
