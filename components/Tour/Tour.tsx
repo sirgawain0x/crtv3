@@ -237,7 +237,7 @@ export const Tour = () => {
             steps={steps}
             run={run}
             stepIndex={stepIndex}
-            onEvent={handleJoyrideCallback}
+            callback={handleJoyrideCallback}
             continuous
             options={{
                 showProgress: true,
