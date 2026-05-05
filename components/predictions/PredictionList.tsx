@@ -80,23 +80,33 @@ export function PredictionList() {
           }
         `;
 
+        let introspectionData: any = null;
         try {
-          const introspectionData = await request(endpoint, INTROSPECTION_QUERY) as any;
+          introspectionData = await request(endpoint, INTROSPECTION_QUERY) as any;
           logger.debug('📋 Available query fields:', introspectionData?.__schema?.queryType?.fields);
         } catch (introError) {
           logger.warn('⚠️ Could not introspect schema:', introError);
         }
+        // Query for questions - fetch more to allow filtering
+        // Fetch up to 200 questions to allow filtering and pagination
+        const variables = {
+          first: 200,
+          skip: 0,
+        };
 
-        // GraphQL query for fetching questions
-        // The subgraph uses event-based entities, so we query log_new_question events
-        // Only query fields that actually exist in the LogNewQuestion entity
-        const GET_QUESTIONS_QUERY = gql`
+        const schemaFieldNames: string[] = introspectionData?.__schema?.queryType?.fields?.map((f: any) => f?.name).filter(Boolean) || [];
+        const preferredFields = ['logNewQuestion', 'log_new_question', 'logNewQuestions', 'log_new_questions'];
+        const dynamicQuestionFields = schemaFieldNames.filter(
+          (name) => /question/i.test(name) && /^log/i.test(name)
+        );
+
+        const orderedFields = Array.from(new Set([...preferredFields, ...dynamicQuestionFields]));
+
+        const buildQuestionQuery = (fieldName: string) => gql`
           query GetQuestions($first: Int!, $skip: Int!) {
-            logNewQuestions(
+            ${fieldName}(
               first: $first
               skip: $skip
-              orderBy: opening_ts
-              orderDirection: desc
             ) {
               id
               question_id
@@ -109,64 +119,45 @@ export function PredictionList() {
           }
         `;
 
-        // Query for questions - fetch more to allow filtering
-        // Fetch up to 200 questions to allow filtering and pagination
-        const variables = {
-          first: 200,
-          skip: 0,
-        };
+        const alternativeQueries = orderedFields.map((field) => ({
+          field,
+          query: buildQuestionQuery(field),
+        }));
 
-        let data = await request(endpoint, GET_QUESTIONS_QUERY, variables) as any;
+        let data: any = null;
+        let lastQueryError: any = null;
 
-        // Check for GraphQL errors
-        if (data.errors) {
-          logger.error('GraphQL errors:', data.errors);
-
-          // Try alternative field names if logNewQuestions doesn't work
-          const alternativeQueries = [
-            { field: 'log_new_questions', query: gql`query GetQuestions($first: Int!, $skip: Int!) { log_new_questions(first: $first, skip: $skip, orderBy: blockTimestamp, orderDirection: desc) { id question_id template_id question arbitrator opening_ts timeout finalize_ts bounty min_bond blockNumber blockTimestamp transactionHash } }` },
-            { field: 'logNewQuestion', query: gql`query GetQuestions($first: Int!, $skip: Int!) { logNewQuestion(first: $first, skip: $skip, orderBy: blockTimestamp, orderDirection: desc) { id question_id template_id question arbitrator opening_ts timeout finalize_ts bounty min_bond blockNumber blockTimestamp transactionHash } }` },
-          ];
-
-          let foundAlternative = false;
-          for (const alt of alternativeQueries) {
-            try {
-              logger.debug(`Trying alternative field name: ${alt.field}`);
-              data = await request(endpoint, alt.query, variables) as any;
-              if (!data.errors && data[alt.field]) {
-                logger.debug(`Found working field: ${alt.field}`);
-                foundAlternative = true;
-                break;
-              }
-            } catch (e) {
-              logger.debug(`${alt.field} didn't work:`, e);
+        for (const alt of alternativeQueries) {
+          try {
+            logger.debug(`Trying subgraph field: ${alt.field}`);
+            const result = await request(endpoint, alt.query, variables) as any;
+            if (result?.[alt.field]) {
+              data = result;
+              logger.debug(`Using subgraph field: ${alt.field}`);
+              break;
             }
+          } catch (e: any) {
+            lastQueryError = e;
+            logger.debug(`${alt.field} query failed:`, e?.message || e);
           }
+        }
 
-          if (!foundAlternative && data.errors) {
-            const hasQuestionsError = data.errors.some((err: any) =>
-              err.message?.includes('no field') ||
-              err.message?.includes('Type `Query` has no field')
-            );
-
-            if (hasQuestionsError) {
-              const errorMsg =
-                "The Reality.eth subgraph doesn't have the expected query fields. " +
-                "Available entities: log_new_question, log_new_answer, etc.\n\n" +
-                "Please check the Goldsky dashboard GraphQL schema to see the exact field names.";
-              throw new Error(errorMsg);
-            }
-
-            throw new Error(`GraphQL error: ${JSON.stringify(data.errors)}`);
-          }
+        if (!data) {
+          const errMsg = lastQueryError?.message || 'Unknown subgraph query error';
+          throw new Error(
+            "The Reality.eth subgraph doesn't expose a compatible question field. " +
+            `Tried: ${alternativeQueries.map(q => q.field).join(', ')}. ` +
+            `Schema fields: ${schemaFieldNames.join(', ') || 'unavailable'}. ` +
+            `Last error: ${errMsg}`
+          );
         }
 
         // Try different possible field names
         const fetchedQuestions = (
-          data.logNewQuestions ||
-          data.log_new_questions ||
           data.logNewQuestion ||
           data.log_new_question ||
+          data.logNewQuestions ||
+          data.log_new_questions ||
           []
         ) as any[];
 
