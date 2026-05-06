@@ -31,6 +31,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { createQuestionWithData } from "@/lib/sdk/reality-eth/reality-eth-question-wrapper";
+import { getCanonicalRealityEthArbitratorAddress } from "@/lib/sdk/reality-eth/reality-eth-client";
 import type { QuestionData } from "@/lib/sdk/reality-eth/reality-eth-utils";
 import { logger } from "@/lib/utils/logger";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -315,9 +316,8 @@ function CreatePrediction() {
       const bond = values.bond ? parseEther(values.bond) : 0n;
       const nonce = BigInt(Date.now());
 
-      // Use a default arbitrator address (Reality.eth's default arbitrator)
-      // In production, you might want to use a custom arbitrator
-      const arbitrator = "0x0000000000000000000000000000000000000000" as Address;
+      // Must match Kleros proxy used for disputes / submitEvidence (see getCanonicalRealityEthArbitratorAddress).
+      const arbitrator = getCanonicalRealityEthArbitratorAddress();
 
       // Template ID 0 is typically used for custom questions
       // You may need to register a template first for production use
