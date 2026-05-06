@@ -10,7 +10,12 @@ import { Clock } from "lucide-react";
 import { request, gql } from "graphql-request";
 import { getAddress, isAddress } from "viem";
 import { logger } from "@/lib/utils/logger";
-import { GET_QUESTIONS_LIST } from "@/lib/sdk/reality-eth/reality-eth-subgraph";
+import {
+  GET_LOG_NEW_QUESTIONS_LIST,
+  GET_QUESTIONS_LIST,
+  GET_QUESTIONS_LIST_BY_OPENING_TS,
+  GET_QUESTIONS_LIST_MINIMAL,
+} from "@/lib/sdk/reality-eth/reality-eth-subgraph";
 
 const APP_ARBITRATOR = "0x0000000000000000000000000000000000000000";
 
@@ -61,7 +66,7 @@ interface Question {
  * PredictionList Component
  * 
  * Displays a list of active Reality.eth prediction questions.
- * Fetches questions from the Reality.eth subgraph hosted on Goldsky.
+ * Fetches questions via /api/reality-eth-subgraph (Graph Studio or Goldsky).
  */
 const ITEMS_PER_PAGE = 20;
 
@@ -112,38 +117,19 @@ export function PredictionList() {
           logger.warn('⚠️ Could not introspect schema:', introError);
         }
 
-        // Goldsky Reality.eth deployment exposes `questions` / `answers` (see reality-eth-subgraph.ts).
-        // Older schemas used logNewQuestion* root fields — keep as fallbacks.
-        const LOG_NEW_QUESTION_QUERY = gql`
-          query GetQuestions($first: Int!, $skip: Int!) {
-            logNewQuestion(
-              first: $first
-              skip: $skip
-              orderBy: opening_ts
-              orderDirection: desc
-            ) {
-              id
-              question_id
-              template_id
-              question
-              arbitrator
-              opening_ts
-              timeout
-            }
-          }
-        `;
-
+        // Graph Studio (creative-platform) exposes `questions`. Goldsky reality-eth uses `logNewQuestions`.
+        // Try `questions` first so Studio works; prefer a non-empty list if a later query shape returns [].
         const variables = {
           first: 200,
           skip: 0,
         };
 
         const alternativeQueries = [
-          { field: "questions" as const, query: GET_QUESTIONS_LIST },
-          { field: "logNewQuestion" as const, query: LOG_NEW_QUESTION_QUERY },
-          { field: "log_new_question" as const, query: gql`query GetQuestions($first: Int!, $skip: Int!) { log_new_question(first: $first, skip: $skip, orderBy: opening_ts, orderDirection: desc) { id question_id template_id question arbitrator opening_ts timeout } }` },
-          { field: "logNewQuestions" as const, query: gql`query GetQuestions($first: Int!, $skip: Int!) { logNewQuestions(first: $first, skip: $skip, orderBy: opening_ts, orderDirection: desc) { id question_id template_id question arbitrator opening_ts timeout } }` },
-          { field: "log_new_questions" as const, query: gql`query GetQuestions($first: Int!, $skip: Int!) { log_new_questions(first: $first, skip: $skip, orderBy: opening_ts, orderDirection: desc) { id question_id template_id question arbitrator opening_ts timeout } }` },
+          { field: "questions" as const, query: GET_QUESTIONS_LIST, label: "questions(orderBy:created)" },
+          { field: "questions" as const, query: GET_QUESTIONS_LIST_BY_OPENING_TS, label: "questions(orderBy:opening_ts)" },
+          { field: "questions" as const, query: GET_QUESTIONS_LIST_MINIMAL, label: "questions(minimal fields)" },
+          { field: "logNewQuestions" as const, query: GET_LOG_NEW_QUESTIONS_LIST, label: "logNewQuestions" },
+          { field: "log_new_questions" as const, query: gql`query GetQuestions($first: Int!, $skip: Int!) { log_new_questions(first: $first, skip: $skip, orderBy: opening_ts, orderDirection: desc) { id question_id template_id question arbitrator opening_ts timeout } }`, label: "log_new_questions" },
         ];
 
         let data: any = null;
@@ -152,18 +138,24 @@ export function PredictionList() {
 
         for (const alt of alternativeQueries) {
           try {
-            logger.debug(`Trying subgraph field: ${alt.field}`);
+            logger.debug(`Trying subgraph query: ${alt.label}`);
             const result = await request(endpoint, alt.query, variables) as any;
             const rows = result?.[alt.field];
-            if (Array.isArray(rows)) {
+            if (!Array.isArray(rows)) continue;
+            if (rows.length > 0) {
               data = result;
               usedField = alt.field;
-              logger.debug(`Using subgraph field: ${alt.field}`);
+              logger.debug(`Using subgraph query: ${alt.label} (${rows.length} rows)`);
               break;
+            }
+            if (!data) {
+              data = result;
+              usedField = alt.field;
+              logger.debug(`Subgraph query ${alt.label} returned 0 rows; will replace if a later query has data`);
             }
           } catch (e: any) {
             lastQueryError = e;
-            logger.debug(`${alt.field} query failed:`, e?.message || e);
+            logger.debug(`${alt.label} query failed:`, e?.message || e);
           }
         }
 
@@ -171,7 +163,7 @@ export function PredictionList() {
           const errMsg = lastQueryError?.message || 'Unknown subgraph query error';
           throw new Error(
             "The Reality.eth subgraph doesn't expose a compatible question field. " +
-            `Tried: ${alternativeQueries.map(q => q.field).join(', ')}. ` +
+            `Tried: ${alternativeQueries.map(q => q.label).join(', ')}. ` +
             `Last error: ${errMsg}`
           );
         }
@@ -428,6 +420,21 @@ export function PredictionList() {
               All Reality.eth
             </Button>
           </div>
+          {showOnlyAppQuestions && (
+            <p className="text-xs text-muted-foreground max-w-xl">
+              Creative TV only lists markets created here with <span className="font-mono">0x0…0</span> arbitrator.
+              Questions you create on{" "}
+              <a
+                className="underline underline-offset-2 hover:text-foreground"
+                href="https://reality.eth.link"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                reality.eth
+              </a>{" "}
+              often use another arbitrator (e.g. Kleros) — switch to <strong>All Reality.eth</strong> to see those.
+            </p>
+          )}
         </div>
         <div className="text-sm text-muted-foreground">
           {totalQuestions > 0

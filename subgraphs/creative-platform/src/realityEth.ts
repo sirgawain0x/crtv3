@@ -38,14 +38,16 @@ export function handleNewQuestion(event: LogNewQuestionEvent): void {
   question.created = event.params.created;
   question.opening_ts = event.params.opening_ts;
   question.timeout = event.params.timeout;
-  question.finalize_ts = event.params.finalize_ts;
-  question.is_pending_arbitration = event.params.is_pending_arbitration.notEqual(BigInt.zero());
-  question.bounty = event.params.bounty;
-  question.best_answer = event.params.best_answer;
+  // Base RealityETH-3.0 LogNewQuestion has no bounty/finalize/best_answer; set safe defaults.
+  question.finalize_ts = null;
+  question.is_pending_arbitration = false;
+  question.bounty = BigInt.zero();
+  question.best_answer = Bytes.empty();
   question.history_hash = event.params.content_hash;
   question.arbitrator = changetype<Bytes>(event.params.arbitrator);
-  question.last_bond = event.params.bounty;
+  question.last_bond = BigInt.zero();
   question.last_bond_ts = event.params.created;
+  question.min_bond = BigInt.zero();
   question.save();
 }
 
@@ -53,18 +55,18 @@ export function handleNewAnswer(event: LogNewAnswerEvent): void {
   const question = getOrCreateQuestion(event.params.question_id);
   question.best_answer = event.params.answer;
   question.last_bond = event.params.bond;
-  question.last_bond_ts = event.params.created;
+  question.last_bond_ts = event.params.ts;
   question.history_hash = event.params.history_hash;
-  question.min_bond = event.params.min_bond;
-  question.is_pending_arbitration = event.params.is_pending_arbitration.notEqual(BigInt.zero());
+  question.min_bond = BigInt.zero();
+  question.is_pending_arbitration = false;
   question.save();
 
   const answer = new Answer(event.transaction.hash.concatI32(event.logIndex.toI32()));
   answer.question = question.id;
   answer.answer = event.params.answer;
   answer.bond = event.params.bond;
-  answer.answerer = event.params.user;
-  answer.created = event.params.created;
+  answer.answerer = changetype<Bytes>(event.params.user);
+  answer.created = event.params.ts;
   answer.is_commitment = event.params.is_commitment;
   answer.history_hash = event.params.history_hash;
   answer.transactionHash = event.transaction.hash;
