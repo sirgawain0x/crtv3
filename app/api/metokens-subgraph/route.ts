@@ -103,7 +103,6 @@ export async function POST(request: NextRequest) {
       }
       response = await performFetch(endpoint, endpointHeaders);
       if (response.ok) break;
-      if (response.status !== 404 && response.status < 500) break;
     }
 
     if (!response) throw new Error('No subgraph endpoint available');

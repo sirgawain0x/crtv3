@@ -194,10 +194,10 @@ importers:
         specifier: ^8.17.10
         version: 8.18.0(@types/react@18.3.28)(react-dom@19.2.5(react@19.2.5))(react-native@0.85.2(@babel/core@7.29.0)(@types/react@18.3.28)(bufferutil@4.1.0)(react@19.2.5)(utf-8-validate@6.0.6))(react@19.2.5)(three@0.169.0)
       '@reality.eth/contracts':
-        specifier: ^3.2.21
+        specifier: ^3.2.22
         version: 3.2.22(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       '@reality.eth/reality-eth-lib':
-        specifier: ^3.4.23
+        specifier: ^3.4.25
         version: 3.4.25(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       '@simplewebauthn/browser':
         specifier: ^13.1.0

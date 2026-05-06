@@ -91,8 +91,9 @@ export async function POST(request: NextRequest) {
       }
       serverLogger.debug(`Forwarding Reality.eth query to endpoint: ${endpoint}`);
       response = await performFetch(endpoint, endpointHeaders);
+      // Try every candidate until one succeeds. (Previous logic stopped on any 4xx,
+      // so a misconfigured Graph Studio URL blocked Goldsky fallback entirely.)
       if (response.ok) break;
-      if (response.status !== 404 && response.status < 500) break;
     }
 
     if (!response) throw new Error('No subgraph endpoint available');
