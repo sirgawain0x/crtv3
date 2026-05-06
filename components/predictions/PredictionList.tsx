@@ -8,8 +8,31 @@ import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
 import { Clock } from "lucide-react";
 import { request, gql } from "graphql-request";
+import { getAddress, isAddress } from "viem";
 import { logger } from "@/lib/utils/logger";
 import { GET_QUESTIONS_LIST } from "@/lib/sdk/reality-eth/reality-eth-subgraph";
+
+const APP_ARBITRATOR = "0x0000000000000000000000000000000000000000";
+
+/** Normalize subgraph Bytes (address or 32-byte word) for comparisons. */
+function normalizeArbitrator(hexLike: unknown): string {
+  if (hexLike == null) return "";
+  let s = typeof hexLike === "string" ? hexLike.trim() : "";
+  if (typeof hexLike === "object" && hexLike !== null && "hex" in hexLike) {
+    s = String((hexLike as { hex: string }).hex).trim();
+  }
+  if (!s) return "";
+  let lower = s.toLowerCase();
+  if (!lower.startsWith("0x")) lower = `0x${lower}`;
+  const body = lower.slice(2);
+  if (body.length === 64) {
+    lower = `0x${body.slice(24)}`;
+  }
+  if (isAddress(lower)) {
+    return getAddress(lower).toLowerCase();
+  }
+  return lower;
+}
 
 interface Question {
   id: string;
@@ -48,7 +71,8 @@ export function PredictionList() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [showOnlyAppQuestions, setShowOnlyAppQuestions] = useState(true); // Default to true to show only app questions
+  /** true = Creative TV only (zero arbitrator); false = all indexed Reality.eth questions */
+  const [showOnlyAppQuestions, setShowOnlyAppQuestions] = useState(true);
 
   useEffect(() => {
     async function fetchQuestions() {
@@ -267,13 +291,12 @@ export function PredictionList() {
           }
         }
 
-        // Filter to only show questions from this app if enabled
-        // Questions created through this app use arbitrator: 0x0000000000000000000000000000000000000000
-        const APP_ARBITRATOR = "0x0000000000000000000000000000000000000000";
+        // Filter to only show questions from this app if enabled (CreatePrediction uses zero arbitrator).
+        const appArbNorm = normalizeArbitrator(APP_ARBITRATOR);
         const filteredQuestions = showOnlyAppQuestions
-          ? parsedQuestions.filter((q) =>
-            q.arbitrator?.toLowerCase() === APP_ARBITRATOR.toLowerCase()
-          )
+          ? parsedQuestions.filter(
+              (q) => normalizeArbitrator(q.arbitrator) === appArbNorm
+            )
           : parsedQuestions;
 
         setAllQuestions(filteredQuestions);
@@ -343,19 +366,6 @@ export function PredictionList() {
     );
   }
 
-  if (!questions || questions.length === 0) {
-    return (
-      <div className="p-4">
-        <div>No predictions found.</div>
-        <div className="text-sm text-gray-500 mt-2">
-          {showOnlyAppQuestions
-            ? "No predictions found from this app. Try unchecking the filter to see all predictions."
-            : "Create your first prediction to get started!"}
-        </div>
-      </div>
-    );
-  }
-
   const totalQuestions = allQuestions?.length || 0;
   const totalPages = totalQuestions > 0 ? Math.ceil(totalQuestions / ITEMS_PER_PAGE) : 1;
   const hasNextPage = totalQuestions > 0 && currentPage < totalPages;
@@ -375,33 +385,70 @@ export function PredictionList() {
     }
   };
 
+  const setFilterCreativeTv = () => {
+    setShowOnlyAppQuestions(true);
+    setCurrentPage(1);
+  };
 
+  const setFilterAllReality = () => {
+    setShowOnlyAppQuestions(false);
+    setCurrentPage(1);
+  };
 
   return (
     <div className="space-y-4">
-      {/* Filter toggle */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            id="filter-app-questions"
-            checked={!showOnlyAppQuestions}
-            onChange={(e) => {
-              setShowOnlyAppQuestions(!e.target.checked);
-              setCurrentPage(1); // Reset to first page when filter changes
-            }}
-            className="h-4 w-4 rounded border-gray-300"
-          />
-          <label htmlFor="filter-app-questions" className="text-sm text-gray-600 dark:text-gray-400 cursor-pointer">
-            Show all Reality.eth predictions
-          </label>
+        <div className="flex flex-col gap-1.5">
+          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Source
+          </span>
+          <div
+            className="inline-flex rounded-lg border bg-muted/40 p-1"
+            role="group"
+            aria-label="Prediction source filter"
+          >
+            <Button
+              type="button"
+              variant={showOnlyAppQuestions ? "default" : "ghost"}
+              size="sm"
+              className="rounded-md shadow-none"
+              onClick={setFilterCreativeTv}
+              aria-pressed={showOnlyAppQuestions}
+            >
+              Creative TV
+            </Button>
+            <Button
+              type="button"
+              variant={!showOnlyAppQuestions ? "default" : "ghost"}
+              size="sm"
+              className="rounded-md shadow-none"
+              onClick={setFilterAllReality}
+              aria-pressed={!showOnlyAppQuestions}
+            >
+              All Reality.eth
+            </Button>
+          </div>
         </div>
-        <div className="text-sm text-gray-500">
-          Showing {questions?.length || 0} of {allQuestions?.length || 0} questions
+        <div className="text-sm text-muted-foreground">
+          {totalQuestions > 0
+            ? `Showing ${questions?.length || 0} of ${totalQuestions} question${totalQuestions === 1 ? "" : "s"}`
+            : showOnlyAppQuestions
+              ? "No Creative TV predictions in this view"
+              : "No predictions in this view"}
         </div>
       </div>
 
-      {/* Questions list */}
+      {totalQuestions === 0 ? (
+        <div className="rounded-lg border border-dashed p-8 text-center">
+          <p className="font-medium text-foreground">No predictions found</p>
+          <p className="mt-2 text-sm text-muted-foreground max-w-md mx-auto">
+            {showOnlyAppQuestions
+              ? "Nothing created on Creative TV matches yet. Choose “All Reality.eth” to browse every indexed market on the network."
+              : "There are no indexed Reality.eth questions to show yet, or data is still syncing."}
+          </p>
+        </div>
+      ) : (
+        <>
       <div className="flex flex-col gap-4 w-full">
         {questions.map((question) => {
           const now = Math.floor(Date.now() / 1000);
@@ -466,7 +513,7 @@ export function PredictionList() {
             Previous
           </Button>
 
-          <div className="flex items-center gap-2 text-sm text-gray-500">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <span>Page {currentPage} of {totalPages}</span>
           </div>
 
@@ -479,6 +526,8 @@ export function PredictionList() {
             Next
           </Button>
         </div>
+      )}
+        </>
       )}
     </div>
   );
