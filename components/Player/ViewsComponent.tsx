@@ -35,12 +35,16 @@ export const ViewsComponent: React.FC<ViewsComponentProps> = ({
       try {
         setLoading(true);
         const response = await fetch(`/api/livepeer/views/${playbackId}`);
-        
-        if (!response.ok) {
-          throw new Error("Failed to fetch view metrics");
-        }
 
         const data = await response.json();
+
+        if (!response.ok) {
+          const msg =
+            typeof data?.error === "string"
+              ? data.error
+              : "Failed to fetch view metrics";
+          throw new Error(msg);
+        }
         
         if (data.success) {
           setViewMetrics({
@@ -72,7 +76,19 @@ export const ViewsComponent: React.FC<ViewsComponentProps> = ({
     );
   }
 
-  if (error || !viewMetrics) {
+  if (error) {
+    return (
+      <div
+        className="flex items-center gap-1 text-sm text-amber-600 dark:text-amber-400"
+        title={error}
+      >
+        <EyeIcon className="h-4 w-4" />
+        <span>Error</span>
+      </div>
+    );
+  }
+
+  if (!viewMetrics) {
     return (
       <div className="flex items-center gap-1 text-sm text-gray-400">
         <EyeIcon className="h-4 w-4" />

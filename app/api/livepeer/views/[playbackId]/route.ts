@@ -25,11 +25,13 @@ export async function GET(
     const metrics = await fetchAllViews(playbackId);
 
     if (metrics) {
-      const livepeerTotal = (metrics.viewCount ?? 0) + (metrics.legacyViewCount ?? 0);
+      const livepeerTotal =
+        (metrics.viewCount ?? 0) + (metrics.legacyViewCount ?? 0);
 
       if (livepeerTotal > 0) {
         return NextResponse.json({
           success: true,
+          source: 'livepeer' as const,
           ...metrics,
         });
       }
@@ -47,6 +49,7 @@ export async function GET(
 
     return NextResponse.json({
       success: true,
+      source: 'database' as const,
       playbackId,
       viewCount: dbViewCount,
       playtimeMins: metrics?.playtimeMins ?? 0,
