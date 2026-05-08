@@ -27,11 +27,15 @@ const VideoViewMetrics: React.FC<VideoViewMetricsProps> = ({ playbackId }) => {
       try {
         const response = await fetch(`/api/livepeer/views/${playbackId}`);
         
-        if (!response.ok) {
-          throw new Error("Failed to fetch view metrics");
-        }
-
         const data = await response.json();
+
+        if (!response.ok) {
+          const msg =
+            typeof data?.error === "string"
+              ? data.error
+              : "Failed to fetch view metrics";
+          throw new Error(msg);
+        }
         
         if (data.success) {
           setViewMetrics({

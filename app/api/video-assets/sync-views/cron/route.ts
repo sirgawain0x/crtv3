@@ -9,7 +9,8 @@ export const dynamic = 'force-dynamic';
 /**
  * Cron job to sync view counts from Livepeer to Supabase
  * Runs daily to catch videos that don't get client-side syncing
- * 
+ * Schedule: see `vercel.json` crons (`/api/video-assets/sync-views/cron`).
+ *
  * Security: Requires CRON_SECRET in Authorization header
  */
 export async function GET(request: NextRequest) {
