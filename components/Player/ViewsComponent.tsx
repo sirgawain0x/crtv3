@@ -1,5 +1,6 @@
 "use client";
 
+import type React from "react";
 import { EyeIcon } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useLivepeerViewMetrics } from "@/lib/hooks/livepeer/useLivepeerViewMetrics";
