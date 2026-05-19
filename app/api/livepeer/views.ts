@@ -1,4 +1,3 @@
-'use server';
 import { serverLogger } from '@/lib/utils/logger';
 
 /** Prefer full-access key for Studio data routes; fall back to LIVEPEER_API_KEY (same key in most setups). */
@@ -37,6 +36,7 @@ export const fetchAllViews = async (
     method: 'GET',
     headers: myHeaders,
     redirect: 'follow' as const,
+    cache: 'no-store' as const,
   };
 
   try {
