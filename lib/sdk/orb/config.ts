@@ -13,10 +13,10 @@ export function getOrbLoginConfig(): OrbLoginConfig {
   const graphqlUrl = process.env.NEXT_PUBLIC_LENS_GRAPHQL_URL?.trim();
   if (graphqlUrl) lens.graphqlUrl = graphqlUrl;
 
-  const qrInit = process.env.NEXT_PUBLIC_ORB_QR_INIT_URL?.trim();
-  const qrPoll = process.env.NEXT_PUBLIC_ORB_QR_POLL_URL?.trim();
-  if (qrInit) qr.initUrl = qrInit;
-  if (qrPoll) qr.pollUrl = qrPoll;
+  qr.initUrl =
+    process.env.NEXT_PUBLIC_ORB_QR_INIT_URL?.trim() ?? '/api/auth/orb/qr/init';
+  qr.pollUrl =
+    process.env.NEXT_PUBLIC_ORB_QR_POLL_URL?.trim() ?? '/api/auth/orb/qr/poll';
 
   return { qr, lens };
 }
