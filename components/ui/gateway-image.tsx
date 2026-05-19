@@ -7,6 +7,7 @@ import {
   extractIpfsHash,
   getImageUrlWithFallback,
   isIpfsUrl,
+  resolveOrbMediaForGateway,
 } from '@/lib/utils/image-gateway';
 import { Skeleton } from '@/components/ui/skeleton';
 import type { ImageProps } from 'next/image';
@@ -37,13 +38,13 @@ export function GatewayImage({
   ...props
 }: GatewayImageProps) {
   const { fill } = props;
-  const [imageSrc, setImageSrc] = useState(() => {
-    // Convert failing gateways on initial load
-    if (src && convertFailingGateway(src) !== src) {
-      return convertFailingGateway(src);
-    }
-    return src;
-  });
+  const normalizeSrc = (raw: string) => {
+    if (!raw) return raw;
+    const orb = resolveOrbMediaForGateway(raw);
+    return convertFailingGateway(orb);
+  };
+
+  const [imageSrc, setImageSrc] = useState(() => normalizeSrc(src));
   const [fallbackIndex, setFallbackIndex] = useState(0);
   const [hasError, setHasError] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -58,9 +59,7 @@ export function GatewayImage({
   // Sync imageSrc state when src prop changes (e.g., when parent updates thumbnailUrl)
   useEffect(() => {
     // Convert failing gateways when src prop changes
-    const convertedSrc = src && convertFailingGateway(src) !== src 
-      ? convertFailingGateway(src) 
-      : (src || '');
+    const convertedSrc = normalizeSrc(src || '');
     
     // Update imageSrc when src prop changes and reset fallback state
     setImageSrc(convertedSrc);

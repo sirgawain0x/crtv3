@@ -1,5 +1,12 @@
-
+import { resolveOrbImageUrl, shouldResolveWithOrbMedia } from '@/lib/sdk/orb/media';
 import { logger } from '@/lib/utils/logger';
+
+/** Apply Orb media resolver before IPFS gateway fallbacks. */
+export function resolveOrbMediaForGateway(url: string | null | undefined): string {
+  if (!url) return '';
+  if (!shouldResolveWithOrbMedia(url)) return url;
+  return resolveOrbImageUrl(url) ?? url;
+}
 /**
  * IPFS Gateway utilities with fallback support
  * Handles conversion of IPFS URLs to alternative gateways when primary gateway fails
@@ -120,6 +127,9 @@ export function isIpfsUrl(url: string): boolean {
  */
 export function convertFailingGateway(url: string): string {
   if (!url) return url;
+
+  const orbResolved = resolveOrbMediaForGateway(url);
+  if (orbResolved !== url) return orbResolved;
 
   // Handle Google Cloud Storage URLs (these are not IPFS, so we can't convert them)
   // These Livepeer AI images are temporary and expired - should be uploaded to IPFS
