@@ -39,38 +39,17 @@ export async function GET(
     const metrics = await fetchAllViews(playbackId);
     const livepeerTotal = metrics ? sumLivepeerViewMetrics(metrics) : 0;
 
-    if (metrics) {
-      const livepeerTotal =
-        (metrics.viewCount ?? 0) + (metrics.legacyViewCount ?? 0);
-
-      if (livepeerTotal > 0) {
-        return NextResponse.json(
-          {
-            success: true,
-            source: 'livepeer' as const,
-            ...metrics,
-          },
-          { headers: noStoreHeaders }
-        );
-      }
-    }
-
-    // Livepeer returned 0 or failed — fall back to database views_count
-    const supabase = await createClient();
-    const { data: videoAsset } = await supabase
-      .from('video_assets')
-      .select('views_count')
-      .eq('playback_id', playbackId)
-      .single();
-
-    const dbViewCount = videoAsset?.views_count ?? 0;
+    const supabase = createServiceClient();
+    const dbViewCount = await getStoredViewsCount(supabase, playbackId);
+    const displayTotal = mergeViewCounts(dbViewCount, livepeerTotal);
+    const source = resolveViewCountSource(livepeerTotal, dbViewCount);
 
     return NextResponse.json(
       {
         success: true,
-        source: 'database' as const,
+        source,
         playbackId,
-        viewCount: dbViewCount,
+        viewCount: displayTotal,
         playtimeMins: metrics?.playtimeMins ?? 0,
         legacyViewCount: 0,
       },
