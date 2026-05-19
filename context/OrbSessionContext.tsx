@@ -16,6 +16,7 @@ import {
   saveStoredOrbSession,
   type StoredOrbSession,
 } from '@/lib/sdk/orb/login';
+import { useWalletAuth } from '@/lib/auth/useWalletAuth';
 import { toast } from 'sonner';
 
 type OrbSessionContextValue = {
@@ -40,6 +41,7 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
   const [isLinking, setIsLinking] = useState(false);
   const user = useUser();
   const { account: modularAccount } = useModularAccount();
+  const { getAuthHeaders } = useWalletAuth();
   const orb = useMemo(() => getOrbLogin(), []);
 
   const lensAccount = useMemo(() => {
@@ -83,29 +85,38 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
       const active = session ?? loadStoredOrbSession();
       if (!active?.accessToken) return;
 
-      const wallet =
+      const wallet = (
         ownerAddress ||
         modularAccount?.address ||
         user?.address ||
-        lensAccount ||
-        undefined;
+        undefined
+      )?.toLowerCase();
 
       if (!wallet) {
-        toast.error('Connect a wallet or complete Orb sign-in to link your profile.');
+        toast.error('Connect a wallet to link your Orb / Lens profile.');
         return;
       }
 
       setIsLinking(true);
       try {
+        let authHeaders: Record<string, string>;
+        try {
+          authHeaders = await getAuthHeaders();
+        } catch {
+          toast.error('Sign in with your wallet to link your profile.');
+          return;
+        }
+
         const res = await fetch('/api/creator-profiles/link-orb', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...authHeaders,
+          },
           body: JSON.stringify({
             accessToken: active.accessToken,
-            refreshToken: active.refreshToken,
             authenticationId: active.authenticationId,
             owner_address: wallet,
-            lens_account_id: lensAccount ?? undefined,
           }),
         });
         const data = await res.json();
@@ -119,7 +130,7 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
         setIsLinking(false);
       }
     },
-    [session, modularAccount?.address, user?.address, lensAccount],
+    [session, modularAccount?.address, user?.address, getAuthHeaders],
   );
 
   const connectWithQr = useCallback(

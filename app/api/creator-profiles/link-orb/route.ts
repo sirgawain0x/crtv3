@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { checkBotId } from 'botid/server';
-import { createOrbLogin } from '@orbclub/modules/auth';
+import { getOrbLogin } from '@/lib/sdk/orb/login';
 import { supabaseService } from '@/lib/sdk/supabase/service';
 import { requireWalletAuthFor, WalletAuthError } from '@/lib/auth/require-wallet';
 import { serverLogger } from '@/lib/utils/logger';
@@ -27,9 +27,6 @@ export async function POST(request: NextRequest) {
 
     const accessToken = String(body.accessToken ?? '').trim();
     const ownerAddress = String(body.owner_address ?? '').trim().toLowerCase();
-    const refreshToken = body.refreshToken
-      ? String(body.refreshToken).trim()
-      : undefined;
     const authenticationId = body.authentication_id
       ? String(body.authentication_id).trim()
       : body.authenticationId
@@ -50,33 +47,42 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const orb = createOrbLogin();
-    const lensFromToken = orb.getAccountFromAccessToken(accessToken);
-    const resolvedLensAccount = (lensAccountId || lensFromToken || '').toLowerCase();
-    const resolvedOwner = (ownerAddress || resolvedLensAccount).toLowerCase();
-
-    if (!resolvedOwner) {
+    if (!ownerAddress) {
       return NextResponse.json(
-        {
-          success: false,
-          error: 'owner_address or a Lens account from the Orb token is required',
-        },
+        { success: false, error: 'owner_address is required' },
         { status: 400 },
       );
     }
 
-    if (ownerAddress) {
-      try {
-        await requireWalletAuthFor(request, ownerAddress);
-      } catch (authErr) {
-        if (authErr instanceof WalletAuthError) {
-          return NextResponse.json(
-            { success: false, error: authErr.message },
-            { status: authErr.status },
-          );
-        }
-        throw authErr;
+    const orb = getOrbLogin();
+    const lensFromToken = orb.getAccountFromAccessToken(accessToken);
+
+    if (!lensFromToken) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid Orb access token' },
+        { status: 401 },
+      );
+    }
+
+    const resolvedLensAccount = lensFromToken.toLowerCase();
+
+    if (lensAccountId && lensAccountId !== resolvedLensAccount) {
+      return NextResponse.json(
+        { success: false, error: 'lens_account_id mismatch with token' },
+        { status: 400 },
+      );
+    }
+
+    try {
+      await requireWalletAuthFor(request, ownerAddress);
+    } catch (authErr) {
+      if (authErr instanceof WalletAuthError) {
+        return NextResponse.json(
+          { success: false, error: authErr.message },
+          { status: authErr.status },
+        );
       }
+      throw authErr;
     }
 
     if (!supabaseService) {
@@ -86,15 +92,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const orbAccountId =
-      authenticationId || resolvedLensAccount || resolvedOwner;
+    const orbAccountId = authenticationId || resolvedLensAccount || ownerAddress;
 
     const payload: Record<string, unknown> = {
-      owner_address: resolvedOwner,
+      owner_address: ownerAddress,
       orb_account_id: orbAccountId,
+      lens_account_id: resolvedLensAccount,
       updated_at: new Date().toISOString(),
     };
-    if (resolvedLensAccount) payload.lens_account_id = resolvedLensAccount;
     if (lensHandle) payload.lens_handle = lensHandle;
     if (lensAvatarUri) {
       payload.lens_avatar_uri = lensAvatarUri;
