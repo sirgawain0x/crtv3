@@ -42,7 +42,7 @@ function syncViewsErrorResponse(error: unknown) {
   );
 }
 
-export async function syncViewsForPlayback(
+async function syncViewsForPlayback(
   supabase: SupabaseClient,
   playbackId: string,
 ) {
