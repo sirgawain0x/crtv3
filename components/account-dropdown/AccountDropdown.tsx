@@ -112,13 +112,14 @@ import { useMembershipVerification } from "@/lib/hooks/unlock/useMembershipVerif
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMeTokensSupabase } from "@/lib/hooks/metokens/useMeTokensSupabase";
 import { useMeTokenHoldings } from "@/lib/hooks/metokens/useMeTokenHoldings";
-import { chains } from "@/config";
+import { chains, lensChain } from "@/config";
 import { HydrationSafe } from "@/components/ui/hydration-safe";
 import { useMembershipNFTs, type MembershipNFT } from "@/lib/hooks/unlock/useMembershipNFTs";
 import { LOCK_ADDRESSES } from "@/lib/sdk/unlock/services";
 
 const chainIconMap: Record<number, string> = {
   [base.id]: "/images/chains/base.svg",
+  [lensChain.id]: "/images/chains/default-chain.svg",
 };
 
 function getChainIcon(chain: { id: number }) {
