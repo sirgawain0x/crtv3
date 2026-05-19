@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { checkBotId } from 'botid/server';
-import { createClient } from '@/lib/sdk/supabase/server';
+import { createServiceClient } from '@/lib/sdk/supabase/service';
 import { fetchAllViews } from '@/app/api/livepeer/views';
+import { sumLivepeerViewMetrics } from '@/lib/livepeer/view-count';
+import { syncStoredViewsCount } from '@/lib/livepeer/sync-view-count';
 import { serverLogger } from '@/lib/utils/logger';
 import { rateLimiters } from '@/lib/middleware/rateLimit';
 
@@ -18,17 +20,15 @@ export async function POST(
 
   try {
     const { playbackId } = await params;
-    
-    // Safely parse JSON body, falling back to empty object on empty/invalid body
-    let body: any = {};
+
+    let body: { viewCount?: number } = {};
     try {
       body = await request.json();
-    } catch (jsonError) {
-      // Empty or invalid JSON body - use empty object
+    } catch {
       body = {};
     }
-    
-    const { viewCount } = body || {};
+
+    const { viewCount: bodyViewCount } = body;
 
     if (!playbackId) {
       return NextResponse.json(
@@ -37,10 +37,12 @@ export async function POST(
       );
     }
 
-    // If viewCount is provided in the request body, use it
-    // Otherwise, fetch from Livepeer API
-    let finalViewCount = viewCount;
-    if (!finalViewCount) {
+    const supabase = createServiceClient();
+    let livepeerTotal: number;
+
+    if (bodyViewCount != null && bodyViewCount > 0) {
+      livepeerTotal = bodyViewCount;
+    } else {
       const metrics = await fetchAllViews(playbackId);
       if (!metrics) {
         return NextResponse.json(
@@ -48,69 +50,55 @@ export async function POST(
           { status: 500 }
         );
       }
-      finalViewCount = metrics.viewCount + metrics.legacyViewCount;
+      livepeerTotal = sumLivepeerViewMetrics(metrics);
     }
 
-    // Update the database
-    const supabase = await createClient();
-    const { error } = await supabase
-      .from('video_assets')
-      .update({ views_count: finalViewCount })
-      .eq('playback_id', playbackId);
-
-    if (error) {
-      serverLogger.error('Failed to update view count:', error);
-      return NextResponse.json(
-        { error: 'Failed to update view count in database' },
-        { status: 500 }
-      );
-    }
+    const { viewCount } = await syncStoredViewsCount(
+      supabase,
+      playbackId,
+      livepeerTotal,
+    );
 
     return NextResponse.json({
       success: true,
       playbackId,
-      viewCount: finalViewCount
+      viewCount,
     });
-
   } catch (error) {
     serverLogger.error('Error syncing view count:', error);
-    
-    // Handle specific error types
+
     if (error instanceof Error) {
-      // Check for Livepeer API errors
       if (error.message.includes('Livepeer') || error.message.includes('playback')) {
         return NextResponse.json(
-          { 
+          {
             error: 'Livepeer API error',
-            details: 'Unable to fetch view metrics from Livepeer. Please try again later.'
+            details: 'Unable to fetch view metrics from Livepeer. Please try again later.',
           },
           { status: 503 }
         );
       }
-      
-      // Check for database errors
+
       if (error.message.includes('database') || error.message.includes('connection')) {
         return NextResponse.json(
-          { 
+          {
             error: 'Database error',
-            details: 'Unable to update view count in database. Please try again later.'
+            details: 'Unable to update view count in database. Please try again later.',
           },
           { status: 503 }
         );
       }
     }
-    
+
     return NextResponse.json(
-      { 
+      {
         error: 'Internal server error',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        details: error instanceof Error ? error.message : 'Unknown error',
       },
       { status: 500 }
     );
   }
 }
 
-// Also support GET for manual syncing
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ playbackId: string }> }
@@ -125,7 +113,6 @@ export async function GET(
       );
     }
 
-    // Fetch from Livepeer API
     const metrics = await fetchAllViews(playbackId);
     if (!metrics) {
       return NextResponse.json(
@@ -134,61 +121,48 @@ export async function GET(
       );
     }
 
-    const totalViews = metrics.viewCount + metrics.legacyViewCount;
-
-    // Update the database
-    const supabase = await createClient();
-    const { error } = await supabase
-      .from('video_assets')
-      .update({ views_count: totalViews })
-      .eq('playback_id', playbackId);
-
-    if (error) {
-      serverLogger.error('Failed to update view count:', error);
-      return NextResponse.json(
-        { error: 'Failed to update view count in database' },
-        { status: 500 }
-      );
-    }
+    const livepeerTotal = sumLivepeerViewMetrics(metrics);
+    const supabase = createServiceClient();
+    const { viewCount } = await syncStoredViewsCount(
+      supabase,
+      playbackId,
+      livepeerTotal,
+    );
 
     return NextResponse.json({
       success: true,
       playbackId,
-      viewCount: totalViews
+      viewCount,
     });
-
   } catch (error) {
     serverLogger.error('Error syncing view count:', error);
-    
-    // Handle specific error types
+
     if (error instanceof Error) {
-      // Check for Livepeer API errors
       if (error.message.includes('Livepeer') || error.message.includes('playback')) {
         return NextResponse.json(
-          { 
+          {
             error: 'Livepeer API error',
-            details: 'Unable to fetch view metrics from Livepeer. Please try again later.'
+            details: 'Unable to fetch view metrics from Livepeer. Please try again later.',
           },
           { status: 503 }
         );
       }
-      
-      // Check for database errors
+
       if (error.message.includes('database') || error.message.includes('connection')) {
         return NextResponse.json(
-          { 
+          {
             error: 'Database error',
-            details: 'Unable to update view count in database. Please try again later.'
+            details: 'Unable to update view count in database. Please try again later.',
           },
           { status: 503 }
         );
       }
     }
-    
+
     return NextResponse.json(
-      { 
+      {
         error: 'Internal server error',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        details: error instanceof Error ? error.message : 'Unknown error',
       },
       { status: 500 }
     );

@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchAllViews } from '@/app/api/livepeer/views';
-import { createClient } from '@/lib/sdk/supabase/server';
+import { createServiceClient } from '@/lib/sdk/supabase/service';
+import {
+  mergeViewCounts,
+  resolveViewCountSource,
+  sumLivepeerViewMetrics,
+} from '@/lib/livepeer/view-count';
+import { getStoredViewsCount } from '@/lib/livepeer/sync-view-count';
 import { serverLogger } from '@/lib/utils/logger';
 
 /**
- * Read-only endpoint to fetch view metrics from Livepeer
- * Falls back to database views_count if Livepeer API fails or returns 0
+ * Read-only endpoint: returns max(Livepeer views, database views_count).
  */
 export async function GET(
   request: NextRequest,
@@ -21,41 +26,22 @@ export async function GET(
       );
     }
 
-    // Fetch metrics from Livepeer API
     const metrics = await fetchAllViews(playbackId);
+    const livepeerTotal = metrics ? sumLivepeerViewMetrics(metrics) : 0;
 
-    if (metrics) {
-      const livepeerTotal =
-        (metrics.viewCount ?? 0) + (metrics.legacyViewCount ?? 0);
-
-      if (livepeerTotal > 0) {
-        return NextResponse.json({
-          success: true,
-          source: 'livepeer' as const,
-          ...metrics,
-        });
-      }
-    }
-
-    // Livepeer returned 0 or failed — fall back to database views_count
-    const supabase = await createClient();
-    const { data: videoAsset } = await supabase
-      .from('video_assets')
-      .select('views_count')
-      .eq('playback_id', playbackId)
-      .single();
-
-    const dbViewCount = videoAsset?.views_count ?? 0;
+    const supabase = createServiceClient();
+    const dbViewCount = await getStoredViewsCount(supabase, playbackId);
+    const displayTotal = mergeViewCounts(dbViewCount, livepeerTotal);
+    const source = resolveViewCountSource(livepeerTotal, dbViewCount);
 
     return NextResponse.json({
       success: true,
-      source: 'database' as const,
+      source,
       playbackId,
-      viewCount: dbViewCount,
+      viewCount: displayTotal,
       playtimeMins: metrics?.playtimeMins ?? 0,
       legacyViewCount: 0,
     });
-
   } catch (error) {
     serverLogger.error('Error fetching view metrics:', error);
     return NextResponse.json(
@@ -64,4 +50,3 @@ export async function GET(
     );
   }
 }
-
