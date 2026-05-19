@@ -58,6 +58,7 @@
     "@livepeer/ai": "^0.6.2",
     "@livepeer/react": "^4.3.6",
     "@neondatabase/serverless": "^1.0.0",
+    "@orbclub/modules": "^0.1.1",
     "@paragraph-com/sdk": "^1.1.0",
     "@radix-ui/react-alert-dialog": "^1.1.15",
     "@radix-ui/react-avatar": "^1.1.3",

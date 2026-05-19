@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchAllViews } from '@/app/api/livepeer/views';
-import { createClient } from '@/lib/sdk/supabase/server';
+import { createServiceClient } from '@/lib/sdk/supabase/service';
+import {
+  mergeViewCounts,
+  resolveViewCountSource,
+  sumLivepeerViewMetrics,
+} from '@/lib/livepeer/view-count';
+import { getStoredViewsCount } from '@/lib/livepeer/sync-view-count';
 import { serverLogger } from '@/lib/utils/logger';
 
 export const dynamic = 'force-dynamic';
@@ -14,8 +20,7 @@ const noStoreHeaders = {
 };
 
 /**
- * Read-only endpoint to fetch view metrics from Livepeer
- * Falls back to database views_count if Livepeer API fails or returns 0
+ * Read-only endpoint: returns max(Livepeer views, database views_count).
  */
 export async function GET(
   request: NextRequest,
@@ -31,8 +36,8 @@ export async function GET(
       );
     }
 
-    // Fetch metrics from Livepeer API
     const metrics = await fetchAllViews(playbackId);
+    const livepeerTotal = metrics ? sumLivepeerViewMetrics(metrics) : 0;
 
     if (metrics) {
       const livepeerTotal =
@@ -80,4 +85,3 @@ export async function GET(
     );
   }
 }
-
