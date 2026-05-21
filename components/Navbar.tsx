@@ -160,8 +160,13 @@ function NetworkStatus({ isConnected }: { isConnected: boolean }) {
 
 export default function Navbar() {
   const { openAuthModal } = useAuthModal();
-  const { openLoginModal: openOrbLogin, isAuthenticated: isOrbAuthenticated } =
-    useOrbSession();
+  const {
+    openLoginModal: openOrbLogin,
+    isAuthenticated: isOrbAuthenticated,
+    hasWallet: hasWalletForOrb,
+    loginError: orbLoginError,
+    linkStatus: orbLinkStatus,
+  } = useOrbSession();
   const user = useUser();
   const { logout } = useLogout();
   const { chain: currentChain, setChain, isSettingChain } = useChain();
@@ -539,7 +544,7 @@ export default function Navbar() {
                     >
                       Get Started
                     </Button>
-                    {hasWalletForOrb && !isOrbAuthenticated && (
+                    {!isOrbAuthenticated && (
                       <Button
                         variant="outline"
                         className="w-full mt-2"
@@ -548,18 +553,9 @@ export default function Navbar() {
                           setIsMenuOpen(false);
                         }}
                       >
-                        Link Lens (Orb)
+                        Sign in with Orb
                       </Button>
                     )}
-                    {hasWalletForOrb &&
-                      isOrbAuthenticated &&
-                      (orbLinkStatus === 'needs_wallet' ||
-                        orbLinkStatus === 'failed') && (
-                        <p className="mt-2 text-center text-xs text-amber-600 dark:text-amber-400">
-                          {orbLoginError ||
-                            'Orb connected — open your account menu to sync your profile.'}
-                        </p>
-                      )}
                   </div>
                 )}
               </HydrationSafe>

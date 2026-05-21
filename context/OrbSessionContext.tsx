@@ -17,7 +17,10 @@ import {
   type StoredOrbSession,
 } from '@/lib/sdk/orb/login';
 import { useWalletAuth } from '@/lib/auth/useWalletAuth';
+import { formatOrbAuthError } from '@/lib/sdk/orb/format-auth-error';
 import { toast } from 'sonner';
+
+export type OrbLinkStatus = 'idle' | 'linked' | 'needs_wallet' | 'failed';
 
 type OrbSessionContextValue = {
   session: StoredOrbSession | null;
@@ -25,8 +28,12 @@ type OrbSessionContextValue = {
   isAuthenticated: boolean;
   isLinking: boolean;
   isLoginModalOpen: boolean;
+  loginError: string | null;
+  linkStatus: OrbLinkStatus;
+  hasWallet: boolean;
   openLoginModal: () => void;
   closeLoginModal: () => void;
+  clearLoginError: () => void;
   connectWithQr: (onInit?: (payload: { qrCode: string; deepLink?: string }) => void) => Promise<void>;
   logout: () => Promise<void>;
   syncSession: () => Promise<StoredOrbSession | null>;
@@ -39,10 +46,15 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
   const [session, setSession] = useState<StoredOrbSession | null>(null);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isLinking, setIsLinking] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [linkStatus, setLinkStatus] = useState<OrbLinkStatus>('idle');
   const user = useUser();
   const { account: modularAccount } = useModularAccount();
   const { getAuthHeaders } = useWalletAuth();
   const orb = useMemo(() => getOrbLogin(), []);
+
+  const walletAddress = modularAccount?.address || user?.address || null;
+  const hasWallet = !!walletAddress;
 
   const lensAccount = useMemo(() => {
     if (!session?.accessToken) return null;
@@ -93,7 +105,12 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
       )?.toLowerCase();
 
       if (!wallet) {
-        toast.error('Connect a wallet to link your Orb / Lens profile.');
+        setLinkStatus('needs_wallet');
+        const message = formatOrbAuthError(
+          'Connect your wallet with Get Started before linking your Lens identity.',
+        );
+        setLoginError(message);
+        toast.error(message);
         return;
       }
 
@@ -102,8 +119,11 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
         let authHeaders: Record<string, string>;
         try {
           authHeaders = await getAuthHeaders();
-        } catch {
-          toast.error('Sign in with your wallet to link your profile.');
+        } catch (signErr) {
+          setLinkStatus('failed');
+          const message = formatOrbAuthError(signErr);
+          setLoginError(message);
+          toast.error(message);
           return;
         }
 
@@ -123,9 +143,14 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
         if (!res.ok || !data.success) {
           throw new Error(data.error || 'Failed to link Orb profile');
         }
+        setLinkStatus('linked');
+        setLoginError(null);
         toast.success('Orb / Lens identity linked to your profile');
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : 'Profile link failed');
+        setLinkStatus('failed');
+        const message = formatOrbAuthError(err);
+        setLoginError(message);
+        toast.error(message);
       } finally {
         setIsLinking(false);
       }
@@ -189,8 +214,22 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
       }
     }
     persistSession(null);
+    setLoginError(null);
+    setLinkStatus('idle');
     toast.success('Signed out of Orb');
   }, [session, orb, persistSession]);
+
+  const openLoginModal = useCallback(() => {
+    if (!hasWallet) {
+      const message = formatOrbAuthError(
+        'Connect your wallet with Get Started before linking your Lens identity.',
+      );
+      toast.info(message);
+      return;
+    }
+    setLoginError(null);
+    setIsLoginModalOpen(true);
+  }, [hasWallet]);
 
   const value = useMemo<OrbSessionContextValue>(
     () => ({
@@ -199,8 +238,12 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
       isAuthenticated: !!session?.accessToken,
       isLinking,
       isLoginModalOpen,
-      openLoginModal: () => setIsLoginModalOpen(true),
+      loginError,
+      linkStatus,
+      hasWallet,
+      openLoginModal,
       closeLoginModal: () => setIsLoginModalOpen(false),
+      clearLoginError: () => setLoginError(null),
       connectWithQr,
       logout,
       syncSession,
@@ -211,6 +254,10 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
       lensAccount,
       isLinking,
       isLoginModalOpen,
+      loginError,
+      linkStatus,
+      hasWallet,
+      openLoginModal,
       connectWithQr,
       logout,
       syncSession,
