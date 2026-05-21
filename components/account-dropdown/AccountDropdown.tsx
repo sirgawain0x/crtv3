@@ -1353,8 +1353,18 @@ export function AccountDropdown() {
               <p className="text-xs text-muted-foreground">Orb / Lens</p>
               {isOrbAuthenticated ? (
                 <div className="space-y-2">
-                  <p className="text-xs text-green-600 dark:text-green-400">
-                    Linked{lensAccount ? `: ${shortenAddress(lensAccount)}` : ""}
+                  <p
+                    className={
+                      orbLinkStatus === 'linked'
+                        ? 'text-xs text-green-600 dark:text-green-400'
+                        : 'text-xs text-amber-600 dark:text-amber-400'
+                    }
+                  >
+                    {orbLinkStatus === 'linked'
+                      ? `Linked${lensAccount ? `: ${shortenAddress(lensAccount)}` : ''}`
+                      : orbLinkStatus === 'failed' || orbLoginError
+                        ? orbLoginError || 'Orb signed in — sync required'
+                        : `Orb session active${lensAccount ? `: ${shortenAddress(lensAccount)}` : ''}`}
                   </p>
                   <div className="flex gap-2">
                     <Button

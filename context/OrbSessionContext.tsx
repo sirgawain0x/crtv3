@@ -133,27 +133,45 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
     [session, modularAccount?.address, user?.address, getAuthHeaders],
   );
 
+  useEffect(() => {
+    if (!session?.accessToken || !walletAddress) return;
+    if (linkStatus !== 'needs_wallet') return;
+    void linkProfile(walletAddress);
+  }, [session?.accessToken, walletAddress, linkStatus, linkProfile]);
+
   const connectWithQr = useCallback(
     async (onInit?: (payload: { qrCode: string; deepLink?: string }) => void) => {
-      const result = await orb.connectWithQr({
-        onInit: (payload) => {
-          onInit?.({ qrCode: payload.qrCode, deepLink: payload.deepLink });
-        },
-      });
+      setLoginError(null);
+      try {
+        const result = await orb.connectWithQr({
+          onInit: (payload) => {
+            onInit?.({ qrCode: payload.qrCode, deepLink: payload.deepLink });
+          },
+        });
 
-      const stored: StoredOrbSession = {
-        accessToken: result.accessToken,
-        refreshToken: result.refreshToken,
-        authenticationId: result.authenticationId,
-        idToken: result.idToken,
-      };
-      persistSession(stored);
-      setIsLoginModalOpen(false);
-      toast.success('Signed in with Orb');
+        const stored: StoredOrbSession = {
+          accessToken: result.accessToken,
+          refreshToken: result.refreshToken,
+          authenticationId: result.authenticationId,
+          idToken: result.idToken,
+        };
+        persistSession(stored);
+        setIsLoginModalOpen(false);
+        toast.success('Signed in with Orb');
 
-      const wallet = modularAccount?.address || user?.address;
-      if (wallet) {
-        await linkProfile(wallet);
+        const wallet = modularAccount?.address || user?.address;
+        if (wallet) {
+          await linkProfile(wallet);
+        } else {
+          setLinkStatus('needs_wallet');
+          toast.info(
+            'Orb connected. Use Get Started to connect your wallet, then sync your profile.',
+          );
+        }
+      } catch (err) {
+        const message = formatOrbAuthError(err);
+        setLoginError(message);
+        throw new Error(message);
       }
     },
     [orb, persistSession, modularAccount?.address, user?.address, linkProfile],

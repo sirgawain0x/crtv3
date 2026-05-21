@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -19,59 +19,84 @@ export function OrbLoginModal() {
     closeLoginModal,
     connectWithQr,
     isAuthenticated,
+    loginError,
+    clearLoginError,
+    hasWallet,
   } = useOrbSession();
   const [qrCode, setQrCode] = useState<string | null>(null);
   const [deepLink, setDeepLink] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [localError, setLocalError] = useState<string | null>(null);
+  const startedRef = useRef(false);
+
+  const displayError = localError ?? loginError;
+
+  const resetFlow = useCallback(() => {
+    setQrCode(null);
+    setDeepLink(null);
+    setLocalError(null);
+    clearLoginError();
+    startedRef.current = false;
+  }, [clearLoginError]);
+
+  const startConnect = useCallback(async () => {
+    setIsConnecting(true);
+    setLocalError(null);
+    clearLoginError();
+    try {
+      await connectWithQr(({ qrCode: qr, deepLink: link }) => {
+        setQrCode(qr);
+        setDeepLink(link ?? null);
+      });
+    } catch (err) {
+      setLocalError(err instanceof Error ? err.message : 'Orb sign-in failed');
+    } finally {
+      setIsConnecting(false);
+    }
+  }, [connectWithQr, clearLoginError]);
 
   useEffect(() => {
     if (!isLoginModalOpen) {
-      setQrCode(null);
-      setDeepLink(null);
-      setError(null);
+      resetFlow();
       setIsConnecting(false);
       return;
     }
 
-    if (isAuthenticated) {
+    if (isAuthenticated || !hasWallet) {
       closeLoginModal();
       return;
     }
 
-    let cancelled = false;
+    if (displayError || startedRef.current) return;
 
-    (async () => {
-      setIsConnecting(true);
-      setError(null);
-      try {
-        await connectWithQr(({ qrCode: qr, deepLink: link }) => {
-          if (cancelled) return;
-          setQrCode(qr);
-          setDeepLink(link ?? null);
-        });
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : 'Orb sign-in failed');
-        }
-      } finally {
-        if (!cancelled) setIsConnecting(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isLoginModalOpen, isAuthenticated, connectWithQr, closeLoginModal]);
+    startedRef.current = true;
+    void startConnect();
+  }, [
+    isLoginModalOpen,
+    isAuthenticated,
+    hasWallet,
+    closeLoginModal,
+    resetFlow,
+    displayError,
+    startConnect,
+  ]);
 
   return (
-    <Dialog open={isLoginModalOpen} onOpenChange={(open) => !open && closeLoginModal()}>
+    <Dialog
+      open={isLoginModalOpen}
+      onOpenChange={(open) => {
+        if (!open) {
+          resetFlow();
+          closeLoginModal();
+        }
+      }}
+    >
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Sign in with Orb</DialogTitle>
+          <DialogTitle>Link Lens with Orb</DialogTitle>
           <DialogDescription>
-            Scan the QR code with the Orb app to connect your sovereign Lens identity.
-            You can still use Account Kit for your smart wallet and transactions.
+            Scan the QR code with the Orb app to connect your Lens identity to the
+            wallet you signed in with.
           </DialogDescription>
         </DialogHeader>
 
@@ -90,26 +115,39 @@ export function OrbLoginModal() {
               />
             </div>
           )}
-          {deepLink && (
+          {deepLink && !displayError && (
             <Button variant="outline" size="sm" asChild>
               <a href={deepLink} target="_blank" rel="noopener noreferrer">
                 Open in Orb app
               </a>
             </Button>
           )}
-          {error && (
-            <p className="text-center text-sm text-destructive">{error}</p>
+          {displayError && (
+            <p className="text-center text-sm text-destructive">{displayError}</p>
           )}
-          {error && (
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setError(null);
-                closeLoginModal();
-              }}
-            >
-              Close
-            </Button>
+          {displayError && (
+            <div className="flex w-full flex-col gap-2 sm:flex-row">
+              <Button
+                className="flex-1"
+                onClick={() => {
+                  resetFlow();
+                  void startConnect();
+                }}
+                disabled={isConnecting}
+              >
+                Try again
+              </Button>
+              <Button
+                variant="secondary"
+                className="flex-1"
+                onClick={() => {
+                  resetFlow();
+                  closeLoginModal();
+                }}
+              >
+                Close
+              </Button>
+            </div>
           )}
         </div>
       </DialogContent>

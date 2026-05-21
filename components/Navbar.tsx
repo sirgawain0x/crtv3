@@ -539,7 +539,7 @@ export default function Navbar() {
                     >
                       Get Started
                     </Button>
-                    {!isOrbAuthenticated && (
+                    {hasWalletForOrb && !isOrbAuthenticated && (
                       <Button
                         variant="outline"
                         className="w-full mt-2"
@@ -548,9 +548,18 @@ export default function Navbar() {
                           setIsMenuOpen(false);
                         }}
                       >
-                        Sign in with Orb
+                        Link Lens (Orb)
                       </Button>
                     )}
+                    {hasWalletForOrb &&
+                      isOrbAuthenticated &&
+                      (orbLinkStatus === 'needs_wallet' ||
+                        orbLinkStatus === 'failed') && (
+                        <p className="mt-2 text-center text-xs text-amber-600 dark:text-amber-400">
+                          {orbLoginError ||
+                            'Orb connected — open your account menu to sync your profile.'}
+                        </p>
+                      )}
                   </div>
                 )}
               </HydrationSafe>
