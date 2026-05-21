@@ -160,8 +160,13 @@ function NetworkStatus({ isConnected }: { isConnected: boolean }) {
 
 export default function Navbar() {
   const { openAuthModal } = useAuthModal();
-  const { openLoginModal: openOrbLogin, isAuthenticated: isOrbAuthenticated } =
-    useOrbSession();
+  const {
+    openLoginModal: openOrbLogin,
+    isAuthenticated: isOrbAuthenticated,
+    hasWallet: hasWalletForOrb,
+    loginError: orbLoginError,
+    linkStatus: orbLinkStatus,
+  } = useOrbSession();
   const user = useUser();
   const { logout } = useLogout();
   const { chain: currentChain, setChain, isSettingChain } = useChain();

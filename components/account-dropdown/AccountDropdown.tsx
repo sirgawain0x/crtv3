@@ -258,6 +258,8 @@ export function AccountDropdown() {
     linkProfile,
     isLinking: isOrbLinking,
     logout: logoutOrb,
+    linkStatus: orbLinkStatus,
+    loginError: orbLoginError,
   } = useOrbSession();
   const user = useUser();
   const { logout } = useLogout();
