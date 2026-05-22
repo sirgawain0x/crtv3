@@ -1385,7 +1385,10 @@ export function AccountDropdown() {
                   variant="outline"
                   size="sm"
                   className="w-full text-xs"
-                  onClick={() => openOrbLogin()}
+                  onClick={() => {
+                    setIsDropdownOpen(false);
+                    openOrbLogin();
+                  }}
                 >
                   Sign in with Orb
                 </Button>
