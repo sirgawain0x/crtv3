@@ -47,7 +47,6 @@ import { TokenBalance } from "./wallet/balance/TokenBalance";
 import { MeTokenBalances } from "./wallet/balance/MeTokenBalances";
 import type { Chain as ViemChain } from "viem";
 import { AccountDropdown } from "@/components/account-dropdown/AccountDropdown";
-import { useOrbSession } from "@/context/OrbSessionContext";
 import { useMembershipVerification } from "@/lib/hooks/unlock/useMembershipVerification";
 import { useMeTokensSupabase } from "@/lib/hooks/metokens/useMeTokensSupabase";
 import { useMeTokenHoldings } from "@/lib/hooks/metokens/useMeTokenHoldings";
@@ -160,13 +159,6 @@ function NetworkStatus({ isConnected }: { isConnected: boolean }) {
 
 export default function Navbar() {
   const { openAuthModal } = useAuthModal();
-  const {
-    openLoginModal: openOrbLogin,
-    isAuthenticated: isOrbAuthenticated,
-    hasWallet: hasWalletForOrb,
-    loginError: orbLoginError,
-    linkStatus: orbLinkStatus,
-  } = useOrbSession();
   const user = useUser();
   const { logout } = useLogout();
   const { chain: currentChain, setChain, isSettingChain } = useChain();
@@ -452,11 +444,18 @@ export default function Navbar() {
           </div>
 
           {/* Mobile menu button */}
-          <div className="flex md:hidden items-center">
+          <div className="flex md:hidden items-center gap-2">
             <ThemeToggleComponent />
+            <HydrationSafe>
+              {user ? (
+                <div className="flex items-center">
+                  <AccountDropdown />
+                </div>
+              ) : null}
+            </HydrationSafe>
             <button
               className={
-                "ml-2 inline-flex items-center justify-center rounded-md p-2 " +
+                "inline-flex items-center justify-center rounded-md p-2 " +
                 "text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 " +
                 "dark:hover:bg-gray-800 dark:hover:text-gray-50 transition-colors"
               }
@@ -544,18 +543,6 @@ export default function Navbar() {
                     >
                       Get Started
                     </Button>
-                    {!isOrbAuthenticated && (
-                      <Button
-                        variant="outline"
-                        className="w-full mt-2"
-                        onClick={() => {
-                          openOrbLogin();
-                          setIsMenuOpen(false);
-                        }}
-                      >
-                        Sign in with Orb
-                      </Button>
-                    )}
                   </div>
                 )}
               </HydrationSafe>
