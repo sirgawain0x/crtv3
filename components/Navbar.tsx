@@ -59,6 +59,7 @@ import makeBlockie from "ethereum-blockies-base64";
 import { logger } from '@/lib/utils/logger';
 import { AnimatedMenuIcon } from "@/components/navbar/AnimatedMenuIcon";
 import { CreativePlatformAppsDrawer } from "@/components/navbar/CreativePlatformAppsDrawer";
+import { navIconButtonProps } from "@/components/navbar/navButtonStyles";
 
 type UseUserResult = (AccountUser & { type: "eoa" | "sca" }) | null;
 
@@ -348,22 +349,16 @@ export default function Navbar() {
             <HydrationSafe>
               <AccountDropdown ref={accountDropdownRef} />
             </HydrationSafe>
-            <button
-              className={
-                "md:hidden inline-flex items-center justify-center rounded-md p-2 " +
-                "text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 " +
-                "dark:hover:bg-gray-800 dark:hover:text-gray-50 transition-colors"
-              }
+            <Button
+              {...navIconButtonProps}
+              className="md:hidden"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               aria-expanded={isMenuOpen}
               id="mobile-menu-btn"
               aria-label={isMenuOpen ? "Close main menu" : "Open main menu"}
             >
-              <span className="sr-only">
-                {isMenuOpen ? "Close main menu" : "Open main menu"}
-              </span>
               <AnimatedMenuIcon isOpen={isMenuOpen} />
-            </button>
+            </Button>
           </div>
 
           {/* Mobile menu */}

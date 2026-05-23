@@ -22,6 +22,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils/utils";
+import { navIconButtonProps } from "@/components/navbar/navButtonStyles";
 
 const CREATIVE_PLATFORM_APPS = [
   {
@@ -74,8 +75,7 @@ export function CreativePlatformAppsDrawer() {
     <Sheet>
       <SheetTrigger asChild>
         <Button
-          variant="outline"
-          size="icon"
+          {...navIconButtonProps}
           id="creative-platform-apps-btn"
         >
           <LayoutGrid className="h-[1.2rem] w-[1.2rem]" />
@@ -93,6 +93,7 @@ export function CreativePlatformAppsDrawer() {
           {CREATIVE_PLATFORM_APPS.map((app) => {
             const Icon = app.icon;
             const isExternal = app.href.startsWith("http");
+            const isCurrent = "isCurrent" in app && app.isCurrent;
 
             return (
               <Link
@@ -104,7 +105,7 @@ export function CreativePlatformAppsDrawer() {
                   "group flex items-center gap-3 rounded-lg border border-transparent p-3",
                   "transition-colors hover:border-gray-200 hover:bg-gray-50",
                   "dark:hover:border-gray-700 dark:hover:bg-gray-800/50",
-                  "isCurrent" in app && app.isCurrent &&
+                  isCurrent &&
                     "border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/50"
                 )}
               >
@@ -120,7 +121,7 @@ export function CreativePlatformAppsDrawer() {
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center gap-2">
                     <span className="font-medium">{app.name}</span>
-                    {"isCurrent" in app && app.isCurrent && (
+                    {isCurrent && (
                       <span className="rounded bg-red-500/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-red-500">
                         Current
                       </span>
