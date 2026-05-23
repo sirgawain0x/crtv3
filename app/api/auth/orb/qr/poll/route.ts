@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { checkBotId } from 'botid/server';
 import { rateLimit } from '@/lib/middleware/rateLimit';
 import { serverLogger } from '@/lib/utils/logger';
 import {
@@ -8,6 +9,12 @@ import {
 
 /** Same-origin proxy for Orb QR poll (avoids browser CORS to orbapi.xyz). */
 export async function POST(request: NextRequest) {
+  const verification = await checkBotId();
+  if (verification.isBot) {
+    serverLogger.warn('[orb/qr/poll] BotID rejected request');
+    return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+  }
+
   const rl = await rateLimit(request, {
     maxRequests: 90,
     windowMs: 60 * 1000,
@@ -46,6 +53,11 @@ export async function POST(request: NextRequest) {
     });
 
     const text = await res.text();
+    if (!res.ok) {
+      serverLogger.warn(
+        `[orb/qr/poll] upstream ${res.status} from ${ORB_QR_POLL_UPSTREAM}`,
+      );
+    }
     return new NextResponse(text, {
       status: res.status,
       headers: {
