@@ -240,8 +240,10 @@ export default function Navbar() {
   const openAccountAction = (
     action: "buy" | "send" | "swap" | "session-keys"
   ) => {
-    accountDropdownRef.current?.openAction(action);
-    setIsMenuOpen(false);
+    if (accountDropdownRef.current) {
+      accountDropdownRef.current.openAction(action);
+      setIsMenuOpen(false);
+    }
   };
 
   const copyToClipboard = async () => {
@@ -389,7 +391,7 @@ export default function Navbar() {
                         </Avatar>
                         <div>
                           <p className="text-xs text-gray-500 dark:text-gray-400">
-                            {smartAccountAddress ? "Smart Wallet" : "EOA"}
+                            {user?.type === "sca" ? "Smart Wallet" : "EOA"}
                           </p>
                           <p className="text-sm font-medium font-mono">
                             {displayAddress}
