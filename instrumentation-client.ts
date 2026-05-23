@@ -3,6 +3,9 @@ import { initBotId } from 'botid/client/core';
 /**
  * BotID protected routes: client attaches headers for these paths so server
  * can call checkBotId(). Excludes cron routes (no browser context).
+ *
+ * Orb QR sign-in (/api/auth/orb/qr/init, /api/auth/orb/qr/poll) is intentionally
+ * omitted — poll loops every ~1–2s and Kasada/BotID flags that as bot traffic.
  */
 initBotId({
   protect: [

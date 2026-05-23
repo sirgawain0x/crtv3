@@ -11,7 +11,7 @@ export function formatOrbAuthError(error: unknown): string {
   const lower = msg.toLowerCase();
 
   if (lower.includes('access denied') || lower.includes('403')) {
-    return 'Sign-in was blocked. Disable VPN or ad blockers, then try again.';
+    return 'Sign-in was blocked by security checks. Try a private window with extensions off, or try again in a minute.';
   }
   if (
     lower.includes('failed to reach orb') ||
