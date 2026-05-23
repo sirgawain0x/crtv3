@@ -69,23 +69,17 @@ const CREATIVE_PLATFORM_APPS = [
   },
 ] as const;
 
-const navButtonClass =
-  "inline-flex items-center justify-center rounded-md p-2 text-gray-500 " +
-  "hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 " +
-  "dark:hover:text-gray-50 transition-colors";
-
 export function CreativePlatformAppsDrawer() {
   return (
     <Sheet>
       <SheetTrigger asChild>
         <Button
-          variant="ghost"
+          variant="outline"
           size="icon"
-          className={navButtonClass}
-          aria-label="Open Creative Platform apps"
           id="creative-platform-apps-btn"
         >
-          <LayoutGrid className="h-5 w-5" />
+          <LayoutGrid className="h-[1.2rem] w-[1.2rem]" />
+          <span className="sr-only">Browse Creative Platform apps</span>
         </Button>
       </SheetTrigger>
       <SheetContent side="right" className="w-full sm:max-w-sm">
@@ -95,7 +89,7 @@ export function CreativePlatformAppsDrawer() {
             Explore apps across the Creative Platform ecosystem.
           </SheetDescription>
         </SheetHeader>
-        <nav className="mt-6 grid gap-2">
+        <nav className="mt-6 grid gap-2" aria-label="Creative Platform apps">
           {CREATIVE_PLATFORM_APPS.map((app) => {
             const Icon = app.icon;
             const isExternal = app.href.startsWith("http");
