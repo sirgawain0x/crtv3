@@ -13,8 +13,7 @@ initBotId({
     { path: '/api/ipfs/upload', method: 'POST' },
     { path: '/api/creator-profiles/upsert', method: 'POST' },
     { path: '/api/creator-profiles/link-orb', method: 'POST' },
-    { path: '/api/auth/orb/qr/init', method: 'GET' },
-    { path: '/api/auth/orb/qr/poll', method: 'POST' },
+    // Orb QR init/poll omitted: high-frequency polling; rate-limited server routes instead.
     { path: '/api/creator-profiles', method: 'POST' },
     { path: '/api/creator-profiles', method: 'PUT' },
     { path: '/api/creator-profiles', method: 'DELETE' },

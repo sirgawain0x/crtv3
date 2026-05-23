@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { checkBotId } from 'botid/server';
 import { rateLimit } from '@/lib/middleware/rateLimit';
 import { serverLogger } from '@/lib/utils/logger';
 import {
@@ -7,14 +6,8 @@ import {
   ORB_QR_POLL_UPSTREAM,
 } from '@/lib/sdk/orb/qr-proxy';
 
-/** Same-origin proxy for Orb QR poll (avoids browser CORS to orbapi.xyz). */
+/** Same-origin proxy for Orb QR poll (avoids browser CORS to orbapi.xyz). BotID omitted: high-frequency polling, rate-limited instead. */
 export async function POST(request: NextRequest) {
-  const verification = await checkBotId();
-  if (verification.isBot) {
-    serverLogger.warn('[orb/qr/poll] BotID rejected request');
-    return NextResponse.json({ error: 'Access denied' }, { status: 403 });
-  }
-
   const rl = await rateLimit(request, {
     maxRequests: 90,
     windowMs: 60 * 1000,
@@ -54,11 +47,13 @@ export async function POST(request: NextRequest) {
 
     const text = await res.text();
     if (!res.ok) {
-      serverLogger.warn('Orb QR poll upstream error', {
-        status: res.status,
-        origin: request.headers.get('origin') ?? '(none)',
-        bodyPreview: text.slice(0, 200),
-      });
+      serverLogger.warn(
+        `[orb/qr/poll] upstream ${res.status} from ${ORB_QR_POLL_UPSTREAM}`,
+        {
+          origin: request.headers.get('origin') ?? '(none)',
+          bodySnippet: text.slice(0, 200),
+        },
+      );
     }
     return new NextResponse(text, {
       status: res.status,
