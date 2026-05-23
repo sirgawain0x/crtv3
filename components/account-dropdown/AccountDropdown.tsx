@@ -1283,7 +1283,7 @@ export function AccountDropdown() {
         </TooltipProvider>
       </HydrationSafe>
 
-      {/* Account dropdown (desktop header + mobile when rendered from Navbar) */}
+      {/* Account menu trigger (visible on all breakpoints when signed in) */}
       <HydrationSafe
         fallback={
           <Button

@@ -85,8 +85,10 @@ export const Tour = () => {
             data: { id: 'connect' }
         },
         {
-            target: '#mobile-menu-btn',
-            content: 'In the menu, you can select "Upload" to add your own content.',
+            target: '#nav-user-menu',
+            content:
+                'Tap your profile avatar to open the account menu, then select "Upload" to add your own content.',
+            spotlightClicks: true,
             data: { id: 'user-menu' }
         },
         {
