@@ -57,6 +57,8 @@ import { ChainSelect } from "@/components/ui/select";
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
 import makeBlockie from "ethereum-blockies-base64";
 import { logger } from '@/lib/utils/logger';
+import { AnimatedMenuIcon } from "@/components/navbar/AnimatedMenuIcon";
+import { CreativePlatformAppsDrawer } from "@/components/navbar/CreativePlatformAppsDrawer";
 
 type UseUserResult = (AccountUser & { type: "eoa" | "sca" }) | null;
 
@@ -341,6 +343,7 @@ export default function Navbar() {
 
           {/* Desktop: account dropdown. Mobile: hamburger only. */}
           <div className="flex items-center gap-2">
+            <CreativePlatformAppsDrawer />
             <ThemeToggleComponent />
             <HydrationSafe>
               <AccountDropdown ref={accountDropdownRef} />
@@ -356,8 +359,10 @@ export default function Navbar() {
               id="mobile-menu-btn"
               aria-label={isMenuOpen ? "Close main menu" : "Open main menu"}
             >
-              <span className="sr-only">Open main menu</span>
-              <MenuIcon className="h-6 w-6" />
+              <span className="sr-only">
+                {isMenuOpen ? "Close main menu" : "Open main menu"}
+              </span>
+              <AnimatedMenuIcon isOpen={isMenuOpen} />
             </button>
           </div>
 
@@ -653,27 +658,5 @@ export default function Navbar() {
         </div>
       </div>
     </header>
-  );
-}
-
-function MenuIcon(props: any) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="h-6 w-6"
-      {...props}
-    >
-      <line x1="4" x2="20" y1="12" y2="12" />
-      <line x1="4" x2="20" y1="6" y2="6" />
-      <line x1="4" x2="20" y1="18" y2="18" />
-    </svg>
   );
 }
