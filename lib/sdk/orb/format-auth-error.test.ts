@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { formatOrbAuthError } from './format-auth-error';
 
 describe('formatOrbAuthError', () => {
-  it('maps access denied to friendly copy', () => {
+  it('maps access denied to security-checks copy', () => {
     expect(formatOrbAuthError(new Error('Access denied'))).toMatch(/security checks/i);
     expect(formatOrbAuthError(new Error('Access denied'))).not.toMatch(/VPN/i);
   });
