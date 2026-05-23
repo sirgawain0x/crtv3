@@ -12,7 +12,6 @@ import {
 import { HydrationSafe } from "@/components/ui/hydration-safe";
 import { Button } from "@/components/ui/button"; // Corrected import
 import {
-  Dialog as AccountKitDialog,
   useAuthModal,
   useLogout,
   useUser,
@@ -41,24 +40,22 @@ import {
 import type { User as AccountUser } from "@account-kit/signer";
 import useModularAccount from "@/lib/hooks/accountkit/useModularAccount";
 import { base } from "@account-kit/infra";
-import { ArrowBigDown, ArrowBigUp, ChevronDown, Search, X } from "lucide-react";
-import CoinbaseFundButton from "./wallet/buy/coinbase-fund-button";
 import { TokenBalance } from "./wallet/balance/TokenBalance";
 import { MeTokenBalances } from "./wallet/balance/MeTokenBalances";
 import type { Chain as ViemChain } from "viem";
-import { AccountDropdown } from "@/components/account-dropdown/AccountDropdown";
+import {
+  AccountDropdown,
+  type AccountDropdownHandle,
+} from "@/components/account-dropdown/AccountDropdown";
+import { MobileOrbSection } from "@/components/account-dropdown/MobileOrbSection";
+import { shortenAddress } from "@/lib/utils/utils";
 import { useMembershipVerification } from "@/lib/hooks/unlock/useMembershipVerification";
 import { useMeTokensSupabase } from "@/lib/hooks/metokens/useMeTokensSupabase";
 import { useMeTokenHoldings } from "@/lib/hooks/metokens/useMeTokenHoldings";
 import { MembershipSection } from "./account-dropdown/MembershipSection";
 import { ChainSelect } from "@/components/ui/select";
-import { TokenSelect } from "@/components/ui/token-select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarImage } from "@/components/ui/avatar";
 import makeBlockie from "ethereum-blockies-base64";
-import { type Address, erc20Abi, formatUnits } from 'viem';
-import { BASE_TOKENS, TOKEN_INFO, type TokenSymbol, alchemySwapService, AlchemySwapService } from '@/lib/sdk/alchemy/swap-service';
-import { AlchemySwapWidget } from './wallet/swap/AlchemySwapWidget';
 import { logger } from '@/lib/utils/logger';
 
 type UseUserResult = (AccountUser & { type: "eoa" | "sca" }) | null;
@@ -166,9 +163,7 @@ export default function Navbar() {
   const [displayAddress, setDisplayAddress] = useState<string>("");
   const { client: smartAccountClient } = useSmartAccountClient({});
   const [isNetworkConnected, setIsNetworkConnected] = useState(true);
-  const [isSessionSigsModalOpen, setIsSessionSigsModalOpen] = useState(false);
   const { isVerified, hasMembership } = useMembershipVerification();
-  const [selectedToken, setSelectedToken] = useState<"ETH" | "USDC" | "DAI">("ETH");
 
   // Check for MeTokens to conditionally render the section
   const { userMeToken, loading: meTokenLoading } = useMeTokensSupabase();
@@ -189,11 +184,7 @@ export default function Navbar() {
   }, [modularAccount?.address, user?.address]);
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [dialogAction, setDialogAction] = useState<"buy" | "send" | "swap">(
-    "buy"
-  );
-  const addressRef = useRef<HTMLDivElement | null>(null);
+  const accountDropdownRef = useRef<AccountDropdownHandle>(null);
   const [copySuccess, setCopySuccess] = useState(false);
   const [currentChainName, setCurrentChainName] = useState(currentChain.name);
   const [isScrolled, setIsScrolled] = useState(false);
@@ -246,9 +237,11 @@ export default function Navbar() {
     setIsMenuOpen(false);
   };
 
-  const handleActionClick = (action: "buy" | "send" | "swap") => {
-    setDialogAction(action);
-    setIsDialogOpen(true);
+  const openAccountAction = (
+    action: "buy" | "send" | "swap" | "session-keys"
+  ) => {
+    accountDropdownRef.current?.openAction(action);
+    setIsMenuOpen(false);
   };
 
   const copyToClipboard = async () => {
@@ -289,106 +282,7 @@ export default function Navbar() {
     : "bg-white dark:bg-gray-900"
     }`;
 
-  // Dialog content based on the selected action
-  const getDialogContent = () => {
-    switch (dialogAction) {
-      case "buy":
-        return (
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
-            <h2 className="text-xl font-bold mb-4">Buy Crypto</h2>
-            <p className="mb-4">Purchase crypto directly to your wallet.</p>
-            <CoinbaseFundButton />
-            <div className="flex justify-end">
-              <Button onClick={() => setIsDialogOpen(false)}>Close</Button>
-            </div>
-          </div>
-        );
-      case "send":
-        return (
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
-            <h2 className="text-xl font-bold mb-4">Send Crypto</h2>
-            <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">Send crypto to another address.</p>
-            <div className="flex flex-col gap-4">
-              {/* Token Selection */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-900 dark:text-gray-100">Token</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {(['ETH', 'USDC', 'DAI'] as const).map((token) => (
-                    <button
-                      key={token}
-                      type="button"
-                      onClick={() => setSelectedToken(token)}
-                      className={`flex items-center justify-center space-x-2 p-2 border rounded-lg transition-colors ${selectedToken === token
-                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-400'
-                        : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
-                        }`}
-                    >
-                      <Image
-                        src={`/images/tokens/${token.toLowerCase()}-logo.svg`}
-                        alt={token}
-                        width={16}
-                        height={16}
-                        className="w-4 h-4 flex-shrink-0"
-                      />
-                      <span className={`text-sm font-medium ${selectedToken === token
-                        ? 'text-blue-700 dark:text-blue-300'
-                        : 'text-gray-900 dark:text-gray-100'
-                        }`}>
-                        {token}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="recipient-address" className="text-sm font-medium text-gray-900 dark:text-gray-100">Recipient Address</label>
-                <input
-                  id="recipient-address"
-                  name="recipientAddress"
-                  type="text"
-                  placeholder="0x..."
-                  className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 bg-white border-gray-200 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
-                />
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="send-amount" className="text-sm font-medium text-gray-900 dark:text-gray-100">Amount ({selectedToken})</label>
-                <input
-                  id="send-amount"
-                  name="sendAmount"
-                  type="number"
-                  placeholder="0.0"
-                  step="any"
-                  className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 bg-white border-gray-200 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
-                />
-              </div>
-              <div className="flex flex-col sm:flex-row gap-3 pt-2">
-                <Button
-                  variant="outline"
-                  className="w-full sm:w-auto sm:order-2"
-                  onClick={() => setIsDialogOpen(false)}
-                >
-                  Cancel
-                </Button>
-                <Button className="w-full sm:flex-1 sm:order-1">Send</Button>
-              </div>
-            </div>
-          </div>
-        );
-      case "swap":
-        return (
-          <AlchemySwapWidget
-            onSwapSuccess={() => {
-              toast.success("Swap successful!");
-              setIsDialogOpen(false);
-            }}
-            hideHeader={true}
-            className="border-none shadow-none p-0"
-          />
-        );
-      default:
-        return null;
-    }
-  };
+  const smartAccountAddress = modularAccount?.address;
 
   return (
     <header className={headerClassName}>
@@ -443,17 +337,11 @@ export default function Navbar() {
             </nav>
           </div>
 
-          {/* Header actions: single theme toggle + account dropdown (avoids duplicate DOM ids) */}
+          {/* Desktop: account dropdown. Mobile: hamburger only. */}
           <div className="flex items-center gap-2">
             <ThemeToggleComponent />
             <HydrationSafe>
-              {user ? (
-                <AccountDropdown />
-              ) : (
-                <div className="hidden md:block">
-                  <AccountDropdown />
-                </div>
-              )}
+              <AccountDropdown ref={accountDropdownRef} />
             </HydrationSafe>
             <button
               className={
@@ -464,7 +352,7 @@ export default function Navbar() {
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               aria-expanded={isMenuOpen}
               id="mobile-menu-btn"
-              aria-label="Open main menu"
+              aria-label={isMenuOpen ? "Close main menu" : "Open main menu"}
             >
               <span className="sr-only">Open main menu</span>
               <MenuIcon className="h-6 w-6" />
@@ -500,9 +388,20 @@ export default function Navbar() {
                           />
                         </Avatar>
                         <div>
-                          <p className="text-sm font-medium">
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            {smartAccountAddress ? "Smart Wallet" : "EOA"}
+                          </p>
+                          <p className="text-sm font-medium font-mono">
                             {displayAddress}
                           </p>
+                          {user?.address &&
+                            smartAccountAddress &&
+                            user.address.toLowerCase() !==
+                              smartAccountAddress.toLowerCase() && (
+                              <p className="text-xs text-gray-500 dark:text-gray-400">
+                                Signer: {shortenAddress(user.address)}
+                              </p>
+                            )}
                           <p className="text-xs text-gray-500 dark:text-gray-400">
                             {getChainName(currentChain)}
                           </p>
@@ -521,6 +420,7 @@ export default function Navbar() {
                         )}
                       </Button>
                     </div>
+                    <MobileOrbSection />
                   </div>
                 ) : (
                   <div className="pb-4 border-b border-gray-200 dark:border-gray-700">
@@ -582,20 +482,29 @@ export default function Navbar() {
                         Options
                       </div>
                       <Link
-                        href="/profile"
+                        href={`/profile/${smartAccountAddress || user?.address}`}
                         className={mobileMemberNavLinkClass}
                         onClick={handleLinkClick}
                       >
                         <ShieldUser className="mr-2 h-4 w-4" /> Profile
                       </Link>
                       <Link
-                        href="/upload"
+                        href={`/upload/${smartAccountAddress || user?.address}`}
                         className={mobileMemberNavLinkClass}
                         onClick={handleLinkClick}
                         id="nav-upload-link"
                       >
                         <CloudUpload className="mr-2 h-4 w-4" /> Upload
                       </Link>
+                      {user?.type !== "eoa" && (
+                        <button
+                          type="button"
+                          className={mobileMemberNavLinkClass}
+                          onClick={() => openAccountAction("session-keys")}
+                        >
+                          <Key className="mr-2 h-4 w-4 text-yellow-500" /> Session Keys
+                        </button>
+                      )}
 
                       {/* Membership Status Section */}
                       <div className="mt-4">
@@ -678,22 +587,16 @@ export default function Navbar() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => {
-                          handleActionClick("buy");
-                          setIsMenuOpen(false);
-                        }}
+                        onClick={() => openAccountAction("buy")}
                         className="flex items-center justify-center"
                       >
                         <Plus className="mr-2 h-4 w-4 text-green-500" />
-                        Buy
+                        Add
                       </Button>
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => {
-                          handleActionClick("send");
-                          setIsMenuOpen(false);
-                        }}
+                        onClick={() => openAccountAction("send")}
                         className="flex items-center justify-center"
                       >
                         <ArrowUpRight className="mr-2 h-4 w-4 text-blue-500" />
@@ -702,10 +605,7 @@ export default function Navbar() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => {
-                          handleActionClick("swap");
-                          setIsMenuOpen(false);
-                        }}
+                        onClick={() => openAccountAction("swap")}
                         className="flex items-center justify-center"
                       >
                         <ArrowUpDown className="mr-2 h-4 w-4 text-purple-500" />
@@ -748,10 +648,6 @@ export default function Navbar() {
             </div>
           </div>
 
-          {/* Account Kit Dialog for actions */}
-          <AccountKitDialog isOpen={isDialogOpen} onClose={() => setIsDialogOpen(false)}>
-            <div className="max-w-md mx-auto">{getDialogContent()}</div>
-          </AccountKitDialog>
         </div>
       </div>
     </header>
