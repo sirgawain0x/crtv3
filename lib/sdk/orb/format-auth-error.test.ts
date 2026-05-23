@@ -3,7 +3,8 @@ import { formatOrbAuthError } from './format-auth-error';
 
 describe('formatOrbAuthError', () => {
   it('maps access denied to friendly copy', () => {
-    expect(formatOrbAuthError(new Error('Access denied'))).toMatch(/blocked/i);
+    expect(formatOrbAuthError(new Error('Access denied'))).toMatch(/security checks/i);
+    expect(formatOrbAuthError(new Error('Access denied'))).not.toMatch(/VPN/i);
   });
 
   it('maps upstream failures', () => {

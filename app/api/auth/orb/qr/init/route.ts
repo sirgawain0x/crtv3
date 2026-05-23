@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { checkBotId } from 'botid/server';
 import { rateLimiters } from '@/lib/middleware/rateLimit';
 import { serverLogger } from '@/lib/utils/logger';
 import {
@@ -9,14 +8,8 @@ import {
 
 const DEFAULT_CREDENTIALS = 'id_access_refresh';
 
-/** Same-origin proxy for Orb QR init (avoids browser CORS to orbapi.xyz). */
+/** Same-origin proxy for Orb QR init (avoids browser CORS to orbapi.xyz). BotID omitted: QR polling is high-frequency and rate-limited instead. */
 export async function GET(request: NextRequest) {
-  const verification = await checkBotId();
-  if (verification.isBot) {
-    serverLogger.warn('[orb/qr/init] BotID rejected request');
-    return NextResponse.json({ error: 'Access denied' }, { status: 403 });
-  }
-
   const rl = await rateLimiters.standard(request);
   if (rl) return rl;
 

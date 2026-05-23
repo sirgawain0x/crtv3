@@ -54,9 +54,11 @@ export async function POST(request: NextRequest) {
 
     const text = await res.text();
     if (!res.ok) {
-      serverLogger.warn(
-        `[orb/qr/poll] upstream ${res.status} from ${ORB_QR_POLL_UPSTREAM}`,
-      );
+      serverLogger.warn('Orb QR poll upstream error', {
+        status: res.status,
+        origin: request.headers.get('origin') ?? '(none)',
+        bodyPreview: text.slice(0, 200),
+      });
     }
     return new NextResponse(text, {
       status: res.status,
