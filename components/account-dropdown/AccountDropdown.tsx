@@ -22,7 +22,13 @@
  *    - Chain Switching: Changes the network for Account Kit integration
  */
 
-import { useState, useEffect } from "react";
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useState,
+} from "react";
 import {
   useAuthModal,
   useLogout,
@@ -249,7 +255,12 @@ const SESSION_KEY_TYPES: SessionKeyConfig[] = [
   },
 ];
 
-export function AccountDropdown() {
+export type AccountDropdownHandle = {
+  openAction: (action: "buy" | "send" | "swap" | "session-keys") => void;
+};
+
+export const AccountDropdown = forwardRef<AccountDropdownHandle>(
+  function AccountDropdown(_, ref) {
   const { openAuthModal } = useAuthModal();
   const {
     isAuthenticated: isOrbAuthenticated,
@@ -431,13 +442,22 @@ export function AccountDropdown() {
     }
   };
 
-  const handleActionClick = (
-    action: "buy" | "send" | "swap" | "session-keys"
-  ) => {
-    setDialogAction(action);
-    setIsDialogOpen(true);
-    setIsDropdownOpen(false); // Close dropdown when action is clicked
-  };
+  const handleActionClick = useCallback(
+    (action: "buy" | "send" | "swap" | "session-keys") => {
+      setDialogAction(action);
+      setIsDialogOpen(true);
+      setIsDropdownOpen(false);
+    },
+    []
+  );
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      openAction: handleActionClick,
+    }),
+    [handleActionClick]
+  );
 
   const handleChainSwitch = async (newChain: any) => {
     if (isSettingChain) return;
@@ -1187,11 +1207,16 @@ export function AccountDropdown() {
   };
 
   if (!user) {
-    return <LoginButton />;
+    return (
+      <div className="hidden md:block">
+        <LoginButton />
+      </div>
+    );
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <>
+    <div className="hidden md:flex items-center gap-2">
       <HydrationSafe
         fallback={
           <Button
@@ -1655,6 +1680,7 @@ export function AccountDropdown() {
           </DropdownMenuContent>
         </DropdownMenu>
       </HydrationSafe>
+    </div>
 
       <Dialog
         open={isDialogOpen}
@@ -1698,6 +1724,6 @@ export function AccountDropdown() {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
-}
+});
