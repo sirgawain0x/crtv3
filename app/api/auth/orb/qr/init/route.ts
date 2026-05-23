@@ -28,6 +28,11 @@ export async function GET(request: NextRequest) {
     });
 
     const body = await res.text();
+    if (!res.ok) {
+      serverLogger.warn(
+        `[orb/qr/init] upstream ${res.status} from ${ORB_QR_INIT_UPSTREAM}`,
+      );
+    }
     return new NextResponse(body, {
       status: res.status,
       headers: {
