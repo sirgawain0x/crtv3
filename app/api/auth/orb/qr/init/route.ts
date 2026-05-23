@@ -13,6 +13,7 @@ const DEFAULT_CREDENTIALS = 'id_access_refresh';
 export async function GET(request: NextRequest) {
   const verification = await checkBotId();
   if (verification.isBot) {
+    serverLogger.warn('[orb/qr/init] BotID rejected request');
     return NextResponse.json({ error: 'Access denied' }, { status: 403 });
   }
 
@@ -34,6 +35,11 @@ export async function GET(request: NextRequest) {
     });
 
     const body = await res.text();
+    if (!res.ok) {
+      serverLogger.warn(
+        `[orb/qr/init] upstream ${res.status} from ${ORB_QR_INIT_UPSTREAM}`,
+      );
+    }
     return new NextResponse(body, {
       status: res.status,
       headers: {

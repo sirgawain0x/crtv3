@@ -1,7 +1,12 @@
 import type { NextRequest } from 'next/server';
 
-export const ORB_QR_INIT_UPSTREAM = 'https://orbapi.xyz/init-sign-in';
-export const ORB_QR_POLL_UPSTREAM = 'https://orbapi.xyz/poll-sign-in';
+import {
+  ORB_SDK_QR_INIT_DEFAULT,
+  ORB_SDK_QR_POLL_DEFAULT,
+} from '@/lib/sdk/orb/config';
+
+export const ORB_QR_INIT_UPSTREAM = ORB_SDK_QR_INIT_DEFAULT;
+export const ORB_QR_POLL_UPSTREAM = ORB_SDK_QR_POLL_DEFAULT;
 
 /** orbapi.xyz requires Origin; forward the browser value or derive from the request. */
 export function buildOrbUpstreamHeaders(request: NextRequest): HeadersInit {
