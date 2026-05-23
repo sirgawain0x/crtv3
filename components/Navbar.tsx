@@ -57,6 +57,9 @@ import { ChainSelect } from "@/components/ui/select";
 import { Avatar, AvatarImage } from "@/components/ui/avatar";
 import makeBlockie from "ethereum-blockies-base64";
 import { logger } from '@/lib/utils/logger';
+import { AnimatedMenuIcon } from "@/components/navbar/AnimatedMenuIcon";
+import { CreativePlatformAppsDrawer } from "@/components/navbar/CreativePlatformAppsDrawer";
+import { navIconButtonProps } from "@/components/navbar/navButtonStyles";
 
 type UseUserResult = (AccountUser & { type: "eoa" | "sca" }) | null;
 
@@ -341,24 +344,21 @@ export default function Navbar() {
 
           {/* Desktop: account dropdown. Mobile: hamburger only. */}
           <div className="flex items-center gap-2">
+            <CreativePlatformAppsDrawer />
             <ThemeToggleComponent />
             <HydrationSafe>
               <AccountDropdown ref={accountDropdownRef} />
             </HydrationSafe>
-            <button
-              className={
-                "md:hidden inline-flex items-center justify-center rounded-md p-2 " +
-                "text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 " +
-                "dark:hover:bg-gray-800 dark:hover:text-gray-50 transition-colors"
-              }
+            <Button
+              {...navIconButtonProps}
+              className="md:hidden"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               aria-expanded={isMenuOpen}
               id="mobile-menu-btn"
               aria-label={isMenuOpen ? "Close main menu" : "Open main menu"}
             >
-              <span className="sr-only">Open main menu</span>
-              <MenuIcon className="h-6 w-6" />
-            </button>
+              <AnimatedMenuIcon isOpen={isMenuOpen} />
+            </Button>
           </div>
 
           {/* Mobile menu */}
@@ -653,27 +653,5 @@ export default function Navbar() {
         </div>
       </div>
     </header>
-  );
-}
-
-function MenuIcon(props: any) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="h-6 w-6"
-      {...props}
-    >
-      <line x1="4" x2="20" y1="12" y2="12" />
-      <line x1="4" x2="20" y1="6" y2="6" />
-      <line x1="4" x2="20" y1="18" y2="18" />
-    </svg>
   );
 }
