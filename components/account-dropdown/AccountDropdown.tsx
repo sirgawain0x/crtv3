@@ -1283,12 +1283,12 @@ export function AccountDropdown() {
         </TooltipProvider>
       </HydrationSafe>
 
-      {/* Desktop Dropdown */}
+      {/* Account menu trigger (visible on all breakpoints when signed in) */}
       <HydrationSafe
         fallback={
           <Button
             variant="outline"
-            className="hidden md:flex items-center gap-2 transition-all hover:bg-gray-100 dark:hover:bg-gray-800 hover:border-blue-500"
+            className="flex items-center gap-2 transition-all hover:bg-gray-100 dark:hover:bg-gray-800 hover:border-blue-500"
           >
             <Avatar className="h-8 w-8">
               <AvatarImage
@@ -1296,7 +1296,7 @@ export function AccountDropdown() {
                 alt="Wallet avatar"
               />
             </Avatar>
-            <span className="max-w-[100px] truncate">
+            <span className="max-w-[100px] truncate hidden sm:inline">
               {displayAddress || "Loading..."}
             </span>
           </Button>
@@ -1306,7 +1306,7 @@ export function AccountDropdown() {
           <DropdownMenuTrigger asChild>
             <Button
               variant="outline"
-              className="hidden md:flex items-center gap-2 transition-all hover:bg-gray-100 dark:hover:bg-gray-800 hover:border-blue-500"
+              className="flex items-center gap-2 transition-all hover:bg-gray-100 dark:hover:bg-gray-800 hover:border-blue-500"
               id="nav-user-menu"
             >
               <Avatar className="h-8 w-8">
@@ -1315,7 +1315,7 @@ export function AccountDropdown() {
                   alt="Wallet avatar"
                 />
               </Avatar>
-              <span className="max-w-[100px] truncate">
+              <span className="max-w-[100px] truncate hidden sm:inline">
                 {displayAddress || "Loading..."}
               </span>
             </Button>

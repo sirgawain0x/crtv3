@@ -47,7 +47,6 @@ import { TokenBalance } from "./wallet/balance/TokenBalance";
 import { MeTokenBalances } from "./wallet/balance/MeTokenBalances";
 import type { Chain as ViemChain } from "viem";
 import { AccountDropdown } from "@/components/account-dropdown/AccountDropdown";
-import { useOrbSession } from "@/context/OrbSessionContext";
 import { useMembershipVerification } from "@/lib/hooks/unlock/useMembershipVerification";
 import { useMeTokensSupabase } from "@/lib/hooks/metokens/useMeTokensSupabase";
 import { useMeTokenHoldings } from "@/lib/hooks/metokens/useMeTokenHoldings";
@@ -160,13 +159,6 @@ function NetworkStatus({ isConnected }: { isConnected: boolean }) {
 
 export default function Navbar() {
   const { openAuthModal } = useAuthModal();
-  const {
-    openLoginModal: openOrbLogin,
-    isAuthenticated: isOrbAuthenticated,
-    hasWallet: hasWalletForOrb,
-    loginError: orbLoginError,
-    linkStatus: orbLinkStatus,
-  } = useOrbSession();
   const user = useUser();
   const { logout } = useLogout();
   const { chain: currentChain, setChain, isSettingChain } = useChain();
@@ -451,32 +443,32 @@ export default function Navbar() {
             </nav>
           </div>
 
-          {/* Mobile menu button */}
-          <div className="flex md:hidden items-center">
+          {/* Header actions: single theme toggle + account dropdown (avoids duplicate DOM ids) */}
+          <div className="flex items-center gap-2">
             <ThemeToggleComponent />
+            <HydrationSafe>
+              {user ? (
+                <AccountDropdown />
+              ) : (
+                <div className="hidden md:block">
+                  <AccountDropdown />
+                </div>
+              )}
+            </HydrationSafe>
             <button
               className={
-                "ml-2 inline-flex items-center justify-center rounded-md p-2 " +
+                "md:hidden inline-flex items-center justify-center rounded-md p-2 " +
                 "text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 " +
                 "dark:hover:bg-gray-800 dark:hover:text-gray-50 transition-colors"
               }
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               aria-expanded={isMenuOpen}
               id="mobile-menu-btn"
+              aria-label="Open main menu"
             >
               <span className="sr-only">Open main menu</span>
               <MenuIcon className="h-6 w-6" />
             </button>
-          </div>
-
-          {/* Desktop wallet display */}
-          <div className="hidden md:flex items-center space-x-4">
-            <div className="flex items-center">
-              <ThemeToggleComponent />
-            </div>
-            <div>
-              <AccountDropdown />
-            </div>
           </div>
 
           {/* Mobile menu */}
@@ -544,18 +536,6 @@ export default function Navbar() {
                     >
                       Get Started
                     </Button>
-                    {!isOrbAuthenticated && (
-                      <Button
-                        variant="outline"
-                        className="w-full mt-2"
-                        onClick={() => {
-                          openOrbLogin();
-                          setIsMenuOpen(false);
-                        }}
-                      >
-                        Sign in with Orb
-                      </Button>
-                    )}
                   </div>
                 )}
               </HydrationSafe>
