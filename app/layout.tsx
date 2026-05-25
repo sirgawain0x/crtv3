@@ -12,7 +12,7 @@ import { Toaster } from "@/components/ui/toaster";
 import Footer from "@/components/Footer";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Analytics } from "@vercel/analytics/next";
-import Script from "next/script";
+import { HypelabSdkScript } from "@/components/ads/HypelabSdkScript";
 import { LayoutClientChunks } from "@/components/LayoutClientChunks";
 
 const inter = Inter({
