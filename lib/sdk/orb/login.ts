@@ -19,6 +19,9 @@ export type StoredOrbSession = {
 
 export const ORB_SESSION_STORAGE_KEY = 'crtv_orb_session';
 
+/** Dispatched on the same tab when Orb session is saved or cleared. */
+export const ORB_SESSION_CHANGE_EVENT = 'crtv:orb-session-change';
+
 export function loadStoredOrbSession(): StoredOrbSession | null {
   if (typeof window === 'undefined') return null;
   try {
@@ -32,11 +35,32 @@ export function loadStoredOrbSession(): StoredOrbSession | null {
   }
 }
 
+function notifyOrbSessionChange(): void {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new Event(ORB_SESSION_CHANGE_EVENT));
+}
+
+export function subscribeOrbSession(onStoreChange: () => void): () => void {
+  if (typeof window === 'undefined') return () => {};
+  const handler = () => onStoreChange();
+  window.addEventListener(ORB_SESSION_CHANGE_EVENT, handler);
+  window.addEventListener('storage', handler);
+  return () => {
+    window.removeEventListener(ORB_SESSION_CHANGE_EVENT, handler);
+    window.removeEventListener('storage', handler);
+  };
+}
+
+export function getOrbSessionServerSnapshot(): StoredOrbSession | null {
+  return null;
+}
+
 export function saveStoredOrbSession(session: StoredOrbSession | null): void {
   if (typeof window === 'undefined') return;
   if (!session?.accessToken) {
     localStorage.removeItem(ORB_SESSION_STORAGE_KEY);
-    return;
+  } else {
+    localStorage.setItem(ORB_SESSION_STORAGE_KEY, JSON.stringify(session));
   }
-  localStorage.setItem(ORB_SESSION_STORAGE_KEY, JSON.stringify(session));
+  notifyOrbSessionChange();
 }

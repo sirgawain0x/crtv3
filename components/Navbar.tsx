@@ -48,6 +48,7 @@ import {
   type AccountDropdownHandle,
 } from "@/components/account-dropdown/AccountDropdown";
 import { MobileOrbSection } from "@/components/account-dropdown/MobileOrbSection";
+import { useOrbSession } from "@/context/OrbSessionContext";
 import { shortenAddress } from "@/lib/utils/utils";
 import { useMembershipVerification } from "@/lib/hooks/unlock/useMembershipVerification";
 import { useMeTokensSupabase } from "@/lib/hooks/metokens/useMeTokensSupabase";
@@ -187,6 +188,8 @@ export default function Navbar() {
   }, [modularAccount?.address, user?.address]);
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const { isAuthenticated: isOrbAuthenticated, accountMenuRefreshSignal } =
+    useOrbSession();
   const accountDropdownRef = useRef<AccountDropdownHandle>(null);
   const [copySuccess, setCopySuccess] = useState(false);
   const [currentChainName, setCurrentChainName] = useState(currentChain.name);
@@ -198,6 +201,12 @@ export default function Navbar() {
     logger.debug("Current Chain ID:", currentChain.id);
     setCurrentChainName(currentChain?.name || "Unknown Chain");
   }, [currentChain]);
+
+  // Surface Orb / Lens linked state in the mobile account menu after sign-in.
+  useEffect(() => {
+    if (!accountMenuRefreshSignal || !isOrbAuthenticated) return;
+    setIsMenuOpen(true);
+  }, [accountMenuRefreshSignal, isOrbAuthenticated]);
 
   // Add scroll effect for sticky navbar
   useEffect(() => {

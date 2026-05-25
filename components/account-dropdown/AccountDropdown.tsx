@@ -271,6 +271,7 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
     logout: logoutOrb,
     linkStatus: orbLinkStatus,
     loginError: orbLoginError,
+    accountMenuRefreshSignal,
   } = useOrbSession();
   const user = useUser();
   const { logout } = useLogout();
@@ -374,6 +375,12 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
   useEffect(() => {
     setIsDialogOpen(false);
   }, [user]);
+
+  // Reopen account menu after Orb sign-in so the Orb / Lens section shows linked state.
+  useEffect(() => {
+    if (!accountMenuRefreshSignal || !isOrbAuthenticated) return;
+    setIsDropdownOpen(true);
+  }, [accountMenuRefreshSignal, isOrbAuthenticated]);
 
   // Fetch token balances when dialog opens with send action
   useEffect(() => {
@@ -1346,6 +1353,7 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent
+            key={`account-menu-orb-${accountMenuRefreshSignal}-${isOrbAuthenticated ? lensAccount ?? "auth" : "guest"}`}
             className="w-[320px] md:w-80 max-h-[80vh] overflow-y-auto"
             align="end"
           >
