@@ -13,10 +13,9 @@ WHERE n.nspname = 'public'
 ORDER BY p.proname;
 
 -- 2) pg_trgm schema (expect extensions, not public)
-SELECT e.extname, n.nspname AS schema
-FROM pg_extension e
-JOIN pg_namespace n ON n.oid = e.extnamespace
-WHERE e.extname = 'pg_trgm';
+SELECT extname, extnamespace::regnamespace AS schema
+FROM pg_extension
+WHERE extname = 'pg_trgm';
 
 -- 3) Permissive write RLS (expect zero rows)
 SELECT tablename, policyname, cmd, qual, with_check

@@ -185,7 +185,18 @@ GRANT EXECUTE ON FUNCTION public.search_metokens(text, integer) TO anon, authent
 -- =============================================================================
 
 CREATE SCHEMA IF NOT EXISTS extensions;
-ALTER EXTENSION IF EXISTS pg_trgm SET SCHEMA extensions;
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM pg_catalog.pg_extension
+    WHERE extname = 'pg_trgm'
+  ) THEN
+    EXECUTE 'ALTER EXTENSION pg_trgm SET SCHEMA extensions';
+  END IF;
+END;
+$$;
 
 -- =============================================================================
 -- 3) get_wallet_address — SECURITY INVOKER + no anon/authenticated EXECUTE
