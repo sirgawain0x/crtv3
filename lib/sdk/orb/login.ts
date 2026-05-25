@@ -22,17 +22,30 @@ export const ORB_SESSION_STORAGE_KEY = 'crtv_orb_session';
 /** Dispatched on the same tab when Orb session is saved or cleared. */
 export const ORB_SESSION_CHANGE_EVENT = 'crtv:orb-session-change';
 
+let cachedSession: StoredOrbSession | null = null;
+let isSessionCacheValid = false;
+
+export function invalidateOrbSessionCache(): void {
+  isSessionCacheValid = false;
+}
+
 export function loadStoredOrbSession(): StoredOrbSession | null {
   if (typeof window === 'undefined') return null;
+  if (isSessionCacheValid) return cachedSession;
+
   try {
     const raw = localStorage.getItem(ORB_SESSION_STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as StoredOrbSession;
-    if (!parsed?.accessToken) return null;
-    return parsed;
+    if (!raw) {
+      cachedSession = null;
+    } else {
+      const parsed = JSON.parse(raw) as StoredOrbSession;
+      cachedSession = parsed?.accessToken ? parsed : null;
+    }
   } catch {
-    return null;
+    cachedSession = null;
   }
+  isSessionCacheValid = true;
+  return cachedSession;
 }
 
 function notifyOrbSessionChange(): void {
@@ -42,7 +55,10 @@ function notifyOrbSessionChange(): void {
 
 export function subscribeOrbSession(onStoreChange: () => void): () => void {
   if (typeof window === 'undefined') return () => {};
-  const handler = () => onStoreChange();
+  const handler = () => {
+    invalidateOrbSessionCache();
+    onStoreChange();
+  };
   window.addEventListener(ORB_SESSION_CHANGE_EVENT, handler);
   window.addEventListener('storage', handler);
   return () => {
@@ -62,5 +78,6 @@ export function saveStoredOrbSession(session: StoredOrbSession | null): void {
   } else {
     localStorage.setItem(ORB_SESSION_STORAGE_KEY, JSON.stringify(session));
   }
+  invalidateOrbSessionCache();
   notifyOrbSessionChange();
 }
