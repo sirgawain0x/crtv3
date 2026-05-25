@@ -85,27 +85,27 @@ BEGIN
   SELECT
     pg_catalog.count(mt.id) AS total_transactions,
     pg_catalog.count(DISTINCT mb.user_address) AS unique_holders,
-    pg_catalog.coalesce(
+    coalesce(
       pg_catalog.sum(
         CASE
           WHEN mt.transaction_type IN ('mint', 'burn') THEN mt.collateral_amount
           ELSE mt.amount
         END
       ),
-      0
+      0::numeric
     ) AS total_volume,
     CASE
       WHEN pg_catalog.count(mt.id) > 0 THEN
-        pg_catalog.coalesce(
+        coalesce(
           pg_catalog.sum(
             CASE
               WHEN mt.transaction_type IN ('mint', 'burn') THEN mt.collateral_amount
               ELSE mt.amount
             END
           ),
-          0
-        ) / pg_catalog.count(mt.id)
-      ELSE 0
+          0::numeric
+        ) / pg_catalog.count(mt.id)::numeric
+      ELSE 0::numeric
     END AS avg_transaction_size
   FROM public.metoken_transactions AS mt
   LEFT JOIN public.metoken_balances AS mb ON mb.metoken_id = mt.metoken_id
@@ -210,12 +210,12 @@ STABLE
 SECURITY INVOKER
 SET search_path = ''
 AS $$
-  SELECT pg_catalog.nullif(
-    pg_catalog.coalesce(
-      pg_catalog.current_setting('request.jwt.claim.address', true),
-      pg_catalog.current_setting('request.jwt.claim.sub', true)
+  SELECT nullif(
+    coalesce(
+      current_setting('request.jwt.claim.address', true)::text,
+      current_setting('request.jwt.claim.sub', true)::text
     ),
-    ''
+    ''::text
   )::text;
 $$;
 
