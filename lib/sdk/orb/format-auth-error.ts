@@ -33,6 +33,12 @@ export function formatOrbAuthError(error: unknown): string {
   if (lower.includes('user rejected') || lower.includes('denied')) {
     return 'Wallet signature was cancelled. Approve the signature to link your profile.';
   }
+  if (
+    lower.includes('lens_account_id') &&
+    (lower.includes('schema cache') || lower.includes('could not find'))
+  ) {
+    return 'Database is missing Orb/Lens profile columns. Run scripts/add-orb-lens-columns-to-creator-profiles.sql in the Supabase SQL Editor, then try again.';
+  }
 
   return msg.length > 160 ? `${msg.slice(0, 157)}…` : msg;
 }

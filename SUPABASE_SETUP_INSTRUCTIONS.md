@@ -75,6 +75,35 @@ After running the migration, you can verify the table was created by:
    - `created_at` (Timestamp)
    - `updated_at` (Timestamp)
 
+## Issue: Missing `lens_account_id` column (Orb sign-in)
+
+After signing in with Orb, you may see:
+
+> Could not find the 'lens_account_id' column of 'creator_profiles' in the schema cache
+
+The app stores Orb/Lens identity on `creator_profiles`, but those columns were not applied to your Supabase database yet.
+
+### Fix
+
+1. Open [Supabase Dashboard](https://supabase.com/dashboard) → your project → **SQL Editor**
+2. Run `scripts/add-orb-lens-columns-to-creator-profiles.sql` in the SQL Editor, **or** apply `supabase/migrations/20260519170000_add_orb_lens_to_creator_profiles.sql` via `supabase db push`
+3. Retry Orb sign-in / **Sync profile**
+
+Alternatively, with the Supabase CLI linked to your project:
+
+```bash
+supabase db push
+```
+
+PostgREST refreshes the schema cache automatically after `ALTER TABLE`; if the error persists, wait a minute or restart the API from Project Settings.
+
+Expected new columns on `creator_profiles`:
+
+- `orb_account_id`
+- `lens_account_id`
+- `lens_handle`
+- `lens_avatar_uri`
+
 ## Fallback Behavior
 
 The application has been updated to handle the missing table gracefully:

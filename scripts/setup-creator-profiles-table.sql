@@ -8,6 +8,10 @@ CREATE TABLE IF NOT EXISTS creator_profiles (
   username TEXT,
   bio TEXT,
   avatar_url TEXT, -- URL to avatar image stored on IPFS via Lighthouse
+  orb_account_id TEXT, -- Orb sovereign account id from QR sign-in
+  lens_account_id TEXT, -- Lens account address linked via Orb
+  lens_handle TEXT, -- Lens username/handle for display
+  lens_avatar_uri TEXT, -- Lens profile picture URI (ipfs/lens)
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -15,6 +19,12 @@ CREATE TABLE IF NOT EXISTS creator_profiles (
 -- Creator profiles indexes
 CREATE INDEX IF NOT EXISTS idx_creator_profiles_owner ON creator_profiles(owner_address);
 CREATE INDEX IF NOT EXISTS idx_creator_profiles_username ON creator_profiles(username);
+CREATE UNIQUE INDEX IF NOT EXISTS creator_profiles_orb_account_id_key
+  ON creator_profiles (orb_account_id)
+  WHERE orb_account_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS creator_profiles_lens_account_id_idx
+  ON creator_profiles (lens_account_id)
+  WHERE lens_account_id IS NOT NULL;
 
 -- Enable Row Level Security
 ALTER TABLE creator_profiles ENABLE ROW LEVEL SECURITY;
