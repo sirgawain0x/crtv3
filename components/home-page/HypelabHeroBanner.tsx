@@ -15,7 +15,7 @@ export function HypelabHeroBanner() {
   return (
     <div className="w-full max-w-7xl mx-auto py-3 px-4 sm:px-6">
       <div className="min-h-[50px] flex items-center justify-center rounded-md border border-border/50 bg-muted/30">
-        <Banner placement={PLACEMENT_SLUG} />
+        <Banner placement={hypelab.placementSlug} />
       </div>
     </div>
   );
