@@ -292,9 +292,12 @@ const VideoThumbnail: React.FC<VideoThumbnailProps> = ({
 
   const handleThumbnailClick = (e: React.MouseEvent) => {
     if (enablePreview) {
-      // If preview is enabled, we don't want to expand the player inline.
-      // The parent Link component will handle navigation.
-      // We might want to stop propagation if there was logic here, but for now we just let it bubble.
+      return;
+    }
+    if (!src?.length) {
+      logger.warn(
+        `[VideoThumbnail] No playback source for ${playbackId}; showing poster only`,
+      );
       return;
     }
     setShowPlayer(true);

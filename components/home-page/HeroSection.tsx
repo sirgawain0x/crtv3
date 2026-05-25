@@ -58,8 +58,10 @@ const HeroSection: React.FC = () => {
 
         if (!isMounted || signal.aborted) return;
 
-        setSrc(playbackSource);
-        if (!playbackSource) {
+        const hasSource =
+          Array.isArray(playbackSource) && playbackSource.length > 0;
+        setSrc(hasSource ? playbackSource : null);
+        if (!hasSource) {
           setError("No video source available.");
         }
       } catch (err) {

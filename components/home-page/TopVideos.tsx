@@ -76,81 +76,38 @@ export function TopVideos() {
 
         logger.debug(`Found ${filteredVideos.length} trending videos (excluding hero video)`);
 
-        // Step 2: Fetch playback sources for each video
-        // Don't set videos state until playback sources are ready to avoid rendering videos without sources
-        const sources: Record<string, Src[] | null> = {};
+        // Step 2: Fetch playback sources in parallel (no shared AbortSignal — avoids
+        // React Strict Mode / fast navigation aborting the whole batch)
         logger.debug("Starting to fetch playback sources...");
-
-        for (const video of filteredVideos) {
-          if (!isMounted || signal.aborted) {
-            // If aborted, don't set any state - component is unmounting
-            return;
-          }
-          
-          if (!video.playback_id) {
-            logger.warn(`Video ${video.asset_id} has no playback_id`);
-            sources[video.asset_id] = null;
-            continue;
-          }
-
-          try {
-            logger.debug(
-              `Fetching playback source for video ${video.playback_id}...`
-            );
-
-            // Get the playback source with abort signal support
-            const src = await getDetailPlaybackSource(video.playback_id, { 
-              signal 
-            });
-            
-            if (!isMounted || signal.aborted) {
-              // If aborted, don't set any state - component is unmounting
-              return;
+        const sourceEntries = await Promise.all(
+          filteredVideos.map(async (video) => {
+            if (!video.playback_id) {
+              logger.warn(`Video ${video.asset_id} has no playback_id`);
+              return [video.asset_id, null] as const;
             }
-            
-            logger.debug(`Playback source for ${video.playback_id}:`, src);
-
-            if (!src || src.length === 0) {
+            try {
+              const src = await getDetailPlaybackSource(video.playback_id);
+              if (!src?.length) {
+                logger.warn(`No valid source for ${video.playback_id}`);
+                return [video.asset_id, null] as const;
+              }
+              return [video.asset_id, src] as const;
+            } catch (error) {
               logger.error(
-                `No valid source found for video ${video.playback_id}`
+                `Error fetching playback source for ${video.playback_id}:`,
+                error,
               );
-              sources[video.asset_id] = null;
-              continue;
+              return [video.asset_id, null] as const;
             }
+          }),
+        );
 
-            sources[video.asset_id] = src;
-          } catch (error) {
-            if (!isMounted || signal.aborted) {
-              // If aborted, don't set any state - component is unmounting
-              return;
-            }
-            
-            // Check if it's an abort error
-            if (error instanceof Error && (
-              error.name === 'AbortError' || 
-              error.message.includes('aborted') ||
-              error.message.includes('signal is aborted')
-            )) {
-              logger.warn(`Video ${video.playback_id} fetch was aborted:`, error.message);
-              // If aborted, don't set any state - component is unmounting
-              return;
-            }
-            
-            logger.error(
-              `Error fetching playback source for video ${video.playback_id}:`,
-              error
-            );
-            sources[video.asset_id] = null;
-          }
-        }
+        if (!isMounted) return;
 
-        if (!isMounted || signal.aborted) {
-          // If aborted, don't set any state - component is unmounting
-          return;
-        }
-        
-        // Only set both videos and playback sources together after all sources are fetched
-        // This ensures videos are never rendered without their playback sources
+        const sources = Object.fromEntries(sourceEntries) as Record<
+          string,
+          Src[] | null
+        >;
         logger.debug("Final playback sources:", sources);
         setVideos(filteredVideos);
         setPlaybackSources(sources);
