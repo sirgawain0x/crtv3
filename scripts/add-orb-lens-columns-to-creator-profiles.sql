@@ -1,7 +1,7 @@
--- Orb / Lens columns for creator_profiles (required for Orb sign-in / link-orb API)
+-- Standalone script: add Orb/Lens columns to creator_profiles (existing databases) (required for Orb sign-in / link-orb API)
 -- Run in Supabase Dashboard → SQL Editor if you see:
 --   "Could not find the 'lens_account_id' column of 'creator_profiles' in the schema cache"
--- Same as: supabase/migrations/20260519170000_add_orb_lens_to_creator_profiles.sql
+-- Canonical migration: supabase/migrations/20260519170000_add_orb_lens_to_creator_profiles.sql
 
 ALTER TABLE public.creator_profiles
   ADD COLUMN IF NOT EXISTS orb_account_id TEXT,

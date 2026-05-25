@@ -86,7 +86,7 @@ The app stores Orb/Lens identity on `creator_profiles`, but those columns were n
 ### Fix
 
 1. Open [Supabase Dashboard](https://supabase.com/dashboard) → your project → **SQL Editor**
-2. Run the script from `scripts/add-orb-lens-columns-to-creator-profiles.sql` (or migration `supabase/migrations/20260519170000_add_orb_lens_to_creator_profiles.sql`)
+2. Run `scripts/add-orb-lens-columns-to-creator-profiles.sql` in the SQL Editor, **or** apply `supabase/migrations/20260519170000_add_orb_lens_to_creator_profiles.sql` via `supabase db push`
 3. Retry Orb sign-in / **Sync profile**
 
 Alternatively, with the Supabase CLI linked to your project:
