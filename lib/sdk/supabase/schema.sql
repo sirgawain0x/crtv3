@@ -55,6 +55,10 @@ CREATE TABLE IF NOT EXISTS creator_profiles (
   username TEXT,
   bio TEXT,
   avatar_url TEXT, -- URL to avatar image in Supabase Storage
+  orb_account_id TEXT,
+  lens_account_id TEXT,
+  lens_handle TEXT,
+  lens_avatar_uri TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

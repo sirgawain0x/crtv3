@@ -37,6 +37,21 @@ CREATE TRIGGER update_creator_profiles_updated_at
   BEFORE UPDATE ON creator_profiles 
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+-- Orb / Lens identity (required for Orb sign-in)
+ALTER TABLE public.creator_profiles
+  ADD COLUMN IF NOT EXISTS orb_account_id TEXT,
+  ADD COLUMN IF NOT EXISTS lens_account_id TEXT,
+  ADD COLUMN IF NOT EXISTS lens_handle TEXT,
+  ADD COLUMN IF NOT EXISTS lens_avatar_uri TEXT;
+
+CREATE UNIQUE INDEX IF NOT EXISTS creator_profiles_orb_account_id_key
+  ON public.creator_profiles (orb_account_id)
+  WHERE orb_account_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS creator_profiles_lens_account_id_idx
+  ON public.creator_profiles (lens_account_id)
+  WHERE lens_account_id IS NOT NULL;
+
 -- Verify the table was created
 SELECT 
   table_name, 

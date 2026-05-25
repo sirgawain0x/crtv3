@@ -18,4 +18,12 @@ describe('formatOrbAuthError', () => {
       /Get Started/i,
     );
   });
+
+  it('maps missing lens_account_id schema cache errors', () => {
+    expect(
+      formatOrbAuthError(
+        "Could not find the 'lens_account_id' column of 'creator_profiles' in the schema cache",
+      ),
+    ).toMatch(/add-orb-lens-columns/i);
+  });
 });
