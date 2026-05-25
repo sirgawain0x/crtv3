@@ -16,12 +16,16 @@ export function MobileOrbSection() {
     linkProfile,
     isLinking: isOrbLinking,
     logout: logoutOrb,
+    accountMenuRefreshSignal,
   } = useOrbSession();
 
   const walletAddress = modularAccount?.address || user?.address;
 
   return (
-    <div className="space-y-2">
+    <div
+      key={`mobile-orb-${accountMenuRefreshSignal}-${isOrbAuthenticated ? lensAccount ?? "auth" : "guest"}`}
+      className="space-y-2"
+    >
       <p className="text-xs text-muted-foreground font-semibold">Orb / Lens</p>
       {isOrbAuthenticated ? (
         <div className="space-y-2 rounded-md border border-gray-200 p-3 dark:border-gray-700">

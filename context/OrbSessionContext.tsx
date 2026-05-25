@@ -7,6 +7,7 @@ import React, {
   useEffect,
   useMemo,
   useState,
+  useSyncExternalStore,
 } from 'react';
 import { useUser } from '@account-kit/react';
 import useModularAccount from '@/lib/hooks/accountkit/useModularAccount';
@@ -14,6 +15,8 @@ import {
   getOrbLogin,
   loadStoredOrbSession,
   saveStoredOrbSession,
+  subscribeOrbSession,
+  getOrbSessionServerSnapshot,
   type StoredOrbSession,
 } from '@/lib/sdk/orb/login';
 import { useWalletAuth } from '@/lib/auth/useWalletAuth';
@@ -38,16 +41,23 @@ type OrbSessionContextValue = {
   logout: () => Promise<void>;
   syncSession: () => Promise<StoredOrbSession | null>;
   linkProfile: (ownerAddress?: string) => Promise<void>;
+  /** Bumped after Orb sign-in so account menus can reopen with fresh state. */
+  accountMenuRefreshSignal: number;
 };
 
 const OrbSessionContext = createContext<OrbSessionContextValue | null>(null);
 
 export function OrbSessionProvider({ children }: { children: React.ReactNode }) {
-  const [session, setSession] = useState<StoredOrbSession | null>(null);
+  const session = useSyncExternalStore(
+    subscribeOrbSession,
+    loadStoredOrbSession,
+    getOrbSessionServerSnapshot,
+  );
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isLinking, setIsLinking] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [linkStatus, setLinkStatus] = useState<OrbLinkStatus>('idle');
+  const [accountMenuRefreshSignal, setAccountMenuRefreshSignal] = useState(0);
   const user = useUser();
   const { account: modularAccount } = useModularAccount();
   const { getAuthHeaders } = useWalletAuth();
@@ -61,13 +71,12 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
     return orb.getAccountFromAccessToken(session.accessToken);
   }, [session, orb]);
 
-  useEffect(() => {
-    setSession(loadStoredOrbSession());
-  }, []);
-
   const persistSession = useCallback((next: StoredOrbSession | null) => {
     saveStoredOrbSession(next);
-    setSession(next);
+  }, []);
+
+  const bumpAccountMenuRefresh = useCallback(() => {
+    setAccountMenuRefreshSignal((n) => n + 1);
   }, []);
 
   const syncSession = useCallback(async () => {
@@ -182,6 +191,7 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
         };
         persistSession(stored);
         setIsLoginModalOpen(false);
+        bumpAccountMenuRefresh();
         toast.success('Signed in with Orb');
 
         const wallet = modularAccount?.address || user?.address;
@@ -199,7 +209,7 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
         throw new Error(message);
       }
     },
-    [orb, persistSession, modularAccount?.address, user?.address, linkProfile],
+    [orb, persistSession, bumpAccountMenuRefresh, modularAccount?.address, user?.address, linkProfile],
   );
 
   const logout = useCallback(async () => {
@@ -248,6 +258,7 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
       logout,
       syncSession,
       linkProfile,
+      accountMenuRefreshSignal,
     }),
     [
       session,
@@ -262,6 +273,7 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
       logout,
       syncSession,
       linkProfile,
+      accountMenuRefreshSignal,
     ],
   );
 
