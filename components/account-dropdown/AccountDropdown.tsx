@@ -1353,7 +1353,6 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent
-            key={`account-menu-orb-${accountMenuRefreshSignal}-${isOrbAuthenticated ? lensAccount ?? "auth" : "guest"}`}
             className="w-[320px] md:w-80 max-h-[80vh] overflow-y-auto"
             align="end"
           >

@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   ORB_SESSION_CHANGE_EVENT,
   ORB_SESSION_STORAGE_KEY,
+  invalidateOrbSessionCache,
   loadStoredOrbSession,
   saveStoredOrbSession,
   subscribeOrbSession,
@@ -11,6 +12,7 @@ import {
 describe('orb session storage', () => {
   afterEach(() => {
     localStorage.clear();
+    invalidateOrbSessionCache();
   });
 
   it('notifies subscribers when session is saved', () => {
@@ -39,5 +41,20 @@ describe('orb session storage', () => {
     expect(localStorage.getItem(ORB_SESSION_STORAGE_KEY)).toBeNull();
 
     window.removeEventListener(ORB_SESSION_CHANGE_EVENT, handler);
+  });
+
+  it('returns a referentially stable snapshot until the session changes', () => {
+    saveStoredOrbSession({ accessToken: 'stable-token' });
+
+    const first = loadStoredOrbSession();
+    const second = loadStoredOrbSession();
+
+    expect(first).toBe(second);
+
+    saveStoredOrbSession({ accessToken: 'updated-token' });
+
+    const third = loadStoredOrbSession();
+    expect(third).not.toBe(first);
+    expect(third?.accessToken).toBe('updated-token');
   });
 });
