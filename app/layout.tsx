@@ -102,13 +102,7 @@ export default async function RootLayout({
         </Providers>
         <Toaster />
         <Analytics />
-        {/* HypeLab SDK: required for @hypelab/sdk-react Banner/Native. Property slug: 33e2e4fa10 */}
-        <Script
-          id="hypelab-sdk"
-          src="https://api.hypelab.com/v1/scripts/sdk.js"
-          strategy="afterInteractive"
-          data-property-slug="33e2e4fa10"
-        />
+        <HypelabSdkScript />
       </body>
     </html>
   );
