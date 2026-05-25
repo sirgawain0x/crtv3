@@ -44,11 +44,13 @@ const VideoCardGrid: React.FC<VideoCardGridProps> = ({
   const [totalAssets, setTotalAssets] = useState<number>(0);
   const [hasNextPage, setHasNextPage] = useState<boolean>(false);
   const [validVideosCount, setValidVideosCount] = useState<number>(0);
+  const [playbackWarning, setPlaybackWarning] = useState<string | null>(null);
 
   const fetchSources = useCallback(async (page: number) => {
     try {
       setLoading(true);
       setError(null);
+      setPlaybackWarning(null);
 
       // Calculate offset based on current page
       const offset = (page - 1) * ITEMS_PER_PAGE;
@@ -124,28 +126,21 @@ const VideoCardGrid: React.FC<VideoCardGridProps> = ({
         })
       );
 
-      // Filter out videos with failed playback sources
-      const validPlaybackSources = videosWithPlayback.filter(
-        (video) => video.detailedSrc !== null
-      );
+      const playbackReadyCount = videosWithPlayback.filter(
+        (video) => video.detailedSrc !== null && video.detailedSrc.length > 0,
+      ).length;
 
-      // Update the count of valid videos that actually rendered
-      setValidVideosCount(validPlaybackSources.length);
+      setValidVideosCount(videosWithPlayback.length);
+      setHasNextPage(hasMore);
 
-      // Update hasMore based on actual valid videos returned
-      // If we got fewer videos than requested, we've reached the end
-      // Also check if API says there are no more pages
-      const actualHasMore = hasMore && validPlaybackSources.length >= ITEMS_PER_PAGE;
-      setHasNextPage(actualHasMore);
-
-      if (validPlaybackSources.length === 0 && page === 1) {
-        setError("Unable to load video playback. Please try again later.");
-        setPlaybackSources([]);
-        setValidVideosCount(0);
-        return;
+      if (playbackReadyCount === 0 && videosWithPlayback.length > 0) {
+        setPlaybackWarning(
+          "Playback is temporarily unavailable. Videos are shown with poster images until streaming recovers.",
+        );
       }
 
-      setPlaybackSources(validPlaybackSources);
+      // Keep all published videos — VideoThumbnail falls back to posters when src is missing
+      setPlaybackSources(videosWithPlayback);
     } catch (err) {
       logger.error("Error fetching videos:", err);
       setError("Failed to load videos. Please try again later.");
@@ -258,6 +253,11 @@ const VideoCardGrid: React.FC<VideoCardGridProps> = ({
 
   return (
     <div>
+      {playbackWarning && (
+        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">
+          {playbackWarning}
+        </div>
+      )}
       <div className="grid grid-cols-1 gap-y-4 sm:grid-cols-1 sm:gap-4 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
         {playbackSources.map((video, index) => (
           <VideoCard
