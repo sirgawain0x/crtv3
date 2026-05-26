@@ -152,7 +152,7 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources, priority 
     if (dbStatus === 'published') {
       syncViewCount();
     }
-  }, [asset?.playbackId, dbStatus, playbackSources]);
+  }, [asset?.playbackId, dbStatus, playbackSources?.length]);
 
   // Early return if asset is not provided or invalid
   if (!asset) {

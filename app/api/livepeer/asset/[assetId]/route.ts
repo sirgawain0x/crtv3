@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getFullLivepeer } from '@/lib/sdk/livepeer/fullClient';
-import {
-  LIVEPEER_AUTH_FAILED,
-  LIVEPEER_NOT_CONFIGURED,
-  livepeerStudioApiBaseUrl,
-  resolveLivepeerStudioAuthToken,
-} from '@/lib/sdk/livepeer/studioAuth';
+import { LIVEPEER_NOT_CONFIGURED } from '@/lib/sdk/livepeer/studioAuth';
 import { serverLogger } from '@/lib/utils/logger';
 
 export async function GET(
@@ -34,8 +29,8 @@ export async function GET(
       );
     }
 
-    const token = resolveLivepeerStudioAuthToken();
-    if (!token) {
+    const client = getFullLivepeer();
+    if (!client) {
       return NextResponse.json(
         {
           error: 'Livepeer is not configured',
@@ -45,66 +40,32 @@ export async function GET(
       );
     }
 
-    const client = getFullLivepeer();
-    if (client) {
-      const assetResponse = await client.asset.get(assetId);
+    const assetResponse = await client.asset.get(assetId);
 
-      if (
-        assetResponse &&
-        'errors' in assetResponse &&
-        Array.isArray(assetResponse.errors) &&
-        assetResponse.errors.length > 0
-      ) {
-        return NextResponse.json(
-          {
-            error: 'Asset not found',
-            details: assetResponse.errors,
-            code: 'ASSET_NOT_FOUND',
-          },
-          { status: 404 },
-        );
-      }
-
-      if (!assetResponse || !assetResponse.asset) {
-        return NextResponse.json(
-          { error: 'Asset not found', code: 'ASSET_NOT_FOUND' },
-          { status: 404 },
-        );
-      }
-
-      return NextResponse.json(assetResponse);
-    }
-
-    const base = livepeerStudioApiBaseUrl();
-    const livepeerRes = await fetch(
-      `${base}/api/asset/${encodeURIComponent(assetId)}`,
-      {
-        headers: { Authorization: `Bearer ${token}` },
-        cache: 'no-store',
-      },
-    );
-
-    if (livepeerRes.status === 401 || livepeerRes.status === 403) {
-      return NextResponse.json(
-        {
-          error: 'Livepeer authentication failed',
-          code: LIVEPEER_AUTH_FAILED,
-        },
-        { status: 502 },
-      );
-    }
-
-    if (!livepeerRes.ok) {
+    if (
+      assetResponse &&
+      'errors' in assetResponse &&
+      Array.isArray(assetResponse.errors) &&
+      assetResponse.errors.length > 0
+    ) {
       return NextResponse.json(
         {
           error: 'Asset not found',
-          code: livepeerRes.status === 404 ? 'ASSET_NOT_FOUND' : 'LIVEPEER_UPSTREAM_ERROR',
+          details: assetResponse.errors,
+          code: 'ASSET_NOT_FOUND',
         },
-        { status: livepeerRes.status >= 500 ? 502 : livepeerRes.status },
+        { status: 404 },
       );
     }
 
-    return NextResponse.json(await livepeerRes.json());
+    if (!assetResponse || !assetResponse.asset) {
+      return NextResponse.json(
+        { error: 'Asset not found', code: 'ASSET_NOT_FOUND' },
+        { status: 404 },
+      );
+    }
+
+    return NextResponse.json(assetResponse);
   } catch (error: unknown) {
     serverLogger.error('Error fetching asset:', error);
 
