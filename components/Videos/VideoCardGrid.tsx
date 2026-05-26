@@ -127,7 +127,7 @@ const VideoCardGrid: React.FC<VideoCardGridProps> = ({
       );
 
       const playbackReadyCount = videosWithPlayback.filter(
-        (video) => video.detailedSrc !== null && video.detailedSrc.length > 0,
+        (video) => (video.detailedSrc?.length ?? 0) > 0,
       ).length;
 
       setValidVideosCount(videosWithPlayback.length);
