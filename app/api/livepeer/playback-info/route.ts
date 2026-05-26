@@ -4,6 +4,13 @@ import { serverLogger } from '@/lib/utils/logger';
 
 export async function GET(request: NextRequest) {
   try {
+    if (!process.env.LIVEPEER_FULL_API_KEY?.trim()) {
+      return NextResponse.json(
+        { error: 'Livepeer playback is not configured on this deployment' },
+        { status: 503 },
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const playbackId = searchParams.get('playbackId');
 
