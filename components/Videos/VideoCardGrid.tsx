@@ -9,6 +9,9 @@ import { Pagination } from "@/components/ui/pagination";
 import { fetchPublishedVideos } from "@/lib/utils/published-videos-client";
 import type { VideoAsset } from "@/lib/types/video-asset";
 import { logger } from '@/lib/utils/logger';
+import { mapInBatches } from '@/lib/utils/map-in-batches';
+
+const PLAYBACK_FETCH_CONCURRENCY = 4;
 
 
 const ITEMS_PER_PAGE = 12; // Number of videos per page
@@ -99,29 +102,33 @@ const VideoCardGrid: React.FC<VideoCardGridProps> = ({
         return;
       }
 
-      // 2. Fetch playback sources from Livepeer only for the videos we need
-      const videosWithPlayback = await Promise.all(
-        videos.map(async (video) => {
-          const detailedSrc = await fetchPlaybackSourceWithRetry(video.playback_id);
+      // 2. Fetch playback sources with bounded concurrency
+      const videosWithPlayback = await mapInBatches(
+        videos,
+        PLAYBACK_FETCH_CONCURRENCY,
+        async (video) => {
+          const detailedSrc = await fetchPlaybackSourceWithRetry(
+            video.playback_id,
+          );
           return {
             ...video,
-            // Map to Asset-like structure for compatibility with VideoCard
             id: video.asset_id,
             playbackId: video.playback_id,
             name: video.title,
-            // Add required Asset fields for VideoCard compatibility
             status: {
-              phase: "ready" as const,
+              phase: 'ready' as const,
             },
             creatorId: {
               value: video.creator_id,
             },
             createdAt: video.created_at,
-            // Include thumbnail_url for VideoThumbnail component
-            thumbnail_url: (video as any).thumbnail_url || video.thumbnailUri || null,
+            thumbnail_url:
+              (video as { thumbnail_url?: string }).thumbnail_url ||
+              video.thumbnailUri ||
+              null,
             detailedSrc,
           };
-        })
+        },
       );
 
       // Filter out videos with failed playback sources

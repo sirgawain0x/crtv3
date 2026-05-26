@@ -8,6 +8,10 @@ import {
 } from '@/lib/livepeer/view-count';
 import { getStoredViewsCount } from '@/lib/livepeer/sync-view-count';
 import { serverLogger } from '@/lib/utils/logger';
+import {
+  LIVEPEER_AUTH_FAILED,
+  LIVEPEER_NOT_CONFIGURED,
+} from '@/lib/sdk/livepeer/studioAuth';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -24,20 +28,47 @@ const noStoreHeaders = {
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ playbackId: string }> }
+  { params }: { params: Promise<{ playbackId: string }> },
 ) {
   try {
     const { playbackId } = await params;
 
     if (!playbackId) {
       return NextResponse.json(
-        { error: 'Playback ID is required' },
-        { status: 400, headers: noStoreHeaders }
+        { error: 'Playback ID is required', code: 'PLAYBACK_ID_REQUIRED' },
+        { status: 400, headers: noStoreHeaders },
       );
     }
 
-    const metrics = await fetchAllViews(playbackId);
-    const livepeerTotal = metrics ? sumLivepeerViewMetrics(metrics) : 0;
+    const viewsResult = await fetchAllViews(playbackId);
+    const livepeerAvailable = viewsResult.ok;
+    const livepeerTotal = viewsResult.ok
+      ? sumLivepeerViewMetrics(viewsResult.metrics)
+      : 0;
+
+    if (!viewsResult.ok && viewsResult.reason === 'not_configured') {
+      return NextResponse.json(
+        {
+          error: 'Livepeer is not configured',
+          code: LIVEPEER_NOT_CONFIGURED,
+        },
+        { status: 503, headers: noStoreHeaders },
+      );
+    }
+
+    if (
+      !viewsResult.ok &&
+      viewsResult.reason === 'upstream_error' &&
+      (viewsResult.status === 401 || viewsResult.status === 403)
+    ) {
+      return NextResponse.json(
+        {
+          error: 'Livepeer authentication failed',
+          code: LIVEPEER_AUTH_FAILED,
+        },
+        { status: 502, headers: noStoreHeaders },
+      );
+    }
 
     const supabase = createServiceClient();
     const dbViewCount = await getStoredViewsCount(supabase, playbackId);
@@ -50,17 +81,20 @@ export async function GET(
         source,
         playbackId,
         viewCount: displayTotal,
-        playtimeMins: metrics?.playtimeMins ?? 0,
+        playtimeMins: viewsResult.ok ? viewsResult.metrics.playtimeMins : 0,
         legacyViewCount: 0,
+        livepeerAvailable,
+        ...(!livepeerAvailable
+          ? { code: 'LIVEPEER_VIEWS_UNAVAILABLE' as const }
+          : {}),
       },
-      { headers: noStoreHeaders }
+      { headers: noStoreHeaders },
     );
-
   } catch (error) {
     serverLogger.error('Error fetching view metrics:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500, headers: noStoreHeaders }
+      { error: 'Internal server error', code: 'VIEW_METRICS_ERROR' },
+      { status: 500, headers: noStoreHeaders },
     );
   }
 }

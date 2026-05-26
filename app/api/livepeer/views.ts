@@ -1,39 +1,45 @@
 import { serverLogger } from '@/lib/utils/logger';
+import {
+  livepeerStudioApiBaseUrl,
+  resolveLivepeerStudioAuthToken,
+} from '@/lib/sdk/livepeer/studioAuth';
 
-/** Prefer full-access key for Studio data routes; fall back to LIVEPEER_API_KEY (same key in most setups). */
-export function resolveLivepeerStudioAuthToken(): string | undefined {
-  const full = process.env.LIVEPEER_FULL_API_KEY?.trim();
-  const standard = process.env.LIVEPEER_API_KEY?.trim();
-  return full || standard || undefined;
-}
+export {
+  livepeerStudioApiBaseUrl,
+  resolveLivepeerStudioAuthToken,
+} from '@/lib/sdk/livepeer/studioAuth';
 
-export function livepeerStudioApiBaseUrl(): string {
-  const raw =
-    process.env.LIVEPEER_FULL_API_URL?.trim() || 'https://livepeer.studio';
-  return raw.replace(/\/$/, '');
-}
-
-export const fetchAllViews = async (
-  playbackId: string,
-): Promise<{
+export type LivepeerViewMetrics = {
   playbackId: string;
   viewCount: number;
   playtimeMins: number;
   legacyViewCount: number;
-} | null> => {
+};
+
+export type FetchAllViewsResult =
+  | { ok: true; metrics: LivepeerViewMetrics }
+  | {
+      ok: false;
+      reason: 'not_configured' | 'upstream_error' | 'network_error';
+      status?: number;
+    };
+
+export const fetchAllViews = async (
+  playbackId: string,
+): Promise<FetchAllViewsResult> => {
   const token = resolveLivepeerStudioAuthToken();
   if (!token) {
     serverLogger.warn(
       'Livepeer view metrics skipped: set LIVEPEER_FULL_API_KEY or LIVEPEER_API_KEY',
     );
-    return null;
+    return { ok: false, reason: 'not_configured' };
   }
 
   const myHeaders = new Headers();
   myHeaders.append('Authorization', `Bearer ${token}`);
 
   const requestOptions = {
-    method: 'GET',
+    method: 'GET' as const,
     headers: myHeaders,
     redirect: 'follow' as const,
     cache: 'no-store' as const,
@@ -47,20 +53,28 @@ export const fetchAllViews = async (
     );
 
     if (!response.ok) {
-      throw new Error(
-        `Error fetching views: ${response.status} ${response.statusText}`,
+      serverLogger.warn(
+        `Livepeer views API ${response.status} for playbackId=${playbackId}`,
       );
+      return {
+        ok: false,
+        reason: 'upstream_error',
+        status: response.status,
+      };
     }
 
     const data = (await response.json()) as Record<string, unknown>;
     return {
-      playbackId: String(data.playbackId ?? playbackId),
-      viewCount: Number(data.viewCount ?? 0) || 0,
-      playtimeMins: Number(data.playtimeMins ?? 0) || 0,
-      legacyViewCount: Number(data.legacyViewCount ?? 0) || 0,
+      ok: true,
+      metrics: {
+        playbackId: String(data.playbackId ?? playbackId),
+        viewCount: Number(data.viewCount ?? 0) || 0,
+        playtimeMins: Number(data.playtimeMins ?? 0) || 0,
+        legacyViewCount: Number(data.legacyViewCount ?? 0) || 0,
+      },
     };
   } catch (error) {
     serverLogger.error('Failed to fetch view metrics:', error);
-    return null;
+    return { ok: false, reason: 'network_error' };
   }
 };

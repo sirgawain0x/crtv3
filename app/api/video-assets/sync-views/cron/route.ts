@@ -73,10 +73,10 @@ export async function GET(request: NextRequest) {
       await Promise.all(
         batch.map(async (video) => {
           try {
-            const metrics = await fetchAllViews(video.playback_id);
-            
-            if (metrics) {
-              const livepeerTotal = sumLivepeerViewMetrics(metrics);
+            const viewsResult = await fetchAllViews(video.playback_id);
+
+            if (viewsResult.ok) {
+              const livepeerTotal = sumLivepeerViewMetrics(viewsResult.metrics);
               const merged = mergeViewCounts(video.views_count ?? 0, livepeerTotal);
 
               if (merged !== video.views_count) {

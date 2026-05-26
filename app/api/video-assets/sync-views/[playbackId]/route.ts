@@ -4,31 +4,48 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { createServiceClient } from '@/lib/sdk/supabase/service';
 import { fetchAllViews } from '@/app/api/livepeer/views';
 import { sumLivepeerViewMetrics } from '@/lib/livepeer/view-count';
-import { syncStoredViewsCount } from '@/lib/livepeer/sync-view-count';
+import {
+  getStoredViewsCount,
+  syncStoredViewsCount,
+} from '@/lib/livepeer/sync-view-count';
 import { serverLogger } from '@/lib/utils/logger';
 import { rateLimiters } from '@/lib/middleware/rateLimit';
+import {
+  LIVEPEER_NOT_CONFIGURED,
+  LIVEPEER_AUTH_FAILED,
+} from '@/lib/sdk/livepeer/studioAuth';
 
 function syncViewsErrorResponse(error: unknown) {
   serverLogger.error('Error syncing view count:', error);
 
   if (error instanceof Error) {
-    if (error.message.includes('Livepeer') || error.message.includes('playback')) {
+    if (
+      error.message.includes('Livepeer') ||
+      error.message.includes('playback')
+    ) {
       return NextResponse.json(
         {
           error: 'Livepeer API error',
-          details: 'Unable to fetch view metrics from Livepeer. Please try again later.',
+          code: 'LIVEPEER_SYNC_ERROR',
+          details:
+            'Unable to fetch view metrics from Livepeer. Please try again later.',
         },
-        { status: 503 }
+        { status: 503 },
       );
     }
 
-    if (error.message.includes('database') || error.message.includes('connection')) {
+    if (
+      error.message.includes('database') ||
+      error.message.includes('connection')
+    ) {
       return NextResponse.json(
         {
           error: 'Database error',
-          details: 'Unable to update view count in database. Please try again later.',
+          code: 'DATABASE_ERROR',
+          details:
+            'Unable to update view count in database. Please try again later.',
         },
-        { status: 503 }
+        { status: 503 },
       );
     }
   }
@@ -36,9 +53,10 @@ function syncViewsErrorResponse(error: unknown) {
   return NextResponse.json(
     {
       error: 'Internal server error',
+      code: 'SYNC_VIEWS_ERROR',
       details: error instanceof Error ? error.message : 'Unknown error',
     },
-    { status: 500 }
+    { status: 500 },
   );
 }
 
@@ -46,15 +64,48 @@ async function syncViewsForPlayback(
   supabase: SupabaseClient,
   playbackId: string,
 ) {
-  const metrics = await fetchAllViews(playbackId);
-  if (!metrics) {
-    return NextResponse.json(
-      { error: 'Failed to fetch view metrics from Livepeer' },
-      { status: 500 }
+  const viewsResult = await fetchAllViews(playbackId);
+
+  if (!viewsResult.ok) {
+    const storedCount = await getStoredViewsCount(supabase, playbackId);
+
+    if (viewsResult.reason === 'not_configured') {
+      return NextResponse.json(
+        {
+          error: 'Livepeer is not configured',
+          code: LIVEPEER_NOT_CONFIGURED,
+        },
+        { status: 503 },
+      );
+    }
+
+    if (
+      viewsResult.reason === 'upstream_error' &&
+      (viewsResult.status === 401 || viewsResult.status === 403)
+    ) {
+      return NextResponse.json(
+        {
+          error: 'Livepeer authentication failed',
+          code: LIVEPEER_AUTH_FAILED,
+        },
+        { status: 502 },
+      );
+    }
+
+    serverLogger.warn(
+      `View sync skipped for ${playbackId}: Livepeer metrics unavailable (${viewsResult.reason})`,
     );
+
+    return NextResponse.json({
+      success: true,
+      playbackId,
+      viewCount: storedCount,
+      livepeerSynced: false,
+      code: 'LIVEPEER_VIEWS_UNAVAILABLE',
+    });
   }
 
-  const livepeerTotal = sumLivepeerViewMetrics(metrics);
+  const livepeerTotal = sumLivepeerViewMetrics(viewsResult.metrics);
   const { viewCount } = await syncStoredViewsCount(
     supabase,
     playbackId,
@@ -65,12 +116,13 @@ async function syncViewsForPlayback(
     success: true,
     playbackId,
     viewCount,
+    livepeerSynced: true,
   });
 }
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: Promise<{ playbackId: string }> }
+  { params }: { params: Promise<{ playbackId: string }> },
 ) {
   const verification = await checkBotId();
   if (verification.isBot) {
@@ -84,8 +136,8 @@ export async function POST(
 
     if (!playbackId) {
       return NextResponse.json(
-        { error: 'Playback ID is required' },
-        { status: 400 }
+        { error: 'Playback ID is required', code: 'PLAYBACK_ID_REQUIRED' },
+        { status: 400 },
       );
     }
 
@@ -98,15 +150,15 @@ export async function POST(
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: Promise<{ playbackId: string }> }
+  { params }: { params: Promise<{ playbackId: string }> },
 ) {
   try {
     const { playbackId } = await params;
 
     if (!playbackId) {
       return NextResponse.json(
-        { error: 'Playback ID is required' },
-        { status: 400 }
+        { error: 'Playback ID is required', code: 'PLAYBACK_ID_REQUIRED' },
+        { status: 400 },
       );
     }
 
