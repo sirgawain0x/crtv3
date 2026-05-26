@@ -3,6 +3,7 @@ import { NextRequest } from 'next/server';
 
 const mockFetchAllViews = vi.fn();
 const mockSyncStoredViewsCount = vi.fn();
+const mockGetStoredViewsCount = vi.fn();
 const mockCreateServiceClient = vi.fn();
 
 vi.mock('botid/server', () => ({
@@ -21,6 +22,7 @@ vi.mock('@/app/api/livepeer/views', () => ({
 
 vi.mock('@/lib/livepeer/sync-view-count', () => ({
   syncStoredViewsCount: (...args: unknown[]) => mockSyncStoredViewsCount(...args),
+  getStoredViewsCount: (...args: unknown[]) => mockGetStoredViewsCount(...args),
 }));
 
 vi.mock('@/lib/sdk/supabase/service', () => ({
@@ -28,20 +30,25 @@ vi.mock('@/lib/sdk/supabase/service', () => ({
 }));
 
 vi.mock('@/lib/utils/logger', () => ({
-  serverLogger: { error: vi.fn(), debug: vi.fn() },
+  serverLogger: { error: vi.fn(), debug: vi.fn(), warn: vi.fn() },
 }));
 
-import { POST } from './route';
+import { GET, POST } from './route';
 
 describe('sync-views POST security', () => {
   beforeEach(() => {
     mockCreateServiceClient.mockReturnValue({});
     mockFetchAllViews.mockResolvedValue({
-      playbackId: 'playback-1',
-      viewCount: 12,
-      legacyViewCount: 5,
+      ok: true,
+      metrics: {
+        playbackId: 'playback-1',
+        viewCount: 12,
+        playtimeMins: 0,
+        legacyViewCount: 5,
+      },
     });
     mockSyncStoredViewsCount.mockResolvedValue({ viewCount: 17, updated: true });
+    mockGetStoredViewsCount.mockResolvedValue(0);
   });
 
   afterEach(() => {
@@ -68,6 +75,7 @@ describe('sync-views POST security', () => {
       success: true,
       playbackId: 'playback-1',
       viewCount: 17,
+      livepeerSynced: true,
     });
     expect(mockFetchAllViews).toHaveBeenCalledWith('playback-1');
     expect(mockSyncStoredViewsCount).toHaveBeenCalledWith(
@@ -75,5 +83,34 @@ describe('sync-views POST security', () => {
       'playback-1',
       17,
     );
+  });
+
+  it('returns stored view count when Livepeer metrics are unavailable', async () => {
+    mockFetchAllViews.mockResolvedValue({
+      ok: false,
+      reason: 'upstream_error',
+      status: 500,
+    });
+    mockGetStoredViewsCount.mockResolvedValue(42);
+
+    const request = new NextRequest(
+      'http://localhost/api/video-assets/sync-views/playback-1',
+      { method: 'GET' },
+    );
+
+    const response = await GET(request, {
+      params: Promise.resolve({ playbackId: 'playback-1' }),
+    });
+    const json = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(json).toMatchObject({
+      success: true,
+      playbackId: 'playback-1',
+      viewCount: 42,
+      livepeerSynced: false,
+      code: 'LIVEPEER_VIEWS_UNAVAILABLE',
+    });
+    expect(mockSyncStoredViewsCount).not.toHaveBeenCalled();
   });
 });

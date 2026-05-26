@@ -114,6 +114,7 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources, priority 
   useEffect(() => {
     async function syncViewCount() {
       if (!asset?.playbackId || dbStatus !== 'published') return;
+      if (!playbackSources?.length) return;
 
       // Check last sync time from localStorage to avoid excessive API calls
       const lastSyncKey = `view-sync-${asset.playbackId}`;
@@ -151,7 +152,7 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources, priority 
     if (dbStatus === 'published') {
       syncViewCount();
     }
-  }, [asset?.playbackId, dbStatus]);
+  }, [asset?.playbackId, dbStatus, playbackSources?.length]);
 
   // Early return if asset is not provided or invalid
   if (!asset) {

@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { fullLivepeer } from '@/lib/sdk/livepeer/fullClient';
+import { getFullLivepeer } from '@/lib/sdk/livepeer/fullClient';
+import { LIVEPEER_NOT_CONFIGURED } from '@/lib/sdk/livepeer/studioAuth';
 import { serverLogger } from '@/lib/utils/logger';
+
+const ethereumAddressRegex = /^0x[a-fA-F0-9]{40}$/;
 
 export async function GET(request: NextRequest) {
   try {
@@ -16,59 +19,76 @@ export async function GET(request: NextRequest) {
 
     if (!playbackId) {
       return NextResponse.json(
-        { error: 'Playback ID is required' },
-        { status: 400 }
+        { error: 'Playback ID is required', code: 'PLAYBACK_ID_REQUIRED' },
+        { status: 400 },
       );
     }
 
-    // Validate that playbackId is not an Ethereum address
-    // Ethereum addresses start with 0x and are 42 characters long
-    const ethereumAddressRegex = /^0x[a-fA-F0-9]{40}$/;
     if (ethereumAddressRegex.test(playbackId)) {
       return NextResponse.json(
-        { error: 'Invalid playback ID format. Expected Livepeer playback ID, received Ethereum address.' },
-        { status: 400 }
+        {
+          error:
+            'Invalid playback ID format. Expected Livepeer playback ID, received Ethereum address.',
+          code: 'INVALID_PLAYBACK_ID',
+        },
+        { status: 400 },
       );
     }
 
-    // Fetch playback info from Livepeer
-    const response = await fullLivepeer.playback.get(playbackId);
+    const client = getFullLivepeer();
+    if (!client) {
+      return NextResponse.json(
+        {
+          error: 'Livepeer is not configured',
+          code: LIVEPEER_NOT_CONFIGURED,
+        },
+        { status: 503 },
+      );
+    }
 
-    // Check if the response contains errors
+    const response = await client.playback.get(playbackId);
+
     if (response.error) {
-      // Extract error message from Livepeer API response if available
-      // The error object might differ based on the SDK version, assuming it matches ErrorT
       return NextResponse.json(
         {
           error: 'Playback info not found',
-          details: response.error
+          details: response.error,
+          code: 'PLAYBACK_NOT_FOUND',
         },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
     if (!response.playbackInfo) {
       return NextResponse.json(
-        { error: 'Playback info not found' },
-        { status: 404 }
+        { error: 'Playback info not found', code: 'PLAYBACK_NOT_FOUND' },
+        { status: 404 },
       );
     }
 
     return NextResponse.json(response.playbackInfo);
-  } catch (error: any) {
+  } catch (error: unknown) {
     serverLogger.error('Error fetching playback info:', error);
 
-    // Extract error message from Livepeer API response if available
-    let errorMessage = 'Failed to fetch playback info';
-    if (error?.message) {
-      errorMessage = error.message;
+    const message =
+      error instanceof Error ? error.message : 'Failed to fetch playback info';
+
+    if (message === 'LIVEPEER_NOT_CONFIGURED') {
+      return NextResponse.json(
+        {
+          error: 'Livepeer is not configured',
+          code: LIVEPEER_NOT_CONFIGURED,
+        },
+        { status: 503 },
+      );
     }
 
     return NextResponse.json(
       {
-        error: errorMessage,
+        error: message,
+        code: 'PLAYBACK_INFO_ERROR',
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -1,57 +1,90 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { fetchAllViews } from './views';
 import {
-  fetchAllViews,
   livepeerStudioApiBaseUrl,
   resolveLivepeerStudioAuthToken,
-} from "./views";
+} from '@/lib/sdk/livepeer/studioAuth';
 
-describe("Livepeer view metrics helpers", () => {
+describe('Livepeer view metrics helpers', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
 
-  it("prefers the full Livepeer API key", () => {
-    vi.stubEnv("LIVEPEER_FULL_API_KEY", "full-key");
-    vi.stubEnv("LIVEPEER_API_KEY", "standard-key");
+  it('prefers the full Livepeer API key', () => {
+    vi.stubEnv('LIVEPEER_FULL_API_KEY', 'full-key');
+    vi.stubEnv('LIVEPEER_API_KEY', 'standard-key');
 
-    expect(resolveLivepeerStudioAuthToken()).toBe("full-key");
+    expect(resolveLivepeerStudioAuthToken()).toBe('full-key');
   });
 
-  it("normalizes the Studio API base URL", () => {
-    vi.stubEnv("LIVEPEER_FULL_API_URL", "https://livepeer.example/");
+  it('normalizes the Studio API base URL', () => {
+    vi.stubEnv('LIVEPEER_FULL_API_URL', 'https://livepeer.example/');
 
-    expect(livepeerStudioApiBaseUrl()).toBe("https://livepeer.example");
+    expect(livepeerStudioApiBaseUrl()).toBe('https://livepeer.example');
   });
 
-  it("fetches view metrics without using cache", async () => {
-    vi.stubEnv("LIVEPEER_FULL_API_KEY", "full-key");
+  it('fetches view metrics without using cache', async () => {
+    vi.stubEnv('LIVEPEER_FULL_API_KEY', 'full-key');
     const fetchMock = vi.fn(async () =>
       Response.json({
-        playbackId: "playback-1",
+        playbackId: 'playback-1',
         viewCount: 12,
         playtimeMins: 34,
         legacyViewCount: 5,
       }),
     );
-    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal('fetch', fetchMock);
 
-    await expect(fetchAllViews("playback-1")).resolves.toEqual({
-      playbackId: "playback-1",
-      viewCount: 12,
-      playtimeMins: 34,
-      legacyViewCount: 5,
+    await expect(fetchAllViews('playback-1')).resolves.toEqual({
+      ok: true,
+      metrics: {
+        playbackId: 'playback-1',
+        viewCount: 12,
+        playtimeMins: 34,
+        legacyViewCount: 5,
+      },
     });
     expect(fetchMock).toHaveBeenCalledWith(
-      "https://livepeer.studio/api/data/views/query/total/playback-1",
+      'https://livepeer.studio/api/data/views/query/total/playback-1',
       expect.objectContaining({
-        cache: "no-store",
+        cache: 'no-store',
         headers: expect.any(Headers),
       }),
     );
-    const [, options] = fetchMock.mock.calls[0];
-    expect((options?.headers as Headers).get("Authorization")).toBe(
-      "Bearer full-key",
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://livepeer.studio/api/data/views/query/total/playback-1',
+      expect.objectContaining({
+        headers: expect.any(Headers),
+      }),
     );
+    const [, options] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect((options.headers as Headers).get('Authorization')).toBe(
+      'Bearer full-key',
+    );
+  });
+
+  it('returns upstream_error when Livepeer responds with 500', async () => {
+    vi.stubEnv('LIVEPEER_FULL_API_KEY', 'full-key');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response(null, { status: 500, statusText: 'Internal Server Error' })),
+    );
+
+    await expect(fetchAllViews('playback-1')).resolves.toEqual({
+      ok: false,
+      reason: 'upstream_error',
+      status: 500,
+    });
+  });
+
+  it('returns not_configured when no API key is set', async () => {
+    vi.stubEnv('LIVEPEER_FULL_API_KEY', '');
+    vi.stubEnv('LIVEPEER_API_KEY', '');
+
+    await expect(fetchAllViews('playback-1')).resolves.toEqual({
+      ok: false,
+      reason: 'not_configured',
+    });
   });
 });
