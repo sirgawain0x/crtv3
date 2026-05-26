@@ -116,7 +116,7 @@ export function OrbLoginModal() {
             </div>
           )}
           {deepLink && !displayError && (
-            <Button variant="outline" size="sm" asChild>
+            <Button variant="outline" size="sm" className="lg:hidden" asChild>
               <a href={deepLink} target="_blank" rel="noopener noreferrer">
                 Open in Orb app
               </a>
