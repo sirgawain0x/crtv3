@@ -22,6 +22,13 @@ describe('Livepeer view metrics helpers', () => {
     expect(resolveLivepeerStudioAuthToken()).toBe('full-key');
   });
 
+  it('strips surrounding quotes from Livepeer API keys', () => {
+    vi.stubEnv('LIVEPEER_FULL_API_KEY', '"quoted-full-key"');
+    vi.stubEnv('LIVEPEER_API_KEY', '');
+
+    expect(resolveLivepeerStudioAuthToken()).toBe('quoted-full-key');
+  });
+
   it('normalizes the Studio API base URL', () => {
     vi.stubEnv('LIVEPEER_FULL_API_URL', 'https://livepeer.example/');
 
