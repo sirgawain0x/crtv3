@@ -8,10 +8,7 @@ import {
 } from '@/lib/livepeer/view-count';
 import { getStoredViewsCount } from '@/lib/livepeer/sync-view-count';
 import { serverLogger } from '@/lib/utils/logger';
-import {
-  LIVEPEER_AUTH_FAILED,
-  LIVEPEER_NOT_CONFIGURED,
-} from '@/lib/sdk/livepeer/studioAuth';
+import { LIVEPEER_NOT_CONFIGURED } from '@/lib/sdk/livepeer/studioAuth';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -40,6 +37,9 @@ export async function GET(
       );
     }
 
+    const supabase = createServiceClient();
+    const dbViewCount = await getStoredViewsCount(supabase, playbackId);
+
     const viewsResult = await fetchAllViews(playbackId);
     const livepeerAvailable = viewsResult.ok;
     const livepeerTotal = viewsResult.ok
@@ -47,6 +47,23 @@ export async function GET(
       : 0;
 
     if (!viewsResult.ok && viewsResult.reason === 'not_configured') {
+      if (dbViewCount > 0) {
+        return NextResponse.json(
+          {
+            success: true,
+            source: 'database' as const,
+            playbackId,
+            totalViews: dbViewCount,
+            viewCount: dbViewCount,
+            playtimeMins: 0,
+            legacyViewCount: 0,
+            livepeerAvailable: false,
+            code: LIVEPEER_NOT_CONFIGURED,
+          },
+          { headers: noStoreHeaders },
+        );
+      }
+
       return NextResponse.json(
         {
           error: 'Livepeer is not configured',
@@ -56,22 +73,6 @@ export async function GET(
       );
     }
 
-    if (
-      !viewsResult.ok &&
-      viewsResult.reason === 'upstream_error' &&
-      (viewsResult.status === 401 || viewsResult.status === 403)
-    ) {
-      return NextResponse.json(
-        {
-          error: 'Livepeer authentication failed',
-          code: LIVEPEER_AUTH_FAILED,
-        },
-        { status: 502, headers: noStoreHeaders },
-      );
-    }
-
-    const supabase = createServiceClient();
-    const dbViewCount = await getStoredViewsCount(supabase, playbackId);
     const displayTotal = mergeViewCounts(dbViewCount, livepeerTotal);
     const source = resolveViewCountSource(livepeerTotal, dbViewCount);
 
@@ -80,6 +81,7 @@ export async function GET(
         success: true,
         source,
         playbackId,
+        totalViews: displayTotal,
         viewCount: displayTotal,
         playtimeMins: viewsResult.ok ? viewsResult.metrics.playtimeMins : 0,
         legacyViewCount: 0,

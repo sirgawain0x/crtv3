@@ -3,6 +3,7 @@ import {
   livepeerStudioApiBaseUrl,
   resolveLivepeerStudioAuthToken,
 } from '@/lib/sdk/livepeer/studioAuth';
+import { hasLivepeerErrors } from '@/lib/livepeer/parse-view-metrics';
 import { serverLogger } from '@/lib/utils/logger';
 
 export const dynamic = 'force-dynamic';
@@ -60,6 +61,15 @@ export async function GET(
     }
 
     const data = await response.json();
+
+    if (hasLivepeerErrors(data)) {
+      serverLogger.warn(`Livepeer real-time views API returned errors for playbackId=${playbackId}`);
+      return NextResponse.json(
+        { error: 'Failed to fetch real-time viewership', code: 'UPSTREAM_ERROR' },
+        { status: 502, headers: noStoreHeaders },
+      );
+    }
+
     const stats = Array.isArray(data) ? data : [];
     
     // Sum viewCount from returned dimensions (should match our playbackId query filter)

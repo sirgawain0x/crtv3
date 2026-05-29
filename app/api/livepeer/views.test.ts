@@ -5,6 +5,10 @@ import {
   resolveLivepeerStudioAuthToken,
 } from '@/lib/sdk/livepeer/studioAuth';
 
+vi.mock('@/lib/sdk/livepeer/fullClient', () => ({
+  getFullLivepeer: vi.fn(() => null),
+}));
+
 describe('Livepeer view metrics helpers', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
@@ -76,6 +80,22 @@ describe('Livepeer view metrics helpers', () => {
         playtimeMins: 34,
         legacyViewCount: 5,
       },
+    });
+  });
+
+  it('returns upstream_error when Livepeer responds with errors in JSON body', async () => {
+    vi.stubEnv('LIVEPEER_FULL_API_KEY', 'full-key');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({ errors: [['id not provided', 'Account not found']] }),
+      ),
+    );
+
+    await expect(fetchAllViews('playback-1')).resolves.toEqual({
+      ok: false,
+      reason: 'upstream_error',
+      status: 200,
     });
   });
 

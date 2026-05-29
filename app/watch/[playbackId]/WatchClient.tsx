@@ -15,6 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { RealtimeViewsComponent } from "@/components/Player/RealtimeViewsComponent";
+import { ViewsComponent } from "@/components/Player/ViewsComponent";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -272,8 +273,9 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
                       Broadcasting Live
                     </p>
                   </div>
-                  {/* Realtime concurrent viewers */}
+                  {/* Total + realtime concurrent viewers */}
                   <div className="flex items-center gap-4">
+                    {playbackId && <ViewsComponent playbackId={playbackId} />}
                     {playbackId && <RealtimeViewsComponent playbackId={playbackId} />}
                   </div>
                 </div>
