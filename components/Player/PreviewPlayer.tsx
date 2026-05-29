@@ -195,6 +195,7 @@ export const PreviewPlayer: React.FC<{
     >
       <Player.Root
         src={src}
+        playbackId={playbackIdProp || getPlaybackId(src) || undefined}
         autoPlay={false}
         volume={0}
         aspectRatio={16 / 9}

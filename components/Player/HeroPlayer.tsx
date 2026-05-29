@@ -7,10 +7,11 @@ import { useVideo } from '../../context/VideoContext';
 import './Player.css';
 import { safelyPauseVideo } from '@/lib/utils/video-controls';
 
-export const HeroPlayer: React.FC<{ src: Src[] | null; title: string }> = ({
-  src,
-  title,
-}) => {
+export const HeroPlayer: React.FC<{
+  src: Src[] | null;
+  title: string;
+  playbackId?: string;
+}> = ({ src, title, playbackId }) => {
   const [controlsVisible, setControlsVisible] = useState(true);
   const fadeTimeoutRef = useRef<NodeJS.Timeout>();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -68,7 +69,7 @@ export const HeroPlayer: React.FC<{ src: Src[] | null; title: string }> = ({
   };
 
   return (
-    <Player.Root src={src} autoPlay volume={0}>
+    <Player.Root src={src} playbackId={playbackId} autoPlay volume={0}>
       <Player.Container 
         ref={containerRef}
         className="hero-player-container relative aspect-video touch-none"

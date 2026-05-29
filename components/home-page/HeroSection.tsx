@@ -34,6 +34,9 @@ const PlayIcon = (props: React.SVGProps<SVGSVGElement>) => {
 const HeroSection: React.FC = () => {
   const router = useRouter();
   const [src, setSrc] = useState<Src[] | null>(null);
+  const [heroPlaybackId, setHeroPlaybackId] = useState<string | undefined>(
+    undefined,
+  );
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -59,8 +62,11 @@ const HeroSection: React.FC = () => {
         if (!isMounted || signal.aborted) return;
 
         const hasSource =
-          Array.isArray(playbackSource) && playbackSource.length > 0;
-        setSrc(hasSource ? playbackSource : null);
+          playbackSource != null &&
+          Array.isArray(playbackSource.src) &&
+          playbackSource.src.length > 0;
+        setSrc(hasSource ? playbackSource.src : null);
+        setHeroPlaybackId(hasSource ? playbackSource.playbackId : undefined);
         if (!hasSource) {
           setError("No video source available.");
         }
@@ -133,7 +139,11 @@ const HeroSection: React.FC = () => {
             ) : (
               <div className="relative touch-none">
                 {src ? (
-                  <HeroPlayer src={src} title={HERO_VIDEO_TITLE} />
+                  <HeroPlayer
+                    src={src}
+                    title={HERO_VIDEO_TITLE}
+                    playbackId={heroPlaybackId}
+                  />
                 ) : (
                   <div className="text-center p-4 bg-red-100 rounded-lg">
                     No video source available.

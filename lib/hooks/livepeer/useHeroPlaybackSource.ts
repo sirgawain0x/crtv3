@@ -4,7 +4,12 @@ import { LIVEPEER_HERO_PLAYBACK_ID, HERO_VIDEO_ASSET_ID } from "../../../context
 import { logger } from '@/lib/utils/logger';
 
 
-export const getHeroPlaybackSource = async (): Promise<Src[] | null> => {
+export type HeroPlaybackSource = {
+  src: Src[];
+  playbackId: string;
+};
+
+export const getHeroPlaybackSource = async (): Promise<HeroPlaybackSource | null> => {
   try {
     // First, try to fetch the asset by asset ID via our API route (server-side, avoids CORS)
     let playbackId: string | null = null;
@@ -38,7 +43,10 @@ export const getHeroPlaybackSource = async (): Promise<Src[] | null> => {
 
     const playbackInfo = await playbackResponse.json();
     const src = getSrc(playbackInfo) as Src[];
-    return src;
+    if (!src?.length) {
+      return null;
+    }
+    return { src, playbackId };
   } catch (error) {
     logger.error("Error fetching playback source:", error);
     return null;

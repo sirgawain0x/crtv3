@@ -63,7 +63,13 @@ export default function VideoDetailsPage({
             ) : error ? (
               <div className="text-red-500">{error}</div>
             ) : (
-              asset && <Player src={asset.playbackId} title={asset?.name} />
+              asset && (
+                <Player
+                  src={asset.playbackId}
+                  playbackId={asset.playbackId}
+                  title={asset?.name}
+                />
+              )
             )}
           </div>
           {asset?.playbackId && (
