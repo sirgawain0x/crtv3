@@ -41,8 +41,8 @@ describe('Real-time viewership API route', () => {
   it('queries Livepeer and aggregates viewer count', async () => {
     const fetchMock = vi.fn(async () =>
       Response.json([
-        { playbackId: 'p1', viewerCount: 8, device: 'desktop' },
-        { playbackId: 'p1', viewerCount: 4, device: 'mobile' },
+        { playbackId: 'p1', viewCount: 8, device: 'desktop' },
+        { playbackId: 'p1', viewCount: 4, device: 'mobile' },
       ]),
     );
     vi.stubGlobal('fetch', fetchMock);

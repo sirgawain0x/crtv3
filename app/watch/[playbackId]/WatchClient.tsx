@@ -274,7 +274,7 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
                   </div>
                   {/* Realtime concurrent viewers */}
                   <div className="flex items-center gap-4">
-                    <RealtimeViewsComponent playbackId={playbackId} />
+                    {playbackId && <RealtimeViewsComponent playbackId={playbackId} />}
                   </div>
                 </div>
               </div>

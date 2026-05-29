@@ -35,7 +35,12 @@ export async function fetchLivepeerViewMetrics(
     },
   );
 
-  const data = (await response.json()) as Record<string, unknown>;
+  let data: Record<string, unknown>;
+  try {
+    data = (await response.json()) as Record<string, unknown>;
+  } catch (err) {
+    throw new Error("Failed to parse view metrics response");
+  }
 
   if (!response.ok) {
     const message =

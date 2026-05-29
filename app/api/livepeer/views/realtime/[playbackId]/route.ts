@@ -62,8 +62,8 @@ export async function GET(
     const data = await response.json();
     const stats = Array.isArray(data) ? data : [];
     
-    // Sum viewerCount from returned dimensions (should match our playbackId query filter)
-    const viewerCount = stats.reduce((sum, item) => sum + Number(item.viewerCount || 0), 0);
+    // Sum viewCount from returned dimensions (should match our playbackId query filter)
+    const viewerCount = stats.reduce((sum, item) => sum + Number(item?.viewCount || 0), 0);
 
     return NextResponse.json(
       {
