@@ -3,6 +3,7 @@ import { getFullLivepeer } from '@/lib/sdk/livepeer/fullClient';
 import {
   hasLivepeerErrors,
   parseLivepeerViewMetricsBody,
+  type ParsedViewMetrics,
 } from '@/lib/livepeer/parse-view-metrics';
 import {
   livepeerStudioApiBaseUrl,
@@ -42,58 +43,187 @@ function getSdkErrorStatus(error: unknown): number | undefined {
   return undefined;
 }
 
-async function fetchAllViewsViaHttp(
-  playbackId: string,
+function isZeroMetrics(metrics: ParsedViewMetrics): boolean {
+  return (
+    metrics.viewCount === 0 &&
+    metrics.legacyViewCount === 0 &&
+    metrics.playtimeMins === 0
+  );
+}
+
+function toLivepeerViewMetrics(parsed: ParsedViewMetrics): LivepeerViewMetrics {
+  return {
+    playbackId: parsed.playbackId,
+    viewCount: parsed.viewCount,
+    playtimeMins: parsed.playtimeMins,
+    legacyViewCount: parsed.legacyViewCount,
+  };
+}
+
+async function livepeerAuthedGet(
+  path: string,
   token: string,
-): Promise<FetchAllViewsResult> {
+): Promise<
+  | { ok: true; status: number; rawData: unknown }
+  | { ok: false; status: number }
+> {
   const myHeaders = new Headers();
   myHeaders.append('Authorization', `Bearer ${token}`);
 
   const base = livepeerStudioApiBaseUrl();
-  const response = await fetch(
-    `${base}/api/data/views/query/total/${encodeURIComponent(playbackId)}`,
-    {
-      method: 'GET',
-      headers: myHeaders,
-      redirect: 'follow',
-      cache: 'no-store',
-    },
-  );
+  const response = await fetch(`${base}${path}`, {
+    method: 'GET',
+    headers: myHeaders,
+    redirect: 'follow',
+    cache: 'no-store',
+  });
 
   if (!response.ok) {
-    serverLogger.warn(
-      `Livepeer views API ${response.status} for playbackId=${playbackId}`,
-    );
-    return {
-      ok: false,
-      reason: 'upstream_error',
-      status: response.status,
-    };
+    return { ok: false, status: response.status };
   }
 
   const rawData = await response.json();
-
   if (hasLivepeerErrors(rawData)) {
+    return { ok: false, status: response.status };
+  }
+
+  return { ok: true, status: response.status, rawData };
+}
+
+async function fetchTotalViewsViaHttp(
+  playbackId: string,
+  token: string,
+): Promise<FetchAllViewsResult> {
+  const result = await livepeerAuthedGet(
+    `/api/data/views/query/total/${encodeURIComponent(playbackId)}`,
+    token,
+  );
+
+  if (!result.ok) {
     serverLogger.warn(
-      `Livepeer views API returned errors for playbackId=${playbackId}`,
+      `Livepeer total views API ${result.status} for playbackId=${playbackId}`,
     );
     return {
       ok: false,
       reason: 'upstream_error',
-      status: response.status,
+      status: result.status,
     };
   }
 
-  const parsed = parseLivepeerViewMetricsBody(rawData, playbackId);
+  const parsed = parseLivepeerViewMetricsBody(result.rawData, playbackId);
   if (!parsed) {
     return {
       ok: false,
       reason: 'upstream_error',
-      status: response.status,
+      status: result.status,
     };
   }
 
-  return { ok: true, metrics: parsed };
+  return { ok: true, metrics: toLivepeerViewMetrics(parsed) };
+}
+
+/** Studio dashboard can show views before the /total endpoint reflects them. */
+async function fetchViewershipQueryViaHttp(
+  playbackId: string,
+  token: string,
+): Promise<FetchAllViewsResult> {
+  const params = new URLSearchParams({
+    playbackId,
+    from: new Date(0).toISOString(),
+    to: new Date().toISOString(),
+  });
+
+  const result = await livepeerAuthedGet(
+    `/api/data/views/query?${params.toString()}`,
+    token,
+  );
+
+  if (!result.ok) {
+    serverLogger.warn(
+      `Livepeer viewership query API ${result.status} for playbackId=${playbackId}`,
+    );
+    return {
+      ok: false,
+      reason: 'upstream_error',
+      status: result.status,
+    };
+  }
+
+  const parsed = parseLivepeerViewMetricsBody(result.rawData, playbackId);
+  if (!parsed) {
+    return {
+      ok: false,
+      reason: 'upstream_error',
+      status: result.status,
+    };
+  }
+
+  return { ok: true, metrics: toLivepeerViewMetrics(parsed) };
+}
+
+async function fetchAllViewsViaHttp(
+  playbackId: string,
+  token: string,
+): Promise<FetchAllViewsResult> {
+  const totalResult = await fetchTotalViewsViaHttp(playbackId, token);
+  if (!totalResult.ok) {
+    return totalResult;
+  }
+
+  if (!isZeroMetrics(totalResult.metrics)) {
+    return totalResult;
+  }
+
+  const queryResult = await fetchViewershipQueryViaHttp(playbackId, token);
+  if (queryResult.ok && !isZeroMetrics(queryResult.metrics)) {
+    serverLogger.debug(
+      `Livepeer viewership query fallback used for playbackId=${playbackId} (total=0, query=${queryResult.metrics.viewCount + queryResult.metrics.legacyViewCount})`,
+    );
+    return queryResult;
+  }
+
+  return totalResult;
+}
+
+async function fetchTotalViewsViaSdk(
+  playbackId: string,
+): Promise<FetchAllViewsResult | null> {
+  const client = getFullLivepeer();
+  if (!client) return null;
+
+  try {
+    const response = await client.metrics.getPublicViewership(playbackId);
+
+    if (response.data) {
+      const parsed = parseLivepeerViewMetricsBody(response.data, playbackId);
+      if (parsed) {
+        return { ok: true, metrics: toLivepeerViewMetrics(parsed) };
+      }
+    }
+
+    if (response.error) {
+      serverLogger.warn(
+        `Livepeer SDK view metrics error for playbackId=${playbackId}`,
+      );
+      return {
+        ok: false,
+        reason: 'upstream_error',
+        status: response.statusCode,
+      };
+    }
+  } catch (error) {
+    const status = getSdkErrorStatus(error);
+    serverLogger.warn(
+      `Livepeer SDK view metrics failed for playbackId=${playbackId}: ${error instanceof Error ? error.message : error}`,
+    );
+    return {
+      ok: false,
+      reason: 'upstream_error',
+      status,
+    };
+  }
+
+  return null;
 }
 
 export const fetchAllViews = async (
@@ -107,40 +237,12 @@ export const fetchAllViews = async (
     return { ok: false, reason: 'not_configured' };
   }
 
-  const client = getFullLivepeer();
-
-  if (client) {
-    try {
-      const response = await client.metrics.getPublicViewership(playbackId);
-
-      if (response.data) {
-        const parsed = parseLivepeerViewMetricsBody(response.data, playbackId);
-        if (parsed) {
-          return { ok: true, metrics: parsed };
-        }
-      }
-
-      if (response.error) {
-        serverLogger.warn(
-          `Livepeer SDK view metrics error for playbackId=${playbackId}`,
-        );
-        return {
-          ok: false,
-          reason: 'upstream_error',
-          status: response.statusCode,
-        };
-      }
-    } catch (error) {
-      const status = getSdkErrorStatus(error);
-      serverLogger.warn(
-        `Livepeer SDK view metrics failed for playbackId=${playbackId}: ${error instanceof Error ? error.message : error}`,
-      );
-      return {
-        ok: false,
-        reason: 'upstream_error',
-        status,
-      };
-    }
+  const sdkResult = await fetchTotalViewsViaSdk(playbackId);
+  if (sdkResult?.ok && !isZeroMetrics(sdkResult.metrics)) {
+    return sdkResult;
+  }
+  if (sdkResult && !sdkResult.ok) {
+    return sdkResult;
   }
 
   try {
