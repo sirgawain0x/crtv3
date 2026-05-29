@@ -63,14 +63,17 @@ export const fetchAllViews = async (
       };
     }
 
-    const data = (await response.json()) as Record<string, unknown>;
+    const rawData = await response.json();
+    const metricsObj = Array.isArray(rawData) ? rawData[0] : rawData;
+    const targetMetrics = metricsObj || {};
+
     return {
       ok: true,
       metrics: {
-        playbackId: String(data.playbackId ?? playbackId),
-        viewCount: Number(data.viewCount ?? 0) || 0,
-        playtimeMins: Number(data.playtimeMins ?? 0) || 0,
-        legacyViewCount: Number(data.legacyViewCount ?? 0) || 0,
+        playbackId: String(targetMetrics.playbackId ?? playbackId),
+        viewCount: Number(targetMetrics.viewCount ?? 0) || 0,
+        playtimeMins: Number(targetMetrics.playtimeMins ?? 0) || 0,
+        legacyViewCount: Number(targetMetrics.legacyViewCount ?? 0) || 0,
       },
     };
   } catch (error) {

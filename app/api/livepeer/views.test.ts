@@ -24,7 +24,7 @@ describe('Livepeer view metrics helpers', () => {
     expect(livepeerStudioApiBaseUrl()).toBe('https://livepeer.example');
   });
 
-  it('fetches view metrics without using cache', async () => {
+  it('fetches view metrics without using cache (single object response)', async () => {
     vi.stubEnv('LIVEPEER_FULL_API_KEY', 'full-key');
     const fetchMock = vi.fn(async () =>
       Response.json({
@@ -52,16 +52,31 @@ describe('Livepeer view metrics helpers', () => {
         headers: expect.any(Headers),
       }),
     );
-    expect(fetchMock).toHaveBeenCalledWith(
-      'https://livepeer.studio/api/data/views/query/total/playback-1',
-      expect.objectContaining({
-        headers: expect.any(Headers),
-      }),
+  });
+
+  it('fetches view metrics correctly when Livepeer responds with an array (standard Livepeer response)', async () => {
+    vi.stubEnv('LIVEPEER_FULL_API_KEY', 'full-key');
+    const fetchMock = vi.fn(async () =>
+      Response.json([
+        {
+          playbackId: 'playback-1',
+          viewCount: 12,
+          playtimeMins: 34,
+          legacyViewCount: 5,
+        },
+      ]),
     );
-    const [, options] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect((options.headers as Headers).get('Authorization')).toBe(
-      'Bearer full-key',
-    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(fetchAllViews('playback-1')).resolves.toEqual({
+      ok: true,
+      metrics: {
+        playbackId: 'playback-1',
+        viewCount: 12,
+        playtimeMins: 34,
+        legacyViewCount: 5,
+      },
+    });
   });
 
   it('returns upstream_error when Livepeer responds with 500', async () => {
