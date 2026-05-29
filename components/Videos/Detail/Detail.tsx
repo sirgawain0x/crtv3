@@ -2,7 +2,9 @@
 import { useEffect, useState } from "react";
 import { Player } from "@/components/Player/Player";
 import { Asset } from "livepeer/models/components";
+import { Src } from "@livepeer/react";
 import { fullLivepeer } from "@/lib/sdk/livepeer/fullClient";
+import { getDetailPlaybackSource } from "@/lib/hooks/livepeer/useDetailPlaybackSources";
 import VideoViewMetrics from "@/components/Videos/VideoViewMetrics";
 import { Skeleton } from "@/components/ui/skeleton";
 import { logger } from '@/lib/utils/logger';
@@ -14,6 +16,8 @@ export default function VideoDetailsPage({
   params: { slug: string };
 }) {
   const [asset, setAsset] = useState<any>();
+  const [playbackSources, setPlaybackSources] = useState<Src[] | null>(null);
+  const [sourcesLoading, setSourcesLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [assetLoading, setAssetLoading] = useState(false);
   const [error, setError] = useState("");
@@ -32,6 +36,38 @@ export default function VideoDetailsPage({
 
     fetchVideoDetails();
   }, [asset?.assetId, params.slug]);
+
+  useEffect(() => {
+    if (!asset?.playbackId) {
+      setPlaybackSources(null);
+      return;
+    }
+
+    let cancelled = false;
+    const fetchPlaybackSources = async () => {
+      setSourcesLoading(true);
+      try {
+        const sources = await getDetailPlaybackSource(asset.playbackId);
+        if (!cancelled) {
+          setPlaybackSources(sources);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setPlaybackSources(null);
+          logger.error(err);
+        }
+      } finally {
+        if (!cancelled) {
+          setSourcesLoading(false);
+        }
+      }
+    };
+
+    fetchPlaybackSources();
+    return () => {
+      cancelled = true;
+    };
+  }, [asset?.playbackId]);
 
   const fetchAssetDetails = async (asset: Asset) => {
     setAssetLoading(true);
@@ -58,14 +94,14 @@ export default function VideoDetailsPage({
           )}
 
           <div className="w-full aspect-video flex justify-center items-center bg-black rounded-lg overflow-hidden shadow-md">
-            {isLoading || assetLoading ? (
+            {isLoading || assetLoading || sourcesLoading ? (
               <Skeleton className="w-full h-full rounded-lg" />
             ) : error ? (
               <div className="text-red-500">{error}</div>
             ) : (
               asset && (
                 <Player
-                  src={asset.playbackId}
+                  src={playbackSources}
                   playbackId={asset.playbackId}
                   title={asset?.name}
                 />
