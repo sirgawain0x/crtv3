@@ -30,9 +30,10 @@ export type FetchAllViewsResult =
     };
 
 function getSdkErrorStatus(error: unknown): number | undefined {
-  if (error && typeof error === 'object' && 'statusCode' in error) {
-    const status = Number((error as { statusCode: number }).statusCode);
-    return Number.isFinite(status) ? status : undefined;
+  if (error && typeof error === 'object') {
+    const obj = error as Record<string, unknown>;
+    const status = Number(obj.statusCode ?? obj.status);
+    if (Number.isFinite(status)) return status;
   }
   if (error instanceof Error) {
     const match = error.message.match(/Status (\d{3})/);

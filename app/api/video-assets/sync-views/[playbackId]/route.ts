@@ -85,19 +85,11 @@ async function syncViewsForPlayback(
       serverLogger.warn(
         `View sync auth failed for ${playbackId}: falling back to stored count`,
       );
-
-      return NextResponse.json({
-        success: true,
-        playbackId,
-        viewCount: storedCount,
-        livepeerSynced: false,
-        code: 'LIVEPEER_VIEWS_UNAVAILABLE',
-      });
+    } else {
+      serverLogger.warn(
+        `View sync skipped for ${playbackId}: Livepeer metrics unavailable (${viewsResult.reason})`,
+      );
     }
-
-    serverLogger.warn(
-      `View sync skipped for ${playbackId}: Livepeer metrics unavailable (${viewsResult.reason})`,
-    );
 
     return NextResponse.json({
       success: true,
