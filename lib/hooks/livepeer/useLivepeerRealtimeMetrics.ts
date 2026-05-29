@@ -2,29 +2,27 @@
 
 import { skipToken, useQuery } from "@tanstack/react-query";
 
-export interface LivepeerViewMetrics {
+export interface LivepeerRealtimeMetrics {
   playbackId: string;
-  viewCount: number;
-  playtimeMins: number;
-  legacyViewCount: number;
+  viewerCount: number;
 }
 
-interface UseLivepeerViewMetricsOptions {
+interface UseLivepeerRealtimeMetricsOptions {
   refreshIntervalMs?: number;
 }
 
-const DEFAULT_REFRESH_INTERVAL_MS = 30_000;
+const DEFAULT_REFRESH_INTERVAL_MS = 10_000; // Poll every 10 seconds for real-time concurrent views
 
-export function livepeerViewMetricsQueryKey(playbackId: string) {
-  return ["livepeer-view-metrics", playbackId] as const;
+export function livepeerRealtimeQueryKey(playbackId: string) {
+  return ["livepeer-realtime-metrics", playbackId] as const;
 }
 
-export async function fetchLivepeerViewMetrics(
+export async function fetchLivepeerRealtimeMetrics(
   playbackId: string,
   signal?: AbortSignal,
-): Promise<LivepeerViewMetrics> {
+): Promise<LivepeerRealtimeMetrics> {
   const response = await fetch(
-    `/api/livepeer/views/${encodeURIComponent(playbackId)}?t=${Date.now()}`,
+    `/api/livepeer/views/realtime/${encodeURIComponent(playbackId)}?t=${Date.now()}`,
     {
       cache: "no-store",
       headers: {
@@ -39,33 +37,31 @@ export async function fetchLivepeerViewMetrics(
   try {
     data = (await response.json()) as Record<string, unknown>;
   } catch (err) {
-    throw new Error("Failed to parse view metrics response");
+    throw new Error("Failed to parse real-time metrics response");
   }
 
   if (!response.ok) {
     const message =
       typeof data?.error === "string"
         ? data.error
-        : "Failed to fetch view metrics";
+        : "Failed to fetch real-time metrics";
     throw new Error(message);
   }
 
   if (!data.success) {
-    throw new Error("Failed to fetch view metrics");
+    throw new Error("Failed to fetch real-time metrics");
   }
 
   return {
     playbackId: String(data.playbackId ?? playbackId),
-    viewCount: Number(data.viewCount ?? 0) || 0,
-    playtimeMins: Number(data.playtimeMins ?? 0) || 0,
-    legacyViewCount: Number(data.legacyViewCount ?? 0) || 0,
+    viewerCount: Number(data.viewerCount ?? 0) || 0,
   };
 }
 
 /** Shared via React Query so duplicate playbackIds dedupe fetches and polling. */
-export function useLivepeerViewMetrics(
+export function useLivepeerRealtimeMetrics(
   playbackId: string,
-  options: UseLivepeerViewMetricsOptions = {},
+  options: UseLivepeerRealtimeMetricsOptions = {},
 ) {
   const refreshIntervalMs =
     options.refreshIntervalMs ?? DEFAULT_REFRESH_INTERVAL_MS;
@@ -74,18 +70,17 @@ export function useLivepeerViewMetrics(
   const enabled = id.length > 0;
 
   const query = useQuery({
-    queryKey: livepeerViewMetricsQueryKey(enabled ? id : "__skipped__"),
+    queryKey: livepeerRealtimeQueryKey(enabled ? id : "__skipped__"),
     queryFn: enabled
-      ? ({ signal }) => fetchLivepeerViewMetrics(id, signal)
+      ? ({ signal }) => fetchLivepeerRealtimeMetrics(id, signal)
       : skipToken,
     staleTime: 0,
     refetchInterval:
       enabled && refreshIntervalMs > 0 ? refreshIntervalMs : false,
   });
 
-  const viewMetrics = query.data ?? null;
-  const totalViews =
-    (viewMetrics?.viewCount ?? 0) + (viewMetrics?.legacyViewCount ?? 0);
+  const realtimeMetrics = query.data ?? null;
+  const viewerCount = realtimeMetrics?.viewerCount ?? 0;
 
   const errorMsg =
     query.error instanceof Error
@@ -95,8 +90,8 @@ export function useLivepeerViewMetrics(
         : null;
 
   return {
-    viewMetrics,
-    totalViews,
+    realtimeMetrics,
+    viewerCount,
     loading: enabled ? query.isPending : false,
     error: errorMsg,
   };

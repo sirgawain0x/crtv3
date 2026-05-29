@@ -28,11 +28,11 @@ export async function GET(request: NextRequest) {
 
     const supabase = createServiceClient();
     
-    // Fetch all published videos with playback IDs
+    // Fetch all published and minted videos with playback IDs
     const { data: videos, error } = await supabase
       .from('video_assets')
       .select('id, playback_id, views_count, title')
-      .eq('status', 'published')
+      .in('status', ['published', 'minted'])
       .not('playback_id', 'is', null);
 
     if (error) {
