@@ -12,7 +12,6 @@ import { serverLogger } from '@/lib/utils/logger';
 import { rateLimiters } from '@/lib/middleware/rateLimit';
 import {
   LIVEPEER_NOT_CONFIGURED,
-  LIVEPEER_AUTH_FAILED,
 } from '@/lib/sdk/livepeer/studioAuth';
 
 function syncViewsErrorResponse(error: unknown) {
@@ -83,18 +82,14 @@ async function syncViewsForPlayback(
       viewsResult.reason === 'upstream_error' &&
       (viewsResult.status === 401 || viewsResult.status === 403)
     ) {
-      return NextResponse.json(
-        {
-          error: 'Livepeer authentication failed',
-          code: LIVEPEER_AUTH_FAILED,
-        },
-        { status: 502 },
+      serverLogger.warn(
+        `View sync auth failed for ${playbackId}: falling back to stored count`,
+      );
+    } else {
+      serverLogger.warn(
+        `View sync skipped for ${playbackId}: Livepeer metrics unavailable (${viewsResult.reason})`,
       );
     }
-
-    serverLogger.warn(
-      `View sync skipped for ${playbackId}: Livepeer metrics unavailable (${viewsResult.reason})`,
-    );
 
     return NextResponse.json({
       success: true,

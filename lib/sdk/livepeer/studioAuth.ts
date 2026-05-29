@@ -1,7 +1,14 @@
+/** Strip whitespace and optional surrounding quotes from env values. */
+export function normalizeEnvSecret(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) return undefined;
+  return trimmed.replace(/^["']|["']$/g, '') || undefined;
+}
+
 /** Prefer full-access key for Studio routes; fall back to LIVEPEER_API_KEY. */
 export function resolveLivepeerStudioAuthToken(): string | undefined {
-  const full = process.env.LIVEPEER_FULL_API_KEY?.trim();
-  const standard = process.env.LIVEPEER_API_KEY?.trim();
+  const full = normalizeEnvSecret(process.env.LIVEPEER_FULL_API_KEY);
+  const standard = normalizeEnvSecret(process.env.LIVEPEER_API_KEY);
   return full || standard || undefined;
 }
 

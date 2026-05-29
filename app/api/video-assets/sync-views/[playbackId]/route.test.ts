@@ -85,6 +85,34 @@ describe('sync-views POST security', () => {
     );
   });
 
+  it('returns stored view count when Livepeer auth fails', async () => {
+    mockFetchAllViews.mockResolvedValue({
+      ok: false,
+      reason: 'upstream_error',
+      status: 401,
+    });
+    mockGetStoredViewsCount.mockResolvedValue(42);
+
+    const request = new NextRequest(
+      'http://localhost/api/video-assets/sync-views/playback-1',
+      { method: 'GET' },
+    );
+
+    const response = await GET(request, {
+      params: Promise.resolve({ playbackId: 'playback-1' }),
+    });
+    const json = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(json).toMatchObject({
+      success: true,
+      playbackId: 'playback-1',
+      viewCount: 42,
+      livepeerSynced: false,
+      code: 'LIVEPEER_VIEWS_UNAVAILABLE',
+    });
+  });
+
   it('returns stored view count when Livepeer metrics are unavailable', async () => {
     mockFetchAllViews.mockResolvedValue({
       ok: false,

@@ -5,6 +5,10 @@ import {
   resolveLivepeerStudioAuthToken,
 } from '@/lib/sdk/livepeer/studioAuth';
 
+vi.mock('@/lib/sdk/livepeer/fullClient', () => ({
+  getFullLivepeer: vi.fn(() => null),
+}));
+
 describe('Livepeer view metrics helpers', () => {
   afterEach(() => {
     vi.unstubAllEnvs();
@@ -16,6 +20,13 @@ describe('Livepeer view metrics helpers', () => {
     vi.stubEnv('LIVEPEER_API_KEY', 'standard-key');
 
     expect(resolveLivepeerStudioAuthToken()).toBe('full-key');
+  });
+
+  it('strips surrounding quotes from Livepeer API keys', () => {
+    vi.stubEnv('LIVEPEER_FULL_API_KEY', '"quoted-full-key"');
+    vi.stubEnv('LIVEPEER_API_KEY', '');
+
+    expect(resolveLivepeerStudioAuthToken()).toBe('quoted-full-key');
   });
 
   it('normalizes the Studio API base URL', () => {
@@ -76,6 +87,49 @@ describe('Livepeer view metrics helpers', () => {
         playtimeMins: 34,
         legacyViewCount: 5,
       },
+    });
+  });
+
+  it('falls back to viewership query when total endpoint returns zero views', async () => {
+    vi.stubEnv('LIVEPEER_FULL_API_KEY', 'full-key');
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes('/query/total/')) {
+        return Response.json({ playbackId: 'playback-1', viewCount: 0, playtimeMins: 0 });
+      }
+      if (url.includes('/query?')) {
+        return Response.json([
+          { playbackId: 'playback-1', viewCount: 3, playtimeMins: 1.5 },
+        ]);
+      }
+      return new Response(null, { status: 404 });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(fetchAllViews('playback-1')).resolves.toEqual({
+      ok: true,
+      metrics: {
+        playbackId: 'playback-1',
+        viewCount: 3,
+        playtimeMins: 1.5,
+        legacyViewCount: 0,
+      },
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('returns upstream_error when Livepeer responds with errors in JSON body', async () => {
+    vi.stubEnv('LIVEPEER_FULL_API_KEY', 'full-key');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () =>
+        Response.json({ errors: [['id not provided', 'Account not found']] }),
+      ),
+    );
+
+    await expect(fetchAllViews('playback-1')).resolves.toEqual({
+      ok: false,
+      reason: 'upstream_error',
+      status: 200,
     });
   });
 
