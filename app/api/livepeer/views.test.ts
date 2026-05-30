@@ -36,7 +36,7 @@ describe('Livepeer view metrics helpers', () => {
     expect(livepeerStudioApiBaseUrl()).toBe('https://livepeer.example');
   });
 
-  it('prefers SDK getViewership when configured', async () => {
+  it('prefers SDK getViewership when a private API key is configured', async () => {
     vi.stubEnv('LIVEPEER_FULL_API_KEY', 'full-key');
     const getViewership = vi.fn(async () => ({
       data: [
@@ -69,6 +69,68 @@ describe('Livepeer view metrics helpers', () => {
       to: expect.any(Date),
     });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('skips SDK getViewership and uses HTTP when only a standard API key is configured', async () => {
+    vi.stubEnv('LIVEPEER_FULL_API_KEY', '');
+    vi.stubEnv('LIVEPEER_API_KEY', 'standard-key');
+    const getViewership = vi.fn();
+    vi.mocked(getFullLivepeer).mockReturnValue({
+      metrics: { getViewership },
+    } as never);
+    const fetchMock = vi.fn(async () =>
+      Response.json({
+        playbackId: 'playback-1',
+        viewCount: 4,
+        playtimeMins: 1,
+        legacyViewCount: 0,
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(fetchAllViews('playback-1')).resolves.toEqual({
+      ok: true,
+      metrics: {
+        playbackId: 'playback-1',
+        viewCount: 4,
+        playtimeMins: 1,
+        legacyViewCount: 0,
+      },
+    });
+    expect(getViewership).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalled();
+  });
+
+  it('falls back to HTTP when SDK getViewership fails', async () => {
+    vi.stubEnv('LIVEPEER_FULL_API_KEY', 'full-key');
+    const getViewership = vi.fn(async () => ({
+      error: { message: 'upstream unavailable' },
+      statusCode: 500,
+    }));
+    vi.mocked(getFullLivepeer).mockReturnValue({
+      metrics: { getViewership },
+    } as never);
+    const fetchMock = vi.fn(async () =>
+      Response.json({
+        playbackId: 'playback-1',
+        viewCount: 9,
+        playtimeMins: 2,
+        legacyViewCount: 0,
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(fetchAllViews('playback-1')).resolves.toEqual({
+      ok: true,
+      metrics: {
+        playbackId: 'playback-1',
+        viewCount: 9,
+        playtimeMins: 2,
+        legacyViewCount: 0,
+      },
+    });
+    expect(getViewership).toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalled();
   });
 
   it('fetches view metrics without using cache (single object response)', async () => {

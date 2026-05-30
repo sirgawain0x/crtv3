@@ -6,6 +6,7 @@ import {
   type ParsedViewMetrics,
 } from '@/lib/livepeer/parse-view-metrics';
 import {
+  hasLivepeerPrivateApiKey,
   livepeerStudioApiBaseUrl,
   resolveLivepeerStudioAuthToken,
 } from '@/lib/sdk/livepeer/studioAuth';
@@ -29,6 +30,10 @@ export type FetchAllViewsResult =
       reason: 'not_configured' | 'upstream_error' | 'network_error';
       status?: number;
     };
+
+function isSdkAuthFailure(status?: number): boolean {
+  return status === 401 || status === 403;
+}
 
 function getSdkErrorStatus(error: unknown): number | undefined {
   if (error && typeof error === 'object') {
@@ -206,6 +211,12 @@ async function fetchViewsViaSdk(
     }
 
     if (response.error) {
+      if (isSdkAuthFailure(response.statusCode)) {
+        serverLogger.debug(
+          `Livepeer SDK getViewership auth rejected for playbackId=${playbackId}, will try HTTP fallback`,
+        );
+        return null;
+      }
       serverLogger.warn(
         `Livepeer SDK getViewership error for playbackId=${playbackId}`,
       );
@@ -217,6 +228,12 @@ async function fetchViewsViaSdk(
     }
   } catch (error) {
     const status = getSdkErrorStatus(error);
+    if (isSdkAuthFailure(status)) {
+      serverLogger.debug(
+        `Livepeer SDK getViewership auth rejected for playbackId=${playbackId}, will try HTTP fallback`,
+      );
+      return null;
+    }
     serverLogger.warn(
       `Livepeer SDK getViewership failed for playbackId=${playbackId}: ${error instanceof Error ? error.message : error}`,
     );
@@ -241,12 +258,16 @@ export const fetchAllViews = async (
     return { ok: false, reason: 'not_configured' };
   }
 
-  const sdkResult = await fetchViewsViaSdk(playbackId);
+  const sdkResult = hasLivepeerPrivateApiKey()
+    ? await fetchViewsViaSdk(playbackId)
+    : null;
   if (sdkResult?.ok && !isZeroMetrics(sdkResult.metrics)) {
     return sdkResult;
   }
   if (sdkResult && !sdkResult.ok) {
-    return sdkResult;
+    serverLogger.debug(
+      `Livepeer SDK getViewership unavailable (status=${sdkResult.status ?? 'unknown'}), falling back to HTTP for playbackId=${playbackId}`,
+    );
   }
 
   try {
