@@ -259,6 +259,7 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
                 <div className="aspect-video bg-black rounded-lg overflow-hidden">
                   <Player
                     src={status.sources}
+                    playbackId={playbackId}
                     title={videoTitle || streamData?.name || "Live Stream"}
                     jwt={jwt}
                   />

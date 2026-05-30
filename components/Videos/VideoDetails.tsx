@@ -553,7 +553,11 @@ export default function VideoDetails({
             </div>
           ) : playbackSources ? (
             <>
-              <Player.Root src={playbackSources} {...conditionalProps}>
+              <Player.Root
+                src={playbackSources}
+                playbackId={asset?.playbackId}
+                {...conditionalProps}
+              >
                 <Player.Container className="aspect-video w-full overflow-hidden rounded-lg bg-gray-800">
                   <Player.Video
                     title={asset?.name}
