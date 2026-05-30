@@ -1,3 +1,5 @@
+"use client";
+
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,9 +14,11 @@ import {
   type LockAddressValue,
 } from "../../lib/sdk/unlock/services";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useUser } from "@account-kit/react";
 
 interface MembershipSectionProps {
   className?: string;
+  onNavigate?: () => void;
 }
 
 const MEMBERSHIP_NAMES: Record<LockAddressValue, string> = {
@@ -36,7 +40,32 @@ const ERROR_MESSAGES: Record<string, string> = {
   DEFAULT: "An error occurred while verifying membership.",
 };
 
-export function MembershipSection({ className }: MembershipSectionProps) {
+function BuyMembershipCta({
+  className,
+  onNavigate,
+}: {
+  className?: string;
+  onNavigate?: () => void;
+}) {
+  return (
+    <div className={`space-y-2 ${className || ""}`}>
+      <p className="text-xs text-muted-foreground">
+        View pricing and purchase Unlock memberships on Base with USDC.
+      </p>
+      <Link href="/memberships" className="w-full block" onClick={onNavigate}>
+        <Button className="w-full bg-black hover:bg-gray-900 text-white">
+          Buy Membership
+        </Button>
+      </Link>
+    </div>
+  );
+}
+
+export function MembershipSection({
+  className,
+  onNavigate,
+}: MembershipSectionProps) {
+  const user = useUser();
   const { isVerified, hasMembership, isLoading, error, membershipDetails } =
     useMembershipVerification();
 
@@ -59,17 +88,33 @@ export function MembershipSection({ className }: MembershipSectionProps) {
   if (error) {
     const errorMessage = ERROR_MESSAGES[error.code] || ERROR_MESSAGES.DEFAULT;
     return (
-      <div className="p-4 space-y-4">
+      <div className={`px-2 py-2 space-y-2 ${className || ""}`}>
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>{errorMessage}</AlertDescription>
         </Alert>
-        <LoginWithEthereumButton />
+        {user ? (
+          <BuyMembershipCta onNavigate={onNavigate} />
+        ) : (
+          <LoginWithEthereumButton />
+        )}
       </div>
     );
   }
 
   if (!isVerified) {
+    if (user) {
+      return (
+        <div className={`px-2 py-2 space-y-2 ${className || ""}`}>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <ShieldX className="h-4 w-4" />
+            <span>No active membership</span>
+          </div>
+          <BuyMembershipCta onNavigate={onNavigate} />
+        </div>
+      );
+    }
+
     return (
       <div className="p-4 space-y-4">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -88,11 +133,7 @@ export function MembershipSection({ className }: MembershipSectionProps) {
           <LockKeyhole className="h-4 w-4" />
           <span>No active membership</span>
         </div>
-        <Link href="/memberships" className="w-full block">
-          <Button className="w-full bg-black hover:bg-gray-900 text-white">
-            Get Membership
-          </Button>
-        </Link>
+        <BuyMembershipCta onNavigate={onNavigate} />
       </div>
     );
   }
@@ -107,7 +148,7 @@ export function MembershipSection({ className }: MembershipSectionProps) {
         <div className="space-y-2">
           {membershipDetails
             .filter(({ isValid }: MembershipDetails) => isValid)
-            .map(({ name, address, lock }: MembershipDetails) => (
+            .map(({ address, lock }: MembershipDetails) => (
               <div
                 key={address}
                 className="flex items-center justify-between text-xs"
