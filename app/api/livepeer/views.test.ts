@@ -4,6 +4,7 @@ import {
   livepeerStudioApiBaseUrl,
   resolveLivepeerStudioAuthToken,
 } from '@/lib/sdk/livepeer/studioAuth';
+import { getFullLivepeer } from '@/lib/sdk/livepeer/fullClient';
 
 vi.mock('@/lib/sdk/livepeer/fullClient', () => ({
   getFullLivepeer: vi.fn(() => null),
@@ -33,6 +34,41 @@ describe('Livepeer view metrics helpers', () => {
     vi.stubEnv('LIVEPEER_FULL_API_URL', 'https://livepeer.example/');
 
     expect(livepeerStudioApiBaseUrl()).toBe('https://livepeer.example');
+  });
+
+  it('prefers SDK getViewership when configured', async () => {
+    vi.stubEnv('LIVEPEER_FULL_API_KEY', 'full-key');
+    const getViewership = vi.fn(async () => ({
+      data: [
+        {
+          playbackId: 'playback-1',
+          viewCount: 7,
+          playtimeMins: 2.5,
+        },
+      ],
+      statusCode: 200,
+    }));
+    vi.mocked(getFullLivepeer).mockReturnValue({
+      metrics: { getViewership },
+    } as never);
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(fetchAllViews('playback-1')).resolves.toEqual({
+      ok: true,
+      metrics: {
+        playbackId: 'playback-1',
+        viewCount: 7,
+        playtimeMins: 2.5,
+        legacyViewCount: 0,
+      },
+    });
+    expect(getViewership).toHaveBeenCalledWith({
+      playbackId: 'playback-1',
+      from: expect.any(Date),
+      to: expect.any(Date),
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('fetches view metrics without using cache (single object response)', async () => {
