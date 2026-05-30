@@ -363,7 +363,7 @@ const nextConfig = {
               "default-src 'self'",
               "img-src 'self' blob: data: https:",
               "media-src 'self' blob: data: https:",
-              "script-src 'self' 'unsafe-eval' 'unsafe-inline' blob: https://va.vercel-scripts.com https://vercel.live https://api.hypelab.com",
+              "script-src 'self' 'unsafe-eval' 'unsafe-inline' blob: https://va.vercel-scripts.com https://vercel.live",
               "style-src 'self' 'unsafe-inline'",
               "font-src 'self' data:",
               "connect-src 'self' https: wss: ws:",

@@ -5,7 +5,7 @@ import { Music2 } from "lucide-react";
 import { getSongchainConfig } from "@/lib/songchain/config";
 
 /**
- * Home promo banner in the HypeLab slot — links to the Songchain Lens hub on Creative TV.
+ * Home promo banner — links to the Songchain Lens hub on Creative TV.
  */
 export function SongchainPromoBanner() {
   const { enabled } = getSongchainConfig();

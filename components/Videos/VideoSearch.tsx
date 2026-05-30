@@ -44,7 +44,6 @@ const VIDEO_CATEGORIES = [
 
 const SORT_OPTIONS = [
   { value: "created_at", label: "Latest" },
-  { value: "views_count", label: "Most Viewed" },
   { value: "likes_count", label: "Most Liked" },
   { value: "updated_at", label: "Recently Updated" },
 ];

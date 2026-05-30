@@ -2,7 +2,6 @@
 
 import React from "react";
 import HeroSection from "./HeroSection";
-import { HypelabHeroBanner } from "./HypelabHeroBanner";
 import { SongchainPromoBanner } from "@/components/songchain/SongchainPromoBanner";
 // import { TopChart } from "./TopChart";
 // import FeaturedVideo from './Featured';
@@ -18,7 +17,6 @@ const NonLoggedInView: React.FC = () => {
     <div>
       <HeroSection />
       <SongchainPromoBanner />
-      <HypelabHeroBanner />
       {/* <TopChart /> */}
       {/* <FeaturedVideo /> */}
       <TopVideos />
