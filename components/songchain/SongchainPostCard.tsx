@@ -62,7 +62,7 @@ export function SongchainPostCard({ post, onReactionChange }: SongchainPostCardP
 
   useEffect(() => {
     setUpvoted(hasReacted);
-  }, [hasReacted, post.id]);
+  }, [hasReacted, content.id]);
   const imageUrl = postImage(post);
   const reactions = content.stats?.upvotes ?? 0;
 
@@ -76,7 +76,7 @@ export function SongchainPostCard({ post, onReactionChange }: SongchainPostCardP
     setPending(true);
     try {
       const client = await getSessionClient();
-      const id = postId(post.id);
+      const id = postId(content.id);
       const result = upvoted
         ? await undoReaction(client, { post: id, reaction: 'UPVOTE' })
         : await addReaction(client, { post: id, reaction: 'UPVOTE' });
