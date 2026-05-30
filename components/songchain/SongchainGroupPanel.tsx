@@ -18,7 +18,7 @@ type SongchainGroupPanelProps = {
 };
 
 export function SongchainGroupPanel({ groupId }: SongchainGroupPanelProps) {
-  const lensWrite = useLensOrbWrite();
+  const { canWrite, getSessionClient, promptWriteAccess } = useLensOrbWrite();
   const [name, setName] = useState<string | null>(null);
   const [description, setDescription] = useState<string | null>(null);
   const [memberCount, setMemberCount] = useState<number | null>(null);
@@ -31,8 +31,8 @@ export function SongchainGroupPanel({ groupId }: SongchainGroupPanelProps) {
     setLoading(true);
     try {
       let client = publicClient;
-      if (lensWrite.canWrite) {
-        client = await lensWrite.getSessionClient();
+      if (canWrite) {
+        client = await getSessionClient();
       }
 
       const groupResult = await fetchGroup(client, {
@@ -69,7 +69,7 @@ export function SongchainGroupPanel({ groupId }: SongchainGroupPanelProps) {
     } finally {
       setLoading(false);
     }
-  }, [groupId, lensWrite]);
+  }, [groupId, canWrite, getSessionClient]);
 
   useEffect(() => {
     void loadGroup();
@@ -77,15 +77,15 @@ export function SongchainGroupPanel({ groupId }: SongchainGroupPanelProps) {
 
   const handleJoin = async () => {
     if (!groupId) return;
-    if (!lensWrite.canWrite) {
-      lensWrite.promptWriteAccess();
+    if (!canWrite) {
+      promptWriteAccess();
       toast.info('Link your Orb account to join the Songchain group');
       return;
     }
 
     setJoining(true);
     try {
-      const client = await lensWrite.getSessionClient();
+      const client = await getSessionClient();
       const result = await joinGroup(client, { group: evmAddress(groupId) });
       if (result.isErr()) throw new Error(result.error.message);
       toast.success('Joined Songchain group');
@@ -141,7 +141,7 @@ export function SongchainGroupPanel({ groupId }: SongchainGroupPanelProps) {
               </span>
             )}
           </div>
-          {!lensWrite.canWrite && (
+          {!canWrite && (
             <p className="mt-4 text-sm text-muted-foreground">
               Read-only: connect wallet, sign in with Orb, and link your profile to join or post.
             </p>

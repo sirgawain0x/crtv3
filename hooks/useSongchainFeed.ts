@@ -18,7 +18,7 @@ export function useSongchainFeed({ feedId, enabled = true }: UseSongchainFeedOpt
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const cursorRef = useRef<string | null>(null);
-  const lensWrite = useLensOrbWrite();
+  const { canWrite, getSessionClient } = useLensOrbWrite();
 
   const fetchPage = useCallback(
     async (mode: 'replace' | 'append') => {
@@ -28,8 +28,8 @@ export function useSongchainFeed({ feedId, enabled = true }: UseSongchainFeedOpt
       setError(null);
       try {
         let client = publicClient;
-        if (lensWrite.canWrite) {
-          client = await lensWrite.getSessionClient();
+        if (canWrite) {
+          client = await getSessionClient();
         }
 
         const result = await fetchPosts(client, {
@@ -55,7 +55,7 @@ export function useSongchainFeed({ feedId, enabled = true }: UseSongchainFeedOpt
         setLoading(false);
       }
     },
-    [feedId, enabled, lensWrite],
+    [feedId, enabled, canWrite, getSessionClient],
   );
 
   useEffect(() => {
@@ -67,7 +67,7 @@ export function useSongchainFeed({ feedId, enabled = true }: UseSongchainFeedOpt
     }
     cursorRef.current = null;
     void fetchPage('replace');
-  }, [feedId, enabled, lensWrite.canWrite, fetchPage]);
+  }, [feedId, enabled, canWrite, fetchPage]);
 
   const reload = useCallback(() => {
     cursorRef.current = null;

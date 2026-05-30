@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useId, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { openHalliday } from "@halliday-sdk/commerce";
 import { Button } from "@/components/ui/button";
 import { getSongchainConfig } from "@/lib/songchain/config";
@@ -9,11 +9,16 @@ import { Wallet } from "lucide-react";
 export function HallidayOnramp() {
   const containerId = useId().replace(/:/g, "");
   const [open, setOpen] = useState(false);
-  const config = getSongchainConfig();
+  const config = useMemo(() => getSongchainConfig(), []);
 
   const handleOpen = useCallback(() => {
     if (!config.hallidayApiKey) return;
     setOpen(true);
+  }, [config.hallidayApiKey]);
+
+  useEffect(() => {
+    if (!open || !config.hallidayApiKey) return;
+
     openHalliday({
       apiKey: config.hallidayApiKey,
       destinationChainId: config.hallidayDestinationChainId,
@@ -22,7 +27,13 @@ export function HallidayOnramp() {
       windowType: "EMBED",
       targetElementId: containerId,
     });
-  }, [config, containerId]);
+  }, [
+    open,
+    containerId,
+    config.hallidayApiKey,
+    config.hallidayDestinationChainId,
+    config.hallidayDestinationTokenAddress,
+  ]);
 
   if (!config.hallidayApiKey) {
     return (

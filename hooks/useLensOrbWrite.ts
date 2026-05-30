@@ -18,45 +18,47 @@ export type LensOrbWriteAccess = {
 };
 
 export function useLensOrbWrite(): LensOrbWriteAccess {
-  const orb = useOrbSession();
+  const {
+    session,
+    syncSession,
+    isAuthenticated,
+    linkStatus,
+    lensAccount,
+    hasWallet,
+    openLoginModal,
+  } = useOrbSession();
 
-  const canWrite = orb.isAuthenticated && orb.linkStatus === 'linked';
-  const needsLink =
-    orb.isAuthenticated && orb.linkStatus !== 'linked';
-  const needsOrbLogin = !orb.isAuthenticated;
+  const canWrite = isAuthenticated && linkStatus === 'linked';
+  const needsLink = isAuthenticated && linkStatus !== 'linked';
+  const needsOrbLogin = !isAuthenticated;
 
   const getSessionClient = useCallback(async () => {
     if (!canWrite) {
       throw new Error('Link your Orb account to interact on Lens');
     }
-    const active = orb.session;
-    if (!active?.accessToken) {
+    if (!session?.accessToken) {
       throw new Error('Orb session expired — sign in again');
     }
-    const synced = (await orb.syncSession()) ?? active;
+    const synced = (await syncSession()) ?? session;
     return resumeLensSessionFromOrb(synced);
-  }, [canWrite, orb]);
+  }, [canWrite, session, syncSession]);
 
   const promptWriteAccess = useCallback(() => {
-    if (needsOrbLogin) {
-      if (!orb.hasWallet) {
-        orb.openLoginModal();
+    if (needsOrbLogin || needsLink) {
+      if (!hasWallet && needsOrbLogin) {
+        openLoginModal();
         return;
       }
-      orb.openLoginModal();
-      return;
+      openLoginModal();
     }
-    if (needsLink) {
-      orb.openLoginModal();
-    }
-  }, [needsOrbLogin, needsLink, orb]);
+  }, [needsOrbLogin, needsLink, hasWallet, openLoginModal]);
 
   return useMemo(
     () => ({
       canWrite,
       needsLink,
       needsOrbLogin,
-      lensAccount: orb.lensAccount,
+      lensAccount,
       getSessionClient,
       promptWriteAccess,
     }),
@@ -64,7 +66,7 @@ export function useLensOrbWrite(): LensOrbWriteAccess {
       canWrite,
       needsLink,
       needsOrbLogin,
-      orb.lensAccount,
+      lensAccount,
       getSessionClient,
       promptWriteAccess,
     ],

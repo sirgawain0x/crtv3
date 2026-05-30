@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import {
   addReaction,
@@ -47,27 +47,29 @@ type SongchainPostCardProps = {
 };
 
 export function SongchainPostCard({ post, onReactionChange }: SongchainPostCardProps) {
-  const lensWrite = useLensOrbWrite();
+  const { canWrite, getSessionClient, promptWriteAccess } = useLensOrbWrite();
   const [pending, setPending] = useState(false);
   const ops = 'operations' in post ? post.operations : null;
-  const [upvoted, setUpvoted] = useState(
-    ops != null &&
-      'hasReacted' in ops &&
-      ops.hasReacted === true,
-  );
+  const hasReacted =
+    ops != null && 'hasReacted' in ops && ops.hasReacted === true;
+  const [upvoted, setUpvoted] = useState(hasReacted);
+
+  useEffect(() => {
+    setUpvoted(hasReacted);
+  }, [hasReacted, post.id]);
   const imageUrl = postImage(post);
   const reactions = post.stats?.reactions ?? 0;
 
   const toggleUpvote = async () => {
-    if (!lensWrite.canWrite) {
-      lensWrite.promptWriteAccess();
+    if (!canWrite) {
+      promptWriteAccess();
       toast.info('Link your Orb account to like posts on Lens');
       return;
     }
 
     setPending(true);
     try {
-      const client = await lensWrite.getSessionClient();
+      const client = await getSessionClient();
       const id = postId(post.id);
       const result = upvoted
         ? await undoReaction(client, { post: id, reaction: 'UPVOTE' })
