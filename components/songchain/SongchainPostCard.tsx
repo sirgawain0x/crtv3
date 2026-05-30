@@ -15,17 +15,22 @@ import { useLensOrbWrite } from "@/hooks/useLensOrbWrite";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils/utils";
 
+/** Lens feed items may be reposts; read metadata from the underlying post. */
+function resolvePost(post: AnyPost) {
+  return post.__typename === "Repost" ? post.repostOf : post;
+}
+
 function postText(post: AnyPost): string {
-  const meta = post.metadata;
-  if (!meta || meta.__typename === '%other') return '';
+  const meta = resolvePost(post).metadata;
+  if (!meta) return '';
   if ('content' in meta && typeof meta.content === 'string') return meta.content;
   if ('title' in meta && typeof meta.title === 'string') return meta.title;
   return '';
 }
 
 function postImage(post: AnyPost): string | null {
-  const meta = post.metadata;
-  if (!meta || meta.__typename === '%other') return null;
+  const meta = resolvePost(post).metadata;
+  if (!meta) return null;
   if ('image' in meta && meta.image?.item) {
     return resolveOrbMediaUrl(String(meta.image.item));
   }
@@ -49,7 +54,8 @@ type SongchainPostCardProps = {
 export function SongchainPostCard({ post, onReactionChange }: SongchainPostCardProps) {
   const { canWrite, getSessionClient, promptWriteAccess } = useLensOrbWrite();
   const [pending, setPending] = useState(false);
-  const ops = 'operations' in post ? post.operations : null;
+  const content = resolvePost(post);
+  const ops = "operations" in content ? content.operations : null;
   const hasReacted =
     ops != null && 'hasReacted' in ops && ops.hasReacted === true;
   const [upvoted, setUpvoted] = useState(hasReacted);
@@ -58,7 +64,7 @@ export function SongchainPostCard({ post, onReactionChange }: SongchainPostCardP
     setUpvoted(hasReacted);
   }, [hasReacted, post.id]);
   const imageUrl = postImage(post);
-  const reactions = post.stats?.reactions ?? 0;
+  const reactions = content.stats?.upvotes ?? 0;
 
   const toggleUpvote = async () => {
     if (!canWrite) {
@@ -107,7 +113,7 @@ export function SongchainPostCard({ post, onReactionChange }: SongchainPostCardP
         )}
         <div className="mt-auto flex items-center justify-between gap-2 pt-2 border-t border-border/40">
           <span className="text-xs text-muted-foreground">
-            {reactions} reaction{reactions === 1 ? '' : 's'}
+            {reactions} upvote{reactions === 1 ? '' : 's'}
           </span>
           <Button
             type="button"

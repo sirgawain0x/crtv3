@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import type { AnyClient } from "@lens-protocol/client";
 import {
   fetchGroup,
   fetchGroupMembers,
@@ -30,7 +31,7 @@ export function SongchainGroupPanel({ groupId }: SongchainGroupPanelProps) {
     if (!groupId) return;
     setLoading(true);
     try {
-      let client = publicClient;
+      let client: AnyClient = publicClient;
       if (canWrite) {
         client = await getSessionClient();
       }

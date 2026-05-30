@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { AnyClient } from '@lens-protocol/client';
 import { fetchPosts } from '@lens-protocol/client/actions';
 import { evmAddress } from '@lens-protocol/types';
 import type { AnyPost } from '@lens-protocol/graphql';
@@ -27,7 +28,7 @@ export function useSongchainFeed({ feedId, enabled = true }: UseSongchainFeedOpt
       setLoading(true);
       setError(null);
       try {
-        let client = publicClient;
+        let client: AnyClient = publicClient;
         if (canWrite) {
           client = await getSessionClient();
         }
@@ -47,7 +48,7 @@ export function useSongchainFeed({ feedId, enabled = true }: UseSongchainFeedOpt
         cursorRef.current = page.pageInfo.next ?? null;
         setHasMore(Boolean(page.pageInfo.next));
         setPosts((prev) =>
-          mode === 'append' ? [...prev, ...page.items] : page.items,
+          mode === 'append' ? [...prev, ...page.items] : [...page.items],
         );
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load feed');
