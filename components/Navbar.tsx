@@ -519,7 +519,7 @@ export default function Navbar() {
 
                       {/* Membership Status Section */}
                       <div className="mt-4">
-                        <MembershipSection />
+                        <MembershipSection onNavigate={handleLinkClick} />
                       </div>
 
                       {isVerified && hasMembership && (
