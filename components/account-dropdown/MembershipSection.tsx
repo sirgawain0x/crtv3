@@ -52,11 +52,11 @@ function BuyMembershipCta({
       <p className="text-xs text-muted-foreground">
         View pricing and purchase Unlock memberships on Base with USDC.
       </p>
-      <Link href="/memberships" className="w-full block" onClick={onNavigate}>
-        <Button className="w-full bg-black hover:bg-gray-900 text-white">
+      <Button asChild className="w-full bg-black hover:bg-gray-900 text-white">
+        <Link href="/memberships" className="w-full" onClick={onNavigate}>
           Buy Membership
-        </Button>
-      </Link>
+        </Link>
+      </Button>
     </div>
   );
 }

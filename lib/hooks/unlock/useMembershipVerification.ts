@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useUser, useSmartAccountClient } from "@account-kit/react";
+import { useUser } from "@account-kit/react";
 
 import {
   unlockService,
@@ -34,12 +34,10 @@ export interface MembershipStatus {
 export function useMembershipVerification() {
   const user = useUser();
   const {
-    client,
-    address: clientAddress,
-    isLoadingClient,
-  } = useSmartAccountClient({});
-  const { address: modularAddress, loading: isModularLoading } =
-    useModularAccount();
+    smartAccountClient: client,
+    address: modularAddress,
+    loading: isModularLoading,
+  } = useModularAccount();
 
   const [status, setStatus] = useState<MembershipStatus>({
     isVerified: false,
@@ -100,8 +98,8 @@ export function useMembershipVerification() {
         }
 
         const scaAddress =
-          client?.account?.address ?? clientAddress ?? modularAddress ?? null;
-        const waitingForClient = isLoadingClient || isModularLoading;
+          client?.account?.address ?? modularAddress ?? null;
+        const waitingForClient = isModularLoading;
 
         if (!scaAddress) {
           if (waitingForClient) {
@@ -139,9 +137,7 @@ export function useMembershipVerification() {
     user?.address,
     user?.type,
     client?.account?.address,
-    clientAddress,
     modularAddress,
-    isLoadingClient,
     isModularLoading,
     verifyMembership,
   ]);
