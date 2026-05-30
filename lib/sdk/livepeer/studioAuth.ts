@@ -12,6 +12,11 @@ export function resolveLivepeerStudioAuthToken(): string | undefined {
   return full || standard || undefined;
 }
 
+/** Private (non-CORS) key required for metrics.getViewership. */
+export function hasLivepeerPrivateApiKey(): boolean {
+  return Boolean(normalizeEnvSecret(process.env.LIVEPEER_FULL_API_KEY));
+}
+
 export function livepeerStudioApiBaseUrl(): string {
   const raw =
     process.env.LIVEPEER_FULL_API_URL?.trim() || 'https://livepeer.studio';
