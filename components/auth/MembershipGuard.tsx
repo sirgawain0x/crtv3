@@ -34,6 +34,7 @@ export function MembershipGuard({ children }: MembershipGuardProps) {
     '/upload',
     '/creator',
     '/memberships',
+    '/songchain',
   ];
 
   const isPublicPath = PUBLIC_PATHS.some(path => pathname?.startsWith(path));

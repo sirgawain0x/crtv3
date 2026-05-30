@@ -10,6 +10,7 @@ import {
   Disc3,
   Gamepad2,
   Mic,
+  Music2,
   ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -55,6 +56,12 @@ const CREATIVE_PLATFORM_APPS = [
     href: "https://air.creativeplatform.xyz/app",
     icon: Disc3,
     description: "Curate and share music mixes",
+  },
+  {
+    name: "Songchain",
+    href: "/songchain",
+    icon: Music2,
+    description: "Lens music feeds and community on TV",
   },
   {
     name: "Beat Me",

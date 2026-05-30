@@ -15,7 +15,6 @@ import { toast } from "sonner";
 import Link from "next/link";
 import { TrendingUpIcon } from "lucide-react";
 import VideoThumbnail from "@/components/Videos/VideoThumbnail";
-import { ViewsComponent } from "@/components/Player/ViewsComponent";
 import { HERO_VIDEO_ASSET_ID } from "@/context/context";
 import { logger } from "@/lib/utils/logger";
 
@@ -41,13 +40,13 @@ export function TopVideos() {
         setLoading(true);
         setError(null);
 
-        // Step 1: Fetch trending videos from database (ordered by views_count)
+        // Step 1: Fetch trending videos from database
         // Fetch 11 videos to ensure we have 10 after excluding the hero video
         logger.debug("Fetching trending videos from database...");
         const { data: trendingVideos } = await fetchPublishedVideos({
           limit: 11, // Fetch 11 to ensure we have 10 after excluding hero video
           offset: 0,
-          orderBy: 'views_count', // Order by views to get trending content
+          orderBy: 'created_at',
           order: 'desc',
         });
 
@@ -235,14 +234,6 @@ export function TopVideos() {
                       ) : (
                         <div className="flex h-full w-full items-center justify-center bg-gray-900 text-white">
                           No playback ID available
-                        </div>
-                      )}
-                      {/* Top bar with view counts */}
-                      {video.playback_id && (
-                        <div className="absolute left-0 right-0 top-0 bg-gradient-to-b from-black/60 to-transparent pt-2">
-                          <div className="flex items-center justify-end px-3 py-1">
-                            <ViewsComponent playbackId={video.playback_id} />
-                          </div>
                         </div>
                       )}
                       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-4">

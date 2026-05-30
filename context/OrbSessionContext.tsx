@@ -21,6 +21,7 @@ import {
 } from '@/lib/sdk/orb/login';
 import { useWalletAuth } from '@/lib/auth/useWalletAuth';
 import { formatOrbAuthError } from '@/lib/sdk/orb/format-auth-error';
+import { clearLensSessionCache } from '@/lib/sdk/lens/orb-session-client';
 import { toast } from 'sonner';
 
 export type OrbLinkStatus = 'idle' | 'linked' | 'needs_wallet' | 'failed';
@@ -224,6 +225,7 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
       }
     }
     persistSession(null);
+    clearLensSessionCache();
     setLoginError(null);
     setLinkStatus('idle');
     toast.success('Signed out of Orb');
