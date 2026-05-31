@@ -8,6 +8,7 @@ import { CheckCircle2, Link2, LogIn } from "lucide-react";
 export function SongchainOrbConnect() {
   const orb = useOrbSession();
   const lensWrite = useLensOrbWrite();
+  const { linkProfile, isLinking } = orb;
 
   if (lensWrite.canWrite) {
     return (
@@ -34,9 +35,20 @@ export function SongchainOrbConnect() {
             : 'Browse feeds in read-only mode. Sign in with Orb and link your account to interact.'}
         </span>
       </div>
-      <Button size="sm" variant="secondary" onClick={() => orb.openLoginModal()}>
+      <Button
+        size="sm"
+        variant="secondary"
+        disabled={isLinking}
+        onClick={() =>
+          lensWrite.needsLink ? void linkProfile() : orb.openLoginModal()
+        }
+      >
         <LogIn className="h-4 w-4 mr-2" />
-        {orb.isAuthenticated ? 'Link Orb' : 'Sign in with Orb'}
+        {isLinking
+          ? 'Linking…'
+          : lensWrite.needsLink
+            ? 'Sync profile'
+            : 'Sign in with Orb'}
       </Button>
     </div>
   );

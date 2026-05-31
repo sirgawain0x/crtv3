@@ -16,6 +16,7 @@ export function MobileOrbSection() {
     linkProfile,
     isLinking: isOrbLinking,
     logout: logoutOrb,
+    linkStatus,
   } = useOrbSession();
 
   const walletAddress = modularAccount?.address || user?.address;
@@ -25,8 +26,15 @@ export function MobileOrbSection() {
       <p className="text-xs text-muted-foreground font-semibold">Orb / Lens</p>
       {isOrbAuthenticated ? (
         <div className="space-y-2 rounded-md border border-gray-200 p-3 dark:border-gray-700">
-          <p className="text-xs text-green-600 dark:text-green-400">
-            Linked{lensAccount ? `: ${shortenAddress(lensAccount)}` : ""}
+          <p
+            className={
+              linkStatus === "linked"
+                ? "text-xs text-green-600 dark:text-green-400"
+                : "text-xs text-amber-600 dark:text-amber-400"
+            }
+          >
+            {linkStatus === "linked" ? "Linked" : "Signed in"}
+            {lensAccount ? `: ${shortenAddress(lensAccount)}` : ""}
           </p>
           <div className="flex gap-2">
             <Button
