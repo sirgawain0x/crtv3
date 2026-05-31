@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   destroyClient,
   initializeClient,
@@ -19,24 +19,17 @@ export type HallidayOnrampProps = {
   hallidaySandbox: boolean;
 };
 
-const CONTAINER_ID_PREFIX = "halliday-onramp";
-
 export function HallidayOnramp({
   hallidayApiKey,
   hallidayOutputAsset,
   hallidaySandbox,
 }: HallidayOnrampProps) {
-  const reactId = useId().replace(/:/g, "");
-  const containerId = `${CONTAINER_ID_PREFIX}-${reactId}`;
-  const containerRef = useRef<HTMLDivElement>(null);
-
   const { openAuthModal } = useAuthModal();
   const user = useUser();
   const { client: smartAccountClient, address: smartAccountAddress } =
     useSmartAccountClient({});
   const { lensAccount } = useLensOrbWrite();
 
-  const [embedOpen, setEmbedOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const destinationAddress = useMemo(() => {
@@ -67,6 +60,7 @@ export function HallidayOnramp({
       apiKey: hallidayApiKey ?? "",
       outputs: [hallidayOutputAsset],
       sandbox: hallidaySandbox,
+      windowType: "MODAL" as const,
       destinationAddress: destinationAddress ?? undefined,
       userWallet,
       onError: (err: Error) => {
@@ -106,31 +100,7 @@ export function HallidayOnramp({
     return false;
   }, [destinationAddress, openAuthModal]);
 
-  const openEmbedded = useCallback(() => {
-    if (!hallidayApiKey || !requireWallet()) return;
-    setError(null);
-    setEmbedOpen(true);
-  }, [hallidayApiKey, requireWallet]);
-
-  useEffect(() => {
-    if (!embedOpen || !hallidayApiKey || !destinationAddress) return;
-    if (!containerRef.current) return;
-
-    setError(null);
-
-    try {
-      openHallidayPayments({
-        ...baseParams,
-        targetElementId: containerId,
-      });
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Could not open Halliday embed.",
-      );
-    }
-  }, [embedOpen, hallidayApiKey, destinationAddress, containerId, baseParams]);
-
-  const openModal = useCallback(() => {
+  const openOnramp = useCallback(() => {
     if (!hallidayApiKey || !requireWallet()) return;
     setError(null);
     try {
@@ -152,7 +122,7 @@ export function HallidayOnramp({
 
   return (
     <div className="rounded-lg border border-border/60 bg-card p-4">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 className="font-semibold flex items-center gap-2">
             <Wallet className="h-4 w-4 text-violet-400" aria-hidden />
@@ -165,47 +135,30 @@ export function HallidayOnramp({
               : "connect wallet"}
           </p>
         </div>
-        {!embedOpen && (
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="secondary" size="sm" onClick={openEmbedded}>
-              Get GHO
-            </Button>
-            <Button type="button" variant="outline" size="sm" onClick={openModal}>
-              Open modal
-            </Button>
-          </div>
-        )}
+        <Button type="button" variant="secondary" size="sm" onClick={openOnramp}>
+          Get GHO
+        </Button>
       </div>
 
       {error && (
-        <p className="mb-3 text-sm text-destructive" role="alert">
+        <p className="mt-3 text-sm text-destructive" role="alert">
           {error}{" "}
-          <button type="button" className="underline" onClick={openModal}>
-            Try modal
+          <button type="button" className="underline" onClick={openOnramp}>
+            Try again
           </button>
         </p>
       )}
 
       {!destinationAddress && (
-        <p className="mb-3 text-sm text-amber-200/90">
+        <p className="mt-3 text-sm text-amber-200/90">
           Sign in and connect a wallet so funds arrive at your Lens destination address.
         </p>
       )}
 
-      {embedOpen && (
-        <>
-          <p className="mb-2 text-xs text-muted-foreground">
-            On the Use cash tab, pick your fiat currency in the Halliday widget
-            header (top of the panel). If you do not see it, scroll up inside the
-            panel or use Open modal for the full view.
-          </p>
-          <div
-            ref={containerRef}
-            id={containerId}
-            className="relative min-h-[520px] w-full overflow-auto rounded-md border border-border/40 bg-muted/20"
-          />
-        </>
-      )}
+      <p className="mt-3 text-xs text-muted-foreground">
+        Opens the full Halliday checkout in a modal so you can pick fiat currency and
+        payment methods on mobile.
+      </p>
     </div>
   );
 }
