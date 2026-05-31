@@ -2,13 +2,15 @@
 
 import Link from "next/link";
 import { Music2 } from "lucide-react";
-import { getSongchainConfig } from "@/lib/songchain/config";
+
+type SongchainPromoBannerProps = {
+  enabled: boolean;
+};
 
 /**
  * Home promo banner — links to the Songchain Lens hub on Creative TV.
  */
-export function SongchainPromoBanner() {
-  const { enabled } = getSongchainConfig();
+export function SongchainPromoBanner({ enabled }: SongchainPromoBannerProps) {
 
   return (
     <div className="w-full max-w-7xl mx-auto py-3 px-4 sm:px-6">

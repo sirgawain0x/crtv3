@@ -1,45 +1,106 @@
 "use client";
 
-import { useCallback, useEffect, useId, useMemo, useState } from "react";
+import { useCallback, useId, useLayoutEffect, useRef, useState } from "react";
 import { openHalliday } from "@halliday-sdk/commerce";
 import { Button } from "@/components/ui/button";
-import { getSongchainConfig } from "@/lib/songchain/config";
 import { Wallet } from "lucide-react";
 
-export function HallidayOnramp() {
-  const containerId = useId().replace(/:/g, "");
+export type HallidayOnrampProps = {
+  hallidayApiKey: string | null;
+  destinationChainId: number;
+  destinationTokenAddress: string;
+};
+
+export function HallidayOnramp({
+  hallidayApiKey,
+  destinationChainId,
+  destinationTokenAddress,
+}: HallidayOnrampProps) {
+  const reactId = useId().replace(/:/g, "");
+  const containerId = `halliday-onramp-${reactId}`;
+  const containerRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
-  const config = useMemo(() => getSongchainConfig(), []);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   const handleOpen = useCallback(() => {
-    if (!config.hallidayApiKey) return;
+    if (!hallidayApiKey) return;
+    setError(null);
     setOpen(true);
-  }, [config.hallidayApiKey]);
+  }, [hallidayApiKey]);
 
-  useEffect(() => {
-    if (!open || !config.hallidayApiKey) return;
+  useLayoutEffect(() => {
+    if (!open || !hallidayApiKey) return;
 
-    openHalliday({
-      apiKey: config.hallidayApiKey,
-      destinationChainId: config.hallidayDestinationChainId,
-      destinationTokenAddress: config.hallidayDestinationTokenAddress,
-      services: ["ONRAMP"],
-      windowType: "EMBED",
-      targetElementId: containerId,
-    });
+    const target = containerRef.current;
+    if (!target) return;
+
+    let cancelled = false;
+
+    const mountEmbed = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        await openHalliday({
+          apiKey: hallidayApiKey,
+          destinationChainId,
+          destinationTokenAddress,
+          services: ["ONRAMP"],
+          windowType: "EMBED",
+          targetElementId: containerId,
+        });
+      } catch (err) {
+        if (!cancelled) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Could not load Halliday onramp. Try again or use popup mode.",
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    };
+
+    void mountEmbed();
+
+    return () => {
+      cancelled = true;
+      target.innerHTML = "";
+    };
   }, [
     open,
     containerId,
-    config.hallidayApiKey,
-    config.hallidayDestinationChainId,
-    config.hallidayDestinationTokenAddress,
+    hallidayApiKey,
+    destinationChainId,
+    destinationTokenAddress,
   ]);
 
-  if (!config.hallidayApiKey) {
+  const handlePopup = useCallback(async () => {
+    if (!hallidayApiKey) return;
+    setError(null);
+    try {
+      await openHalliday({
+        apiKey: hallidayApiKey,
+        destinationChainId,
+        destinationTokenAddress,
+        services: ["ONRAMP"],
+        windowType: "POPUP",
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not open Halliday popup.");
+    }
+  }, [hallidayApiKey, destinationChainId, destinationTokenAddress]);
+
+  if (!hallidayApiKey) {
     return (
       <p className="text-sm text-muted-foreground">
         Fund your Lens wallet with GHO via Halliday — set{" "}
-        <code className="text-xs">NEXT_PUBLIC_HALLIDAY_API_KEY</code> to enable.
+        <code className="text-xs">NEXT_PUBLIC_HALLIDAY_API_KEY</code> (or{" "}
+        <code className="text-xs">HALLIDAY_API_KEY</code> on the server) to enable.
       </p>
     );
   }
@@ -57,16 +118,43 @@ export function HallidayOnramp() {
           </p>
         </div>
         {!open && (
-          <Button type="button" variant="secondary" size="sm" onClick={handleOpen}>
-            Get GHO
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="secondary" size="sm" onClick={handleOpen}>
+              Get GHO
+            </Button>
+            <Button type="button" variant="outline" size="sm" onClick={() => void handlePopup()}>
+              Open in popup
+            </Button>
+          </div>
         )}
       </div>
+
+      {error && (
+        <p className="mb-3 text-sm text-destructive" role="alert">
+          {error}{" "}
+          <button
+            type="button"
+            className="underline"
+            onClick={() => void handlePopup()}
+          >
+            Try popup
+          </button>
+        </p>
+      )}
+
       {open && (
         <div
+          ref={containerRef}
           id={containerId}
-          className="min-h-[420px] w-full overflow-hidden rounded-md border border-border/40 bg-muted/20"
-        />
+          className="relative min-h-[420px] w-full overflow-hidden rounded-md border border-border/40 bg-muted/20"
+          aria-busy={loading}
+        >
+          {loading && (
+            <p className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
+              Loading Halliday…
+            </p>
+          )}
+        </div>
       )}
     </div>
   );
