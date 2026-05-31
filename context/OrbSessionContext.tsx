@@ -174,6 +174,33 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
     void linkProfile(walletAddress);
   }, [session?.accessToken, walletAddress, linkStatus, linkProfile]);
 
+  /** Restore link status after refresh when profile was already linked server-side. */
+  useEffect(() => {
+    if (!session?.accessToken || !walletAddress || !lensAccount) return;
+    if (linkStatus === 'linked' || linkStatus === 'needs_wallet') return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/creator-profiles?owner=${encodeURIComponent(walletAddress)}`,
+        );
+        const json = await res.json();
+        if (cancelled || !json?.success || !json.data?.lens_account_id) return;
+        const storedLens = String(json.data.lens_account_id).toLowerCase();
+        if (storedLens === lensAccount.toLowerCase()) {
+          setLinkStatus('linked');
+        }
+      } catch {
+        // Non-fatal: user can still use Sync profile / Link Orb
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.accessToken, walletAddress, lensAccount, linkStatus]);
+
   const connectWithQr = useCallback(
     async (onInit?: (payload: { qrCode: string; deepLink?: string }) => void) => {
       setLoginError(null);

@@ -193,11 +193,18 @@ export function HallidayOnramp({
       )}
 
       {embedOpen && (
-        <div
-          ref={containerRef}
-          id={containerId}
-          className="relative min-h-[420px] w-full overflow-hidden rounded-md border border-border/40 bg-muted/20"
-        />
+        <>
+          <p className="mb-2 text-xs text-muted-foreground">
+            On the Use cash tab, pick your fiat currency in the Halliday widget
+            header (top of the panel). If you do not see it, scroll up inside the
+            panel or use Open modal for the full view.
+          </p>
+          <div
+            ref={containerRef}
+            id={containerId}
+            className="relative min-h-[520px] w-full overflow-auto rounded-md border border-border/40 bg-muted/20"
+          />
+        </>
       )}
     </div>
   );
