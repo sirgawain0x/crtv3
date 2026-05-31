@@ -16,7 +16,7 @@ describe('getSongchainConfig', () => {
       '0xabc0000000000000000000000000000000000001',
     );
     expect(config.hallidayOutputAsset).toContain(':');
-    expect(config.hallidayInputAssets).toEqual(['USD', 'EUR']);
+    expect(config.hallidayInputAssets).toEqual(['usd']);
   });
 
   it('normalizes addresses to lowercase', () => {

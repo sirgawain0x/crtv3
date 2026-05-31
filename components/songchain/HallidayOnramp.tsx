@@ -69,6 +69,8 @@ export function HallidayOnramp({
       outputs: [hallidayOutputAsset],
       sandbox: hallidaySandbox,
       windowType: "MODAL" as const,
+      /** Fiat onramp tab; matches Halliday widget `sessionType` for card/bank pay-in. */
+      sessionType: "cash" as const,
       destinationAddress: destinationAddress ?? undefined,
       headerTitle: HALLIDAY_HEADER_TITLE,
       customStyles: {

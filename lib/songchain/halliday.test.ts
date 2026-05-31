@@ -5,7 +5,25 @@ import {
   HALLIDAY_DEFAULT_INPUT_ASSETS,
   isHallidaySandboxEnabled,
   LENS_GHO_TOKEN_ADDRESS,
+  normalizeHallidayAssetId,
 } from './halliday';
+
+describe('normalizeHallidayAssetId', () => {
+  it('lowercases fiat symbols', () => {
+    expect(normalizeHallidayAssetId('USD')).toBe('usd');
+    expect(normalizeHallidayAssetId(' EUR ')).toBe('eur');
+  });
+
+  it('lowercases chain slug and token address', () => {
+    expect(
+      normalizeHallidayAssetId('Lens:0xABCDEF0000000000000000000000000000000001'),
+    ).toBe('lens:0xabcdef0000000000000000000000000000000001');
+  });
+
+  it('lowercases chain slug and token symbol', () => {
+    expect(normalizeHallidayAssetId('Ethereum:USDC')).toBe('ethereum:usdc');
+  });
+});
 
 describe('buildHallidayOutputAsset', () => {
   const env = process.env;
@@ -24,8 +42,8 @@ describe('buildHallidayOutputAsset', () => {
     );
   });
 
-  it('respects full output asset override', () => {
-    process.env.NEXT_PUBLIC_HALLIDAY_OUTPUT_ASSET = 'lens:0xabc';
+  it('respects full output asset override and normalizes casing', () => {
+    process.env.NEXT_PUBLIC_HALLIDAY_OUTPUT_ASSET = 'Lens:0xAbC';
     expect(buildHallidayOutputAsset('mainnet')).toBe('lens:0xabc');
   });
 });
@@ -37,14 +55,14 @@ describe('buildHallidayInputAssets', () => {
     process.env = { ...env };
   });
 
-  it('defaults to USD and EUR for fiat onramp', () => {
+  it('defaults to usd for fiat onramp', () => {
     delete process.env.NEXT_PUBLIC_HALLIDAY_INPUT_ASSET;
     expect(buildHallidayInputAssets()).toEqual([...HALLIDAY_DEFAULT_INPUT_ASSETS]);
   });
 
-  it('supports comma-separated input overrides', () => {
+  it('supports comma-separated input overrides with normalization', () => {
     process.env.NEXT_PUBLIC_HALLIDAY_INPUT_ASSET = 'USD, EUR';
-    expect(buildHallidayInputAssets()).toEqual(['USD', 'EUR']);
+    expect(buildHallidayInputAssets()).toEqual(['usd', 'eur']);
   });
 
   it('falls back to defaults when override is only whitespace or commas', () => {

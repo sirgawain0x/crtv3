@@ -18,6 +18,30 @@ function readEnv(...keys: string[]): string | null {
 }
 
 /**
+ * Normalizes a Halliday Payments SDK asset id.
+ * Fiat symbols → lowercase (`usd`). Tokens → `chain:0x…` with lowercase chain slug and hex.
+ * @see https://docs.halliday.xyz/pages/payments-sdk-docs
+ */
+export function normalizeHallidayAssetId(asset: string): string {
+  const trimmed = asset.trim();
+  if (!trimmed) return trimmed;
+
+  if (!trimmed.includes(':')) {
+    return trimmed.toLowerCase();
+  }
+
+  const colon = trimmed.indexOf(':');
+  const chain = trimmed.slice(0, colon).trim().toLowerCase();
+  const token = trimmed.slice(colon + 1).trim();
+  const normalizedToken =
+    token.startsWith('0x') || token.startsWith('0X')
+      ? token.toLowerCase()
+      : token.toLowerCase();
+
+  return `${chain}:${normalizedToken}`;
+}
+
+/**
  * Halliday Payments SDK output asset id (`chain:tokenAddress`).
  * @see https://docs.halliday.xyz/pages/payments-sdk-docs
  */
@@ -29,14 +53,14 @@ export function buildHallidayOutputAsset(
     'NEXT_PUBLIC_HALLIDAY_OUTPUT_ASSET',
     'HALLIDAY_OUTPUT_ASSET',
   );
-  if (assetOverride) return assetOverride;
+  if (assetOverride) return normalizeHallidayAssetId(assetOverride);
 
   const chainSlug =
     readEnv('NEXT_PUBLIC_HALLIDAY_CHAIN_SLUG', 'HALLIDAY_CHAIN_SLUG') ??
     DEFAULT_CHAIN_SLUG[network];
 
   const token = (tokenAddress ?? LENS_GHO_TOKEN_ADDRESS).toLowerCase();
-  return `${chainSlug}:${token}`;
+  return normalizeHallidayAssetId(`${chainSlug}:${token}`);
 }
 
 export function isHallidaySandboxEnabled(): boolean {
@@ -44,12 +68,14 @@ export function isHallidaySandboxEnabled(): boolean {
   return value === '1' || value?.toLowerCase() === 'true';
 }
 
-/** Default fiat inputs for Halliday onramp (debit/credit → crypto). */
-export const HALLIDAY_DEFAULT_INPUT_ASSETS = ['USD', 'EUR'] as const;
+/**
+ * Default fiat input for Halliday onramp (debit/credit → crypto).
+ * Single `usd` pre-selects pay currency in the widget; add `eur` via env if needed.
+ */
+export const HALLIDAY_DEFAULT_INPUT_ASSETS = ['usd'] as const;
 
 /**
  * Halliday Payments SDK input asset id (fiat symbol or `chain:tokenAddress`).
- * Multiple values let users choose pay currency in the widget (e.g. USD or EUR).
  * @see https://docs.halliday.xyz/pages/payments-sdk-docs
  */
 export function buildHallidayInputAssets(): string[] {
@@ -60,7 +86,7 @@ export function buildHallidayInputAssets(): string[] {
   if (override) {
     const assets = override
       .split(',')
-      .map((value) => value.trim())
+      .map((value) => normalizeHallidayAssetId(value))
       .filter(Boolean);
     if (assets.length > 0) {
       return assets;
@@ -68,4 +94,3 @@ export function buildHallidayInputAssets(): string[] {
   }
   return [...HALLIDAY_DEFAULT_INPUT_ASSETS];
 }
-

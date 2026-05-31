@@ -14,7 +14,7 @@ export type SongchainConfig = {
   hallidayApiKey: string | null;
   /** Halliday Payments SDK `outputs` entry, e.g. `lens:0x…800a`. */
   hallidayOutputAsset: string;
-  /** Halliday Payments SDK `inputs` entries, e.g. `USD` for fiat onramp. */
+  /** Halliday Payments SDK `inputs` entries, e.g. `usd` for fiat onramp. */
   hallidayInputAssets: string[];
   hallidaySandbox: boolean;
 };
