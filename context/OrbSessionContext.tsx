@@ -22,7 +22,7 @@ import {
 } from '@/lib/sdk/orb/login';
 import { useWalletAuth } from '@/lib/auth/useWalletAuth';
 import { formatOrbAuthError } from '@/lib/sdk/orb/format-auth-error';
-import { isRevokedOrbSessionError } from '@/lib/sdk/orb/session-errors';
+import { isStaleOrbSessionError } from '@/lib/sdk/orb/session-errors';
 import { toast } from 'sonner';
 
 export type OrbLinkStatus = 'idle' | 'linked' | 'needs_wallet' | 'failed';
@@ -116,13 +116,20 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
       persistSession(stored);
       return stored;
     } catch (err) {
-      if (isRevokedOrbSessionError(err)) {
+      if (isStaleOrbSessionError(err)) {
         invalidateOrbSession();
         return null;
       }
       return session;
     }
   }, [session, orb, persistSession, invalidateOrbSession]);
+
+  /** Reset link UI when tokens were cleared outside this provider (e.g. Songchain feed). */
+  useEffect(() => {
+    if (!session?.accessToken && linkStatus === 'linked') {
+      setLinkStatus('idle');
+    }
+  }, [session?.accessToken, linkStatus]);
 
   /** Clear revoked/expired Orb tokens so Songchain and feeds stay read-only instead of erroring. */
   useEffect(() => {

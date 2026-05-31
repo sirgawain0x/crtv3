@@ -12,7 +12,7 @@ import { publicClient } from "@/lib/sdk/lens/client";
 import { Button } from "@/components/ui/button";
 import { Loader2, Users } from "lucide-react";
 import { useLensOrbWrite } from "@/hooks/useLensOrbWrite";
-import { isRevokedOrbSessionError } from "@/lib/sdk/orb/session-errors";
+import { clearStaleOrbSessionIfNeeded } from "@/lib/sdk/orb/session-errors";
 import { toast } from "sonner";
 
 type SongchainGroupPanelProps = {
@@ -37,7 +37,7 @@ export function SongchainGroupPanel({ groupId }: SongchainGroupPanelProps) {
         try {
           client = await getSessionClient();
         } catch (err) {
-          if (!isRevokedOrbSessionError(err)) throw err;
+          if (!clearStaleOrbSessionIfNeeded(err)) throw err;
         }
       }
 
