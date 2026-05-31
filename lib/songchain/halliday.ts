@@ -32,13 +32,9 @@ export function normalizeHallidayAssetId(asset: string): string {
 
   const colon = trimmed.indexOf(':');
   const chain = trimmed.slice(0, colon).trim().toLowerCase();
-  const token = trimmed.slice(colon + 1).trim();
-  const normalizedToken =
-    token.startsWith('0x') || token.startsWith('0X')
-      ? token.toLowerCase()
-      : token.toLowerCase();
+  const token = trimmed.slice(colon + 1).trim().toLowerCase();
 
-  return `${chain}:${normalizedToken}`;
+  return `${chain}:${token}`;
 }
 
 /**
