@@ -44,8 +44,8 @@ export function SongchainPageClient({ config }: SongchainPageClientProps) {
         <SongchainOrbConnect />
         <HallidayOnramp
           hallidayApiKey={config.hallidayApiKey}
-          destinationChainId={config.hallidayDestinationChainId}
-          destinationTokenAddress={config.hallidayDestinationTokenAddress}
+          hallidayOutputAsset={config.hallidayOutputAsset}
+          hallidaySandbox={config.hallidaySandbox}
         />
       </div>
 

@@ -1,7 +1,9 @@
-import { getLensChainId, getLensNetwork } from '@/lib/sdk/lens/chains';
-
-/** Lens GHO on mainnet (wrapped gas token). Same address pattern on Lens Chain. */
-const LENS_GHO_ADDRESS = '0x000000000000000000000000000000000000800A' as const;
+import {
+  buildHallidayOutputAsset,
+  isHallidaySandboxEnabled,
+  LENS_GHO_TOKEN_ADDRESS,
+} from '@/lib/songchain/halliday';
+import { getLensNetwork } from '@/lib/sdk/lens/chains';
 
 export type SongchainConfig = {
   enabled: boolean;
@@ -9,8 +11,9 @@ export type SongchainConfig = {
   exclusiveFeedId: string | null;
   groupId: string | null;
   hallidayApiKey: string | null;
-  hallidayDestinationChainId: number;
-  hallidayDestinationTokenAddress: string;
+  /** Halliday Payments SDK `outputs` entry, e.g. `lens:0x…800a`. */
+  hallidayOutputAsset: string;
+  hallidaySandbox: boolean;
 };
 
 function readEnv(...keys: string[]): string | null {
@@ -58,13 +61,18 @@ export function getSongchainConfig(): SongchainConfig {
     'HALLIDAY_API_KEY',
   );
 
+  const network = getLensNetwork();
+
   return {
     enabled: Boolean(publicFeedId || exclusiveFeedId || groupId),
     publicFeedId,
     exclusiveFeedId,
     groupId,
     hallidayApiKey,
-    hallidayDestinationChainId: getLensChainId(getLensNetwork()),
-    hallidayDestinationTokenAddress: tokenOverride || LENS_GHO_ADDRESS,
+    hallidayOutputAsset: buildHallidayOutputAsset(
+      network,
+      tokenOverride ?? LENS_GHO_TOKEN_ADDRESS,
+    ),
+    hallidaySandbox: isHallidaySandboxEnabled(),
   };
 }

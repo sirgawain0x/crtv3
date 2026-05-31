@@ -43,7 +43,7 @@
     "@ffmpeg/core": "^0.12.10",
     "@ffmpeg/ffmpeg": "^0.12.15",
     "@ffmpeg/util": "^0.12.2",
-    "@halliday-sdk/commerce": "^3.2.2",
+    "@halliday-sdk/payments": "^3.2.0",
     "@helia/strings": "^5.0.3",
     "@helia/unixfs": "^6.0.4",
     "@hookform/resolvers": "^5.0.1",

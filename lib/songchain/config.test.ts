@@ -15,6 +15,7 @@ describe('getSongchainConfig', () => {
     expect(config.publicFeedId).toBe(
       '0xabc0000000000000000000000000000000000001',
     );
+    expect(config.hallidayOutputAsset).toContain(':');
   });
 
   it('normalizes addresses to lowercase', () => {
