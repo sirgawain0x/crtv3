@@ -61,6 +61,11 @@ export function HallidayOnramp({
     );
   }, [smartAccountClient, destinationAddress]);
 
+  const fiatLabel = useMemo(
+    () => hallidayInputAssets.join(" or "),
+    [hallidayInputAssets],
+  );
+
   const baseParams = useMemo(
     () => ({
       apiKey: hallidayApiKey ?? "",
@@ -69,7 +74,7 @@ export function HallidayOnramp({
       sandbox: hallidaySandbox,
       windowType: "MODAL" as const,
       destinationAddress: destinationAddress ?? undefined,
-      headerTitle: "Buy GHO with USD",
+      headerTitle: `Buy GHO (${fiatLabel})`,
       customStyles: {
         zIndex: HALLIDAY_WIDGET_Z_INDEX,
         backgroundStyle: "BLUR" as const,
@@ -85,6 +90,7 @@ export function HallidayOnramp({
       hallidayInputAssets,
       hallidayOutputAsset,
       hallidaySandbox,
+      fiatLabel,
       destinationAddress,
       userWallet,
       openAuthModal,
@@ -170,8 +176,8 @@ export function HallidayOnramp({
       )}
 
       <p className="mt-3 text-xs text-muted-foreground">
-        Opens Halliday checkout with USD pre-selected. Use a card or bank in the widget
-        to receive GHO at your Lens destination.
+        Opens Halliday checkout with {fiatLabel} available. Pick your currency, then pay
+        by card or bank to receive GHO at your Lens destination.
       </p>
     </div>
   );

@@ -44,12 +44,12 @@ export function isHallidaySandboxEnabled(): boolean {
   return value === '1' || value?.toLowerCase() === 'true';
 }
 
-/** Default fiat input for Halliday onramp (debit/credit → crypto). */
-export const HALLIDAY_DEFAULT_INPUT_ASSET = 'USD' as const;
+/** Default fiat inputs for Halliday onramp (debit/credit → crypto). */
+export const HALLIDAY_DEFAULT_INPUT_ASSETS = ['USD', 'EUR'] as const;
 
 /**
  * Halliday Payments SDK input asset id (fiat symbol or `chain:tokenAddress`).
- * Pre-selects the pay-with currency in the widget (e.g. USD for card onramp).
+ * Multiple values let users choose pay currency in the widget (e.g. USD or EUR).
  * @see https://docs.halliday.xyz/pages/payments-sdk-docs
  */
 export function buildHallidayInputAssets(): string[] {
@@ -63,5 +63,5 @@ export function buildHallidayInputAssets(): string[] {
       .map((value) => value.trim())
       .filter(Boolean);
   }
-  return [HALLIDAY_DEFAULT_INPUT_ASSET];
+  return [...HALLIDAY_DEFAULT_INPUT_ASSETS];
 }
