@@ -19,6 +19,14 @@ describe('formatOrbAuthError', () => {
     );
   });
 
+  it('maps revoked Orb/Lens session copy', () => {
+    expect(
+      formatOrbAuthError(
+        new Error('You are trying to renew a revoked authentication'),
+      ),
+    ).toMatch(/signed out/i);
+  });
+
   it('maps missing lens_account_id schema cache errors', () => {
     expect(
       formatOrbAuthError(

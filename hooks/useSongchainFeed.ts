@@ -7,6 +7,7 @@ import { evmAddress } from '@lens-protocol/types';
 import type { AnyPost } from '@lens-protocol/graphql';
 import { publicClient } from '@/lib/sdk/lens/client';
 import { useLensOrbWrite } from '@/hooks/useLensOrbWrite';
+import { isRevokedOrbSessionError } from '@/lib/sdk/orb/session-errors';
 
 type UseSongchainFeedOptions = {
   feedId: string | null;
@@ -30,7 +31,12 @@ export function useSongchainFeed({ feedId, enabled = true }: UseSongchainFeedOpt
       try {
         let client: AnyClient = publicClient;
         if (canWrite) {
-          client = await getSessionClient();
+          try {
+            client = await getSessionClient();
+          } catch (err) {
+            if (!isRevokedOrbSessionError(err)) throw err;
+            // Stale Orb session was cleared; keep browsing the feed read-only.
+          }
         }
 
         const result = await fetchPosts(client, {
