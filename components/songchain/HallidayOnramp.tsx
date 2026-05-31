@@ -12,13 +12,10 @@ import type { WalletClient } from "viem";
 import { Button } from "@/components/ui/button";
 import { useLensOrbWrite } from "@/hooks/useLensOrbWrite";
 import { Wallet } from "lucide-react";
-import {
-  buildHallidayHeaderTitle,
-  formatHallidayInputList,
-} from "@/lib/songchain/halliday";
 
 /** Above app modals (e.g. z-50 nav, z-[99999] selects) so Halliday header stays visible. */
 const HALLIDAY_WIDGET_Z_INDEX = 1_000_000;
+const HALLIDAY_HEADER_TITLE = "Buy GHO";
 
 export type HallidayOnrampProps = {
   hallidayApiKey: string | null;
@@ -65,16 +62,6 @@ export function HallidayOnramp({
     );
   }, [smartAccountClient, destinationAddress]);
 
-  const inputListLabel = useMemo(
-    () => formatHallidayInputList(hallidayInputAssets),
-    [hallidayInputAssets],
-  );
-
-  const headerTitle = useMemo(
-    () => buildHallidayHeaderTitle(hallidayInputAssets),
-    [hallidayInputAssets],
-  );
-
   const baseParams = useMemo(
     () => ({
       apiKey: hallidayApiKey ?? "",
@@ -83,7 +70,7 @@ export function HallidayOnramp({
       sandbox: hallidaySandbox,
       windowType: "MODAL" as const,
       destinationAddress: destinationAddress ?? undefined,
-      headerTitle,
+      headerTitle: HALLIDAY_HEADER_TITLE,
       customStyles: {
         zIndex: HALLIDAY_WIDGET_Z_INDEX,
         backgroundStyle: "BLUR" as const,
@@ -99,7 +86,6 @@ export function HallidayOnramp({
       hallidayInputAssets,
       hallidayOutputAsset,
       hallidaySandbox,
-      headerTitle,
       destinationAddress,
       userWallet,
       openAuthModal,
@@ -157,8 +143,7 @@ export function HallidayOnramp({
             Fund on Lens Chain
           </h3>
           <p className="text-sm text-muted-foreground">
-            Buy GHO on Lens with {inputListLabel} (debit/credit via
-            Halliday) — destination{" "}
+            Buy GHO on Lens with debit/credit via Halliday — destination{" "}
             {destinationAddress
               ? `${destinationAddress.slice(0, 6)}…${destinationAddress.slice(-4)}`
               : "connect wallet"}
@@ -185,17 +170,8 @@ export function HallidayOnramp({
       )}
 
       <p className="mt-3 text-xs text-muted-foreground">
-        {hallidayInputAssets.length > 0 ? (
-          <>
-            Opens Halliday checkout with {inputListLabel} pre-selected. Use a card or
-            bank in the widget to receive GHO at your Lens destination.
-          </>
-        ) : (
-          <>
-            Opens Halliday checkout. Use a card or bank in the widget to receive GHO at
-            your Lens destination.
-          </>
-        )}
+        Opens Halliday checkout. Pay by card or bank in the widget to receive GHO at
+        your Lens destination.
       </p>
     </div>
   );
