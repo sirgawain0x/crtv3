@@ -45,6 +45,7 @@ export function SongchainPageClient({ config }: SongchainPageClientProps) {
         <HallidayOnramp
           hallidayApiKey={config.hallidayApiKey}
           hallidayOutputAsset={config.hallidayOutputAsset}
+          hallidayInputAssets={config.hallidayInputAssets}
           hallidaySandbox={config.hallidaySandbox}
         />
       </div>

@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  buildHallidayInputAssets,
   buildHallidayOutputAsset,
+  HALLIDAY_DEFAULT_INPUT_ASSET,
   isHallidaySandboxEnabled,
   LENS_GHO_TOKEN_ADDRESS,
 } from './halliday';
@@ -25,6 +27,24 @@ describe('buildHallidayOutputAsset', () => {
   it('respects full output asset override', () => {
     process.env.NEXT_PUBLIC_HALLIDAY_OUTPUT_ASSET = 'lens:0xabc';
     expect(buildHallidayOutputAsset('mainnet')).toBe('lens:0xabc');
+  });
+});
+
+describe('buildHallidayInputAssets', () => {
+  const env = process.env;
+
+  afterEach(() => {
+    process.env = { ...env };
+  });
+
+  it('defaults to USD for fiat onramp', () => {
+    delete process.env.NEXT_PUBLIC_HALLIDAY_INPUT_ASSET;
+    expect(buildHallidayInputAssets()).toEqual([HALLIDAY_DEFAULT_INPUT_ASSET]);
+  });
+
+  it('supports comma-separated input overrides', () => {
+    process.env.NEXT_PUBLIC_HALLIDAY_INPUT_ASSET = 'USD, EUR';
+    expect(buildHallidayInputAssets()).toEqual(['USD', 'EUR']);
   });
 });
 
