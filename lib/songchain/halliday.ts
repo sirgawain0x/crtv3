@@ -58,10 +58,25 @@ export function buildHallidayInputAssets(): string[] {
     'HALLIDAY_INPUT_ASSET',
   );
   if (override) {
-    return override
+    const assets = override
       .split(',')
       .map((value) => value.trim())
       .filter(Boolean);
+    if (assets.length > 0) {
+      return assets;
+    }
   }
   return [...HALLIDAY_DEFAULT_INPUT_ASSETS];
+}
+
+/** Comma-separated label for configured fiat inputs (e.g. `USD, EUR`). */
+export function formatHallidayInputList(assets: string[]): string {
+  return assets.join(', ');
+}
+
+/** Halliday modal header reflecting configured pay currencies. */
+export function buildHallidayHeaderTitle(assets: string[]): string {
+  return assets.length > 0
+    ? `Buy GHO with ${formatHallidayInputList(assets)}`
+    : 'Buy GHO';
 }

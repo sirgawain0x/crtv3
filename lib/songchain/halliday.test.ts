@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  buildHallidayHeaderTitle,
   buildHallidayInputAssets,
   buildHallidayOutputAsset,
   HALLIDAY_DEFAULT_INPUT_ASSETS,
@@ -45,6 +46,21 @@ describe('buildHallidayInputAssets', () => {
   it('supports comma-separated input overrides', () => {
     process.env.NEXT_PUBLIC_HALLIDAY_INPUT_ASSET = 'USD, EUR';
     expect(buildHallidayInputAssets()).toEqual(['USD', 'EUR']);
+  });
+
+  it('falls back to defaults when override is only whitespace or commas', () => {
+    process.env.NEXT_PUBLIC_HALLIDAY_INPUT_ASSET = ' , , ';
+    expect(buildHallidayInputAssets()).toEqual([...HALLIDAY_DEFAULT_INPUT_ASSETS]);
+  });
+});
+
+describe('buildHallidayHeaderTitle', () => {
+  it('lists configured fiat currencies', () => {
+    expect(buildHallidayHeaderTitle(['USD', 'EUR'])).toBe('Buy GHO with USD, EUR');
+  });
+
+  it('uses generic title when no inputs', () => {
+    expect(buildHallidayHeaderTitle([])).toBe('Buy GHO');
   });
 });
 
