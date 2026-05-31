@@ -179,25 +179,27 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
     if (!session?.accessToken || !walletAddress || !lensAccount) return;
     if (linkStatus === 'linked' || linkStatus === 'needs_wallet') return;
 
-    let cancelled = false;
+    const controller = new AbortController();
     (async () => {
       try {
         const res = await fetch(
           `/api/creator-profiles?owner=${encodeURIComponent(walletAddress)}`,
+          { signal: controller.signal },
         );
         const json = await res.json();
-        if (cancelled || !json?.success || !json.data?.lens_account_id) return;
+        if (!json?.success || !json.data?.lens_account_id) return;
         const storedLens = String(json.data.lens_account_id).toLowerCase();
         if (storedLens === lensAccount.toLowerCase()) {
           setLinkStatus('linked');
         }
-      } catch {
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
         // Non-fatal: user can still use Sync profile / Link Orb
       }
     })();
 
     return () => {
-      cancelled = true;
+      controller.abort();
     };
   }, [session?.accessToken, walletAddress, lensAccount, linkStatus]);
 
