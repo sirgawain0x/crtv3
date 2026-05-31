@@ -12,6 +12,7 @@ import { publicClient } from "@/lib/sdk/lens/client";
 import { Button } from "@/components/ui/button";
 import { Loader2, Users } from "lucide-react";
 import { useLensOrbWrite } from "@/hooks/useLensOrbWrite";
+import { clearStaleOrbSessionIfNeeded } from "@/lib/sdk/orb/session-errors";
 import { toast } from "sonner";
 
 type SongchainGroupPanelProps = {
@@ -33,7 +34,11 @@ export function SongchainGroupPanel({ groupId }: SongchainGroupPanelProps) {
     try {
       let client: AnyClient = publicClient;
       if (canWrite) {
-        client = await getSessionClient();
+        try {
+          client = await getSessionClient();
+        } catch (err) {
+          if (!clearStaleOrbSessionIfNeeded(err)) throw err;
+        }
       }
 
       const groupResult = await fetchGroup(client, {

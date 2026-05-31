@@ -1,5 +1,6 @@
 import { createOrbLogin, type OrbLogin } from '@orbclub/modules/auth';
 import { getOrbLoginConfig } from '@/lib/sdk/orb/config';
+import { clearLensSessionCache } from '@/lib/sdk/lens/orb-session-client';
 
 let orbLoginSingleton: OrbLogin | null = null;
 
@@ -80,4 +81,10 @@ export function saveStoredOrbSession(session: StoredOrbSession | null): void {
   }
   invalidateOrbSessionCache();
   notifyOrbSessionChange();
+}
+
+/** Drops Orb tokens and cached Lens session clients (e.g. revoked refresh). */
+export function clearStoredOrbSession(): void {
+  clearLensSessionCache();
+  saveStoredOrbSession(null);
 }

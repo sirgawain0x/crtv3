@@ -5,6 +5,7 @@ import {
 } from '@lens-protocol/storage';
 import type { AccessToken, IdToken, RefreshToken } from '@lens-protocol/types';
 import type { StoredOrbSession } from '@/lib/sdk/orb/login';
+import { isStaleOrbSessionError } from '@/lib/sdk/orb/session-errors';
 
 function getLensEnvironment() {
   return process.env.NEXT_PUBLIC_LENS_ENV === 'production' ? mainnet : testnet;
@@ -62,7 +63,11 @@ export async function resumeLensSessionFromOrb(
 
     const resumeResult = await publicClient.resumeSession();
     if (resumeResult.isErr()) {
-      throw new Error(resumeResult.error.message);
+      const message = resumeResult.error.message;
+      if (isStaleOrbSessionError(message)) {
+        sessionCache.delete(cacheKey);
+      }
+      throw new Error(message);
     }
 
     return resumeResult.value;

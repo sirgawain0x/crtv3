@@ -15,13 +15,14 @@ import {
   getOrbLogin,
   loadStoredOrbSession,
   saveStoredOrbSession,
+  clearStoredOrbSession,
   subscribeOrbSession,
   getOrbSessionServerSnapshot,
   type StoredOrbSession,
 } from '@/lib/sdk/orb/login';
 import { useWalletAuth } from '@/lib/auth/useWalletAuth';
 import { formatOrbAuthError } from '@/lib/sdk/orb/format-auth-error';
-import { clearLensSessionCache } from '@/lib/sdk/lens/orb-session-client';
+import { isStaleOrbSessionError } from '@/lib/sdk/orb/session-errors';
 import { toast } from 'sonner';
 
 export type OrbLinkStatus = 'idle' | 'linked' | 'needs_wallet' | 'failed';
@@ -76,6 +77,20 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
     saveStoredOrbSession(next);
   }, []);
 
+  const invalidateOrbSession = useCallback(
+    (options?: { notify?: boolean }) => {
+      clearStoredOrbSession();
+      setLoginError(null);
+      setLinkStatus('idle');
+      if (options?.notify !== false) {
+        toast.info(
+          'Your Orb session ended. Sign in again to like posts and join groups.',
+        );
+      }
+    },
+    [],
+  );
+
   const bumpAccountMenuRefresh = useCallback(() => {
     setAccountMenuRefreshSignal((n) => n + 1);
   }, []);
@@ -88,7 +103,10 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
         refreshToken: session.refreshToken,
         authenticationId: session.authenticationId,
       });
-      if (!synced?.accessToken) return null;
+      if (!synced?.accessToken) {
+        invalidateOrbSession();
+        return null;
+      }
       const stored: StoredOrbSession = {
         accessToken: synced.accessToken,
         refreshToken: synced.refreshToken ?? session.refreshToken,
@@ -97,10 +115,27 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
       };
       persistSession(stored);
       return stored;
-    } catch {
+    } catch (err) {
+      if (isStaleOrbSessionError(err)) {
+        invalidateOrbSession();
+        return null;
+      }
       return session;
     }
-  }, [session, orb, persistSession]);
+  }, [session, orb, persistSession, invalidateOrbSession]);
+
+  /** Reset link UI when tokens were cleared outside this provider (e.g. Songchain feed). */
+  useEffect(() => {
+    if (!session?.accessToken && linkStatus === 'linked') {
+      setLinkStatus('idle');
+    }
+  }, [session?.accessToken, linkStatus]);
+
+  /** Clear revoked/expired Orb tokens so Songchain and feeds stay read-only instead of erroring. */
+  useEffect(() => {
+    if (!session?.accessToken) return;
+    void syncSession();
+  }, [session?.accessToken, syncSession]);
 
   const linkProfile = useCallback(
     async (ownerAddress?: string) => {
@@ -253,12 +288,11 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
         // still clear local session
       }
     }
-    persistSession(null);
-    clearLensSessionCache();
+    clearStoredOrbSession();
     setLoginError(null);
     setLinkStatus('idle');
     toast.success('Signed out of Orb');
-  }, [session, orb, persistSession]);
+  }, [session, orb]);
 
   const openLoginModal = useCallback(() => {
     if (!hasWallet) {
