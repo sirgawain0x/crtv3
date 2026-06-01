@@ -26,8 +26,8 @@ export function HallidayOnramp({
 }: HallidayOnrampProps) {
   const { openAuthModal } = useAuthModal();
   const user = useUser();
-  const { client: smartAccountClient, address: smartAccountAddress } =
-    useSmartAccountClient({});
+  const { client: smartAccountClient, address: smartAccountAddress } = 
+    useSmartAccountClient();
   const { lensAccount } = useLensOrbWrite();
 
   const [error, setError] = useState<string | null>(null);
