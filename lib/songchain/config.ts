@@ -5,6 +5,7 @@ import {
   LENS_GHO_TOKEN_ADDRESS,
 } from '@/lib/songchain/halliday';
 import { getLensNetwork } from '@/lib/sdk/lens/chains';
+import { normalizeLensPrimitiveId } from '@/lib/sdk/lens/primitive-id';
 
 export type SongchainConfig = {
   enabled: boolean;
@@ -27,10 +28,9 @@ function readEnv(...keys: string[]): string | null {
   return null;
 }
 
-function readAddressEnv(...keys: string[]): string | null {
+function readLensPrimitiveEnv(...keys: string[]): string | null {
   const value = readEnv(...keys);
-  if (!value) return null;
-  return value.toLowerCase();
+  return normalizeLensPrimitiveId(value);
 }
 
 /**
@@ -41,15 +41,15 @@ function readAddressEnv(...keys: string[]): string | null {
  * components should receive the result via props instead of calling this directly.
  */
 export function getSongchainConfig(): SongchainConfig {
-  const publicFeedId = readAddressEnv(
+  const publicFeedId = readLensPrimitiveEnv(
     'NEXT_PUBLIC_SONGCHAIN_FEED_ID',
     'SONGCHAIN_FEED_ID',
   );
-  const exclusiveFeedId = readAddressEnv(
+  const exclusiveFeedId = readLensPrimitiveEnv(
     'NEXT_PUBLIC_SONGCHAIN_EXCLUSIVE_FEED_ID',
     'SONGCHAIN_EXCLUSIVE_FEED_ID',
   );
-  const groupId = readAddressEnv(
+  const groupId = readLensPrimitiveEnv(
     'NEXT_PUBLIC_SONGCHAIN_GROUP_ID',
     'SONGCHAIN_GROUP_ID',
   );

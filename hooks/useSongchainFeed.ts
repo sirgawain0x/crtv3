@@ -8,6 +8,10 @@ import type { AnyPost } from '@lens-protocol/graphql';
 import { publicClient } from '@/lib/sdk/lens/client';
 import { useLensOrbWrite } from '@/hooks/useLensOrbWrite';
 import { clearStaleOrbSessionIfNeeded } from '@/lib/sdk/orb/session-errors';
+import {
+  extractLensContractAddress,
+  getLensContractAddressError,
+} from '@/lib/sdk/lens/primitive-id';
 
 type UseSongchainFeedOptions = {
   feedId: string | null;
@@ -26,6 +30,15 @@ export function useSongchainFeed({ feedId, enabled = true }: UseSongchainFeedOpt
     async (mode: 'replace' | 'append') => {
       if (!feedId || !enabled) return;
 
+      const feedAddress = extractLensContractAddress(feedId);
+      if (!feedAddress) {
+        setPosts([]);
+        cursorRef.current = null;
+        setHasMore(false);
+        setError(getLensContractAddressError(feedId, 'Feed contract ID'));
+        return;
+      }
+
       setLoading(true);
       setError(null);
       try {
@@ -41,7 +54,7 @@ export function useSongchainFeed({ feedId, enabled = true }: UseSongchainFeedOpt
 
         const result = await fetchPosts(client, {
           filter: {
-            feeds: [{ feed: evmAddress(feedId) }],
+            feeds: [{ feed: evmAddress(feedAddress) }],
           },
           cursor: mode === 'append' ? (cursorRef.current ?? undefined) : undefined,
         });
@@ -77,6 +90,7 @@ export function useSongchainFeed({ feedId, enabled = true }: UseSongchainFeedOpt
       setPosts([]);
       cursorRef.current = null;
       setHasMore(false);
+      setError(null);
       return;
     }
     cursorRef.current = null;

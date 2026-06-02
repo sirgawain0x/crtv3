@@ -1,0 +1,28 @@
+import { describe, expect, it } from 'vitest';
+import {
+  extractLensContractAddress,
+  getLensContractAddressError,
+  normalizeLensPrimitiveId,
+} from './primitive-id';
+
+describe('Lens primitive IDs', () => {
+  it('extracts lowercase contract addresses from Lens-style IDs', () => {
+    expect(
+      extractLensContractAddress(
+        'lens:0xAbC0000000000000000000000000000000000001',
+      ),
+    ).toBe('0xabc0000000000000000000000000000000000001');
+    expect(
+      normalizeLensPrimitiveId(
+        'https://developer.lens.xyz/contracts/0xDeF0000000000000000000000000000000000002',
+      ),
+    ).toBe('0xdef0000000000000000000000000000000000002');
+  });
+
+  it('reports IDs that do not include a contract address', () => {
+    expect(extractLensContractAddress('creative-feed')).toBeNull();
+    expect(getLensContractAddressError('creative-feed', 'Feed contract ID')).toContain(
+      '0x contract address',
+    );
+  });
+});
