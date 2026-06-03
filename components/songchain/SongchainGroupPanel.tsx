@@ -38,7 +38,7 @@ export function SongchainGroupPanel({ groupId }: SongchainGroupPanelProps) {
           client = await getSessionClient();
         } catch (err) {
           clearStaleOrbSessionIfNeeded(err);
-          client = publicClient;
+          client = createLensClient();
         }
       }
 

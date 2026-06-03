@@ -49,7 +49,7 @@ export function useSongchainFeed({ feedId, enabled = true }: UseSongchainFeedOpt
           } catch (err) {
             clearStaleOrbSessionIfNeeded(err);
             // Always fall back to read-only public client for feed browsing.
-            client = publicClient;
+            client = createLensClient();
           }
         }
 
