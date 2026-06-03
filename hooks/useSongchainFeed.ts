@@ -5,7 +5,7 @@ import type { AnyClient } from '@lens-protocol/client';
 import { fetchPosts } from '@lens-protocol/client/actions';
 import { evmAddress } from '@lens-protocol/types';
 import type { AnyPost } from '@lens-protocol/graphql';
-import { publicClient } from '@/lib/sdk/lens/client';
+import { createLensClient } from '@/lib/sdk/lens/create-client';
 import { useLensOrbWrite } from '@/hooks/useLensOrbWrite';
 import { clearStaleOrbSessionIfNeeded } from '@/lib/sdk/orb/session-errors';
 import {
@@ -42,7 +42,7 @@ export function useSongchainFeed({ feedId, enabled = true }: UseSongchainFeedOpt
       setLoading(true);
       setError(null);
       try {
-        let client: AnyClient = publicClient;
+        let client: AnyClient = createLensClient();
         if (canWrite) {
           try {
             client = await getSessionClient();

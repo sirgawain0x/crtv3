@@ -8,7 +8,7 @@ import {
   joinGroup,
 } from "@lens-protocol/client/actions";
 import { evmAddress } from "@lens-protocol/types";
-import { publicClient } from "@/lib/sdk/lens/client";
+import { createLensClient } from "@/lib/sdk/lens/create-client";
 import { Button } from "@/components/ui/button";
 import { Loader2, Users } from "lucide-react";
 import { useLensOrbWrite } from "@/hooks/useLensOrbWrite";
@@ -32,7 +32,7 @@ export function SongchainGroupPanel({ groupId }: SongchainGroupPanelProps) {
     if (!groupId) return;
     setLoading(true);
     try {
-      let client: AnyClient = publicClient;
+      let client: AnyClient = createLensClient();
       if (canWrite) {
         try {
           client = await getSessionClient();
