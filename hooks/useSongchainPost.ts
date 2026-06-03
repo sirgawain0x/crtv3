@@ -5,6 +5,7 @@ import { textOnly } from "@lens-protocol/metadata";
 import { post } from "@lens-protocol/client/actions";
 import { evmAddress, uri } from "@lens-protocol/client";
 import { groveService } from "@/lib/sdk/grove/service";
+import { clearStaleOrbSessionIfNeeded } from "@/lib/sdk/orb/session-errors";
 import { useLensOrbWrite } from "@/hooks/useLensOrbWrite";
 import { toast } from "sonner";
 
@@ -60,6 +61,7 @@ export function useSongchainPost() {
         toast.success("Posted to Songchain feed!");
         return true;
       } catch (err) {
+        clearStaleOrbSessionIfNeeded(err);
         toast.error(err instanceof Error ? err.message : "Posting failed");
         return false;
       } finally {

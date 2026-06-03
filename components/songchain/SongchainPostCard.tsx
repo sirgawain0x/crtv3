@@ -38,25 +38,31 @@ import { resolveOrbMediaUrl } from "@/lib/sdk/orb/media";
 import { publicClient } from "@/lib/sdk/lens/client";
 import { useLensOrbWrite } from "@/hooks/useLensOrbWrite";
 import { groveService } from "@/lib/sdk/grove/service";
+import { clearStaleOrbSessionIfNeeded } from "@/lib/sdk/orb/session-errors";
 import { SongchainAuthorTimeline } from "@/components/songchain/SongchainAuthorTimeline";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils/utils";
 
-function resolvePost(post: AnyPost) {
-  return post.__typename === "Repost" ? post.repostOf : post;
+function resolvePost(post: AnyPost): AnyPost | null {
+  if (post.__typename === "Repost") {
+    return post.repostOf ?? null;
+  }
+  return post;
 }
 
 function postText(post: AnyPost): string {
-  const meta = resolvePost(post).metadata;
-  if (!meta) return "";
+  const resolved = resolvePost(post);
+  if (!resolved || !("metadata" in resolved) || !resolved.metadata) return "";
+  const meta = resolved.metadata;
   if ("content" in meta && typeof meta.content === "string") return meta.content;
   if ("title" in meta && typeof meta.title === "string") return meta.title;
   return "";
 }
 
 function postImage(post: AnyPost): string | null {
-  const meta = resolvePost(post).metadata;
-  if (!meta) return null;
+  const resolved = resolvePost(post);
+  if (!resolved || !("metadata" in resolved) || !resolved.metadata) return null;
+  const meta = resolved.metadata;
   if ("image" in meta && meta.image?.item) {
     return resolveOrbMediaUrl(String(meta.image.item));
   }
@@ -97,25 +103,47 @@ export function SongchainPostCard({
   const [bookmarked, setBookmarked] = useState(false);
 
   const content = resolvePost(post);
-  const ops = "operations" in content ? content.operations : null;
+  const ops =
+    content != null && "operations" in content ? content.operations : null;
   const hasReacted =
     ops != null && "hasReacted" in ops && ops.hasReacted === true;
   const [upvoted, setUpvoted] = useState(hasReacted);
   const imageUrl = postImage(post);
-  const reactions = content.stats?.upvotes ?? 0;
+  const reactions =
+    content != null && "stats" in content ? (content.stats?.upvotes ?? 0) : 0;
   const isOwner =
     !!lensAccount &&
+    !!content &&
     content.author.address.toLowerCase() === lensAccount.toLowerCase();
 
   useEffect(() => {
     setUpvoted(hasReacted);
-  }, [hasReacted, content.id]);
+  }, [hasReacted, content?.id]);
 
   useEffect(() => {
     if (ops && "hasBookmarked" in ops) {
       setBookmarked(Boolean(ops.hasBookmarked));
     }
-  }, [ops, content.id]);
+  }, [ops, content?.id]);
+
+  const loadComments = useCallback(async () => {
+    if (!content) return;
+    try {
+      const result = await fetchPostReferences(publicClient, {
+        referencedPost: postId(content.id),
+        referenceTypes: [PostReferenceType.CommentOn],
+      });
+      if (result.isOk()) setComments([...result.value.items]);
+    } catch {
+      // Non-fatal
+    }
+  }, [content]);
+
+  useEffect(() => {
+    if (showComments) void loadComments();
+  }, [showComments, loadComments]);
+
+  if (!content) return null;
 
   const withWrite = async (
     action: string,
@@ -130,6 +158,7 @@ export function SongchainPostCard({
       await fn();
       onReactionChange?.();
     } catch (err) {
+      clearStaleOrbSessionIfNeeded(err);
       toast.error(err instanceof Error ? err.message : "Action failed");
     } finally {
       setPending(null);
@@ -169,22 +198,6 @@ export function SongchainPostCard({
       if (result.isErr()) throw new Error(result.error.message);
       toast.success("Reposted");
     });
-
-  const loadComments = useCallback(async () => {
-    try {
-      const result = await fetchPostReferences(publicClient, {
-        referencedPost: postId(content.id),
-        referenceTypes: [PostReferenceType.CommentOn],
-      });
-      if (result.isOk()) setComments([...result.value.items]);
-    } catch {
-      // Non-fatal
-    }
-  }, [content.id]);
-
-  useEffect(() => {
-    if (showComments) void loadComments();
-  }, [showComments, loadComments]);
 
   const submitComment = () =>
     void withWrite("comment", async () => {
