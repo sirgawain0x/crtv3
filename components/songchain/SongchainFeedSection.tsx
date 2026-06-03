@@ -9,12 +9,14 @@ type SongchainFeedSectionProps = {
   title: string;
   description: string;
   feedId: string | null;
+  emptyDescription: string;
 };
 
 export function SongchainFeedSection({
   title,
   description,
   feedId,
+  emptyDescription,
 }: SongchainFeedSectionProps) {
   const { posts, loading, error, hasMore, reload, loadMore } = useSongchainFeed({
     feedId,
@@ -50,7 +52,10 @@ export function SongchainFeedSection({
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
       ) : posts.length === 0 ? (
-        <p className="text-center text-muted-foreground py-12">No posts in this feed yet.</p>
+        <div className="mx-auto max-w-2xl rounded-lg border border-dashed border-border/60 p-8 text-center">
+          <p className="font-medium text-foreground">No posts found in this feed yet.</p>
+          <p className="mt-2 text-sm text-muted-foreground">{emptyDescription}</p>
+        </div>
       ) : (
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {posts.map((post) => (
