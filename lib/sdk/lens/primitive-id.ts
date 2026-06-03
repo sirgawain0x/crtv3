@@ -1,4 +1,4 @@
-const EVM_ADDRESS_PATTERN = /0x[a-fA-F0-9]{40}/;
+const EVM_ADDRESS_PATTERN = /\b0x[a-fA-F0-9]{40}\b/;
 
 export function extractLensContractAddress(
   value: string | null | undefined,

@@ -24,5 +24,10 @@ describe('Lens primitive IDs', () => {
     expect(getLensContractAddressError('creative-feed', 'Feed contract ID')).toContain(
       '0x contract address',
     );
+    expect(
+      extractLensContractAddress(
+        'lens:0xAbC00000000000000000000000000000000000012345',
+      ),
+    ).toBeNull();
   });
 });
