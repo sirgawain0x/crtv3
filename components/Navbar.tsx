@@ -35,6 +35,7 @@ import {
   RadioTower,
   Bot,
   ShieldUser,
+  Music2,
   TrendingUp,
 } from "lucide-react";
 import type { User as AccountUser } from "@account-kit/signer";
@@ -49,6 +50,8 @@ import {
 } from "@/components/account-dropdown/AccountDropdown";
 import { MobileOrbSection } from "@/components/account-dropdown/MobileOrbSection";
 import { useOrbSession } from "@/context/OrbSessionContext";
+import { useUnifiedLogout } from "@/hooks/useUnifiedLogout";
+import { resetAppSession } from "@/lib/auth/session-recovery";
 import { shortenAddress } from "@/lib/utils/utils";
 import { useMembershipVerification } from "@/lib/hooks/unlock/useMembershipVerification";
 import { useMeTokensSupabase } from "@/lib/hooks/metokens/useMeTokensSupabase";
@@ -161,7 +164,9 @@ function NetworkStatus({ isConnected }: { isConnected: boolean }) {
 export default function Navbar() {
   const { openAuthModal } = useAuthModal();
   const user = useUser();
-  const { logout } = useLogout();
+  const { logout: walletLogout } = useLogout();
+  const unifiedLogout = useUnifiedLogout();
+  const { logout: orbLogout } = useOrbSession();
   const { chain: currentChain, setChain, isSettingChain } = useChain();
   const { account: modularAccount } = useModularAccount();
   const [displayAddress, setDisplayAddress] = useState<string>("");
@@ -188,8 +193,6 @@ export default function Navbar() {
   }, [modularAccount?.address, user?.address]);
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { isAuthenticated: isOrbAuthenticated, accountMenuRefreshSignal } =
-    useOrbSession();
   const accountDropdownRef = useRef<AccountDropdownHandle>(null);
   const [copySuccess, setCopySuccess] = useState(false);
   const [currentChainName, setCurrentChainName] = useState(currentChain.name);
@@ -201,12 +204,6 @@ export default function Navbar() {
     logger.debug("Current Chain ID:", currentChain.id);
     setCurrentChainName(currentChain?.name || "Unknown Chain");
   }, [currentChain]);
-
-  // Surface Orb / Lens linked state in the mobile account menu after sign-in.
-  useEffect(() => {
-    if (!accountMenuRefreshSignal || !isOrbAuthenticated) return;
-    setIsMenuOpen(true);
-  }, [accountMenuRefreshSignal, isOrbAuthenticated]);
 
   // Add scroll effect for sticky navbar
   useEffect(() => {
@@ -454,6 +451,22 @@ export default function Navbar() {
               {/* Navigation Links */}
               <nav className="grid grid-flow-row gap-2 auto-rows-max text-sm pb-4 border-b border-gray-200 dark:border-gray-700">
                 <Link
+                  href="/"
+                  className={mobileNavLinkClass}
+                  onClick={handleLinkClick}
+                  id="mobile-nav-home-link"
+                >
+                  Home
+                </Link>
+                <Link
+                  href="/songchain"
+                  className={mobileNavLinkClass}
+                  onClick={handleLinkClick}
+                  id="mobile-nav-songchain-link"
+                >
+                  <Music2 className="mr-2 h-4 w-4" /> Songchain
+                </Link>
+                <Link
                   href="/discover"
                   className={mobileNavLinkClass}
                   onClick={handleLinkClick}
@@ -637,10 +650,10 @@ export default function Navbar() {
                     )}
 
                     {/* Logout Button */}
-                    <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 space-y-2">
                       <button
                         onClick={() => {
-                          logout();
+                          void unifiedLogout();
                           setIsMenuOpen(false);
                         }}
                         className="flex w-full items-center rounded-md p-2 text-sm font-medium
@@ -648,6 +661,21 @@ export default function Navbar() {
                       >
                         <LogOut className="mr-2 h-4 w-4" />
                         Logout
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void resetAppSession({
+                            walletLogout: async () => {
+                              await walletLogout();
+                            },
+                            orbLogout,
+                          });
+                        }}
+                        className="flex w-full items-center rounded-md p-2 text-xs font-medium
+                            text-muted-foreground hover:bg-muted transition-colors"
+                      >
+                        Reset session (fix login loops)
                       </button>
                     </div>
                   </>

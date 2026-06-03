@@ -5,15 +5,24 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SongchainOrbConnect } from "@/components/songchain/SongchainOrbConnect";
 import { SongchainFeedSection } from "@/components/songchain/SongchainFeedSection";
 import { SongchainGroupPanel } from "@/components/songchain/SongchainGroupPanel";
+import { SongchainComposePost } from "@/components/songchain/SongchainComposePost";
+import { SongchainBookmarksSection } from "@/components/songchain/SongchainBookmarksSection";
+import { SongchainLensAdvancedPanel } from "@/components/songchain/SongchainLensAdvancedPanel";
 import { HallidayOnramp } from "@/components/songchain/HallidayOnramp";
 import type { SongchainConfig } from "@/lib/songchain/config";
 import { Music2 } from "lucide-react";
+import { useCallback, useState } from "react";
 
 type SongchainPageClientProps = {
   config: SongchainConfig;
 };
 
 export function SongchainPageClient({ config }: SongchainPageClientProps) {
+  const [feedRefreshKey, setFeedRefreshKey] = useState(0);
+  const bumpFeedRefresh = useCallback(() => {
+    setFeedRefreshKey((k) => k + 1);
+  }, []);
+
   return (
     <div className="mx-auto w-full max-w-7xl py-10 px-4 sm:px-6">
       <nav className="mb-6 text-sm text-muted-foreground">
@@ -51,22 +60,33 @@ export function SongchainPageClient({ config }: SongchainPageClientProps) {
       </div>
 
       <Tabs defaultValue="feed" className="space-y-8">
-        <TabsList>
+        <TabsList className="flex flex-wrap h-auto gap-1">
           <TabsTrigger value="feed">Feed</TabsTrigger>
           <TabsTrigger value="exclusive">Exclusive</TabsTrigger>
           <TabsTrigger value="group">Group</TabsTrigger>
+          <TabsTrigger value="bookmarks">Bookmarks</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="feed">
+        <TabsContent value="feed" className="space-y-6">
+          <SongchainComposePost
+            feedId={config.publicFeedId}
+            onPosted={bumpFeedRefresh}
+          />
           <SongchainFeedSection
+            key={`public-${feedRefreshKey}`}
             title="Songchain feed"
             description="Posts from the main Songchain Lens feed (Orb)."
             feedId={config.publicFeedId}
           />
         </TabsContent>
 
-        <TabsContent value="exclusive">
+        <TabsContent value="exclusive" className="space-y-6">
+          <SongchainComposePost
+            feedId={config.exclusiveFeedId}
+            onPosted={bumpFeedRefresh}
+          />
           <SongchainFeedSection
+            key={`exclusive-${feedRefreshKey}`}
             title="Exclusive feed"
             description="Members-only drops and announcements on Lens."
             feedId={config.exclusiveFeedId}
@@ -76,7 +96,13 @@ export function SongchainPageClient({ config }: SongchainPageClientProps) {
         <TabsContent value="group">
           <SongchainGroupPanel groupId={config.groupId} />
         </TabsContent>
+
+        <TabsContent value="bookmarks">
+          <SongchainBookmarksSection />
+        </TabsContent>
       </Tabs>
+
+      <SongchainLensAdvancedPanel className="mt-10" />
 
       {!config.enabled && (
         <p className="mt-10 text-center text-sm text-muted-foreground">
@@ -84,7 +110,8 @@ export function SongchainPageClient({ config }: SongchainPageClientProps) {
           <code className="text-xs">NEXT_PUBLIC_SONGCHAIN_FEED_ID</code>,{" "}
           <code className="text-xs">NEXT_PUBLIC_SONGCHAIN_EXCLUSIVE_FEED_ID</code>, and{" "}
           <code className="text-xs">NEXT_PUBLIC_SONGCHAIN_GROUP_ID</code> with your Lens
-          primitives, then redeploy if you added them after the last build.
+          primitives, then redeploy if you added them after the last build. See{" "}
+          <code className="text-xs">env.example</code> in the repo.
         </p>
       )}
     </div>
