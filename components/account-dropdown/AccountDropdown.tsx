@@ -31,12 +31,12 @@ import {
 } from "react";
 import {
   useAuthModal,
-  useLogout,
   useUser,
   useChain,
   useSmartAccountClient,
   useSendUserOperation,
 } from "@account-kit/react";
+import { useUnifiedLogout } from "@/hooks/useUnifiedLogout";
 import { base } from "@account-kit/infra";
 import { Button } from "@/components/ui/button";
 import {
@@ -274,7 +274,7 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
     accountMenuRefreshSignal,
   } = useOrbSession();
   const user = useUser();
-  const { logout } = useLogout();
+  const unifiedLogout = useUnifiedLogout();
   const { chain, setChain, isSettingChain } = useChain();
   const [displayAddress, setDisplayAddress] = useState<string>("");
   const [isNetworkConnected, setIsNetworkConnected] = useState(true);
@@ -1674,7 +1674,7 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
               <DropdownMenuItem
                 onClick={async () => {
                   try {
-                    await logout();
+                    await unifiedLogout();
                     logger.debug('Logged out successfully');
                     // Small delay to ensure logout completes
                     setTimeout(() => {

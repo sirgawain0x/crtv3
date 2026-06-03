@@ -8,7 +8,7 @@ import { useOrbSession } from "@/context/OrbSessionContext";
 import { video, MediaVideoMimeType, MetadataLicenseType } from "@lens-protocol/metadata";
 import { groveService } from "@/lib/sdk/grove/service";
 import { post } from "@lens-protocol/client/actions";
-import { uri, SessionClient } from "@lens-protocol/client";
+import { uri, SessionClient, evmAddress } from "@lens-protocol/client";
 import { WalletClient } from "viem";
 import { toast } from "sonner";
 
@@ -18,6 +18,8 @@ export interface CreatePostParams {
   title?: string;
   coverUrl?: string;
   mimeType?: MediaVideoMimeType;
+  /** Custom Lens feed address; posts appear in fetchPosts for that feed. */
+  feedId?: string;
 }
 
 export interface UseLensReturn {
@@ -98,6 +100,7 @@ export function useLens(): UseLensReturn {
       title = "Creative TV Video",
       coverUrl,
       mimeType = MediaVideoMimeType.MP4,
+      feedId,
     }: CreatePostParams) => {
       let activeClient = sessionClient;
       if (!activeClient) {
@@ -134,6 +137,7 @@ export function useLens(): UseLensReturn {
 
         const result = await post(activeClient, {
           contentUri: uri(uploadResult.url),
+          ...(feedId ? { feed: evmAddress(feedId) } : {}),
         });
 
         if (result.isErr()) {

@@ -13,6 +13,8 @@ import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { useOrbSession } from '@/context/OrbSessionContext';
 
+const QR_TIMEOUT_MS = 120_000;
+
 export function OrbLoginModal() {
   const {
     isLoginModalOpen,
@@ -27,29 +29,53 @@ export function OrbLoginModal() {
   const [deepLink, setDeepLink] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
+  const [timedOut, setTimedOut] = useState(false);
   const startedRef = useRef(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const displayError = localError ?? loginError;
+  const displayError =
+    localError ??
+    loginError ??
+    (timedOut ? 'QR sign-in timed out. Try again or cancel.' : null);
 
   const resetFlow = useCallback(() => {
     setQrCode(null);
     setDeepLink(null);
     setLocalError(null);
+    setTimedOut(false);
     clearLoginError();
     startedRef.current = false;
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
   }, [clearLoginError]);
 
   const startConnect = useCallback(async () => {
     setIsConnecting(true);
     setLocalError(null);
+    setTimedOut(false);
     clearLoginError();
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => {
+      setTimedOut(true);
+      setIsConnecting(false);
+    }, QR_TIMEOUT_MS);
     try {
       await connectWithQr(({ qrCode: qr, deepLink: link }) => {
         setQrCode(qr);
         setDeepLink(link ?? null);
       });
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : 'Orb sign-in failed');
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
     } finally {
       setIsConnecting(false);
     }
@@ -67,7 +93,7 @@ export function OrbLoginModal() {
       return;
     }
 
-    if (displayError || startedRef.current) return;
+    if ((displayError && !timedOut) || startedRef.current) return;
 
     startedRef.current = true;
     void startConnect();
@@ -78,17 +104,26 @@ export function OrbLoginModal() {
     closeLoginModal,
     resetFlow,
     displayError,
+    timedOut,
     startConnect,
   ]);
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []);
+
+  const handleCancel = () => {
+    resetFlow();
+    closeLoginModal();
+  };
 
   return (
     <Dialog
       open={isLoginModalOpen}
       onOpenChange={(open) => {
-        if (!open) {
-          resetFlow();
-          closeLoginModal();
-        }
+        if (!open) handleCancel();
       }}
     >
       <DialogContent className="sm:max-w-md">
@@ -101,10 +136,10 @@ export function OrbLoginModal() {
         </DialogHeader>
 
         <div className="flex flex-col items-center gap-4 py-2">
-          {isConnecting && !qrCode && (
+          {isConnecting && !qrCode && !displayError && (
             <Loader2 className="h-10 w-10 animate-spin text-muted-foreground" />
           )}
-          {qrCode && (
+          {qrCode && !displayError && (
             <div className="relative h-56 w-56 overflow-hidden rounded-lg border bg-white p-2">
               <Image
                 src={qrCode}
@@ -125,8 +160,8 @@ export function OrbLoginModal() {
           {displayError && (
             <p className="text-center text-sm text-destructive">{displayError}</p>
           )}
-          {displayError && (
-            <div className="flex w-full flex-col gap-2 sm:flex-row">
+          <div className="flex w-full flex-col gap-2 sm:flex-row">
+            {(displayError || qrCode) && (
               <Button
                 className="flex-1"
                 onClick={() => {
@@ -137,18 +172,15 @@ export function OrbLoginModal() {
               >
                 Try again
               </Button>
-              <Button
-                variant="secondary"
-                className="flex-1"
-                onClick={() => {
-                  resetFlow();
-                  closeLoginModal();
-                }}
-              >
-                Close
-              </Button>
-            </div>
-          )}
+            )}
+            <Button
+              variant={displayError || qrCode ? 'secondary' : 'outline'}
+              className="flex-1"
+              onClick={handleCancel}
+            >
+              Cancel
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

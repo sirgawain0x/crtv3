@@ -47,8 +47,9 @@ export function useSongchainFeed({ feedId, enabled = true }: UseSongchainFeedOpt
           try {
             client = await getSessionClient();
           } catch (err) {
-            if (!clearStaleOrbSessionIfNeeded(err)) throw err;
-            // Stale Orb session cleared; keep browsing the feed read-only.
+            clearStaleOrbSessionIfNeeded(err);
+            // Always fall back to read-only public client for feed browsing.
+            client = publicClient;
           }
         }
 

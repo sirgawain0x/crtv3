@@ -37,7 +37,8 @@ export function SongchainGroupPanel({ groupId }: SongchainGroupPanelProps) {
         try {
           client = await getSessionClient();
         } catch (err) {
-          if (!clearStaleOrbSessionIfNeeded(err)) throw err;
+          clearStaleOrbSessionIfNeeded(err);
+          client = publicClient;
         }
       }
 

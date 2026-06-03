@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useMemo } from 'react';
+import { useAuthModal } from '@account-kit/react';
 import { useOrbSession } from '@/context/OrbSessionContext';
 import { resumeLensSessionFromOrb } from '@/lib/sdk/lens/orb-session-client';
 import type { SessionClient } from '@lens-protocol/client';
@@ -27,6 +28,7 @@ export function useLensOrbWrite(): LensOrbWriteAccess {
     hasWallet,
     openLoginModal,
   } = useOrbSession();
+  const { openAuthModal } = useAuthModal();
 
   const canWrite = isAuthenticated && linkStatus === 'linked';
   const needsLink = isAuthenticated && linkStatus !== 'linked';
@@ -44,14 +46,14 @@ export function useLensOrbWrite(): LensOrbWriteAccess {
   }, [canWrite, session, syncSession]);
 
   const promptWriteAccess = useCallback(() => {
+    if (!hasWallet) {
+      openAuthModal();
+      return;
+    }
     if (needsOrbLogin || needsLink) {
-      if (!hasWallet && needsOrbLogin) {
-        openLoginModal();
-        return;
-      }
       openLoginModal();
     }
-  }, [needsOrbLogin, needsLink, hasWallet, openLoginModal]);
+  }, [needsOrbLogin, needsLink, hasWallet, openLoginModal, openAuthModal]);
 
   return useMemo(
     () => ({
