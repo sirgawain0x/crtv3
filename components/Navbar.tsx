@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import {
   SITE_LOGO,
   SITE_NAME,
@@ -176,14 +177,28 @@ export default function Navbar() {
   const shouldShowMetokens = hasMetokens || meTokenLoading || holdingsLoading;
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
   const accountDropdownRef = useRef<AccountDropdownHandle>(null);
   const [copySuccess, setCopySuccess] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   useEffect(() => {
     const openMobileMenu = () => setIsMenuOpen(true);
     window.addEventListener('crtv:open-mobile-menu', openMobileMenu);
     return () => window.removeEventListener('crtv:open-mobile-menu', openMobileMenu);
   }, []);
+
+  useEffect(() => {
+    if (!isMenuOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isMenuOpen]);
   const [currentChainName, setCurrentChainName] = useState(currentChain.name);
   const [isScrolled, setIsScrolled] = useState(false);
 
@@ -353,16 +368,19 @@ export default function Navbar() {
             </Button>
           </div>
 
-          {/* Mobile menu */}
-          <div
-            className={
-              "fixed inset-0 top-16 z-50 grid h-[calc(100vh-4rem)] grid-flow-row " +
-              "auto-rows-max overflow-auto p-4 pb-32 shadow-md md:hidden bg-white dark:bg-gray-900 " +
-              (isMenuOpen ? "animate-in slide-in-from-top-5" : "hidden")
-            }
-            aria-hidden={!isMenuOpen}
-            inert={!isMenuOpen}
-          >
+          {isMounted &&
+            isMenuOpen &&
+            createPortal(
+              <div
+                className={
+                  "fixed inset-x-0 top-16 z-50 flex min-h-0 flex-col " +
+                  "h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain touch-pan-y " +
+                  "[-webkit-overflow-scrolling:touch] p-4 shadow-md md:hidden " +
+                  "bg-white pb-[calc(2rem+env(safe-area-inset-bottom,0px))] dark:bg-gray-900 " +
+                  "animate-in slide-in-from-top-5"
+                }
+                aria-hidden={false}
+              >
             <div
               className={
                 "relative z-20 grid gap-4 rounded-md " +
@@ -665,10 +683,10 @@ export default function Navbar() {
                 )}
               </HydrationSafe>
 
-              {/* Navigation Links */}
-
             </div>
-          </div>
+              </div>,
+              document.body
+            )}
 
         </div>
       </div>
