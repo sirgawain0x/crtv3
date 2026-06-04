@@ -33,52 +33,33 @@ function unauthorizedResponse(message: string): NextResponse {
   );
 }
 
-function getConfiguredSiteOrigins(): string[] {
-  const origins: string[] = [];
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim();
-  if (siteUrl) {
-    try {
-      origins.push(new URL(siteUrl).origin);
-    } catch {
-      // ignore invalid URL
-    }
+function mergePlatformApiHeaders(response: NextResponse): NextResponse {
+  const headers = new Headers(response.headers);
+  for (const [key, value] of Object.entries(PLATFORM_API_CORS_HEADERS)) {
+    headers.set(key, value);
   }
-
-  if (process.env.NODE_ENV === "production") {
-    origins.push("https://tv.creativeplatform.xyz");
-  } else {
-    origins.push("http://localhost:3000");
-  }
-
-  return [...new Set(origins)];
+  return new NextResponse(response.body, { status: response.status, headers });
 }
 
 /** Allow first-party Creative TV browser traffic without Platform API credentials. */
 export function isSameOriginAppRequest(request: NextRequest): boolean {
   const fetchSite = request.headers.get("sec-fetch-site");
-  if (fetchSite === "same-origin" || fetchSite === "same-site") {
-    return true;
+  return fetchSite === "same-origin" || fetchSite === "same-site";
+}
+
+async function tryAllowSameOriginAppRequest(
+  request: NextRequest,
+): Promise<PlatformApiAccessResult | null> {
+  if (!isSameOriginAppRequest(request)) {
+    return null;
   }
 
-  const allowedOrigins = getConfiguredSiteOrigins();
-  const origin = request.headers.get("origin");
-  if (origin && allowedOrigins.includes(origin)) {
-    return true;
+  const rl = await rateLimiters.generous(request);
+  if (rl) {
+    return { allowed: false, response: mergePlatformApiHeaders(rl) };
   }
 
-  const referer = request.headers.get("referer");
-  if (referer) {
-    try {
-      const refererOrigin = new URL(referer).origin;
-      if (allowedOrigins.includes(refererOrigin)) {
-        return true;
-      }
-    } catch {
-      // ignore invalid referer
-    }
-  }
-
-  return false;
+  return { allowed: true, tier: "public" };
 }
 
 export async function requirePlatformApiAccess(
@@ -86,10 +67,6 @@ export async function requirePlatformApiAccess(
   options: PlatformApiAccessOptions,
 ): Promise<PlatformApiAccessResult> {
   if (!isPlatformApiAccessConfigured()) {
-    return { allowed: true, tier: "public" };
-  }
-
-  if (isSameOriginAppRequest(request)) {
     return { allowed: true, tier: "public" };
   }
 
@@ -102,13 +79,9 @@ export async function requirePlatformApiAccess(
       if (match.tier === "partner") {
         const rl = await rateLimiters.apiKey(request, match.keyId ?? "partner");
         if (rl) {
-          const headers = new Headers(rl.headers);
-          for (const [key, value] of Object.entries(PLATFORM_API_CORS_HEADERS)) {
-            headers.set(key, value);
-          }
           return {
             allowed: false,
-            response: new NextResponse(rl.body, { status: rl.status, headers }),
+            response: mergePlatformApiHeaders(rl),
           };
         }
       }
@@ -123,6 +96,11 @@ export async function requirePlatformApiAccess(
     }
 
     return { allowed: false, response: unauthorizedResponse("Invalid API key") };
+  }
+
+  const sameOriginResult = await tryAllowSameOriginAppRequest(request);
+  if (sameOriginResult) {
+    return sameOriginResult;
   }
 
   const recipient = getX402Recipient();

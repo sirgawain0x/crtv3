@@ -23,6 +23,8 @@ GET https://tv.creativeplatform.xyz/api/video-assets/by-asset-id/{uuid}/playback
 
 Gating is active when `PLATFORM_API_ACCESS_ENABLED=true`, or when admin/partner keys or `X402_API_RECIPIENT` are configured. Set `PLATFORM_API_ACCESS_ENABLED=false` to disable gating in local dev.
 
+Same-origin browser traffic from the Creative TV web app (`Sec-Fetch-Site: same-origin` or `same-site`) is exempt from x402/key checks so in-app playback works. External cross-origin callers still require partner/admin keys or x402 payment. Same-origin requests are rate-limited per IP.
+
 ## Generate API keys (local only)
 
 ```bash

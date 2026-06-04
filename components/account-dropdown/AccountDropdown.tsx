@@ -33,7 +33,6 @@ import {
   useAuthModal,
   useUser,
   useChain,
-  useSmartAccountClient,
   useSendUserOperation,
 } from "@account-kit/react";
 import { useUnifiedLogout } from "@/hooks/useUnifiedLogout";
@@ -85,7 +84,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import CoinbaseFundButton from "@/components/wallet/buy/coinbase-fund-button";
 import { LoginButton } from "@/components/auth/LoginButton";
 import { AlchemySwapWidget } from "@/components/wallet/swap/AlchemySwapWidget";
-import useModularAccount from "@/lib/hooks/accountkit/useModularAccount";
+import { useSmartWalletDisplayAddress } from "@/lib/hooks/accountkit/useSmartWalletDisplayAddress";
 import { TokenBalance } from "@/components/wallet/balance/TokenBalance";
 import { MeTokenBalances } from "@/components/wallet/balance/MeTokenBalances";
 import makeBlockie from "ethereum-blockies-base64";
@@ -276,7 +275,15 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
   const user = useUser();
   const unifiedLogout = useUnifiedLogout();
   const { chain, setChain, isSettingChain } = useChain();
-  const [displayAddress, setDisplayAddress] = useState<string>("");
+  const {
+    primaryAddress,
+    smartAccountAddress,
+    signerAddress,
+    displayAddress,
+    walletLabel,
+    client,
+    account,
+  } = useSmartWalletDisplayAddress();
   const [isNetworkConnected, setIsNetworkConnected] = useState(true);
   const [copySuccess, setCopySuccess] = useState(false);
   const [isArrowUp, setIsArrowUp] = useState(true);
@@ -317,8 +324,6 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
     },
   });
 
-  const { account, address: smartAccountAddress } = useModularAccount();
-  const { client } = useSmartAccountClient({});
   const validationClient = chain
     ? (client?.extend(installValidationActions as any) as any)
     : undefined;
@@ -337,23 +342,9 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
     logger.debug('Account state:', {
       "EOA Address (user.address)": user?.address,
       "Smart Contract Account Address": smartAccountAddress,
+      "Primary display address": primaryAddress,
     });
-  }, [smartAccountAddress, user]);
-
-  useEffect(() => {
-    let newDisplayAddress = "";
-    // Smart Wallet is the primary public identity for Creative TV
-    // EOA is kept in background for signing and permissions
-    if (smartAccountAddress) {
-      newDisplayAddress = `${smartAccountAddress.slice(0, 6)}...${smartAccountAddress.slice(-4)}`;
-    } else if (user?.address) {
-      // Fallback to EOA only if Smart Wallet is not available
-      newDisplayAddress = `${user.address.slice(0, 6)}...${user.address.slice(-4)}`;
-    }
-    // Only update if value actually changes
-    if (displayAddress !== newDisplayAddress)
-      setDisplayAddress(newDisplayAddress);
-  }, [user, smartAccountAddress, displayAddress]);
+  }, [smartAccountAddress, primaryAddress, user]);
 
   useEffect(() => {
     const checkNetworkStatus = async () => {
@@ -435,9 +426,7 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
   }, [client, smartAccountAddress, dialogAction, isDialogOpen, chain?.id]);
 
   const copyToClipboard = async () => {
-    // Copy Smart Wallet address as primary identity
-    // EOA is kept in background for signing operations
-    const addressToCopy = smartAccountAddress || user?.address;
+    const addressToCopy = primaryAddress;
     if (addressToCopy) {
       try {
         await navigator.clipboard.writeText(addressToCopy);
@@ -1324,7 +1313,7 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
           >
             <Avatar className="h-8 w-8">
               <AvatarImage
-                src={makeBlockie(smartAccountAddress || user?.address || "0x")}
+                src={makeBlockie(primaryAddress || user?.address || "0x")}
                 alt="Wallet avatar"
               />
             </Avatar>
@@ -1334,7 +1323,7 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
           </Button>
         }
       >
-        <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
+        <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen} modal={false}>
           <DropdownMenuTrigger asChild>
             <Button
               variant="outline"
@@ -1343,7 +1332,7 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
             >
               <Avatar className="h-8 w-8">
                 <AvatarImage
-                  src={makeBlockie(smartAccountAddress || user?.address || "0x")}
+                  src={makeBlockie(primaryAddress || user?.address || "0x")}
                   alt="Wallet avatar"
                 />
               </Avatar>
@@ -1352,10 +1341,8 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
               </span>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent
-            className="w-[320px] md:w-80 max-h-[80vh] overflow-y-auto"
-            align="end"
-          >
+          <DropdownMenuContent className="w-[320px] md:w-80 p-0" align="end">
+            <div className="max-h-[min(80vh,32rem)] overflow-y-auto overscroll-contain touch-pan-y [-webkit-overflow-scrolling:touch] p-1">
             <DropdownMenuLabel className="font-normal">
               <div
                 className={`flex items-center justify-between cursor-pointer 
@@ -1364,12 +1351,12 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
               >
                 <div className="flex flex-col space-y-1">
                   <p className="text-xs text-gray-500">
-                    {smartAccountAddress ? "Smart Wallet" : user?.address ? "EOA" : "Not Connected"}
+                    {walletLabel}
                   </p>
-                  <p className="font-mono text-sm">{displayAddress}</p>
-                  {user?.address && smartAccountAddress && user.address.toLowerCase() !== smartAccountAddress.toLowerCase() && (
+                  <p className="font-mono text-sm">{displayAddress || "Loading..."}</p>
+                  {signerAddress && (
                     <p className="text-xs text-gray-500">
-                      Signer (EOA): {shortenAddress(user.address)}
+                      Signer (EOA): {shortenAddress(signerAddress)}
                     </p>
                   )}
                 </div>
@@ -1404,7 +1391,7 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
                       className="flex-1 text-xs"
                       disabled={isOrbLinking}
                       onClick={() =>
-                        linkProfile(smartAccountAddress || user?.address)
+                        linkProfile(primaryAddress)
                       }
                     >
                       {isOrbLinking ? "Linking…" : "Sync profile"}
@@ -1451,7 +1438,7 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
                   }
                   onClick={() => setIsDropdownOpen(false)}
                 >
-                  <Link href={`/profile/${smartAccountAddress || user?.address}`}>
+                  <Link href={`/profile/${primaryAddress ?? ""}`}>
                     <ShieldUser className="h-3 w-3 mb-1" />
                     <span className="text-xs">Profile</span>
                   </Link>
@@ -1465,7 +1452,7 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
                   }
                   onClick={() => setIsDropdownOpen(false)}
                 >
-                  <Link href={`/upload/${smartAccountAddress || user?.address}`} id="nav-upload-link">
+                  <Link href={`/upload/${primaryAddress ?? ""}`} id="nav-upload-link">
                     <CloudUpload className="h-3 w-3 mb-1" />
                     <span className="text-xs">Upload</span>
                   </Link>
@@ -1690,6 +1677,7 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
                 <LogOut className="mr-2 h-4 w-4" />
                 <span className="text-sm">Logout</span>
               </DropdownMenuItem>
+            </div>
             </div>
           </DropdownMenuContent>
         </DropdownMenu>
