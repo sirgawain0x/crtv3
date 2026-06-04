@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// CORS middleware for API routes
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // Only handle CORS for /api routes
+  // Embed routes: inject header for root layout chrome suppression
+  if (pathname.startsWith("/embed")) {
+    const requestHeaders = new Headers(req.headers);
+    requestHeaders.set("x-crtv-embed-route", "1");
+    return NextResponse.next({
+      request: { headers: requestHeaders },
+    });
+  }
+
+  // CORS for API routes
   if (pathname.startsWith("/api")) {
     const origin = req.headers.get("origin");
     const allowedOrigins =
@@ -39,11 +47,9 @@ export function proxy(req: NextRequest) {
     return res;
   }
 
-  // For all other routes, just continue
   return NextResponse.next();
 }
 
-// Apply to all API routes
 export const config = {
-  matcher: ["/api/:path*"],
+  matcher: ["/api/:path*", "/embed/:path*"],
 };
