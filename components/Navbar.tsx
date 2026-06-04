@@ -184,6 +184,27 @@ export default function Navbar() {
     window.addEventListener('crtv:open-mobile-menu', openMobileMenu);
     return () => window.removeEventListener('crtv:open-mobile-menu', openMobileMenu);
   }, []);
+
+  // Trap scroll inside the mobile menu panel (prevent background page scroll on touch)
+  useEffect(() => {
+    if (!isMenuOpen) return;
+
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtmlOverflow = html.style.overflow;
+    const prevBodyOverflow = body.style.overflow;
+    const prevBodyTouchAction = body.style.touchAction;
+
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    body.style.touchAction = "none";
+
+    return () => {
+      html.style.overflow = prevHtmlOverflow;
+      body.style.overflow = prevBodyOverflow;
+      body.style.touchAction = prevBodyTouchAction;
+    };
+  }, [isMenuOpen]);
   const [currentChainName, setCurrentChainName] = useState(currentChain.name);
   const [isScrolled, setIsScrolled] = useState(false);
 
@@ -352,20 +373,26 @@ export default function Navbar() {
               <AnimatedMenuIcon isOpen={isMenuOpen} />
             </Button>
           </div>
+        </div>
+      </div>
 
-          {/* Mobile menu */}
-          <div
-            className={
-              "fixed inset-0 top-16 z-50 grid h-[calc(100vh-4rem)] grid-flow-row " +
-              "auto-rows-max overflow-auto p-4 pb-32 shadow-md md:hidden bg-white dark:bg-gray-900 " +
-              (isMenuOpen ? "animate-in slide-in-from-top-5" : "hidden")
-            }
-            aria-hidden={!isMenuOpen}
-            inert={!isMenuOpen}
-          >
+      {/* Mobile menu — sibling to header bar so fixed positioning and scroll work on touch devices */}
+      <div
+        id="mobile-nav-menu"
+        className={
+          "fixed inset-x-0 top-16 bottom-0 z-50 flex flex-col overflow-hidden md:hidden bg-white dark:bg-gray-900 shadow-md " +
+          (isMenuOpen ? "animate-in slide-in-from-top-5" : "hidden")
+        }
+        aria-hidden={!isMenuOpen}
+        inert={!isMenuOpen}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Main menu"
+      >
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y [-webkit-overflow-scrolling:touch] p-4 pb-32">
             <div
               className={
-                "relative z-20 grid gap-4 rounded-md " +
+                "relative grid gap-4 rounded-md " +
                 "text-popover-foreground"
               }
             >
@@ -668,8 +695,6 @@ export default function Navbar() {
               {/* Navigation Links */}
 
             </div>
-          </div>
-
         </div>
       </div>
     </header>
