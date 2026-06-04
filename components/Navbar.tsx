@@ -440,7 +440,7 @@ export default function Navbar() {
                         openAuthModal();
                         setIsMenuOpen(false);
                       }}
-                      id="connect-wallet-btn"
+                      id="mobile-connect-wallet-btn"
                     >
                       Get Started
                     </Button>

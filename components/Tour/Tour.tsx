@@ -22,6 +22,7 @@ const DESKTOP_STEPS: TourStep[] = [
         target: '#connect-wallet-btn',
         content: 'Sign in to get started! Click "Get Started" to create your account with just your email.',
         disableBeacon: true,
+        placement: 'bottom',
         spotlightClicks: true,
         data: { id: 'connect' }
     },
@@ -104,6 +105,7 @@ export const Tour = () => {
 
     // Simple mobile detection
     const [isMobile, setIsMobile] = useState(false);
+    const [isMounted, setIsMounted] = useState(false);
 
     useEffect(() => {
         const checkMobile = () => {
@@ -111,6 +113,7 @@ export const Tour = () => {
         };
 
         checkMobile();
+        setIsMounted(true);
         window.addEventListener('resize', checkMobile);
         return () => window.removeEventListener('resize', checkMobile);
     }, []);
@@ -246,8 +249,9 @@ export const Tour = () => {
 
     return (
         <Joyride
+            key={isMobile ? 'mobile-tour' : 'desktop-tour'}
             steps={steps}
-            run={run}
+            run={run && isMounted}
             stepIndex={stepIndex}
             callback={handleJoyrideCallback}
             continuous
