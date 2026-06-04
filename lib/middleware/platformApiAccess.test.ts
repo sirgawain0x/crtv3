@@ -120,4 +120,60 @@ describe("requirePlatformApiAccess", () => {
       expect(result.tier).toBe("public");
     }
   });
+
+  it("allows same-origin requests without auth when gating is enabled", async () => {
+    const request = new NextRequest("http://localhost/api/livepeer/playback-info", {
+      headers: { "Sec-Fetch-Site": "same-origin" },
+    });
+
+    const result = await requirePlatformApiAccess(request, { resource: "playback.info" });
+    expect(result.allowed).toBe(true);
+    if (result.allowed) {
+      expect(result.tier).toBe("public");
+    }
+  });
+
+  it("allows same-site requests without auth when gating is enabled", async () => {
+    const request = new NextRequest("http://localhost/api/livepeer/playback-info", {
+      headers: { "Sec-Fetch-Site": "same-site" },
+    });
+
+    const result = await requirePlatformApiAccess(request, { resource: "playback.info" });
+    expect(result.allowed).toBe(true);
+    if (result.allowed) {
+      expect(result.tier).toBe("public");
+    }
+  });
+
+  it("returns 402 for cross-site requests without auth", async () => {
+    const request = new NextRequest("http://localhost/api/livepeer/playback-info", {
+      headers: {
+        "Sec-Fetch-Site": "cross-site",
+        Origin: "https://evil.example.com",
+      },
+    });
+
+    const result = await requirePlatformApiAccess(request, { resource: "playback.info" });
+    expect(result.allowed).toBe(false);
+    if (!result.allowed) {
+      expect(result.response.status).toBe(402);
+    }
+  });
+
+  it("allows partner API key on cross-origin requests", async () => {
+    const request = new NextRequest("https://tv.creativeplatform.xyz/api/video-assets/by-asset-id/uuid/playback", {
+      headers: {
+        Authorization: "Bearer crtv_pk_mixtape_test",
+        Origin: "https://air.creativeplatform.xyz",
+        "Sec-Fetch-Site": "cross-site",
+      },
+    });
+
+    const result = await requirePlatformApiAccess(request, { resource: "playback.resolve" });
+    expect(result.allowed).toBe(true);
+    if (result.allowed) {
+      expect(result.tier).toBe("partner");
+      expect(result.keyId).toBe("mixtape");
+    }
+  });
 });
