@@ -43,11 +43,12 @@ export function CreativeTVUrlEmbed({
       return;
     }
 
+    const playbackId = state.result.playbackId;
     let cancelled = false;
 
     async function loadSources() {
       try {
-        const sources = await getDetailPlaybackSource(state.result.playbackId);
+        const sources = await getDetailPlaybackSource(playbackId);
         if (!cancelled) {
           setPlaybackSources(sources);
           if (!sources?.length) {
@@ -179,9 +180,11 @@ export function CreativeTVUrlEmbed({
           </div>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <ExternalLink className="h-4 w-4" />
-            <Link href={fallbackUrl} target="_blank" rel="noopener noreferrer" className="hover:underline">
-              Open on Creative TV
-            </Link>
+            {fallbackUrl ? (
+              <Link href={fallbackUrl} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                Open on Creative TV
+              </Link>
+            ) : null}
           </div>
         </div>
       ) : null}
