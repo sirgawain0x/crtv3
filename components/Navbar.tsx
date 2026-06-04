@@ -1,6 +1,7 @@
 // components/Navbar.tsx
 "use client";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import Image from "next/image";
 import { useState, useEffect, useRef } from "react";
 import {
@@ -104,6 +105,9 @@ const mobileMemberNavLinkClass = `
   text-[#EC406A]
 `;
 
+/** Matches Tailwind `md` — mobile nav is hidden at 768px and above */
+const MOBILE_NAV_MEDIA_QUERY = "(max-width: 767px)";
+
 // Add this near the top with other utility functions
 const getChainGradient = (chain: ViemChain) => {
   switch (chain.id) {
@@ -176,6 +180,7 @@ export default function Navbar() {
   const shouldShowMetokens = hasMetokens || meTokenLoading || holdingsLoading;
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const pathname = usePathname();
   const accountDropdownRef = useRef<AccountDropdownHandle>(null);
   const [copySuccess, setCopySuccess] = useState(false);
 
@@ -184,6 +189,42 @@ export default function Navbar() {
     window.addEventListener('crtv:open-mobile-menu', openMobileMenu);
     return () => window.removeEventListener('crtv:open-mobile-menu', openMobileMenu);
   }, []);
+
+  // Close menu when viewport grows past mobile (e.g. rotate tablet) so scroll lock cannot stick
+  useEffect(() => {
+    const mq = window.matchMedia(MOBILE_NAV_MEDIA_QUERY);
+    const handleChange = () => {
+      if (!mq.matches) setIsMenuOpen(false);
+    };
+    mq.addEventListener("change", handleChange);
+    return () => mq.removeEventListener("change", handleChange);
+  }, []);
+
+  // Trap scroll inside the mobile menu panel (prevent background page scroll on touch)
+  useEffect(() => {
+    if (!isMenuOpen) return;
+
+    const mq = window.matchMedia(MOBILE_NAV_MEDIA_QUERY);
+    if (!mq.matches) return;
+
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtmlOverflow = html.style.overflow;
+    const prevBodyOverflow = body.style.overflow;
+
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+
+    return () => {
+      html.style.overflow = prevHtmlOverflow;
+      body.style.overflow = prevBodyOverflow;
+    };
+  }, [isMenuOpen]);
+
+  // Close menu on navigation (e.g. logo link has no explicit close handler)
+  useEffect(() => {
+    setIsMenuOpen(false);
+  }, [pathname]);
   const [currentChainName, setCurrentChainName] = useState(currentChain.name);
   const [isScrolled, setIsScrolled] = useState(false);
 
@@ -352,20 +393,26 @@ export default function Navbar() {
               <AnimatedMenuIcon isOpen={isMenuOpen} />
             </Button>
           </div>
+        </div>
+      </div>
 
-          {/* Mobile menu */}
-          <div
-            className={
-              "fixed inset-0 top-16 z-50 grid h-[calc(100vh-4rem)] grid-flow-row " +
-              "auto-rows-max overflow-auto p-4 pb-32 shadow-md md:hidden bg-white dark:bg-gray-900 " +
-              (isMenuOpen ? "animate-in slide-in-from-top-5" : "hidden")
-            }
-            aria-hidden={!isMenuOpen}
-            inert={!isMenuOpen}
-          >
+      {/* Mobile menu — sibling to header bar so fixed positioning and scroll work on touch devices */}
+      <div
+        id="mobile-nav-menu"
+        className={
+          "fixed inset-x-0 top-16 bottom-0 z-50 flex flex-col overflow-hidden md:hidden bg-white dark:bg-gray-900 shadow-md " +
+          (isMenuOpen ? "animate-in slide-in-from-top-5" : "hidden")
+        }
+        aria-hidden={!isMenuOpen}
+        inert={!isMenuOpen}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Main menu"
+      >
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y [-webkit-overflow-scrolling:touch] p-4 pb-32">
             <div
               className={
-                "relative z-20 grid gap-4 rounded-md " +
+                "relative grid gap-4 rounded-md " +
                 "text-popover-foreground"
               }
             >
@@ -668,8 +715,6 @@ export default function Navbar() {
               {/* Navigation Links */}
 
             </div>
-          </div>
-
         </div>
       </div>
     </header>
