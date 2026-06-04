@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SongchainOrbConnect } from "@/components/songchain/SongchainOrbConnect";
 import { SongchainFeedSection } from "@/components/songchain/SongchainFeedSection";
 import { SongchainGroupPanel } from "@/components/songchain/SongchainGroupPanel";
+import { SongchainGraphPanel } from "@/components/songchain/SongchainGraphPanel";
 import { SongchainComposePost } from "@/components/songchain/SongchainComposePost";
 import { SongchainBookmarksSection } from "@/components/songchain/SongchainBookmarksSection";
 import { SongchainLensAdvancedPanel } from "@/components/songchain/SongchainLensAdvancedPanel";
@@ -64,6 +65,7 @@ export function SongchainPageClient({ config }: SongchainPageClientProps) {
           <TabsTrigger value="feed">Feed</TabsTrigger>
           <TabsTrigger value="exclusive">Exclusive</TabsTrigger>
           <TabsTrigger value="group">Group</TabsTrigger>
+          <TabsTrigger value="graph">Graph</TabsTrigger>
           <TabsTrigger value="bookmarks">Bookmarks</TabsTrigger>
         </TabsList>
 
@@ -77,6 +79,7 @@ export function SongchainPageClient({ config }: SongchainPageClientProps) {
             title="Songchain feed"
             description="Posts from the main Songchain Lens feed (Orb)."
             feedId={config.publicFeedId}
+            graphId={config.graphId}
             emptyDescription="Lens custom feeds only show posts published to that feed contract. Existing Orb profile or global posts are not backfilled, so publish a new post directly to this feed if it should appear here."
           />
         </TabsContent>
@@ -91,6 +94,7 @@ export function SongchainPageClient({ config }: SongchainPageClientProps) {
             title="Exclusive feed"
             description="Members-only drops and announcements on Lens."
             feedId={config.exclusiveFeedId}
+            graphId={config.graphId}
             emptyDescription="Exclusive feeds can require an Orb-linked Lens session, and posts still need to be published directly to the exclusive feed contract before they appear here."
           />
         </TabsContent>
@@ -99,8 +103,12 @@ export function SongchainPageClient({ config }: SongchainPageClientProps) {
           <SongchainGroupPanel groupId={config.groupId} />
         </TabsContent>
 
+        <TabsContent value="graph">
+          <SongchainGraphPanel graphId={config.graphId} groupId={config.groupId} />
+        </TabsContent>
+
         <TabsContent value="bookmarks">
-          <SongchainBookmarksSection />
+          <SongchainBookmarksSection graphId={config.graphId} />
         </TabsContent>
       </Tabs>
 
@@ -109,9 +117,12 @@ export function SongchainPageClient({ config }: SongchainPageClientProps) {
       {!config.enabled && (
         <p className="mt-10 text-center text-sm text-muted-foreground">
           Configure{" "}
-          <code className="text-xs">NEXT_PUBLIC_SONGCHAIN_FEED_ID</code>,{" "}
-          <code className="text-xs">NEXT_PUBLIC_SONGCHAIN_EXCLUSIVE_FEED_ID</code>, and{" "}
-          <code className="text-xs">NEXT_PUBLIC_SONGCHAIN_GROUP_ID</code> with your Lens
+          <code className="text-xs">NEXT_PUBLIC_SONGCHAIN_APP_ID</code> (Lens app),{" "}
+          <code className="text-xs">NEXT_PUBLIC_SONGCHAIN_FEED_ID</code> /{" "}
+          <code className="text-xs">NEXT_PUBLIC_SONGCHAIN_EXCLUSIVE_FEED_ID</code> (feed
+          contracts), and{" "}
+          <code className="text-xs">NEXT_PUBLIC_SONGCHAIN_GROUP_ID</code>,{" "}
+          <code className="text-xs">NEXT_PUBLIC_SONGCHAIN_GRAPH_ID</code> with your Lens
           primitives, then redeploy if you added them after the last build. See{" "}
           <code className="text-xs">env.example</code> in the repo.
         </p>

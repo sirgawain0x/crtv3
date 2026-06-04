@@ -3,11 +3,58 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   ORB_SESSION_CHANGE_EVENT,
   ORB_SESSION_STORAGE_KEY,
+  hasOrbWriteCredentials,
   invalidateOrbSessionCache,
   loadStoredOrbSession,
+  normalizeOrbAuthTokens,
   saveStoredOrbSession,
   subscribeOrbSession,
 } from './login';
+
+describe('hasOrbWriteCredentials', () => {
+  it('returns false when session is null or missing tokens', () => {
+    expect(hasOrbWriteCredentials(null)).toBe(false);
+    expect(hasOrbWriteCredentials({ accessToken: 'a' })).toBe(false);
+    expect(hasOrbWriteCredentials({ refreshToken: 'r' } as never)).toBe(false);
+  });
+
+  it('returns true when both access and refresh are present', () => {
+    expect(
+      hasOrbWriteCredentials({
+        accessToken: 'access',
+        refreshToken: 'refresh',
+      }),
+    ).toBe(true);
+  });
+});
+
+describe('normalizeOrbAuthTokens', () => {
+  it('maps snake_case poll fields to StoredOrbSession', () => {
+    expect(
+      normalizeOrbAuthTokens({
+        access_token: 'at',
+        refresh_token: 'rt',
+        authentication_id: 'auth-1',
+        id_token: 'id',
+      }),
+    ).toEqual({
+      accessToken: 'at',
+      refreshToken: 'rt',
+      authenticationId: 'auth-1',
+      idToken: 'id',
+    });
+  });
+
+  it('returns null when access token is missing', () => {
+    expect(normalizeOrbAuthTokens({ refresh_token: 'rt' })).toBeNull();
+  });
+
+  it('access-only merge after sync is not writable', () => {
+    const merged = normalizeOrbAuthTokens({ accessToken: 'new-access' });
+    expect(merged).not.toBeNull();
+    expect(hasOrbWriteCredentials(merged)).toBe(false);
+  });
+});
 
 describe('orb session storage', () => {
   afterEach(() => {

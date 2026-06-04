@@ -40,6 +40,7 @@ import { useLensOrbWrite } from "@/hooks/useLensOrbWrite";
 import { groveService } from "@/lib/sdk/grove/service";
 import { clearStaleOrbSessionIfNeeded } from "@/lib/sdk/orb/session-errors";
 import { SongchainAuthorTimeline } from "@/components/songchain/SongchainAuthorTimeline";
+import { SongchainFollowButton } from "@/components/songchain/SongchainGraphPanel";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils/utils";
 
@@ -81,6 +82,7 @@ function authorLabel(post: AnyPost): string {
 type SongchainPostCardProps = {
   post: AnyPost;
   feedId?: string | null;
+  graphId?: string | null;
   compact?: boolean;
   onReactionChange?: () => void;
 };
@@ -88,6 +90,7 @@ type SongchainPostCardProps = {
 export function SongchainPostCard({
   post,
   feedId,
+  graphId = null,
   compact = false,
   onReactionChange,
 }: SongchainPostCardProps) {
@@ -269,13 +272,21 @@ export function SongchainPostCard({
           </div>
         )}
         <div className="flex flex-1 flex-col gap-3 p-4">
-          <button
-            type="button"
-            className="text-xs text-muted-foreground text-left hover:text-violet-400 w-fit"
-            onClick={() => setTimelineOpen(true)}
-          >
-            {authorLabel(post)}
-          </button>
+          <div className="flex items-center justify-between gap-2">
+            <button
+              type="button"
+              className="text-xs text-muted-foreground text-left hover:text-violet-400 w-fit"
+              onClick={() => setTimelineOpen(true)}
+            >
+              {authorLabel(post)}
+            </button>
+            {content && (
+              <SongchainFollowButton
+                graphId={graphId}
+                accountAddress={content.author.address}
+              />
+            )}
+          </div>
           {postText(post) && (
             <p className="text-sm leading-relaxed whitespace-pre-wrap">
               {postText(post)}

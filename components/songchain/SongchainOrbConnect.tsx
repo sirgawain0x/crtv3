@@ -19,7 +19,7 @@ export function SongchainOrbConnect() {
           {lensWrite.lensAccount
             ? ` · ${lensWrite.lensAccount.slice(0, 6)}…${lensWrite.lensAccount.slice(-4)}`
             : ''}
-          — you can like posts and join the group.
+          — you can post, like, and join the group.
         </span>
       </div>
     );
@@ -30,9 +30,11 @@ export function SongchainOrbConnect() {
       <div className="flex items-start gap-2 text-sm">
         <Link2 className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
         <span>
-          {lensWrite.needsLink
-            ? 'Orb signed in — link your wallet profile to unlock likes and group join.'
-            : 'Browse feeds in read-only mode. Sign in with Orb and link your account to interact.'}
+          {lensWrite.needsOrbReauth
+            ? 'Your Orb session needs a fresh sign-in before you can post or interact on Lens.'
+            : lensWrite.needsLink
+              ? 'Orb signed in — link your wallet profile to unlock likes and group join.'
+              : 'Browse feeds in read-only mode. Sign in with Orb and link your account to interact.'}
         </span>
       </div>
       <Button
@@ -40,15 +42,19 @@ export function SongchainOrbConnect() {
         variant="secondary"
         disabled={isLinking}
         onClick={() =>
-          lensWrite.needsLink ? void linkProfile() : orb.openLoginModal()
+          lensWrite.needsLink && !lensWrite.needsOrbReauth
+            ? void linkProfile()
+            : orb.openLoginModal()
         }
       >
         <LogIn className="h-4 w-4 mr-2" />
         {isLinking
           ? 'Linking…'
-          : lensWrite.needsLink
-            ? 'Sync profile'
-            : 'Sign in with Orb'}
+          : lensWrite.needsOrbReauth
+            ? 'Sign in again'
+            : lensWrite.needsLink
+              ? 'Sync profile'
+              : 'Sign in with Orb'}
       </Button>
     </div>
   );

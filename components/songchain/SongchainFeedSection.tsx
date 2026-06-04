@@ -10,6 +10,7 @@ type SongchainFeedSectionProps = {
   title: string;
   description: string;
   feedId: string | null;
+  graphId?: string | null;
   emptyDescription: string;
 };
 
@@ -48,7 +49,14 @@ function FeedDiagnostics({
       {isEmpty && !error && feedId && (
         <p>
           Feed is reachable but has no posts yet. Posts must be created on this custom feed
-          address (not the global Lens feed).
+          address (not the global Lens timeline).
+        </p>
+      )}
+      {error && error.includes('not registered on') && (
+        <p>
+          Fix <code className="text-[10px]">NEXT_PUBLIC_SONGCHAIN_FEED_ID</code> in your
+          deployment env, then redeploy. Use the feed contract address from the Lens / Orb
+          dashboard — not the feed display name.
         </p>
       )}
     </div>
@@ -59,6 +67,7 @@ export function SongchainFeedSection({
   title,
   description,
   feedId,
+  graphId = null,
   emptyDescription,
 }: SongchainFeedSectionProps) {
   const { posts, loading, error, hasMore, reload, loadMore } = useSongchainFeed({
@@ -113,6 +122,7 @@ export function SongchainFeedSection({
               key={post.id}
               post={post}
               feedId={feedId}
+              graphId={graphId}
               onReactionChange={reload}
             />
           ))}

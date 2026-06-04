@@ -18,6 +18,8 @@ import {
   clearStoredOrbSession,
   subscribeOrbSession,
   getOrbSessionServerSnapshot,
+  hasOrbWriteCredentials,
+  normalizeOrbAuthTokens,
   type StoredOrbSession,
 } from '@/lib/sdk/orb/login';
 import { useWalletAuth } from '@/lib/auth/useWalletAuth';
@@ -116,16 +118,24 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
         invalidateOrbSession();
         return null;
       }
-      const stored: StoredOrbSession = {
+      const merged = normalizeOrbAuthTokens({
         accessToken: synced.accessToken,
         refreshToken: synced.refreshToken ?? session.refreshToken,
         authenticationId: synced.authenticationId ?? session.authenticationId,
         idToken: synced.idToken ?? session.idToken,
-      };
-      persistSession(stored);
-      return stored;
+      });
+      if (!merged || !hasOrbWriteCredentials(merged)) {
+        invalidateOrbSession();
+        return null;
+      }
+      persistSession(merged);
+      return merged;
     } catch (err) {
       if (isStaleOrbSessionError(err)) {
+        invalidateOrbSession();
+        return null;
+      }
+      if (!hasOrbWriteCredentials(session)) {
         invalidateOrbSession();
         return null;
       }
@@ -284,12 +294,15 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
           },
         });
 
-        const stored: StoredOrbSession = {
-          accessToken: result.accessToken,
-          refreshToken: result.refreshToken,
-          authenticationId: result.authenticationId,
-          idToken: result.idToken,
-        };
+        const stored = normalizeOrbAuthTokens(
+          result as unknown as Record<string, unknown>,
+        );
+
+        if (!stored?.refreshToken?.trim()) {
+          throw new Error(
+            'Orb sign-in did not return a refresh token. Try signing in again.',
+          );
+        }
         persistSession(stored);
         setIsLoginModalOpen(false);
         bumpAccountMenuRefresh();

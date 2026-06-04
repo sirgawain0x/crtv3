@@ -5,7 +5,15 @@ import { Button } from "@/components/ui/button";
 import { useSongchainBookmarks } from "@/hooks/useSongchainBookmarks";
 import { SongchainPostCard } from "@/components/songchain/SongchainPostCard";
 
-export function SongchainBookmarksSection() {
+import type { SongchainConfig } from "@/lib/songchain/config";
+
+type SongchainBookmarksSectionProps = {
+  graphId?: string | null;
+};
+
+export function SongchainBookmarksSection({
+  graphId = null,
+}: SongchainBookmarksSectionProps) {
   const { posts, loading, error, reload, canWrite, promptWriteAccess } =
     useSongchainBookmarks();
 
@@ -49,7 +57,12 @@ export function SongchainBookmarksSection() {
       ) : (
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {posts.map((post) => (
-            <SongchainPostCard key={post.id} post={post} onReactionChange={reload} />
+            <SongchainPostCard
+              key={post.id}
+              post={post}
+              graphId={graphId}
+              onReactionChange={reload}
+            />
           ))}
         </div>
       )}

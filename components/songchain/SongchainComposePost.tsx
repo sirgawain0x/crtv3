@@ -13,7 +13,8 @@ type SongchainComposePostProps = {
 
 export function SongchainComposePost({ feedId, onPosted }: SongchainComposePostProps) {
   const [content, setContent] = useState("");
-  const { createPost, isPosting, canWrite, promptWriteAccess } = useSongchainPost();
+  const { createPost, isPosting, canWrite, needsOrbReauth, promptWriteAccess } =
+    useSongchainPost();
 
   if (!feedId) return null;
 
@@ -30,7 +31,9 @@ export function SongchainComposePost({ feedId, onPosted }: SongchainComposePostP
       <h3 className="text-sm font-semibold">Create a post</h3>
       {!canWrite && (
         <p className="text-xs text-muted-foreground">
-          Connect wallet, sign in with Orb, and link your profile to post to this feed.
+          {needsOrbReauth
+            ? "Your Orb session expired partially — sign in again with Orb to post."
+            : "Connect wallet, sign in with Orb, and link your profile to post to this feed."}
         </p>
       )}
       <Textarea
@@ -44,7 +47,7 @@ export function SongchainComposePost({ feedId, onPosted }: SongchainComposePostP
       <div className="flex justify-end gap-2">
         {!canWrite ? (
           <Button type="button" variant="outline" size="sm" onClick={promptWriteAccess}>
-            Link Orb to post
+            {needsOrbReauth ? "Sign in again" : "Link Orb to post"}
           </Button>
         ) : (
           <Button

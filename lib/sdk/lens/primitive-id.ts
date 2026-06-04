@@ -14,7 +14,7 @@ export function normalizeLensPrimitiveId(value: string | null | undefined): stri
   const trimmed = value?.trim();
   if (!trimmed) return null;
 
-  return extractLensContractAddress(trimmed) ?? trimmed.toLowerCase();
+  return extractLensContractAddress(trimmed);
 }
 
 export function getLensContractAddressError(

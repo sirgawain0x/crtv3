@@ -5,7 +5,17 @@ import { textOnly } from "@lens-protocol/metadata";
 import { post } from "@lens-protocol/client/actions";
 import { evmAddress, uri } from "@lens-protocol/client";
 import { groveService } from "@/lib/sdk/grove/service";
-import { clearStaleOrbSessionIfNeeded } from "@/lib/sdk/orb/session-errors";
+import {
+  clearStaleOrbSessionIfNeeded,
+  isIncompleteOrbSessionError,
+} from "@/lib/sdk/orb/session-errors";
+import { formatOrbAuthError } from "@/lib/sdk/orb/format-auth-error";
+import {
+  checkLensFeedExists,
+  formatLensFeedPostError,
+  resolveSongchainFeedAddress,
+} from "@/lib/songchain/lens-feed";
+import { getLensContractAddressError } from "@/lib/sdk/lens/primitive-id";
 import { useLensOrbWrite } from "@/hooks/useLensOrbWrite";
 import { toast } from "sonner";
 
@@ -17,7 +27,12 @@ export type CreateSongchainPostParams = {
 
 export function useSongchainPost() {
   const [isPosting, setIsPosting] = useState(false);
-  const { canWrite, getSessionClient, promptWriteAccess } = useLensOrbWrite();
+  const {
+    canWrite,
+    needsOrbReauth,
+    getSessionClient,
+    promptWriteAccess,
+  } = useLensOrbWrite();
 
   const createPost = useCallback(
     async ({ content, feedId, title = "Songchain post" }: CreateSongchainPostParams) => {
@@ -30,9 +45,26 @@ export function useSongchainPost() {
         toast.error("Feed is not configured.");
         return false;
       }
+
+      const feedAddress = resolveSongchainFeedAddress(feedId);
+      if (!feedAddress) {
+        toast.error(getLensContractAddressError(feedId, "Feed contract ID") ?? "Invalid feed ID.");
+        return false;
+      }
+
+      const feedCheck = await checkLensFeedExists(feedId);
+      if (!feedCheck.exists) {
+        toast.error(feedCheck.error ?? "Feed is not available on this Lens network.");
+        return false;
+      }
+
       if (!canWrite) {
         promptWriteAccess();
-        toast.info("Link your Orb account to post on Lens.");
+        toast.info(
+          needsOrbReauth
+            ? "Sign in again with Orb to post on Lens."
+            : "Link your Orb account to post on Lens.",
+        );
         return false;
       }
 
@@ -51,7 +83,7 @@ export function useSongchainPost() {
 
         const result = await post(client, {
           contentUri: uri(uploadResult.url),
-          feed: evmAddress(feedId),
+          feed: evmAddress(feedAddress),
         });
 
         if (result.isErr()) {
@@ -61,15 +93,22 @@ export function useSongchainPost() {
         toast.success("Posted to Songchain feed!");
         return true;
       } catch (err) {
-        clearStaleOrbSessionIfNeeded(err);
-        toast.error(err instanceof Error ? err.message : "Posting failed");
+        const cleared = clearStaleOrbSessionIfNeeded(err);
+        if (cleared || isIncompleteOrbSessionError(err)) {
+          promptWriteAccess();
+        }
+        toast.error(
+          isIncompleteOrbSessionError(err)
+            ? formatOrbAuthError(err)
+            : formatLensFeedPostError(err, feedId),
+        );
         return false;
       } finally {
         setIsPosting(false);
       }
     },
-    [canWrite, getSessionClient, promptWriteAccess],
+    [canWrite, needsOrbReauth, getSessionClient, promptWriteAccess],
   );
 
-  return { createPost, isPosting, canWrite, promptWriteAccess };
+  return { createPost, isPosting, canWrite, needsOrbReauth, promptWriteAccess };
 }
