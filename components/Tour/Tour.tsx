@@ -180,7 +180,7 @@ export const Tour = () => {
 
     // 3. Publish Button Appearance
     useEffect(() => {
-        let interval: NodeJS.Timeout;
+        let interval: ReturnType<typeof setInterval>;
         const uploadFormIndex = getStepIndex('upload-form');
         const publishBtnIndex = getStepIndex('publish-btn');
 
@@ -209,7 +209,6 @@ export const Tour = () => {
     const TourTooltip = ({
         index,
         step,
-        backProps,
         primaryProps,
         skipProps,
         tooltipProps,
@@ -258,7 +257,6 @@ export const Tour = () => {
             disableScrolling={isMobile}
             scrollOffset={isMobile ? 80 : 120}
             floaterProps={{
-                disableAnimation: isMobile,
                 offset: isMobile ? 8 : 12,
                 styles: {
                     floater: {
