@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getFullLivepeer } from '@/lib/sdk/livepeer/fullClient';
-import { LIVEPEER_NOT_CONFIGURED } from '@/lib/sdk/livepeer/studioAuth';
+import { isLivepeerConfigured, LIVEPEER_NOT_CONFIGURED } from '@/lib/sdk/livepeer/studioAuth';
 import { serverLogger } from '@/lib/utils/logger';
 import {
   platformApiOptionsResponse,
@@ -20,9 +20,9 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    if (!process.env.LIVEPEER_FULL_API_KEY?.trim()) {
+    if (!isLivepeerConfigured()) {
       return NextResponse.json(
-        { error: 'Livepeer playback is not configured on this deployment' },
+        { error: 'Livepeer playback is not configured on this deployment', code: LIVEPEER_NOT_CONFIGURED },
         { status: 503 },
       );
     }

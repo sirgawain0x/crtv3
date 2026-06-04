@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, forwardRef, useMemo } from "react";
+import React, { useState, useEffect, forwardRef, useMemo, useCallback } from "react";
 import {
   CheckIcon,
   ChevronDownIcon,
@@ -168,6 +168,8 @@ export default function VideoDetails({
   tokenId,
 }: VideoDetailsProps) {
   const [playbackSources, setPlaybackSources] = useState<Src[] | null>(null);
+  const [sourcesLoading, setSourcesLoading] = useState(true);
+  const [sourcesError, setSourcesError] = useState<string | null>(null);
   const [conditionalProps, setConditionalProps] = useState<any>({});
   const [dbStatus, setDbStatus] = useState<"draft" | "published" | "minted" | "archived" | null>(null);
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
@@ -177,11 +179,35 @@ export default function VideoDetails({
   const { openAuthModal } = useAuthModal();
   const isConnected = !!user;
 
+  const loadPlaybackSources = useCallback(async () => {
+    if (!asset?.playbackId) {
+      setSourcesLoading(false);
+      setSourcesError("No playback ID available.");
+      setPlaybackSources(null);
+      return;
+    }
+
+    setSourcesLoading(true);
+    setSourcesError(null);
+    setPlaybackSources(null);
+
+    try {
+      const sources = await getDetailPlaybackSource(asset.playbackId);
+      if (!sources?.length) {
+        setSourcesError("Unable to load playback sources.");
+        setPlaybackSources(null);
+      } else {
+        setPlaybackSources(sources);
+      }
+    } catch {
+      setSourcesError("Unable to load playback sources.");
+      setPlaybackSources(null);
+    } finally {
+      setSourcesLoading(false);
+    }
+  }, [asset?.playbackId]);
+
   useEffect(() => {
-    const fetchPlaybackSources = async () => {
-      const sources = await getDetailPlaybackSource(asset?.playbackId || "");
-      setPlaybackSources(sources);
-    };
     const fetchDbStatus = async () => {
       try {
         if (!asset?.playbackId) return;
@@ -227,7 +253,7 @@ export default function VideoDetails({
         setThumbnailUrl("/Creative_TV.png");
       }
     };
-    fetchPlaybackSources();
+    void loadPlaybackSources();
     fetchDbStatus();
     // Wrap in try-catch to prevent unhandled promise rejection
     fetchThumbnail().catch(() => {
@@ -249,7 +275,7 @@ export default function VideoDetails({
         return prev;
       return conProps;
     });
-  }, [account, asset]);
+  }, [account, asset, loadPlaybackSources]);
 
   const Seek = forwardRef<HTMLButtonElement, Player.SeekProps>(
     ({ children, ...props }, forwardedRef) => (
@@ -550,6 +576,16 @@ export default function VideoDetails({
                   </Button>
                 </div>
               </div>
+            </div>
+          ) : sourcesLoading ? (
+            <Skeleton className="h-96 w-full" />
+          ) : sourcesError ? (
+            <div className="relative flex aspect-video w-full flex-col items-center justify-center gap-4 overflow-hidden rounded-lg bg-gray-800 p-8 text-center">
+              <p className="text-lg font-medium text-white">Failed to load video</p>
+              <p className="text-sm text-gray-300">{sourcesError}</p>
+              <Button type="button" variant="outline" onClick={() => void loadPlaybackSources()}>
+                Retry
+              </Button>
             </div>
           ) : playbackSources ? (
             <>
