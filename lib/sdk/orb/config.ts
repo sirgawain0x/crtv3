@@ -35,7 +35,13 @@ function resolveClientUrl(pathOrUrl: string): string {
   if (typeof window !== 'undefined') {
     return new URL(pathOrUrl, window.location.origin).toString();
   }
-  return pathOrUrl;
+
+  const siteUrl =
+    process.env.NEXT_PUBLIC_SITE_URL?.trim() ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined) ||
+    'https://tv.creativeplatform.xyz';
+
+  return new URL(pathOrUrl, siteUrl.replace(/\/$/, '')).toString();
 }
 
 /** Resolved Orb/Lens auth + media config from app env (@orbclub/modules does not read env). */

@@ -97,6 +97,7 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
 
   const syncSession = useCallback(async () => {
     if (!session?.accessToken) return null;
+    let syncTimeoutId: ReturnType<typeof setTimeout> | undefined;
     try {
       const synced = await Promise.race([
         orb.syncSession({
@@ -105,7 +106,10 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
           authenticationId: session.authenticationId,
         }),
         new Promise<never>((_, reject) => {
-          setTimeout(() => reject(new Error('Orb session sync timed out')), 20_000);
+          syncTimeoutId = setTimeout(
+            () => reject(new Error('Orb session sync timed out')),
+            20_000,
+          );
         }),
       ]);
       if (!synced?.accessToken) {
@@ -126,6 +130,10 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
         return null;
       }
       return session;
+    } finally {
+      if (syncTimeoutId !== undefined) {
+        clearTimeout(syncTimeoutId);
+      }
     }
   }, [session, orb, persistSession, invalidateOrbSession]);
 

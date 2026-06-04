@@ -2,6 +2,16 @@
 
 Tiered access for read-only Platform API routes used by Creative Platform apps (Mixtape), administrators, and external AI agents.
 
+## Canonical playback resolver URL
+
+```
+GET https://tv.creativeplatform.xyz/api/video-assets/by-asset-id/{uuid}/playback
+```
+
+- `{uuid}` is the Livepeer asset id from `/discover/{uuid}` (not the playback id).
+- For watch pages, use `/watch/{playbackId}` directly — no resolver call needed.
+- There is no `/api/platform/...` prefix in Phase 1.
+
 ## Tiers
 
 | Tier | Auth | Fee |

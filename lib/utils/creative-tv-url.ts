@@ -73,3 +73,27 @@ export function parseCreativeTVUrl(
 
   return { kind: "invalid", raw };
 }
+
+/** Lightweight iframe-safe embed URL for a discover asset id. */
+export function getCreativeTVEmbedDiscoverUrl(
+  assetId: string,
+  opts?: { origin?: string },
+): string {
+  return toAbsoluteFallbackUrl(`/embed/discover/${assetId}`, opts?.origin);
+}
+
+/**
+ * Embed URL suitable for iframes when resolution falls back to the full discover page.
+ */
+export function getCreativeTVEmbedUrlForParsed(
+  parsed: ParsedCreativeTVUrl,
+  opts?: { origin?: string },
+): string | undefined {
+  if (parsed.kind === "discover") {
+    return getCreativeTVEmbedDiscoverUrl(parsed.assetId, opts);
+  }
+  if (parsed.kind === "watch") {
+    return toAbsoluteFallbackUrl(`/watch/${parsed.playbackId}`, opts?.origin);
+  }
+  return undefined;
+}

@@ -167,12 +167,23 @@ export const Tour = () => {
     const prepareStepTarget = useCallback(
         async (step?: TourStep) => {
             if (!step?.data?.openMobileMenu || !isMobile) {
-                return;
+                return true;
             }
             openMobileMenuForTour();
-            await waitForElement(String(step.target));
+            return waitForElement(String(step.target));
         },
         [isMobile],
+    );
+
+    const advanceToStep = useCallback(
+        async (nextIndex: number) => {
+            const nextStep = steps[nextIndex];
+            if (nextStep?.data?.openMobileMenu && isMobile) {
+                await prepareStepTarget(nextStep);
+            }
+            setStepIndex(nextIndex);
+        },
+        [isMobile, prepareStepTarget, setStepIndex, steps],
     );
 
     const handleJoyrideCallback = (data: CallBackProps) => {
@@ -188,23 +199,45 @@ export const Tour = () => {
             return;
         }
 
-        if (type === EVENTS.STEP_BEFORE) {
-            void prepareStepTarget(currentStep);
-            return;
-        }
-
         if (type === EVENTS.TARGET_NOT_FOUND) {
             logger.warn('Tour: target not found', { target: currentStep?.target, index });
             if (index < steps.length - 1) {
-                window.setTimeout(() => setStepIndex(index + 1), 400);
+                window.setTimeout(() => {
+                    void advanceToStep(index + 1);
+                }, 400);
             }
             return;
         }
 
         if (type === EVENTS.STEP_AFTER && action !== 'prev') {
-            setStepIndex(index + 1);
+            if (index < steps.length - 1) {
+                void advanceToStep(index + 1);
+            }
         }
     };
+
+    useEffect(() => {
+        if (!run || !isMobile) {
+            return;
+        }
+
+        const currentStep = steps[stepIndex];
+        if (!currentStep?.data?.openMobileMenu) {
+            return;
+        }
+
+        let cancelled = false;
+        void (async () => {
+            await prepareStepTarget(currentStep);
+            if (cancelled) {
+                return;
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [run, stepIndex, isMobile, steps, prepareStepTarget]);
 
     useEffect(() => {
         if (!isConnected || !run || !isMobile) {

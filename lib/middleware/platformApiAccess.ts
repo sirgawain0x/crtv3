@@ -3,8 +3,8 @@ import { rateLimiters } from "@/lib/middleware/rateLimit";
 import {
   extractBearerToken,
   isPlatformApiAccessConfigured,
+  getPlatformApiKeysFromEnv,
   matchPlatformApiKey,
-  parsePlatformApiKeysFromEnv,
 } from "@/lib/middleware/platformApiKeys";
 import {
   buildX402PaymentRequiredResponse,
@@ -41,7 +41,7 @@ export async function requirePlatformApiAccess(
     return { allowed: true, tier: "public" };
   }
 
-  const keys = parsePlatformApiKeysFromEnv();
+  const keys = getPlatformApiKeysFromEnv();
   const bearer = extractBearerToken(request.headers.get("authorization"));
 
   if (bearer) {
@@ -85,7 +85,11 @@ export async function requirePlatformApiAccess(
     };
   }
 
-  const payment = await verifyX402PaymentFromRequest(request, { recipient, priceUsdc });
+  const payment = await verifyX402PaymentFromRequest(request, {
+    recipient,
+    priceUsdc,
+    resource: options.resource,
+  });
   if (payment.ok) {
     serverLogger.debug("[platformApiAccess] x402 payment verified", {
       resource: options.resource,

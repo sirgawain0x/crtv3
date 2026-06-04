@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ExternalLink, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Player, PlayerLoading } from "@/components/Player/Player";
 import { getDetailPlaybackSource } from "@/lib/hooks/livepeer/useDetailPlaybackSources";
 import { useCreativeTVUrlResolve } from "@/hooks/useCreativeTVUrlResolve";
+import { getCreativeTVEmbedUrlForParsed } from "@/lib/utils/creative-tv-url";
 import type { Src } from "@livepeer/react";
 import { logger } from "@/lib/utils/logger";
 
@@ -74,6 +75,21 @@ export function CreativeTVUrlEmbed({
       : state.status === "fallback"
         ? state.result.fallbackUrl
         : undefined;
+
+  const iframeSrc = useMemo(() => {
+    const parsed =
+      state.status === "resolved"
+        ? state.result.parsed
+        : state.status === "fallback"
+          ? state.result.parsed
+          : undefined;
+
+    if (parsed) {
+      return getCreativeTVEmbedUrlForParsed(parsed, { origin: siteOrigin }) ?? fallbackUrl;
+    }
+
+    return fallbackUrl;
+  }, [state, siteOrigin, fallbackUrl]);
 
   const showIframeFallback =
     state.status === "fallback" ||
@@ -150,11 +166,11 @@ export function CreativeTVUrlEmbed({
         </div>
       ) : null}
 
-      {showIframeFallback && fallbackUrl ? (
+      {showIframeFallback && iframeSrc ? (
         <div className="mt-4 space-y-3">
           <div className="overflow-hidden rounded-lg border">
             <iframe
-              src={fallbackUrl}
+              src={iframeSrc}
               title="Creative TV video"
               className="aspect-video w-full border-0"
               allow="autoplay; encrypted-media; picture-in-picture; fullscreen"

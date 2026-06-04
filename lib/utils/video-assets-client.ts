@@ -138,6 +138,12 @@ export async function fetchPlaybackByAssetId(
 
     return (await response.json()) as VideoAssetPlaybackResponse;
   } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw error;
+    }
+    if (error instanceof Error && error.name === "AbortError") {
+      throw error;
+    }
     logger.error(`[fetchPlaybackByAssetId] Error fetching playback for ${assetId}:`, error);
     throw error;
   }

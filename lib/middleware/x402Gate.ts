@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { USDC_TOKEN_ADDRESSES } from "@/lib/contracts/USDCToken";
+import { consumePaymentReceipt } from "@/lib/middleware/paymentReplayGuard";
 import {
   parsePaymentProofHeader,
   verifyUsdcPaymentProof,
@@ -77,7 +78,7 @@ export function buildX402PaymentRequiredResponse(options: X402GateOptions): Next
 
 export async function verifyX402PaymentFromRequest(
   request: NextRequest,
-  options: { recipient: string; priceUsdc: string },
+  options: { recipient: string; priceUsdc: string; resource?: string },
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const proof =
     parsePaymentProofHeader(request.headers.get("X-Payment-Proof")) ||
@@ -87,13 +88,26 @@ export async function verifyX402PaymentFromRequest(
     return { ok: false, error: "Missing payment proof" };
   }
 
+  let requiredAmount: bigint;
+  try {
+    requiredAmount = BigInt(options.priceUsdc);
+  } catch {
+    return { ok: false, error: "Invalid price configuration" };
+  }
+
   const verification = await verifyUsdcPaymentProof(proof, {
     recipient: options.recipient,
-    requiredAmount: BigInt(options.priceUsdc),
+    requiredAmount,
   });
 
   if (!verification.valid) {
     return { ok: false, error: verification.error };
+  }
+
+  const resource = options.resource?.trim() || "platform-api";
+  const replay = await consumePaymentReceipt(proof.transactionHash, resource);
+  if (!replay.ok) {
+    return { ok: false, error: replay.error };
   }
 
   return { ok: true };

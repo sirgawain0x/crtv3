@@ -26,6 +26,13 @@ function parseCommaList(raw: string | undefined): string[] {
     .filter(Boolean);
 }
 
+let cachedKeys: ParsedPlatformApiKeys | null = null;
+let cachedEnvFingerprint: string | null = null;
+
+function platformApiKeysEnvFingerprint(env: NodeJS.ProcessEnv): string {
+  return `${env.CREATIVE_PLATFORM_ADMIN_API_KEYS ?? ""}|${env.CREATIVE_PLATFORM_PARTNER_API_KEYS ?? ""}`;
+}
+
 export function parsePlatformApiKeysFromEnv(env: NodeJS.ProcessEnv = process.env): ParsedPlatformApiKeys {
   const adminSecrets = parseCommaList(env.CREATIVE_PLATFORM_ADMIN_API_KEYS);
 
@@ -43,6 +50,22 @@ export function parsePlatformApiKeysFromEnv(env: NodeJS.ProcessEnv = process.env
   }
 
   return { adminSecrets, partnerKeys };
+}
+
+/** Cached in production to avoid re-parsing env on every Platform API request. */
+export function getPlatformApiKeysFromEnv(env: NodeJS.ProcessEnv = process.env): ParsedPlatformApiKeys {
+  if (env.NODE_ENV !== "production") {
+    return parsePlatformApiKeysFromEnv(env);
+  }
+
+  const fingerprint = platformApiKeysEnvFingerprint(env);
+  if (cachedKeys && cachedEnvFingerprint === fingerprint) {
+    return cachedKeys;
+  }
+
+  cachedKeys = parsePlatformApiKeysFromEnv(env);
+  cachedEnvFingerprint = fingerprint;
+  return cachedKeys;
 }
 
 export function extractBearerToken(authorizationHeader: string | null): string | null {
@@ -80,7 +103,7 @@ export function isPlatformApiAccessConfigured(env: NodeJS.ProcessEnv = process.e
     return true;
   }
 
-  const keys = parsePlatformApiKeysFromEnv(env);
+  const keys = getPlatformApiKeysFromEnv(env);
   return (
     keys.adminSecrets.length > 0 ||
     keys.partnerKeys.size > 0 ||
