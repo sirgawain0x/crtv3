@@ -1,6 +1,7 @@
 // components/Navbar.tsx
 "use client";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import Image from "next/image";
 import { useState, useEffect, useRef } from "react";
 import {
@@ -179,6 +180,7 @@ export default function Navbar() {
   const shouldShowMetokens = hasMetokens || meTokenLoading || holdingsLoading;
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const pathname = usePathname();
   const accountDropdownRef = useRef<AccountDropdownHandle>(null);
   const [copySuccess, setCopySuccess] = useState(false);
 
@@ -209,18 +211,20 @@ export default function Navbar() {
     const body = document.body;
     const prevHtmlOverflow = html.style.overflow;
     const prevBodyOverflow = body.style.overflow;
-    const prevBodyTouchAction = body.style.touchAction;
 
     html.style.overflow = "hidden";
     body.style.overflow = "hidden";
-    body.style.touchAction = "none";
 
     return () => {
       html.style.overflow = prevHtmlOverflow;
       body.style.overflow = prevBodyOverflow;
-      body.style.touchAction = prevBodyTouchAction;
     };
   }, [isMenuOpen]);
+
+  // Close menu on navigation (e.g. logo link has no explicit close handler)
+  useEffect(() => {
+    setIsMenuOpen(false);
+  }, [pathname]);
   const [currentChainName, setCurrentChainName] = useState(currentChain.name);
   const [isScrolled, setIsScrolled] = useState(false);
 
