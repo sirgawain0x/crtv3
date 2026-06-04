@@ -1,6 +1,7 @@
 // components/Navbar.tsx
 "use client";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import Image from "next/image";
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
@@ -105,6 +106,9 @@ const mobileMemberNavLinkClass = `
   text-[#EC406A]
 `;
 
+/** Matches Tailwind `md` — mobile nav is hidden at 768px and above */
+const MOBILE_NAV_MEDIA_QUERY = "(max-width: 767px)";
+
 // Add this near the top with other utility functions
 const getChainGradient = (chain: ViemChain) => {
   switch (chain.id) {
@@ -178,6 +182,7 @@ export default function Navbar() {
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const pathname = usePathname();
   const accountDropdownRef = useRef<AccountDropdownHandle>(null);
   const [copySuccess, setCopySuccess] = useState(false);
 
@@ -191,14 +196,41 @@ export default function Navbar() {
     return () => window.removeEventListener('crtv:open-mobile-menu', openMobileMenu);
   }, []);
 
+  // Close menu when viewport grows past mobile (e.g. rotate tablet) so scroll lock cannot stick
+  useEffect(() => {
+    const mq = window.matchMedia(MOBILE_NAV_MEDIA_QUERY);
+    const handleChange = () => {
+      if (!mq.matches) setIsMenuOpen(false);
+    };
+    mq.addEventListener("change", handleChange);
+    return () => mq.removeEventListener("change", handleChange);
+  }, []);
+
+  // Trap scroll inside the mobile menu panel (prevent background page scroll on touch)
   useEffect(() => {
     if (!isMenuOpen) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
+
+    const mq = window.matchMedia(MOBILE_NAV_MEDIA_QUERY);
+    if (!mq.matches) return;
+
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtmlOverflow = html.style.overflow;
+    const prevBodyOverflow = body.style.overflow;
+
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+
     return () => {
-      document.body.style.overflow = previousOverflow;
+      html.style.overflow = prevHtmlOverflow;
+      body.style.overflow = prevBodyOverflow;
     };
   }, [isMenuOpen]);
+
+  // Close menu on navigation (e.g. logo link has no explicit close handler)
+  useEffect(() => {
+    setIsMenuOpen(false);
+  }, [pathname]);
   const [currentChainName, setCurrentChainName] = useState(currentChain.name);
   const [isScrolled, setIsScrolled] = useState(false);
 
@@ -367,23 +399,32 @@ export default function Navbar() {
               <AnimatedMenuIcon isOpen={isMenuOpen} />
             </Button>
           </div>
+        </div>
+      </div>
 
-          {isMounted &&
-            isMenuOpen &&
-            createPortal(
-              <div
-                className={
-                  "fixed inset-x-0 top-16 z-50 flex min-h-0 flex-col " +
-                  "h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain touch-pan-y " +
-                  "[-webkit-overflow-scrolling:touch] p-4 shadow-md md:hidden " +
-                  "bg-white pb-[calc(2rem+env(safe-area-inset-bottom,0px))] dark:bg-gray-900 " +
-                  "animate-in slide-in-from-top-5"
-                }
-                aria-hidden={false}
-              >
+      {isMounted &&
+        isMenuOpen &&
+        createPortal(
+          <div
+            id="mobile-nav-menu"
+            className={
+              "fixed inset-x-0 top-16 bottom-0 z-50 flex flex-col overflow-hidden md:hidden " +
+              "bg-white dark:bg-gray-900 shadow-md animate-in slide-in-from-top-5"
+            }
+            role="dialog"
+            aria-modal="true"
+            aria-label="Main menu"
+          >
             <div
               className={
-                "relative z-20 grid gap-4 rounded-md " +
+                "flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y " +
+                "[-webkit-overflow-scrolling:touch] p-4 " +
+                "pb-[calc(2rem+env(safe-area-inset-bottom,0px))]"
+              }
+            >
+            <div
+              className={
+                "relative grid gap-4 rounded-md " +
                 "text-popover-foreground"
               }
             >
@@ -684,12 +725,10 @@ export default function Navbar() {
               </HydrationSafe>
 
             </div>
-              </div>,
-              document.body
-            )}
-
-        </div>
-      </div>
+            </div>
+          </div>,
+          document.body
+        )}
     </header>
   );
 }
