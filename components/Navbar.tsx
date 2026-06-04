@@ -104,6 +104,9 @@ const mobileMemberNavLinkClass = `
   text-[#EC406A]
 `;
 
+/** Matches Tailwind `md` — mobile nav is hidden at 768px and above */
+const MOBILE_NAV_MEDIA_QUERY = "(max-width: 767px)";
+
 // Add this near the top with other utility functions
 const getChainGradient = (chain: ViemChain) => {
   switch (chain.id) {
@@ -185,9 +188,22 @@ export default function Navbar() {
     return () => window.removeEventListener('crtv:open-mobile-menu', openMobileMenu);
   }, []);
 
+  // Close menu when viewport grows past mobile (e.g. rotate tablet) so scroll lock cannot stick
+  useEffect(() => {
+    const mq = window.matchMedia(MOBILE_NAV_MEDIA_QUERY);
+    const handleChange = () => {
+      if (!mq.matches) setIsMenuOpen(false);
+    };
+    mq.addEventListener("change", handleChange);
+    return () => mq.removeEventListener("change", handleChange);
+  }, []);
+
   // Trap scroll inside the mobile menu panel (prevent background page scroll on touch)
   useEffect(() => {
     if (!isMenuOpen) return;
+
+    const mq = window.matchMedia(MOBILE_NAV_MEDIA_QUERY);
+    if (!mq.matches) return;
 
     const html = document.documentElement;
     const body = document.body;
