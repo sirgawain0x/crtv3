@@ -344,7 +344,32 @@ const nextConfig = {
     ],
   },
   async headers() {
+    const embedCsp = [
+      "default-src 'self'",
+      "img-src 'self' blob: data: https:",
+      "media-src 'self' blob: data: https:",
+      "script-src 'self' 'unsafe-eval' 'unsafe-inline' blob: https://va.vercel-scripts.com https://vercel.live",
+      "style-src 'self' 'unsafe-inline'",
+      "font-src 'self' data:",
+      "connect-src 'self' https: wss: ws:",
+      "frame-src 'self' https:",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+      "frame-ancestors *",
+      "upgrade-insecure-requests",
+    ].join("; ");
+
     return [
+      {
+        source: "/embed/:path*",
+        headers: [
+          {
+            key: "Content-Security-Policy",
+            value: embedCsp,
+          },
+        ],
+      },
       {
         // Apply to all routes
         source: '/(.*)',

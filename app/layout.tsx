@@ -63,6 +63,7 @@ export default async function RootLayout({
     config,
     headersList.get("cookie") ?? undefined
   );
+  const isEmbedRoute = headersList.get("x-crtv-embed-route") === "1";
 
   return (
     <html lang="en" suppressHydrationWarning>
@@ -91,11 +92,11 @@ export default async function RootLayout({
         <LayoutClientChunks />
         <Providers initialState={initialState}>
           <ErrorBoundary>
-            <Tour />
-            <Navbar />
+            {!isEmbedRoute ? <Tour /> : null}
+            {!isEmbedRoute ? <Navbar /> : null}
             <div className="min-h-screen flex flex-col">
               <main className="flex-1">{children}</main>
-              <Footer />
+              {!isEmbedRoute ? <Footer /> : null}
             </div>
           </ErrorBoundary>
         </Providers>

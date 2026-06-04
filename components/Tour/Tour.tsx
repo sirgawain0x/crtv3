@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
     Joyride,
     EVENTS,
@@ -14,7 +14,7 @@ import { useTour } from '@/context/TourContext';
 import { logger } from '@/lib/utils/logger';
 
 type TourStep = Step & {
-    data?: { id: string };
+    data?: { id: string; openMobileMenu?: boolean };
 };
 
 const DESKTOP_STEPS: TourStep[] = [
@@ -23,40 +23,118 @@ const DESKTOP_STEPS: TourStep[] = [
         content: 'Sign in to get started! Click "Get Started" to create your account with just your email.',
         disableBeacon: true,
         spotlightClicks: true,
-        data: { id: 'connect' }
+        placement: 'bottom',
+        data: { id: 'connect' },
     },
     {
         target: '#nav-user-menu',
         content: 'Click your profile to open the menu, then select "Upload" to start adding content.',
         spotlightClicks: true,
-        data: { id: 'user-menu' }
+        placement: 'bottom',
+        data: { id: 'user-menu' },
     },
     {
         target: '#upload-video-form',
         content: 'Upload your video file here. You can drag and drop or select a file.',
         placement: 'bottom',
-        data: { id: 'upload-form' }
+        data: { id: 'upload-form' },
     },
     {
         target: '#publish-video-btn',
         content: 'Once uploaded, click Publish to share it with the world!',
-        data: { id: 'publish-btn' }
+        placement: 'top',
+        data: { id: 'publish-btn' },
     },
     {
         target: '#nav-discover-link',
         content: 'Check out what others are creating on the Discover page.',
-        data: { id: 'discover' }
+        placement: 'bottom',
+        data: { id: 'discover' },
     },
     {
         target: '#nav-trade-link',
         content: 'Buy or sell Creative Coins by creators on the platform in the Trading Market.',
-        data: { id: 'trade' }
+        placement: 'bottom',
+        data: { id: 'trade' },
     },
 ];
 
+const MOBILE_STEPS: TourStep[] = [
+    {
+        target: '#mobile-menu-btn',
+        content: 'Tap the menu icon to open navigation and sign in.',
+        disableBeacon: true,
+        spotlightClicks: true,
+        placement: 'bottom',
+        data: { id: 'connect', openMobileMenu: false },
+    },
+    {
+        target: '#connect-wallet-btn-mobile',
+        content: 'Tap "Get Started" to create your account with just your email.',
+        spotlightClicks: true,
+        placement: 'bottom',
+        data: { id: 'connect-wallet', openMobileMenu: true },
+    },
+    {
+        target: '#nav-user-menu',
+        content: 'After signing in, tap your profile avatar to open account options.',
+        spotlightClicks: true,
+        placement: 'bottom',
+        data: { id: 'user-menu' },
+    },
+    {
+        target: '#nav-upload-link',
+        content: 'Open the menu and choose Upload to add your video.',
+        placement: 'bottom',
+        data: { id: 'upload-form', openMobileMenu: true },
+    },
+    {
+        target: '#publish-video-btn',
+        content: 'After selecting a file, tap Publish to share your video.',
+        placement: 'top',
+        data: { id: 'publish-btn' },
+    },
+    {
+        target: '#mobile-nav-discover-link',
+        content: 'Use Discover in the menu to see what others are creating.',
+        placement: 'bottom',
+        data: { id: 'discover', openMobileMenu: true },
+    },
+    {
+        target: '#mobile-nav-trade-link',
+        content: 'Open Trade in the menu to buy or sell Creative Coins.',
+        placement: 'bottom',
+        data: { id: 'trade', openMobileMenu: true },
+    },
+];
 
+function openMobileMenuForTour() {
+    if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('crtv:open-mobile-menu'));
+    }
+}
 
+function waitForElement(selector: string, timeoutMs = 2500): Promise<boolean> {
+    return new Promise((resolve) => {
+        if (document.querySelector(selector)) {
+            resolve(true);
+            return;
+        }
 
+        const started = Date.now();
+        const interval = window.setInterval(() => {
+            if (document.querySelector(selector)) {
+                window.clearInterval(interval);
+                resolve(true);
+                return;
+            }
+            if (Date.now() - started >= timeoutMs) {
+                window.clearInterval(interval);
+                resolve(false);
+            }
+        }, 100);
+    });
+}
 
 export const Tour = () => {
     const { run, stepIndex, setRun, setStepIndex } = useTour();
@@ -64,7 +142,6 @@ export const Tour = () => {
     const user = useUser();
     const isConnected = !!user;
 
-    // Simple mobile detection
     const [isMobile, setIsMobile] = useState(false);
 
     useEffect(() => {
@@ -77,84 +154,116 @@ export const Tour = () => {
         return () => window.removeEventListener('resize', checkMobile);
     }, []);
 
-    const MOBILE_STEPS: TourStep[] = [
-        {
-            target: '#mobile-menu-btn',
-            content: 'Tap the menu to get started by signing in.',
-            disableBeacon: true,
-            data: { id: 'connect' }
-        },
-        {
-            target: '#nav-user-menu',
-            content:
-                'Tap your profile avatar to open the account menu, then select "Upload" to add your own content.',
-            spotlightClicks: true,
-            data: { id: 'user-menu' }
-        },
-        {
-            target: '#mobile-menu-btn',
-            content: 'Select "Upload" in the menu to access the video upload form.',
-            data: { id: 'upload-form' }
-        },
-        {
-            target: '#mobile-menu-btn',
-            content: 'After selecting a file, use the "Publish" button to share your video.',
-            data: { id: 'publish-btn' }
-        },
-        {
-            target: '#mobile-menu-btn',
-            content: 'Use the "Discover" link in the menu to see what others are creating.',
-            data: { id: 'discover' }
-        },
-        {
-            target: '#mobile-menu-btn',
-            content: 'Access the "Trading Market" via the menu to buy or sell Creative Coins.',
-            data: { id: 'trade' }
-        },
-    ];
+    const steps = useMemo(
+        () => (isMobile ? MOBILE_STEPS : DESKTOP_STEPS),
+        [isMobile],
+    );
 
-    const steps = isMobile ? MOBILE_STEPS : DESKTOP_STEPS;
+    const getStepIndex = useCallback(
+        (id: string) => steps.findIndex((step) => step.data?.id === id),
+        [steps],
+    );
 
-    // Helper to find step index by ID
-    const getStepIndex = (id: string) => {
-        return steps.findIndex(s => s.data?.id === id);
-    };
+    const prepareStepTarget = useCallback(
+        async (step?: TourStep) => {
+            if (!step?.data?.openMobileMenu || !isMobile) {
+                return true;
+            }
+            openMobileMenuForTour();
+            return waitForElement(String(step.target));
+        },
+        [isMobile],
+    );
+
+    const advanceToStep = useCallback(
+        async (nextIndex: number) => {
+            const nextStep = steps[nextIndex];
+            if (nextStep?.data?.openMobileMenu && isMobile) {
+                await prepareStepTarget(nextStep);
+            }
+            setStepIndex(nextIndex);
+        },
+        [isMobile, prepareStepTarget, setStepIndex, steps],
+    );
 
     const handleJoyrideCallback = (data: CallBackProps) => {
         const { index, status, type, action } = data;
         const currentStep = steps[index];
         const currentId = currentStep?.data?.id;
 
-        logger.debug("Tour: Callback", { index, status, type, action, currentId });
+        logger.debug('Tour: Callback', { index, status, type, action, currentId });
 
-        if ([STATUS.FINISHED, STATUS.SKIPPED].includes(status as any)) {
+        if ([STATUS.FINISHED, STATUS.SKIPPED].includes(status as typeof STATUS.FINISHED)) {
             setRun(false);
             localStorage.setItem('crtv3_tour_completed', 'true');
-        } else if (type === EVENTS.STEP_AFTER) {
-            // Logic to handle specific transitions if needed, 
-            // otherwise just let it go to next index
-            setStepIndex(index + 1);
-        } else if (type === EVENTS.TARGET_NOT_FOUND) {
-            // Wait
+            return;
+        }
+
+        if (type === EVENTS.TARGET_NOT_FOUND) {
+            logger.warn('Tour: target not found', { target: currentStep?.target, index });
+            if (index < steps.length - 1) {
+                window.setTimeout(() => {
+                    void advanceToStep(index + 1);
+                }, 400);
+            }
+            return;
+        }
+
+        if (type === EVENTS.STEP_AFTER && action !== 'prev') {
+            if (index < steps.length - 1) {
+                void advanceToStep(index + 1);
+            }
         }
     };
 
-    // Auto-advance logic refactored to use IDs
-
-    // 1. Authenticated -> Go to next relevant step
-    // Desktop: Connect (0) -> User Menu (1)
-    // Mobile: Connect (1) -> Open Menu for Upload (2)
     useEffect(() => {
-        if (isConnected && run) {
-            // If we are on the connect step, move forward
-            const connectIndex = getStepIndex('connect');
-            if (stepIndex === connectIndex) {
-                setStepIndex(connectIndex + 1);
-            }
+        if (!run || !isMobile) {
+            return;
         }
-    }, [isConnected, stepIndex, run, steps]);
 
-    // 2. Navigation to /upload
+        const currentStep = steps[stepIndex];
+        if (!currentStep?.data?.openMobileMenu) {
+            return;
+        }
+
+        let cancelled = false;
+        void (async () => {
+            await prepareStepTarget(currentStep);
+            if (cancelled) {
+                return;
+            }
+        })();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [run, stepIndex, isMobile, steps, prepareStepTarget]);
+
+    useEffect(() => {
+        if (!isConnected || !run || !isMobile) {
+            return;
+        }
+
+        const connectIndex = getStepIndex('connect');
+        const connectWalletIndex = getStepIndex('connect-wallet');
+        if (stepIndex === connectIndex || stepIndex === connectWalletIndex) {
+            window.setTimeout(() => {
+                setStepIndex(getStepIndex('user-menu'));
+            }, 400);
+        }
+    }, [isConnected, stepIndex, run, isMobile, getStepIndex, setStepIndex]);
+
+    useEffect(() => {
+        if (!isConnected || !run || isMobile) {
+            return;
+        }
+
+        const connectIndex = getStepIndex('connect');
+        if (stepIndex === connectIndex) {
+            window.setTimeout(() => setStepIndex(connectIndex + 1), 300);
+        }
+    }, [isConnected, stepIndex, run, isMobile, getStepIndex, setStepIndex]);
+
     useEffect(() => {
         if (pathname.startsWith('/upload') && run) {
             const uploadFormIndex = getStepIndex('upload-form');
@@ -162,9 +271,8 @@ export const Tour = () => {
                 setStepIndex(uploadFormIndex);
             }
         }
-    }, [pathname, stepIndex, run, steps]);
+    }, [pathname, stepIndex, run, getStepIndex, setStepIndex]);
 
-    // 3. Publish Button Appearance
     useEffect(() => {
         let interval: NodeJS.Timeout;
         const uploadFormIndex = getStepIndex('upload-form');
@@ -178,9 +286,8 @@ export const Tour = () => {
             }, 1000);
         }
         return () => clearInterval(interval);
-    }, [stepIndex, run, steps]);
+    }, [stepIndex, run, getStepIndex, setStepIndex]);
 
-    // 4. Navigation to /discover
     useEffect(() => {
         if (pathname.startsWith('/discover') && run) {
             const discoverIndex = getStepIndex('discover');
@@ -188,43 +295,51 @@ export const Tour = () => {
                 setStepIndex(discoverIndex);
             }
         }
-    }, [pathname, stepIndex, run, steps]);
+    }, [pathname, stepIndex, run, getStepIndex, setStepIndex]);
 
-
-    // Custom Tooltip component
     const TourTooltip = ({
         index,
         step,
-        backProps,
         primaryProps,
         skipProps,
         tooltipProps,
         isLastStep,
         size,
-    }: any) => {
+    }: {
+        index: number;
+        step: Step;
+        primaryProps: React.ComponentProps<'button'>;
+        skipProps: React.ComponentProps<'button'>;
+        tooltipProps: React.ComponentProps<'div'>;
+        isLastStep: boolean;
+        size: number;
+    }) => {
         return (
-            <div {...tooltipProps} className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-2xl border border-indigo-100 dark:border-indigo-900 max-w-sm relative overflow-hidden">
-                {/* Decorative BG element */}
-                <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 opacity-10 rounded-bl-full -mr-4 -mt-4"></div>
+            <div
+                {...tooltipProps}
+                className="relative z-[10001] w-[min(calc(100vw-2rem),22rem)] overflow-hidden rounded-2xl border border-indigo-100 bg-white p-5 shadow-2xl dark:border-indigo-900 dark:bg-slate-900"
+            >
+                <div className="absolute -right-4 -top-4 h-16 w-16 rounded-bl-full bg-gradient-to-br from-indigo-500 to-purple-600 opacity-10" />
 
-                <div className="relative z-10 text-slate-800 dark:text-slate-100">
+                <div className="relative z-10 text-sm leading-relaxed text-slate-800 dark:text-slate-100">
                     {step.content}
                 </div>
 
-                <div className="mt-6 flex justify-between items-center relative z-10 w-full">
-                    <div className="flex gap-2">
-                        <button {...skipProps} className="px-3 py-1.5 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 text-sm font-medium transition">
-                            Skip
-                        </button>
-                    </div>
-
-                    <div className="flex gap-2">
-                        <button {...primaryProps} className="px-4 py-2 bg-indigo-600 text-white text-sm font-bold rounded-full hover:bg-indigo-700 transition shadow-lg shadow-indigo-200 dark:shadow-none">
-                            {isLastStep ? 'Finish' : 'Next Step'}
-                        </button>
-                    </div>
+                <div className="relative z-10 mt-5 flex items-center justify-between gap-2">
+                    <button
+                        {...skipProps}
+                        className="px-3 py-1.5 text-sm font-medium text-slate-500 transition hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                    >
+                        Skip
+                    </button>
+                    <button
+                        {...primaryProps}
+                        className="rounded-full bg-indigo-600 px-4 py-2 text-sm font-bold text-white shadow-lg shadow-indigo-200 transition hover:bg-indigo-700 dark:shadow-none"
+                    >
+                        {isLastStep ? 'Finish' : 'Next Step'}
+                    </button>
                 </div>
-                <div className="mt-2 text-center text-xs text-slate-400 font-medium">
+                <div className="relative z-10 mt-2 text-center text-xs font-medium text-slate-400">
                     Step {index + 1} of {size}
                 </div>
             </div>
@@ -241,9 +356,27 @@ export const Tour = () => {
             showProgress
             showSkipButton
             disableOverlayClose
+            scrollToFirstStep
+            scrollOffset={96}
+            disableScrollParentFix={false}
+            spotlightPadding={10}
+            floaterProps={{
+                disableAnimation: true,
+                styles: {
+                    floater: {
+                        filter: 'none',
+                    },
+                },
+            }}
             styles={{
                 options: {
                     primaryColor: '#4f46e5',
+                    zIndex: 10000,
+                },
+                overlay: {
+                    zIndex: 9999,
+                },
+                spotlight: {
                     zIndex: 10000,
                 },
             }}

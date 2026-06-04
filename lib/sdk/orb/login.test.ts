@@ -30,6 +30,20 @@ describe('orb session storage', () => {
     unsubscribe();
   });
 
+  it('does not notify when session payload is unchanged', () => {
+    const listener = vi.fn();
+    const unsubscribe = subscribeOrbSession(listener);
+
+    saveStoredOrbSession({ accessToken: 'same-token' });
+    expect(listener).toHaveBeenCalledTimes(1);
+    listener.mockClear();
+
+    saveStoredOrbSession({ accessToken: 'same-token' });
+    expect(listener).not.toHaveBeenCalled();
+
+    unsubscribe();
+  });
+
   it('dispatches a session change event on save and clear', () => {
     const handler = vi.fn();
     window.addEventListener(ORB_SESSION_CHANGE_EVENT, handler);
