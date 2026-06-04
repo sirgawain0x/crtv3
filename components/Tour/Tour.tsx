@@ -361,7 +361,6 @@ export const Tour = () => {
             disableScrollParentFix={false}
             spotlightPadding={10}
             floaterProps={{
-                disableAnimation: true,
                 styles: {
                     floater: {
                         filter: 'none',
@@ -369,6 +368,9 @@ export const Tour = () => {
                 },
             }}
             styles={{
+                tooltip: {
+                    transition: 'none',
+                },
                 options: {
                     primaryColor: '#4f46e5',
                     zIndex: 10000,
