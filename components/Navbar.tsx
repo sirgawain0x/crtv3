@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import {
   SITE_LOGO,
   SITE_NAME,
@@ -180,9 +181,14 @@ export default function Navbar() {
   const shouldShowMetokens = hasMetokens || meTokenLoading || holdingsLoading;
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
   const pathname = usePathname();
   const accountDropdownRef = useRef<AccountDropdownHandle>(null);
   const [copySuccess, setCopySuccess] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   useEffect(() => {
     const openMobileMenu = () => setIsMenuOpen(true);
@@ -396,20 +402,26 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* Mobile menu — sibling to header bar so fixed positioning and scroll work on touch devices */}
-      <div
-        id="mobile-nav-menu"
-        className={
-          "fixed inset-x-0 top-16 bottom-0 z-50 flex flex-col overflow-hidden md:hidden bg-white dark:bg-gray-900 shadow-md " +
-          (isMenuOpen ? "animate-in slide-in-from-top-5" : "hidden")
-        }
-        aria-hidden={!isMenuOpen}
-        inert={!isMenuOpen}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Main menu"
-      >
-        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y [-webkit-overflow-scrolling:touch] p-4 pb-32">
+      {isMounted &&
+        isMenuOpen &&
+        createPortal(
+          <div
+            id="mobile-nav-menu"
+            className={
+              "fixed inset-x-0 top-16 bottom-0 z-50 flex flex-col overflow-hidden md:hidden " +
+              "bg-white dark:bg-gray-900 shadow-md animate-in slide-in-from-top-5"
+            }
+            role="dialog"
+            aria-modal="true"
+            aria-label="Main menu"
+          >
+            <div
+              className={
+                "flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y " +
+                "[-webkit-overflow-scrolling:touch] p-4 " +
+                "pb-[calc(2rem+env(safe-area-inset-bottom,0px))]"
+              }
+            >
             <div
               className={
                 "relative grid gap-4 rounded-md " +
@@ -712,11 +724,11 @@ export default function Navbar() {
                 )}
               </HydrationSafe>
 
-              {/* Navigation Links */}
-
             </div>
-        </div>
-      </div>
+            </div>
+          </div>,
+          document.body
+        )}
     </header>
   );
 }
