@@ -27,6 +27,17 @@ function readClientEnv(...keys: string[]): string | undefined {
   return undefined;
 }
 
+/** Resolve relative app proxy paths to absolute URLs for Orb SDK fetch calls. */
+function resolveClientUrl(pathOrUrl: string): string {
+  if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) {
+    return pathOrUrl;
+  }
+  if (typeof window !== 'undefined') {
+    return new URL(pathOrUrl, window.location.origin).toString();
+  }
+  return pathOrUrl;
+}
+
 /** Resolved Orb/Lens auth + media config from app env (@orbclub/modules does not read env). */
 export function getOrbLoginConfig(): OrbLoginConfig {
   const qr: QrAuthPluginConfig = {};
@@ -35,12 +46,15 @@ export function getOrbLoginConfig(): OrbLoginConfig {
   const graphqlUrl = readClientEnv('NEXT_PUBLIC_LENS_GRAPHQL_URL');
   if (graphqlUrl) lens.graphqlUrl = graphqlUrl;
 
-  qr.initUrl =
+  const initPath =
     readClientEnv('NEXT_PUBLIC_QR_INIT_URL', 'NEXT_PUBLIC_ORB_QR_INIT_URL') ??
     ORB_APP_QR_INIT_PROXY;
-  qr.pollUrl =
+  const pollPath =
     readClientEnv('NEXT_PUBLIC_QR_POLL_URL', 'NEXT_PUBLIC_ORB_QR_POLL_URL') ??
     ORB_APP_QR_POLL_PROXY;
+
+  qr.initUrl = resolveClientUrl(initPath);
+  qr.pollUrl = resolveClientUrl(pollPath);
 
   return { qr, lens };
 }

@@ -13,6 +13,14 @@ export interface VideoAssetResponse {
   [key: string]: any;
 }
 
+export interface VideoAssetPlaybackResponse {
+  playbackId: string;
+  title?: string;
+  thumbnailUri?: string;
+  requiresMetoken?: boolean;
+  fallbackUrl: string;
+}
+
 /**
  * Fetch video asset by playback ID (client-safe)
  */
@@ -97,6 +105,40 @@ export async function fetchVideoAssetByPlaybackId(
       `[fetchVideoAssetByPlaybackId] Error fetching asset for playbackId ${playbackId}:`,
       error
     );
+    throw error;
+  }
+}
+
+/**
+ * Fetch published playback metadata by Livepeer asset UUID (client-safe, CORS-enabled).
+ */
+export async function fetchPlaybackByAssetId(
+  assetId: string,
+  opts?: { apiBaseUrl?: string; signal?: AbortSignal },
+): Promise<VideoAssetPlaybackResponse | null> {
+  const path = `/api/video-assets/by-asset-id/${encodeURIComponent(assetId)}/playback`;
+  const url = opts?.apiBaseUrl
+    ? `${opts.apiBaseUrl.replace(/\/$/, "")}${path}`
+    : path;
+
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: { "Content-Type": "application/json" },
+      signal: opts?.signal,
+    });
+
+    if (response.status === 404) {
+      return null;
+    }
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch playback (${response.status})`);
+    }
+
+    return (await response.json()) as VideoAssetPlaybackResponse;
+  } catch (error) {
+    logger.error(`[fetchPlaybackByAssetId] Error fetching playback for ${assetId}:`, error);
     throw error;
   }
 }

@@ -195,6 +195,12 @@ export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const accountDropdownRef = useRef<AccountDropdownHandle>(null);
   const [copySuccess, setCopySuccess] = useState(false);
+
+  useEffect(() => {
+    const openMobileMenu = () => setIsMenuOpen(true);
+    window.addEventListener('crtv:open-mobile-menu', openMobileMenu);
+    return () => window.removeEventListener('crtv:open-mobile-menu', openMobileMenu);
+  }, []);
   const [currentChainName, setCurrentChainName] = useState(currentChain.name);
   const [isScrolled, setIsScrolled] = useState(false);
 
@@ -440,7 +446,7 @@ export default function Navbar() {
                         openAuthModal();
                         setIsMenuOpen(false);
                       }}
-                      id="connect-wallet-btn"
+                      id="connect-wallet-btn-mobile"
                     >
                       Get Started
                     </Button>

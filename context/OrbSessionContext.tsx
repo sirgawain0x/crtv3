@@ -62,7 +62,7 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
   const [accountMenuRefreshSignal, setAccountMenuRefreshSignal] = useState(0);
   const user = useUser();
   const { account: modularAccount } = useModularAccount();
-  const { getAuthHeaders } = useWalletAuth();
+  const { getAuthHeaders, isReady: isWalletAuthReady } = useWalletAuth();
   const orb = useMemo(() => getOrbLogin(), []);
 
   const walletAddress = modularAccount?.address || user?.address || null;
@@ -98,11 +98,16 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
   const syncSession = useCallback(async () => {
     if (!session?.accessToken) return null;
     try {
-      const synced = await orb.syncSession({
-        accessToken: session.accessToken,
-        refreshToken: session.refreshToken,
-        authenticationId: session.authenticationId,
-      });
+      const synced = await Promise.race([
+        orb.syncSession({
+          accessToken: session.accessToken,
+          refreshToken: session.refreshToken,
+          authenticationId: session.authenticationId,
+        }),
+        new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error('Orb session sync timed out')), 20_000);
+        }),
+      ]);
       if (!synced?.accessToken) {
         invalidateOrbSession();
         return null;
@@ -133,8 +138,22 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
 
   /** Clear revoked/expired Orb tokens so Songchain and feeds stay read-only instead of erroring. */
   useEffect(() => {
-    if (!session?.accessToken) return;
-    void syncSession();
+    const token = session?.accessToken;
+    if (!token) return;
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        await syncSession();
+      } catch {
+        /* syncSession handles stale sessions internally */
+      }
+      if (cancelled) return;
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [session?.accessToken, syncSession]);
 
   const linkProfile = useCallback(
@@ -161,6 +180,15 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
 
       setIsLinking(true);
       try {
+        if (!isWalletAuthReady) {
+          setLinkStatus('needs_wallet');
+          const message =
+            'Wallet is still initializing. Wait a moment, then tap Sync profile again.';
+          setLoginError(message);
+          toast.info(message);
+          return;
+        }
+
         let authHeaders: Record<string, string>;
         try {
           authHeaders = await getAuthHeaders();
@@ -200,7 +228,7 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
         setIsLinking(false);
       }
     },
-    [session, modularAccount?.address, user?.address, getAuthHeaders],
+    [session, modularAccount?.address, user?.address, getAuthHeaders, isWalletAuthReady],
   );
 
   useEffect(() => {
@@ -261,7 +289,7 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
 
         const wallet = modularAccount?.address || user?.address;
         if (wallet) {
-          await linkProfile(wallet);
+          void linkProfile(wallet).catch(() => undefined);
         } else {
           setLinkStatus('needs_wallet');
           toast.info(

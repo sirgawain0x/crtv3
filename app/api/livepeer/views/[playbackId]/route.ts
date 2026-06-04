@@ -9,6 +9,11 @@ import {
 import { getStoredViewsCount } from '@/lib/livepeer/sync-view-count';
 import { serverLogger } from '@/lib/utils/logger';
 import { LIVEPEER_NOT_CONFIGURED } from '@/lib/sdk/livepeer/studioAuth';
+import {
+  platformApiOptionsResponse,
+  requirePlatformApiAccess,
+} from '@/lib/middleware/platformApiAccess';
+import { PLATFORM_API_CORS_HEADERS } from '@/lib/middleware/x402Gate';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -18,15 +23,25 @@ const noStoreHeaders = {
   'Cache-Control': 'no-store, no-cache, max-age=0, must-revalidate',
   Pragma: 'no-cache',
   Expires: '0',
+  ...PLATFORM_API_CORS_HEADERS,
 };
 
 /**
  * Read-only endpoint: returns max(Livepeer views, database views_count).
  */
+export async function OPTIONS() {
+  return platformApiOptionsResponse();
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ playbackId: string }> },
 ) {
+  const access = await requirePlatformApiAccess(request, { resource: 'views.metrics' });
+  if (!access.allowed) {
+    return access.response;
+  }
+
   try {
     const { playbackId } = await params;
 

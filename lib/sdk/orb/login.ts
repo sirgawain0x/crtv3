@@ -74,11 +74,25 @@ export function getOrbSessionServerSnapshot(): StoredOrbSession | null {
 
 export function saveStoredOrbSession(session: StoredOrbSession | null): void {
   if (typeof window === 'undefined') return;
+
+  const existingRaw = localStorage.getItem(ORB_SESSION_STORAGE_KEY);
+
   if (!session?.accessToken) {
+    if (!existingRaw) {
+      return;
+    }
     localStorage.removeItem(ORB_SESSION_STORAGE_KEY);
-  } else {
-    localStorage.setItem(ORB_SESSION_STORAGE_KEY, JSON.stringify(session));
+    invalidateOrbSessionCache();
+    notifyOrbSessionChange();
+    return;
   }
+
+  const serialized = JSON.stringify(session);
+  if (existingRaw === serialized) {
+    return;
+  }
+
+  localStorage.setItem(ORB_SESSION_STORAGE_KEY, serialized);
   invalidateOrbSessionCache();
   notifyOrbSessionChange();
 }
