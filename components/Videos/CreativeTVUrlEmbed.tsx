@@ -44,29 +44,30 @@ export function CreativeTVUrlEmbed({
     }
 
     const playbackId = state.result.playbackId;
-    let cancelled = false;
+    const controller = new AbortController();
 
     async function loadSources() {
       try {
-        const sources = await getDetailPlaybackSource(playbackId);
-        if (!cancelled) {
-          setPlaybackSources(sources);
-          if (!sources?.length) {
-            setPlayerError("Unable to load playback sources.");
-          }
-        }
-      } catch (error) {
-        if (!cancelled) {
-          logger.error("[CreativeTVUrlEmbed] Failed to load playback sources:", error);
+        const sources = await getDetailPlaybackSource(playbackId, {
+          signal: controller.signal,
+        });
+        setPlaybackSources(sources);
+        if (!sources?.length) {
           setPlayerError("Unable to load playback sources.");
         }
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+        logger.error("[CreativeTVUrlEmbed] Failed to load playback sources:", error);
+        setPlayerError("Unable to load playback sources.");
       }
     }
 
     void loadSources();
 
     return () => {
-      cancelled = true;
+      controller.abort();
     };
   }, [state]);
 
@@ -178,14 +179,14 @@ export function CreativeTVUrlEmbed({
               loading="lazy"
             />
           </div>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <ExternalLink className="h-4 w-4" />
-            {fallbackUrl ? (
+          {fallbackUrl ? (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <ExternalLink className="h-4 w-4" />
               <Link href={fallbackUrl} target="_blank" rel="noopener noreferrer" className="hover:underline">
                 Open on Creative TV
               </Link>
-            ) : null}
-          </div>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
