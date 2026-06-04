@@ -19,6 +19,18 @@ describe('formatOrbAuthError', () => {
     );
   });
 
+  it('keeps actionable timeout copy for QR, wallet, and profile link waits', () => {
+    expect(formatOrbAuthError('QR sign-in timed out. Try again or cancel.')).toMatch(
+      /try again or cancel/i,
+    );
+    expect(formatOrbAuthError('Wallet signature timed out. Try again.')).toMatch(
+      /signature prompt/i,
+    );
+    expect(formatOrbAuthError('Linking Orb to your wallet timed out.')).toMatch(
+      /Sync profile/i,
+    );
+  });
+
   it('maps revoked Orb/Lens session copy', () => {
     expect(
       formatOrbAuthError(

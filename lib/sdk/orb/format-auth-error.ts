@@ -23,6 +23,18 @@ export function formatOrbAuthError(error: unknown): string {
   ) {
     return 'Orb sign-in is temporarily unavailable. Please try again in a moment.';
   }
+  if (lower.includes('wallet signature timed out')) {
+    return 'Wallet signature timed out. Try again and approve the signature prompt.';
+  }
+  if (lower.includes('linking orb')) {
+    return 'Linking Orb to your wallet timed out. Try Sync profile again.';
+  }
+  if (lower.includes('qr sign-in timed out')) {
+    return 'QR sign-in timed out. Try again or cancel.';
+  }
+  if (lower.includes('timed out') || lower.includes('abort')) {
+    return 'Orb sign-in is taking too long. Please try again in a moment.';
+  }
   if (lower.includes('too many') || lower.includes('rate limit')) {
     return 'Too many sign-in attempts. Please wait a minute and try again.';
   }

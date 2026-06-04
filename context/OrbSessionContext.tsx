@@ -27,6 +27,37 @@ import { toast } from 'sonner';
 
 export type OrbLinkStatus = 'idle' | 'linked' | 'needs_wallet' | 'failed';
 
+const ORB_QR_AUTH_TIMEOUT_MS = 120_000;
+const ORB_SESSION_SYNC_TIMEOUT_MS = 15_000;
+const ORB_WALLET_SIGNATURE_TIMEOUT_MS = 45_000;
+const ORB_PROFILE_LINK_TIMEOUT_MS = 30_000;
+
+function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  message: string,
+  onTimeout?: () => void,
+): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  return new Promise<T>((resolve, reject) => {
+    timeout = setTimeout(() => {
+      onTimeout?.();
+      reject(new Error(message));
+    }, timeoutMs);
+
+    promise.then(
+      (value) => {
+        if (timeout) clearTimeout(timeout);
+        resolve(value);
+      },
+      (error) => {
+        if (timeout) clearTimeout(timeout);
+        reject(error);
+      },
+    );
+  });
+}
+
 type OrbSessionContextValue = {
   session: StoredOrbSession | null;
   lensAccount: string | null;
@@ -42,7 +73,10 @@ type OrbSessionContextValue = {
   connectWithQr: (onInit?: (payload: { qrCode: string; deepLink?: string }) => void) => Promise<void>;
   logout: () => Promise<void>;
   syncSession: () => Promise<StoredOrbSession | null>;
-  linkProfile: (ownerAddress?: string) => Promise<void>;
+  linkProfile: (
+    ownerAddress?: string,
+    sessionOverride?: StoredOrbSession,
+  ) => Promise<void>;
   /** Bumped after Orb sign-in so account menus can reopen with fresh state. */
   accountMenuRefreshSignal: number;
 };
@@ -98,11 +132,15 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
   const syncSession = useCallback(async () => {
     if (!session?.accessToken) return null;
     try {
-      const synced = await orb.syncSession({
-        accessToken: session.accessToken,
-        refreshToken: session.refreshToken,
-        authenticationId: session.authenticationId,
-      });
+      const synced = await withTimeout(
+        orb.syncSession({
+          accessToken: session.accessToken,
+          refreshToken: session.refreshToken,
+          authenticationId: session.authenticationId,
+        }),
+        ORB_SESSION_SYNC_TIMEOUT_MS,
+        'Orb session refresh timed out. Try again in a moment.',
+      );
       if (!synced?.accessToken) {
         invalidateOrbSession();
         return null;
@@ -138,8 +176,8 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
   }, [session?.accessToken, syncSession]);
 
   const linkProfile = useCallback(
-    async (ownerAddress?: string) => {
-      const active = session ?? loadStoredOrbSession();
+    async (ownerAddress?: string, sessionOverride?: StoredOrbSession) => {
+      const active = sessionOverride ?? session ?? loadStoredOrbSession();
       if (!active?.accessToken) return;
 
       const wallet = (
@@ -163,7 +201,11 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
       try {
         let authHeaders: Record<string, string>;
         try {
-          authHeaders = await getAuthHeaders();
+          authHeaders = await withTimeout(
+            getAuthHeaders(),
+            ORB_WALLET_SIGNATURE_TIMEOUT_MS,
+            'Wallet signature timed out. Try again and approve the signature prompt.',
+          );
         } catch (signErr) {
           setLinkStatus('failed');
           const message = formatOrbAuthError(signErr);
@@ -172,19 +214,26 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
           return;
         }
 
-        const res = await fetch('/api/creator-profiles/link-orb', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...authHeaders,
-          },
-          body: JSON.stringify({
-            accessToken: active.accessToken,
-            authenticationId: active.authenticationId,
-            owner_address: wallet,
+        const controller = new AbortController();
+        const res = await withTimeout(
+          fetch('/api/creator-profiles/link-orb', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...authHeaders,
+            },
+            signal: controller.signal,
+            body: JSON.stringify({
+              accessToken: active.accessToken,
+              authenticationId: active.authenticationId,
+              owner_address: wallet,
+            }),
           }),
-        });
-        const data = await res.json();
+          ORB_PROFILE_LINK_TIMEOUT_MS,
+          'Linking Orb to your wallet timed out. Try Sync profile again.',
+          () => controller.abort(),
+        );
+        const data = await res.json().catch(() => ({}));
         if (!res.ok || !data.success) {
           throw new Error(data.error || 'Failed to link Orb profile');
         }
@@ -242,11 +291,15 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
     async (onInit?: (payload: { qrCode: string; deepLink?: string }) => void) => {
       setLoginError(null);
       try {
-        const result = await orb.connectWithQr({
-          onInit: (payload) => {
-            onInit?.({ qrCode: payload.qrCode, deepLink: payload.deepLink });
-          },
-        });
+        const result = await withTimeout(
+          orb.connectWithQr({
+            onInit: (payload) => {
+              onInit?.({ qrCode: payload.qrCode, deepLink: payload.deepLink });
+            },
+          }),
+          ORB_QR_AUTH_TIMEOUT_MS,
+          'QR sign-in timed out. Try again or cancel.',
+        );
 
         const stored: StoredOrbSession = {
           accessToken: result.accessToken,
@@ -261,7 +314,7 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
 
         const wallet = modularAccount?.address || user?.address;
         if (wallet) {
-          await linkProfile(wallet);
+          await linkProfile(wallet, stored);
         } else {
           setLinkStatus('needs_wallet');
           toast.info(

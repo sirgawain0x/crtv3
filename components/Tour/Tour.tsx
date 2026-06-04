@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
     Joyride,
     EVENTS,
@@ -54,9 +54,47 @@ const DESKTOP_STEPS: TourStep[] = [
     },
 ];
 
-
-
-
+const MOBILE_STEPS: TourStep[] = [
+    {
+        target: '#mobile-menu-btn',
+        content: 'Tap the menu to get started by signing in.',
+        disableBeacon: true,
+        placement: 'bottom',
+        data: { id: 'connect' }
+    },
+    {
+        target: '#mobile-menu-btn',
+        content:
+            'Open the menu, tap Get Started or your profile, then choose "Upload" to add your own content.',
+        placement: 'bottom',
+        spotlightClicks: true,
+        data: { id: 'user-menu' }
+    },
+    {
+        target: '#mobile-menu-btn',
+        content: 'Select "Upload" in the menu to access the video upload form.',
+        placement: 'bottom',
+        data: { id: 'upload-form' }
+    },
+    {
+        target: '#mobile-menu-btn',
+        content: 'After selecting a file, use the "Publish" button to share your video.',
+        placement: 'bottom',
+        data: { id: 'publish-btn' }
+    },
+    {
+        target: '#mobile-menu-btn',
+        content: 'Use the "Discover" link in the menu to see what others are creating.',
+        placement: 'bottom',
+        data: { id: 'discover' }
+    },
+    {
+        target: '#mobile-menu-btn',
+        content: 'Access the "Trading Market" via the menu to buy or sell Creative Coins.',
+        placement: 'bottom',
+        data: { id: 'trade' }
+    },
+];
 
 export const Tour = () => {
     const { run, stepIndex, setRun, setStepIndex } = useTour();
@@ -77,43 +115,7 @@ export const Tour = () => {
         return () => window.removeEventListener('resize', checkMobile);
     }, []);
 
-    const MOBILE_STEPS: TourStep[] = [
-        {
-            target: '#mobile-menu-btn',
-            content: 'Tap the menu to get started by signing in.',
-            disableBeacon: true,
-            data: { id: 'connect' }
-        },
-        {
-            target: '#nav-user-menu',
-            content:
-                'Tap your profile avatar to open the account menu, then select "Upload" to add your own content.',
-            spotlightClicks: true,
-            data: { id: 'user-menu' }
-        },
-        {
-            target: '#mobile-menu-btn',
-            content: 'Select "Upload" in the menu to access the video upload form.',
-            data: { id: 'upload-form' }
-        },
-        {
-            target: '#mobile-menu-btn',
-            content: 'After selecting a file, use the "Publish" button to share your video.',
-            data: { id: 'publish-btn' }
-        },
-        {
-            target: '#mobile-menu-btn',
-            content: 'Use the "Discover" link in the menu to see what others are creating.',
-            data: { id: 'discover' }
-        },
-        {
-            target: '#mobile-menu-btn',
-            content: 'Access the "Trading Market" via the menu to buy or sell Creative Coins.',
-            data: { id: 'trade' }
-        },
-    ];
-
-    const steps = isMobile ? MOBILE_STEPS : DESKTOP_STEPS;
+    const steps = useMemo(() => (isMobile ? MOBILE_STEPS : DESKTOP_STEPS), [isMobile]);
 
     // Helper to find step index by ID
     const getStepIndex = (id: string) => {
@@ -133,11 +135,23 @@ export const Tour = () => {
         } else if (type === EVENTS.STEP_AFTER) {
             // Logic to handle specific transitions if needed, 
             // otherwise just let it go to next index
-            setStepIndex(index + 1);
+            setStepIndex(action === 'prev' ? Math.max(index - 1, 0) : index + 1);
         } else if (type === EVENTS.TARGET_NOT_FOUND) {
-            // Wait
+            const nextIndex = action === 'prev' ? Math.max(index - 1, 0) : index + 1;
+            if (nextIndex >= steps.length) {
+                setRun(false);
+                localStorage.setItem('crtv3_tour_completed', 'true');
+                return;
+            }
+            setStepIndex(nextIndex);
         }
     };
+
+    useEffect(() => {
+        if (stepIndex >= steps.length) {
+            setStepIndex(Math.max(steps.length - 1, 0));
+        }
+    }, [stepIndex, steps.length, setStepIndex]);
 
     // Auto-advance logic refactored to use IDs
 
@@ -203,7 +217,7 @@ export const Tour = () => {
         size,
     }: any) => {
         return (
-            <div {...tooltipProps} className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-2xl border border-indigo-100 dark:border-indigo-900 max-w-sm relative overflow-hidden">
+            <div {...tooltipProps} className="bg-white dark:bg-slate-900 p-4 sm:p-6 rounded-2xl shadow-2xl border border-indigo-100 dark:border-indigo-900 w-[min(calc(100vw-2rem),24rem)] max-w-[calc(100vw-2rem)] relative overflow-hidden">
                 {/* Decorative BG element */}
                 <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 opacity-10 rounded-bl-full -mr-4 -mt-4"></div>
 
@@ -211,7 +225,7 @@ export const Tour = () => {
                     {step.content}
                 </div>
 
-                <div className="mt-6 flex justify-between items-center relative z-10 w-full">
+                <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center relative z-10 w-full">
                     <div className="flex gap-2">
                         <button {...skipProps} className="px-3 py-1.5 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 text-sm font-medium transition">
                             Skip
@@ -219,7 +233,7 @@ export const Tour = () => {
                     </div>
 
                     <div className="flex gap-2">
-                        <button {...primaryProps} className="px-4 py-2 bg-indigo-600 text-white text-sm font-bold rounded-full hover:bg-indigo-700 transition shadow-lg shadow-indigo-200 dark:shadow-none">
+                        <button {...primaryProps} className="w-full sm:w-auto px-4 py-2 bg-indigo-600 text-white text-sm font-bold rounded-full hover:bg-indigo-700 transition shadow-lg shadow-indigo-200 dark:shadow-none">
                             {isLastStep ? 'Finish' : 'Next Step'}
                         </button>
                     </div>
@@ -241,6 +255,18 @@ export const Tour = () => {
             showProgress
             showSkipButton
             disableOverlayClose
+            disableScrolling={isMobile}
+            scrollOffset={isMobile ? 80 : 120}
+            floaterProps={{
+                disableAnimation: isMobile,
+                offset: isMobile ? 8 : 12,
+                styles: {
+                    floater: {
+                        maxWidth: isMobile ? 'calc(100vw - 32px)' : 384,
+                        width: isMobile ? 'calc(100vw - 32px)' : undefined,
+                    },
+                },
+            }}
             styles={{
                 options: {
                     primaryColor: '#4f46e5',
