@@ -16,7 +16,6 @@ import {
   useLogout,
   useUser,
   useChain,
-  useSmartAccountClient,
 } from "@account-kit/react";
 import ThemeToggleComponent from "./ThemeToggle/toggleComponent";
 import { toast } from "sonner";
@@ -39,7 +38,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import type { User as AccountUser } from "@account-kit/signer";
-import useModularAccount from "@/lib/hooks/accountkit/useModularAccount";
+import { useSmartWalletDisplayAddress } from "@/lib/hooks/accountkit/useSmartWalletDisplayAddress";
 import { base } from "@account-kit/infra";
 import { TokenBalance } from "./wallet/balance/TokenBalance";
 import { MeTokenBalances } from "./wallet/balance/MeTokenBalances";
@@ -105,14 +104,6 @@ const mobileMemberNavLinkClass = `
   text-[#EC406A]
 `;
 
-// Simplified truncateAddress - ENS resolution disabled to prevent webpack chunk loading errors
-const truncateAddress = (address: string) => {
-  if (!address) return "";
-  // Simply truncate the address without ENS resolution
-  // This prevents webpack chunk loading issues with CCIP utilities
-  return `${address.slice(0, 6)}...${address.slice(-4)}`;
-};
-
 // Add this near the top with other utility functions
 const getChainGradient = (chain: ViemChain) => {
   switch (chain.id) {
@@ -168,9 +159,13 @@ export default function Navbar() {
   const unifiedLogout = useUnifiedLogout();
   const { logout: orbLogout } = useOrbSession();
   const { chain: currentChain, setChain, isSettingChain } = useChain();
-  const { account: modularAccount } = useModularAccount();
-  const [displayAddress, setDisplayAddress] = useState<string>("");
-  const { client: smartAccountClient } = useSmartAccountClient({});
+  const {
+    primaryAddress,
+    signerAddress,
+    displayAddress,
+    walletLabel,
+    client: smartAccountClient,
+  } = useSmartWalletDisplayAddress();
   const [isNetworkConnected, setIsNetworkConnected] = useState(true);
   const { isVerified, hasMembership } = useMembershipVerification();
 
@@ -179,18 +174,6 @@ export default function Navbar() {
   const { holdings, loading: holdingsLoading } = useMeTokenHoldings();
   const hasMetokens = !!userMeToken || holdings.length > 0;
   const shouldShowMetokens = hasMetokens || meTokenLoading || holdingsLoading;
-
-  // Update display address when user changes
-  useEffect(() => {
-    // Smart Wallet is the primary public identity for Creative TV
-    // EOA is kept in background for signing and permissions
-    const addressToDisplay = modularAccount?.address || user?.address;
-
-    if (addressToDisplay) {
-      const resolved = truncateAddress(addressToDisplay);
-      setDisplayAddress(resolved);
-    }
-  }, [modularAccount?.address, user?.address]);
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const accountDropdownRef = useRef<AccountDropdownHandle>(null);
@@ -262,8 +245,7 @@ export default function Navbar() {
   };
 
   const copyToClipboard = async () => {
-    // Prioritize Smart Account address, fallback to EOA
-    const addressToCopy = modularAccount?.address || user?.address;
+    const addressToCopy = primaryAddress;
 
     if (addressToCopy) {
       try {
@@ -298,8 +280,6 @@ export default function Navbar() {
     ? "shadow-md bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm"
     : "bg-white dark:bg-gray-900"
     }`;
-
-  const smartAccountAddress = modularAccount?.address;
 
   return (
     <header className={headerClassName}>
@@ -397,23 +377,20 @@ export default function Navbar() {
                       <div className="flex items-center space-x-2">
                         <Avatar className="h-8 w-8">
                           <AvatarImage
-                            src={makeBlockie(modularAccount?.address || user?.address || "0x")}
+                            src={makeBlockie(primaryAddress || user?.address || "0x")}
                             alt="Wallet avatar"
                           />
                         </Avatar>
                         <div>
                           <p className="text-xs text-gray-500 dark:text-gray-400">
-                            {user?.type === "sca" ? "Smart Wallet" : "EOA"}
+                            {walletLabel}
                           </p>
                           <p className="text-sm font-medium font-mono">
-                            {displayAddress}
+                            {displayAddress || "Loading..."}
                           </p>
-                          {user?.address &&
-                            smartAccountAddress &&
-                            user.address.toLowerCase() !==
-                              smartAccountAddress.toLowerCase() && (
+                          {signerAddress && (
                               <p className="text-xs text-gray-500 dark:text-gray-400">
-                                Signer: {shortenAddress(user.address)}
+                                Signer: {shortenAddress(signerAddress)}
                               </p>
                             )}
                           <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -512,14 +489,14 @@ export default function Navbar() {
                         Options
                       </div>
                       <Link
-                        href={`/profile/${smartAccountAddress || user?.address}`}
+                        href={`/profile/${primaryAddress ?? ""}`}
                         className={mobileMemberNavLinkClass}
                         onClick={handleLinkClick}
                       >
                         <ShieldUser className="mr-2 h-4 w-4" /> Profile
                       </Link>
                       <Link
-                        href={`/upload/${smartAccountAddress || user?.address}`}
+                        href={`/upload/${primaryAddress ?? ""}`}
                         className={mobileMemberNavLinkClass}
                         onClick={handleLinkClick}
                         id="nav-upload-link"

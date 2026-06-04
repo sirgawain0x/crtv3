@@ -6,6 +6,7 @@ const mockVerifyX402PaymentFromRequest = vi.fn();
 vi.mock("@/lib/middleware/rateLimit", () => ({
   rateLimiters: {
     apiKey: vi.fn(async () => null),
+    generous: vi.fn(async () => null),
   },
 }));
 
@@ -170,6 +171,22 @@ describe("requirePlatformApiAccess", () => {
     });
 
     const result = await requirePlatformApiAccess(request, { resource: "playback.resolve" });
+    expect(result.allowed).toBe(true);
+    if (result.allowed) {
+      expect(result.tier).toBe("partner");
+      expect(result.keyId).toBe("mixtape");
+    }
+  });
+
+  it("prefers partner API key over same-origin bypass", async () => {
+    const request = new NextRequest("http://localhost/api/livepeer/playback-info", {
+      headers: {
+        Authorization: "Bearer crtv_pk_mixtape_test",
+        "Sec-Fetch-Site": "same-origin",
+      },
+    });
+
+    const result = await requirePlatformApiAccess(request, { resource: "playback.info" });
     expect(result.allowed).toBe(true);
     if (result.allowed) {
       expect(result.tier).toBe("partner");
