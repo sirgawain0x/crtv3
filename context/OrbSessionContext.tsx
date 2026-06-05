@@ -6,6 +6,7 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
 } from 'react';
@@ -23,7 +24,11 @@ import {
   type StoredOrbSession,
 } from '@/lib/sdk/orb/login';
 import { useWalletAuth } from '@/lib/auth/useWalletAuth';
-import { formatOrbAuthError } from '@/lib/sdk/orb/format-auth-error';
+import {
+  formatOrbAuthError,
+  formatOrbLinkError,
+  isOrbLinkRateLimitError,
+} from '@/lib/sdk/orb/format-auth-error';
 import { isStaleOrbSessionError } from '@/lib/sdk/orb/session-errors';
 import { toast } from 'sonner';
 
@@ -66,6 +71,7 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
   const { account: modularAccount } = useModularAccount();
   const { getAuthHeaders, isReady: isWalletAuthReady } = useWalletAuth();
   const orb = useMemo(() => getOrbLogin(), []);
+  const linkProfileInFlightRef = useRef<Promise<void> | null>(null);
 
   const walletAddress = modularAccount?.address || user?.address || null;
   const hasWallet = !!walletAddress;
@@ -176,75 +182,122 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
 
   const linkProfile = useCallback(
     async (ownerAddress?: string) => {
-      const active = session ?? loadStoredOrbSession();
-      if (!active?.accessToken) return;
-
-      const wallet = (
-        ownerAddress ||
-        modularAccount?.address ||
-        user?.address ||
-        undefined
-      )?.toLowerCase();
-
-      if (!wallet) {
-        setLinkStatus('needs_wallet');
-        const message = formatOrbAuthError(
-          'Connect your wallet with Get Started before linking your Lens identity.',
-        );
-        setLoginError(message);
-        toast.error(message);
-        return;
+      if (linkProfileInFlightRef.current) {
+        return linkProfileInFlightRef.current;
       }
 
-      setIsLinking(true);
-      try {
-        if (!isWalletAuthReady) {
+      const run = async () => {
+        const active = session ?? loadStoredOrbSession();
+        if (!active?.accessToken) return;
+
+        const wallet = (
+          ownerAddress ||
+          modularAccount?.address ||
+          user?.address ||
+          undefined
+        )?.toLowerCase();
+
+        const hasOrbSession = !!active.accessToken;
+
+        if (!wallet) {
           setLinkStatus('needs_wallet');
-          const message =
-            'Wallet is still initializing. Wait a moment, then tap Sync profile again.';
+          const message = formatOrbLinkError(
+            'Connect your wallet with Get Started before linking your Lens identity.',
+          );
           setLoginError(message);
-          toast.info(message);
+          if (!hasOrbSession) toast.error(message);
+          else toast.info(message);
           return;
         }
 
-        let authHeaders: Record<string, string>;
+        setIsLinking(true);
         try {
-          authHeaders = await getAuthHeaders();
-        } catch (signErr) {
-          setLinkStatus('failed');
-          const message = formatOrbAuthError(signErr);
-          setLoginError(message);
-          toast.error(message);
-          return;
-        }
+          if (!isWalletAuthReady) {
+            setLinkStatus('needs_wallet');
+            const message =
+              'Wallet is still initializing. Wait a moment, then tap Sync profile again.';
+            setLoginError(message);
+            toast.info(message);
+            return;
+          }
 
-        const res = await fetch('/api/creator-profiles/link-orb', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...authHeaders,
-          },
-          body: JSON.stringify({
-            accessToken: active.accessToken,
-            authenticationId: active.authenticationId,
-            owner_address: wallet,
-          }),
-        });
-        const data = await res.json();
-        if (!res.ok || !data.success) {
-          throw new Error(data.error || 'Failed to link Orb profile');
+          let authHeaders: Record<string, string>;
+          try {
+            authHeaders = await getAuthHeaders();
+          } catch (signErr) {
+            setLinkStatus('failed');
+            const message = formatOrbLinkError(signErr);
+            setLoginError(message);
+            if (hasOrbSession) toast.warning(message);
+            else toast.error(message);
+            return;
+          }
+
+          const retryDelays = [0, 5_000, 15_000, 30_000];
+          let lastErr: unknown = null;
+
+          for (let attempt = 0; attempt < retryDelays.length; attempt++) {
+            if (retryDelays[attempt] > 0) {
+              await new Promise((r) => setTimeout(r, retryDelays[attempt]));
+            }
+
+            try {
+              const res = await fetch('/api/creator-profiles/link-orb', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  ...authHeaders,
+                },
+                body: JSON.stringify({
+                  accessToken: active.accessToken,
+                  authenticationId: active.authenticationId,
+                  owner_address: wallet,
+                }),
+              });
+
+              let data: { success?: boolean; error?: string } = {};
+              try {
+                data = await res.json();
+              } catch {
+                // Non-JSON body (e.g. HTML error page on 502/429)
+              }
+
+              if (res.ok && data.success) {
+                setLinkStatus('linked');
+                setLoginError(null);
+                toast.success('Orb / Lens identity linked to your profile');
+                return;
+              }
+
+              lastErr = new Error(data.error || `Failed to link Orb profile (${res.status})`);
+              if (res.status !== 429 && !isOrbLinkRateLimitError(lastErr)) {
+                break;
+              }
+            } catch (err) {
+              lastErr = err;
+            }
+          }
+
+          throw lastErr ?? new Error('Failed to link Orb profile');
+        } catch (err) {
+          setLinkStatus('failed');
+          const message = formatOrbLinkError(err);
+          setLoginError(message);
+          if (hasOrbSession) {
+            toast.warning(message);
+          } else {
+            toast.error(message);
+          }
+        } finally {
+          setIsLinking(false);
         }
-        setLinkStatus('linked');
-        setLoginError(null);
-        toast.success('Orb / Lens identity linked to your profile');
-      } catch (err) {
-        setLinkStatus('failed');
-        const message = formatOrbAuthError(err);
-        setLoginError(message);
-        toast.error(message);
-      } finally {
-        setIsLinking(false);
-      }
+      };
+
+      const promise = run().finally(() => {
+        linkProfileInFlightRef.current = null;
+      });
+      linkProfileInFlightRef.current = promise;
+      return promise;
     },
     [session, modularAccount?.address, user?.address, getAuthHeaders, isWalletAuthReady],
   );
