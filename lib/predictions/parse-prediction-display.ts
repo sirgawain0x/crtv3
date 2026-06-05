@@ -68,7 +68,7 @@ function inferTypeFromOutcomes(outcomes: string[]): ParsedPredictionDisplay["typ
  */
 export function parsePredictionDisplay(
   questionText: string,
-  templateId?: string | number | null
+  templateId?: string | number | bigint | null
 ): ParsedPredictionDisplay {
   const raw = (questionText ?? "").trim();
   if (!raw) {
