@@ -15,10 +15,12 @@ type SongchainFeedSectionProps = {
   feedId: string | null;
   graphId?: string | null;
   emptyDescription: string;
+  onPostUpdated?: () => void;
 };
 
 export type SongchainFeedHandle = {
   registerNewPost: (created: SongchainCreatedPost) => void;
+  reload: () => void;
 };
 
 function FeedDiagnostics({
@@ -59,7 +61,7 @@ function FeedDiagnostics({
           address (not the global Lens timeline).
         </p>
       )}
-      {error && error.includes('not registered on') && (
+      {error && error.includes("not registered on") && (
         <p>
           Fix <code className="text-[10px]">NEXT_PUBLIC_SONGCHAIN_FEED_ID</code> in your
           deployment env, then redeploy. Use the feed contract address from the Lens / Orb
@@ -72,13 +74,17 @@ function FeedDiagnostics({
 
 export const SongchainFeedSection = forwardRef<SongchainFeedHandle, SongchainFeedSectionProps>(
   function SongchainFeedSection(
-    { title, description, feedId, graphId = null, emptyDescription },
+    { title, description, feedId, graphId = null, emptyDescription, onPostUpdated },
     ref,
   ) {
     const { posts, pendingPosts, loading, error, hasMore, reload, loadMore, registerNewPost } =
       useSongchainFeed({ feedId });
 
-    useImperativeHandle(ref, () => ({ registerNewPost }), [registerNewPost]);
+    useImperativeHandle(
+      ref,
+      () => ({ registerNewPost, reload }),
+      [registerNewPost, reload],
+    );
 
     if (!feedId) {
       const info = getFeedDiagnosticInfo(null);
@@ -143,6 +149,7 @@ export const SongchainFeedSection = forwardRef<SongchainFeedHandle, SongchainFee
                 feedId={feedId}
                 graphId={graphId}
                 onReactionChange={reload}
+                onPostUpdated={onPostUpdated}
               />
             ))}
           </div>

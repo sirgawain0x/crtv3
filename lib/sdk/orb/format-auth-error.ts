@@ -56,6 +56,12 @@ export function formatOrbAuthError(error: unknown): string {
   ) {
     return 'Database is missing Orb/Lens profile columns. Run scripts/add-orb-lens-columns-to-creator-profiles.sql in the Supabase SQL Editor, then try again.';
   }
+  if (
+    lower.includes('creator_profiles_orb_account_id_key') ||
+    lower.includes('already linked to another profile')
+  ) {
+    return 'This Orb account is already linked to a different wallet profile. Connect the wallet you used before, or contact support to transfer the link.';
+  }
 
   return msg.length > 160 ? `${msg.slice(0, 157)}…` : msg;
 }

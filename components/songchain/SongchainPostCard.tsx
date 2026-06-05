@@ -38,6 +38,7 @@ import { useLensOrbWrite } from "@/hooks/useLensOrbWrite";
 import { groveService } from "@/lib/sdk/grove/service";
 import { clearStaleOrbSessionIfNeeded } from "@/lib/sdk/orb/session-errors";
 import { SongchainAuthorTimeline } from "@/components/songchain/SongchainAuthorTimeline";
+import { SongchainPostContent } from "@/components/songchain/SongchainPostContent";
 import { SongchainFollowButton } from "@/components/songchain/SongchainGraphPanel";
 import { SongchainPostMedia } from "@/components/songchain/SongchainPostMedia";
 import {
@@ -60,6 +61,7 @@ type SongchainPostCardProps = {
   graphId?: string | null;
   compact?: boolean;
   onReactionChange?: () => void;
+  onPostUpdated?: () => void;
 };
 
 export function SongchainPostCard({
@@ -68,6 +70,7 @@ export function SongchainPostCard({
   graphId = null,
   compact = false,
   onReactionChange,
+  onPostUpdated,
 }: SongchainPostCardProps) {
   const { canWrite, getSessionClient, promptWriteAccess, lensAccount } =
     useLensOrbWrite();
@@ -78,6 +81,7 @@ export function SongchainPostCard({
   const [commentText, setCommentText] = useState("");
   const [editOpen, setEditOpen] = useState(false);
   const [editText, setEditText] = useState("");
+  const [displayText, setDisplayText] = useState<string | null>(null);
   const [timelineOpen, setTimelineOpen] = useState(false);
   const [bookmarked, setBookmarked] = useState(false);
 
@@ -130,6 +134,12 @@ export function SongchainPostCard({
   useEffect(() => {
     if (showComments) void loadComments();
   }, [showComments, loadComments]);
+
+  useEffect(() => {
+    setDisplayText(null);
+  }, [content?.id, post]);
+
+  const resolvedPostText = displayText ?? postText(post);
 
   if (!content) return null;
 
@@ -240,8 +250,11 @@ export function SongchainPostCard({
         contentUri: uri(upload.url),
       });
       if (result.isErr()) throw new Error(result.error.message);
+      setDisplayText(trimmed);
       setEditOpen(false);
       toast.success("Post updated");
+      onPostUpdated?.();
+      window.setTimeout(() => onReactionChange?.(), 3000);
     });
 
   const handleDelete = () => {
@@ -258,10 +271,19 @@ export function SongchainPostCard({
     <>
       <article
         className={cn(
-          "flex flex-col overflow-hidden rounded-xl border border-border/50 bg-card shadow-sm",
+          "relative flex flex-col overflow-hidden rounded-xl border border-border/50 bg-card shadow-sm",
           compact && "text-sm",
+          pending === "edit" && "opacity-70",
         )}
       >
+        {pending === "edit" && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/60 backdrop-blur-[1px]">
+            <div className="flex items-center gap-2 rounded-md bg-card px-3 py-2 text-sm shadow-sm">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Updating post…
+            </div>
+          </div>
+        )}
         {media.length > 0 && !compact && (
           <div className="w-full">
             <SongchainPostMedia media={media} compact={compact} />
@@ -286,10 +308,8 @@ export function SongchainPostCard({
           {compact && media.length > 0 && (
             <SongchainPostMedia media={media} compact />
           )}
-          {postText(post) && (
-            <p className="text-sm leading-relaxed whitespace-pre-wrap">
-              {postText(post)}
-            </p>
+          {resolvedPostText && (
+            <SongchainPostContent text={resolvedPostText} compact={compact} />
           )}
           <div className="mt-auto flex flex-wrap items-center gap-1 pt-2 border-t border-border/40">
             <span className="text-xs text-muted-foreground mr-auto">
@@ -392,7 +412,7 @@ export function SongchainPostCard({
                   {comments.map((c) => (
                     <li key={c.id} className="rounded bg-muted/40 p-2">
                       <span className="font-medium">{authorLabel(c)}: </span>
-                      {postText(c)}
+                      <SongchainPostContent text={postText(c)} compact />
                       {c.id.startsWith("pending-comment-") && (
                         <span className="ml-1 text-[10px] text-violet-400">· posting…</span>
                       )}
@@ -434,18 +454,35 @@ export function SongchainPostCard({
         onOpenChange={setTimelineOpen}
       />
 
-      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+      <Dialog
+        open={editOpen}
+        onOpenChange={(open) => {
+          if (pending !== "edit") setEditOpen(open);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Edit post</DialogTitle>
           </DialogHeader>
-          <Textarea
-            value={editText}
-            onChange={(e) => setEditText(e.target.value)}
-            rows={4}
-          />
+          {pending === "edit" ? (
+            <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Updating post…
+            </div>
+          ) : (
+            <Textarea
+              value={editText}
+              onChange={(e) => setEditText(e.target.value)}
+              rows={4}
+              disabled={pending === "edit"}
+            />
+          )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setEditOpen(false)}
+              disabled={pending === "edit"}
+            >
               Cancel
             </Button>
             <Button
@@ -453,9 +490,13 @@ export function SongchainPostCard({
               onClick={submitEdit}
             >
               {pending === "edit" ? (
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-              ) : null}
-              Save
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Updating…
+                </>
+              ) : (
+                "Save"
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

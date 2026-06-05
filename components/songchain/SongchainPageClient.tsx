@@ -79,6 +79,7 @@ export function SongchainPageClient({ config }: SongchainPageClientProps) {
             description="Posts from the main Songchain Lens feed (Orb)."
             feedId={config.publicFeedId}
             graphId={config.graphId}
+            onPostUpdated={() => publicFeedRef.current?.reload()}
             emptyDescription="Lens custom feeds only show posts published to that feed contract. Existing Orb profile or global posts are not backfilled, so publish a new post directly to this feed if it should appear here."
           />
         </TabsContent>
@@ -94,6 +95,7 @@ export function SongchainPageClient({ config }: SongchainPageClientProps) {
             description="Members-only drops and announcements on Lens."
             feedId={config.exclusiveFeedId}
             graphId={config.graphId}
+            onPostUpdated={() => exclusiveFeedRef.current?.reload()}
             emptyDescription="Exclusive feeds can require an Orb-linked Lens session, and posts still need to be published directly to the exclusive feed contract before they appear here."
           />
         </TabsContent>

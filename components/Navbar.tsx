@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
 import { useState, useEffect, useRef } from "react";
-import { createPortal } from "react-dom";
 import {
   SITE_LOGO,
   SITE_NAME,
@@ -15,7 +14,6 @@ import { HydrationSafe } from "@/components/ui/hydration-safe";
 import { Button } from "@/components/ui/button"; // Corrected import
 import {
   useAuthModal,
-  useLogout,
   useUser,
   useChain,
 } from "@account-kit/react";
@@ -50,9 +48,7 @@ import {
   type AccountDropdownHandle,
 } from "@/components/account-dropdown/AccountDropdown";
 import { MobileOrbSection } from "@/components/account-dropdown/MobileOrbSection";
-import { useOrbSession } from "@/context/OrbSessionContext";
 import { useUnifiedLogout } from "@/hooks/useUnifiedLogout";
-import { resetAppSession } from "@/lib/auth/session-recovery";
 import { shortenAddress } from "@/lib/utils/utils";
 import { useMembershipVerification } from "@/lib/hooks/unlock/useMembershipVerification";
 import { useMeTokensSupabase } from "@/lib/hooks/metokens/useMeTokensSupabase";
@@ -65,6 +61,10 @@ import { logger } from '@/lib/utils/logger';
 import { AnimatedMenuIcon } from "@/components/navbar/AnimatedMenuIcon";
 import { CreativePlatformAppsDrawer } from "@/components/navbar/CreativePlatformAppsDrawer";
 import { navIconButtonProps } from "@/components/navbar/navButtonStyles";
+import {
+  Sheet,
+  SheetContent,
+} from "@/components/ui/sheet";
 
 type UseUserResult = (AccountUser & { type: "eoa" | "sca" }) | null;
 
@@ -160,9 +160,7 @@ function NetworkStatus({ isConnected }: { isConnected: boolean }) {
 export default function Navbar() {
   const { openAuthModal } = useAuthModal();
   const user = useUser();
-  const { logout: walletLogout } = useLogout();
   const unifiedLogout = useUnifiedLogout();
-  const { logout: orbLogout } = useOrbSession();
   const { chain: currentChain, setChain, isSettingChain } = useChain();
   const {
     primaryAddress,
@@ -181,14 +179,9 @@ export default function Navbar() {
   const shouldShowMetokens = hasMetokens || meTokenLoading || holdingsLoading;
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isMounted, setIsMounted] = useState(false);
   const pathname = usePathname();
   const accountDropdownRef = useRef<AccountDropdownHandle>(null);
   const [copySuccess, setCopySuccess] = useState(false);
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
 
   useEffect(() => {
     const openMobileMenu = () => setIsMenuOpen(true);
@@ -329,6 +322,7 @@ export default function Navbar() {
     }`;
 
   return (
+    <>
     <header className={headerClassName}>
       <div className="container mx-auto px-4 sm:px-6">
         <div className="flex h-16 items-center justify-between">
@@ -401,33 +395,27 @@ export default function Navbar() {
           </div>
         </div>
       </div>
+    </header>
 
-      {isMounted &&
-        isMenuOpen &&
-        createPortal(
-          <div
-            id="mobile-nav-menu"
-            className={
-              "fixed inset-x-0 top-16 bottom-0 z-50 flex flex-col overflow-hidden md:hidden " +
-              "bg-white dark:bg-gray-900 shadow-md animate-in slide-in-from-top-5"
-            }
-            role="dialog"
-            aria-modal="true"
-            aria-label="Main menu"
-          >
-            <div
-              className={
-                "flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y " +
-                "[-webkit-overflow-scrolling:touch] p-4 " +
-                "pb-[calc(2rem+env(safe-area-inset-bottom,0px))]"
-              }
-            >
-            <div
-              className={
-                "relative grid gap-4 rounded-md " +
-                "text-popover-foreground"
-              }
-            >
+    <Sheet open={isMenuOpen} onOpenChange={setIsMenuOpen}>
+      <SheetContent
+        side="top"
+        overlayClassName="z-[100] bg-black/50 md:hidden"
+        className={
+          "fixed inset-x-0 top-16 bottom-0 z-[101] flex h-auto w-full max-w-none flex-col " +
+          "overflow-hidden border-0 p-0 md:hidden bg-background " +
+          "[&>button]:hidden data-[state=closed]:slide-out-to-top " +
+          "data-[state=open]:slide-in-from-top"
+        }
+      >
+        <div
+          className={
+            "flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y " +
+            "[-webkit-overflow-scrolling:touch] p-4 " +
+            "pb-[calc(2rem+env(safe-area-inset-bottom,0px))]"
+          }
+        >
+          <div className="relative grid gap-4 rounded-md text-popover-foreground">
               {/* User Account Section or Get Started */}
               <HydrationSafe>
                 {user ? (
@@ -692,7 +680,7 @@ export default function Navbar() {
                     )}
 
                     {/* Logout Button */}
-                    <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 space-y-2">
+                    <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                       <button
                         onClick={() => {
                           void unifiedLogout();
@@ -704,31 +692,14 @@ export default function Navbar() {
                         <LogOut className="mr-2 h-4 w-4" />
                         Logout
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          void resetAppSession({
-                            walletLogout: async () => {
-                              await walletLogout();
-                            },
-                            orbLogout,
-                          });
-                        }}
-                        className="flex w-full items-center rounded-md p-2 text-xs font-medium
-                            text-muted-foreground hover:bg-muted transition-colors"
-                      >
-                        Reset session (fix login loops)
-                      </button>
                     </div>
                   </>
                 )}
               </HydrationSafe>
-
-            </div>
-            </div>
-          </div>,
-          document.body
-        )}
-    </header>
+          </div>
+        </div>
+      </SheetContent>
+    </Sheet>
+    </>
   );
 }

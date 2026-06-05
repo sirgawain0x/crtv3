@@ -39,4 +39,12 @@ describe('formatOrbAuthError', () => {
       ),
     ).toMatch(/add-orb-lens-columns/i);
   });
+
+  it('maps duplicate orb_account_id constraint errors', () => {
+    expect(
+      formatOrbAuthError(
+        'duplicate key value violates unique constraint "creator_profiles_orb_account_id_key"',
+      ),
+    ).toMatch(/different wallet profile/i);
+  });
 });
