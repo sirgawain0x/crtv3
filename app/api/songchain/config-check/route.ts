@@ -71,6 +71,9 @@ export async function GET() {
       'Set NEXT_PUBLIC_SONGCHAIN_FEED_ID (and related vars) in your deployment environment.',
       'Ensure NEXT_PUBLIC_LENS_ENV matches the network where feeds were created.',
     );
+    if (config.resolutionNotes.length > 0) {
+      hints.push(...config.resolutionNotes);
+    }
   }
   if (publicFeed.configured && !publicFeed.registered) {
     hints.push(

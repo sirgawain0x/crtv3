@@ -128,6 +128,21 @@ describe('resolveSongchainConfig', () => {
     expect(resolved.resolutionNotes.some((n) => n.includes('not found'))).toBe(true);
   });
 
+  it('marks config disabled when only app id is set and fetchApp throws', async () => {
+    const app = '0x3412c2509eef4f9a133e6d3638b9b3c06fc30111';
+
+    fetchAppMock.mockRejectedValue(new Error('network timeout'));
+
+    const resolved = await resolveSongchainConfig({
+      ...baseConfig,
+      enabled: true,
+      appId: app,
+    });
+
+    expect(resolved.enabled).toBe(false);
+    expect(resolved.resolutionNotes.some((n) => n.includes('network error'))).toBe(true);
+  });
+
   it('treats lens existence check failures as missing', async () => {
     fetchFeedMock.mockRejectedValue(new Error('network timeout'));
 
