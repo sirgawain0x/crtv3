@@ -18,6 +18,47 @@ export type StoredOrbSession = {
   idToken?: string;
 };
 
+/** User-facing message when access token exists but refresh is missing. */
+export const ORB_INCOMPLETE_SESSION_MESSAGE =
+  'Orb session is incomplete. Sign in again with Orb to post and interact.';
+
+/** Lens writes require both access and refresh tokens (see resumeLensSessionFromOrb). */
+export function hasOrbWriteCredentials(
+  session: StoredOrbSession | null | undefined,
+): boolean {
+  if (!session) return false;
+  return (
+    !!session.accessToken?.trim() && !!session.refreshToken?.trim()
+  );
+}
+
+/**
+ * Normalize Orb QR poll / sync payloads (camelCase or snake_case from orbapi.xyz).
+ */
+export function normalizeOrbAuthTokens(
+  raw: Record<string, unknown>,
+): StoredOrbSession | null {
+  const accessToken = String(
+    raw.accessToken ?? raw.access_token ?? '',
+  ).trim();
+  if (!accessToken) return null;
+
+  const refreshToken = String(
+    raw.refreshToken ?? raw.refresh_token ?? '',
+  ).trim();
+  const authenticationId = String(
+    raw.authenticationId ?? raw.authentication_id ?? '',
+  ).trim();
+  const idToken = String(raw.idToken ?? raw.id_token ?? '').trim();
+
+  return {
+    accessToken,
+    refreshToken: refreshToken || undefined,
+    authenticationId: authenticationId || undefined,
+    idToken: idToken || undefined,
+  };
+}
+
 export const ORB_SESSION_STORAGE_KEY = 'crtv_orb_session';
 
 /** Dispatched on the same tab when Orb session is saved or cleared. */

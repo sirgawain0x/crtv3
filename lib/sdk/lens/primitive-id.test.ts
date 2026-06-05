@@ -19,8 +19,9 @@ describe('Lens primitive IDs', () => {
     ).toBe('0xdef0000000000000000000000000000000000002');
   });
 
-  it('reports IDs that do not include a contract address', () => {
-    expect(extractLensContractAddress('creative-feed')).toBeNull();
+  it('returns null for labels without a contract address', () => {
+    expect(normalizeLensPrimitiveId('Lens Public Feed')).toBeNull();
+    expect(normalizeLensPrimitiveId('creative-feed')).toBeNull();
     expect(getLensContractAddressError('creative-feed', 'Feed contract ID')).toContain(
       '0x contract address',
     );

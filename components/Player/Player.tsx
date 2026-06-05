@@ -132,8 +132,8 @@ export function Player(props: {
       src={src}
       playbackId={playbackId}
       jwt={jwt}
-      autoPlay={true} // Autoplay for live streams
-      volume={0.5} // Start unmuted but low volume if possible, or muted if browser blocks
+      autoPlay={true}
+      volume={0}
       aspectRatio={16 / 9}
       lowLatency={true} // Force low latency for livestream
     >

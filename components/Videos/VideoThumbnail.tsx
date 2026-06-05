@@ -45,7 +45,7 @@ const VideoThumbnail: React.FC<VideoThumbnailProps> = ({
   const [showPlayer, setShowPlayer] = useState(false);
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
-  const [isMuted, setIsMuted] = useState(false); // Start unmuted as requested
+  const [isMuted, setIsMuted] = useState(true);
   const [retryCount, setRetryCount] = useState(0);
   const showPlayerRef = React.useRef(showPlayer);
   const observerRef = React.useRef<IntersectionObserver | null>(null);
@@ -198,36 +198,16 @@ const VideoThumbnail: React.FC<VideoThumbnailProps> = ({
 
       vid.addEventListener('timeupdate', handleTimeUpdate);
 
-      // Attempt to play unmuted
-      vid.play().catch(err => {
-        // AbortError is expected when video is removed/unmounted
+      vid.muted = true;
+      setIsMuted(true);
+      vid.play().catch((err) => {
         if (err instanceof Error && err.name === 'AbortError') {
           return;
         }
         if (!isMounted || !previewVideoRef.current) return;
-
-        // NotAllowedError is expected when autoplay is blocked by browser policy
-        // This is normal browser behavior - we handle it by falling back to muted playback
-        const isAutoplayBlocked = err instanceof Error &&
-          (err.name === 'NotAllowedError' ||
-            err.message?.includes('user didn\'t interact') ||
-            err.message?.includes('play() failed'));
-
-        if (!isAutoplayBlocked) {
-          // Only log unexpected errors
-          logger.warn("Autoplay unmuted failed with unexpected error, trying muted", err);
+        if (err instanceof Error && err.name !== 'NotAllowedError') {
+          logger.error("Autoplay muted preview failed", err);
         }
-
-        // Fallback to muted playback (browsers allow muted autoplay)
-        vid.muted = true;
-        setIsMuted(true);
-        vid.play().catch(e => {
-          // AbortError is expected when video is removed/unmounted
-          // NotAllowedError on muted playback is also possible but less common
-          if (e instanceof Error && e.name !== 'AbortError' && e.name !== 'NotAllowedError') {
-            logger.error("Autoplay muted failed with unexpected error", e);
-          }
-        });
       });
 
       return () => {
