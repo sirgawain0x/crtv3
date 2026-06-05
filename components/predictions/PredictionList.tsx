@@ -16,8 +16,17 @@ import {
   GET_QUESTIONS_LIST_BY_OPENING_TS,
   GET_QUESTIONS_LIST_MINIMAL,
 } from "@/lib/sdk/reality-eth/reality-eth-subgraph";
+import {
+  parsePredictionDisplay,
+  answerBytesToLabel,
+  formatCategoryLabel,
+  isSongchainCategory,
+} from "@/lib/predictions/parse-prediction-display";
+import { PredictiveSearchInput } from "@/components/search/PredictiveSearchInput";
 
 const APP_ARBITRATOR = "0x0000000000000000000000000000000000000000";
+
+type SourceFilter = "creative_tv" | "songchain" | "all";
 
 /** Normalize subgraph Bytes (address or 32-byte word) for comparisons. */
 function normalizeArbitrator(hexLike: unknown): string {
@@ -60,6 +69,8 @@ interface Question {
   outcomes?: string[];
   title?: string;
   description?: string;
+  parsedCategory?: string;
+  leadingLabel?: string | null;
 }
 
 /**
@@ -76,8 +87,8 @@ export function PredictionList() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  /** true = Creative TV only (zero arbitrator); false = all indexed Reality.eth questions */
-  const [showOnlyAppQuestions, setShowOnlyAppQuestions] = useState(true);
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>("creative_tv");
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     async function fetchQuestions() {
@@ -171,12 +182,18 @@ export function PredictionList() {
         const fetchedQuestions = data[usedField] as any[];
 
         const parsedQuestions: Question[] = (fetchedQuestions || []).map((q) => {
-          let title = q.question || "Untitled Prediction";
-          let description: string | undefined;
+          const rawQuestion = q.question || "";
+          const display = parsePredictionDisplay(rawQuestion, q.template_id);
+          let title = display.title;
+          let description: string | undefined = display.description;
+          const parsedCategory = display.category;
+          const leadingLabel = q.best_answer
+            ? answerBytesToLabel(q.best_answer, display)
+            : null;
 
           try {
-            if (q.question && q.question.length > 0) {
-              title = q.question;
+            if (rawQuestion.length > 0) {
+              title = display.title;
             }
           } catch (e) {
             logger.warn('Could not parse question text for question', q.id, e);
@@ -205,11 +222,15 @@ export function PredictionList() {
               min_bond: q.min_bond?.toString() ?? "0",
               last_bond: q.last_bond?.toString() ?? "0",
               last_bond_ts: q.last_bond_ts != null ? String(q.last_bond_ts) : undefined,
-              category: q.category ?? undefined,
-              language: q.language ?? undefined,
-              outcomes,
+              category: q.category ?? parsedCategory,
+              language: q.language ?? display.language,
+              outcomes: outcomes ?? display.outcomes,
               title,
               description,
+              parsedCategory,
+              leadingLabel: q.best_answer
+                ? answerBytesToLabel(q.best_answer, display)
+                : null,
             };
           }
 
@@ -229,11 +250,13 @@ export function PredictionList() {
             min_bond: "0",
             last_bond: "0",
             last_bond_ts: undefined,
-            category: undefined,
-            language: undefined,
-            outcomes: undefined,
+            category: parsedCategory,
+            language: display.language,
+            outcomes: display.outcomes,
             title,
             description,
+            parsedCategory,
+            leadingLabel,
           } as Question;
         });
 
@@ -283,13 +306,29 @@ export function PredictionList() {
           }
         }
 
-        // Filter to only show questions from this app if enabled (CreatePrediction uses zero arbitrator).
         const appArbNorm = normalizeArbitrator(APP_ARBITRATOR);
-        const filteredQuestions = showOnlyAppQuestions
-          ? parsedQuestions.filter(
-              (q) => normalizeArbitrator(q.arbitrator) === appArbNorm
-            )
-          : parsedQuestions;
+        let filteredQuestions = parsedQuestions;
+
+        if (sourceFilter === "creative_tv") {
+          filteredQuestions = parsedQuestions.filter(
+            (q) => normalizeArbitrator(q.arbitrator) === appArbNorm
+          );
+        } else if (sourceFilter === "songchain") {
+          filteredQuestions = parsedQuestions.filter(
+            (q) =>
+              normalizeArbitrator(q.arbitrator) === appArbNorm &&
+              isSongchainCategory(q.parsedCategory ?? q.category ?? "")
+          );
+        }
+
+        if (searchQuery.trim()) {
+          const sq = searchQuery.trim().toLowerCase();
+          filteredQuestions = filteredQuestions.filter(
+            (q) =>
+              (q.title ?? "").toLowerCase().includes(sq) ||
+              (q.parsedCategory ?? "").toLowerCase().includes(sq)
+          );
+        }
 
         setAllQuestions(filteredQuestions);
 
@@ -333,7 +372,7 @@ export function PredictionList() {
     }
 
     fetchQuestions();
-  }, [currentPage, showOnlyAppQuestions])
+  }, [currentPage, sourceFilter, searchQuery])
 
   if (isLoading) {
     return (
@@ -377,71 +416,83 @@ export function PredictionList() {
     }
   };
 
-  const setFilterCreativeTv = () => {
-    setShowOnlyAppQuestions(true);
-    setCurrentPage(1);
-  };
-
-  const setFilterAllReality = () => {
-    setShowOnlyAppQuestions(false);
+  const setFilter = (filter: SourceFilter) => {
+    setSourceFilter(filter);
     setCurrentPage(1);
   };
 
   return (
     <div className="space-y-4">
+      <PredictiveSearchInput
+        scope="predictions"
+        placeholder="Search predictions by title or category…"
+        onQueryChange={setSearchQuery}
+        className="max-w-xl"
+      />
+
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex flex-col gap-1.5">
           <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Source
           </span>
           <div
-            className="inline-flex rounded-lg border bg-muted/40 p-1"
+            className="inline-flex rounded-lg border bg-muted/40 p-1 flex-wrap"
             role="group"
             aria-label="Prediction source filter"
           >
             <Button
               type="button"
-              variant={showOnlyAppQuestions ? "default" : "ghost"}
+              variant={sourceFilter === "creative_tv" ? "default" : "ghost"}
               size="sm"
               className="rounded-md shadow-none"
-              onClick={setFilterCreativeTv}
-              aria-pressed={showOnlyAppQuestions}
+              onClick={() => setFilter("creative_tv")}
+              aria-pressed={sourceFilter === "creative_tv"}
             >
               Creative TV
             </Button>
             <Button
               type="button"
-              variant={!showOnlyAppQuestions ? "default" : "ghost"}
+              variant={sourceFilter === "songchain" ? "default" : "ghost"}
               size="sm"
               className="rounded-md shadow-none"
-              onClick={setFilterAllReality}
-              aria-pressed={!showOnlyAppQuestions}
+              onClick={() => setFilter("songchain")}
+              aria-pressed={sourceFilter === "songchain"}
+            >
+              Songchain
+            </Button>
+            <Button
+              type="button"
+              variant={sourceFilter === "all" ? "default" : "ghost"}
+              size="sm"
+              className="rounded-md shadow-none"
+              onClick={() => setFilter("all")}
+              aria-pressed={sourceFilter === "all"}
             >
               All Reality.eth
             </Button>
           </div>
-          {showOnlyAppQuestions && (
+          {sourceFilter === "creative_tv" && (
             <p className="text-xs text-muted-foreground max-w-xl">
-              Creative TV only lists markets created here with <span className="font-mono">0x0…0</span> arbitrator.
-              Questions you create on{" "}
-              <a
-                className="underline underline-offset-2 hover:text-foreground"
-                href="https://reality.eth.link"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                reality.eth
-              </a>{" "}
-              often use another arbitrator (e.g. Kleros) — switch to <strong>All Reality.eth</strong> to see those.
+              Creative TV lists markets created here with{" "}
+              <span className="font-mono">0x0…0</span> arbitrator. Switch to{" "}
+              <strong>All Reality.eth</strong> for external arbitrators (e.g. Kleros).
+            </p>
+          )}
+          {sourceFilter === "songchain" && (
+            <p className="text-xs text-muted-foreground max-w-xl">
+              Fan/community predictions posted from Songchain with category{" "}
+              <strong>songchain</strong>.
             </p>
           )}
         </div>
         <div className="text-sm text-muted-foreground">
           {totalQuestions > 0
             ? `Showing ${questions?.length || 0} of ${totalQuestions} question${totalQuestions === 1 ? "" : "s"}`
-            : showOnlyAppQuestions
-              ? "No Creative TV predictions in this view"
-              : "No predictions in this view"}
+            : sourceFilter === "songchain"
+              ? "No Songchain predictions in this view"
+              : sourceFilter === "creative_tv"
+                ? "No Creative TV predictions in this view"
+                : "No predictions in this view"}
         </div>
       </div>
 
@@ -449,9 +500,11 @@ export function PredictionList() {
         <div className="rounded-lg border border-dashed p-8 text-center">
           <p className="font-medium text-foreground">No predictions found</p>
           <p className="mt-2 text-sm text-muted-foreground max-w-md mx-auto">
-            {showOnlyAppQuestions
-              ? "Nothing created on Creative TV matches yet. Choose “All Reality.eth” to browse every indexed market on the network."
-              : "There are no indexed Reality.eth questions to show yet, or data is still syncing."}
+            {sourceFilter === "songchain"
+              ? "No Songchain predictions yet. Create one with category “songchain”."
+              : sourceFilter === "creative_tv"
+                ? "Nothing created on Creative TV matches yet. Choose “All Reality.eth” to browse every indexed market."
+                : "There are no indexed Reality.eth questions to show yet, or data is still syncing."}
           </p>
         </div>
       ) : (
@@ -469,9 +522,23 @@ export function PredictionList() {
               <div className="flex flex-col md:flex-row items-start justify-between gap-4">
                 <div className="flex-1 min-w-0 w-full">
                   <div className="flex justify-between items-start gap-2 mb-2">
-                    <h3 className="text-lg font-semibold break-all leading-tight min-w-0 pr-1">
-                      {question.title || "Untitled Prediction"}
-                    </h3>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-lg font-semibold leading-tight">
+                        {question.title || "Untitled Prediction"}
+                      </h3>
+                      <div className="flex flex-wrap gap-1.5 mt-1.5">
+                        {question.parsedCategory && (
+                          <Badge variant="outline" className="text-xs">
+                            {formatCategoryLabel(question.parsedCategory)}
+                          </Badge>
+                        )}
+                        {question.leadingLabel && (
+                          <Badge variant="secondary" className="text-xs">
+                            Leading: {question.leadingLabel}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
                     <Badge className="shrink-0 mt-0.5" variant={isActive ? "default" : isClosed ? "secondary" : "outline"}>
                       {isActive ? "Active" : isClosed ? "Closed" : "Pending"}
                     </Badge>

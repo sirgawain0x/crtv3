@@ -1,6 +1,5 @@
 "use client";
 
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -9,8 +8,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Search, X, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { X, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { MarketFilters as MarketFiltersType } from '@/lib/hooks/market/useMarketData';
+import { PredictiveSearchInput } from '@/components/search/PredictiveSearchInput';
 
 interface MarketFiltersProps {
   filters: MarketFiltersType;
@@ -51,23 +51,12 @@ export function MarketFilters({ filters, onFiltersChange }: MarketFiltersProps) 
       <div className="flex flex-col sm:flex-row gap-4">
         {/* Search Input */}
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
+          <PredictiveSearchInput
+            scope="market"
             placeholder="Search tokens, symbols, or creators..."
             value={filters.search}
-            onChange={(e) => handleSearchChange(e.target.value)}
-            className="pl-9"
+            onQueryChange={handleSearchChange}
           />
-          {filters.search && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
-              onClick={() => handleSearchChange('')}
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          )}
         </div>
 
         {/* Type Filter */}

@@ -181,9 +181,25 @@ export default function Navbar() {
 
   useEffect(() => {
     const openMobileMenu = () => setIsMenuOpen(true);
-    window.addEventListener('crtv:open-mobile-menu', openMobileMenu);
-    return () => window.removeEventListener('crtv:open-mobile-menu', openMobileMenu);
+    const closeMobileMenu = () => setIsMenuOpen(false);
+    window.addEventListener("crtv:open-mobile-menu", openMobileMenu);
+    window.addEventListener("crtv:close-mobile-menu", closeMobileMenu);
+    return () => {
+      window.removeEventListener("crtv:open-mobile-menu", openMobileMenu);
+      window.removeEventListener("crtv:close-mobile-menu", closeMobileMenu);
+    };
   }, []);
+
+  useEffect(() => {
+    if (isMenuOpen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [isMenuOpen]);
   const [currentChainName, setCurrentChainName] = useState(currentChain.name);
   const [isScrolled, setIsScrolled] = useState(false);
 
@@ -355,10 +371,10 @@ export default function Navbar() {
 
           {/* Mobile menu */}
           <div
+            data-state={isMenuOpen ? "open" : "closed"}
             className={
-              "fixed inset-0 top-16 z-50 grid h-[calc(100vh-4rem)] grid-flow-row " +
-              "auto-rows-max overflow-auto p-4 pb-32 shadow-md md:hidden bg-white dark:bg-gray-900 " +
-              (isMenuOpen ? "animate-in slide-in-from-top-5" : "hidden")
+              "fixed inset-0 top-16 z-50 h-[calc(100vh-4rem)] overflow-y-auto p-4 pb-32 shadow-md md:hidden bg-white dark:bg-gray-900 " +
+              (isMenuOpen ? "block" : "hidden")
             }
             aria-hidden={!isMenuOpen}
             inert={!isMenuOpen}

@@ -202,7 +202,11 @@ export function ShareDialog({
               variant="outline"
               className="flex items-center justify-center gap-2 h-auto py-3"
             >
-              <Share2 className="h-5 w-5" />
+              <img
+                src="/images/Farcaster_logo.svg"
+                alt="Farcaster"
+                className="h-5 w-5"
+              />
               <span>Farcaster</span>
             </Button>
 

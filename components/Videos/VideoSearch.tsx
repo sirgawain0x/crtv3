@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useCallback, useEffect } from "react";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -10,8 +9,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Search, X, SlidersHorizontal } from "lucide-react";
+import { X, SlidersHorizontal } from "lucide-react";
 import { useDebounce } from "@/lib/hooks/useDebounce";
+import { PredictiveSearchInput } from "@/components/search/PredictiveSearchInput";
 
 interface VideoSearchProps {
   onSearchChange: (search: string) => void;
@@ -87,23 +87,16 @@ export function VideoSearch({
 
   return (
     <div className="mb-6 space-y-4 px-2 sm:px-0">
-      {/* Search Bar */}
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-        <label htmlFor="video-search-input" className="sr-only">
-          Search videos
-        </label>
-        <Input
-          id="video-search-input"
-          name="search"
-          aria-label="Search videos"
-          type="text"
+        <PredictiveSearchInput
+          scope="videos"
           placeholder="Search videos by title or description..."
           value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-          className="pl-10 pr-24"
+          onQueryChange={setSearchInput}
+          showClear={false}
+          inputClassName="pr-24"
         />
-        <div className="absolute right-2 top-1/2 flex -translate-y-1/2 gap-2">
+        <div className="absolute right-2 top-1/2 flex -translate-y-1/2 gap-2 z-10">
           {searchInput && (
             <Button
               variant="ghost"

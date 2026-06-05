@@ -93,6 +93,9 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
 
   const bumpAccountMenuRefresh = useCallback(() => {
     setAccountMenuRefreshSignal((n) => n + 1);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("crtv:close-mobile-menu"));
+    }
   }, []);
 
   const syncSession = useCallback(async () => {
