@@ -12,7 +12,9 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Slash, VideoIcon, Share2, ShieldCheck } from "lucide-react";
+import { Slash, VideoIcon, Share2, ShieldCheck, Radio } from "lucide-react";
+import { useCreatorLiveStream } from "@/hooks/useCreatorLiveStream";
+import { SongchainShareLiveDialog } from "@/components/songchain/SongchainShareLiveDialog";
 import { FaExclamationTriangle } from "react-icons/fa";
 import { MembershipGuard } from "@/components/auth/MembershipGuard";
 import { ProfilePageGuard } from "@/components/UserProfile/UserProfile";
@@ -63,7 +65,11 @@ export default function LivePage() {
   const [storyLicenseTermsId, setStoryLicenseTermsId] = useState<string | null>(null);
   const [storyRevShare, setStoryRevShare] = useState<number | null>(null);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [songchainShareOpen, setSongchainShareOpen] = useState(false);
   const [moderatorsDialogOpen, setModeratorsDialogOpen] = useState(false);
+  const { stream: liveStream, isLive: isStreamLive } = useCreatorLiveStream(15_000);
+  const songchainFeedId =
+    process.env.NEXT_PUBLIC_SONGCHAIN_FEED_ID?.trim() || null;
 
   // Match the viewer-side derivation in WatchClient so host + viewers share the
   // same XMTP group ID.
@@ -90,6 +96,11 @@ export default function LivePage() {
           setStoryIpId(stream.story_ip_id ?? null);
           setStoryLicenseTermsId(stream.story_license_terms_id ?? null);
           setStoryRevShare(stream.story_commercial_rev_share ?? null);
+
+          // Ensure recording is enabled for channels created before auto-record shipped.
+          fetch(`/api/livepeer/stream/${encodeURIComponent(stream.stream_id)}/recording`, {
+            method: "POST",
+          }).catch((err) => logger.error("Failed to enable stream recording:", err));
         }
 
         // 2. Fetch targets (only if we have a streamId, which we might have just set)
@@ -213,7 +224,7 @@ export default function LivePage() {
             profile: "H264Baseline",
           },
         ],
-        record: false,
+        record: true,
         playbackPolicy: { type: "jwt" },
         // Don't include multistream targets during initial creation
         // Targets can be added after stream creation using the API
@@ -368,6 +379,17 @@ export default function LivePage() {
                       >
                         <Share2 className="h-4 w-4 mr-1.5" /> Share Stream
                       </Button>
+                      {isStreamLive && liveStream?.playback_id && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="border-red-500/40 text-red-400 hover:text-red-300"
+                          onClick={() => setSongchainShareOpen(true)}
+                        >
+                          <Radio className="h-4 w-4 mr-1.5" /> Share to Songchain
+                        </Button>
+                      )}
                       {chatStreamId && (
                         <Button
                           type="button"
@@ -466,6 +488,14 @@ export default function LivePage() {
             </div>
           </div>
         </div>
+        {liveStream?.playback_id && (
+          <SongchainShareLiveDialog
+            open={songchainShareOpen}
+            onOpenChange={setSongchainShareOpen}
+            stream={liveStream}
+            feedId={songchainFeedId}
+          />
+        )}
         {playbackId && (
           <ShareDialog
             open={shareDialogOpen}

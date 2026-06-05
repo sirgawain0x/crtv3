@@ -12,17 +12,16 @@ import { SongchainLensAdvancedPanel } from "@/components/songchain/SongchainLens
 import { HallidayOnramp } from "@/components/songchain/HallidayOnramp";
 import type { SongchainConfig } from "@/lib/songchain/config";
 import { Music2 } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useRef } from "react";
+import type { SongchainFeedHandle } from "@/components/songchain/SongchainFeedSection";
 
 type SongchainPageClientProps = {
   config: SongchainConfig;
 };
 
 export function SongchainPageClient({ config }: SongchainPageClientProps) {
-  const [feedRefreshKey, setFeedRefreshKey] = useState(0);
-  const bumpFeedRefresh = useCallback(() => {
-    setFeedRefreshKey((k) => k + 1);
-  }, []);
+  const publicFeedRef = useRef<SongchainFeedHandle>(null);
+  const exclusiveFeedRef = useRef<SongchainFeedHandle>(null);
 
   return (
     <div className="mx-auto w-full max-w-7xl py-10 px-4 sm:px-6">
@@ -72,10 +71,10 @@ export function SongchainPageClient({ config }: SongchainPageClientProps) {
         <TabsContent value="feed" className="space-y-6">
           <SongchainComposePost
             feedId={config.publicFeedId}
-            onPosted={bumpFeedRefresh}
+            onPosted={(created) => publicFeedRef.current?.registerNewPost(created)}
           />
           <SongchainFeedSection
-            key={`public-${feedRefreshKey}`}
+            ref={publicFeedRef}
             title="Songchain feed"
             description="Posts from the main Songchain Lens feed (Orb)."
             feedId={config.publicFeedId}
@@ -87,10 +86,10 @@ export function SongchainPageClient({ config }: SongchainPageClientProps) {
         <TabsContent value="exclusive" className="space-y-6">
           <SongchainComposePost
             feedId={config.exclusiveFeedId}
-            onPosted={bumpFeedRefresh}
+            onPosted={(created) => exclusiveFeedRef.current?.registerNewPost(created)}
           />
           <SongchainFeedSection
-            key={`exclusive-${feedRefreshKey}`}
+            ref={exclusiveFeedRef}
             title="Exclusive feed"
             description="Members-only drops and announcements on Lens."
             feedId={config.exclusiveFeedId}

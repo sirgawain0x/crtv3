@@ -80,6 +80,18 @@ export async function createStreamViaProxy(params: CreateStreamProxyParams) {
   return res.json();
 }
 
+async function finalizeStreamRecordings(streamId: string) {
+  try {
+    await fetch("/api/streams/recordings/finalize", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ streamId }),
+    });
+  } catch (err) {
+    logger.error("Failed to finalize stream recordings:", err);
+  }
+}
+
 function BroadcastWithControls({ streamKey, streamId: propStreamId, creatorAddress }: BroadcastProps) {
   const ingestUrl = React.useMemo(() => {
     return `https://ingest.livepeer.studio/whip/${streamKey}`;
@@ -110,18 +122,29 @@ function BroadcastWithControls({ streamKey, streamId: propStreamId, creatorAddre
     }
   }, [broadcastError]);
 
-  // Sync is_live status with DB
+  const finalizeTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  // Sync is_live status with DB; finalize recordings when broadcast ends
   useEffect(() => {
     if (!creatorAddress) return;
 
     const syncStatus = async () => {
       try {
         if (status === 'live') {
+          finalizeTimeoutsRef.current.forEach(clearTimeout);
+          finalizeTimeoutsRef.current = [];
           await updateStream(creatorAddress, { is_live: true, last_live_at: new Date().toISOString() });
           logger.info("Stream marked as live in DB");
         } else if (status === 'idle' || status === 'error') {
           await updateStream(creatorAddress, { is_live: false });
           logger.info("Stream marked as offline in DB");
+          if (status === 'idle' && propStreamId) {
+            // Recording assets may take a minute to process; retry a few times.
+            const delays = [15_000, 45_000, 120_000];
+            finalizeTimeoutsRef.current = delays.map((delay) =>
+              setTimeout(() => finalizeStreamRecordings(propStreamId), delay)
+            );
+          }
         }
       } catch (err) {
         logger.error("Failed to sync stream status:", err);
@@ -129,7 +152,13 @@ function BroadcastWithControls({ streamKey, streamId: propStreamId, creatorAddre
     };
 
     syncStatus();
-  }, [status, creatorAddress]);
+  }, [status, creatorAddress, propStreamId]);
+
+  useEffect(() => {
+    return () => {
+      finalizeTimeoutsRef.current.forEach(clearTimeout);
+    };
+  }, []);
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
