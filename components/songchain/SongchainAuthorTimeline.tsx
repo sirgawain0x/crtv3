@@ -73,7 +73,12 @@ export function SongchainAuthorTimeline({
         )}
         <div className="space-y-4">
           {posts.map((post) => (
-            <SongchainPostCard key={post.id} post={post} compact />
+            <SongchainPostCard
+              key={post.id}
+              post={post}
+              compact
+              onReactionChange={load}
+            />
           ))}
         </div>
         {posts.length > 0 && (

@@ -39,6 +39,7 @@ import { getDetailPlaybackSource } from "@/lib/hooks/livepeer/useDetailPlaybackS
 import { generateAccessKey, WebhookContext } from "@/lib/access-key";
 import { Skeleton } from "../ui/skeleton";
 import { Badge } from "../ui/badge";
+import { useIsVideoAdmin } from "@/hooks/useIsVideoAdmin";
 import { Button } from "../ui/button";
 import { fetchVideoAssetByPlaybackId } from "@/lib/utils/video-assets-client";
 import { getThumbnailUrl } from "@/lib/utils/thumbnail";
@@ -167,6 +168,7 @@ export default function VideoDetails({
   contractAddress,
   tokenId,
 }: VideoDetailsProps) {
+  const isVideoAdmin = useIsVideoAdmin();
   const [playbackSources, setPlaybackSources] = useState<Src[] | null>(null);
   const [sourcesLoading, setSourcesLoading] = useState(true);
   const [sourcesError, setSourcesError] = useState<string | null>(null);
@@ -522,10 +524,10 @@ export default function VideoDetails({
         <div className="w-full space-y-6">
           <h1 className="text-2xl font-bold">{videoTitle || asset?.name}</h1>
           <div className="flex items-center gap-2 flex-wrap">
-            {asset?.status?.phase && (
+            {isVideoAdmin && asset?.status?.phase && (
               <Badge>{asset.status.phase}</Badge>
             )}
-            {dbStatus && <Badge variant="secondary">{dbStatus}</Badge>}
+            {isVideoAdmin && dbStatus && <Badge variant="secondary">{dbStatus}</Badge>}
             {livepeerAttestationId && (
               <Badge
                 variant="secondary"
@@ -592,6 +594,7 @@ export default function VideoDetails({
               <Player.Root
                 src={playbackSources}
                 playbackId={asset?.playbackId}
+                volume={0}
                 {...conditionalProps}
               >
                 <Player.Container className="aspect-video w-full overflow-hidden rounded-lg bg-gray-800">

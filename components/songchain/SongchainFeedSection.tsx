@@ -11,6 +11,7 @@ type SongchainFeedSectionProps = {
   description: string;
   feedId: string | null;
   emptyDescription: string;
+  onPostUpdated?: () => void;
 };
 
 function FeedDiagnostics({
@@ -60,6 +61,7 @@ export function SongchainFeedSection({
   description,
   feedId,
   emptyDescription,
+  onPostUpdated,
 }: SongchainFeedSectionProps) {
   const { posts, loading, error, hasMore, reload, loadMore } = useSongchainFeed({
     feedId,
@@ -114,6 +116,7 @@ export function SongchainFeedSection({
               post={post}
               feedId={feedId}
               onReactionChange={reload}
+              onPostUpdated={onPostUpdated}
             />
           ))}
         </div>

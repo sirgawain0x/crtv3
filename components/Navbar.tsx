@@ -13,7 +13,6 @@ import { HydrationSafe } from "@/components/ui/hydration-safe";
 import { Button } from "@/components/ui/button"; // Corrected import
 import {
   useAuthModal,
-  useLogout,
   useUser,
   useChain,
 } from "@account-kit/react";
@@ -48,9 +47,7 @@ import {
   type AccountDropdownHandle,
 } from "@/components/account-dropdown/AccountDropdown";
 import { MobileOrbSection } from "@/components/account-dropdown/MobileOrbSection";
-import { useOrbSession } from "@/context/OrbSessionContext";
 import { useUnifiedLogout } from "@/hooks/useUnifiedLogout";
-import { resetAppSession } from "@/lib/auth/session-recovery";
 import { shortenAddress } from "@/lib/utils/utils";
 import { useMembershipVerification } from "@/lib/hooks/unlock/useMembershipVerification";
 import { useMeTokensSupabase } from "@/lib/hooks/metokens/useMeTokensSupabase";
@@ -63,6 +60,10 @@ import { logger } from '@/lib/utils/logger';
 import { AnimatedMenuIcon } from "@/components/navbar/AnimatedMenuIcon";
 import { CreativePlatformAppsDrawer } from "@/components/navbar/CreativePlatformAppsDrawer";
 import { navIconButtonProps } from "@/components/navbar/navButtonStyles";
+import {
+  Sheet,
+  SheetContent,
+} from "@/components/ui/sheet";
 
 type UseUserResult = (AccountUser & { type: "eoa" | "sca" }) | null;
 
@@ -155,9 +156,7 @@ function NetworkStatus({ isConnected }: { isConnected: boolean }) {
 export default function Navbar() {
   const { openAuthModal } = useAuthModal();
   const user = useUser();
-  const { logout: walletLogout } = useLogout();
   const unifiedLogout = useUnifiedLogout();
-  const { logout: orbLogout } = useOrbSession();
   const { chain: currentChain, setChain, isSettingChain } = useChain();
   const {
     primaryAddress,
@@ -282,6 +281,7 @@ export default function Navbar() {
     }`;
 
   return (
+    <>
     <header className={headerClassName}>
       <div className="container mx-auto px-4 sm:px-6">
         <div className="flex h-16 items-center justify-between">
@@ -353,22 +353,22 @@ export default function Navbar() {
             </Button>
           </div>
 
-          {/* Mobile menu */}
-          <div
-            className={
-              "fixed inset-0 top-16 z-50 grid h-[calc(100vh-4rem)] grid-flow-row " +
-              "auto-rows-max overflow-auto p-4 pb-32 shadow-md md:hidden bg-white dark:bg-gray-900 " +
-              (isMenuOpen ? "animate-in slide-in-from-top-5" : "hidden")
-            }
-            aria-hidden={!isMenuOpen}
-            inert={!isMenuOpen}
-          >
-            <div
-              className={
-                "relative z-20 grid gap-4 rounded-md " +
-                "text-popover-foreground"
-              }
-            >
+        </div>
+      </div>
+    </header>
+
+    <Sheet open={isMenuOpen} onOpenChange={setIsMenuOpen}>
+      <SheetContent
+        side="top"
+        overlayClassName="z-[100] bg-black/50 md:hidden"
+        className={
+          "fixed inset-x-0 top-16 bottom-0 z-[101] h-auto w-full max-w-none " +
+          "border-0 p-4 pb-32 md:hidden overflow-y-auto bg-background " +
+          "[&>button]:hidden data-[state=closed]:slide-out-to-top " +
+          "data-[state=open]:slide-in-from-top"
+        }
+      >
+        <div className="relative grid gap-4 rounded-md text-popover-foreground">
               {/* User Account Section or Get Started */}
               <HydrationSafe>
                 {user ? (
@@ -633,7 +633,7 @@ export default function Navbar() {
                     )}
 
                     {/* Logout Button */}
-                    <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 space-y-2">
+                    <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                       <button
                         onClick={() => {
                           void unifiedLogout();
@@ -645,33 +645,13 @@ export default function Navbar() {
                         <LogOut className="mr-2 h-4 w-4" />
                         Logout
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          void resetAppSession({
-                            walletLogout: async () => {
-                              await walletLogout();
-                            },
-                            orbLogout,
-                          });
-                        }}
-                        className="flex w-full items-center rounded-md p-2 text-xs font-medium
-                            text-muted-foreground hover:bg-muted transition-colors"
-                      >
-                        Reset session (fix login loops)
-                      </button>
                     </div>
                   </>
                 )}
               </HydrationSafe>
-
-              {/* Navigation Links */}
-
-            </div>
-          </div>
-
         </div>
-      </div>
-    </header>
+      </SheetContent>
+    </Sheet>
+    </>
   );
 }

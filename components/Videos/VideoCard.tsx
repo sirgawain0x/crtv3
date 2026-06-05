@@ -27,6 +27,7 @@ import { ShareDialog } from "./ShareDialog";
 import { useCreatorProfile } from "@/lib/hooks/metokens/useCreatorProfile";
 import { VideoBuyButton } from "./VideoBuyButton";
 import { logger } from '@/lib/utils/logger';
+import { useIsVideoAdmin } from "@/hooks/useIsVideoAdmin";
 
 
 interface VideoCardProps {
@@ -37,6 +38,7 @@ interface VideoCardProps {
 
 const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources, priority = false }) => {
   const { currentPlayingId, setCurrentPlayingId } = useVideo();
+  const isVideoAdmin = useIsVideoAdmin();
   const [dbStatus, setDbStatus] = useState<"draft" | "published" | "minted" | "archived" | null>(null);
   const [isShareDialogOpen, setIsShareDialogOpen] = useState(false);
   const playerRef = useRef<HTMLDivElement>(null);
@@ -227,13 +229,17 @@ const VideoCard: React.FC<VideoCardProps> = ({ asset, playbackSources, priority 
         <CardContent>
           <div className="my-2 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Badge className={asset.status?.phase === "ready" ? "black" : "white"}>
-                {asset?.status?.phase}
-              </Badge>
-              {dbStatus && (
-                <Badge variant="secondary">
-                  {dbStatus}
-                </Badge>
+              {isVideoAdmin && (
+                <>
+                  <Badge className={asset.status?.phase === "ready" ? "black" : "white"}>
+                    {asset?.status?.phase}
+                  </Badge>
+                  {dbStatus && (
+                    <Badge variant="secondary">
+                      {dbStatus}
+                    </Badge>
+                  )}
+                </>
               )}
             </div>
             <VideoViewMetrics playbackId={asset.playbackId || ""} />

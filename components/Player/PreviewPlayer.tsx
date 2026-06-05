@@ -79,9 +79,6 @@ export const PreviewPlayer: React.FC<{
     const video = containerRef.current?.querySelector("video");
     if (video) {
       videoRef.current = video;
-
-      // Set initial volume and playback rate
-      video.volume = 0.5;
       video.playbackRate = 1.0;
     }
 
@@ -209,11 +206,6 @@ export const PreviewPlayer: React.FC<{
             title={title}
             playsInline
             controls={false}
-            onCanPlay={() => {
-              if (videoRef.current) {
-                videoRef.current.volume = 0.5;
-              }
-            }}
             onPlay={() => {
               setIsPlaying(true);
               setCurrentPlayingId(playerId);
