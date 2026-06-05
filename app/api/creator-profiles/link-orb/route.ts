@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
       existingByOrb?.owner_address &&
       existingByOrb.owner_address.toLowerCase() !== ownerAddress
     ) {
-      staleOwners.add(existingByOrb.owner_address.toLowerCase());
+      staleOwners.add(existingByOrb.owner_address);
     }
 
     const { data: existingByLens, error: lensLookupError } = await supabaseService
@@ -147,10 +147,10 @@ export async function POST(request: NextRequest) {
       existingByLens?.owner_address &&
       existingByLens.owner_address.toLowerCase() !== ownerAddress
     ) {
-      staleOwners.add(existingByLens.owner_address.toLowerCase());
+      staleOwners.add(existingByLens.owner_address);
     }
 
-    for (const staleOwner of staleOwners) {
+    if (staleOwners.size > 0) {
       const { error: clearError } = await supabaseService
         .from('creator_profiles')
         .update({
@@ -160,7 +160,7 @@ export async function POST(request: NextRequest) {
           lens_avatar_uri: null,
           updated_at: new Date().toISOString(),
         })
-        .eq('owner_address', staleOwner);
+        .in('owner_address', Array.from(staleOwners));
 
       if (clearError) {
         serverLogger.error('[link-orb] failed to clear previous orb link:', clearError);

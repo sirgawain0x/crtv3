@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils/utils";
 
@@ -58,13 +58,14 @@ export function ExternalLinkPreview({
     return () => controller.abort();
   }, [url]);
 
-  const domain = preview?.domain ?? (() => {
+  const domain = useMemo(() => {
+    if (preview?.domain) return preview.domain;
     try {
       return new URL(url).hostname;
     } catch {
       return url;
     }
-  })();
+  }, [preview?.domain, url]);
 
   return (
     <span className={cn("block", className)}>

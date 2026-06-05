@@ -21,31 +21,19 @@ export function SongchainPostContent({
 }: SongchainPostContentProps) {
   const segments = useMemo(() => linkifyPostText(text), [text]);
 
-  const internalUrls = useMemo(
-    () =>
-      segments
-        .filter((segment) => segment.type === "internal")
-        .map((segment) => segment.value),
-    [segments],
-  );
+  const uniqueInternalUrls = useMemo(() => {
+    const urls = segments
+      .filter((segment) => segment.type === "internal")
+      .map((segment) => segment.value);
+    return Array.from(new Set(urls));
+  }, [segments]);
 
-  const uniqueInternalUrls = useMemo(
-    () => Array.from(new Set(internalUrls)),
-    [internalUrls],
-  );
-
-  const externalUrls = useMemo(
-    () =>
-      segments
-        .filter((segment) => segment.type === "external")
-        .map((segment) => segment.value),
-    [segments],
-  );
-
-  const uniqueExternalUrls = useMemo(
-    () => Array.from(new Set(externalUrls)),
-    [externalUrls],
-  );
+  const uniqueExternalUrls = useMemo(() => {
+    const urls = segments
+      .filter((segment) => segment.type === "external")
+      .map((segment) => segment.value);
+    return Array.from(new Set(urls));
+  }, [segments]);
 
   if (!text) return null;
 

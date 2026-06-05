@@ -10,7 +10,7 @@ const ORB_AUTH_ID = 'orb-auth-123';
 const mockGetAccountFromAccessToken = vi.fn();
 const mockRequireWalletAuthFor = vi.fn();
 const mockMaybeSingle = vi.fn();
-const mockUpdateEq = vi.fn();
+const mockUpdateIn = vi.fn();
 const mockUpsert = vi.fn();
 
 vi.mock('botid/server', () => ({
@@ -51,7 +51,7 @@ vi.mock('@/lib/sdk/supabase/service', () => ({
         }),
       }),
       update: () => ({
-        eq: mockUpdateEq,
+        in: mockUpdateIn,
       }),
       upsert: mockUpsert,
     }),
@@ -77,7 +77,7 @@ describe('link-orb POST security', () => {
     mockGetAccountFromAccessToken.mockReturnValue(TOKEN_LENS);
     mockRequireWalletAuthFor.mockResolvedValue({ address: OWNER });
     mockMaybeSingle.mockResolvedValue({ data: null, error: null });
-    mockUpdateEq.mockResolvedValue({ error: null });
+    mockUpdateIn.mockResolvedValue({ error: null });
     mockUpsert.mockReturnValue({
       select: () => ({
         single: async () => ({
@@ -178,7 +178,7 @@ describe('link-orb POST security', () => {
 
     expect(response.status).toBe(200);
     expect(json.success).toBe(true);
-    expect(mockUpdateEq).toHaveBeenCalledWith('owner_address', STALE_OWNER);
+    expect(mockUpdateIn).toHaveBeenCalledWith('owner_address', [STALE_OWNER]);
     expect(mockUpsert).toHaveBeenCalledWith(
       expect.objectContaining({
         owner_address: OWNER,
