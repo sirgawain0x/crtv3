@@ -15,16 +15,56 @@ function normalizeAddress(value: string | null | undefined): string | null {
   return normalizeLensPrimitiveId(value);
 }
 
+function hasSongchainPrimitives(parts: {
+  publicFeedId: string | null;
+  exclusiveFeedId: string | null;
+  groupId: string | null;
+  graphId: string | null;
+}): boolean {
+  return Boolean(
+    parts.publicFeedId ||
+      parts.exclusiveFeedId ||
+      parts.groupId ||
+      parts.graphId,
+  );
+}
+
+function buildResolvedConfig(
+  config: SongchainConfig,
+  resolved: {
+    appId: string | null;
+    publicFeedId: string | null;
+    exclusiveFeedId: string | null;
+    groupId: string | null;
+    graphId: string | null;
+    resolutionNotes: string[];
+  },
+): ResolvedSongchainConfig {
+  return {
+    ...config,
+    ...resolved,
+    enabled: hasSongchainPrimitives(resolved),
+  };
+}
+
 async function lensAppExists(appAddress: string): Promise<boolean> {
-  const client = createLensClient();
-  const result = await fetchApp(client, { app: evmAddress(appAddress) });
-  return result.isOk() && !!result.value;
+  try {
+    const client = createLensClient();
+    const result = await fetchApp(client, { app: evmAddress(appAddress) });
+    return result.isOk() && !!result.value;
+  } catch {
+    return false;
+  }
 }
 
 async function lensFeedExists(feedAddress: string): Promise<boolean> {
-  const client = createLensClient();
-  const result = await fetchFeed(client, { feed: evmAddress(feedAddress) });
-  return result.isOk() && !!result.value;
+  try {
+    const client = createLensClient();
+    const result = await fetchFeed(client, { feed: evmAddress(feedAddress) });
+    return result.isOk() && !!result.value;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -62,22 +102,42 @@ export async function resolveSongchainConfig(
   }
 
   if (!appId) {
-    return {
-      ...config,
+    return buildResolvedConfig(config, {
       appId: null,
       publicFeedId,
       exclusiveFeedId,
       groupId,
       graphId,
       resolutionNotes: notes,
-    };
+    });
   }
 
   const client = createLensClient();
-  const appResult = await fetchApp(client, { app: evmAddress(appId) });
+  let appResult;
+  try {
+    appResult = await fetchApp(client, { app: evmAddress(appId) });
+  } catch {
+    notes.push(`Lens app ${appId} could not be loaded (network error).`);
+    return buildResolvedConfig(config, {
+      appId,
+      publicFeedId,
+      exclusiveFeedId,
+      groupId,
+      graphId,
+      resolutionNotes: notes,
+    });
+  }
+
   if (appResult.isErr() || !appResult.value) {
     notes.push(`Lens app ${appId} was not found on this network.`);
-    return { ...config, appId, publicFeedId, exclusiveFeedId, groupId, graphId, resolutionNotes: notes };
+    return buildResolvedConfig(config, {
+      appId,
+      publicFeedId,
+      exclusiveFeedId,
+      groupId,
+      graphId,
+      resolutionNotes: notes,
+    });
   }
 
   const app = appResult.value;
@@ -118,14 +178,12 @@ export async function resolveSongchainConfig(
     notes.push('Public feed env matched the app contract; substituted the app feed address.');
   }
 
-  return {
-    ...config,
-    enabled: Boolean(publicFeedId || exclusiveFeedId || groupId || graphId),
+  return buildResolvedConfig(config, {
     appId,
     publicFeedId,
     exclusiveFeedId,
     groupId,
     graphId,
     resolutionNotes: notes,
-  };
+  });
 }

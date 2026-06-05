@@ -242,6 +242,8 @@ export function SongchainFollowButton({
         if (!cancelled && result.isOk() && result.value[0]) {
           setIsFollowing(Boolean(result.value[0].isFollowing));
         }
+      } catch {
+        if (!cancelled) setIsFollowing(false);
       } finally {
         if (!cancelled) setChecking(false);
       }

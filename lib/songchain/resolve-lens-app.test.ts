@@ -107,4 +107,38 @@ describe('resolveSongchainConfig', () => {
     expect(resolved.graphId).toBe(graph);
     expect(resolved.resolutionNotes.some((n) => n.includes('graph'))).toBe(true);
   });
+
+  it('marks config disabled when only app id is set and fetchApp fails', async () => {
+    const app = '0x3412c2509eef4f9a133e6d3638b9b3c06fc30111';
+
+    fetchAppMock.mockResolvedValue({
+      isOk: () => false,
+      isErr: () => true,
+      value: null,
+    });
+
+    const resolved = await resolveSongchainConfig({
+      ...baseConfig,
+      enabled: true,
+      appId: app,
+    });
+
+    expect(resolved.enabled).toBe(false);
+    expect(resolved.publicFeedId).toBeNull();
+    expect(resolved.resolutionNotes.some((n) => n.includes('not found'))).toBe(true);
+  });
+
+  it('treats lens existence check failures as missing', async () => {
+    fetchFeedMock.mockRejectedValue(new Error('network timeout'));
+
+    const resolved = await resolveSongchainConfig({
+      ...baseConfig,
+      publicFeedId: '0xabc0000000000000000000000000000000000001',
+    });
+
+    expect(resolved.appId).toBeNull();
+    expect(resolved.publicFeedId).toBe(
+      '0xabc0000000000000000000000000000000000001',
+    );
+  });
 });
