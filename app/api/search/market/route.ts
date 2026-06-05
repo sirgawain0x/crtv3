@@ -3,6 +3,8 @@ import { checkBotId } from "botid/server";
 import { rateLimiters } from "@/lib/middleware/rateLimit";
 import { meTokenSupabaseService } from "@/lib/sdk/supabase/metokens";
 
+import { sanitizeAutocompleteQuery } from "@/lib/search/sanitize-autocomplete-query";
+
 export async function GET(request: NextRequest) {
   const verification = await checkBotId();
   if (verification.isBot) {
@@ -11,7 +13,9 @@ export async function GET(request: NextRequest) {
   const rl = await rateLimiters.generous(request);
   if (rl) return rl;
 
-  const q = request.nextUrl.searchParams.get("q")?.trim() ?? "";
+  const q = sanitizeAutocompleteQuery(
+    request.nextUrl.searchParams.get("q") ?? ""
+  );
   const limit = Math.min(
     parseInt(request.nextUrl.searchParams.get("limit") || "8", 10) || 8,
     20

@@ -3,6 +3,8 @@ import { checkBotId } from "botid/server";
 import { rateLimiters } from "@/lib/middleware/rateLimit";
 import { supabaseService } from "@/lib/sdk/supabase/service";
 
+import { sanitizeAutocompleteQuery } from "@/lib/search/sanitize-autocomplete-query";
+
 export async function GET(request: NextRequest) {
   const verification = await checkBotId();
   if (verification.isBot) {
@@ -11,7 +13,9 @@ export async function GET(request: NextRequest) {
   const rl = await rateLimiters.generous(request);
   if (rl) return rl;
 
-  const q = request.nextUrl.searchParams.get("q")?.trim() ?? "";
+  const q = sanitizeAutocompleteQuery(
+    request.nextUrl.searchParams.get("q") ?? ""
+  );
   const limit = Math.min(
     parseInt(request.nextUrl.searchParams.get("limit") || "8", 10) || 8,
     20
@@ -25,24 +29,23 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ results: [] });
   }
 
-  const { data, error } = await supabaseService
-    .from("video_assets")
-    .select("id, title, thumbnail_url")
-    .in("status", ["published", "minted"])
-    .or(`title.ilike.%${q}%,description.ilike.%${q}%`)
-    .order("created_at", { ascending: false })
-    .limit(limit);
+  const { data, error } = await supabaseService.rpc("autocomplete_video_assets", {
+    search_query: q,
+    result_limit: limit,
+  });
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const results = (data ?? []).map((row) => ({
-    id: String(row.id),
-    title: row.title ?? "Untitled",
-    thumbnailUrl: row.thumbnail_url ?? undefined,
-    href: `/discover/${row.id}`,
-  }));
+  const results = (data ?? []).map(
+    (row: { id: number; title: string | null; thumbnail_url: string | null }) => ({
+      id: String(row.id),
+      title: row.title ?? "Untitled",
+      thumbnailUrl: row.thumbnail_url ?? undefined,
+      href: `/discover/${row.id}`,
+    })
+  );
 
   return NextResponse.json({ results });
 }

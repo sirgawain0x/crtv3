@@ -43,6 +43,14 @@ export function EvidenceSubmissionModal({
   const { ipfsService, isReady: isHeliaReady } = useIpfsService();
 
   const handleFileUpload = async (file: File) => {
+    if (!ipfsService) {
+      toast({
+        variant: "destructive",
+        title: "Upload failed",
+        description: "IPFS service is not initialized yet.",
+      });
+      return;
+    }
     setIsUploading(true);
     try {
       let fileUri = "";

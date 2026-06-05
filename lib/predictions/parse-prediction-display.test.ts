@@ -21,6 +21,20 @@ describe("parsePredictionDisplay", () => {
       "0x0000000000000000000000000000000000000000000000000000000000000001",
       parsed
     )).toBe("Yes");
+    expect(answerBytesToLabel(
+      "0x0000000000000000000000000000000000000000000000000000000000000000",
+      parsed
+    )).toBe("No");
+  });
+
+  it("returns null for unresolved non-boolean zero answer", () => {
+    const parsed = parsePredictionDisplay(
+      'Pick one?\u241f"A","B","C"\u241fgeneral\u241fen_US'
+    );
+    expect(answerBytesToLabel(
+      "0x0000000000000000000000000000000000000000000000000000000000000000",
+      parsed
+    )).toBeNull();
   });
 
   it("detects songchain category", () => {

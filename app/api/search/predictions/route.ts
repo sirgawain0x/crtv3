@@ -3,6 +3,8 @@ import { checkBotId } from "botid/server";
 import { rateLimiters } from "@/lib/middleware/rateLimit";
 import { supabaseService } from "@/lib/sdk/supabase/service";
 
+import { sanitizeAutocompleteQuery } from "@/lib/search/sanitize-autocomplete-query";
+
 export async function GET(request: NextRequest) {
   const verification = await checkBotId();
   if (verification.isBot) {
@@ -11,7 +13,9 @@ export async function GET(request: NextRequest) {
   const rl = await rateLimiters.generous(request);
   if (rl) return rl;
 
-  const q = request.nextUrl.searchParams.get("q")?.trim() ?? "";
+  const q = sanitizeAutocompleteQuery(
+    request.nextUrl.searchParams.get("q") ?? ""
+  );
   const limit = Math.min(
     parseInt(request.nextUrl.searchParams.get("limit") || "8", 10) || 8,
     20
@@ -25,26 +29,32 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ results: [] });
   }
 
-  const { data, error } = await supabaseService
-    .from("prediction_market_creations")
-    .select("question_id, title, category")
-    .or(`title.ilike.%${q}%,category.ilike.%${q}%`)
-    .not("question_id", "is", null)
-    .order("created_at", { ascending: false })
-    .limit(limit);
+  const { data, error } = await supabaseService.rpc(
+    "autocomplete_prediction_creations",
+    {
+      search_query: q,
+      result_limit: limit,
+    }
+  );
 
   if (error) {
     return NextResponse.json({ results: [] });
   }
 
   const results = (data ?? [])
-    .filter((row) => row.question_id)
-    .map((row) => ({
-      questionId: row.question_id as string,
-      title: row.title ?? "Prediction",
-      category: row.category ?? undefined,
-      href: `/predict/${row.question_id}`,
-    }));
+    .filter((row: { question_id: string | null }) => row.question_id)
+    .map(
+      (row: {
+        question_id: string;
+        title: string | null;
+        category: string | null;
+      }) => ({
+        questionId: row.question_id,
+        title: row.title ?? "Prediction",
+        category: row.category ?? undefined,
+        href: `/predict/${row.question_id}`,
+      })
+    );
 
   return NextResponse.json({ results });
 }

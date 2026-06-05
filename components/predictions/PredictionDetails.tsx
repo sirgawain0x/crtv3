@@ -85,7 +85,7 @@ export function PredictionDetails({ questionId }: PredictionDetailsProps) {
 
         const parsed = parsePredictionDisplay(
           questionDataRaw.question ?? "",
-          0
+          questionDataRaw.template_id
         );
 
         const questionData: QuestionData = {

@@ -134,10 +134,9 @@ export function answerBytesToLabel(
   answerHex: string | null | undefined,
   parsed: ParsedPredictionDisplay
 ): string | null {
-  if (!answerHex || answerHex === ZERO_ANSWER && parsed.type !== "bool") {
-    if (answerHex === ZERO_ANSWER && parsed.type === "bool") return "No";
+  if (!answerHex || (answerHex === ZERO_ANSWER && parsed.type !== "bool")) {
+    return null;
   }
-  if (!answerHex) return null;
 
   const normalized = answerHex.toLowerCase();
 
@@ -171,7 +170,8 @@ export function answerBytesToLabel(
     : answerHex;
 }
 
-export function formatCategoryLabel(category: string): string {
+export function formatCategoryLabel(category: string | null | undefined): string {
+  if (!category) return "";
   return category
     .replace(/_/g, " ")
     .replace(/\b\w/g, (c) => c.toUpperCase());

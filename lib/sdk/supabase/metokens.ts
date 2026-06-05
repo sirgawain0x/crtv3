@@ -539,18 +539,16 @@ export class MeTokenSupabaseService {
 
   // Search MeTokens
   async searchMeTokens(query: string, limit: number = 20): Promise<MeToken[]> {
-    const { data, error } = await supabase
-      .from('metokens')
-      .select('*')
-      .or(`name.ilike.%${query}%,symbol.ilike.%${query}%`)
-      .limit(limit)
-      .order('tvl', { ascending: false });
+    const { data, error } = await supabase.rpc("search_metokens_ilike", {
+      search_query: query,
+      result_limit: limit,
+    });
 
     if (error) {
       throw new Error(`Failed to search MeTokens: ${error.message}`);
     }
 
-    return data || [];
+    return (data as MeToken[]) || [];
   }
 
   // Get trending MeTokens (highest TVL growth)

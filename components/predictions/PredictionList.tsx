@@ -228,9 +228,7 @@ export function PredictionList() {
               title,
               description,
               parsedCategory,
-              leadingLabel: q.best_answer
-                ? answerBytesToLabel(q.best_answer, display)
-                : null,
+              leadingLabel,
             };
           }
 
