@@ -185,8 +185,13 @@ export default function Navbar() {
 
   useEffect(() => {
     const openMobileMenu = () => setIsMenuOpen(true);
-    window.addEventListener('crtv:open-mobile-menu', openMobileMenu);
-    return () => window.removeEventListener('crtv:open-mobile-menu', openMobileMenu);
+    const closeMobileMenu = () => setIsMenuOpen(false);
+    window.addEventListener("crtv:open-mobile-menu", openMobileMenu);
+    window.addEventListener("crtv:close-mobile-menu", closeMobileMenu);
+    return () => {
+      window.removeEventListener("crtv:open-mobile-menu", openMobileMenu);
+      window.removeEventListener("crtv:close-mobile-menu", closeMobileMenu);
+    };
   }, []);
 
   // Close menu when viewport grows past mobile (e.g. rotate tablet) so scroll lock cannot stick
@@ -224,6 +229,7 @@ export default function Navbar() {
   useEffect(() => {
     setIsMenuOpen(false);
   }, [pathname]);
+
   const [currentChainName, setCurrentChainName] = useState(currentChain.name);
   const [isScrolled, setIsScrolled] = useState(false);
 
@@ -416,6 +422,7 @@ export default function Navbar() {
           }
         >
           <div className="relative grid gap-4 rounded-md text-popover-foreground">
+
               {/* User Account Section or Get Started */}
               <HydrationSafe>
                 {user ? (

@@ -35,6 +35,19 @@ import { getCanonicalRealityEthArbitratorAddress } from "@/lib/sdk/reality-eth/r
 import type { QuestionData } from "@/lib/sdk/reality-eth/reality-eth-utils";
 import { logger } from "@/lib/utils/logger";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { usePredictionAccess } from "@/lib/hooks/predictions/usePredictionAccess";
+import { ShareDialog } from "@/components/Videos/ShareDialog";
+import { useSongchainPost } from "@/hooks/useSongchainPost";
+import { getSongchainConfig } from "@/lib/songchain/config";
+
+const PREDICTION_CATEGORIES = [
+  { value: "creative tv", label: "Creative TV" },
+  { value: "songchain", label: "Songchain" },
+  { value: "general", label: "General" },
+  { value: "technology", label: "Technology" },
+  { value: "sports", label: "Sports" },
+  { value: "entertainment", label: "Entertainment" },
+] as const;
 
 const predictionSchema = z.object({
   title: z.string().min(3, "Title is required"),
@@ -102,6 +115,14 @@ function CreatePrediction() {
 
   const { openAuthModal } = useAuthModal();
   const { client: accountKitClient } = useSmartAccountClient({});
+  const { canCreatePrediction, blockReason, isCreatorTier } = usePredictionAccess();
+  const { createPost, isPosting: isSongchainPosting } = useSongchainPost();
+  const songchainConfig = getSongchainConfig();
+  const [shareOpen, setShareOpen] = useState(false);
+  const [createdMeta, setCreatedMeta] = useState<{
+    title: string;
+    category: string;
+  } | null>(null);
 
   const form = useForm<PredictionForm>({
     resolver: zodResolver(predictionSchema),
@@ -109,7 +130,7 @@ function CreatePrediction() {
       title: "",
       type: "bool",
       outcomes: [{ value: "Yes" }, { value: "No" }], // Default to Yes/No for bool type
-      category: "general",
+      category: "creative tv",
       description: "",
       closeDate: "",
       closeTime: "",
@@ -182,6 +203,11 @@ function CreatePrediction() {
 
     if (!accountKitClient) {
       setFormError("Wallet client not ready. Please try again.");
+      return;
+    }
+
+    if (!canCreatePrediction) {
+      setFormError(blockReason ?? "You cannot create predictions with this account.");
       return;
     }
 
@@ -361,6 +387,9 @@ function CreatePrediction() {
           body: JSON.stringify({
             address,
             transactionHash: hash,
+            title: values.title,
+            category: values.category || "creative tv",
+            questionType: values.type,
           }),
         });
         const recData = await rec.json();
@@ -378,7 +407,11 @@ function CreatePrediction() {
       }
 
       toast.success("Prediction created successfully! Transaction submitted.");
-      router.push("/predict");
+      setCreatedMeta({
+        title: values.title,
+        category: values.category || "creative tv",
+      });
+      setShareOpen(true);
     } catch (error: any) {
       logger.error("❌ Error creating prediction:", error);
       
@@ -435,6 +468,12 @@ function CreatePrediction() {
           onSubmit={handleFormSubmit}
           className="w-full p-5 md:w-2/5 space-y-6"
         >
+          {isCreatorTier && blockReason && (
+            <Alert variant="destructive">
+              <AlertTitle>Cannot create predictions</AlertTitle>
+              <AlertDescription>{blockReason}</AlertDescription>
+            </Alert>
+          )}
           {!isConnected || !address ? null : quotaLoading ? (
             <Alert>
               <Info className="h-4 w-4" />
@@ -514,23 +553,26 @@ function CreatePrediction() {
             control={form.control}
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Question Type</FormLabel>
-                <Select
-                  onValueChange={field.onChange}
-                  defaultValue={field.value}
-                >
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select question type" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="bool">Yes/No</SelectItem>
-                    <SelectItem value="single-select">Single Choice</SelectItem>
-                    <SelectItem value="multiple-select">Multiple Choice</SelectItem>
-                    <SelectItem value="uint">Number</SelectItem>
-                  </SelectContent>
-                </Select>
+                <FormLabel>Question type</FormLabel>
+                <div className="flex flex-wrap gap-2">
+                  {(
+                    [
+                      ["bool", "Yes / No"],
+                      ["single-select", "Pick one"],
+                      ["uint", "Number"],
+                    ] as const
+                  ).map(([value, label]) => (
+                    <Button
+                      key={value}
+                      type="button"
+                      variant={field.value === value ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => field.onChange(value)}
+                    >
+                      {label}
+                    </Button>
+                  ))}
+                </div>
                 <FormMessage />
               </FormItem>
             )}
@@ -580,10 +622,21 @@ function CreatePrediction() {
             control={form.control}
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Category (optional)</FormLabel>
-                <FormControl>
-                  <Input placeholder="general" {...field} />
-                </FormControl>
+                <FormLabel>Category</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {PREDICTION_CATEGORIES.map((cat) => (
+                      <SelectItem key={cat.value} value={cat.value}>
+                        {cat.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <FormMessage />
               </FormItem>
             )}
@@ -662,6 +715,7 @@ function CreatePrediction() {
               isSubmitting ||
               !isConnected ||
               isLoadingClient ||
+              !canCreatePrediction ||
               (quota !== null &&
                 !quota.unlimited &&
                 quota.remaining !== null &&
@@ -684,6 +738,52 @@ function CreatePrediction() {
           </Button>
         </form>
       </Form>
+
+      {createdMeta && (
+        <div className="w-full p-5 md:w-2/5 space-y-3">
+          <Button
+            type="button"
+            variant="secondary"
+            className="w-full"
+            disabled={isSongchainPosting || !songchainConfig.publicFeedId}
+            onClick={() => {
+              const origin =
+                typeof window !== "undefined" ? window.location.origin : "";
+              void createPost({
+                feedId: songchainConfig.publicFeedId!,
+                content: `New prediction: ${createdMeta.title}\n\n${origin}/predict`,
+                title: createdMeta.title,
+              });
+            }}
+          >
+            {isSongchainPosting ? "Posting to Songchain…" : "Post to Songchain"}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            onClick={() => router.push("/predict")}
+          >
+            View all predictions
+          </Button>
+        </div>
+      )}
+
+      <ShareDialog
+        open={shareOpen}
+        onOpenChange={(open) => {
+          setShareOpen(open);
+          if (!open && createdMeta) {
+            router.push("/predict");
+          }
+        }}
+        videoTitle={createdMeta?.title ?? "Prediction"}
+        videoId="new"
+        shareUrlOverride="/predict"
+        titleOverride={createdMeta?.title}
+        dialogTitle="Share Prediction"
+        shareNoun="prediction"
+      />
     </div>
   );
 }

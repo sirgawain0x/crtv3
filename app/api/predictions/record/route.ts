@@ -11,6 +11,8 @@ import {
   PREDICTION_MARKETS_MONTHLY_LIMIT,
 } from "@/lib/predictions/prediction-quota";
 import { unlockService } from "@/lib/sdk/unlock/services";
+import { isPlatformAdmin } from "@/lib/access/platform-admin";
+import { hasValidCreatorPass } from "@/lib/access/creator-membership";
 
 const bodySchema = z.object({
   address: z.string().refine(isAddress, "Invalid address"),
@@ -18,6 +20,9 @@ const bodySchema = z.object({
     .string()
     .regex(/^0x[a-fA-F0-9]{64}$/, "Invalid transaction hash"),
   questionId: z.string().min(1).optional(),
+  title: z.string().optional(),
+  category: z.string().optional(),
+  questionType: z.string().optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -50,11 +55,23 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { address, transactionHash, questionId } = parsed.data;
+  const { address, transactionHash, questionId, title, category, questionType } =
+    parsed.data;
 
   try {
     const normalized = normalizeCreatorAddress(address);
     const memberships = await unlockService.getAllMemberships(normalized);
+
+    if (!isPlatformAdmin(normalized) && hasValidCreatorPass(memberships)) {
+      return NextResponse.json(
+        {
+          error: "Creator members cannot create prediction markets",
+          code: "CREATOR_TIER_BLOCKED",
+        },
+        { status: 403 }
+      );
+    }
+
     const { unlimited } = getPremiumPredictionAccess(memberships);
 
     if (unlimited) {
@@ -80,6 +97,9 @@ export async function POST(request: NextRequest) {
         creator_address: normalized,
         transaction_hash: transactionHash.toLowerCase(),
         question_id: questionId ?? null,
+        title: title ?? null,
+        category: category ?? null,
+        question_type: questionType ?? null,
       });
 
     if (insertError) {

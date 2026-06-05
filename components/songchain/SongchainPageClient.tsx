@@ -8,7 +8,7 @@ import { SongchainGroupPanel } from "@/components/songchain/SongchainGroupPanel"
 import { SongchainGraphPanel } from "@/components/songchain/SongchainGraphPanel";
 import { SongchainComposePost } from "@/components/songchain/SongchainComposePost";
 import { SongchainBookmarksSection } from "@/components/songchain/SongchainBookmarksSection";
-import { SongchainLensAdvancedPanel } from "@/components/songchain/SongchainLensAdvancedPanel";
+import { SongchainLensAdvancedTooltip } from "@/components/songchain/SongchainLensAdvancedTooltip";
 import { HallidayOnramp } from "@/components/songchain/HallidayOnramp";
 import type { SongchainConfig } from "@/lib/songchain/config";
 import { Music2 } from "lucide-react";
@@ -46,6 +46,9 @@ export function SongchainPageClient({ config }: SongchainPageClientProps) {
             Music on Lens Chain — public and exclusive feeds, community group, and
             onramp via Halliday. Interactions require a linked Orb account.
           </p>
+          <div className="mt-3">
+            <SongchainLensAdvancedTooltip />
+          </div>
         </div>
       </header>
 
@@ -112,8 +115,6 @@ export function SongchainPageClient({ config }: SongchainPageClientProps) {
           <SongchainBookmarksSection graphId={config.graphId} />
         </TabsContent>
       </Tabs>
-
-      <SongchainLensAdvancedPanel className="mt-10" />
 
       {!config.enabled && (
         <p className="mt-10 text-center text-sm text-muted-foreground">

@@ -367,10 +367,12 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
     setIsDialogOpen(false);
   }, [user]);
 
-  // Reopen account menu after Orb sign-in so the Orb / Lens section shows linked state.
+  // Reopen account menu after Orb sign-in (desktop only).
   useEffect(() => {
     if (!accountMenuRefreshSignal || !isOrbAuthenticated) return;
-    setIsDropdownOpen(true);
+    if (typeof window !== "undefined" && window.matchMedia("(min-width: 768px)").matches) {
+      setIsDropdownOpen(true);
+    }
   }, [accountMenuRefreshSignal, isOrbAuthenticated]);
 
   // Fetch token balances when dialog opens with send action

@@ -302,6 +302,7 @@ export async function submitAnswer(
  */
 export interface RealityEthQuestion {
   question: string;
+  template_id?: bigint | number;
   opening_ts: bigint;
   timeout: bigint;
   finalize_ts: bigint;
@@ -385,8 +386,12 @@ export async function getQuestion(
       });
 
       if (logs.length > 0) {
-        const logArgs = logs[0].args as any;
-        questionText = logArgs.question;
+        const logArgs = logs[0].args as {
+          question?: string;
+          template_id?: bigint | number;
+        };
+        questionText = logArgs.question ?? "";
+        structData.template_id = logArgs.template_id;
       } else {
         serverLogger.warn(`No LogNewQuestion event found for ${questionId}. Title might be missing.`);
       }

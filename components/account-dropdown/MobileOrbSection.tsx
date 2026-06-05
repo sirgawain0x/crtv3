@@ -61,7 +61,12 @@ export function MobileOrbSection() {
           variant="outline"
           size="sm"
           className="w-full text-xs"
-          onClick={() => openOrbLogin()}
+          onClick={() => {
+            if (typeof window !== "undefined") {
+              window.dispatchEvent(new Event("crtv:close-mobile-menu"));
+            }
+            openOrbLogin();
+          }}
         >
           Sign in with Orb
         </Button>

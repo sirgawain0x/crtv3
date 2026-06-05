@@ -23,7 +23,7 @@ import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { submitAnswer } from "@/lib/sdk/reality-eth/reality-eth-question-wrapper";
 import { useWalletStatus } from "@/lib/hooks/accountkit/useWalletStatus";
-import { useMembershipVerification } from "@/lib/hooks/unlock/useMembershipVerification";
+import { usePredictionAccess } from "@/lib/hooks/predictions/usePredictionAccess";
 import { logger } from '@/lib/utils/logger';
 
 
@@ -45,11 +45,14 @@ export function BetForm({ questionId, questionType, outcomes }: BetFormProps) {
   const [error, setError] = useState<string | null>(null);
 
   const { isConnected, walletAddress } = useWalletStatus();
-  const { isVerified, hasMembership, isLoading: isMembershipLoading } =
-    useMembershipVerification();
+  const {
+    canBetOnPrediction,
+    blockReason,
+    isLoading: isAccessLoading,
+  } = usePredictionAccess();
   const { client: accountKitClient } = useSmartAccountClient({});
 
-  const canBet = isVerified && hasMembership;
+  const canBet = isConnected && canBetOnPrediction;
 
   const form = useForm<BetFormData>({
     resolver: zodResolver(betSchema),
@@ -64,7 +67,8 @@ export function BetForm({ questionId, questionType, outcomes }: BetFormProps) {
 
     if (!canBet) {
       setError(
-        "You need a Creative Pass membership to place bets. Please purchase a membership."
+        blockReason ??
+          "Please connect your wallet to place a bet."
       );
       return;
     }
@@ -225,7 +229,7 @@ export function BetForm({ questionId, questionType, outcomes }: BetFormProps) {
         <Button
           type="submit"
           className="w-full"
-          disabled={isSubmitting || !canBet || isMembershipLoading}
+          disabled={isSubmitting || !canBet || isAccessLoading}
         >
           {isSubmitting ? (
             <>
@@ -233,8 +237,8 @@ export function BetForm({ questionId, questionType, outcomes }: BetFormProps) {
             </>
           ) : !isConnected ? (
             "Connect Wallet to Bet"
-          ) : !canBet ? (
-            "Membership Required"
+          ) : !canBetOnPrediction ? (
+            "Not Available"
           ) : (
             "Place Bet"
           )}
