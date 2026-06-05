@@ -1,4 +1,7 @@
-import { isRevokedOrbSessionError } from '@/lib/sdk/orb/session-errors';
+import {
+  isIncompleteOrbSessionError,
+  isRevokedOrbSessionError,
+} from '@/lib/sdk/orb/session-errors';
 
 /** User-facing copy for Orb QR / link failures (init proxy, poll, SDK). */
 export function formatOrbAuthError(error: unknown): string {
@@ -31,6 +34,9 @@ export function formatOrbAuthError(error: unknown): string {
   }
   if (isRevokedOrbSessionError(error)) {
     return 'Your Orb session was signed out. Sign in again with Orb to interact on Lens.';
+  }
+  if (isIncompleteOrbSessionError(error)) {
+    return 'Sign in again with Orb to post and interact on Lens.';
   }
   if (lower.includes('wallet not connected') || lower.includes('sign in with your wallet')) {
     return 'Connect your wallet with Get Started before linking your Lens identity.';

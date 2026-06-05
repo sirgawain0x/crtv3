@@ -9,9 +9,13 @@ import { normalizeLensPrimitiveId } from '@/lib/sdk/lens/primitive-id';
 
 export type SongchainConfig = {
   enabled: boolean;
+  /** Lens app contract — used to resolve feed addresses (not a post target). */
+  appId: string | null;
   publicFeedId: string | null;
   exclusiveFeedId: string | null;
   groupId: string | null;
+  /** Lens social graph — required for follow/unfollow on Songchain. */
+  graphId: string | null;
   hallidayApiKey: string | null;
   /** Halliday Payments SDK `outputs` entry, e.g. `lens:0x…800a`. */
   hallidayOutputAsset: string;
@@ -41,6 +45,12 @@ function readLensPrimitiveEnv(...keys: string[]): string | null {
  * components should receive the result via props instead of calling this directly.
  */
 export function getSongchainConfig(): SongchainConfig {
+  const appId = readLensPrimitiveEnv(
+    'NEXT_PUBLIC_SONGCHAIN_APP_ID',
+    'SONGCHAIN_APP_ID',
+    'NEXT_PUBLIC_LENS_APP_ID',
+    'LENS_APP_ID',
+  );
   const publicFeedId = readLensPrimitiveEnv(
     'NEXT_PUBLIC_SONGCHAIN_FEED_ID',
     'SONGCHAIN_FEED_ID',
@@ -52,6 +62,10 @@ export function getSongchainConfig(): SongchainConfig {
   const groupId = readLensPrimitiveEnv(
     'NEXT_PUBLIC_SONGCHAIN_GROUP_ID',
     'SONGCHAIN_GROUP_ID',
+  );
+  const graphId = readLensPrimitiveEnv(
+    'NEXT_PUBLIC_SONGCHAIN_GRAPH_ID',
+    'SONGCHAIN_GRAPH_ID',
   );
 
   const tokenOverride = readEnv(
@@ -67,10 +81,12 @@ export function getSongchainConfig(): SongchainConfig {
   const network = getLensNetwork();
 
   return {
-    enabled: Boolean(publicFeedId || exclusiveFeedId || groupId),
+    enabled: Boolean(appId || publicFeedId || exclusiveFeedId || groupId || graphId),
+    appId,
     publicFeedId,
     exclusiveFeedId,
     groupId,
+    graphId,
     hallidayApiKey,
     hallidayOutputAsset: buildHallidayOutputAsset(
       network,

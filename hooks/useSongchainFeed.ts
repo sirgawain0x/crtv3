@@ -12,6 +12,7 @@ import {
   extractLensContractAddress,
   getLensContractAddressError,
 } from '@/lib/sdk/lens/primitive-id';
+import { checkLensFeedExists } from '@/lib/songchain/lens-feed';
 
 type UseSongchainFeedOptions = {
   feedId: string | null;
@@ -42,13 +43,21 @@ export function useSongchainFeed({ feedId, enabled = true }: UseSongchainFeedOpt
       setLoading(true);
       setError(null);
       try {
+        const feedCheck = await checkLensFeedExists(feedId);
+        if (!feedCheck.exists) {
+          setPosts([]);
+          cursorRef.current = null;
+          setHasMore(false);
+          setError(feedCheck.error);
+          return;
+        }
+
         let client: AnyClient = createLensClient();
         if (canWrite) {
           try {
             client = await getSessionClient();
           } catch (err) {
             clearStaleOrbSessionIfNeeded(err);
-            // Always fall back to read-only public client for feed browsing.
             client = createLensClient();
           }
         }
