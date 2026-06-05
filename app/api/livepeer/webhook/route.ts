@@ -1,23 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyLivepeerWebhookSignature } from "@/lib/livepeer/verify-webhook";
 import {
-  getLivepeerAsset,
-  type LivepeerAssetSummary,
-} from "@/lib/livepeer/studio-api";
+  extractAssetFromWebhook,
+  extractAssetIdFromWebhook,
+  extractStreamIdFromWebhook,
+  type LivepeerWebhookPayload,
+} from "@/lib/livepeer/parse-webhook-event";
+import { verifyLivepeerWebhookSignature } from "@/lib/livepeer/verify-webhook";
+import { getLivepeerAsset } from "@/lib/livepeer/studio-api";
 import {
   finalizeStreamRecordings,
   persistRecordingAsset,
 } from "@/services/livestream-recordings";
 import { serverLogger } from "@/lib/utils/logger";
-
-type WebhookPayload = {
-  event?: string;
-  streamId?: string;
-  asset?: LivepeerAssetSummary;
-  assetId?: string;
-  session?: { id?: string };
-  sessionId?: string;
-};
 
 export async function POST(request: NextRequest) {
   const rawBody = await request.text();
@@ -27,7 +21,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
-  let payload: WebhookPayload;
+  let payload: LivepeerWebhookPayload;
   try {
     payload = JSON.parse(rawBody);
   } catch {
@@ -35,27 +29,27 @@ export async function POST(request: NextRequest) {
   }
 
   const event = payload.event;
-  const streamId = payload.streamId;
+  const streamId = extractStreamIdFromWebhook(payload);
 
   try {
     if (event === "asset.ready") {
-      let asset = payload.asset;
-      if (!asset?.id && payload.assetId) {
-        asset = (await getLivepeerAsset(payload.assetId)) ?? undefined;
+      let asset = extractAssetFromWebhook(payload);
+      if (!asset?.id) {
+        const assetId = extractAssetIdFromWebhook(payload);
+        if (assetId) {
+          asset = (await getLivepeerAsset(assetId)) ?? undefined;
+        }
       }
       if (asset?.id) {
         await persistRecordingAsset(asset, { streamId });
       }
-    } else if (
-      event === "recording.ready" ||
-      event === "stream.idle"
-    ) {
+    } else if (event === "recording.ready" || event === "stream.idle") {
       if (streamId) {
         await finalizeStreamRecordings(streamId);
       }
     }
   } catch (err) {
-    serverLogger.error("Livepeer webhook handler error", { event, err });
+    serverLogger.error("Livepeer webhook handler error", { event, streamId, err });
     return NextResponse.json({ error: "Handler failed" }, { status: 500 });
   }
 
