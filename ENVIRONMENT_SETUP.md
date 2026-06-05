@@ -61,6 +61,11 @@ Your Livepeer API key for video streaming and processing.
 2. Create a new API key
 3. Copy the key
 
+#### `LIVEPEER_FULL_API_KEY`
+Full-access Livepeer API key used server-side for playback-info, asset routes, and view metrics. **Required for Discover video playback** on Vercel production. If unset, the app falls back to `LIVEPEER_API_KEY` where supported.
+
+**How to get it:** Same as `LIVEPEER_API_KEY` — use a key with playback and data API access, or create a dedicated full-access key in Livepeer Studio.
+
 #### `LIVEPEER_WEBHOOK_ID`
 Your Livepeer webhook ID for video processing callbacks.
 
@@ -285,6 +290,7 @@ NEXT_PUBLIC_ALCHEMY_PAYMASTER_POLICY_ID=your_gas_manager_policy_id_here
 
 # Livepeer Configuration
 LIVEPEER_API_KEY=your_livepeer_api_key
+LIVEPEER_FULL_API_KEY=your_livepeer_full_api_key
 LIVEPEER_WEBHOOK_ID=your_livepeer_webhook_id
 
 # Supabase Configuration

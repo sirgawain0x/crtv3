@@ -15,7 +15,6 @@ import { toast } from "sonner";
 import Link from "next/link";
 import { TrendingUpIcon } from "lucide-react";
 import VideoThumbnail from "@/components/Videos/VideoThumbnail";
-import { ViewsComponent } from "@/components/Player/ViewsComponent";
 import { HERO_VIDEO_ASSET_ID } from "@/context/context";
 import { logger } from "@/lib/utils/logger";
 
@@ -41,13 +40,13 @@ export function TopVideos() {
         setLoading(true);
         setError(null);
 
-        // Step 1: Fetch trending videos from database (ordered by views_count)
+        // Step 1: Fetch trending videos from database
         // Fetch 11 videos to ensure we have 10 after excluding the hero video
         logger.debug("Fetching trending videos from database...");
         const { data: trendingVideos } = await fetchPublishedVideos({
           limit: 11, // Fetch 11 to ensure we have 10 after excluding hero video
           offset: 0,
-          orderBy: 'views_count', // Order by views to get trending content
+          orderBy: 'created_at',
           order: 'desc',
         });
 
@@ -76,81 +75,38 @@ export function TopVideos() {
 
         logger.debug(`Found ${filteredVideos.length} trending videos (excluding hero video)`);
 
-        // Step 2: Fetch playback sources for each video
-        // Don't set videos state until playback sources are ready to avoid rendering videos without sources
-        const sources: Record<string, Src[] | null> = {};
+        // Step 2: Fetch playback sources in parallel (no shared AbortSignal — avoids
+        // React Strict Mode / fast navigation aborting the whole batch)
         logger.debug("Starting to fetch playback sources...");
-
-        for (const video of filteredVideos) {
-          if (!isMounted || signal.aborted) {
-            // If aborted, don't set any state - component is unmounting
-            return;
-          }
-          
-          if (!video.playback_id) {
-            logger.warn(`Video ${video.asset_id} has no playback_id`);
-            sources[video.asset_id] = null;
-            continue;
-          }
-
-          try {
-            logger.debug(
-              `Fetching playback source for video ${video.playback_id}...`
-            );
-
-            // Get the playback source with abort signal support
-            const src = await getDetailPlaybackSource(video.playback_id, { 
-              signal 
-            });
-            
-            if (!isMounted || signal.aborted) {
-              // If aborted, don't set any state - component is unmounting
-              return;
+        const sourceEntries = await Promise.all(
+          filteredVideos.map(async (video) => {
+            if (!video.playback_id) {
+              logger.warn(`Video ${video.asset_id} has no playback_id`);
+              return [video.asset_id, null] as const;
             }
-            
-            logger.debug(`Playback source for ${video.playback_id}:`, src);
-
-            if (!src || src.length === 0) {
+            try {
+              const src = await getDetailPlaybackSource(video.playback_id);
+              if (!src?.length) {
+                logger.warn(`No valid source for ${video.playback_id}`);
+                return [video.asset_id, null] as const;
+              }
+              return [video.asset_id, src] as const;
+            } catch (error) {
               logger.error(
-                `No valid source found for video ${video.playback_id}`
+                `Error fetching playback source for ${video.playback_id}:`,
+                error,
               );
-              sources[video.asset_id] = null;
-              continue;
+              return [video.asset_id, null] as const;
             }
+          }),
+        );
 
-            sources[video.asset_id] = src;
-          } catch (error) {
-            if (!isMounted || signal.aborted) {
-              // If aborted, don't set any state - component is unmounting
-              return;
-            }
-            
-            // Check if it's an abort error
-            if (error instanceof Error && (
-              error.name === 'AbortError' || 
-              error.message.includes('aborted') ||
-              error.message.includes('signal is aborted')
-            )) {
-              logger.warn(`Video ${video.playback_id} fetch was aborted:`, error.message);
-              // If aborted, don't set any state - component is unmounting
-              return;
-            }
-            
-            logger.error(
-              `Error fetching playback source for video ${video.playback_id}:`,
-              error
-            );
-            sources[video.asset_id] = null;
-          }
-        }
+        if (!isMounted) return;
 
-        if (!isMounted || signal.aborted) {
-          // If aborted, don't set any state - component is unmounting
-          return;
-        }
-        
-        // Only set both videos and playback sources together after all sources are fetched
-        // This ensures videos are never rendered without their playback sources
+        const sources = Object.fromEntries(sourceEntries) as Record<
+          string,
+          Src[] | null
+        >;
         logger.debug("Final playback sources:", sources);
         setVideos(filteredVideos);
         setPlaybackSources(sources);
@@ -278,14 +234,6 @@ export function TopVideos() {
                       ) : (
                         <div className="flex h-full w-full items-center justify-center bg-gray-900 text-white">
                           No playback ID available
-                        </div>
-                      )}
-                      {/* Top bar with view counts */}
-                      {video.playback_id && (
-                        <div className="absolute left-0 right-0 top-0 bg-gradient-to-b from-black/60 to-transparent pt-2">
-                          <div className="flex items-center justify-end px-3 py-1">
-                            <ViewsComponent playbackId={video.playback_id} />
-                          </div>
                         </div>
                       )}
                       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-4">

@@ -121,7 +121,11 @@ export const TrendingPlayer: React.FC<{
 
   return (
     <SubtitlesProvider>
-      <Player.Root src={src} volume={0}>
+      <Player.Root
+        src={src}
+        playbackId={assetMetadata?.playbackId}
+        volume={0}
+      >
         <Player.Container
           ref={containerRef}
           className="player-container relative h-full w-full touch-none"

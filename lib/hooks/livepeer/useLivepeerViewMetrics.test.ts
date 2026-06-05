@@ -14,6 +14,7 @@ describe("fetchLivepeerViewMetrics", () => {
         Response.json({
           success: true,
           playbackId: "playback-1",
+          totalViews: 5,
           viewCount: 3,
           playtimeMins: 10,
           legacyViewCount: 2,
@@ -26,6 +27,7 @@ describe("fetchLivepeerViewMetrics", () => {
       viewCount: 3,
       playtimeMins: 10,
       legacyViewCount: 2,
+      totalViews: 5,
     });
   });
 

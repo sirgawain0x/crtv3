@@ -14,6 +14,8 @@ import { useUser } from "@account-kit/react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertCircle } from "lucide-react";
 import Link from "next/link";
+import { RealtimeViewsComponent } from "@/components/Player/RealtimeViewsComponent";
+import { ViewsComponent } from "@/components/Player/ViewsComponent";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -253,12 +255,31 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
             )}
 
             {status.kind === "live" && (
-              <div className="aspect-video bg-black rounded-lg overflow-hidden">
-                <Player
-                  src={status.sources}
-                  title={videoTitle || streamData?.name || "Live Stream"}
-                  jwt={jwt}
-                />
+              <div className="space-y-4">
+                <div className="aspect-video bg-black rounded-lg overflow-hidden">
+                  <Player
+                    src={status.sources}
+                    playbackId={playbackId}
+                    title={videoTitle || streamData?.name || "Live Stream"}
+                    jwt={jwt}
+                  />
+                </div>
+                {/* Live Stream Viewership Stats */}
+                <div className="flex items-center justify-between p-4 rounded-xl bg-slate-900/60 backdrop-blur border border-slate-800">
+                  <div className="flex flex-col">
+                    <h1 className="text-xl font-bold text-white truncate max-w-lg">
+                      {videoTitle || streamData?.name || "Live Stream"}
+                    </h1>
+                    <p className="text-sm text-gray-400 mt-1">
+                      Broadcasting Live
+                    </p>
+                  </div>
+                  {/* Total + realtime concurrent viewers */}
+                  <div className="flex items-center gap-4">
+                    {playbackId && <ViewsComponent playbackId={playbackId} />}
+                    {playbackId && <RealtimeViewsComponent playbackId={playbackId} />}
+                  </div>
+                </div>
               </div>
             )}
 

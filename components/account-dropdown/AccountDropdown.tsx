@@ -22,15 +22,20 @@
  *    - Chain Switching: Changes the network for Account Kit integration
  */
 
-import { useState, useEffect } from "react";
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useState,
+} from "react";
 import {
   useAuthModal,
-  useLogout,
   useUser,
   useChain,
-  useSmartAccountClient,
   useSendUserOperation,
 } from "@account-kit/react";
+import { useUnifiedLogout } from "@/hooks/useUnifiedLogout";
 import { base } from "@account-kit/infra";
 import { Button } from "@/components/ui/button";
 import {
@@ -79,7 +84,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import CoinbaseFundButton from "@/components/wallet/buy/coinbase-fund-button";
 import { LoginButton } from "@/components/auth/LoginButton";
 import { AlchemySwapWidget } from "@/components/wallet/swap/AlchemySwapWidget";
-import useModularAccount from "@/lib/hooks/accountkit/useModularAccount";
+import { useSmartWalletDisplayAddress } from "@/lib/hooks/accountkit/useSmartWalletDisplayAddress";
 import { TokenBalance } from "@/components/wallet/balance/TokenBalance";
 import { MeTokenBalances } from "@/components/wallet/balance/MeTokenBalances";
 import makeBlockie from "ethereum-blockies-base64";
@@ -249,7 +254,12 @@ const SESSION_KEY_TYPES: SessionKeyConfig[] = [
   },
 ];
 
-export function AccountDropdown() {
+export type AccountDropdownHandle = {
+  openAction: (action: "buy" | "send" | "swap" | "session-keys") => void;
+};
+
+export const AccountDropdown = forwardRef<AccountDropdownHandle>(
+  function AccountDropdown(_, ref) {
   const { openAuthModal } = useAuthModal();
   const {
     isAuthenticated: isOrbAuthenticated,
@@ -258,11 +268,22 @@ export function AccountDropdown() {
     linkProfile,
     isLinking: isOrbLinking,
     logout: logoutOrb,
+    linkStatus: orbLinkStatus,
+    loginError: orbLoginError,
+    accountMenuRefreshSignal,
   } = useOrbSession();
   const user = useUser();
-  const { logout } = useLogout();
+  const unifiedLogout = useUnifiedLogout();
   const { chain, setChain, isSettingChain } = useChain();
-  const [displayAddress, setDisplayAddress] = useState<string>("");
+  const {
+    primaryAddress,
+    smartAccountAddress,
+    signerAddress,
+    displayAddress,
+    walletLabel,
+    client,
+    account,
+  } = useSmartWalletDisplayAddress();
   const [isNetworkConnected, setIsNetworkConnected] = useState(true);
   const [copySuccess, setCopySuccess] = useState(false);
   const [isArrowUp, setIsArrowUp] = useState(true);
@@ -303,8 +324,6 @@ export function AccountDropdown() {
     },
   });
 
-  const { account, address: smartAccountAddress } = useModularAccount();
-  const { client } = useSmartAccountClient({});
   const validationClient = chain
     ? (client?.extend(installValidationActions as any) as any)
     : undefined;
@@ -323,23 +342,9 @@ export function AccountDropdown() {
     logger.debug('Account state:', {
       "EOA Address (user.address)": user?.address,
       "Smart Contract Account Address": smartAccountAddress,
+      "Primary display address": primaryAddress,
     });
-  }, [smartAccountAddress, user]);
-
-  useEffect(() => {
-    let newDisplayAddress = "";
-    // Smart Wallet is the primary public identity for Creative TV
-    // EOA is kept in background for signing and permissions
-    if (smartAccountAddress) {
-      newDisplayAddress = `${smartAccountAddress.slice(0, 6)}...${smartAccountAddress.slice(-4)}`;
-    } else if (user?.address) {
-      // Fallback to EOA only if Smart Wallet is not available
-      newDisplayAddress = `${user.address.slice(0, 6)}...${user.address.slice(-4)}`;
-    }
-    // Only update if value actually changes
-    if (displayAddress !== newDisplayAddress)
-      setDisplayAddress(newDisplayAddress);
-  }, [user, smartAccountAddress, displayAddress]);
+  }, [smartAccountAddress, primaryAddress, user]);
 
   useEffect(() => {
     const checkNetworkStatus = async () => {
@@ -361,6 +366,12 @@ export function AccountDropdown() {
   useEffect(() => {
     setIsDialogOpen(false);
   }, [user]);
+
+  // Reopen account menu after Orb sign-in so the Orb / Lens section shows linked state.
+  useEffect(() => {
+    if (!accountMenuRefreshSignal || !isOrbAuthenticated) return;
+    setIsDropdownOpen(true);
+  }, [accountMenuRefreshSignal, isOrbAuthenticated]);
 
   // Fetch token balances when dialog opens with send action
   useEffect(() => {
@@ -415,9 +426,7 @@ export function AccountDropdown() {
   }, [client, smartAccountAddress, dialogAction, isDialogOpen, chain?.id]);
 
   const copyToClipboard = async () => {
-    // Copy Smart Wallet address as primary identity
-    // EOA is kept in background for signing operations
-    const addressToCopy = smartAccountAddress || user?.address;
+    const addressToCopy = primaryAddress;
     if (addressToCopy) {
       try {
         await navigator.clipboard.writeText(addressToCopy);
@@ -429,13 +438,22 @@ export function AccountDropdown() {
     }
   };
 
-  const handleActionClick = (
-    action: "buy" | "send" | "swap" | "session-keys"
-  ) => {
-    setDialogAction(action);
-    setIsDialogOpen(true);
-    setIsDropdownOpen(false); // Close dropdown when action is clicked
-  };
+  const handleActionClick = useCallback(
+    (action: "buy" | "send" | "swap" | "session-keys") => {
+      setDialogAction(action);
+      setIsDialogOpen(true);
+      setIsDropdownOpen(false);
+    },
+    []
+  );
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      openAction: handleActionClick,
+    }),
+    [handleActionClick]
+  );
 
   const handleChainSwitch = async (newChain: any) => {
     if (isSettingChain) return;
@@ -1185,11 +1203,16 @@ export function AccountDropdown() {
   };
 
   if (!user) {
-    return <LoginButton />;
+    return (
+      <div className="hidden md:block">
+        <LoginButton />
+      </div>
+    );
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <>
+    <div className="hidden md:flex items-center gap-2">
       <HydrationSafe
         fallback={
           <Button
@@ -1281,47 +1304,45 @@ export function AccountDropdown() {
         </TooltipProvider>
       </HydrationSafe>
 
-      {/* Desktop Dropdown */}
+      {/* Account menu trigger (visible on all breakpoints when signed in) */}
       <HydrationSafe
         fallback={
           <Button
             variant="outline"
-            className="hidden md:flex items-center gap-2 transition-all hover:bg-gray-100 dark:hover:bg-gray-800 hover:border-blue-500"
+            className="flex items-center gap-2 transition-all hover:bg-gray-100 dark:hover:bg-gray-800 hover:border-blue-500"
           >
             <Avatar className="h-8 w-8">
               <AvatarImage
-                src={makeBlockie(smartAccountAddress || user?.address || "0x")}
+                src={makeBlockie(primaryAddress || user?.address || "0x")}
                 alt="Wallet avatar"
               />
             </Avatar>
-            <span className="max-w-[100px] truncate">
+            <span className="max-w-[100px] truncate hidden sm:inline">
               {displayAddress || "Loading..."}
             </span>
           </Button>
         }
       >
-        <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
+        <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen} modal={false}>
           <DropdownMenuTrigger asChild>
             <Button
               variant="outline"
-              className="hidden md:flex items-center gap-2 transition-all hover:bg-gray-100 dark:hover:bg-gray-800 hover:border-blue-500"
+              className="flex items-center gap-2 transition-all hover:bg-gray-100 dark:hover:bg-gray-800 hover:border-blue-500"
               id="nav-user-menu"
             >
               <Avatar className="h-8 w-8">
                 <AvatarImage
-                  src={makeBlockie(smartAccountAddress || user?.address || "0x")}
+                  src={makeBlockie(primaryAddress || user?.address || "0x")}
                   alt="Wallet avatar"
                 />
               </Avatar>
-              <span className="max-w-[100px] truncate">
+              <span className="max-w-[100px] truncate hidden sm:inline">
                 {displayAddress || "Loading..."}
               </span>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent
-            className="w-[320px] md:w-80 max-h-[80vh] overflow-y-auto"
-            align="end"
-          >
+          <DropdownMenuContent className="w-[320px] md:w-80 p-0" align="end">
+            <div className="max-h-[min(80vh,32rem)] overflow-y-auto overscroll-contain touch-pan-y [-webkit-overflow-scrolling:touch] p-1">
             <DropdownMenuLabel className="font-normal">
               <div
                 className={`flex items-center justify-between cursor-pointer 
@@ -1330,12 +1351,12 @@ export function AccountDropdown() {
               >
                 <div className="flex flex-col space-y-1">
                   <p className="text-xs text-gray-500">
-                    {smartAccountAddress ? "Smart Wallet" : user?.address ? "EOA" : "Not Connected"}
+                    {walletLabel}
                   </p>
-                  <p className="font-mono text-sm">{displayAddress}</p>
-                  {user?.address && smartAccountAddress && user.address.toLowerCase() !== smartAccountAddress.toLowerCase() && (
+                  <p className="font-mono text-sm">{displayAddress || "Loading..."}</p>
+                  {signerAddress && (
                     <p className="text-xs text-gray-500">
-                      Signer (EOA): {shortenAddress(user.address)}
+                      Signer (EOA): {shortenAddress(signerAddress)}
                     </p>
                   )}
                 </div>
@@ -1353,8 +1374,15 @@ export function AccountDropdown() {
               <p className="text-xs text-muted-foreground">Orb / Lens</p>
               {isOrbAuthenticated ? (
                 <div className="space-y-2">
-                  <p className="text-xs text-green-600 dark:text-green-400">
-                    Linked{lensAccount ? `: ${shortenAddress(lensAccount)}` : ""}
+                  <p
+                    className={
+                      orbLinkStatus === "linked"
+                        ? "text-xs text-green-600 dark:text-green-400"
+                        : "text-xs text-amber-600 dark:text-amber-400"
+                    }
+                  >
+                    {orbLinkStatus === "linked" ? "Linked" : "Signed in"}
+                    {lensAccount ? `: ${shortenAddress(lensAccount)}` : ""}
                   </p>
                   <div className="flex gap-2">
                     <Button
@@ -1363,7 +1391,7 @@ export function AccountDropdown() {
                       className="flex-1 text-xs"
                       disabled={isOrbLinking}
                       onClick={() =>
-                        linkProfile(smartAccountAddress || user?.address)
+                        linkProfile(primaryAddress)
                       }
                     >
                       {isOrbLinking ? "Linking…" : "Sync profile"}
@@ -1383,7 +1411,10 @@ export function AccountDropdown() {
                   variant="outline"
                   size="sm"
                   className="w-full text-xs"
-                  onClick={() => openOrbLogin()}
+                  onClick={() => {
+                    setIsDropdownOpen(false);
+                    openOrbLogin();
+                  }}
                 >
                   Sign in with Orb
                 </Button>
@@ -1407,7 +1438,7 @@ export function AccountDropdown() {
                   }
                   onClick={() => setIsDropdownOpen(false)}
                 >
-                  <Link href={`/profile/${smartAccountAddress || user?.address}`}>
+                  <Link href={`/profile/${primaryAddress ?? ""}`}>
                     <ShieldUser className="h-3 w-3 mb-1" />
                     <span className="text-xs">Profile</span>
                   </Link>
@@ -1421,7 +1452,7 @@ export function AccountDropdown() {
                   }
                   onClick={() => setIsDropdownOpen(false)}
                 >
-                  <Link href={`/upload/${smartAccountAddress || user?.address}`} id="nav-upload-link">
+                  <Link href={`/upload/${primaryAddress ?? ""}`} id="nav-upload-link">
                     <CloudUpload className="h-3 w-3 mb-1" />
                     <span className="text-xs">Upload</span>
                   </Link>
@@ -1630,7 +1661,7 @@ export function AccountDropdown() {
               <DropdownMenuItem
                 onClick={async () => {
                   try {
-                    await logout();
+                    await unifiedLogout();
                     logger.debug('Logged out successfully');
                     // Small delay to ensure logout completes
                     setTimeout(() => {
@@ -1647,9 +1678,11 @@ export function AccountDropdown() {
                 <span className="text-sm">Logout</span>
               </DropdownMenuItem>
             </div>
+            </div>
           </DropdownMenuContent>
         </DropdownMenu>
       </HydrationSafe>
+    </div>
 
       <Dialog
         open={isDialogOpen}
@@ -1693,6 +1726,6 @@ export function AccountDropdown() {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
-}
+});

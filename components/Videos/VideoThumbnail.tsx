@@ -317,7 +317,7 @@ const VideoThumbnail: React.FC<VideoThumbnailProps> = ({
   const mp4Source = src?.find(s => (s.type as string) === 'video/mp4' || (s.src as string).endsWith('.mp4'))?.src;
 
   // Show inline full player if clicked (and not in preview mode context usually, but kept for backward compat)
-  if (showPlayer) {
+  if (showPlayer && src?.length) {
     return (
       <div ref={containerCallbackRef} className={className}>
         <Player

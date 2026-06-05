@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { config } from "@/config";
-import { Loader2 } from "lucide-react";
+import { GuardLoadingFallback } from "@/components/auth/GuardLoadingFallback";
 
 function isStoreReady(): boolean {
   try {
@@ -30,8 +30,6 @@ function isStoreReady(): boolean {
 /**
  * Renders children only after the Account Kit store has the current chain in connections.
  * Prevents ChainNotFoundError when useSmartAccountClient runs before the store is ready.
- * Uses useEffect + deferred setState so we never update this component during a child's render
- * (avoids "Cannot update a component while rendering a different component").
  */
 export function AccountKitStoreGuard({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
@@ -49,10 +47,8 @@ export function AccountKitStoreGuard({ children }: { children: React.ReactNode }
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
     const unsub = store.subscribe(() => {
       if (!isStoreReady()) return;
-      // Defer setState to next tick so we don't update during another component's render
       timeoutId = setTimeout(() => setReady(true), 0);
     });
-    // In case store became ready before we subscribed
     if (isStoreReady()) setReady(true);
     return () => {
       unsub();
@@ -60,13 +56,13 @@ export function AccountKitStoreGuard({ children }: { children: React.ReactNode }
     };
   }, []);
 
-  if (!ready) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
-  return <>{children}</>;
+  return (
+    <GuardLoadingFallback
+      isLoading={!ready}
+      allowBypass
+      message="Connecting wallet services…"
+    >
+      {children}
+    </GuardLoadingFallback>
+  );
 }

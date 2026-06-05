@@ -8,6 +8,12 @@ import {
 } from '@/lib/livepeer/view-count';
 import { getStoredViewsCount } from '@/lib/livepeer/sync-view-count';
 import { serverLogger } from '@/lib/utils/logger';
+import { LIVEPEER_NOT_CONFIGURED } from '@/lib/sdk/livepeer/studioAuth';
+import {
+  platformApiOptionsResponse,
+  requirePlatformApiAccess,
+} from '@/lib/middleware/platformApiAccess';
+import { PLATFORM_API_CORS_HEADERS } from '@/lib/middleware/x402Gate';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -17,71 +23,95 @@ const noStoreHeaders = {
   'Cache-Control': 'no-store, no-cache, max-age=0, must-revalidate',
   Pragma: 'no-cache',
   Expires: '0',
+  ...PLATFORM_API_CORS_HEADERS,
 };
 
 /**
  * Read-only endpoint: returns max(Livepeer views, database views_count).
  */
+export async function OPTIONS() {
+  return platformApiOptionsResponse();
+}
+
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ playbackId: string }> }
+  { params }: { params: Promise<{ playbackId: string }> },
 ) {
+  const access = await requirePlatformApiAccess(request, { resource: 'views.metrics' });
+  if (!access.allowed) {
+    return access.response;
+  }
+
   try {
     const { playbackId } = await params;
 
     if (!playbackId) {
       return NextResponse.json(
-        { error: 'Playback ID is required' },
-        { status: 400, headers: noStoreHeaders }
+        { error: 'Playback ID is required', code: 'PLAYBACK_ID_REQUIRED' },
+        { status: 400, headers: noStoreHeaders },
       );
     }
 
-    const metrics = await fetchAllViews(playbackId);
-    const livepeerTotal = metrics ? sumLivepeerViewMetrics(metrics) : 0;
+    const supabase = createServiceClient();
+    const dbViewCount = await getStoredViewsCount(supabase, playbackId);
 
-    if (metrics) {
-      const livepeerTotal =
-        (metrics.viewCount ?? 0) + (metrics.legacyViewCount ?? 0);
+    const viewsResult = await fetchAllViews(playbackId);
+    const livepeerAvailable = viewsResult.ok;
+    const livepeerTotal = viewsResult.ok
+      ? sumLivepeerViewMetrics(viewsResult.metrics)
+      : 0;
 
-      if (livepeerTotal > 0) {
+    if (!viewsResult.ok && viewsResult.reason === 'not_configured') {
+      if (dbViewCount > 0) {
         return NextResponse.json(
           {
             success: true,
-            source: 'livepeer' as const,
-            ...metrics,
+            source: 'database' as const,
+            playbackId,
+            totalViews: dbViewCount,
+            viewCount: dbViewCount,
+            playtimeMins: 0,
+            legacyViewCount: 0,
+            livepeerAvailable: false,
+            code: LIVEPEER_NOT_CONFIGURED,
           },
-          { headers: noStoreHeaders }
+          { headers: noStoreHeaders },
         );
       }
+
+      return NextResponse.json(
+        {
+          error: 'Livepeer is not configured',
+          code: LIVEPEER_NOT_CONFIGURED,
+        },
+        { status: 503, headers: noStoreHeaders },
+      );
     }
 
-    // Livepeer returned 0 or failed — fall back to database views_count
-    const supabase = await createClient();
-    const { data: videoAsset } = await supabase
-      .from('video_assets')
-      .select('views_count')
-      .eq('playback_id', playbackId)
-      .single();
-
-    const dbViewCount = videoAsset?.views_count ?? 0;
+    const displayTotal = mergeViewCounts(dbViewCount, livepeerTotal);
+    const source = resolveViewCountSource(livepeerTotal, dbViewCount);
 
     return NextResponse.json(
       {
         success: true,
-        source: 'database' as const,
+        source,
         playbackId,
-        viewCount: dbViewCount,
-        playtimeMins: metrics?.playtimeMins ?? 0,
+        totalViews: displayTotal,
+        viewCount: displayTotal,
+        playtimeMins: viewsResult.ok ? viewsResult.metrics.playtimeMins : 0,
         legacyViewCount: 0,
+        livepeerAvailable,
+        ...(!livepeerAvailable
+          ? { code: 'LIVEPEER_VIEWS_UNAVAILABLE' as const }
+          : {}),
       },
-      { headers: noStoreHeaders }
+      { headers: noStoreHeaders },
     );
-
   } catch (error) {
     serverLogger.error('Error fetching view metrics:', error);
     return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500, headers: noStoreHeaders }
+      { error: 'Internal server error', code: 'VIEW_METRICS_ERROR' },
+      { status: 500, headers: noStoreHeaders },
     );
   }
 }

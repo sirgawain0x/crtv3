@@ -20,6 +20,7 @@ import { MembershipGuard } from "@/components/auth/MembershipGuard";
 import { AccountKitStoreGuard } from "@/components/auth/AccountKitStoreGuard";
 import { OrbSessionProvider } from "@/context/OrbSessionContext";
 import { OrbLoginModal } from "@/components/auth/OrbLoginModal";
+import { OrbLinkingOverlay } from "@/components/auth/OrbLinkingOverlay";
 import NoSSR from "@/components/NoSSR";
 
 function ErrorFallback({ error }: { error: Error }) {
@@ -84,6 +85,7 @@ export const Providers = (
                               </MembershipGuard>
                             </AccountKitStoreGuard>
                             <OrbLoginModal />
+                            <OrbLinkingOverlay />
                             <Toaster position="top-right" richColors />
                           </OrbSessionProvider>
                         </VideoProvider>

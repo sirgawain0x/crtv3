@@ -28,11 +28,11 @@ export async function GET(request: NextRequest) {
 
     const supabase = createServiceClient();
     
-    // Fetch all published videos with playback IDs
+    // Fetch all published and minted videos with playback IDs
     const { data: videos, error } = await supabase
       .from('video_assets')
       .select('id, playback_id, views_count, title')
-      .eq('status', 'published')
+      .in('status', ['published', 'minted'])
       .not('playback_id', 'is', null);
 
     if (error) {
@@ -73,10 +73,10 @@ export async function GET(request: NextRequest) {
       await Promise.all(
         batch.map(async (video) => {
           try {
-            const metrics = await fetchAllViews(video.playback_id);
-            
-            if (metrics) {
-              const livepeerTotal = sumLivepeerViewMetrics(metrics);
+            const viewsResult = await fetchAllViews(video.playback_id);
+
+            if (viewsResult.ok) {
+              const livepeerTotal = sumLivepeerViewMetrics(viewsResult.metrics);
               const merged = mergeViewCounts(video.views_count ?? 0, livepeerTotal);
 
               if (merged !== video.views_count) {

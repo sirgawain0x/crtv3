@@ -178,7 +178,7 @@ export async function GET(request: NextRequest) {
           created_at
         `)
         .not('attributes->content_coin_id', 'is', null)
-        .eq('status', 'published');
+        .in('status', ['published', 'minted']);
 
       if (!videoError && videoAssets) {
         // Get unique content coin addresses

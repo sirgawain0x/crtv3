@@ -615,7 +615,7 @@ export async function getPublishedVideoAssets(options: GetPublishedVideoAssetsOp
   let query = supabase
     .from('video_assets')
     .select('*', { count: 'exact' })
-    .eq('status', 'published');
+    .in('status', ['published', 'minted']);
 
   // Add creator filter if specified (case-insensitive comparison)
   if (options.creatorId) {
@@ -681,7 +681,7 @@ export async function getVideoAssetsWithStoryIP(options: GetStoryIPAssetsOptions
   let query = supabase
     .from('video_assets')
     .select('*', { count: 'exact' })
-    .eq('status', 'published')
+    .in('status', ['published', 'minted'])
     .eq('story_ip_registered', true)
     .order(orderBy, { ascending: order === 'asc' });
 

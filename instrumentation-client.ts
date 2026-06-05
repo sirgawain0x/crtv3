@@ -3,6 +3,9 @@ import { initBotId } from 'botid/client/core';
 /**
  * BotID protected routes: client attaches headers for these paths so server
  * can call checkBotId(). Excludes cron routes (no browser context).
+ *
+ * Orb QR sign-in (/api/auth/orb/qr/init, /api/auth/orb/qr/poll) is intentionally
+ * omitted — poll loops every ~1–2s and Kasada/BotID flags that as bot traffic.
  */
 initBotId({
   protect: [
@@ -10,6 +13,7 @@ initBotId({
     { path: '/api/ipfs/upload', method: 'POST' },
     { path: '/api/creator-profiles/upsert', method: 'POST' },
     { path: '/api/creator-profiles/link-orb', method: 'POST' },
+    // Orb QR init/poll omitted: high-frequency polling; rate-limited server routes instead.
     { path: '/api/creator-profiles', method: 'POST' },
     { path: '/api/creator-profiles', method: 'PUT' },
     { path: '/api/creator-profiles', method: 'DELETE' },

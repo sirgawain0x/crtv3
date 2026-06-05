@@ -1,5 +1,3 @@
-"use client";
-
 import NonLoggedInView from '@/components/home-page/NonLoggedInView';
 
 export default function Home() {

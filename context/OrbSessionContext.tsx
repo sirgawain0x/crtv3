@@ -7,6 +7,7 @@ import React, {
   useEffect,
   useMemo,
   useState,
+  useSyncExternalStore,
 } from 'react';
 import { useUser } from '@account-kit/react';
 import useModularAccount from '@/lib/hooks/accountkit/useModularAccount';
@@ -14,10 +15,19 @@ import {
   getOrbLogin,
   loadStoredOrbSession,
   saveStoredOrbSession,
+  clearStoredOrbSession,
+  subscribeOrbSession,
+  getOrbSessionServerSnapshot,
+  hasOrbWriteCredentials,
+  normalizeOrbAuthTokens,
   type StoredOrbSession,
 } from '@/lib/sdk/orb/login';
 import { useWalletAuth } from '@/lib/auth/useWalletAuth';
+import { formatOrbAuthError } from '@/lib/sdk/orb/format-auth-error';
+import { isStaleOrbSessionError } from '@/lib/sdk/orb/session-errors';
 import { toast } from 'sonner';
+
+export type OrbLinkStatus = 'idle' | 'linked' | 'needs_wallet' | 'failed';
 
 type OrbSessionContextValue = {
   session: StoredOrbSession | null;
@@ -25,60 +35,144 @@ type OrbSessionContextValue = {
   isAuthenticated: boolean;
   isLinking: boolean;
   isLoginModalOpen: boolean;
+  loginError: string | null;
+  linkStatus: OrbLinkStatus;
+  hasWallet: boolean;
   openLoginModal: () => void;
   closeLoginModal: () => void;
+  clearLoginError: () => void;
   connectWithQr: (onInit?: (payload: { qrCode: string; deepLink?: string }) => void) => Promise<void>;
   logout: () => Promise<void>;
   syncSession: () => Promise<StoredOrbSession | null>;
   linkProfile: (ownerAddress?: string) => Promise<void>;
+  /** Bumped after Orb sign-in so account menus can reopen with fresh state. */
+  accountMenuRefreshSignal: number;
 };
 
 const OrbSessionContext = createContext<OrbSessionContextValue | null>(null);
 
 export function OrbSessionProvider({ children }: { children: React.ReactNode }) {
-  const [session, setSession] = useState<StoredOrbSession | null>(null);
+  const session = useSyncExternalStore(
+    subscribeOrbSession,
+    loadStoredOrbSession,
+    getOrbSessionServerSnapshot,
+  );
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isLinking, setIsLinking] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [linkStatus, setLinkStatus] = useState<OrbLinkStatus>('idle');
+  const [accountMenuRefreshSignal, setAccountMenuRefreshSignal] = useState(0);
   const user = useUser();
   const { account: modularAccount } = useModularAccount();
-  const { getAuthHeaders } = useWalletAuth();
+  const { getAuthHeaders, isReady: isWalletAuthReady } = useWalletAuth();
   const orb = useMemo(() => getOrbLogin(), []);
+
+  const walletAddress = modularAccount?.address || user?.address || null;
+  const hasWallet = !!walletAddress;
 
   const lensAccount = useMemo(() => {
     if (!session?.accessToken) return null;
     return orb.getAccountFromAccessToken(session.accessToken);
   }, [session, orb]);
 
-  useEffect(() => {
-    setSession(loadStoredOrbSession());
-  }, []);
-
   const persistSession = useCallback((next: StoredOrbSession | null) => {
     saveStoredOrbSession(next);
-    setSession(next);
+  }, []);
+
+  const invalidateOrbSession = useCallback(
+    (options?: { notify?: boolean }) => {
+      clearStoredOrbSession();
+      setLoginError(null);
+      setLinkStatus('idle');
+      if (options?.notify !== false) {
+        toast.info(
+          'Your Orb session ended. Sign in again to like posts and join groups.',
+        );
+      }
+    },
+    [],
+  );
+
+  const bumpAccountMenuRefresh = useCallback(() => {
+    setAccountMenuRefreshSignal((n) => n + 1);
   }, []);
 
   const syncSession = useCallback(async () => {
     if (!session?.accessToken) return null;
+    let syncTimeoutId: ReturnType<typeof setTimeout> | undefined;
     try {
-      const synced = await orb.syncSession({
-        accessToken: session.accessToken,
-        refreshToken: session.refreshToken,
-        authenticationId: session.authenticationId,
-      });
-      if (!synced?.accessToken) return null;
-      const stored: StoredOrbSession = {
+      const synced = await Promise.race([
+        orb.syncSession({
+          accessToken: session.accessToken,
+          refreshToken: session.refreshToken,
+          authenticationId: session.authenticationId,
+        }),
+        new Promise<never>((_, reject) => {
+          syncTimeoutId = setTimeout(
+            () => reject(new Error('Orb session sync timed out')),
+            20_000,
+          );
+        }),
+      ]);
+      if (!synced?.accessToken) {
+        invalidateOrbSession();
+        return null;
+      }
+      const merged = normalizeOrbAuthTokens({
         accessToken: synced.accessToken,
         refreshToken: synced.refreshToken ?? session.refreshToken,
         authenticationId: synced.authenticationId ?? session.authenticationId,
         idToken: synced.idToken ?? session.idToken,
-      };
-      persistSession(stored);
-      return stored;
-    } catch {
+      });
+      if (!merged || !hasOrbWriteCredentials(merged)) {
+        invalidateOrbSession();
+        return null;
+      }
+      persistSession(merged);
+      return merged;
+    } catch (err) {
+      if (isStaleOrbSessionError(err)) {
+        invalidateOrbSession();
+        return null;
+      }
+      if (!hasOrbWriteCredentials(session)) {
+        invalidateOrbSession();
+        return null;
+      }
       return session;
+    } finally {
+      if (syncTimeoutId !== undefined) {
+        clearTimeout(syncTimeoutId);
+      }
     }
-  }, [session, orb, persistSession]);
+  }, [session, orb, persistSession, invalidateOrbSession]);
+
+  /** Reset link UI when tokens were cleared outside this provider (e.g. Songchain feed). */
+  useEffect(() => {
+    if (!session?.accessToken && linkStatus === 'linked') {
+      setLinkStatus('idle');
+    }
+  }, [session?.accessToken, linkStatus]);
+
+  /** Clear revoked/expired Orb tokens so Songchain and feeds stay read-only instead of erroring. */
+  useEffect(() => {
+    const token = session?.accessToken;
+    if (!token) return;
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        await syncSession();
+      } catch {
+        /* syncSession handles stale sessions internally */
+      }
+      if (cancelled) return;
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.accessToken, syncSession]);
 
   const linkProfile = useCallback(
     async (ownerAddress?: string) => {
@@ -93,17 +187,34 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
       )?.toLowerCase();
 
       if (!wallet) {
-        toast.error('Connect a wallet to link your Orb / Lens profile.');
+        setLinkStatus('needs_wallet');
+        const message = formatOrbAuthError(
+          'Connect your wallet with Get Started before linking your Lens identity.',
+        );
+        setLoginError(message);
+        toast.error(message);
         return;
       }
 
       setIsLinking(true);
       try {
+        if (!isWalletAuthReady) {
+          setLinkStatus('needs_wallet');
+          const message =
+            'Wallet is still initializing. Wait a moment, then tap Sync profile again.';
+          setLoginError(message);
+          toast.info(message);
+          return;
+        }
+
         let authHeaders: Record<string, string>;
         try {
           authHeaders = await getAuthHeaders();
-        } catch {
-          toast.error('Sign in with your wallet to link your profile.');
+        } catch (signErr) {
+          setLinkStatus('failed');
+          const message = formatOrbAuthError(signErr);
+          setLoginError(message);
+          toast.error(message);
           return;
         }
 
@@ -123,40 +234,96 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
         if (!res.ok || !data.success) {
           throw new Error(data.error || 'Failed to link Orb profile');
         }
+        setLinkStatus('linked');
+        setLoginError(null);
         toast.success('Orb / Lens identity linked to your profile');
       } catch (err) {
-        toast.error(err instanceof Error ? err.message : 'Profile link failed');
+        setLinkStatus('failed');
+        const message = formatOrbAuthError(err);
+        setLoginError(message);
+        toast.error(message);
       } finally {
         setIsLinking(false);
       }
     },
-    [session, modularAccount?.address, user?.address, getAuthHeaders],
+    [session, modularAccount?.address, user?.address, getAuthHeaders, isWalletAuthReady],
   );
+
+  useEffect(() => {
+    if (!session?.accessToken || !walletAddress) return;
+    if (linkStatus !== 'needs_wallet') return;
+    void linkProfile(walletAddress);
+  }, [session?.accessToken, walletAddress, linkStatus, linkProfile]);
+
+  /** Restore link status after refresh when profile was already linked server-side. */
+  useEffect(() => {
+    if (!session?.accessToken || !walletAddress || !lensAccount) return;
+    if (linkStatus === 'linked' || linkStatus === 'needs_wallet') return;
+
+    const controller = new AbortController();
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/creator-profiles?owner=${encodeURIComponent(walletAddress)}`,
+          { signal: controller.signal },
+        );
+        const json = await res.json();
+        if (!json?.success || !json.data?.lens_account_id) return;
+        const storedLens = String(json.data.lens_account_id).toLowerCase();
+        if (storedLens === lensAccount.toLowerCase()) {
+          setLinkStatus('linked');
+        }
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        // Non-fatal: user can still use Sync profile / Link Orb
+      }
+    })();
+
+    return () => {
+      controller.abort();
+    };
+  }, [session?.accessToken, walletAddress, lensAccount, linkStatus]);
 
   const connectWithQr = useCallback(
     async (onInit?: (payload: { qrCode: string; deepLink?: string }) => void) => {
-      const result = await orb.connectWithQr({
-        onInit: (payload) => {
-          onInit?.({ qrCode: payload.qrCode, deepLink: payload.deepLink });
-        },
-      });
+      setLoginError(null);
+      try {
+        const result = await orb.connectWithQr({
+          onInit: (payload) => {
+            onInit?.({ qrCode: payload.qrCode, deepLink: payload.deepLink });
+          },
+        });
 
-      const stored: StoredOrbSession = {
-        accessToken: result.accessToken,
-        refreshToken: result.refreshToken,
-        authenticationId: result.authenticationId,
-        idToken: result.idToken,
-      };
-      persistSession(stored);
-      setIsLoginModalOpen(false);
-      toast.success('Signed in with Orb');
+        const stored = normalizeOrbAuthTokens(
+          result as unknown as Record<string, unknown>,
+        );
 
-      const wallet = modularAccount?.address || user?.address;
-      if (wallet) {
-        await linkProfile(wallet);
+        if (!stored?.refreshToken?.trim()) {
+          throw new Error(
+            'Orb sign-in did not return a refresh token. Try signing in again.',
+          );
+        }
+        persistSession(stored);
+        setIsLoginModalOpen(false);
+        bumpAccountMenuRefresh();
+        toast.success('Signed in with Orb');
+
+        const wallet = modularAccount?.address || user?.address;
+        if (wallet) {
+          void linkProfile(wallet).catch(() => undefined);
+        } else {
+          setLinkStatus('needs_wallet');
+          toast.info(
+            'Orb connected. Use Get Started to connect your wallet, then sync your profile.',
+          );
+        }
+      } catch (err) {
+        const message = formatOrbAuthError(err);
+        setLoginError(message);
+        throw new Error(message);
       }
     },
-    [orb, persistSession, modularAccount?.address, user?.address, linkProfile],
+    [orb, persistSession, bumpAccountMenuRefresh, modularAccount?.address, user?.address, linkProfile],
   );
 
   const logout = useCallback(async () => {
@@ -170,9 +337,23 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
         // still clear local session
       }
     }
-    persistSession(null);
+    clearStoredOrbSession();
+    setLoginError(null);
+    setLinkStatus('idle');
     toast.success('Signed out of Orb');
-  }, [session, orb, persistSession]);
+  }, [session, orb]);
+
+  const openLoginModal = useCallback(() => {
+    if (!hasWallet) {
+      const message = formatOrbAuthError(
+        'Connect your wallet with Get Started before linking your Lens identity.',
+      );
+      toast.info(message);
+      return;
+    }
+    setLoginError(null);
+    setIsLoginModalOpen(true);
+  }, [hasWallet]);
 
   const value = useMemo<OrbSessionContextValue>(
     () => ({
@@ -181,22 +362,32 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
       isAuthenticated: !!session?.accessToken,
       isLinking,
       isLoginModalOpen,
-      openLoginModal: () => setIsLoginModalOpen(true),
+      loginError,
+      linkStatus,
+      hasWallet,
+      openLoginModal,
       closeLoginModal: () => setIsLoginModalOpen(false),
+      clearLoginError: () => setLoginError(null),
       connectWithQr,
       logout,
       syncSession,
       linkProfile,
+      accountMenuRefreshSignal,
     }),
     [
       session,
       lensAccount,
       isLinking,
       isLoginModalOpen,
+      loginError,
+      linkStatus,
+      hasWallet,
+      openLoginModal,
       connectWithQr,
       logout,
       syncSession,
       linkProfile,
+      accountMenuRefreshSignal,
     ],
   );
 

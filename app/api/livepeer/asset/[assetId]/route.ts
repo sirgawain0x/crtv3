@@ -1,69 +1,99 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { fullLivepeer } from '@/lib/sdk/livepeer/fullClient';
+import { getFullLivepeer } from '@/lib/sdk/livepeer/fullClient';
+import { LIVEPEER_NOT_CONFIGURED } from '@/lib/sdk/livepeer/studioAuth';
 import { serverLogger } from '@/lib/utils/logger';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: Promise<{ assetId: string }> }
+  { params }: { params: Promise<{ assetId: string }> },
 ) {
   try {
     const { assetId } = await params;
 
     if (!assetId) {
       return NextResponse.json(
-        { error: 'Asset ID is required' },
-        { status: 400 }
+        { error: 'Asset ID is required', code: 'ASSET_ID_REQUIRED' },
+        { status: 400 },
       );
     }
 
-    // Validate UUID format
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    const uuidRegex =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     if (!uuidRegex.test(assetId)) {
       return NextResponse.json(
-        { error: 'Invalid asset ID format. Expected UUID format.' },
-        { status: 400 }
+        {
+          error: 'Invalid asset ID format. Expected UUID format.',
+          code: 'INVALID_ASSET_ID',
+        },
+        { status: 400 },
       );
     }
 
-    // Fetch asset from Livepeer (server-side, no CORS issues)
-    const assetResponse = await fullLivepeer.asset.get(assetId);
-    
-    // Check if the response contains errors (Livepeer API format)
-    if (assetResponse && 'errors' in assetResponse && Array.isArray(assetResponse.errors) && assetResponse.errors.length > 0) {
+    const client = getFullLivepeer();
+    if (!client) {
       return NextResponse.json(
-        { 
-          error: 'Asset not found',
-          details: assetResponse.errors 
+        {
+          error: 'Livepeer is not configured',
+          code: LIVEPEER_NOT_CONFIGURED,
         },
-        { status: 404 }
+        { status: 503 },
       );
     }
-    
+
+    const assetResponse = await client.asset.get(assetId);
+
+    if (
+      assetResponse &&
+      'errors' in assetResponse &&
+      Array.isArray(assetResponse.errors) &&
+      assetResponse.errors.length > 0
+    ) {
+      return NextResponse.json(
+        {
+          error: 'Asset not found',
+          details: assetResponse.errors,
+          code: 'ASSET_NOT_FOUND',
+        },
+        { status: 404 },
+      );
+    }
+
     if (!assetResponse || !assetResponse.asset) {
       return NextResponse.json(
-        { error: 'Asset not found' },
-        { status: 404 }
+        { error: 'Asset not found', code: 'ASSET_NOT_FOUND' },
+        { status: 404 },
       );
     }
 
     return NextResponse.json(assetResponse);
-  } catch (error: any) {
+  } catch (error: unknown) {
     serverLogger.error('Error fetching asset:', error);
-    
-    // Extract error message from Livepeer API response if available
+
+    const err = error as { errors?: string[]; message?: string };
     let errorMessage = 'Failed to fetch asset';
-    if (error?.errors && Array.isArray(error.errors)) {
-      errorMessage = error.errors.join(', ');
-    } else if (error?.message) {
-      errorMessage = error.message;
+    if (err?.errors && Array.isArray(err.errors)) {
+      errorMessage = err.errors.join(', ');
+    } else if (err?.message) {
+      errorMessage = err.message;
     }
-    
+
+    if (errorMessage === 'LIVEPEER_NOT_CONFIGURED') {
+      return NextResponse.json(
+        {
+          error: 'Livepeer is not configured',
+          code: LIVEPEER_NOT_CONFIGURED,
+        },
+        { status: 503 },
+      );
+    }
+
     return NextResponse.json(
-      { 
+      {
         error: errorMessage,
-        details: error?.errors || undefined
+        details: err?.errors || undefined,
+        code: 'ASSET_FETCH_ERROR',
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

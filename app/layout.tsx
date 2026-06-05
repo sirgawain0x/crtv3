@@ -12,7 +12,6 @@ import { Toaster } from "@/components/ui/toaster";
 import Footer from "@/components/Footer";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Analytics } from "@vercel/analytics/next";
-import Script from "next/script";
 import { LayoutClientChunks } from "@/components/LayoutClientChunks";
 
 const inter = Inter({
@@ -64,6 +63,7 @@ export default async function RootLayout({
     config,
     headersList.get("cookie") ?? undefined
   );
+  const isEmbedRoute = headersList.get("x-crtv-embed-route") === "1";
 
   return (
     <html lang="en" suppressHydrationWarning>
@@ -92,23 +92,16 @@ export default async function RootLayout({
         <LayoutClientChunks />
         <Providers initialState={initialState}>
           <ErrorBoundary>
-            <Tour />
-            <Navbar />
+            {!isEmbedRoute ? <Tour /> : null}
+            {!isEmbedRoute ? <Navbar /> : null}
             <div className="min-h-screen flex flex-col">
               <main className="flex-1">{children}</main>
-              <Footer />
+              {!isEmbedRoute ? <Footer /> : null}
             </div>
           </ErrorBoundary>
         </Providers>
         <Toaster />
         <Analytics />
-        {/* HypeLab SDK: required for @hypelab/sdk-react Banner/Native. Property slug: 33e2e4fa10 */}
-        <Script
-          id="hypelab-sdk"
-          src="https://api.hypelab.com/v1/scripts/sdk.js"
-          strategy="afterInteractive"
-          data-property-slug="33e2e4fa10"
-        />
       </body>
     </html>
   );

@@ -7,6 +7,7 @@ export interface LivepeerViewMetrics {
   viewCount: number;
   playtimeMins: number;
   legacyViewCount: number;
+  totalViews: number;
 }
 
 interface UseLivepeerViewMetricsOptions {
@@ -35,7 +36,12 @@ export async function fetchLivepeerViewMetrics(
     },
   );
 
-  const data = (await response.json()) as Record<string, unknown>;
+  let data: Record<string, unknown>;
+  try {
+    data = (await response.json()) as Record<string, unknown>;
+  } catch (err) {
+    throw new Error("Failed to parse view metrics response");
+  }
 
   if (!response.ok) {
     const message =
@@ -54,6 +60,10 @@ export async function fetchLivepeerViewMetrics(
     viewCount: Number(data.viewCount ?? 0) || 0,
     playtimeMins: Number(data.playtimeMins ?? 0) || 0,
     legacyViewCount: Number(data.legacyViewCount ?? 0) || 0,
+    totalViews:
+      Number(data.totalViews ?? 0) ||
+      (Number(data.viewCount ?? 0) || 0) +
+        (Number(data.legacyViewCount ?? 0) || 0),
   };
 }
 
@@ -80,6 +90,7 @@ export function useLivepeerViewMetrics(
 
   const viewMetrics = query.data ?? null;
   const totalViews =
+    viewMetrics?.totalViews ??
     (viewMetrics?.viewCount ?? 0) + (viewMetrics?.legacyViewCount ?? 0);
 
   const errorMsg =

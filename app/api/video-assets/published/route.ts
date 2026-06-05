@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getPublishedVideoAssets } from "@/services/video-assets";
 import { serverLogger } from "@/lib/utils/logger";
+import {
+  platformApiOptionsResponse,
+  requirePlatformApiAccess,
+} from "@/lib/middleware/platformApiAccess";
+import { PLATFORM_API_CORS_HEADERS } from "@/lib/middleware/x402Gate";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 export const fetchCache = "force-no-store";
@@ -11,6 +16,7 @@ const noStoreHeaders = {
   "Cache-Control": "no-store, no-cache, max-age=0, must-revalidate",
   Pragma: "no-cache",
   Expires: "0",
+  ...PLATFORM_API_CORS_HEADERS,
 };
 
 /**
@@ -28,7 +34,16 @@ const noStoreHeaders = {
  * - category: string (optional)
  * - search: string (optional)
  */
+export async function OPTIONS() {
+  return platformApiOptionsResponse();
+}
+
 export async function GET(request: NextRequest) {
+  const access = await requirePlatformApiAccess(request, { resource: "videos.published" });
+  if (!access.allowed) {
+    return access.response;
+  }
+
   try {
     // Parse query parameters
     const searchParams = request.nextUrl.searchParams;

@@ -1,9 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState, useRef } from "react";
-import { useUser, useSmartAccountClient } from "@account-kit/react";
-import type { UseSmartAccountClientResult } from "@account-kit/react";
-import { logger } from '@/lib/utils/logger';
+import { useCallback, useEffect, useState } from "react";
+import { useUser } from "@account-kit/react";
 
 import {
   unlockService,
@@ -12,6 +10,7 @@ import {
   type MembershipError,
   fetchLockAndKey,
 } from "../../sdk/unlock/services";
+import useModularAccount from "@/lib/hooks/accountkit/useModularAccount";
 
 export interface MembershipDetails {
   name: LockAddress;
@@ -34,7 +33,12 @@ export interface MembershipStatus {
 
 export function useMembershipVerification() {
   const user = useUser();
-  const accountKit = useSmartAccountClient({});
+  const {
+    smartAccountClient: client,
+    address: modularAddress,
+    loading: isModularLoading,
+  } = useModularAccount();
+
   const [status, setStatus] = useState<MembershipStatus>({
     isVerified: false,
     hasMembership: false,
@@ -45,15 +49,8 @@ export function useMembershipVerification() {
   const verifyMembership = useCallback(
     async (address: string, walletType: "eoa" | "sca") => {
       try {
-        // Get all memberships using Unlock Protocol's Web3Service
         const memberships = await unlockService.getAllMemberships(address);
-
         const hasMembership = memberships.some(({ isValid }) => isValid);
-
-        // Log valid memberships for debugging
-        if (hasMembership) {
-          const validMemberships = memberships.filter(({ isValid }) => isValid);
-        }
 
         setStatus({
           isVerified: true,
@@ -82,7 +79,6 @@ export function useMembershipVerification() {
 
   useEffect(() => {
     const checkMembership = async () => {
-      // If no user address is available (not logged in), reset status
       const userAddress = user?.address;
 
       if (!userAddress) {
@@ -96,32 +92,35 @@ export function useMembershipVerification() {
       }
 
       try {
-        // For EOA users, check their address directly
         if (user?.type === "eoa") {
           await verifyMembership(userAddress, "eoa");
           return;
         }
 
-        // For Account Kit users, check the SCA address
-        const scaAddress = accountKit?.client?.account?.address;
+        const scaAddress =
+          client?.account?.address ?? modularAddress ?? null;
+        const waitingForClient = isModularLoading;
 
         if (!scaAddress) {
+          if (waitingForClient) {
+            setStatus((prev) => ({ ...prev, isLoading: true }));
+            return;
+          }
+
+          setStatus({
+            isVerified: false,
+            hasMembership: false,
+            isLoading: false,
+            error: {
+              name: "Error",
+              message: "No valid address found for verification",
+              code: "NO_VALID_ADDRESS",
+            } as MembershipError,
+          });
           return;
         }
 
         await verifyMembership(scaAddress, "sca");
-        return;
-
-        setStatus({
-          isVerified: false,
-          hasMembership: false,
-          isLoading: false,
-          error: {
-            name: "Error",
-            message: "No valid address found for verification",
-            code: "NO_VALID_ADDRESS",
-          } as MembershipError,
-        });
       } catch (error) {
         const membershipError = error as MembershipError;
         setStatus({
@@ -133,9 +132,15 @@ export function useMembershipVerification() {
       }
     };
 
-    checkMembership();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.address, user?.type, accountKit?.client?.account?.address, verifyMembership]);
+    void checkMembership();
+  }, [
+    user?.address,
+    user?.type,
+    client?.account?.address,
+    modularAddress,
+    isModularLoading,
+    verifyMembership,
+  ]);
 
   return status;
 }
@@ -164,9 +169,6 @@ export function useUnlockNFT({
       .finally(() => setIsLoading(false));
   }, [lockAddress, userAddress, network]);
 
-  const DEBUG = process.env.NODE_ENV === "development";
-  if (DEBUG) logger.debug("message", data);
-
   return { data, isLoading, error };
 }
 
@@ -174,7 +176,7 @@ interface UseUnlockNFTApiParams {
   lockAddress: string;
   userAddress: string;
   network: number;
-  enabled?: boolean; // Optional: only fetch if true
+  enabled?: boolean;
 }
 
 interface UnlockNFTApiResult {

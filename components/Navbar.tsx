@@ -1,8 +1,10 @@
 // components/Navbar.tsx
 "use client";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import Image from "next/image";
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import {
   SITE_LOGO,
   SITE_NAME,
@@ -12,12 +14,10 @@ import {
 import { HydrationSafe } from "@/components/ui/hydration-safe";
 import { Button } from "@/components/ui/button"; // Corrected import
 import {
-  Dialog as AccountKitDialog,
   useAuthModal,
   useLogout,
   useUser,
   useChain,
-  useSmartAccountClient,
 } from "@account-kit/react";
 import ThemeToggleComponent from "./ThemeToggle/toggleComponent";
 import { toast } from "sonner";
@@ -36,31 +36,35 @@ import {
   RadioTower,
   Bot,
   ShieldUser,
+  Music2,
   TrendingUp,
 } from "lucide-react";
 import type { User as AccountUser } from "@account-kit/signer";
-import useModularAccount from "@/lib/hooks/accountkit/useModularAccount";
+import { useSmartWalletDisplayAddress } from "@/lib/hooks/accountkit/useSmartWalletDisplayAddress";
 import { base } from "@account-kit/infra";
-import { ArrowBigDown, ArrowBigUp, ChevronDown, Search, X } from "lucide-react";
-import CoinbaseFundButton from "./wallet/buy/coinbase-fund-button";
 import { TokenBalance } from "./wallet/balance/TokenBalance";
 import { MeTokenBalances } from "./wallet/balance/MeTokenBalances";
 import type { Chain as ViemChain } from "viem";
-import { AccountDropdown } from "@/components/account-dropdown/AccountDropdown";
+import {
+  AccountDropdown,
+  type AccountDropdownHandle,
+} from "@/components/account-dropdown/AccountDropdown";
+import { MobileOrbSection } from "@/components/account-dropdown/MobileOrbSection";
 import { useOrbSession } from "@/context/OrbSessionContext";
+import { useUnifiedLogout } from "@/hooks/useUnifiedLogout";
+import { resetAppSession } from "@/lib/auth/session-recovery";
+import { shortenAddress } from "@/lib/utils/utils";
 import { useMembershipVerification } from "@/lib/hooks/unlock/useMembershipVerification";
 import { useMeTokensSupabase } from "@/lib/hooks/metokens/useMeTokensSupabase";
 import { useMeTokenHoldings } from "@/lib/hooks/metokens/useMeTokenHoldings";
 import { MembershipSection } from "./account-dropdown/MembershipSection";
 import { ChainSelect } from "@/components/ui/select";
-import { TokenSelect } from "@/components/ui/token-select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarImage } from "@/components/ui/avatar";
 import makeBlockie from "ethereum-blockies-base64";
-import { type Address, erc20Abi, formatUnits } from 'viem';
-import { BASE_TOKENS, TOKEN_INFO, type TokenSymbol, alchemySwapService, AlchemySwapService } from '@/lib/sdk/alchemy/swap-service';
-import { AlchemySwapWidget } from './wallet/swap/AlchemySwapWidget';
 import { logger } from '@/lib/utils/logger';
+import { AnimatedMenuIcon } from "@/components/navbar/AnimatedMenuIcon";
+import { CreativePlatformAppsDrawer } from "@/components/navbar/CreativePlatformAppsDrawer";
+import { navIconButtonProps } from "@/components/navbar/navButtonStyles";
 
 type UseUserResult = (AccountUser & { type: "eoa" | "sca" }) | null;
 
@@ -102,13 +106,8 @@ const mobileMemberNavLinkClass = `
   text-[#EC406A]
 `;
 
-// Simplified truncateAddress - ENS resolution disabled to prevent webpack chunk loading errors
-const truncateAddress = (address: string) => {
-  if (!address) return "";
-  // Simply truncate the address without ENS resolution
-  // This prevents webpack chunk loading issues with CCIP utilities
-  return `${address.slice(0, 6)}...${address.slice(-4)}`;
-};
+/** Matches Tailwind `md` — mobile nav is hidden at 768px and above */
+const MOBILE_NAV_MEDIA_QUERY = "(max-width: 767px)";
 
 // Add this near the top with other utility functions
 const getChainGradient = (chain: ViemChain) => {
@@ -160,18 +159,20 @@ function NetworkStatus({ isConnected }: { isConnected: boolean }) {
 
 export default function Navbar() {
   const { openAuthModal } = useAuthModal();
-  const { openLoginModal: openOrbLogin, isAuthenticated: isOrbAuthenticated } =
-    useOrbSession();
   const user = useUser();
-  const { logout } = useLogout();
+  const { logout: walletLogout } = useLogout();
+  const unifiedLogout = useUnifiedLogout();
+  const { logout: orbLogout } = useOrbSession();
   const { chain: currentChain, setChain, isSettingChain } = useChain();
-  const { account: modularAccount } = useModularAccount();
-  const [displayAddress, setDisplayAddress] = useState<string>("");
-  const { client: smartAccountClient } = useSmartAccountClient({});
+  const {
+    primaryAddress,
+    signerAddress,
+    displayAddress,
+    walletLabel,
+    client: smartAccountClient,
+  } = useSmartWalletDisplayAddress();
   const [isNetworkConnected, setIsNetworkConnected] = useState(true);
-  const [isSessionSigsModalOpen, setIsSessionSigsModalOpen] = useState(false);
   const { isVerified, hasMembership } = useMembershipVerification();
-  const [selectedToken, setSelectedToken] = useState<"ETH" | "USDC" | "DAI">("ETH");
 
   // Check for MeTokens to conditionally render the section
   const { userMeToken, loading: meTokenLoading } = useMeTokensSupabase();
@@ -179,25 +180,57 @@ export default function Navbar() {
   const hasMetokens = !!userMeToken || holdings.length > 0;
   const shouldShowMetokens = hasMetokens || meTokenLoading || holdingsLoading;
 
-  // Update display address when user changes
-  useEffect(() => {
-    // Smart Wallet is the primary public identity for Creative TV
-    // EOA is kept in background for signing and permissions
-    const addressToDisplay = modularAccount?.address || user?.address;
-
-    if (addressToDisplay) {
-      const resolved = truncateAddress(addressToDisplay);
-      setDisplayAddress(resolved);
-    }
-  }, [modularAccount?.address, user?.address]);
-
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [dialogAction, setDialogAction] = useState<"buy" | "send" | "swap">(
-    "buy"
-  );
-  const addressRef = useRef<HTMLDivElement | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
+  const pathname = usePathname();
+  const accountDropdownRef = useRef<AccountDropdownHandle>(null);
   const [copySuccess, setCopySuccess] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  useEffect(() => {
+    const openMobileMenu = () => setIsMenuOpen(true);
+    window.addEventListener('crtv:open-mobile-menu', openMobileMenu);
+    return () => window.removeEventListener('crtv:open-mobile-menu', openMobileMenu);
+  }, []);
+
+  // Close menu when viewport grows past mobile (e.g. rotate tablet) so scroll lock cannot stick
+  useEffect(() => {
+    const mq = window.matchMedia(MOBILE_NAV_MEDIA_QUERY);
+    const handleChange = () => {
+      if (!mq.matches) setIsMenuOpen(false);
+    };
+    mq.addEventListener("change", handleChange);
+    return () => mq.removeEventListener("change", handleChange);
+  }, []);
+
+  // Trap scroll inside the mobile menu panel (prevent background page scroll on touch)
+  useEffect(() => {
+    if (!isMenuOpen) return;
+
+    const mq = window.matchMedia(MOBILE_NAV_MEDIA_QUERY);
+    if (!mq.matches) return;
+
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtmlOverflow = html.style.overflow;
+    const prevBodyOverflow = body.style.overflow;
+
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+
+    return () => {
+      html.style.overflow = prevHtmlOverflow;
+      body.style.overflow = prevBodyOverflow;
+    };
+  }, [isMenuOpen]);
+
+  // Close menu on navigation (e.g. logo link has no explicit close handler)
+  useEffect(() => {
+    setIsMenuOpen(false);
+  }, [pathname]);
   const [currentChainName, setCurrentChainName] = useState(currentChain.name);
   const [isScrolled, setIsScrolled] = useState(false);
 
@@ -249,14 +282,17 @@ export default function Navbar() {
     setIsMenuOpen(false);
   };
 
-  const handleActionClick = (action: "buy" | "send" | "swap") => {
-    setDialogAction(action);
-    setIsDialogOpen(true);
+  const openAccountAction = (
+    action: "buy" | "send" | "swap" | "session-keys"
+  ) => {
+    if (accountDropdownRef.current) {
+      accountDropdownRef.current.openAction(action);
+      setIsMenuOpen(false);
+    }
   };
 
   const copyToClipboard = async () => {
-    // Prioritize Smart Account address, fallback to EOA
-    const addressToCopy = modularAccount?.address || user?.address;
+    const addressToCopy = primaryAddress;
 
     if (addressToCopy) {
       try {
@@ -291,107 +327,6 @@ export default function Navbar() {
     ? "shadow-md bg-white/90 dark:bg-gray-900/90 backdrop-blur-sm"
     : "bg-white dark:bg-gray-900"
     }`;
-
-  // Dialog content based on the selected action
-  const getDialogContent = () => {
-    switch (dialogAction) {
-      case "buy":
-        return (
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
-            <h2 className="text-xl font-bold mb-4">Buy Crypto</h2>
-            <p className="mb-4">Purchase crypto directly to your wallet.</p>
-            <CoinbaseFundButton />
-            <div className="flex justify-end">
-              <Button onClick={() => setIsDialogOpen(false)}>Close</Button>
-            </div>
-          </div>
-        );
-      case "send":
-        return (
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
-            <h2 className="text-xl font-bold mb-4">Send Crypto</h2>
-            <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">Send crypto to another address.</p>
-            <div className="flex flex-col gap-4">
-              {/* Token Selection */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-900 dark:text-gray-100">Token</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {(['ETH', 'USDC', 'DAI'] as const).map((token) => (
-                    <button
-                      key={token}
-                      type="button"
-                      onClick={() => setSelectedToken(token)}
-                      className={`flex items-center justify-center space-x-2 p-2 border rounded-lg transition-colors ${selectedToken === token
-                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-400'
-                        : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
-                        }`}
-                    >
-                      <Image
-                        src={`/images/tokens/${token.toLowerCase()}-logo.svg`}
-                        alt={token}
-                        width={16}
-                        height={16}
-                        className="w-4 h-4 flex-shrink-0"
-                      />
-                      <span className={`text-sm font-medium ${selectedToken === token
-                        ? 'text-blue-700 dark:text-blue-300'
-                        : 'text-gray-900 dark:text-gray-100'
-                        }`}>
-                        {token}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="recipient-address" className="text-sm font-medium text-gray-900 dark:text-gray-100">Recipient Address</label>
-                <input
-                  id="recipient-address"
-                  name="recipientAddress"
-                  type="text"
-                  placeholder="0x..."
-                  className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 bg-white border-gray-200 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
-                />
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="send-amount" className="text-sm font-medium text-gray-900 dark:text-gray-100">Amount ({selectedToken})</label>
-                <input
-                  id="send-amount"
-                  name="sendAmount"
-                  type="number"
-                  placeholder="0.0"
-                  step="any"
-                  className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 bg-white border-gray-200 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
-                />
-              </div>
-              <div className="flex flex-col sm:flex-row gap-3 pt-2">
-                <Button
-                  variant="outline"
-                  className="w-full sm:w-auto sm:order-2"
-                  onClick={() => setIsDialogOpen(false)}
-                >
-                  Cancel
-                </Button>
-                <Button className="w-full sm:flex-1 sm:order-1">Send</Button>
-              </div>
-            </div>
-          </div>
-        );
-      case "swap":
-        return (
-          <AlchemySwapWidget
-            onSwapSuccess={() => {
-              toast.success("Swap successful!");
-              setIsDialogOpen(false);
-            }}
-            hideHeader={true}
-            className="border-none shadow-none p-0"
-          />
-        );
-      default:
-        return null;
-    }
-  };
 
   return (
     <header className={headerClassName}>
@@ -446,47 +381,50 @@ export default function Navbar() {
             </nav>
           </div>
 
-          {/* Mobile menu button */}
-          <div className="flex md:hidden items-center">
+          {/* Desktop: account dropdown. Mobile: hamburger only. */}
+          <div className="flex items-center gap-2">
+            <CreativePlatformAppsDrawer />
             <ThemeToggleComponent />
-            <button
-              className={
-                "ml-2 inline-flex items-center justify-center rounded-md p-2 " +
-                "text-gray-500 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 " +
-                "dark:hover:bg-gray-800 dark:hover:text-gray-50 transition-colors"
-              }
+            <HydrationSafe>
+              <AccountDropdown ref={accountDropdownRef} />
+            </HydrationSafe>
+            <Button
+              {...navIconButtonProps}
+              className="md:hidden"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               aria-expanded={isMenuOpen}
               id="mobile-menu-btn"
+              aria-label={isMenuOpen ? "Close main menu" : "Open main menu"}
             >
-              <span className="sr-only">Open main menu</span>
-              <MenuIcon className="h-6 w-6" />
-            </button>
+              <AnimatedMenuIcon isOpen={isMenuOpen} />
+            </Button>
           </div>
+        </div>
+      </div>
 
-          {/* Desktop wallet display */}
-          <div className="hidden md:flex items-center space-x-4">
-            <div className="flex items-center">
-              <ThemeToggleComponent />
-            </div>
-            <div>
-              <AccountDropdown />
-            </div>
-          </div>
-
-          {/* Mobile menu */}
+      {isMounted &&
+        isMenuOpen &&
+        createPortal(
           <div
+            id="mobile-nav-menu"
             className={
-              "fixed inset-0 top-16 z-50 grid h-[calc(100vh-4rem)] grid-flow-row " +
-              "auto-rows-max overflow-auto p-4 pb-32 shadow-md md:hidden bg-white dark:bg-gray-900 " +
-              (isMenuOpen ? "animate-in slide-in-from-top-5" : "hidden")
+              "fixed inset-x-0 top-16 bottom-0 z-50 flex flex-col overflow-hidden md:hidden " +
+              "bg-white dark:bg-gray-900 shadow-md animate-in slide-in-from-top-5"
             }
-            aria-hidden={!isMenuOpen}
-            inert={!isMenuOpen}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Main menu"
           >
             <div
               className={
-                "relative z-20 grid gap-4 rounded-md " +
+                "flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y " +
+                "[-webkit-overflow-scrolling:touch] p-4 " +
+                "pb-[calc(2rem+env(safe-area-inset-bottom,0px))]"
+              }
+            >
+            <div
+              className={
+                "relative grid gap-4 rounded-md " +
                 "text-popover-foreground"
               }
             >
@@ -498,14 +436,22 @@ export default function Navbar() {
                       <div className="flex items-center space-x-2">
                         <Avatar className="h-8 w-8">
                           <AvatarImage
-                            src={makeBlockie(modularAccount?.address || user?.address || "0x")}
+                            src={makeBlockie(primaryAddress || user?.address || "0x")}
                             alt="Wallet avatar"
                           />
                         </Avatar>
                         <div>
-                          <p className="text-sm font-medium">
-                            {displayAddress}
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            {walletLabel}
                           </p>
+                          <p className="text-sm font-medium font-mono">
+                            {displayAddress || "Loading..."}
+                          </p>
+                          {signerAddress && (
+                              <p className="text-xs text-gray-500 dark:text-gray-400">
+                                Signer: {shortenAddress(signerAddress)}
+                              </p>
+                            )}
                           <p className="text-xs text-gray-500 dark:text-gray-400">
                             {getChainName(currentChain)}
                           </p>
@@ -524,6 +470,7 @@ export default function Navbar() {
                         )}
                       </Button>
                     </div>
+                    <MobileOrbSection />
                   </div>
                 ) : (
                   <div className="pb-4 border-b border-gray-200 dark:border-gray-700">
@@ -535,28 +482,32 @@ export default function Navbar() {
                         openAuthModal();
                         setIsMenuOpen(false);
                       }}
-                      id="connect-wallet-btn"
+                      id="connect-wallet-btn-mobile"
                     >
                       Get Started
                     </Button>
-                    {!isOrbAuthenticated && (
-                      <Button
-                        variant="outline"
-                        className="w-full mt-2"
-                        onClick={() => {
-                          openOrbLogin();
-                          setIsMenuOpen(false);
-                        }}
-                      >
-                        Sign in with Orb
-                      </Button>
-                    )}
                   </div>
                 )}
               </HydrationSafe>
 
               {/* Navigation Links */}
               <nav className="grid grid-flow-row gap-2 auto-rows-max text-sm pb-4 border-b border-gray-200 dark:border-gray-700">
+                <Link
+                  href="/"
+                  className={mobileNavLinkClass}
+                  onClick={handleLinkClick}
+                  id="mobile-nav-home-link"
+                >
+                  Home
+                </Link>
+                <Link
+                  href="/songchain"
+                  className={mobileNavLinkClass}
+                  onClick={handleLinkClick}
+                  id="mobile-nav-songchain-link"
+                >
+                  <Music2 className="mr-2 h-4 w-4" /> Songchain
+                </Link>
                 <Link
                   href="/discover"
                   className={mobileNavLinkClass}
@@ -597,24 +548,33 @@ export default function Navbar() {
                         Options
                       </div>
                       <Link
-                        href="/profile"
+                        href={`/profile/${primaryAddress ?? ""}`}
                         className={mobileMemberNavLinkClass}
                         onClick={handleLinkClick}
                       >
                         <ShieldUser className="mr-2 h-4 w-4" /> Profile
                       </Link>
                       <Link
-                        href="/upload"
+                        href={`/upload/${primaryAddress ?? ""}`}
                         className={mobileMemberNavLinkClass}
                         onClick={handleLinkClick}
                         id="nav-upload-link"
                       >
                         <CloudUpload className="mr-2 h-4 w-4" /> Upload
                       </Link>
+                      {user?.type !== "eoa" && (
+                        <button
+                          type="button"
+                          className={mobileMemberNavLinkClass}
+                          onClick={() => openAccountAction("session-keys")}
+                        >
+                          <Key className="mr-2 h-4 w-4 text-yellow-500" /> Session Keys
+                        </button>
+                      )}
 
                       {/* Membership Status Section */}
                       <div className="mt-4">
-                        <MembershipSection />
+                        <MembershipSection onNavigate={handleLinkClick} />
                       </div>
 
                       {isVerified && hasMembership && (
@@ -693,22 +653,16 @@ export default function Navbar() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => {
-                          handleActionClick("buy");
-                          setIsMenuOpen(false);
-                        }}
+                        onClick={() => openAccountAction("buy")}
                         className="flex items-center justify-center"
                       >
                         <Plus className="mr-2 h-4 w-4 text-green-500" />
-                        Buy
+                        Add
                       </Button>
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => {
-                          handleActionClick("send");
-                          setIsMenuOpen(false);
-                        }}
+                        onClick={() => openAccountAction("send")}
                         className="flex items-center justify-center"
                       >
                         <ArrowUpRight className="mr-2 h-4 w-4 text-blue-500" />
@@ -717,10 +671,7 @@ export default function Navbar() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => {
-                          handleActionClick("swap");
-                          setIsMenuOpen(false);
-                        }}
+                        onClick={() => openAccountAction("swap")}
                         className="flex items-center justify-center"
                       >
                         <ArrowUpDown className="mr-2 h-4 w-4 text-purple-500" />
@@ -741,10 +692,10 @@ export default function Navbar() {
                     )}
 
                     {/* Logout Button */}
-                    <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 space-y-2">
                       <button
                         onClick={() => {
-                          logout();
+                          void unifiedLogout();
                           setIsMenuOpen(false);
                         }}
                         className="flex w-full items-center rounded-md p-2 text-sm font-medium
@@ -753,44 +704,31 @@ export default function Navbar() {
                         <LogOut className="mr-2 h-4 w-4" />
                         Logout
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void resetAppSession({
+                            walletLogout: async () => {
+                              await walletLogout();
+                            },
+                            orbLogout,
+                          });
+                        }}
+                        className="flex w-full items-center rounded-md p-2 text-xs font-medium
+                            text-muted-foreground hover:bg-muted transition-colors"
+                      >
+                        Reset session (fix login loops)
+                      </button>
                     </div>
                   </>
                 )}
               </HydrationSafe>
 
-              {/* Navigation Links */}
-
             </div>
-          </div>
-
-          {/* Account Kit Dialog for actions */}
-          <AccountKitDialog isOpen={isDialogOpen} onClose={() => setIsDialogOpen(false)}>
-            <div className="max-w-md mx-auto">{getDialogContent()}</div>
-          </AccountKitDialog>
-        </div>
-      </div>
+            </div>
+          </div>,
+          document.body
+        )}
     </header>
-  );
-}
-
-function MenuIcon(props: any) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="h-6 w-6"
-      {...props}
-    >
-      <line x1="4" x2="20" y1="12" y2="12" />
-      <line x1="4" x2="20" y1="6" y2="6" />
-      <line x1="4" x2="20" y1="18" y2="18" />
-    </svg>
   );
 }
