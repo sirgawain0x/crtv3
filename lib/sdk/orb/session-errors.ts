@@ -25,9 +25,19 @@ export function isRevokedOrbSessionError(error: unknown): boolean {
   );
 }
 
+/** Session has access token but cannot resume Lens writes (missing refresh). */
+export function isIncompleteOrbSessionError(error: unknown): boolean {
+  const lower = getOrbErrorMessage(error).toLowerCase();
+  return (
+    lower.includes('missing a refresh token') ||
+    lower.includes('orb session is incomplete')
+  );
+}
+
 /** Auth failures that mean the cached Orb session should be dropped. */
 export function isStaleOrbSessionError(error: unknown): boolean {
   if (isRevokedOrbSessionError(error)) return true;
+  if (isIncompleteOrbSessionError(error)) return true;
 
   const lower = getOrbErrorMessage(error).toLowerCase();
   return (

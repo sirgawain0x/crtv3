@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
   if (verification.isBot) {
     return NextResponse.json({ error: 'Access denied' }, { status: 403 });
   }
-  const rl = await rateLimiters.standard(request);
+  const rl = await rateLimiters.generous(request);
   if (rl) return rl;
 
   try {

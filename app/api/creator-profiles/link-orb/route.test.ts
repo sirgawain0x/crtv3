@@ -19,7 +19,7 @@ vi.mock('botid/server', () => ({
 
 vi.mock('@/lib/middleware/rateLimit', () => ({
   rateLimiters: {
-    standard: vi.fn(async () => null),
+    generous: vi.fn(async () => null),
   },
 }));
 

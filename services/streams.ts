@@ -50,6 +50,26 @@ export async function getStreamByCreator(creatorId: string) {
 }
 
 /**
+ * Get a stream by Livepeer stream ID
+ */
+export async function getStreamByStreamId(streamId: string) {
+    const supabase = await createServiceClient();
+
+    const { data, error } = await supabase
+        .from("streams")
+        .select("*")
+        .eq("stream_id", streamId)
+        .maybeSingle();
+
+    if (error) {
+        console.error("Error fetching stream by stream ID:", error);
+        throw new Error(`Failed to fetch stream: ${error.message}`);
+    }
+
+    return data as Stream | null;
+}
+
+/**
  * Get a stream by playback ID
  */
 export async function getStreamByPlaybackId(playbackId: string) {

@@ -14,6 +14,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { SongchainPostCard } from "@/components/songchain/SongchainPostCard";
+import { isRootFeedPost } from "@/lib/songchain/post-utils";
 
 type SongchainAuthorTimelineProps = {
   authorAddress: string;
@@ -43,7 +44,7 @@ export function SongchainAuthorTimeline({
         },
       });
       if (result.isErr()) throw new Error(result.error.message);
-      setPosts([...result.value.items]);
+      setPosts(result.value.items.filter(isRootFeedPost));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load timeline");
       setPosts([]);

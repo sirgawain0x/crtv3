@@ -1,27 +1,71 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2 } from "lucide-react";
+import Link from "next/link";
+import { Loader2, Radio, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useSongchainPost } from "@/hooks/useSongchainPost";
+import { useCreatorVideoLibrary } from "@/hooks/useCreatorVideoLibrary";
+import { useCreatorLiveStream } from "@/hooks/useCreatorLiveStream";
+import { CreativeTVVideoPicker } from "@/components/songchain/CreativeTVVideoPicker";
+import type { SongchainCreatedPost } from "@/lib/songchain/feed-types";
+import type { VideoAsset } from "@/lib/types/video-asset";
+import type { StreamSummary } from "@/lib/songchain/build-lens-livestream-metadata";
 
 type SongchainComposePostProps = {
   feedId: string | null;
-  onPosted?: () => void;
+  onPosted?: (created: SongchainCreatedPost) => void;
+  /** Pre-fill live stream attach (e.g. from /live page modal). */
+  initialLiveStream?: StreamSummary | null;
 };
 
-export function SongchainComposePost({ feedId, onPosted }: SongchainComposePostProps) {
+export function SongchainComposePost({
+  feedId,
+  onPosted,
+  initialLiveStream = null,
+}: SongchainComposePostProps) {
   const [content, setContent] = useState("");
-  const { createPost, isPosting, canWrite, promptWriteAccess } = useSongchainPost();
+  const [attachedVideo, setAttachedVideo] = useState<VideoAsset | null>(null);
+  const [attachedLiveStream, setAttachedLiveStream] = useState<StreamSummary | null>(
+    initialLiveStream?.is_live ? initialLiveStream : null,
+  );
+
+  const { createPost, isPosting, canWrite, needsOrbReauth, promptWriteAccess } =
+    useSongchainPost();
+  const { videos, loading: videosLoading, hasWallet } = useCreatorVideoLibrary();
+  const { stream, isLive, loading: streamLoading } = useCreatorLiveStream();
 
   if (!feedId) return null;
 
+  const liveAttached = !!attachedLiveStream?.is_live;
+  const canSubmit =
+    content.trim().length > 0 || !!attachedVideo || liveAttached;
+
+  const handleAttachLive = () => {
+    if (stream?.is_live) {
+      setAttachedLiveStream(stream);
+      setAttachedVideo(null);
+    }
+  };
+
+  const handleSelectVideo = (video: VideoAsset | null) => {
+    setAttachedVideo(video);
+    if (video) setAttachedLiveStream(null);
+  };
+
   const handleSubmit = async () => {
-    const ok = await createPost({ content, feedId });
-    if (ok) {
+    const created = await createPost({
+      content,
+      feedId,
+      attachedVideo: liveAttached ? null : attachedVideo,
+      attachedLiveStream: liveAttached ? attachedLiveStream : null,
+    });
+    if (created) {
       setContent("");
-      onPosted?.();
+      setAttachedVideo(null);
+      setAttachedLiveStream(null);
+      onPosted?.(created);
     }
   };
 
@@ -30,9 +74,65 @@ export function SongchainComposePost({ feedId, onPosted }: SongchainComposePostP
       <h3 className="text-sm font-semibold">Create a post</h3>
       {!canWrite && (
         <p className="text-xs text-muted-foreground">
-          Connect wallet, sign in with Orb, and link your profile to post to this feed.
+          {needsOrbReauth
+            ? "Your Orb session expired partially — sign in again with Orb to post."
+            : "Connect wallet, sign in with Orb, and link your profile to post to this feed."}
         </p>
       )}
+
+      {isLive && !liveAttached && (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={streamLoading || isPosting}
+          onClick={handleAttachLive}
+          className="gap-2 border-red-500/40 text-red-400 hover:text-red-300"
+        >
+          <Radio className="h-3.5 w-3.5" />
+          Attach your live stream
+        </Button>
+      )}
+
+      {liveAttached && attachedLiveStream && (
+        <div className="flex items-center gap-3 rounded-md border border-red-500/30 bg-red-950/20 p-3">
+          <span className="rounded bg-red-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
+            LIVE
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium truncate">
+              {attachedLiveStream.name || "Live on Creative TV"}
+            </p>
+            <Link
+              href={`/watch/${attachedLiveStream.playback_id}`}
+              className="text-xs text-violet-400 hover:underline"
+            >
+              View stream
+            </Link>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setAttachedLiveStream(null)}
+            aria-label="Detach live stream"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      )}
+
+      {!liveAttached && (
+        <CreativeTVVideoPicker
+          videos={videos}
+          loading={videosLoading}
+          selected={attachedVideo}
+          onSelect={handleSelectVideo}
+          disabled={!hasWallet}
+        />
+      )}
+
       <Textarea
         value={content}
         onChange={(e) => setContent(e.target.value)}
@@ -44,13 +144,13 @@ export function SongchainComposePost({ feedId, onPosted }: SongchainComposePostP
       <div className="flex justify-end gap-2">
         {!canWrite ? (
           <Button type="button" variant="outline" size="sm" onClick={promptWriteAccess}>
-            Link Orb to post
+            {needsOrbReauth ? "Sign in again" : "Link Orb to post"}
           </Button>
         ) : (
           <Button
             type="button"
             size="sm"
-            disabled={isPosting || !content.trim()}
+            disabled={isPosting || !canSubmit}
             onClick={() => void handleSubmit()}
           >
             {isPosting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}

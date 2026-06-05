@@ -2,6 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { formatOrbAuthError } from './format-auth-error';
 
 describe('formatOrbAuthError', () => {
+  it('maps incomplete Orb session to re-sign copy', () => {
+    expect(
+      formatOrbAuthError(new Error('Orb session is missing a refresh token')),
+    ).toMatch(/sign in again with orb/i);
+  });
   it('maps access denied to security-checks copy', () => {
     expect(formatOrbAuthError(new Error('Access denied'))).toMatch(/security checks/i);
     expect(formatOrbAuthError(new Error('Access denied'))).not.toMatch(/VPN/i);

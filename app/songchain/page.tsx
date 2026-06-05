@@ -1,5 +1,6 @@
 import { SongchainPageClient } from "@/components/songchain/SongchainPageClient";
 import { getSongchainConfig } from "@/lib/songchain/config";
+import { resolveSongchainConfig } from "@/lib/songchain/resolve-lens-app";
 import type { Metadata } from "next";
 
 /** Read Songchain env on each request (Vercel runtime vars, not build-time snapshot). */
@@ -10,7 +11,7 @@ export const metadata: Metadata = {
   description: "Music on Lens Chain — feeds, community group, and GHO onramp.",
 };
 
-export default function SongchainPage() {
-  const config = getSongchainConfig();
+export default async function SongchainPage() {
+  const config = await resolveSongchainConfig(getSongchainConfig());
   return <SongchainPageClient config={config} />;
 }

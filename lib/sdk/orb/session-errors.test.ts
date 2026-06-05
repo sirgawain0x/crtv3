@@ -1,78 +1,64 @@
-/** @vitest-environment jsdom */
-import { afterEach, describe, expect, it } from 'vitest';
+import { describe, expect, it, vi, afterEach } from 'vitest';
 import {
   clearStaleOrbSessionIfNeeded,
-  getOrbErrorMessage,
-  isRevokedOrbSessionError,
+  isIncompleteOrbSessionError,
   isStaleOrbSessionError,
 } from './session-errors';
-import { ORB_SESSION_STORAGE_KEY } from './login';
 
-describe('getOrbErrorMessage', () => {
-  afterEach(() => {
-    localStorage.clear();
-  });
-  it('reads message from plain objects', () => {
-    expect(getOrbErrorMessage({ message: 'GraphQL failure' })).toBe(
-      'GraphQL failure',
-    );
-  });
-});
+vi.mock('@/lib/sdk/orb/login', () => ({
+  clearStoredOrbSession: vi.fn(),
+}));
 
-describe('isRevokedOrbSessionError', () => {
-  it('detects Lens revoked refresh copy', () => {
+import { clearStoredOrbSession } from '@/lib/sdk/orb/login';
+
+describe('isIncompleteOrbSessionError', () => {
+  it('detects missing refresh token and incomplete session messages', () => {
     expect(
-      isRevokedOrbSessionError(
-        new Error('You are trying to renew a revoked authentication'),
+      isIncompleteOrbSessionError(
+        new Error('Orb session is missing a refresh token'),
       ),
     ).toBe(true);
-  });
-
-  it('ignores unrelated errors', () => {
-    expect(isRevokedOrbSessionError(new Error('Network request failed'))).toBe(
-      false,
-    );
-  });
-});
-
-describe('isStaleOrbSessionError', () => {
-  it('detects 401 and unauthorized', () => {
-    expect(isStaleOrbSessionError(new Error('401 Unauthorized'))).toBe(true);
-    expect(isStaleOrbSessionError(new Error('invalid orb access token'))).toBe(
-      true,
-    );
+    expect(
+      isIncompleteOrbSessionError(
+        new Error('Orb session is incomplete. Sign in again'),
+      ),
+    ).toBe(true);
+    expect(isIncompleteOrbSessionError(new Error('network error'))).toBe(false);
   });
 });
 
 describe('clearStaleOrbSessionIfNeeded', () => {
   afterEach(() => {
-    localStorage.clear();
+    vi.mocked(clearStoredOrbSession).mockClear();
   });
 
-  it('clears storage for stale sessions', () => {
-    localStorage.setItem(
-      ORB_SESSION_STORAGE_KEY,
-      JSON.stringify({ accessToken: 'stale' }),
+  it('clears storage for incomplete session errors', () => {
+    const cleared = clearStaleOrbSessionIfNeeded(
+      new Error('Orb session is missing a refresh token'),
     );
+    expect(cleared).toBe(true);
+    expect(clearStoredOrbSession).toHaveBeenCalledOnce();
+  });
 
-    expect(
-      clearStaleOrbSessionIfNeeded(
-        new Error('You are trying to renew a revoked authentication'),
-      ),
-    ).toBe(true);
-    expect(localStorage.getItem(ORB_SESSION_STORAGE_KEY)).toBeNull();
+  it('clears storage for stale session errors', () => {
+    const cleared = clearStaleOrbSessionIfNeeded(new Error('401 unauthorized'));
+    expect(cleared).toBe(true);
+    expect(clearStoredOrbSession).toHaveBeenCalledOnce();
   });
 
   it('does not clear for unrelated errors', () => {
-    localStorage.setItem(
-      ORB_SESSION_STORAGE_KEY,
-      JSON.stringify({ accessToken: 'keep' }),
-    );
+    const cleared = clearStaleOrbSessionIfNeeded(new Error('upload failed'));
+    expect(cleared).toBe(false);
+    expect(clearStoredOrbSession).not.toHaveBeenCalled();
+  });
+});
 
-    expect(clearStaleOrbSessionIfNeeded(new Error('Network failed'))).toBe(
-      false,
-    );
-    expect(localStorage.getItem(ORB_SESSION_STORAGE_KEY)).not.toBeNull();
-    localStorage.removeItem(ORB_SESSION_STORAGE_KEY);
+describe('isStaleOrbSessionError', () => {
+  it('includes incomplete session as stale', () => {
+    expect(
+      isStaleOrbSessionError(
+        new Error('Orb session is missing a refresh token'),
+      ),
+    ).toBe(true);
   });
 });

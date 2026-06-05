@@ -1,7 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import Image from "next/image";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   addReaction,
   undoReaction,
@@ -34,44 +33,21 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { resolveOrbMediaUrl } from "@/lib/sdk/orb/media";
 import { publicClient } from "@/lib/sdk/lens/client";
 import { useLensOrbWrite } from "@/hooks/useLensOrbWrite";
 import { groveService } from "@/lib/sdk/grove/service";
 import { clearStaleOrbSessionIfNeeded } from "@/lib/sdk/orb/session-errors";
 import { SongchainAuthorTimeline } from "@/components/songchain/SongchainAuthorTimeline";
 import { SongchainPostContent } from "@/components/songchain/SongchainPostContent";
+import { SongchainFollowButton } from "@/components/songchain/SongchainGraphPanel";
+import { SongchainPostMedia } from "@/components/songchain/SongchainPostMedia";
+import {
+  extractPostMedia,
+  postText,
+  resolvePostContent,
+} from "@/lib/songchain/post-utils";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils/utils";
-
-function resolvePost(post: AnyPost): AnyPost | null {
-  if (post.__typename === "Repost") {
-    return post.repostOf ?? null;
-  }
-  return post;
-}
-
-function postText(post: AnyPost): string {
-  const resolved = resolvePost(post);
-  if (!resolved || !("metadata" in resolved) || !resolved.metadata) return "";
-  const meta = resolved.metadata;
-  if ("content" in meta && typeof meta.content === "string") return meta.content;
-  if ("title" in meta && typeof meta.title === "string") return meta.title;
-  return "";
-}
-
-function postImage(post: AnyPost): string | null {
-  const resolved = resolvePost(post);
-  if (!resolved || !("metadata" in resolved) || !resolved.metadata) return null;
-  const meta = resolved.metadata;
-  if ("image" in meta && meta.image?.item) {
-    return resolveOrbMediaUrl(String(meta.image.item));
-  }
-  if ("video" in meta && meta.video?.cover) {
-    return resolveOrbMediaUrl(String(meta.video.cover));
-  }
-  return null;
-}
 
 function authorLabel(post: AnyPost): string {
   const author = post.author;
@@ -82,6 +58,7 @@ function authorLabel(post: AnyPost): string {
 type SongchainPostCardProps = {
   post: AnyPost;
   feedId?: string | null;
+  graphId?: string | null;
   compact?: boolean;
   onReactionChange?: () => void;
   onPostUpdated?: () => void;
@@ -90,6 +67,7 @@ type SongchainPostCardProps = {
 export function SongchainPostCard({
   post,
   feedId,
+  graphId = null,
   compact = false,
   onReactionChange,
   onPostUpdated,
@@ -99,6 +77,7 @@ export function SongchainPostCard({
   const [pending, setPending] = useState<string | null>(null);
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState<AnyPost[]>([]);
+  const [commentCount, setCommentCount] = useState(0);
   const [commentText, setCommentText] = useState("");
   const [editOpen, setEditOpen] = useState(false);
   const [editText, setEditText] = useState("");
@@ -106,13 +85,13 @@ export function SongchainPostCard({
   const [timelineOpen, setTimelineOpen] = useState(false);
   const [bookmarked, setBookmarked] = useState(false);
 
-  const content = resolvePost(post);
+  const content = resolvePostContent(post);
+  const media = useMemo(() => extractPostMedia(post), [post]);
   const ops =
     content != null && "operations" in content ? content.operations : null;
   const hasReacted =
     ops != null && "hasReacted" in ops && ops.hasReacted === true;
   const [upvoted, setUpvoted] = useState(hasReacted);
-  const imageUrl = postImage(post);
   const reactions =
     content != null && "stats" in content ? (content.stats?.upvotes ?? 0) : 0;
   const isOwner =
@@ -137,11 +116,20 @@ export function SongchainPostCard({
         referencedPost: postId(content.id),
         referenceTypes: [PostReferenceType.CommentOn],
       });
-      if (result.isOk()) setComments([...result.value.items]);
+      if (result.isOk()) {
+        const items = [...result.value.items];
+        setComments(items);
+        setCommentCount(items.length);
+      }
     } catch {
       // Non-fatal
     }
   }, [content]);
+
+  useEffect(() => {
+    if (!content) return;
+    void loadComments();
+  }, [content, loadComments]);
 
   useEffect(() => {
     if (showComments) void loadComments();
@@ -155,10 +143,7 @@ export function SongchainPostCard({
 
   if (!content) return null;
 
-  const withWrite = async (
-    action: string,
-    fn: () => Promise<void>,
-  ) => {
+  const withWrite = async (action: string, fn: () => Promise<void>) => {
     if (!canWrite) {
       promptWriteAccess();
       return;
@@ -213,18 +198,38 @@ export function SongchainPostCard({
     void withWrite("comment", async () => {
       const trimmed = commentText.trim();
       if (!trimmed) return;
+
+      const optimisticId = `pending-comment-${Date.now()}`;
+      const optimisticComment = {
+        id: optimisticId,
+        __typename: "Post",
+        author: {
+          address: lensAccount ?? "",
+          username: null,
+        },
+        metadata: { content: trimmed, __typename: "TextOnlyMetadata" },
+      } as unknown as AnyPost;
+
+      setComments((prev) => [...prev, optimisticComment]);
+      setCommentCount((c) => c + 1);
+
       const client = await getSessionClient();
       const metadata = textOnly({ content: trimmed, locale: "en" });
       const upload = await groveService.uploadJson(metadata);
       if (!upload.success || !upload.url) {
+        setComments((prev) => prev.filter((c) => c.id !== optimisticId));
+        setCommentCount((c) => Math.max(0, c - 1));
         throw new Error("Failed to upload comment metadata");
       }
       const result = await createLensPost(client, {
         contentUri: uri(upload.url),
         commentOn: { post: postId(content.id) },
-        ...(feedId ? { feed: evmAddress(feedId) } : {}),
       });
-      if (result.isErr()) throw new Error(result.error.message);
+      if (result.isErr()) {
+        setComments((prev) => prev.filter((c) => c.id !== optimisticId));
+        setCommentCount((c) => Math.max(0, c - 1));
+        throw new Error(result.error.message);
+      }
       setCommentText("");
       toast.success("Comment posted");
       void loadComments();
@@ -279,25 +284,30 @@ export function SongchainPostCard({
             </div>
           </div>
         )}
-        {imageUrl && !compact && (
-          <div className="relative aspect-video w-full bg-muted">
-            <Image
-              src={imageUrl}
-              alt=""
-              fill
-              className="object-cover"
-              unoptimized
-            />
+        {media.length > 0 && !compact && (
+          <div className="w-full">
+            <SongchainPostMedia media={media} compact={compact} />
           </div>
         )}
         <div className="flex flex-1 flex-col gap-3 p-4">
-          <button
-            type="button"
-            className="text-xs text-muted-foreground text-left hover:text-violet-400 w-fit"
-            onClick={() => setTimelineOpen(true)}
-          >
-            {authorLabel(post)}
-          </button>
+          <div className="flex items-center justify-between gap-2">
+            <button
+              type="button"
+              className="text-xs text-muted-foreground text-left hover:text-violet-400 w-fit"
+              onClick={() => setTimelineOpen(true)}
+            >
+              {authorLabel(post)}
+            </button>
+            {content && (
+              <SongchainFollowButton
+                graphId={graphId}
+                accountAddress={content.author.address}
+              />
+            )}
+          </div>
+          {compact && media.length > 0 && (
+            <SongchainPostMedia media={media} compact />
+          )}
           {resolvedPostText && (
             <SongchainPostContent text={resolvedPostText} compact={compact} />
           )}
@@ -325,9 +335,13 @@ export function SongchainPostCard({
               variant="ghost"
               size="sm"
               onClick={() => setShowComments((v) => !v)}
-              aria-label="Comments"
+              aria-label={`Comments${commentCount > 0 ? ` (${commentCount})` : ""}`}
+              className="gap-1"
             >
               <MessageCircle className="h-4 w-4" />
+              {commentCount > 0 && (
+                <span className="text-[10px] tabular-nums">{commentCount}</span>
+              )}
             </Button>
             <Button
               type="button"
@@ -399,6 +413,9 @@ export function SongchainPostCard({
                     <li key={c.id} className="rounded bg-muted/40 p-2">
                       <span className="font-medium">{authorLabel(c)}: </span>
                       <SongchainPostContent text={postText(c)} compact />
+                      {c.id.startsWith("pending-comment-") && (
+                        <span className="ml-1 text-[10px] text-violet-400">· posting…</span>
+                      )}
                     </li>
                   ))}
                 </ul>

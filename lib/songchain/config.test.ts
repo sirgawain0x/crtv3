@@ -44,6 +44,17 @@ describe('getSongchainConfig', () => {
     );
   });
 
+  it('reads app id separately from feed ids', () => {
+    process.env.NEXT_PUBLIC_SONGCHAIN_APP_ID =
+      '0x3412C2509EeF4f9A133E6D3638B9B3c06fc30111';
+    process.env.NEXT_PUBLIC_SONGCHAIN_GRAPH_ID =
+      '0x2B36706E8E352a273c34D108A5854A55cb2302A6';
+    const config = getSongchainConfig();
+    expect(config.appId).toBe('0x3412c2509eef4f9a133e6d3638b9b3c06fc30111');
+    expect(config.graphId).toBe('0x2b36706e8e352a273c34d108a5854a55cb2302a6');
+    expect(config.enabled).toBe(true);
+  });
+
   it('falls back to server-only env keys when NEXT_PUBLIC vars are unset', () => {
     delete process.env.NEXT_PUBLIC_SONGCHAIN_FEED_ID;
     process.env.SONGCHAIN_FEED_ID =
