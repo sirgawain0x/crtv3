@@ -5346,19 +5346,19 @@
     suspend-react "^0.1.3"
     zustand "^3.7.1"
 
-"@reality.eth/contracts@^3.2.22":
-  version "3.2.22"
-  resolved "https://registry.npmjs.org/@reality.eth/contracts/-/contracts-3.2.22.tgz"
-  integrity sha512-TAK5dtMLmIDvWFyoa7pjo7AYykVUFO8va4xIqXBlXYhoeDr0CSimTgZd24GMpoukYdzcSiKhWilHyjP2Sp38Nw==
+"@reality.eth/contracts@^3.2.25":
+  version "3.2.25"
+  resolved "https://registry.npmjs.org/@reality.eth/contracts/-/contracts-3.2.25.tgz#d4996a92a9e8292e0ed064603c04bb77f946214d"
+  integrity sha512-MO36RaAPhb/lJq2z85bxo7WaU5wbsrx1+Va9968eUvOG1yyQLIkuHhpEB602JYaUfCVQizvHdTLhcwvmbMSQsQ==
   dependencies:
     ethers "^5.8.0"
 
-"@reality.eth/reality-eth-lib@^3.4.25":
-  version "3.4.25"
-  resolved "https://registry.npmjs.org/@reality.eth/reality-eth-lib/-/reality-eth-lib-3.4.25.tgz"
-  integrity sha512-H7AZ/Sh2PINJfWyI2jSCDgVhULmjYiYukLdq+znp7rB5RAlaX0DXSVxCBG7jft7dJBvjGYOcxbxovuCf0jcqHQ==
+"@reality.eth/reality-eth-lib@^3.4.28":
+  version "3.4.28"
+  resolved "https://registry.npmjs.org/@reality.eth/reality-eth-lib/-/reality-eth-lib-3.4.28.tgz#97b2574fadeaff02a8ca584a1d7a539cd7b68988"
+  integrity sha512-Qydja7drrt7zTvirDgMeBOI4Q4kbA6DQ/gPclqPGOgGDcW/bPeFnT06fDfbQM6fQndb+1BSiOhesOHQILY+bpw==
   dependencies:
-    "@reality.eth/contracts" "^3.2.22"
+    "@reality.eth/contracts" "^3.2.25"
     bignumber.js "^7.2.1"
     bn.js "^5.2.1"
     ethereumjs-abi "^0.6.5"
