@@ -39,7 +39,7 @@ export function useSongchainFeed({ feedId, enabled = true }: UseSongchainFeedOpt
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const cursorRef = useRef<string | null>(null);
-  const pollAbortRef = useRef<AbortController | null>(null);
+  const pollAbortsRef = useRef<Map<string, AbortController>>(new Map());
   const { canWrite, getSessionClient } = useLensOrbWrite();
 
   const getClient = useCallback(async (): Promise<AnyClient> => {
@@ -135,9 +135,9 @@ export function useSongchainFeed({ feedId, enabled = true }: UseSongchainFeedOpt
 
   const registerNewPost = useCallback(
     (created: SongchainCreatedPost) => {
-      pollAbortRef.current?.abort();
+      pollAbortsRef.current.get(created.postId)?.abort();
       const controller = new AbortController();
-      pollAbortRef.current = controller;
+      pollAbortsRef.current.set(created.postId, controller);
 
       const localId = `pending-${created.postId}`;
       setPendingPosts((prev) => [
@@ -181,6 +181,10 @@ export function useSongchainFeed({ feedId, enabled = true }: UseSongchainFeedOpt
               ),
             );
           }
+        } finally {
+          if (pollAbortsRef.current.get(created.postId) === controller) {
+            pollAbortsRef.current.delete(created.postId);
+          }
         }
       })();
     },
@@ -189,7 +193,8 @@ export function useSongchainFeed({ feedId, enabled = true }: UseSongchainFeedOpt
 
   useEffect(() => {
     return () => {
-      pollAbortRef.current?.abort();
+      pollAbortsRef.current.forEach((ctrl) => ctrl.abort());
+      pollAbortsRef.current.clear();
     };
   }, []);
 

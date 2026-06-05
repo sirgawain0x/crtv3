@@ -131,8 +131,6 @@ function BroadcastWithControls({ streamKey, streamId: propStreamId, creatorAddre
     const syncStatus = async () => {
       try {
         if (status === 'live') {
-          finalizeTimeoutsRef.current.forEach(clearTimeout);
-          finalizeTimeoutsRef.current = [];
           await updateStream(creatorAddress, { is_live: true, last_live_at: new Date().toISOString() });
           logger.info("Stream marked as live in DB");
         } else if (status === 'idle' || status === 'error') {
@@ -151,14 +149,13 @@ function BroadcastWithControls({ streamKey, streamId: propStreamId, creatorAddre
       }
     };
 
-    syncStatus();
-  }, [status, creatorAddress, propStreamId]);
+    void syncStatus();
 
-  useEffect(() => {
     return () => {
       finalizeTimeoutsRef.current.forEach(clearTimeout);
+      finalizeTimeoutsRef.current = [];
     };
-  }, []);
+  }, [status, creatorAddress, propStreamId]);
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);

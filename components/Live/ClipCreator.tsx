@@ -190,16 +190,17 @@ export function ClipCreator({
 
   const canMint = !!clip?.parentStoryIpId && !!clip?.clipVideoAssetId;
 
-  const clipSharePayload: ClipLensShareInput | null = clip
-    ? {
-        assetId: clip.assetId,
-        playbackId: clip.newPlaybackId,
-        title: clip.title,
-        thumbnailUrl: clip.thumbnailUrl,
-        clipperAddress: clipperAddress!,
-        clipVideoAssetId: clip.clipVideoAssetId,
-      }
-    : null;
+  const clipSharePayload: ClipLensShareInput | null =
+    clip && clipperAddress
+      ? {
+          assetId: clip.assetId,
+          playbackId: clip.newPlaybackId,
+          title: clip.title,
+          thumbnailUrl: clip.thumbnailUrl,
+          clipperAddress,
+          clipVideoAssetId: clip.clipVideoAssetId,
+        }
+      : null;
 
   return (
     <div className="w-full max-w-3xl mx-auto my-4 px-2 space-y-3">
@@ -284,6 +285,7 @@ export function ClipCreator({
               <Button
                 type="button"
                 variant="secondary"
+                disabled={!clipSharePayload}
                 onClick={() => setSongchainShareOpen(true)}
               >
                 <Share2 className="h-4 w-4 mr-1.5" />

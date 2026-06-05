@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Broadcast, createStreamViaProxy } from "@/components/Live/Broadcast";
 import { getStreamByCreator, createStreamRecord, updateStream } from "@/services/streams";
 import { useUser } from "@account-kit/react";
@@ -70,6 +70,7 @@ export default function LivePage() {
   const { stream: liveStream, isLive: isStreamLive } = useCreatorLiveStream(15_000);
   const songchainFeedId =
     process.env.NEXT_PUBLIC_SONGCHAIN_FEED_ID?.trim() || null;
+  const recordingEnableRequestedRef = useRef<Set<string>>(new Set());
 
   // Match the viewer-side derivation in WatchClient so host + viewers share the
   // same XMTP group ID.
@@ -97,14 +98,17 @@ export default function LivePage() {
           setStoryLicenseTermsId(stream.story_license_terms_id ?? null);
           setStoryRevShare(stream.story_commercial_rev_share ?? null);
 
-          // Ensure recording is enabled for channels created before auto-record shipped.
-          fetch(`/api/livepeer/stream/${encodeURIComponent(stream.stream_id)}/recording`, {
-            method: "POST",
-          }).catch((err) => logger.error("Failed to enable stream recording:", err));
+          // One-time migration: enable recording for channels created before auto-record.
+          if (!recordingEnableRequestedRef.current.has(stream.stream_id)) {
+            recordingEnableRequestedRef.current.add(stream.stream_id);
+            fetch(`/api/livepeer/stream/${encodeURIComponent(stream.stream_id)}/recording`, {
+              method: "POST",
+            }).catch((err) => logger.error("Failed to enable stream recording:", err));
+          }
         }
 
-        // 2. Fetch targets (only if we have a streamId, which we might have just set)
-        const currentStreamId = stream?.stream_id || streamId;
+        // 2. Fetch multistream targets for the persisted stream
+        const currentStreamId = stream?.stream_id;
         if (!currentStreamId) {
           setMultistreamTargets([]);
           return;
@@ -124,7 +128,7 @@ export default function LivePage() {
     }
 
     fetchStreamAndTargets();
-  }, [user?.address, streamId]);
+  }, [user?.address]);
 
   useEffect(() => {
     async function fetchThumbnail() {

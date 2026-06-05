@@ -26,9 +26,10 @@ export function verifyLivepeerWebhookSignature(
   const payload = `${timestamp}.${rawBody}`;
   const expected = createHmac("sha256", secret).update(payload).digest("hex");
 
-  try {
-    return timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
-  } catch {
+  const sigBuf = Buffer.from(signature);
+  const expBuf = Buffer.from(expected);
+  if (sigBuf.length !== expBuf.length) {
     return false;
   }
+  return timingSafeEqual(sigBuf, expBuf);
 }

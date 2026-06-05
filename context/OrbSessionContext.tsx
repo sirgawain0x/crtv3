@@ -241,29 +241,40 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
               await new Promise((r) => setTimeout(r, retryDelays[attempt]));
             }
 
-            const res = await fetch('/api/creator-profiles/link-orb', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                ...authHeaders,
-              },
-              body: JSON.stringify({
-                accessToken: active.accessToken,
-                authenticationId: active.authenticationId,
-                owner_address: wallet,
-              }),
-            });
-            const data = await res.json();
-            if (res.ok && data.success) {
-              setLinkStatus('linked');
-              setLoginError(null);
-              toast.success('Orb / Lens identity linked to your profile');
-              return;
-            }
+            try {
+              const res = await fetch('/api/creator-profiles/link-orb', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  ...authHeaders,
+                },
+                body: JSON.stringify({
+                  accessToken: active.accessToken,
+                  authenticationId: active.authenticationId,
+                  owner_address: wallet,
+                }),
+              });
 
-            lastErr = new Error(data.error || 'Failed to link Orb profile');
-            if (res.status !== 429 && !isOrbLinkRateLimitError(lastErr)) {
-              break;
+              let data: { success?: boolean; error?: string } = {};
+              try {
+                data = await res.json();
+              } catch {
+                // Non-JSON body (e.g. HTML error page on 502/429)
+              }
+
+              if (res.ok && data.success) {
+                setLinkStatus('linked');
+                setLoginError(null);
+                toast.success('Orb / Lens identity linked to your profile');
+                return;
+              }
+
+              lastErr = new Error(data.error || `Failed to link Orb profile (${res.status})`);
+              if (res.status !== 429 && !isOrbLinkRateLimitError(lastErr)) {
+                break;
+              }
+            } catch (err) {
+              lastErr = err;
             }
           }
 
