@@ -74,6 +74,7 @@ describe("parsePredictionDisplay", () => {
     });
     expect(updated.title).toBe("How many streams?");
     expect(updated.type).toBe("uint");
+    expect(updated.outcomes).toEqual([]);
     expect(
       answerBytesToLabel(
         "0x0000000000000000000000000000000000000000000000000000000000000005",

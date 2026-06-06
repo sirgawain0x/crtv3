@@ -56,9 +56,8 @@ export function PredictiveSearchInput({
   const [activeIndex, setActiveIndex] = useState(-1);
   const containerRef = useRef<HTMLDivElement>(null);
   const lastEmittedRef = useRef("");
+  const isFirstResetRender = useRef(true);
   const debounced = useDebounce(input, 300);
-  const onQueryChangeRef = useRef(onQueryChange);
-
   const onQueryChangeRef = useRef(onQueryChange);
 
   useEffect(() => {
@@ -66,6 +65,10 @@ export function PredictiveSearchInput({
   }, [onQueryChange]);
 
   useEffect(() => {
+    if (isFirstResetRender.current) {
+      isFirstResetRender.current = false;
+      return;
+    }
     setInput("");
     setResults([]);
     setOpen(false);

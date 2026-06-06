@@ -122,6 +122,11 @@ export function applyPredictionMetadataOverride(
 
   if (metadata.questionType && isValidQuestionType(metadata.questionType)) {
     next = { ...next, type: metadata.questionType };
+    if (metadata.questionType === "uint") {
+      next.outcomes = [];
+    } else if (metadata.questionType === "bool" && next.outcomes.length === 0) {
+      next.outcomes = ["Yes", "No"];
+    }
   }
 
   if (metadata.category?.trim()) {

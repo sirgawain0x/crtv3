@@ -57,6 +57,7 @@ export function VideoSearch({
   const [sort, setSort] = useState(initialSort);
   const [showFilters, setShowFilters] = useState(false);
   const [searchResetKey, setSearchResetKey] = useState(0);
+  const [hasSearch, setHasSearch] = useState(false);
 
   const handleCategoryChange = useCallback((value: string) => {
     setCategory(value);
@@ -71,6 +72,7 @@ export function VideoSearch({
 
   const clearSearch = useCallback(() => {
     setSearchResetKey((k) => k + 1);
+    setHasSearch(false);
     onSearchChange("");
   }, [onSearchChange]);
 
@@ -81,20 +83,25 @@ export function VideoSearch({
           scope="videos"
           placeholder="Search videos by title or description..."
           resetKey={searchResetKey}
-          onQueryChange={onSearchChange}
+          onQueryChange={(q) => {
+            setHasSearch(!!q);
+            onSearchChange(q);
+          }}
           showClear={false}
           inputClassName="pr-24"
         />
         <div className="absolute right-2 top-1/2 flex -translate-y-1/2 gap-2 z-10">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={clearSearch}
-            className="h-7 px-2"
-            aria-label="Clear search"
-          >
-            <X className="h-4 w-4" />
-          </Button>
+          {hasSearch && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={clearSearch}
+              className="h-7 px-2"
+              aria-label="Clear search"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="sm"
