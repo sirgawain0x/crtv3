@@ -37,8 +37,9 @@ export function Player(props: {
   assetId?: string;
   jwt?: string;
   onPlay?: () => void;
+  autoPlay?: boolean;
 }) {
-  const { src, title, playbackId, assetId, jwt, onPlay } = props;
+  const { src, title, playbackId, assetId, jwt, onPlay, autoPlay = true } = props;
 
   const [controlsVisible, setControlsVisible] = useState(true);
   const fadeTimeoutRef = useRef<NodeJS.Timeout>();
@@ -132,7 +133,7 @@ export function Player(props: {
       src={src}
       playbackId={playbackId}
       jwt={jwt}
-      autoPlay={true}
+      autoPlay={autoPlay}
       volume={0}
       aspectRatio={16 / 9}
       lowLatency={true} // Force low latency for livestream

@@ -108,6 +108,7 @@ export function CreativeTVLinkPreview({
             src={playbackSources}
             title={resolvedTitle}
             playbackId={state.result.playbackId}
+            autoPlay={false}
           />
         ) : (
           <div className="flex items-center justify-center py-6 text-muted-foreground">

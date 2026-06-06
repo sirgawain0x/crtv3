@@ -19,12 +19,37 @@ const ZERO_ANSWER =
 const ONE_ANSWER =
   "0x0000000000000000000000000000000000000000000000000000000000000001" as const;
 
-const TEMPLATE_ID_TO_TYPE: Record<number, ParsedPredictionDisplay["type"]> = {
-  0: "bool",
-  1: "uint",
-  2: "single-select",
-  3: "multiple-select",
-};
+function isBadParsedTitle(title: string): boolean {
+  const t = title.trim();
+  if (!t) return true;
+  if (t.startsWith("[Badly formatted question]")) return true;
+  if (/^␟+$/.test(t) || /^[\u241F]+$/.test(t)) return true;
+  return false;
+}
+
+function buildDisplayFromParsed(
+  parsed: Record<string, unknown>,
+  raw: string
+): ParsedPredictionDisplay | null {
+  const title = String(parsed.title ?? "").trim();
+  if (isBadParsedTitle(title)) return null;
+
+  const outcomes = Array.isArray(parsed.outcomes)
+    ? parsed.outcomes.map(String)
+    : parseOutcomesSegment(String(parsed.outcomes ?? ""));
+  const type =
+    (parsed.type as ParsedPredictionDisplay["type"]) ??
+    inferTypeFromOutcomes(outcomes);
+
+  return {
+    title,
+    type,
+    outcomes: outcomes.length ? outcomes : type === "bool" ? ["Yes", "No"] : [],
+    category: String(parsed.category ?? "general"),
+    language: String(parsed.lang ?? parsed.language ?? "en_US"),
+    description: parsed.description ? String(parsed.description) : undefined,
+  };
+}
 
 function parseOutcomesSegment(segment: string): string[] {
   const trimmed = segment.trim();
@@ -130,22 +155,8 @@ export function parsePredictionDisplay(
     if (templateText) {
       try {
         const parsed = parseQuestionText(templateText, raw);
-        const outcomes = Array.isArray(parsed.outcomes)
-          ? parsed.outcomes.map(String)
-          : parseOutcomesSegment(String(parsed.outcomes ?? ""));
-        const typeFromTemplate = TEMPLATE_ID_TO_TYPE[tid];
-        const type =
-          (parsed.type as ParsedPredictionDisplay["type"]) ??
-          typeFromTemplate ??
-          inferTypeFromOutcomes(outcomes);
-        return {
-          title: String(parsed.title ?? raw.split(UNIT_SEP)[0] ?? raw),
-          type,
-          outcomes: outcomes.length ? outcomes : type === "bool" ? ["Yes", "No"] : [],
-          category: String(parsed.category ?? "general"),
-          language: String(parsed.language ?? parsed.lang ?? "en_US"),
-          description: parsed.description ? String(parsed.description) : undefined,
-        };
+        const display = buildDisplayFromParsed(parsed, raw);
+        if (display) return display;
       } catch {
         // fall through to manual split
       }

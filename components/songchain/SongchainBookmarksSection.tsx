@@ -4,6 +4,10 @@ import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSongchainBookmarks } from "@/hooks/useSongchainBookmarks";
 import { SongchainPostCard } from "@/components/songchain/SongchainPostCard";
+import {
+  SongchainPostMasonryGrid,
+  SongchainPostMasonryItem,
+} from "@/components/songchain/SongchainPostMasonryGrid";
 
 import type { SongchainConfig } from "@/lib/songchain/config";
 
@@ -55,16 +59,17 @@ export function SongchainBookmarksSection({
       ) : posts.length === 0 ? (
         <p className="text-center text-muted-foreground py-12">No bookmarks yet.</p>
       ) : (
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <SongchainPostMasonryGrid>
           {posts.map((post) => (
-            <SongchainPostCard
-              key={post.id}
-              post={post}
-              graphId={graphId}
-              onReactionChange={reload}
-            />
+            <SongchainPostMasonryItem key={post.id}>
+              <SongchainPostCard
+                post={post}
+                graphId={graphId}
+                onReactionChange={reload}
+              />
+            </SongchainPostMasonryItem>
           ))}
-        </div>
+        </SongchainPostMasonryGrid>
       )}
     </section>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { X, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { X, ArrowUp, ArrowDown } from 'lucide-react';
 import { MarketFilters as MarketFiltersType } from '@/lib/hooks/market/useMarketData';
 import { PredictiveSearchInput } from '@/components/search/PredictiveSearchInput';
 
@@ -21,9 +21,12 @@ interface MarketFiltersProps {
 export function MarketFilters({ filters, onFiltersChange }: MarketFiltersProps) {
   const [searchResetKey, setSearchResetKey] = useState(0);
 
-  const handleSearchChange = (value: string) => {
-    onFiltersChange({ search: value });
-  };
+  const handleSearchChange = useCallback(
+    (searchValue: string) => {
+      onFiltersChange({ search: searchValue });
+    },
+    [onFiltersChange]
+  );
 
   const handleTypeChange = (value: string) => {
     onFiltersChange({ type: value as MarketFiltersType['type'] });

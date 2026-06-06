@@ -57,6 +57,13 @@ export function PredictiveSearchInput({
   const containerRef = useRef<HTMLDivElement>(null);
   const lastEmittedRef = useRef("");
   const debounced = useDebounce(input, 300);
+  const onQueryChangeRef = useRef(onQueryChange);
+
+  const onQueryChangeRef = useRef(onQueryChange);
+
+  useEffect(() => {
+    onQueryChangeRef.current = onQueryChange;
+  }, [onQueryChange]);
 
   useEffect(() => {
     setInput("");
@@ -64,14 +71,14 @@ export function PredictiveSearchInput({
     setOpen(false);
     setFetchError(null);
     lastEmittedRef.current = "";
-    onQueryChange("");
-  }, [resetKey]); // eslint-disable-line react-hooks/exhaustive-deps -- reset only when key changes
+    onQueryChangeRef.current("");
+  }, [resetKey]);
 
   useEffect(() => {
     if (debounced === lastEmittedRef.current) return;
     lastEmittedRef.current = debounced;
-    onQueryChange(debounced);
-  }, [debounced, onQueryChange]);
+    onQueryChangeRef.current(debounced);
+  }, [debounced]);
 
   useEffect(() => {
     if (debounced.trim().length < 2) {
@@ -148,12 +155,12 @@ export function PredictiveSearchInput({
     (result: SuggestResult) => {
       setInput(result.title);
       lastEmittedRef.current = result.title;
-      onQueryChange(result.title);
+      onQueryChangeRef.current(result.title);
       setOpen(false);
       onSelect?.(result);
       router.push(result.href);
     },
-    [onSelect, onQueryChange, router]
+    [onSelect, router]
   );
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -204,7 +211,7 @@ export function PredictiveSearchInput({
               setResults([]);
               setFetchError(null);
               setOpen(false);
-              onQueryChange("");
+              onQueryChangeRef.current("");
             }}
           >
             <X className="h-4 w-4" />

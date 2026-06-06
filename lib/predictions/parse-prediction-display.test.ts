@@ -87,4 +87,30 @@ describe("parsePredictionDisplay", () => {
     expect(isSongchainCategory("songchain")).toBe(true);
     expect(isSongchainCategory("creative tv")).toBe(false);
   });
+
+  it("parses bool question with template_id 0", () => {
+    const raw =
+      "Will the album drop this week?\u241fcreative tv\u241fen_US";
+    const parsed = parsePredictionDisplay(raw, 0);
+    expect(parsed.title).toBe("Will the album drop this week?");
+    expect(parsed.category).toBe("creative tv");
+    expect(parsed.type).toBe("bool");
+    expect(parsed.title).not.toContain("[Badly formatted question]");
+  });
+
+  it("parses single-select question with template_id 2", () => {
+    const raw = 'Who wins?\u241f"Alice","Bob"\u241fgeneral\u241fen_US';
+    const parsed = parsePredictionDisplay(raw, 2);
+    expect(parsed.title).toBe("Who wins?");
+    expect(parsed.outcomes).toEqual(["Alice", "Bob"]);
+    expect(parsed.type).toBe("single-select");
+    expect(parsed.title).not.toContain("[Badly formatted question]");
+  });
+
+  it("parses bool question with template_id as bigint", () => {
+    const raw = "Test question?\u241fgeneral\u241fen_US";
+    const parsed = parsePredictionDisplay(raw, BigInt(0));
+    expect(parsed.title).toBe("Test question?");
+    expect(parsed.title).not.toContain("[Badly formatted question]");
+  });
 });
