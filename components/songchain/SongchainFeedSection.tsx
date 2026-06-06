@@ -6,6 +6,10 @@ import { Button } from "@/components/ui/button";
 import { useSongchainFeed } from "@/hooks/useSongchainFeed";
 import { SongchainPostCard } from "@/components/songchain/SongchainPostCard";
 import { SongchainPendingPostCard } from "@/components/songchain/SongchainPendingPostCard";
+import {
+  SongchainPostMasonryGrid,
+  SongchainPostMasonryItem,
+} from "@/components/songchain/SongchainPostMasonryGrid";
 import { getFeedDiagnosticInfo } from "@/lib/songchain/feed-diagnostics";
 import type { SongchainCreatedPost } from "@/lib/songchain/feed-types";
 
@@ -134,25 +138,27 @@ export const SongchainFeedSection = forwardRef<SongchainFeedHandle, SongchainFee
             <p className="mt-2 text-sm text-muted-foreground">{emptyDescription}</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <SongchainPostMasonryGrid>
             {pendingPosts.map((pending) => (
-              <SongchainPendingPostCard
-                key={pending.localId}
-                pending={pending}
-                onRefresh={() => reload()}
-              />
+              <SongchainPostMasonryItem key={pending.localId}>
+                <SongchainPendingPostCard
+                  pending={pending}
+                  onRefresh={() => reload()}
+                />
+              </SongchainPostMasonryItem>
             ))}
             {posts.map((post) => (
-              <SongchainPostCard
-                key={post.id}
-                post={post}
-                feedId={feedId}
-                graphId={graphId}
-                onReactionChange={reload}
-                onPostUpdated={onPostUpdated}
-              />
+              <SongchainPostMasonryItem key={post.id}>
+                <SongchainPostCard
+                  post={post}
+                  feedId={feedId}
+                  graphId={graphId}
+                  onReactionChange={reload}
+                  onPostUpdated={onPostUpdated}
+                />
+              </SongchainPostMasonryItem>
             ))}
-          </div>
+          </SongchainPostMasonryGrid>
         )}
 
         {hasMore && (
