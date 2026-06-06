@@ -38,6 +38,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { usePredictionAccess } from "@/lib/hooks/predictions/usePredictionAccess";
 import { ShareDialog } from "@/components/Videos/ShareDialog";
 import { useSongchainPost } from "@/hooks/useSongchainPost";
+import { getSongchainConfig } from "@/lib/songchain/config";
 import { getTemplateIdForQuestionType } from "@/lib/predictions/reality-template";
 
 const PREDICTION_CATEGORIES = [
