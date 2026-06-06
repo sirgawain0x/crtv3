@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
 
     const { unlimited } = getPremiumPredictionAccess(memberships);
 
-    if (unlimited) {
+    if (unlimited || isPlatformAdmin(normalized)) {
       return NextResponse.json({ recorded: false, unlimited: true });
     }
 

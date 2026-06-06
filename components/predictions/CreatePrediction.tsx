@@ -38,7 +38,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { usePredictionAccess } from "@/lib/hooks/predictions/usePredictionAccess";
 import { ShareDialog } from "@/components/Videos/ShareDialog";
 import { useSongchainPost } from "@/hooks/useSongchainPost";
-import { getSongchainConfig } from "@/lib/songchain/config";
+import { getTemplateIdForQuestionType } from "@/lib/predictions/reality-template";
 
 const PREDICTION_CATEGORIES = [
   { value: "creative tv", label: "Creative TV" },
@@ -115,7 +115,7 @@ function CreatePrediction() {
 
   const { openAuthModal } = useAuthModal();
   const { client: accountKitClient } = useSmartAccountClient({});
-  const { canCreatePrediction, blockReason, isCreatorTier } = usePredictionAccess();
+  const { canCreatePrediction, blockReason, isCreatorTier, isAdmin } = usePredictionAccess();
   const { createPost, isPosting: isSongchainPosting } = useSongchainPost();
   const songchainConfig = getSongchainConfig();
   const [shareOpen, setShareOpen] = useState(false);
@@ -150,6 +150,18 @@ function CreatePrediction() {
       setQuota(null);
       return;
     }
+    if (isAdmin) {
+      setQuota({
+        unlimited: true,
+        premiumTier: null,
+        usedThisMonth: 0,
+        monthlyLimit: 3,
+        remaining: null,
+      });
+      setQuotaLoading(false);
+      setQuotaError(null);
+      return;
+    }
     let cancelled = false;
     (async () => {
       setQuotaLoading(true);
@@ -178,7 +190,7 @@ function CreatePrediction() {
     return () => {
       cancelled = true;
     };
-  }, [address]);
+  }, [address, isAdmin]);
 
   // Auto-populate outcomes when type changes to bool
   useEffect(() => {
@@ -345,9 +357,7 @@ function CreatePrediction() {
       // Must match Kleros proxy used for disputes / submitEvidence (see getCanonicalRealityEthArbitratorAddress).
       const arbitrator = getCanonicalRealityEthArbitratorAddress();
 
-      // Template ID 0 is typically used for custom questions
-      // You may need to register a template first for production use
-      const templateId = 0;
+      const templateId = getTemplateIdForQuestionType(questionData.type);
 
       logger.debug("📝 Creating question with params:", {
         templateId,

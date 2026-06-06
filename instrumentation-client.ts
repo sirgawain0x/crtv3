@@ -47,6 +47,12 @@ initBotId({
     { path: '/api/coinbase/session-token', method: 'POST' },
     { path: '/api/reality-eth-subgraph', method: 'POST' },
     { path: '/api/metokens/*/transactions', method: 'POST' },
+    { path: '/api/predictions/quota', method: 'GET' },
+    { path: '/api/predictions/record', method: 'POST' },
+    { path: '/api/predictions/metadata', method: 'GET' },
+    { path: '/api/search/videos', method: 'GET' },
+    { path: '/api/search/market', method: 'GET' },
+    { path: '/api/search/predictions', method: 'GET' },
     // Server actions: pages that invoke saveCreatorCollectionAction (Next.js POSTs to page URL)
     { path: '/', method: 'POST' },
     { path: '/studio', method: 'POST' },

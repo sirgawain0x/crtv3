@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   parsePredictionDisplay,
   answerBytesToLabel,
+  applyPredictionMetadataOverride,
   isSongchainCategory,
 } from "./parse-prediction-display";
 
@@ -13,6 +14,20 @@ describe("parsePredictionDisplay", () => {
     expect(parsed.title).toBe("Will it rain tomorrow?");
     expect(parsed.outcomes).toContain("Yes");
     expect(parsed.category.toLowerCase()).toContain("creative");
+  });
+
+  it("parses bool template id 0", () => {
+    const raw = 'Will it rain?\u241fgeneral\u241fen_US';
+    const parsed = parsePredictionDisplay(raw, 0);
+    expect(parsed.type).toBe("bool");
+    expect(parsed.title).toBe("Will it rain?");
+  });
+
+  it("parses uint template id 1", () => {
+    const raw = 'How many views?\u241fgeneral\u241fen_US';
+    const parsed = parsePredictionDisplay(raw, 1);
+    expect(parsed.type).toBe("uint");
+    expect(parsed.title).toBe("How many views?");
   });
 
   it("maps bool answers", () => {
@@ -27,6 +42,17 @@ describe("parsePredictionDisplay", () => {
     )).toBe("No");
   });
 
+  it("decodes uint answer even when parsed type was mis-inferred as bool", () => {
+    const parsed = parsePredictionDisplay("Test?\u241f\u241fgeneral\u241fen_US");
+    expect(parsed.type).toBe("bool");
+    expect(
+      answerBytesToLabel(
+        "0x0000000000000000000000000000000000000000000000000000000000000005",
+        parsed
+      )
+    ).toBe("5");
+  });
+
   it("returns null for unresolved non-boolean zero answer", () => {
     const parsed = parsePredictionDisplay(
       'Pick one?\u241f"A","B","C"\u241fgeneral\u241fen_US'
@@ -35,6 +61,26 @@ describe("parsePredictionDisplay", () => {
       "0x0000000000000000000000000000000000000000000000000000000000000000",
       parsed
     )).toBeNull();
+  });
+
+  it("applies metadata override for badly formatted titles", () => {
+    const parsed = parsePredictionDisplay(
+      "[Badly formatted question]: usususus",
+      0
+    );
+    const updated = applyPredictionMetadataOverride(parsed, {
+      title: "How many streams?",
+      questionType: "uint",
+    });
+    expect(updated.title).toBe("How many streams?");
+    expect(updated.type).toBe("uint");
+    expect(
+      answerBytesToLabel(
+        "0x0000000000000000000000000000000000000000000000000000000000000005",
+        updated,
+        updated.type
+      )
+    ).toBe("5");
   });
 
   it("detects songchain category", () => {
