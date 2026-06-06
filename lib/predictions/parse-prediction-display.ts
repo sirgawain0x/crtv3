@@ -1,5 +1,7 @@
 import { keccak256, stringToHex } from "viem";
 import { parseQuestionText } from "@/lib/sdk/reality-eth/reality-eth-utils";
+import type { QuestionType } from "@/lib/sdk/reality-eth/reality-eth-utils";
+import { getTemplateTextForId } from "@/lib/predictions/reality-template";
 
 const UNIT_SEP = "\u241F";
 
@@ -16,15 +18,6 @@ const ZERO_ANSWER =
   "0x0000000000000000000000000000000000000000000000000000000000000000" as const;
 const ONE_ANSWER =
   "0x0000000000000000000000000000000000000000000000000000000000000001" as const;
-
-/** Reality.eth built-in template JSON strings by template id */
-const TEMPLATE_BY_ID: Record<number, string> = {
-  0: `{"title": "%s", "type": "bool", "category": "%s", "lang": "%s"}`,
-  1: `{"title": "%s", "type": "uint", "decimals": 18, "category": "%s", "lang": "%s"}`,
-  2: `{"title": "%s", "type": "single-select", "outcomes": [%s], "category": "%s", "lang": "%s"}`,
-  3: `{"title": "%s", "type": "multiple-select", "outcomes": [%s], "category": "%s", "lang": "%s"}`,
-  4: `{"title": "%s", "type": "datetime", "category": "%s", "lang": "%s"}`,
-};
 
 function isBadParsedTitle(title: string): boolean {
   const t = title.trim();
@@ -97,6 +90,52 @@ function inferTypeFromOutcomes(outcomes: string[]): ParsedPredictionDisplay["typ
   return "bool";
 }
 
+function isValidQuestionType(value: string): value is ParsedPredictionDisplay["type"] {
+  return (
+    value === "bool" ||
+    value === "uint" ||
+    value === "single-select" ||
+    value === "multiple-select"
+  );
+}
+
+/** Prefer Supabase-stored title when on-chain parse failed. */
+export function applyPredictionMetadataOverride(
+  parsed: ParsedPredictionDisplay,
+  metadata?: {
+    title?: string | null;
+    questionType?: string | null;
+    category?: string | null;
+  } | null
+): ParsedPredictionDisplay {
+  if (!metadata) return parsed;
+
+  let next = { ...parsed };
+
+  if (
+    metadata.title?.trim() &&
+    (parsed.title.startsWith("[Badly formatted question]") ||
+      parsed.title === "Untitled Prediction")
+  ) {
+    next = { ...next, title: metadata.title.trim() };
+  }
+
+  if (metadata.questionType && isValidQuestionType(metadata.questionType)) {
+    next = { ...next, type: metadata.questionType };
+    if (metadata.questionType === "uint") {
+      next.outcomes = [];
+    } else if (metadata.questionType === "bool" && next.outcomes.length === 0) {
+      next.outcomes = ["Yes", "No"];
+    }
+  }
+
+  if (metadata.category?.trim()) {
+    next = { ...next, category: metadata.category.trim() };
+  }
+
+  return next;
+}
+
 /**
  * Parse encoded Reality.eth question text for display.
  */
@@ -116,13 +155,16 @@ export function parsePredictionDisplay(
   }
 
   const tid = templateId != null ? Number(templateId) : NaN;
-  if (!Number.isNaN(tid) && TEMPLATE_BY_ID[tid] !== undefined) {
-    try {
-      const parsed = parseQuestionText(TEMPLATE_BY_ID[tid], raw);
-      const display = buildDisplayFromParsed(parsed, raw);
-      if (display) return display;
-    } catch {
-      // fall through to manual split
+  if (!Number.isNaN(tid)) {
+    const templateText = getTemplateTextForId(tid);
+    if (templateText) {
+      try {
+        const parsed = parseQuestionText(templateText, raw);
+        const display = buildDisplayFromParsed(parsed, raw);
+        if (display) return display;
+      } catch {
+        // fall through to manual split
+      }
     }
   }
 
@@ -151,30 +193,50 @@ export function parsePredictionDisplay(
   };
 }
 
+function looksLikeUintAnswer(normalized: string): boolean {
+  if (normalized === ZERO_ANSWER.toLowerCase() || normalized === ONE_ANSWER.toLowerCase()) {
+    return false;
+  }
+  try {
+    const value = BigInt(normalized);
+    return value >= 0n && value < 2n ** 128n;
+  } catch {
+    return false;
+  }
+}
+
+function decodeUintAnswer(answerHex: string): string | null {
+  try {
+    const value = BigInt(answerHex);
+    if (value < 0n || value >= 2n ** 128n) return null;
+    return value.toString();
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Map bytes32 answer to human-readable label.
  */
 export function answerBytesToLabel(
   answerHex: string | null | undefined,
-  parsed: ParsedPredictionDisplay
+  parsed: ParsedPredictionDisplay,
+  typeOverride?: QuestionType | null
 ): string | null {
   if (!answerHex || (answerHex === ZERO_ANSWER && parsed.type !== "bool")) {
     return null;
   }
 
+  const effectiveType = typeOverride ?? parsed.type;
   const normalized = answerHex.toLowerCase();
 
-  if (parsed.type === "bool") {
+  if (effectiveType === "bool") {
     if (normalized === ONE_ANSWER.toLowerCase()) return "Yes";
     if (normalized === ZERO_ANSWER.toLowerCase()) return "No";
   }
 
-  if (parsed.type === "uint") {
-    try {
-      return BigInt(answerHex).toString();
-    } catch {
-      return answerHex;
-    }
+  if (effectiveType === "uint") {
+    return decodeUintAnswer(answerHex) ?? answerHex;
   }
 
   for (const outcome of parsed.outcomes) {
@@ -188,6 +250,10 @@ export function answerBytesToLabel(
 
   if (normalized === ONE_ANSWER.toLowerCase()) return "Yes";
   if (normalized === ZERO_ANSWER.toLowerCase()) return "No";
+
+  if (looksLikeUintAnswer(normalized)) {
+    return decodeUintAnswer(answerHex);
+  }
 
   return answerHex.length > 18
     ? `${answerHex.slice(0, 10)}…${answerHex.slice(-6)}`

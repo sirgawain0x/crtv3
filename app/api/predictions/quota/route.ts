@@ -10,6 +10,7 @@ import {
   PREDICTION_MARKETS_MONTHLY_LIMIT,
 } from "@/lib/predictions/prediction-quota";
 import { unlockService } from "@/lib/sdk/unlock/services";
+import { isPlatformAdmin } from "@/lib/access/platform-admin";
 
 export async function GET(request: NextRequest) {
   const verification = await checkBotId();
@@ -36,6 +37,17 @@ export async function GET(request: NextRequest) {
 
   try {
     const normalized = normalizeCreatorAddress(address);
+
+    if (isPlatformAdmin(normalized)) {
+      return NextResponse.json({
+        unlimited: true,
+        premiumTier: null,
+        usedThisMonth: 0,
+        monthlyLimit: PREDICTION_MARKETS_MONTHLY_LIMIT,
+        remaining: null,
+      });
+    }
+
     const memberships = await unlockService.getAllMemberships(normalized);
     const { unlimited, tier } = getPremiumPredictionAccess(memberships);
 

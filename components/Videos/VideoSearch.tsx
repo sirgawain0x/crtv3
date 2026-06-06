@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useCallback, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -10,14 +10,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { X, SlidersHorizontal } from "lucide-react";
-import { useDebounce } from "@/lib/hooks/useDebounce";
 import { PredictiveSearchInput } from "@/components/search/PredictiveSearchInput";
 
 interface VideoSearchProps {
   onSearchChange: (search: string) => void;
   onCategoryChange: (category: string) => void;
   onSortChange: (sort: 'created_at' | 'views_count' | 'likes_count' | 'updated_at') => void;
-  initialSearch?: string;
   initialCategory?: string;
   initialSort?: 'created_at' | 'views_count' | 'likes_count' | 'updated_at';
 }
@@ -52,22 +50,14 @@ export function VideoSearch({
   onSearchChange,
   onCategoryChange,
   onSortChange,
-  initialSearch = "",
   initialCategory = "all",
   initialSort = "created_at",
 }: VideoSearchProps) {
-  const [searchInput, setSearchInput] = useState(initialSearch);
   const [category, setCategory] = useState(initialCategory);
   const [sort, setSort] = useState(initialSort);
   const [showFilters, setShowFilters] = useState(false);
-
-  // Debounce search input to avoid excessive API calls
-  const debouncedSearch = useDebounce(searchInput, 500);
-
-  // Notify parent of search changes
-  useEffect(() => {
-    onSearchChange(debouncedSearch);
-  }, [debouncedSearch, onSearchChange]);
+  const [searchResetKey, setSearchResetKey] = useState(0);
+  const [hasSearch, setHasSearch] = useState(false);
 
   const handleCategoryChange = useCallback((value: string) => {
     setCategory(value);
@@ -81,7 +71,8 @@ export function VideoSearch({
   }, [onSortChange]);
 
   const clearSearch = useCallback(() => {
-    setSearchInput("");
+    setSearchResetKey((k) => k + 1);
+    setHasSearch(false);
     onSearchChange("");
   }, [onSearchChange]);
 
@@ -91,18 +82,22 @@ export function VideoSearch({
         <PredictiveSearchInput
           scope="videos"
           placeholder="Search videos by title or description..."
-          value={searchInput}
-          onQueryChange={setSearchInput}
+          resetKey={searchResetKey}
+          onQueryChange={(q) => {
+            setHasSearch(!!q);
+            onSearchChange(q);
+          }}
           showClear={false}
           inputClassName="pr-24"
         />
         <div className="absolute right-2 top-1/2 flex -translate-y-1/2 gap-2 z-10">
-          {searchInput && (
+          {hasSearch && (
             <Button
               variant="ghost"
               size="sm"
               onClick={clearSearch}
               className="h-7 px-2"
+              aria-label="Clear search"
             >
               <X className="h-4 w-4" />
             </Button>
@@ -118,10 +113,8 @@ export function VideoSearch({
         </div>
       </div>
 
-      {/* Filters (Collapsible) */}
       {showFilters && (
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-          {/* Category Filter */}
           <div className="flex-1">
             <label htmlFor="genre-select" className="mb-2 block text-sm font-medium">Genre</label>
             <Select value={category} onValueChange={handleCategoryChange}>
@@ -138,7 +131,6 @@ export function VideoSearch({
             </Select>
           </div>
 
-          {/* Sort Filter */}
           <div className="flex-1">
             <label htmlFor="sort-select" className="mb-2 block text-sm font-medium">Sort By</label>
             <Select value={sort} onValueChange={handleSortChange}>
@@ -159,4 +151,3 @@ export function VideoSearch({
     </div>
   );
 }
-

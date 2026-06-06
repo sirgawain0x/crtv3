@@ -16,6 +16,7 @@ import {
   parsePredictionDisplay,
   answerBytesToLabel,
   formatCategoryLabel,
+  applyPredictionMetadataOverride,
   type ParsedPredictionDisplay,
 } from "@/lib/predictions/parse-prediction-display";
 import { BetForm } from "./BetForm";
@@ -83,10 +84,28 @@ export function PredictionDetails({ questionId }: PredictionDetailsProps) {
           throw questionError;
         }
 
-        const parsed = parsePredictionDisplay(
+        let parsed = parsePredictionDisplay(
           questionDataRaw.question ?? "",
           questionDataRaw.template_id
         );
+
+        try {
+          const metaRes = await fetch(
+            `/api/predictions/metadata?questionId=${encodeURIComponent(questionId)}`
+          );
+          if (metaRes.ok) {
+            const metaJson = (await metaRes.json()) as {
+              metadata?: {
+                title?: string | null;
+                questionType?: string | null;
+                category?: string | null;
+              } | null;
+            };
+            parsed = applyPredictionMetadataOverride(parsed, metaJson.metadata);
+          }
+        } catch (metaErr) {
+          logger.debug("Prediction metadata fetch skipped:", metaErr);
+        }
 
         const questionData: QuestionData = {
           ...questionDataRaw,

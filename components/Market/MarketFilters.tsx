@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { X, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { X, ArrowUp, ArrowDown } from 'lucide-react';
 import { MarketFilters as MarketFiltersType } from '@/lib/hooks/market/useMarketData';
 import { PredictiveSearchInput } from '@/components/search/PredictiveSearchInput';
 
@@ -19,6 +19,8 @@ interface MarketFiltersProps {
 }
 
 export function MarketFilters({ filters, onFiltersChange }: MarketFiltersProps) {
+  const [searchResetKey, setSearchResetKey] = useState(0);
+
   const handleSearchChange = useCallback(
     (searchValue: string) => {
       onFiltersChange({ search: searchValue });
@@ -39,6 +41,7 @@ export function MarketFilters({ filters, onFiltersChange }: MarketFiltersProps) 
   };
 
   const clearFilters = () => {
+    setSearchResetKey((k) => k + 1);
     onFiltersChange({
       type: 'all',
       search: '',
@@ -51,19 +54,16 @@ export function MarketFilters({ filters, onFiltersChange }: MarketFiltersProps) 
 
   return (
     <div className="space-y-4">
-      {/* Search and Type Filter Row */}
       <div className="flex flex-col sm:flex-row gap-4">
-        {/* Search Input */}
         <div className="relative flex-1">
           <PredictiveSearchInput
             scope="market"
             placeholder="Search tokens, symbols, or creators..."
-            value={filters.search}
+            resetKey={searchResetKey}
             onQueryChange={handleSearchChange}
           />
         </div>
 
-        {/* Type Filter */}
         <Select value={filters.type} onValueChange={handleTypeChange}>
           <SelectTrigger className="w-full sm:w-[180px]">
             <SelectValue placeholder="Token Type" />
@@ -76,7 +76,6 @@ export function MarketFilters({ filters, onFiltersChange }: MarketFiltersProps) 
         </Select>
       </div>
 
-      {/* Sort Controls Row */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm text-muted-foreground">Sort by:</span>
@@ -109,7 +108,6 @@ export function MarketFilters({ filters, onFiltersChange }: MarketFiltersProps) 
           </Button>
         </div>
 
-        {/* Clear Filters */}
         {hasActiveFilters && (
           <Button
             variant="ghost"
@@ -123,7 +121,6 @@ export function MarketFilters({ filters, onFiltersChange }: MarketFiltersProps) 
         )}
       </div>
 
-      {/* Active Filters Display */}
       {hasActiveFilters && (
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <span className="text-muted-foreground">Active filters:</span>
@@ -142,4 +139,3 @@ export function MarketFilters({ filters, onFiltersChange }: MarketFiltersProps) 
     </div>
   );
 }
-

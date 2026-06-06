@@ -28,7 +28,8 @@ const SCOPE_ENDPOINT: Record<SearchScope, string> = {
 interface PredictiveSearchInputProps {
   scope: SearchScope;
   placeholder?: string;
-  value?: string;
+  /** External reset key — increment to clear the input from parent (e.g. "Clear filters"). */
+  resetKey?: number;
   onQueryChange: (query: string) => void;
   onSelect?: (result: SuggestResult) => void;
   className?: string;
@@ -39,7 +40,7 @@ interface PredictiveSearchInputProps {
 export function PredictiveSearchInput({
   scope,
   placeholder = "Search…",
-  value,
+  resetKey = 0,
   onQueryChange,
   onSelect,
   className,
@@ -47,12 +48,15 @@ export function PredictiveSearchInput({
   showClear = true,
 }: PredictiveSearchInputProps) {
   const router = useRouter();
-  const [input, setInput] = useState(value ?? "");
+  const [input, setInput] = useState("");
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const [results, setResults] = useState<SuggestResult[]>([]);
   const [activeIndex, setActiveIndex] = useState(-1);
   const containerRef = useRef<HTMLDivElement>(null);
+  const lastEmittedRef = useRef("");
+  const isFirstResetRender = useRef(true);
   const debounced = useDebounce(input, 300);
   const onQueryChangeRef = useRef(onQueryChange);
 
@@ -60,22 +64,29 @@ export function PredictiveSearchInput({
     onQueryChangeRef.current = onQueryChange;
   }, [onQueryChange]);
 
-  // Sync external value changes only (not while user is typing ahead of debounce)
   useEffect(() => {
-    if (value === undefined) return;
-    if (value !== input && value !== debounced) {
-      setInput(value);
+    if (isFirstResetRender.current) {
+      isFirstResetRender.current = false;
+      return;
     }
-  }, [value, input, debounced]);
+    setInput("");
+    setResults([]);
+    setOpen(false);
+    setFetchError(null);
+    lastEmittedRef.current = "";
+    onQueryChangeRef.current("");
+  }, [resetKey]);
 
   useEffect(() => {
-    if (value !== undefined && debounced === value) return;
+    if (debounced === lastEmittedRef.current) return;
+    lastEmittedRef.current = debounced;
     onQueryChangeRef.current(debounced);
-  }, [debounced, value]);
+  }, [debounced]);
 
   useEffect(() => {
     if (debounced.trim().length < 2) {
       setResults([]);
+      setFetchError(null);
       setOpen(false);
       return;
     }
@@ -83,12 +94,23 @@ export function PredictiveSearchInput({
     let cancelled = false;
     (async () => {
       setLoading(true);
+      setFetchError(null);
+      setOpen(true);
       try {
         const res = await fetch(
           `${SCOPE_ENDPOINT[scope]}?q=${encodeURIComponent(debounced.trim())}&limit=8`
         );
         const data = await res.json();
         if (cancelled) return;
+        if (!res.ok) {
+          setResults([]);
+          setFetchError(
+            typeof data.error === "string" ? data.error : "Search unavailable"
+          );
+          setOpen(true);
+          setActiveIndex(-1);
+          return;
+        }
         const mapped: SuggestResult[] = (data.results ?? []).map(
           (r: Record<string, string>) => ({
             id: r.id,
@@ -100,10 +122,15 @@ export function PredictiveSearchInput({
           })
         );
         setResults(mapped);
-        setOpen(mapped.length > 0);
+        setFetchError(null);
+        setOpen(true);
         setActiveIndex(-1);
       } catch {
-        if (!cancelled) setResults([]);
+        if (!cancelled) {
+          setResults([]);
+          setFetchError("Search unavailable");
+          setOpen(true);
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -130,6 +157,8 @@ export function PredictiveSearchInput({
   const selectResult = useCallback(
     (result: SuggestResult) => {
       setInput(result.title);
+      lastEmittedRef.current = result.title;
+      onQueryChangeRef.current(result.title);
       setOpen(false);
       onSelect?.(result);
       router.push(result.href);
@@ -153,6 +182,11 @@ export function PredictiveSearchInput({
     }
   };
 
+  const showDropdown =
+    open &&
+    debounced.trim().length >= 2 &&
+    (loading || fetchError !== null || results.length > 0);
+
   return (
     <div ref={containerRef} className={cn("relative", className)}>
       <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
@@ -161,7 +195,7 @@ export function PredictiveSearchInput({
         placeholder={placeholder}
         value={input}
         onChange={(e) => setInput(e.target.value)}
-        onFocus={() => results.length > 0 && setOpen(true)}
+        onFocus={() => debounced.trim().length >= 2 && setOpen(true)}
         onKeyDown={handleKeyDown}
         className={cn("pl-10 pr-20", inputClassName)}
         autoComplete="off"
@@ -176,20 +210,31 @@ export function PredictiveSearchInput({
             className="h-7 px-2"
             onClick={() => {
               setInput("");
+              lastEmittedRef.current = "";
               setResults([]);
+              setFetchError(null);
               setOpen(false);
-              onQueryChange("");
+              onQueryChangeRef.current("");
             }}
           >
             <X className="h-4 w-4" />
           </Button>
         )}
       </div>
-      {open && results.length > 0 && (
+      {showDropdown && (
         <ul
           className="absolute z-50 mt-1 w-full rounded-md border bg-popover text-popover-foreground shadow-md max-h-64 overflow-auto"
           role="listbox"
         >
+          {loading && results.length === 0 && (
+            <li className="px-3 py-2 text-sm text-muted-foreground">Searching…</li>
+          )}
+          {!loading && fetchError && (
+            <li className="px-3 py-2 text-sm text-destructive">{fetchError}</li>
+          )}
+          {!loading && !fetchError && results.length === 0 && (
+            <li className="px-3 py-2 text-sm text-muted-foreground">No results</li>
+          )}
           {results.map((result, idx) => (
             <li key={result.href + idx}>
               <button

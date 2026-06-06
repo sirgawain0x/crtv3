@@ -73,7 +73,6 @@ const AllVideosContent: React.FC = () => {
           onSearchChange={setSearchQuery}
           onCategoryChange={setCategory}
           onSortChange={setSortBy}
-          initialSearch={searchQuery}
           initialCategory={category}
           initialSort={sortBy}
         />
