@@ -55,7 +55,6 @@ export function PredictiveSearchInput({
   const containerRef = useRef<HTMLDivElement>(null);
   const debounced = useDebounce(input, 300);
   const onQueryChangeRef = useRef(onQueryChange);
-  const prevValueRef = useRef(value);
 
   useEffect(() => {
     onQueryChangeRef.current = onQueryChange;
@@ -64,11 +63,10 @@ export function PredictiveSearchInput({
   // Sync external value changes only (not while user is typing ahead of debounce)
   useEffect(() => {
     if (value === undefined) return;
-    if (prevValueRef.current !== value) {
-      prevValueRef.current = value;
+    if (value !== input && value !== debounced) {
       setInput(value);
     }
-  }, [value]);
+  }, [value, input, debounced]);
 
   useEffect(() => {
     if (value !== undefined && debounced === value) return;
