@@ -17,12 +17,46 @@ const ZERO_ANSWER =
 const ONE_ANSWER =
   "0x0000000000000000000000000000000000000000000000000000000000000001" as const;
 
-/** Reality.eth standard template strings by template id */
+/** Reality.eth built-in template JSON strings by template id */
 const TEMPLATE_BY_ID: Record<number, string> = {
-  0: `␟␟␟␟`,
-  1: `␟␟␟`,
-  2: `␟␟␟␟`,
+  0: `{"title": "%s", "type": "bool", "category": "%s", "lang": "%s"}`,
+  1: `{"title": "%s", "type": "uint", "decimals": 18, "category": "%s", "lang": "%s"}`,
+  2: `{"title": "%s", "type": "single-select", "outcomes": [%s], "category": "%s", "lang": "%s"}`,
+  3: `{"title": "%s", "type": "multiple-select", "outcomes": [%s], "category": "%s", "lang": "%s"}`,
+  4: `{"title": "%s", "type": "datetime", "category": "%s", "lang": "%s"}`,
 };
+
+function isBadParsedTitle(title: string): boolean {
+  const t = title.trim();
+  if (!t) return true;
+  if (t.startsWith("[Badly formatted question]")) return true;
+  if (/^␟+$/.test(t) || /^[\u241F]+$/.test(t)) return true;
+  return false;
+}
+
+function buildDisplayFromParsed(
+  parsed: Record<string, unknown>,
+  raw: string
+): ParsedPredictionDisplay | null {
+  const title = String(parsed.title ?? "").trim();
+  if (isBadParsedTitle(title)) return null;
+
+  const outcomes = Array.isArray(parsed.outcomes)
+    ? parsed.outcomes.map(String)
+    : parseOutcomesSegment(String(parsed.outcomes ?? ""));
+  const type =
+    (parsed.type as ParsedPredictionDisplay["type"]) ??
+    inferTypeFromOutcomes(outcomes);
+
+  return {
+    title,
+    type,
+    outcomes: outcomes.length ? outcomes : type === "bool" ? ["Yes", "No"] : [],
+    category: String(parsed.category ?? "general"),
+    language: String(parsed.lang ?? parsed.language ?? "en_US"),
+    description: parsed.description ? String(parsed.description) : undefined,
+  };
+}
 
 function parseOutcomesSegment(segment: string): string[] {
   const trimmed = segment.trim();
@@ -85,18 +119,8 @@ export function parsePredictionDisplay(
   if (!Number.isNaN(tid) && TEMPLATE_BY_ID[tid] !== undefined) {
     try {
       const parsed = parseQuestionText(TEMPLATE_BY_ID[tid], raw);
-      const outcomes = Array.isArray(parsed.outcomes)
-        ? parsed.outcomes.map(String)
-        : parseOutcomesSegment(String(parsed.outcomes ?? ""));
-      const type = (parsed.type as ParsedPredictionDisplay["type"]) ?? inferTypeFromOutcomes(outcomes);
-      return {
-        title: String(parsed.title ?? raw.split(UNIT_SEP)[0] ?? raw),
-        type,
-        outcomes: outcomes.length ? outcomes : type === "bool" ? ["Yes", "No"] : [],
-        category: String(parsed.category ?? "general"),
-        language: String(parsed.language ?? "en_US"),
-        description: parsed.description ? String(parsed.description) : undefined,
-      };
+      const display = buildDisplayFromParsed(parsed, raw);
+      if (display) return display;
     } catch {
       // fall through to manual split
     }

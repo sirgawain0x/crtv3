@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -18,9 +19,12 @@ interface MarketFiltersProps {
 }
 
 export function MarketFilters({ filters, onFiltersChange }: MarketFiltersProps) {
-  const handleSearchChange = (value: string) => {
-    onFiltersChange({ search: value });
-  };
+  const handleSearchChange = useCallback(
+    (searchValue: string) => {
+      onFiltersChange({ search: searchValue });
+    },
+    [onFiltersChange]
+  );
 
   const handleTypeChange = (value: string) => {
     onFiltersChange({ type: value as MarketFiltersType['type'] });
