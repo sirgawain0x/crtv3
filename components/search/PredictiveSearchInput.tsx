@@ -32,6 +32,8 @@ interface PredictiveSearchInputProps {
   resetKey?: number;
   onQueryChange: (query: string) => void;
   onSelect?: (result: SuggestResult) => void;
+  /** Client-side suggestions (e.g. from already-loaded list data). */
+  localSuggest?: (query: string) => SuggestResult[];
   className?: string;
   inputClassName?: string;
   showClear?: boolean;
@@ -43,6 +45,7 @@ export function PredictiveSearchInput({
   resetKey = 0,
   onQueryChange,
   onSelect,
+  localSuggest,
   className,
   inputClassName,
   showClear = true,
@@ -83,11 +86,27 @@ export function PredictiveSearchInput({
     onQueryChangeRef.current(debounced);
   }, [debounced]);
 
+  const localSuggestRef = useRef(localSuggest);
+  useEffect(() => {
+    localSuggestRef.current = localSuggest;
+  }, [localSuggest]);
+
   useEffect(() => {
     if (debounced.trim().length < 2) {
       setResults([]);
       setFetchError(null);
       setOpen(false);
+      return;
+    }
+
+    const localResults = localSuggestRef.current?.(debounced.trim()) ?? [];
+
+    if (localResults.length > 0) {
+      setResults(localResults);
+      setFetchError(null);
+      setOpen(true);
+      setLoading(false);
+      setActiveIndex(-1);
       return;
     }
 

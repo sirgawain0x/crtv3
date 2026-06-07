@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
-import { Clock } from "lucide-react";
+import { Clock, Gift } from "lucide-react";
 import { request, gql } from "graphql-request";
 import { getAddress, isAddress } from "viem";
 import { logger } from "@/lib/utils/logger";
@@ -17,12 +17,26 @@ import {
   GET_QUESTIONS_LIST_MINIMAL,
 } from "@/lib/sdk/reality-eth/reality-eth-subgraph";
 import {
-  parsePredictionDisplay,
   answerBytesToLabel,
   formatCategoryLabel,
   isSongchainCategory,
+  normalizeCategoryKey,
 } from "@/lib/predictions/parse-prediction-display";
+import { enrichPredictionDisplaySync } from "@/lib/predictions/enrich-prediction-display";
+import {
+  PREDICTION_CATEGORIES,
+  ALL_CATEGORIES_VALUE,
+} from "@/lib/predictions/categories";
 import { PredictiveSearchInput } from "@/components/search/PredictiveSearchInput";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useWalletStatus } from "@/lib/hooks/accountkit/useWalletStatus";
+import type { UserClaimStatus } from "@/lib/predictions/claim-status";
 
 const APP_ARBITRATOR = "0x0000000000000000000000000000000000000000";
 
@@ -71,6 +85,22 @@ interface Question {
   description?: string;
   parsedCategory?: string;
   leadingLabel?: string | null;
+  claimStatus?: UserClaimStatus | null;
+}
+
+function matchesSearchQuery(q: Question, sq: string): boolean {
+  const haystack = [
+    q.title,
+    q.parsedCategory,
+    q.category,
+    q.description,
+    q.question,
+    ...(q.outcomes ?? []),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  return haystack.includes(sq);
 }
 
 /**
@@ -82,13 +112,24 @@ interface Question {
 const ITEMS_PER_PAGE = 20;
 
 export function PredictionList() {
-  const [questions, setQuestions] = useState<Question[]>([]);
-  const [allQuestions, setAllQuestions] = useState<Question[]>([]);
+  const [rawQuestions, setRawQuestions] = useState<Question[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("creative_tv");
+  const [categoryFilter, setCategoryFilter] = useState<string>(ALL_CATEGORIES_VALUE);
   const [searchQuery, setSearchQuery] = useState("");
+  const [claimStatusMap, setClaimStatusMap] = useState<
+    Record<string, UserClaimStatus>
+  >({});
+  const fetchedClaimStatusRef = useRef<Set<string>>(new Set());
+
+  const { isConnected, walletAddress, smartAccountAddress } = useWalletStatus();
+
+  useEffect(() => {
+    fetchedClaimStatusRef.current.clear();
+    setClaimStatusMap({});
+  }, [walletAddress, smartAccountAddress]);
 
   useEffect(() => {
     async function fetchQuestions() {
@@ -183,29 +224,31 @@ export function PredictionList() {
 
         const parsedQuestions: Question[] = (fetchedQuestions || []).map((q) => {
           const rawQuestion = q.question || "";
-          const display = parsePredictionDisplay(rawQuestion, q.template_id);
-          let title = display.title;
-          let description: string | undefined = display.description;
+          const subgraphOutcomes =
+            usedField === "questions" && typeof q.outcomes === "string"
+              ? q.outcomes
+              : q.outcomes;
+          const { parsed: display } = enrichPredictionDisplaySync(
+            rawQuestion,
+            q.template_id,
+            {
+              subgraphOutcomes,
+              subgraphCategory: q.category ?? null,
+            }
+          );
+          const title = display.title;
+          const description = display.description;
           const parsedCategory = display.category;
+          const outcomes =
+            usedField === "questions" && typeof q.outcomes === "string"
+              ? q.outcomes.split("\n").filter(Boolean)
+              : display.outcomes;
+          const enrichedDisplay = { ...display, outcomes };
           const leadingLabel = q.best_answer
-            ? answerBytesToLabel(q.best_answer, display)
+            ? answerBytesToLabel(q.best_answer, enrichedDisplay)
             : null;
 
-          try {
-            if (rawQuestion.length > 0) {
-              title = display.title;
-            }
-          } catch (e) {
-            logger.warn('Could not parse question text for question', q.id, e);
-          }
-
           if (usedField === "questions") {
-            const outcomesRaw = q.outcomes;
-            const outcomes =
-              typeof outcomesRaw === "string" && outcomesRaw.length > 0
-                ? outcomesRaw.split("\n").filter(Boolean)
-                : undefined;
-
             return {
               id: q.id,
               template_id: q.template_id?.toString() ?? "0",
@@ -224,7 +267,7 @@ export function PredictionList() {
               last_bond_ts: q.last_bond_ts != null ? String(q.last_bond_ts) : undefined,
               category: q.category ?? parsedCategory,
               language: q.language ?? display.language,
-              outcomes: outcomes ?? display.outcomes,
+              outcomes,
               title,
               description,
               parsedCategory,
@@ -242,7 +285,7 @@ export function PredictionList() {
             finalize_ts: undefined,
             is_pending_arbitration: false,
             bounty: "0",
-            best_answer: undefined,
+            best_answer: q.best_answer,
             history_hash: "",
             arbitrator: q.arbitrator || "",
             min_bond: "0",
@@ -250,7 +293,7 @@ export function PredictionList() {
             last_bond_ts: undefined,
             category: parsedCategory,
             language: display.language,
-            outcomes: display.outcomes,
+            outcomes,
             title,
             description,
             parsedCategory,
@@ -304,37 +347,7 @@ export function PredictionList() {
           }
         }
 
-        const appArbNorm = normalizeArbitrator(APP_ARBITRATOR);
-        let filteredQuestions = parsedQuestions;
-
-        if (sourceFilter === "creative_tv") {
-          filteredQuestions = parsedQuestions.filter(
-            (q) => normalizeArbitrator(q.arbitrator) === appArbNorm
-          );
-        } else if (sourceFilter === "songchain") {
-          filteredQuestions = parsedQuestions.filter(
-            (q) =>
-              normalizeArbitrator(q.arbitrator) === appArbNorm &&
-              isSongchainCategory(q.parsedCategory ?? q.category ?? "")
-          );
-        }
-
-        if (searchQuery.trim()) {
-          const sq = searchQuery.trim().toLowerCase();
-          filteredQuestions = filteredQuestions.filter(
-            (q) =>
-              (q.title ?? "").toLowerCase().includes(sq) ||
-              (q.parsedCategory ?? "").toLowerCase().includes(sq)
-          );
-        }
-
-        setAllQuestions(filteredQuestions);
-
-        // Apply pagination
-        const safeFilteredQuestions = filteredQuestions || [];
-        const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-        const endIndex = startIndex + ITEMS_PER_PAGE;
-        setQuestions(safeFilteredQuestions.slice(startIndex, endIndex));
+        setRawQuestions(parsedQuestions);
       } catch (err: any) {
         logger.error('Failed to fetch questions from Reality.eth subgraph:', err);
 
@@ -361,16 +374,137 @@ export function PredictionList() {
         }
 
         setError(errorMessage);
-        // Set empty arrays on error to prevent undefined errors
-        setAllQuestions([]);
-        setQuestions([]);
+        setRawQuestions([]);
       } finally {
         setIsLoading(false);
       }
     }
 
     fetchQuestions();
-  }, [currentPage, sourceFilter, searchQuery])
+  }, []);
+
+  const filteredQuestions = useMemo(() => {
+    const appArbNorm = normalizeArbitrator(APP_ARBITRATOR);
+    let list = rawQuestions;
+
+    if (sourceFilter === "creative_tv") {
+      list = list.filter(
+        (q) => normalizeArbitrator(q.arbitrator) === appArbNorm
+      );
+    } else if (sourceFilter === "songchain") {
+      list = list.filter(
+        (q) =>
+          normalizeArbitrator(q.arbitrator) === appArbNorm &&
+          isSongchainCategory(q.parsedCategory ?? q.category ?? "")
+      );
+    }
+
+    if (categoryFilter !== ALL_CATEGORIES_VALUE) {
+      const key = normalizeCategoryKey(categoryFilter);
+      list = list.filter(
+        (q) => normalizeCategoryKey(q.parsedCategory ?? q.category ?? "") === key
+      );
+    }
+
+    if (searchQuery.trim()) {
+      const sq = searchQuery.trim().toLowerCase();
+      list = list.filter((q) => matchesSearchQuery(q, sq));
+    }
+
+    return list;
+  }, [rawQuestions, sourceFilter, categoryFilter, searchQuery]);
+
+  const totalQuestions = filteredQuestions.length;
+  const totalPages =
+    totalQuestions > 0 ? Math.ceil(totalQuestions / ITEMS_PER_PAGE) : 1;
+
+  const questions = useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredQuestions.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [filteredQuestions, currentPage]);
+
+  useEffect(() => {
+    if (!isConnected || !walletAddress) {
+      return;
+    }
+
+    const resolvedCandidates = questions.filter(
+      (q) =>
+        q.best_answer &&
+        q.best_answer !==
+          "0x0000000000000000000000000000000000000000000000000000000000000000" &&
+        !fetchedClaimStatusRef.current.has(q.id)
+    );
+
+    if (resolvedCandidates.length === 0) return;
+
+    resolvedCandidates.forEach((q) => fetchedClaimStatusRef.current.add(q.id));
+
+    let cancelled = false;
+    (async () => {
+      const entries = await Promise.all(
+        resolvedCandidates.map(async (q) => {
+          try {
+            const params = new URLSearchParams({
+              questionId: q.id,
+              address: walletAddress,
+            });
+            if (smartAccountAddress) {
+              params.set("smartAccount", smartAccountAddress);
+            }
+            const res = await fetch(
+              `/api/predictions/claim-status?${params.toString()}`
+            );
+            if (!res.ok) {
+              fetchedClaimStatusRef.current.delete(q.id);
+              return [q.id, null] as const;
+            }
+            const data = (await res.json()) as { status: UserClaimStatus };
+            return [q.id, data.status] as const;
+          } catch {
+            fetchedClaimStatusRef.current.delete(q.id);
+            return [q.id, null] as const;
+          }
+        })
+      );
+      if (cancelled) return;
+      setClaimStatusMap((prev) => {
+        const next = { ...prev };
+        for (const [id, status] of entries) {
+          if (
+            status === "won_pending_claim" ||
+            status === "won_withdrawable"
+          ) {
+            next[id] = status;
+          }
+        }
+        return next;
+      });
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isConnected, walletAddress, smartAccountAddress, questions]);
+
+  const localSuggest = useCallback(
+    (query: string) => {
+      const sq = query.trim().toLowerCase();
+      if (sq.length < 2) return [];
+      return filteredQuestions
+        .filter((q) => matchesSearchQuery(q, sq))
+        .slice(0, 8)
+        .map((q) => ({
+          questionId: q.id,
+          title: q.title || "Prediction",
+          subtitle: q.parsedCategory
+            ? formatCategoryLabel(q.parsedCategory)
+            : undefined,
+          href: `/predict/${q.id}`,
+        }));
+    },
+    [filteredQuestions]
+  );
 
   if (isLoading) {
     return (
@@ -395,9 +529,8 @@ export function PredictionList() {
     );
   }
 
-  const totalQuestions = allQuestions?.length || 0;
-  const totalPages = totalQuestions > 0 ? Math.ceil(totalQuestions / ITEMS_PER_PAGE) : 1;
-  const hasNextPage = totalQuestions > 0 && currentPage < totalPages;
+  const totalQuestionsDisplay = filteredQuestions?.length || 0;
+  const hasNextPage = totalQuestionsDisplay > 0 && currentPage < totalPages;
   const hasPrevPage = currentPage > 1;
 
   const handleNextPage = () => {
@@ -419,20 +552,30 @@ export function PredictionList() {
     setCurrentPage(1);
   };
 
+  const setCategory = (value: string) => {
+    setCategoryFilter(value);
+    setCurrentPage(1);
+  };
+
   return (
     <div className="space-y-4">
       <PredictiveSearchInput
         scope="predictions"
-        placeholder="Search predictions by title or category…"
-        onQueryChange={setSearchQuery}
+        placeholder="Search predictions by title, category, or outcomes…"
+        onQueryChange={(q) => {
+          setSearchQuery(q);
+          setCurrentPage(1);
+        }}
+        localSuggest={localSuggest}
         className="max-w-xl"
       />
 
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="flex flex-col gap-1.5">
-          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Source
-          </span>
+      <div className="flex flex-col lg:flex-row items-start lg:items-end justify-between gap-4">
+        <div className="flex flex-col sm:flex-row gap-6 flex-wrap">
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Source
+            </span>
           <div
             className="inline-flex rounded-lg border bg-muted/40 p-1 flex-wrap"
             role="group"
@@ -482,10 +625,30 @@ export function PredictionList() {
               <strong>songchain</strong>.
             </p>
           )}
+          </div>
+
+          <div className="flex flex-col gap-1.5 min-w-[160px]">
+            <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Category
+            </span>
+            <Select value={categoryFilter} onValueChange={setCategory}>
+              <SelectTrigger className="w-full sm:w-[180px]">
+                <SelectValue placeholder="All categories" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL_CATEGORIES_VALUE}>All categories</SelectItem>
+                {PREDICTION_CATEGORIES.map((cat) => (
+                  <SelectItem key={cat.value} value={cat.value}>
+                    {cat.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
         <div className="text-sm text-muted-foreground">
-          {totalQuestions > 0
-            ? `Showing ${questions?.length || 0} of ${totalQuestions} question${totalQuestions === 1 ? "" : "s"}`
+          {totalQuestionsDisplay > 0
+            ? `Showing ${questions?.length || 0} of ${totalQuestionsDisplay} question${totalQuestionsDisplay === 1 ? "" : "s"}`
             : sourceFilter === "songchain"
               ? "No Songchain predictions in this view"
               : sourceFilter === "creative_tv"
@@ -494,7 +657,7 @@ export function PredictionList() {
         </div>
       </div>
 
-      {totalQuestions === 0 ? (
+      {totalQuestionsDisplay === 0 ? (
         <div className="rounded-lg border border-dashed p-8 text-center">
           <p className="font-medium text-foreground">No predictions found</p>
           <p className="mt-2 text-sm text-muted-foreground max-w-md mx-auto">
@@ -533,6 +696,12 @@ export function PredictionList() {
                         {question.leadingLabel && (
                           <Badge variant="secondary" className="text-xs">
                             Leading: {question.leadingLabel}
+                          </Badge>
+                        )}
+                        {claimStatusMap[question.id] && (
+                          <Badge className="text-xs bg-emerald-600 hover:bg-emerald-700">
+                            <Gift className="h-3 w-3 mr-1" aria-hidden />
+                            Claim winnings
                           </Badge>
                         )}
                       </div>

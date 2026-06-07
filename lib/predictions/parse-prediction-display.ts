@@ -99,14 +99,17 @@ function isValidQuestionType(value: string): value is ParsedPredictionDisplay["t
   );
 }
 
+export type PredictionMetadataInput = {
+  title?: string | null;
+  questionType?: string | null;
+  category?: string | null;
+  outcomes?: string[] | null;
+};
+
 /** Prefer Supabase-stored title when on-chain parse failed. */
 export function applyPredictionMetadataOverride(
   parsed: ParsedPredictionDisplay,
-  metadata?: {
-    title?: string | null;
-    questionType?: string | null;
-    category?: string | null;
-  } | null
+  metadata?: PredictionMetadataInput | null
 ): ParsedPredictionDisplay {
   if (!metadata) return parsed;
 
@@ -131,6 +134,16 @@ export function applyPredictionMetadataOverride(
 
   if (metadata.category?.trim()) {
     next = { ...next, category: metadata.category.trim() };
+  }
+
+  if (metadata.outcomes?.length) {
+    next = { ...next, outcomes: metadata.outcomes.filter(Boolean) };
+    if (
+      next.type === "bool" &&
+      next.outcomes.length > 2
+    ) {
+      next = { ...next, type: "single-select" };
+    }
   }
 
   return next;
@@ -215,6 +228,29 @@ function decodeUintAnswer(answerHex: string): string | null {
   }
 }
 
+/** Map small integer answers to outcome labels (Precog-style ordinal indexing). */
+function outcomeLabelFromIndex(
+  answerHex: string,
+  outcomes: string[]
+): string | null {
+  if (outcomes.length === 0) return null;
+  try {
+    const value = BigInt(answerHex);
+    if (value < 0n || value >= BigInt(outcomes.length + 1)) return null;
+    // Try 1-based index first (answer 1 → outcomes[0])
+    if (value >= 1n && value <= BigInt(outcomes.length)) {
+      return outcomes[Number(value) - 1];
+    }
+    // Then 0-based index
+    if (value < BigInt(outcomes.length)) {
+      return outcomes[Number(value)];
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
 /**
  * Map bytes32 answer to human-readable label.
  */
@@ -236,6 +272,8 @@ export function answerBytesToLabel(
   }
 
   if (effectiveType === "uint") {
+    const indexLabel = outcomeLabelFromIndex(answerHex, parsed.outcomes);
+    if (indexLabel) return indexLabel;
     return decodeUintAnswer(answerHex) ?? answerHex;
   }
 
@@ -252,6 +290,8 @@ export function answerBytesToLabel(
   if (normalized === ZERO_ANSWER.toLowerCase()) return "No";
 
   if (looksLikeUintAnswer(normalized)) {
+    const indexLabel = outcomeLabelFromIndex(answerHex, parsed.outcomes);
+    if (indexLabel) return indexLabel;
     return decodeUintAnswer(answerHex);
   }
 

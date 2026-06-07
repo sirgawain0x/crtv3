@@ -114,4 +114,27 @@ describe("parsePredictionDisplay", () => {
     expect(parsed.title).toBe("Test question?");
     expect(parsed.title).not.toContain("[Badly formatted question]");
   });
+
+  it("maps ordinal answer to outcome label when outcomes exist", () => {
+    const parsed = parsePredictionDisplay(
+      'Pick a movie?\u241f"Movie A","Movie B","Movie C","Movie D","Movie E"\u241fgeneral\u241fen_US',
+      2
+    );
+    expect(
+      answerBytesToLabel(
+        "0x0000000000000000000000000000000000000000000000000000000000000005",
+        parsed
+      )
+    ).toBe("Movie E");
+  });
+
+  it("applies metadata outcomes override", () => {
+    const parsed = parsePredictionDisplay("Test?\u241fgeneral\u241fen_US", 0);
+    const updated = applyPredictionMetadataOverride(parsed, {
+      outcomes: ["Alpha", "Beta", "Gamma"],
+      questionType: "single-select",
+    });
+    expect(updated.outcomes).toEqual(["Alpha", "Beta", "Gamma"]);
+    expect(updated.type).toBe("single-select");
+  });
 });
