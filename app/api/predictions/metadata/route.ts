@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
 
   const { data, error } = await supabaseService
     .from("prediction_market_creations")
-    .select("title, category, question_type")
+    .select("title, category, question_type, outcomes")
     .eq("question_id", questionId.toLowerCase())
     .maybeSingle();
 
@@ -45,6 +45,9 @@ export async function GET(request: NextRequest) {
       title: data.title ?? null,
       category: data.category ?? null,
       questionType: data.question_type ?? null,
+      outcomes: Array.isArray(data.outcomes)
+        ? (data.outcomes as string[])
+        : null,
     },
   });
 }

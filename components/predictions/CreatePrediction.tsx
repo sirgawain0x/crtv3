@@ -40,15 +40,11 @@ import { ShareDialog } from "@/components/Videos/ShareDialog";
 import { useSongchainPost } from "@/hooks/useSongchainPost";
 import { getSongchainConfig } from "@/lib/songchain/config";
 import { getTemplateIdForQuestionType } from "@/lib/predictions/reality-template";
-
-const PREDICTION_CATEGORIES = [
-  { value: "creative tv", label: "Creative TV" },
-  { value: "songchain", label: "Songchain" },
-  { value: "general", label: "General" },
-  { value: "technology", label: "Technology" },
-  { value: "sports", label: "Sports" },
-  { value: "entertainment", label: "Entertainment" },
-] as const;
+import { PREDICTION_CATEGORIES } from "@/lib/predictions/categories";
+import {
+  REALITY_QUESTION_TYPES,
+  getRealityQuestionTypeOption,
+} from "@/lib/predictions/reality-question-types";
 
 const predictionSchema = z.object({
   title: z.string().min(3, "Title is required"),
@@ -401,6 +397,7 @@ function CreatePrediction() {
             title: values.title,
             category: values.category || "creative tv",
             questionType: values.type,
+            outcomes: finalOutcomes,
           }),
         });
         const recData = await rec.json();
@@ -562,31 +559,35 @@ function CreatePrediction() {
           <FormField
             name="type"
             control={form.control}
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Question type</FormLabel>
-                <div className="flex flex-wrap gap-2">
-                  {(
-                    [
-                      ["bool", "Yes / No"],
-                      ["single-select", "Pick one"],
-                      ["uint", "Number"],
-                    ] as const
-                  ).map(([value, label]) => (
-                    <Button
-                      key={value}
-                      type="button"
-                      variant={field.value === value ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => field.onChange(value)}
-                    >
-                      {label}
-                    </Button>
-                  ))}
-                </div>
-                <FormMessage />
-              </FormItem>
-            )}
+            render={({ field }) => {
+              const selected = getRealityQuestionTypeOption(field.value);
+              return (
+                <FormItem>
+                  <FormLabel>Question type</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select question type" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {REALITY_QUESTION_TYPES.map((opt) => (
+                        <SelectItem key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {selected && (
+                    <p className="text-xs text-muted-foreground mt-1.5">
+                      {selected.description} (Reality.eth template{" "}
+                      {selected.templateId})
+                    </p>
+                  )}
+                  <FormMessage />
+                </FormItem>
+              );
+            }}
           />
 
           {(questionType === "single-select" || questionType === "multiple-select") && (

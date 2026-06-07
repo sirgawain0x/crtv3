@@ -1,24 +1,25 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { base } from "@account-kit/infra";
 import { createPublicClient, http, fallback, formatEther } from "viem";
+import { request } from "graphql-request";
 import {
   getQuestion,
   getFinalAnswer,
   type RealityEthQuestion,
 } from "@/lib/sdk/reality-eth/reality-eth-question-wrapper";
+import { GET_QUESTION } from "@/lib/sdk/reality-eth/reality-eth-subgraph";
 import {
-  parsePredictionDisplay,
   answerBytesToLabel,
   formatCategoryLabel,
-  applyPredictionMetadataOverride,
   type ParsedPredictionDisplay,
 } from "@/lib/predictions/parse-prediction-display";
+import { enrichPredictionDisplay } from "@/lib/predictions/enrich-prediction-display";
 import { BetForm } from "./BetForm";
 import { ClaimWinningsCard } from "./ClaimWinningsCard";
 import { Clock, Share2 } from "lucide-react";
@@ -31,6 +32,14 @@ interface PredictionDetailsProps {
 }
 
 type QuestionType = ParsedPredictionDisplay["type"];
+
+type AnswerTimelineEntry = {
+  answer: string;
+  bond: string;
+  answerer: string;
+  created: string;
+  label: string | null;
+};
 
 interface QuestionData extends Omit<
   RealityEthQuestion,
@@ -48,23 +57,30 @@ export function PredictionDetails({ questionId }: PredictionDetailsProps) {
   const [error, setError] = useState<string | null>(null);
   const [finalAnswer, setFinalAnswer] = useState<string | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
+  const [answerTimeline, setAnswerTimeline] = useState<AnswerTimelineEntry[]>(
+    []
+  );
+
+  const publicClient = useMemo(
+    () =>
+      createPublicClient({
+        chain: base,
+        transport: fallback([
+          http(
+            process.env.NEXT_PUBLIC_ALCHEMY_API_KEY
+              ? `https://base-mainnet.g.alchemy.com/v2/${process.env.NEXT_PUBLIC_ALCHEMY_API_KEY}`
+              : undefined
+          ),
+          http("https://mainnet.base.org"),
+        ]),
+      }),
+    []
+  );
 
   useEffect(() => {
     async function fetchQuestion() {
       try {
         setIsLoading(true);
-
-        const publicClient = createPublicClient({
-          chain: base,
-          transport: fallback([
-            http(
-              process.env.NEXT_PUBLIC_ALCHEMY_API_KEY
-                ? `https://base-mainnet.g.alchemy.com/v2/${process.env.NEXT_PUBLIC_ALCHEMY_API_KEY}`
-                : undefined
-            ),
-            http("https://mainnet.base.org"),
-          ]),
-        });
 
         let questionDataRaw;
         try {
@@ -84,10 +100,12 @@ export function PredictionDetails({ questionId }: PredictionDetailsProps) {
           throw questionError;
         }
 
-        let parsed = parsePredictionDisplay(
-          questionDataRaw.question ?? "",
-          questionDataRaw.template_id
-        );
+        let metadata: {
+          title?: string | null;
+          questionType?: string | null;
+          category?: string | null;
+          outcomes?: string[] | null;
+        } | null = null;
 
         try {
           const metaRes = await fetch(
@@ -95,17 +113,66 @@ export function PredictionDetails({ questionId }: PredictionDetailsProps) {
           );
           if (metaRes.ok) {
             const metaJson = (await metaRes.json()) as {
-              metadata?: {
-                title?: string | null;
-                questionType?: string | null;
-                category?: string | null;
-              } | null;
+              metadata?: typeof metadata;
             };
-            parsed = applyPredictionMetadataOverride(parsed, metaJson.metadata);
+            metadata = metaJson.metadata ?? null;
           }
         } catch (metaErr) {
           logger.debug("Prediction metadata fetch skipped:", metaErr);
         }
+
+        let subgraphOutcomes: unknown;
+        let subgraphCategory: string | null = null;
+        let timeline: AnswerTimelineEntry[] = [];
+
+        if (typeof window !== "undefined") {
+          try {
+            const endpoint = `${window.location.origin}/api/reality-eth-subgraph`;
+            const subgraphData = (await request(endpoint, GET_QUESTION, {
+              id: questionId,
+            })) as {
+              question?: {
+                outcomes?: string;
+                category?: string;
+                answers?: Array<{
+                  answer: string;
+                  bond: string;
+                  answerer: string;
+                  created: string;
+                }>;
+              };
+            };
+
+            subgraphOutcomes = subgraphData?.question?.outcomes;
+            subgraphCategory = subgraphData?.question?.category ?? null;
+
+            const { parsed: previewParsed } = await enrichPredictionDisplay(
+              questionDataRaw.question ?? "",
+              questionDataRaw.template_id,
+              { subgraphOutcomes, subgraphCategory, metadata }
+            );
+
+            timeline = (subgraphData?.question?.answers ?? [])
+              .slice()
+              .reverse()
+              .slice(0, 8)
+              .map((a) => ({
+                answer: a.answer,
+                bond: a.bond,
+                answerer: a.answerer,
+                created: a.created,
+                label: answerBytesToLabel(a.answer, previewParsed),
+              }));
+          } catch (subErr) {
+            logger.debug("Subgraph enrichment skipped:", subErr);
+          }
+        }
+
+        const { parsed } = await enrichPredictionDisplay(
+          questionDataRaw.question ?? "",
+          questionDataRaw.template_id,
+          { subgraphOutcomes, subgraphCategory, metadata }
+        );
 
         const questionData: QuestionData = {
           ...questionDataRaw,
@@ -118,6 +185,7 @@ export function PredictionDetails({ questionId }: PredictionDetailsProps) {
         };
 
         setQuestion(questionData);
+        setAnswerTimeline(timeline);
 
         try {
           const answer = await getFinalAnswer(publicClient, questionId);
@@ -144,7 +212,7 @@ export function PredictionDetails({ questionId }: PredictionDetailsProps) {
     if (questionId) {
       fetchQuestion();
     }
-  }, [questionId]);
+  }, [questionId, publicClient]);
 
   if (isLoading) {
     return (
@@ -194,34 +262,32 @@ export function PredictionDetails({ questionId }: PredictionDetailsProps) {
   return (
     <div className="space-y-6">
       <div>
-        <div className="flex items-start gap-2 mb-2 flex-wrap">
-          <h1 className="text-2xl font-bold flex-1 min-w-0">{parsed.title}</h1>
-          <div className="flex gap-2 items-center flex-wrap">
-            <Badge variant="outline">{formatCategoryLabel(parsed.category)}</Badge>
-            <Badge variant="secondary">{parsed.language}</Badge>
-            {isResolved ? (
-              <Badge variant="secondary">Resolved</Badge>
-            ) : isPendingArbitration ? (
-              <Badge variant="destructive">Arbitration Pending</Badge>
-            ) : isFinalizing ? (
-              <Badge className="bg-yellow-500 hover:bg-yellow-600">Finalizing</Badge>
-            ) : isActive ? (
-              <Badge className="bg-green-600 hover:bg-green-700">Active</Badge>
-            ) : (
-              <Badge variant="secondary">Closed</Badge>
-            )}
-            {!isResolved && (
-              <EvidenceSubmissionModal questionId={questionId} />
-            )}
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => setShareOpen(true)}
-              title="Share Prediction"
-            >
-              <Share2 className="h-4 w-4" />
-            </Button>
-          </div>
+        <h1 className="text-2xl font-bold mb-3">{parsed.title}</h1>
+        <div className="flex gap-2 items-center flex-wrap mb-4">
+          <Badge variant="outline">{formatCategoryLabel(parsed.category)}</Badge>
+          <Badge variant="secondary">{parsed.language}</Badge>
+          {isResolved ? (
+            <Badge variant="secondary">Resolved</Badge>
+          ) : isPendingArbitration ? (
+            <Badge variant="destructive">Arbitration Pending</Badge>
+          ) : isFinalizing ? (
+            <Badge className="bg-yellow-500 hover:bg-yellow-600">Finalizing</Badge>
+          ) : isActive ? (
+            <Badge className="bg-green-600 hover:bg-green-700">Active</Badge>
+          ) : (
+            <Badge variant="secondary">Closed</Badge>
+          )}
+          {!isResolved && (
+            <EvidenceSubmissionModal questionId={questionId} />
+          )}
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setShareOpen(true)}
+            title="Share Prediction"
+          >
+            <Share2 className="h-4 w-4" />
+          </Button>
         </div>
 
         <div className="text-sm text-muted-foreground space-y-1 mb-4">
@@ -262,21 +328,25 @@ export function PredictionDetails({ questionId }: PredictionDetailsProps) {
         <div className="text-foreground/90">{parsed.description}</div>
       )}
 
-      {parsed.outcomes.length > 1 && !isResolved && (
+      {parsed.outcomes.length > 0 && (
         <Card className="p-4">
           <h3 className="text-sm font-medium text-muted-foreground mb-2">
             Outcomes
           </h3>
           <div className="flex flex-wrap gap-2">
-            {parsed.outcomes.map((o) => (
-              <Badge
-                key={o}
-                variant={leadingLabel === o ? "default" : "outline"}
-              >
-                {o}
-                {leadingLabel === o ? " · leading" : ""}
-              </Badge>
-            ))}
+            {parsed.outcomes.map((o) => {
+              const isFinal = isResolved && finalLabel === o;
+              const isLeading = !isResolved && leadingLabel === o;
+              return (
+                <Badge
+                  key={o}
+                  variant={isFinal || isLeading ? "default" : "outline"}
+                >
+                  {o}
+                  {isFinal ? " · final" : isLeading ? " · leading" : ""}
+                </Badge>
+              );
+            })}
           </div>
         </Card>
       )}
@@ -291,7 +361,11 @@ export function PredictionDetails({ questionId }: PredictionDetailsProps) {
               {finalLabel}
             </div>
           </Card>
-          <ClaimWinningsCard questionId={questionId} />
+          <ClaimWinningsCard
+            questionId={questionId}
+            finalAnswer={finalAnswer}
+            parsed={parsed}
+          />
         </>
       ) : (
         leadingLabel &&
@@ -317,6 +391,29 @@ export function PredictionDetails({ questionId }: PredictionDetailsProps) {
             )}
           </Card>
         )
+      )}
+
+      {answerTimeline.length > 0 && (
+        <Card className="p-4">
+          <h3 className="text-sm font-medium text-muted-foreground mb-3">
+            Recent answers
+          </h3>
+          <ul className="space-y-2 text-sm">
+            {answerTimeline.map((entry, idx) => (
+              <li
+                key={`${entry.answerer}-${entry.created}-${idx}`}
+                className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 pb-2 last:border-0 last:pb-0"
+              >
+                <span className="font-medium">
+                  {entry.label ?? "Unknown answer"}
+                </span>
+                <span className="text-muted-foreground text-xs">
+                  {Number(formatEther(BigInt(entry.bond || "0"))).toFixed(4)} ETH
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Card>
       )}
 
       {isActive && !isResolved && (

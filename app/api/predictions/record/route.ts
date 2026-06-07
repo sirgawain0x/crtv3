@@ -23,6 +23,7 @@ const bodySchema = z.object({
   title: z.string().optional(),
   category: z.string().optional(),
   questionType: z.string().optional(),
+  outcomes: z.array(z.string()).optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -55,7 +56,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { address, transactionHash, questionId, title, category, questionType } =
+  const { address, transactionHash, questionId, title, category, questionType, outcomes } =
     parsed.data;
 
   try {
@@ -100,6 +101,7 @@ export async function POST(request: NextRequest) {
         title: title ?? null,
         category: category ?? null,
         question_type: questionType ?? null,
+        outcomes: outcomes?.length ? outcomes : null,
       });
 
     if (insertError) {
