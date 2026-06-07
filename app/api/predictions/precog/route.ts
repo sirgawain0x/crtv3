@@ -11,18 +11,20 @@ export async function GET(request: NextRequest) {
   const rl = await rateLimiters.generous(request);
   if (rl) return rl;
 
-  const chainId = parseInt(
-    request.nextUrl.searchParams.get("chainId") ?? "",
-    10
-  );
-  const marketId = parseInt(
-    request.nextUrl.searchParams.get("marketId") ?? "",
-    10
-  );
+  const chainIdStr = request.nextUrl.searchParams.get("chainId");
+  const marketIdStr = request.nextUrl.searchParams.get("marketId");
 
-  if (!Number.isFinite(chainId) || !Number.isFinite(marketId)) {
+  const chainId = chainIdStr ? parseInt(chainIdStr, 10) : NaN;
+  const marketId = marketIdStr ? parseInt(marketIdStr, 10) : NaN;
+
+  if (
+    !Number.isInteger(chainId) ||
+    chainId <= 0 ||
+    !Number.isInteger(marketId) ||
+    marketId <= 0
+  ) {
     return NextResponse.json(
-      { error: "chainId and marketId are required" },
+      { error: "Valid positive integer chainId and marketId are required" },
       { status: 400 }
     );
   }

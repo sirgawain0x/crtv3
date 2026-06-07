@@ -124,6 +124,7 @@ export function PredictionDetails({ questionId }: PredictionDetailsProps) {
         let subgraphOutcomes: unknown;
         let subgraphCategory: string | null = null;
         let timeline: AnswerTimelineEntry[] = [];
+        let parsedDisplay: ParsedPredictionDisplay | null = null;
 
         if (typeof window !== "undefined") {
           try {
@@ -151,6 +152,7 @@ export function PredictionDetails({ questionId }: PredictionDetailsProps) {
               questionDataRaw.template_id,
               { subgraphOutcomes, subgraphCategory, metadata }
             );
+            parsedDisplay = previewParsed;
 
             timeline = (subgraphData?.question?.answers ?? [])
               .slice()
@@ -168,11 +170,15 @@ export function PredictionDetails({ questionId }: PredictionDetailsProps) {
           }
         }
 
-        const { parsed } = await enrichPredictionDisplay(
-          questionDataRaw.question ?? "",
-          questionDataRaw.template_id,
-          { subgraphOutcomes, subgraphCategory, metadata }
-        );
+        const parsed =
+          parsedDisplay ??
+          (
+            await enrichPredictionDisplay(
+              questionDataRaw.question ?? "",
+              questionDataRaw.template_id,
+              { subgraphOutcomes, subgraphCategory, metadata }
+            )
+          ).parsed;
 
         const questionData: QuestionData = {
           ...questionDataRaw,

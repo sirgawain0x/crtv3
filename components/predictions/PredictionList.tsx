@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -122,8 +122,14 @@ export function PredictionList() {
   const [claimStatusMap, setClaimStatusMap] = useState<
     Record<string, UserClaimStatus>
   >({});
+  const fetchedClaimStatusRef = useRef<Set<string>>(new Set());
 
   const { isConnected, walletAddress, smartAccountAddress } = useWalletStatus();
+
+  useEffect(() => {
+    fetchedClaimStatusRef.current.clear();
+    setClaimStatusMap({});
+  }, [walletAddress, smartAccountAddress]);
 
   useEffect(() => {
     async function fetchQuestions() {
@@ -419,7 +425,6 @@ export function PredictionList() {
 
   useEffect(() => {
     if (!isConnected || !walletAddress) {
-      setClaimStatusMap({});
       return;
     }
 
@@ -427,10 +432,13 @@ export function PredictionList() {
       (q) =>
         q.best_answer &&
         q.best_answer !==
-          "0x0000000000000000000000000000000000000000000000000000000000000000"
+          "0x0000000000000000000000000000000000000000000000000000000000000000" &&
+        !fetchedClaimStatusRef.current.has(q.id)
     );
 
     if (resolvedCandidates.length === 0) return;
+
+    resolvedCandidates.forEach((q) => fetchedClaimStatusRef.current.add(q.id));
 
     let cancelled = false;
     (async () => {
@@ -447,25 +455,31 @@ export function PredictionList() {
             const res = await fetch(
               `/api/predictions/claim-status?${params.toString()}`
             );
-            if (!res.ok) return [q.id, null] as const;
+            if (!res.ok) {
+              fetchedClaimStatusRef.current.delete(q.id);
+              return [q.id, null] as const;
+            }
             const data = (await res.json()) as { status: UserClaimStatus };
             return [q.id, data.status] as const;
           } catch {
+            fetchedClaimStatusRef.current.delete(q.id);
             return [q.id, null] as const;
           }
         })
       );
       if (cancelled) return;
-      const next: Record<string, UserClaimStatus> = {};
-      for (const [id, status] of entries) {
-        if (
-          status === "won_pending_claim" ||
-          status === "won_withdrawable"
-        ) {
-          next[id] = status;
+      setClaimStatusMap((prev) => {
+        const next = { ...prev };
+        for (const [id, status] of entries) {
+          if (
+            status === "won_pending_claim" ||
+            status === "won_withdrawable"
+          ) {
+            next[id] = status;
+          }
         }
-      }
-      setClaimStatusMap(next);
+        return next;
+      });
     })();
 
     return () => {

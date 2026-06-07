@@ -30,6 +30,20 @@ export type PrecogMarketData = {
 
 const precogCache = new Map<string, { data: PrecogMarketData; expires: number }>();
 const CACHE_TTL_MS = 5 * 60 * 1000;
+const CACHE_MAX_SIZE = 1000;
+
+function evictPrecogCacheIfNeeded(): void {
+  if (precogCache.size <= CACHE_MAX_SIZE) return;
+  const now = Date.now();
+  for (const [key, entry] of precogCache.entries()) {
+    if (entry.expires <= now) {
+      precogCache.delete(key);
+    }
+  }
+  if (precogCache.size > CACHE_MAX_SIZE) {
+    precogCache.clear();
+  }
+}
 
 function cacheKey(chainId: number, marketId: number): string {
   return `${chainId}:${marketId}`;
@@ -105,6 +119,7 @@ export async function fetchPrecogMarket(
       const json = await res.json();
       const data = parsePrecogMarketPayload(json);
       if (data.outcomes.length > 0 || data.title) {
+        evictPrecogCacheIfNeeded();
         precogCache.set(key, { data, expires: Date.now() + CACHE_TTL_MS });
         return data;
       }
