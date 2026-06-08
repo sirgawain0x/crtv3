@@ -7,11 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
 import { Clock, Gift } from "lucide-react";
-import { request, gql } from "graphql-request";
+import { request } from "graphql-request";
 import { getAddress, isAddress } from "viem";
 import { logger } from "@/lib/utils/logger";
 import {
-  GET_LOG_NEW_QUESTIONS_LIST,
   GET_QUESTIONS_LIST,
   GET_QUESTIONS_LIST_BY_OPENING_TS,
   GET_QUESTIONS_LIST_MINIMAL,
@@ -145,89 +144,51 @@ export function PredictionList() {
         const endpoint = `${window.location.origin}/api/reality-eth-subgraph`;
         logger.debug('🔗 Fetching Reality.eth questions from:', endpoint);
 
-        // First, try to introspect the schema to see what fields are available
-        const INTROSPECTION_QUERY = gql`
-          query IntrospectSchema {
-            __schema {
-              queryType {
-                fields {
-                  name
-                  type {
-                    name
-                    kind
-                  }
-                }
-              }
-            }
-          }
-        `;
-
-        try {
-          const introspectionData = await request(endpoint, INTROSPECTION_QUERY) as any;
-          logger.debug('📋 Available query fields:', introspectionData?.__schema?.queryType?.fields);
-        } catch (introError) {
-          logger.warn('⚠️ Could not introspect schema:', introError);
-        }
-
-        // Graph Studio (creative-platform) exposes `questions`. Goldsky reality-eth uses `logNewQuestions`.
-        // Try `questions` first so Studio works; prefer a non-empty list if a later query shape returns [].
         const variables = {
           first: 200,
           skip: 0,
         };
 
-        const alternativeQueries = [
-          { field: "questions" as const, query: GET_QUESTIONS_LIST, label: "questions(orderBy:created)" },
-          { field: "questions" as const, query: GET_QUESTIONS_LIST_BY_OPENING_TS, label: "questions(orderBy:opening_ts)" },
-          { field: "questions" as const, query: GET_QUESTIONS_LIST_MINIMAL, label: "questions(minimal fields)" },
-          { field: "logNewQuestions" as const, query: GET_LOG_NEW_QUESTIONS_LIST, label: "logNewQuestions" },
-          { field: "log_new_questions" as const, query: gql`query GetQuestions($first: Int!, $skip: Int!) { log_new_questions(first: $first, skip: $skip, orderBy: opening_ts, orderDirection: desc) { id question_id template_id question arbitrator opening_ts timeout } }`, label: "log_new_questions" },
+        // Graph Studio creative-platform subgraph exposes `questions`.
+        const studioQueries = [
+          { query: GET_QUESTIONS_LIST, label: "questions(orderBy:created)" },
+          { query: GET_QUESTIONS_LIST_BY_OPENING_TS, label: "questions(orderBy:opening_ts)" },
+          { query: GET_QUESTIONS_LIST_MINIMAL, label: "questions(minimal fields)" },
         ];
 
-        let data: any = null;
-        let lastQueryError: any = null;
-        let usedField: (typeof alternativeQueries)[number]["field"] | null = null;
+        let data: { questions?: unknown[] } | null = null;
+        let lastQueryError: Error | null = null;
 
-        for (const alt of alternativeQueries) {
+        for (const candidate of studioQueries) {
           try {
-            logger.debug(`Trying subgraph query: ${alt.label}`);
-            const result = await request(endpoint, alt.query, variables) as any;
-            const rows = result?.[alt.field];
-            if (!Array.isArray(rows)) continue;
-            if (rows.length > 0) {
-              data = result;
-              usedField = alt.field;
-              logger.debug(`Using subgraph query: ${alt.label} (${rows.length} rows)`);
-              break;
-            }
-            if (!data) {
-              data = result;
-              usedField = alt.field;
-              logger.debug(`Subgraph query ${alt.label} returned 0 rows; will replace if a later query has data`);
-            }
-          } catch (e: any) {
-            lastQueryError = e;
-            logger.debug(`${alt.label} query failed:`, e?.message || e);
+            logger.debug(`Trying subgraph query: ${candidate.label}`);
+            const result = await request(endpoint, candidate.query, variables) as {
+              questions?: unknown[];
+            };
+            if (!Array.isArray(result?.questions)) continue;
+            data = result;
+            logger.debug(`Using subgraph query: ${candidate.label} (${result.questions.length} rows)`);
+            break;
+          } catch (e) {
+            lastQueryError = e instanceof Error ? e : new Error(String(e));
+            logger.debug(`${candidate.label} query failed:`, lastQueryError.message);
           }
         }
 
-        if (!data || !usedField) {
+        if (!data || !Array.isArray(data.questions)) {
           const errMsg = lastQueryError?.message || 'Unknown subgraph query error';
           throw new Error(
-            "The Reality.eth subgraph doesn't expose a compatible question field. " +
-            `Tried: ${alternativeQueries.map(q => q.label).join(', ')}. ` +
+            "Subgraph unavailable — check Graph Studio deployment URL. " +
+            `Tried: ${studioQueries.map((q) => q.label).join(', ')}. ` +
             `Last error: ${errMsg}`
           );
         }
 
-        const fetchedQuestions = data[usedField] as any[];
+        const fetchedQuestions = data.questions as any[];
 
         const parsedQuestions: Question[] = (fetchedQuestions || []).map((q) => {
           const rawQuestion = q.question || "";
-          const subgraphOutcomes =
-            usedField === "questions" && typeof q.outcomes === "string"
-              ? q.outcomes
-              : q.outcomes;
+          const subgraphOutcomes = q.outcomes;
           const { parsed: display } = enrichPredictionDisplaySync(
             rawQuestion,
             q.template_id,
@@ -240,7 +201,7 @@ export function PredictionList() {
           const description = display.description;
           const parsedCategory = display.category;
           const outcomes =
-            usedField === "questions" && typeof q.outcomes === "string"
+            typeof q.outcomes === "string"
               ? q.outcomes.split("\n").filter(Boolean)
               : display.outcomes;
           const enrichedDisplay = { ...display, outcomes };
@@ -248,104 +209,33 @@ export function PredictionList() {
             ? answerBytesToLabel(q.best_answer, enrichedDisplay)
             : null;
 
-          if (usedField === "questions") {
-            return {
-              id: q.id,
-              template_id: q.template_id?.toString() ?? "0",
-              question: q.question ?? "",
-              created: q.created?.toString() ?? "0",
-              opening_ts: q.opening_ts?.toString() ?? "0",
-              timeout: q.timeout?.toString() ?? "0",
-              finalize_ts: q.finalize_ts != null ? String(q.finalize_ts) : undefined,
-              is_pending_arbitration: Boolean(q.is_pending_arbitration),
-              bounty: q.bounty?.toString() ?? "0",
-              best_answer: q.best_answer,
-              history_hash: q.history_hash ?? "",
-              arbitrator: q.arbitrator ?? "",
-              min_bond: q.min_bond?.toString() ?? "0",
-              last_bond: q.last_bond?.toString() ?? "0",
-              last_bond_ts: q.last_bond_ts != null ? String(q.last_bond_ts) : undefined,
-              category: q.category ?? parsedCategory,
-              language: q.language ?? display.language,
-              outcomes,
-              title,
-              description,
-              parsedCategory,
-              leadingLabel,
-            };
-          }
-
           return {
-            id: q.question_id || q.id,
-            template_id: q.template_id?.toString() || "0",
-            question: q.question || "",
-            created: q.id || "0",
-            opening_ts: q.opening_ts?.toString() || "0",
-            timeout: q.timeout?.toString() || "0",
-            finalize_ts: undefined,
-            is_pending_arbitration: false,
-            bounty: "0",
+            id: q.id,
+            template_id: q.template_id?.toString() ?? "0",
+            question: q.question ?? "",
+            created: q.created?.toString() ?? "0",
+            opening_ts: q.opening_ts?.toString() ?? "0",
+            timeout: q.timeout?.toString() ?? "0",
+            finalize_ts: q.finalize_ts != null ? String(q.finalize_ts) : undefined,
+            is_pending_arbitration: Boolean(q.is_pending_arbitration),
+            bounty: q.bounty?.toString() ?? "0",
             best_answer: q.best_answer,
-            history_hash: "",
-            arbitrator: q.arbitrator || "",
-            min_bond: "0",
-            last_bond: "0",
-            last_bond_ts: undefined,
-            category: parsedCategory,
-            language: display.language,
+            history_hash: q.history_hash ?? "",
+            arbitrator: q.arbitrator ?? "",
+            min_bond: q.min_bond?.toString() ?? "0",
+            last_bond: q.last_bond?.toString() ?? "0",
+            last_bond_ts: q.last_bond_ts != null ? String(q.last_bond_ts) : undefined,
+            category: q.category ?? parsedCategory,
+            language: q.language ?? display.language,
             outcomes,
             title,
             description,
             parsedCategory,
             leadingLabel,
-          } as Question;
+          };
         });
 
         logger.debug(`Successfully fetched ${parsedQuestions.length} questions from Reality.eth subgraph`);
-
-        // Fetch bounties for these questions
-        const questionIds = parsedQuestions.map(q => q.id);
-
-        // `questions` entities already include `bounty`; log-only fallbacks may not.
-        if (usedField !== "questions" && questionIds.length > 0) {
-          const GET_BOUNTIES_QUERY = gql`
-            query GetBounties($questionIds: [String!]) {
-              logFundAnswerBounties(
-                where: { question_id_in: $questionIds }
-                orderBy: timestamp_
-                orderDirection: desc
-              ) {
-                question_id
-                bounty
-              }
-            }
-          `;
-
-          try {
-            logger.debug('💰 Fetching bounties for questions');
-            const bountyData = await request(endpoint, GET_BOUNTIES_QUERY, { questionIds }) as any;
-            const bounties = bountyData.logFundAnswerBounties || [];
-
-            const bountyMap = new Map<string, bigint>();
-
-            bounties.forEach((b: any) => {
-              const qId = b.question_id;
-              const amount = BigInt(b.bounty || 0);
-              const current = bountyMap.get(qId) || BigInt(0);
-              bountyMap.set(qId, current + amount);
-            });
-
-            parsedQuestions.forEach(q => {
-              if (bountyMap.has(q.id)) {
-                q.bounty = bountyMap.get(q.id)?.toString() || "0";
-              }
-            });
-
-            logger.debug(`Updated ${bountyMap.size} questions with bounty data`);
-          } catch (bountyError) {
-            logger.warn('Failed to fetch bounties:', bountyError);
-          }
-        }
 
         setRawQuestions(parsedQuestions);
       } catch (err: any) {
@@ -353,24 +243,18 @@ export function PredictionList() {
 
         let errorMessage = err?.message || 'Failed to load predictions.';
 
-        // Provide helpful error messages based on the error type
-        if (err?.message?.includes("no field `questions`") ||
-          err?.message?.includes("Type `Query` has no field `questions`")) {
+        if (
+          err?.message?.includes('Subgraph unavailable') ||
+          err?.message?.includes('does not exist')
+        ) {
           errorMessage =
-            "The Reality.eth subgraph schema doesn't match. " +
-            "This usually means:\n\n" +
-            "• The subgraph hasn't been deployed to Goldsky yet\n" +
-            "• The subgraph is still syncing/indexing data\n" +
-            "• The subgraph schema uses different field names\n\n" +
-            "Please check:\n" +
-            "1. Goldsky dashboard - verify the 'reality-eth' subgraph exists\n" +
-            "2. Subgraph status - ensure it's synced and indexed\n" +
-            "3. Subgraph schema - verify it includes a 'questions' query field";
-        } else if (err?.message?.includes("404") || err?.message?.includes("not found")) {
+            "Predictions subgraph unavailable. " +
+            "Redeploy creative-platform to Graph Studio and set GRAPH_STUDIO_CREATIVE_PLATFORM_URL " +
+            "(SUBGRAPH_PROVIDER_MODE=studio).";
+        } else if (err?.message?.includes('404') || err?.message?.includes('not found')) {
           errorMessage =
-            "Reality.eth subgraph not found. " +
-            "Please deploy the subgraph to Goldsky first. " +
-            "See REALITY_ETH_SUBGRAPH_HOSTING.md for deployment instructions.";
+            "Graph Studio subgraph not found. " +
+            "See GRAPH_STUDIO_MIGRATION.md for deployment instructions.";
         }
 
         setError(errorMessage);
