@@ -119,19 +119,27 @@ No configuration is required as these are public endpoints:
 
 **Note:** The Reality.eth subgraph endpoint is accessed via `/api/reality-eth-subgraph` to handle CORS.
 
-#### Graph Studio (Merged Creative Platform Subgraph)
+#### Graph Studio (Merged Creative Platform Subgraph) — Primary
+
+Production uses **The Graph Studio only** (`SUBGRAPH_PROVIDER_MODE=studio`). The merged
+`creative-platform` subgraph serves MeTokens and Reality.eth (`questions`, `answers`).
 
 `SUBGRAPH_PROVIDER_MODE` (Optional)
-- Supported values: `goldsky` (default), `studio`, `dual`
-- `dual` attempts Graph Studio first, then falls back to Goldsky
+- Default: **`studio`**
+- Supported values: `studio` (production), `goldsky` (emergency rollback), `dual` (Studio first, then Goldsky)
 
 `GRAPH_STUDIO_CREATIVE_PLATFORM_URL` (Required for `studio` or `dual`)
-- Full GraphQL query URL for your Graph Studio deployment
-- Example format: `https://gateway.thegraph.com/api/<query-key>/subgraphs/id/<deployment-id>`
+- Full GraphQL query URL from Graph Studio → **Query** tab after deploy
+- Example: `https://gateway.thegraph.com/api/<query-key>/subgraphs/id/<deployment-id>`
+- If you see `deployment ... does not exist`, redeploy and update this URL
 
 `GRAPH_STUDIO_DEPLOY_KEY` (Deployment only)
 - Used by `scripts/graph-studio/deploy-creative-platform.sh`
-- Keep server-side only
+- Keep server-side only; see `GRAPH_STUDIO_MIGRATION.md`
+
+#### Goldsky (Legacy rollback)
+
+Goldsky endpoints remain available when `SUBGRAPH_PROVIDER_MODE=goldsky` or `dual`:
 
 ### 5. Coinbase CDP Configuration (Onramp/Offramp)
 
@@ -327,11 +335,11 @@ NEXT_PUBLIC_NFT_CONTRACT_ADDRESS=0x0000000000000000000000000000000000000000
 # Optional
 NEXT_PUBLIC_SUPPORT_URL=https://your-support-url.com
 
-# Note: SUBGRAPH_QUERY_KEY is no longer needed - now using Goldsky public endpoints
-# Optional Graph Studio migration vars
-# SUBGRAPH_PROVIDER_MODE=dual
-# GRAPH_STUDIO_CREATIVE_PLATFORM_URL=https://gateway.thegraph.com/api/<query-key>/subgraphs/id/<deployment-id>
-# GRAPH_STUDIO_DEPLOY_KEY=<deploy-key>
+# Note: SUBGRAPH_QUERY_KEY is no longer needed — production uses Graph Studio
+# Graph Studio (primary) — see GRAPH_STUDIO_MIGRATION.md
+SUBGRAPH_PROVIDER_MODE=studio
+GRAPH_STUDIO_CREATIVE_PLATFORM_URL=https://gateway.thegraph.com/api/<query-key>/subgraphs/id/<deployment-id>
+# GRAPH_STUDIO_DEPLOY_KEY=<deploy-key>  # deploy script only, server-side
 ```
 
 3. Replace the placeholder values with your actual keys
