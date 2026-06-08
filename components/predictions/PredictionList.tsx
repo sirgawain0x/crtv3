@@ -438,8 +438,6 @@ export function PredictionList() {
 
     if (resolvedCandidates.length === 0) return;
 
-    resolvedCandidates.forEach((q) => fetchedClaimStatusRef.current.add(q.id));
-
     let cancelled = false;
     (async () => {
       const entries = await Promise.all(
@@ -456,18 +454,19 @@ export function PredictionList() {
               `/api/predictions/claim-status?${params.toString()}`
             );
             if (!res.ok) {
-              fetchedClaimStatusRef.current.delete(q.id);
               return [q.id, null] as const;
             }
             const data = (await res.json()) as { status: UserClaimStatus };
             return [q.id, data.status] as const;
           } catch {
-            fetchedClaimStatusRef.current.delete(q.id);
             return [q.id, null] as const;
           }
         })
       );
       if (cancelled) return;
+      for (const [id] of entries) {
+        fetchedClaimStatusRef.current.add(id);
+      }
       setClaimStatusMap((prev) => {
         const next = { ...prev };
         for (const [id, status] of entries) {
