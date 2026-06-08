@@ -3,8 +3,10 @@ import { checkBotId } from 'botid/server';
 import { serverLogger } from '@/lib/utils/logger';
 import { rateLimiters } from '@/lib/middleware/rateLimit';
 import {
+  asGraphQlRequestBody,
   buildSubgraphRequestHeaders,
   formatGraphQlErrors,
+  getGraphQlResponseErrors,
   getSubgraphProviderMode,
   GOLDSKY_ROLLBACK_HINT,
   isGraphQlResponseSuccessful,
@@ -34,9 +36,10 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    const bodyObj = asGraphQlRequestBody(body);
     serverLogger.debug('Subgraph proxy received request:', {
-      query: (body as { query?: string }).query?.substring(0, 100) + '...',
-      variables: (body as { variables?: unknown }).variables,
+      query: bodyObj.query?.substring(0, 100) + '...',
+      variables: bodyObj.variables,
       providerMode: getSubgraphProviderMode(),
     });
 
@@ -72,18 +75,31 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      const data = await response.json();
+      let data: unknown;
+      try {
+        data = await response.json();
+      } catch (jsonError) {
+        lastHttpError = {
+          status: response.status,
+          details: 'Failed to parse JSON response',
+          endpoint,
+        };
+        serverLogger.error('MeTokens subgraph JSON parse error:', jsonError);
+        continue;
+      }
 
       if (!isGraphQlResponseSuccessful(data)) {
-        const message = formatGraphQlErrors(data.errors ?? []);
+        const message = formatGraphQlErrors(getGraphQlResponseErrors(data));
         lastGraphQlError = { message, endpoint };
         serverLogger.error('MeTokens subgraph GraphQL error:', { endpoint, message });
         continue;
       }
 
+      const payload = data as { data: Record<string, unknown> };
+
       serverLogger.debug('Subgraph query successful:', {
         endpoint,
-        dataKeys: data.data ? Object.keys(data.data) : [],
+        dataKeys: payload.data ? Object.keys(payload.data) : [],
       });
 
       return NextResponse.json(data);

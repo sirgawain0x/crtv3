@@ -3,8 +3,10 @@ import { checkBotId } from 'botid/server';
 import { serverLogger } from '@/lib/utils/logger';
 import { rateLimiters } from '@/lib/middleware/rateLimit';
 import {
+  asGraphQlRequestBody,
   buildSubgraphRequestHeaders,
   formatGraphQlErrors,
+  getGraphQlResponseErrors,
   getSubgraphProviderMode,
   GOLDSKY_ROLLBACK_HINT,
   isGraphQlResponseSuccessful,
@@ -21,7 +23,8 @@ export async function POST(request: NextRequest) {
   if (rl) return rl;
 
   try {
-    const body = await request.json();
+    const rawBody = await request.json();
+    const body = asGraphQlRequestBody(rawBody);
     serverLogger.debug('Reality.eth subgraph proxy received request:', {
       query: body.query?.substring(0, 100) + '...',
       variables: body.variables,
@@ -50,7 +53,7 @@ export async function POST(request: NextRequest) {
       const response = await fetch(endpoint, {
         method: 'POST',
         headers,
-        body: JSON.stringify(body),
+        body: JSON.stringify(rawBody),
       });
 
       if (!response.ok) {
@@ -60,18 +63,31 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      const data = await response.json();
+      let data: unknown;
+      try {
+        data = await response.json();
+      } catch (jsonError) {
+        lastHttpError = {
+          status: response.status,
+          details: 'Failed to parse JSON response',
+          endpoint,
+        };
+        serverLogger.error('Reality.eth subgraph JSON parse error:', jsonError);
+        continue;
+      }
 
       if (!isGraphQlResponseSuccessful(data)) {
-        const message = formatGraphQlErrors(data.errors ?? []);
+        const message = formatGraphQlErrors(getGraphQlResponseErrors(data));
         lastGraphQlError = { message, endpoint };
         serverLogger.error('Reality.eth subgraph GraphQL error:', { endpoint, message });
         continue;
       }
 
+      const payload = data as { data: Record<string, unknown> };
+
       serverLogger.debug('Reality.eth subgraph query successful:', {
         endpoint,
-        dataKeys: data.data ? Object.keys(data.data) : [],
+        dataKeys: payload.data ? Object.keys(payload.data) : [],
       });
 
       return NextResponse.json(data);

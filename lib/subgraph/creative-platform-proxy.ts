@@ -75,12 +75,24 @@ export function buildSubgraphRequestHeaders(endpoint: string): Record<string, st
   return headers;
 }
 
-export function isGraphQlResponseSuccessful(data: {
-  data?: unknown;
-  errors?: Array<{ message?: string }>;
-}): boolean {
-  if (data.errors?.length) return false;
-  return data.data != null;
+export function isGraphQlResponseSuccessful(data: unknown): boolean {
+  if (!data || typeof data !== 'object') return false;
+  const payload = data as { data?: unknown; errors?: Array<{ message?: string }> };
+  if (payload.errors?.length) return false;
+  return payload.data != null;
+}
+
+export function getGraphQlResponseErrors(data: unknown): Array<{ message?: string }> {
+  if (data && typeof data === 'object' && Array.isArray((data as { errors?: unknown }).errors)) {
+    return (data as { errors: Array<{ message?: string }> }).errors;
+  }
+  return [{ message: 'Invalid or empty GraphQL response' }];
+}
+
+export function asGraphQlRequestBody(body: unknown): { query?: string; variables?: unknown } {
+  return body && typeof body === 'object'
+    ? (body as { query?: string; variables?: unknown })
+    : {};
 }
 
 export function formatGraphQlErrors(errors: Array<{ message?: string }>): string {

@@ -188,8 +188,7 @@ export function PredictionList() {
 
         const parsedQuestions: Question[] = (fetchedQuestions || []).map((q) => {
           const rawQuestion = q.question || "";
-          const subgraphOutcomes =
-            typeof q.outcomes === "string" ? q.outcomes : q.outcomes;
+          const subgraphOutcomes = q.outcomes;
           const { parsed: display } = enrichPredictionDisplaySync(
             rawQuestion,
             q.template_id,

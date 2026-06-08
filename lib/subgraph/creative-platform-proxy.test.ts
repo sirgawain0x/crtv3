@@ -46,6 +46,11 @@ describe('creative-platform-proxy', () => {
     ).toBe(false);
   });
 
+  it('rejects null or non-object GraphQL payloads', () => {
+    expect(isGraphQlResponseSuccessful(null)).toBe(false);
+    expect(isGraphQlResponseSuccessful('error')).toBe(false);
+  });
+
   it('accepts valid GraphQL data', () => {
     expect(isGraphQlResponseSuccessful({ data: { questions: [] } })).toBe(true);
   });
