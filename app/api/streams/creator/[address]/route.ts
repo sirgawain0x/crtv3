@@ -22,6 +22,8 @@ export async function GET(
       thumbnail_url: stream.thumbnail_url,
       is_live: stream.is_live,
       last_live_at: stream.last_live_at,
+      requires_metoken: stream.requires_metoken ?? false,
+      metoken_price: stream.metoken_price ?? null,
     });
   } catch (error) {
     return NextResponse.json(

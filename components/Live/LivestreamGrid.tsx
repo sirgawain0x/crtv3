@@ -11,7 +11,7 @@ import { logger } from '@/lib/utils/logger';
 
 
 import { getActiveStreams, ActiveStream } from "@/services/streams";
-import { RefreshCcw } from "lucide-react";
+import { Lock, RefreshCcw } from "lucide-react";
 
 // Removed fetchStreamsFromApi since we use getActiveStreams now
 
@@ -97,8 +97,18 @@ export default function LivestreamGrid() {
                       </div>
                     </div>
                   )}
-                  <div className="absolute right-2 top-2 rounded-full bg-red-500 px-2 py-1 text-xs text-white">
-                    LIVE
+                  <div className="absolute right-2 top-2 flex items-center gap-1">
+                    {stream.requires_metoken && (
+                      <span
+                        className="rounded-full bg-amber-500/90 px-2 py-1 text-xs text-white"
+                        title="MeToken required to watch"
+                      >
+                        <Lock className="inline h-3 w-3" />
+                      </span>
+                    )}
+                    <span className="rounded-full bg-red-500 px-2 py-1 text-xs text-white">
+                      LIVE
+                    </span>
                   </div>
                 </div>
                 <div className="p-4">

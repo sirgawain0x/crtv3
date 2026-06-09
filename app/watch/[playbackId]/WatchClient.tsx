@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, type ReactNode } from "react";
+import { useState, useEffect, useCallback, useRef, type ReactNode } from "react";
 import { useParams } from "next/navigation";
 import { useInterval } from "@/lib/hooks/useInterval";
 import { Player } from "@/components/Player/Player";
@@ -11,8 +11,13 @@ import { ClipCreator } from "@/components/Live/ClipCreator";
 import { DigitalTwinOverlay } from "@/components/Live/DigitalTwinOverlay";
 import { Src } from "@livepeer/react";
 import { useUser } from "@account-kit/react";
+import useModularAccount from "@/lib/hooks/accountkit/useModularAccount";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertCircle } from "lucide-react";
+import {
+  LiveStreamMeTokenGate,
+  type LiveStreamGateInfo,
+} from "@/components/Live/LiveStreamMeTokenGate";
 import Link from "next/link";
 import { RealtimeViewsComponent } from "@/components/Player/RealtimeViewsComponent";
 import { ViewsComponent } from "@/components/Player/ViewsComponent";
@@ -46,6 +51,7 @@ interface WatchClientProps {
 type StreamStatus =
   | { kind: "loading" }
   | { kind: "live"; sources: Src[] }
+  | { kind: "metoken-gated"; gate: LiveStreamGateInfo; sources: Src[] }
   | { kind: "offline-temporary"; attempts: number }
   | { kind: "offline-permanent" }
   | { kind: "not-found" }
@@ -74,10 +80,57 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
     : params.playbackId;
 
   const user = useUser();
+  const { address: smartAccountAddress } = useModularAccount();
   const [status, setStatus] = useState<StreamStatus>({ kind: "loading" });
   const [streamData, setStreamData] = useState<import("@/services/streams").Stream | null>(null);
   const [jwt, setJwt] = useState<string | undefined>(undefined);
   const [isChecking, setIsChecking] = useState(false);
+  const [gatePrefetch, setGatePrefetch] = useState<LiveStreamGateInfo | null>(null);
+
+  const requestStreamJwt = useCallback(async (): Promise<{
+    ok: boolean;
+    token?: string;
+    gate?: LiveStreamGateInfo;
+  }> => {
+    if (!playbackId) {
+      return { ok: false };
+    }
+
+    const jwtRes = await fetch("/api/livepeer/sign-jwt", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        playbackId,
+        userAddress: user?.address,
+        smartAccountAddress,
+      }),
+    });
+
+    if (jwtRes.ok) {
+      const { token } = await jwtRes.json();
+      return { ok: true, token };
+    }
+
+    const errData = await jwtRes.json().catch(() => ({}));
+    if (jwtRes.status === 403 && errData.code === "METOKEN_REQUIRED") {
+      return {
+        ok: false,
+        gate: {
+          code: errData.code,
+          connectWallet: errData.connectWallet,
+          meTokenAddress: errData.meTokenAddress,
+          symbol: errData.symbol,
+          required: errData.required,
+          balance: errData.balance,
+          creatorAddress: errData.creatorAddress,
+          streamName: streamData?.name ?? gatePrefetch?.streamName ?? null,
+        },
+      };
+    }
+
+    logger.warn("Failed to sign JWT for stream:", errData);
+    return { ok: false };
+  }, [playbackId, user?.address, smartAccountAddress, streamData?.name, gatePrefetch?.streamName]);
 
   const fetchPlaybackSources = useCallback(async (isInitial = false) => {
     if (!playbackId) {
@@ -112,29 +165,23 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
         setStreamData(streamRecord as import("@/services/streams").Stream);
       }
 
-      // Happy path — stream is live.
+      // Happy path — stream is live; JWT required for playback.
       if (sources && sources.length > 0) {
-        setStatus({ kind: "live", sources });
-
         try {
-          const jwtRes = await fetch("/api/livepeer/sign-jwt", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              playbackId,
-              userAddress: user?.address
-            }),
-          });
-
-          if (jwtRes.ok) {
-            const { token } = await jwtRes.json();
-            setJwt(token);
+          const jwtResult = await requestStreamJwt();
+          if (jwtResult.ok && jwtResult.token) {
+            setJwt(jwtResult.token);
+            setStatus({ kind: "live", sources });
+          } else if (jwtResult.gate) {
+            setJwt(undefined);
+            setStatus({ kind: "metoken-gated", gate: jwtResult.gate, sources });
           } else {
-            const errData = await jwtRes.json().catch(() => ({}));
-            logger.warn("Failed to sign JWT for stream:", errData);
+            setJwt(undefined);
+            setStatus({ kind: "live", sources });
           }
         } catch (jwtErr) {
           logger.error("Error signing JWT:", jwtErr);
+          setStatus({ kind: "live", sources });
         }
         return;
       }
@@ -159,7 +206,54 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
     } finally {
       setIsChecking(false);
     }
-  }, [playbackId, user?.address, videoTitle]);
+  }, [playbackId, user?.address, smartAccountAddress, videoTitle, requestStreamJwt]);
+
+  useEffect(() => {
+    if (!playbackId) return;
+
+    fetch(`/api/streams/access/${encodeURIComponent(playbackId)}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!data?.requiresMetoken) return;
+        setGatePrefetch({
+          code: "METOKEN_REQUIRED",
+          creatorAddress: data.creatorAddress,
+          symbol: data.meTokenSymbol ?? undefined,
+          required: data.metokenPrice != null ? String(data.metokenPrice) : undefined,
+          streamName: data.streamName,
+        });
+      })
+      .catch((err) => logger.warn("Failed to prefetch stream gate metadata:", err));
+  }, [playbackId]);
+
+  const retryAfterGate = useCallback(async () => {
+    if (status.kind !== "metoken-gated") return;
+    setIsChecking(true);
+    try {
+      const jwtResult = await requestStreamJwt();
+      if (jwtResult.ok && jwtResult.token) {
+        setJwt(jwtResult.token);
+        setStatus({ kind: "live", sources: status.sources });
+      } else if (jwtResult.gate) {
+        setStatus({ kind: "metoken-gated", gate: jwtResult.gate, sources: status.sources });
+      }
+    } finally {
+      setIsChecking(false);
+    }
+  }, [status, requestStreamJwt]);
+
+  const prevWalletKeyRef = useRef("");
+  useEffect(() => {
+    const walletKey = `${user?.address ?? ""}:${smartAccountAddress ?? ""}`;
+    if (status.kind !== "metoken-gated") {
+      prevWalletKeyRef.current = walletKey;
+      return;
+    }
+    if (walletKey === prevWalletKeyRef.current) return;
+    prevWalletKeyRef.current = walletKey;
+    if (!user?.address && !smartAccountAddress) return;
+    void retryAfterGate();
+  }, [user?.address, smartAccountAddress, status.kind, retryAfterGate]);
 
   // Initial fetch
   useEffect(() => {
@@ -252,6 +346,16 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
                   <Skeleton className="h-4 w-32" />
                 </div>
               </div>
+            )}
+
+            {status.kind === "metoken-gated" && (
+              <LiveStreamMeTokenGate
+                gate={status.gate}
+                playbackId={playbackId as string}
+                streamTitle={videoTitle || streamData?.name || status.gate.streamName}
+                thumbnailUrl={streamData?.thumbnail_url}
+                onAccessGranted={() => void retryAfterGate()}
+              />
             )}
 
             {status.kind === "live" && (

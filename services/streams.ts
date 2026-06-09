@@ -19,6 +19,8 @@ export interface Stream {
     story_ip_registration_tx?: string | null;
     story_ip_registered_at?: string | null;
     story_commercial_rev_share?: number | null;
+    requires_metoken?: boolean;
+    metoken_price?: number | null;
     created_at: string;
     updated_at: string;
 }
@@ -77,7 +79,7 @@ export async function getStreamByPlaybackId(playbackId: string) {
 
     const { data, error } = await supabase
         .from("streams")
-        .select("id, creator_id, playback_id, thumbnail_url, name, is_live, last_live_at, allow_clipping, story_ip_id, story_license_terms_id, story_commercial_rev_share, story_ip_registered_at")
+        .select("id, creator_id, playback_id, thumbnail_url, name, is_live, last_live_at, allow_clipping, requires_metoken, metoken_price, story_ip_id, story_license_terms_id, story_commercial_rev_share, story_ip_registered_at")
         .eq("playback_id", playbackId)
         .maybeSingle();
 
@@ -180,6 +182,7 @@ export interface ActiveStream {
     name?: string | null;
     is_live: boolean;
     last_live_at?: string | null;
+    requires_metoken?: boolean;
     created_at: string;
 }
 
@@ -191,7 +194,7 @@ export async function getActiveStreams() {
 
     const { data, error } = await supabase
         .from("streams")
-        .select("id, creator_id, playback_id, thumbnail_url, name, is_live, last_live_at, created_at")
+        .select("id, creator_id, playback_id, thumbnail_url, name, is_live, last_live_at, requires_metoken, created_at")
         .eq("is_live", true)
         .order("last_live_at", { ascending: false });
 
