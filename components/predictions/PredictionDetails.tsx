@@ -20,6 +20,11 @@ import {
   type ParsedPredictionDisplay,
 } from "@/lib/predictions/parse-prediction-display";
 import { enrichPredictionDisplay } from "@/lib/predictions/enrich-prediction-display";
+import {
+  computeStakeStats,
+  formatEth,
+  type StakeStats,
+} from "@/lib/predictions/stake-stats";
 import { BetForm } from "./BetForm";
 import { ClaimWinningsCard } from "./ClaimWinningsCard";
 import { Clock, Share2 } from "lucide-react";
@@ -60,6 +65,7 @@ export function PredictionDetails({ questionId }: PredictionDetailsProps) {
   const [answerTimeline, setAnswerTimeline] = useState<AnswerTimelineEntry[]>(
     []
   );
+  const [stakeStats, setStakeStats] = useState<StakeStats | null>(null);
 
   const publicClient = useMemo(
     () =>
@@ -125,6 +131,12 @@ export function PredictionDetails({ questionId }: PredictionDetailsProps) {
         let subgraphCategory: string | null = null;
         let timeline: AnswerTimelineEntry[] = [];
         let parsedDisplay: ParsedPredictionDisplay | null = null;
+        let subgraphAnswers: Array<{
+          answer: string;
+          bond: string;
+          answerer: string;
+          created: string;
+        }> = [];
 
         if (typeof window !== "undefined") {
           try {
@@ -146,6 +158,7 @@ export function PredictionDetails({ questionId }: PredictionDetailsProps) {
 
             subgraphOutcomes = subgraphData?.question?.outcomes;
             subgraphCategory = subgraphData?.question?.category ?? null;
+            subgraphAnswers = subgraphData?.question?.answers ?? [];
 
             const { parsed: previewParsed } = await enrichPredictionDisplay(
               questionDataRaw.question ?? "",
@@ -154,7 +167,7 @@ export function PredictionDetails({ questionId }: PredictionDetailsProps) {
             );
             parsedDisplay = previewParsed;
 
-            timeline = (subgraphData?.question?.answers ?? [])
+            timeline = subgraphAnswers
               .slice()
               .reverse()
               .slice(0, 8)
@@ -190,8 +203,17 @@ export function PredictionDetails({ questionId }: PredictionDetailsProps) {
           parsed,
         };
 
+        const computedStake = computeStakeStats({
+          bounty: questionDataRaw.bounty ?? 0n,
+          minBond: questionDataRaw.min_bond ?? 0n,
+          leadingBond: questionDataRaw.bond ?? 0n,
+          answers: subgraphAnswers,
+          parsed,
+        });
+
         setQuestion(questionData);
         setAnswerTimeline(timeline);
+        setStakeStats(computedStake);
 
         try {
           const answer = await getFinalAnswer(publicClient, questionId);
@@ -334,6 +356,28 @@ export function PredictionDetails({ questionId }: PredictionDetailsProps) {
         <div className="text-foreground/90">{parsed.description}</div>
       )}
 
+      {stakeStats && stakeStats.totalPrizePool > 0n && (
+        <Card className="p-4 bg-violet-50 dark:bg-violet-950/30 border-violet-200 dark:border-violet-800">
+          <h3 className="text-sm font-medium text-violet-700 dark:text-violet-300 mb-1">
+            At stake
+          </h3>
+          <div className="text-2xl font-bold text-violet-900 dark:text-violet-100">
+            {formatEth(stakeStats.totalPrizePool)} ETH
+          </div>
+          <div className="mt-2 text-xs text-violet-700/80 dark:text-violet-300/80 space-y-0.5">
+            {stakeStats.bounty > 0n && (
+              <div>Bounty: {formatEth(stakeStats.bounty)} ETH</div>
+            )}
+            {stakeStats.totalBonded > 0n && (
+              <div>Total bonded: {formatEth(stakeStats.totalBonded)} ETH</div>
+            )}
+            {stakeStats.minBond > 0n && (
+              <div>Min bond: {formatEth(stakeStats.minBond)} ETH</div>
+            )}
+          </div>
+        </Card>
+      )}
+
       {parsed.outcomes.length > 0 && (
         <Card className="p-4">
           <h3 className="text-sm font-medium text-muted-foreground mb-2">
@@ -343,12 +387,18 @@ export function PredictionDetails({ questionId }: PredictionDetailsProps) {
             {parsed.outcomes.map((o) => {
               const isFinal = isResolved && finalLabel === o;
               const isLeading = !isResolved && leadingLabel === o;
+              const outcomeStake = stakeStats?.perOutcome.find(
+                (entry) => entry.label === o
+              );
               return (
                 <Badge
                   key={o}
                   variant={isFinal || isLeading ? "default" : "outline"}
                 >
                   {o}
+                  {outcomeStake && outcomeStake.totalBond > 0n
+                    ? ` · ${formatEth(outcomeStake.totalBond)} ETH`
+                    : ""}
                   {isFinal ? " · final" : isLeading ? " · leading" : ""}
                 </Badge>
               );
@@ -429,6 +479,10 @@ export function PredictionDetails({ questionId }: PredictionDetailsProps) {
             questionId={questionId}
             questionType={parsed.type as QuestionType}
             outcomes={parsed.outcomes}
+            stakeStats={stakeStats}
+            parsed={parsed}
+            minBond={question.min_bond}
+            leadingBond={question.bond}
           />
         </Card>
       )}
