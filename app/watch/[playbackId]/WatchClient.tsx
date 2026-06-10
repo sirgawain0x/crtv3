@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/breadcrumb";
 import { Slash } from "lucide-react";
 import { logger } from '@/lib/utils/logger';
+import { useWalletAuth } from "@/lib/auth/useWalletAuth";
 
 
 import { MeTokenShareButton } from "@/components/Market/MeTokenShareButton";
@@ -81,6 +82,7 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
 
   const user = useUser();
   const { address: smartAccountAddress } = useModularAccount();
+  const { getAuthHeaders } = useWalletAuth();
   const [status, setStatus] = useState<StreamStatus>({ kind: "loading" });
   const [streamData, setStreamData] = useState<import("@/services/streams").Stream | null>(null);
   const [jwt, setJwt] = useState<string | undefined>(undefined);
@@ -100,14 +102,21 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
       return { ok: false };
     }
 
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (user?.address || smartAccountAddress) {
+      try {
+        Object.assign(headers, await getAuthHeaders());
+      } catch (authErr) {
+        logger.warn("Wallet auth unavailable for stream JWT:", authErr);
+      }
+    }
+
     const jwtRes = await fetch("/api/livepeer/sign-jwt", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        playbackId,
-        userAddress: user?.address,
-        smartAccountAddress,
-      }),
+      headers,
+      body: JSON.stringify({ playbackId }),
     });
 
     if (jwtRes.ok) {
@@ -135,7 +144,7 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
 
     logger.warn("Failed to sign JWT for stream:", errData);
     return { ok: false };
-  }, [playbackId, user?.address, smartAccountAddress]);
+  }, [playbackId, user?.address, smartAccountAddress, getAuthHeaders]);
 
   const fetchPlaybackSources = useCallback(async (isInitial = false) => {
     if (!playbackId) {
