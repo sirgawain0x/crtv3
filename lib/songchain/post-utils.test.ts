@@ -36,12 +36,25 @@ describe('normalizeFeedPosts', () => {
     expect(result[0].id).toBe('post-1');
   });
 
+  it('includes reposted content when original is not on the page', () => {
+    const original = mockPost('post-1', 'Post', {
+      metadata: { content: 'hello', __typename: 'TextOnlyMetadata' },
+    });
+    const repost = mockPost('repost-1', 'Repost', {
+      repostOf: original,
+    });
+
+    const result = normalizeFeedPosts([repost]);
+    expect(result).toHaveLength(1);
+    expect(result[0].id).toBe('post-1');
+  });
+
   it('dedupes by underlying content id', () => {
     const original = mockPost('post-1', 'Post', {
       metadata: { content: 'hello', __typename: 'TextOnlyMetadata' },
     });
-    const duplicate = mockPost('post-1-dup', 'Post', {
-      metadata: { content: 'hello', __typename: 'TextOnlyMetadata' },
+    const duplicate = mockPost('repost-1', 'Repost', {
+      repostOf: original,
     });
 
     const result = normalizeFeedPosts([original, duplicate]);

@@ -21,20 +21,21 @@ export function isRootFeedPost(post: AnyPost): boolean {
   return true;
 }
 
-/** Feed list: exclude repost wrappers and dedupe by underlying post content id. */
+/** Feed list: collapse repost wrappers to underlying content and dedupe by content id. */
 export function normalizeFeedPosts(items: AnyPost[]): AnyPost[] {
   const seenContentIds = new Set<string>();
   const result: AnyPost[] = [];
 
   for (const item of items) {
-    if ((item.__typename as string) === 'Repost') continue;
     if (!isRootFeedPost(item)) continue;
 
     const content = resolvePostContent(item);
-    const contentId = content?.id ?? item.id;
+    if (!content) continue;
+
+    const contentId = content.id;
     if (seenContentIds.has(contentId)) continue;
     seenContentIds.add(contentId);
-    result.push(item);
+    result.push(content);
   }
 
   return result;
@@ -197,16 +198,14 @@ function addCreativeTvUrlVariants(rawUrl: string, out: Set<string>) {
   if (!trimmed) return;
   out.add(trimmed);
 
-  try {
-    const parsed = parseCreativeTVUrl(trimmed);
-    if (parsed.kind === 'watch') {
-      out.add(parsed.fallbackUrl);
-      out.add(`/watch/${parsed.playbackId}`);
-    } else if (parsed.kind === 'discover') {
-      out.add(parsed.fallbackUrl);
-      out.add(`/discover/${parsed.assetId}`);
-    }
-  } catch {
+  const parsed = parseCreativeTVUrl(trimmed);
+  if (parsed.kind === 'watch') {
+    out.add(parsed.fallbackUrl);
+    out.add(`/watch/${parsed.playbackId}`);
+  } else if (parsed.kind === 'discover') {
+    out.add(parsed.fallbackUrl);
+    out.add(`/discover/${parsed.assetId}`);
+  } else {
     const watchMatch = trimmed.match(/\/watch\/([^/?#]+)/i);
     if (watchMatch?.[1]) {
       out.add(`/watch/${watchMatch[1]}`);
@@ -238,9 +237,9 @@ export function stripAttachedMediaBoilerplate(
   if (!hasAttachedVideoOrLivestream(media)) return text;
 
   return text
-    .replace(/\n\nWatch on Creative TV:\s*https?:\/\/[^\s]+/gi, '')
-    .replace(/\n\nhttps?:\/\/[^\s/]+(?:\/[^\s]*)?\/watch\/[^\s]+/gi, '')
-    .replace(/\n\nI'm live on Creative TV —\s*https?:\/\/[^\s]+/gi, '')
+    .replace(/\s*Watch on Creative TV:\s*https?:\/\/[^\s]+/gi, '')
+    .replace(/\s*https?:\/\/[^\s/]+(?:\/[^\s]*)?\/watch\/[^\s]+/gi, '')
+    .replace(/\s*I'm live on Creative TV —\s*https?:\/\/[^\s]+/gi, '')
     .trim();
 }
 
@@ -252,18 +251,14 @@ export function shouldSkipLinkPreview(
   if (skipAllInternal) return true;
   if (embeddedUrls.has(url)) return true;
 
-  try {
-    const parsed = parseCreativeTVUrl(url);
-    if (parsed.kind === 'watch' || parsed.kind === 'discover') {
-      if (embeddedUrls.has(parsed.fallbackUrl)) return true;
-      const path =
-        parsed.kind === 'watch'
-          ? `/watch/${parsed.playbackId}`
-          : `/discover/${parsed.assetId}`;
-      if (embeddedUrls.has(path)) return true;
-    }
-  } catch {
-    // not a creative TV url
+  const parsed = parseCreativeTVUrl(url);
+  if (parsed.kind === 'watch' || parsed.kind === 'discover') {
+    if (embeddedUrls.has(parsed.fallbackUrl)) return true;
+    const path =
+      parsed.kind === 'watch'
+        ? `/watch/${parsed.playbackId}`
+        : `/discover/${parsed.assetId}`;
+    if (embeddedUrls.has(path)) return true;
   }
 
   return false;
