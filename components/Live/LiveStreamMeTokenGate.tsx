@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Lock, Wallet } from "lucide-react";
+import { Lock, PenLine, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuthModal } from "@account-kit/react";
 import { VideoMeTokenBuyDialog } from "@/components/Videos/VideoMeTokenBuyDialog";
@@ -9,6 +9,8 @@ import { VideoMeTokenBuyDialog } from "@/components/Videos/VideoMeTokenBuyDialog
 export interface LiveStreamGateInfo {
   code?: string;
   connectWallet?: boolean;
+  signingRequired?: boolean;
+  message?: string;
   meTokenAddress?: string;
   symbol?: string;
   required?: string;
@@ -39,6 +41,7 @@ export function LiveStreamMeTokenGate({
   const required = gate.required ?? "0";
   const balance = gate.balance ?? "0";
   const needsWallet = Boolean(gate.connectWallet);
+  const needsSignature = Boolean(gate.signingRequired);
 
   return (
     <>
@@ -57,7 +60,10 @@ export function LiveStreamMeTokenGate({
             Hold at least <span className="font-semibold text-white">{required} {symbol}</span> to
             watch this live stream.
           </p>
-          {!needsWallet && (
+          {gate.message && (
+            <p className="text-xs text-amber-200/90">{gate.message}</p>
+          )}
+          {!needsWallet && !needsSignature && (
             <p className="text-xs text-gray-400">
               Your balance: {balance} {symbol}
             </p>
@@ -67,6 +73,11 @@ export function LiveStreamMeTokenGate({
               <Button onClick={() => openAuthModal()}>
                 <Wallet className="h-4 w-4 mr-2" />
                 Connect Wallet
+              </Button>
+            ) : needsSignature ? (
+              <Button onClick={() => onAccessGranted?.()}>
+                <PenLine className="h-4 w-4 mr-2" />
+                Approve Signature
               </Button>
             ) : (
               <Button onClick={() => setBuyDialogOpen(true)}>
