@@ -43,8 +43,11 @@ import { SongchainFollowButton } from "@/components/songchain/SongchainGraphPane
 import { SongchainPostMedia } from "@/components/songchain/SongchainPostMedia";
 import {
   extractPostMedia,
+  getEmbeddedCreativeTVUrls,
+  hasAttachedVideoOrLivestream,
   postText,
   resolvePostContent,
+  stripAttachedMediaBoilerplate,
 } from "@/lib/songchain/post-utils";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils/utils";
@@ -94,6 +97,16 @@ export function SongchainPostCard({
   const [upvoted, setUpvoted] = useState(hasReacted);
   const reactions =
     content != null && "stats" in content ? (content.stats?.upvotes ?? 0) : 0;
+  const reposts =
+    content != null && "stats" in content ? (content.stats?.reposts ?? 0) : 0;
+  const embeddedCreativeTVUrls = useMemo(
+    () => getEmbeddedCreativeTVUrls(media),
+    [media],
+  );
+  const skipAllInternalPreviews = useMemo(
+    () => hasAttachedVideoOrLivestream(media),
+    [media],
+  );
   const isOwner =
     !!lensAccount &&
     !!content &&
@@ -139,7 +152,10 @@ export function SongchainPostCard({
     setDisplayText(null);
   }, [content?.id, post]);
 
-  const resolvedPostText = displayText ?? postText(post);
+  const resolvedPostText = stripAttachedMediaBoilerplate(
+    displayText ?? postText(post),
+    media,
+  );
 
   if (!content) return null;
 
@@ -309,7 +325,12 @@ export function SongchainPostCard({
             <SongchainPostMedia media={media} compact />
           )}
           {resolvedPostText && (
-            <SongchainPostContent text={resolvedPostText} compact={compact} />
+            <SongchainPostContent
+              text={resolvedPostText}
+              compact={compact}
+              embeddedCreativeTVUrls={embeddedCreativeTVUrls}
+              skipAllInternalPreviews={skipAllInternalPreviews}
+            />
           )}
           <div className="mt-auto flex flex-wrap items-center gap-1 pt-2 border-t border-border/40">
             <span className="text-xs text-muted-foreground mr-auto">
@@ -349,12 +370,16 @@ export function SongchainPostCard({
               size="sm"
               disabled={pending === "repost"}
               onClick={handleRepost}
-              aria-label="Repost"
+              aria-label={`Repost${reposts > 0 ? ` (${reposts})` : ""}`}
+              className="gap-1"
             >
               {pending === "repost" ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <Repeat2 className="h-4 w-4" />
+              )}
+              {reposts > 0 && (
+                <span className="text-[10px] tabular-nums">{reposts}</span>
               )}
             </Button>
             <Button

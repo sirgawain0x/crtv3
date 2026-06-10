@@ -1,5 +1,6 @@
 import type { AnyPost } from '@lens-protocol/graphql';
 import { resolveOrbMediaUrl } from '@/lib/sdk/orb/media';
+import { parseCreativeTVUrl } from '@/lib/utils/creative-tv-url';
 
 export function resolvePostContent(post: AnyPost): AnyPost | null {
   if (post.__typename === 'Repost') {
@@ -18,6 +19,25 @@ export function isRootFeedPost(post: AnyPost): boolean {
   if (contentTypename === 'Comment') return false;
   if ('commentOn' in content && content.commentOn) return false;
   return true;
+}
+
+/** Feed list: exclude repost wrappers and dedupe by underlying post content id. */
+export function normalizeFeedPosts(items: AnyPost[]): AnyPost[] {
+  const seenContentIds = new Set<string>();
+  const result: AnyPost[] = [];
+
+  for (const item of items) {
+    if ((item.__typename as string) === 'Repost') continue;
+    if (!isRootFeedPost(item)) continue;
+
+    const content = resolvePostContent(item);
+    const contentId = content?.id ?? item.id;
+    if (seenContentIds.has(contentId)) continue;
+    seenContentIds.add(contentId);
+    result.push(item);
+  }
+
+  return result;
 }
 
 export type PostMediaType = 'image' | 'video' | 'audio' | 'livestream';
@@ -170,6 +190,83 @@ export function extractPostMedia(post: AnyPost): PostMediaItem[] {
   }
 
   return items;
+}
+
+function addCreativeTvUrlVariants(rawUrl: string, out: Set<string>) {
+  const trimmed = rawUrl.trim();
+  if (!trimmed) return;
+  out.add(trimmed);
+
+  try {
+    const parsed = parseCreativeTVUrl(trimmed);
+    if (parsed.kind === 'watch') {
+      out.add(parsed.fallbackUrl);
+      out.add(`/watch/${parsed.playbackId}`);
+    } else if (parsed.kind === 'discover') {
+      out.add(parsed.fallbackUrl);
+      out.add(`/discover/${parsed.assetId}`);
+    }
+  } catch {
+    const watchMatch = trimmed.match(/\/watch\/([^/?#]+)/i);
+    if (watchMatch?.[1]) {
+      out.add(`/watch/${watchMatch[1]}`);
+    }
+    const discoverMatch = trimmed.match(/\/discover\/([^/?#]+)/i);
+    if (discoverMatch?.[1]) {
+      out.add(`/discover/${discoverMatch[1]}`);
+    }
+  }
+}
+
+/** Creative TV URLs already represented by attached media (skip duplicate link previews). */
+export function getEmbeddedCreativeTVUrls(media: PostMediaItem[]): Set<string> {
+  const urls = new Set<string>();
+  for (const item of media) {
+    if (item.url) addCreativeTvUrlVariants(item.url, urls);
+  }
+  return urls;
+}
+
+export function hasAttachedVideoOrLivestream(media: PostMediaItem[]): boolean {
+  return media.some((item) => item.type === 'video' || item.type === 'livestream');
+}
+
+export function stripAttachedMediaBoilerplate(
+  text: string,
+  media: PostMediaItem[],
+): string {
+  if (!hasAttachedVideoOrLivestream(media)) return text;
+
+  return text
+    .replace(/\n\nWatch on Creative TV:\s*https?:\/\/[^\s]+/gi, '')
+    .replace(/\n\nhttps?:\/\/[^\s/]+(?:\/[^\s]*)?\/watch\/[^\s]+/gi, '')
+    .replace(/\n\nI'm live on Creative TV —\s*https?:\/\/[^\s]+/gi, '')
+    .trim();
+}
+
+export function shouldSkipLinkPreview(
+  url: string,
+  embeddedUrls: Set<string>,
+  skipAllInternal: boolean,
+): boolean {
+  if (skipAllInternal) return true;
+  if (embeddedUrls.has(url)) return true;
+
+  try {
+    const parsed = parseCreativeTVUrl(url);
+    if (parsed.kind === 'watch' || parsed.kind === 'discover') {
+      if (embeddedUrls.has(parsed.fallbackUrl)) return true;
+      const path =
+        parsed.kind === 'watch'
+          ? `/watch/${parsed.playbackId}`
+          : `/discover/${parsed.assetId}`;
+      if (embeddedUrls.has(path)) return true;
+    }
+  } catch {
+    // not a creative TV url
+  }
+
+  return false;
 }
 
 export function extractCreatedPostId(value: unknown): string | null {

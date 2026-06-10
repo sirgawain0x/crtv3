@@ -13,7 +13,7 @@ import {
   getLensContractAddressError,
 } from '@/lib/sdk/lens/primitive-id';
 import { checkLensFeedExists } from '@/lib/songchain/lens-feed';
-import { isRootFeedPost } from '@/lib/songchain/post-utils';
+import { normalizeFeedPosts } from '@/lib/songchain/post-utils';
 import { waitForPostIndexed } from '@/lib/songchain/wait-for-post-index';
 import type { PendingFeedPost, SongchainCreatedPost } from '@/lib/songchain/feed-types';
 
@@ -21,16 +21,6 @@ type UseSongchainFeedOptions = {
   feedId: string | null;
   enabled?: boolean;
 };
-
-function filterRootPosts(items: AnyPost[]): AnyPost[] {
-  const seen = new Set<string>();
-  return items.filter((item) => {
-    if (!isRootFeedPost(item)) return false;
-    if (seen.has(item.id)) return false;
-    seen.add(item.id);
-    return true;
-  });
-}
 
 export function useSongchainFeed({ feedId, enabled = true }: UseSongchainFeedOptions) {
   const [posts, setPosts] = useState<AnyPost[]>([]);
@@ -98,8 +88,8 @@ export function useSongchainFeed({ feedId, enabled = true }: UseSongchainFeedOpt
         setPosts((prev) => {
           const combined =
             mode === 'append'
-              ? filterRootPosts([...prev, ...page.items])
-              : filterRootPosts([...page.items]);
+              ? normalizeFeedPosts([...prev, ...page.items])
+              : normalizeFeedPosts([...page.items]);
           return combined;
         });
       } catch (err) {
@@ -162,7 +152,7 @@ export function useSongchainFeed({ feedId, enabled = true }: UseSongchainFeedOpt
           if (controller.signal.aborted) return;
 
           if (indexed) {
-            setPosts((prev) => filterRootPosts([indexed, ...prev]));
+            setPosts((prev) => normalizeFeedPosts([indexed, ...prev]));
             setPendingPosts((prev) => prev.filter((p) => p.postId !== created.postId));
           } else {
             setPendingPosts((prev) =>

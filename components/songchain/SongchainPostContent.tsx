@@ -6,18 +6,23 @@ import { ExternalLink } from "lucide-react";
 import { linkifyPostText } from "@/lib/utils/linkify-post-text";
 import { CreativeTVLinkPreview } from "@/components/songchain/CreativeTVLinkPreview";
 import { ExternalLinkPreview } from "@/components/songchain/ExternalLinkPreview";
+import { shouldSkipLinkPreview } from "@/lib/songchain/post-utils";
 import { cn } from "@/lib/utils/utils";
 
 type SongchainPostContentProps = {
   text: string;
   compact?: boolean;
   className?: string;
+  embeddedCreativeTVUrls?: Set<string>;
+  skipAllInternalPreviews?: boolean;
 };
 
 export function SongchainPostContent({
   text,
   compact = false,
   className,
+  embeddedCreativeTVUrls,
+  skipAllInternalPreviews = false,
 }: SongchainPostContentProps) {
   const segments = useMemo(() => linkifyPostText(text), [text]);
 
@@ -27,6 +32,19 @@ export function SongchainPostContent({
       .map((segment) => segment.value);
     return Array.from(new Set(urls));
   }, [segments]);
+
+  const internalUrlsForPreview = useMemo(() => {
+    if (compact) return [];
+    const embedded = embeddedCreativeTVUrls ?? new Set<string>();
+    return uniqueInternalUrls.filter(
+      (url) => !shouldSkipLinkPreview(url, embedded, skipAllInternalPreviews),
+    );
+  }, [
+    compact,
+    uniqueInternalUrls,
+    embeddedCreativeTVUrls,
+    skipAllInternalPreviews,
+  ]);
 
   const uniqueExternalUrls = useMemo(() => {
     const urls = segments
@@ -77,10 +95,9 @@ export function SongchainPostContent({
         })}
       </p>
 
-      {!compact &&
-        uniqueInternalUrls.map((url) => (
-          <CreativeTVLinkPreview key={`preview-internal-${url}`} url={url} />
-        ))}
+      {internalUrlsForPreview.map((url) => (
+        <CreativeTVLinkPreview key={`preview-internal-${url}`} url={url} />
+      ))}
 
       {!compact &&
         uniqueExternalUrls.map((url) => (
