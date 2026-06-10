@@ -44,6 +44,13 @@ export async function POST(req: NextRequest) {
       stream &&
       isMeTokenGateActive(stream.requires_metoken, stream.metoken_price)
     ) {
+      if (!stream.creator_id) {
+        return NextResponse.json(
+          { message: "Stream creator not found" },
+          { status: 400 }
+        );
+      }
+
       if (!userAddress && !smartAccountAddress) {
         return NextResponse.json(
           {
@@ -59,7 +66,7 @@ export async function POST(req: NextRequest) {
 
       const access = await checkMeTokenAccess({
         viewerAddresses: [userAddress, smartAccountAddress],
-        creatorAddress: stream.creator_id!,
+        creatorAddress: stream.creator_id,
         requiredAmount: stream.metoken_price!,
       });
 

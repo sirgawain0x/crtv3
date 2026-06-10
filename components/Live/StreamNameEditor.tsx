@@ -29,6 +29,8 @@ export function StreamNameEditor({
   }, [currentName]);
 
   const saveName = async () => {
+    if (isSaving) return;
+
     const trimmedName = name.trim();
     if (!trimmedName) {
       toast.error("Stream title cannot be empty");

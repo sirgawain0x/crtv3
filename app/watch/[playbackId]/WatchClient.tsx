@@ -86,6 +86,10 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
   const [jwt, setJwt] = useState<string | undefined>(undefined);
   const [isChecking, setIsChecking] = useState(false);
   const [gatePrefetch, setGatePrefetch] = useState<LiveStreamGateInfo | null>(null);
+  const streamDataRef = useRef(streamData);
+  streamDataRef.current = streamData;
+  const gatePrefetchRef = useRef(gatePrefetch);
+  gatePrefetchRef.current = gatePrefetch;
 
   const requestStreamJwt = useCallback(async (): Promise<{
     ok: boolean;
@@ -123,14 +127,15 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
           required: errData.required,
           balance: errData.balance,
           creatorAddress: errData.creatorAddress,
-          streamName: streamData?.name ?? gatePrefetch?.streamName ?? null,
+          streamName:
+            streamDataRef.current?.name ?? gatePrefetchRef.current?.streamName ?? null,
         },
       };
     }
 
     logger.warn("Failed to sign JWT for stream:", errData);
     return { ok: false };
-  }, [playbackId, user?.address, smartAccountAddress, streamData?.name, gatePrefetch?.streamName]);
+  }, [playbackId, user?.address, smartAccountAddress]);
 
   const fetchPlaybackSources = useCallback(async (isInitial = false) => {
     if (!playbackId) {
