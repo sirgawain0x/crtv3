@@ -28,6 +28,8 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { LivestreamThumbnail } from "@/components/Live/LivestreamThumbnail";
 import { StreamThumbnailUploader } from "@/components/Live/StreamThumbnailUploader";
+import { StreamNameEditor } from "@/components/Live/StreamNameEditor";
+import { StreamMeTokenGateEditor } from "@/components/Live/StreamMeTokenGateEditor";
 import { StreamIPRegistration } from "@/components/Live/StreamIPRegistration";
 import { CreatorClipsList } from "@/components/Live/CreatorClipsList";
 import { getThumbnailUrl } from "@/services/livepeer-thumbnails";
@@ -61,6 +63,8 @@ export default function LivePage() {
   const [allowClipping, setAllowClipping] = useState(true);
   const [isUpdatingClipPref, setIsUpdatingClipPref] = useState(false);
   const [streamName, setStreamName] = useState<string | null>(null);
+  const [requiresMetoken, setRequiresMetoken] = useState(false);
+  const [metokenPrice, setMetokenPrice] = useState<number | null>(null);
   const [storyIpId, setStoryIpId] = useState<string | null>(null);
   const [storyLicenseTermsId, setStoryLicenseTermsId] = useState<string | null>(null);
   const [storyRevShare, setStoryRevShare] = useState<number | null>(null);
@@ -94,6 +98,8 @@ export default function LivePage() {
           setThumbnailUrl(stream.thumbnail_url || null);
           setAllowClipping(stream.allow_clipping ?? true);
           setStreamName(stream.name ?? null);
+          setRequiresMetoken(stream.requires_metoken ?? false);
+          setMetokenPrice(stream.metoken_price ?? null);
           setStoryIpId(stream.story_ip_id ?? null);
           setStoryLicenseTermsId(stream.story_license_terms_id ?? null);
           setStoryRevShare(stream.story_commercial_rev_share ?? null);
@@ -170,6 +176,18 @@ export default function LivePage() {
 
   function handleThumbnailUpdated(url: string) {
     setThumbnailUrl(url);
+  }
+
+  function handleNameUpdated(name: string) {
+    setStreamName(name);
+  }
+
+  function handleGateUpdated(config: {
+    requiresMetoken: boolean;
+    metokenPrice: number | null;
+  }) {
+    setRequiresMetoken(config.requiresMetoken);
+    setMetokenPrice(config.metokenPrice);
   }
 
   async function handleToggleClipping(next: boolean) {
@@ -297,15 +315,8 @@ export default function LivePage() {
   return (
     <ProfilePageGuard>
       <MembershipGuard>
-        <div className="min-h-screen p-6">
-          <div className="mb-8 rounded-lg bg-white dark:bg-gray-800/60 p-8 shadow-md">
-            <h1 className="mb-6 flex items-center justify-center gap-2 text-center text-4xl font-bold text-red-600 dark:text-red-400">
-              <VideoIcon className="h-10 w-10" />
-              <span>LIVE</span>
-            </h1>
-            <p className="mb-8 text-center text-gray-600 dark:text-gray-400">THE STAGE IS YOURS</p>
-          </div>
-          <div className="my-5 p-4">
+        <div className="min-h-screen p-4 md:p-6">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem>
@@ -328,33 +339,27 @@ export default function LivePage() {
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
+            <h1 className="flex items-center gap-2 text-lg font-bold text-red-600 dark:text-red-400">
+              <VideoIcon className="h-5 w-5" />
+              <span>Live Studio</span>
+            </h1>
           </div>
           <div>
-            {thumbnailLoading ? (
-              <div className="flex items-center justify-center h-40 text-gray-400">
-                Loading thumbnail...
-              </div>
-            ) : thumbnailError ? (
-              <div className="flex items-center justify-center h-40 text-red-400">
-                {thumbnailError}
-              </div>
-            ) : thumbnailUrl ? (
-              <LivestreamThumbnail thumbnailUrl={thumbnailUrl} />
-            ) : null}
-
-            {streamKey && streamId && user?.address && (
-              <div className="my-6 flex justify-center">
-                <StreamThumbnailUploader
-                  creatorAddress={user.address}
-                  playbackId={playbackId || streamId} // Fallback to streamId if playbackId missing, though unlikely
-                  currentThumbnailUrl={thumbnailUrl}
-                  onThumbnailUpdated={handleThumbnailUpdated}
-                />
-              </div>
-            )}
-
             {!streamKey ? (
               <div className="flex flex-col items-center justify-center my-8">
+                {thumbnailLoading ? (
+                  <div className="flex items-center justify-center h-32 text-gray-400 mb-6">
+                    Loading thumbnail...
+                  </div>
+                ) : thumbnailError ? (
+                  <div className="flex items-center justify-center h-32 text-red-400 mb-6">
+                    {thumbnailError}
+                  </div>
+                ) : thumbnailUrl ? (
+                  <div className="mb-6 w-full max-w-md">
+                    <LivestreamThumbnail thumbnailUrl={thumbnailUrl} />
+                  </div>
+                ) : null}
                 <button
                   onClick={handleCreateStream}
                   disabled={isCreatingStream}
@@ -367,7 +372,7 @@ export default function LivePage() {
                 )}
               </div>
             ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
                 <div className="lg:col-span-2 relative">
                   <Broadcast streamKey={streamKey} streamId={streamId} creatorAddress={user.address} />
                   {user?.address && (
@@ -413,6 +418,7 @@ export default function LivePage() {
                       streamId={chatStreamId}
                       sessionId={chatSessionId}
                       creatorAddress={user.address}
+                      className="h-[min(70vh,520px)]"
                     />
                   ) : (
                     <div className="border rounded-lg p-4 text-sm text-muted-foreground">
@@ -420,6 +426,28 @@ export default function LivePage() {
                     </div>
                   )}
                 </div>
+              </div>
+            )}
+
+            {streamKey && streamId && user?.address && (
+              <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-5xl mx-auto">
+                <StreamThumbnailUploader
+                  creatorAddress={user.address}
+                  playbackId={playbackId || streamId}
+                  currentThumbnailUrl={thumbnailUrl}
+                  onThumbnailUpdated={handleThumbnailUpdated}
+                />
+                <StreamNameEditor
+                  creatorAddress={user.address}
+                  currentName={streamName}
+                  onNameUpdated={handleNameUpdated}
+                />
+                <StreamMeTokenGateEditor
+                  creatorAddress={user.address}
+                  requiresMetoken={requiresMetoken}
+                  metokenPrice={metokenPrice}
+                  onGateUpdated={handleGateUpdated}
+                />
               </div>
             )}
             {streamId && user?.address && (

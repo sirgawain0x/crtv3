@@ -34,6 +34,8 @@ interface VideoMeTokenBuyDialogProps {
   onOpenChange: (open: boolean) => void;
   playbackId: string;
   videoTitle?: string;
+  /** When set (e.g. live streams), fetch creator MeToken directly instead of VOD asset lookup */
+  creatorAddress?: string;
 }
 
 interface MeToken {
@@ -49,6 +51,7 @@ export function VideoMeTokenBuyDialog({
   onOpenChange,
   playbackId,
   videoTitle,
+  creatorAddress,
 }: VideoMeTokenBuyDialogProps) {
   const [meToken, setMeToken] = useState<MeToken | null>(null);
   const [videoAsset, setVideoAsset] = useState<{ id?: number; playback_id?: string; attributes?: any; creator_metoken_id?: string } | null>(null);
@@ -100,44 +103,45 @@ export function VideoMeTokenBuyDialog({
       setIsLoadingMeToken(true);
       setError(null);
       try {
-        // Fetch video asset to get token information
-        const fetchedVideoAsset = await fetchVideoAssetByPlaybackId(playbackId);
-        setVideoAsset(fetchedVideoAsset);
-
-        if (!fetchedVideoAsset) {
-          setError('Video asset not found.');
-          setIsLoadingMeToken(false);
-          return;
-        }
-
-        // Prioritize Content Coin over Creator MeToken
-        const contentCoinId = fetchedVideoAsset?.attributes?.content_coin_id;
-        const creatorMeTokenId = fetchedVideoAsset?.creator_metoken_id;
-
         let fetchUrl: string | null = null;
 
-        // First, try to fetch Content Coin (video-specific token)
-        if (contentCoinId) {
-          if (contentCoinId.startsWith('0x')) {
-            // It's an address - use the address endpoint
-            fetchUrl = `/api/metokens/${contentCoinId}`;
-          } else {
-            // It's an ID - use the by-id endpoint
-            fetchUrl = `/api/metokens/by-id/${contentCoinId}`;
-          }
-        } else if (creatorMeTokenId) {
-          // Fallback to creator's MeToken if no Content Coin exists
-          fetchUrl = `/api/metokens/by-id/${creatorMeTokenId}`;
-        }
+        if (creatorAddress) {
+          fetchUrl = `/api/metokens?owner=${encodeURIComponent(creatorAddress)}`;
+        } else {
+          // Fetch video asset to get token information
+          const fetchedVideoAsset = await fetchVideoAssetByPlaybackId(playbackId);
+          setVideoAsset(fetchedVideoAsset);
 
-        if (!fetchUrl) {
-          setError('This video does not have an associated MeToken or Content Coin.');
-          setIsLoadingMeToken(false);
-          return;
+          if (!fetchedVideoAsset) {
+            setError('Video asset not found.');
+            setIsLoadingMeToken(false);
+            return;
+          }
+
+          // Prioritize Content Coin over Creator MeToken
+          const contentCoinId = fetchedVideoAsset?.attributes?.content_coin_id;
+          const creatorMeTokenId = fetchedVideoAsset?.creator_metoken_id;
+
+          // First, try to fetch Content Coin (video-specific token)
+          if (contentCoinId) {
+            if (contentCoinId.startsWith('0x')) {
+              fetchUrl = `/api/metokens/${contentCoinId}`;
+            } else {
+              fetchUrl = `/api/metokens/by-id/${contentCoinId}`;
+            }
+          } else if (creatorMeTokenId) {
+            fetchUrl = `/api/metokens/by-id/${creatorMeTokenId}`;
+          }
+
+          if (!fetchUrl) {
+            setError('This video does not have an associated MeToken or Content Coin.');
+            setIsLoadingMeToken(false);
+            return;
+          }
         }
 
         // Fetch MeToken/Content Coin
-        const response = await fetch(fetchUrl);
+        const response = await fetch(fetchUrl!);
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}));
           throw new Error(errorData.error || 'Failed to fetch MeToken');
@@ -173,7 +177,7 @@ export function VideoMeTokenBuyDialog({
     };
 
     fetchMeToken();
-  }, [open, playbackId]);
+  }, [open, playbackId, creatorAddress]);
 
   // Vault Address fetch effect removed
 
