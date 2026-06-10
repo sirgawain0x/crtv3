@@ -1,15 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { checkBotId } from 'botid/server';
-import { IPFSService } from '@/lib/sdk/ipfs/service';
+import { ipfsService } from '@/lib/sdk/ipfs/service';
 import { serverLogger } from '@/lib/utils/logger';
 import { rateLimiters } from '@/lib/middleware/rateLimit';
-
-const ipfsService = new IPFSService({
-  filecoinFirstApiKey: process.env.NEXT_PUBLIC_FILECOIN_FIRST_API_KEY,
-  enableFilecoinArchival:
-    process.env.NEXT_PUBLIC_ENABLE_FILECOIN_ARCHIVAL === 'true',
-  gateway: process.env.NEXT_PUBLIC_IPFS_GATEWAY,
-});
 
 /**
  * Converts a data URL to a File object (server-side)

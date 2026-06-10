@@ -24,6 +24,7 @@ export interface IPFSConfig {
 
 let fallbackHeliaInstance: Helia | null = null;
 let fallbackHeliaFs: UnixFS | null = null;
+let fallbackHeliaPromise: Promise<void> | null = null;
 
 function toUploadableFile(file: File | Blob, fallbackName = 'upload'): File {
   if (file instanceof File) return file;
@@ -75,8 +76,16 @@ export class IPFSService {
       return;
     }
 
-    try {
-      if (!fallbackHeliaInstance) {
+    if (fallbackHeliaPromise) {
+      await fallbackHeliaPromise;
+      this.helia = fallbackHeliaInstance!;
+      this.fs = fallbackHeliaFs!;
+      this.initialized = true;
+      return;
+    }
+
+    fallbackHeliaPromise = (async () => {
+      try {
         serverLogger.debug('[IPFSService] Initializing fallback Helia (dynamic import)...');
         const [{ createNode }, { unixfs }] = await Promise.all([
           import('./helia-config'),
@@ -84,15 +93,18 @@ export class IPFSService {
         ]);
         fallbackHeliaInstance = await createNode();
         fallbackHeliaFs = unixfs(fallbackHeliaInstance);
+      } catch (error) {
+        fallbackHeliaPromise = null;
+        serverLogger.error('[IPFSService] Fallback Helia failed:', error);
+        throw error;
       }
-      this.helia = fallbackHeliaInstance;
-      this.fs = fallbackHeliaFs!;
-      this.initialized = true;
-      serverLogger.debug('[IPFSService] Fallback Helia ready');
-    } catch (error) {
-      serverLogger.error('[IPFSService] Fallback Helia failed:', error);
-      throw error;
-    }
+    })();
+
+    await fallbackHeliaPromise;
+    this.helia = fallbackHeliaInstance!;
+    this.fs = fallbackHeliaFs!;
+    this.initialized = true;
+    serverLogger.debug('[IPFSService] Fallback Helia ready');
   }
 
   /**
