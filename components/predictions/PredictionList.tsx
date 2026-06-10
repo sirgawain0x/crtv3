@@ -36,6 +36,10 @@ import {
 } from "@/components/ui/select";
 import { useWalletStatus } from "@/lib/hooks/accountkit/useWalletStatus";
 import type { UserClaimStatus } from "@/lib/predictions/claim-status";
+import {
+  formatEth,
+  type ListStakeSummary,
+} from "@/lib/predictions/stake-stats";
 
 const APP_ARBITRATOR = "0x0000000000000000000000000000000000000000";
 
@@ -121,7 +125,11 @@ export function PredictionList() {
   const [claimStatusMap, setClaimStatusMap] = useState<
     Record<string, UserClaimStatus>
   >({});
+  const [stakeStatsMap, setStakeStatsMap] = useState<
+    Record<string, ListStakeSummary>
+  >({});
   const fetchedClaimStatusRef = useRef<Set<string>>(new Set());
+  const fetchedStakeStatsRef = useRef<Set<string>>(new Set());
 
   const { isConnected, walletAddress, smartAccountAddress } = useWalletStatus();
 
@@ -129,6 +137,11 @@ export function PredictionList() {
     fetchedClaimStatusRef.current.clear();
     setClaimStatusMap({});
   }, [walletAddress, smartAccountAddress]);
+
+  useEffect(() => {
+    fetchedStakeStatsRef.current.clear();
+    setStakeStatsMap({});
+  }, [sourceFilter, categoryFilter, searchQuery, currentPage]);
 
   useEffect(() => {
     async function fetchQuestions() {
@@ -370,6 +383,40 @@ export function PredictionList() {
     };
   }, [isConnected, walletAddress, smartAccountAddress, questions]);
 
+  useEffect(() => {
+    const pendingIds = questions
+      .map((q) => q.id)
+      .filter((id) => !fetchedStakeStatsRef.current.has(id));
+
+    if (pendingIds.length === 0) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/predictions/stake-stats?ids=${encodeURIComponent(pendingIds.join(","))}`
+        );
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          stats?: Record<string, ListStakeSummary>;
+        };
+        if (cancelled) return;
+        for (const id of pendingIds) {
+          fetchedStakeStatsRef.current.add(id);
+        }
+        if (data.stats) {
+          setStakeStatsMap((prev) => ({ ...prev, ...data.stats }));
+        }
+      } catch {
+        // Non-fatal
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [questions]);
+
   const localSuggest = useCallback(
     (query: string) => {
       const sq = query.trim().toLowerCase();
@@ -607,9 +654,22 @@ export function PredictionList() {
                           : "No timeout"}
                       </span>
                     </div>
-                    {question.bounty && Number(question.bounty) > 0 && (
-                      <div>Bounty: {(Number(question.bounty) / 1e18).toFixed(4)} ETH</div>
-                    )}
+                    {(() => {
+                      const stakeSummary =
+                        stakeStatsMap[question.id.toLowerCase()];
+                      return stakeSummary &&
+                        BigInt(stakeSummary.totalPrizePool) > 0n ? (
+                        <div>
+                          Pool:{" "}
+                          {formatEth(BigInt(stakeSummary.totalPrizePool))} ETH
+                        </div>
+                      ) : question.bounty && Number(question.bounty) > 0 ? (
+                        <div>
+                          Bounty: {(Number(question.bounty) / 1e18).toFixed(4)}{" "}
+                          ETH
+                        </div>
+                      ) : null;
+                    })()}
                   </div>
                 </div>
                 <div className="flex flex-col gap-2 w-full md:w-auto mt-2 md:mt-0">

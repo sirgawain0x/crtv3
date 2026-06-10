@@ -134,6 +134,23 @@ Proxies Precog market fetch with in-memory cache (5 min TTL). Used when question
 
 Autocomplete over `prediction_market_creations` via `autocomplete_prediction_creations` RPC. Minimum query length: 2 characters.
 
+### `GET /api/predictions/stake-stats?ids=0x…,0x…`
+
+Batch stake summary for list cards (max 25 IDs). Returns per-question `totalPrizePool`, `totalBonded`, `leadingBond`, and `answerCount` from subgraph answers. Cached 60s at the edge.
+
+## Stake display
+
+| Metric | Meaning |
+|--------|---------|
+| **Prize pool** | Bounty + sum of all bonded answers (ETH locked until resolution) |
+| **Leading bond** | Bond backing the current best answer; minimum to overtake with a different answer |
+| **Min bond** | Floor set when the question was created |
+| **Per-outcome stake** | Total ETH bonded on each outcome label |
+
+Detail page (`/predict/[questionId]`) shows a full breakdown and per-outcome totals. List cards show **Pool: X ETH** when bonds exist; otherwise bounty only. `BetForm` shows prize pool context and an approximate earnings hint when the user selects an outcome and bond amount.
+
+Computation lives in `lib/predictions/stake-stats.ts`.
+
 ## Supabase: `prediction_market_creations`
 
 | Column | Purpose |
