@@ -22,7 +22,7 @@ export function isRootFeedPost(post: AnyPost): boolean {
 }
 
 /** Feed list: collapse repost wrappers to underlying content and dedupe by content id. */
-export function normalizeFeedPosts(items: AnyPost[]): AnyPost[] {
+export function normalizeFeedPosts(items: readonly AnyPost[]): AnyPost[] {
   const seenContentIds = new Set<string>();
   const result: AnyPost[] = [];
 
