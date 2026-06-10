@@ -57,6 +57,7 @@ interface BetFormProps {
   parsed?: ParsedPredictionDisplay;
   minBond?: bigint;
   leadingBond?: bigint;
+  leadingAnswerHex?: string;
 }
 
 export function BetForm({
@@ -67,6 +68,7 @@ export function BetForm({
   parsed,
   minBond = 0n,
   leadingBond = 0n,
+  leadingAnswerHex,
 }: BetFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -187,6 +189,20 @@ export function BetForm({
       if (bond < requiredMinBond) {
         setError(
           `Bond must be at least ${formatEth(requiredMinBond)} ETH to participate.`
+        );
+        setIsSubmitting(false);
+        return;
+      }
+
+      const zeroAnswer =
+        "0x0000000000000000000000000000000000000000000000000000000000000000";
+      if (
+        leadingAnswerHex &&
+        leadingAnswerHex.toLowerCase() !== zeroAnswer &&
+        answerBytes32.toLowerCase() === leadingAnswerHex.toLowerCase()
+      ) {
+        setError(
+          "You cannot submit the same answer as the current leading answer."
         );
         setIsSubmitting(false);
         return;

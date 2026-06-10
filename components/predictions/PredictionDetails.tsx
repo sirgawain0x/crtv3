@@ -483,6 +483,7 @@ export function PredictionDetails({ questionId }: PredictionDetailsProps) {
             parsed={parsed}
             minBond={question.min_bond}
             leadingBond={question.bond}
+            leadingAnswerHex={question.best_answer}
           />
         </Card>
       )}

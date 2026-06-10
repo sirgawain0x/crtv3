@@ -152,6 +152,12 @@ export function resolveSelectedAnswerHex(
   return null;
 }
 
+/**
+ * Estimates potential earnings if the selected outcome wins.
+ * Note: Reality.eth uses a sequential bonding model where incorrect bonds are distributed
+ * to the next correct answerer, rather than a proportional pool-based distribution.
+ * This pool-based calculation serves as a simplified heuristic for estimation.
+ */
 export function estimateEarningsIfWin(params: {
   stats: StakeStats;
   selectedAnswerHex: string;
@@ -176,8 +182,8 @@ export function estimateEarningsIfWin(params: {
   return params.userBond + share;
 }
 
-/** Minimum bond to participate: max(min_bond, leadingBond + 1 wei when leading exists). */
+/** Minimum bond to participate: max(min_bond, 2× leading bond when a leading answer exists). */
 export function minBondRequired(minBond: bigint, leadingBond: bigint): bigint {
-  const beatLeading = leadingBond > 0n ? leadingBond + 1n : 0n;
+  const beatLeading = leadingBond > 0n ? leadingBond * 2n : 0n;
   return minBond > beatLeading ? minBond : beatLeading;
 }

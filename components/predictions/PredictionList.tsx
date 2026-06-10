@@ -654,20 +654,22 @@ export function PredictionList() {
                           : "No timeout"}
                       </span>
                     </div>
-                    {stakeStatsMap[question.id] &&
-                    BigInt(stakeStatsMap[question.id].totalPrizePool) > 0n ? (
-                      <div>
-                        Pool:{" "}
-                        {formatEth(
-                          BigInt(stakeStatsMap[question.id].totalPrizePool)
-                        )}{" "}
-                        ETH
-                      </div>
-                    ) : question.bounty && Number(question.bounty) > 0 ? (
-                      <div>
-                        Bounty: {(Number(question.bounty) / 1e18).toFixed(4)} ETH
-                      </div>
-                    ) : null}
+                    {(() => {
+                      const stakeSummary =
+                        stakeStatsMap[question.id.toLowerCase()];
+                      return stakeSummary &&
+                        BigInt(stakeSummary.totalPrizePool) > 0n ? (
+                        <div>
+                          Pool:{" "}
+                          {formatEth(BigInt(stakeSummary.totalPrizePool))} ETH
+                        </div>
+                      ) : question.bounty && Number(question.bounty) > 0 ? (
+                        <div>
+                          Bounty: {(Number(question.bounty) / 1e18).toFixed(4)}{" "}
+                          ETH
+                        </div>
+                      ) : null;
+                    })()}
                   </div>
                 </div>
                 <div className="flex flex-col gap-2 w-full md:w-auto mt-2 md:mt-0">
