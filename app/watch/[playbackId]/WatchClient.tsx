@@ -32,6 +32,8 @@ import {
 import { Slash } from "lucide-react";
 import { logger } from '@/lib/utils/logger';
 import { useWalletAuth } from "@/lib/auth/useWalletAuth";
+import { formatWalletAuthError } from "@/lib/auth/format-wallet-auth-error";
+import { isMeTokenGateActive } from "@/lib/utils/metoken-access";
 
 
 import { MeTokenShareButton } from "@/components/Market/MeTokenShareButton";
@@ -82,7 +84,7 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
 
   const user = useUser();
   const { address: smartAccountAddress } = useModularAccount();
-  const { getAuthHeaders } = useWalletAuth();
+  const { getAuthHeaders, address: authAddress } = useWalletAuth();
   const [status, setStatus] = useState<StreamStatus>({ kind: "loading" });
   const [streamData, setStreamData] = useState<import("@/services/streams").Stream | null>(null);
   const [jwt, setJwt] = useState<string | undefined>(undefined);
@@ -93,6 +95,27 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
   const gatePrefetchRef = useRef(gatePrefetch);
   gatePrefetchRef.current = gatePrefetch;
 
+  const isGateLikelyActive = useCallback(() => {
+    const stream = streamDataRef.current;
+    if (
+      stream &&
+      isMeTokenGateActive(stream.requires_metoken, stream.metoken_price)
+    ) {
+      return true;
+    }
+    return Boolean(gatePrefetchRef.current?.code === "METOKEN_REQUIRED");
+  }, []);
+
+  const buildCompanionAddress = useCallback((): string | undefined => {
+    if (!authAddress) return undefined;
+    const verified = authAddress.toLowerCase();
+    const eoa = user?.address?.toLowerCase();
+    const sca = smartAccountAddress?.toLowerCase();
+    if (eoa && eoa !== verified) return eoa;
+    if (sca && sca !== verified) return sca;
+    return undefined;
+  }, [authAddress, user?.address, smartAccountAddress]);
+
   const requestStreamJwt = useCallback(async (): Promise<{
     ok: boolean;
     token?: string;
@@ -102,21 +125,66 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
       return { ok: false };
     }
 
+    const gateActive = isGateLikelyActive();
+    const streamName =
+      streamDataRef.current?.name ?? gatePrefetchRef.current?.streamName ?? null;
+    const gateBase: LiveStreamGateInfo = {
+      code: "METOKEN_REQUIRED",
+      streamName,
+      creatorAddress:
+        streamDataRef.current?.creator_id ??
+        gatePrefetchRef.current?.creatorAddress,
+      symbol: gatePrefetchRef.current?.symbol,
+      required:
+        streamDataRef.current?.metoken_price != null
+          ? String(streamDataRef.current.metoken_price)
+          : gatePrefetchRef.current?.required,
+    };
+
+    if (gateActive && !user?.address && !smartAccountAddress) {
+      return {
+        ok: false,
+        gate: {
+          ...gateBase,
+          connectWallet: true,
+          message: "Connect your wallet to verify MeToken balance",
+        },
+      };
+    }
+
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     };
-    if (user?.address || smartAccountAddress) {
+    const body: { playbackId: string; companionAddress?: string } = {
+      playbackId,
+    };
+
+    if (gateActive && (user?.address || smartAccountAddress)) {
       try {
         Object.assign(headers, await getAuthHeaders());
+        const companion = buildCompanionAddress();
+        if (companion) {
+          body.companionAddress = companion;
+        }
       } catch (authErr) {
         logger.warn("Wallet auth unavailable for stream JWT:", authErr);
+        const walletConnected = Boolean(user?.address || smartAccountAddress);
+        return {
+          ok: false,
+          gate: {
+            ...gateBase,
+            connectWallet: !walletConnected,
+            signingRequired: walletConnected,
+            message: formatWalletAuthError(authErr),
+          },
+        };
       }
     }
 
     const jwtRes = await fetch("/api/livepeer/sign-jwt", {
       method: "POST",
       headers,
-      body: JSON.stringify({ playbackId }),
+      body: JSON.stringify(body),
     });
 
     if (jwtRes.ok) {
@@ -131,20 +199,29 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
         gate: {
           code: errData.code,
           connectWallet: errData.connectWallet,
+          signingRequired: errData.signingRequired,
+          message: errData.message,
           meTokenAddress: errData.meTokenAddress,
           symbol: errData.symbol,
           required: errData.required,
           balance: errData.balance,
           creatorAddress: errData.creatorAddress,
-          streamName:
-            streamDataRef.current?.name ?? gatePrefetchRef.current?.streamName ?? null,
+          streamName,
         },
       };
     }
 
     logger.warn("Failed to sign JWT for stream:", errData);
     return { ok: false };
-  }, [playbackId, user?.address, smartAccountAddress, getAuthHeaders]);
+  }, [
+    playbackId,
+    user?.address,
+    smartAccountAddress,
+    authAddress,
+    getAuthHeaders,
+    isGateLikelyActive,
+    buildCompanionAddress,
+  ]);
 
   const fetchPlaybackSources = useCallback(async (isInitial = false) => {
     if (!playbackId) {

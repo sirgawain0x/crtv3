@@ -1,3 +1,4 @@
+import { formatWalletAuthError } from '@/lib/auth/format-wallet-auth-error';
 import {
   isIncompleteOrbSessionError,
   isRevokedOrbSessionError,
@@ -44,11 +45,16 @@ export function formatOrbAuthError(error: unknown): string {
   if (isIncompleteOrbSessionError(error)) {
     return 'Sign in again with Orb to post and interact on Lens.';
   }
-  if (lower.includes('wallet not connected') || lower.includes('sign in with your wallet')) {
-    return 'Connect your wallet with Get Started before linking your Lens identity.';
-  }
-  if (lower.includes('user rejected') || lower.includes('denied')) {
-    return 'Wallet signature was cancelled. Approve the signature to link your profile.';
+  if (
+    lower.includes('wallet not connected') ||
+    lower.includes('sign in with your wallet') ||
+    lower.includes('user rejected') ||
+    lower.includes('denied')
+  ) {
+    return formatWalletAuthError(error).replace(
+      'verify access',
+      'link your profile',
+    );
   }
   if (
     lower.includes('lens_account_id') &&
@@ -74,11 +80,16 @@ export function formatOrbLinkError(error: unknown): string {
   if (lower.includes('too many') || lower.includes('rate limit')) {
     return "Profile link is busy — we'll retry shortly.";
   }
-  if (lower.includes('wallet not connected') || lower.includes('sign in with your wallet')) {
-    return 'Connect your wallet with Get Started before linking your Lens identity.';
-  }
-  if (lower.includes('user rejected') || lower.includes('denied')) {
-    return 'Wallet signature was cancelled. Approve the signature to link your profile.';
+  if (
+    lower.includes('wallet not connected') ||
+    lower.includes('sign in with your wallet') ||
+    lower.includes('user rejected') ||
+    lower.includes('denied')
+  ) {
+    return formatWalletAuthError(error).replace(
+      'verify access',
+      'link your profile',
+    );
   }
   if (
     lower.includes('lens_account_id') &&
