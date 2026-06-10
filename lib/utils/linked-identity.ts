@@ -1,6 +1,6 @@
 import { predictModularAccountV2Address } from "@account-kit/smart-contracts";
-import { Address, createPublicClient, getAddress } from "viem";
-import { alchemy, base } from "@account-kit/infra";
+import { Address, getAddress } from "viem";
+import { base } from "@account-kit/infra";
 import {
   modularAccountFactoryAddresses,
   smaBytecodeImplementationAddresses,
@@ -14,13 +14,6 @@ import { logger } from '@/lib/utils/logger';
  * - Primary Display: Smart Wallet address (or ENS/Basename if available)
  * - Background: EOA address for signing operations (Snapshot, approvals, etc.)
  */
-
-const publicClient = createPublicClient({
-  chain: base,
-  transport: alchemy({
-    apiKey: process.env.NEXT_PUBLIC_ALCHEMY_API_KEY as string,
-  }),
-});
 
 function predictSmaAddress(ownerAddress: string): string | null {
   const factory = modularAccountFactoryAddresses[base.id];
@@ -59,20 +52,7 @@ export async function isPermittedSigner(
     }
 
     const predicted = predictSmaAddress(normalizedEOA);
-    if (predicted && predicted === normalizedSmartWallet) {
-      return true;
-    }
-
-    // Deployed SMA stores the owner as an immutable arg; undeployed counterfactual
-    // still matches prediction above.
-    const code = await publicClient.getCode({
-      address: getAddress(normalizedSmartWallet),
-    });
-    if (!code || code === "0x") {
-      return false;
-    }
-
-    return false;
+    return Boolean(predicted && predicted === normalizedSmartWallet);
   } catch (error) {
     logger.error("Error checking permitted signer:", error);
     return false;
