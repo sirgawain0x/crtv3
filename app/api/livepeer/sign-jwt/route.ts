@@ -4,6 +4,10 @@ import { checkBotId } from "botid/server";
 import { rateLimiters } from "@/lib/middleware/rateLimit";
 import { getStreamByPlaybackId } from "@/services/streams";
 import {
+  requireWalletAuth,
+  WalletAuthError,
+} from "@/lib/auth/require-wallet";
+import {
   checkMeTokenAccess,
   isMeTokenGateActive,
 } from "@/lib/utils/metoken-access";
@@ -29,7 +33,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { playbackId, userAddress, smartAccountAddress } = body;
+    const { playbackId } = body;
 
     if (!playbackId) {
       return NextResponse.json(
@@ -39,35 +43,49 @@ export async function POST(req: NextRequest) {
     }
 
     const stream = await getStreamByPlaybackId(playbackId);
-
-    if (
+    const gateActive = Boolean(
       stream &&
-      isMeTokenGateActive(stream.requires_metoken, stream.metoken_price)
-    ) {
-      if (!stream.creator_id) {
+        isMeTokenGateActive(stream.requires_metoken, stream.metoken_price),
+    );
+
+    let verifiedViewerAddress: string | null = null;
+
+    if (gateActive) {
+      if (!stream!.creator_id) {
         return NextResponse.json(
           { message: "Stream creator not found" },
           { status: 400 }
         );
       }
 
-      if (!userAddress && !smartAccountAddress) {
-        return NextResponse.json(
-          {
-            code: "METOKEN_REQUIRED",
-            connectWallet: true,
-            creatorAddress: stream.creator_id,
-            required: String(stream.metoken_price),
-            message: "Connect your wallet to verify MeToken balance",
-          },
-          { status: 403 }
-        );
+      try {
+        const verified = await requireWalletAuth(req);
+        verifiedViewerAddress = verified.address;
+      } catch (err) {
+        if (err instanceof WalletAuthError) {
+          const connectWallet =
+            err.status === 401 &&
+            err.message.includes("Missing wallet auth headers");
+          return NextResponse.json(
+            {
+              code: "METOKEN_REQUIRED",
+              connectWallet,
+              creatorAddress: stream!.creator_id,
+              required: String(stream!.metoken_price),
+              message: connectWallet
+                ? "Connect your wallet to verify MeToken balance"
+                : err.message,
+            },
+            { status: 403 }
+          );
+        }
+        throw err;
       }
 
       const access = await checkMeTokenAccess({
-        viewerAddresses: [userAddress, smartAccountAddress],
-        creatorAddress: stream.creator_id,
-        requiredAmount: stream.metoken_price!,
+        viewerAddresses: [verifiedViewerAddress],
+        creatorAddress: stream!.creator_id,
+        requiredAmount: stream!.metoken_price!,
       });
 
       if (!access.allowed) {
@@ -79,7 +97,7 @@ export async function POST(req: NextRequest) {
             symbol: access.symbol,
             required: access.requiredFormatted,
             balance: access.balanceFormatted,
-            creatorAddress: stream.creator_id,
+            creatorAddress: stream!.creator_id,
             message:
               access.reason === "no_viewer_address"
                 ? "Connect your wallet to verify MeToken balance"
@@ -97,7 +115,7 @@ export async function POST(req: NextRequest) {
       playbackId,
       expiration: 3600,
       custom: {
-        userId: userAddress || smartAccountAddress || "anonymous",
+        userId: verifiedViewerAddress ?? "anonymous",
       },
     });
 
