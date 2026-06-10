@@ -1,21 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { checkBotId } from 'botid/server';
-import { IPFSService } from '@/lib/sdk/ipfs/service';
+import { ipfsService } from '@/lib/sdk/ipfs/service';
 import { serverLogger } from '@/lib/utils/logger';
 import { rateLimiters } from '@/lib/middleware/rateLimit';
-
-// Lens Grove first; optional Lighthouse if API key is set (see lib/sdk/ipfs/service.ts).
-const ipfsService = new IPFSService({
-  lighthouseApiKey: process.env.NEXT_PUBLIC_LIGHTHOUSE_API_KEY,
-  filecoinFirstApiKey: process.env.NEXT_PUBLIC_FILECOIN_FIRST_API_KEY,
-  enableFilecoinArchival:
-    process.env.NEXT_PUBLIC_ENABLE_FILECOIN_ARCHIVAL === 'true',
-  gateway:
-    process.env.NEXT_PUBLIC_IPFS_GATEWAY ||
-    (process.env.NEXT_PUBLIC_LIGHTHOUSE_API_KEY
-      ? 'https://gateway.lighthouse.storage/ipfs'
-      : 'https://w3s.link/ipfs'),
-});
 
 /**
  * Converts a data URL to a File object (server-side)
