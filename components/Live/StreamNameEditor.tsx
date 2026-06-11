@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Loader2, Type } from "lucide-react";
 import { toast } from "sonner";
 import { updateStream } from "@/services/streams";
+import { useWalletAuth } from "@/lib/auth/useWalletAuth";
+import { formatWalletAuthError } from "@/lib/auth/format-wallet-auth-error";
 import { logger } from "@/lib/utils/logger";
 
 const MAX_NAME_LENGTH = 100;
@@ -23,6 +25,7 @@ export function StreamNameEditor({
 }: StreamNameEditorProps) {
   const [name, setName] = useState(currentName?.trim() || "Live Stream");
   const [isSaving, setIsSaving] = useState(false);
+  const { getAuthArgs } = useWalletAuth();
 
   useEffect(() => {
     setName(currentName?.trim() || "Live Stream");
@@ -43,12 +46,13 @@ export function StreamNameEditor({
 
     try {
       setIsSaving(true);
-      await updateStream(creatorAddress, { name: trimmedName });
+      const auth = await getAuthArgs();
+      await updateStream(creatorAddress, { name: trimmedName }, auth);
       onNameUpdated(trimmedName);
       toast.success("Stream title updated");
     } catch (error) {
       logger.error("Error updating stream name:", error);
-      toast.error("Failed to update stream title. Please try again.");
+      toast.error(formatWalletAuthError(error));
     } finally {
       setIsSaving(false);
     }

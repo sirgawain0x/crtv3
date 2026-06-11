@@ -2,6 +2,8 @@
 
 import { createClient } from "../lib/sdk/supabase/server";
 import { createServiceClient } from "../lib/sdk/supabase/service";
+import { authorizeStreamOwner } from "@/lib/auth/authorize-stream-owner";
+import type { WalletAuthArgs } from "@/lib/auth/require-wallet";
 
 export interface Stream {
     id: string;
@@ -117,7 +119,13 @@ export async function createStreamRecord(params: CreateStreamParams) {
 /**
  * Update an existing stream record
  */
-export async function updateStream(creatorId: string, updates: UpdateStreamParams) {
+export async function updateStream(
+    creatorId: string,
+    updates: UpdateStreamParams,
+    auth: WalletAuthArgs,
+) {
+    await authorizeStreamOwner(creatorId, auth);
+
     const supabase = await createServiceClient();
 
     const { data, error } = await supabase

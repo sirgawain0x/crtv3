@@ -39,11 +39,15 @@ import { LiveChat } from "@/components/Live/LiveChat";
 import { ShareDialog } from "@/components/Videos/ShareDialog";
 import { ModeratorsDialog } from "@/components/Live/ModeratorsDialog";
 import { DigitalTwinOverlay } from "@/components/Live/DigitalTwinOverlay";
+import { toast } from "sonner";
 import { logger } from '@/lib/utils/logger';
+import { useWalletAuth } from "@/lib/auth/useWalletAuth";
+import { formatWalletAuthError } from "@/lib/auth/format-wallet-auth-error";
 
 
 export default function LivePage() {
   const user = useUser();
+  const { getAuthArgs } = useWalletAuth();
   const isConnected = !!user?.address;
   const [multistreamTargets, setMultistreamTargets] = useState<
     MultistreamTarget[]
@@ -196,9 +200,11 @@ export default function LivePage() {
     setAllowClipping(next);
     setIsUpdatingClipPref(true);
     try {
-      await updateStream(user.address, { allow_clipping: next });
+      const auth = await getAuthArgs();
+      await updateStream(user.address, { allow_clipping: next }, auth);
     } catch (err) {
       logger.error("Failed to update clipping preference:", err);
+      toast.error(formatWalletAuthError(err));
       setAllowClipping(previous);
     } finally {
       setIsUpdatingClipPref(false);
