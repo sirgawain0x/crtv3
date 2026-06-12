@@ -7,6 +7,8 @@ import { toast } from "sonner";
 import { uploadThumbnailToIPFS } from "@/lib/services/thumbnail-upload";
 import { updateStream } from "@/services/streams";
 import { logger } from "@/lib/utils/logger";
+import { useWalletAuth } from "@/lib/auth/useWalletAuth";
+import { formatWalletAuthError } from "@/lib/auth/format-wallet-auth-error";
 import { LivestreamThumbnail } from "./LivestreamThumbnail";
 
 interface StreamThumbnailUploaderProps {
@@ -24,6 +26,7 @@ export function StreamThumbnailUploader({
 }: StreamThumbnailUploaderProps) {
     const [isUploading, setIsUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const { getAuthArgs } = useWalletAuth();
 
     const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -48,9 +51,12 @@ export function StreamThumbnailUploader({
             const newThumbnailUrl = result.thumbnailUrl;
 
             // 2. Update Stream Record
-            await updateStream(creatorAddress, {
-                thumbnail_url: newThumbnailUrl
-            });
+            const auth = await getAuthArgs();
+            await updateStream(
+                creatorAddress,
+                { thumbnail_url: newThumbnailUrl },
+                auth,
+            );
 
             // 3. Update UI
             onThumbnailUpdated(newThumbnailUrl);
@@ -63,7 +69,7 @@ export function StreamThumbnailUploader({
 
         } catch (error) {
             logger.error("Error updating thumbnail:", error);
-            toast.error("Failed to update thumbnail. Please try again.");
+            toast.error(formatWalletAuthError(error));
         } finally {
             setIsUploading(false);
         }

@@ -15,6 +15,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { useSignMessage, useSmartAccountClient, useUser } from "@account-kit/react";
 import useModularAccount from "@/lib/hooks/accountkit/useModularAccount";
 import { logger } from "@/lib/utils/logger";
+import type { WalletAuthArgs } from "@/lib/auth/require-wallet";
 
 const CACHE_LIFETIME_MS = 4 * 60 * 1000; // refresh well before the server's 5-min window
 
@@ -118,6 +119,15 @@ export function useWalletAuth() {
     };
   }, [address, signMessage]);
 
+  const getAuthArgs = useCallback(async (): Promise<WalletAuthArgs> => {
+    const headers = await getAuthHeaders();
+    return {
+      address: headers["X-Wallet-Address"],
+      timestamp: Number(headers["X-Wallet-Timestamp"]),
+      signature: headers["X-Wallet-Signature"],
+    };
+  }, [getAuthHeaders]);
+
   const clearAuthCache = useCallback(() => {
     cacheRef.current = null;
   }, []);
@@ -125,6 +135,7 @@ export function useWalletAuth() {
   return {
     address: address || null,
     getAuthHeaders,
+    getAuthArgs,
     clearAuthCache,
     /** Whether signMessage is wired up — false if the smart account client isn't ready yet. */
     isReady: !!accountClient && !!address,

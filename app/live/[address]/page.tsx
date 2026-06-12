@@ -40,10 +40,12 @@ import { ShareDialog } from "@/components/Videos/ShareDialog";
 import { ModeratorsDialog } from "@/components/Live/ModeratorsDialog";
 import { DigitalTwinOverlay } from "@/components/Live/DigitalTwinOverlay";
 import { logger } from '@/lib/utils/logger';
+import { useWalletAuth } from "@/lib/auth/useWalletAuth";
 
 
 export default function LivePage() {
   const user = useUser();
+  const { getAuthArgs } = useWalletAuth();
   const isConnected = !!user?.address;
   const [multistreamTargets, setMultistreamTargets] = useState<
     MultistreamTarget[]
@@ -196,7 +198,8 @@ export default function LivePage() {
     setAllowClipping(next);
     setIsUpdatingClipPref(true);
     try {
-      await updateStream(user.address, { allow_clipping: next });
+      const auth = await getAuthArgs();
+      await updateStream(user.address, { allow_clipping: next }, auth);
     } catch (err) {
       logger.error("Failed to update clipping preference:", err);
       setAllowClipping(previous);
@@ -270,14 +273,18 @@ export default function LivePage() {
           // Persist the stream to database
           if (user?.address) {
             try {
-              await createStreamRecord({
-                creator_id: user.address,
-                stream_key: streamKeyValue,
-                stream_id: streamIdValue,
-                playback_id: result.playbackId || result.stream?.playbackId,
-                name: `Channel-${user.address.slice(0, 6)}`,
-                is_live: false
-              });
+              const auth = await getAuthArgs();
+              await createStreamRecord(
+                {
+                  creator_id: user.address,
+                  stream_key: streamKeyValue,
+                  stream_id: streamIdValue,
+                  playback_id: result.playbackId || result.stream?.playbackId,
+                  name: `Channel-${user.address.slice(0, 6)}`,
+                  is_live: false,
+                },
+                auth,
+              );
             } catch (persistErr) {
               logger.error("Failed to persist stream record:", persistErr);
               // Don't block UI, but warn

@@ -2,6 +2,8 @@
 
 import { createClient } from "../lib/sdk/supabase/server";
 import { createServiceClient } from "../lib/sdk/supabase/service";
+import type { WalletAuthArgs } from "@/lib/auth/require-wallet";
+import { verifyStreamCreatorWalletAuth } from "@/lib/auth/verify-stream-creator";
 
 export interface Stream {
     id: string;
@@ -94,7 +96,12 @@ export async function getStreamByPlaybackId(playbackId: string) {
 /**
  * Create a new persistent stream record
  */
-export async function createStreamRecord(params: CreateStreamParams) {
+export async function createStreamRecord(
+    params: CreateStreamParams,
+    auth: WalletAuthArgs,
+) {
+    await verifyStreamCreatorWalletAuth(params.creator_id, auth);
+
     const supabase = await createServiceClient();
 
     const { data, error } = await supabase
@@ -117,7 +124,13 @@ export async function createStreamRecord(params: CreateStreamParams) {
 /**
  * Update an existing stream record
  */
-export async function updateStream(creatorId: string, updates: UpdateStreamParams) {
+export async function updateStream(
+    creatorId: string,
+    updates: UpdateStreamParams,
+    auth: WalletAuthArgs,
+) {
+    await verifyStreamCreatorWalletAuth(creatorId, auth);
+
     const supabase = await createServiceClient();
 
     const { data, error } = await supabase

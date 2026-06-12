@@ -11,6 +11,8 @@ import { toast } from "sonner";
 import { updateStream } from "@/services/streams";
 import { useMeTokensSupabase } from "@/lib/hooks/metokens/useMeTokensSupabase";
 import { logger } from "@/lib/utils/logger";
+import { useWalletAuth } from "@/lib/auth/useWalletAuth";
+import { formatWalletAuthError } from "@/lib/auth/format-wallet-auth-error";
 
 interface StreamMeTokenGateEditorProps {
   creatorAddress: string;
@@ -26,6 +28,7 @@ export function StreamMeTokenGateEditor({
   onGateUpdated,
 }: StreamMeTokenGateEditorProps) {
   const { userMeToken, loading: meTokenLoading, checkUserMeToken } = useMeTokensSupabase();
+  const { getAuthArgs } = useWalletAuth();
   const [requireMeToken, setRequireMeToken] = useState(requiresMetoken);
   const [price, setPrice] = useState(
     metokenPrice !== null && metokenPrice !== undefined ? String(metokenPrice) : "0",
@@ -52,10 +55,15 @@ export function StreamMeTokenGateEditor({
 
     try {
       setIsSaving(true);
-      await updateStream(creatorAddress, {
-        requires_metoken: requireMeToken,
-        metoken_price: requireMeToken ? parsedPrice : null,
-      });
+      const auth = await getAuthArgs();
+      await updateStream(
+        creatorAddress,
+        {
+          requires_metoken: requireMeToken,
+          metoken_price: requireMeToken ? parsedPrice : null,
+        },
+        auth,
+      );
       onGateUpdated({
         requiresMetoken: requireMeToken,
         metokenPrice: requireMeToken ? parsedPrice : null,
@@ -63,7 +71,7 @@ export function StreamMeTokenGateEditor({
       toast.success("MeToken access settings saved");
     } catch (error) {
       logger.error("Error updating stream MeToken gate:", error);
-      toast.error("Failed to save MeToken settings. Please try again.");
+      toast.error(formatWalletAuthError(error));
     } finally {
       setIsSaving(false);
     }
