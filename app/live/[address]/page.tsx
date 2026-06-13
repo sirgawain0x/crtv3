@@ -40,6 +40,8 @@ import { ShareDialog } from "@/components/Videos/ShareDialog";
 import { ModeratorsDialog } from "@/components/Live/ModeratorsDialog";
 import { DigitalTwinOverlay } from "@/components/Live/DigitalTwinOverlay";
 import { logger } from '@/lib/utils/logger';
+import { useWalletAuth } from "@/lib/auth/useWalletAuth";
+import { walletAuthArgsFromHeaders } from "@/lib/auth/wallet-auth-args";
 
 
 export default function LivePage() {
@@ -75,6 +77,7 @@ export default function LivePage() {
   const songchainFeedId =
     process.env.NEXT_PUBLIC_SONGCHAIN_FEED_ID?.trim() || null;
   const recordingEnableRequestedRef = useRef<Set<string>>(new Set());
+  const { getAuthHeaders } = useWalletAuth();
 
   // Match the viewer-side derivation in WatchClient so host + viewers share the
   // same XMTP group ID.
@@ -88,11 +91,20 @@ export default function LivePage() {
       if (!user?.address) return;
 
       try {
+        let auth;
+        try {
+          auth = walletAuthArgsFromHeaders(await getAuthHeaders());
+        } catch (authErr) {
+          logger.debug("Stream fetch without owner auth (stream key withheld):", authErr);
+        }
+
         // 1. Fetch persistent stream
-        const stream = await getStreamByCreator(user.address);
+        const stream = await getStreamByCreator(user.address, auth);
 
         if (stream) {
-          setStreamKey(stream.stream_key);
+          if ("stream_key" in stream && stream.stream_key) {
+            setStreamKey(stream.stream_key);
+          }
           setStreamId(stream.stream_id);
           setPlaybackId(stream.playback_id);
           setThumbnailUrl(stream.thumbnail_url || null);
@@ -134,7 +146,7 @@ export default function LivePage() {
     }
 
     fetchStreamAndTargets();
-  }, [user?.address]);
+  }, [user?.address, getAuthHeaders]);
 
   useEffect(() => {
     async function fetchThumbnail() {
@@ -196,7 +208,8 @@ export default function LivePage() {
     setAllowClipping(next);
     setIsUpdatingClipPref(true);
     try {
-      await updateStream(user.address, { allow_clipping: next });
+      const auth = walletAuthArgsFromHeaders(await getAuthHeaders());
+      await updateStream(user.address, { allow_clipping: next }, auth);
     } catch (err) {
       logger.error("Failed to update clipping preference:", err);
       setAllowClipping(previous);

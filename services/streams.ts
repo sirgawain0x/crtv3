@@ -2,6 +2,11 @@
 
 import { createClient } from "../lib/sdk/supabase/server";
 import { createServiceClient } from "../lib/sdk/supabase/service";
+import {
+  verifyWalletAuthArgs,
+  WalletAuthError,
+  type WalletAuthArgs,
+} from "../lib/auth/require-wallet";
 
 export interface Stream {
     id: string;
@@ -27,11 +32,36 @@ export interface Stream {
 
 export type CreateStreamParams = Omit<Stream, "id" | "created_at" | "updated_at">;
 export type UpdateStreamParams = Partial<Omit<Stream, "id" | "creator_id" | "created_at">>;
+export type PublicStream = Omit<Stream, "stream_key">;
+
+async function assertStreamOwner(
+    creatorId: string,
+    auth: WalletAuthArgs | undefined,
+): Promise<string> {
+    const { address } = await verifyWalletAuthArgs(auth);
+    const normalizedCreatorId = creatorId.toLowerCase();
+    if (address !== normalizedCreatorId) {
+        throw new WalletAuthError(
+            403,
+            "Authenticated address does not match the stream owner",
+        );
+    }
+    return address;
+}
+
+function redactStreamKey(stream: Stream): PublicStream {
+    const { stream_key: _streamKey, ...publicStream } = stream;
+    return publicStream;
+}
 
 /**
- * Get a stream by creator ID (wallet address)
+ * Get a stream by creator ID (wallet address).
+ * `stream_key` is only returned when wallet auth proves ownership of `creatorId`.
  */
-export async function getStreamByCreator(creatorId: string) {
+export async function getStreamByCreator(
+    creatorId: string,
+    auth?: WalletAuthArgs,
+): Promise<Stream | PublicStream | null> {
     const supabase = await createServiceClient(); // Use service client to bypass RLS initially or ensure reliable fetch
 
     // Normalize creator ID
@@ -48,7 +78,24 @@ export async function getStreamByCreator(creatorId: string) {
         throw new Error(`Failed to fetch stream: ${error.message}`);
     }
 
-    return data as Stream | null;
+    if (!data) {
+        return null;
+    }
+
+    const stream = data as Stream;
+
+    if (auth) {
+        try {
+            const verified = await verifyWalletAuthArgs(auth);
+            if (verified.address === normalizedCreatorId) {
+                return stream;
+            }
+        } catch {
+            // Fall through to redacted response for invalid or mismatched auth.
+        }
+    }
+
+    return redactStreamKey(stream);
 }
 
 /**
@@ -115,9 +162,15 @@ export async function createStreamRecord(params: CreateStreamParams) {
 }
 
 /**
- * Update an existing stream record
+ * Update an existing stream record. Requires wallet auth proving `creatorId`.
  */
-export async function updateStream(creatorId: string, updates: UpdateStreamParams) {
+export async function updateStream(
+    creatorId: string,
+    updates: UpdateStreamParams,
+    auth: WalletAuthArgs,
+) {
+    await assertStreamOwner(creatorId, auth);
+
     const supabase = await createServiceClient();
 
     const { data, error } = await supabase
