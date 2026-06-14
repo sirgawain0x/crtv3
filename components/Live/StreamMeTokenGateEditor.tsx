@@ -11,6 +11,8 @@ import { toast } from "sonner";
 import { updateStream } from "@/services/streams";
 import { useMeTokensSupabase } from "@/lib/hooks/metokens/useMeTokensSupabase";
 import { logger } from "@/lib/utils/logger";
+import { useWalletAuth } from "@/lib/auth/useWalletAuth";
+import { walletAuthArgsFromHeaders } from "@/lib/auth/wallet-auth-args";
 
 interface StreamMeTokenGateEditorProps {
   creatorAddress: string;
@@ -26,6 +28,7 @@ export function StreamMeTokenGateEditor({
   onGateUpdated,
 }: StreamMeTokenGateEditorProps) {
   const { userMeToken, loading: meTokenLoading, checkUserMeToken } = useMeTokensSupabase();
+  const { getAuthHeaders } = useWalletAuth();
   const [requireMeToken, setRequireMeToken] = useState(requiresMetoken);
   const [price, setPrice] = useState(
     metokenPrice !== null && metokenPrice !== undefined ? String(metokenPrice) : "0",
@@ -52,10 +55,11 @@ export function StreamMeTokenGateEditor({
 
     try {
       setIsSaving(true);
+      const auth = walletAuthArgsFromHeaders(await getAuthHeaders());
       await updateStream(creatorAddress, {
         requires_metoken: requireMeToken,
         metoken_price: requireMeToken ? parsedPrice : null,
-      });
+      }, auth);
       onGateUpdated({
         requiresMetoken: requireMeToken,
         metokenPrice: requireMeToken ? parsedPrice : null,
