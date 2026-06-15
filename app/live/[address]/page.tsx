@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { Broadcast, createStreamViaProxy } from "@/components/Live/Broadcast";
 import { getStreamByCreator, createStreamRecord, updateStream } from "@/services/streams";
 import { useUser } from "@account-kit/react";
+import { useWalletAuth, walletAuthHeadersToArgs } from "@/lib/auth/useWalletAuth";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -44,6 +45,7 @@ import { logger } from '@/lib/utils/logger';
 
 export default function LivePage() {
   const user = useUser();
+  const { getAuthHeaders } = useWalletAuth();
   const isConnected = !!user?.address;
   const [multistreamTargets, setMultistreamTargets] = useState<
     MultistreamTarget[]
@@ -88,11 +90,14 @@ export default function LivePage() {
       if (!user?.address) return;
 
       try {
-        // 1. Fetch persistent stream
-        const stream = await getStreamByCreator(user.address);
+        // 1. Fetch persistent stream (wallet auth required for stream_key)
+        const auth = walletAuthHeadersToArgs(await getAuthHeaders());
+        const stream = await getStreamByCreator(user.address, auth);
 
         if (stream) {
-          setStreamKey(stream.stream_key);
+          if ("stream_key" in stream && stream.stream_key) {
+            setStreamKey(stream.stream_key);
+          }
           setStreamId(stream.stream_id);
           setPlaybackId(stream.playback_id);
           setThumbnailUrl(stream.thumbnail_url || null);
@@ -134,7 +139,7 @@ export default function LivePage() {
     }
 
     fetchStreamAndTargets();
-  }, [user?.address]);
+  }, [user?.address, getAuthHeaders]);
 
   useEffect(() => {
     async function fetchThumbnail() {
@@ -196,7 +201,8 @@ export default function LivePage() {
     setAllowClipping(next);
     setIsUpdatingClipPref(true);
     try {
-      await updateStream(user.address, { allow_clipping: next });
+      const auth = walletAuthHeadersToArgs(await getAuthHeaders());
+      await updateStream(user.address, { allow_clipping: next }, auth);
     } catch (err) {
       logger.error("Failed to update clipping preference:", err);
       setAllowClipping(previous);

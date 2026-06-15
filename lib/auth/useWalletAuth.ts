@@ -130,3 +130,12 @@ export function useWalletAuth() {
     isReady: !!accountClient && !!address,
   };
 }
+
+/** Convert wallet auth headers into server-action auth args. */
+export function walletAuthHeadersToArgs(headers: AuthHeaders) {
+  return {
+    address: headers["X-Wallet-Address"],
+    timestamp: Number(headers["X-Wallet-Timestamp"]),
+    signature: headers["X-Wallet-Signature"],
+  };
+}

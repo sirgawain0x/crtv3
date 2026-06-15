@@ -2,6 +2,14 @@
 
 import { createClient } from "../lib/sdk/supabase/server";
 import { createServiceClient } from "../lib/sdk/supabase/service";
+import {
+  WalletAuthError,
+  type WalletAuthArgs,
+} from "@/lib/auth/require-wallet";
+import {
+  redactStreamKey,
+  verifyStreamOwner,
+} from "@/lib/auth/verify-stream-owner";
 
 export interface Stream {
     id: string;
@@ -27,11 +35,17 @@ export interface Stream {
 
 export type CreateStreamParams = Omit<Stream, "id" | "created_at" | "updated_at">;
 export type UpdateStreamParams = Partial<Omit<Stream, "id" | "creator_id" | "created_at">>;
+export type OwnerStream = Stream;
+export type PublicStream = Omit<Stream, "stream_key">;
 
 /**
- * Get a stream by creator ID (wallet address)
+ * Get a stream by creator ID (wallet address).
+ * `stream_key` is only returned when the caller proves ownership via wallet auth.
  */
-export async function getStreamByCreator(creatorId: string) {
+export async function getStreamByCreator(
+  creatorId: string,
+  auth?: WalletAuthArgs,
+): Promise<OwnerStream | PublicStream | null> {
     const supabase = await createServiceClient(); // Use service client to bypass RLS initially or ensure reliable fetch
 
     // Normalize creator ID
@@ -48,7 +62,23 @@ export async function getStreamByCreator(creatorId: string) {
         throw new Error(`Failed to fetch stream: ${error.message}`);
     }
 
-    return data as Stream | null;
+    if (!data) {
+      return null;
+    }
+
+    if (auth) {
+      try {
+        await verifyStreamOwner(creatorId, auth);
+        return data as OwnerStream;
+      } catch (err) {
+        if (err instanceof WalletAuthError) {
+          return redactStreamKey(data as Stream);
+        }
+        throw err;
+      }
+    }
+
+    return redactStreamKey(data as Stream);
 }
 
 /**
@@ -117,13 +147,21 @@ export async function createStreamRecord(params: CreateStreamParams) {
 /**
  * Update an existing stream record
  */
-export async function updateStream(creatorId: string, updates: UpdateStreamParams) {
+export async function updateStream(
+  creatorId: string,
+  updates: UpdateStreamParams,
+  auth: WalletAuthArgs,
+) {
+    await verifyStreamOwner(creatorId, auth);
+
+    const { stream_key: _ignoredStreamKey, ...safeUpdates } = updates;
+
     const supabase = await createServiceClient();
 
     const { data, error } = await supabase
         .from("streams")
         .update({
-            ...updates,
+            ...safeUpdates,
             updated_at: new Date().toISOString(),
         })
         .ilike("creator_id", creatorId)

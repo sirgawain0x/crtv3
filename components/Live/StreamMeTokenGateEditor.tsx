@@ -10,6 +10,8 @@ import { Loader2, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { updateStream } from "@/services/streams";
 import { useMeTokensSupabase } from "@/lib/hooks/metokens/useMeTokensSupabase";
+import { useWalletAuth, walletAuthHeadersToArgs } from "@/lib/auth/useWalletAuth";
+import { formatWalletAuthError } from "@/lib/auth/format-wallet-auth-error";
 import { logger } from "@/lib/utils/logger";
 
 interface StreamMeTokenGateEditorProps {
@@ -25,6 +27,7 @@ export function StreamMeTokenGateEditor({
   metokenPrice = null,
   onGateUpdated,
 }: StreamMeTokenGateEditorProps) {
+  const { getAuthHeaders } = useWalletAuth();
   const { userMeToken, loading: meTokenLoading, checkUserMeToken } = useMeTokensSupabase();
   const [requireMeToken, setRequireMeToken] = useState(requiresMetoken);
   const [price, setPrice] = useState(
@@ -52,10 +55,11 @@ export function StreamMeTokenGateEditor({
 
     try {
       setIsSaving(true);
+      const auth = walletAuthHeadersToArgs(await getAuthHeaders());
       await updateStream(creatorAddress, {
         requires_metoken: requireMeToken,
         metoken_price: requireMeToken ? parsedPrice : null,
-      });
+      }, auth);
       onGateUpdated({
         requiresMetoken: requireMeToken,
         metokenPrice: requireMeToken ? parsedPrice : null,
@@ -63,7 +67,7 @@ export function StreamMeTokenGateEditor({
       toast.success("MeToken access settings saved");
     } catch (error) {
       logger.error("Error updating stream MeToken gate:", error);
-      toast.error("Failed to save MeToken settings. Please try again.");
+      toast.error(formatWalletAuthError(error));
     } finally {
       setIsSaving(false);
     }
