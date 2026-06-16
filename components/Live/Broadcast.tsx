@@ -53,31 +53,49 @@ export interface StreamProfile {
 }
 
 export interface CreateStreamProxyParams {
+  creatorAddress: string;
   name: string;
   profiles: StreamProfile[];
   record: boolean;
   playbackPolicy: any;
   multistream?: any;
+  authHeaders: Record<string, string>;
 }
 
 export async function createStreamViaProxy(params: CreateStreamProxyParams) {
-  const { name, profiles, record, playbackPolicy, multistream } = params;
-  const body: any = {
+  const { creatorAddress, name, profiles, record, playbackPolicy, authHeaders } = params;
+  const body = {
+    creatorAddress,
     name,
     profiles,
     record,
     playbackPolicy,
   };
-  if (multistream !== undefined) {
-    body.multistream = multistream;
-  }
   const res = await fetch("/api/livepeer/livepeer-proxy", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders },
     body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error("Failed to create stream");
   return res.json();
+}
+
+export async function fetchStreamKeyForCreator(
+  creatorAddress: string,
+  authHeaders: Record<string, string>,
+) {
+  const res = await fetch(
+    `/api/livepeer/stream-key?creatorAddress=${encodeURIComponent(creatorAddress)}`,
+    { headers: authHeaders },
+  );
+  if (!res.ok) {
+    throw new Error("Failed to fetch stream key");
+  }
+  return res.json() as Promise<{
+    streamId: string;
+    playbackId: string;
+    streamKey: string;
+  }>;
 }
 
 async function finalizeStreamRecordings(streamId: string) {

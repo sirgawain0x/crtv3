@@ -14,6 +14,7 @@ import { getStreamByPlaybackId } from "@/services/streams";
 import { groveService } from "@/lib/sdk/grove/service";
 import type { Address } from "viem";
 import { serverLogger } from "@/lib/utils/logger";
+import { requireWalletAuthFor, WalletAuthError } from "@/lib/auth/require-wallet";
 
 const ADDRESS_REGEX = /^0x[a-fA-F0-9]{40}$/;
 
@@ -43,6 +44,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid recipient format" }, { status: 400 });
   }
 
+  const normalizedRecipient = recipient.toLowerCase();
+
+  try {
+    await requireWalletAuthFor(request, normalizedRecipient);
+  } catch (authErr) {
+    if (authErr instanceof WalletAuthError) {
+      return NextResponse.json({ error: authErr.message }, { status: authErr.status });
+    }
+    throw authErr;
+  }
+
   const clip = await getVideoAssetById(Number(clipVideoAssetId));
   if (!clip) {
     return NextResponse.json({ error: "Clip not found" }, { status: 404 });
@@ -55,7 +67,7 @@ export async function POST(request: NextRequest) {
   }
   if (
     clip.clipper_address &&
-    clip.clipper_address.toLowerCase() !== recipient.toLowerCase()
+    clip.clipper_address.toLowerCase() !== normalizedRecipient
   ) {
     return NextResponse.json(
       { error: "Only the clipper can mint their own clip" },
@@ -130,7 +142,7 @@ export async function POST(request: NextRequest) {
     }
 
     const client = createStoryClient(fundingAddress, privateKey);
-    const clipperAddress = (clip.clipper_address || recipient) as Address;
+    const clipperAddress = (clip.clipper_address || normalizedRecipient) as Address;
     const collectionAddress = await getOrCreateCreatorCollection(
       client,
       clipperAddress,
@@ -140,7 +152,7 @@ export async function POST(request: NextRequest) {
 
     const result = await mintAndRegisterDerivative(client, {
       collectionAddress,
-      recipient: recipient as Address,
+      recipient: normalizedRecipient as Address,
       parentIpIds: [parentStoryIpId as Address],
       licenseTermsIds: [parentLicenseTermsId],
       metadataURI: metadataUpload.url,

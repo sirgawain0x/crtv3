@@ -3,6 +3,9 @@ import { checkBotId } from 'botid/server';
 import { meTokenSupabaseService } from '@/lib/sdk/supabase/metokens';
 import { serverLogger } from '@/lib/utils/logger';
 import { rateLimiters } from '@/lib/middleware/rateLimit';
+import { requireWalletAuthFor, WalletAuthError } from '@/lib/auth/require-wallet';
+import { verifyMeTokenTransaction } from '@/lib/metokens/verifyMeTokenTransaction';
+import { TransactionVerificationError } from '@/lib/chain/verifyTransactionReceipt';
 
 // GET /api/metokens/[address]/transactions - Get MeToken transactions
 export async function GET(
@@ -106,20 +109,32 @@ export async function POST(
     } = body;
 
     // Validate required fields
-    if (!user_address || !transaction_type || amount === undefined) {
+    if (!user_address || !transaction_type || amount === undefined || !transaction_hash) {
       const missingFields = [];
       if (!user_address) missingFields.push('user_address');
       if (!transaction_type) missingFields.push('transaction_type');
       if (amount === undefined) missingFields.push('amount');
+      if (!transaction_hash) missingFields.push('transaction_hash');
 
       return NextResponse.json(
         {
           error: 'Missing required fields',
           missingFields,
-          hint: 'All of the following fields are required: user_address, transaction_type, amount'
+          hint: 'All of the following fields are required: user_address, transaction_type, amount, transaction_hash'
         },
         { status: 400 }
       );
+    }
+
+    const normalizedUserAddress = user_address.toLowerCase();
+
+    try {
+      await requireWalletAuthFor(request, normalizedUserAddress);
+    } catch (authErr) {
+      if (authErr instanceof WalletAuthError) {
+        return NextResponse.json({ error: authErr.message }, { status: authErr.status });
+      }
+      throw authErr;
     }
 
     // Validate transaction_type is valid
@@ -149,7 +164,7 @@ export async function POST(
 
     // Validate user_address format
     const addressRegex = /^0x[a-fA-F0-9]{40}$/;
-    if (!addressRegex.test(user_address)) {
+    if (!addressRegex.test(normalizedUserAddress)) {
       return NextResponse.json(
         {
           error: 'Invalid user_address format',
@@ -168,14 +183,33 @@ export async function POST(
       );
     }
 
+    let verified;
+    try {
+      verified = await verifyMeTokenTransaction({
+        meTokenAddress: address,
+        userAddress: normalizedUserAddress,
+        transactionHash: transaction_hash,
+        transactionType: transaction_type,
+        claimedAmount: amount,
+      });
+    } catch (verifyErr) {
+      if (verifyErr instanceof TransactionVerificationError) {
+        return NextResponse.json(
+          { error: verifyErr.message },
+          { status: 400 },
+        );
+      }
+      throw verifyErr;
+    }
+
     const transactionData = {
       metoken_id: meToken.id,
-      user_address,
+      user_address: normalizedUserAddress,
       transaction_type,
-      amount,
+      amount: verified.amount,
       collateral_amount,
-      transaction_hash,
-      block_number,
+      transaction_hash: verified.transactionHash,
+      block_number: Number(verified.blockNumber),
       video_id,
       playback_id,
     };

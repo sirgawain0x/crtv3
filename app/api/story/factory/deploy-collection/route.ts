@@ -18,6 +18,7 @@ import { deployCreatorCollection, getCollectionBytecode, getFactoryContractAddre
 import type { Address } from "viem";
 import { serverLogger } from "@/lib/utils/logger";
 import { rateLimiters } from "@/lib/middleware/rateLimit";
+import { requireWalletAuthFor, WalletAuthError } from "@/lib/auth/require-wallet";
 
 /**
  * Story Protocol chain configuration
@@ -49,6 +50,17 @@ export async function POST(request: NextRequest) {
         { error: "Missing required fields: creatorAddress, collectionName, collectionSymbol" },
         { status: 400 }
       );
+    }
+
+    const normalizedCreator = String(creatorAddress).toLowerCase();
+
+    try {
+      await requireWalletAuthFor(request, normalizedCreator);
+    } catch (authErr) {
+      if (authErr instanceof WalletAuthError) {
+        return NextResponse.json({ error: authErr.message }, { status: authErr.status });
+      }
+      throw authErr;
     }
 
     // Check factory configuration
@@ -104,7 +116,7 @@ export async function POST(request: NextRequest) {
     // Deploy collection via factory
     const result = await deployCreatorCollection(
       walletClient,
-      creatorAddress as Address,
+      normalizedCreator as Address,
       collectionName,
       collectionSymbol,
       bytecode
