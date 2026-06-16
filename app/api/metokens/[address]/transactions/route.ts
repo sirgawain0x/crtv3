@@ -4,6 +4,7 @@ import { meTokenSupabaseService } from '@/lib/sdk/supabase/metokens';
 import { serverLogger } from '@/lib/utils/logger';
 import { rateLimiters } from '@/lib/middleware/rateLimit';
 import { requireWalletAuthFor, WalletAuthError } from '@/lib/auth/require-wallet';
+import { isValidEthAddress } from '@/lib/auth/validate-address';
 import { verifyMeTokenTransaction } from '@/lib/metokens/verifyMeTokenTransaction';
 import { TransactionVerificationError } from '@/lib/chain/verifyTransactionReceipt';
 
@@ -97,6 +98,13 @@ export async function POST(
       );
     }
 
+    if (!isValidEthAddress(address)) {
+      return NextResponse.json(
+        { error: 'Invalid MeToken address format' },
+        { status: 400 }
+      );
+    }
+
     const {
       user_address,
       transaction_type,
@@ -126,7 +134,24 @@ export async function POST(
       );
     }
 
-    const normalizedUserAddress = user_address.toLowerCase();
+    const normalizedUserAddress = user_address.trim().toLowerCase();
+
+    if (!isValidEthAddress(normalizedUserAddress)) {
+      return NextResponse.json(
+        {
+          error: 'Invalid user_address format',
+          details: 'user_address must be a valid Ethereum address (0x followed by 40 hex characters)'
+        },
+        { status: 400 }
+      );
+    }
+
+    if (!/^0x[a-fA-F0-9]{64}$/.test(String(transaction_hash).trim())) {
+      return NextResponse.json(
+        { error: 'Invalid transaction_hash format' },
+        { status: 400 }
+      );
+    }
 
     try {
       await requireWalletAuthFor(request, normalizedUserAddress);
@@ -157,18 +182,6 @@ export async function POST(
         {
           error: 'Invalid amount',
           details: 'amount must be a non-negative number'
-        },
-        { status: 400 }
-      );
-    }
-
-    // Validate user_address format
-    const addressRegex = /^0x[a-fA-F0-9]{40}$/;
-    if (!addressRegex.test(normalizedUserAddress)) {
-      return NextResponse.json(
-        {
-          error: 'Invalid user_address format',
-          details: 'user_address must be a valid Ethereum address (0x followed by 40 hex characters)'
         },
         { status: 400 }
       );

@@ -4,6 +4,7 @@ import { meTokenSupabaseService } from '@/lib/sdk/supabase/metokens';
 import { serverLogger } from '@/lib/utils/logger';
 import { rateLimiters } from '@/lib/middleware/rateLimit';
 import { requireWalletAuthFor, WalletAuthError } from '@/lib/auth/require-wallet';
+import { isValidEthAddress } from '@/lib/auth/validate-address';
 import { verifyMeTokenBalance } from '@/lib/metokens/verifyMeTokenBalance';
 import { TransactionVerificationError } from '@/lib/chain/verifyTransactionReceipt';
 
@@ -43,6 +44,13 @@ export async function PUT(
       );
     }
 
+    if (!isValidEthAddress(address)) {
+      return NextResponse.json(
+        { error: 'Invalid MeToken address format' },
+        { status: 400 }
+      );
+    }
+
     const {
       user_address,
       balance,
@@ -75,10 +83,10 @@ export async function PUT(
         { status: 400 }
       );
     }
-    
-    // Validate user_address format
-    const addressRegex = /^0x[a-fA-F0-9]{40}$/;
-    if (!addressRegex.test(user_address)) {
+
+    const normalizedUserAddress = user_address.trim().toLowerCase();
+
+    if (!isValidEthAddress(normalizedUserAddress)) {
       return NextResponse.json(
         { 
           error: 'Invalid user_address format',
@@ -87,8 +95,6 @@ export async function PUT(
         { status: 400 }
       );
     }
-
-    const normalizedUserAddress = user_address.toLowerCase();
 
     try {
       await requireWalletAuthFor(request, normalizedUserAddress);

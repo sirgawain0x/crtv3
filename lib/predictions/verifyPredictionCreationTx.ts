@@ -28,6 +28,7 @@ export async function verifyPredictionCreationTx(
   });
 
   const realityAddress = getRealityEthContractAddress().toLowerCase();
+  let sawUserMismatch = false;
 
   for (const log of receipt.logs) {
     if (log.address.toLowerCase() !== realityAddress) {
@@ -47,21 +48,23 @@ export async function verifyPredictionCreationTx(
         user: string;
       };
       if (args.user.toLowerCase() !== normalizedCreator) {
-        throw new TransactionVerificationError(
-          "Transaction creator does not match authenticated address",
-        );
+        sawUserMismatch = true;
+        continue;
       }
       return {
         questionId: args.question_id,
         creatorAddress: normalizedCreator,
         transactionHash: transactionHash.toLowerCase(),
       };
-    } catch (err) {
-      if (err instanceof TransactionVerificationError) {
-        throw err;
-      }
+    } catch {
       // Not a LogNewQuestion log — try next.
     }
+  }
+
+  if (sawUserMismatch) {
+    throw new TransactionVerificationError(
+      "Transaction creator does not match authenticated address",
+    );
   }
 
   throw new TransactionVerificationError(

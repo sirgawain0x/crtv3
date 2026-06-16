@@ -1,6 +1,7 @@
-import { decodeEventLog, formatEther, parseAbi, type Hash } from "viem";
+import { decodeEventLog, formatEther, parseAbi } from "viem";
 import {
   getVerifiedTransactionReceipt,
+  getVerifiedTransaction,
   TransactionVerificationError,
 } from "@/lib/chain/verifyTransactionReceipt";
 
@@ -69,9 +70,7 @@ export async function verifyMeTokenTransaction(
     { maxAgeSeconds: 60 * 60 * 24 * 7 },
   );
 
-  const tx = await import("@/lib/viem").then((m) =>
-    m.publicClient.getTransaction({ hash: params.transactionHash as Hash }),
-  );
+  const tx = await getVerifiedTransaction(params.transactionHash);
 
   const involvedAddresses = new Set(
     receipt.logs.map((log) => log.address.toLowerCase()),
