@@ -22,6 +22,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Info, Loader2 } from "lucide-react";
 import { useWalletStatus } from "@/lib/hooks/accountkit/useWalletStatus";
+import { useWalletAuth } from "@/lib/auth/useWalletAuth";
 import { toast } from "sonner";
 import {
   Select,
@@ -109,6 +110,7 @@ function CreatePrediction() {
     walletAddress,
     smartAccountAddress: address,
   } = useWalletStatus();
+  const { getAuthHeaders } = useWalletAuth();
 
   const { openAuthModal } = useAuthModal();
   const { client: accountKitClient } = useSmartAccountClient({});
@@ -388,9 +390,10 @@ function CreatePrediction() {
       logger.debug("✅ Transaction hash:", hash);
 
       try {
+        const authHeaders = await getAuthHeaders();
         const rec = await fetch("/api/predictions/record", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", ...authHeaders },
           body: JSON.stringify({
             address,
             transactionHash: hash,

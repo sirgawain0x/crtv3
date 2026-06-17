@@ -8,6 +8,7 @@ import { METOKEN_ABI } from '@/lib/contracts/MeToken';
 import { DAI_TOKEN_ADDRESSES, getDaiTokenContract } from '@/lib/contracts/DAIToken';
 import { useToast } from '@/components/ui/use-toast';
 import { useGasSponsorship } from '@/lib/hooks/wallet/useGasSponsorship';
+import { useWalletAuth } from '@/lib/auth/useWalletAuth';
 import { logger } from '@/lib/utils/logger';
 import { appendBuilderCode } from "@/lib/utils/builder-code";
 
@@ -101,6 +102,7 @@ export function useMeTokensSupabase(targetAddress?: string) {
   const { client } = useSmartAccountClient({});
   const { toast } = useToast();
   const { getGasContext, isMember } = useGasSponsorship();
+  const { getAuthHeaders } = useWalletAuth();
 
   // Use targetAddress if provided, otherwise use the smart account address from client
   const address = targetAddress || client?.account?.address || user?.address;
@@ -1572,9 +1574,10 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
       if (meToken) {
         // Record the transaction with video tracking if provided via API route
         try {
+          const authHeaders = await getAuthHeaders();
           const response = await fetch(`/api/metokens/${meTokenAddress}/transactions`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...authHeaders },
             body: JSON.stringify({
               user_address: address,
               transaction_type: 'mint',
@@ -1610,9 +1613,10 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
           const newBalance = parseFloat(formatEther(actualBalance));
           logger.debug(`📊 Syncing balance to Supabase: ${newBalance} (Chain balance: ${actualBalance.toString()})`);
 
+          const authHeaders = await getAuthHeaders();
           const balanceResponse = await fetch(`/api/metokens/${meTokenAddress}/balance`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...authHeaders },
             body: JSON.stringify({
               user_address: address,
               balance: newBalance,
@@ -2019,9 +2023,10 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         // Record the transaction via API route
         // Note: collateralAmountReturned was calculated before the burn for accuracy
         try {
+          const authHeaders = await getAuthHeaders();
           const response = await fetch(`/api/metokens/${meTokenAddress}/transactions`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...authHeaders },
             body: JSON.stringify({
               user_address: address,
               transaction_type: 'burn',
@@ -2055,9 +2060,10 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
           const newBalance = parseFloat(formatEther(actualBalance));
           logger.debug(`📊 Syncing balance to Supabase: ${newBalance} (Chain balance: ${actualBalance.toString()})`);
 
+          const authHeaders = await getAuthHeaders();
           const balanceResponse = await fetch(`/api/metokens/${meTokenAddress}/balance`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...authHeaders },
             body: JSON.stringify({
               user_address: address,
               balance: newBalance,

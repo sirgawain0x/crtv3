@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useState } from "react";
 import { useUser } from "@account-kit/react";
+import { useWalletAuth } from "@/lib/auth/useWalletAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -35,6 +36,7 @@ export function ClipCreator({
   parentCommercialRevShare,
 }: ClipCreatorProps) {
   const user = useUser();
+  const { getAuthHeaders } = useWalletAuth();
   const clipperAddress = user?.address;
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -141,9 +143,10 @@ export function ClipCreator({
     setIsMinting(true);
     setError(null);
     try {
+      const authHeaders = await getAuthHeaders();
       const res = await fetch("/api/story/mint-derivative", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders },
         body: JSON.stringify({
           clipVideoAssetId: clip.clipVideoAssetId,
           recipient: clipperAddress,

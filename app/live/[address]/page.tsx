@@ -1,8 +1,9 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
-import { Broadcast, createStreamViaProxy } from "@/components/Live/Broadcast";
-import { getStreamByCreator, createStreamRecord, updateStream } from "@/services/streams";
+import { Broadcast, createStreamViaProxy, fetchStreamKeyForCreator } from "@/components/Live/Broadcast";
+import { updateStream } from "@/services/streams";
 import { useUser } from "@account-kit/react";
+import { useWalletAuth } from "@/lib/auth/useWalletAuth";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -45,6 +46,7 @@ import { userMessageForStreamProxyError } from "@/lib/livepeer/stream-proxy-erro
 
 export default function LivePage() {
   const user = useUser();
+  const { getAuthHeaders } = useWalletAuth();
   const isConnected = !!user?.address;
   const [multistreamTargets, setMultistreamTargets] = useState<
     MultistreamTarget[]
@@ -89,11 +91,16 @@ export default function LivePage() {
       if (!user?.address) return;
 
       try {
-        // 1. Fetch persistent stream
-        const stream = await getStreamByCreator(user.address);
+        const authHeaders = await getAuthHeaders();
+        const streamRes = await fetch(
+          `/api/streams/creator/${encodeURIComponent(user.address)}`,
+        );
 
-        if (stream) {
-          setStreamKey(stream.stream_key);
+        let currentStreamId: string | null = null;
+
+        if (streamRes.ok) {
+          const stream = await streamRes.json();
+          currentStreamId = stream.stream_id ?? null;
           setStreamId(stream.stream_id);
           setPlaybackId(stream.playback_id);
           setThumbnailUrl(stream.thumbnail_url || null);
@@ -105,17 +112,24 @@ export default function LivePage() {
           setStoryLicenseTermsId(stream.story_license_terms_id ?? null);
           setStoryRevShare(stream.story_commercial_rev_share ?? null);
 
-          // One-time migration: enable recording for channels created before auto-record.
-          if (!recordingEnableRequestedRef.current.has(stream.stream_id)) {
-            recordingEnableRequestedRef.current.add(stream.stream_id);
-            fetch(`/api/livepeer/stream/${encodeURIComponent(stream.stream_id)}/recording`, {
+          try {
+            const keyData = await fetchStreamKeyForCreator(user.address, authHeaders);
+            setStreamKey(keyData.streamKey);
+          } catch (keyErr) {
+            logger.error("Failed to fetch stream key:", keyErr);
+          }
+
+          if (currentStreamId && !recordingEnableRequestedRef.current.has(currentStreamId)) {
+            recordingEnableRequestedRef.current.add(currentStreamId);
+            fetch(`/api/livepeer/stream/${encodeURIComponent(currentStreamId)}/recording`, {
               method: "POST",
             }).catch((err) => logger.error("Failed to enable stream recording:", err));
           }
+        } else if (streamRes.status !== 404) {
+          logger.error("Error fetching stream metadata:", await streamRes.text());
         }
 
         // 2. Fetch multistream targets for the persisted stream
-        const currentStreamId = stream?.stream_id;
         if (!currentStreamId) {
           setMultistreamTargets([]);
           return;
@@ -207,10 +221,14 @@ export default function LivePage() {
   }
 
   async function handleCreateStream() {
+    if (!user?.address) return;
     setIsCreatingStream(true);
     setStreamCreateError(null);
     try {
+      const authHeaders = await getAuthHeaders();
       const result = await createStreamViaProxy({
+        creatorAddress: user.address,
+        authHeaders,
         name: `Broadcast-${Date.now()}`,
         profiles: [
           {
@@ -254,36 +272,15 @@ export default function LivePage() {
         multistream: undefined,
       });
 
-      // Extract stream key and stream ID from response
-      // Livepeer API can return data in different formats:
-      // 1. Direct property: result.streamKey, result.id
-      // 2. Nested in stream object: result.stream.streamKey, result.stream.id
-      const streamKeyValue = result.streamKey || result.stream?.streamKey;
-      const streamIdValue = result.id || result.stream?.id;
-      const playbackIdValue = result.playbackId || result.stream?.playbackId;
+      const streamKeyValue = result.streamKey;
+      const streamIdValue = result.streamId;
+      const playbackIdValue = result.playbackId;
 
       if (streamKeyValue) {
         setStreamKey(streamKeyValue);
         if (streamIdValue) {
           setStreamId(streamIdValue);
           if (playbackIdValue) setPlaybackId(playbackIdValue);
-
-          // Persist the stream to database
-          if (user?.address) {
-            try {
-              await createStreamRecord({
-                creator_id: user.address,
-                stream_key: streamKeyValue,
-                stream_id: streamIdValue,
-                playback_id: result.playbackId || result.stream?.playbackId,
-                name: `Channel-${user.address.slice(0, 6)}`,
-                is_live: false
-              });
-            } catch (persistErr) {
-              logger.error("Failed to persist stream record:", persistErr);
-              // Don't block UI, but warn
-            }
-          }
         }
       } else {
         setStreamCreateError("Stream key not found in response");

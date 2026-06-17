@@ -4,9 +4,14 @@ import { checkBotId } from "botid/server";
 import { rateLimiters } from "@/lib/middleware/rateLimit";
 import { getStreamByPlaybackId } from "@/services/streams";
 import {
+  requireWalletAuth,
+  WalletAuthError,
+} from "@/lib/auth/require-wallet";
+import {
   checkMeTokenAccess,
   isMeTokenGateActive,
 } from "@/lib/utils/metoken-access";
+import { resolveVerifiedViewerAddresses } from "@/lib/utils/linked-identity";
 
 export async function POST(req: NextRequest) {
   const verification = await checkBotId();
@@ -29,7 +34,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { playbackId, userAddress, smartAccountAddress } = body;
+    const { playbackId, companionAddress } = body;
 
     if (!playbackId) {
       return NextResponse.json(
@@ -41,53 +46,91 @@ export async function POST(req: NextRequest) {
     const stream = await getStreamByPlaybackId(playbackId);
 
     if (
-      stream &&
-      isMeTokenGateActive(stream.requires_metoken, stream.metoken_price)
+      !stream ||
+      !isMeTokenGateActive(stream.requires_metoken, stream.metoken_price)
     ) {
-      if (!stream.creator_id) {
-        return NextResponse.json(
-          { message: "Stream creator not found" },
-          { status: 400 }
-        );
-      }
-
-      if (!userAddress && !smartAccountAddress) {
-        return NextResponse.json(
-          {
-            code: "METOKEN_REQUIRED",
-            connectWallet: true,
-            creatorAddress: stream.creator_id,
-            required: String(stream.metoken_price),
-            message: "Connect your wallet to verify MeToken balance",
-          },
-          { status: 403 }
-        );
-      }
-
-      const access = await checkMeTokenAccess({
-        viewerAddresses: [userAddress, smartAccountAddress],
-        creatorAddress: stream.creator_id,
-        requiredAmount: stream.metoken_price!,
+      const token = await signAccessJwt({
+        privateKey: accessControlPrivateKey,
+        publicKey: accessControlPublicKey,
+        issuer: "https://crtv3.app",
+        playbackId,
+        expiration: 3600,
+        custom: {
+          userId: "anonymous",
+        },
       });
 
-      if (!access.allowed) {
+      return NextResponse.json({ token });
+    }
+
+    const gatedStream = stream;
+    const requiredAmount = gatedStream.metoken_price ?? 0;
+
+    if (!gatedStream.creator_id) {
+      return NextResponse.json(
+        { message: "Stream creator not found" },
+        { status: 400 }
+      );
+    }
+
+    let verifiedViewerAddress: string;
+
+    try {
+      const verified = await requireWalletAuth(req);
+      verifiedViewerAddress = verified.address;
+    } catch (err) {
+      if (err instanceof WalletAuthError) {
+        const missingHeaders = err.message.includes("Missing wallet auth headers");
+        const signingRejected =
+          !missingHeaders &&
+          (err.message.includes("Invalid wallet signature") ||
+            err.message.includes("too old"));
+
         return NextResponse.json(
           {
             code: "METOKEN_REQUIRED",
-            connectWallet: access.reason === "no_viewer_address",
-            meTokenAddress: access.meTokenAddress,
-            symbol: access.symbol,
-            required: access.requiredFormatted,
-            balance: access.balanceFormatted,
-            creatorAddress: stream.creator_id,
-            message:
-              access.reason === "no_viewer_address"
-                ? "Connect your wallet to verify MeToken balance"
-                : "Insufficient MeToken balance to watch this stream",
+            connectWallet: missingHeaders,
+            signingRequired: signingRejected,
+            creatorAddress: gatedStream.creator_id,
+            required: String(requiredAmount),
+            message: missingHeaders
+              ? "Connect your wallet to verify MeToken balance"
+              : err.message,
           },
           { status: 403 }
         );
       }
+      throw err;
+    }
+
+    const viewerAddresses = await resolveVerifiedViewerAddresses(
+      verifiedViewerAddress,
+      companionAddress,
+    );
+
+    const access = await checkMeTokenAccess({
+      viewerAddresses,
+      creatorAddress: gatedStream.creator_id,
+      requiredAmount,
+    });
+
+    if (!access.allowed) {
+      return NextResponse.json(
+        {
+          code: "METOKEN_REQUIRED",
+          connectWallet: access.reason === "no_viewer_address",
+          meTokenAddress: access.meTokenAddress,
+          symbol: access.symbol,
+          required: access.requiredFormatted,
+          balance: access.balanceFormatted,
+          creatorAddress: gatedStream.creator_id,
+          message:
+            access.reason === "no_viewer_address"
+              ? "Connect your wallet to verify MeToken balance"
+              : "Insufficient MeToken balance to watch this stream",
+        },
+        { status: 403 }
+      );
     }
 
     const token = await signAccessJwt({
@@ -97,7 +140,7 @@ export async function POST(req: NextRequest) {
       playbackId,
       expiration: 3600,
       custom: {
-        userId: userAddress || smartAccountAddress || "anonymous",
+        userId: verifiedViewerAddress,
       },
     });
 

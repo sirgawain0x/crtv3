@@ -40,6 +40,7 @@ initBotId({
     { path: '/api/livepeer/stream/*/recording', method: 'POST' },
     { path: '/api/streams/recordings/finalize', method: 'POST' },
     { path: '/api/livepeer/clips', method: 'POST' },
+    { path: '/api/livepeer/stream-key', method: 'GET' },
     { path: '/api/livepeer', method: 'POST' },
     { path: '/api/livepeer/attestation', method: 'POST' },
     { path: '/api/ai/upload-to-ipfs', method: 'POST' },

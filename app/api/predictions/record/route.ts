@@ -4,6 +4,9 @@ import { z } from "zod";
 import { isAddress } from "viem";
 import { rateLimiters } from "@/lib/middleware/rateLimit";
 import { supabaseService } from "@/lib/sdk/supabase/service";
+import { requireWalletAuthFor, WalletAuthError } from "@/lib/auth/require-wallet";
+import { verifyPredictionCreationTx } from "@/lib/predictions/verifyPredictionCreationTx";
+import { TransactionVerificationError } from "@/lib/chain/verifyTransactionReceipt";
 import {
   countPredictionMarketsThisMonthUtc,
   getPremiumPredictionAccess,
@@ -61,6 +64,33 @@ export async function POST(request: NextRequest) {
 
   try {
     const normalized = normalizeCreatorAddress(address);
+
+    try {
+      await requireWalletAuthFor(request, normalized);
+    } catch (authErr) {
+      if (authErr instanceof WalletAuthError) {
+        return NextResponse.json({ error: authErr.message }, { status: authErr.status });
+      }
+      throw authErr;
+    }
+
+    let verifiedQuestionId: string | undefined;
+    try {
+      const verified = await verifyPredictionCreationTx(transactionHash, normalized);
+      verifiedQuestionId = verified.questionId;
+      if (questionId && questionId.toLowerCase() !== verified.questionId.toLowerCase()) {
+        return NextResponse.json(
+          { error: "questionId does not match on-chain transaction" },
+          { status: 400 },
+        );
+      }
+    } catch (verifyErr) {
+      if (verifyErr instanceof TransactionVerificationError) {
+        return NextResponse.json({ error: verifyErr.message }, { status: 400 });
+      }
+      throw verifyErr;
+    }
+
     const memberships = await unlockService.getAllMemberships(normalized);
 
     if (!isPlatformAdmin(normalized) && hasValidCreatorPass(memberships)) {
@@ -97,7 +127,7 @@ export async function POST(request: NextRequest) {
       .insert({
         creator_address: normalized,
         transaction_hash: transactionHash.toLowerCase(),
-        question_id: questionId ?? null,
+        question_id: questionId ?? verifiedQuestionId ?? null,
         title: title ?? null,
         category: category ?? null,
         question_type: questionType ?? null,
