@@ -37,6 +37,7 @@ initBotId({
     { path: '/api/livepeer/sign-jwt', method: 'POST' },
     { path: '/api/livepeer/token-gate', method: 'POST' },
     { path: '/api/livepeer/livepeer-proxy', method: 'POST' },
+    { path: '/api/livepeer/stream-key', method: 'GET' },
     { path: '/api/livepeer', method: 'POST' },
     { path: '/api/livepeer/attestation', method: 'POST' },
     { path: '/api/ai/upload-to-ipfs', method: 'POST' },
