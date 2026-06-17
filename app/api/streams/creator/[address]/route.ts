@@ -35,14 +35,15 @@ export async function GET(
     }
 
     return NextResponse.json({
+      stream_id: stream.stream_id,
       playback_id: stream.playback_id,
       name: stream.name,
       thumbnail_url: stream.thumbnail_url,
       is_live: stream.is_live,
       last_live_at: stream.last_live_at,
+      allow_clipping: stream.allow_clipping ?? true,
       requires_metoken: stream.requires_metoken ?? false,
       metoken_price: stream.metoken_price ?? null,
-      allow_clipping: stream.allow_clipping ?? true,
       story_ip_id: stream.story_ip_id ?? null,
       story_license_terms_id: stream.story_license_terms_id ?? null,
       story_commercial_rev_share: stream.story_commercial_rev_share ?? null,

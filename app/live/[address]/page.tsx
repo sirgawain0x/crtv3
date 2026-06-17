@@ -170,6 +170,8 @@ export default function LivePage() {
           const stream = await res.json();
           if (!active) return;
           if (!stream?.playback_id) return;
+          if (stream.stream_id) setStreamId(stream.stream_id);
+          setPlaybackId(stream.playback_id);
           setThumbnailUrl(stream.thumbnail_url || null);
           setAllowClipping(stream.allow_clipping ?? true);
           setStreamName(stream.name ?? null);
@@ -178,6 +180,8 @@ export default function LivePage() {
           setStoryIpId(stream.story_ip_id ?? null);
           setStoryLicenseTermsId(stream.story_license_terms_id ?? null);
           setStoryRevShare(stream.story_commercial_rev_share ?? null);
+        } else {
+          logger.error("Error fetching stream metadata:", await res.text());
         }
       } catch (err) {
         logger.error("Error fetching stream data:", err);
@@ -324,6 +328,7 @@ export default function LivePage() {
         setStreamCreateError("Stream key not found in response");
       }
     } catch (e) {
+      logger.error("Failed to create stream:", e);
       setStreamCreateError(userMessageForStreamProxyError(e));
     } finally {
       setIsCreatingStream(false);
@@ -397,6 +402,9 @@ export default function LivePage() {
                     <LivestreamThumbnail thumbnailUrl={thumbnailUrl} />
                   </div>
                 ) : null}
+                <p className="text-sm text-muted-foreground mb-4 text-center max-w-md">
+                  Create your channel first — camera preview and live chat appear on the next step.
+                </p>
                 <button
                   onClick={handleCreateStream}
                   disabled={isCreatingStream}
