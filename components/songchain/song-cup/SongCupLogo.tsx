@@ -3,8 +3,8 @@ export function SongCupLogo() {
     <div className="logo-container">
       <div className="top-row text-glow">
         <span className="letter-s">s</span>
-        <div className="ball-container" aria-label="O" role="text">
-          <svg className="soccer-ball" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <div className="ball-container" aria-hidden="true">
+          <svg className="soccer-ball" viewBox="0 0 100 100" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
             <defs>
               <radialGradient id="ballGradient" cx="30%" cy="30%" r="70%">
                 <stop offset="0%" stopColor="#ffffff" />

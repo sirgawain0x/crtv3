@@ -1,12 +1,14 @@
 export type SongchainEventStatus = "active" | "upcoming";
 
-export type SongchainEvent = {
+type SongchainEventBase = {
   slug: string;
   title: string;
   description?: string;
-  status: SongchainEventStatus;
-  href?: string;
 };
+
+export type SongchainEvent =
+  | (SongchainEventBase & { status: "active"; href: string })
+  | (SongchainEventBase & { status: "upcoming" });
 
 export const SONGCHAIN_EVENTS: SongchainEvent[] = [
   {
