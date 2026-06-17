@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   initializeClient,
   openHallidayPayments,
@@ -170,6 +170,12 @@ export function HallidayOnramp({
     setInitialized(true);
   }, [hallidayApiKey, initialized, baseParams]);
 
+  useEffect(() => {
+    if (!lazyInit && hallidayApiKey && !lensOnrampBlocked) {
+      void ensureInitialized();
+    }
+  }, [lazyInit, hallidayApiKey, lensOnrampBlocked, ensureInitialized]);
+
   const requireWallet = useCallback((): boolean => {
     if (destinationAddress) return true;
     setError(copy.connectMessage);
@@ -181,21 +187,18 @@ export function HallidayOnramp({
     if (!hallidayApiKey || !requireWallet()) return;
     setError(null);
     try {
-      if (lazyInit) {
-        await ensureInitialized();
-      }
+      await ensureInitialized();
       openHallidayPayments(baseParams);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not open Halliday.");
     }
-  }, [hallidayApiKey, requireWallet, lazyInit, ensureInitialized, baseParams]);
+  }, [hallidayApiKey, requireWallet, ensureInitialized, baseParams]);
 
   if (!hallidayApiKey) {
     return (
       <p className="text-sm text-muted-foreground">
         {copy.missingKeyMessage} — set{" "}
-        <code className="text-xs">NEXT_PUBLIC_HALLIDAY_API_KEY</code> (or{" "}
-        <code className="text-xs">HALLIDAY_API_KEY</code> on the server) to enable.
+        <code className="text-xs">NEXT_PUBLIC_HALLIDAY_API_KEY</code> to enable.
       </p>
     );
   }

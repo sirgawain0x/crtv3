@@ -77,7 +77,7 @@ export function SongCupPlayModal({ open, onOpenChange }: SongCupPlayModalProps) 
             Choose how to play
           </DialogTitle>
           <DialogDescription className="sr-only">
-            Pick predict your winner on Orb or guess your artist on Beat Me.
+            Predict your winner on Orb or guess your artist on Beat Me.
           </DialogDescription>
         </DialogHeader>
         <div className="mt-6 grid grid-cols-1 gap-10 sm:grid-cols-2 sm:gap-8">

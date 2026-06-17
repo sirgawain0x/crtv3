@@ -67,10 +67,7 @@ export function NFTMintingStep({
     (process.env.NEXT_PUBLIC_STORY_POLICY_ID ?? "").replace(/^["']|["']$/g, "").trim()
   );
 
-  const hallidayApiKey =
-    process.env.NEXT_PUBLIC_HALLIDAY_API_KEY?.trim() ||
-    process.env.HALLIDAY_API_KEY?.trim() ||
-    null;
+  const hallidayApiKey = process.env.NEXT_PUBLIC_HALLIDAY_API_KEY?.trim() || null;
   const hallidayOutputAsset = buildHallidayStoryOutputAsset();
   const hallidayInputAssets = buildHallidayInputAssets();
   const hallidaySandbox = isHallidaySandboxEnabled();
