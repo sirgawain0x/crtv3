@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkBotId } from "botid/server";
 import { rateLimiters } from "@/lib/middleware/rateLimit";
-import { requireWalletAuthFor, WalletAuthError } from "@/lib/auth/require-wallet";
+import { requireWalletAuthFor, WalletAuthError, walletAuthFromRequest } from "@/lib/auth/require-wallet";
 import { getStreamByCreator } from "@/services/streams";
 
 /**
@@ -31,8 +31,11 @@ export async function GET(req: NextRequest) {
     throw authErr;
   }
 
-  const stream = await getStreamByCreator(normalizedCreator);
-  if (!stream) {
+  const stream = await getStreamByCreator(
+    normalizedCreator,
+    walletAuthFromRequest(req),
+  );
+  if (!stream || !("stream_key" in stream)) {
     return NextResponse.json({ error: "Stream not found" }, { status: 404 });
   }
 

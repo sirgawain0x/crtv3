@@ -154,6 +154,29 @@ export interface WalletAuthArgs {
   signature: string;
 }
 
+/**
+ * Extract wallet auth args from request headers. Call only after
+ * `requireWalletAuth` / `requireWalletAuthFor` has validated the request.
+ */
+export function walletAuthFromRequest(request: Request): WalletAuthArgs {
+  const address = request.headers.get(HEADER_ADDRESS)?.trim().toLowerCase();
+  const timestampHeader = request.headers.get(HEADER_TIMESTAMP)?.trim();
+  const signature = request.headers.get(HEADER_SIGNATURE)?.trim();
+
+  if (!address || !timestampHeader || !signature) {
+    throw new WalletAuthError(
+      401,
+      "Missing wallet auth headers (X-Wallet-Address, X-Wallet-Timestamp, X-Wallet-Signature)",
+    );
+  }
+
+  return {
+    address,
+    timestamp: Number(timestampHeader),
+    signature,
+  };
+}
+
 export async function verifyWalletAuthArgs(
   auth: WalletAuthArgs | undefined
 ): Promise<VerifiedWallet> {

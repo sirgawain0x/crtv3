@@ -21,6 +21,11 @@ vi.mock("@/lib/middleware/rateLimit", () => ({
 
 vi.mock("@/lib/auth/require-wallet", () => ({
   requireWalletAuthFor: (...args: unknown[]) => mockRequireWalletAuthFor(...args),
+  walletAuthFromRequest: () => ({
+    address: CREATOR,
+    timestamp: 1,
+    signature: "0xsig",
+  }),
   WalletAuthError: class WalletAuthError extends Error {
     constructor(
       public status: number,
@@ -117,6 +122,10 @@ describe("livepeer-proxy POST security", () => {
       expect.objectContaining({
         creator_id: CREATOR,
         stream_key: "secret-key",
+      }),
+      expect.objectContaining({
+        address: CREATOR,
+        signature: "0xsig",
       }),
     );
   });

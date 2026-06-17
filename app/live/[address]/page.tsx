@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import { Broadcast, createStreamViaProxy, fetchStreamKeyForCreator } from "@/components/Live/Broadcast";
 import { updateStream } from "@/services/streams";
 import { useUser } from "@account-kit/react";
-import { useWalletAuth } from "@/lib/auth/useWalletAuth";
+import { useWalletAuth, walletAuthHeadersToArgs } from "@/lib/auth/useWalletAuth";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -148,7 +148,7 @@ export default function LivePage() {
     }
 
     fetchStreamAndTargets();
-  }, [user?.address]);
+  }, [user?.address, getAuthHeaders]);
 
   useEffect(() => {
     async function fetchThumbnail() {
@@ -210,7 +210,8 @@ export default function LivePage() {
     setAllowClipping(next);
     setIsUpdatingClipPref(true);
     try {
-      await updateStream(user.address, { allow_clipping: next });
+      const auth = walletAuthHeadersToArgs(await getAuthHeaders());
+      await updateStream(user.address, { allow_clipping: next }, auth);
     } catch (err) {
       logger.error("Failed to update clipping preference:", err);
       setAllowClipping(previous);

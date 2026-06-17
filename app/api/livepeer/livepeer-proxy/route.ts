@@ -3,7 +3,7 @@ import { checkBotId } from "botid/server";
 import { z } from "zod";
 import { isAddress } from "viem";
 import { rateLimiters } from "@/lib/middleware/rateLimit";
-import { requireWalletAuthFor, WalletAuthError } from "@/lib/auth/require-wallet";
+import { requireWalletAuthFor, WalletAuthError, walletAuthFromRequest } from "@/lib/auth/require-wallet";
 import { createStreamRecord, getStreamByCreator } from "@/services/streams";
 import { serverLogger } from "@/lib/utils/logger";
 
@@ -116,7 +116,7 @@ export async function POST(req: NextRequest) {
       playback_id: playbackIdValue,
       name: name || `Channel-${normalizedCreator.slice(0, 6)}`,
       is_live: false,
-    });
+    }, walletAuthFromRequest(req));
 
     return NextResponse.json({
       streamId: streamIdValue,

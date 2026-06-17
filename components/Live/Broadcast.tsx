@@ -33,6 +33,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { updateStream } from "@/services/streams";
+import { useWalletAuth, walletAuthHeadersToArgs } from "@/lib/auth/useWalletAuth";
 
 interface BroadcastProps {
   streamKey: string;
@@ -111,6 +112,7 @@ async function finalizeStreamRecordings(streamId: string) {
 }
 
 function BroadcastWithControls({ streamKey, streamId: propStreamId, creatorAddress }: BroadcastProps) {
+  const { getAuthHeaders } = useWalletAuth();
   const ingestUrl = React.useMemo(() => {
     return `https://ingest.livepeer.studio/whip/${streamKey}`;
   }, [streamKey]);
@@ -148,11 +150,12 @@ function BroadcastWithControls({ streamKey, streamId: propStreamId, creatorAddre
 
     const syncStatus = async () => {
       try {
+        const auth = walletAuthHeadersToArgs(await getAuthHeaders());
         if (status === 'live') {
-          await updateStream(creatorAddress, { is_live: true, last_live_at: new Date().toISOString() });
+          await updateStream(creatorAddress, { is_live: true, last_live_at: new Date().toISOString() }, auth);
           logger.info("Stream marked as live in DB");
         } else if (status === 'idle' || status === 'error') {
-          await updateStream(creatorAddress, { is_live: false });
+          await updateStream(creatorAddress, { is_live: false }, auth);
           logger.info("Stream marked as offline in DB");
           if (status === 'idle' && propStreamId) {
             // Recording assets may take a minute to process; retry a few times.
@@ -173,7 +176,7 @@ function BroadcastWithControls({ streamKey, streamId: propStreamId, creatorAddre
       finalizeTimeoutsRef.current.forEach(clearTimeout);
       finalizeTimeoutsRef.current = [];
     };
-  }, [status, creatorAddress, propStreamId]);
+  }, [status, creatorAddress, propStreamId, getAuthHeaders]);
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
