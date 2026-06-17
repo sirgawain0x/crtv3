@@ -1,9 +1,13 @@
 
-.s3gon:nth-child(n + 23), .s4gon:nth-child(n + 48), .s5gon:nth-child(n + 7) {
+.song-cup-hero-scene .s3gon:nth-child(n + 23),
+.song-cup-hero-scene .s4gon:nth-child(n + 48),
+.song-cup-hero-scene .s5gon:nth-child(n + 7) {
   --sup: 1;
 }
 
-.s3gon:nth-child(n + 18):nth-child(-n + 27), .s4gon:nth-child(n + 38):nth-last-child(n + 6), .s5gon:nth-child(n + 2):nth-child(-n + 11) {
+.song-cup-hero-scene .s3gon:nth-child(n + 18):nth-child(-n + 27),
+.song-cup-hero-scene .s4gon:nth-child(n + 38):nth-last-child(n + 6),
+.song-cup-hero-scene .s5gon:nth-child(n + 2):nth-child(-n + 11) {
   --mid: 1;
 }
 
@@ -24,14 +28,8 @@
   place-self: center;
 }
 
-.stage {
-  color: #ffffff;
-  text-shadow: 0 0 0.25ch rgba(0,0,0,0.6);
-  font: 700 2.25ch/ 1.5 ubuntu mono, consolas, monaco, monospace;
-  animation: text-move 48s linear calc(((var(--p) - .25)/var(--n-data) - 1)*48s) infinite;
-}
 
-.site-header {
+.song-cup-hero-scene .site-header {
   position: absolute;
   top: 0;
   left: 0;
@@ -43,7 +41,7 @@
   pointer-events: none;
 }
 
-.site-logo {
+.song-cup-hero-scene .site-logo {
   width: min(90vw, 560px);
   max-width: 100%;
   display: block;
@@ -53,7 +51,7 @@
   pointer-events: auto;
 }
 
-.song-cup-hero-copy {
+.song-cup-hero-scene .song-cup-hero-copy {
   position: relative;
   z-index: 20;
   margin-top: clamp(140px, 24vh, 200px);
@@ -66,7 +64,7 @@
   pointer-events: none;
 }
 
-.song-cup-hero-line {
+.song-cup-hero-scene .song-cup-hero-line {
   margin: 0;
   font-size: clamp(1rem, 3.5vw, 1.75rem);
   font-weight: 800;
@@ -76,14 +74,14 @@
   text-shadow: 0 2px 12px rgba(0, 0, 0, 0.8);
 }
 
-.song-cup-hero-line-sub {
+.song-cup-hero-scene .song-cup-hero-line-sub {
   font-size: clamp(0.75rem, 2.5vw, 1.125rem);
   font-weight: 600;
   letter-spacing: 0.06em;
   max-width: 36rem;
 }
 
-.song-cup-lets-goal-btn {
+.song-cup-hero-scene .song-cup-lets-goal-btn {
   pointer-events: auto;
   margin-top: 0.75rem;
   border: none;
@@ -99,18 +97,18 @@
   transition: filter 0.2s, box-shadow 0.2s;
 }
 
-.song-cup-lets-goal-btn:hover {
+.song-cup-hero-scene .song-cup-lets-goal-btn:hover {
   filter: brightness(1.1);
   box-shadow: 0 6px 24px rgba(232, 37, 148, 0.55);
 }
 
-.song-cup-lets-goal-btn:focus-visible {
+.song-cup-hero-scene .song-cup-lets-goal-btn:focus-visible {
   outline: 2px solid #ff66cc;
   outline-offset: 3px;
 }
 
 /* Logo typography */
-.logo-container {
+.song-cup-hero-scene .logo-container {
   display: inline-flex;
   flex-direction: column;
   align-items: stretch;
@@ -122,7 +120,7 @@
   font-weight: bold;
 }
 
-.top-row {
+.song-cup-hero-scene .top-row {
   display: flex;
   align-items: baseline;
   position: relative;
@@ -130,16 +128,16 @@
   white-space: nowrap;
 }
 
-.top-row > * {
+.song-cup-hero-scene .top-row > * {
   flex-shrink: 0;
 }
 
-.letter-s {
+.song-cup-hero-scene .letter-s {
   font-size: 65px;
   margin-right: 4px;
 }
 
-.ball-container {
+.song-cup-hero-scene .ball-container {
   position: relative;
   display: inline-flex;
   flex-direction: column;
@@ -149,14 +147,14 @@
   top: 5px;
 }
 
-.soccer-ball {
+.song-cup-hero-scene .soccer-ball {
   width: 75px;
   height: 75px;
   position: relative;
   z-index: 2;
 }
 
-.ball-shadow {
+.song-cup-hero-scene .ball-shadow {
   position: absolute;
   bottom: -6px;
   width: 60px;
@@ -168,16 +166,16 @@
   z-index: 1;
 }
 
-.letter-ng {
+.song-cup-hero-scene .letter-ng {
   font-size: 95px;
 }
 
-.word-cup {
+.song-cup-hero-scene .word-cup {
   font-size: 95px;
   margin-left: 35px;
 }
 
-.bottom-row {
+.song-cup-hero-scene .bottom-row {
   display: flex;
   justify-content: space-between;
   width: 100%;
@@ -189,87 +187,72 @@
   white-space: nowrap;
 }
 
-.bottom-row span {
+.song-cup-hero-scene .bottom-row span {
   flex-shrink: 0;
   display: inline;
   grid-area: unset;
   place-self: unset;
 }
 
-.bottom-row span:last-child {
+.song-cup-hero-scene .bottom-row span:last-child {
   padding-right: 8px;
 }
 
-.text-glow {
+.song-cup-hero-scene .text-glow {
   text-shadow: 0px 2px 4px rgba(0, 0, 0, 0.8), 0 0 2px rgba(255, 255, 255, 0.3);
 }
 
 @media (max-width: 600px) {
-  .logo-container {
+  .song-cup-hero-scene .logo-container {
     padding: 12px 18px 12px 12px;
   }
-  .letter-s {
+  .song-cup-hero-scene .letter-s {
     font-size: 40px;
     margin-right: 2px;
   }
-  .letter-ng {
+  .song-cup-hero-scene .letter-ng {
     font-size: 60px;
   }
-  .word-cup {
+  .song-cup-hero-scene .word-cup {
     font-size: 60px;
     margin-left: 15px;
   }
-  .bottom-row {
+  .song-cup-hero-scene .bottom-row {
     font-size: 68px;
     margin-top: -22px;
   }
-  .ball-container {
+  .song-cup-hero-scene .ball-container {
     top: 3px;
     margin-right: 4px;
   }
-  .soccer-ball {
+  .song-cup-hero-scene .soccer-ball {
     width: 50px;
     height: 50px;
   }
-  .ball-shadow {
+  .song-cup-hero-scene .ball-shadow {
     width: 40px;
     height: 6px;
     bottom: -4px;
   }
-  .song-cup-hero-copy {
+  .song-cup-hero-scene .song-cup-hero-copy {
     margin-top: clamp(100px, 18vh, 140px);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .a3d,
-  .s2d {
+  .song-cup-hero-scene .a3d,
+  .song-cup-hero-scene .s2d {
     animation: none !important;
   }
 }
 
-@keyframes text-move {
-  0% {
-    transform: rotate(1turn);
-  }
-}
-span {
-  --pos: rotate(calc((var(--idx) - .5*(var(--n-char) - 1))*2.33635deg)) translatey(-30.63759ch);
-  transform: var(--pos) scale(1.375);
-  animation: text-fade 48s ease-in-out infinite;
-  animation-delay: calc(((var(--p) + var(--idx)/var(--n-char) - .75)/var(--n-data) - 1)*48s);
 }
 
-@keyframes text-fade {
-  15%, 85% {
-    transform: var(--pos) scale(0.625);
-    filter: grayscale(1);
-  }
   50% {
     opacity: 0.15;
   }
 }
-.a3d {
+.song-cup-hero-scene .a3d {
   transform-style: preserve-3d;
   animation: roty 12s linear infinite, size 48s cubic-bezier(0.25, 1, 0.5, 1) infinite;
 }
@@ -286,7 +269,7 @@ span {
 }
 
 /* 3D shape faces - brighter material and rim light so they pop on black */
-.s2d {
+.song-cup-hero-scene .s2d {
   --sup: 0;
   --not-sup: calc(1 - var(--sup));
   --sgn-sup: calc(2*var(--sup) - 1);
@@ -311,7 +294,7 @@ span {
 }
 
 /* White hexagon/triangle faces */
-.s3gon {
+.song-cup-hero-scene .s3gon {
   --i: calc(var(--sgn-sup)*(var(--not-mid)*0.29235 + var(--mid)*0.06007));
   --k: var(--not-xor);
   --hs: 0deg, 0%;
@@ -323,19 +306,19 @@ span {
   border-color: rgba(0,0,0,0.35);
   box-shadow: inset 0 0 1.5ch rgba(0,0,0,0.12), 0 0 0.8ch rgba(255,255,255,0.35);
 }
-.s3gon:nth-child(5n + 13) {
+.song-cup-hero-scene .s3gon:nth-child(5n + 13) {
   --j: calc((0 + .5*var(--sup))/5);
 }
-.s3gon:nth-child(5n + 14) {
+.song-cup-hero-scene .s3gon:nth-child(5n + 14) {
   --j: calc((1 + .5*var(--sup))/5);
 }
-.s3gon:nth-child(5n + 15) {
+.song-cup-hero-scene .s3gon:nth-child(5n + 15) {
   --j: calc((2 + .5*var(--sup))/5);
 }
-.s3gon:nth-child(5n + 16) {
+.song-cup-hero-scene .s3gon:nth-child(5n + 16) {
   --j: calc((3 + .5*var(--sup))/5);
 }
-.s3gon:nth-child(5n + 17) {
+.song-cup-hero-scene .s3gon:nth-child(5n + 17) {
   --j: calc((4 + .5*var(--sup))/5);
 }
 
@@ -357,7 +340,7 @@ span {
 }
 
 /* White square faces */
-.s4gon {
+.song-cup-hero-scene .s4gon {
   --ver: 0;
   --not-ver: calc(1 - var(--ver));
   --i: calc(var(--not-ver)*var(--sgn-sup)*(var(--not-mid)*0.32379 + var(--mid)*0.17621));
@@ -371,22 +354,22 @@ span {
   border-color: rgba(0,0,0,0.35);
   box-shadow: inset 0 0 1.5ch rgba(0,0,0,0.12), 0 0 0.8ch rgba(255,255,255,0.35);
 }
-.s4gon:nth-last-child(n + 11):nth-last-child(-n + 20) {
+.song-cup-hero-scene .s4gon:nth-last-child(n + 11):nth-last-child(-n + 20) {
   --ver: 1;
 }
-.s4gon:nth-child(5n + 33) {
+.song-cup-hero-scene .s4gon:nth-child(5n + 33) {
   --j: calc((0 + var(--not-ver)*var(--not-xor)*.5 + var(--ver)*var(--sgn-sup)*.25)/5);
 }
-.s4gon:nth-child(5n + 34) {
+.song-cup-hero-scene .s4gon:nth-child(5n + 34) {
   --j: calc((1 + var(--not-ver)*var(--not-xor)*.5 + var(--ver)*var(--sgn-sup)*.25)/5);
 }
-.s4gon:nth-child(5n + 35) {
+.song-cup-hero-scene .s4gon:nth-child(5n + 35) {
   --j: calc((2 + var(--not-ver)*var(--not-xor)*.5 + var(--ver)*var(--sgn-sup)*.25)/5);
 }
-.s4gon:nth-child(5n + 36) {
+.song-cup-hero-scene .s4gon:nth-child(5n + 36) {
   --j: calc((3 + var(--not-ver)*var(--not-xor)*.5 + var(--ver)*var(--sgn-sup)*.25)/5);
 }
-.s4gon:nth-child(5n + 37) {
+.song-cup-hero-scene .s4gon:nth-child(5n + 37) {
   --j: calc((4 + var(--not-ver)*var(--not-xor)*.5 + var(--ver)*var(--sgn-sup)*.25)/5);
 }
 
@@ -403,7 +386,7 @@ span {
 }
 
 /* Black pentagon faces */
-.s5gon {
+.song-cup-hero-scene .s5gon {
   --hs: 0deg, 0%;
   --lum: 22%;
   --i: calc(var(--sgn-sup)*(var(--not-mid)*.5 + var(--mid)*0.14758));
@@ -422,23 +405,23 @@ span {
   }
 }
 
-.s5gon:nth-child(1), .s5gon:nth-child(12) {
+.song-cup-hero-scene .s5gon:nth-child(1), .song-cup-hero-scene .s5gon:nth-child(12) {
   filter: brightness(calc(1 - .5*var(--not-sup)));
   animation-name: nos, var(--morph);
 }
-.s5gon:nth-child(5n + 2) {
+.song-cup-hero-scene .s5gon:nth-child(5n + 2) {
   --j: calc((0 + .5*var(--not-sup))/5);
 }
-.s5gon:nth-child(5n + 3) {
+.song-cup-hero-scene .s5gon:nth-child(5n + 3) {
   --j: calc((1 + .5*var(--not-sup))/5);
 }
-.s5gon:nth-child(5n + 4) {
+.song-cup-hero-scene .s5gon:nth-child(5n + 4) {
   --j: calc((2 + .5*var(--not-sup))/5);
 }
-.s5gon:nth-child(5n + 5) {
+.song-cup-hero-scene .s5gon:nth-child(5n + 5) {
   --j: calc((3 + .5*var(--not-sup))/5);
 }
-.s5gon:nth-child(5n + 6) {
+.song-cup-hero-scene .s5gon:nth-child(5n + 6) {
   --j: calc((4 + .5*var(--not-sup))/5);
 }
 

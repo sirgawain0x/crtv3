@@ -26,14 +26,14 @@ function PolyhedronFaces() {
 export function SongCupHero({ onLetsGoalClick }: SongCupHeroProps) {
   return (
     <section className="song-cup-hero-scene relative min-h-[85vh] w-full overflow-hidden bg-black">
-      <header className="site-header">
-        <div className="site-logo">
+      <div className="site-header">
+        <div className="site-logo" aria-label="Song Cup Contest">
           <SongCupLogo />
         </div>
-      </header>
+      </div>
 
       <div className="song-cup-hero-copy">
-        <p className="song-cup-hero-line">BE OUR TOP ARTIST</p>
+        <h1 className="song-cup-hero-line">BE OUR TOP ARTIST</h1>
         <p className="song-cup-hero-line song-cup-hero-line-sub">
           CREATE YOUR 30 SEC. WORLD CUP MUSIC VIDEO
         </p>

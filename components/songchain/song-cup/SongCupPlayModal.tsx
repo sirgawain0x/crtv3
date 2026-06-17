@@ -4,6 +4,7 @@ import Image from "next/image";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -75,6 +76,9 @@ export function SongCupPlayModal({ open, onOpenChange }: SongCupPlayModalProps) 
           <DialogTitle className="text-center text-lg font-bold uppercase tracking-wide text-white">
             Choose how to play
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            Pick predict your winner on Orb or guess your artist on Beat Me.
+          </DialogDescription>
         </DialogHeader>
         <div className="mt-6 grid grid-cols-1 gap-10 sm:grid-cols-2 sm:gap-8">
           <PlayCard
