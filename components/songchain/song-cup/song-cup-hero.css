@@ -19,15 +19,73 @@
   perspective-origin: 50% calc(50% - 8rem);
   perspective: 35em;
   background: #000000;
+  isolation: isolate;
 }
 
-.song-cup-hero-scene div:not(.logo-container):not(.top-row):not(.bottom-row):not(.ball-container):not(.ball-shadow),
-.song-cup-hero-scene .a3d span {
+/* 3D rings + polyhedron — stacked in one cell; filters stay inside this subtree */
+.song-cup-hero-scene .song-cup-hero-animation {
+  grid-area: 1 / 1;
+  place-self: center;
   display: grid;
-  grid-area: 1/ 1;
+  width: 100%;
+  min-height: min(70vh, 560px);
+  margin-top: clamp(80px, 14vh, 120px);
+  z-index: 1;
+  pointer-events: none;
+  contain: paint;
+}
+
+.song-cup-hero-scene .song-cup-hero-animation > div {
+  display: grid;
+  grid-area: 1 / 1;
   place-self: center;
 }
 
+.song-cup-hero-scene .song-cup-hero-rings {
+  --n-data: 8;
+  z-index: 1;
+}
+
+.song-cup-hero-scene .stage {
+  display: grid;
+  grid-area: 1 / 1;
+  place-self: center;
+  color: #ffffff;
+  text-shadow: 0 0 0.25ch rgba(0, 0, 0, 0.6);
+  font: 700 2.25ch / 1.5 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  animation: song-cup-text-move 48s linear calc(((var(--p) - 0.25) / var(--n-data) - 1) * 48s)
+    infinite;
+}
+
+.song-cup-hero-scene .stage span {
+  --pos: rotate(calc((var(--idx) - 0.5 * (var(--n-char) - 1)) * 2.33635deg))
+    translatey(-30.63759ch);
+  display: grid;
+  grid-area: 1 / 1;
+  place-self: center;
+  transform: var(--pos) scale(1.375);
+  animation: song-cup-text-fade 48s ease-in-out infinite;
+  animation-delay: calc(
+    ((var(--p) + var(--idx) / var(--n-char) - 0.75) / var(--n-data) - 1) * 48s
+  );
+}
+
+@keyframes song-cup-text-move {
+  0% {
+    transform: rotate(1turn);
+  }
+}
+
+@keyframes song-cup-text-fade {
+  15%,
+  85% {
+    transform: var(--pos) scale(0.625);
+    filter: grayscale(1);
+  }
+  50% {
+    opacity: 0.15;
+  }
+}
 
 .song-cup-hero-scene .site-header {
   position: absolute;
@@ -241,18 +299,16 @@
 
 @media (prefers-reduced-motion: reduce) {
   .song-cup-hero-scene .a3d,
-  .song-cup-hero-scene .s2d {
+  .song-cup-hero-scene .s2d,
+  .song-cup-hero-scene .stage,
+  .song-cup-hero-scene .stage span {
     animation: none !important;
   }
 }
 
-}
-
-  50% {
-    opacity: 0.15;
-  }
-}
 .song-cup-hero-scene .a3d {
+  z-index: 2;
+  display: grid;
   transform-style: preserve-3d;
   animation: roty 12s linear infinite, size 48s cubic-bezier(0.25, 1, 0.5, 1) infinite;
 }
@@ -270,6 +326,9 @@
 
 /* 3D shape faces - brighter material and rim light so they pop on black */
 .song-cup-hero-scene .s2d {
+  display: grid;
+  grid-area: 1 / 1;
+  place-self: center;
   --sup: 0;
   --not-sup: calc(1 - var(--sup));
   --sgn-sup: calc(2*var(--sup) - 1);

@@ -1,6 +1,7 @@
 "use client";
 
 import "./song-cup-hero.css";
+import { CirclingTextRings } from "./CirclingTextRings";
 import { SongCupLogo } from "./SongCupLogo";
 
 type SongCupHeroProps = {
@@ -46,7 +47,10 @@ export function SongCupHero({ onLetsGoalClick }: SongCupHeroProps) {
         </button>
       </div>
 
-      <PolyhedronFaces />
+      <div className="song-cup-hero-animation" aria-hidden="true">
+        <CirclingTextRings />
+        <PolyhedronFaces />
+      </div>
     </section>
   );
 }

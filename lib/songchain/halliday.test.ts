@@ -4,6 +4,8 @@ import {
   buildHallidayOutputAsset,
   buildHallidayStoryOutputAsset,
   HALLIDAY_DEFAULT_INPUT_ASSETS,
+  isHallidayLensChainAsset,
+  isHallidayLensOnrampSupported,
   isHallidaySandboxEnabled,
   LENS_GHO_TOKEN_ADDRESS,
   normalizeHallidayAssetId,
@@ -90,6 +92,30 @@ describe('buildHallidayInputAssets', () => {
   it('falls back to defaults when override is only whitespace or commas', () => {
     process.env.NEXT_PUBLIC_HALLIDAY_INPUT_ASSET = ' , , ';
     expect(buildHallidayInputAssets()).toEqual([...HALLIDAY_DEFAULT_INPUT_ASSETS]);
+  });
+});
+
+describe('isHallidayLensChainAsset', () => {
+  it('detects lens mainnet and testnet assets', () => {
+    expect(isHallidayLensChainAsset(`lens:${LENS_GHO_TOKEN_ADDRESS}`)).toBe(true);
+    expect(isHallidayLensChainAsset('lens-testnet:0xabc')).toBe(true);
+    expect(isHallidayLensChainAsset('story:0x')).toBe(false);
+  });
+});
+
+describe('isHallidayLensOnrampSupported', () => {
+  const env = process.env;
+
+  afterEach(() => {
+    process.env = { ...env };
+  });
+
+  it('is disabled unless explicitly enabled', () => {
+    delete process.env.NEXT_PUBLIC_HALLIDAY_LENS_ENABLED;
+    expect(isHallidayLensOnrampSupported()).toBe(false);
+
+    process.env.NEXT_PUBLIC_HALLIDAY_LENS_ENABLED = 'true';
+    expect(isHallidayLensOnrampSupported()).toBe(true);
   });
 });
 

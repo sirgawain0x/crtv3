@@ -11,6 +11,10 @@ import type { WalletClient } from "viem";
 import { Button } from "@/components/ui/button";
 import { useLensOrbWrite } from "@/hooks/useLensOrbWrite";
 import { Wallet } from "lucide-react";
+import {
+  isHallidayLensChainAsset,
+  isHallidayLensOnrampSupported,
+} from "@/lib/songchain/halliday";
 
 /** Above app modals (e.g. z-50 nav, z-[99999] selects) so Halliday header stays visible. */
 const HALLIDAY_WIDGET_Z_INDEX = 1_000_000;
@@ -71,10 +75,14 @@ export function HallidayOnramp({
   hallidayOutputAsset,
   hallidayInputAssets,
   hallidaySandbox,
-  variant = "lens",
+  variant = "story",
   destinationAddressOverride,
   lazyInit = true,
 }: HallidayOnrampProps) {
+  const lensOnrampBlocked =
+    (variant === "lens" || isHallidayLensChainAsset(hallidayOutputAsset)) &&
+    !isHallidayLensOnrampSupported();
+
   const copy = VARIANT_COPY[variant];
   const { openAuthModal } = useAuthModal();
   const user = useUser();
@@ -188,6 +196,18 @@ export function HallidayOnramp({
         {copy.missingKeyMessage} — set{" "}
         <code className="text-xs">NEXT_PUBLIC_HALLIDAY_API_KEY</code> (or{" "}
         <code className="text-xs">HALLIDAY_API_KEY</code> on the server) to enable.
+      </p>
+    );
+  }
+
+  if (lensOnrampBlocked) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        Lens GHO onramp via Halliday is temporarily unavailable — Halliday
+        production does not support the Lens chain yet. Bridge or swap GHO on Lens
+        manually, or set{" "}
+        <code className="text-xs">NEXT_PUBLIC_HALLIDAY_LENS_ENABLED=true</code>{" "}
+        after Halliday enables Lens.
       </p>
     );
   }

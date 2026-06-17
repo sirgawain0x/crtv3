@@ -93,6 +93,24 @@ export function isHallidaySandboxEnabled(): boolean {
   return value === '1' || value?.toLowerCase() === 'true';
 }
 
+/** True when the Halliday asset id targets Lens mainnet or testnet. */
+export function isHallidayLensChainAsset(asset: string): boolean {
+  const chain = normalizeHallidayAssetId(asset).split(':')[0];
+  return chain === 'lens' || chain === 'lens-testnet';
+}
+
+/**
+ * Halliday production rejects `lens:*` outputs (`Unknown Chain: 'lens'`).
+ * Opt in with NEXT_PUBLIC_HALLIDAY_LENS_ENABLED=true once Halliday ships support.
+ */
+export function isHallidayLensOnrampSupported(): boolean {
+  const value = readEnv(
+    'NEXT_PUBLIC_HALLIDAY_LENS_ENABLED',
+    'HALLIDAY_LENS_ENABLED',
+  );
+  return value === '1' || value?.toLowerCase() === 'true';
+}
+
 /**
  * Default fiat input for Halliday onramp (debit/credit → crypto).
  * Single `usd` pre-selects pay currency in the widget; add `eur` via env if needed.
