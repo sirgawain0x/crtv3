@@ -19,8 +19,8 @@ export async function requireHumanOrVerifiedBot(
   if (verification.isBot && !verification.isVerifiedBot) {
     serverLogger.warn("[botIdGuard] access denied", {
       context,
+      isBot: verification.isBot,
       isVerifiedBot: verification.isVerifiedBot,
-      verifiedBotName: verification.verifiedBotName,
     });
 
     return {
