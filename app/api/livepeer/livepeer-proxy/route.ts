@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import { checkBotId } from "botid/server";
 import { z } from "zod";
 import { isAddress } from "viem";
 import { rateLimiters } from "@/lib/middleware/rateLimit";
+import { requireHumanOrVerifiedBot } from "@/lib/middleware/botIdGuard";
 import { requireWalletAuthFor, WalletAuthError } from "@/lib/auth/require-wallet";
 import { createStreamRecord, getStreamByCreator } from "@/services/streams";
+import {
+  hasLivepeerPrivateApiKey,
+  livepeerStudioApiBaseUrl,
+} from "@/lib/sdk/livepeer/studioAuth";
 import { serverLogger } from "@/lib/utils/logger";
 
 const streamProfileSchema = z.object({
@@ -28,10 +32,11 @@ const bodySchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const verification = await checkBotId();
-  if (verification.isBot) {
-    return NextResponse.json({ error: "Access denied" }, { status: 403 });
+  const botCheck = await requireHumanOrVerifiedBot("livepeer-proxy");
+  if (!botCheck.allowed) {
+    return botCheck.response;
   }
+
   const rl = await rateLimiters.standard(req);
   if (rl) return rl;
 
@@ -39,13 +44,16 @@ export async function POST(req: NextRequest) {
   try {
     json = await req.json();
   } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    return NextResponse.json(
+      { error: "Invalid JSON body", code: "INVALID_REQUEST" },
+      { status: 400 },
+    );
   }
 
   const parsed = bodySchema.safeParse(json);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: parsed.error.flatten().fieldErrors },
+      { error: parsed.error.flatten().fieldErrors, code: "INVALID_REQUEST" },
       { status: 400 },
     );
   }
@@ -67,44 +75,99 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         error: "Stream already exists for this creator",
+        code: "STREAM_EXISTS",
         streamId: existing.stream_id,
         playbackId: existing.playback_id,
+        streamKey: existing.stream_key,
       },
       { status: 409 },
     );
   }
 
-  const apiKey = process.env.LIVEPEER_FULL_API_KEY;
-  if (!apiKey) {
+  if (!hasLivepeerPrivateApiKey()) {
+    serverLogger.error("[livepeer-proxy] LIVEPEER_FULL_API_KEY is not configured");
     return NextResponse.json(
-      { error: "Livepeer API key not configured" },
+      {
+        error: "Missing Livepeer API key",
+        code: "MISSING_API_KEY",
+      },
       { status: 500 },
     );
   }
 
   try {
-    const livepeerRes = await fetch("https://livepeer.studio/api/stream", {
+    const baseUrl = livepeerStudioApiBaseUrl();
+    const livepeerRes = await fetch(`${baseUrl}/api/stream`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
+        Authorization: `Bearer ${process.env.LIVEPEER_FULL_API_KEY}`,
       },
       body: JSON.stringify({ name, profiles, record, playbackPolicy }),
     });
 
-    const data = await livepeerRes.json();
-    if (!livepeerRes.ok) {
-      return NextResponse.json(data, { status: livepeerRes.status });
+    let data: Record<string, unknown> = {};
+    try {
+      data = (await livepeerRes.json()) as Record<string, unknown>;
+    } catch {
+      serverLogger.error("[livepeer-proxy] Livepeer returned non-JSON response", {
+        status: livepeerRes.status,
+      });
+      return NextResponse.json(
+        {
+          error: "Invalid response from streaming provider",
+          code: "LIVEPEER_ERROR",
+        },
+        { status: 502 },
+      );
     }
 
-    const streamKeyValue = data.streamKey || data.stream?.streamKey;
-    const streamIdValue = data.id || data.stream?.id;
-    const playbackIdValue = data.playbackId || data.stream?.playbackId;
+    if (!livepeerRes.ok) {
+      const message =
+        typeof data.error === "string"
+          ? data.error
+          : typeof data.message === "string"
+            ? data.message
+            : "Failed to create stream";
+
+      serverLogger.error("[livepeer-proxy] Livepeer stream create failed", {
+        status: livepeerRes.status,
+        message,
+      });
+
+      return NextResponse.json(
+        {
+          error: message,
+          code: "LIVEPEER_ERROR",
+          details: data,
+        },
+        { status: livepeerRes.status },
+      );
+    }
+
+    const streamKeyValue =
+      (data.streamKey as string | undefined) ||
+      ((data.stream as Record<string, unknown> | undefined)?.streamKey as
+        | string
+        | undefined);
+    const streamIdValue =
+      (data.id as string | undefined) ||
+      ((data.stream as Record<string, unknown> | undefined)?.id as
+        | string
+        | undefined);
+    const playbackIdValue =
+      (data.playbackId as string | undefined) ||
+      ((data.stream as Record<string, unknown> | undefined)?.playbackId as
+        | string
+        | undefined);
 
     if (!streamKeyValue || !streamIdValue || !playbackIdValue) {
-      serverLogger.error("Livepeer create stream missing fields:", data);
+      serverLogger.error("[livepeer-proxy] Livepeer create stream missing fields:", data);
       return NextResponse.json(
-        { error: "Livepeer response missing stream identifiers" },
+        {
+          error: "Livepeer response missing stream identifiers",
+          code: "INVALID_RESPONSE",
+        },
         { status: 502 },
       );
     }
@@ -118,15 +181,23 @@ export async function POST(req: NextRequest) {
       is_live: false,
     });
 
+    serverLogger.debug("[livepeer-proxy] stream created", {
+      streamId: streamIdValue,
+      playbackId: playbackIdValue,
+    });
+
     return NextResponse.json({
       streamId: streamIdValue,
       playbackId: playbackIdValue,
       streamKey: streamKeyValue,
     });
   } catch (error) {
-    serverLogger.error("Livepeer stream creation error:", error);
+    serverLogger.error("[livepeer-proxy] Livepeer stream creation error:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to create stream" },
+      {
+        error: error instanceof Error ? error.message : "Failed to create stream",
+        code: "LIVEPEER_ERROR",
+      },
       { status: 500 },
     );
   }

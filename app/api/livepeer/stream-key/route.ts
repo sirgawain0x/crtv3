@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { checkBotId } from "botid/server";
+import { requireHumanOrVerifiedBot } from "@/lib/middleware/botIdGuard";
 import { rateLimiters } from "@/lib/middleware/rateLimit";
 import { requireWalletAuthFor, WalletAuthError } from "@/lib/auth/require-wallet";
 import { getStreamByCreator } from "@/services/streams";
@@ -8,9 +8,9 @@ import { getStreamByCreator } from "@/services/streams";
  * Owner-only: return RTMP/WHIP stream key for the authenticated creator's channel.
  */
 export async function GET(req: NextRequest) {
-  const verification = await checkBotId();
-  if (verification.isBot) {
-    return NextResponse.json({ error: "Access denied" }, { status: 403 });
+  const botCheck = await requireHumanOrVerifiedBot("livepeer-stream-key");
+  if (!botCheck.allowed) {
+    return botCheck.response;
   }
   const rl = await rateLimiters.standard(req);
   if (rl) return rl;

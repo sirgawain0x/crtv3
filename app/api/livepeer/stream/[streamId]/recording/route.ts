@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { checkBotId } from "botid/server";
+import { requireHumanOrVerifiedBot } from "@/lib/middleware/botIdGuard";
 import { rateLimiters } from "@/lib/middleware/rateLimit";
 import { enableStreamRecording } from "@/lib/livepeer/studio-api";
 import { serverLogger } from "@/lib/utils/logger";
@@ -8,9 +8,9 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ streamId: string }> }
 ) {
-  const verification = await checkBotId();
-  if (verification.isBot) {
-    return NextResponse.json({ error: "Access denied" }, { status: 403 });
+  const botCheck = await requireHumanOrVerifiedBot("stream-recording");
+  if (!botCheck.allowed) {
+    return botCheck.response;
   }
 
   const rl = await rateLimiters.standard(request);

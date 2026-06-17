@@ -33,6 +33,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { updateStream } from "@/services/streams";
+import { parseStreamProxyFailure } from "@/lib/livepeer/stream-proxy-errors";
 
 interface BroadcastProps {
   streamKey: string;
@@ -76,7 +77,9 @@ export async function createStreamViaProxy(params: CreateStreamProxyParams) {
     headers: { "Content-Type": "application/json", ...authHeaders },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error("Failed to create stream");
+  if (!res.ok) {
+    throw await parseStreamProxyFailure(res);
+  }
   return res.json();
 }
 

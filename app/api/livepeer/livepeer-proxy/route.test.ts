@@ -7,12 +7,15 @@ vi.mock("viem", () => ({
 
 const CREATOR = "0xcccccccccccccccccccccccccccccccccccccccc";
 
+const mockRequireHumanOrVerifiedBot = vi.fn();
 const mockRequireWalletAuthFor = vi.fn();
 const mockGetStreamByCreator = vi.fn();
 const mockCreateStreamRecord = vi.fn();
+const mockFetch = vi.fn();
 
-vi.mock("botid/server", () => ({
-  checkBotId: vi.fn(async () => ({ isBot: false })),
+vi.mock("@/lib/middleware/botIdGuard", () => ({
+  requireHumanOrVerifiedBot: (...args: unknown[]) =>
+    mockRequireHumanOrVerifiedBot(...args),
 }));
 
 vi.mock("@/lib/middleware/rateLimit", () => ({
@@ -38,7 +41,7 @@ vi.mock("@/services/streams", () => ({
 }));
 
 vi.mock("@/lib/utils/logger", () => ({
-  serverLogger: { error: vi.fn(), debug: vi.fn() },
+  serverLogger: { warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
 import { POST } from "./route";
@@ -71,29 +74,28 @@ function streamRequest(body: Record<string, unknown>) {
   });
 }
 
-describe("livepeer-proxy POST security", () => {
+describe("POST /api/livepeer/livepeer-proxy", () => {
   beforeEach(() => {
-    process.env.LIVEPEER_FULL_API_KEY = "test-key";
+    vi.clearAllMocks();
+    mockRequireHumanOrVerifiedBot.mockResolvedValue({ allowed: true });
     mockRequireWalletAuthFor.mockResolvedValue({ address: CREATOR });
     mockGetStreamByCreator.mockResolvedValue(null);
     mockCreateStreamRecord.mockResolvedValue({ id: "db-1" });
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => ({
-        ok: true,
-        status: 200,
-        json: async () => ({
-          id: "stream-1",
-          playbackId: "playback-1",
-          streamKey: "secret-key",
-        }),
-      })),
-    );
+    process.env.LIVEPEER_FULL_API_KEY = "test-full-key";
+    global.fetch = mockFetch as typeof fetch;
   });
 
   afterEach(() => {
-    vi.clearAllMocks();
     vi.unstubAllGlobals();
+  });
+
+  it("returns MISSING_API_KEY when full key is absent", async () => {
+    delete process.env.LIVEPEER_FULL_API_KEY;
+
+    const res = await POST(streamRequest(validBody));
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.code).toBe("MISSING_API_KEY");
   });
 
   it("returns 401 without wallet auth", async () => {
@@ -105,7 +107,31 @@ describe("livepeer-proxy POST security", () => {
     expect(mockCreateStreamRecord).not.toHaveBeenCalled();
   });
 
+  it("returns LIVEPEER_ERROR when upstream fails", async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 402,
+      json: async () => ({ error: "quota exceeded" }),
+    });
+
+    const res = await POST(streamRequest(validBody));
+    expect(res.status).toBe(402);
+    const body = await res.json();
+    expect(body.code).toBe("LIVEPEER_ERROR");
+    expect(body.error).toBe("quota exceeded");
+  });
+
   it("creates stream and persists record for authenticated creator", async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        id: "stream-1",
+        playbackId: "playback-1",
+        streamKey: "secret-key",
+      }),
+    });
+
     const res = await POST(streamRequest(validBody));
     const json = await res.json();
 
