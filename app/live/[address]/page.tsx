@@ -40,6 +40,7 @@ import { ShareDialog } from "@/components/Videos/ShareDialog";
 import { ModeratorsDialog } from "@/components/Live/ModeratorsDialog";
 import { DigitalTwinOverlay } from "@/components/Live/DigitalTwinOverlay";
 import { logger } from '@/lib/utils/logger';
+import { userMessageForStreamProxyError } from "@/lib/livepeer/stream-proxy-errors";
 
 
 export default function LivePage() {
@@ -288,7 +289,8 @@ export default function LivePage() {
         setStreamCreateError("Stream key not found in response");
       }
     } catch (e) {
-      setStreamCreateError("Failed to create stream");
+      logger.error("Failed to create stream:", e);
+      setStreamCreateError(userMessageForStreamProxyError(e));
     } finally {
       setIsCreatingStream(false);
     }
@@ -360,6 +362,9 @@ export default function LivePage() {
                     <LivestreamThumbnail thumbnailUrl={thumbnailUrl} />
                   </div>
                 ) : null}
+                <p className="text-sm text-muted-foreground mb-4 text-center max-w-md">
+                  Create your channel first — camera preview and live chat appear on the next step.
+                </p>
                 <button
                   onClick={handleCreateStream}
                   disabled={isCreatingStream}
