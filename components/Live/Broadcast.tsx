@@ -55,6 +55,7 @@ export interface StreamProfile {
 
 export interface CreateStreamProxyParams {
   creatorAddress: string;
+  legacyCreatorAddress?: string | null;
   name: string;
   profiles: StreamProfile[];
   record: boolean;
@@ -64,19 +65,40 @@ export interface CreateStreamProxyParams {
 }
 
 export async function createStreamViaProxy(params: CreateStreamProxyParams) {
-  const { creatorAddress, name, profiles, record, playbackPolicy, authHeaders } = params;
-  const body = {
+  const {
+    creatorAddress,
+    legacyCreatorAddress,
+    name,
+    profiles,
+    record,
+    playbackPolicy,
+    authHeaders,
+  } = params;
+  const body: Record<string, unknown> = {
     creatorAddress,
     name,
     profiles,
     record,
     playbackPolicy,
   };
+  if (legacyCreatorAddress) {
+    body.legacyCreatorAddress = legacyCreatorAddress;
+  }
   const res = await fetch("/api/livepeer/livepeer-proxy", {
     method: "POST",
     headers: { "Content-Type": "application/json", ...authHeaders },
     body: JSON.stringify(body),
   });
+  if (res.status === 409) {
+    const existing = (await res.json()) as Record<string, unknown>;
+    if (existing.code === "STREAM_EXISTS") {
+      return {
+        streamId: existing.streamId as string,
+        playbackId: existing.playbackId as string,
+        streamKey: existing.streamKey as string,
+      };
+    }
+  }
   if (!res.ok) {
     throw await parseStreamProxyFailure(res);
   }
@@ -86,11 +108,15 @@ export async function createStreamViaProxy(params: CreateStreamProxyParams) {
 export async function fetchStreamKeyForCreator(
   creatorAddress: string,
   authHeaders: Record<string, string>,
+  legacyCreatorAddress?: string | null,
 ) {
-  const res = await fetch(
-    `/api/livepeer/stream-key?creatorAddress=${encodeURIComponent(creatorAddress)}`,
-    { headers: authHeaders },
-  );
+  const params = new URLSearchParams({ creatorAddress });
+  if (legacyCreatorAddress) {
+    params.set("legacyCreatorAddress", legacyCreatorAddress);
+  }
+  const res = await fetch(`/api/livepeer/stream-key?${params.toString()}`, {
+    headers: authHeaders,
+  });
   if (!res.ok) {
     throw new Error("Failed to fetch stream key");
   }

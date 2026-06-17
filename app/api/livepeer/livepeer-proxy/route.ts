@@ -4,7 +4,7 @@ import { isAddress } from "viem";
 import { rateLimiters } from "@/lib/middleware/rateLimit";
 import { requireHumanOrVerifiedBot } from "@/lib/middleware/botIdGuard";
 import { requireWalletAuthFor, WalletAuthError } from "@/lib/auth/require-wallet";
-import { createStreamRecord, getStreamByCreator } from "@/services/streams";
+import { createStreamRecord, resolveStreamForCreator } from "@/services/streams";
 import {
   hasLivepeerPrivateApiKey,
   livepeerStudioApiBaseUrl,
@@ -25,6 +25,7 @@ const streamProfileSchema = z.object({
 
 const bodySchema = z.object({
   creatorAddress: z.string().refine(isAddress, "Invalid creatorAddress"),
+  legacyCreatorAddress: z.string().refine(isAddress, "Invalid legacyCreatorAddress").optional(),
   name: z.string().min(1),
   profiles: z.array(streamProfileSchema).min(1),
   record: z.boolean(),
@@ -58,7 +59,8 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { creatorAddress, name, profiles, record, playbackPolicy } = parsed.data;
+  const { creatorAddress, legacyCreatorAddress, name, profiles, record, playbackPolicy } =
+    parsed.data;
   const normalizedCreator = creatorAddress.toLowerCase();
 
   try {
@@ -70,7 +72,10 @@ export async function POST(req: NextRequest) {
     throw authErr;
   }
 
-  const existing = await getStreamByCreator(normalizedCreator);
+  const existing = await resolveStreamForCreator(
+    normalizedCreator,
+    legacyCreatorAddress?.toLowerCase(),
+  );
   if (existing) {
     return NextResponse.json(
       {

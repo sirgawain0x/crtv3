@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireHumanOrVerifiedBot } from "@/lib/middleware/botIdGuard";
 import { rateLimiters } from "@/lib/middleware/rateLimit";
 import { requireWalletAuthFor, WalletAuthError } from "@/lib/auth/require-wallet";
-import { getStreamByCreator } from "@/services/streams";
+import { resolveStreamForCreator } from "@/services/streams";
 
 /**
  * Owner-only: return RTMP/WHIP stream key for the authenticated creator's channel.
@@ -20,6 +20,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Valid creatorAddress query param required" }, { status: 400 });
   }
 
+  const legacyCreatorAddress =
+    req.nextUrl.searchParams.get("legacyCreatorAddress")?.trim() || undefined;
+
   const normalizedCreator = creatorAddress.toLowerCase();
 
   try {
@@ -31,7 +34,10 @@ export async function GET(req: NextRequest) {
     throw authErr;
   }
 
-  const stream = await getStreamByCreator(normalizedCreator);
+  const stream = await resolveStreamForCreator(
+    normalizedCreator,
+    legacyCreatorAddress?.toLowerCase(),
+  );
   if (!stream) {
     return NextResponse.json({ error: "Stream not found" }, { status: 404 });
   }

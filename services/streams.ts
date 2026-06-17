@@ -2,6 +2,8 @@
 
 import { createClient } from "../lib/sdk/supabase/server";
 import { createServiceClient } from "../lib/sdk/supabase/service";
+import { isPermittedSigner } from "@/lib/utils/linked-identity";
+import { serverLogger } from "@/lib/utils/logger";
 
 export interface Stream {
     id: string;
@@ -49,6 +51,141 @@ export async function getStreamByCreator(creatorId: string) {
     }
 
     return data as Stream | null;
+}
+
+function uniqueAddresses(addresses: Array<string | null | undefined>): string[] {
+    const seen = new Set<string>();
+    const result: string[] = [];
+    for (const addr of addresses) {
+        const normalized = addr?.trim().toLowerCase();
+        if (!normalized || seen.has(normalized)) continue;
+        seen.add(normalized);
+        result.push(normalized);
+    }
+    return result;
+}
+
+async function collectLegacyCreatorCandidates(
+    normalizedSca: string,
+    legacySignerAddress?: string | null,
+): Promise<string[]> {
+    const candidates = uniqueAddresses([legacySignerAddress]);
+
+    try {
+        const supabase = await createServiceClient();
+        const { data: profiles } = await supabase
+            .from("creator_profiles")
+            .select("owner_address")
+            .ilike("owner_address", normalizedSca);
+
+        if (profiles?.length) {
+            for (const row of profiles) {
+                const owner = row.owner_address?.toLowerCase();
+                if (owner && owner !== normalizedSca) {
+                    candidates.push(owner);
+                }
+            }
+        }
+    } catch (error) {
+        serverLogger.warn("[resolveStreamForCreator] creator_profiles lookup failed", {
+            normalizedSca,
+            error: error instanceof Error ? error.message : String(error),
+        });
+    }
+
+    return uniqueAddresses(candidates).filter((addr) => addr !== normalizedSca);
+}
+
+async function migrateStreamCreatorId(
+    legacyStream: Stream,
+    normalizedSca: string,
+    legacyAddress: string,
+): Promise<Stream> {
+    const permitted = await isPermittedSigner(legacyAddress, normalizedSca);
+    if (!permitted) {
+        serverLogger.warn("[resolveStreamForCreator] migration denied — signer not permitted", {
+            legacyAddress,
+            normalizedSca,
+            streamId: legacyStream.id,
+        });
+        return legacyStream;
+    }
+
+    const supabase = await createServiceClient();
+    const { data, error } = await supabase
+        .from("streams")
+        .update({
+            creator_id: normalizedSca,
+            updated_at: new Date().toISOString(),
+        })
+        .eq("id", legacyStream.id)
+        .select()
+        .single();
+
+    if (error) {
+        serverLogger.error("[resolveStreamForCreator] migration update failed", {
+            legacyAddress,
+            normalizedSca,
+            streamId: legacyStream.id,
+            error: error.message,
+        });
+        return legacyStream;
+    }
+
+    serverLogger.info("[resolveStreamForCreator] migrated stream creator_id", {
+        legacyAddress,
+        normalizedSca,
+        streamId: legacyStream.id,
+    });
+
+    return data as Stream;
+}
+
+/**
+ * Resolve a creator's stream by smart-account address, migrating legacy EOA-keyed rows.
+ */
+export async function resolveStreamForCreator(
+    smartAccountAddress: string,
+    legacySignerAddress?: string | null,
+): Promise<Stream | null> {
+    const normalizedSca = smartAccountAddress.toLowerCase();
+    const existing = await getStreamByCreator(normalizedSca);
+    if (existing) return existing;
+
+    const legacyCandidates = await collectLegacyCreatorCandidates(
+        normalizedSca,
+        legacySignerAddress,
+    );
+
+    if (legacyCandidates.length === 0) {
+        serverLogger.debug("[resolveStreamForCreator] no legacy candidates", { normalizedSca });
+        return null;
+    }
+
+    for (const legacy of legacyCandidates) {
+        const legacyStream = await getStreamByCreator(legacy);
+        if (!legacyStream) continue;
+
+        const migrated = await migrateStreamCreatorId(legacyStream, normalizedSca, legacy);
+        if (migrated.creator_id.toLowerCase() === normalizedSca) {
+            return migrated;
+        }
+
+        // Read fallback: client supplied a matching legacy address but on-chain check failed.
+        if (legacySignerAddress?.trim().toLowerCase() === legacy) {
+            serverLogger.warn("[resolveStreamForCreator] returning legacy stream without migration", {
+                legacyAddress: legacy,
+                normalizedSca,
+            });
+            return legacyStream;
+        }
+    }
+
+    serverLogger.warn("[resolveStreamForCreator] legacy streams found but migration failed", {
+        normalizedSca,
+        legacyCandidates,
+    });
+    return null;
 }
 
 /**

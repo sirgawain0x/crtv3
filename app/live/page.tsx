@@ -11,7 +11,8 @@ function LiveRedirect() {
   const eoaAddress = user?.address;
 
   useEffect(() => {
-    if (eoaAddress) router.replace(`/live/${eoaAddress || scaAddress}`);
+    const targetAddress = scaAddress || eoaAddress;
+    if (targetAddress) router.replace(`/live/${targetAddress}`);
   }, [eoaAddress, scaAddress, router]);
 
   return (

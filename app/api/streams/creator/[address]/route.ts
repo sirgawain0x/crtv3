@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getStreamByCreator } from '@/services/streams';
+import { resolveStreamForCreator } from '@/services/streams';
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ address: string }> },
 ) {
   try {
@@ -11,9 +11,27 @@ export async function GET(
       return NextResponse.json({ error: 'Address is required' }, { status: 400 });
     }
 
-    const stream = await getStreamByCreator(address);
+    const legacyCreatorAddress =
+      request.nextUrl.searchParams.get('legacyCreatorAddress')?.trim() || undefined;
+
+    const stream = await resolveStreamForCreator(
+      address.toLowerCase(),
+      legacyCreatorAddress?.toLowerCase(),
+    );
     if (!stream) {
-      return NextResponse.json({ error: 'Stream not found' }, { status: 404 });
+      return NextResponse.json({
+        playback_id: null,
+        name: null,
+        thumbnail_url: null,
+        is_live: false,
+        last_live_at: null,
+        requires_metoken: false,
+        metoken_price: null,
+        allow_clipping: true,
+        story_ip_id: null,
+        story_license_terms_id: null,
+        story_commercial_rev_share: null,
+      });
     }
 
     return NextResponse.json({
