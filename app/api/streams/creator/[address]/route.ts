@@ -19,7 +19,19 @@ export async function GET(
       legacyCreatorAddress?.toLowerCase(),
     );
     if (!stream) {
-      return NextResponse.json({ error: 'Stream not found' }, { status: 404 });
+      return NextResponse.json({
+        playback_id: null,
+        name: null,
+        thumbnail_url: null,
+        is_live: false,
+        last_live_at: null,
+        requires_metoken: false,
+        metoken_price: null,
+        allow_clipping: true,
+        story_ip_id: null,
+        story_license_terms_id: null,
+        story_commercial_rev_share: null,
+      });
     }
 
     return NextResponse.json({

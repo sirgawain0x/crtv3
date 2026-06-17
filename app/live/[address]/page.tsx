@@ -50,7 +50,7 @@ import { logger } from '@/lib/utils/logger';
 
 
 export default function LivePage() {
-  const { creatorAddress, signerAddress, isConnected } = useCreatorWalletAddress();
+  const { creatorAddress, signerAddress, smartAccountAddress, eoaAddress, isConnected, isLoading: isWalletLoading } = useCreatorWalletAddress();
   const { getAuthHeaders } = useWalletAuth();
   const [multistreamTargets, setMultistreamTargets] = useState<
     MultistreamTarget[]
@@ -90,13 +90,38 @@ export default function LivePage() {
   const chatSessionId = playbackId ? `session-${playbackId}` : "";
 
 
+  const identityReady =
+    !isWalletLoading &&
+    !!creatorAddress &&
+    (!smartAccountAddress ||
+      !!signerAddress ||
+      (!!eoaAddress &&
+        eoaAddress.toLowerCase() === creatorAddress.toLowerCase()));
+
   // Fetch existing stream and multistream targets
   useEffect(() => {
+    let active = true;
+
+    setStreamKey(null);
+    setStreamId(null);
+    setPlaybackId(null);
+    setThumbnailUrl(null);
+    setAllowClipping(true);
+    setStreamName(null);
+    setRequiresMetoken(false);
+    setMetokenPrice(null);
+    setStoryIpId(null);
+    setStoryLicenseTermsId(null);
+    setStoryRevShare(null);
+    setMultistreamTargets([]);
+    setIsLoadingTargets(false);
+
     async function fetchStreamAndTargets() {
-      if (!creatorAddress) return;
+      if (!identityReady || !creatorAddress) return;
 
       try {
         const authHeaders = await getAuthHeaders();
+        if (!active) return;
         const legacy = signerAddress ?? undefined;
 
         try {
@@ -105,6 +130,7 @@ export default function LivePage() {
             authHeaders,
             legacy,
           );
+          if (!active) return;
           setStreamKey(keyData.streamKey);
           setStreamId(keyData.streamId);
           setPlaybackId(keyData.playbackId);
@@ -118,6 +144,7 @@ export default function LivePage() {
 
           setIsLoadingTargets(true);
           const result = await listMultistreamTargets({ streamId: keyData.streamId });
+          if (!active) return;
           setIsLoadingTargets(false);
           if (result.targets) {
             setMultistreamTargets(result.targets);
@@ -126,7 +153,9 @@ export default function LivePage() {
           }
         } catch (keyErr) {
           logger.debug("No stream key yet for creator:", keyErr);
-          setMultistreamTargets([]);
+          if (active) {
+            setMultistreamTargets([]);
+          }
         }
 
         const params = new URLSearchParams();
@@ -139,6 +168,8 @@ export default function LivePage() {
 
         if (res.ok) {
           const stream = await res.json();
+          if (!active) return;
+          if (!stream?.playback_id) return;
           setThumbnailUrl(stream.thumbnail_url || null);
           setAllowClipping(stream.allow_clipping ?? true);
           setStreamName(stream.name ?? null);
@@ -154,7 +185,11 @@ export default function LivePage() {
     }
 
     fetchStreamAndTargets();
-  }, [creatorAddress, signerAddress, getAuthHeaders]);
+
+    return () => {
+      active = false;
+    };
+  }, [creatorAddress, signerAddress, getAuthHeaders, identityReady]);
 
   useEffect(() => {
     async function fetchThumbnail() {

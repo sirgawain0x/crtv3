@@ -13,12 +13,11 @@ interface LivePageClientProps {
 }
 
 /**
- * Ensures the address in the URL matches the logged-in user's smart account.
+ * Ensures the address in the URL matches the logged-in user's canonical creator address.
  */
 export function LivePageClient({ urlAddress, children }: LivePageClientProps) {
   const router = useRouter();
-  const { creatorAddress, smartAccountAddress, eoaAddress, isLoading } =
-    useCreatorWalletAddress();
+  const { creatorAddress, isLoading } = useCreatorWalletAddress();
   const { isInitializing, isAuthenticating } = useSignerStatus();
 
   useEffect(() => {
@@ -38,29 +37,18 @@ export function LivePageClient({ urlAddress, children }: LivePageClientProps) {
       addr ? addr.toLowerCase() : null;
 
     const urlAddr = normalize(urlAddress);
-    const smartAddr = normalize(smartAccountAddress ?? creatorAddress);
-    const eoaAddr = normalize(eoaAddress);
+    const canonicalAddr = normalize(creatorAddress);
 
-    if (smartAddr) {
-      if (urlAddr !== smartAddr) {
-        logger.debug(
-          "Live URL address mismatch, redirecting to smart account:",
-          smartAccountAddress,
-        );
-        router.replace(`/live/${smartAccountAddress ?? creatorAddress}`);
-      }
-      return;
-    }
-
-    if (eoaAddr && urlAddr !== eoaAddr) {
-      logger.debug("Live URL address mismatch, redirecting to EOA:", eoaAddress);
-      router.replace(`/live/${eoaAddress}`);
+    if (canonicalAddr && urlAddr !== canonicalAddr) {
+      logger.debug(
+        "Live URL address mismatch, redirecting to canonical address:",
+        creatorAddress,
+      );
+      router.replace(`/live/${creatorAddress}`);
     }
   }, [
     urlAddress,
-    smartAccountAddress,
     creatorAddress,
-    eoaAddress,
     isLoading,
     isInitializing,
     isAuthenticating,
