@@ -33,6 +33,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { updateStream } from "@/services/streams";
+import { parseStreamProxyFailure } from "@/lib/livepeer/stream-proxy-errors";
 
 interface BroadcastProps {
   streamKey: string;
@@ -53,31 +54,77 @@ export interface StreamProfile {
 }
 
 export interface CreateStreamProxyParams {
+  creatorAddress: string;
+  legacyCreatorAddress?: string | null;
   name: string;
   profiles: StreamProfile[];
   record: boolean;
   playbackPolicy: any;
   multistream?: any;
+  authHeaders: Record<string, string>;
 }
 
 export async function createStreamViaProxy(params: CreateStreamProxyParams) {
-  const { name, profiles, record, playbackPolicy, multistream } = params;
-  const body: any = {
+  const {
+    creatorAddress,
+    legacyCreatorAddress,
+    name,
+    profiles,
+    record,
+    playbackPolicy,
+    authHeaders,
+  } = params;
+  const body: Record<string, unknown> = {
+    creatorAddress,
     name,
     profiles,
     record,
     playbackPolicy,
   };
-  if (multistream !== undefined) {
-    body.multistream = multistream;
+  if (legacyCreatorAddress) {
+    body.legacyCreatorAddress = legacyCreatorAddress;
   }
   const res = await fetch("/api/livepeer/livepeer-proxy", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...authHeaders },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error("Failed to create stream");
+  if (res.status === 409) {
+    const existing = (await res.json()) as Record<string, unknown>;
+    if (existing.code === "STREAM_EXISTS") {
+      return {
+        streamId: existing.streamId as string,
+        playbackId: existing.playbackId as string,
+        streamKey: existing.streamKey as string,
+      };
+    }
+  }
+  if (!res.ok) {
+    throw await parseStreamProxyFailure(res);
+  }
   return res.json();
+}
+
+export async function fetchStreamKeyForCreator(
+  creatorAddress: string,
+  authHeaders: Record<string, string>,
+  legacyCreatorAddress?: string | null,
+) {
+  const params = new URLSearchParams({ creatorAddress });
+  if (legacyCreatorAddress) {
+    params.set("legacyCreatorAddress", legacyCreatorAddress);
+  }
+  const res = await fetch(`/api/livepeer/stream-key?${params.toString()}`, {
+    headers: authHeaders,
+  });
+  if (!res.ok) {
+    throw new Error("Failed to fetch stream key");
+  }
+  return res.json() as Promise<{
+    streamId: string;
+    playbackId: string;
+    streamKey: string;
+  }>;
 }
 
 async function finalizeStreamRecordings(streamId: string) {

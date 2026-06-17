@@ -1,8 +1,15 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
-import { Broadcast, createStreamViaProxy } from "@/components/Live/Broadcast";
-import { getStreamByCreator, createStreamRecord, updateStream } from "@/services/streams";
-import { useUser } from "@account-kit/react";
+import {
+  Broadcast,
+  createStreamViaProxy,
+  fetchStreamKeyForCreator,
+} from "@/components/Live/Broadcast";
+import { updateStream } from "@/services/streams";
+import { useCreatorWalletAddress } from "@/lib/hooks/accountkit/useCreatorWalletAddress";
+import { useWalletAuth } from "@/lib/auth/useWalletAuth";
+import { LivePageClient } from "./LivePageClient";
+import { userMessageForStreamProxyError } from "@/lib/livepeer/stream-proxy-errors";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -43,13 +50,14 @@ import { logger } from '@/lib/utils/logger';
 
 
 export default function LivePage() {
-  const user = useUser();
-  const isConnected = !!user?.address;
+  const { creatorAddress, signerAddress, isConnected } = useCreatorWalletAddress();
+  const { getAuthHeaders } = useWalletAuth();
   const [multistreamTargets, setMultistreamTargets] = useState<
     MultistreamTarget[]
   >([]);
   const [isLoadingTargets, setIsLoadingTargets] = useState(false);
   const { address: addressParam } = useParams();
+  const urlAddress = Array.isArray(addressParam) ? addressParam[0] : addressParam;
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
   const [thumbnailError, setThumbnailError] = useState<string | null>(null);
   const [thumbnailLoading, setThumbnailLoading] = useState(false);
@@ -85,16 +93,52 @@ export default function LivePage() {
   // Fetch existing stream and multistream targets
   useEffect(() => {
     async function fetchStreamAndTargets() {
-      if (!user?.address) return;
+      if (!creatorAddress) return;
 
       try {
-        // 1. Fetch persistent stream
-        const stream = await getStreamByCreator(user.address);
+        const authHeaders = await getAuthHeaders();
+        const legacy = signerAddress ?? undefined;
 
-        if (stream) {
-          setStreamKey(stream.stream_key);
-          setStreamId(stream.stream_id);
-          setPlaybackId(stream.playback_id);
+        try {
+          const keyData = await fetchStreamKeyForCreator(
+            creatorAddress,
+            authHeaders,
+            legacy,
+          );
+          setStreamKey(keyData.streamKey);
+          setStreamId(keyData.streamId);
+          setPlaybackId(keyData.playbackId);
+
+          if (!recordingEnableRequestedRef.current.has(keyData.streamId)) {
+            recordingEnableRequestedRef.current.add(keyData.streamId);
+            fetch(`/api/livepeer/stream/${encodeURIComponent(keyData.streamId)}/recording`, {
+              method: "POST",
+            }).catch((err) => logger.error("Failed to enable stream recording:", err));
+          }
+
+          setIsLoadingTargets(true);
+          const result = await listMultistreamTargets({ streamId: keyData.streamId });
+          setIsLoadingTargets(false);
+          if (result.targets) {
+            setMultistreamTargets(result.targets);
+          } else if (result.error) {
+            logger.error("Error fetching multistream targets:", result.error);
+          }
+        } catch (keyErr) {
+          logger.debug("No stream key yet for creator:", keyErr);
+          setMultistreamTargets([]);
+        }
+
+        const params = new URLSearchParams();
+        if (legacy) params.set("legacyCreatorAddress", legacy);
+        const query = params.toString();
+        const res = await fetch(
+          `/api/streams/creator/${encodeURIComponent(creatorAddress)}${query ? `?${query}` : ""}`,
+          { cache: "no-store" },
+        );
+
+        if (res.ok) {
+          const stream = await res.json();
           setThumbnailUrl(stream.thumbnail_url || null);
           setAllowClipping(stream.allow_clipping ?? true);
           setStreamName(stream.name ?? null);
@@ -103,30 +147,6 @@ export default function LivePage() {
           setStoryIpId(stream.story_ip_id ?? null);
           setStoryLicenseTermsId(stream.story_license_terms_id ?? null);
           setStoryRevShare(stream.story_commercial_rev_share ?? null);
-
-          // One-time migration: enable recording for channels created before auto-record.
-          if (!recordingEnableRequestedRef.current.has(stream.stream_id)) {
-            recordingEnableRequestedRef.current.add(stream.stream_id);
-            fetch(`/api/livepeer/stream/${encodeURIComponent(stream.stream_id)}/recording`, {
-              method: "POST",
-            }).catch((err) => logger.error("Failed to enable stream recording:", err));
-          }
-        }
-
-        // 2. Fetch multistream targets for the persisted stream
-        const currentStreamId = stream?.stream_id;
-        if (!currentStreamId) {
-          setMultistreamTargets([]);
-          return;
-        }
-
-        setIsLoadingTargets(true);
-        const result = await listMultistreamTargets({ streamId: currentStreamId });
-        setIsLoadingTargets(false);
-        if (result.targets) {
-          setMultistreamTargets(result.targets);
-        } else if (result.error) {
-          logger.error("Error fetching multistream targets:", result.error);
         }
       } catch (err) {
         logger.error("Error fetching stream data:", err);
@@ -134,7 +154,7 @@ export default function LivePage() {
     }
 
     fetchStreamAndTargets();
-  }, [user?.address]);
+  }, [creatorAddress, signerAddress, getAuthHeaders]);
 
   useEffect(() => {
     async function fetchThumbnail() {
@@ -191,12 +211,12 @@ export default function LivePage() {
   }
 
   async function handleToggleClipping(next: boolean) {
-    if (!user?.address) return;
+    if (!creatorAddress) return;
     const previous = allowClipping;
     setAllowClipping(next);
     setIsUpdatingClipPref(true);
     try {
-      await updateStream(user.address, { allow_clipping: next });
+      await updateStream(creatorAddress, { allow_clipping: next });
     } catch (err) {
       logger.error("Failed to update clipping preference:", err);
       setAllowClipping(previous);
@@ -206,10 +226,14 @@ export default function LivePage() {
   }
 
   async function handleCreateStream() {
+    if (!creatorAddress) return;
     setIsCreatingStream(true);
     setStreamCreateError(null);
     try {
+      const authHeaders = await getAuthHeaders();
       const result = await createStreamViaProxy({
+        creatorAddress,
+        legacyCreatorAddress: signerAddress,
         name: `Broadcast-${Date.now()}`,
         profiles: [
           {
@@ -248,47 +272,24 @@ export default function LivePage() {
         ],
         record: true,
         playbackPolicy: { type: "jwt" },
-        // Don't include multistream targets during initial creation
-        // Targets can be added after stream creation using the API
-        multistream: undefined,
+        authHeaders,
       });
 
-      // Extract stream key and stream ID from response
-      // Livepeer API can return data in different formats:
-      // 1. Direct property: result.streamKey, result.id
-      // 2. Nested in stream object: result.stream.streamKey, result.stream.id
-      const streamKeyValue = result.streamKey || result.stream?.streamKey;
-      const streamIdValue = result.id || result.stream?.id;
-      const playbackIdValue = result.playbackId || result.stream?.playbackId;
+      const streamKeyValue = result.streamKey;
+      const streamIdValue = result.streamId;
+      const playbackIdValue = result.playbackId;
 
       if (streamKeyValue) {
         setStreamKey(streamKeyValue);
         if (streamIdValue) {
           setStreamId(streamIdValue);
           if (playbackIdValue) setPlaybackId(playbackIdValue);
-
-          // Persist the stream to database
-          if (user?.address) {
-            try {
-              await createStreamRecord({
-                creator_id: user.address,
-                stream_key: streamKeyValue,
-                stream_id: streamIdValue,
-                playback_id: result.playbackId || result.stream?.playbackId,
-                name: `Channel-${user.address.slice(0, 6)}`,
-                is_live: false
-              });
-            } catch (persistErr) {
-              logger.error("Failed to persist stream record:", persistErr);
-              // Don't block UI, but warn
-            }
-          }
         }
       } else {
         setStreamCreateError("Stream key not found in response");
       }
     } catch (e) {
-      setStreamCreateError("Failed to create stream");
+      setStreamCreateError(userMessageForStreamProxyError(e));
     } finally {
       setIsCreatingStream(false);
     }
@@ -313,6 +314,7 @@ export default function LivePage() {
   }
 
   return (
+    <LivePageClient urlAddress={urlAddress ?? ""}>
     <ProfilePageGuard>
       <MembershipGuard>
         <div className="min-h-screen p-4 md:p-6">
@@ -374,9 +376,9 @@ export default function LivePage() {
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
                 <div className="lg:col-span-2 relative">
-                  <Broadcast streamKey={streamKey} streamId={streamId} creatorAddress={user.address} />
-                  {user?.address && (
-                    <DigitalTwinOverlay creatorAddress={user.address} />
+                  <Broadcast streamKey={streamKey} streamId={streamId} creatorAddress={creatorAddress!} />
+                  {creatorAddress && (
+                    <DigitalTwinOverlay creatorAddress={creatorAddress} />
                   )}
                   {playbackId && (
                     <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
@@ -417,7 +419,7 @@ export default function LivePage() {
                     <LiveChat
                       streamId={chatStreamId}
                       sessionId={chatSessionId}
-                      creatorAddress={user.address}
+                      creatorAddress={creatorAddress!}
                       className="h-[min(70vh,520px)]"
                     />
                   ) : (
@@ -429,30 +431,30 @@ export default function LivePage() {
               </div>
             )}
 
-            {streamKey && streamId && user?.address && (
+            {streamKey && streamId && creatorAddress && (
               <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-5xl mx-auto">
                 <StreamThumbnailUploader
-                  creatorAddress={user.address}
+                  creatorAddress={creatorAddress}
                   playbackId={playbackId || streamId}
                   currentThumbnailUrl={thumbnailUrl}
                   onThumbnailUpdated={handleThumbnailUpdated}
                 />
                 <StreamNameEditor
-                  creatorAddress={user.address}
+                  creatorAddress={creatorAddress}
                   currentName={streamName}
                   onNameUpdated={handleNameUpdated}
                 />
                 <StreamMeTokenGateEditor
-                  creatorAddress={user.address}
+                  creatorAddress={creatorAddress}
                   requiresMetoken={requiresMetoken}
                   metokenPrice={metokenPrice}
                   onGateUpdated={handleGateUpdated}
                 />
               </div>
             )}
-            {streamId && user?.address && (
+            {streamId && creatorAddress && (
               <StreamIPRegistration
-                creatorAddress={user.address}
+                creatorAddress={creatorAddress}
                 streamName={streamName}
                 thumbnailUrl={thumbnailUrl}
                 storyIpId={storyIpId}
@@ -541,15 +543,16 @@ export default function LivePage() {
             shareNoun="live stream"
           />
         )}
-        {chatStreamId && user?.address && (
+        {chatStreamId && creatorAddress && (
           <ModeratorsDialog
             open={moderatorsDialogOpen}
             onOpenChange={setModeratorsDialogOpen}
             streamId={chatStreamId}
-            creatorAddress={user.address}
+            creatorAddress={creatorAddress}
           />
         )}
       </MembershipGuard>
     </ProfilePageGuard>
+    </LivePageClient>
   );
 }

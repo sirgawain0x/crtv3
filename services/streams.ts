@@ -2,6 +2,7 @@
 
 import { createClient } from "../lib/sdk/supabase/server";
 import { createServiceClient } from "../lib/sdk/supabase/service";
+import { isPermittedSigner } from "@/lib/utils/linked-identity";
 
 export interface Stream {
     id: string;
@@ -49,6 +50,45 @@ export async function getStreamByCreator(creatorId: string) {
     }
 
     return data as Stream | null;
+}
+
+/**
+ * Resolve a creator's stream by smart-account address, migrating legacy EOA-keyed rows.
+ */
+export async function resolveStreamForCreator(
+    smartAccountAddress: string,
+    legacySignerAddress?: string | null,
+): Promise<Stream | null> {
+    const normalizedSca = smartAccountAddress.toLowerCase();
+    const existing = await getStreamByCreator(normalizedSca);
+    if (existing) return existing;
+
+    const legacy = legacySignerAddress?.trim().toLowerCase();
+    if (!legacy || legacy === normalizedSca) return null;
+
+    const legacyStream = await getStreamByCreator(legacy);
+    if (!legacyStream) return null;
+
+    const permitted = await isPermittedSigner(legacy, normalizedSca);
+    if (!permitted) return null;
+
+    const supabase = await createServiceClient();
+    const { data, error } = await supabase
+        .from("streams")
+        .update({
+            creator_id: normalizedSca,
+            updated_at: new Date().toISOString(),
+        })
+        .eq("id", legacyStream.id)
+        .select()
+        .single();
+
+    if (error) {
+        console.error("Error migrating stream creator_id:", error);
+        return legacyStream;
+    }
+
+    return data as Stream;
 }
 
 /**

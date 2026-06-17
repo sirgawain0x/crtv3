@@ -1,29 +1,31 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { useUser } from '@account-kit/react';
-import useModularAccount from '@/lib/hooks/accountkit/useModularAccount';
+import { useCreatorWalletAddress } from '@/lib/hooks/accountkit/useCreatorWalletAddress';
 import type { StreamSummary } from '@/lib/songchain/build-lens-livestream-metadata';
 
 export function useCreatorLiveStream(pollMs = 30_000) {
-  const user = useUser();
-  const { account: modularAccount } = useModularAccount();
-  const creatorId = modularAccount?.address || user?.address || null;
+  const { creatorAddress, signerAddress } = useCreatorWalletAddress();
 
   const [stream, setStream] = useState<StreamSummary | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
-    if (!creatorId) {
+    if (!creatorAddress) {
       setStream(null);
       return;
     }
     setLoading(true);
     setError(null);
     try {
+      const params = new URLSearchParams();
+      if (signerAddress) {
+        params.set('legacyCreatorAddress', signerAddress);
+      }
+      const query = params.toString();
       const res = await fetch(
-        `/api/streams/creator/${encodeURIComponent(creatorId)}`,
+        `/api/streams/creator/${encodeURIComponent(creatorAddress)}${query ? `?${query}` : ''}`,
         { cache: 'no-store' },
       );
       if (!res.ok) {
@@ -41,14 +43,14 @@ export function useCreatorLiveStream(pollMs = 30_000) {
     } finally {
       setLoading(false);
     }
-  }, [creatorId]);
+  }, [creatorAddress, signerAddress]);
 
   useEffect(() => {
     void reload();
-    if (!creatorId) return;
+    if (!creatorAddress) return;
     const id = setInterval(() => void reload(), pollMs);
     return () => clearInterval(id);
-  }, [reload, creatorId, pollMs]);
+  }, [reload, creatorAddress, pollMs]);
 
   return {
     stream,
@@ -56,6 +58,6 @@ export function useCreatorLiveStream(pollMs = 30_000) {
     loading,
     error,
     reload,
-    creatorId,
+    creatorId: creatorAddress,
   };
 }
