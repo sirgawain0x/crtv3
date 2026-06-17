@@ -21,7 +21,6 @@ export async function requireHumanOrVerifiedBot(
       context,
       isBot: verification.isBot,
       isVerifiedBot: verification.isVerifiedBot,
-      verifiedBotName: verification.verifiedBotName,
     });
 
     return {
