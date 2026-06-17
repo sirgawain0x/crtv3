@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   buildHallidayInputAssets,
   buildHallidayOutputAsset,
+  buildHallidayStoryOutputAsset,
   HALLIDAY_DEFAULT_INPUT_ASSETS,
   isHallidaySandboxEnabled,
   LENS_GHO_TOKEN_ADDRESS,
@@ -45,6 +46,27 @@ describe('buildHallidayOutputAsset', () => {
   it('respects full output asset override and normalizes casing', () => {
     process.env.NEXT_PUBLIC_HALLIDAY_OUTPUT_ASSET = 'Lens:0xAbC';
     expect(buildHallidayOutputAsset('mainnet')).toBe('lens:0xabc');
+  });
+});
+
+describe('buildHallidayStoryOutputAsset', () => {
+  const env = process.env;
+
+  afterEach(() => {
+    process.env = { ...env };
+  });
+
+  it('builds story testnet native IP output by default', () => {
+    delete process.env.NEXT_PUBLIC_HALLIDAY_STORY_OUTPUT_ASSET;
+    delete process.env.NEXT_PUBLIC_HALLIDAY_STORY_CHAIN_SLUG;
+    delete process.env.NEXT_PUBLIC_STORY_NETWORK;
+
+    expect(buildHallidayStoryOutputAsset('testnet')).toBe('story-testnet:0x');
+  });
+
+  it('builds story mainnet native IP output', () => {
+    delete process.env.NEXT_PUBLIC_HALLIDAY_STORY_OUTPUT_ASSET;
+    expect(buildHallidayStoryOutputAsset('mainnet')).toBe('story:0x');
   });
 });
 

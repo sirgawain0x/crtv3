@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { SongchainOrbConnect } from "@/components/songchain/SongchainOrbConnect";
 import { SongchainLensAdvancedTooltip } from "@/components/songchain/SongchainLensAdvancedTooltip";
-import { HallidayOnramp } from "@/components/songchain/HallidayOnramp";
+// import { HallidayOnramp } from "@/components/songchain/HallidayOnramp";
 import type { SongchainConfig } from "@/lib/songchain/config";
 import { SONGCHAIN_EVENTS } from "@/lib/songchain/events";
 import { Music2, Trophy } from "lucide-react";
@@ -45,12 +45,14 @@ export function SongchainPageClient({ config }: SongchainPageClientProps) {
 
       <div className="mb-10 space-y-6">
         <SongchainOrbConnect />
+        {/* TODO: Re-enable when Halliday supports Lens GHO on production
         <HallidayOnramp
           hallidayApiKey={config.hallidayApiKey}
           hallidayOutputAsset={config.hallidayOutputAsset}
           hallidayInputAssets={config.hallidayInputAssets}
           hallidaySandbox={config.hallidaySandbox}
         />
+        */}
       </div>
 
       <section aria-labelledby="songchain-events-heading">
@@ -63,8 +65,6 @@ export function SongchainPageClient({ config }: SongchainPageClientProps) {
         </h2>
         <ul className="grid gap-4 sm:grid-cols-2">
           {SONGCHAIN_EVENTS.map((event) => {
-            const isActive = event.status === "active" && event.href;
-
             const cardContent = (
               <>
                 <span className="text-xs font-semibold uppercase tracking-wider text-violet-400">
@@ -74,7 +74,7 @@ export function SongchainPageClient({ config }: SongchainPageClientProps) {
                 {event.description && (
                   <span className="mt-1 block text-sm text-violet-200/70">{event.description}</span>
                 )}
-                {isActive && (
+                {event.status === "active" && (
                   <span className="mt-3 inline-block rounded-md bg-gradient-to-r from-[#E82594] to-[#FF66CC] px-3 py-1.5 text-sm font-semibold text-white">
                     Enter event
                   </span>
@@ -82,11 +82,11 @@ export function SongchainPageClient({ config }: SongchainPageClientProps) {
               </>
             );
 
-            return (
-              <li key={event.slug}>
-                {isActive ? (
+            if (event.status === "active") {
+              return (
+                <li key={event.slug}>
                   <Link
-                    href={event.href!}
+                    href={event.href}
                     className={cn(
                       "block rounded-xl border border-violet-500/30 bg-gradient-to-br from-violet-950/80 to-fuchsia-950/60 p-6",
                       "transition hover:border-violet-400/50 hover:shadow-md",
@@ -94,14 +94,18 @@ export function SongchainPageClient({ config }: SongchainPageClientProps) {
                   >
                     {cardContent}
                   </Link>
-                ) : (
-                  <div
-                    className="block cursor-not-allowed rounded-xl border border-violet-500/15 bg-violet-950/30 p-6 opacity-70"
-                    aria-disabled="true"
-                  >
-                    {cardContent}
-                  </div>
-                )}
+                </li>
+              );
+            }
+
+            return (
+              <li key={event.slug}>
+                <div
+                  className="block cursor-not-allowed rounded-xl border border-violet-500/15 bg-violet-950/30 p-6 opacity-70"
+                  aria-disabled="true"
+                >
+                  {cardContent}
+                </div>
               </li>
             );
           })}

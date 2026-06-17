@@ -9,7 +9,7 @@ const CREATOR = "0xcccccccccccccccccccccccccccccccccccccccc";
 
 const mockRequireHumanOrVerifiedBot = vi.fn();
 const mockRequireWalletAuthFor = vi.fn();
-const mockGetStreamByCreator = vi.fn();
+const mockResolveStreamForCreator = vi.fn();
 const mockCreateStreamRecord = vi.fn();
 const mockFetch = vi.fn();
 
@@ -36,7 +36,7 @@ vi.mock("@/lib/auth/require-wallet", () => ({
 }));
 
 vi.mock("@/services/streams", () => ({
-  getStreamByCreator: (...args: unknown[]) => mockGetStreamByCreator(...args),
+  resolveStreamForCreator: (...args: unknown[]) => mockResolveStreamForCreator(...args),
   createStreamRecord: (...args: unknown[]) => mockCreateStreamRecord(...args),
 }));
 
@@ -79,7 +79,7 @@ describe("POST /api/livepeer/livepeer-proxy", () => {
     vi.clearAllMocks();
     mockRequireHumanOrVerifiedBot.mockResolvedValue({ allowed: true });
     mockRequireWalletAuthFor.mockResolvedValue({ address: CREATOR });
-    mockGetStreamByCreator.mockResolvedValue(null);
+    mockResolveStreamForCreator.mockResolvedValue(null);
     mockCreateStreamRecord.mockResolvedValue({ id: "db-1" });
     process.env.LIVEPEER_FULL_API_KEY = "test-full-key";
     global.fetch = mockFetch as typeof fetch;

@@ -8,7 +8,7 @@ import { SongchainGroupPanel } from "@/components/songchain/SongchainGroupPanel"
 import { SongchainGraphPanel } from "@/components/songchain/SongchainGraphPanel";
 import { SongchainComposePost } from "@/components/songchain/SongchainComposePost";
 import { SongchainBookmarksSection } from "@/components/songchain/SongchainBookmarksSection";
-import { HallidayOnramp } from "@/components/songchain/HallidayOnramp";
+// import { HallidayOnramp } from "@/components/songchain/HallidayOnramp";
 import type { SongchainConfig } from "@/lib/songchain/config";
 import type { SongchainFeedHandle } from "@/components/songchain/SongchainFeedSection";
 
@@ -31,12 +31,14 @@ export function SongchainFeedExperience({
       {showWallet && (
         <div className="space-y-6">
           <SongchainOrbConnect />
+          {/* TODO: Re-enable when Halliday supports Lens GHO on production
           <HallidayOnramp
             hallidayApiKey={config.hallidayApiKey}
             hallidayOutputAsset={config.hallidayOutputAsset}
             hallidayInputAssets={config.hallidayInputAssets}
             hallidaySandbox={config.hallidaySandbox}
           />
+          */}
         </div>
       )}
 

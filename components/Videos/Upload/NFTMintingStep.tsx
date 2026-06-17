@@ -7,6 +7,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, InfoIcon, XCircle, CheckCircle, ExternalLink, FuelIcon } from "lucide-react";
 import { CrossChainSwap } from "./CrossChainSwap";
+import { HallidayOnramp } from "@/components/songchain/HallidayOnramp";
+import {
+  buildHallidayInputAssets,
+  buildHallidayStoryOutputAsset,
+  isHallidaySandboxEnabled,
+} from "@/lib/songchain/halliday";
 import { createStoryPublicClient } from "@/lib/sdk/story/client";
 import { getNFTContractAddress, mintVideoNFT } from "@/lib/sdk/nft/minting-service";
 import { formatEther, type Address } from "viem";
@@ -60,6 +66,14 @@ export function NFTMintingStep({
   const hasStoryPolicy = Boolean(
     (process.env.NEXT_PUBLIC_STORY_POLICY_ID ?? "").replace(/^["']|["']$/g, "").trim()
   );
+
+  const hallidayApiKey =
+    process.env.NEXT_PUBLIC_HALLIDAY_API_KEY?.trim() ||
+    process.env.HALLIDAY_API_KEY?.trim() ||
+    null;
+  const hallidayOutputAsset = buildHallidayStoryOutputAsset();
+  const hallidayInputAssets = buildHallidayInputAssets();
+  const hallidaySandbox = isHallidaySandboxEnabled();
 
   useEffect(() => {
     const address = getNFTContractAddress();
@@ -265,6 +279,18 @@ export function NFTMintingStep({
                 }, 3000);
               }}
             />
+
+            {hallidayApiKey && (
+              <HallidayOnramp
+                variant="story"
+                hallidayApiKey={hallidayApiKey}
+                hallidayOutputAsset={hallidayOutputAsset}
+                hallidayInputAssets={hallidayInputAssets}
+                hallidaySandbox={hallidaySandbox}
+                destinationAddressOverride={fundingWalletAddress}
+                lazyInit
+              />
+            )}
           </div>
             )}
           </>

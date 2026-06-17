@@ -1,8 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
-  destroyClient,
   initializeClient,
   openHallidayPayments,
 } from "@halliday-sdk/payments";
@@ -15,14 +14,56 @@ import { Wallet } from "lucide-react";
 
 /** Above app modals (e.g. z-50 nav, z-[99999] selects) so Halliday header stays visible. */
 const HALLIDAY_WIDGET_Z_INDEX = 1_000_000;
-const HALLIDAY_HEADER_TITLE = "Buy GHO";
+
+export type HallidayOnrampVariant = "lens" | "story";
 
 export type HallidayOnrampProps = {
   hallidayApiKey: string | null;
   hallidayOutputAsset: string;
-  /** Fiat or token ids for the pay side, e.g. `["USD"]` for card onramp. */
+  /** Fiat or token ids for the pay side, e.g. `["usd"]` for card onramp. */
   hallidayInputAssets: string[];
   hallidaySandbox: boolean;
+  /** Lens GHO onramp vs Story $IP gas funding. */
+  variant?: HallidayOnrampVariant;
+  /** Override destination (e.g. Story funding wallet). */
+  destinationAddressOverride?: string | null;
+  /** When true, skip mount-time preload; init on button click only. */
+  lazyInit?: boolean;
+};
+
+const VARIANT_COPY: Record<
+  HallidayOnrampVariant,
+  {
+    headerTitle: string;
+    buttonLabel: string;
+    title: string;
+    description: string;
+    connectMessage: string;
+    footer: string;
+    missingKeyMessage: string;
+  }
+> = {
+  lens: {
+    headerTitle: "Buy GHO",
+    buttonLabel: "Get GHO",
+    title: "Fund on Lens Chain",
+    description: "Buy GHO on Lens with debit/credit via Halliday — destination",
+    connectMessage:
+      "Sign in and connect a wallet so funds arrive at your Lens destination address.",
+    footer:
+      "Opens Halliday checkout. Pay by card or bank in the widget to receive GHO at your Lens destination.",
+    missingKeyMessage: "Fund your Lens wallet with GHO via Halliday",
+  },
+  story: {
+    headerTitle: "Buy $IP",
+    buttonLabel: "Buy $IP",
+    title: "Fund Story Protocol Gas",
+    description: "Buy $IP with debit/credit via Halliday — destination",
+    connectMessage: "Connect your wallet so Halliday knows where to send $IP.",
+    footer:
+      "Opens Halliday checkout. Pay by card or bank to top up Story Protocol gas.",
+    missingKeyMessage: "Fund Story Protocol gas with $IP via Halliday",
+  },
 };
 
 export function HallidayOnramp({
@@ -30,7 +71,11 @@ export function HallidayOnramp({
   hallidayOutputAsset,
   hallidayInputAssets,
   hallidaySandbox,
+  variant = "lens",
+  destinationAddressOverride,
+  lazyInit = true,
 }: HallidayOnrampProps) {
+  const copy = VARIANT_COPY[variant];
   const { openAuthModal } = useAuthModal();
   const user = useUser();
   const { client: smartAccountClient, address: smartAccountAddress } =
@@ -38,8 +83,18 @@ export function HallidayOnramp({
   const { lensAccount } = useLensOrbWrite();
 
   const [error, setError] = useState<string | null>(null);
+  const [initialized, setInitialized] = useState(false);
 
   const destinationAddress = useMemo(() => {
+    if (destinationAddressOverride) return destinationAddressOverride;
+    if (variant === "story") {
+      return (
+        smartAccountClient?.account?.address ??
+        smartAccountAddress ??
+        user?.address ??
+        null
+      );
+    }
     return (
       lensAccount ??
       smartAccountClient?.account?.address ??
@@ -48,6 +103,8 @@ export function HallidayOnramp({
       null
     );
   }, [
+    destinationAddressOverride,
+    variant,
     lensAccount,
     smartAccountClient?.account?.address,
     smartAccountAddress,
@@ -69,10 +126,9 @@ export function HallidayOnramp({
       outputs: [hallidayOutputAsset],
       sandbox: hallidaySandbox,
       windowType: "MODAL" as const,
-      /** Fiat onramp tab; matches Halliday widget `sessionType` for card/bank pay-in. */
       sessionType: "cash" as const,
       destinationAddress: destinationAddress ?? undefined,
-      headerTitle: HALLIDAY_HEADER_TITLE,
+      headerTitle: copy.headerTitle,
       customStyles: {
         zIndex: HALLIDAY_WIDGET_Z_INDEX,
         backgroundStyle: "BLUR" as const,
@@ -91,45 +147,45 @@ export function HallidayOnramp({
       destinationAddress,
       userWallet,
       openAuthModal,
+      copy.headerTitle,
     ],
   );
 
-  useEffect(() => {
-    if (!hallidayApiKey) return;
-
-    initializeClient({
+  const ensureInitialized = useCallback(async () => {
+    if (!hallidayApiKey || initialized) return;
+    await initializeClient({
       ...baseParams,
       onError: (err) => {
         setError(err.message || "Halliday failed to preload.");
       },
     });
-
-    return () => {
-      destroyClient();
-    };
-  }, [hallidayApiKey, baseParams]);
+    setInitialized(true);
+  }, [hallidayApiKey, initialized, baseParams]);
 
   const requireWallet = useCallback((): boolean => {
     if (destinationAddress) return true;
-    setError("Connect your wallet (or link Orb) so Halliday knows where to send GHO.");
+    setError(copy.connectMessage);
     openAuthModal();
     return false;
-  }, [destinationAddress, openAuthModal]);
+  }, [destinationAddress, openAuthModal, copy.connectMessage]);
 
-  const openOnramp = useCallback(() => {
+  const openOnramp = useCallback(async () => {
     if (!hallidayApiKey || !requireWallet()) return;
     setError(null);
     try {
+      if (lazyInit) {
+        await ensureInitialized();
+      }
       openHallidayPayments(baseParams);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not open Halliday.");
     }
-  }, [hallidayApiKey, requireWallet, baseParams]);
+  }, [hallidayApiKey, requireWallet, lazyInit, ensureInitialized, baseParams]);
 
   if (!hallidayApiKey) {
     return (
       <p className="text-sm text-muted-foreground">
-        Fund your Lens wallet with GHO via Halliday — set{" "}
+        {copy.missingKeyMessage} — set{" "}
         <code className="text-xs">NEXT_PUBLIC_HALLIDAY_API_KEY</code> (or{" "}
         <code className="text-xs">HALLIDAY_API_KEY</code> on the server) to enable.
       </p>
@@ -142,39 +198,34 @@ export function HallidayOnramp({
         <div>
           <h3 className="font-semibold flex items-center gap-2">
             <Wallet className="h-4 w-4 text-violet-400" aria-hidden />
-            Fund on Lens Chain
+            {copy.title}
           </h3>
           <p className="text-sm text-muted-foreground">
-            Buy GHO on Lens with debit/credit via Halliday — destination{" "}
+            {copy.description}{" "}
             {destinationAddress
               ? `${destinationAddress.slice(0, 6)}…${destinationAddress.slice(-4)}`
               : "connect wallet"}
           </p>
         </div>
-        <Button type="button" variant="secondary" size="sm" onClick={openOnramp}>
-          Get GHO
+        <Button type="button" variant="secondary" size="sm" onClick={() => void openOnramp()}>
+          {copy.buttonLabel}
         </Button>
       </div>
 
       {error && (
         <p className="mt-3 text-sm text-destructive" role="alert">
           {error}{" "}
-          <button type="button" className="underline" onClick={openOnramp}>
+          <button type="button" className="underline" onClick={() => void openOnramp()}>
             Try again
           </button>
         </p>
       )}
 
       {!destinationAddress && (
-        <p className="mt-3 text-sm text-amber-200/90">
-          Sign in and connect a wallet so funds arrive at your Lens destination address.
-        </p>
+        <p className="mt-3 text-sm text-amber-200/90">{copy.connectMessage}</p>
       )}
 
-      <p className="mt-3 text-xs text-muted-foreground">
-        Opens Halliday checkout. Pay by card or bank in the widget to receive GHO at
-        your Lens destination.
-      </p>
+      <p className="mt-3 text-xs text-muted-foreground">{copy.footer}</p>
     </div>
   );
 }
