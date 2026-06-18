@@ -16,9 +16,9 @@
   overflow: hidden;
   margin: 0;
   min-height: 85vh;
-  perspective-origin: 50% calc(50% - 8rem);
+  perspective-origin: 50% 50%;
   perspective: 35em;
-  background: #000000;
+  background: #1a202c;
   isolation: isolate;
 }
 
@@ -29,13 +29,14 @@
   display: grid;
   width: 100%;
   min-height: min(70vh, 560px);
-  margin-top: clamp(80px, 14vh, 120px);
+  margin-top: clamp(2rem, 6vh, 4rem);
   z-index: 1;
   pointer-events: none;
   contain: paint;
 }
 
-.song-cup-hero-scene .song-cup-hero-animation > div {
+.song-cup-hero-scene .song-cup-hero-animation > .song-cup-hero-rings,
+.song-cup-hero-scene .song-cup-hero-animation > .a3d {
   display: grid;
   grid-area: 1 / 1;
   place-self: center;
@@ -79,11 +80,11 @@
 @keyframes song-cup-text-fade {
   15%,
   85% {
-    transform: var(--pos) scale(0.625);
-    filter: grayscale(1);
+    transform: var(--pos) scale(0.75);
+    opacity: 0.35;
   }
   50% {
-    opacity: 0.15;
+    opacity: 0.12;
   }
 }
 
@@ -110,16 +111,25 @@
 }
 
 .song-cup-hero-scene .song-cup-hero-copy {
+  grid-area: 1 / 1;
+  place-self: center;
   position: relative;
-  z-index: 20;
-  margin-top: clamp(140px, 24vh, 200px);
+  z-index: 3;
+  padding: 0 1rem;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0.75rem;
-  padding: 0 1rem;
   text-align: center;
   pointer-events: none;
+}
+
+.song-cup-hero-scene .song-cup-hero-copy-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1.25rem 1.75rem;
 }
 
 .song-cup-hero-scene .song-cup-hero-line {
@@ -129,7 +139,9 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: #ffffff;
-  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.8);
+  text-shadow:
+    0 2px 12px rgba(0, 0, 0, 0.9),
+    0 0 2px rgba(0, 0, 0, 0.8);
 }
 
 .song-cup-hero-scene .song-cup-hero-line-sub {
@@ -217,7 +229,7 @@
   bottom: -6px;
   width: 60px;
   height: 10px;
-  background-color: #0f2427;
+  background-color: #2d3748;
   border-radius: 50%;
   opacity: 0.9;
   box-shadow: inset 0 2px 4px rgba(255, 255, 255, 0.2);
@@ -292,8 +304,24 @@
     height: 6px;
     bottom: -4px;
   }
-  .song-cup-hero-scene .song-cup-hero-copy {
-    margin-top: clamp(100px, 18vh, 140px);
+
+  .song-cup-hero-scene .song-cup-hero-rings {
+    display: none;
+  }
+
+  .song-cup-hero-scene .soccer-ball .ball-patch {
+    stroke: #e2e8f0;
+    stroke-width: 0.75;
+  }
+}
+
+@media (max-width: 768px) {
+  .song-cup-hero-scene .a3d {
+    animation: roty 20s linear infinite !important;
+  }
+
+  .song-cup-hero-scene .s2d {
+    animation: none !important;
   }
 }
 
@@ -310,7 +338,8 @@
   z-index: 2;
   display: grid;
   transform-style: preserve-3d;
-  animation: roty 12s linear infinite, size 48s cubic-bezier(0.25, 1, 0.5, 1) infinite;
+  backface-visibility: hidden;
+  animation: roty 20s linear infinite, size 48s cubic-bezier(0.25, 1, 0.5, 1) infinite;
 }
 
 @keyframes roty {
@@ -329,6 +358,7 @@
   display: grid;
   grid-area: 1 / 1;
   place-self: center;
+  backface-visibility: hidden;
   --sup: 0;
   --not-sup: calc(1 - var(--sup));
   --sgn-sup: calc(2*var(--sup) - 1);
@@ -341,15 +371,9 @@
   --dir: rotatey(calc(var(--j)*1turn)) rotatex(calc(var(--i)*.5turn)) rotatez(calc(var(--k, 0)*.5turn));
   --lum: 50%;
   background: HSL(var(--hs), calc(var(--lum) + var(--i)*39%));
-  animation: shade 6s ease-in-out calc(var(--j)*-12s) infinite alternate, var(--morph, a) 48s cubic-bezier(0.25, 1, 0.5, 1) infinite;
+  animation: var(--morph, a) 48s cubic-bezier(0.25, 1, 0.5, 1) infinite;
   border: 0.15ch solid rgba(255,255,255,0.18);
   box-shadow: 0 0 0.8ch rgba(255,255,255,0.35);
-}
-
-@keyframes shade {
-  to {
-    filter: brightness(0.85);
-  }
 }
 
 /* White hexagon/triangle faces */
@@ -465,8 +489,7 @@
 }
 
 .song-cup-hero-scene .s5gon:nth-child(1), .song-cup-hero-scene .s5gon:nth-child(12) {
-  filter: brightness(calc(1 - .5*var(--not-sup)));
-  animation-name: nos, var(--morph);
+  animation-name: var(--morph);
 }
 .song-cup-hero-scene .s5gon:nth-child(5n + 2) {
   --j: calc((0 + .5*var(--not-sup))/5);

@@ -7,9 +7,10 @@ import { useSongchainFeed } from "@/hooks/useSongchainFeed";
 import { SongchainPostCard } from "@/components/songchain/SongchainPostCard";
 import { SongchainPendingPostCard } from "@/components/songchain/SongchainPendingPostCard";
 import {
-  SongchainPostMasonryGrid,
-  SongchainPostMasonryItem,
-} from "@/components/songchain/SongchainPostMasonryGrid";
+  SongchainPostTimeline,
+  SongchainPostTimelineItem,
+} from "@/components/songchain/SongchainPostTimeline";
+import { isQuotePost } from "@/lib/songchain/post-utils";
 import { getFeedDiagnosticInfo } from "@/lib/songchain/feed-diagnostics";
 import type { SongchainCreatedPost } from "@/lib/songchain/feed-types";
 
@@ -138,17 +139,17 @@ export const SongchainFeedSection = forwardRef<SongchainFeedHandle, SongchainFee
             <p className="mt-2 text-sm text-muted-foreground">{emptyDescription}</p>
           </div>
         ) : (
-          <SongchainPostMasonryGrid>
+          <SongchainPostTimeline>
             {pendingPosts.map((pending) => (
-              <SongchainPostMasonryItem key={pending.localId}>
+              <SongchainPostTimelineItem key={pending.localId}>
                 <SongchainPendingPostCard
                   pending={pending}
                   onRefresh={() => reload()}
                 />
-              </SongchainPostMasonryItem>
+              </SongchainPostTimelineItem>
             ))}
             {posts.map((post) => (
-              <SongchainPostMasonryItem key={post.id}>
+              <SongchainPostTimelineItem key={post.id} isQuote={isQuotePost(post)}>
                 <SongchainPostCard
                   post={post}
                   feedId={feedId}
@@ -156,9 +157,9 @@ export const SongchainFeedSection = forwardRef<SongchainFeedHandle, SongchainFee
                   onReactionChange={reload}
                   onPostUpdated={onPostUpdated}
                 />
-              </SongchainPostMasonryItem>
+              </SongchainPostTimelineItem>
             ))}
-          </SongchainPostMasonryGrid>
+          </SongchainPostTimeline>
         )}
 
         {hasMore && (

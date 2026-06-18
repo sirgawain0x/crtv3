@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button";
 import { useSongchainBookmarks } from "@/hooks/useSongchainBookmarks";
 import { SongchainPostCard } from "@/components/songchain/SongchainPostCard";
 import {
-  SongchainPostMasonryGrid,
-  SongchainPostMasonryItem,
-} from "@/components/songchain/SongchainPostMasonryGrid";
+  SongchainPostTimeline,
+  SongchainPostTimelineItem,
+} from "@/components/songchain/SongchainPostTimeline";
+import { isQuotePost } from "@/lib/songchain/post-utils";
 
 import type { SongchainConfig } from "@/lib/songchain/config";
 
@@ -59,17 +60,17 @@ export function SongchainBookmarksSection({
       ) : posts.length === 0 ? (
         <p className="text-center text-muted-foreground py-12">No bookmarks yet.</p>
       ) : (
-        <SongchainPostMasonryGrid>
+        <SongchainPostTimeline>
           {posts.map((post) => (
-            <SongchainPostMasonryItem key={post.id}>
+            <SongchainPostTimelineItem key={post.id} isQuote={isQuotePost(post)}>
               <SongchainPostCard
                 post={post}
                 graphId={graphId}
                 onReactionChange={reload}
               />
-            </SongchainPostMasonryItem>
+            </SongchainPostTimelineItem>
           ))}
-        </SongchainPostMasonryGrid>
+        </SongchainPostTimeline>
       )}
     </section>
   );

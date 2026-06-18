@@ -1,5 +1,5 @@
 import { SongCupPageClient } from "@/components/songchain/song-cup/SongCupPageClient";
-import { getSongchainConfig } from "@/lib/songchain/config";
+import { getSongCupConfig } from "@/lib/songchain/config";
 import { resolveSongchainConfig } from "@/lib/songchain/resolve-lens-app";
 import type { Metadata } from "next";
 
@@ -12,6 +12,6 @@ export const metadata: Metadata = {
 };
 
 export default async function SongCupPage() {
-  const config = await resolveSongchainConfig(getSongchainConfig());
+  const config = await resolveSongchainConfig(getSongCupConfig());
   return <SongCupPageClient config={config} />;
 }

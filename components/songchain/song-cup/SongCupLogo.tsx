@@ -15,8 +15,9 @@ export function SongCupLogo() {
             <circle cx="50" cy="50" r="48" fill="url(#ballGradient)" stroke="#333" strokeWidth="1.5" />
             <polygon
               points="50,30 69,44 62,66 38,66 31,44"
-              fill="#151515"
-              stroke="#151515"
+              className="ball-patch"
+              fill="#3d4a5c"
+              stroke="#3d4a5c"
               strokeWidth="1.5"
               strokeLinejoin="round"
             />
@@ -27,36 +28,41 @@ export function SongCupLogo() {
             <line x1="31" y1="44" x2="12" y2="38" stroke="#333" strokeWidth="1.5" strokeLinecap="round" />
             <path
               d="M 50 10 L 36 4 A 48 48 0 0 1 64 4 Z"
-              fill="#151515"
-              stroke="#151515"
+              className="ball-patch"
+              fill="#3d4a5c"
+              stroke="#3d4a5c"
               strokeWidth="1"
               strokeLinejoin="round"
             />
             <path
               d="M 88 38 L 89 22 A 48 48 0 0 1 98 50 Z"
-              fill="#151515"
-              stroke="#151515"
+              className="ball-patch"
+              fill="#3d4a5c"
+              stroke="#3d4a5c"
               strokeWidth="1"
               strokeLinejoin="round"
             />
             <path
               d="M 74 82 L 89 78 A 48 48 0 0 1 65 96 Z"
-              fill="#151515"
-              stroke="#151515"
+              className="ball-patch"
+              fill="#3d4a5c"
+              stroke="#3d4a5c"
               strokeWidth="1"
               strokeLinejoin="round"
             />
             <path
               d="M 26 82 L 35 96 A 48 48 0 0 1 11 78 Z"
-              fill="#151515"
-              stroke="#151515"
+              className="ball-patch"
+              fill="#3d4a5c"
+              stroke="#3d4a5c"
               strokeWidth="1"
               strokeLinejoin="round"
             />
             <path
               d="M 12 38 L 2 50 A 48 48 0 0 1 11 22 Z"
-              fill="#151515"
-              stroke="#151515"
+              className="ball-patch"
+              fill="#3d4a5c"
+              stroke="#3d4a5c"
               strokeWidth="1"
               strokeLinejoin="round"
             />

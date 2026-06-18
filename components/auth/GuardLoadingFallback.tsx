@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useLogout } from '@account-kit/react';
-import { useOrbSession } from '@/context/OrbSessionContext';
+import { clearStoredOrbSession } from '@/lib/sdk/orb/login';
 import { resetAppSession } from '@/lib/auth/session-recovery';
 
 const GUARD_TIMEOUT_MS = 8000;
@@ -25,11 +25,14 @@ export function GuardLoadingFallback({
 }: GuardLoadingFallbackProps) {
   const [timedOut, setTimedOut] = useState(false);
   const { logout: walletLogoutMutate } = useLogout();
-  const { logout: orbLogout } = useOrbSession();
 
   const walletLogout = useCallback(async () => {
     await walletLogoutMutate();
   }, [walletLogoutMutate]);
+
+  const orbLogout = useCallback(async () => {
+    clearStoredOrbSession();
+  }, []);
 
   useEffect(() => {
     if (!isLoading) {
