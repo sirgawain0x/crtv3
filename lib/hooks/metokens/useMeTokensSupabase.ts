@@ -6,6 +6,12 @@ import { CreateMeTokenData, UpdateMeTokenData } from '@/lib/sdk/supabase/client'
 import { getMeTokenFactoryContract, METOKEN_FACTORY_ADDRESSES } from '@/lib/contracts/MeTokenFactory';
 import { METOKEN_ABI } from '@/lib/contracts/MeToken';
 import { DAI_TOKEN_ADDRESSES, getDaiTokenContract } from '@/lib/contracts/DAIToken';
+import {
+  getCollateralForHub,
+  parseCollateralAmount,
+  describeCollateralAmount,
+  collateralSymbol,
+} from '@/lib/utils/metokenCollateralApproval';
 import { useToast } from '@/components/ui/use-toast';
 import { useGasSponsorship } from '@/lib/hooks/wallet/useGasSponsorship';
 import { useWalletAuth } from '@/lib/auth/useWalletAuth';
@@ -510,71 +516,77 @@ export function useMeTokensSupabase(targetAddress?: string) {
       // This is more efficient and ensures the MeToken is registered with the protocol
       logger.debug('📦 Creating and subscribing MeToken...');
 
-      const depositAmount = parseEther(assetsDeposited);
+      const hubAsset = getCollateralForHub(hubId);
+      const depositAmount = parseCollateralAmount(assetsDeposited, hubId);
 
-      // If depositing DAI, we need to approve the vault contract (not Diamond!)
+      // If depositing collateral, approve the vault contract (not Diamond!)
       // The subscribe function calls IVault(vault).handleDeposit() which calls transferFrom
       if (depositAmount > BigInt(0)) {
-        logger.debug('💰 Depositing DAI, checking approval...');
+        logger.debug(`💰 Depositing ${hubAsset.symbol}, checking approval...`);
 
-        // DAI contract address on Base
-        const DAI_ADDRESS = DAI_TOKEN_ADDRESSES.base;
-        const daiContract = getDaiTokenContract('base');
+        const COLLATERAL_ADDRESS = hubAsset.address;
+        const collateralContract = {
+          address: hubAsset.address,
+          abi: getDaiTokenContract('base').abi,
+          symbol: hubAsset.symbol,
+          decimals: hubAsset.decimals,
+        };
+        const daiContract = collateralContract;
+        const DAI_ADDRESS = COLLATERAL_ADDRESS;
 
-        // First, check if user has sufficient DAI balance
-        logger.debug('💳 Checking DAI balance...');
-        logger.debug('🔍 DAI balance check details:', {
-          daiContractAddress: DAI_ADDRESS,
+        // First, check if user has sufficient collateral balance
+        logger.debug(`💳 Checking ${hubAsset.symbol} balance...`);
+        logger.debug(`🔍 ${hubAsset.symbol} balance check details:`, {
+          collateralAddress: COLLATERAL_ADDRESS,
           smartAccountAddress: address,
           userEOAAddress: user?.address,
           clientAccountAddress: client.account?.address
         });
 
-        let daiBalance: bigint;
+        let collateralBalance: bigint;
         try {
-          daiBalance = await client.readContract({
-            address: daiContract.address as `0x${string}`,
-            abi: daiContract.abi,
+          collateralBalance = await client.readContract({
+            address: collateralContract.address as `0x${string}`,
+            abi: collateralContract.abi,
             functionName: 'balanceOf',
             args: [address as `0x${string}`]
           }) as bigint;
 
-          logger.debug('✅ DAI balance check successful');
+          logger.debug(`✅ ${hubAsset.symbol} balance check successful`);
         } catch (balanceErr) {
-          logger.error('❌ DAI balance check failed:', balanceErr);
-          throw new Error(`Failed to check DAI balance: ${balanceErr instanceof Error ? balanceErr.message : 'Unknown error'}`);
+          logger.error(`❌ ${hubAsset.symbol} balance check failed:`, balanceErr);
+          throw new Error(`Failed to check ${hubAsset.symbol} balance: ${balanceErr instanceof Error ? balanceErr.message : 'Unknown error'}`);
         }
 
-        logger.debug('📊 DAI balance result:', {
-          balanceWei: daiBalance.toString(),
-          balanceDAI: formatEther(daiBalance),
+        logger.debug(`📊 ${hubAsset.symbol} balance result:`, {
+          balanceWei: collateralBalance.toString(),
+          balanceFormatted: describeCollateralAmount(collateralBalance, hubId),
           requiredWei: depositAmount.toString(),
-          requiredDAI: formatEther(depositAmount),
-          hasEnough: daiBalance >= depositAmount
+          requiredFormatted: describeCollateralAmount(depositAmount, hubId),
+          hasEnough: collateralBalance >= depositAmount
         });
 
-        if (daiBalance < depositAmount) {
-          // If smart account has no DAI, check if EOA has DAI (in case of address confusion)
+        if (collateralBalance < depositAmount) {
           if (user?.address && user.address !== address) {
-            logger.debug('🔍 Smart account has no DAI, checking EOA balance...');
+            logger.debug(`🔍 Smart account has no ${hubAsset.symbol}, checking EOA balance...`);
             try {
               const eoaBalance = await client.readContract({
-                address: daiContract.address as `0x${string}`,
-                abi: daiContract.abi,
+                address: collateralContract.address as `0x${string}`,
+                abi: collateralContract.abi,
                 functionName: 'balanceOf',
                 args: [user.address as `0x${string}`]
               }) as bigint;
 
-              logger.debug('📊 EOA DAI balance:', {
+              logger.debug(`📊 EOA ${hubAsset.symbol} balance:`, {
                 balanceWei: eoaBalance.toString(),
-                balanceDAI: formatEther(eoaBalance),
+                balanceFormatted: describeCollateralAmount(eoaBalance, hubId),
                 eoaAddress: user.address
               });
 
               if (eoaBalance >= depositAmount) {
                 throw new Error(
-                  `DAI is in your EOA wallet (${user.address}) but the transaction is being sent from your smart account (${address}). ` +
-                  'Please transfer DAI to your smart account first.'
+                  `${hubAsset.symbol} is in your EOA wallet (${user.address}) but the transaction is being sent from your smart account (${address}). ` +
+                  `Please transfer ${hubAsset.symbol} to your smart account first.`
                 );
               }
             } catch (eoaErr) {
@@ -583,8 +595,8 @@ export function useMeTokensSupabase(targetAddress?: string) {
           }
 
           throw new Error(
-            `Insufficient DAI balance in smart account (${address}). You have ${formatEther(daiBalance)} DAI ` +
-            `but need ${formatEther(depositAmount)} DAI. Please ensure your DAI is in your smart account wallet.`
+            `Insufficient ${hubAsset.symbol} balance in smart account (${address}). You have ${describeCollateralAmount(collateralBalance, hubId)} ` +
+            `but need ${describeCollateralAmount(depositAmount, hubId)}. Please ensure your ${hubAsset.symbol} is in your smart account wallet.`
           );
         }
 

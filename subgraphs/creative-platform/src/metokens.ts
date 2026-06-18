@@ -1,11 +1,12 @@
-import { Bytes, ethereum } from "@graphprotocol/graph-ts";
+import { Address, BigInt, Bytes, ethereum } from "@graphprotocol/graph-ts";
 import {
   Burn as BurnEvent,
   Mint as MintEvent,
   Register as RegisterEvent,
   Subscribe as SubscribeEvent
 } from "../generated/MeTokens/MeTokens";
-import { Burn, Mint, Register, Subscribe } from "../generated/schema";
+import { Burn, Hub, Mint, Register, Subscribe } from "../generated/schema";
+import { adjustMeTokenBalance, subtractMeTokenBalance } from "./balances";
 
 function entityId(event: ethereum.Event): Bytes {
   return event.transaction.hash.concatI32(event.logIndex.toI32());
@@ -26,6 +27,14 @@ export function handleSubscribe(event: SubscribeEvent): void {
   entity.symbol = event.params.symbol;
   entity.hubId = event.params.hubId;
   entity.save();
+
+  // Credit initial mint to owner
+  adjustMeTokenBalance(
+    event.params.owner,
+    event.params.meToken,
+    event.params.minted,
+    event.block.timestamp
+  );
 }
 
 export function handleMint(event: MintEvent): void {
@@ -41,6 +50,13 @@ export function handleMint(event: MintEvent): void {
   entity.assetsDeposited = event.params.assetsDeposited;
   entity.meTokensMinted = event.params.meTokensMinted;
   entity.save();
+
+  adjustMeTokenBalance(
+    event.params.recipient,
+    event.params.meToken,
+    event.params.meTokensMinted,
+    event.block.timestamp
+  );
 }
 
 export function handleBurn(event: BurnEvent): void {
@@ -56,6 +72,13 @@ export function handleBurn(event: BurnEvent): void {
   entity.meTokensBurned = event.params.meTokensBurned;
   entity.assetsReturned = event.params.assetsReturned;
   entity.save();
+
+  subtractMeTokenBalance(
+    event.params.burner,
+    event.params.meToken,
+    event.params.meTokensBurned,
+    event.block.timestamp
+  );
 }
 
 export function handleRegister(event: RegisterEvent): void {
@@ -73,4 +96,18 @@ export function handleRegister(event: RegisterEvent): void {
   entity.reserveWeight = event.params.reserveWeight;
   entity.encodedVaultArgs = event.params.encodedVaultArgs;
   entity.save();
+
+  const hubId = event.params.id.toString();
+  const hub = new Hub(hubId);
+  hub.owner = event.params.owner;
+  hub.asset = event.params.asset;
+  hub.vault = event.params.vault;
+  hub.refundRatio = event.params.refundRatio;
+  hub.baseY = event.params.baseY;
+  hub.reserveWeight = event.params.reserveWeight;
+  hub.encodedVaultArgs = event.params.encodedVaultArgs;
+  hub.active = true;
+  hub.block_number = event.block.number;
+  hub.timestamp_ = event.block.timestamp;
+  hub.save();
 }

@@ -22,6 +22,8 @@ dataSources:
         - Mint
         - Burn
         - Register
+        - Hub
+        - MeTokenBalance
       abis:
         - name: MeTokens
           file: ./abis/MeTokens.json
@@ -54,7 +56,6 @@ dataSources:
         - name: RealityETH
           file: ./abis/RealityETH-3.0.json
       eventHandlers:
-        # Shapes match Base RealityETH-3.0 (see lib/sdk/reality-eth/reality-eth-abi.json). Wrong signatures = zero entities.
         - event: LogNewQuestion(indexed bytes32,indexed address,uint256,string,indexed bytes32,address,uint32,uint32,uint256,uint256)
           handler: handleNewQuestion
         - event: LogNewAnswer(bytes32,indexed bytes32,bytes32,indexed address,uint256,uint256,bool)

@@ -537,6 +537,26 @@ export class MeTokenSupabaseService {
       .subscribe();
   }
 
+  // Get all MeToken balances for a user (Turbo pipeline / manual sync)
+  async getUserMeTokenBalances(userAddress: string): Promise<
+    Array<MeTokenBalance & { metoken?: MeToken | null }>
+  > {
+    const { data, error } = await supabase
+      .from('metoken_balances')
+      .select(`
+        *,
+        metoken:metokens(*)
+      `)
+      .eq('user_address', userAddress.toLowerCase())
+      .gt('balance', 0);
+
+    if (error) {
+      throw new Error(`Failed to fetch user MeToken balances: ${error.message}`);
+    }
+
+    return data || [];
+  }
+
   // Search MeTokens
   async searchMeTokens(query: string, limit: number = 20): Promise<MeToken[]> {
     const { data, error } = await supabase.rpc("search_metokens_ilike", {

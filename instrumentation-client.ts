@@ -23,7 +23,7 @@ initBotId({
     { path: '/api/story/mint-derivative', method: 'POST' },
     { path: '/api/story/prepare-mint', method: 'POST' },
     // rpc-proxy omitted: BotID blocks legitimate client RPC (e.g. eth_getBalance for funding wallet).
-    // Mint/transfer remain protected; proxy is read/forward only.
+    // metokens-subgraph omitted: read-only GraphQL proxy; BotID 403 breaks portfolio balance queries.
     { path: '/api/story/factory/deploy-collection', method: 'POST' },
     { path: '/api/poap/create-event', method: 'POST' },
     { path: '/api/poap-proxy', method: 'POST' },
@@ -32,7 +32,7 @@ initBotId({
     { path: '/api/metokens', method: 'POST' },
     { path: '/api/metokens/*', method: 'PUT' },
     { path: '/api/metokens/*/balance', method: 'PUT' },
-    { path: '/api/metokens-subgraph', method: 'POST' },
+    // metokens-subgraph: read-only GraphQL proxy — excluded from BotID (see rpc-proxy note above).
     { path: '/api/membership', method: 'POST' },
     { path: '/api/livepeer/sign-jwt', method: 'POST' },
     { path: '/api/livepeer/token-gate', method: 'POST' },
