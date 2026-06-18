@@ -320,7 +320,7 @@ export function SongchainPostCard({
               className="text-xs text-muted-foreground text-left hover:text-violet-400 w-fit"
               onClick={() => setTimelineOpen(true)}
             >
-              {authorLabel(post)}
+              {authorLabel(isQuote ? post : content)}
             </button>
             {content && (
               <SongchainFollowButton
@@ -494,9 +494,9 @@ export function SongchainPostCard({
 
       <SongchainAuthorTimeline
         authorAddress={
-          isQuote ? post.author.address : content?.author?.address ?? ""
+          isQuote ? post.author.address : content.author.address
         }
-        authorLabel={authorLabel(post)}
+        authorLabel={authorLabel(isQuote ? post : content)}
         open={timelineOpen}
         onOpenChange={setTimelineOpen}
       />
