@@ -9,6 +9,28 @@ export function resolvePostContent(post: AnyPost): AnyPost | null {
   return post;
 }
 
+/** Read text from the post wrapper itself (not unwrapped repost target). */
+export function directPostText(post: AnyPost): string {
+  if (!('metadata' in post) || !post.metadata) return '';
+  const meta = post.metadata;
+  if ('content' in meta && typeof meta.content === 'string') return meta.content;
+  if ('title' in meta && typeof meta.title === 'string') return meta.title;
+  return '';
+}
+
+/** Repost with commentary — should render as a quote in the timeline. */
+export function isQuotePost(post: AnyPost): boolean {
+  if (post.__typename !== 'Repost') return false;
+  return directPostText(post).trim().length > 0;
+}
+
+export function getQuotedPost(post: AnyPost): AnyPost | null {
+  if (post.__typename === 'Repost') {
+    return post.repostOf ?? null;
+  }
+  return null;
+}
+
 /** Root feed posts only — excludes Lens comments. */
 export function isRootFeedPost(post: AnyPost): boolean {
   const rootTypename = post.__typename as string;
@@ -21,20 +43,27 @@ export function isRootFeedPost(post: AnyPost): boolean {
   return true;
 }
 
-/** Feed list: collapse repost wrappers to underlying content and dedupe by content id. */
-export function normalizeFeedPosts(items: readonly AnyPost[]): AnyPost[] {
-  const seenContentIds = new Set<string>();
+/** Feed list: collapse plain reposts; preserve quote wrappers; dedupe by id. */
+export function normalizeFeedPosts(items: AnyPost[]): AnyPost[] {
+  const seenIds = new Set<string>();
   const result: AnyPost[] = [];
 
   for (const item of items) {
     if (!isRootFeedPost(item)) continue;
 
+    if (isQuotePost(item)) {
+      if (seenIds.has(item.id)) continue;
+      seenIds.add(item.id);
+      result.push(item);
+      continue;
+    }
+
     const content = resolvePostContent(item);
     if (!content) continue;
 
     const contentId = content.id;
-    if (seenContentIds.has(contentId)) continue;
-    seenContentIds.add(contentId);
+    if (seenIds.has(contentId)) continue;
+    seenIds.add(contentId);
     result.push(content);
   }
 
@@ -96,6 +125,9 @@ function mediaFromAttachment(raw: unknown): PostMediaItem | null {
 }
 
 export function postText(post: AnyPost): string {
+  if (isQuotePost(post)) {
+    return directPostText(post);
+  }
   const resolved = resolvePostContent(post);
   if (!resolved || !('metadata' in resolved) || !resolved.metadata) return '';
   const meta = resolved.metadata;

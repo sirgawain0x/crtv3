@@ -89,7 +89,7 @@ export function SongCupPlayModal({ open, onOpenChange }: SongCupPlayModalProps) 
             href={SONG_CUP_PLAY_LINKS.goal}
           />
           <PlayCard
-            imageSrc="/songchain/song-cup-beat-me.png"
+            imageSrc="/songchain/BeatMe_v2.png"
             imageAlt="Beat Me — guess your artist"
             label="GUESS YOUR ARTIST. PLAY NOW"
             buttonText="BEAT"

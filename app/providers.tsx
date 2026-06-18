@@ -78,16 +78,16 @@ export const Providers = (
                     <HeliaProvider>
                       <TourProvider>
                         <VideoProvider>
-                          <OrbSessionProvider>
-                            <AccountKitStoreGuard>
+                          <AccountKitStoreGuard>
+                            <OrbSessionProvider>
                               <MembershipGuard>
                                 {props.children}
                               </MembershipGuard>
-                            </AccountKitStoreGuard>
-                            <OrbLoginModal />
-                            <OrbLinkingOverlay />
-                            <Toaster position="top-right" richColors />
-                          </OrbSessionProvider>
+                              <OrbLoginModal />
+                              <OrbLinkingOverlay />
+                              <Toaster position="top-right" richColors />
+                            </OrbSessionProvider>
+                          </AccountKitStoreGuard>
                         </VideoProvider>
                       </TourProvider>
                     </HeliaProvider>

@@ -51,6 +51,7 @@
     "@lens-chain/sdk": "^1.0.3",
     "@lens-chain/storage-client": "^1.0.6",
     "@lens-protocol/client": "^0.0.0-canary-20250820102520",
+    "@lens-protocol/env": "0.0.0-canary-20250820102520",
     "@lens-protocol/metadata": "^2.1.0",
     "@libp2p/bootstrap": "^12.0.11",
     "@libp2p/identify": "^4.0.10",
@@ -172,6 +173,11 @@
     }
   },
   "resolutions": {
+    "@lens-protocol/client": "0.0.0-canary-20250820102520",
+    "@lens-protocol/env": "0.0.0-canary-20250820102520",
+    "@lens-protocol/graphql": "0.0.0-canary-20250820102520",
+    "@lens-protocol/storage": "0.0.0-canary-20250820102520",
+    "@lens-protocol/types": "0.0.0-canary-20250820102520",
     "@reown/appkit": "1.7.8",
     "@reown/appkit-controllers": "1.7.8",
     "@reown/appkit-common": "1.7.8",

@@ -28,6 +28,9 @@ const baseConfig: SongchainConfig = {
   hallidayOutputAsset: 'lens:0x0',
   hallidayInputAssets: ['usd'],
   hallidaySandbox: false,
+  season2Enabled: false,
+  season2PublicFeedId: null,
+  season2ExclusiveFeedId: null,
 };
 
 describe('resolveSongchainConfig', () => {

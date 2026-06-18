@@ -38,13 +38,16 @@ import { useLensOrbWrite } from "@/hooks/useLensOrbWrite";
 import { groveService } from "@/lib/sdk/grove/service";
 import { clearStaleOrbSessionIfNeeded } from "@/lib/sdk/orb/session-errors";
 import { SongchainAuthorTimeline } from "@/components/songchain/SongchainAuthorTimeline";
+import { SongchainQuotedPostEmbed } from "@/components/songchain/SongchainQuotedPostEmbed";
 import { SongchainPostContent } from "@/components/songchain/SongchainPostContent";
 import { SongchainFollowButton } from "@/components/songchain/SongchainGraphPanel";
 import { SongchainPostMedia } from "@/components/songchain/SongchainPostMedia";
 import {
   extractPostMedia,
   getEmbeddedCreativeTVUrls,
+  getQuotedPost,
   hasAttachedVideoOrLivestream,
+  isQuotePost,
   postText,
   resolvePostContent,
   stripAttachedMediaBoilerplate,
@@ -78,7 +81,7 @@ export function SongchainPostCard({
   const { canWrite, getSessionClient, promptWriteAccess, lensAccount } =
     useLensOrbWrite();
   const [pending, setPending] = useState<string | null>(null);
-  const [showComments, setShowComments] = useState(false);
+  const [commentsOpen, setCommentsOpen] = useState(false);
   const [comments, setComments] = useState<AnyPost[]>([]);
   const [commentCount, setCommentCount] = useState(0);
   const [commentText, setCommentText] = useState("");
@@ -88,8 +91,10 @@ export function SongchainPostCard({
   const [timelineOpen, setTimelineOpen] = useState(false);
   const [bookmarked, setBookmarked] = useState(false);
 
-  const content = resolvePostContent(post);
-  const media = useMemo(() => extractPostMedia(post), [post]);
+  const isQuote = isQuotePost(post);
+  const quotedPost = isQuote ? getQuotedPost(post) : null;
+  const content = isQuote ? quotedPost : resolvePostContent(post);
+  const media = useMemo(() => extractPostMedia(content ?? post), [content, post]);
   const ops =
     content != null && "operations" in content ? content.operations : null;
   const hasReacted =
@@ -110,7 +115,9 @@ export function SongchainPostCard({
   const isOwner =
     !!lensAccount &&
     !!content &&
-    content.author.address.toLowerCase() === lensAccount.toLowerCase();
+    (isQuote
+      ? post.author.address.toLowerCase() === lensAccount.toLowerCase()
+      : content.author.address.toLowerCase() === lensAccount.toLowerCase());
 
   useEffect(() => {
     setUpvoted(hasReacted);
@@ -145,8 +152,8 @@ export function SongchainPostCard({
   }, [content, loadComments]);
 
   useEffect(() => {
-    if (showComments) void loadComments();
-  }, [showComments, loadComments]);
+    if (commentsOpen) void loadComments();
+  }, [commentsOpen, loadComments]);
 
   useEffect(() => {
     setDisplayText(null);
@@ -289,6 +296,7 @@ export function SongchainPostCard({
         className={cn(
           "relative flex flex-col overflow-hidden rounded-xl border border-border/50 bg-card shadow-sm",
           compact && "text-sm",
+          isQuote && "border-violet-500/30",
           pending === "edit" && "opacity-70",
         )}
       >
@@ -300,7 +308,7 @@ export function SongchainPostCard({
             </div>
           </div>
         )}
-        {media.length > 0 && !compact && (
+        {media.length > 0 && !compact && !isQuote && (
           <div className="w-full">
             <SongchainPostMedia media={media} compact={compact} />
           </div>
@@ -317,7 +325,9 @@ export function SongchainPostCard({
             {content && (
               <SongchainFollowButton
                 graphId={graphId}
-                accountAddress={content.author.address}
+                accountAddress={
+                  isQuote ? post.author.address : content.author.address
+                }
               />
             )}
           </div>
@@ -332,6 +342,7 @@ export function SongchainPostCard({
               skipAllInternalPreviews={skipAllInternalPreviews}
             />
           )}
+          {quotedPost && <SongchainQuotedPostEmbed quotedPost={quotedPost} />}
           <div className="mt-auto flex flex-wrap items-center gap-1 pt-2 border-t border-border/40">
             <span className="text-xs text-muted-foreground mr-auto">
               {reactions} upvote{reactions === 1 ? "" : "s"}
@@ -355,7 +366,7 @@ export function SongchainPostCard({
               type="button"
               variant="ghost"
               size="sm"
-              onClick={() => setShowComments((v) => !v)}
+              onClick={() => setCommentsOpen(true)}
               aria-label={`Comments${commentCount > 0 ? ` (${commentCount})` : ""}`}
               className="gap-1"
             >
@@ -429,48 +440,57 @@ export function SongchainPostCard({
               </>
             )}
           </div>
-
-          {showComments && (
-            <div className="space-y-2 border-t border-border/30 pt-3">
-              {comments.length > 0 && (
-                <ul className="space-y-2 text-xs text-muted-foreground">
-                  {comments.map((c) => (
-                    <li key={c.id} className="rounded bg-muted/40 p-2">
-                      <span className="font-medium">{authorLabel(c)}: </span>
-                      <SongchainPostContent text={postText(c)} compact />
-                      {c.id.startsWith("pending-comment-") && (
-                        <span className="ml-1 text-[10px] text-violet-400">· posting…</span>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {canWrite ? (
-                <div className="flex gap-2">
-                  <Textarea
-                    value={commentText}
-                    onChange={(e) => setCommentText(e.target.value)}
-                    placeholder="Write a comment…"
-                    rows={2}
-                    className="text-xs"
-                  />
-                  <Button
-                    size="sm"
-                    disabled={pending === "comment" || !commentText.trim()}
-                    onClick={submitComment}
-                  >
-                    Post
-                  </Button>
-                </div>
-              ) : (
-                <Button size="sm" variant="outline" onClick={promptWriteAccess}>
-                  Link Orb to comment
-                </Button>
-              )}
-            </div>
-          )}
         </div>
       </article>
+
+      <Dialog open={commentsOpen} onOpenChange={setCommentsOpen}>
+        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>
+              Comments{commentCount > 0 ? ` (${commentCount})` : ""}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            {comments.length > 0 ? (
+              <ul className="space-y-2 text-xs text-muted-foreground">
+                {comments.map((c) => (
+                  <li key={c.id} className="rounded bg-muted/40 p-2">
+                    <span className="font-medium">{authorLabel(c)}: </span>
+                    <SongchainPostContent text={postText(c)} compact />
+                    {c.id.startsWith("pending-comment-") && (
+                      <span className="ml-1 text-[10px] text-violet-400">· posting…</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-muted-foreground">No comments yet.</p>
+            )}
+            {canWrite ? (
+              <div className="flex gap-2">
+                <Textarea
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                  placeholder="Write a comment…"
+                  rows={3}
+                  className="text-xs"
+                />
+                <Button
+                  size="sm"
+                  disabled={pending === "comment" || !commentText.trim()}
+                  onClick={submitComment}
+                >
+                  Post
+                </Button>
+              </div>
+            ) : (
+              <Button size="sm" variant="outline" onClick={promptWriteAccess}>
+                Link Orb to comment
+              </Button>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <SongchainAuthorTimeline
         authorAddress={content.author.address}

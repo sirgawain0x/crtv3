@@ -3,6 +3,7 @@ import type { AnyPost } from '@lens-protocol/graphql';
 import {
   getEmbeddedCreativeTVUrls,
   hasAttachedVideoOrLivestream,
+  isQuotePost,
   normalizeFeedPosts,
   shouldSkipLinkPreview,
   stripAttachedMediaBoilerplate,
@@ -59,6 +60,23 @@ describe('normalizeFeedPosts', () => {
 
     const result = normalizeFeedPosts([original, duplicate]);
     expect(result).toHaveLength(1);
+  });
+
+  it('preserves repost wrappers with commentary as quote posts', () => {
+    const original = mockPost('post-1', 'Post', {
+      metadata: { content: 'original', __typename: 'TextOnlyMetadata' },
+    });
+    const quote = mockPost('quote-1', 'Repost', {
+      metadata: { content: 'my take on this', __typename: 'TextOnlyMetadata' },
+      repostOf: original,
+    });
+
+    expect(isQuotePost(quote)).toBe(true);
+
+    const result = normalizeFeedPosts([quote, original]);
+    expect(result).toHaveLength(2);
+    expect(result[0].id).toBe('quote-1');
+    expect(result[1].id).toBe('post-1');
   });
 });
 

@@ -3151,9 +3151,9 @@
   resolved "https://registry.npmjs.org/@lens-chain/storage-client/-/storage-client-1.0.6.tgz"
   integrity sha512-CchjEt3vKAj5RlHd9sWOGFlHZ9WvQm6edHrn0a2BBPXxOZ0gZwbK6aKOSCySEk0gmDvmy7LB6dGdtNLSFzutHg==
 
-"@lens-protocol/client@^0.0.0-canary-20250820102520":
+"@lens-protocol/client@0.0.0-canary-20250820102520", "@lens-protocol/client@^0.0.0-canary-20250820102520":
   version "0.0.0-canary-20250820102520"
-  resolved "https://registry.npmjs.org/@lens-protocol/client/-/client-0.0.0-canary-20250820102520.tgz"
+  resolved "https://registry.npmjs.org/@lens-protocol/client/-/client-0.0.0-canary-20250820102520.tgz#8c2af2d2c768f64305f99b23aba32a324880615e"
   integrity sha512-Y7lCJe8gO5+OkLJWHj1SQhlj8nzubYowXI3X4FV1vhXt+RziogC/8IzUgmF5kBeR2f0gh+e5LPtst5O+VL2ZgQ==
   dependencies:
     "@lens-chain/sdk" "^1.0.0"

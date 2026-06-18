@@ -1,11 +1,18 @@
 "use client";
 
+import type { ReactNode } from "react";
 import "./song-cup-hero.css";
 import { CirclingTextRings } from "./CirclingTextRings";
 import { SongCupLogo } from "./SongCupLogo";
 
 type SongCupHeroProps = {
-  onLetsGoalClick: () => void;
+  headline?: string;
+  subheadline?: string;
+  ctaLabel?: string;
+  onCtaClick: () => void;
+  logo?: ReactNode;
+  showRings?: boolean;
+  ariaLabel?: string;
 };
 
 function PolyhedronFaces() {
@@ -24,32 +31,39 @@ function PolyhedronFaces() {
   );
 }
 
-export function SongCupHero({ onLetsGoalClick }: SongCupHeroProps) {
+export function SongCupHero({
+  headline = "BE OUR TOP ARTIST",
+  subheadline = "Create your 30 sec. World Cup music video",
+  ctaLabel = "Let's Goal",
+  onCtaClick,
+  logo,
+  showRings = true,
+  ariaLabel = "Song Cup Contest",
+}: SongCupHeroProps) {
   return (
-    <section className="song-cup-hero-scene relative min-h-[85vh] w-full overflow-hidden bg-black">
+    <section className="song-cup-hero-scene relative min-h-[85vh] w-full overflow-hidden">
       <div className="site-header">
-        <div className="site-logo" aria-label="Song Cup Contest">
-          <SongCupLogo />
+        <div className="site-logo" aria-label={ariaLabel}>
+          {logo ?? <SongCupLogo />}
         </div>
       </div>
 
-      <div className="song-cup-hero-copy">
-        <h1 className="song-cup-hero-line">BE OUR TOP ARTIST</h1>
-        <p className="song-cup-hero-line song-cup-hero-line-sub">
-          CREATE YOUR 30 SEC. WORLD CUP MUSIC VIDEO
-        </p>
-        <button
-          type="button"
-          onClick={onLetsGoalClick}
-          className="song-cup-lets-goal-btn"
-        >
-          Let&apos;s Goal
-        </button>
-      </div>
-
-      <div className="song-cup-hero-animation" aria-hidden="true">
-        <CirclingTextRings />
+      <div className="song-cup-hero-animation">
+        {showRings && <CirclingTextRings />}
         <PolyhedronFaces />
+        <div className="song-cup-hero-copy">
+          <div className="song-cup-hero-copy-inner">
+            <h1 className="song-cup-hero-line">{headline}</h1>
+            <p className="song-cup-hero-line song-cup-hero-line-sub">{subheadline}</p>
+            <button
+              type="button"
+              onClick={onCtaClick}
+              className="song-cup-lets-goal-btn"
+            >
+              {ctaLabel}
+            </button>
+          </div>
+        </div>
       </div>
     </section>
   );
