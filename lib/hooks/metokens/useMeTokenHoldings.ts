@@ -183,7 +183,7 @@ export function useMeTokenHoldings(targetAddress?: string): UseMeTokenHoldingsRe
       const candidates = await fetchBalanceCandidates(address);
 
       const holdingsResults = await Promise.all(
-        candidates.map(async ({ meToken, balance: indexedBalance }) => {
+        candidates.map(async ({ meToken }) => {
           try {
             const meTokenAddress = meToken as `0x${string}`;
 
@@ -217,7 +217,7 @@ export function useMeTokenHoldings(targetAddress?: string): UseMeTokenHoldingsRe
               }) as Promise<bigint>,
             ]);
 
-            const balance = onChainBalance > BigInt(0) ? onChainBalance : indexedBalance;
+            const balance = onChainBalance;
             if (balance <= BigInt(0)) {
               return null;
             }

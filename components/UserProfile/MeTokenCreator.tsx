@@ -28,7 +28,7 @@ export function MeTokenCreator({ onMeTokenCreated }: MeTokenCreatorProps) {
   const [name, setName] = useState('');
   const [symbol, setSymbol] = useState('');
   const [collateralAmount, setCollateralAmount] = useState('0');
-  const [selectedHubId, setSelectedHubId] = useState<number>(1);
+  const [selectedHubId, setSelectedHubId] = useState<number | undefined>(undefined);
   const [localError, setLocalError] = useState<string | null>(null);
 
   const user = useUser();
@@ -40,10 +40,11 @@ export function MeTokenCreator({ onMeTokenCreated }: MeTokenCreatorProps) {
   const collateralSymbol = selectedHub?.symbol ?? 'USDC';
 
   useEffect(() => {
-    if (defaultHub) {
-      setSelectedHubId(defaultHub.hubId);
-    } else if (activeHubs.length > 0 && !activeHubs.some((h) => h.hubId === selectedHubId)) {
-      setSelectedHubId(activeHubs[0].hubId);
+    if (
+      activeHubs.length > 0 &&
+      (selectedHubId === undefined || !activeHubs.some((h) => h.hubId === selectedHubId))
+    ) {
+      setSelectedHubId(defaultHub?.hubId ?? activeHubs[0].hubId);
     }
   }, [activeHubs, defaultHub, selectedHubId]);
 
@@ -283,7 +284,7 @@ export function MeTokenCreator({ onMeTokenCreated }: MeTokenCreatorProps) {
           <div className="space-y-2">
             <Label htmlFor="hubId">Collateral Hub</Label>
             <Select
-              value={String(selectedHubId)}
+              value={selectedHubId !== undefined ? String(selectedHubId) : undefined}
               onValueChange={(v) => setSelectedHubId(Number(v))}
               disabled={isLoading || hubsLoading || activeHubs.length === 0}
             >

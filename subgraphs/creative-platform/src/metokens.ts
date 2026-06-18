@@ -5,8 +5,12 @@ import {
   Register as RegisterEvent,
   Subscribe as SubscribeEvent
 } from "../generated/MeTokens/MeTokens";
+import { Transfer as TransferEvent } from "../generated/templates/MeToken/ERC20";
+import { MeToken as MeTokenTemplate } from "../generated/templates";
 import { Burn, Hub, Mint, Register, Subscribe } from "../generated/schema";
 import { adjustMeTokenBalance, subtractMeTokenBalance } from "./balances";
+
+const ZERO = Address.fromString("0x0000000000000000000000000000000000000000");
 
 function entityId(event: ethereum.Event): Bytes {
   return event.transaction.hash.concatI32(event.logIndex.toI32());
@@ -35,6 +39,9 @@ export function handleSubscribe(event: SubscribeEvent): void {
     event.params.minted,
     event.block.timestamp
   );
+
+  // Track P2P Transfer events (mint/burn handled by Subscribe/Mint/Burn handlers)
+  MeTokenTemplate.create(event.params.meToken);
 }
 
 export function handleMint(event: MintEvent): void {
@@ -110,4 +117,20 @@ export function handleRegister(event: RegisterEvent): void {
   hub.block_number = event.block.number;
   hub.timestamp_ = event.block.timestamp;
   hub.save();
+}
+
+export function handleTransfer(event: TransferEvent): void {
+  const from = event.params.from;
+  const to = event.params.to;
+  const amount = event.params.value;
+  const meToken = event.address;
+  const timestamp = event.block.timestamp;
+
+  // Skip mint/burn — already indexed via Subscribe, Mint, and Burn handlers
+  if (from.equals(ZERO) || to.equals(ZERO)) {
+    return;
+  }
+
+  subtractMeTokenBalance(from, meToken, amount, timestamp);
+  adjustMeTokenBalance(to, meToken, amount, timestamp);
 }

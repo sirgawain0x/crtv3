@@ -62,3 +62,23 @@ dataSources:
           handler: handleNewAnswer
         - event: LogFinalize(indexed bytes32,indexed bytes32)
           handler: handleFinalize
+
+templates:
+  - kind: ethereum
+    name: MeToken
+    network: base
+    source:
+      abi: ERC20
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.9
+      language: wasm/assemblyscript
+      file: ./src/metokens.ts
+      entities:
+        - MeTokenBalance
+      abis:
+        - name: ERC20
+          file: ./abis/ERC20.json
+      eventHandlers:
+        - event: Transfer(indexed address,indexed address,uint256)
+          handler: handleTransfer
