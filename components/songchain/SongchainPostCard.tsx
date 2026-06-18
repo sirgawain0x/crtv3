@@ -493,7 +493,9 @@ export function SongchainPostCard({
       </Dialog>
 
       <SongchainAuthorTimeline
-        authorAddress={content.author.address}
+        authorAddress={
+          isQuote ? post.author.address : content?.author?.address ?? ""
+        }
         authorLabel={authorLabel(post)}
         open={timelineOpen}
         onOpenChange={setTimelineOpen}
