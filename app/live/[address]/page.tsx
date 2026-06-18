@@ -8,6 +8,7 @@ import {
 import { updateStream } from "@/services/streams";
 import { useCreatorWalletAddress } from "@/lib/hooks/accountkit/useCreatorWalletAddress";
 import { useWalletAuth } from "@/lib/auth/useWalletAuth";
+import { walletAuthHeadersToArgs } from "@/lib/auth/require-wallet";
 import { LivePageClient } from "./LivePageClient";
 import { userMessageForStreamProxyError } from "@/lib/livepeer/stream-proxy-errors";
 import {
@@ -255,7 +256,8 @@ export default function LivePage() {
     setAllowClipping(next);
     setIsUpdatingClipPref(true);
     try {
-      await updateStream(creatorAddress, { allow_clipping: next });
+      const auth = walletAuthHeadersToArgs(await getAuthHeaders());
+      await updateStream(creatorAddress, { allow_clipping: next }, auth);
     } catch (err) {
       logger.error("Failed to update clipping preference:", err);
       setAllowClipping(previous);

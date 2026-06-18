@@ -154,6 +154,17 @@ export interface WalletAuthArgs {
   signature: string;
 }
 
+/** Convert client auth headers into server-action args. */
+export function walletAuthHeadersToArgs(
+  headers: Record<string, string>,
+): WalletAuthArgs {
+  return {
+    address: headers[HEADER_ADDRESS] ?? headers["X-Wallet-Address"],
+    timestamp: Number(headers[HEADER_TIMESTAMP] ?? headers["X-Wallet-Timestamp"]),
+    signature: headers[HEADER_SIGNATURE] ?? headers["X-Wallet-Signature"],
+  };
+}
+
 export async function verifyWalletAuthArgs(
   auth: WalletAuthArgs | undefined
 ): Promise<VerifiedWallet> {
