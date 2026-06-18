@@ -44,7 +44,7 @@ export function isRootFeedPost(post: AnyPost): boolean {
 }
 
 /** Feed list: collapse plain reposts; preserve quote wrappers; dedupe by id. */
-export function normalizeFeedPosts(items: AnyPost[]): AnyPost[] {
+export function normalizeFeedPosts(items: readonly AnyPost[]): AnyPost[] {
   const seenIds = new Set<string>();
   const result: AnyPost[] = [];
 
