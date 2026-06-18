@@ -2,6 +2,11 @@
 
 import { createClient } from "../lib/sdk/supabase/server";
 import { createServiceClient } from "../lib/sdk/supabase/service";
+import {
+  verifyWalletAuthArgs,
+  WalletAuthError,
+  type WalletAuthArgs,
+} from "@/lib/auth/require-wallet";
 import { isPermittedSigner } from "@/lib/utils/linked-identity";
 import { serverLogger } from "@/lib/utils/logger";
 
@@ -28,7 +33,50 @@ export interface Stream {
 }
 
 export type CreateStreamParams = Omit<Stream, "id" | "created_at" | "updated_at">;
-export type UpdateStreamParams = Partial<Omit<Stream, "id" | "creator_id" | "created_at">>;
+export type UpdateStreamParams = Partial<
+  Pick<
+    Stream,
+    | "thumbnail_url"
+    | "name"
+    | "is_live"
+    | "last_live_at"
+    | "allow_clipping"
+    | "requires_metoken"
+    | "metoken_price"
+  >
+>;
+
+const CLIENT_MUTABLE_STREAM_FIELDS = new Set<keyof UpdateStreamParams>([
+  "thumbnail_url",
+  "name",
+  "is_live",
+  "last_live_at",
+  "allow_clipping",
+  "requires_metoken",
+  "metoken_price",
+]);
+
+async function authorizeStreamOwner(
+  creatorId: string,
+  auth: WalletAuthArgs,
+): Promise<string> {
+  const { address: caller } = await verifyWalletAuthArgs(auth);
+  const normalizedCreator = creatorId.trim().toLowerCase();
+
+  if (caller === normalizedCreator) {
+    return caller;
+  }
+
+  const permitted =
+    (await isPermittedSigner(normalizedCreator, caller)) ||
+    (await isPermittedSigner(caller, normalizedCreator));
+
+  if (!permitted) {
+    throw new WalletAuthError(403, "Not authorized to modify this stream");
+  }
+
+  return caller;
+}
 
 /**
  * Get a stream by creator ID (wallet address)
@@ -170,15 +218,6 @@ export async function resolveStreamForCreator(
         if (migrated.creator_id.toLowerCase() === normalizedSca) {
             return migrated;
         }
-
-        // Read fallback: client supplied a matching legacy address but on-chain check failed.
-        if (legacySignerAddress?.trim().toLowerCase() === legacy) {
-            serverLogger.warn("[resolveStreamForCreator] returning legacy stream without migration", {
-                legacyAddress: legacy,
-                normalizedSca,
-            });
-            return legacyStream;
-        }
     }
 
     serverLogger.warn("[resolveStreamForCreator] legacy streams found but migration failed", {
@@ -254,13 +293,30 @@ export async function createStreamRecord(params: CreateStreamParams) {
 /**
  * Update an existing stream record
  */
-export async function updateStream(creatorId: string, updates: UpdateStreamParams) {
+export async function updateStream(
+    creatorId: string,
+    updates: UpdateStreamParams,
+    auth: WalletAuthArgs,
+) {
+    await authorizeStreamOwner(creatorId, auth);
+
+    const safeUpdates: UpdateStreamParams = {};
+    for (const [key, value] of Object.entries(updates)) {
+        if (CLIENT_MUTABLE_STREAM_FIELDS.has(key as keyof UpdateStreamParams)) {
+            (safeUpdates as Record<string, unknown>)[key] = value;
+        }
+    }
+
+    if (Object.keys(safeUpdates).length === 0) {
+        throw new WalletAuthError(400, "No valid stream fields to update");
+    }
+
     const supabase = await createServiceClient();
 
     const { data, error } = await supabase
         .from("streams")
         .update({
-            ...updates,
+            ...safeUpdates,
             updated_at: new Date().toISOString(),
         })
         .ilike("creator_id", creatorId)
