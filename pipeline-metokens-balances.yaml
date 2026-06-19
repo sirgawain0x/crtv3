@@ -3,28 +3,17 @@ resource_size: s
 apiVersion: 3
 sources:
   metoken_balances_source:
-    name: meTokenBalance
+    name: me_token_balance
     subgraphs:
       - name: metokens
         version: 1.0.3
     type: subgraph_entity
-transforms:
-  metoken_balances_transform:
-    type: sql
-    primary_key: id
-    sql: >-
-      SELECT
-        id,
-        user AS user_address,
-        meToken AS metoken_address,
-        CAST(balance AS DOUBLE) / 1e18 AS balance,
-        updatedAt AS updated_at
-      FROM metoken_balances_source
-      WHERE CAST(balance AS DOUBLE) > 0
+transforms: {}
 sinks:
-  postgres_metoken_balances_sync:
-    from: metoken_balances_transform
+  postgres_metoken_subgraph_balances:
+    from: metoken_balances_source
     schema: public
     secret_name: POSTGRES_SECRET_CMJIQCIFZ0
-    table: metoken_balances
+    table: metoken_subgraph_balances
+    primary_key: id
     type: postgres
