@@ -5,7 +5,7 @@ import { logger } from '@/lib/utils/logger';
 import { METOKEN_DIAMOND_BASE } from '@/lib/contracts/metokens/deployments';
 
 // Base mainnet Diamond contract address
-const DIAMOND_ADDRESS = METOKEN_DIAMOND_BASE as const;
+const DIAMOND_ADDRESS = METOKEN_DIAMOND_BASE;
 
 // Diamond contract ABI for getMeTokenInfo function
 const DIAMOND_ABI = [
