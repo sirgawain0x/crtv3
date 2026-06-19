@@ -69,6 +69,7 @@ if (!botIdGlobal.__crtvBotIdInit) {
       botIdDeepAnalysisRoute('/api/predictions/quota', 'GET'),
       botIdDeepAnalysisRoute('/api/predictions/record', 'POST'),
       botIdDeepAnalysisRoute('/api/predictions/metadata', 'GET'),
+      // claim-status omitted: read-only on-chain claim lookup; BotID 403 breaks list badges.
       botIdDeepAnalysisRoute('/api/search/videos', 'GET'),
       botIdDeepAnalysisRoute('/api/search/market', 'GET'),
       botIdDeepAnalysisRoute('/api/search/predictions', 'GET'),

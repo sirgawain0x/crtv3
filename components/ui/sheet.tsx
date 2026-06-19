@@ -6,6 +6,11 @@ import { Cross2Icon } from "@radix-ui/react-icons";
 import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "@/lib/utils/utils";
+import { createRadixLayerFocusHandlers } from "@/lib/utils/radixLayerFocus";
+
+const sheetFocusHandlers = createRadixLayerFocusHandlers(
+  "[data-radix-dialog-content]"
+);
 
 const Sheet = SheetPrimitive.Root;
 
@@ -84,6 +89,8 @@ const SheetContent = React.forwardRef<
     <SheetPrimitive.Content
       ref={ref}
       className={cn(sheetVariants({ side }), className)}
+      onOpenAutoFocus={sheetFocusHandlers.onOpenAutoFocus}
+      onCloseAutoFocus={sheetFocusHandlers.onCloseAutoFocus}
       {...props}
     >
       {children}
