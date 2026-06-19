@@ -17,7 +17,12 @@
     "test:solidity": "forge test",
     "test:solidity:gas": "forge test --gas-report",
     "test:solidity:fuzz": "forge test --fuzz-runs 10000",
-    "test:all": "npm run test:solidity && npm run test"
+    "test:all": "npm run test:solidity && npm run test",
+    "metokens:install": "yarn --cwd packages/metokens/core install",
+    "metokens:compile": "yarn --cwd packages/metokens/core compileCI",
+    "metokens:test": "yarn --cwd packages/metokens/core hardhat test",
+    "metokens:inspect-diamond": "louper-cli inspect diamond -a 0xba5502db2aC2cBff189965e991C07109B14eB3f5 -n base --json",
+    "metokens:validate-deployments": "tsx scripts/metokens/sync-base-deployments.ts"
   },
   "dependencies": {
     "@0xsplits/splits-kit": "^2.2.0",
@@ -151,6 +156,7 @@
     "zod": "^3.25.0"
   },
   "devDependencies": {
+    "@mark3labs/louper-cli": "^0.5.10",
     "@thirdweb-dev/contracts": "^3.15.0",
     "@types/node": "^22.15.18",
     "@types/react": "^18",

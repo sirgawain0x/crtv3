@@ -4,8 +4,9 @@ import { formatEther, createPublicClient, http, fallback, parseAbi } from 'viem'
 import { baseMainnet } from '@/lib/utils/chains/base';
 import { METOKEN_ABI } from '@/lib/contracts/MeToken';
 import { serverLogger } from '@/lib/utils/logger';
+import { METOKEN_DIAMOND_BASE, METOKEN_FACTORY_BASE } from '@/lib/contracts/metokens/deployments';
 
-const DIAMOND = '0xba5502db2aC2cBff189965e991C07109B14eB3f5';
+const DIAMOND = METOKEN_DIAMOND_BASE;
 
 export interface PriceHistoryPoint {
   timestamp: number;

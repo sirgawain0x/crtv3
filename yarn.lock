@@ -2261,6 +2261,11 @@
   dependencies:
     type-fest "^4.1.0"
 
+"@go-task/go-npm@^0.2.0":
+  version "0.2.0"
+  resolved "https://registry.npmjs.org/@go-task/go-npm/-/go-npm-0.2.0.tgz#5dcbb9378eca5657d962978fa9e3d09370e81a5e"
+  integrity sha512-vQbdtBvesHm8EUFHX8QKg4rbBodmu9VsAXH1ozpbiN5jdTMOYHTCMM31EurAYmY+rNNtxJQ4JGy6t383RPlqbw==
+
 "@gql.tada/cli-utils@1.7.2":
   version "1.7.2"
   resolved "https://registry.npmjs.org/@gql.tada/cli-utils/-/cli-utils-1.7.2.tgz"
@@ -3808,6 +3813,13 @@
   integrity sha512-qC72D4+CDdjGqJvkFMMEAtancHUQ7/d/tAiHf64z8MopFDmcrtbcJuerDtFceuAfQJ2pDSfCKCtbqoGBNnwg0w==
   dependencies:
     "@lukeed/csprng" "^1.1.0"
+
+"@mark3labs/louper-cli@^0.5.10":
+  version "0.5.10"
+  resolved "https://registry.npmjs.org/@mark3labs/louper-cli/-/louper-cli-0.5.10.tgz#5e4f43b330d95aa405c92b6981595934dc307a70"
+  integrity sha512-digSQzUk6aDPnBYQUeHIFLYvTI9+0YSgrgLnGm5fQ8pVUMo9LAShBW/6frg4RXAgGiDe+pc52ZxjgepJ1hfY9g==
+  dependencies:
+    "@go-task/go-npm" "^0.2.0"
 
 "@mediapipe/tasks-vision@0.10.17":
   version "0.10.17"

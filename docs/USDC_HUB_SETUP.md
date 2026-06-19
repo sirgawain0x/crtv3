@@ -14,7 +14,7 @@ Only **Hub 1 (DAI)** is registered on the MeTokens Diamond today. USDC support r
 - Hub-aware collateral parsing (DAI 18 decimals, USDC 6 decimals)
 - Hub selector in MeToken creation (lists only **active** hubs from chain)
 - Subgraph `Hub` entity from `Register` events
-- Admin script: `scripts/register-usdc-hub.ts`
+- Admin script: `scripts/metokens/register-usdc-hub.ts`
 
 ## Steps to enable USDC (protocol admin)
 
@@ -23,13 +23,15 @@ These steps follow [meTokens-core](https://github.com/meTokens/meTokens-core) Ha
 ### 1. Deploy / register a USDC vault
 
 ```bash
-# In meTokens-core repo, on Base:
+# In meTokens-core repo (submodule packages/metokens/core), on Base:
 yarn hardhat add-vault \
   --diamond 0xba5502db2aC2cBff189965e991C07109B14eB3f5 \
   --registry <VaultRegistry> \
   --vault <NewUSDCVault> \
   --network base
 ```
+
+Diamond address is canonical in [`deployments/metokens/base.json`](deployments/metokens/base.json).
 
 Use the same curve parameters as Hub 1 unless you have reason to change them (`baseY: 224`, `reserveWeight: 32`, `refundRatio: 50%`).
 
@@ -38,7 +40,7 @@ Use the same curve parameters as Hub 1 unless you have reason to change them (`b
 ```bash
 USDC_VAULT_ADDRESS=0xYourVault \
 DIAMOND_OWNER_PRIVATE_KEY=0x... \
-npx tsx scripts/register-usdc-hub.ts
+npx tsx scripts/metokens/register-usdc-hub.ts
 ```
 
 Or call `register(owner, asset, vault, refundRatio, baseY, reserveWeight, encodedVaultArgs)` on the Diamond from any admin wallet.

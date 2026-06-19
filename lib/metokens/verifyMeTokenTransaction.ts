@@ -1,11 +1,12 @@
 import { decodeEventLog, formatEther, parseAbi } from "viem";
 import {
+import { METOKEN_DIAMOND_BASE, METOKEN_FACTORY_BASE } from '@/lib/contracts/metokens/deployments';
   getVerifiedTransactionReceipt,
   getVerifiedTransaction,
   TransactionVerificationError,
 } from "@/lib/chain/verifyTransactionReceipt";
 
-const DIAMOND_ADDRESS = "0xba5502db2aC2cBff189965e991C07109B14eB3f5";
+const DIAMOND_ADDRESS = METOKEN_DIAMOND_BASE;
 const METOKEN_FACTORY = "0xb31Ae2583d983faa7D8C8304e6A16E414e721A0B";
 
 const transferAbi = parseAbi([

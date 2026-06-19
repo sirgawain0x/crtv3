@@ -15,6 +15,7 @@ import { DaiFundingOptions } from '@/components/wallet/funding/DaiFundingOptions
 import { parseBundlerError, shouldRetryError } from '@/lib/utils/bundlerErrorParser';
 import { logger } from '@/lib/utils/logger';
 import { appendBuilderCode } from "@/lib/utils/builder-code";
+import { METOKEN_DIAMOND_BASE, METOKEN_FACTORY_BASE } from '@/lib/contracts/metokens/deployments';
 
 interface MeTokenSubscriptionProps {
   meToken: MeTokenData;
@@ -99,7 +100,7 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
     }
 
     try {
-      const diamondAddress = '0xba5502db2aC2cBff189965e991C07109B14eB3f5';
+      const diamondAddress = METOKEN_DIAMOND_BASE;
       const daiAddress = '0x50c5725949a6f0c72e6c4a641f24049a917db0cb' as `0x${string}`;
 
       // Get the correct spender address (Vault)
@@ -151,7 +152,7 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
     setApprovalComplete(false);
 
     try {
-      const diamondAddress = '0xba5502db2aC2cBff189965e991C07109B14eB3f5';
+      const diamondAddress = METOKEN_DIAMOND_BASE;
       const daiAddress = '0x50c5725949a6f0c72e6c4a641f24049a917db0cb' as `0x${string}`;
 
       // Get the correct spender address (Vault)
@@ -336,7 +337,7 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
 
       logger.debug('✅ Confirmed not subscribed, proceeding with mint...');
 
-      const diamondAddress = '0xba5502db2aC2cBff189965e991C07109B14eB3f5' as `0x${string}`;
+      const diamondAddress = METOKEN_DIAMOND_BASE as `0x${string}`;
       const daiAddress = '0x50c5725949a6f0c72e6c4a641f24049a917db0cb' as `0x${string}`;
       const depositAmount = parseEther(assetsDeposited);
 

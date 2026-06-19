@@ -6,8 +6,12 @@ import { DAI_TOKEN_ADDRESSES, DAI_TOKEN_DECIMALS, DAI_TOKEN_SYMBOL } from '@/lib
 import { USDC_TOKEN_ADDRESSES, USDC_TOKEN_DECIMALS, USDC_TOKEN_SYMBOL } from '@/lib/contracts/USDCToken';
 import { USDS_TOKEN_ADDRESSES, USDS_TOKEN_DECIMALS, USDS_TOKEN_SYMBOL } from '@/lib/contracts/USDSToken';
 import { GHO_TOKEN_ADDRESSES, GHO_TOKEN_DECIMALS, GHO_TOKEN_SYMBOL } from '@/lib/contracts/GHOToken';
+import {
+  METOKEN_DIAMOND_BASE,
+  METOKEN_FACTORY_BASE,
+} from '@/lib/contracts/metokens/deployments';
 
-export const METOKEN_DIAMOND_BASE = '0xba5502db2aC2cBff189965e991C07109B14eB3f5' as const;
+export { METOKEN_DIAMOND_BASE, METOKEN_FACTORY_BASE };
 
 /** Hub 1 — legacy DAI collateral (live on Base). */
 export const DAI_HUB_ID = 1;
