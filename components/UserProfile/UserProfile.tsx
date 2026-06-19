@@ -142,8 +142,6 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
   )?.find((m: MembershipDetails) => m.isValid);
 
   if (loading) return <div>Loading...</div>;
-  if (serverMembershipError)
-    return <div className="text-destructive">{serverMembershipError}</div>;
 
   return (
     <ProfilePageGuard>
@@ -256,6 +254,13 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
 
             {/* Membership Tab Content */}
             <TabsContent value="Membership">
+              {serverMembershipError ? (
+                <Alert variant="destructive" className="mb-4">
+                  <FaExclamationTriangle className="h-4 w-4" />
+                  <AlertTitle>Membership lookup failed</AlertTitle>
+                  <AlertDescription>{serverMembershipError}</AlertDescription>
+                </Alert>
+              ) : null}
               {validMembership ? (
                 <Card>
                   <CardHeader className="space-y-1">
