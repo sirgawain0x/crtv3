@@ -131,6 +131,8 @@ export class PriceService {
           ETH: 'ethereum',
           USDC: 'usd-coin',
           DAI: 'dai',
+          USDS: 'usds',
+          GHO: 'gho',
         };
 
         const coinIds = uncachedSymbols.map(symbol => coinGeckoIds[symbol]).join(',');
