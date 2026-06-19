@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ExternalLink, ChevronDown, ChevronUp } from "lucide-react";
 import { linkifyPostText } from "@/lib/utils/linkify-post-text";
 import { CreativeTVLinkPreview } from "@/components/songchain/CreativeTVLinkPreview";
@@ -9,9 +9,20 @@ import { ExternalLinkPreview } from "@/components/songchain/ExternalLinkPreview"
 import { shouldSkipLinkPreview } from "@/lib/songchain/post-utils";
 import { cn } from "@/lib/utils/utils";
 
+const LINE_CLAMP_CLASS: Record<number, string> = {
+  1: "line-clamp-1",
+  2: "line-clamp-2",
+  3: "line-clamp-3",
+  4: "line-clamp-4",
+  5: "line-clamp-5",
+  6: "line-clamp-6",
+};
+
 type SongchainPostContentProps = {
   text: string;
   compact?: boolean;
+  /** Max visible lines before truncation; expand only offered when content overflows. */
+  maxLines?: number;
   className?: string;
   embeddedCreativeTVUrls?: Set<string>;
   skipAllInternalPreviews?: boolean;
@@ -20,11 +31,15 @@ type SongchainPostContentProps = {
 export function SongchainPostContent({
   text,
   compact = false,
+  maxLines = 3,
   className,
   embeddedCreativeTVUrls,
   skipAllInternalPreviews = false,
 }: SongchainPostContentProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [hasOverflow, setHasOverflow] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const clampClass = LINE_CLAMP_CLASS[maxLines] ?? LINE_CLAMP_CLASS[3];
   const segments = useMemo(() => linkifyPostText(text), [text]);
 
   const uniqueInternalUrls = useMemo(() => {
@@ -54,11 +69,34 @@ export function SongchainPostContent({
     return Array.from(new Set(urls));
   }, [segments]);
 
+  useLayoutEffect(() => {
+    setIsExpanded(false);
+  }, [text]);
+
+  useLayoutEffect(() => {
+    if (isExpanded) return;
+
+    const element = contentRef.current;
+    if (!element) return;
+
+    const measureOverflow = () => {
+      setHasOverflow(element.scrollHeight > element.clientHeight + 1);
+    };
+
+    measureOverflow();
+    const observer = new ResizeObserver(measureOverflow);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [text, isExpanded, maxLines, compact]);
+
   if (!text) return null;
 
   return (
     <div className={cn("space-y-2", className)}>
-      <div className={cn("relative", !isExpanded && "line-clamp-3")}>
+      <div
+        ref={contentRef}
+        className={cn("relative", !isExpanded && clampClass)}
+      >
         <p
           className={cn(
             "text-sm leading-relaxed whitespace-pre-wrap",
@@ -110,7 +148,7 @@ export function SongchainPostContent({
         )}
       </div>
 
-      {!isExpanded && (
+      {!isExpanded && hasOverflow && (
         <button
           type="button"
           onClick={() => setIsExpanded(true)}

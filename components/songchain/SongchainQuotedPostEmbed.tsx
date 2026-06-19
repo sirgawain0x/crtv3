@@ -51,10 +51,11 @@ export function SongchainQuotedPostEmbed({
         </div>
       )}
       {text && (
-        <div className="mt-2 text-sm text-muted-foreground line-clamp-4">
+        <div className="mt-2 text-sm text-muted-foreground">
           <SongchainPostContent
             text={text}
             compact
+            maxLines={4}
             embeddedCreativeTVUrls={embeddedCreativeTVUrls}
             skipAllInternalPreviews={skipAllInternalPreviews}
           />
