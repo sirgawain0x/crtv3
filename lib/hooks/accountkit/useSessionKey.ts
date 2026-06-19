@@ -25,9 +25,6 @@ export function useSessionKey(options: UseSessionKeyOptions = {}) {
   const { chain } = useChain();
   const { client: smartAccountClient } = useSmartAccountClient({
     type: "ModularAccountV2",
-    accountParams: {
-      mode: "7702",
-    },
   });
   const [isInstalling, setIsInstalling] = useState(false);
   const { sessionKeys } = useSessionKeyStorage();

@@ -103,7 +103,9 @@ export function useMembershipVerification() {
 
         if (!scaAddress) {
           if (waitingForClient) {
-            setStatus((prev) => ({ ...prev, isLoading: true }));
+            setStatus((prev) =>
+              prev.isLoading ? prev : { ...prev, isLoading: true },
+            );
             return;
           }
 

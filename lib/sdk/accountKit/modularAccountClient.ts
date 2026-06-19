@@ -33,7 +33,7 @@ export async function createModularAccountClient({
   }
 
   const accountClient = await createModularAccountV2Client({
-    mode: "7702",
+    mode: "default",
     chain,
     transport: alchemy({
       apiKey,

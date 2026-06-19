@@ -146,7 +146,7 @@ export const config = createConfig(
     accountConfig: {
       type: "ModularAccountV2",
       accountParams: {
-        mode: "7702", // Use EIP-7702 mode for Alchemy swap compatibility
+        mode: "default",
         factoryAddresses: modularAccountFactoryAddresses,
       },
       gasManagerConfig: {
