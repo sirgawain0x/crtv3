@@ -12,6 +12,14 @@ export interface TokenPrice {
 const priceCache = new Map<TokenSymbol, TokenPrice>();
 const CACHE_DURATION = 60000; // 1 minute cache
 
+const COINGECKO_IDS: Record<TokenSymbol, string> = {
+  ETH: 'ethereum',
+  USDC: 'usd-coin',
+  DAI: 'dai',
+  USDS: 'usds',
+  GHO: 'gho',
+};
+
 export class PriceService {
   private static instance: PriceService;
   private apiKey: string;
@@ -76,15 +84,7 @@ export class PriceService {
    * Fetch price from CoinGecko API
    */
   private async fetchTokenPrice(symbol: TokenSymbol): Promise<number> {
-    const coinGeckoIds: Record<TokenSymbol, string> = {
-      ETH: 'ethereum',
-      USDC: 'usd-coin',
-      DAI: 'dai',
-      USDS: 'usds',
-      GHO: 'gho',
-    };
-
-    const coinId = coinGeckoIds[symbol];
+    const coinId = COINGECKO_IDS[symbol];
     if (!coinId) {
       throw new Error(`Unknown token symbol: ${symbol}`);
     }
@@ -127,15 +127,7 @@ export class PriceService {
     // Fetch uncached prices
     if (uncachedSymbols.length > 0) {
       try {
-        const coinGeckoIds: Record<TokenSymbol, string> = {
-          ETH: 'ethereum',
-          USDC: 'usd-coin',
-          DAI: 'dai',
-          USDS: 'usds',
-          GHO: 'gho',
-        };
-
-        const coinIds = uncachedSymbols.map(symbol => coinGeckoIds[symbol]).join(',');
+        const coinIds = uncachedSymbols.map(symbol => COINGECKO_IDS[symbol]).join(',');
 
         const response = await fetch(
           `https://api.coingecko.com/api/v3/simple/price?ids=${coinIds}&vs_currencies=usd`,
@@ -150,7 +142,7 @@ export class PriceService {
           const data = await response.json();
 
           for (const symbol of uncachedSymbols) {
-            const coinId = coinGeckoIds[symbol];
+            const coinId = COINGECKO_IDS[symbol];
             const price = data[coinId]?.usd || 0;
 
             prices[symbol] = price;
