@@ -1,6 +1,6 @@
 import { signAccessJwt } from "@livepeer/core/crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { checkBotId } from "botid/server";
+import { checkBotIdDeep } from "@/lib/middleware/botIdGuard";
 import { rateLimiters } from "@/lib/middleware/rateLimit";
 import { getStreamByPlaybackId } from "@/services/streams";
 import {
@@ -14,7 +14,7 @@ import {
 import { resolveVerifiedViewerAddresses } from "@/lib/utils/linked-identity";
 
 export async function POST(req: NextRequest) {
-  const verification = await checkBotId();
+  const verification = await checkBotIdDeep();
   if (verification.isBot) {
     return NextResponse.json({ error: "Access denied" }, { status: 403 });
   }

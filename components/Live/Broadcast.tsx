@@ -120,7 +120,7 @@ export async function fetchStreamKeyForCreator(
     headers: authHeaders,
   });
   if (!res.ok) {
-    throw new Error("Failed to fetch stream key");
+    throw await parseStreamProxyFailure(res);
   }
   return res.json() as Promise<{
     streamId: string;

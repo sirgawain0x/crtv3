@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { isAddress } from "viem";
 import { rateLimiters } from "@/lib/middleware/rateLimit";
-import { requireHumanOrVerifiedBot } from "@/lib/middleware/botIdGuard";
 import { requireWalletAuthFor, WalletAuthError } from "@/lib/auth/require-wallet";
 import { createStreamRecord, resolveStreamForCreator } from "@/services/streams";
 import {
@@ -33,11 +32,6 @@ const bodySchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const botCheck = await requireHumanOrVerifiedBot("livepeer-proxy");
-  if (!botCheck.allowed) {
-    return botCheck.response;
-  }
-
   const rl = await rateLimiters.standard(req);
   if (rl) return rl;
 

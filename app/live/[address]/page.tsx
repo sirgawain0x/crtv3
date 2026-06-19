@@ -10,7 +10,7 @@ import { useCreatorWalletAddress } from "@/lib/hooks/accountkit/useCreatorWallet
 import { useWalletAuth } from "@/lib/auth/useWalletAuth";
 import { walletAuthHeadersToArgs } from "@/lib/auth/require-wallet";
 import { LivePageClient } from "./LivePageClient";
-import { userMessageForStreamProxyError } from "@/lib/livepeer/stream-proxy-errors";
+import { userMessageForStreamProxyError, StreamProxyError } from "@/lib/livepeer/stream-proxy-errors";
 import { formatWalletAuthError } from "@/lib/auth/format-wallet-auth-error";
 import {
   Breadcrumb,
@@ -49,6 +49,30 @@ import { ShareDialog } from "@/components/Videos/ShareDialog";
 import { ModeratorsDialog } from "@/components/Live/ModeratorsDialog";
 import { DigitalTwinOverlay } from "@/components/Live/DigitalTwinOverlay";
 import { logger } from '@/lib/utils/logger';
+
+async function fetchStreamKeyWithRetry(
+  creatorAddress: string,
+  authHeaders: Record<string, string>,
+  legacyCreatorAddress?: string | null,
+) {
+  try {
+    return await fetchStreamKeyForCreator(
+      creatorAddress,
+      authHeaders,
+      legacyCreatorAddress,
+    );
+  } catch (err) {
+    if (err instanceof StreamProxyError && err.code === "BOTID_DENIED") {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      return fetchStreamKeyForCreator(
+        creatorAddress,
+        authHeaders,
+        legacyCreatorAddress,
+      );
+    }
+    throw err;
+  }
+}
 
 
 export default function LivePage() {
@@ -127,7 +151,7 @@ export default function LivePage() {
         const legacy = signerAddress ?? undefined;
 
         try {
-          const keyData = await fetchStreamKeyForCreator(
+          const keyData = await fetchStreamKeyWithRetry(
             creatorAddress,
             authHeaders,
             legacy,

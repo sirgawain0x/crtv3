@@ -106,7 +106,7 @@
     "@xmtp/browser-sdk": "^5.0.1",
     "ai": "^4.0.0",
     "alchemy-sdk": "^3.6.5",
-    "botid": "^1.5.10",
+    "botid": "^1.5.11",
     "browser-image-compression": "^2.0.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
