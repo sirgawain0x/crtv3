@@ -40,11 +40,17 @@ export function MembershipGuard({ children }: MembershipGuardProps) {
   const canBypassLoading = isHomePage || isPublicPath;
 
   useEffect(() => {
-    logger.debug("MembershipGuard:", membership);
+    logger.debug("MembershipGuard:", {
+      isLoading,
+      isVerified,
+      hasMembership,
+      isHomePage,
+      isPublicPath,
+    });
     if (!isLoading && (!isVerified || !hasMembership) && !isHomePage && !isPublicPath) {
       router.push("/");
     }
-  }, [isLoading, isVerified, hasMembership, router, membership, isHomePage, isPublicPath]);
+  }, [isLoading, isVerified, hasMembership, router, isHomePage, isPublicPath]);
 
   if ((!isVerified || !hasMembership) && !isHomePage && !isPublicPath) {
     if (isLoading) {

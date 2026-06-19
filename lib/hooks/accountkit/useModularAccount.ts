@@ -36,9 +36,6 @@ export default function useModularAccount(props?: UseModularAccountProps) {
     error,
   } = useSmartAccountClient({
     type: "ModularAccountV2",
-    accountParams: {
-      mode: "7702",
-    },
   });
 
   /**
