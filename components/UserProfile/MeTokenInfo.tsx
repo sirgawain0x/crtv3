@@ -4,6 +4,8 @@ import { Badge } from '@/components/ui/badge';
 import { MeTokenData } from '@/lib/hooks/metokens/useMeTokens';
 import { formatEther } from 'viem';
 import { TrendingUp, TrendingDown, Users, DollarSign, Clock, Copy, Check, Coins, BarChart3 } from 'lucide-react';
+import { CollateralBadge } from '@/components/metokens/CollateralBadge';
+import { resolveHubAsset } from '@/lib/utils/hubAssetUtils';
 import { useMeTokenMarketStats } from '@/lib/hooks/market/useMeTokenMarketStats';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
@@ -72,6 +74,8 @@ export function MeTokenInfo({ meToken }: MeTokenInfoProps) {
 
     return { number: formattedNumber, symbol };
   };
+
+  const collateral = resolveHubAsset(Number(meToken.info.hubId));
 
   return (
     <div className="grid gap-4 md:grid-cols-2">
@@ -148,6 +152,13 @@ export function MeTokenInfo({ meToken }: MeTokenInfoProps) {
               </p>
             </div>
             <div className="space-y-1">
+              <p className="text-xs sm:text-sm font-medium text-muted-foreground">Collateral</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <CollateralBadge hubId={Number(meToken.info.hubId)} showHubId />
+                <span className="text-xs text-muted-foreground">{collateral.tagline}</span>
+              </div>
+            </div>
+            <div className="space-y-1">
               <p className="text-xs sm:text-sm font-medium text-muted-foreground">Hub ID</p>
               <p className="text-lg sm:text-xl font-semibold">
                 #{meToken.info.hubId.toString()}
@@ -159,7 +170,7 @@ export function MeTokenInfo({ meToken }: MeTokenInfoProps) {
             <div className="space-y-1">
               <p className="text-xs sm:text-sm font-medium text-muted-foreground">Pooled Balance</p>
               {(() => {
-                const { number, symbol } = formatTokenAmount(meToken.info.balancePooled, 'DAI');
+                const { number, symbol } = formatTokenAmount(meToken.info.balancePooled, collateral.symbol);
                 return (
                   <p className="text-sm sm:text-base break-all sm:break-normal overflow-wrap-anywhere">
                     {number} {symbol}
@@ -171,7 +182,7 @@ export function MeTokenInfo({ meToken }: MeTokenInfoProps) {
               <div className="space-y-1">
                 <p className="text-xs sm:text-sm font-medium text-muted-foreground">Locked Balance</p>
                 {(() => {
-                  const { number, symbol } = formatTokenAmount(meToken.info.balanceLocked, 'DAI');
+                  const { number, symbol } = formatTokenAmount(meToken.info.balanceLocked, collateral.symbol);
                   return (
                     <p className="text-sm sm:text-base break-all sm:break-normal overflow-wrap-anywhere">
                       {number} {symbol}
