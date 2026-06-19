@@ -41,6 +41,7 @@ if (!botIdGlobal.__crtvBotIdInit) {
       botIdDeepAnalysisRoute('/api/story/prepare-mint', 'POST'),
       // rpc-proxy omitted: BotID blocks legitimate client RPC (e.g. eth_getBalance for funding wallet).
       // metokens-subgraph omitted: read-only GraphQL proxy; BotID 403 breaks portfolio balance queries.
+      // reality-eth-subgraph omitted: read-only GraphQL proxy; BotID 403 breaks predictions list queries.
       botIdDeepAnalysisRoute('/api/story/factory/deploy-collection', 'POST'),
       botIdDeepAnalysisRoute('/api/poap/create-event', 'POST'),
       botIdDeepAnalysisRoute('/api/poap-proxy', 'POST'),
@@ -64,7 +65,6 @@ if (!botIdGlobal.__crtvBotIdInit) {
       botIdDeepAnalysisRoute('/api/video-assets/sync-views/*', 'POST'),
       botIdDeepAnalysisRoute('/api/video-assets/*/regenerate-thumbnail', 'POST'),
       botIdDeepAnalysisRoute('/api/coinbase/session-token', 'POST'),
-      botIdDeepAnalysisRoute('/api/reality-eth-subgraph', 'POST'),
       botIdDeepAnalysisRoute('/api/metokens/*/transactions', 'POST'),
       botIdDeepAnalysisRoute('/api/predictions/quota', 'GET'),
       botIdDeepAnalysisRoute('/api/predictions/record', 'POST'),
