@@ -42,6 +42,13 @@ export function createRadixLayerFocusHandlers(contentSelector: string) {
   };
 }
 
+/** Blur page focus when a Radix Select opens (Select has no onOpenAutoFocus). */
+export function blurBackgroundForSelectOpen(): void {
+  blurActiveElementOutside(
+    "[data-radix-select-content], [data-radix-select-trigger]"
+  );
+}
+
 /** Close a popover/dropdown, blur focus, then run an action on the next frame. */
 export function deferAfterOverlayClose(
   close: () => void,
