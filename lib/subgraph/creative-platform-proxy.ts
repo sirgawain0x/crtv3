@@ -6,6 +6,9 @@ export type SubgraphProviderMode = 'goldsky' | 'studio' | 'dual';
 
 const DEFAULT_GOLDSKY_PROJECT_ID = 'project_cmh0iv6s500dbw2p22vsxcfo6';
 
+/** Goldsky MeTokens subgraph version (Studio deploy tag should match). */
+export const METOKENS_GOLDSKY_VERSION = '1.0.3';
+
 export function getSubgraphProviderMode(): SubgraphProviderMode {
   const rawMode = process.env.SUBGRAPH_PROVIDER_MODE?.toLowerCase();
   if (rawMode === 'studio' || rawMode === 'dual' || rawMode === 'goldsky') return rawMode;
@@ -45,12 +48,12 @@ export function resolveSubgraphEndpoints(target: SubgraphProxyTarget): string[] 
   const goldskyPrimary =
     target === 'reality-eth'
       ? getGoldskyUrl('reality-eth', '1.0.0', true, isPrivate ? 'private' : 'public')
-      : getGoldskyUrl('metokens', '1.0.2', false, isPrivate ? 'private' : 'public');
+      : getGoldskyUrl('metokens', METOKENS_GOLDSKY_VERSION, false, isPrivate ? 'private' : 'public');
 
   const goldskyPublicFallback =
     target === 'reality-eth'
       ? getGoldskyUrl('reality-eth', '1.0.0', true, 'public')
-      : getGoldskyUrl('metokens', '1.0.2', false, 'public');
+      : getGoldskyUrl('metokens', METOKENS_GOLDSKY_VERSION, false, 'public');
 
   const endpoints: string[] = [];
 

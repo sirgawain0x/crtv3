@@ -47,20 +47,20 @@ Or call `register(owner, asset, vault, refundRatio, baseY, reserveWeight, encode
 
 USDC on Base: `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`
 
-### 3. Redeploy subgraph (v1.0.3+)
+### 3. Sync Turbo pipelines (subgraph 1.0.3 on Studio)
 
-The subgraph now indexes `Hub` and `MeTokenBalance` entities. After deploy, sync the Turbo pipeline:
+Graph Studio deploy **1.0.3** indexes `Hub` and `MeTokenBalance`. Mirror to Goldsky at the same version, then apply pipelines:
 
 ```bash
-cd subgraphs/creative-platform
-yarn codegen && yarn build
-# Deploy to Graph Studio / Goldsky as metokens 1.0.3
 turbo pipeline apply pipeline-metokens-balances.yaml
+turbo pipeline apply pipeline-metokens-hubs.yaml
+# or sync all MeToken entities:
+turbo pipeline apply pipeline-metokens-all.yaml
 ```
 
 ### 4. Verify in the app
 
-- Open **Create MeToken** — Hub selector should show **Hub 2 — USDC**
+- Open **Create MeToken** — Hub selector should show **Hub 3 — USDC** once registered on-chain
 - Portfolio uses `meTokenBalances(where: { user })` instead of scanning all tokens
 
 ## Subgraph balance index

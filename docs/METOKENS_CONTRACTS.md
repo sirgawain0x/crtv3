@@ -53,6 +53,12 @@ HUB_SYMBOL=USDC VAULT_ADDRESS=0x... DIAMOND_OWNER_PRIVATE_KEY=0x... \
 
 See [`USDC_HUB_SETUP.md`](USDC_HUB_SETUP.md).
 
+## Subgraph
+
+- **Graph Studio (primary)**: `GRAPH_STUDIO_CREATIVE_PLATFORM_URL` — deploy tag **1.0.3** (`Hub`, `MeTokenBalance`, P2P `Transfer` indexing)
+- **Goldsky (fallback)**: `metokens/1.0.3` — see `METOKENS_GOLDSKY_VERSION` in `lib/subgraph/creative-platform-proxy.ts`
+- **Turbo**: `pipeline-metokens-balances.yaml`, `pipeline-metokens-hubs.yaml`, `pipeline-metokens-all.yaml`
+
 ## Upgrade vs register
 
 - **Upgrade (ERC-2535):** replace facet logic on the existing Diamond via `diamondCut` — see [`METOKENS_UPGRADE_RUNBOOK.md`](METOKENS_UPGRADE_RUNBOOK.md).
