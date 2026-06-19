@@ -96,7 +96,7 @@ export function MeTokenCreator({ onMeTokenCreated }: MeTokenCreatorProps) {
   }, [transactionError, toast]);
 
   const handleCreateMeToken = async () => {
-    logger.debug('🚀 handleCreateMeToken called', { name, symbol, daiAmount });
+    logger.debug('🚀 handleCreateMeToken called', { name, symbol, collateralAmount });
 
     if (!name.trim() || !symbol.trim()) {
       setLocalError('Please fill in all fields');

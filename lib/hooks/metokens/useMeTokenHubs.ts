@@ -59,9 +59,11 @@ function enrichHub(hubId: number, asset: `0x${string}`, info: {
   owner: `0x${string}`;
   active: boolean;
 }): MeTokenHubInfo {
-  const known = Object.values(HUB_ASSET_CONFIGS).find(
-    (c) => c.hubId === hubId || c.address.toLowerCase() === asset.toLowerCase()
-  );
+  const known =
+    Object.values(HUB_ASSET_CONFIGS).find(
+      (c) => c.address.toLowerCase() === asset.toLowerCase()
+    ) ??
+    Object.values(HUB_ASSET_CONFIGS).find((c) => c.hubId === hubId);
 
   return {
     hubId,
