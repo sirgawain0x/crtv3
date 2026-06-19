@@ -18,6 +18,7 @@ import { RadixProvider } from "@/components/ui/radix-provider";
 import { cleanupExistingIframes } from "@/components/IframeCleanup";
 import { MembershipGuard } from "@/components/auth/MembershipGuard";
 import { AccountKitStoreGuard } from "@/components/auth/AccountKitStoreGuard";
+import { AuthErrorMonitor } from "@/components/auth/AuthErrorMonitor";
 import { OrbSessionProvider } from "@/context/OrbSessionContext";
 import { OrbLoginModal } from "@/components/auth/OrbLoginModal";
 import { OrbLinkingOverlay } from "@/components/auth/OrbLinkingOverlay";
@@ -79,6 +80,7 @@ export const Providers = (
                       <TourProvider>
                         <VideoProvider>
                           <AccountKitStoreGuard>
+                            <AuthErrorMonitor />
                             <OrbSessionProvider>
                               <MembershipGuard>
                                 {props.children}

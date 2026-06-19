@@ -26,7 +26,7 @@ export function useSessionKey(options: UseSessionKeyOptions = {}) {
   const { client: smartAccountClient } = useSmartAccountClient({
     type: "ModularAccountV2",
     accountParams: {
-      mode: "default",
+      mode: "7702",
     },
   });
   const [isInstalling, setIsInstalling] = useState(false);

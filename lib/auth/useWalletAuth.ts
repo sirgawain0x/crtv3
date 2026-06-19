@@ -42,7 +42,9 @@ function buildMessage(address: string, timestamp: number): string {
 export function useWalletAuth() {
   const user = useUser();
   const { smartAccountClient, address: smartAccountAddress } = useModularAccount();
-  const { client: fallbackClient } = useSmartAccountClient({});
+  const { client: fallbackClient } = useSmartAccountClient({
+    accountParams: { mode: "7702" },
+  });
   const accountClient = smartAccountClient || fallbackClient;
   const address = (smartAccountAddress || user?.address || "").toLowerCase();
 

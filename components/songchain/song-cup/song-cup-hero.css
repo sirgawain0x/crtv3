@@ -305,23 +305,15 @@
     bottom: -4px;
   }
 
-  .song-cup-hero-scene .song-cup-hero-rings {
-    display: none;
-  }
-
   .song-cup-hero-scene .soccer-ball .ball-patch {
     stroke: #e2e8f0;
     stroke-width: 0.75;
   }
 }
 
-@media (max-width: 768px) {
-  .song-cup-hero-scene .a3d {
-    animation: roty 20s linear infinite !important;
-  }
-
-  .song-cup-hero-scene .s2d {
-    animation: none !important;
+@media (max-width: 480px) {
+  .song-cup-hero-scene {
+    perspective: 28em;
   }
 }
 
@@ -339,6 +331,7 @@
   display: grid;
   transform-style: preserve-3d;
   backface-visibility: hidden;
+  will-change: transform;
   animation: roty 20s linear infinite, size 48s cubic-bezier(0.25, 1, 0.5, 1) infinite;
 }
 
@@ -359,6 +352,7 @@
   grid-area: 1 / 1;
   place-self: center;
   backface-visibility: hidden;
+  will-change: transform, clip-path;
   --sup: 0;
   --not-sup: calc(1 - var(--sup));
   --sgn-sup: calc(2*var(--sup) - 1);

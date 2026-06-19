@@ -11,6 +11,7 @@ import { useWalletAuth } from "@/lib/auth/useWalletAuth";
 import { walletAuthHeadersToArgs } from "@/lib/auth/require-wallet";
 import { LivePageClient } from "./LivePageClient";
 import { userMessageForStreamProxyError } from "@/lib/livepeer/stream-proxy-errors";
+import { formatWalletAuthError } from "@/lib/auth/format-wallet-auth-error";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -52,7 +53,7 @@ import { logger } from '@/lib/utils/logger';
 
 export default function LivePage() {
   const { creatorAddress, signerAddress, smartAccountAddress, eoaAddress, isConnected, isLoading: isWalletLoading } = useCreatorWalletAddress();
-  const { getAuthHeaders } = useWalletAuth();
+  const { getAuthHeaders, isReady: isWalletAuthReady } = useWalletAuth();
   const [multistreamTargets, setMultistreamTargets] = useState<
     MultistreamTarget[]
   >([]);
@@ -268,10 +269,20 @@ export default function LivePage() {
 
   async function handleCreateStream() {
     if (!creatorAddress) return;
+    if (!identityReady || !isWalletAuthReady) {
+      setStreamCreateError("Wallet is still initializing. Wait a moment and try again.");
+      return;
+    }
     setIsCreatingStream(true);
     setStreamCreateError(null);
     try {
-      const authHeaders = await getAuthHeaders();
+      let authHeaders;
+      try {
+        authHeaders = await getAuthHeaders();
+      } catch (authErr) {
+        setStreamCreateError(formatWalletAuthError(authErr));
+        return;
+      }
       const result = await createStreamViaProxy({
         creatorAddress,
         legacyCreatorAddress: signerAddress,
@@ -407,9 +418,14 @@ export default function LivePage() {
                 <p className="text-sm text-muted-foreground mb-4 text-center max-w-md">
                   Create your channel first — camera preview and live chat appear on the next step.
                 </p>
+                {!identityReady || !isWalletAuthReady ? (
+                  <p className="text-sm text-muted-foreground mb-4 text-center max-w-md">
+                    Preparing wallet…
+                  </p>
+                ) : null}
                 <button
                   onClick={handleCreateStream}
-                  disabled={isCreatingStream}
+                  disabled={isCreatingStream || !identityReady || !isWalletAuthReady}
                   className="px-6 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
                 >
                   {isCreatingStream ? "Creating Stream..." : "Create Stream"}
