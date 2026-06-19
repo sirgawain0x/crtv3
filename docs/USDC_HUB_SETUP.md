@@ -33,7 +33,7 @@ yarn hardhat add-vault \
 
 Diamond address is canonical in [`deployments/metokens/base.json`](deployments/metokens/base.json).
 
-Use the same curve parameters as Hub 1 unless you have reason to change them (`baseY: 224`, `reserveWeight: 32`, `refundRatio: 50%`).
+Use the same curve parameters as Hub 1 unless you have reason to change them (`baseY: 224`, `reserveWeight: 32`, `refundRatio: 800000` = 80% in ppm, max `1e6`).
 
 ### 2. Register the USDC hub on the Diamond
 

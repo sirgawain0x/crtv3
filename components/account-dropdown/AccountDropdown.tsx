@@ -109,6 +109,9 @@ import { useToast } from "@/components/ui/use-toast";
 import { ToastAction } from "@/components/ui/toast";
 import { USDC_TOKEN_ADDRESSES, USDC_TOKEN_DECIMALS } from "@/lib/contracts/USDCToken";
 import { DAI_TOKEN_ADDRESSES, DAI_TOKEN_DECIMALS } from "@/lib/contracts/DAIToken";
+import { USDS_TOKEN_ADDRESSES, USDS_TOKEN_DECIMALS } from "@/lib/contracts/USDSToken";
+import { GHO_TOKEN_ADDRESSES, GHO_TOKEN_DECIMALS } from "@/lib/contracts/GHOToken";
+import { SWAP_UI_TOKENS, emptyTokenBalances, type TokenSymbol as SwapTokenSymbol } from "@/lib/sdk/alchemy/swap-service";
 import { useSessionKeyStorage } from "@/lib/hooks/accountkit/useSessionKeyStorage";
 import { MembershipSection } from "./MembershipSection";
 import { shortenAddress } from "@/lib/utils/utils";
@@ -183,22 +186,12 @@ interface SessionKeyConfig {
   };
 }
 
-// Token configuration for send modal
-type TokenSymbol = 'ETH' | 'USDC' | 'DAI';
+import { getTokenIcon } from '@/lib/utils/token-icons';
 
-const getTokenIcon = (symbol: TokenSymbol, chainId?: number) => {
-  const isBase = chainId === 8453;
-  switch (symbol) {
-    case "ETH":
-      return isBase ? "/images/tokens/ETH_on_Base.svg" : "/images/tokens/eth-logo.svg";
-    case "USDC":
-      return isBase ? "/images/tokens/USDC_on_Base.svg" : "/images/tokens/usdc-logo.svg";
-    case "DAI":
-      return isBase ? "/images/tokens/DAI_on_Base.svg" : "/images/tokens/dai-logo.svg";
-    default:
-      return "/images/tokens/eth-logo.svg";
-  }
-};
+// Token configuration for send modal
+type TokenSymbol = SwapTokenSymbol;
+
+const ERC20_SEND_TOKENS: Exclude<TokenSymbol, 'ETH'>[] = ['USDC', 'DAI', 'USDS', 'GHO'];
 
 // Helper function to get token info for the current chain
 const getTokenInfo = (chainId?: number) => {
@@ -208,17 +201,27 @@ const getTokenInfo = (chainId?: number) => {
     ETH: {
       decimals: 18,
       symbol: "ETH",
-      address: null, // Native token
+      address: null as null,
     },
     USDC: {
       decimals: USDC_TOKEN_DECIMALS,
       symbol: "USDC",
-      address: chainKey ? (USDC_TOKEN_ADDRESSES as any)[chainKey] : undefined,
+      address: chainKey ? USDC_TOKEN_ADDRESSES[chainKey] : undefined,
     },
     DAI: {
       decimals: DAI_TOKEN_DECIMALS,
       symbol: "DAI",
-      address: chainKey ? (DAI_TOKEN_ADDRESSES as any)[chainKey] : undefined,
+      address: chainKey ? DAI_TOKEN_ADDRESSES[chainKey] : undefined,
+    },
+    USDS: {
+      decimals: USDS_TOKEN_DECIMALS,
+      symbol: "USDS",
+      address: chainKey ? USDS_TOKEN_ADDRESSES[chainKey] : undefined,
+    },
+    GHO: {
+      decimals: GHO_TOKEN_DECIMALS,
+      symbol: "GHO",
+      address: chainKey ? GHO_TOKEN_ADDRESSES[chainKey] : undefined,
     },
   } as const;
 };
@@ -306,11 +309,7 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
   const [selectedToken, setSelectedToken] = useState<TokenSymbol>('ETH');
   const [sendType, setSendType] = useState<'token' | 'nft'>('token');
   const [selectedNFT, setSelectedNFT] = useState<MembershipNFT | null>(null);
-  const [tokenBalances, setTokenBalances] = useState<Record<TokenSymbol, string>>({
-    ETH: '0',
-    USDC: '0',
-    DAI: '0',
-  });
+  const [tokenBalances, setTokenBalances] = useState<Record<TokenSymbol, string>>(emptyTokenBalances());
   const { nfts: membershipNFTs, isLoading: isLoadingNFTs } = useMembershipNFTs();
   const { toast } = useToast();
   const [isLinksLoading, setIsLinksLoading] = useState(false);
@@ -386,38 +385,30 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
           address: smartAccountAddress as Address,
         });
 
-        // Resolve per-chain ERC-20 addresses (Base only for now)
         const chainKey = chain?.id === base.id ? "base" : undefined;
-        let usdc = 0n;
-        let dai = 0n;
-
-        if (chainKey) {
-          const usdcAddr = (USDC_TOKEN_ADDRESSES as any)[chainKey] as Address | undefined;
-          const daiAddr = (DAI_TOKEN_ADDRESSES as any)[chainKey] as Address | undefined;
-
-          if (usdcAddr) {
-            usdc = await client.readContract({
-              address: usdcAddr,
-              abi: erc20Abi,
-              functionName: 'balanceOf',
-              args: [smartAccountAddress as Address],
-            }) as bigint;
-          }
-
-          if (daiAddr) {
-            dai = await client.readContract({
-              address: daiAddr,
-              abi: erc20Abi,
-              functionName: 'balanceOf',
-              args: [smartAccountAddress as Address],
-            }) as bigint;
-          }
-        }
+        const erc20Balances = Object.fromEntries(
+          await Promise.all(
+            ERC20_SEND_TOKENS.map(async (symbol) => {
+              if (!chainKey) return [symbol, 0n] as const;
+              const info = getTokenInfo(chain?.id)[symbol];
+              if (!info.address) return [symbol, 0n] as const;
+              const balance = await client.readContract({
+                address: info.address as Address,
+                abi: erc20Abi,
+                functionName: 'balanceOf',
+                args: [smartAccountAddress as Address],
+              }) as bigint;
+              return [symbol, balance] as const;
+            })
+          )
+        ) as Record<Exclude<TokenSymbol, 'ETH'>, bigint>;
 
         setTokenBalances({
           ETH: formatUnits(ethBalance, 18),
-          USDC: formatUnits(usdc, USDC_TOKEN_DECIMALS),
-          DAI: formatUnits(dai, DAI_TOKEN_DECIMALS),
+          USDC: formatUnits(erc20Balances.USDC, USDC_TOKEN_DECIMALS),
+          DAI: formatUnits(erc20Balances.DAI, DAI_TOKEN_DECIMALS),
+          USDS: formatUnits(erc20Balances.USDS, USDS_TOKEN_DECIMALS),
+          GHO: formatUnits(erc20Balances.GHO, GHO_TOKEN_DECIMALS),
         });
       } catch (error) {
         logger.error('Error fetching token balances:', error);
@@ -660,7 +651,7 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
             },
           });
         } else {
-          // Send ERC-20 token (USDC or DAI)
+          // Send ERC-20 token (USDC, DAI, USDS, GHO)
           // Check if token is supported on current chain
           if (!tokenInfo.address) {
             toast({
@@ -874,8 +865,8 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
                   {/* Token Selection */}
                   <div className="space-y-3">
                     <label className="text-sm font-medium text-gray-900 dark:text-gray-100">Token</label>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                      {(['ETH', 'USDC', 'DAI'] as TokenSymbol[]).map((token) => (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {SWAP_UI_TOKENS.map((token) => (
                         <button
                           key={token}
                           type="button"
