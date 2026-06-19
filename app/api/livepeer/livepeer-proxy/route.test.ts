@@ -7,16 +7,10 @@ vi.mock("viem", () => ({
 
 const CREATOR = "0xcccccccccccccccccccccccccccccccccccccccc";
 
-const mockRequireHumanOrVerifiedBot = vi.fn();
 const mockRequireWalletAuthFor = vi.fn();
 const mockResolveStreamForCreator = vi.fn();
 const mockCreateStreamRecord = vi.fn();
 const mockFetch = vi.fn();
-
-vi.mock("@/lib/middleware/botIdGuard", () => ({
-  requireHumanOrVerifiedBot: (...args: unknown[]) =>
-    mockRequireHumanOrVerifiedBot(...args),
-}));
 
 vi.mock("@/lib/middleware/rateLimit", () => ({
   rateLimiters: { standard: vi.fn(async () => null) },
@@ -77,7 +71,6 @@ function streamRequest(body: Record<string, unknown>) {
 describe("POST /api/livepeer/livepeer-proxy", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockRequireHumanOrVerifiedBot.mockResolvedValue({ allowed: true });
     mockRequireWalletAuthFor.mockResolvedValue({ address: CREATOR });
     mockResolveStreamForCreator.mockResolvedValue(null);
     mockCreateStreamRecord.mockResolvedValue({ id: "db-1" });

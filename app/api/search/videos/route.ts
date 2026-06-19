@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { checkBotId } from "botid/server";
+import { checkBotIdDeep } from "@/lib/middleware/botIdGuard";
 import { rateLimiters } from "@/lib/middleware/rateLimit";
 import { supabaseService } from "@/lib/sdk/supabase/service";
 
 import { sanitizeAutocompleteQuery } from "@/lib/search/sanitize-autocomplete-query";
 
 export async function GET(request: NextRequest) {
-  const verification = await checkBotId();
+  const verification = await checkBotIdDeep();
   if (verification.isBot) {
     return NextResponse.json({ error: "Access denied" }, { status: 403 });
   }

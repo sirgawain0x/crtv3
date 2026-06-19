@@ -4,7 +4,7 @@
  * and submit via eth_sendRawTransaction (e.g. through /api/story/rpc-proxy).
  */
 import { NextRequest, NextResponse } from "next/server";
-import { checkBotId } from "botid/server";
+import { checkBotIdDeep } from "@/lib/middleware/botIdGuard";
 import { createStoryClient, getStoryRpcUrl } from "@/lib/sdk/story/client";
 import { getOrCreateCreatorCollection } from "@/lib/sdk/story/collection-service";
 import { mintAndRegisterIp } from "@/lib/sdk/story/spg-service";
@@ -26,7 +26,7 @@ function serializeTx(tx: { to: Address; data: `0x${string}`; value?: bigint; gas
 }
 
 export async function POST(request: NextRequest) {
-  const verification = await checkBotId();
+  const verification = await checkBotIdDeep();
   if (verification.isBot) {
     return NextResponse.json({ error: "Access denied" }, { status: 403 });
   }

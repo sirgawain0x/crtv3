@@ -4,7 +4,7 @@
  * via the parent's attached PIL license terms.
  */
 import { NextRequest, NextResponse } from "next/server";
-import { checkBotId } from "botid/server";
+import { checkBotIdDeep } from "@/lib/middleware/botIdGuard";
 import { rateLimiters } from "@/lib/middleware/rateLimit";
 import { createStoryClient } from "@/lib/sdk/story/client";
 import { getOrCreateCreatorCollection } from "@/lib/sdk/story/collection-service";
@@ -19,7 +19,7 @@ import { requireWalletAuthFor, WalletAuthError } from "@/lib/auth/require-wallet
 const ADDRESS_REGEX = /^0x[a-fA-F0-9]{40}$/;
 
 export async function POST(request: NextRequest) {
-  const verification = await checkBotId();
+  const verification = await checkBotIdDeep();
   if (verification.isBot) {
     return NextResponse.json({ error: "Access denied" }, { status: 403 });
   }

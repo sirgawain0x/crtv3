@@ -4,7 +4,7 @@
  * minted as derivative IPs with automatic royalty routing to the broadcaster.
  */
 import { NextRequest, NextResponse } from "next/server";
-import { checkBotId } from "botid/server";
+import { checkBotIdDeep } from "@/lib/middleware/botIdGuard";
 import { PILFlavor } from "@story-protocol/core-sdk";
 import { parseEther, type Address } from "viem";
 import { rateLimiters } from "@/lib/middleware/rateLimit";
@@ -21,7 +21,7 @@ const ADDRESS_REGEX = /^0x[a-fA-F0-9]{40}$/;
 const DEFAULT_REV_SHARE = 10;
 
 export async function POST(request: NextRequest) {
-  const verification = await checkBotId();
+  const verification = await checkBotIdDeep();
   if (verification.isBot) {
     return NextResponse.json({ error: "Access denied" }, { status: 403 });
   }
