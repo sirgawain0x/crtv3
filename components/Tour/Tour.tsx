@@ -193,6 +193,10 @@ export const Tour = () => {
 
         logger.debug('Tour: Callback', { index, status, type, action, currentId });
 
+        if (type === EVENTS.STEP_BEFORE || type === EVENTS.TOUR_START) {
+            (document.activeElement as HTMLElement | null)?.blur?.();
+        }
+
         if ([STATUS.FINISHED, STATUS.SKIPPED].includes(status as typeof STATUS.FINISHED)) {
             setRun(false);
             localStorage.setItem('crtv3_tour_completed', 'true');

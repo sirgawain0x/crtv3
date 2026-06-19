@@ -104,6 +104,7 @@ import {
 } from "@account-kit/smart-contracts/experimental";
 import { parseEther, type Address, type Hex, encodeFunctionData, parseAbi, parseUnits, formatUnits, erc20Abi } from "viem";
 import { logger } from "@/lib/utils/logger";
+import { deferAfterOverlayClose } from "@/lib/utils/radixLayerFocus";
 import { appendBuilderCode } from "@/lib/utils/builder-code";
 import { useToast } from "@/components/ui/use-toast";
 import { ToastAction } from "@/components/ui/toast";
@@ -433,9 +434,13 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
 
   const handleActionClick = useCallback(
     (action: "buy" | "send" | "swap" | "session-keys") => {
-      setDialogAction(action);
-      setIsDialogOpen(true);
-      setIsDropdownOpen(false);
+      deferAfterOverlayClose(
+        () => setIsDropdownOpen(false),
+        () => {
+          setDialogAction(action);
+          setIsDialogOpen(true);
+        }
+      );
     },
     []
   );

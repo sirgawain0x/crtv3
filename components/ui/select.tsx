@@ -8,6 +8,7 @@ import { base, optimism } from "@account-kit/infra";
 import Image from "next/image";
 
 import { cn } from "@/lib/utils/utils";
+import { blurActiveElementOutside } from "@/lib/utils/radixLayerFocus";
 
 const Select = SelectPrimitive.Root;
 
@@ -109,6 +110,9 @@ const SelectContent = React.forwardRef<
         className
       )}
       position={position}
+      onOpenAutoFocus={() => {
+        blurActiveElementOutside("[data-radix-select-content]");
+      }}
       {...props}
     >
       <SelectScrollUpButton />

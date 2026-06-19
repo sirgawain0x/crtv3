@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { checkBotIdDeep } from "@/lib/middleware/botIdGuard";
 import { isAddress, createPublicClient, http, fallback } from "viem";
 import { base } from "@account-kit/infra";
 import { rateLimiters } from "@/lib/middleware/rateLimit";
@@ -11,10 +10,6 @@ import { enrichPredictionDisplaySync } from "@/lib/predictions/enrich-prediction
 import { getUserClaimStatus } from "@/lib/predictions/claim-status";
 
 export async function GET(request: NextRequest) {
-  const verification = await checkBotIdDeep();
-  if (verification.isBot) {
-    return NextResponse.json({ error: "Access denied" }, { status: 403 });
-  }
   const rl = await rateLimiters.generous(request);
   if (rl) return rl;
 
