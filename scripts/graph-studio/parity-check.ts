@@ -57,11 +57,11 @@ async function main() {
   compareCounts("subscribes", goldskyMeTokens.data?.subscribes.length ?? 0, studioMeTokens.data?.subscribes.length ?? 0);
   compareCounts("mints", goldskyMeTokens.data?.mints.length ?? 0, studioMeTokens.data?.mints.length ?? 0);
   compareCounts("burns", goldskyMeTokens.data?.burns.length ?? 0, studioMeTokens.data?.burns.length ?? 0);
-  compareCounts("hubs", goldskyMeTokens.data?.hubs.length ?? 0, studioMeTokens.data?.hubs.length ?? 0);
+  compareCounts("hubs", goldskyMeTokens.data?.hubs?.length ?? 0, studioMeTokens.data?.hubs?.length ?? 0);
   compareCounts(
     "meTokenBalances",
-    goldskyMeTokens.data?.meTokenBalances.length ?? 0,
-    studioMeTokens.data?.meTokenBalances.length ?? 0
+    goldskyMeTokens.data?.meTokenBalances?.length ?? 0,
+    studioMeTokens.data?.meTokenBalances?.length ?? 0
   );
   compareCounts("questions", goldskyReality.data?.questions.length ?? 0, studioReality.data?.questions.length ?? 0);
   compareCounts("answers", goldskyReality.data?.answers.length ?? 0, studioReality.data?.answers.length ?? 0);
