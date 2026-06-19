@@ -15,7 +15,7 @@ import { DaiFundingOptions } from '@/components/wallet/funding/DaiFundingOptions
 import { parseBundlerError, shouldRetryError } from '@/lib/utils/bundlerErrorParser';
 import { logger } from '@/lib/utils/logger';
 import { appendBuilderCode } from "@/lib/utils/builder-code";
-import { METOKEN_DIAMOND_BASE, METOKEN_FACTORY_BASE } from '@/lib/contracts/metokens/deployments';
+import { METOKEN_DIAMOND_BASE } from '@/lib/contracts/metokens/deployments';
 
 interface MeTokenSubscriptionProps {
   meToken: MeTokenData;

@@ -13,7 +13,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { DaiFundingOptions } from '@/components/wallet/funding/DaiFundingOptions';
 import { logger } from '@/lib/utils/logger';
 import { appendBuilderCode } from "@/lib/utils/builder-code";
-import { METOKEN_DIAMOND_BASE, METOKEN_FACTORY_BASE } from '@/lib/contracts/metokens/deployments';
+import { METOKEN_DIAMOND_BASE } from '@/lib/contracts/metokens/deployments';
 
 // Contract addresses and ABIs
 const METOKEN_CONTRACTS = {

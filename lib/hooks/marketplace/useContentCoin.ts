@@ -8,7 +8,7 @@ import { METOKEN_ABI } from '@/lib/contracts/MeToken';
 import { parseBundlerError } from '@/lib/utils/bundlerErrorParser';
 import { logger } from '@/lib/utils/logger';
 import { appendBuilderCode } from "@/lib/utils/builder-code";
-import { METOKEN_DIAMOND_BASE, METOKEN_FACTORY_BASE } from '@/lib/contracts/metokens/deployments';
+import { METOKEN_DIAMOND_BASE } from '@/lib/contracts/metokens/deployments';
 
 
 // Diamond Address (Hardcoded for Base as per previous files)

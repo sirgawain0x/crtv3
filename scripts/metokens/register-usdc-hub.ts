@@ -28,9 +28,10 @@ const REGISTER_ABI = parseAbi([
 async function main() {
   const privateKey = process.env.DIAMOND_OWNER_PRIVATE_KEY as `0x${string}` | undefined;
   const vaultAddress = process.env.USDC_VAULT_ADDRESS as `0x${string}` | undefined;
-  const hubOwner = (process.env.HUB_OWNER_ADDRESS ?? privateKey
-    ? privateKeyToAccount(privateKey as `0x${string}`).address
-    : undefined) as `0x${string}` | undefined;
+  const hubOwner = (process.env.HUB_OWNER_ADDRESS ??
+    (privateKey ? privateKeyToAccount(privateKey as `0x${string}`).address : undefined)) as
+    | `0x${string}`
+    | undefined;
 
   if (!privateKey || !vaultAddress || !hubOwner) {
     console.error(`

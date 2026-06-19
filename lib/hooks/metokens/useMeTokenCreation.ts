@@ -24,7 +24,7 @@ import { METOKEN_DIAMOND_BASE, METOKEN_FACTORY_BASE } from '@/lib/contracts/meto
 
 // MeTokens contract addresses on Base
 const DIAMOND = METOKEN_DIAMOND_BASE as const;
-const METOKEN_FACTORY = '0x7BE650f4AA109377c1bBbEE0851CF72A8e7E915C' as const;
+const METOKEN_FACTORY = METOKEN_FACTORY_BASE as const;
 
 // Subscribe ABI
 const SUBSCRIBE_ABI = [{

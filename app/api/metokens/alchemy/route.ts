@@ -4,7 +4,7 @@ import { createClient } from '@/lib/sdk/supabase/server';
 import { MeTokenCreationParams } from '@/lib/sdk/alchemy/metoken-service';
 import { serverLogger } from '@/lib/utils/logger';
 import { rateLimiters } from '@/lib/middleware/rateLimit';
-import { METOKEN_DIAMOND_BASE, METOKEN_FACTORY_BASE } from '@/lib/contracts/metokens/deployments';
+import { METOKEN_DIAMOND_BASE } from '@/lib/contracts/metokens/deployments';
 
 // Force dynamic route to avoid build-time evaluation
 export const dynamic = 'force-dynamic';

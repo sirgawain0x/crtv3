@@ -2,7 +2,7 @@ import { MeTokenData, MeTokenInfo } from '@/lib/hooks/metokens/useMeTokensSupaba
 import { publicClient } from '@/lib/viem';
 import { parseAbi } from 'viem';
 import { logger } from '@/lib/utils/logger';
-import { METOKEN_DIAMOND_BASE, METOKEN_FACTORY_BASE } from '@/lib/contracts/metokens/deployments';
+import { METOKEN_DIAMOND_BASE } from '@/lib/contracts/metokens/deployments';
 
 // Base mainnet Diamond contract address
 const DIAMOND_ADDRESS = METOKEN_DIAMOND_BASE as const;

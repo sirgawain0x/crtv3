@@ -4,7 +4,7 @@ import { formatEther, createPublicClient, http, fallback, parseAbi } from 'viem'
 import { baseMainnet } from '@/lib/utils/chains/base';
 import { METOKEN_ABI } from '@/lib/contracts/MeToken';
 import { serverLogger } from '@/lib/utils/logger';
-import { METOKEN_DIAMOND_BASE, METOKEN_FACTORY_BASE } from '@/lib/contracts/metokens/deployments';
+import { METOKEN_DIAMOND_BASE } from '@/lib/contracts/metokens/deployments';
 
 const DIAMOND = METOKEN_DIAMOND_BASE;
 

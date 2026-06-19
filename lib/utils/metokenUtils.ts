@@ -8,7 +8,7 @@ const METOKEN_FACTORY_ABI = parseAbi([
   'event MeTokenCreated(address indexed meToken, address indexed owner, string name, string symbol)'
 ]);
 
-const METOKEN_FACTORY_ADDRESS = '0xb31Ae2583d983faa7D8C8304e6A16E414e721A0B';
+const METOKEN_FACTORY_ADDRESS = METOKEN_FACTORY_BASE;
 
 // Create a public client for reading blockchain data
 const publicClient = createPublicClient({
@@ -125,7 +125,7 @@ export async function extractMeTokenAddressFromTransaction(transactionHash: stri
 
       // Also check for generic contract creation patterns
       // Look for logs from the MeTokenFactory contract
-      const METOKEN_FACTORY = '0xb31Ae2583d983faa7D8C8304e6A16E414e721A0B';
+      const METOKEN_FACTORY = METOKEN_FACTORY_BASE;
       for (const log of receipt.logs) {
         if (log.address.toLowerCase() === METOKEN_FACTORY.toLowerCase()) {
           logger.debug('📍 Found log from MeTokenFactory:', log);

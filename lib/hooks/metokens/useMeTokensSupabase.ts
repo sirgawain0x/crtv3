@@ -22,7 +22,7 @@ import { appendBuilderCode } from "@/lib/utils/builder-code";
 import { METOKEN_DIAMOND_BASE, METOKEN_FACTORY_BASE } from '@/lib/contracts/metokens/deployments';
 
 // MeTokens contract addresses on Base
-const METOKEN_FACTORY = '0xb31Ae2583d983faa7D8C8304e6A16E414e721A0B';
+const METOKEN_FACTORY = METOKEN_FACTORY_BASE;
 const DIAMOND = METOKEN_DIAMOND_BASE;
 
 
