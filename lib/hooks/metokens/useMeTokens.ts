@@ -5,11 +5,12 @@ import { parseEther, formatEther, encodeFunctionData } from 'viem';
 import { meTokensSubgraph, MeToken } from '@/lib/sdk/metokens/subgraph';
 import { logger } from '@/lib/utils/logger';
 import { appendBuilderCode } from "@/lib/utils/builder-code";
+import { METOKEN_DIAMOND_BASE, METOKEN_FACTORY_BASE } from '@/lib/contracts/metokens/deployments';
 
 
 // MeTokens contract addresses on Base
-const METOKEN_FACTORY = '0xb31Ae2583d983faa7D8C8304e6A16E414e721A0B';
-const DIAMOND = '0xba5502db2aC2cBff189965e991C07109B14eB3f5';
+const METOKEN_FACTORY = METOKEN_FACTORY_BASE;
+const DIAMOND = METOKEN_DIAMOND_BASE;
 
 // ABI for MeToken Factory
 const METOKEN_FACTORY_ABI = [

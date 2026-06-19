@@ -8,10 +8,11 @@ import { METOKEN_ABI } from '@/lib/contracts/MeToken';
 import { parseBundlerError } from '@/lib/utils/bundlerErrorParser';
 import { logger } from '@/lib/utils/logger';
 import { appendBuilderCode } from "@/lib/utils/builder-code";
+import { METOKEN_DIAMOND_BASE } from '@/lib/contracts/metokens/deployments';
 
 
 // Diamond Address (Hardcoded for Base as per previous files)
-const DIAMOND = '0xba5502db2aC2cBff189965e991C07109B14eB3f5';
+const DIAMOND = METOKEN_DIAMOND_BASE;
 // const VAULT_REGISTRY = '0x0000000000000000000000000000000000000000'; // Removed in favor of dynamic fetch
 
 export function useContentCoin() {

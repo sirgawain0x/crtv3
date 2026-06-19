@@ -1,13 +1,14 @@
 import { createPublicClient, http, parseAbi, formatEther } from 'viem';
 import { baseMainnet } from '@/lib/utils/chains/base';
 import { logger } from '@/lib/utils/logger';
+import { METOKEN_DIAMOND_BASE, METOKEN_FACTORY_BASE } from '@/lib/contracts/metokens/deployments';
 
 // MeTokenFactory ABI - we only need the MeTokenCreated event
 const METOKEN_FACTORY_ABI = parseAbi([
   'event MeTokenCreated(address indexed meToken, address indexed owner, string name, string symbol)'
 ]);
 
-const METOKEN_FACTORY_ADDRESS = '0xb31Ae2583d983faa7D8C8304e6A16E414e721A0B';
+const METOKEN_FACTORY_ADDRESS = METOKEN_FACTORY_BASE;
 
 // Create a public client for reading blockchain data
 const publicClient = createPublicClient({
@@ -124,7 +125,7 @@ export async function extractMeTokenAddressFromTransaction(transactionHash: stri
 
       // Also check for generic contract creation patterns
       // Look for logs from the MeTokenFactory contract
-      const METOKEN_FACTORY = '0xb31Ae2583d983faa7D8C8304e6A16E414e721A0B';
+      const METOKEN_FACTORY = METOKEN_FACTORY_BASE;
       for (const log of receipt.logs) {
         if (log.address.toLowerCase() === METOKEN_FACTORY.toLowerCase()) {
           logger.debug('📍 Found log from MeTokenFactory:', log);
@@ -250,7 +251,7 @@ export async function getMeTokenInfoFromBlockchain(meTokenAddress: string): Prom
     ]);
 
     // Diamond ABI
-    const DIAMOND_ADDRESS = '0xba5502db2aC2cBff189965e991C07109B14eB3f5';
+    const DIAMOND_ADDRESS = METOKEN_DIAMOND_BASE;
     const DIAMOND_ABI = parseAbi([
       'struct MeTokenInfo { address owner; uint256 hubId; uint256 balancePooled; uint256 balanceLocked; uint256 startTime; uint256 endTime; uint256 targetHubId; address migration; }',
       'function getMeTokenInfo(address meToken) view returns (MeTokenInfo)'
@@ -336,7 +337,7 @@ export async function getMeTokenProtocolInfo(meTokenAddress: string): Promise<{
       'function getMeTokenInfo(address meToken) view returns (MeTokenInfo)'
     ]);
 
-    const DIAMOND_ADDRESS = '0xba5502db2aC2cBff189965e991C07109B14eB3f5'; // Base mainnet diamond
+    const DIAMOND_ADDRESS = METOKEN_DIAMOND_BASE; // Base mainnet diamond
 
     const result = await publicClient.readContract({
       address: DIAMOND_ADDRESS,
@@ -386,7 +387,7 @@ export async function getBulkMeTokenInfo(meTokenAddresses: string[]): Promise<Re
     ]);
 
     // Diamond ABI
-    const DIAMOND_ADDRESS = '0xba5502db2aC2cBff189965e991C07109B14eB3f5';
+    const DIAMOND_ADDRESS = METOKEN_DIAMOND_BASE;
     const DIAMOND_ABI = parseAbi([
       'struct MeTokenInfo { address owner; uint256 hubId; uint256 balancePooled; uint256 balanceLocked; uint256 startTime; uint256 endTime; uint256 targetHubId; address migration; }',
       'function getMeTokenInfo(address meToken) view returns (MeTokenInfo)'

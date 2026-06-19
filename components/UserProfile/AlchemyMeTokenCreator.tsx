@@ -13,10 +13,11 @@ import { useToast } from '@/components/ui/use-toast';
 import { DaiFundingOptions } from '@/components/wallet/funding/DaiFundingOptions';
 import { logger } from '@/lib/utils/logger';
 import { appendBuilderCode } from "@/lib/utils/builder-code";
+import { METOKEN_DIAMOND_BASE } from '@/lib/contracts/metokens/deployments';
 
 // Contract addresses and ABIs
 const METOKEN_CONTRACTS = {
-  DIAMOND: '0xba5502db2aC2cBff189965e991C07109B14eB3f5',
+  DIAMOND: METOKEN_DIAMOND_BASE,
   DAI: '0x50c5725949a6f0c72e6c4a641f24049a917db0cb',
 } as const;
 

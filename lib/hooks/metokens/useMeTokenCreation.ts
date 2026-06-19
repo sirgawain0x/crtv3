@@ -19,11 +19,12 @@ import { parseBundlerError, shouldRetryError } from '@/lib/utils/bundlerErrorPar
 import { getDaiTokenContract, DAI_TOKEN_ADDRESSES } from '@/lib/contracts/DAIToken';
 import { logger } from '@/lib/utils/logger';
 import { appendBuilderCode } from "@/lib/utils/builder-code";
+import { METOKEN_DIAMOND_BASE, METOKEN_FACTORY_BASE } from '@/lib/contracts/metokens/deployments';
 
 
 // MeTokens contract addresses on Base
-const DIAMOND = '0xba5502db2aC2cBff189965e991C07109B14eB3f5' as const;
-const METOKEN_FACTORY = '0x7BE650f4AA109377c1bBbEE0851CF72A8e7E915C' as const;
+const DIAMOND = METOKEN_DIAMOND_BASE;
+const METOKEN_FACTORY = METOKEN_FACTORY_BASE;
 
 // Subscribe ABI
 const SUBSCRIBE_ABI = [{
