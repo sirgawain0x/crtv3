@@ -16,12 +16,7 @@ export function SongchainPostMasonryGrid({
   className,
 }: SongchainPostMasonryGridProps) {
   return (
-    <div
-      className={cn(
-        "columns-1 gap-6 sm:columns-2 lg:columns-3",
-        className
-      )}
-    >
+    <div className={cn("columns-1 gap-6 sm:columns-2 lg:columns-3", className)}>
       {children}
     </div>
   );
@@ -37,6 +32,6 @@ export function SongchainPostMasonryItem({
   className,
 }: SongchainPostMasonryItemProps) {
   return (
-    <div className={cn("mb-6 break-inside-avoid", className)}>{children}</div>
+    <div className={cn("mb-6 break-inside-avoid-column", className)}>{children}</div>
   );
 }
