@@ -49,8 +49,8 @@ if (!botIdGlobal.__crtvBotIdInit) {
       botIdDeepAnalysisRoute('/api/metokens', 'POST'),
       botIdDeepAnalysisRoute('/api/metokens/*', 'PUT'),
       botIdDeepAnalysisRoute('/api/metokens/*/balance', 'PUT'),
+      // membership omitted: read-only Unlock lookup; BotID Deep Analysis caused profile 403s.
       // metokens-subgraph: read-only GraphQL proxy — excluded from BotID (see rpc-proxy note above).
-      botIdDeepAnalysisRoute('/api/membership', 'POST'),
       botIdDeepAnalysisRoute('/api/livepeer/sign-jwt', 'POST'),
       botIdDeepAnalysisRoute('/api/livepeer/token-gate', 'POST'),
       botIdDeepAnalysisRoute('/api/livepeer/stream/*/recording', 'POST'),

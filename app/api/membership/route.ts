@@ -1,14 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { checkBotIdDeep } from "@/lib/middleware/botIdGuard";
 import { unlockService } from "@/lib/sdk/unlock/services";
 import { rateLimiters } from "@/lib/middleware/rateLimit";
 
-// POST /api/membership
+// POST /api/membership — read-only Unlock lookup; excluded from BotID (see instrumentation-client.ts).
 export async function POST(req: NextRequest) {
-  const verification = await checkBotIdDeep();
-  if (verification.isBot) {
-    return NextResponse.json({ error: "Access denied" }, { status: 403 });
-  }
   const rl = await rateLimiters.standard(req);
   if (rl) return rl;
 

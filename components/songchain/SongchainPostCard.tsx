@@ -294,7 +294,7 @@ export function SongchainPostCard({
     <>
       <article
         className={cn(
-          "relative flex flex-col overflow-hidden rounded-xl border border-border/50 bg-card shadow-sm",
+          "relative flex flex-col overflow-hidden rounded-xl border border-border/50 bg-card shadow-sm break-inside-avoid-column",
           compact && "text-sm",
           isQuote && "border-violet-500/30",
           pending === "edit" && "opacity-70",
