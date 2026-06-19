@@ -82,7 +82,15 @@ SelectScrollDownButton.displayName =
 const SelectContent = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>
->(({ className, children, position = "popper", ...props }, ref) => (
+>(function SelectContent(
+  { className, children, position = "popper", ...props },
+  ref
+) {
+  React.useLayoutEffect(() => {
+    blurActiveElementOutside("[data-radix-select-content]");
+  }, []);
+
+  return (
   <SelectPrimitive.Portal>
     <SelectPrimitive.Content
       ref={ref}
@@ -110,9 +118,6 @@ const SelectContent = React.forwardRef<
         className
       )}
       position={position}
-      onOpenAutoFocus={() => {
-        blurActiveElementOutside("[data-radix-select-content]");
-      }}
       {...props}
     >
       <SelectScrollUpButton />
@@ -128,7 +133,8 @@ const SelectContent = React.forwardRef<
       <SelectScrollDownButton />
     </SelectPrimitive.Content>
   </SelectPrimitive.Portal>
-));
+  );
+});
 SelectContent.displayName = SelectPrimitive.Content.displayName;
 
 const SelectLabel = React.forwardRef<
