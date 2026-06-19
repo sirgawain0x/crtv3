@@ -15,10 +15,10 @@ export { METOKEN_DIAMOND_BASE, METOKEN_FACTORY_BASE };
 
 /** Hub 1 — legacy DAI collateral (live on Base). */
 export const DAI_HUB_ID = 1;
-/** Hub 2 — USDS (Sky Protocol). */
-export const USDS_HUB_ID = 2;
-/** Hub 3 — USDC (recommended default for new MeTokens). */
-export const USDC_HUB_ID = 3;
+/** Hub 2 — USDC (recommended default for new MeTokens). */
+export const USDC_HUB_ID = 2;
+/** Hub 3 — USDS (Sky Protocol). */
+export const USDS_HUB_ID = 3;
 /** Hub 4 — GHO (Aave). */
 export const GHO_HUB_ID = 4;
 
@@ -136,14 +136,14 @@ export function formatMeTokenBackingLabel(hubId: number): string {
   return `Backed by ${asset.displayName}`;
 }
 
-/** Default Bancor curve params from Hub 1 Register event on Base. */
+/** Default curve params matching Hub 1 (DAI) on Base. refundRatio is ppm (max 1e6); 800000 = 80%. */
 export const DEFAULT_HUB_CURVE_PARAMS = {
-  refundRatio: '500000000000000000',
+  refundRatio: '800000',
   baseY: '224',
   reserveWeight: 32,
 } as const;
 
 export const DAI_HUB_VAULT_BASE = '0xff6Eb470bf0D817B17DFD596F1B2b3110682a40f' as const;
 
-/** Planned hub registrations (requires on-chain vault + register). */
-export const PENDING_STABLE_HUBS: HubAssetSymbol[] = ['USDS', 'USDC', 'GHO'];
+/** All stable hubs registered on Base (2026-06). */
+export const PENDING_STABLE_HUBS: HubAssetSymbol[] = [];

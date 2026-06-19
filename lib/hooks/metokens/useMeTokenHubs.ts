@@ -37,6 +37,13 @@ const HUB_INFO_ABI = [
     stateMutability: 'view',
     type: 'function',
   },
+  {
+    inputs: [],
+    name: 'count',
+    outputs: [{ internalType: 'uint256', name: '', type: 'uint256' }],
+    stateMutability: 'view',
+    type: 'function',
+  },
 ] as const;
 
 export interface MeTokenHubInfo {
@@ -91,7 +98,12 @@ export function useMeTokenHubs() {
     setError(null);
 
     try {
-      const hubIds = Object.values(HUB_ASSET_CONFIGS).map((c) => c.hubId);
+      const hubCount = await publicClient.readContract({
+        address: METOKEN_DIAMOND_BASE,
+        abi: HUB_INFO_ABI,
+        functionName: 'count',
+      });
+      const hubIds = Array.from({ length: Number(hubCount) }, (_, i) => i + 1);
       const results = await Promise.all(
         hubIds.map(async (hubId) => {
           const info = await publicClient.readContract({

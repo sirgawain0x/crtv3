@@ -10,14 +10,12 @@
       "address": "0xb31Ae2583d983faa7D8C8304e6A16E414721A0B"
     },
     "vaultRegistry": {
-      "address": null,
-      "source": "manual",
-      "note": "TBD — confirm on Basescan or protocol admin records"
+      "address": "0x77445bf99cb8d01db7fa06112200fd12c9f860e1",
+      "source": "on-chain AppStorage slot 21"
     },
     "migrationRegistry": {
-      "address": null,
-      "source": "manual",
-      "note": "TBD — confirm on Basescan or protocol admin records"
+      "address": "0xbd25c36811df69d080735ec53ea4a61c55fdcccd",
+      "source": "on-chain AppStorage slot 22"
     },
     "facets": {
       "diamondCut": "0x2256CF92163748AF1B30bb0a477C68672Fb14432",
@@ -34,6 +32,24 @@
         "asset": "DAI",
         "assetAddress": "0x50c5725949A6F0c72E6C4a641F24049A917DB0Cb",
         "vault": "0xff6Eb470bf0D817B17DFD596F1B2b3110682a40f",
+        "active": true
+      },
+      "2": {
+        "asset": "USDC",
+        "assetAddress": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        "vault": "0xd4b3f4d2c44Feba751F30e19D7e1047A29eE085d",
+        "active": true
+      },
+      "3": {
+        "asset": "USDS",
+        "assetAddress": "0x820c137FA70c8691f0e44DC420a5e53c168921dc",
+        "vault": "0x4Ee13136b6d2A2EaCA34D7f75245577a14046b91",
+        "active": true
+      },
+      "4": {
+        "asset": "GHO",
+        "assetAddress": "0x6bb7a212910682dcfdbd5bcbb3e28fb4e8da10ee",
+        "vault": "0xB10C9eB57a3f29D27e3aC23ffD9681f12fa63351",
         "active": true
       }
     },

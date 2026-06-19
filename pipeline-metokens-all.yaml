@@ -109,12 +109,10 @@ sinks:
     schema: public
     secret_name: POSTGRES_SECRET_CMJIQCIFZ0
     table: metoken_hubs
-    primary_key: id
     type: postgres
   postgres_metoken_subgraph_balances:
     from: metoken_balances_transform
     schema: public
     secret_name: POSTGRES_SECRET_CMJIQCIFZ0
     table: metoken_subgraph_balances
-    primary_key: id
     type: postgres

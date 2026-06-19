@@ -12,6 +12,8 @@ import { useUser } from '@account-kit/react';
 import { useToast } from '@/components/ui/use-toast';
 import { Loader2, CheckCircle, AlertCircle, Info } from 'lucide-react';
 import { logger } from '@/lib/utils/logger';
+import Image from 'next/image';
+import { getTokenIcon } from '@/lib/utils/token-icons';
 import {
   Select,
   SelectContent,
@@ -294,9 +296,18 @@ export function MeTokenCreator({ onMeTokenCreated }: MeTokenCreatorProps) {
               <SelectContent>
                 {activeHubs.map((hub) => (
                   <SelectItem key={hub.hubId} value={String(hub.hubId)}>
-                    Hub {hub.hubId} — {hub.displayName}
-                    {hub.recommended ? ' (Recommended)' : ''}
-                    {hub.deprecated ? ' (Legacy)' : ''}
+                    <span className="flex items-center gap-2">
+                      <Image
+                        src={getTokenIcon(hub.symbol, 8453)}
+                        alt={hub.symbol}
+                        width={20}
+                        height={20}
+                        className="h-5 w-5 rounded-full"
+                      />
+                      Hub {hub.hubId} — {hub.displayName}
+                      {hub.recommended ? ' (Recommended)' : ''}
+                      {hub.deprecated ? ' (Legacy)' : ''}
+                    </span>
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -353,7 +364,7 @@ export function MeTokenCreator({ onMeTokenCreated }: MeTokenCreatorProps) {
               <Alert className="py-2">
                 <Info className="h-3 w-3" />
                 <AlertDescription className="text-xs">
-                  USDS is Sky&apos;s upgrade from DAI — same 1:1 stable concept with decentralized backing and savings features.
+                  USDS is Sky&apos;s upgrade from DAI. Use the wallet swap tool to convert ETH or USDC into USDS before depositing.
                 </AlertDescription>
               </Alert>
               )}
@@ -361,7 +372,7 @@ export function MeTokenCreator({ onMeTokenCreated }: MeTokenCreatorProps) {
               <Alert className="py-2">
                 <Info className="h-3 w-3" />
                 <AlertDescription className="text-xs">
-                  GHO works best for DeFi-native communities using lending and borrowing. Less common for everyday purchases.
+                  Need GHO? Swap from ETH or other stables in the account menu, or mint via Aave on Base.
                 </AlertDescription>
               </Alert>
               )}

@@ -64,6 +64,8 @@ export class PriceService {
         ETH: 3000,
         USDC: 1,
         DAI: 1,
+        USDS: 1,
+        GHO: 1,
       };
 
       return fallbackPrices[symbol];
@@ -78,6 +80,8 @@ export class PriceService {
       ETH: 'ethereum',
       USDC: 'usd-coin',
       DAI: 'dai',
+      USDS: 'usds',
+      GHO: 'gho',
     };
 
     const coinId = coinGeckoIds[symbol];

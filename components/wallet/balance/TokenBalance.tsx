@@ -6,9 +6,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatUnits, createPublicClient, http } from "viem";
 import { getUsdcTokenContract } from "@/lib/contracts/USDCToken";
 import { getDaiTokenContract } from "@/lib/contracts/DAIToken";
+import { getUsdsTokenContract } from "@/lib/contracts/USDSToken";
+import { getGhoTokenContract } from "@/lib/contracts/GHOToken";
 import { Skeleton } from "@/components/ui/skeleton";
 import Image from "next/image";
 import { logger } from '@/lib/utils/logger';
+import { getTokenIcon } from '@/lib/utils/token-icons';
 
 
 interface TokenBalanceData {
@@ -49,6 +52,8 @@ export function TokenBalance() {
   const [ethBalance, setEthBalance] = useState<bigint | null>(null);
   const [usdcBalance, setUsdcBalance] = useState<bigint | null>(null);
   const [daiBalance, setDaiBalance] = useState<bigint | null>(null);
+  const [usdsBalance, setUsdsBalance] = useState<bigint | null>(null);
+  const [ghoBalance, setGhoBalance] = useState<bigint | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -114,45 +119,31 @@ export function TokenBalance() {
           }
         }
 
-        // Get USDC balance
-        try {
-          if (!isMounted || signal.aborted) return;
+        // ERC-20 balances (Base hub collateral stables)
+        const erc20Tokens = [
+          { symbol: 'USDC', contract: getUsdcTokenContract(chainKey), setter: setUsdcBalance },
+          { symbol: 'DAI', contract: getDaiTokenContract(chainKey), setter: setDaiBalance },
+          { symbol: 'USDS', contract: getUsdsTokenContract(chainKey), setter: setUsdsBalance },
+          { symbol: 'GHO', contract: getGhoTokenContract(chainKey), setter: setGhoBalance },
+        ] as const;
 
-          const usdcTokenContract = getUsdcTokenContract(chainKey);
-          const usdcBalance = (await publicClient.readContract({
-            address: usdcTokenContract.address,
-            abi: usdcTokenContract.abi,
-            functionName: "balanceOf",
-            args: [address as `0x${string}`],
-          })) as bigint;
-          if (isMounted && !signal.aborted) {
-            setUsdcBalance(usdcBalance);
-          }
-        } catch (error) {
-          if (isMounted && !signal.aborted) {
-            logger.error("Error fetching USDC balance:", error);
-            setUsdcBalance(null);
-          }
-        }
-
-        // Get DAI balance
-        try {
-          if (!isMounted || signal.aborted) return;
-
-          const daiTokenContract = getDaiTokenContract(chainKey);
-          const daiBalance = (await publicClient.readContract({
-            address: daiTokenContract.address,
-            abi: daiTokenContract.abi,
-            functionName: "balanceOf",
-            args: [address as `0x${string}`],
-          })) as bigint;
-          if (isMounted && !signal.aborted) {
-            setDaiBalance(daiBalance);
-          }
-        } catch (error) {
-          if (isMounted && !signal.aborted) {
-            logger.error("Error fetching DAI balance:", error);
-            setDaiBalance(null);
+        for (const { contract, setter } of erc20Tokens) {
+          try {
+            if (!isMounted || signal.aborted) return;
+            const balance = (await publicClient.readContract({
+              address: contract.address,
+              abi: contract.abi,
+              functionName: "balanceOf",
+              args: [address as `0x${string}`],
+            })) as bigint;
+            if (isMounted && !signal.aborted) {
+              setter(balance);
+            }
+          } catch (error) {
+            if (isMounted && !signal.aborted) {
+              logger.error(`Error fetching ${contract.symbol} balance:`, error);
+              setter(null);
+            }
           }
         }
       } catch (error) {
@@ -180,20 +171,14 @@ export function TokenBalance() {
     };
   }, [client, user, chain]);
 
-  // Helper to get token icon based on chain
-  const getTokenIcon = (symbol: string) => {
-    const isBase = chain?.id === 8453;
-    switch (symbol) {
-      case "ETH":
-        return isBase ? "/images/tokens/ETH_on_Base.svg" : "/images/tokens/eth-logo.svg";
-      case "USDC":
-        return isBase ? "/images/tokens/USDC_on_Base.svg" : "/images/tokens/usdc-logo.svg";
-      case "DAI":
-        return isBase ? "/images/tokens/DAI_on_Base.svg" : "/images/tokens/dai-logo.svg";
-      default:
-        return "/images/tokens/eth-logo.svg";
-    }
-  };
+  const chainId = chain?.id;
+  const tokenRows = [
+    { symbol: 'ETH', balance: ethBalance, decimals: 18 },
+    { symbol: 'USDC', balance: usdcBalance, decimals: 6 },
+    { symbol: 'DAI', balance: daiBalance, decimals: 18 },
+    { symbol: 'USDS', balance: usdsBalance, decimals: 18 },
+    { symbol: 'GHO', balance: ghoBalance, decimals: 18 },
+  ] as const;
 
   if (isLoading) {
     return (
@@ -202,45 +187,15 @@ export function TokenBalance() {
           <CardTitle className="text-sm font-medium">Balances</CardTitle>
         </CardHeader>
         <CardContent className="space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <Image
-                src={getTokenIcon("ETH")}
-                alt="ETH"
-                width={24}
-                height={24}
-                className="w-6 h-6"
-              />
-              <span className="text-sm">ETH</span>
+          {tokenRows.map(({ symbol }) => (
+            <div key={symbol} className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Image src={getTokenIcon(symbol, chainId)} alt={symbol} width={24} height={24} className="w-6 h-6" />
+                <span className="text-sm">{symbol}</span>
+              </div>
+              <Skeleton className="h-5 w-16" />
             </div>
-            <Skeleton className="h-5 w-16" />
-          </div>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <Image
-                src={getTokenIcon("USDC")}
-                alt="USDC"
-                width={24}
-                height={24}
-                className="w-6 h-6"
-              />
-              <span className="text-sm">USDC</span>
-            </div>
-            <Skeleton className="h-5 w-16" />
-          </div>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <Image
-                src={getTokenIcon("DAI")}
-                alt="DAI"
-                width={24}
-                height={24}
-                className="w-6 h-6"
-              />
-              <span className="text-sm">DAI</span>
-            </div>
-            <Skeleton className="h-5 w-16" />
-          </div>
+          ))}
         </CardContent>
       </Card>
     );
@@ -267,57 +222,17 @@ export function TokenBalance() {
         <CardTitle className="text-sm font-medium">Balances</CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <Image
-              src={getTokenIcon("ETH")}
-              alt="ETH"
-              width={24}
-              height={24}
-              className="w-6 h-6"
-            />
-            <span className="text-sm">ETH</span>
+        {tokenRows.map(({ symbol, balance, decimals }) => (
+          <div key={symbol} className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Image src={getTokenIcon(symbol, chainId)} alt={symbol} width={24} height={24} className="w-6 h-6" />
+              <span className="text-sm">{symbol}</span>
+            </div>
+            <span className="text-sm font-medium">
+              {balance ? formatBalance(formatUnits(balance, decimals)) : "0"}
+            </span>
           </div>
-          <span className="text-sm font-medium">
-            {ethBalance
-              ? formatBalance(formatUnits(ethBalance, 18))
-              : "0"}
-          </span>
-        </div>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <Image
-              src={getTokenIcon("USDC")}
-              alt="USDC"
-              width={24}
-              height={24}
-              className="w-6 h-6"
-            />
-            <span className="text-sm">USDC</span>
-          </div>
-          <span className="text-sm font-medium">
-            {usdcBalance
-              ? formatBalance(formatUnits(usdcBalance, 6))
-              : "0"}
-          </span>
-        </div>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <Image
-              src={getTokenIcon("DAI")}
-              alt="DAI"
-              width={24}
-              height={24}
-              className="w-6 h-6"
-            />
-            <span className="text-sm">DAI</span>
-          </div>
-          <span className="text-sm font-medium">
-            {daiBalance
-              ? formatBalance(formatUnits(daiBalance, 18))
-              : "0"}
-          </span>
-        </div>
+        ))}
       </CardContent>
     </Card>
   );

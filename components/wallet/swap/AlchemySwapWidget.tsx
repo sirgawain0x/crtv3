@@ -10,25 +10,20 @@ import { Loader2, ArrowRightLeft, CheckCircle, XCircle, ExternalLink, DollarSign
 import Image from 'next/image';
 import { useSmartAccountClient } from '@account-kit/react';
 import { type Hex, type Address, parseEther, formatEther, encodeFunctionData, erc20Abi, parseUnits, maxUint256 } from 'viem';
-import { alchemySwapService, AlchemySwapService, type TokenSymbol, BASE_TOKENS, TOKEN_INFO } from '@/lib/sdk/alchemy/swap-service';
+import { alchemySwapService, AlchemySwapService, type TokenSymbol, BASE_TOKENS, TOKEN_INFO, SWAP_UI_TOKENS, emptyTokenBalances, emptyTokenPrices } from '@/lib/sdk/alchemy/swap-service';
 import { priceService, PriceService } from '@/lib/sdk/alchemy/price-service';
 import { CurrencyConverter } from '@/lib/utils/currency-converter';
 import { logger } from '@/lib/utils/logger';
+import { getTokenIcon } from '@/lib/utils/token-icons';
 import { swapActions } from "@account-kit/wallet-client/experimental";
 
-const getTokenIcon = (symbol: string, chainId?: number) => {
-  const isBase = chainId === 8453;
-  switch (symbol) {
-    case "ETH":
-      return isBase ? "/images/tokens/ETH_on_Base.svg" : "/images/tokens/eth-logo.svg";
-    case "USDC":
-      return isBase ? "/images/tokens/USDC_on_Base.svg" : "/images/tokens/usdc-logo.svg";
-    case "DAI":
-      return isBase ? "/images/tokens/DAI_on_Base.svg" : "/images/tokens/dai-logo.svg";
-    default:
-      return "/images/tokens/eth-logo.svg";
-  }
-};
+const ERC20_BALANCE_ABI = [{
+  name: 'balanceOf',
+  type: 'function',
+  stateMutability: 'view',
+  inputs: [{ name: 'account', type: 'address' }],
+  outputs: [{ name: 'balance', type: 'uint256' }],
+}] as const;
 
 interface AlchemySwapWidgetProps {
   onSwapSuccess?: () => void;
@@ -67,17 +62,9 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
 
   const [isApprovingToken, setIsApprovingToken] = useState(false);
 
-  const [balances, setBalances] = useState<Record<TokenSymbol, string>>({
-    ETH: '0',
-    USDC: '0',
-    DAI: '0',
-  });
+  const [balances, setBalances] = useState<Record<TokenSymbol, string>>(emptyTokenBalances());
 
-  const [prices, setPrices] = useState<Record<TokenSymbol, number>>({
-    ETH: 0,
-    USDC: 0,
-    DAI: 0,
-  });
+  const [prices, setPrices] = useState<Record<TokenSymbol, number>>(emptyTokenPrices());
 
   const [usdValues, setUsdValues] = useState<{
     fromAmount: number;
@@ -94,7 +81,7 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
   useEffect(() => {
     const fetchPrices = async () => {
       try {
-        const tokenPrices = await priceService.getTokenPrices(['ETH', 'USDC', 'DAI']);
+        const tokenPrices = await priceService.getTokenPrices([...SWAP_UI_TOKENS]);
         setPrices(tokenPrices);
       } catch (error) {
         logger.error('Error fetching prices:', error);
@@ -149,49 +136,23 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
 
         logger.debug('ETH balance (wei):', ethBalance.toString());
 
-        // Get USDC balance (ERC20)
-        let usdcBalance = 0n;
-        try {
-          usdcBalance = await client.readContract({
-            address: BASE_TOKENS.USDC as Address,
-            abi: [{
-              name: 'balanceOf',
-              type: 'function',
-              stateMutability: 'view',
-              inputs: [{ name: 'account', type: 'address' }],
-              outputs: [{ name: 'balance', type: 'uint256' }],
-            }],
-            functionName: 'balanceOf',
-            args: [address as Address],
-          }) as bigint;
-        } catch (e) {
-          logger.warn('Failed to fetch USDC balance:', e);
-        }
+        // Get ERC-20 balances
+        const newBalances = emptyTokenBalances();
+        newBalances.ETH = AlchemySwapService.parseAmount(`0x${ethBalance.toString(16)}` as Hex, 'ETH');
 
-        // Get DAI balance (ERC20)
-        let daiBalance = 0n;
-        try {
-          daiBalance = await client.readContract({
-            address: BASE_TOKENS.DAI as Address,
-            abi: [{
-              name: 'balanceOf',
-              type: 'function',
-              stateMutability: 'view',
-              inputs: [{ name: 'account', type: 'address' }],
-              outputs: [{ name: 'balance', type: 'uint256' }],
-            }],
-            functionName: 'balanceOf',
-            args: [address as Address],
-          }) as bigint;
-        } catch (e) {
-          logger.warn('Failed to fetch DAI balance:', e);
+        for (const token of SWAP_UI_TOKENS.filter((t) => t !== 'ETH')) {
+          try {
+            const raw = await client.readContract({
+              address: BASE_TOKENS[token] as Address,
+              abi: ERC20_BALANCE_ABI,
+              functionName: 'balanceOf',
+              args: [address as Address],
+            }) as bigint;
+            newBalances[token] = AlchemySwapService.parseAmount(`0x${raw.toString(16)}` as Hex, token);
+          } catch (e) {
+            logger.warn(`Failed to fetch ${token} balance:`, e);
+          }
         }
-
-        const newBalances: Record<TokenSymbol, string> = {
-          ETH: AlchemySwapService.parseAmount(`0x${ethBalance.toString(16)}` as Hex, 'ETH'),
-          USDC: AlchemySwapService.parseAmount(`0x${usdcBalance.toString(16)}` as Hex, 'USDC'),
-          DAI: AlchemySwapService.parseAmount(`0x${daiBalance.toString(16)}` as Hex, 'DAI'),
-        };
 
         logger.debug('Parsed balances:', newBalances);
         setBalances(newBalances);
@@ -648,9 +609,9 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
                 value={swapState.fromToken}
                 onChange={(e) => handleFromTokenChange(e.target.value as TokenSymbol)}
               >
-                <option value="ETH">ETH</option>
-                <option value="USDC">USDC</option>
-                <option value="DAI">DAI</option>
+                {SWAP_UI_TOKENS.map((token) => (
+                  <option key={token} value={token}>{token}</option>
+                ))}
               </select>
 
               <Image
@@ -665,9 +626,9 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ETH">ETH</SelectItem>
-                  <SelectItem value="USDC">USDC</SelectItem>
-                  <SelectItem value="DAI">DAI</SelectItem>
+                  {SWAP_UI_TOKENS.map((token) => (
+                    <SelectItem key={token} value={token}>{token}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -771,9 +732,9 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
                 value={swapState.toToken}
                 onChange={(e) => handleToTokenChange(e.target.value as TokenSymbol)}
               >
-                <option value="ETH">ETH</option>
-                <option value="USDC">USDC</option>
-                <option value="DAI">DAI</option>
+                {SWAP_UI_TOKENS.map((token) => (
+                  <option key={token} value={token}>{token}</option>
+                ))}
               </select>
 
               <Image
@@ -788,9 +749,9 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ETH">ETH</SelectItem>
-                  <SelectItem value="USDC">USDC</SelectItem>
-                  <SelectItem value="DAI">DAI</SelectItem>
+                  {SWAP_UI_TOKENS.map((token) => (
+                    <SelectItem key={token} value={token}>{token}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
