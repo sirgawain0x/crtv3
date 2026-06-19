@@ -8,7 +8,7 @@ import { meTokensSubgraph } from '@/lib/sdk/metokens/subgraph';
 import { creatorProfileSupabaseService, CreatorProfile } from '@/lib/sdk/supabase/creator-profiles';
 import { logger } from '@/lib/utils/logger';
 import { METOKEN_DIAMOND_BASE } from '@/lib/contracts/MeTokenHubs';
-import { formatHubAssetAmount, resolveHubAsset } from '@/lib/utils/hubAssetUtils';
+import { formatHubAssetAmount, resolveHubAsset, type HubAssetSymbol } from '@/lib/utils/hubAssetUtils';
 
 const DIAMOND = METOKEN_DIAMOND_BASE;
 
@@ -88,7 +88,7 @@ export interface MeTokenHolding {
   endCooldown: bigint;
   targetHubId: number;
   migration: boolean;
-  collateralSymbol: string;
+  collateralSymbol: HubAssetSymbol;
   collateralDisplayName: string;
 }
 
