@@ -21,6 +21,8 @@ type SongchainFeedSectionProps = {
   graphId?: string | null;
   emptyDescription: string;
   onPostUpdated?: () => void;
+  /** When false, skips fetching posts (e.g. club feed before join). */
+  enabled?: boolean;
 };
 
 export type SongchainFeedHandle = {
@@ -79,11 +81,11 @@ function FeedDiagnostics({
 
 export const SongchainFeedSection = forwardRef<SongchainFeedHandle, SongchainFeedSectionProps>(
   function SongchainFeedSection(
-    { title, description, feedId, graphId = null, emptyDescription, onPostUpdated },
+    { title, description, feedId, graphId = null, emptyDescription, onPostUpdated, enabled = true },
     ref,
   ) {
     const { posts, pendingPosts, loading, error, hasMore, reload, loadMore, registerNewPost } =
-      useSongchainFeed({ feedId });
+      useSongchainFeed({ feedId, enabled });
 
     useImperativeHandle(
       ref,

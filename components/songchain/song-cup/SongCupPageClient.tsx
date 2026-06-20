@@ -7,6 +7,7 @@ import { SongCupBanner } from "@/components/songchain/SongCupBanner";
 import { SongchainFeedExperience } from "@/components/songchain/SongchainFeedExperience";
 import { SongCupHero } from "@/components/songchain/song-cup/SongCupHero";
 import { SongCupPlayModal } from "@/components/songchain/song-cup/SongCupPlayModal";
+import { SONG_CUP_CLUB_FEED_ID, SONG_CUP_CLUB_GROUP_ID, SONG_CUP_PLAY_LINKS } from "@/lib/songchain/events";
 
 type SongCupPageClientProps = {
   config: SongchainConfig;
@@ -29,17 +30,26 @@ export function SongCupPageClient({ config }: SongCupPageClientProps) {
         <span className="text-foreground">Song Cup Contest</span>
       </nav>
 
-      <SongCupHero onCtaClick={() => setPlayModalOpen(true)} />
+      <SongCupHero
+        animationPaused={playModalOpen}
+        onCtaClick={() => setPlayModalOpen(true)}
+      />
       <SongCupPlayModal open={playModalOpen} onOpenChange={setPlayModalOpen} />
 
       <div className="mx-auto max-w-7xl space-y-10 px-4 py-10 sm:px-6">
         <SongCupBanner showButton={false} />
         <SongchainFeedExperience
           config={config}
-          hiddenTabs={["exclusive"]}
+          publicFeedId={SONG_CUP_CLUB_FEED_ID}
+          gateGroupId={SONG_CUP_CLUB_GROUP_ID}
+          hiddenTabs={["exclusive", "group"]}
+          gateFeedBehindGroup
+          clubGateTitle="Join the Song Cup club to unlock the feed"
+          clubGateDescription="Join the Song Cup club on Lens (via Orb) to read and post on the member-only feed."
+          orbClubUrl={SONG_CUP_PLAY_LINKS.goal}
           configEnvPrefix="SONG_CUP"
-          publicFeedTitle="Song Cup feed"
-          publicFeedDescription="Posts from the Song Cup Lens feed (Orb)."
+          publicFeedTitle="Song Cup club feed"
+          publicFeedDescription="Member-only posts — available after you join the club."
         />
       </div>
     </div>

@@ -12,6 +12,9 @@ type SongchainPostMediaProps = {
   compact?: boolean;
 };
 
+const FEED_MEDIA_SIZES = "(max-width: 768px) 100vw, (max-width: 1280px) 768px, 896px";
+const FEED_AUDIO_COVER_SIZES = "64px";
+
 function extractPlaybackIdFromUrl(url: string): string | null {
   const match = url.match(/\/watch\/([^/?#]+)/i);
   return match?.[1] ?? null;
@@ -59,7 +62,14 @@ function LiveStreamBlock({
       )}
     >
       {item.cover ? (
-        <Image src={item.cover} alt="" fill className="object-cover opacity-80" unoptimized />
+        <Image
+          src={item.cover}
+          alt=""
+          fill
+          sizes={FEED_MEDIA_SIZES}
+          className="object-cover opacity-80"
+          unoptimized
+        />
       ) : (
         <div className="flex h-full min-h-[8rem] items-center justify-center bg-gradient-to-br from-violet-950/80 to-slate-950">
           <Radio className="h-10 w-10 text-violet-300" />
@@ -96,7 +106,14 @@ function MediaBlock({ item, compact }: { item: PostMediaItem; compact?: boolean 
   if (item.type === "image") {
     return (
       <div className={cn("relative w-full bg-muted", compact ? "aspect-video max-h-36" : "aspect-video")}>
-        <Image src={item.url} alt="" fill className="object-cover" unoptimized />
+        <Image
+          src={item.url}
+          alt=""
+          fill
+          sizes={FEED_MEDIA_SIZES}
+          className="object-cover"
+          unoptimized
+        />
       </div>
     );
   }
@@ -121,7 +138,14 @@ function MediaBlock({ item, compact }: { item: PostMediaItem; compact?: boolean 
       <div className="flex gap-3 rounded-lg border border-border/40 bg-muted/30 p-3">
         {item.cover ? (
           <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded">
-            <Image src={item.cover} alt="" fill className="object-cover" unoptimized />
+            <Image
+              src={item.cover}
+              alt=""
+              fill
+              sizes={FEED_AUDIO_COVER_SIZES}
+              className="object-cover"
+              unoptimized
+            />
           </div>
         ) : (
           <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded bg-muted">

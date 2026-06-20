@@ -318,9 +318,12 @@ export const Tour = () => {
         isLastStep: boolean;
         size: number;
     }) => {
+        const { zIndex: _tooltipZIndex, ...restTooltipProps } =
+            tooltipProps as typeof tooltipProps & { zIndex?: number };
+
         return (
             <div
-                {...tooltipProps}
+                {...restTooltipProps}
                 className="relative z-[10001] w-[min(calc(100vw-2rem),22rem)] overflow-hidden rounded-2xl border border-indigo-100 bg-white p-5 shadow-2xl dark:border-indigo-900 dark:bg-slate-900"
             >
                 <div className="absolute -right-4 -top-4 h-16 w-16 rounded-bl-full bg-gradient-to-br from-indigo-500 to-purple-600 opacity-10" />

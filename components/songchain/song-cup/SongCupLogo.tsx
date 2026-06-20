@@ -80,7 +80,8 @@ export function SongCupLogo() {
           </svg>
           <div className="ball-shadow" />
         </div>
-        <span className="letter-ng">Ng</span>
+        <span className="letter-n">N</span>
+        <span className="letter-g">g</span>
         <span className="word-cup">CUP</span>
       </div>
       <div className="bottom-row text-glow">

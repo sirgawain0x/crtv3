@@ -9,6 +9,7 @@ import { SongchainGraphPanel } from "@/components/songchain/SongchainGraphPanel"
 import { SongchainComposePost } from "@/components/songchain/SongchainComposePost";
 import { SongchainBookmarksSection } from "@/components/songchain/SongchainBookmarksSection";
 import { HallidayOnramp } from "@/components/songchain/HallidayOnramp";
+import { SongchainGatedFeedTab } from "@/components/songchain/SongchainGatedFeedTab";
 import type { SongchainConfig } from "@/lib/songchain/config";
 import type { SongchainFeedHandle } from "@/components/songchain/SongchainFeedSection";
 
@@ -28,6 +29,13 @@ type SongchainFeedExperienceProps = {
   publicFeedDescription?: string;
   /** Env var names shown in the unconfigured state. */
   configEnvPrefix?: "SONGCHAIN" | "SONG_CUP";
+  /** Require Lens group membership before loading or posting to the main feed tab. */
+  gateFeedBehindGroup?: boolean;
+  /** Group contract used for join / membership checks when gating (defaults to config.groupId). */
+  gateGroupId?: string | null;
+  clubGateTitle?: string;
+  clubGateDescription?: string;
+  orbClubUrl?: string;
 };
 
 export function SongchainFeedExperience({
@@ -40,6 +48,11 @@ export function SongchainFeedExperience({
   publicFeedTitle = "Songchain feed",
   publicFeedDescription = "Posts from the main Songchain Lens feed (Orb).",
   configEnvPrefix = "SONGCHAIN",
+  gateFeedBehindGroup = false,
+  gateGroupId,
+  clubGateTitle,
+  clubGateDescription,
+  orbClubUrl,
 }: SongchainFeedExperienceProps) {
   const publicFeedRef = useRef<SongchainFeedHandle>(null);
   const exclusiveFeedRef = useRef<SongchainFeedHandle>(null);
@@ -102,19 +115,34 @@ export function SongchainFeedExperience({
         </TabsList>
 
         <TabsContent value="feed" className="space-y-6">
-          <SongchainComposePost
-            feedId={resolvedPublicFeedId}
-            onPosted={(created) => publicFeedRef.current?.registerNewPost(created)}
-          />
-          <SongchainFeedSection
-            ref={publicFeedRef}
-            title={publicFeedTitle}
-            description={publicFeedDescription}
-            feedId={resolvedPublicFeedId}
-            graphId={config.graphId}
-            onPostUpdated={() => publicFeedRef.current?.reload()}
-            emptyDescription="Lens custom feeds only show posts published to that feed contract. Existing Orb profile or global posts are not backfilled, so publish a new post directly to this feed if it should appear here."
-          />
+          {gateFeedBehindGroup ? (
+            <SongchainGatedFeedTab
+              gateGroupId={gateGroupId ?? config.groupId}
+              feedId={resolvedPublicFeedId}
+              graphId={config.graphId}
+              feedTitle={publicFeedTitle}
+              feedDescription={publicFeedDescription}
+              clubGateTitle={clubGateTitle}
+              clubGateDescription={clubGateDescription}
+              orbClubUrl={orbClubUrl}
+            />
+          ) : (
+            <>
+              <SongchainComposePost
+                feedId={resolvedPublicFeedId}
+                onPosted={(created) => publicFeedRef.current?.registerNewPost(created)}
+              />
+              <SongchainFeedSection
+                ref={publicFeedRef}
+                title={publicFeedTitle}
+                description={publicFeedDescription}
+                feedId={resolvedPublicFeedId}
+                graphId={config.graphId}
+                onPostUpdated={() => publicFeedRef.current?.reload()}
+                emptyDescription="Lens custom feeds only show posts published to that feed contract. Existing Orb profile or global posts are not backfilled, so publish a new post directly to this feed if it should appear here."
+              />
+            </>
+          )}
         </TabsContent>
 
         {!hidden.has("exclusive") && (

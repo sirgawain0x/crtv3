@@ -64,6 +64,9 @@ import { navIconButtonProps } from "@/components/navbar/navButtonStyles";
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
 } from "@/components/ui/sheet";
 
 type UseUserResult = (AccountUser & { type: "eoa" | "sca" }) | null;
@@ -414,6 +417,12 @@ export default function Navbar() {
           "data-[state=open]:slide-in-from-top"
         }
       >
+        <SheetHeader className="sr-only">
+          <SheetTitle>Navigation menu</SheetTitle>
+          <SheetDescription>
+            Site navigation, wallet, and account options.
+          </SheetDescription>
+        </SheetHeader>
         <div
           className={
             "flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y " +

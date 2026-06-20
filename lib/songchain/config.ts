@@ -4,6 +4,7 @@ import {
   isHallidaySandboxEnabled,
   LENS_GHO_TOKEN_ADDRESS,
 } from '@/lib/songchain/halliday';
+import { SONG_CUP_CLUB_FEED_ID, SONG_CUP_CLUB_GROUP_ID } from '@/lib/songchain/events';
 import { getLensNetwork } from '@/lib/sdk/lens/chains';
 import { normalizeLensPrimitiveId } from '@/lib/sdk/lens/primitive-id';
 
@@ -126,18 +127,20 @@ export function getSongCupConfig(): SongchainConfig {
     'NEXT_PUBLIC_SONG_CUP_APP_ID',
     'SONG_CUP_APP_ID',
   );
-  const publicFeedId = readLensPrimitiveEnv(
-    'NEXT_PUBLIC_SONG_CUP_FEED_ID',
-    'SONG_CUP_FEED_ID',
-  );
+  const publicFeedId =
+    readLensPrimitiveEnv(
+      'NEXT_PUBLIC_SONG_CUP_FEED_ID',
+      'SONG_CUP_FEED_ID',
+    ) ?? normalizeLensPrimitiveId(SONG_CUP_CLUB_FEED_ID);
   const exclusiveFeedId = readLensPrimitiveEnv(
     'NEXT_PUBLIC_SONG_CUP_EXCLUSIVE_FEED_ID',
     'SONG_CUP_EXCLUSIVE_FEED_ID',
   );
-  const groupId = readLensPrimitiveEnv(
-    'NEXT_PUBLIC_SONG_CUP_GROUP_ID',
-    'SONG_CUP_GROUP_ID',
-  );
+  const groupId =
+    readLensPrimitiveEnv(
+      'NEXT_PUBLIC_SONG_CUP_GROUP_ID',
+      'SONG_CUP_GROUP_ID',
+    ) ?? normalizeLensPrimitiveId(SONG_CUP_CLUB_GROUP_ID);
   const graphId = readLensPrimitiveEnv(
     'NEXT_PUBLIC_SONG_CUP_GRAPH_ID',
     'SONG_CUP_GRAPH_ID',

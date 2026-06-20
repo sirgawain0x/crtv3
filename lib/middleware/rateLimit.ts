@@ -197,6 +197,14 @@ export const rateLimiters = {
       windowMs: 60 * 1000,
     }),
 
+  /** Playback grids burst many IDs on one page view */
+  playbackInfo: (request: NextRequest) =>
+    rateLimit(request, {
+      maxRequests: process.env.NODE_ENV === 'development' ? 200 : 100,
+      windowMs: 60 * 1000,
+      errorMessage: 'Too many playback info requests. Please try again shortly.',
+    }),
+
   /** API key-based rate limiter: 100 requests per minute */
   apiKey: (request: NextRequest, apiKey: string) =>
     rateLimit(request, {

@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import "./song-cup-hero.css";
 import { CirclingTextRings } from "./CirclingTextRings";
 import { SongCupLogo } from "./SongCupLogo";
+import { cn } from "@/lib/utils";
 
 type SongCupHeroProps = {
   headline?: string;
@@ -13,6 +14,8 @@ type SongCupHeroProps = {
   logo?: ReactNode;
   showRings?: boolean;
   ariaLabel?: string;
+  /** Pause 3D hero animations (e.g. while a modal is open). */
+  animationPaused?: boolean;
 };
 
 function PolyhedronFaces() {
@@ -39,9 +42,15 @@ export function SongCupHero({
   logo,
   showRings = true,
   ariaLabel = "Song Cup Contest",
+  animationPaused = false,
 }: SongCupHeroProps) {
   return (
-    <section className="song-cup-hero-scene relative min-h-[85vh] w-full overflow-hidden">
+    <section
+      className={cn(
+        "song-cup-hero-scene relative min-h-[85vh] w-full overflow-hidden",
+        animationPaused && "song-cup-hero-scene--paused",
+      )}
+    >
       <div className="site-header">
         <div className="site-logo" aria-label={ariaLabel}>
           {logo ?? <SongCupLogo />}
