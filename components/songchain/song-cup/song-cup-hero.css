@@ -202,9 +202,17 @@
   flex-shrink: 0;
 }
 
-.song-cup-hero-scene .letter-s {
+.song-cup-hero-scene .letter-s,
+.song-cup-hero-scene .letter-g {
   font-size: 65px;
+}
+
+.song-cup-hero-scene .letter-s {
   margin-right: 4px;
+}
+
+.song-cup-hero-scene .letter-n {
+  font-size: 95px;
 }
 
 .song-cup-hero-scene .ball-container {
@@ -234,10 +242,6 @@
   opacity: 0.9;
   box-shadow: inset 0 2px 4px rgba(255, 255, 255, 0.2);
   z-index: 1;
-}
-
-.song-cup-hero-scene .letter-ng {
-  font-size: 95px;
 }
 
 .song-cup-hero-scene .word-cup {
@@ -276,11 +280,16 @@
   .song-cup-hero-scene .logo-container {
     padding: 12px 18px 12px 12px;
   }
-  .song-cup-hero-scene .letter-s {
+  .song-cup-hero-scene .letter-s,
+  .song-cup-hero-scene .letter-g {
     font-size: 40px;
+  }
+
+  .song-cup-hero-scene .letter-s {
     margin-right: 2px;
   }
-  .song-cup-hero-scene .letter-ng {
+
+  .song-cup-hero-scene .letter-n {
     font-size: 60px;
   }
   .song-cup-hero-scene .word-cup {
@@ -324,6 +333,14 @@
   .song-cup-hero-scene .stage span {
     animation: none !important;
   }
+}
+
+/* Freeze hero motion while overlays (e.g. play modal) are open — avoids 3D layers painting over dialogs. */
+.song-cup-hero-scene.song-cup-hero-scene--paused .a3d,
+.song-cup-hero-scene.song-cup-hero-scene--paused .s2d,
+.song-cup-hero-scene.song-cup-hero-scene--paused .stage,
+.song-cup-hero-scene.song-cup-hero-scene--paused .stage span {
+  animation-play-state: paused !important;
 }
 
 .song-cup-hero-scene .a3d {

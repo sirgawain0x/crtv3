@@ -2,9 +2,9 @@ import type { CSSProperties } from "react";
 
 const RING_PHRASES = [
   "Music",
-  "Predict your Winner",
+  "Predict Your Winner",
   "Technology",
-  "Guess the Song",
+  "Guess Your Song",
   "Fun",
   "Community",
   "Art",

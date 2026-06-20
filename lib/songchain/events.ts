@@ -30,3 +30,11 @@ export const SONG_CUP_PLAY_LINKS = {
   goal: "https://orb.club/c/worldcup",
   beat: "https://beatme.creativeplatform.xyz",
 } as const;
+
+/** Lens group contract — join here to access the member feed on Orb. */
+export const SONG_CUP_CLUB_GROUP_ID =
+  "0x0EA378E56930d4602E7b29CAbFdbD84C5Fd1959B" as const;
+
+/** Group-gated feed contract for Song Cup club posts. */
+export const SONG_CUP_CLUB_FEED_ID =
+  "0x5D15E5b8848A2BaFB0B968dC4CB6725551F1addb" as const;

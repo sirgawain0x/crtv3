@@ -22,6 +22,7 @@ export function SongchainPendingPostCard({
             src={pending.thumbnailUrl}
             alt=""
             fill
+            sizes="(max-width: 768px) 100vw, (max-width: 1280px) 768px, 896px"
             className="object-cover"
             unoptimized
           />

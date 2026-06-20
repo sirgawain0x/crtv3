@@ -11,7 +11,7 @@ import type { VideoAsset } from "@/lib/types/video-asset";
 import { logger } from '@/lib/utils/logger';
 import { mapInBatches } from '@/lib/utils/map-in-batches';
 
-const PLAYBACK_FETCH_CONCURRENCY = 4;
+const PLAYBACK_FETCH_CONCURRENCY = 3;
 
 
 const ITEMS_PER_PAGE = 12; // Number of videos per page
@@ -58,29 +58,11 @@ const VideoCardGrid: React.FC<VideoCardGridProps> = ({
       // Calculate offset based on current page
       const offset = (page - 1) * ITEMS_PER_PAGE;
 
-      // Function to fetch playback source with retries
+      // Function to fetch playback source (429 retries handled in getDetailPlaybackSource)
       const fetchPlaybackSourceWithRetry = async (
         playbackId: string,
-        retries = 3
       ): Promise<Src[] | null> => {
-        try {
-          const detailedSrc = await getDetailPlaybackSource(playbackId);
-          return detailedSrc;
-        } catch (err) {
-          if (retries > 0) {
-            logger.warn(
-              `Retrying playback source fetch for ${playbackId}. Attempts remaining: ${retries - 1
-              }`
-            );
-            await new Promise((resolve) => setTimeout(resolve, 1000));
-            return fetchPlaybackSourceWithRetry(playbackId, retries - 1);
-          }
-          logger.error(
-            `Failed to fetch playback source for ${playbackId} after all retries:`,
-            err
-          );
-          return null;
-        }
+        return getDetailPlaybackSource(playbackId);
       };
 
       // 1. Fetch published videos from Supabase (single efficient query!)

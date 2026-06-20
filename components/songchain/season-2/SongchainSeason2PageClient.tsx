@@ -40,6 +40,7 @@ export function SongchainSeason2PageClient({
         headline="BE OUR TOP ARTIST"
         subheadline="Create your 30 sec. World Cup music video"
         ctaLabel="Let's Goal"
+        animationPaused={playModalOpen}
         onCtaClick={() => setPlayModalOpen(true)}
       />
       <SongCupPlayModal open={playModalOpen} onOpenChange={setPlayModalOpen} />
