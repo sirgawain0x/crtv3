@@ -293,6 +293,7 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
   const [isArrowUp, setIsArrowUp] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState<boolean>(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
+  const [balanceRefreshKey, setBalanceRefreshKey] = useState(0);
   const [dialogAction, setDialogAction] = useState<
     "buy" | "send" | "swap" | "session-keys"
   >("buy");
@@ -727,8 +728,7 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
       setSelectedNFT(null);
       setSendType('token');
 
-      // Refresh balances - refetch on next render
-      // Token balances will be refreshed on next component update
+      setBalanceRefreshKey((key) => key + 1);
     } catch (error: unknown) {
       logger.error("Error sending transaction:", error);
       toast({
@@ -1056,6 +1056,7 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
               <AlchemySwapWidget
                 onSwapSuccess={() => {
                   setIsDialogOpen(false);
+                  setBalanceRefreshKey((key) => key + 1);
                   toast({
                     title: "Swap Completed",
                     description: "Your token swap was successful!",
@@ -1639,7 +1640,10 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
 
             {/* Balances Section */}
             <div className="px-2 py-2">
-              <TokenBalance />
+              <TokenBalance
+                isVisible={isDropdownOpen}
+                refreshKey={balanceRefreshKey}
+              />
             </div>
 
             {shouldShowMetokens && (
