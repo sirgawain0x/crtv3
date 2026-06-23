@@ -2,10 +2,13 @@
 
 import { useEffect } from "react";
 import { useSmartAccountClient, useUser, useChain } from "@account-kit/react";
-import { formatUnits } from "viem";
 import { Skeleton } from "@/components/ui/skeleton";
 import Image from "next/image";
 import { getTokenIcon } from "@/lib/utils/token-icons";
+import {
+  formatTokenBalance,
+  tokenBalanceToUsd,
+} from "@/lib/utils/format-token-balance";
 import { useTokenBalances } from "@/lib/hooks/wallet/useTokenBalances";
 import { PriceService } from "@/lib/sdk/alchemy/price-service";
 import { TOKEN_INFO, type TokenSymbol } from "@/lib/sdk/alchemy/swap-service";
@@ -16,26 +19,6 @@ type TokenBalanceProps = {
   /** Increment to force a balance refresh after send/swap. */
   refreshKey?: number;
 };
-
-function formatBalance(balance: string): string {
-  const num = parseFloat(balance);
-  if (num <= 0) return "0";
-  if (num < 0.000001) return "< 0.000001";
-
-  if (num < 1) {
-    return new Intl.NumberFormat("en-US", {
-      maximumFractionDigits: 6,
-      minimumFractionDigits: 0,
-      useGrouping: false,
-    }).format(num);
-  }
-
-  return new Intl.NumberFormat("en-US", {
-    maximumFractionDigits: 4,
-    minimumFractionDigits: 0,
-    useGrouping: true,
-  }).format(num);
-}
 
 const TOKEN_ROWS: TokenSymbol[] = ["ETH", "USDC", "DAI", "USDS", "GHO"];
 
@@ -52,13 +35,13 @@ export function TokenBalance({ isVisible, refreshKey = 0 }: TokenBalanceProps) {
 
   useEffect(() => {
     if (isVisible) {
-      void refetch();
+      void refetch({ background: true });
     }
   }, [isVisible, refetch]);
 
   useEffect(() => {
     if (refreshKey > 0) {
-      void refetch();
+      void refetch({ background: true });
     }
   }, [refreshKey, refetch]);
 
@@ -67,10 +50,14 @@ export function TokenBalance({ isVisible, refreshKey = 0 }: TokenBalanceProps) {
   const tokenRows = TOKEN_ROWS.map((symbol) => {
     const balance = balances[symbol];
     const decimals = TOKEN_INFO[symbol].decimals;
-    const amount =
-      balance !== null ? parseFloat(formatUnits(balance, decimals)) : 0;
-    const usdValue = amount * (prices[symbol] ?? 0);
-    return { symbol, amount, formattedAmount: formatBalance(String(amount)), usdValue };
+    const formattedAmount =
+      balance !== null ? formatTokenBalance(balance, decimals) : "0";
+    const usdValue =
+      balance !== null
+        ? tokenBalanceToUsd(balance, decimals, prices[symbol] ?? 0)
+        : 0;
+
+    return { symbol, formattedAmount, usdValue };
   });
 
   const totalUsd = tokenRows.reduce((sum, row) => sum + row.usdValue, 0);
