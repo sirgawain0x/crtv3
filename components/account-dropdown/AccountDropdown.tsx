@@ -34,7 +34,7 @@ import {
   useUser,
   useChain,
   useSendUserOperation,
-} from "@account-kit/react";
+} from "@/lib/wallet/react";
 import { useUnifiedLogout } from "@/hooks/useUnifiedLogout";
 import { base } from "@account-kit/infra";
 import { Button } from "@/components/ui/button";

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { useUser, useSmartAccountClient } from '@account-kit/react';
+import { useUser, useSmartAccountClient } from '@/lib/wallet/react';
 import { parseEther, formatEther, encodeFunctionData } from 'viem';
 import { meTokenSupabaseService, MeToken, MeTokenBalance } from '@/lib/sdk/supabase/metokens';
 import { CreateMeTokenData, UpdateMeTokenData } from '@/lib/sdk/supabase/client';

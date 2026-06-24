@@ -12,7 +12,7 @@
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { useUser, useSmartAccountClient } from '@account-kit/react';
+import { useUser, useSmartAccountClient } from '@/lib/wallet/react';
 import { useGasSponsorship } from '@/lib/hooks/wallet/useGasSponsorship';
 import { parseEther, formatEther, encodeFunctionData, decodeEventLog } from 'viem';
 import { parseBundlerError, shouldRetryError } from '@/lib/utils/bundlerErrorParser';
@@ -532,7 +532,7 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
       });
 
       // Send the operation without blocking on a long timeout
-      let operation: { hash: `0x${string}` };
+      let operation: { hash: string };
       try {
         const sendPromise = client.sendUserOperation({
           uo: {

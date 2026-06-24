@@ -14,7 +14,7 @@ import {
   type LockAddressValue,
 } from "../../lib/sdk/unlock/services";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useUser } from "@account-kit/react";
+import { useUser } from "@/lib/wallet/react";
 
 interface MembershipSectionProps {
   className?: string;

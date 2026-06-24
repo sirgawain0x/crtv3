@@ -11,7 +11,7 @@ import {
 import { Src } from "@livepeer/react";
 import * as Popover from "@radix-ui/react-popover";
 
-import { useUser, useAuthModal } from "@account-kit/react";
+import { useUser, useAuthModal } from "@/lib/wallet/react";
 import { userToAccount } from "@/lib/types/account";
 
 import {

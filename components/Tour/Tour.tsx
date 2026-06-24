@@ -5,11 +5,12 @@ import {
     Joyride,
     EVENTS,
     STATUS,
-    type CallBackProps,
+    ACTIONS,
+    type EventData,
     type Step,
 } from 'react-joyride';
 import { usePathname } from 'next/navigation';
-import { useUser } from '@account-kit/react';
+import { useUser } from '@/lib/wallet/react';
 import { useTour } from '@/context/TourContext';
 import { logger } from '@/lib/utils/logger';
 
@@ -21,15 +22,15 @@ const DESKTOP_STEPS: TourStep[] = [
     {
         target: '#connect-wallet-btn',
         content: 'Sign in to get started! Click "Get Started" to create your account with just your email.',
-        disableBeacon: true,
-        spotlightClicks: true,
+        skipBeacon: true,
+        blockTargetInteraction: false,
         placement: 'bottom',
         data: { id: 'connect' },
     },
     {
         target: '#nav-user-menu',
         content: 'Click your profile to open the menu, then select "Upload" to start adding content.',
-        spotlightClicks: true,
+        blockTargetInteraction: false,
         placement: 'bottom',
         data: { id: 'user-menu' },
     },
@@ -63,22 +64,22 @@ const MOBILE_STEPS: TourStep[] = [
     {
         target: '#mobile-menu-btn',
         content: 'Tap the menu icon to open navigation and sign in.',
-        disableBeacon: true,
-        spotlightClicks: true,
+        skipBeacon: true,
+        blockTargetInteraction: false,
         placement: 'bottom',
         data: { id: 'connect', openMobileMenu: false },
     },
     {
         target: '#connect-wallet-btn-mobile',
         content: 'Tap "Get Started" to create your account with just your email.',
-        spotlightClicks: true,
+        blockTargetInteraction: false,
         placement: 'bottom',
         data: { id: 'connect-wallet', openMobileMenu: true },
     },
     {
         target: '#nav-user-menu',
         content: 'After signing in, tap your profile avatar to open account options.',
-        spotlightClicks: true,
+        blockTargetInteraction: false,
         placement: 'bottom',
         data: { id: 'user-menu' },
     },
@@ -186,7 +187,7 @@ export const Tour = () => {
         [isMobile, prepareStepTarget, setStepIndex, steps],
     );
 
-    const handleJoyrideCallback = (data: CallBackProps) => {
+    const handleJoyrideCallback = (data: EventData) => {
         const { index, status, type, action } = data;
         const currentStep = steps[index];
         const currentId = currentStep?.data?.id;
@@ -213,7 +214,7 @@ export const Tour = () => {
             return;
         }
 
-        if (type === EVENTS.STEP_AFTER && action !== 'prev') {
+        if (type === EVENTS.STEP_AFTER && action !== ACTIONS.PREV) {
             if (index < steps.length - 1) {
                 void advanceToStep(index + 1);
             }
@@ -358,35 +359,24 @@ export const Tour = () => {
             steps={steps}
             run={run}
             stepIndex={stepIndex}
-            callback={handleJoyrideCallback}
+            onEvent={handleJoyrideCallback}
             continuous
-            showProgress
-            showSkipButton
-            disableOverlayClose
             scrollToFirstStep
-            scrollOffset={96}
-            disableScrollParentFix={false}
-            spotlightPadding={10}
-            floaterProps={{
-                styles: {
-                    floater: {
-                        filter: 'none',
-                    },
-                },
+            options={{
+                primaryColor: '#4f46e5',
+                zIndex: 10000,
+                showProgress: true,
+                buttons: ['back', 'close', 'primary', 'skip'],
+                overlayClickAction: false,
+                scrollOffset: 96,
+                spotlightPadding: 10,
             }}
             styles={{
                 tooltip: {
                     transition: 'none',
                 },
-                options: {
-                    primaryColor: '#4f46e5',
-                    zIndex: 10000,
-                },
-                overlay: {
-                    zIndex: 9999,
-                },
-                spotlight: {
-                    zIndex: 10000,
+                floater: {
+                    filter: 'none',
                 },
             }}
             tooltipComponent={TourTooltip}

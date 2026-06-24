@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Lock, PenLine, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useAuthModal } from "@account-kit/react";
+import { useAuthModal } from "@/lib/wallet/react";
 import { VideoMeTokenBuyDialog } from "@/components/Videos/VideoMeTokenBuyDialog";
 
 export interface LiveStreamGateInfo {

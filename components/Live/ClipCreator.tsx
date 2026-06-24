@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useState } from "react";
-import { useUser } from "@account-kit/react";
+import { useUser } from "@/lib/wallet/react";
 import { useWalletAuth } from "@/lib/auth/useWalletAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

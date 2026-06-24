@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useUser, useSendUserOperation, useSmartAccountClient } from '@account-kit/react';
+import { useUser, useSendUserOperation, useSmartAccountClient } from '@/lib/wallet/react';
 import { useGasSponsorship } from "@/lib/hooks/wallet/useGasSponsorship";
 import { parseEther, formatEther, encodeFunctionData } from 'viem';
 import { meTokensSubgraph, MeToken } from '@/lib/sdk/metokens/subgraph';

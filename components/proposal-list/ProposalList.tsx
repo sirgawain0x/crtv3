@@ -21,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2, Clock, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
-import { useChain, useAuthModal, useSignTypedData } from "@account-kit/react";
+import { useChain, useAuthModal, useSignTypedData } from "@/lib/wallet/react";
 import { useWalletStatus } from "@/lib/hooks/accountkit/useWalletStatus";
 import { createVote } from "@/app/vote/[id]/actions";
 import { SNAPSHOT_SPACE } from "@/context/context";

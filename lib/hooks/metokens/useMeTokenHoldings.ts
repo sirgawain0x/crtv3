@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
-import { useUser } from '@account-kit/react';
-import { useSmartAccountClient } from '@account-kit/react';
+import { useUser } from '@/lib/wallet/react';
+import { useSmartAccountClient } from '@/lib/wallet/react';
 import { formatEther, parseEther } from 'viem';
 import { meTokensSubgraph } from '@/lib/sdk/metokens/subgraph';
 import { creatorProfileSupabaseService, CreatorProfile } from '@/lib/sdk/supabase/creator-profiles';

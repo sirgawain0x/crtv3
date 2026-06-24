@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from 'react';
-import { useSmartAccountClient } from '@account-kit/react';
+import { useSmartAccountClient } from '@/lib/wallet/react';
 import { formatEther } from 'viem';
 import { erc20Abi } from 'viem';
 import { DAI_TOKEN_ADDRESSES } from '@/lib/contracts/DAIToken';

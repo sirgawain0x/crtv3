@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, AlertCircle, CheckCircle, CreditCard, ArrowRightLeft } from 'lucide-react';
-import { useSmartAccountClient } from '@account-kit/react';
+import { useSmartAccountClient } from '@/lib/wallet/react';
 import { formatEther } from 'viem';
 import { erc20Abi } from 'viem';
 import { DAI_TOKEN_ADDRESSES } from '@/lib/contracts/DAIToken';

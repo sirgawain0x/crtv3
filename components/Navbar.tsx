@@ -16,7 +16,7 @@ import {
   useAuthModal,
   useUser,
   useChain,
-} from "@account-kit/react";
+} from "@/lib/wallet/react";
 import ThemeToggleComponent from "./ThemeToggle/toggleComponent";
 import { toast } from "sonner";
 import { CheckIcon } from "@radix-ui/react-icons";

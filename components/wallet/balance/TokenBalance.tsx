@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSmartAccountClient, useUser, useChain } from "@account-kit/react";
+import { useSmartAccountClient, useUser, useChain } from "@/lib/wallet/react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatUnits, createPublicClient, http } from "viem";
 import { getUsdcTokenContract } from "@/lib/contracts/USDCToken";

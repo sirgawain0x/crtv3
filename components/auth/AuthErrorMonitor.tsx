@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { useAuthError } from "@account-kit/react";
+import { useAuthError } from "@/lib/wallet/react";
 import { toast } from "sonner";
 import { formatAccountKitAuthError } from "@/lib/auth/format-account-kit-auth-error";
 

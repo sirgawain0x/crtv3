@@ -12,7 +12,7 @@
  */
 
 import { useCallback, useEffect, useRef } from "react";
-import { useSignMessage, useUser } from "@account-kit/react";
+import { useSignMessage, useUser } from "@/lib/wallet/react";
 import useModularAccount from "@/lib/hooks/accountkit/useModularAccount";
 import { logger } from "@/lib/utils/logger";
 

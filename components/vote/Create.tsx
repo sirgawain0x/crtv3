@@ -4,7 +4,7 @@ import React, { useState, Suspense, useEffect } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useChain, useAuthModal, useSigner } from "@account-kit/react";
+import { useChain, useAuthModal, useSigner } from "@/lib/wallet/react";
 import { useRouter } from "next/navigation";
 import { createProposal } from "@/app/vote/create/[address]/actions";
 import { SNAPSHOT_SPACE } from "@/context/context";
@@ -318,12 +318,7 @@ function Create() {
       // Best-effort: verify signer is responsive and bound to the expected EOA.
       // Some environments report waitForConnected timeouts even when signing works, so do not hard-fail on it.
       try {
-        const signerAddr = await Promise.race([
-          signer.getAddress(),
-          new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error("getAddress timed out")), 10000),
-          ),
-        ]);
+        const signerAddr = signer.address;
         logger.debug("Signer getAddress():", signerAddr);
         if (signerAddr?.toLowerCase?.() !== walletAddress.toLowerCase()) {
           logger.warn(

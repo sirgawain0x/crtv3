@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { useSmartAccountClient, useUser } from "@account-kit/react";
+import { useSmartAccountClient, useUser } from "@/lib/wallet/react";
 import { signLensChallenge } from "@/lib/sdk/lens/account-kit-adapter";
 import { publicClient } from "@/lib/sdk/lens/client";
 import { useOrbSession } from "@/context/OrbSessionContext";

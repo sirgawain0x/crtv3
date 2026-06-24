@@ -1,9 +1,15 @@
 "use client";
 import "@/lib/utils/suppressDevWarnings";
 import "@/lib/utils/xmtp/wasm-patch";
-import { config, queryClient } from "@/config";
-import { AlchemyAccountProvider } from "@account-kit/react";
-import { AlchemyClientState } from "@account-kit/core";
+// Migration SDK styles use Tailwind v4 @layer base, incompatible with our Tailwind v3
+// PostCSS setup. Modal remains functional without the stylesheet.
+import { queryClient } from "@/config";
+import { PrivyProvider } from "@privy-io/react-auth";
+import { MigrationProvider } from "@privy-io/alchemy-migration";
+import { alchemyMigrationConfig } from "@/lib/sdk/wallet/migration-config";
+import { getPrivyConfig } from "@/lib/wallet/privy-config";
+import { WalletChainProvider } from "@/lib/wallet/chain-context";
+import { WalletClientProvider } from "@/lib/wallet/wallet-context";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { PropsWithChildren, Suspense, useEffect, useState } from "react";
 import { ThemeProvider } from "next-themes";
@@ -16,8 +22,7 @@ import { ApolloNextAppProvider } from "@apollo/client-integration-nextjs";
 import { makeClient } from "./apolloWrapper";
 import { RadixProvider } from "@/components/ui/radix-provider";
 import { cleanupExistingIframes } from "@/components/IframeCleanup";
-import { MembershipGuard } from "@/components/auth/MembershipGuard";
-import { AccountKitStoreGuard } from "@/components/auth/AccountKitStoreGuard";
+import { WalletReadyGuard } from "@/components/auth/WalletReadyGuard";
 import { AuthErrorMonitor } from "@/components/auth/AuthErrorMonitor";
 import { OrbSessionProvider } from "@/context/OrbSessionContext";
 import { OrbLoginModal } from "@/components/auth/OrbLoginModal";
@@ -35,24 +40,30 @@ function ErrorFallback({ error }: { error: Error }) {
   );
 }
 
-export const Providers = (
-  props: PropsWithChildren<{ initialState?: AlchemyClientState }>
-) => {
+export const Providers = (props: PropsWithChildren) => {
   const [isReady, setIsReady] = useState(false);
+  const privyAppId = process.env.NEXT_PUBLIC_PRIVY_APP_ID;
+  const privyClientId = process.env.NEXT_PUBLIC_PRIVY_CLIENT_ID;
 
   useEffect(() => {
-    // Only clean up DUPLICATE iframes, not the active one
-    // This prevents breaking the signer connection while still handling hot-reload duplicates
     cleanupExistingIframes();
     setIsReady(true);
   }, []);
 
-  // Don't render providers until ready
-  // Note: We removed aggressive iframe cleanup to preserve the signer connection
   if (!isReady) {
     return (
       <div className="flex min-h-screen items-center justify-center">
         Loading...
+      </div>
+    );
+  }
+
+  if (!privyAppId) {
+    return (
+      <div className="flex min-h-screen items-center justify-center p-6 text-center">
+        <p className="text-sm text-muted-foreground">
+          Missing NEXT_PUBLIC_PRIVY_APP_ID. Configure Privy in your environment to enable wallet auth.
+        </p>
       </div>
     );
   }
@@ -68,35 +79,40 @@ export const Providers = (
       >
         <QueryClientProvider client={queryClient}>
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-            <ApolloNextAppProvider makeClient={makeClient}>
-              <NoSSR>
-                <AlchemyAccountProvider
-                  config={config}
-                  queryClient={queryClient}
-                  initialState={props.initialState}
-                >
-                  <RadixProvider>
-                    <HeliaProvider>
-                      <TourProvider>
-                        <VideoProvider>
-                          <AccountKitStoreGuard>
-                            <AuthErrorMonitor />
-                            <OrbSessionProvider>
-                              <MembershipGuard>
-                                {props.children}
-                              </MembershipGuard>
-                              <OrbLoginModal />
-                              <OrbLinkingOverlay />
-                              <Toaster position="top-right" richColors />
-                            </OrbSessionProvider>
-                          </AccountKitStoreGuard>
-                        </VideoProvider>
-                      </TourProvider>
-                    </HeliaProvider>
-                  </RadixProvider>
-                </AlchemyAccountProvider>
-              </NoSSR>
-            </ApolloNextAppProvider>
+            <PrivyProvider appId={privyAppId} config={getPrivyConfig()}>
+              <MigrationProvider
+                alchemyConfig={alchemyMigrationConfig}
+                privyAppId={privyAppId}
+                privyClientId={privyClientId}
+                showDebugButton={process.env.NODE_ENV === "development"}
+              >
+                <WalletChainProvider>
+                  <WalletClientProvider>
+                    <ApolloNextAppProvider makeClient={makeClient}>
+                      <NoSSR>
+                        <RadixProvider>
+                          <HeliaProvider>
+                            <TourProvider>
+                              <VideoProvider>
+                                <WalletReadyGuard>
+                                  <AuthErrorMonitor />
+                                  <OrbSessionProvider>
+                                    {props.children}
+                                    <OrbLoginModal />
+                                    <OrbLinkingOverlay />
+                                    <Toaster position="top-right" richColors />
+                                  </OrbSessionProvider>
+                                </WalletReadyGuard>
+                              </VideoProvider>
+                            </TourProvider>
+                          </HeliaProvider>
+                        </RadixProvider>
+                      </NoSSR>
+                    </ApolloNextAppProvider>
+                  </WalletClientProvider>
+                </WalletChainProvider>
+              </MigrationProvider>
+            </PrivyProvider>
           </ThemeProvider>
         </QueryClientProvider>
       </Suspense>

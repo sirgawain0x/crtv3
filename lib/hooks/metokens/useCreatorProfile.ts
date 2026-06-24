@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
-import { useUser } from '@account-kit/react';
+import { useUser } from '@/lib/wallet/react';
 import { logger } from '@/lib/utils/logger';
 import { useWalletAuth } from '@/lib/auth/useWalletAuth';
 import { formatWalletAuthError } from '@/lib/auth/format-wallet-auth-error';
