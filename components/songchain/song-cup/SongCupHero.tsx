@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import "./song-cup-hero.css";
 import { CirclingTextRings } from "./CirclingTextRings";
+import { SongCupGoalButton } from "./SongCupGoalButton";
 import { SongCupLogo } from "./SongCupLogo";
 import { cn } from "@/lib/utils";
 
@@ -62,15 +63,15 @@ export function SongCupHero({
         <PolyhedronFaces />
         <div className="song-cup-hero-copy">
           <div className="song-cup-hero-copy-inner">
-            <h1 className="song-cup-hero-line">{headline}</h1>
-            <p className="song-cup-hero-line song-cup-hero-line-sub">{subheadline}</p>
-            <button
-              type="button"
-              onClick={onCtaClick}
-              className="song-cup-lets-goal-btn"
-            >
-              {ctaLabel}
-            </button>
+            {headline ? (
+              <h1 className="song-cup-hero-line">{headline}</h1>
+            ) : (
+              <h1 className="sr-only">{ariaLabel}</h1>
+            )}
+            {subheadline ? (
+              <p className="song-cup-hero-line song-cup-hero-line-sub">{subheadline}</p>
+            ) : null}
+            <SongCupGoalButton label={ctaLabel} onClick={onCtaClick} />
           </div>
         </div>
       </div>
