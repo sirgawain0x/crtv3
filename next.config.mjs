@@ -215,18 +215,12 @@ const nextConfig = {
       }
     }
 
-    // Privy pulls optional Solana funding modules; Creative TV is EVM-only.
+    // Privy pulls optional Solana funding UI; Creative TV is EVM-only.
+    // Keep @solana-program/* installable — IgnorePlugin left broken runtime requires.
     config.plugins.push(
       new webpack.IgnorePlugin({
         checkResource(resource) {
           return /FundSolWalletWithExternalSolanaWallet/.test(resource || "");
-        },
-      })
-    );
-    config.plugins.push(
-      new webpack.IgnorePlugin({
-        checkResource(resource) {
-          return /@solana-program[\\/]token/.test(resource || "");
         },
       })
     );
