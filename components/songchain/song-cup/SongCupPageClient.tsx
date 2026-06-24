@@ -5,6 +5,7 @@ import { useState } from "react";
 import type { SongchainConfig } from "@/lib/songchain/config";
 import { SongCupBanner } from "@/components/songchain/SongCupBanner";
 import { SongchainFeedExperience } from "@/components/songchain/SongchainFeedExperience";
+import { SongCupBrandLogo } from "@/components/songchain/song-cup/SongCupBrandLogo";
 import { SongCupHero } from "@/components/songchain/song-cup/SongCupHero";
 import { SongCupPlayModal } from "@/components/songchain/song-cup/SongCupPlayModal";
 import { SONG_CUP_CLUB_FEED_ID, SONG_CUP_CLUB_GROUP_ID, SONG_CUP_PLAY_LINKS } from "@/lib/songchain/events";
@@ -31,6 +32,11 @@ export function SongCupPageClient({ config }: SongCupPageClientProps) {
       </nav>
 
       <SongCupHero
+        logo={<SongCupBrandLogo priority />}
+        headline=""
+        subheadline=""
+        ctaLabel="Play"
+        ariaLabel="Song Cup"
         animationPaused={playModalOpen}
         onCtaClick={() => setPlayModalOpen(true)}
       />
