@@ -101,7 +101,7 @@
 }
 
 .song-cup-hero-scene .site-logo {
-  width: min(90vw, 560px);
+  width: min(90vw, 720px);
   max-width: 100%;
   display: block;
   margin-inline: auto;
@@ -151,30 +151,10 @@
   max-width: 36rem;
 }
 
-.song-cup-hero-scene .song-cup-lets-goal-btn {
+.song-cup-hero-scene .song-cup-hero-copy-inner > button,
+.song-cup-hero-scene .song-cup-hero-copy-inner > a {
   pointer-events: auto;
   margin-top: 0.75rem;
-  border: none;
-  border-radius: 9999px;
-  background: linear-gradient(to right, #e82594, #ff66cc);
-  padding: 0.75rem 2rem;
-  font-size: clamp(0.875rem, 2vw, 1rem);
-  font-weight: 700;
-  letter-spacing: 0.05em;
-  color: #ffffff;
-  cursor: pointer;
-  box-shadow: 0 4px 20px rgba(232, 37, 148, 0.4);
-  transition: filter 0.2s, box-shadow 0.2s;
-}
-
-.song-cup-hero-scene .song-cup-lets-goal-btn:hover {
-  filter: brightness(1.1);
-  box-shadow: 0 6px 24px rgba(232, 37, 148, 0.55);
-}
-
-.song-cup-hero-scene .song-cup-lets-goal-btn:focus-visible {
-  outline: 2px solid #ff66cc;
-  outline-offset: 3px;
 }
 
 /* Logo typography */
