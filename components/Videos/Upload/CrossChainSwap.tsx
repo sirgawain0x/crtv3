@@ -164,7 +164,11 @@ export function CrossChainSwap({ onSwapSuccess, requiredAmount, recipientAddress
             const result = await prepareSwapAsync(swapParams) as {
                 quote: { minimumToAmount?: string | bigint };
                 [key: string]: unknown;
-            };
+            } | null | undefined;
+
+            if (!result) {
+                throw new Error("Failed to prepare swap: no result returned");
+            }
 
             const { quote: swapQuote, ...calls } = result;
 

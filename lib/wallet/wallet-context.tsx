@@ -33,7 +33,6 @@ const WalletClientContext = createContext<WalletClientContextValue | null>(null)
 export function WalletClientProvider({ children }: { children: ReactNode }) {
   const { authenticated, ready } = usePrivy();
   const { wallets } = useWallets();
-  const embeddedWallet = wallets.find((w) => w.walletClientType === "privy");
   const { chain } = useWalletChain();
 
   const [signer, setSigner] = useState<LocalAccount | undefined>();
@@ -50,7 +49,8 @@ export function WalletClientProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
 
     async function loadSigner() {
-      if (!ready || !authenticated || !embeddedWallet) {
+      const privyWallet = wallets.find((w) => w.walletClientType === "privy");
+      if (!ready || !authenticated || !privyWallet) {
         setSigner(undefined);
         setClient(undefined);
         setError(null);
@@ -58,7 +58,7 @@ export function WalletClientProvider({ children }: { children: ReactNode }) {
       }
 
       try {
-        const account = await toViemAccount({ wallet: embeddedWallet });
+        const account = await toViemAccount({ wallet: privyWallet });
         if (!cancelled) setSigner(account);
       } catch (err) {
         if (!cancelled) {
@@ -72,7 +72,7 @@ export function WalletClientProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [ready, authenticated, embeddedWallet, refreshToken]);
+  }, [ready, authenticated, wallets, refreshToken]);
 
   useEffect(() => {
     let cancelled = false;

@@ -318,7 +318,7 @@ function Create() {
       // Best-effort: verify signer is responsive and bound to the expected EOA.
       // Some environments report waitForConnected timeouts even when signing works, so do not hard-fail on it.
       try {
-        const signerAddr = signer.address;
+        const signerAddr = signer?.address;
         logger.debug("Signer getAddress():", signerAddr);
         if (signerAddr?.toLowerCase?.() !== walletAddress.toLowerCase()) {
           logger.warn(

@@ -142,7 +142,11 @@ export async function createCompatSmartAccountClient(
     chain,
     getAddress: () => scaAddress,
     async sendUserOperation(args: SendUserOperationArgs) {
-      const calls = (Array.isArray(args.uo) ? args.uo : [args.uo]).map((uo) => ({
+      const uoArray = Array.isArray(args.uo) ? args.uo : args.uo ? [args.uo] : [];
+      if (uoArray.length === 0) {
+        throw new Error("User operation calls (uo) cannot be empty");
+      }
+      const calls = uoArray.map((uo) => ({
         to: uo.target,
         data: (uo.data ?? "0x") as Hex,
         value: uo.value ?? 0n,
@@ -174,6 +178,9 @@ export async function createCompatSmartAccountClient(
     },
     async waitForUserOperationTransaction({ hash }: { hash: string }) {
       const status = await clientWithAccount.waitForCallsStatus({ id: hash });
+      if (status.status === "reverted") {
+        throw new Error("Transaction reverted");
+      }
       const txHash = status.receipts?.[0]?.transactionHash;
       if (!txHash) {
         throw new Error("Transaction hash not available from call status");

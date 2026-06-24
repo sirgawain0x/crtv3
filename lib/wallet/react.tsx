@@ -124,7 +124,7 @@ export function useSignMessage(options: SignMessageHookOptions = {}) {
       setError(null);
       try {
         const signature = (await signer.signMessage({
-          message: message as string,
+          message: typeof message === "string" ? message : { raw: message },
         })) as Hex;
         optionsRef.current.onSuccess?.(signature);
         return signature;

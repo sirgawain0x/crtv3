@@ -41,6 +41,7 @@ type SwapWalletClient = {
     calls: Array<{ to: Address; data: Hex; value: bigint }>;
   }) => Promise<{ id: string }>;
   waitForCallsStatus: (args: { id: string }) => Promise<{
+    status?: string;
     receipts?: Array<{ transactionHash?: string }>;
   }>;
   requestAccount: (args: {
@@ -144,9 +145,13 @@ export async function executeSwap(params: {
     throw new Error(`Quote request failed: ${response.status} - ${errorText}`);
   }
 
-  const quoteResponse = await response.json();
-  if (quoteResponse.error) {
-    throw new Error(`RPC Error: ${quoteResponse.error.message}`);
+  const quoteResponse = (await response.json()) as Record<string, unknown> | null;
+  if (!quoteResponse || typeof quoteResponse !== "object") {
+    throw new Error("Invalid JSON response from Alchemy quote API");
+  }
+  const rpcError = quoteResponse.error as { message?: string } | undefined;
+  if (rpcError) {
+    throw new Error(`RPC Error: ${rpcError.message ?? "Unknown error"}`);
   }
   if (!quoteResponse.result) {
     throw new Error("No quote result received from Alchemy");
@@ -173,6 +178,9 @@ export async function executeSwap(params: {
       });
 
       const status = await swapClient.waitForCallsStatus({ id });
+      if (status.status === "reverted") {
+        throw new Error(`Transaction reverted for call ${i + 1}`);
+      }
       const receipt = status.receipts?.[0]?.transactionHash;
       if (isLast && receipt) {
         txHash = receipt as Hex;
@@ -200,6 +208,9 @@ export async function executeSwap(params: {
     });
 
     const status = await swapClient.waitForCallsStatus({ id });
+    if (status.status === "reverted") {
+      throw new Error("Transaction reverted for legacy swap call");
+    }
     txHash = (status.receipts?.[0]?.transactionHash as Hex) ?? null;
   }
 
