@@ -10,6 +10,7 @@ import { alchemyMigrationConfig } from "@/lib/sdk/wallet/migration-config";
 import { getPrivyConfig } from "@/lib/wallet/privy-config";
 import { WalletChainProvider } from "@/lib/wallet/chain-context";
 import { WalletClientProvider } from "@/lib/wallet/wallet-context";
+import { AuthErrorProvider } from "@/lib/wallet/auth-error-context";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { PropsWithChildren, Suspense, useEffect, useState } from "react";
 import { ThemeProvider } from "next-themes";
@@ -80,38 +81,40 @@ export const Providers = (props: PropsWithChildren) => {
         <QueryClientProvider client={queryClient}>
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
             <PrivyProvider appId={privyAppId} config={getPrivyConfig()}>
-              <MigrationProvider
-                alchemyConfig={alchemyMigrationConfig}
-                privyAppId={privyAppId}
-                privyClientId={privyClientId}
-                showDebugButton={process.env.NODE_ENV === "development"}
-              >
-                <WalletChainProvider>
-                  <WalletClientProvider>
-                    <ApolloNextAppProvider makeClient={makeClient}>
-                      <NoSSR>
-                        <RadixProvider>
-                          <HeliaProvider>
-                            <TourProvider>
-                              <VideoProvider>
-                                <WalletReadyGuard>
-                                  <AuthErrorMonitor />
-                                  <OrbSessionProvider>
-                                    {props.children}
-                                    <OrbLoginModal />
-                                    <OrbLinkingOverlay />
-                                    <Toaster position="top-right" richColors />
-                                  </OrbSessionProvider>
-                                </WalletReadyGuard>
-                              </VideoProvider>
-                            </TourProvider>
-                          </HeliaProvider>
-                        </RadixProvider>
-                      </NoSSR>
-                    </ApolloNextAppProvider>
-                  </WalletClientProvider>
-                </WalletChainProvider>
-              </MigrationProvider>
+              <AuthErrorProvider>
+                <MigrationProvider
+                  alchemyConfig={alchemyMigrationConfig}
+                  privyAppId={privyAppId}
+                  privyClientId={privyClientId}
+                  showDebugButton={process.env.NODE_ENV === "development"}
+                >
+                  <WalletChainProvider>
+                    <WalletClientProvider>
+                      <ApolloNextAppProvider makeClient={makeClient}>
+                        <NoSSR>
+                          <RadixProvider>
+                            <HeliaProvider>
+                              <TourProvider>
+                                <VideoProvider>
+                                  <WalletReadyGuard>
+                                    <AuthErrorMonitor />
+                                    <OrbSessionProvider>
+                                      {props.children}
+                                      <OrbLoginModal />
+                                      <OrbLinkingOverlay />
+                                      <Toaster position="top-right" richColors />
+                                    </OrbSessionProvider>
+                                  </WalletReadyGuard>
+                                </VideoProvider>
+                              </TourProvider>
+                            </HeliaProvider>
+                          </RadixProvider>
+                        </NoSSR>
+                      </ApolloNextAppProvider>
+                    </WalletClientProvider>
+                  </WalletChainProvider>
+                </MigrationProvider>
+              </AuthErrorProvider>
             </PrivyProvider>
           </ThemeProvider>
         </QueryClientProvider>

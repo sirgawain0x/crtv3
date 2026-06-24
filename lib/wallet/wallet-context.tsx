@@ -34,6 +34,7 @@ export function WalletClientProvider({ children }: { children: ReactNode }) {
   const { authenticated, ready } = usePrivy();
   const { wallets } = useWallets();
   const { chain } = useWalletChain();
+  const privyWallet = wallets.find((w) => w.walletClientType === "privy");
 
   const [signer, setSigner] = useState<LocalAccount | undefined>();
   const [client, setClient] = useState<CompatSmartAccountClient | undefined>();
@@ -110,11 +111,14 @@ export function WalletClientProvider({ children }: { children: ReactNode }) {
       eoaAddress: signer?.address,
       client,
       address: client?.scaAddress,
-      isLoadingClient: !ready || isLoadingClient,
+      isLoadingClient:
+        !ready ||
+        (authenticated && !error && (!privyWallet || !signer)) ||
+        isLoadingClient,
       error,
       refreshClient,
     }),
-    [signer, client, isLoadingClient, ready, error, refreshClient],
+    [signer, client, isLoadingClient, ready, authenticated, privyWallet, error, refreshClient],
   );
 
   return (

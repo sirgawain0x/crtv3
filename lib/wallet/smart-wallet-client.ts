@@ -98,12 +98,27 @@ export async function resolveScaAddress(
   return address;
 }
 
-function mapPaymasterCapabilities(
+function mapSendCallsCapabilities(
   context?: SendUserOperationArgs["context"],
-): { paymaster?: { policyId: string } } | undefined {
+  permissionsContext?: Hex,
+): Record<string, unknown> | undefined {
   const policyId = context?.paymasterService?.policyId ?? PAYMASTER_POLICY_ID;
-  if (!policyId) return undefined;
-  return { paymaster: { policyId } };
+  const tokenAddress = context?.erc20?.tokenAddress;
+
+  const capabilities: Record<string, unknown> = {};
+
+  if (policyId) {
+    capabilities.paymaster = {
+      policyId,
+      ...(tokenAddress ? { erc20: { tokenAddress } } : {}),
+    };
+  }
+
+  if (permissionsContext) {
+    capabilities.permissions = { context: permissionsContext };
+  }
+
+  return Object.keys(capabilities).length > 0 ? capabilities : undefined;
 }
 
 type WalletClientParams = {
@@ -152,17 +167,10 @@ export async function createCompatSmartAccountClient(
         value: uo.value ?? 0n,
       }));
 
-      const paymasterCaps = mapPaymasterCapabilities(args.context);
-      const permissionsContext = args.context?.permissions?.context;
-      const capabilities =
-        paymasterCaps || permissionsContext
-          ? {
-              ...(paymasterCaps ?? {}),
-              ...(permissionsContext
-                ? { permissions: { context: permissionsContext } }
-                : {}),
-            }
-          : undefined;
+      const capabilities = mapSendCallsCapabilities(
+        args.context,
+        args.context?.permissions?.context,
+      );
 
       const result = await clientWithAccount.sendCalls({
         account: scaAddress,

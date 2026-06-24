@@ -4,7 +4,8 @@
  * Drop-in replacements for @account-kit/react hooks after Privy + Wallet APIs v5 migration.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { usePrivy, useLogin, useLogout as usePrivyLogout } from "@privy-io/react-auth";
+import { usePrivy, useLogout as usePrivyLogout } from "@privy-io/react-auth";
+import { useAuthErrorContext } from "./auth-error-context";
 import { requestQuoteV0 } from "@alchemy/wallet-apis/experimental";
 import type { Address, Hex } from "viem";
 import { useWalletChain } from "./chain-context";
@@ -39,7 +40,7 @@ export function useUser(): CompatUser | null {
 }
 
 export function useAuthModal() {
-  const { login } = useLogin();
+  const { login } = useAuthErrorContext();
   return {
     openAuthModal: login,
   };
@@ -88,7 +89,8 @@ export function useSigner() {
 }
 
 export function useAuthError() {
-  return null;
+  const { authError } = useAuthErrorContext();
+  return authError;
 }
 
 type SignMessageHookOptions = {
@@ -290,13 +292,24 @@ export function usePrepareSwap({ client }: { client?: SwapHookClient } = {}) {
         const account = client.scaAddress ?? client.getAddress();
         const capabilities = params.capabilities as Record<string, unknown> | undefined;
         const paymasterService = capabilities?.paymasterService as { policyId?: string } | undefined;
+        const erc20 = capabilities?.erc20 as { tokenAddress?: string } | undefined;
+
+        const quoteCapabilities =
+          paymasterService?.policyId
+            ? {
+                paymaster: {
+                  policyId: paymasterService.policyId,
+                  ...(erc20?.tokenAddress
+                    ? { erc20: { tokenAddress: erc20.tokenAddress } }
+                    : {}),
+                },
+              }
+            : undefined;
 
         return await requestQuoteV0(client as never, {
           ...params,
           account,
-          ...(paymasterService?.policyId
-            ? { capabilities: { paymaster: { policyId: paymasterService.policyId } } }
-            : {}),
+          ...(quoteCapabilities ? { capabilities: quoteCapabilities } : {}),
         } as never);
       } finally {
         setIsPreparingSwap(false);
@@ -366,6 +379,11 @@ export function useWaitForCallsStatus({
       .waitForCallsStatus({ id })
       .then((result) => {
         if (cancelled) return;
+        if (result.status === "reverted") {
+          setError(new Error("Transaction reverted"));
+          setData({ ...result, statusCode: 500 });
+          return;
+        }
         setData({
           ...result,
           statusCode: result.status === "success" ? 200 : 120,
