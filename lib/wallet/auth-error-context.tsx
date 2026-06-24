@@ -21,7 +21,7 @@ export function AuthErrorProvider({ children }: { children: ReactNode }) {
   const [authError, setAuthError] = useState<Error | null>(null);
   const { login } = useLogin({
     onComplete: () => setAuthError(null),
-    onError: (error) => {
+    onError: (error: unknown) => {
       setAuthError(error instanceof Error ? error : new Error(String(error)));
     },
   });
