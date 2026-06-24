@@ -63,7 +63,11 @@ export function SongCupHero({
         <PolyhedronFaces />
         <div className="song-cup-hero-copy">
           <div className="song-cup-hero-copy-inner">
-            {headline ? <h1 className="song-cup-hero-line">{headline}</h1> : null}
+            {headline ? (
+              <h1 className="song-cup-hero-line">{headline}</h1>
+            ) : (
+              <h1 className="sr-only">{ariaLabel}</h1>
+            )}
             {subheadline ? (
               <p className="song-cup-hero-line song-cup-hero-line-sub">{subheadline}</p>
             ) : null}

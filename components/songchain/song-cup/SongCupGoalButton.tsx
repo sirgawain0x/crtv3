@@ -2,22 +2,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
-type SongCupGoalButtonBaseProps = {
+type SongCupGoalButtonProps = {
   label: string;
   className?: string;
-};
-
-type SongCupGoalButtonLinkProps = SongCupGoalButtonBaseProps & {
-  href: string;
-  onClick?: never;
-};
-
-type SongCupGoalButtonActionProps = SongCupGoalButtonBaseProps & {
-  href?: never;
-  onClick: () => void;
-};
-
-type SongCupGoalButtonProps = SongCupGoalButtonLinkProps | SongCupGoalButtonActionProps;
+  onClick?: () => void;
+} & ({ href: string } | { href?: never; onClick: () => void });
 
 const buttonClassName =
   "group relative inline-flex shrink-0 transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF66CC] focus-visible:ring-offset-2 focus-visible:ring-offset-black";
@@ -43,7 +32,7 @@ function SongCupGoalButtonContent({ label }: { label: string }) {
 export function SongCupGoalButton({ label, className, href, onClick }: SongCupGoalButtonProps) {
   if (href) {
     return (
-      <Link href={href} className={cn(buttonClassName, className)}>
+      <Link href={href} onClick={onClick} className={cn(buttonClassName, className)}>
         <SongCupGoalButtonContent label={label} />
       </Link>
     );
