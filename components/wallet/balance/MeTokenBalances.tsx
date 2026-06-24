@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSmartAccountClient, useUser } from "@account-kit/react";
+import { useSmartAccountClient, useUser } from "@/lib/wallet/react";
 import { formatEther } from "viem";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMeTokensSupabase, MeTokenData } from "@/lib/hooks/metokens/useMeTokensSupabase";

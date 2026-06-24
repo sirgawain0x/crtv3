@@ -30,7 +30,7 @@ import {
   X
 } from 'lucide-react';
 import { formatEther, parseEther } from 'viem';
-import { useSmartAccountClient, useChain } from '@account-kit/react';
+import { useSmartAccountClient, useChain } from '@/lib/wallet/react';
 import { useToast } from '@/components/ui/use-toast';
 import { useMeTokenCreation, PendingMeTokenTransaction, CreationStatus } from '@/lib/hooks/metokens/useMeTokenCreation';
 import { getDaiTokenContract } from '@/lib/contracts/DAIToken';

@@ -22,7 +22,7 @@ import type { VideoAsset } from "@/lib/types/video-asset";
 import { useUniversalAccount } from "@/lib/hooks/accountkit/useUniversalAccount";
 import { getLivepeerAsset } from "@/app/api/livepeer/assetUploadActions";
 import { useAutoDeployContentCoin } from "@/lib/hooks/marketplace/useAutoDeployContentCoin";
-import { useSmartAccountClient } from "@account-kit/react";
+import { useSmartAccountClient } from "@/lib/wallet/react";
 import { createSplitForVideo } from "@/services/splits";
 import { logger } from "@/lib/utils/logger";
 

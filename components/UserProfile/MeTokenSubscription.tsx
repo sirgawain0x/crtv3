@@ -8,7 +8,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, AlertCircle, CheckCircle, ExternalLink } from 'lucide-react';
 import Image from 'next/image';
 import { formatEther, parseEther, encodeFunctionData, maxUint256 } from 'viem';
-import { useSmartAccountClient, useChain } from '@account-kit/react';
+import { useSmartAccountClient, useChain } from '@/lib/wallet/react';
 import { useMeTokensSupabase, MeTokenData } from '@/lib/hooks/metokens/useMeTokensSupabase';
 import { getHubVaultAddress } from '@/lib/utils/metokenSubscriptionUtils';
 import { DaiFundingOptions } from '@/components/wallet/funding/DaiFundingOptions';

@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useMeTokensSupabase, MeTokenData } from '@/lib/hooks/metokens/useMeTokensSupabase';
 import { Loader2, TrendingUp, TrendingDown, AlertCircle, CheckCircle, Lock, ExternalLink } from 'lucide-react';
 import { formatEther, parseEther, encodeFunctionData } from 'viem';
-import { useSmartAccountClient, useChain, useAuthModal, useUser } from '@account-kit/react';
+import { useSmartAccountClient, useChain, useAuthModal, useUser } from '@/lib/wallet/react';
 import { DAI_TOKEN_ADDRESSES, getDaiTokenContract } from '@/lib/contracts/DAIToken';
 import { erc20Abi } from 'viem';
 import { MeTokenSubscription } from './MeTokenSubscription';

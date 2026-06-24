@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { useChain, useAuthModal, useSmartAccountClient } from "@account-kit/react";
+import { useChain, useAuthModal, useSmartAccountClient } from "@/lib/wallet/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { base } from "@account-kit/infra";

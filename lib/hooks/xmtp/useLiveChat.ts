@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { Client, Group, Message, DecodedMessage } from "@xmtp/browser-sdk";
 import { ConsentState } from "@xmtp/browser-sdk";
-import { useUser } from "@account-kit/react";
+import { useUser } from "@/lib/wallet/react";
 import { useXmtpClient } from "./useXmtpClient";
 import { parseTipMessage } from "@/lib/utils/video-tip";
 import useModularAccount from "@/lib/hooks/accountkit/useModularAccount";

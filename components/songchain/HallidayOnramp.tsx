@@ -6,7 +6,7 @@ import {
   openHallidayPayments,
 } from "@halliday-sdk/payments";
 import { connectWalletClient } from "@halliday-sdk/payments/viem";
-import { useAuthModal, useSmartAccountClient, useUser } from "@account-kit/react";
+import { useAuthModal, useSmartAccountClient, useUser } from "@/lib/wallet/react";
 import type { WalletClient } from "viem";
 import { Button } from "@/components/ui/button";
 import { useLensOrbWrite } from "@/hooks/useLensOrbWrite";

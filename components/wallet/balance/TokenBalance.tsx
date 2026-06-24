@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useSmartAccountClient, useUser, useChain } from "@account-kit/react";
+import { useSmartAccountClient, useUser, useChain } from "@/lib/wallet/react";
 import { Skeleton } from "@/components/ui/skeleton";
 import Image from "next/image";
 import { getTokenIcon } from "@/lib/utils/token-icons";

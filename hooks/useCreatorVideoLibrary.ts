@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { useUser } from '@account-kit/react';
+import { useUser } from '@/lib/wallet/react';
 import useModularAccount from '@/lib/hooks/accountkit/useModularAccount';
 import type { VideoAsset } from '@/lib/types/video-asset';
 import { fetchPublishedVideos } from '@/lib/utils/published-videos-client';

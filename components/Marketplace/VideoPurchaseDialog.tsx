@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useMeTokensSupabase } from "@/lib/hooks/metokens/useMeTokensSupabase";
-import { useSmartAccountClient } from "@account-kit/react";
+import { useSmartAccountClient } from "@/lib/wallet/react";
 import { useMeTokenPurchase } from "@/lib/hooks/metokens/useMeTokenPurchase";
 import { Loader2, Lock, Coins, AlertCircle } from "lucide-react";
 import { formatEther, parseEther } from "viem";

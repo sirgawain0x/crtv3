@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useSignerStatus } from "@account-kit/react";
+import { useSignerStatus } from "@/lib/wallet/react";
 import { isAddress } from "viem";
 import { useCreatorWalletAddress } from "@/lib/hooks/accountkit/useCreatorWalletAddress";
 import { logger } from "@/lib/utils/logger";

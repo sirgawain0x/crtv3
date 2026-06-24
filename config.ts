@@ -7,16 +7,12 @@ import { alchemy, base } from "@account-kit/infra";
 import { http } from "viem";
 import { QueryClient } from "@tanstack/react-query";
 import { modularAccountFactoryAddresses } from "./lib/utils/modularAccount";
-import { getStoryChain } from "./lib/sdk/story/chains";
-import { getLensChain } from "./lib/sdk/lens/chains";
+import { storyChain, lensChain } from "@/lib/wallet/chains";
 import { SITE_TOPIC_LOGO } from "./context/context";
 import Image from "next/image";
 import React from "react";
 
-// Define the chains we want to support (Base + Story + Lens for client-side signing)
-const storyChain = getStoryChain();
-export const lensChain = getLensChain();
-export const chains = [base, storyChain, lensChain];
+export { walletChains as chains, lensChain } from "@/lib/wallet/chains";
 
 // Default chain for initial connection
 const defaultChain = base;
@@ -107,7 +103,6 @@ const uiConfig: AlchemyAccountsUIConfig = {
       [{ type: "email", emailMode: "otp" }, { type: "passkey" }],
       [
         { type: "social", authProviderId: "google", mode: "popup" },
-        { type: "social", authProviderId: "facebook", mode: "popup" },
         { type: "social", authProviderId: "twitch", mode: "popup" },
       ],
     ],

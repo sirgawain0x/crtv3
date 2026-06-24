@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useSmartAccountClient } from '@account-kit/react';
+import { useSmartAccountClient } from '@/lib/wallet/react';
 import { createPublicClient, encodeFunctionData, parseEther } from 'viem';
 import { alchemy, base } from '@account-kit/infra';
 import { useToast } from '@/components/ui/use-toast';

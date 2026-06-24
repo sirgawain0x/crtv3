@@ -3,7 +3,7 @@
 import * as React from "react";
 import * as SelectPrimitive from "@radix-ui/react-select";
 import { Check, ChevronDown, ChevronUp } from "lucide-react";
-import { useChain } from "@account-kit/react";
+import { useChain } from "@/lib/wallet/react";
 import { base, optimism } from "@account-kit/infra";
 import Image from "next/image";
 

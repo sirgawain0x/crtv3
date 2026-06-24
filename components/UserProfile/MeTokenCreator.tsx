@@ -8,7 +8,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useMeTokensSupabase } from '@/lib/hooks/metokens/useMeTokensSupabase';
 import { useMeTokenHubs } from '@/lib/hooks/metokens/useMeTokenHubs';
 import { CollateralHubGuide, STABLECOIN_SUMMARY } from '@/components/metokens/CollateralHubGuide';
-import { useUser } from '@account-kit/react';
+import { useUser } from '@/lib/wallet/react';
 import { useToast } from '@/components/ui/use-toast';
 import { Loader2, CheckCircle, AlertCircle, Info } from 'lucide-react';
 import { logger } from '@/lib/utils/logger';

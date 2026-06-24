@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Loader2, Send, ExternalLink, AlertCircle, RefreshCw, Wallet } from 'lucide-react';
-import { useSmartAccountClient } from '@account-kit/react';
+import { useSmartAccountClient } from '@/lib/wallet/react';
 import { type Address, parseUnits, formatUnits, erc20Abi, encodeFunctionData } from 'viem';
 import { BASE_TOKENS } from '@/lib/sdk/alchemy/swap-service';
 import { useGasSponsorship } from '@/lib/hooks/wallet/useGasSponsorship';
@@ -45,7 +45,7 @@ export function CreativeBankTab() {
                 functionName: 'balanceOf',
                 args: [userAddress as Address],
             });
-            setUsdcBalance(balance);
+            setUsdcBalance(balance as bigint);
             setIsLoadingBalance(false);
         } catch (err) {
             logger.warn('Failed to fetch USDC balance:', err);

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useLogout } from '@account-kit/react';
+import { useLogout } from '@/lib/wallet/react';
 import { clearStoredOrbSession } from '@/lib/sdk/orb/login';
 import { resetAppSession } from '@/lib/auth/session-recovery';
 

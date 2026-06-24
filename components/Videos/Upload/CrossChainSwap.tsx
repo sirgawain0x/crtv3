@@ -7,7 +7,7 @@ import {
     useSignAndSendPreparedCalls,
     useWaitForCallsStatus,
     useUser,
-} from "@account-kit/react";
+} from "@/lib/wallet/react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -161,7 +161,14 @@ export function CrossChainSwap({ onSwapSuccess, requiredAmount, recipientAddress
                 swapParams.to = targetRecipient;
             }
 
-            const result = await prepareSwapAsync(swapParams);
+            const result = await prepareSwapAsync(swapParams) as {
+                quote: { minimumToAmount?: string | bigint };
+                [key: string]: unknown;
+            } | null | undefined;
+
+            if (!result) {
+                throw new Error("Failed to prepare swap: no result returned");
+            }
 
             const { quote: swapQuote, ...calls } = result;
 
@@ -172,7 +179,10 @@ export function CrossChainSwap({ onSwapSuccess, requiredAmount, recipientAddress
             });
 
             if (swapQuote.minimumToAmount) {
-                const rawAmount = BigInt(swapQuote.minimumToAmount);
+                const rawAmount =
+                    typeof swapQuote.minimumToAmount === "bigint"
+                        ? swapQuote.minimumToAmount
+                        : BigInt(swapQuote.minimumToAmount);
                 const formattedAmount = formatEther(rawAmount);
                 const ipAmount = parseFloat(formattedAmount);
 

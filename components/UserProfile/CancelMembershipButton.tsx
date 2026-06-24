@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useSendUserOperation, useSmartAccountClient } from "@account-kit/react";
+import { useSendUserOperation, useSmartAccountClient } from "@/lib/wallet/react";
 import { encodeFunctionData, type Abi } from "viem";
 import { Button } from "@/components/ui/button";
 import { appendBuilderCode } from "@/lib/utils/builder-code";

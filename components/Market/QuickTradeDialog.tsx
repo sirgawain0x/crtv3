@@ -15,7 +15,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, AlertCircle, CheckCircle, TrendingUp } from 'lucide-react';
 import { useMeTokensSupabase } from '@/lib/hooks/metokens/useMeTokensSupabase';
 import { formatEther, parseEther } from 'viem';
-import { useSmartAccountClient, useAuthModal, useUser } from '@account-kit/react';
+import { useSmartAccountClient, useAuthModal, useUser } from '@/lib/wallet/react';
 import { getDaiTokenContract } from '@/lib/contracts/DAIToken';
 import { erc20Abi } from 'viem';
 import { DaiFundingOptions } from '@/components/wallet/funding/DaiFundingOptions';

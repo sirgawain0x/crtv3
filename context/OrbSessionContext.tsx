@@ -10,7 +10,7 @@ import React, {
   useState,
   useSyncExternalStore,
 } from 'react';
-import { useUser } from '@account-kit/react';
+import { useUser } from '@/lib/wallet/react';
 import useModularAccount from '@/lib/hooks/accountkit/useModularAccount';
 import {
   getOrbLogin,

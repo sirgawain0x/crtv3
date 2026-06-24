@@ -8,14 +8,14 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, ArrowRightLeft, CheckCircle, XCircle, ExternalLink, DollarSign } from 'lucide-react';
 import Image from 'next/image';
-import { useSmartAccountClient } from '@account-kit/react';
+import { useSmartAccountClient, useChain } from '@/lib/wallet/react';
 import { type Hex, type Address, parseEther, formatEther, encodeFunctionData, erc20Abi, parseUnits, maxUint256 } from 'viem';
 import { alchemySwapService, AlchemySwapService, type TokenSymbol, BASE_TOKENS, TOKEN_INFO, SWAP_UI_TOKENS, emptyTokenBalances, emptyTokenPrices } from '@/lib/sdk/alchemy/swap-service';
 import { priceService, PriceService } from '@/lib/sdk/alchemy/price-service';
 import { CurrencyConverter } from '@/lib/utils/currency-converter';
 import { logger } from '@/lib/utils/logger';
 import { getTokenIcon } from '@/lib/utils/token-icons';
-import { swapActions } from "@account-kit/wallet-client/experimental";
+import { swapActions } from "@alchemy/wallet-apis/experimental";
 
 const ERC20_BALANCE_ABI = [{
   name: 'balanceOf',
@@ -47,6 +47,7 @@ interface SwapState {
 export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false, defaultToToken = 'USDC' }: AlchemySwapWidgetProps) {
 
   const { address, client } = useSmartAccountClient({});
+  const { chain } = useChain();
 
   const [swapState, setSwapState] = useState<SwapState>({
     fromToken: 'ETH',
@@ -615,7 +616,7 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
               </select>
 
               <Image
-                src={getTokenIcon(swapState.fromToken, client?.chain?.id)}
+                src={getTokenIcon(swapState.fromToken, client?.chain?.id ?? chain?.id)}
                 alt={swapState.fromToken}
                 width={32}
                 height={32}
@@ -665,7 +666,7 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
           <div className="flex justify-between text-xs text-muted-foreground">
             <div className="flex items-center space-x-1">
               <Image
-                src={getTokenIcon(swapState.fromToken, client?.chain?.id)}
+                src={getTokenIcon(swapState.fromToken, client?.chain?.id ?? chain?.id)}
                 alt={swapState.fromToken}
                 width={20}
                 height={20}
@@ -738,7 +739,7 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
               </select>
 
               <Image
-                src={getTokenIcon(swapState.toToken, client?.chain?.id)}
+                src={getTokenIcon(swapState.toToken, client?.chain?.id ?? chain?.id)}
                 alt={swapState.toToken}
                 width={32}
                 height={32}
@@ -773,7 +774,7 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
           <div className="flex justify-between text-xs text-muted-foreground">
             <div className="flex items-center space-x-1">
               <Image
-                src={getTokenIcon(swapState.toToken, client?.chain?.id)}
+                src={getTokenIcon(swapState.toToken, client?.chain?.id ?? chain?.id)}
                 alt={swapState.toToken}
                 width={20}
                 height={20}

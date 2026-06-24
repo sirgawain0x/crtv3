@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSendUserOperation, useSmartAccountClient, useUser, useChain } from "@account-kit/react";
+import { useSendUserOperation, useSmartAccountClient, useUser, useChain } from "@/lib/wallet/react";
 import { formatUnits, parseUnits, encodeFunctionData, encodeAbiParameters, type Abi, erc20Abi, createPublicClient, http } from "viem";
 import { MembershipButton } from "./MembershipButton";
 import { MembershipCard } from "./MembershipCard";
