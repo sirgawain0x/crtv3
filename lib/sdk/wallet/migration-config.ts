@@ -14,7 +14,7 @@ export const alchemyMigrationConfig = createMigrationConfig(
     }),
     chain: base,
     ssr: true,
-  },
+  } as never,
   {
     auth: {
       sections: [

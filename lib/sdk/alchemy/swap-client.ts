@@ -57,7 +57,7 @@ export async function initializeSwapClient() {
 
   try {
     const clientParams = getClientParams();
-    const clientWithoutAccount = createSmartWalletClient(clientParams);
+    const clientWithoutAccount = createSmartWalletClient(clientParams as never);
     account = await clientWithoutAccount.requestAccount({
       creationHint: { accountType: "sma-b" },
     });
@@ -65,7 +65,7 @@ export async function initializeSwapClient() {
     client = createSmartWalletClient({
       ...clientParams,
       account: account.address,
-    }) as SwapWalletClient;
+    } as never) as SwapWalletClient;
 
     serverLogger.debug("Swap client initialized with account:", account.address);
     return client;

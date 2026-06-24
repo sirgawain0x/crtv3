@@ -60,7 +60,7 @@ export function WalletClientProvider({ children }: { children: ReactNode }) {
 
       try {
         const account = await toViemAccount({ wallet: privyWallet });
-        if (!cancelled) setSigner(account);
+        if (!cancelled) setSigner(account as LocalAccount);
       } catch (err) {
         if (!cancelled) {
           setSigner(undefined);
