@@ -12,6 +12,8 @@ import { useWalletChain } from "./chain-context";
 import { useWalletClientContext } from "./wallet-context";
 import type { CompatSmartAccountClient, SendUserOperationArgs } from "./smart-wallet-client";
 
+export type RequestQuoteV0Result = Awaited<ReturnType<typeof requestQuoteV0>>;
+
 export type CompatUser = {
   address: Address;
   email?: string;
@@ -285,7 +287,7 @@ export function usePrepareSwap({ client }: { client?: SwapHookClient } = {}) {
   const [isPreparingSwap, setIsPreparingSwap] = useState(false);
 
   const prepareSwapAsync = useCallback(
-    async (params: Record<string, unknown>) => {
+    async (params: Record<string, unknown>): Promise<RequestQuoteV0Result> => {
       if (!client) throw new Error("Smart account client not initialized");
       setIsPreparingSwap(true);
       try {

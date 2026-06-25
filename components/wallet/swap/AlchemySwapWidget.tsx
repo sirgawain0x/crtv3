@@ -249,18 +249,15 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
         fromAmount: amount,
       });
 
-      const result = (await prepareSwapAsync(
+      const result = await prepareSwapAsync(
         buildSwapParams(amount, fromToken, toToken),
-      )) as {
-        quote?: { minimumToAmount: string; feePayment?: { sponsored?: boolean } };
-        rawCalls?: unknown;
-      } | null | undefined;
+      );
 
       if (!result) {
         throw new Error('Failed to prepare swap: No response received');
       }
 
-      if (result.rawCalls) {
+      if ("rawCalls" in result && result.rawCalls) {
         throw new Error('Expected user operation calls, got raw calls');
       }
 
@@ -456,23 +453,19 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
 
       logger.debug('Requesting fresh quote for execution...');
 
-      const result = (await prepareSwapAsync(
+      const result = await prepareSwapAsync(
         buildSwapParams(swapState.fromAmount, swapState.fromToken, swapState.toToken),
-      )) as {
-        quote?: unknown;
-        rawCalls?: unknown;
-        [key: string]: unknown;
-      } | null | undefined;
+      );
 
       if (!result) {
         throw new Error('Failed to prepare swap: No response received');
       }
 
-      if (result.rawCalls) {
+      if ("rawCalls" in result && result.rawCalls) {
         throw new Error('Expected user operation calls, got raw calls');
       }
 
-      const { quote: _quote, rawCalls: _rawCalls, ...calls } = result;
+      const { quote: _quote, ...calls } = result;
 
       logger.debug('Signing and sending prepared calls...');
       const { preparedCallIds } = await signAndSendPreparedCallsAsync(calls);
