@@ -7,6 +7,7 @@ import { requireWalletAuthFor, WalletAuthError } from '@/lib/auth/require-wallet
 import { isValidEthAddress } from '@/lib/auth/validate-address';
 import { verifyMeTokenTransaction } from '@/lib/metokens/verifyMeTokenTransaction';
 import { TransactionVerificationError } from '@/lib/chain/verifyTransactionReceipt';
+import { syncMeTokenMarketData } from '@/lib/metokens/syncMeTokenMarketData';
 
 // GET /api/metokens/[address]/transactions - Get MeToken transactions
 export async function GET(
@@ -228,6 +229,16 @@ export async function POST(
     };
 
     const result = await meTokenSupabaseService.recordTransaction(transactionData);
+
+    // Keep TVL/supply in sync after trades so market stats and charts update
+    const tradeTypes = ['mint', 'burn', 'buy', 'sell'];
+    if (tradeTypes.includes(transaction_type)) {
+      try {
+        await syncMeTokenMarketData(address);
+      } catch (syncErr) {
+        serverLogger.warn('Post-trade market sync failed (non-critical):', syncErr);
+      }
+    }
 
     return NextResponse.json({ data: result }, { status: 201 });
   } catch (error) {

@@ -41,6 +41,11 @@ import { USDC_TOKEN_ADDRESSES, USDC_TOKEN_DECIMALS } from "@/lib/contracts/USDCT
 import { DAI_TOKEN_ADDRESSES, DAI_TOKEN_DECIMALS } from "@/lib/contracts/DAIToken";
 import { logger } from '@/lib/utils/logger';
 import { appendBuilderCode } from "@/lib/utils/builder-code";
+import {
+  formatSendError,
+  getMaxEthSendAmount,
+  normalizeRecipientAddress,
+} from "@/lib/utils/sendHelpers";
 
 
 // Token configuration
@@ -142,6 +147,14 @@ export default function SendTransaction() {
       return;
     }
 
+    const normalizedRecipient = normalizeRecipientAddress(recipient);
+    if (!normalizedRecipient) {
+      const errorMsg = "Please enter a valid Ethereum recipient address (0x...)";
+      toast.error(errorMsg);
+      setError(errorMsg);
+      return;
+    }
+
     if (!amount || parseFloat(amount) <= 0) {
       const errorMsg = "Please enter a valid amount";
       toast.error(errorMsg);
@@ -172,7 +185,7 @@ export default function SendTransaction() {
 
         operation = await client!.sendUserOperation({
           uo: {
-            target: recipient as Address,
+            target: normalizedRecipient,
             data: appendBuilderCode("0x" as Hex),
             value: valueInWei,
           },
@@ -185,7 +198,7 @@ export default function SendTransaction() {
         const transferCalldata = encodeFunctionData({
           abi: parseAbi(["function transfer(address,uint256) returns (bool)"]),
           functionName: "transfer",
-          args: [recipient as Address, tokenAmount],
+          args: [normalizedRecipient, tokenAmount],
         });
 
         logger.debug('Sending ERC-20 transfer:', {
@@ -219,7 +232,7 @@ export default function SendTransaction() {
       fetchBalances();
     } catch (error) {
       logger.error("Error preparing transaction:", error);
-      const errorMsg = `Error preparing transaction: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      const errorMsg = formatSendError(error);
       toast.error(errorMsg);
       setError(errorMsg);
     } finally {
@@ -230,10 +243,8 @@ export default function SendTransaction() {
   const handleMaxAmount = () => {
     const balance = balances[selectedToken];
     if (parseFloat(balance) > 0) {
-      // For ETH, leave a small buffer for gas
       if (selectedToken === 'ETH') {
-        const bufferAmount = parseFloat(balance) - 0.001; // Leave 0.001 ETH for gas
-        setAmount(bufferAmount > 0 ? bufferAmount.toFixed(6) : '0');
+        setAmount(getMaxEthSendAmount(balance));
       } else {
         setAmount(balance);
       }

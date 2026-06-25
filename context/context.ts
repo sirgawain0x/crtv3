@@ -73,9 +73,12 @@ export const LIVEPEER_FEATURED_PLAYBACK_ID = "5c2bzf537qbq0r7o";
  * Livepeer integration constants
  * These IDs connect to specific assets hosted on Livepeer's platform
  * CAUTION: Changing these values will affect what media is displayed to users
+ *
+ * Hero video uses LIVEPEER_HERO_PLAYBACK_ID directly (not the app video library)
+ * so the homepage hero keeps working even if the asset is removed from Supabase.
  */
-export const LIVEPEER_HERO_PLAYBACK_ID = "cb8ekf9y8kaatrpu"; // Default playback ID for hero section video (fallback)
-export const HERO_VIDEO_ASSET_ID = "cb8eabe3-ed26-4a9a-91a5-949712f85030"; // Asset ID for hero section video
+export const LIVEPEER_HERO_PLAYBACK_ID = "15ebvaxzii695zae"; // Creative intro — static hero playback ID
+export const HERO_VIDEO_ASSET_ID = "15eb360c-698f-48f2-aabe-d46cd5f8d181"; // Livepeer asset ID (discover/trending exclusion)
 
 // URLS
 export const API_BASE_URL = "https://api.poap.tech";

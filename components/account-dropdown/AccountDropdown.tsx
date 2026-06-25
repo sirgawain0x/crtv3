@@ -106,6 +106,11 @@ import { parseEther, type Address, type Hex, encodeFunctionData, parseAbi, parse
 import { logger } from "@/lib/utils/logger";
 import { deferAfterOverlayClose } from "@/lib/utils/radixLayerFocus";
 import { appendBuilderCode } from "@/lib/utils/builder-code";
+import {
+  formatSendError,
+  getMaxEthSendAmount,
+  normalizeRecipientAddress,
+} from "@/lib/utils/sendHelpers";
 import { useToast } from "@/components/ui/use-toast";
 import { ToastAction } from "@/components/ui/toast";
 import { USDC_TOKEN_ADDRESSES, USDC_TOKEN_DECIMALS } from "@/lib/contracts/USDCToken";
@@ -566,6 +571,16 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
   const handleSend = async () => {
     if (!client || !recipientAddress) return;
 
+    const normalizedRecipient = normalizeRecipientAddress(recipientAddress);
+    if (!normalizedRecipient) {
+      toast({
+        variant: "destructive",
+        title: "Invalid Address",
+        description: "Please enter a valid Ethereum recipient address (0x...).",
+      });
+      return;
+    }
+
     // Validate based on send type
     if (sendType === 'token' && !sendAmount) {
       toast({
@@ -604,7 +619,7 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
           functionName: "safeTransferFrom",
           args: [
             smartAccountAddress as Address,
-            recipientAddress as Address,
+            normalizedRecipient,
             BigInt(selectedNFT.tokenId),
           ],
         });
@@ -651,7 +666,7 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
 
           operation = await client!.sendUserOperation({
             uo: {
-              target: recipientAddress as `0x${string}`,
+              target: normalizedRecipient,
               data: appendBuilderCode("0x" as Hex),
               value: valueInWei,
             },
@@ -675,7 +690,7 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
           const transferCalldata = encodeFunctionData({
             abi: parseAbi(["function transfer(address,uint256) returns (bool)"]),
             functionName: "transfer",
-            args: [recipientAddress as Address, tokenAmount],
+            args: [normalizedRecipient, tokenAmount],
           });
 
           logger.debug('Sending ERC-20 transfer:', {
@@ -734,10 +749,7 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
       toast({
         variant: "destructive",
         title: "Transaction Failed",
-        description:
-          error instanceof Error
-            ? error.message
-            : "Failed to initiate transaction.",
+        description: formatSendError(error),
       });
     } finally {
       // Ensure sending state is always reset, even if an error occurs
@@ -798,6 +810,45 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
       throw error;
     }
   };
+
+  const renderSendDialogFooter = () => (
+    <div className="flex flex-col sm:flex-row gap-3 border-t pt-3 mt-1 shrink-0">
+      <Button
+        variant="outline"
+        className="w-full sm:w-auto sm:order-2 min-h-[44px] touch-manipulation"
+        onClick={() => {
+          setIsDialogOpen(false);
+          setSelectedNFT(null);
+          setSendType('token');
+        }}
+      >
+        Cancel
+      </Button>
+      <Button
+        className="w-full sm:flex-1 sm:order-1 min-h-[44px] touch-manipulation"
+        onClick={handleSend}
+        disabled={
+          isSending ||
+          !recipientAddress ||
+          (sendType === 'token' && !sendAmount) ||
+          (sendType === 'nft' && !selectedNFT)
+        }
+      >
+        {isSending ? (
+          <>
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            <span className="hidden sm:inline">{sendType === 'nft' ? 'Sending NFT...' : `Sending ${selectedToken}...`}</span>
+            <span className="sm:hidden">Sending...</span>
+          </>
+        ) : (
+          <>
+            <Send className="mr-2 h-4 w-4" />
+            {sendType === 'nft' ? 'Send NFT' : `Send ${selectedToken}`}
+          </>
+        )}
+      </Button>
+    </div>
+  );
 
   const getDialogContent = () => {
     switch (dialogAction) {
@@ -910,7 +961,13 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
                       </div>
                       <button
                         type="button"
-                        onClick={() => setSendAmount(tokenBalances[selectedToken])}
+                        onClick={() => {
+                          if (selectedToken === 'ETH') {
+                            setSendAmount(getMaxEthSendAmount(tokenBalances.ETH));
+                          } else {
+                            setSendAmount(tokenBalances[selectedToken]);
+                          }
+                        }}
                         className="text-blue-600 hover:text-blue-700 dark:text-blue-400 font-medium px-3 py-1.5 rounded text-xs min-h-[32px] touch-manipulation"
                       >
                         MAX
@@ -997,7 +1054,7 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
               )}
 
               {/* Recipient Address */}
-              <div className="space-y-3">
+              <div className="space-y-3 pb-2">
                 <label className="text-sm font-medium text-gray-900 dark:text-gray-100">Recipient Address</label>
                 <input
                   type="text"
@@ -1007,44 +1064,6 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
                   value={recipientAddress}
                   onChange={(e) => setRecipientAddress(e.target.value)}
                 />
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex flex-col sm:flex-row gap-3 pt-2">
-                <Button
-                  variant="outline"
-                  className="w-full sm:w-auto sm:order-2 min-h-[44px] touch-manipulation"
-                  onClick={() => {
-                    setIsDialogOpen(false);
-                    setSelectedNFT(null);
-                    setSendType('token');
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  className="w-full sm:flex-1 sm:order-1 min-h-[44px] touch-manipulation"
-                  onClick={handleSend}
-                  disabled={
-                    isSending ||
-                    !recipientAddress ||
-                    (sendType === 'token' && !sendAmount) ||
-                    (sendType === 'nft' && !selectedNFT)
-                  }
-                >
-                  {isSending ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      <span className="hidden sm:inline">{sendType === 'nft' ? 'Sending NFT...' : `Sending ${selectedToken}...`}</span>
-                      <span className="sm:hidden">Sending...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Send className="mr-2 h-4 w-4" />
-                      {sendType === 'nft' ? 'Send NFT' : `Send ${selectedToken}`}
-                    </>
-                  )}
-                </Button>
               </div>
             </div>
           </div>
@@ -1699,8 +1718,8 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
           }
         }}
       >
-        <DialogContent className="w-[95vw] max-w-[425px] max-h-[95vh] sm:max-h-[90vh] overflow-hidden p-4 sm:p-6 rounded-lg">
-          <DialogHeader className="pb-4 pr-8 sm:pr-12">
+        <DialogContent className="flex w-[95vw] max-w-[425px] max-h-[min(85dvh,640px)] flex-col overflow-hidden p-4 sm:p-6 rounded-lg">
+          <DialogHeader className="shrink-0 pb-4 pr-8 sm:pr-12">
             <DialogTitle className="text-lg sm:text-xl">
               {dialogAction.charAt(0).toUpperCase() + dialogAction.slice(1)}
             </DialogTitle>
@@ -1721,10 +1740,11 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
               </button>
             </DialogClose>
           </DialogHeader>
-          <div className="flex flex-col overflow-hidden">
-            <div className="space-y-4 overflow-y-auto flex-1 pr-1 sm:pr-2">
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain touch-pan-y [-webkit-overflow-scrolling:touch] pr-1 sm:pr-2">
               {getDialogContent()}
             </div>
+            {dialogAction === "send" && renderSendDialogFooter()}
           </div>
         </DialogContent>
       </Dialog>

@@ -15,7 +15,7 @@ import { toast } from "sonner";
 import Link from "next/link";
 import { TrendingUpIcon } from "lucide-react";
 import VideoThumbnail from "@/components/Videos/VideoThumbnail";
-import { HERO_VIDEO_ASSET_ID } from "@/context/context";
+import { HERO_VIDEO_ASSET_ID, LIVEPEER_HERO_PLAYBACK_ID } from "@/context/context";
 import { logger } from "@/lib/utils/logger";
 import { mapInBatches } from "@/lib/utils/map-in-batches";
 
@@ -65,8 +65,10 @@ export function TopVideos() {
 
         // Filter out the hero video from the trending list
         const filteredVideos = trendingVideos.filter(
-          (video) => video.asset_id !== HERO_VIDEO_ASSET_ID
-        ).slice(0, 10); // Take top 10 after filtering
+          (video) =>
+            video.asset_id !== HERO_VIDEO_ASSET_ID &&
+            video.playback_id !== LIVEPEER_HERO_PLAYBACK_ID,
+        ).slice(0, 10);
 
         if (filteredVideos.length === 0) {
           logger.warn("No trending videos found after filtering hero video");

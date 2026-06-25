@@ -199,7 +199,6 @@ const VideoThumbnail: React.FC<VideoThumbnailProps> = ({
       vid.addEventListener('timeupdate', handleTimeUpdate);
 
       vid.muted = true;
-      setIsMuted(true);
       vid.play().catch((err) => {
         if (err instanceof Error && err.name === 'AbortError') {
           return;
@@ -225,6 +224,13 @@ const VideoThumbnail: React.FC<VideoThumbnailProps> = ({
       };
     }
   }, [isPreviewing]);
+
+  // Keep preview video muted state in sync with toggle
+  useEffect(() => {
+    if (previewVideoRef.current) {
+      previewVideoRef.current.muted = isMuted;
+    }
+  }, [isMuted, isPreviewing]);
 
   // Intersection Observer to reset states when out of view
   const setupObserver = React.useCallback((element: HTMLDivElement | null) => {
@@ -283,6 +289,7 @@ const VideoThumbnail: React.FC<VideoThumbnailProps> = ({
 
   const handleMouseEnter = () => {
     if (enablePreview && !showPlayer) {
+      setIsMuted(true);
       setIsPreviewing(true);
     }
   };
@@ -290,7 +297,14 @@ const VideoThumbnail: React.FC<VideoThumbnailProps> = ({
   const handleMouseLeave = () => {
     if (enablePreview && !showPlayer) {
       setIsPreviewing(false);
+      setIsMuted(true);
     }
+  };
+
+  const handleToggleMute = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsMuted((prev) => !prev);
   };
 
   // Find MP4 source for preview
@@ -341,9 +355,14 @@ const VideoThumbnail: React.FC<VideoThumbnailProps> = ({
             muted={isMuted} // Controlled by state
             loop={false} // Managed manually for 10s loop
           />
-          <div className="absolute bottom-2 right-2 p-1 bg-black/50 rounded-full">
+          <button
+            type="button"
+            className="absolute bottom-2 right-2 z-20 rounded-full bg-black/50 p-1 transition-colors hover:bg-black/70"
+            onClick={handleToggleMute}
+            aria-label={isMuted ? 'Unmute preview' : 'Mute preview'}
+          >
             {isMuted ? <VolumeX className="w-4 h-4 text-white" /> : <Volume2 className="w-4 h-4 text-white" />}
-          </div>
+          </button>
         </div>
       ) : null}
 
