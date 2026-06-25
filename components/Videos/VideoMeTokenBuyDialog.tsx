@@ -614,9 +614,27 @@ export function VideoMeTokenBuyDialog({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="amount">
-                  {mode === 'buy' ? 'DAI Amount' : `${meToken.symbol} Amount`}
-                </Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="amount">
+                    {mode === 'buy' ? 'DAI Amount' : `${meToken.symbol} Amount`}
+                  </Label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-6 px-2 text-xs"
+                    disabled={isLoading || !isConnected}
+                    onClick={() => {
+                      if (mode === 'buy') {
+                        setAmount(formatEther(daiBalance));
+                      } else {
+                        setAmount(formatEther(meTokenBalance));
+                      }
+                    }}
+                  >
+                    MAX
+                  </Button>
+                </div>
                 <div className="relative">
                   {mode === 'buy' && (
                     <div className="absolute left-3 top-1/2 -translate-y-1/2 z-10">

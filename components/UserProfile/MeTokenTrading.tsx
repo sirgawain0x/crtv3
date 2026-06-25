@@ -569,7 +569,19 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
 
           <TabsContent value="buy" className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="buyAmount">DAI Amount to Spend</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="buyAmount">DAI Amount to Spend</Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-xs"
+                  disabled={isLoading || !isConnected}
+                  onClick={() => setBuyAmount(formatEther(daiBalance))}
+                >
+                  MAX
+                </Button>
+              </div>
               <Input
                 id="buyAmount"
                 type="number"
@@ -631,7 +643,19 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
 
           <TabsContent value="sell" className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="sellAmount">{meToken.symbol} Amount to Sell</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="sellAmount">{meToken.symbol} Amount to Sell</Label>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-xs"
+                  disabled={isLoading || !isConnected || meToken.balance <= 0n}
+                  onClick={() => setSellAmount(formatEther(meToken.balance))}
+                >
+                  MAX
+                </Button>
+              </div>
               <Input
                 id="sellAmount"
                 type="number"

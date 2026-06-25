@@ -33,12 +33,14 @@ interface QuickTradeDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   token: MarketToken | null;
+  onTradeComplete?: () => void;
 }
 
 export function QuickTradeDialog({
   open,
   onOpenChange,
   token,
+  onTradeComplete,
 }: QuickTradeDialogProps) {
   const [mode, setMode] = useState<'buy' | 'sell'>('buy');
   const [amount, setAmount] = useState('');
@@ -250,6 +252,7 @@ export function QuickTradeDialog({
       // Refresh balances
       await checkDaiBalance();
       await checkMeTokenBalance();
+      onTradeComplete?.();
 
       // Close dialog after a short delay
       setTimeout(() => {
@@ -325,6 +328,7 @@ export function QuickTradeDialog({
 
       await checkDaiBalance();
       await checkMeTokenBalance();
+      onTradeComplete?.();
 
       setTimeout(() => {
         onOpenChange(false);
@@ -480,9 +484,27 @@ export function QuickTradeDialog({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="amount">
-              {mode === 'buy' ? 'DAI Amount' : `${token.symbol} Amount`}
-            </Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="amount">
+                {mode === 'buy' ? 'DAI Amount' : `${token.symbol} Amount`}
+              </Label>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-6 px-2 text-xs"
+                disabled={isLoading || !isConnected}
+                onClick={() => {
+                  if (mode === 'buy') {
+                    setAmount(formatEther(daiBalance));
+                  } else {
+                    setAmount(formatEther(meTokenBalance));
+                  }
+                }}
+              >
+                MAX
+              </Button>
+            </div>
             <div className="relative">
               {mode === 'buy' && (
                 <div className="absolute left-3 top-1/2 -translate-y-1/2 z-10">
