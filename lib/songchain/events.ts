@@ -13,7 +13,7 @@ export type SongchainEvent =
 export const SONGCHAIN_EVENTS: SongchainEvent[] = [
   {
     slug: "song-cup",
-    title: "Song Cup Contest",
+    title: "Song Cup",
     description: "Predict your winner. Guess your song. Runs through the World Cup.",
     status: "active",
     href: "/songchain/song-cup",

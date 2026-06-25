@@ -105,6 +105,14 @@ const nextConfig = {
     // Use NormalModuleReplacementPlugin to replace problematic test file imports with empty module
     // This catches imports that reference test files directly
     const emptyModulePath = require.resolve('./lib/webpack/empty-module.cjs');
+
+    // Privy optional peer deps (fiat onramp, Farcaster Solana mini-app). Creative TV is EVM-only.
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@stripe/crypto': emptyModulePath,
+      '@farcaster/mini-app-solana': emptyModulePath,
+    };
+
     config.plugins.push(
       new webpack.NormalModuleReplacementPlugin(
         /thread-stream[\/\\]test[\/\\].*\.(js|mjs|ts)$/,
@@ -122,6 +130,13 @@ const nextConfig = {
         }
       )
     );
+
+    // viem/ox Tempo chain defs use dynamic requires — harmless in dev, very noisy in the terminal.
+    config.ignoreWarnings = [
+      ...(config.ignoreWarnings ?? []),
+      { module: /virtualMasterPool\.js/ },
+      { message: /Critical dependency: the request of a dependency is an expression/ },
+    ];
 
     // Handle .wasm files as asset resources
     // Place them in static/media/ to match Next.js default behavior

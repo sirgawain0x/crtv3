@@ -42,7 +42,7 @@ export function SongCupHero({
   onCtaClick,
   logo,
   showRings = true,
-  ariaLabel = "Song Cup Contest",
+  ariaLabel = "Song Cup",
   animationPaused = false,
 }: SongCupHeroProps) {
   return (
