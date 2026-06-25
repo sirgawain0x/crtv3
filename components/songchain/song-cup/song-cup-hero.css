@@ -109,7 +109,7 @@
   filter: drop-shadow(0 0.5ch 1ch rgba(0, 0, 0, 0.4));
   pointer-events: auto;
   /* Slight right nudge so the ball balances against the centered 3D rings. */
-  transform: translateX(clamp(0.5rem, 1.5vw, 1.25rem));
+  transform: translateX(clamp(1rem, 3.5vw, 2.5rem));
 }
 
 .song-cup-hero-scene .song-cup-hero-copy {

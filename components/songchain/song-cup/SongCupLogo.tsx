@@ -85,10 +85,10 @@ export function SongCupLogo() {
         <span className="word-cup">CUP</span>
       </div>
       <div className="bottom-row text-glow">
-        <span>S</span>
-        <span>O</span>
-        <span>N</span>
-        <span>G</span>
+        <span>C</span>
+        <span>L</span>
+        <span>U</span>
+        <span>B</span>
       </div>
     </div>
   );

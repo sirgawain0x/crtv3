@@ -4,6 +4,7 @@ import { forwardRef, useImperativeHandle } from "react";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSongchainFeed } from "@/hooks/useSongchainFeed";
+import { SongchainFeedInfoTooltip } from "./SongchainFeedInfoTooltip";
 import { SongchainPostCard } from "@/components/songchain/SongchainPostCard";
 import { SongchainPendingPostCard } from "@/components/songchain/SongchainPendingPostCard";
 import {
@@ -23,6 +24,10 @@ type SongchainFeedSectionProps = {
   onPostUpdated?: () => void;
   /** When false, skips fetching posts (e.g. club feed before join). */
   enabled?: boolean;
+  /** Disables like/comment/repost/bookmark actions on posts. */
+  readOnly?: boolean;
+  /** Enables a contained, scroll-driven animated feed where posts scale near the center. */
+  animated?: boolean;
 };
 
 export type SongchainFeedHandle = {
@@ -39,24 +44,10 @@ function FeedDiagnostics({
   error: string | null;
   isEmpty: boolean;
 }) {
-  const info = getFeedDiagnosticInfo(feedId);
+  void getFeedDiagnosticInfo(feedId);
 
   return (
-    <div className="mb-4 rounded-md border border-border/50 bg-muted/30 px-4 py-3 text-xs text-muted-foreground space-y-1">
-      <p>
-        <span className="font-medium text-foreground">Lens network:</span>{" "}
-        {info.lensNetworkLabel}
-        {info.lensNetwork === "testnet" && (
-          <span className="ml-1">
-            — set <code className="text-[10px]">NEXT_PUBLIC_LENS_ENV=production</code> for
-            mainnet feeds
-          </span>
-        )}
-      </p>
-      <p>
-        <span className="font-medium text-foreground">Feed:</span>{" "}
-        <code className="text-[10px]">{info.feedIdDisplay}</code>
-      </p>
+    <div className="mb-2 rounded-md px-4 py-2 text-xs text-muted-foreground space-y-1">
       {error && (
         <p className="text-destructive">
           <span className="font-medium">API error:</span> {error}
@@ -81,7 +72,7 @@ function FeedDiagnostics({
 
 export const SongchainFeedSection = forwardRef<SongchainFeedHandle, SongchainFeedSectionProps>(
   function SongchainFeedSection(
-    { title, description, feedId, graphId = null, emptyDescription, onPostUpdated, enabled = true },
+    { title, description, feedId, graphId = null, emptyDescription, onPostUpdated, enabled = true, readOnly = false, animated = false },
     ref,
   ) {
     const { posts, pendingPosts, loading, error, hasMore, reload, loadMore, registerNewPost } =
@@ -112,7 +103,10 @@ export const SongchainFeedSection = forwardRef<SongchainFeedHandle, SongchainFee
     return (
       <section>
         <div className="mb-6">
-          <h2 className="text-2xl font-bold">{title}</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-2xl font-bold">{title}</h2>
+            <SongchainFeedInfoTooltip feedId={feedId} />
+          </div>
           <p className="text-muted-foreground mt-1">{description}</p>
         </div>
 
@@ -141,7 +135,7 @@ export const SongchainFeedSection = forwardRef<SongchainFeedHandle, SongchainFee
             <p className="mt-2 text-sm text-muted-foreground">{emptyDescription}</p>
           </div>
         ) : (
-          <SongchainPostTimeline>
+          <SongchainPostTimeline animated={animated}>
             {pendingPosts.map((pending) => (
               <SongchainPostTimelineItem key={pending.localId}>
                 <SongchainPendingPostCard
@@ -156,6 +150,7 @@ export const SongchainFeedSection = forwardRef<SongchainFeedHandle, SongchainFee
                   post={post}
                   feedId={feedId}
                   graphId={graphId}
+                  readOnly={readOnly}
                   onReactionChange={reload}
                   onPostUpdated={onPostUpdated}
                 />

@@ -46,7 +46,6 @@ export function SongCupPageClient({ config }: SongCupPageClientProps) {
         feedId={config.publicFeedId}
         groupId={config.groupId}
         graphId={config.graphId}
-        gateFeedBehindGroup
         clubGateTitle="Join the Song Cup club to unlock the feed"
         clubGateDescription="Join the Song Cup club on Lens (via Orb) to read and post on the member-only feed."
         orbClubUrl={SONG_CUP_PLAY_LINKS.goal}
