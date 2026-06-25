@@ -109,6 +109,7 @@ import { appendBuilderCode } from "@/lib/utils/builder-code";
 import {
   formatSendError,
   getMaxEthSendAmount,
+  validateSendBalance,
   normalizeRecipientAddress,
 } from "@/lib/utils/sendHelpers";
 import { useToast } from "@/components/ui/use-toast";
@@ -639,15 +640,17 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
         });
       } else {
         // Send token (existing logic)
-        // Check balance
-        const availableBalance = parseFloat(tokenBalances[selectedToken]);
-        const requestedAmount = parseFloat(sendAmount);
-
-        if (requestedAmount > availableBalance) {
+        // Check balance (ETH reserves gas buffer)
+        const balanceError = validateSendBalance(
+          selectedToken,
+          sendAmount,
+          tokenBalances[selectedToken],
+        );
+        if (balanceError) {
           toast({
             variant: "destructive",
             title: "Insufficient Balance",
-            description: `You have ${availableBalance} ${selectedToken}, but trying to send ${requestedAmount} ${selectedToken}`,
+            description: balanceError,
           });
           setIsSending(false);
           return;

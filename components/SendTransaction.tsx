@@ -44,6 +44,7 @@ import { appendBuilderCode } from "@/lib/utils/builder-code";
 import {
   formatSendError,
   getMaxEthSendAmount,
+  validateSendBalance,
   normalizeRecipientAddress,
 } from "@/lib/utils/sendHelpers";
 
@@ -162,14 +163,11 @@ export default function SendTransaction() {
       return;
     }
 
-    // Check balance
-    const availableBalance = parseFloat(balances[selectedToken]);
-    const requestedAmount = parseFloat(amount);
-    
-    if (requestedAmount > availableBalance) {
-      const errorMsg = `Insufficient balance. You have ${availableBalance} ${selectedToken}, but trying to send ${requestedAmount} ${selectedToken}`;
-      toast.error(errorMsg);
-      setError(errorMsg);
+    // Check balance (ETH reserves gas buffer)
+    const balanceError = validateSendBalance(selectedToken, amount, balances[selectedToken]);
+    if (balanceError) {
+      toast.error(balanceError);
+      setError(balanceError);
       return;
     }
 
