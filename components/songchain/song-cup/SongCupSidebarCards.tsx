@@ -50,12 +50,12 @@ const BUTTON_ICONS: SidebarIcon[] = [
   {
     src: "/songchain/button-icons/beat-me-icon.svg",
     alt: "Beat me",
-    href: "/songchain/song-cup",
+    href: "https://beatme.creativeplatform.xyz",
   },
   {
     src: "/songchain/button-icons/worldcup-icon.svg",
     alt: "World cup",
-    href: "/songchain/song-cup",
+    href: "https://orb.club/c/worldcup",
   },
 ];
 
