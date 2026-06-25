@@ -48,6 +48,8 @@ export type CompatSmartAccountClient = {
   }) => Promise<{ address: Address }>;
   signPreparedCalls: (calls: unknown) => Promise<unknown>;
   sendPreparedCalls: (calls: unknown) => Promise<{ preparedCallIds: string[] }>;
+  signMessage: (args: { message: string | { raw: Uint8Array } }) => Promise<Hex>;
+  signTypedData: (args: Record<string, unknown>) => Promise<Hex>;
   extend: <T>(fn: (client: unknown) => T) => T;
   readContract: (args: Record<string, unknown>) => Promise<unknown>;
   getBalance: (args: { address: Address }) => Promise<bigint>;
