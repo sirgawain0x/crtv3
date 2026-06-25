@@ -7,12 +7,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePrivy, useLogout as usePrivyLogout } from "@privy-io/react-auth";
 import { useAuthErrorContext } from "./auth-error-context";
 import { requestQuoteV0 } from "@alchemy/wallet-apis/experimental";
-
-export type RequestQuoteV0Result = Awaited<ReturnType<typeof requestQuoteV0>>;
 import type { Address, Hex } from "viem";
 import { useWalletChain } from "./chain-context";
 import { useWalletClientContext } from "./wallet-context";
 import type { CompatSmartAccountClient, SendUserOperationArgs } from "./smart-wallet-client";
+
+export type RequestQuoteV0Result = Awaited<ReturnType<typeof requestQuoteV0>>;
 
 export type CompatUser = {
   address: Address;
