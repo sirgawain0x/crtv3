@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { Loader2, Lock, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { useSongchainGroupMembership } from "@/hooks/useSongchainGroupMembership";
@@ -24,6 +25,7 @@ export function SongchainClubGate({
     groupId,
     name,
     description: clubDescription,
+    imageUrl,
     loading,
     joining,
     isMember,
@@ -47,9 +49,22 @@ export function SongchainClubGate({
       aria-labelledby="songchain-club-gate-title"
     >
       <div className="mx-auto flex max-w-lg flex-col items-center text-center">
-        <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-violet-500/15">
-          <Lock className="h-7 w-7 text-violet-300" aria-hidden />
-        </div>
+        {imageUrl ? (
+          <div className="mb-4 h-20 w-20 overflow-hidden rounded-full border-2 border-violet-500/30 bg-violet-500/10">
+            <Image
+              src={imageUrl}
+              alt={name ?? "Club"}
+              width={80}
+              height={80}
+              className="h-full w-full object-cover"
+              unoptimized
+            />
+          </div>
+        ) : (
+          <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-violet-500/15">
+            <Lock className="h-7 w-7 text-violet-300" aria-hidden />
+          </div>
+        )}
         <h2
           id="songchain-club-gate-title"
           className="text-xl font-bold tracking-tight sm:text-2xl"

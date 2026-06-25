@@ -86,12 +86,9 @@ export function SongCupLogo() {
       </div>
       <div className="bottom-row text-glow">
         <span>C</span>
-        <span>O</span>
-        <span>N</span>
-        <span>T</span>
-        <span>E</span>
-        <span>S</span>
-        <span>T</span>
+        <span>L</span>
+        <span>U</span>
+        <span>B</span>
       </div>
     </div>
   );

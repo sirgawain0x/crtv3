@@ -19,6 +19,21 @@ async function sleep(ms: number) {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function extractGroupImage(metadata: unknown): string | null {
+  if (!metadata || typeof metadata !== "object") return null;
+  const m = metadata as Record<string, unknown>;
+  const raw = m.icon || m.coverPicture || m.image || m.picture || m.logo;
+  if (!raw) return null;
+  if (typeof raw === "string") return raw;
+  if (typeof raw === "object" && raw !== null) {
+    const obj = raw as Record<string, unknown>;
+    if (typeof obj.uri === "string") return obj.uri;
+    if (typeof obj.url === "string") return obj.url;
+    if (typeof obj.src === "string") return obj.src;
+  }
+  return null;
+}
+
 function applyMembershipFromApi(
   memberFromApi: boolean,
   optimisticMemberRef: { current: boolean },
@@ -42,6 +57,7 @@ export function useSongchainGroupMembership({
   const { canWrite, getSessionClient, promptWriteAccess } = useLensOrbWrite();
   const [name, setName] = useState<string | null>(null);
   const [description, setDescription] = useState<string | null>(null);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [isMember, setIsMember] = useState(false);
   const [loading, setLoading] = useState(false);
   const [joining, setJoining] = useState(false);
@@ -54,6 +70,7 @@ export function useSongchainGroupMembership({
       optimisticMemberRef.current = false;
       setName(null);
       setDescription(null);
+      setImageUrl(null);
       setIsMember(false);
       setError(null);
       return;
@@ -82,6 +99,7 @@ export function useSongchainGroupMembership({
         optimisticMemberRef.current = false;
         setName(null);
         setDescription(null);
+        setImageUrl(null);
         applyMembershipFromApi(false, optimisticMemberRef, setIsMember);
         setError("Club not found on this Lens network.");
         return;
@@ -93,6 +111,8 @@ export function useSongchainGroupMembership({
           ? String(group.metadata.description ?? "")
           : null,
       );
+
+      setImageUrl(extractGroupImage(group.metadata));
 
       const ops = group.operations;
       const memberFromApi =
@@ -167,6 +187,7 @@ export function useSongchainGroupMembership({
     groupId,
     name,
     description,
+    imageUrl,
     isMember,
     loading,
     joining,

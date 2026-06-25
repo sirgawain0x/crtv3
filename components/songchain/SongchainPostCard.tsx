@@ -66,6 +66,7 @@ type SongchainPostCardProps = {
   feedId?: string | null;
   graphId?: string | null;
   compact?: boolean;
+  readOnly?: boolean;
   onReactionChange?: () => void;
   onPostUpdated?: () => void;
 };
@@ -75,6 +76,7 @@ export function SongchainPostCard({
   feedId,
   graphId = null,
   compact = false,
+  readOnly = false,
   onReactionChange,
   onPostUpdated,
 }: SongchainPostCardProps) {
@@ -351,8 +353,8 @@ export function SongchainPostCard({
               type="button"
               variant="ghost"
               size="sm"
-              disabled={pending === "upvote"}
-              onClick={toggleUpvote}
+              disabled={readOnly || pending === "upvote"}
+              onClick={readOnly ? undefined : toggleUpvote}
               className={cn(upvoted && "text-rose-500")}
               aria-label="Upvote"
             >
@@ -368,7 +370,7 @@ export function SongchainPostCard({
               size="sm"
               onClick={() => setCommentsOpen(true)}
               aria-label={`Comments${commentCount > 0 ? ` (${commentCount})` : ""}`}
-              className="gap-1"
+              className={cn("gap-1", readOnly && "text-muted-foreground")}
             >
               <MessageCircle className="h-4 w-4" />
               {commentCount > 0 && (
@@ -379,8 +381,8 @@ export function SongchainPostCard({
               type="button"
               variant="ghost"
               size="sm"
-              disabled={pending === "repost"}
-              onClick={handleRepost}
+              disabled={readOnly || pending === "repost"}
+              onClick={readOnly ? undefined : handleRepost}
               aria-label={`Repost${reposts > 0 ? ` (${reposts})` : ""}`}
               className="gap-1"
             >
@@ -397,8 +399,8 @@ export function SongchainPostCard({
               type="button"
               variant="ghost"
               size="sm"
-              disabled={pending === "bookmark"}
-              onClick={toggleBookmark}
+              disabled={readOnly || pending === "bookmark"}
+              onClick={readOnly ? undefined : toggleBookmark}
               className={cn(bookmarked && "text-amber-500")}
               aria-label="Bookmark"
             >
@@ -408,7 +410,7 @@ export function SongchainPostCard({
                 <Bookmark className={cn("h-4 w-4", bookmarked && "fill-current")} />
               )}
             </Button>
-            {isOwner && (
+            {isOwner && !readOnly && (
               <>
                 <Button
                   type="button"
@@ -466,7 +468,9 @@ export function SongchainPostCard({
             ) : (
               <p className="text-sm text-muted-foreground">No comments yet.</p>
             )}
-            {canWrite ? (
+            {readOnly ? (
+              <p className="text-sm text-muted-foreground">Join the club to add comments.</p>
+            ) : canWrite ? (
               <div className="flex gap-2">
                 <Textarea
                   value={commentText}

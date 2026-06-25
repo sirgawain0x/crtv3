@@ -33,6 +33,8 @@ export type HallidayOnrampProps = {
   destinationAddressOverride?: string | null;
   /** When true, skip mount-time preload; init on button click only. */
   lazyInit?: boolean;
+  /** When true and the Lens GHO onramp is unsupported, render nothing instead of the help text. */
+  hideLensBlockedMessage?: boolean;
 };
 
 const VARIANT_COPY: Record<
@@ -78,6 +80,7 @@ export function HallidayOnramp({
   variant = "story",
   destinationAddressOverride,
   lazyInit = true,
+  hideLensBlockedMessage = false,
 }: HallidayOnrampProps) {
   const lensOnrampBlocked =
     (variant === "lens" || isHallidayLensChainAsset(hallidayOutputAsset)) &&
@@ -204,6 +207,7 @@ export function HallidayOnramp({
   }
 
   if (lensOnrampBlocked) {
+    if (hideLensBlockedMessage) return null;
     return (
       <p className="text-sm text-muted-foreground">
         Lens GHO onramp via Halliday is temporarily unavailable — Halliday

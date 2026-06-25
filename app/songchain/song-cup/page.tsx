@@ -14,22 +14,22 @@ const SONG_CUP_OG_IMAGE = {
 } as const;
 
 export const metadata: Metadata = {
-  title: "Song Cup Contest | Songchain | Creative TV",
+  title: "Song Cup | Songchain | Creative TV",
   description:
-    "Predict your winner. Guess your song. Song Cup Contest on Songchain — music on Orb.",
+    "Predict your winner. Guess your song. Song Cup on Songchain — music on Orb.",
   openGraph: {
-    title: "Song Cup Contest | Songchain | Creative TV",
+    title: "Song Cup | Songchain | Creative TV",
     description:
-      "Predict your winner. Guess your song. Song Cup Contest on Songchain — music on Orb.",
+      "Predict your winner. Guess your song. Song Cup on Songchain — music on Orb.",
     type: "website",
     url: "/songchain/song-cup",
     images: [SONG_CUP_OG_IMAGE],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Song Cup Contest | Songchain | Creative TV",
+    title: "Song Cup | Songchain | Creative TV",
     description:
-      "Predict your winner. Guess your song. Song Cup Contest on Songchain — music on Orb.",
+      "Predict your winner. Guess your song. Song Cup on Songchain — music on Orb.",
     images: [SONG_CUP_OG_IMAGE.url],
   },
 };
