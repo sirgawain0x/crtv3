@@ -108,6 +108,8 @@ export function useSignMessage(options: SignMessageHookOptions = {}) {
   const optionsRef = useRef(options);
   optionsRef.current = options;
 
+  const client = options.client;
+
   const signMessage = useCallback(
     async (args?: { message: string | Uint8Array }) => {
       const message = args?.message;
@@ -117,19 +119,28 @@ export function useSignMessage(options: SignMessageHookOptions = {}) {
         optionsRef.current.onError?.(err);
         throw err;
       }
-      if (!signer?.signMessage) {
-        const err = new Error("Signer not ready");
-        setError(err);
-        optionsRef.current.onError?.(err);
-        throw err;
-      }
 
       setIsSigningMessage(true);
       setError(null);
       try {
-        const signature = (await signer.signMessage({
-          message: typeof message === "string" ? message : { raw: message },
-        })) as Hex;
+        let signature: Hex;
+        if (client?.signMessage) {
+          // Smart-account path: produces an EIP-1271 / ERC-6492 compatible
+          // signature that validates against the smart account address.
+          signature = await client.signMessage({
+            message: typeof message === "string" ? message : { raw: message },
+          });
+        } else if (signer?.signMessage) {
+          // EOA / embedded-wallet fallback.
+          signature = (await signer.signMessage({
+            message: typeof message === "string" ? message : { raw: message },
+          })) as Hex;
+        } else {
+          const err = new Error("Signer not ready");
+          setError(err);
+          optionsRef.current.onError?.(err);
+          throw err;
+        }
         optionsRef.current.onSuccess?.(signature);
         return signature;
       } catch (err) {
@@ -141,7 +152,7 @@ export function useSignMessage(options: SignMessageHookOptions = {}) {
         setIsSigningMessage(false);
       }
     },
-    [signer],
+    [client, signer],
   );
 
   return { signMessage, isSigningMessage, error };
@@ -167,22 +178,30 @@ export function useSignTypedData(options: SignTypedDataHookOptions = {}) {
   const optionsRef = useRef(options);
   optionsRef.current = options;
 
+  const client = options.client;
+
   const signTypedData = useCallback(
     async (args: { typedData: TypedDataPayload } | TypedDataPayload) => {
       const typedData = "typedData" in args ? args.typedData : args;
-      if (!signer?.signTypedData) {
-        const err = new Error("Signer not ready");
-        setError(err);
-        optionsRef.current.onError?.(err);
-        throw err;
-      }
 
       setIsSigningTypedData(true);
       setError(null);
       try {
-        const signature = (await signer.signTypedData(
-          typedData as Parameters<NonNullable<typeof signer.signTypedData>>[0],
-        )) as Hex;
+        let signature: Hex;
+        if (client?.signTypedData) {
+          signature = (await client.signTypedData(
+            typedData as Parameters<NonNullable<typeof client.signTypedData>>[0],
+          )) as Hex;
+        } else if (signer?.signTypedData) {
+          signature = (await signer.signTypedData(
+            typedData as Parameters<NonNullable<typeof signer.signTypedData>>[0],
+          )) as Hex;
+        } else {
+          const err = new Error("Signer not ready");
+          setError(err);
+          optionsRef.current.onError?.(err);
+          throw err;
+        }
         optionsRef.current.onSuccess?.(signature);
         return signature;
       } catch (err) {
@@ -194,7 +213,7 @@ export function useSignTypedData(options: SignTypedDataHookOptions = {}) {
         setIsSigningTypedData(false);
       }
     },
-    [signer],
+    [client, signer],
   );
 
   return { signTypedData, isSigningTypedData, error };
