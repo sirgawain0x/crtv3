@@ -368,9 +368,9 @@ export function SongchainPostCard({
               type="button"
               variant="ghost"
               size="sm"
-              onClick={() => !readOnly && setCommentsOpen(true)}
+              onClick={() => setCommentsOpen(true)}
               aria-label={`Comments${commentCount > 0 ? ` (${commentCount})` : ""}`}
-              className="gap-1"
+              className={cn("gap-1", readOnly && "text-muted-foreground")}
             >
               <MessageCircle className="h-4 w-4" />
               {commentCount > 0 && (

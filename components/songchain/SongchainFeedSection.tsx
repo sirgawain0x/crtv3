@@ -36,16 +36,12 @@ export type SongchainFeedHandle = {
 };
 
 function FeedDiagnostics({
-  feedId,
   error,
   isEmpty,
 }: {
-  feedId: string | null;
   error: string | null;
   isEmpty: boolean;
 }) {
-  void getFeedDiagnosticInfo(feedId);
-
   return (
     <div className="mb-2 rounded-md px-4 py-2 text-xs text-muted-foreground space-y-1">
       {error && (
@@ -53,7 +49,7 @@ function FeedDiagnostics({
           <span className="font-medium">API error:</span> {error}
         </p>
       )}
-      {isEmpty && !error && feedId && (
+      {isEmpty && !error && (
         <p>
           Feed is reachable but has no posts yet. Posts must be created on this custom feed
           address (not the global Lens timeline).
@@ -111,7 +107,6 @@ export const SongchainFeedSection = forwardRef<SongchainFeedHandle, SongchainFee
         </div>
 
         <FeedDiagnostics
-          feedId={feedId}
           error={error}
           isEmpty={!loading && !hasVisiblePosts}
         />

@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useRef, type ReactNode, Children } from "react";
-import { motion, useScroll, useTransform } from "framer-motion";
+import React, { useRef, useEffect, type ReactNode, Children } from "react";
+import { motion, animate, useMotionValue } from "framer-motion";
 import { cn } from "@/lib/utils/utils";
 
 type SongchainPostTimelineProps = {
@@ -13,31 +13,62 @@ type SongchainPostTimelineProps = {
 
 function AnimatedItem({
   children,
-  scrollY,
   containerRef,
 }: {
   children: ReactNode;
-  scrollY: ReturnType<typeof useScroll>["scrollY"];
   containerRef: React.RefObject<HTMLDivElement | null>;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const scale = useMotionValue(0.94);
+  const opacity = useMotionValue(0.65);
+  const closenessRef = useRef(0);
 
-  const getCloseness = () => {
+  useEffect(() => {
     const container = containerRef.current;
     const item = ref.current;
-    if (!container || !item) return 0;
+    if (!container || !item) return;
 
-    const containerRect = container.getBoundingClientRect();
-    const itemRect = item.getBoundingClientRect();
-    const containerCenter = containerRect.top + containerRect.height / 2;
-    const itemCenter = itemRect.top + itemRect.height / 2;
-    const distance = Math.abs(containerCenter - itemCenter);
-    const maxDistance = Math.max(1, containerRect.height / 2);
-    return Math.max(0, 1 - distance / maxDistance);
-  };
+    let rafId: number | null = null;
+    let isDirty = false;
 
-  const scale = useTransform(scrollY, () => 0.94 + getCloseness() * 0.1);
-  const opacity = useTransform(scrollY, () => 0.65 + getCloseness() * 0.35);
+    const updateFromRects = () => {
+      isDirty = false;
+      const containerRect = container.getBoundingClientRect();
+      const itemRect = item.getBoundingClientRect();
+      const containerCenter = containerRect.top + containerRect.height / 2;
+      const itemCenter = itemRect.top + itemRect.height / 2;
+      const distance = Math.abs(containerCenter - itemCenter);
+      const maxDistance = Math.max(1, containerRect.height / 2);
+      const closeness = Math.max(0, 1 - distance / maxDistance);
+
+      if (Math.abs(closeness - closenessRef.current) > 0.001) {
+        closenessRef.current = closeness;
+        animate(scale, 0.94 + closeness * 0.1, { duration: 0.15, ease: "linear" });
+        animate(opacity, 0.65 + closeness * 0.35, { duration: 0.15, ease: "linear" });
+      }
+    };
+
+    const scheduleUpdate = () => {
+      if (isDirty) return;
+      isDirty = true;
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        updateFromRects();
+      });
+    };
+
+    // Initial measurement deferred to next frame so container has layout.
+    rafId = requestAnimationFrame(updateFromRects);
+
+    container.addEventListener("scroll", scheduleUpdate, { passive: true });
+    window.addEventListener("resize", scheduleUpdate, { passive: true });
+
+    return () => {
+      container.removeEventListener("scroll", scheduleUpdate);
+      window.removeEventListener("resize", scheduleUpdate);
+      if (rafId) cancelAnimationFrame(rafId);
+    };
+  }, [containerRef, scale, opacity]);
 
   return (
     <motion.div ref={ref} style={{ scale, opacity }} className="origin-center will-change-transform">
@@ -53,11 +84,10 @@ export function SongchainPostTimeline({
   animated = false,
 }: SongchainPostTimelineProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const { scrollY } = useScroll({ container: containerRef });
 
   const timelineChildren = animated
     ? Children.toArray(children).map((child, i) => (
-        <AnimatedItem key={i} scrollY={scrollY} containerRef={containerRef}>
+        <AnimatedItem key={i} containerRef={containerRef}>
           {child}
         </AnimatedItem>
       ))

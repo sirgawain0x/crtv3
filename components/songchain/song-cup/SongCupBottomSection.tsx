@@ -95,7 +95,8 @@ function MobileDivider() {
 export function SongCupBottomSection(props: SongCupBottomSectionProps) {
   const { config } = props;
   const [activePanel, setActivePanel] = useState<SongCupPanel>("feed");
-  const isDesktop = useMediaQuery("(min-width: 1024px)");
+  const isDesktopQuery = useMediaQuery("(min-width: 1024px)");
+  const isDesktop = isDesktopQuery ?? true;
 
   if (!config.enabled) {
     return (
