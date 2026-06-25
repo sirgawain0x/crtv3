@@ -264,7 +264,7 @@ export async function GET(request: NextRequest) {
       const bulkData = await getBulkMeTokenInfo(addresses);
 
       allTokens = allTokens.map((token) => {
-        const fresh = bulkData[token.address];
+        const fresh = bulkData ? bulkData[token.address] : undefined;
 
         if (fresh) {
           return {

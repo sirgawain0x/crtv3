@@ -254,7 +254,11 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
       )) as {
         quote?: { minimumToAmount: string; feePayment?: { sponsored?: boolean } };
         rawCalls?: unknown;
-      };
+      } | null | undefined;
+
+      if (!result) {
+        throw new Error('Failed to prepare swap: No response received');
+      }
 
       if (result.rawCalls) {
         throw new Error('Expected user operation calls, got raw calls');
@@ -458,7 +462,11 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
         quote?: unknown;
         rawCalls?: unknown;
         [key: string]: unknown;
-      };
+      } | null | undefined;
+
+      if (!result) {
+        throw new Error('Failed to prepare swap: No response received');
+      }
 
       if (result.rawCalls) {
         throw new Error('Expected user operation calls, got raw calls');
