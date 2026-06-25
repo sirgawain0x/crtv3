@@ -386,13 +386,13 @@ Original error: ${result.error.message}`;
   }
 
   /**
-   * Convert hex amount to readable format
+   * Convert SDK bigint or hex amount to readable format
    */
-  static parseAmount(hexAmount: Hex, token: TokenSymbol): string {
+  static parseAmount(amount: bigint | Hex | string, token: TokenSymbol): string {
     const decimals = TOKEN_INFO[token].decimals;
-    const amountBigInt = BigInt(hexAmount);
-    const amount = Number(amountBigInt) / Math.pow(10, decimals);
-    return amount.toFixed(6);
+    const amountBigInt = typeof amount === "bigint" ? amount : BigInt(amount);
+    const human = Number(amountBigInt) / 10 ** decimals;
+    return human.toFixed(6);
   }
 }
 

@@ -7,6 +7,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePrivy, useLogout as usePrivyLogout } from "@privy-io/react-auth";
 import { useAuthErrorContext } from "./auth-error-context";
 import { requestQuoteV0 } from "@alchemy/wallet-apis/experimental";
+
+export type RequestQuoteV0Result = Awaited<ReturnType<typeof requestQuoteV0>>;
 import type { Address, Hex } from "viem";
 import { useWalletChain } from "./chain-context";
 import { useWalletClientContext } from "./wallet-context";
@@ -285,7 +287,7 @@ export function usePrepareSwap({ client }: { client?: SwapHookClient } = {}) {
   const [isPreparingSwap, setIsPreparingSwap] = useState(false);
 
   const prepareSwapAsync = useCallback(
-    async (params: Record<string, unknown>) => {
+    async (params: Record<string, unknown>): Promise<RequestQuoteV0Result> => {
       if (!client) throw new Error("Smart account client not initialized");
       setIsPreparingSwap(true);
       try {
