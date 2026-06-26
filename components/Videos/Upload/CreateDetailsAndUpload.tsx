@@ -19,7 +19,9 @@ import { useState } from "react";
 import { Asset } from "livepeer/models/components";
 import { Collapsible } from "@/components/ui/collapsible";
 import { SplitsCollaboratorsForm } from "./SplitsCollaboratorsForm";
-import { Users } from "lucide-react";
+import { Users, ShieldCheck, Loader2 } from "lucide-react";
+import { UploadAttestationModal } from "@/components/eas/UploadAttestationModal";
+import { useUploadAttestation } from "@/lib/hooks/eas/useUploadAttestation";
 
 type CreateDetailsAndUploadProps = {
     onPressNext: (formData: TVideoMetaForm, livepeerAsset: Asset) => void;
@@ -28,6 +30,8 @@ type CreateDetailsAndUploadProps = {
 const CreateDetailsAndUpload = ({ onPressNext }: CreateDetailsAndUploadProps) => {
     const [livepeerAsset, setLivepeerAsset] = useState<Asset | null>(null);
     const [uploadedAssetId, setUploadedAssetId] = useState<string | null>(null);
+    const [attestationModalOpen, setAttestationModalOpen] = useState(false);
+    const { isAttested, isLoading: isAttestationLoading } = useUploadAttestation();
 
     const form = useForm<TVideoMetaForm>({
         mode: "onChange",
@@ -217,7 +221,7 @@ const CreateDetailsAndUpload = ({ onPressNext }: CreateDetailsAndUploadProps) =>
                 {/* Right Column: Upload */}
                 <div className="flex-1">
                     <h4 className="text-xl font-semibold mb-6">Video File</h4>
-                    <div className="bg-card border rounded-lg p-4">
+                    <div className="bg-card border rounded-lg p-4 relative">
                         <FileUpload
                             onFileSelect={() => {
                                 setLivepeerAsset(null);
@@ -226,7 +230,24 @@ const CreateDetailsAndUpload = ({ onPressNext }: CreateDetailsAndUploadProps) =>
                             onFileUploaded={(id) => setUploadedAssetId(id)}
                             onAssetReady={(asset) => setLivepeerAsset(asset)}
                             hideNavigation={true}
+                            attestationVerified={isAttested}
                         />
+                        {!isAttested && !isAttestationLoading && (
+                            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-card/80 backdrop-blur-sm rounded-lg p-6 text-center">
+                                <ShieldCheck className="h-10 w-10 text-primary mb-3" />
+                                <h4 className="text-lg font-semibold mb-2">Upload Rights Attestation Required</h4>
+                                <p className="text-sm text-muted-foreground mb-4 max-w-xs">
+                                    Sign an on-chain attestation confirming you own the copyright to your media before uploading.
+                                </p>
+                                <Button onClick={() => setAttestationModalOpen(true)}>Sign Attestation</Button>
+                            </div>
+                        )}
+                        {isAttestationLoading && (
+                            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-card/80 backdrop-blur-sm rounded-lg p-6 text-center">
+                                <Loader2 className="h-10 w-10 animate-spin text-primary mb-3" />
+                                <p className="text-sm text-muted-foreground">Verifying upload rights...</p>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -234,12 +255,17 @@ const CreateDetailsAndUpload = ({ onPressNext }: CreateDetailsAndUploadProps) =>
             <div className="mt-8 flex justify-end">
                 <Button
                     size="lg"
-                    disabled={!canProceed}
+                    disabled={!canProceed || !isAttested}
                     onClick={form.handleSubmit(onSubmit)}
                 >
                     Create & Continue
                 </Button>
             </div>
+            <UploadAttestationModal
+                open={attestationModalOpen}
+                onOpenChange={setAttestationModalOpen}
+                onVerified={() => setAttestationModalOpen(false)}
+            />
         </div >
     );
 };

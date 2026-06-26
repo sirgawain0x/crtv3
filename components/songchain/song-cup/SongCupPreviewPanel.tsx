@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
+import { CreativePixelsSteps } from "./CreativePixelsSteps";
 
 type SongCupPreviewPanelProps = {
   title: string;
@@ -8,6 +9,8 @@ type SongCupPreviewPanelProps = {
   showVideo?: boolean;
   className?: string;
 };
+
+const PIXELS_TITLE = "Create with Pixels";
 
 export function SongCupPreviewPanel({
   title,
@@ -33,21 +36,28 @@ export function SongCupPreviewPanel({
           <h3 className="text-sm font-semibold uppercase tracking-wide text-fuchsia-600 dark:text-fuchsia-300">
             Information
           </h3>
-          <p className="text-sm text-foreground">
-            Details, rules, and links for this section go here. Replace this
-            placeholder with the real copy and media for the selected tab.
-          </p>
-          <div className="mt-2 flex flex-wrap gap-2">
-            <span className="rounded-full border border-fuchsia-500/30 bg-fuchsia-500/10 px-3 py-1 text-xs text-fuchsia-700 dark:text-fuchsia-100">
-              Web3 native
-            </span>
-            <span className="rounded-full border border-fuchsia-500/30 bg-fuchsia-500/10 px-3 py-1 text-xs text-fuchsia-700 dark:text-fuchsia-100">
-              Member-only
-            </span>
-            <span className="rounded-full border border-fuchsia-500/30 bg-fuchsia-500/10 px-3 py-1 text-xs text-fuchsia-700 dark:text-fuchsia-100">
-              Rewards
-            </span>
-          </div>
+
+          {title === PIXELS_TITLE ? (
+            <CreativePixelsSteps />
+          ) : (
+            <>
+              <p className="text-sm text-foreground">
+                Details, rules, and links for this section go here. Replace this
+                placeholder with the real copy and media for the selected tab.
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <span className="rounded-full border border-fuchsia-500/30 bg-fuchsia-500/10 px-3 py-1 text-xs text-fuchsia-700 dark:text-fuchsia-100">
+                  Web3 native
+                </span>
+                <span className="rounded-full border border-fuchsia-500/30 bg-fuchsia-500/10 px-3 py-1 text-xs text-fuchsia-700 dark:text-fuchsia-100">
+                  Member-only
+                </span>
+                <span className="rounded-full border border-fuchsia-500/30 bg-fuchsia-500/10 px-3 py-1 text-xs text-fuchsia-700 dark:text-fuchsia-100">
+                  Rewards
+                </span>
+              </div>
+            </>
+          )}
         </div>
 
         {showVideo && (

@@ -62,6 +62,11 @@ import { AnimatedMenuIcon } from "@/components/navbar/AnimatedMenuIcon";
 import { CreativePlatformAppsDrawer } from "@/components/navbar/CreativePlatformAppsDrawer";
 import { navIconButtonProps } from "@/components/navbar/navButtonStyles";
 import {
+  hasAnyValidPass,
+  hasValidBrandPass,
+  hasValidCreatorPass,
+} from "@/lib/access/creator-membership";
+import {
   Sheet,
   SheetContent,
   SheetDescription,
@@ -173,7 +178,7 @@ export default function Navbar() {
     client: smartAccountClient,
   } = useSmartWalletDisplayAddress();
   const [isNetworkConnected, setIsNetworkConnected] = useState(true);
-  const { isVerified, hasMembership } = useMembershipVerification();
+  const { isVerified, hasMembership, membershipDetails } = useMembershipVerification();
 
   // Check for MeTokens to conditionally render the section
   const { userMeToken, loading: meTokenLoading } = useMeTokensSupabase();
@@ -581,46 +586,54 @@ export default function Navbar() {
                         <MembershipSection onNavigate={handleLinkClick} />
                       </div>
 
-                      {isVerified && hasMembership && (
+                      {isVerified && user && (
                         <>
                           <div className="mt-4 mb-1 text-xs text-muted-foreground font-semibold">
                             Member Access
                           </div>
-                          <Link
-                            href="/live"
-                            className={mobileMemberNavLinkClass}
-                            onClick={handleLinkClick}
-                          >
-                            <RadioTower className="mr-2 h-4 w-4" /> Live
-                          </Link>
-                          <Link
-                            href="https://create.creativeplatform.xyz"
-                            className={mobileMemberNavLinkClass}
-                            onClick={handleLinkClick}
-                          >
-                            <Bot className="mr-2 h-4 w-4" /> Pixels
-                            <span className="ml-2 px-2 py-0.5 rounded bg-muted-foreground/10 text-xs text-muted-foreground">
-                              Beta
-                            </span>
-                          </Link>
-                          <Link
-                            href="/vote/create"
-                            className="flex w-full items-center rounded-md p-2 text-sm font-medium
-                                hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors
-                                text-green-600 dark:text-green-400"
-                            onClick={handleLinkClick}
-                          >
-                            <Plus className="mr-2 h-4 w-4 text-green-500" /> Poll
-                          </Link>
-                          <Link
-                            href="/predict/create"
-                            className="flex w-full items-center rounded-md p-2 text-sm font-medium
-                                hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors
-                                text-blue-600 dark:text-blue-400"
-                            onClick={handleLinkClick}
-                          >
-                            <TrendingUp className="mr-2 h-4 w-4 text-blue-500" /> Predict
-                          </Link>
+                          {(hasValidCreatorPass(membershipDetails) || hasValidBrandPass(membershipDetails)) && (
+                            <Link
+                              href="/live"
+                              className={mobileMemberNavLinkClass}
+                              onClick={handleLinkClick}
+                            >
+                              <RadioTower className="mr-2 h-4 w-4" /> Live
+                            </Link>
+                          )}
+                          {hasAnyValidPass(membershipDetails) && (
+                            <Link
+                              href="https://create.creativeplatform.xyz"
+                              className={mobileMemberNavLinkClass}
+                              onClick={handleLinkClick}
+                            >
+                              <Bot className="mr-2 h-4 w-4" /> Pixels
+                              <span className="ml-2 px-2 py-0.5 rounded bg-muted-foreground/10 text-xs text-muted-foreground">
+                                Beta
+                              </span>
+                            </Link>
+                          )}
+                          {hasValidBrandPass(membershipDetails) && (
+                            <Link
+                              href="/vote/create"
+                              className="flex w-full items-center rounded-md p-2 text-sm font-medium
+                                  hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors
+                                  text-green-600 dark:text-green-400"
+                              onClick={handleLinkClick}
+                            >
+                              <Plus className="mr-2 h-4 w-4 text-green-500" /> Campaigns
+                            </Link>
+                          )}
+                          {!hasValidCreatorPass(membershipDetails) && !hasValidBrandPass(membershipDetails) && (
+                            <Link
+                              href="/predict/create"
+                              className="flex w-full items-center rounded-md p-2 text-sm font-medium
+                                  hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors
+                                  text-blue-600 dark:text-blue-400"
+                              onClick={handleLinkClick}
+                            >
+                              <TrendingUp className="mr-2 h-4 w-4 text-blue-500" /> Predict
+                            </Link>
+                          )}
                         </>
                       )}
                     </>
@@ -652,8 +665,13 @@ export default function Navbar() {
                       <ChainSelect className="w-full" />
                     </div>
 
+                    {/* Balances */}
+                    <div className="mt-4">
+                      <TokenBalance />
+                    </div>
+
                     {/* Wallet Actions */}
-                    <div className="mt-4 grid grid-cols-3 gap-2 pb-4 border-b border-gray-200 dark:border-gray-700">
+                    <div className="mt-4 grid grid-cols-3 gap-2">
                       <Button
                         variant="outline"
                         size="sm"
@@ -683,12 +701,7 @@ export default function Navbar() {
                       </Button>
                     </div>
 
-                    {/* Add TokenBalance here */}
-                    <div className="mt-4">
-                      <TokenBalance />
-                    </div>
-
-                    {/* Add MeTokenBalances here */}
+                    {/* MeTokenBalances */}
                     {shouldShowMetokens && (
                       <div className="mt-4">
                         <MeTokenBalances />

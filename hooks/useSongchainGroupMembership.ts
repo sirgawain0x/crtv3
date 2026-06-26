@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { AnyClient } from "@lens-protocol/client";
-import { fetchGroup, joinGroup } from "@lens-protocol/client/actions";
+import { fetchGroup, joinGroup, leaveGroup } from "@lens-protocol/client/actions";
 import { evmAddress } from "@lens-protocol/types";
 import { createLensClient } from "@/lib/sdk/lens/create-client";
 import { useLensOrbWrite } from "@/hooks/useLensOrbWrite";
@@ -19,18 +19,51 @@ async function sleep(ms: number) {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function resolveImageUri(raw: unknown): string | null {
+  if (!raw) return null;
+  let value: string | null = null;
+
+  if (typeof raw === "string") {
+    value = raw;
+  } else if (typeof raw === "object") {
+    const obj = raw as Record<string, unknown>;
+    value =
+      typeof obj.uri === "string"
+        ? obj.uri
+        : typeof obj.url === "string"
+          ? obj.url
+          : typeof obj.src === "string"
+            ? obj.src
+            : null;
+  }
+
+  if (!value) return null;
+
+  // Lens sometimes returns URIs like `ipfs://cid...` or `ar://hash...`.
+  // Convert them to HTTP gateway URLs so next/image and <img> can render them.
+  if (value.startsWith("ipfs://")) {
+    const cidAndPath = value.slice(7);
+    return `https://ipfs.io/ipfs/${cidAndPath}`;
+  }
+  if (value.startsWith("ar://")) {
+    const arHash = value.slice(5);
+    return `https://arweave.net/${arHash}`;
+  }
+
+  return value;
+}
+
 function extractGroupImage(metadata: unknown): string | null {
   if (!metadata || typeof metadata !== "object") return null;
   const m = metadata as Record<string, unknown>;
-  const raw = m.icon || m.coverPicture || m.image || m.picture || m.logo;
-  if (!raw) return null;
-  if (typeof raw === "string") return raw;
-  if (typeof raw === "object" && raw !== null) {
-    const obj = raw as Record<string, unknown>;
-    if (typeof obj.uri === "string") return obj.uri;
-    if (typeof obj.url === "string") return obj.url;
-    if (typeof obj.src === "string") return obj.src;
+
+  // Avatar / icon first, then cover picture / banner.
+  const candidates = [m.icon, m.picture, m.logo, m.image, m.coverPicture];
+  for (const candidate of candidates) {
+    const resolved = resolveImageUri(candidate);
+    if (resolved) return resolved;
   }
+
   return null;
 }
 
@@ -61,6 +94,7 @@ export function useSongchainGroupMembership({
   const [isMember, setIsMember] = useState(false);
   const [loading, setLoading] = useState(false);
   const [joining, setJoining] = useState(false);
+  const [leaving, setLeaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const optimisticMemberRef = useRef(false);
   const loadRef = useRef<(() => Promise<void>) | null>(null);
@@ -112,7 +146,15 @@ export function useSongchainGroupMembership({
           : null,
       );
 
-      setImageUrl(extractGroupImage(group.metadata));
+      const resolvedImage = extractGroupImage(group.metadata);
+      setImageUrl(resolvedImage);
+
+      if (process.env.NODE_ENV === "development") {
+        // eslint-disable-next-line no-console
+        console.log("[useSongchainGroupMembership] group metadata:", group.metadata);
+        // eslint-disable-next-line no-console
+        console.log("[useSongchainGroupMembership] resolved imageUrl:", resolvedImage);
+      }
 
       const ops = group.operations;
       const memberFromApi =
@@ -183,6 +225,31 @@ export function useSongchainGroupMembership({
     }
   }, [groupId, canWrite, getSessionClient, promptWriteAccess]);
 
+  const leave = useCallback(async () => {
+    if (!groupId) return false;
+    if (!canWrite) {
+      promptWriteAccess();
+      toast.info("Link your Orb account to leave the club");
+      return false;
+    }
+
+    setLeaving(true);
+    try {
+      const client = await getSessionClient();
+      const result = await leaveGroup(client, { group: evmAddress(groupId) });
+      if (result.isErr()) throw new Error(result.error.message);
+      toast.success("Left club — you will need to rejoin to post");
+      setIsMember(false);
+      await loadRef.current?.();
+      return true;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not leave club");
+      return false;
+    } finally {
+      setLeaving(false);
+    }
+  }, [groupId, canWrite, getSessionClient, promptWriteAccess]);
+
   return {
     groupId,
     name,
@@ -191,9 +258,11 @@ export function useSongchainGroupMembership({
     isMember,
     loading,
     joining,
+    leaving,
     error,
     canWrite,
     refresh: load,
     join,
+    leave,
   };
 }

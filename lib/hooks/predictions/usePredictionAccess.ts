@@ -2,12 +2,15 @@
 
 import { useMemo } from "react";
 import { isPlatformAdmin } from "@/lib/access/platform-admin";
-import { hasValidCreatorPass } from "@/lib/access/creator-membership";
+import {
+  hasValidCreatorPass,
+  hasValidBrandPass,
+} from "@/lib/access/creator-membership";
 import { useMembershipVerification } from "@/lib/hooks/unlock/useMembershipVerification";
 import { useWalletStatus } from "@/lib/hooks/accountkit/useWalletStatus";
 
-export const CREATOR_PREDICTION_BLOCK_MESSAGE =
-  "Creator members can't create or bet on predictions — this keeps markets fair for fans.";
+export const PREDICTION_BLOCK_MESSAGE =
+  "Only non-members and investor members can create or bet on predictions — this keeps markets fair for fans.";
 
 export function usePredictionAccess() {
   const { isConnected, walletAddress, smartAccountAddress } = useWalletStatus();
@@ -17,24 +20,28 @@ export function usePredictionAccess() {
 
   const isAdmin = isPlatformAdmin(address);
   const isCreatorTier = hasValidCreatorPass(membershipDetails);
+  const isBrandTier = hasValidBrandPass(membershipDetails);
+  const isBlockedTier = isCreatorTier || isBrandTier;
 
   const canCreatePrediction = useMemo(() => {
     if (!isConnected || !address) return false;
     if (isAdmin) return true;
-    if (isCreatorTier) return false;
+    if (isBlockedTier) return false;
     return true;
-  }, [isConnected, address, isAdmin, isCreatorTier]);
+  }, [isConnected, address, isAdmin, isBlockedTier]);
 
   const canBetOnPrediction = canCreatePrediction;
 
   const blockReason =
-    isAdmin || !isCreatorTier ? null : CREATOR_PREDICTION_BLOCK_MESSAGE;
+    isAdmin || !isBlockedTier ? null : PREDICTION_BLOCK_MESSAGE;
 
   return {
     canCreatePrediction,
     canBetOnPrediction,
     isAdmin,
     isCreatorTier,
+    isBrandTier,
+    isBlockedTier,
     blockReason,
     isLoading,
     isConnected,

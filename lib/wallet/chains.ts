@@ -10,8 +10,11 @@ export const lensChain = getLensChain();
 export const defaultWalletChain: Chain = viemBase;
 
 /** Chains available for wallet signing in the app UI. */
-export const walletChains: Chain[] = [viemBase, storyChain, lensChain];
+export const walletChains: Chain[] = [viemBase];
+
+/** All supported chains, including those used by specific features but not exposed in the network switcher. */
+export const allSupportedChains: Chain[] = [viemBase, storyChain, lensChain];
 
 export function getWalletChainById(chainId: number): Chain | undefined {
-  return walletChains.find((c) => c.id === chainId);
+  return allSupportedChains.find((c) => c.id === chainId);
 }
