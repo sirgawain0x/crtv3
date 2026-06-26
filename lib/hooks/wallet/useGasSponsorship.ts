@@ -123,6 +123,15 @@ export function useGasSponsorship() {
                 isSponsored: true,
             };
         }
+        // Try the general membership sponsored policy as a fallback
+        if (SPONSORED_POLICY_ID) {
+            return {
+                context: {
+                    paymasterService: { policyId: SPONSORED_POLICY_ID },
+                },
+                isSponsored: true,
+            };
+        }
         return { context: undefined, isSponsored: false };
     };
 

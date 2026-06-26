@@ -71,7 +71,7 @@ export function SongCupHero({
             {subheadline ? (
               <p className="song-cup-hero-line song-cup-hero-line-sub">{subheadline}</p>
             ) : null}
-            <SongCupGoalButton label={ctaLabel} onClick={onCtaClick} className="animate-songcup-pulse hover:animate-none" />
+            <SongCupGoalButton label={ctaLabel} onClick={onCtaClick} />
           </div>
         </div>
       </div>

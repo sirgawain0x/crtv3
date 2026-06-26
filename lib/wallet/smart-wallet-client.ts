@@ -7,8 +7,6 @@ import type { Address, Chain, Hash, Hex } from "viem";
 import { http, type Transport } from "viem";
 
 const ALCHEMY_API_KEY = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY ?? "";
-const PAYMASTER_POLICY_ID =
-  process.env.NEXT_PUBLIC_ALCHEMY_PAYMASTER_POLICY_ID?.replace(/^["']|["']$/g, "") ?? "";
 
 export type UserOperationCall = {
   target: Address;
@@ -106,7 +104,7 @@ function mapSendCallsCapabilities(
   context?: SendUserOperationArgs["context"],
   permissionsContext?: Hex,
 ): Record<string, unknown> | undefined {
-  const policyId = context?.paymasterService?.policyId ?? PAYMASTER_POLICY_ID;
+  const policyId = context?.paymasterService?.policyId;
   const tokenAddress = context?.erc20?.tokenAddress;
 
   const capabilities: Record<string, unknown> = {};
@@ -130,7 +128,6 @@ type WalletClientParams = {
   transport: Transport | ReturnType<typeof alchemyWalletTransport>;
   chain: Chain;
   account?: Address;
-  paymaster?: { policyId: string };
 };
 
 function createWalletClient(params: WalletClientParams): CompatSmartAccountClient {
@@ -142,9 +139,8 @@ export async function createCompatSmartAccountClient(
   chain: Chain,
 ): Promise<CompatSmartAccountClient> {
   const transport = getTransportForChain(chain);
-  const paymaster = PAYMASTER_POLICY_ID ? { policyId: PAYMASTER_POLICY_ID } : undefined;
 
-  const baseClient = createWalletClient({ signer, transport, chain, paymaster });
+  const baseClient = createWalletClient({ signer, transport, chain });
   const scaAddress = await resolveScaAddress(baseClient, signer.address, chain.id);
 
   const clientWithAccount = createWalletClient({
@@ -152,7 +148,6 @@ export async function createCompatSmartAccountClient(
     transport,
     chain,
     account: scaAddress,
-    paymaster,
   });
 
   const compat = Object.assign(clientWithAccount, {
