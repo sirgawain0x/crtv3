@@ -66,10 +66,14 @@ function isMeTokenSymbol(token: TokenSymbol): token is `metoken:${string}` {
   return token.startsWith('metoken:');
 }
 
+function isAddressLike(value: string): boolean {
+  return typeof value === 'string' && /^0x[a-fA-F0-9]{40}$/.test(value);
+}
+
 function parseMeTokenSymbol(token: TokenSymbol): { address: string } | null {
   if (!isMeTokenSymbol(token)) return null;
   const address = token.slice('metoken:'.length);
-  if (!address || !address.startsWith('0x')) return null;
+  if (!isAddressLike(address)) return null;
   return { address };
 }
 
@@ -84,6 +88,17 @@ function getTokenConfig(token: TokenSymbol, meToken?: MeTokenInfo | null): Token
   }
   if (token === 'ETH') return NATIVE_TOKEN_INFO[token];
   return ERC20_TOKEN_INFO[token];
+}
+
+function validateTipToken(token: TokenSymbol, meToken?: MeTokenInfo | null): TokenConfig | null {
+  const config = getTokenConfig(token, meToken);
+  if (isMeTokenSymbol(token)) {
+    const parsed = parseMeTokenSymbol(token);
+    if (!parsed || !isAddressLike(parsed.address)) return null;
+    // Cross-check with the provided meToken address if available
+    if (meToken?.address && parsed.address.toLowerCase() !== meToken.address.toLowerCase()) return null;
+  }
+  return config;
 }
 
 export interface TipResult {
@@ -142,7 +157,7 @@ export function useVideoTip(): UseVideoTipReturn {
         address: address as Address,
       });
 
-      // Get ERC-20 balances for known tokens
+      // Get ERC-20 balances for known tokens in parallel
       const newBalances: Record<TokenSymbol, string> = {
         ETH: formatUnits(ethBalance, 18),
         USDC: '0',
@@ -151,21 +166,26 @@ export function useVideoTip(): UseVideoTipReturn {
         GHO: '0',
       };
 
-      for (const symbol of Object.keys(ERC20_TOKEN_INFO) as Array<Exclude<SwapTokenSymbol, 'ETH'>>) {
-        try {
-          const info = ERC20_TOKEN_INFO[symbol];
-          const balance = await client.readContract({
-            address: info.address as Address,
-            abi: erc20Abi,
-            functionName: 'balanceOf',
-            args: [address as Address],
-          }) as bigint;
-          newBalances[symbol] = formatUnits(balance, info.decimals);
-        } catch (err) {
-          logger.debug(`Failed to fetch ${symbol} balance:`, err);
-          newBalances[symbol] = '0';
-        }
-      }
+      const balanceResults = await Promise.all(
+        (Object.keys(ERC20_TOKEN_INFO) as Array<Exclude<SwapTokenSymbol, 'ETH'>>).map(async (symbol) => {
+          try {
+            const info = ERC20_TOKEN_INFO[symbol];
+            const balance = await client.readContract({
+              address: info.address as Address,
+              abi: erc20Abi,
+              functionName: 'balanceOf',
+              args: [address as Address],
+            }) as bigint;
+            return { symbol, balance: formatUnits(balance, info.decimals) };
+          } catch (err) {
+            logger.debug(`Failed to fetch ${symbol} balance:`, err);
+            return { symbol, balance: '0' };
+          }
+        })
+      );
+      balanceResults.forEach(({ symbol, balance }) => {
+        newBalances[symbol] = balance;
+      });
 
       // Get creator meToken balance if provided
       if (meToken?.address) {
@@ -238,7 +258,12 @@ export function useVideoTip(): UseVideoTipReturn {
       setError(null);
 
       try {
-        const tokenInfo = getTokenConfig(token, meToken);
+        const tokenInfo = validateTipToken(token, meToken);
+        if (!tokenInfo) {
+          setError(new Error("Invalid tip token"));
+          setIsTipping(false);
+          return null;
+        }
         const isNative = tokenInfo.address === null;
 
         let transferCalldata: Hex | undefined;

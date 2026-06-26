@@ -65,27 +65,40 @@ export function convertToCandlestickData(priceHistory: PriceHistoryPoint[]): Can
 }
 
 /**
- * Convert volume data to lightweight-charts format
+ * Convert volume data to lightweight-charts format with candlestick-derived colors.
+ * Falls back to comparing each point's price to the previous point when no exact
+ * candle timestamp match exists, so volume bars still show correct directionality.
  */
 export function convertToVolumeDataWithColor(
   priceHistory: PriceHistoryPoint[],
-  candles?: CandlestickDataPoint[]
+  candles?: CandlestickDataPoint[],
+  isDark: boolean = false
 ): VolumeDataPoint[] {
   if (!candles || candles.length === 0) {
     return convertToVolumeData(priceHistory);
   }
 
+  const colors = getChartColors(isDark);
   const candleMap = new Map<number, CandlestickDataPoint>(
     candles.map((c) => [c.time, c])
   );
 
-  return priceHistory.map((point) => {
+  return priceHistory.map((point, index) => {
     const candle = candleMap.get(point.timestamp as UTCTimestamp);
-    const color = candle && candle.close >= candle.open ? '#22c55e' : '#ef4444';
+    let isUp: boolean;
+    if (candle) {
+      isUp = candle.close >= candle.open;
+    } else if (index > 0) {
+      // Fallback: compare to previous price point
+      isUp = point.price >= priceHistory[index - 1].price;
+    } else {
+      isUp = true;
+    }
+
     return {
       time: point.timestamp as UTCTimestamp,
       value: point.volume,
-      color,
+      color: isUp ? colors.volumeUp : colors.volumeDown,
     } as HistogramData<Time>;
   });
 }
@@ -204,4 +217,3 @@ export function formatTime(timestamp: number, period: '7d' | '30d' | 'all'): str
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   }
 }
-

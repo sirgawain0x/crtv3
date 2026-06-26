@@ -29,6 +29,7 @@ import { OrbSessionProvider } from "@/context/OrbSessionContext";
 import { OrbLoginModal } from "@/components/auth/OrbLoginModal";
 import { OrbLinkingOverlay } from "@/components/auth/OrbLinkingOverlay";
 import NoSSR from "@/components/NoSSR";
+import { MembershipProvider } from "@/lib/context/MembershipContext";
 
 function ErrorFallback({ error }: { error: Error }) {
   return (
@@ -96,15 +97,17 @@ export const Providers = (props: PropsWithChildren) => {
                             <HeliaProvider>
                               <TourProvider>
                                 <VideoProvider>
-                                  <WalletReadyGuard>
-                                    <AuthErrorMonitor />
-                                    <OrbSessionProvider>
-                                      {props.children}
-                                      <OrbLoginModal />
-                                      <OrbLinkingOverlay />
-                                      <Toaster position="top-right" richColors />
-                                    </OrbSessionProvider>
-                                  </WalletReadyGuard>
+                                  <MembershipProvider>
+                                    <WalletReadyGuard>
+                                      <AuthErrorMonitor />
+                                      <OrbSessionProvider>
+                                        {props.children}
+                                        <OrbLoginModal />
+                                        <OrbLinkingOverlay />
+                                        <Toaster position="top-right" richColors />
+                                      </OrbSessionProvider>
+                                    </WalletReadyGuard>
+                                  </MembershipProvider>
                                 </VideoProvider>
                               </TourProvider>
                             </HeliaProvider>

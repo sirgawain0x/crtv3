@@ -50,7 +50,7 @@ import {
 import { MobileOrbSection } from "@/components/account-dropdown/MobileOrbSection";
 import { useUnifiedLogout } from "@/hooks/useUnifiedLogout";
 import { shortenAddress } from "@/lib/utils/utils";
-import { useMembershipVerification } from "@/lib/hooks/unlock/useMembershipVerification";
+import { useMembershipContext } from "@/lib/context/MembershipContext";
 import { useMeTokensSupabase } from "@/lib/hooks/metokens/useMeTokensSupabase";
 import { useMeTokenHoldings } from "@/lib/hooks/metokens/useMeTokenHoldings";
 import { MembershipSection } from "./account-dropdown/MembershipSection";
@@ -68,6 +68,7 @@ import {
 } from "@/lib/access/creator-membership";
 import {
   Sheet,
+  SheetClose,
   SheetContent,
   SheetDescription,
   SheetHeader,
@@ -178,7 +179,11 @@ export default function Navbar() {
     client: smartAccountClient,
   } = useSmartWalletDisplayAddress();
   const [isNetworkConnected, setIsNetworkConnected] = useState(true);
-  const { isVerified, hasMembership, membershipDetails } = useMembershipVerification();
+  const {
+    isVerified,
+    hasMembership,
+    membershipDetails,
+  } = useMembershipContext();
 
   // Check for MeTokens to conditionally render the section
   const { userMeToken, loading: meTokenLoading } = useMeTokensSupabase();
@@ -416,7 +421,7 @@ export default function Navbar() {
         side="top"
         overlayClassName="z-[100] bg-black/50 md:hidden"
         className={
-          "fixed inset-x-0 top-16 bottom-0 z-[101] flex h-auto w-full max-w-none flex-col " +
+          "fixed inset-x-0 top-0 bottom-0 z-[101] flex h-auto w-full max-w-none flex-col " +
           "overflow-hidden border-0 p-0 md:hidden bg-background " +
           "[&>button]:hidden data-[state=closed]:slide-out-to-top " +
           "data-[state=open]:slide-in-from-top"
@@ -428,6 +433,42 @@ export default function Navbar() {
             Site navigation, wallet, and account options.
           </SheetDescription>
         </SheetHeader>
+
+        {/** Self-contained mobile menu header so it works even when the page is scrolled. */}
+        <div className="flex h-16 shrink-0 items-center justify-between border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-4">
+          <Link
+            href="/"
+            className="flex items-center space-x-2"
+            onClick={() => setIsMenuOpen(false)}
+          >
+            <Image
+              src={SITE_LOGO}
+              alt={SITE_NAME}
+              width={30}
+              height={30}
+              priority
+              style={{ width: "30px", height: "30px" }}
+              className="rounded-md"
+            />
+            <span className="text-lg" style={{ fontFamily: "ConthraxSb-Regular, sans-serif" }}>
+              {SITE_ORG}
+              <span className="ml-1 text-xl font-bold text-red-500" style={{ fontFamily: "sans-serif" }}>
+                {SITE_PRODUCT}
+              </span>
+            </span>
+          </Link>
+          <SheetClose asChild>
+            <Button
+              {...navIconButtonProps}
+              className="md:hidden"
+              aria-label="Close main menu"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              <AnimatedMenuIcon isOpen={true} />
+            </Button>
+          </SheetClose>
+        </div>
+
         <div
           className={
             "flex-1 min-h-0 overflow-y-auto overscroll-contain touch-pan-y " +

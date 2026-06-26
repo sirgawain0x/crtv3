@@ -37,6 +37,10 @@ const ADDRESS_TO_SYMBOL: Record<string, TokenSymbol> = Object.fromEntries(
   ])
 ) as Record<string, TokenSymbol>;
 
+function isValidAddress(value: unknown): value is `0x${string}` {
+  return typeof value === 'string' && /^0x[a-fA-F0-9]{40}$/.test(value);
+}
+
 function parseUsdPrice(
   prices: Array<{ currency: string; value: string }>
 ): number {
@@ -85,25 +89,34 @@ export class PriceService {
   ): Promise<Partial<Record<TokenSymbol, number>>> {
     if (symbols.length === 0) return {};
 
-    const response = await alchemyClient.prices.getTokenPriceBySymbol(symbols);
-    const prices: Partial<Record<TokenSymbol, number>> = {};
+    try {
+      const response = await alchemyClient.prices.getTokenPriceBySymbol(symbols);
+      const prices: Partial<Record<TokenSymbol, number>> = {};
 
-    for (const result of response.data) {
-      const symbol = result.symbol.toUpperCase() as TokenSymbol;
-      if (result.error) {
-        serverLogger.error(
-          `Alchemy price error for ${symbol}:`,
-          result.error.message
-        );
-        continue;
+      for (const result of response.data) {
+        try {
+          const symbol = result.symbol.toUpperCase() as TokenSymbol;
+          if (result.error) {
+            serverLogger.error(
+              `Alchemy price error for ${symbol}:`,
+              result.error.message
+            );
+            continue;
+          }
+          const price = parseUsdPrice(result.prices);
+          if (price > 0) {
+            prices[symbol] = price;
+          }
+        } catch (itemErr) {
+          serverLogger.error('Failed to parse price result:', itemErr);
+        }
       }
-      const price = parseUsdPrice(result.prices);
-      if (price > 0) {
-        prices[symbol] = price;
-      }
+
+      return prices;
+    } catch (batchErr) {
+      serverLogger.error('Failed to fetch prices by symbol:', batchErr);
+      return {};
     }
-
-    return prices;
   }
 
   private async fetchPricesByAddress(
@@ -111,57 +124,74 @@ export class PriceService {
   ): Promise<Partial<Record<TokenSymbol, number>>> {
     if (symbols.length === 0) return {};
 
-    const response = await alchemyClient.prices.getTokenPriceByAddress(
-      symbols.map((symbol) => ({
-        network: Network.BASE_MAINNET,
-        address: BASE_TOKENS[symbol],
-      }))
-    );
+    try {
+      const response = await alchemyClient.prices.getTokenPriceByAddress(
+        symbols
+          .filter((symbol) => isValidAddress(BASE_TOKENS[symbol]))
+          .map((symbol) => ({
+            network: Network.BASE_MAINNET,
+            address: BASE_TOKENS[symbol],
+          }))
+      );
 
-    const prices: Partial<Record<TokenSymbol, number>> = {};
+      const prices: Partial<Record<TokenSymbol, number>> = {};
 
-    for (const result of response.data) {
-      const symbol = ADDRESS_TO_SYMBOL[result.address.toLowerCase()];
-      if (!symbol) continue;
+      for (const result of response.data) {
+        try {
+          if (!isValidAddress(result.address)) continue;
+          const symbol = ADDRESS_TO_SYMBOL[result.address.toLowerCase()];
+          if (!symbol) continue;
 
-      if (result.error) {
-        serverLogger.error(
-          `Alchemy price error for ${symbol}:`,
-          result.error.message
-        );
-        continue;
+          if (result.error) {
+            serverLogger.error(
+              `Alchemy price error for ${symbol}:`,
+              result.error.message
+            );
+            continue;
+          }
+
+          const price = parseUsdPrice(result.prices);
+          if (price > 0) {
+            prices[symbol] = price;
+          }
+        } catch (itemErr) {
+          serverLogger.error('Failed to parse price result by address:', itemErr);
+        }
       }
 
-      const price = parseUsdPrice(result.prices);
-      if (price > 0) {
-        prices[symbol] = price;
-      }
+      return prices;
+    } catch (batchErr) {
+      serverLogger.error('Failed to fetch prices by address:', batchErr);
+      return {};
     }
-
-    return prices;
   }
 
   private async fetchEthPriceByWeth(): Promise<number | undefined> {
-    const response = await alchemyClient.prices.getTokenPriceByAddress([
-      {
-        network: Network.BASE_MAINNET,
-        address: BASE_WETH_ADDRESS,
-      },
-    ]);
+    try {
+      const response = await alchemyClient.prices.getTokenPriceByAddress([
+        {
+          network: Network.BASE_MAINNET,
+          address: BASE_WETH_ADDRESS,
+        },
+      ]);
 
-    const result = response.data[0];
-    if (!result || result.error) {
-      if (result?.error) {
-        serverLogger.error(
-          "Alchemy WETH price error for ETH fallback:",
-          result.error.message
-        );
+      const result = response.data[0];
+      if (!result || result.error) {
+        if (result?.error) {
+          serverLogger.error(
+            "Alchemy WETH price error for ETH fallback:",
+            result.error.message
+          );
+        }
+        return undefined;
       }
+
+      const price = parseUsdPrice(result.prices);
+      return price > 0 ? price : undefined;
+    } catch (batchErr) {
+      serverLogger.error('Failed to fetch WETH price for ETH fallback:', batchErr);
       return undefined;
     }
-
-    const price = parseUsdPrice(result.prices);
-    return price > 0 ? price : undefined;
   }
 
   async getTokenPrices(
