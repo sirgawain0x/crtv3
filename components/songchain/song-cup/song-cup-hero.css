@@ -1,4 +1,3 @@
-
 .song-cup-hero-scene .s3gon:nth-child(n + 23),
 .song-cup-hero-scene .s4gon:nth-child(n + 48),
 .song-cup-hero-scene .s5gon:nth-child(n + 7) {
@@ -32,9 +31,7 @@
   margin-top: clamp(2rem, 6vh, 4rem);
   z-index: 1;
   pointer-events: none;
-  contain: layout paint style;
-  transform: translateZ(0);
-  isolation: isolate;
+  contain: paint;
 }
 
 .song-cup-hero-scene .song-cup-hero-animation > .song-cup-hero-rings,
@@ -110,17 +107,14 @@
   overflow: visible;
   filter: drop-shadow(0 0.5ch 1ch rgba(0, 0, 0, 0.4));
   pointer-events: auto;
-  /* Slight right nudge so the ball balances against the centered 3D rings. */
-  transform: translateX(clamp(1rem, 3.5vw, 2.5rem));
 }
 
 .song-cup-hero-scene .song-cup-hero-copy {
   grid-area: 1 / 1;
-  align-self: end;
-  justify-self: center;
+  place-self: center;
   position: relative;
   z-index: 3;
-  padding: 0 1rem clamp(2rem, 12vh, 7rem);
+  padding: 0 1rem;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -244,13 +238,9 @@
   position: relative;
   z-index: 1;
   white-space: nowrap;
-  /* Keep the full word centered; the "CONTEST" row is removed below. */
-  letter-spacing: 0.02em;
 }
 
 .song-cup-hero-scene .bottom-row span {
-  flex: 1;
-  text-align: center;
   flex-shrink: 0;
   display: inline;
   grid-area: unset;
@@ -258,7 +248,7 @@
 }
 
 .song-cup-hero-scene .bottom-row span:last-child {
-  padding-right: 0;
+  padding-right: 8px;
 }
 
 .song-cup-hero-scene .text-glow {
@@ -508,11 +498,17 @@
 }
 
 @keyframes morph5 {
-  0%,
-  100% {
+  25%, 100% {
     transform: var(--dir) translatez(13.07563ch) scale(0.55623);
+    clip-path: polygon(calc(calc(1 - 0.5)*50% + 0.5*97.55283%) calc(calc(1 - 0.5)*0% + 0.5*34.54915%), calc(0.5*50% + calc(1 - 0.5)*97.55283%) calc(0.5*0% + calc(1 - 0.5)*34.54915%), calc(calc(1 - 0.5)*97.55283% + 0.5*79.38926%) calc(calc(1 - 0.5)*34.54915% + 0.5*90.45085%), calc(0.5*97.55283% + calc(1 - 0.5)*79.38926%) calc(0.5*34.54915% + calc(1 - 0.5)*90.45085%), calc(calc(1 - 0.5)*79.38926% + 0.5*20.61074%) calc(calc(1 - 0.5)*90.45085% + 0.5*90.45085%), calc(0.5*79.38926% + calc(1 - 0.5)*20.61074%) calc(0.5*90.45085% + calc(1 - 0.5)*90.45085%), calc(calc(1 - 0.5)*20.61074% + 0.5*2.44717%) calc(calc(1 - 0.5)*90.45085% + 0.5*34.54915%), calc(0.5*20.61074% + calc(1 - 0.5)*2.44717%) calc(0.5*90.45085% + calc(1 - 0.5)*34.54915%), calc(calc(1 - 0.5)*2.44717% + 0.5*50%) calc(calc(1 - 0.5)*34.54915% + 0.5*0%), calc(0.5*2.44717% + calc(1 - 0.5)*50%) calc(0.5*34.54915% + calc(1 - 0.5)*0%));
   }
   50% {
-    transform: var(--dir) translatez(18ch) scale(0.75);
+    transform: var(--dir) translatez(18.07007ch) scale(0);
+  }
+  75% {
+    transform: var(--dir) translatez(39.22688ch) scale(-1.11246);
+  }
+  100% {
+    transform: var(--dir) translatez(21.15681ch) scale(-1.11246);
   }
 }

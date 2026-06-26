@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { SongchainOrbConnect } from "@/components/songchain/SongchainOrbConnect";
 import { SongchainLensAdvancedTooltip } from "@/components/songchain/SongchainLensAdvancedTooltip";
 import { LensRewardsCard } from "@/components/songchain/LensRewardsCard";
@@ -67,16 +68,30 @@ export function SongchainPageClient({ config }: SongchainPageClientProps) {
         </h2>
         <ul className="grid gap-4 sm:grid-cols-2">
           {SONGCHAIN_EVENTS.map((event) => {
+            const isActive = event.status === "active";
             const cardContent = (
               <>
-                <span className="text-xs font-semibold uppercase tracking-wider text-violet-600">
-                  {event.status === "active" ? "Live now" : "Coming soon"}
+                <span className="text-xs font-semibold uppercase tracking-wider text-violet-300">
+                  {isActive ? "Live now" : "Coming soon"}
                 </span>
-                <span className="mt-1 block text-lg font-bold text-violet-900">{event.title}</span>
-                {event.description && (
-                  <span className="mt-1 block text-sm text-violet-800">{event.description}</span>
+                {event.slug === "song-cup" ? (
+                  <div className="mt-2">
+                    <Image
+                      src="/songchain/logo.svg"
+                      alt="Song Cup"
+                      width={260}
+                      height={44}
+                      className="h-auto w-[min(55%,220px)]"
+                      priority
+                    />
+                  </div>
+                ) : (
+                  <span className="mt-1 block text-lg font-bold text-white">{event.title}</span>
                 )}
-                {event.status === "active" && (
+                {event.description && (
+                  <span className="mt-1 block text-sm text-violet-100/90">{event.description}</span>
+                )}
+                {isActive && (
                   <span className="mt-3 inline-block rounded-md bg-gradient-to-r from-[#E82594] to-[#FF66CC] px-3 py-1.5 text-sm font-semibold text-white">
                     Enter event
                   </span>
@@ -84,16 +99,32 @@ export function SongchainPageClient({ config }: SongchainPageClientProps) {
               </>
             );
 
-            if (event.status === "active") {
+            if (isActive) {
               return (
                 <li key={event.slug}>
                   <Link
                     href={event.href}
                     className={cn(
-                      "block rounded-xl border border-violet-500/30 bg-gradient-to-br from-violet-950/80 to-fuchsia-950/60 p-6",
+                      "group relative block overflow-hidden rounded-xl border border-violet-500/30 p-6",
                       "transition hover:border-violet-400/50 hover:shadow-md",
+                      event.slug === "song-cup" && "min-h-[220px]",
                     )}
                   >
+                    {event.slug === "song-cup" && (
+                      <div className="absolute inset-0 -z-10" aria-hidden>
+                        <Image
+                          src="/songchain/song-cup-banner-charts.png"
+                          alt=""
+                          fill
+                          className="object-cover object-left opacity-60 transition duration-500 group-hover:opacity-75"
+                          sizes="(max-width: 640px) 100vw, 50vw"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-r from-violet-950/90 via-fuchsia-950/70 to-slate-950/80" />
+                      </div>
+                    )}
+                    {event.slug !== "song-cup" && (
+                      <div className="absolute inset-0 -z-10 rounded-xl bg-gradient-to-br from-violet-950/80 to-fuchsia-950/60" aria-hidden />
+                    )}
                     {cardContent}
                   </Link>
                 </li>

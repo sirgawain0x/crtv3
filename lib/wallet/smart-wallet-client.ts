@@ -51,7 +51,9 @@ export type CompatSmartAccountClient = {
   signMessage: (args: { message: string | { raw: Uint8Array } }) => Promise<Hex>;
   signTypedData: (args: Record<string, unknown>) => Promise<Hex>;
   extend: <T>(fn: (client: unknown) => T) => T;
+  /** @deprecated use a dedicated publicClient for reads; the smart-account client is write-only */
   readContract: (args: Record<string, unknown>) => Promise<unknown>;
+  /** @deprecated use a dedicated publicClient for reads; the smart-account client is write-only */
   getBalance: (args: { address: Address }) => Promise<bigint>;
   getCode: (args: { address: Address }) => Promise<Hex>;
   waitForTransactionReceipt: (args: { hash: Hash }) => Promise<unknown>;

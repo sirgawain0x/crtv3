@@ -16,10 +16,20 @@ import {
   UPLOAD_ATTESTATION_TERMS_VERSION,
   UPLOAD_ATTESTATION_VERSION,
 } from "@/lib/eas/config";
-import { encodeFunctionData, erc20Abi, formatEther, formatUnits, parseEther } from "viem";
+import {
+  encodeFunctionData,
+  erc20Abi,
+  formatEther,
+  formatUnits,
+  parseEther,
+  type Address,
+  http,
+  createPublicClient,
+} from "viem";
 import { toast } from "sonner";
 import { logger } from "@/lib/utils/logger";
 import { parseBundlerError } from "@/lib/utils/bundlerErrorParser";
+import { base } from "viem/chains";
 
 export type AttestationStatus =
   | "idle"
@@ -65,6 +75,20 @@ interface AttestationSubgraphNode {
 const USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as `0x${string}`;
 const MIN_ETH_FOR_GAS = parseEther("0.001");
 const MIN_USDC_FOR_GAS = 5_000_000n; // $5 USDC (6 decimals) — paymaster usually needs a small buffer
+
+/**
+ * Build a Base public RPC client for gas-balance reads so we don't rely on the
+ * Alchemy smart-account client exposing viem public actions. This fixes
+ * "t.getBalance is not a function" when the underlying wallet client isn't
+ * extended with publicActions.
+ */
+function getBasePublicClient() {
+  const apiKey = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY;
+  const transport = apiKey
+    ? http(`https://base-mainnet.g.alchemy.com/v2/${apiKey}`)
+    : http("https://mainnet.base.org");
+  return createPublicClient({ chain: base, transport });
+}
 
 export function useUploadAttestation() {
   const { address } = useAccount();
@@ -178,10 +202,10 @@ export function useUploadAttestation() {
   }, [address, fetchAttestation]);
 
   const fetchGasBalances = useCallback(async (scaAddress: `0x${string}`): Promise<{ ethBalance: bigint; usdcBalance: bigint }> => {
-    if (!client) return { ethBalance: 0n, usdcBalance: 0n };
+    const publicClient = getBasePublicClient();
     const [ethBalance, usdcBalanceRaw] = await Promise.all([
-      client.getBalance({ address: scaAddress }),
-      client.readContract({
+      publicClient.getBalance({ address: scaAddress }),
+      publicClient.readContract({
         address: USDC_ADDRESS,
         abi: erc20Abi,
         functionName: "balanceOf",
@@ -189,7 +213,7 @@ export function useUploadAttestation() {
       }) as Promise<bigint>,
     ]);
     return { ethBalance, usdcBalance: usdcBalanceRaw };
-  }, [client]);
+  }, []);
 
   const buildOnrampUrl = useCallback((address: `0x${string}`) => {
     const appId = process.env.NEXT_PUBLIC_COINBASE_ONRAMP_APP_ID || "";

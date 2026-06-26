@@ -1,10 +1,44 @@
-import { createPublicClient } from "viem";
+import { createPublicClient, http, type Address } from "viem";
 import { alchemy, base } from "@account-kit/infra";
+
+const apiKey = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY;
+const fallbackRpc = "https://mainnet.base.org";
 
 // Create a public client for reading blockchain data
 export const publicClient = createPublicClient({
   chain: base,
-  transport: alchemy({
-    apiKey: process.env.NEXT_PUBLIC_ALCHEMY_API_KEY as string,
-  }),
+  transport: apiKey
+    ? alchemy({ apiKey })
+    : http(fallbackRpc),
 });
+
+/** Helper to read the native ETH balance of an address on Base. */
+export async function getEthBalance(address: Address) {
+  return publicClient.getBalance({ address });
+}
+
+/** Helper to read an ERC-20 balance of an address on Base. */
+export async function getErc20Balance({
+  token,
+  owner,
+}: {
+  token: Address;
+  owner: Address;
+}) {
+  return publicClient.readContract({
+    address: token,
+    abi: [
+      {
+        constant: true,
+        inputs: [{ name: "_owner", type: "address" }],
+        name: "balanceOf",
+        outputs: [{ name: "balance", type: "uint256" }],
+        payable: false,
+        stateMutability: "view",
+        type: "function",
+      },
+    ] as const,
+    functionName: "balanceOf",
+    args: [owner],
+  }) as Promise<bigint>;
+}
