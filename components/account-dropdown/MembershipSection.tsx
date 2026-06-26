@@ -159,10 +159,10 @@ export function MembershipSection({
                 className="flex items-center justify-between text-xs"
               >
                 <span className="text-muted-foreground">
-                  {MEMBERSHIP_NAMES[address]}
+                  {getPassDisplayName(address)}
                 </span>
                 <span className="font-medium">
-                  {MEMBERSHIP_NAMES[address]}
+                  {getPassDisplayName(address)}
                   {lock?.expirationDuration && (
                     <span className="ml-1 text-muted-foreground">
                       (Expires:{" "}

@@ -10,7 +10,7 @@ export function hasValidCreatorPass(
   memberships: MembershipLike[] | null | undefined
 ): boolean {
   if (!memberships?.length) return false;
-  const creatorLock = (LOCK_ADDRESSES.BASE_CREATIVE_PASS_2 || "").toLowerCase();
+  const creatorLock = (LOCK_ADDRESSES.BASE_CREATIVE_PASS || "").toLowerCase();
   return memberships.some(
     (m) => m.isValid && m.address.toLowerCase() === creatorLock
   );
@@ -21,7 +21,7 @@ export function hasValidBrandPass(
   memberships: MembershipLike[] | null | undefined
 ): boolean {
   if (!memberships?.length) return false;
-  const brandLock = (LOCK_ADDRESSES.BASE_CREATIVE_PASS || "").toLowerCase();
+  const brandLock = (LOCK_ADDRESSES.BASE_CREATIVE_PASS_3 || "").toLowerCase();
   return memberships.some(
     (m) => m.isValid && m.address.toLowerCase() === brandLock
   );
@@ -32,7 +32,7 @@ export function hasValidInvestorPass(
   memberships: MembershipLike[] | null | undefined
 ): boolean {
   if (!memberships?.length) return false;
-  const investorLock = (LOCK_ADDRESSES.BASE_CREATIVE_PASS_3 || "").toLowerCase();
+  const investorLock = (LOCK_ADDRESSES.BASE_CREATIVE_PASS_2 || "").toLowerCase();
   return memberships.some(
     (m) => m.isValid && m.address.toLowerCase() === investorLock
   );

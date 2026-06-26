@@ -353,8 +353,7 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
             </TabsTrigger>
             <TabsTrigger value="profile" className="flex items-center justify-center gap-2">
               <User className="h-4 w-4" />
-              <span className="hidden sm:inline">Profile</span>
-              <span className="sm:hidden">Profile</span>
+              <span>Profile</span>
             </TabsTrigger>
             <TabsTrigger value="trading" className="flex items-center justify-center gap-2">
               <TrendingUp className="h-4 w-4" />
