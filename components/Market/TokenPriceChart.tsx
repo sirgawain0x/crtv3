@@ -273,7 +273,7 @@ export function TokenPriceChart({
           <div className="relative" style={{ width: '100%', height }}>
             <TradingViewChart
               data={data}
-              chartType="area"
+              chartType="candlestick"
               showVolume={true}
               height={height}
               className="w-full"

@@ -57,6 +57,8 @@ interface AlchemySwapWidgetProps {
   className?: string;
   hideHeader?: boolean;
   defaultToToken?: TokenSymbol;
+  /** If true, reduces spacing and presets for a compact side-panel view */
+  compact?: boolean;
 }
 
 interface SwapState {
@@ -71,7 +73,7 @@ interface SwapState {
   transactionHash: string | null;
 }
 
-export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false, defaultToToken = 'USDC' }: AlchemySwapWidgetProps) {
+export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false, defaultToToken = 'USDC', compact = false }: AlchemySwapWidgetProps) {
 
   const { address, client } = useSmartAccountClient({});
   const { chain } = useChain();
@@ -530,14 +532,16 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
   if (!address || !client) {
     return (
       <Card className={className}>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <ArrowRightLeft className="h-5 w-5" />
-            Token Swap
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-center py-8 text-muted-foreground">
+        {(!hideHeader || !compact) && (
+          <CardHeader className={compact ? "pb-2" : undefined}>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <ArrowRightLeft className="h-4 w-4" />
+              Token Swap
+            </CardTitle>
+          </CardHeader>
+        )}
+        <CardContent className={compact ? "p-4" : undefined}>
+          <div className="flex items-center justify-center py-4 text-muted-foreground text-sm">
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             Connecting wallet...
           </div>
@@ -548,13 +552,15 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
 
   return (
     <Card className={className}>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <ArrowRightLeft className="h-5 w-5" />
-          Token Swap
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
+      {(!hideHeader || !compact) && (
+        <CardHeader className={compact ? "pb-2" : undefined}>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <ArrowRightLeft className="h-4 w-4" />
+            Token Swap
+          </CardTitle>
+        </CardHeader>
+      )}
+      <CardContent className={`${compact ? 'p-4 space-y-3' : 'space-y-4'}`}>
         {swapState.error && (
           <Alert variant="destructive">
             <XCircle className="h-4 w-4" />
@@ -711,7 +717,7 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
           </div>
 
           {/* Quick Amount Presets */}
-          {inputMode === 'usd' && (
+          {inputMode === 'usd' && !compact && (
             <div className="space-y-2">
               <div className="flex gap-2 pt-1">
                 {[10, 25, 50, 100].map((amount) => (
@@ -877,7 +883,7 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
         </Button>
 
         {/* Supported Tokens Info */}
-        <div className="text-xs text-muted-foreground">
+        <div className={`text-xs text-muted-foreground ${compact ? 'hidden' : ''}`}>
           <p>Supported tokens on Base: ETH, USDC, DAI</p>
           <p>Swaps powered by Alchemy Smart Wallets</p>
         </div>

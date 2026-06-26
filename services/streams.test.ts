@@ -98,7 +98,7 @@ describe("updateStream", () => {
           single: mockUpdateSingle,
         }),
       }),
-    });
+    } as unknown as ReturnType<typeof mockUpdate>);
   });
 
   it("rejects callers who are not the stream owner", async () => {

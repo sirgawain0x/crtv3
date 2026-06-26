@@ -16,9 +16,10 @@ import {
   UPLOAD_ATTESTATION_TERMS_VERSION,
   UPLOAD_ATTESTATION_VERSION,
 } from "@/lib/eas/config";
-import { encodeFunctionData } from "viem";
+import { encodeFunctionData, erc20Abi, formatEther, formatUnits, parseEther } from "viem";
 import { toast } from "sonner";
 import { logger } from "@/lib/utils/logger";
+import { parseBundlerError } from "@/lib/utils/bundlerErrorParser";
 
 export type AttestationStatus =
   | "idle"
@@ -26,8 +27,18 @@ export type AttestationStatus =
   | "needsAttestation"
   | "signing"
   | "submitting"
+  | "needsGas"
   | "success"
   | "error";
+
+export interface GasRequirement {
+  ethBalance: bigint;
+  usdcBalance: bigint;
+  minEth: bigint;
+  minUsdc: bigint;
+  scaAddress: `0x${string}`;
+  onrampUrl?: string;
+}
 
 interface UploadAttestation {
   uid: string;
@@ -51,13 +62,23 @@ interface AttestationSubgraphNode {
   txHash: string;
 }
 
+const USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as `0x${string}`;
+const MIN_ETH_FOR_GAS = parseEther("0.001");
+const MIN_USDC_FOR_GAS = 5_000_000n; // $5 USDC (6 decimals) — paymaster usually needs a small buffer
+
 export function useUploadAttestation() {
   const { address } = useAccount();
   const { client } = useSmartAccountClient({ type: "MultiOwnerModularAccount" });
-  const { getAttestationGasContext } = useGasSponsorship();
+  const { getAttestationGasContext, getGasContext } = useGasSponsorship();
   const [status, setStatus] = useState<AttestationStatus>("idle");
   const [error, setError] = useState<string | null>(null);
   const [attestation, setAttestation] = useState<UploadAttestation | null>(null);
+  const [gasRequirement, setGasRequirement] = useState<GasRequirement | null>(null);
+
+  const clearGasRequirement = useCallback(() => {
+  setGasRequirement(null);
+  if (status === "needsGas") setStatus("needsAttestation");
+  }, [status]);
 
   const decodeAttestation = useCallback((node: AttestationSubgraphNode): UploadAttestation | null => {
     try {
@@ -156,6 +177,49 @@ export function useUploadAttestation() {
     }
   }, [address, fetchAttestation]);
 
+  const fetchGasBalances = useCallback(async (scaAddress: `0x${string}`): Promise<{ ethBalance: bigint; usdcBalance: bigint }> => {
+    if (!client) return { ethBalance: 0n, usdcBalance: 0n };
+    const [ethBalance, usdcBalanceRaw] = await Promise.all([
+      client.getBalance({ address: scaAddress }),
+      client.readContract({
+        address: USDC_ADDRESS,
+        abi: erc20Abi,
+        functionName: "balanceOf",
+        args: [scaAddress],
+      }) as Promise<bigint>,
+    ]);
+    return { ethBalance, usdcBalance: usdcBalanceRaw };
+  }, [client]);
+
+  const buildOnrampUrl = useCallback((address: `0x${string}`) => {
+    const appId = process.env.NEXT_PUBLIC_COINBASE_ONRAMP_APP_ID || "";
+    const params = new URLSearchParams({
+      address,
+      presetFiatAmount: "50",
+      fiatCurrency: "USD",
+    });
+    if (appId) params.set("appId", appId);
+    return `https://pay.coinbase.com/buy/select-asset?${params.toString()}`;
+  }, []);
+
+  const setNeedsGas = useCallback((
+    scaAddress: `0x${string}`,
+    ethBalance: bigint,
+    usdcBalance: bigint,
+  ) => {
+    const onrampUrl = buildOnrampUrl(scaAddress);
+    setGasRequirement({
+      ethBalance,
+      usdcBalance,
+      minEth: MIN_ETH_FOR_GAS,
+      minUsdc: MIN_USDC_FOR_GAS,
+      scaAddress,
+      onrampUrl,
+    });
+    setStatus("needsGas");
+    setError(null);
+  }, [buildOnrampUrl]);
+
   const signAttestation = useCallback(async () => {
     if (!address || !client) {
       toast.error("Wallet not ready");
@@ -168,6 +232,7 @@ export function useUploadAttestation() {
 
     setStatus("signing");
     setError(null);
+    setGasRequirement(null);
 
     try {
       const encoder = new SchemaEncoder(EAS_UPLOAD_SCHEMA);
@@ -183,34 +248,105 @@ export function useUploadAttestation() {
         { name: "version", value: UPLOAD_ATTESTATION_VERSION, type: "string" },
       ]) as `0x${string}`;
 
-      const { context, isSponsored } = getAttestationGasContext();
+      let { context, isSponsored } = getAttestationGasContext();
       logger.debug("Attestation gas context:", { isSponsored, hasContext: !!context });
+
+      // Validate policy ID shape early so we don't send a malformed context to the paymaster.
+      const policyId = context?.paymasterService?.policyId;
+      if (context?.paymasterService && (!policyId || !/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(policyId))) {
+        logger.warn("Attestation sponsor policy ID looks malformed, falling back to ETH gas", { policyId });
+        context = undefined;
+        isSponsored = false;
+      }
+
+      const uoCall = {
+        target: (EAS_CONTRACT_ADDRESS.startsWith("0x") ? EAS_CONTRACT_ADDRESS : `0x${EAS_CONTRACT_ADDRESS}`) as `0x${string}`,
+        data: encodeFunctionData({
+          abi: EAS_ABI,
+          functionName: "attest",
+          args: [
+            EAS_UPLOAD_SCHEMA_UID as `0x${string}`,
+            {
+              recipient: "0x0000000000000000000000000000000000000000",
+              expirationTime: 0n,
+              revocable: false,
+              refUID: "0x0000000000000000000000000000000000000000000000000000000000000000",
+              data: encoded,
+              value: 0n,
+            },
+          ],
+        }) as `0x${string}`,
+      };
 
       setStatus("submitting");
 
-      const uoResult = await client.sendUserOperation({
-        uo: {
-          target: (EAS_CONTRACT_ADDRESS.startsWith("0x") ? EAS_CONTRACT_ADDRESS : `0x${EAS_CONTRACT_ADDRESS}`) as `0x${string}`,
-          data: encodeFunctionData({
-            abi: EAS_ABI,
-            functionName: "attest",
-            args: [
-              EAS_UPLOAD_SCHEMA_UID as `0x${string}`,
-              {
-                recipient: "0x0000000000000000000000000000000000000000",
-                expirationTime: 0n,
-                revocable: false,
-                refUID: "0x0000000000000000000000000000000000000000000000000000000000000000",
-                data: encoded,
-                value: 0n,
-              },
-            ],
-          }) as `0x${string}`,
-        },
-        context,
-      });
+      let uoResult: Awaited<ReturnType<typeof client.sendUserOperation>>;
+      try {
+        uoResult = await client.sendUserOperation({
+          uo: uoCall,
+          context,
+        });
+        logger.debug("Attestation UserOp hash:", uoResult.hash);
+      } catch (firstErr) {
+        const firstError = firstErr instanceof Error ? firstErr : new Error(String(firstErr));
+        logger.error("Attestation UserOp failed with sponsor context:", {
+          error: firstError.message,
+          isSponsored,
+          hasContext: !!context,
+          policyId,
+        });
 
-      logger.debug("Attestation UserOp hash:", uoResult.hash);
+        // If sponsorship failed, decide whether we can retry with ETH or USDC, or if the user needs to add gas.
+        if (context) {
+          const parsed = parseBundlerError(firstError);
+          const scaAddress = client.scaAddress;
+          const { ethBalance, usdcBalance } = await fetchGasBalances(scaAddress);
+
+          logger.warn("Attestation sponsor failed — checking gas options:", {
+            error: firstError.message,
+            parsed: parsed.code,
+            ethBalance: formatEther(ethBalance),
+            usdcBalance: formatUnits(usdcBalance, 6),
+          });
+
+          // Option 1: user has enough ETH to pay gas themselves
+          if (ethBalance >= MIN_ETH_FOR_GAS) {
+            logger.warn("Retrying attestation with ETH gas payment...");
+            toast.info("Sponsor gas failed — using ETH from your wallet");
+            uoResult = await client.sendUserOperation({
+              uo: uoCall,
+              context: undefined,
+            });
+            logger.debug("Attestation UserOp hash (ETH fallback):", uoResult.hash);
+          }
+          // Option 2: user has USDC and a USDC paymaster policy exists — retry with USDC gas
+          else if (usdcBalance >= MIN_USDC_FOR_GAS && process.env.NEXT_PUBLIC_ANYTOKEN_POLICY_ID) {
+            logger.warn("Retrying attestation with USDC paymaster...");
+            toast.info("Sponsor gas failed — using USDC from your wallet");
+            const usdcContext = getGasContext("usdc").context;
+            uoResult = await client.sendUserOperation({
+              uo: uoCall,
+              context: usdcContext,
+            });
+            logger.debug("Attestation UserOp hash (USDC fallback):", uoResult.hash);
+          }
+          // Option 3: no gas available — surface a clear "add gas" message
+          else {
+            const hasNoTokens = ethBalance === 0n && usdcBalance === 0n;
+            const message = hasNoTokens
+              ? `Your smart account has no ETH or USDC, so this transaction cannot be submitted.`
+              : `Your smart account does not have enough gas. You have ${formatEther(ethBalance)} ETH and ${formatUnits(usdcBalance, 6)} USDC.`;
+            logger.error(message, { scaAddress, ethBalance, usdcBalance });
+
+            setNeedsGas(scaAddress, ethBalance, usdcBalance);
+            toast.error("Gas required — see options in the dialog");
+            return null;
+          }
+        } else {
+          throw firstError;
+        }
+      }
+
       toast.success("Attestation submitted — waiting for confirmation");
 
       try {
@@ -237,7 +373,7 @@ export function useUploadAttestation() {
       toast.error(msg);
       return null;
     }
-  }, [address, client, fetchAttestation, getAttestationGasContext]);
+  }, [address, client, fetchAttestation, getAttestationGasContext, getGasContext, fetchGasBalances, setNeedsGas]);
 
   useEffect(() => {
     void checkAttestation();
@@ -247,11 +383,14 @@ export function useUploadAttestation() {
     status,
     error,
     attestation,
+    gasRequirement,
     isAttested: status === "success",
-    needsAttestation: status === "needsAttestation" || status === "error" || status === "idle",
+    needsAttestation: status === "needsAttestation" || status === "error" || status === "idle" || status === "needsGas",
     isLoading: status === "checking" || status === "signing" || status === "submitting",
+    needsGas: status === "needsGas",
     checkAttestation,
     signAttestation,
+    clearGasRequirement,
   };
 }
 

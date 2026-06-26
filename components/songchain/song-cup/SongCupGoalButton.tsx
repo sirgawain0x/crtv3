@@ -9,7 +9,7 @@ type SongCupGoalButtonProps = {
 } & ({ href: string } | { href?: never; onClick: () => void });
 
 const buttonClassName =
-  "group relative inline-flex shrink-0 transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF66CC] focus-visible:ring-offset-2 focus-visible:ring-offset-black";
+  "group relative inline-flex shrink-0 transition hover:brightness-110 hover:scale-105 hover:drop-shadow-[0_0_12px_rgba(255,102,204,0.6)] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF66CC] focus-visible:ring-offset-2 focus-visible:ring-offset-black cursor-pointer";
 
 function SongCupGoalButtonContent({ label }: { label: string }) {
   return (

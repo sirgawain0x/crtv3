@@ -6,19 +6,38 @@ import { type Address, type Hex, encodeFunctionData, parseAbi, parseUnits, forma
 import { USDC_TOKEN_ADDRESSES, USDC_TOKEN_DECIMALS } from "@/lib/contracts/USDCToken";
 import { useGasSponsorship } from "@/lib/hooks/wallet/useGasSponsorship";
 import { DAI_TOKEN_ADDRESSES, DAI_TOKEN_DECIMALS } from "@/lib/contracts/DAIToken";
+import { USDS_TOKEN_ADDRESSES, USDS_TOKEN_DECIMALS } from "@/lib/contracts/USDSToken";
+import { GHO_TOKEN_ADDRESSES, GHO_TOKEN_DECIMALS } from "@/lib/contracts/GHOToken";
+import { SWAP_UI_TOKENS, BASE_TOKENS, type TokenSymbol as SwapTokenSymbol } from "@/lib/sdk/alchemy/swap-service";
+import { priceService } from "@/lib/sdk/alchemy/price-service";
 import { toast } from "sonner";
 import { logger } from '@/lib/utils/logger';
 import { appendBuilderCode } from "@/lib/utils/builder-code";
 
 
-export type TokenSymbol = 'ETH' | 'USDC' | 'DAI';
+export type TokenSymbol = SwapTokenSymbol | `metoken:${string}`;
 
-const TOKEN_INFO = {
+interface MeTokenInfo {
+  address: string;
+  symbol: string;
+  decimals?: number;
+}
+
+interface TokenConfig {
+  decimals: number;
+  symbol: string;
+  address: string | null;
+}
+
+const NATIVE_TOKEN_INFO: Record<'ETH', TokenConfig> = {
   ETH: {
     decimals: 18,
     symbol: "ETH",
-    address: null, // Native token
+    address: null,
   },
+};
+
+const ERC20_TOKEN_INFO: Record<Exclude<SwapTokenSymbol, 'ETH'>, TokenConfig> = {
   USDC: {
     decimals: USDC_TOKEN_DECIMALS,
     symbol: "USDC",
@@ -29,7 +48,58 @@ const TOKEN_INFO = {
     symbol: "DAI",
     address: DAI_TOKEN_ADDRESSES.base,
   },
-} as const;
+  USDS: {
+    decimals: USDS_TOKEN_DECIMALS,
+    symbol: "USDS",
+    address: USDS_TOKEN_ADDRESSES.base,
+  },
+  GHO: {
+    decimals: GHO_TOKEN_DECIMALS,
+    symbol: "GHO",
+    address: GHO_TOKEN_ADDRESSES.base,
+  },
+};
+
+export const TIP_TOKEN_OPTIONS: TokenSymbol[] = [...SWAP_UI_TOKENS];
+
+function isMeTokenSymbol(token: TokenSymbol): token is `metoken:${string}` {
+  return token.startsWith('metoken:');
+}
+
+function isAddressLike(value: string): boolean {
+  return typeof value === 'string' && /^0x[a-fA-F0-9]{40}$/.test(value);
+}
+
+function parseMeTokenSymbol(token: TokenSymbol): { address: string } | null {
+  if (!isMeTokenSymbol(token)) return null;
+  const address = token.slice('metoken:'.length);
+  if (!isAddressLike(address)) return null;
+  return { address };
+}
+
+function getTokenConfig(token: TokenSymbol, meToken?: MeTokenInfo | null): TokenConfig {
+  if (isMeTokenSymbol(token)) {
+    const parsed = parseMeTokenSymbol(token);
+    return {
+      decimals: meToken?.decimals ?? 18,
+      symbol: meToken?.symbol ?? 'MeToken',
+      address: parsed?.address ?? null,
+    };
+  }
+  if (token === 'ETH') return NATIVE_TOKEN_INFO[token];
+  return ERC20_TOKEN_INFO[token];
+}
+
+function validateTipToken(token: TokenSymbol, meToken?: MeTokenInfo | null): TokenConfig | null {
+  const config = getTokenConfig(token, meToken);
+  if (isMeTokenSymbol(token)) {
+    const parsed = parseMeTokenSymbol(token);
+    if (!parsed || !isAddressLike(parsed.address)) return null;
+    // Cross-check with the provided meToken address if available
+    if (meToken?.address && parsed.address.toLowerCase() !== meToken.address.toLowerCase()) return null;
+  }
+  return config;
+}
 
 export interface TipResult {
   txHash: string;
@@ -38,16 +108,18 @@ export interface TipResult {
 }
 
 export interface UseVideoTipReturn {
-  sendTip: (amount: string, token: TokenSymbol, creatorAddress: string) => Promise<TipResult | null>;
+  sendTip: (amount: string, token: TokenSymbol, creatorAddress: string, meToken?: MeTokenInfo | null) => Promise<TipResult | null>;
   isTipping: boolean;
   error: Error | null;
   balances: Record<TokenSymbol, string>;
-  fetchBalances: () => Promise<void>;
+  fetchBalances: (meToken?: MeTokenInfo | null) => Promise<void>;
+  getUsdValue: (amount: string, token: TokenSymbol, meToken?: MeTokenInfo | null) => Promise<number>;
+  isLoadingPrice: boolean;
 }
 
 /**
  * Hook for sending tips to video creators
- * Supports ETH, USDC, and DAI transfers
+ * Supports ETH, USDC, DAI, USDS, GHO, and creator meTokens
  */
 export function useVideoTip(): UseVideoTipReturn {
   const [isTipping, setIsTipping] = useState(false);
@@ -56,13 +128,27 @@ export function useVideoTip(): UseVideoTipReturn {
     ETH: '0',
     USDC: '0',
     DAI: '0',
+    USDS: '0',
+    GHO: '0',
   });
+  const [isLoadingPrice, setIsLoadingPrice] = useState(false);
+  const [prices, setPrices] = useState<Partial<Record<SwapTokenSymbol, number>>>({});
 
   const { address, client } = useSmartAccountClient({});
   const { getGasContext } = useGasSponsorship();
 
+  // Fetch token prices
+  const fetchPrices = useCallback(async () => {
+    try {
+      const tokenPrices = await priceService.getTokenPrices([...SWAP_UI_TOKENS]);
+      setPrices(tokenPrices);
+    } catch (err) {
+      logger.error("Error fetching token prices:", err);
+    }
+  }, []);
+
   // Fetch token balances
-  const fetchBalances = useCallback(async () => {
+  const fetchBalances = useCallback(async (meToken?: MeTokenInfo | null) => {
     if (!address || !client) return;
 
     try {
@@ -71,35 +157,79 @@ export function useVideoTip(): UseVideoTipReturn {
         address: address as Address,
       });
 
-      // Get USDC balance
-      const usdcBalance = await client.readContract({
-        address: USDC_TOKEN_ADDRESSES.base as Address,
-        abi: erc20Abi,
-        functionName: 'balanceOf',
-        args: [address as Address],
-      }) as bigint;
-
-      // Get DAI balance
-      const daiBalance = await client.readContract({
-        address: DAI_TOKEN_ADDRESSES.base as Address,
-        abi: erc20Abi,
-        functionName: 'balanceOf',
-        args: [address as Address],
-      }) as bigint;
-
-      setBalances({
+      // Get ERC-20 balances for known tokens in parallel
+      const newBalances: Record<TokenSymbol, string> = {
         ETH: formatUnits(ethBalance, 18),
-        USDC: formatUnits(usdcBalance, USDC_TOKEN_DECIMALS),
-        DAI: formatUnits(daiBalance, DAI_TOKEN_DECIMALS),
+        USDC: '0',
+        DAI: '0',
+        USDS: '0',
+        GHO: '0',
+      };
+
+      const balanceResults = await Promise.all(
+        (Object.keys(ERC20_TOKEN_INFO) as Array<Exclude<SwapTokenSymbol, 'ETH'>>).map(async (symbol) => {
+          try {
+            const info = ERC20_TOKEN_INFO[symbol];
+            const balance = await client.readContract({
+              address: info.address as Address,
+              abi: erc20Abi,
+              functionName: 'balanceOf',
+              args: [address as Address],
+            }) as bigint;
+            return { symbol, balance: formatUnits(balance, info.decimals) };
+          } catch (err) {
+            logger.debug(`Failed to fetch ${symbol} balance:`, err);
+            return { symbol, balance: '0' };
+          }
+        })
+      );
+      balanceResults.forEach(({ symbol, balance }) => {
+        newBalances[symbol] = balance;
       });
+
+      // Get creator meToken balance if provided
+      if (meToken?.address) {
+        try {
+          const balance = await client.readContract({
+            address: meToken.address as Address,
+            abi: erc20Abi,
+            functionName: 'balanceOf',
+            args: [address as Address],
+          }) as bigint;
+          newBalances[`metoken:${meToken.address}` as TokenSymbol] = formatUnits(balance, meToken.decimals ?? 18);
+        } catch (err) {
+          logger.debug('Failed to fetch meToken balance:', err);
+          newBalances[`metoken:${meToken.address}` as TokenSymbol] = '0';
+        }
+      }
+
+      setBalances(newBalances);
     } catch (err) {
       logger.error("Error fetching balances:", err);
     }
   }, [address, client]);
 
+  const getUsdValue = useCallback(async (amount: string, token: TokenSymbol, meToken?: MeTokenInfo | null): Promise<number> => {
+    const amountNum = parseFloat(amount);
+    if (isNaN(amountNum) || amountNum <= 0) return 0;
+
+    if (isMeTokenSymbol(token)) {
+      // meTokens are stablecoin-backed; approximate $1 unless a real price is provided
+      return amountNum;
+    }
+
+    try {
+      const price = await priceService.getTokenPrice(token as SwapTokenSymbol);
+      return amountNum * price;
+    } catch (err) {
+      logger.error("Failed to compute USD value:", err);
+      return 0;
+    }
+  }, []);
+
   // Send tip to creator
   const sendTip = useCallback(
-    async (amount: string, token: TokenSymbol, creatorAddress: string): Promise<TipResult | null> => {
+    async (amount: string, token: TokenSymbol, creatorAddress: string, meToken?: MeTokenInfo | null): Promise<TipResult | null> => {
       if (!client || !address) {
         setError(new Error("Wallet not connected"));
         return null;
@@ -128,10 +258,22 @@ export function useVideoTip(): UseVideoTipReturn {
       setError(null);
 
       try {
-        const tokenInfo = TOKEN_INFO[token];
+        const tokenInfo = validateTipToken(token, meToken);
+        if (!tokenInfo) {
+          setError(new Error("Invalid tip token"));
+          setIsTipping(false);
+          return null;
+        }
+        // Only ETH is native; never treat a missing token address as native.
+        const isNative = token === 'ETH';
+        if (!isNative && !tokenInfo.address) {
+          setError(new Error(`Invalid token address for ${tokenInfo.symbol}`));
+          setIsTipping(false);
+          return null;
+        }
 
         let transferCalldata: Hex | undefined;
-        if (token !== 'ETH') {
+        if (!isNative && tokenInfo.address) {
           const tokenAmount = parseUnits(amount, tokenInfo.decimals);
           transferCalldata = encodeFunctionData({
             abi: parseAbi(["function transfer(address,uint256) returns (bool)"]),
@@ -145,9 +287,9 @@ export function useVideoTip(): UseVideoTipReturn {
         // Define helper for fallback execution
         const executeOperation = async (context: any) => {
           const uo = {
-            target: token === 'ETH' ? (creatorAddress as Address) : (tokenInfo.address as Address),
-            data: appendBuilderCode(token === 'ETH' ? ("0x" as Hex) : (transferCalldata as Hex)),
-            value: token === 'ETH' ? (parseUnits(amount, tokenInfo.decimals)) : BigInt(0),
+            target: isNative ? (creatorAddress as Address) : (tokenInfo.address as Address),
+            data: appendBuilderCode(isNative ? ("0x" as Hex) : (transferCalldata as Hex)),
+            value: isNative ? (parseUnits(amount, tokenInfo.decimals)) : BigInt(0),
           };
 
           return await client.sendUserOperation({
@@ -181,10 +323,10 @@ export function useVideoTip(): UseVideoTipReturn {
         });
 
         // Success
-        toast.success(`Tip of ${amount} ${token} sent successfully!`);
+        toast.success(`Tip of ${amount} ${tokenInfo.symbol} sent successfully!`);
 
         // Refresh balances
-        await fetchBalances();
+        await fetchBalances(meToken);
 
         return {
           txHash,
@@ -201,13 +343,13 @@ export function useVideoTip(): UseVideoTipReturn {
         setIsTipping(false);
       }
     },
-    [client, address, fetchBalances]
+    [client, address, fetchBalances, getGasContext]
   );
 
-  // Fetch balances on mount and when address changes
+  // Fetch balances and prices on mount and when address changes
   useEffect(() => {
-    fetchBalances();
-  }, [fetchBalances]);
+    fetchPrices();
+  }, [fetchPrices]);
 
   return {
     sendTip,
@@ -215,6 +357,7 @@ export function useVideoTip(): UseVideoTipReturn {
     error,
     balances,
     fetchBalances,
+    getUsdValue,
+    isLoadingPrice,
   };
 }
-

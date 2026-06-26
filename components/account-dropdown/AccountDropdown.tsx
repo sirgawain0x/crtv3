@@ -123,7 +123,7 @@ import { useSessionKeyStorage } from "@/lib/hooks/accountkit/useSessionKeyStorag
 import { MembershipSection } from "./MembershipSection";
 import { shortenAddress } from "@/lib/utils/utils";
 import Link from "next/link";
-import { useMembershipVerification } from "@/lib/hooks/unlock/useMembershipVerification";
+import { useMembershipContext } from "@/lib/context/MembershipContext";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMeTokensSupabase } from "@/lib/hooks/metokens/useMeTokensSupabase";
 import { useMeTokenHoldings, type MeTokenHolding } from "@/lib/hooks/metokens/useMeTokenHoldings";
@@ -340,7 +340,7 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
     ? (client?.extend(installValidationActions as any) as any)
     : undefined;
 
-  const { isVerified, isLoading: isMembershipLoading, error: membershipError, membershipDetails } = useMembershipVerification();
+  const { isVerified, isLoading: isMembershipLoading, error: membershipError, membershipDetails } = useMembershipContext();
 
   // Check for MeTokens to conditionally render the section
   const { userMeToken, loading: meTokenLoading } = useMeTokensSupabase();

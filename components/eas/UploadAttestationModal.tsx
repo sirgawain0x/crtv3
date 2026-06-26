@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { formatEther, formatUnits } from "viem";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -62,7 +63,7 @@ export function UploadAttestationModal({
   onOpenChange,
   onVerified,
 }: UploadAttestationModalProps) {
-  const { status, error, signAttestation, isAttested, isLoading } = useUploadAttestation();
+  const { status, error, signAttestation, isAttested, isLoading, gasRequirement, needsGas, clearGasRequirement } = useUploadAttestation();
   const [confirmed, setConfirmed] = useState(false);
 
   const handleSign = async () => {
@@ -87,6 +88,55 @@ export function UploadAttestationModal({
             Your upload-rights attestation is on-chain. You can now upload media to Creative TV.
           </p>
           <Button onClick={() => onOpenChange(false)} className="w-full sm:w-auto">Continue to Upload</Button>
+        </div>
+      );
+    }
+
+    if (needsGas && gasRequirement) {
+      const hasNoTokens = gasRequirement.ethBalance === 0n && gasRequirement.usdcBalance === 0n;
+      const canBuyEth = true;
+      const canBuyUsdc = true;
+
+      return (
+        <div className="flex flex-col gap-4 py-4 text-center">
+          <div className="flex flex-col items-center gap-2">
+            <div className="rounded-full bg-amber-100 p-4 dark:bg-amber-900/30">
+              <AlertCircle className="h-10 w-10 text-amber-600 dark:text-amber-400" />
+            </div>
+            <h3 className="text-xl font-semibold">Gas Required</h3>
+          </div>
+
+          <div className="rounded-lg border bg-muted/50 p-4 text-left space-y-3">
+            <p className="text-sm">
+              {hasNoTokens
+                ? "Your smart account has no ETH or USDC. You need one of these gas tokens on Base to submit the attestation."
+                : `Your smart account does not have enough gas. You currently have ${Number(formatEther(gasRequirement.ethBalance)).toFixed(6)} ETH and ${(Number(formatUnits(gasRequirement.usdcBalance, 6))).toFixed(2)} USDC.`}
+            </p>
+
+            <div className="text-sm space-y-1">
+              <p className="font-medium">Accepted gas options on Base:</p>
+              <ul className="list-disc list-inside text-muted-foreground">
+                <li>ETH — pays gas directly from your smart account.</li>
+                <li>USDC — pays gas through the USDC paymaster (needs at least $5 USDC).</li>
+              </ul>
+            </div>
+
+            <div className="text-sm">
+              <p className="font-medium">Smart account address:</p>
+              <code className="block break-all text-xs text-muted-foreground mt-1">{gasRequirement.scaAddress}</code>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Button asChild className="w-full">
+              <a href={gasRequirement.onrampUrl} target="_blank" rel="noopener noreferrer">
+                Buy ETH or USDC with Coinbase
+              </a>
+            </Button>
+            <Button variant="outline" onClick={clearGasRequirement} className="w-full">
+              I&apos;ve added gas — try again
+            </Button>
+          </div>
         </div>
       );
     }

@@ -3,10 +3,8 @@
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  useMembershipVerification,
-  type MembershipDetails,
-} from "../../lib/hooks/unlock/useMembershipVerification";
+import { useMembershipContext } from "../../lib/context/MembershipContext";
+import { type MembershipDetails } from "../../lib/hooks/unlock/useMembershipVerification";
 import { LoginWithEthereumButton } from "@/components/auth/LoginWithEthereumButton";
 import { LockKeyhole, ShieldCheck, ShieldX, AlertTriangle } from "lucide-react";
 import {
@@ -67,7 +65,7 @@ export function MembershipSection({
 }: MembershipSectionProps) {
   const user = useUser();
   const { isVerified, hasMembership, isLoading, error, membershipDetails } =
-    useMembershipVerification();
+    useMembershipContext();
 
   if (isLoading) {
     return (

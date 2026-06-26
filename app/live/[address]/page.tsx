@@ -44,6 +44,7 @@ import { CreatorClipsList } from "@/components/Live/CreatorClipsList";
 import { getThumbnailUrl } from "@/services/livepeer-thumbnails";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
+import { LiveTokenPanel } from "@/components/Live/LiveTokenPanel";
 import { LiveChat } from "@/components/Live/LiveChat";
 import { ShareDialog } from "@/components/Videos/ShareDialog";
 import { ModeratorsDialog } from "@/components/Live/ModeratorsDialog";
@@ -529,14 +530,33 @@ export default function LivePage() {
                   )}
                 </div>
                 <div className="lg:col-span-1">
-                  {chatStreamId && chatSessionId ? (
-                    <LiveChat
-                      streamId={chatStreamId}
-                      sessionId={chatSessionId}
-                      creatorAddress={creatorAddress!}
-                      className="h-[min(70vh,520px)]"
-                    />
-                  ) : (
+                  {chatStreamId && chatSessionId && creatorAddress && (
+                    <>
+                      <LiveTokenPanel
+                        creatorAddress={creatorAddress}
+                        creatorMeToken={
+                          playbackId
+                            ? {
+                                address: playbackId,
+                                symbol: streamName ? `${streamName} Token` : "Creator Token",
+                                name: streamName ? `${streamName} Token` : "Creator Token",
+                                decimals: 18,
+                              }
+                            : undefined
+                        }
+                        streamId={chatStreamId}
+                        sessionId={chatSessionId}
+                      />
+                      <LiveChat
+                        streamId={chatStreamId}
+                        sessionId={chatSessionId}
+                        creatorAddress={creatorAddress!}
+                        variant="host"
+                        className="h-[min(70vh,520px)] mt-4"
+                      />
+                    </>
+                  )}
+                  {!(chatStreamId && chatSessionId && creatorAddress) && (
                     <div className="border rounded-lg p-4 text-sm text-muted-foreground">
                       Chat will appear here once the stream is ready.
                     </div>

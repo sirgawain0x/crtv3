@@ -69,7 +69,7 @@ export function SongCupBanner({
         </p>
 
         {showButton && (
-          <SongCupGoalButton href="/songchain/song-cup" label={buttonLabel} />
+          <SongCupGoalButton href="/songchain/song-cup" label={buttonLabel} className="animate-songcup-pulse hover:animate-none" />
         )}
       </div>
     </div>
