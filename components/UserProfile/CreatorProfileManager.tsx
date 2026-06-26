@@ -193,7 +193,7 @@ export function CreatorProfileManager({ targetAddress, onProfileUpdated }: Creat
         </div>
 
         {isOwner && (
-          <div className="flex gap-2 pt-4">
+          <div className="flex flex-col gap-2 pt-4 sm:flex-row">
             {isEditing ? (
               <>
                 <Button

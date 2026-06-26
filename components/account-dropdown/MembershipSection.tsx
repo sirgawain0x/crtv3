@@ -13,17 +13,19 @@ import {
 } from "../../lib/sdk/unlock/services";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useUser } from "@/lib/wallet/react";
-
-interface MembershipSectionProps {
-  className?: string;
-  onNavigate?: () => void;
-}
+import { getPassDisplayName } from "../../lib/access/membership-labels";
 
 const MEMBERSHIP_NAMES: Record<LockAddressValue, string> = {
-  [LOCK_ADDRESSES.BASE_CREATIVE_PASS]: "Creative Pass",
-  [LOCK_ADDRESSES.BASE_CREATIVE_PASS_2]: "Creative Pass Plus",
-  [LOCK_ADDRESSES.BASE_CREATIVE_PASS_3]: "Creative Pass Pro",
-} as const;
+  [LOCK_ADDRESSES.BASE_CREATIVE_PASS]: getPassDisplayName(
+    LOCK_ADDRESSES.BASE_CREATIVE_PASS
+  ),
+  [LOCK_ADDRESSES.BASE_CREATIVE_PASS_2]: getPassDisplayName(
+    LOCK_ADDRESSES.BASE_CREATIVE_PASS_2
+  ),
+  [LOCK_ADDRESSES.BASE_CREATIVE_PASS_3]: getPassDisplayName(
+    LOCK_ADDRESSES.BASE_CREATIVE_PASS_3
+  ),
+};
 
 const ERROR_MESSAGES: Record<string, string> = {
   LOCK_NOT_FOUND: "Unable to verify membership. Please try again later.",
@@ -37,6 +39,11 @@ const ERROR_MESSAGES: Record<string, string> = {
     "Unable to fetch membership details. Basic verification will continue.",
   DEFAULT: "An error occurred while verifying membership.",
 };
+
+interface MembershipSectionProps {
+  className?: string;
+  onNavigate?: () => void;
+}
 
 function BuyMembershipCta({
   className,
@@ -155,7 +162,7 @@ export function MembershipSection({
                   {MEMBERSHIP_NAMES[address]}
                 </span>
                 <span className="font-medium">
-                  {lock?.name || "Active"}
+                  {MEMBERSHIP_NAMES[address]}
                   {lock?.expirationDuration && (
                     <span className="ml-1 text-muted-foreground">
                       (Expires:{" "}

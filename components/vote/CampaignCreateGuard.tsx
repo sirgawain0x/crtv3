@@ -1,5 +1,6 @@
 "use client";
 
+import { type ReactNode } from "react";
 import Link from "next/link";
 import { useCampaignCreateAccess } from "@/lib/hooks/vote/useCampaignCreateAccess";
 import { Button } from "@/components/ui/button";
@@ -7,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Loader2 } from "lucide-react";
 
 interface CampaignCreateGuardProps {
-  children: React.ReactNode;
+  children: ReactNode;
 }
 
 export function CampaignCreateGuard({ children }: CampaignCreateGuardProps) {
@@ -40,7 +41,7 @@ export function CampaignCreateGuard({ children }: CampaignCreateGuardProps) {
         <CardHeader>
           <CardTitle>Brand membership required</CardTitle>
           <CardDescription>
-            Only Brand Creative Pass holders can create Snapshot campaigns. Upgrade
+            Only Creative Brand Pass holders can create Snapshot campaigns. Upgrade
             your membership or contact the platform admin.
           </CardDescription>
         </CardHeader>

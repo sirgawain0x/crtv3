@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { NextPage } from "next";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useEffect, useContext } from "react";
+import { useState, useEffect, useContext, type ReactNode } from "react";
 import { useUser } from "@/lib/wallet/react";
 import { userToAccount } from "@/lib/types/account";
 import { ListUploadedAssets } from "@/components/UserProfile/list-uploaded-assets/ListUploadedAssets";
@@ -29,6 +29,7 @@ import { CreativeBankTab } from "./CreativeBankTab";
 import { MembershipHome } from "@/components/memberships/MembershipHome";
 import { logger } from '@/lib/utils/logger';
 import { CancelMembershipButton } from "./CancelMembershipButton";
+import { getPassDisplayName } from "@/lib/access/membership-labels";
 
 
 function useServerMembership(address?: string) {
@@ -99,7 +100,7 @@ function useServerMembership(address?: string) {
   return { data, loading, error };
 }
 
-function ProfilePageGuard({ children }: { children: React.ReactNode }) {
+function ProfilePageGuard({ children }: { children: ReactNode }) {
   const router = useRouter();
   const activeAccount = useUser();
   const account = userToAccount(activeAccount);
@@ -159,37 +160,31 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
           </div>
         )}
         <Tabs defaultValue="Uploads" className="w-full">
-          <TabsList className="flex h-10 items-center justify-start space-x-1 rounded-lg bg-muted p-1">
+          <TabsList className="flex h-auto min-h-10 w-full items-start justify-start gap-1 rounded-lg bg-muted p-1 overflow-x-auto">
             <TabsTrigger
               value="Uploads"
-              className="flex-shrink-0 rounded-t-lg px-4 py-2 text-sm font-medium"
+              className="flex-shrink-0 rounded-md px-3 py-2 text-sm font-medium"
             >
               Uploads
             </TabsTrigger>
             <TabsTrigger
               value="MeTokens"
-              className="flex-shrink-0 rounded-t-lg px-4 py-2 text-sm font-medium"
+              className="flex-shrink-0 rounded-md px-3 py-2 text-sm font-medium"
             >
               MeTokens
             </TabsTrigger>
             <TabsTrigger
               value="Bank"
-              className="flex-shrink-0 rounded-t-lg px-4 py-2 text-sm font-medium"
+              className="flex-shrink-0 rounded-md px-3 py-2 text-sm font-medium"
             >
               Bank
             </TabsTrigger>
             <TabsTrigger
               value="Membership"
-              className="flex-shrink-0 rounded-t-lg px-4 py-2 text-sm font-medium"
+              className="flex-shrink-0 rounded-md px-3 py-2 text-sm font-medium"
             >
               Membership
             </TabsTrigger>
-            {/* <TabsTrigger
-                value="Revenue"
-                className="flex-shrink-0 rounded-t-lg px-4 py-2 text-sm font-medium"
-              >
-                Revenue
-              </TabsTrigger> */}
           </TabsList>
 
           <div className="mt-6">
@@ -270,11 +265,11 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
-                    <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between p-6 border rounded-xl bg-card">
+                    <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between p-4 sm:p-6 border rounded-xl bg-card">
                       <div className="space-y-1">
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <p className="font-semibold text-lg">
-                            {validMembership.lock?.name || validMembership.name}
+                            {getPassDisplayName(validMembership.address)}
                           </p>
                           <span className="inline-flex items-center rounded-full bg-green-500/15 px-2.5 py-0.5 text-xs font-medium text-green-500">
                             Active
@@ -308,7 +303,7 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
                         )}
                       </div>
 
-                      <div className="flex gap-3">
+                      <div className="flex flex-col gap-3 sm:flex-row">
                         {/* Show renewal options if needed */}
                         <Button
                           variant="outline"

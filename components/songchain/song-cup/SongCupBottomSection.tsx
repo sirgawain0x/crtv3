@@ -66,8 +66,6 @@ function FeedPanel(props: SongCupBottomSectionProps) {
       clubGateTitle={props.clubGateTitle}
       clubGateDescription={props.clubGateDescription}
       orbClubUrl={props.orbClubUrl}
-      allowReadBeforeJoin
-      animated
     />
   );
 }
@@ -86,6 +84,19 @@ function ActivePanel({
 }) {
   if (panel === "feed") return <FeedPanel {...props} />;
   return <PreviewPanel panel={panel} />;
+}
+
+function ActivePanelBanner({ panel }: { panel: SongCupPanel }) {
+  const icon = SONG_CUP_BUTTON_ICONS.find(({ id }) => id === panel);
+  if (!icon) return null;
+  return (
+    <div className="mb-3 inline-flex items-center gap-2 rounded-lg border border-fuchsia-500/20 bg-fuchsia-500/10 px-3 py-1.5">
+      <img src={icon.src} alt="" className="h-5 w-5 object-contain" aria-hidden />
+      <span className="text-xs font-semibold uppercase tracking-wide text-foreground">
+        {icon.alt}
+      </span>
+    </div>
+  );
 }
 
 function MobileDivider() {
@@ -118,6 +129,7 @@ export function SongCupBottomSection(props: SongCupBottomSectionProps) {
       <div id="song-cup-feed" className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
         <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
           <main className="order-2 min-h-[480px] rounded-2xl border border-fuchsia-500/20 p-4 sm:p-6 lg:order-1">
+            <ActivePanelBanner panel={activePanel} />
             <ActivePanel panel={activePanel} props={props} />
           </main>
           <aside className="order-1 space-y-6 lg:order-2">

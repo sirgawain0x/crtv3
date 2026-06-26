@@ -14,7 +14,7 @@ export function MembershipFeatures({ setActiveTab }: FeaturesProps) {
     // Pricing must match MembershipHome tiers
     const tiers = [
         {
-            name: "Creator",
+            name: "Creative Creator Pass",
             priceLabel: "$30 USD every 3 months",
             icon: "star" as const,
             features: [
@@ -27,7 +27,7 @@ export function MembershipFeatures({ setActiveTab }: FeaturesProps) {
             ],
         },
         {
-            name: "Investor",
+            name: "Creative Investor Pass",
             priceLabel: "$100 USD per month",
             icon: "star" as const,
             features: [
@@ -41,7 +41,7 @@ export function MembershipFeatures({ setActiveTab }: FeaturesProps) {
             ],
         },
         {
-            name: "Brand",
+            name: "Creative Brand Pass",
             priceLabel: "$1,000 USD per month",
             icon: "star" as const,
             features: [
@@ -85,7 +85,7 @@ export function MembershipFeatures({ setActiveTab }: FeaturesProps) {
                                             <div className="flex items-center justify-between mb-2">
                                                 <h3 className="text-xl font-bold text-primary flex items-center">
                                                     <MembershipIcon name={tier.icon} className="mr-2" />
-                                                    {tier.name} Tier
+                                                    {tier.name}
                                                 </h3>
                                                 <span className="text-sm text-muted-foreground">
                                                     {index + 1} of {tiers.length}

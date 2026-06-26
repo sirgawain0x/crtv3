@@ -4,7 +4,6 @@ import { useSongchainGroupMembership } from "@/hooks/useSongchainGroupMembership
 import { SongchainComposePost } from "./SongchainComposePost";
 import { SongchainFeedSection } from "./SongchainFeedSection";
 import { Loader2, Lock, ExternalLink, Users } from "lucide-react";
-import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -49,30 +48,17 @@ export function SongchainGatedFeedTab({
   const isMember = membership.isMember ?? false;
 
   return (
-    <div className={cn("space-y-6", allowReadBeforeJoin && "space-y-4")}>
+    <div className={cn("space-y-6")}>
       {/* Club membership banner — always visible, toggles Join/Leave */}
       <div className="flex flex-col gap-3 rounded-xl border border-fuchsia-500/20 bg-fuchsia-500/10 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-3">
-          {membership.imageUrl ? (
-            <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full border border-fuchsia-500/30">
-              <Image
-                src={membership.imageUrl}
-                alt={membership.name ?? "Club"}
-                width={40}
-                height={40}
-                className="h-full w-full object-cover"
-                unoptimized
-              />
-            </div>
-          ) : (
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-fuchsia-500/30 bg-fuchsia-500/10">
-              {isMember ? (
-                <Users className="h-5 w-5 text-fuchsia-400" />
-              ) : (
-                <Lock className="h-5 w-5 text-fuchsia-400" />
-              )}
-            </div>
-          )}
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-fuchsia-500/30 bg-fuchsia-500/10">
+            {isMember ? (
+              <Users className="h-5 w-5 text-fuchsia-400" />
+            ) : (
+              <Lock className="h-5 w-5 text-fuchsia-400" />
+            )}
+          </div>
           <div>
             <p className="font-medium text-foreground">
               {isMember
@@ -106,7 +92,7 @@ export function SongchainGatedFeedTab({
             <Button
               variant="secondary"
               className="shrink-0"
-              disabled={membership.joining || !membership.groupId || !membership.canWrite}
+              disabled={membership.joining || !membership.groupId}
               onClick={() => void membership.join()}
             >
               {membership.joining ? (
