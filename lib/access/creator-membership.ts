@@ -5,7 +5,7 @@ export type MembershipLike = {
   isValid: boolean;
 };
 
-/** Creative Pass Plus — creators blocked from prediction create/bet (anti-cheat). */
+/** Creative Creator Pass — creators blocked from prediction create/bet (anti-cheat). */
 export function hasValidCreatorPass(
   memberships: MembershipLike[] | null | undefined
 ): boolean {

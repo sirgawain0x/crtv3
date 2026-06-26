@@ -36,6 +36,7 @@ import {
   useSendUserOperation,
 } from "@/lib/wallet/react";
 import { useUnifiedLogout } from "@/hooks/useUnifiedLogout";
+import { getPassDisplayName } from "@/lib/access/membership-labels";
 import { base } from "@account-kit/infra";
 import { Button } from "@/components/ui/button";
 import {
@@ -1129,7 +1130,7 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
                               </div>
                               <div className="flex-1 min-w-0">
                                 <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                                  {nft.metadata?.name || nft.lockName}
+                                  {getPassDisplayName(nft.lockAddress) || nft.lockName}
                                 </p>
                                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                                   Token ID: {nft.tokenId}

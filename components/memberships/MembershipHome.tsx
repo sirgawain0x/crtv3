@@ -56,28 +56,28 @@ export function MembershipHome({ setActiveTab }: HomeProps) {
     // Membership Tiers Configuration (prices in USDC; displayed as USD for clarity)
     const tiers: MembershipTier[] = [
         {
-            name: "Creator",
+            name: "Creative Creator Pass",
             price: "30",
             periodLabel: "every 3 months",
             decimals: 6,
-            address: "0x13b818daf7016b302383737ba60c3a39fef231cf",
+            address: "0xf7c4cd399395d80f9d61fde833849106775269c6",
             features: ["Community Access", "Weekly Challenges", "Resource Library"],
         },
         {
-            name: "Investor",
+            name: "Creative Investor Pass",
             price: "100",
             periodLabel: "per month",
             decimals: 6,
-            address: "0x9c3744c96200a52d05a630d4aec0db707d7509be",
+            address: "0x13b818daf7016b302383737ba60c3a39fef231cf",
             features: ["Priority Access", "Investment Reports", "Direct Creator Access"],
             recommended: true,
         },
         {
-            name: "Brand",
+            name: "Creative Brand Pass",
             price: "1000",
             periodLabel: "per month",
             decimals: 6,
-            address: "0xf7c4cd399395d80f9d61fde833849106775269c6",
+            address: "0x9c3744c96200a52d05a630d4aec0db707d7509be",
             features: ["Partnership Opportunities", "Brand Showcase", "Strategic Consulting"],
         },
     ];
@@ -210,7 +210,7 @@ export function MembershipHome({ setActiveTab }: HomeProps) {
         <div className="space-y-6 animate-in fade-in zoom-in duration-300">
             {/* Header / Balance Card */}
             <MembershipCard className="bg-gradient-to-br from-background to-secondary/20">
-                <div className="flex justify-between items-center">
+                <div className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center">
                     <div>
                         <h2 className="text-lg font-semibold">Your Balance</h2>
                         <p className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-blue-600">
@@ -225,7 +225,7 @@ export function MembershipHome({ setActiveTab }: HomeProps) {
             </MembershipCard>
 
             {/* Tiers Grid */}
-            <div className="grid gap-4">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 {tiers.map((tier) => (
                     <MembershipCard
                         key={tier.name}
@@ -236,14 +236,14 @@ export function MembershipHome({ setActiveTab }: HomeProps) {
                                 Recommended
                             </div>
                         )}
-                        <div className="flex justify-between items-start mb-4">
-                            <div>
+                        <div className="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-start mb-4">
+                            <div className="min-w-0">
                                 <h3 className="text-xl font-bold">{tier.name}</h3>
                                 <p className="text-2xl font-bold mt-1">
                                     ${tier.price} <span className="text-sm font-normal text-muted-foreground">{tier.periodLabel}</span>
                                 </p>
                             </div>
-                            <div className="bg-secondary/50 p-2 rounded-full">
+                            <div className="bg-secondary/50 p-2 rounded-full flex-shrink-0">
                                 <MembershipIcon name="star" className="text-primary" />
                             </div>
                         </div>
@@ -313,7 +313,7 @@ export function MembershipHome({ setActiveTab }: HomeProps) {
                             </div>
                         </div>
 
-                        <div className="flex gap-3">
+                        <div className="flex flex-col gap-3 sm:flex-row">
                             <MembershipButton
                                 variant="outline"
                                 className="flex-1"

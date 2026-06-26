@@ -34,7 +34,7 @@ export function SongchainPageClient({ config }: SongchainPageClientProps) {
           <h1 className="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
             Songchain
           </h1>
-          <p className="mt-3 text-violet-100/80">
+          <p className="mt-3 text-violet-50/95">
             A music channel on Creative TV — join events, explore feeds, and connect
             your Orb account to participate.
           </p>
@@ -69,12 +69,12 @@ export function SongchainPageClient({ config }: SongchainPageClientProps) {
           {SONGCHAIN_EVENTS.map((event) => {
             const cardContent = (
               <>
-                <span className="text-xs font-semibold uppercase tracking-wider text-violet-400">
+                <span className="text-xs font-semibold uppercase tracking-wider text-violet-600">
                   {event.status === "active" ? "Live now" : "Coming soon"}
                 </span>
-                <span className="mt-1 block text-lg font-bold text-white">{event.title}</span>
+                <span className="mt-1 block text-lg font-bold text-violet-900">{event.title}</span>
                 {event.description && (
-                  <span className="mt-1 block text-sm text-violet-200/70">{event.description}</span>
+                  <span className="mt-1 block text-sm text-violet-800">{event.description}</span>
                 )}
                 {event.status === "active" && (
                   <span className="mt-3 inline-block rounded-md bg-gradient-to-r from-[#E82594] to-[#FF66CC] px-3 py-1.5 text-sm font-semibold text-white">
@@ -103,7 +103,7 @@ export function SongchainPageClient({ config }: SongchainPageClientProps) {
             return (
               <li key={event.slug}>
                 <div
-                  className="block cursor-not-allowed rounded-xl border border-violet-500/15 bg-violet-950/30 p-6 opacity-70"
+                  className="block cursor-not-allowed rounded-xl border border-violet-500/15 bg-violet-100 p-6 opacity-80"
                   aria-disabled="true"
                 >
                   {cardContent}

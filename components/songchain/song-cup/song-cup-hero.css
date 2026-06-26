@@ -32,7 +32,9 @@
   margin-top: clamp(2rem, 6vh, 4rem);
   z-index: 1;
   pointer-events: none;
-  contain: paint;
+  contain: layout paint style;
+  transform: translateZ(0);
+  isolation: isolate;
 }
 
 .song-cup-hero-scene .song-cup-hero-animation > .song-cup-hero-rings,
@@ -506,17 +508,11 @@
 }
 
 @keyframes morph5 {
-  25%, 100% {
+  0%,
+  100% {
     transform: var(--dir) translatez(13.07563ch) scale(0.55623);
-    clip-path: polygon(calc(calc(1 - 0.5)*50% + 0.5*97.55283%) calc(calc(1 - 0.5)*0% + 0.5*34.54915%), calc(0.5*50% + calc(1 - 0.5)*97.55283%) calc(0.5*0% + calc(1 - 0.5)*34.54915%), calc(calc(1 - 0.5)*97.55283% + 0.5*79.38926%) calc(calc(1 - 0.5)*34.54915% + 0.5*90.45085%), calc(0.5*97.55283% + calc(1 - 0.5)*79.38926%) calc(0.5*34.54915% + calc(1 - 0.5)*90.45085%), calc(calc(1 - 0.5)*79.38926% + 0.5*20.61074%) calc(calc(1 - 0.5)*90.45085% + 0.5*90.45085%), calc(0.5*79.38926% + calc(1 - 0.5)*20.61074%) calc(0.5*90.45085% + calc(1 - 0.5)*90.45085%), calc(calc(1 - 0.5)*20.61074% + 0.5*2.44717%) calc(calc(1 - 0.5)*90.45085% + 0.5*34.54915%), calc(0.5*20.61074% + calc(1 - 0.5)*2.44717%) calc(0.5*90.45085% + calc(1 - 0.5)*34.54915%), calc(calc(1 - 0.5)*2.44717% + 0.5*50%) calc(calc(1 - 0.5)*34.54915% + 0.5*0%), calc(0.5*2.44717% + calc(1 - 0.5)*50%) calc(0.5*34.54915% + calc(1 - 0.5)*0%));
   }
   50% {
-    transform: var(--dir) translatez(18.07007ch) scale(0);
-  }
-  75% {
-    transform: var(--dir) translatez(39.22688ch) scale(-1.11246);
-  }
-  100% {
-    transform: var(--dir) translatez(21.15681ch) scale(-1.11246);
+    transform: var(--dir) translatez(18ch) scale(0.75);
   }
 }

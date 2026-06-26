@@ -28,6 +28,7 @@ export const SONGCHAIN_EVENTS: SongchainEvent[] = [
 
 export const SONG_CUP_PLAY_LINKS = {
   goal: "https://orb.club/c/worldcup",
+  club: "https://orb.club/c/0x0ea378e56930d4602e7b29cabfdbd84c5fd1959b",
   beat: "https://beatme.creativeplatform.xyz",
 } as const;
 
