@@ -217,27 +217,6 @@ export default function Navbar() {
     return () => mq.removeEventListener("change", handleChange);
   }, []);
 
-  // Trap scroll inside the mobile menu panel (prevent background page scroll on touch)
-  useEffect(() => {
-    if (!isMenuOpen) return;
-
-    const mq = window.matchMedia(MOBILE_NAV_MEDIA_QUERY);
-    if (!mq.matches) return;
-
-    const html = document.documentElement;
-    const body = document.body;
-    const prevHtmlOverflow = html.style.overflow;
-    const prevBodyOverflow = body.style.overflow;
-
-    html.style.overflow = "hidden";
-    body.style.overflow = "hidden";
-
-    return () => {
-      html.style.overflow = prevHtmlOverflow;
-      body.style.overflow = prevBodyOverflow;
-    };
-  }, [isMenuOpen]);
-
   // Close menu on navigation (e.g. logo link has no explicit close handler)
   useEffect(() => {
     setIsMenuOpen(false);
@@ -418,14 +397,9 @@ export default function Navbar() {
 
     <Sheet open={isMenuOpen} onOpenChange={setIsMenuOpen}>
       <SheetContent
-        side="top"
+        side="right"
         overlayClassName="z-[100] bg-black/50 md:hidden"
-        className={
-          "fixed inset-x-0 top-0 bottom-0 z-[101] flex h-auto w-full max-w-none flex-col " +
-          "overflow-hidden border-0 p-0 md:hidden bg-background " +
-          "[&>button]:hidden data-[state=closed]:slide-out-to-top " +
-          "data-[state=open]:slide-in-from-top"
-        }
+        className="fixed inset-y-0 right-0 z-[101] flex h-full w-full flex-col overflow-hidden border-0 p-0 md:hidden bg-background [&>button]:hidden"
       >
         <SheetHeader className="sr-only">
           <SheetTitle>Navigation menu</SheetTitle>
