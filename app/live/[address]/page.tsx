@@ -49,6 +49,12 @@ import { ShareDialog } from "@/components/Videos/ShareDialog";
 import { ModeratorsDialog } from "@/components/Live/ModeratorsDialog";
 import { DigitalTwinOverlay } from "@/components/Live/DigitalTwinOverlay";
 import { logger } from '@/lib/utils/logger';
+import { isPlatformAdmin } from "@/lib/access/platform-admin";
+import { useMembershipVerification } from "@/lib/hooks/unlock/useMembershipVerification";
+import {
+  hasValidCreatorPass,
+  hasValidBrandPass,
+} from "@/lib/access/creator-membership";
 
 async function fetchStreamKeyWithRetry(
   creatorAddress: string,
@@ -78,6 +84,11 @@ async function fetchStreamKeyWithRetry(
 export default function LivePage() {
   const { creatorAddress, signerAddress, smartAccountAddress, eoaAddress, isConnected, isLoading: isWalletLoading } = useCreatorWalletAddress();
   const { getAuthHeaders, isReady: isWalletAuthReady } = useWalletAuth();
+  const { membershipDetails, isLoading: isMembershipLoading } = useMembershipVerification();
+  const canStream =
+    isPlatformAdmin(creatorAddress) ||
+    hasValidCreatorPass(membershipDetails) ||
+    hasValidBrandPass(membershipDetails);
   const [multistreamTargets, setMultistreamTargets] = useState<
     MultistreamTarget[]
   >([]);
@@ -382,6 +393,24 @@ export default function LivePage() {
               <AlertTitle>Authentication Required</AlertTitle>
               <AlertDescription>
                 Please connect your wallet to access the live streaming feature.
+              </AlertDescription>
+            </Alert>
+          </div>
+        </MembershipGuard>
+      </ProfilePageGuard>
+    );
+  }
+
+  if (!isMembershipLoading && !canStream) {
+    return (
+      <ProfilePageGuard>
+        <MembershipGuard>
+          <div className="min-h-screen p-6">
+            <Alert variant="destructive">
+              <FaExclamationTriangle className="h-4 w-4" />
+              <AlertTitle>Live streaming not available</AlertTitle>
+              <AlertDescription>
+                Live streaming is available to Creator and Brand members only.
               </AlertDescription>
             </Alert>
           </div>

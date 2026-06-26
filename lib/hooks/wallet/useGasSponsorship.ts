@@ -21,6 +21,7 @@ export function useGasSponsorship() {
     const SPONSORED_POLICY_ID = process.env.NEXT_PUBLIC_ALCHEMY_PAYMASTER_POLICY_ID?.replace(/^["']|["']$/g, '');
     const USDC_POLICY_ID = process.env.NEXT_PUBLIC_ANYTOKEN_POLICY_ID?.replace(/^["']|["']$/g, '');
     const STORY_POLICY_ID = process.env.NEXT_PUBLIC_STORY_POLICY_ID?.replace(/^["']|["']$/g, '');
+    const ATTESTATION_SPONSORED_POLICY_ID = process.env.NEXT_PUBLIC_ATTESTATION_SPONSORED_POLICY_ID?.replace(/^["']|["']$/g, '');
 
     /**
      * Returns the appropriate UserOperation context based on membership status and target payment method.
@@ -109,9 +110,26 @@ export function useGasSponsorship() {
         return { context: undefined, isSponsored: false };
     };
 
+    /**
+     * Returns a fully-sponsored gas context for upload attestation UserOperations.
+     * Uses NEXT_PUBLIC_ATTESTATION_SPONSORED_POLICY_ID when set, regardless of membership status.
+     */
+    const getAttestationGasContext = (): { context: GasSponsorshipContext | undefined; isSponsored: boolean } => {
+        if (ATTESTATION_SPONSORED_POLICY_ID) {
+            return {
+                context: {
+                    paymasterService: { policyId: ATTESTATION_SPONSORED_POLICY_ID },
+                },
+                isSponsored: true,
+            };
+        }
+        return { context: undefined, isSponsored: false };
+    };
+
     return {
         getGasContext,
         getStoryGasContext,
+        getAttestationGasContext,
         isMember,
     };
 }

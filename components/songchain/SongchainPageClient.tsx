@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { SongchainOrbConnect } from "@/components/songchain/SongchainOrbConnect";
 import { SongchainLensAdvancedTooltip } from "@/components/songchain/SongchainLensAdvancedTooltip";
+import { LensRewardsCard } from "@/components/songchain/LensRewardsCard";
 // import { HallidayOnramp } from "@/components/songchain/HallidayOnramp";
 import type { SongchainConfig } from "@/lib/songchain/config";
 import { SONGCHAIN_EVENTS } from "@/lib/songchain/events";
@@ -45,6 +46,7 @@ export function SongchainPageClient({ config }: SongchainPageClientProps) {
 
       <div className="mb-10 space-y-6">
         <SongchainOrbConnect />
+        <LensRewardsCard />
         {/* TODO: Re-enable when Halliday supports Lens GHO on production
         <HallidayOnramp
           hallidayApiKey={config.hallidayApiKey}

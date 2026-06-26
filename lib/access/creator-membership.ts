@@ -26,3 +26,25 @@ export function hasValidBrandPass(
     (m) => m.isValid && m.address.toLowerCase() === brandLock
   );
 }
+
+/** Investor pass — unlimited predictions, but no live/campaign access. */
+export function hasValidInvestorPass(
+  memberships: MembershipLike[] | null | undefined
+): boolean {
+  if (!memberships?.length) return false;
+  const investorLock = (LOCK_ADDRESSES.BASE_CREATIVE_PASS_3 || "").toLowerCase();
+  return memberships.some(
+    (m) => m.isValid && m.address.toLowerCase() === investorLock
+  );
+}
+
+/** Any paid Creative Platform pass (Creator, Brand, or Investor). */
+export function hasAnyValidPass(
+  memberships: MembershipLike[] | null | undefined
+): boolean {
+  return (
+    hasValidCreatorPass(memberships) ||
+    hasValidBrandPass(memberships) ||
+    hasValidInvestorPass(memberships)
+  );
+}

@@ -114,7 +114,7 @@ function CreatePrediction() {
 
   const { openAuthModal } = useAuthModal();
   const { client: accountKitClient } = useSmartAccountClient({});
-  const { canCreatePrediction, blockReason, isCreatorTier, isAdmin } = usePredictionAccess();
+  const { canCreatePrediction, blockReason, isBlockedTier, isAdmin } = usePredictionAccess();
   const { createPost, isPosting: isSongchainPosting } = useSongchainPost();
   const songchainConfig = getSongchainConfig();
   const [shareOpen, setShareOpen] = useState(false);
@@ -265,7 +265,7 @@ function CreatePrediction() {
           fresh.remaining <= 0
         ) {
           setFormError(
-            "You've reached your limit of 3 prediction markets this month (UTC). Investor or Brand members can create unlimited markets."
+            "You've reached your limit of 3 prediction markets this month (UTC). Investor members can create unlimited markets."
           );
           setIsSubmitting(false);
           return;
@@ -479,7 +479,7 @@ function CreatePrediction() {
           onSubmit={handleFormSubmit}
           className="w-full p-5 md:w-2/5 space-y-6"
         >
-          {isCreatorTier && blockReason && (
+          {isBlockedTier && blockReason && (
             <Alert variant="destructive">
               <AlertTitle>Cannot create predictions</AlertTitle>
               <AlertDescription>{blockReason}</AlertDescription>
@@ -507,7 +507,7 @@ function CreatePrediction() {
                       <span>Investor membership: unlimited prediction markets. </span>
                     )}
                     {quota.premiumTier === "brand" && (
-                      <span>Brand membership: unlimited prediction markets. </span>
+                      <span>Brand membership does not include prediction creation. </span>
                     )}
                     {!quota.premiumTier && (
                       <span>Unlimited prediction markets for your account. </span>
@@ -524,7 +524,7 @@ function CreatePrediction() {
                           href="/"
                           className="underline font-medium text-foreground"
                         >
-                          Upgrade to Investor or Brand
+                          Upgrade to Investor
                         </Link>{" "}
                         for unlimited markets.
                       </span>
@@ -534,7 +534,7 @@ function CreatePrediction() {
                           href="/"
                           className="underline font-medium text-foreground"
                         >
-                          Upgrade to Investor or Brand
+                          Upgrade to Investor
                         </Link>{" "}
                         for unlimited markets.
                       </span>

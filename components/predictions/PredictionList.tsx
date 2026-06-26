@@ -18,7 +18,6 @@ import {
 import {
   answerBytesToLabel,
   formatCategoryLabel,
-  isSongchainCategory,
   normalizeCategoryKey,
 } from "@/lib/predictions/parse-prediction-display";
 import { enrichPredictionDisplaySync } from "@/lib/predictions/enrich-prediction-display";
@@ -43,7 +42,7 @@ import {
 
 const APP_ARBITRATOR = "0x0000000000000000000000000000000000000000";
 
-type SourceFilter = "creative_tv" | "songchain" | "all";
+type SourceFilter = "creative_tv" | "all";
 
 /** Normalize subgraph Bytes (address or 32-byte word) for comparisons. */
 function normalizeArbitrator(hexLike: unknown): string {
@@ -288,12 +287,6 @@ export function PredictionList() {
       list = list.filter(
         (q) => normalizeArbitrator(q.arbitrator) === appArbNorm
       );
-    } else if (sourceFilter === "songchain") {
-      list = list.filter(
-        (q) =>
-          normalizeArbitrator(q.arbitrator) === appArbNorm &&
-          isSongchainCategory(q.parsedCategory ?? q.category ?? "")
-      );
     }
 
     if (categoryFilter !== ALL_CATEGORIES_VALUE) {
@@ -521,16 +514,7 @@ export function PredictionList() {
             >
               Creative TV
             </Button>
-            <Button
-              type="button"
-              variant={sourceFilter === "songchain" ? "default" : "ghost"}
-              size="sm"
-              className="rounded-md shadow-none"
-              onClick={() => setFilter("songchain")}
-              aria-pressed={sourceFilter === "songchain"}
-            >
-              Songchain
-            </Button>
+
             <Button
               type="button"
               variant={sourceFilter === "all" ? "default" : "ghost"}
@@ -549,12 +533,7 @@ export function PredictionList() {
               <strong>All Reality.eth</strong> for external arbitrators (e.g. Kleros).
             </p>
           )}
-          {sourceFilter === "songchain" && (
-            <p className="text-xs text-muted-foreground max-w-xl">
-              Fan/community predictions posted from Songchain with category{" "}
-              <strong>songchain</strong>.
-            </p>
-          )}
+
           </div>
 
           <div className="flex flex-col gap-1.5 min-w-[160px]">
@@ -579,11 +558,9 @@ export function PredictionList() {
         <div className="text-sm text-muted-foreground">
           {totalQuestionsDisplay > 0
             ? `Showing ${questions?.length || 0} of ${totalQuestionsDisplay} question${totalQuestionsDisplay === 1 ? "" : "s"}`
-            : sourceFilter === "songchain"
-              ? "No Songchain predictions in this view"
-              : sourceFilter === "creative_tv"
-                ? "No Creative TV predictions in this view"
-                : "No predictions in this view"}
+            : sourceFilter === "creative_tv"
+              ? "No Creative TV predictions in this view"
+              : "No predictions in this view"}
         </div>
       </div>
 
@@ -591,11 +568,9 @@ export function PredictionList() {
         <div className="rounded-lg border border-dashed p-8 text-center">
           <p className="font-medium text-foreground">No predictions found</p>
           <p className="mt-2 text-sm text-muted-foreground max-w-md mx-auto">
-            {sourceFilter === "songchain"
-              ? "No Songchain predictions yet. Create one with category “songchain”."
-              : sourceFilter === "creative_tv"
-                ? "Nothing created on Creative TV matches yet. Choose “All Reality.eth” to browse every indexed market."
-                : "There are no indexed Reality.eth questions to show yet, or data is still syncing."}
+            {sourceFilter === "creative_tv"
+              ? "Nothing created on Creative TV matches yet. Choose “All Reality.eth” to browse every indexed market."
+              : "There are no indexed Reality.eth questions to show yet, or data is still syncing."}
           </p>
         </div>
       ) : (

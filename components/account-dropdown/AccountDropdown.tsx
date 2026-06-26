@@ -81,7 +81,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import CoinbaseFundButton from "@/components/wallet/buy/coinbase-fund-button";
+import { HeadlessCdpOnramp } from "@/components/wallet/buy/HeadlessCdpOnramp";
 import { LoginButton } from "@/components/auth/LoginButton";
 import { AlchemySwapWidget } from "@/components/wallet/swap/AlchemySwapWidget";
 import { useSmartWalletDisplayAddress } from "@/lib/hooks/accountkit/useSmartWalletDisplayAddress";
@@ -126,12 +126,16 @@ import Link from "next/link";
 import { useMembershipVerification } from "@/lib/hooks/unlock/useMembershipVerification";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMeTokensSupabase } from "@/lib/hooks/metokens/useMeTokensSupabase";
-import { useMeTokenHoldings } from "@/lib/hooks/metokens/useMeTokenHoldings";
+import { useMeTokenHoldings, type MeTokenHolding } from "@/lib/hooks/metokens/useMeTokenHoldings";
 import { chains, lensChain } from "@/config";
 import { useOrbSession } from "@/context/OrbSessionContext";
 import { HydrationSafe } from "@/components/ui/hydration-safe";
 import { useMembershipNFTs, type MembershipNFT } from "@/lib/hooks/unlock/useMembershipNFTs";
-import { LOCK_ADDRESSES } from "@/lib/sdk/unlock/services";
+import {
+  hasAnyValidPass,
+  hasValidBrandPass,
+  hasValidCreatorPass,
+} from "@/lib/access/creator-membership";
 
 const chainIconMap: Record<number, string> = {
   [base.id]: "/images/chains/base.svg",
@@ -315,8 +319,9 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
   const [sendAmount, setSendAmount] = useState<string>("");
   const [isSending, setIsSending] = useState(false);
   const [selectedToken, setSelectedToken] = useState<TokenSymbol>('ETH');
-  const [sendType, setSendType] = useState<'token' | 'nft'>('token');
+  const [sendType, setSendType] = useState<'token' | 'nft' | 'metoken'>('token');
   const [selectedNFT, setSelectedNFT] = useState<MembershipNFT | null>(null);
+  const [selectedMeToken, setSelectedMeToken] = useState<MeTokenHolding | null>(null);
   const [tokenBalances, setTokenBalances] = useState<Record<TokenSymbol, string>>(emptyTokenBalances());
   const { nfts: membershipNFTs, isLoading: isLoadingNFTs } = useMembershipNFTs();
   const { toast } = useToast();
@@ -335,9 +340,7 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
     ? (client?.extend(installValidationActions as any) as any)
     : undefined;
 
-  const { isVerified, hasMembership, isLoading: isMembershipLoading, error: membershipError, membershipDetails } = useMembershipVerification();
-
-  const isBrandMember = membershipDetails?.some((m) => m.isValid && m.address === LOCK_ADDRESSES.BASE_CREATIVE_PASS_3);
+  const { isVerified, isLoading: isMembershipLoading, error: membershipError, membershipDetails } = useMembershipVerification();
 
   // Check for MeTokens to conditionally render the section
   const { userMeToken, loading: meTokenLoading } = useMeTokensSupabase();
@@ -435,7 +438,9 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
         setTimeout(() => setCopySuccess(false), 2000);
         // Optionally close dropdown after copying
         // setIsDropdownOpen(false);
-      } catch { }
+      } catch {
+        // Clipboard write may fail on unsupported contexts; ignore silently.
+      }
     }
   };
 
@@ -599,6 +604,14 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
       });
       return;
     }
+    if (sendType === 'metoken' && !selectedMeToken) {
+      toast({
+        variant: "destructive",
+        title: "No MeToken Selected",
+        description: "Please select a MeToken to send.",
+      });
+      return;
+    }
 
     try {
       setIsSending(true);
@@ -636,6 +649,55 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
             target: selectedNFT.lockAddress as Address,
             data: appendBuilderCode(transferCalldata as Hex),
             value: BigInt(0), // No native value for NFT transfers
+          },
+        });
+      } else if (sendType === 'metoken' && selectedMeToken) {
+        // Send ERC-20 MeToken
+        if (!sendAmount) {
+          toast({
+            variant: "destructive",
+            title: "Amount Required",
+            description: "Please enter an amount to send.",
+          });
+          setIsSending(false);
+          return;
+        }
+
+        const rawBalance = BigInt(selectedMeToken.balanceRaw);
+        const tokenAmount = parseEther(sendAmount);
+        if (tokenAmount > rawBalance) {
+          toast({
+            variant: "destructive",
+            title: "Insufficient MeToken Balance",
+            description: `You only have ${selectedMeToken.balance} ${selectedMeToken.symbol}.`,
+          });
+          setIsSending(false);
+          return;
+        }
+
+        toast({
+          title: "Transaction Initiated",
+          description: `Sending ${sendAmount} ${selectedMeToken.symbol}...`,
+        });
+
+        const transferCalldata = encodeFunctionData({
+          abi: parseAbi(["function transfer(address,uint256) returns (bool)"]),
+          functionName: "transfer",
+          args: [normalizedRecipient, tokenAmount],
+        });
+
+        logger.debug('Sending MeToken transfer:', {
+          token: selectedMeToken.symbol,
+          tokenAddress: selectedMeToken.address,
+          recipient: recipientAddress,
+          amount: tokenAmount.toString(),
+        });
+
+        operation = await client!.sendUserOperation({
+          uo: {
+            target: selectedMeToken.address as Address,
+            data: appendBuilderCode(transferCalldata as Hex),
+            value: BigInt(0),
           },
         });
       } else {
@@ -822,6 +884,7 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
         onClick={() => {
           setIsDialogOpen(false);
           setSelectedNFT(null);
+          setSelectedMeToken(null);
           setSendType('token');
         }}
       >
@@ -834,19 +897,20 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
           isSending ||
           !recipientAddress ||
           (sendType === 'token' && !sendAmount) ||
-          (sendType === 'nft' && !selectedNFT)
+          (sendType === 'nft' && !selectedNFT) ||
+          (sendType === 'metoken' && (!selectedMeToken || !sendAmount))
         }
       >
         {isSending ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            <span className="hidden sm:inline">{sendType === 'nft' ? 'Sending NFT...' : `Sending ${selectedToken}...`}</span>
+            <span className="hidden sm:inline">{sendType === 'nft' ? 'Sending NFT...' : sendType === 'metoken' ? `Sending ${selectedMeToken?.symbol}...` : `Sending ${selectedToken}...`}</span>
             <span className="sm:hidden">Sending...</span>
           </>
         ) : (
           <>
             <Send className="mr-2 h-4 w-4" />
-            {sendType === 'nft' ? 'Send NFT' : `Send ${selectedToken}`}
+            {sendType === 'nft' ? 'Send NFT' : sendType === 'metoken' ? `Send ${selectedMeToken?.symbol || 'MeToken'}` : `Send ${selectedToken}`}
           </>
         )}
       </Button>
@@ -858,12 +922,14 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
       case "buy":
         return (
           <div className="space-y-4">
-            <p className="text-sm text-gray-500">
-              Purchase crypto directly to your wallet.
-            </p>
-            <div className="flex flex-col gap-4">
-              <CoinbaseFundButton onClose={() => setIsDialogOpen(false)} />
-            </div>
+            <HeadlessCdpOnramp
+              presetFiatAmount={10}
+              fiatCurrency="USD"
+              onSuccess={() => {
+                setBalanceRefreshKey((key) => key + 1);
+                setTimeout(() => setIsDialogOpen(false), 1500);
+              }}
+            />
           </div>
         );
       case "send":
@@ -873,14 +939,15 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
               {/* Send Type Selection */}
               <div className="space-y-3">
                 <label className="text-sm font-medium text-gray-900 dark:text-gray-100">Send Type</label>
-                <div className="flex flex-col sm:grid sm:grid-cols-2 gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   <button
                     type="button"
                     onClick={() => {
                       setSendType('token');
                       setSelectedNFT(null);
+                      setSelectedMeToken(null);
                     }}
-                    className={`flex items-center justify-center space-x-2 p-3 sm:p-2.5 border rounded-lg transition-colors min-h-[44px] w-full ${sendType === 'token'
+                    className={`flex items-center justify-center space-x-2 p-2 sm:p-2.5 border rounded-lg transition-colors min-h-[44px] w-full ${sendType === 'token'
                       ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-400'
                       : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
                       }`}
@@ -897,9 +964,10 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
                     onClick={() => {
                       setSendType('nft');
                       setSendAmount('');
+                      setSelectedMeToken(null);
                     }}
                     disabled={membershipNFTs.length === 0}
-                    className={`flex items-center justify-center space-x-2 p-3 sm:p-2.5 border rounded-lg transition-colors min-h-[44px] w-full ${sendType === 'nft'
+                    className={`flex items-center justify-center space-x-2 p-2 sm:p-2.5 border rounded-lg transition-colors min-h-[44px] w-full ${sendType === 'nft'
                       ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-400'
                       : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
                       } ${membershipNFTs.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
@@ -908,13 +976,38 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
                       ? 'text-blue-700 dark:text-blue-300'
                       : 'text-gray-900 dark:text-gray-100'
                       }`}>
-                      Membership NFT
+                      NFT
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSendType('metoken');
+                      setSendAmount('');
+                      setSelectedNFT(null);
+                    }}
+                    disabled={holdings.length === 0}
+                    className={`flex items-center justify-center space-x-2 p-2 sm:p-2.5 border rounded-lg transition-colors min-h-[44px] w-full ${sendType === 'metoken'
+                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-400'
+                      : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
+                      } ${holdings.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    <span className={`text-sm font-medium ${sendType === 'metoken'
+                      ? 'text-blue-700 dark:text-blue-300'
+                      : 'text-gray-900 dark:text-gray-100'
+                      }`}>
+                      MeToken
                     </span>
                   </button>
                 </div>
                 {membershipNFTs.length === 0 && sendType === 'nft' && (
                   <p className="text-xs text-gray-500 dark:text-gray-400 px-1">
                     You don't have any membership NFTs to send.
+                  </p>
+                )}
+                {holdings.length === 0 && sendType === 'metoken' && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400 px-1">
+                    You don't have any MeTokens to send.
                   </p>
                 )}
               </div>
@@ -992,7 +1085,7 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
                     />
                   </div>
                 </>
-              ) : (
+              ) : sendType === 'nft' ? (
                 <>
                   {/* NFT Selection */}
                   <div className="space-y-3">
@@ -1052,6 +1145,67 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
                         ))}
                       </div>
                     )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* MeToken Selection */}
+                  <div className="space-y-3">
+                    <label className="text-sm font-medium text-gray-900 dark:text-gray-100">MeToken</label>
+                    {holdings.length === 0 ? (
+                      <div className="p-4 border rounded-lg text-center text-sm text-gray-500 dark:text-gray-400">
+                        No MeTokens found
+                      </div>
+                    ) : (
+                      <div className="space-y-2 max-h-48 sm:max-h-64 overflow-y-auto -mx-1 px-1">
+                        {holdings.map((holding) => (
+                          <button
+                            key={holding.address}
+                            type="button"
+                            onClick={() => setSelectedMeToken(holding)}
+                            className={`w-full p-3 sm:p-2.5 border rounded-lg text-left transition-colors min-h-[60px] sm:min-h-[56px] touch-manipulation ${selectedMeToken?.address === holding.address
+                              ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-400'
+                              : 'border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 active:bg-gray-100 dark:active:bg-gray-600'
+                              }`}
+                          >
+                            <div className="flex flex-col">
+                              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                                {holding.symbol}
+                              </p>
+                              <p className="text-xs text-gray-500 dark:text-gray-400">
+                                Balance: {holding.balance}
+                              </p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Amount */}
+                  <div className="space-y-3">
+                    <label className="text-sm font-medium text-gray-900 dark:text-gray-100">Amount ({selectedMeToken?.symbol || "MeToken"})</label>
+                    <input
+                      type="number"
+                      placeholder="0.0"
+                      step="any"
+                      inputMode="decimal"
+                      className="w-full p-3 sm:p-2.5 border rounded-lg dark:bg-gray-700 dark:border-gray-600 bg-white border-gray-200 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 text-base sm:text-sm min-h-[44px]"
+                      value={sendAmount}
+                      onChange={(e) => setSendAmount(e.target.value)}
+                    />
+                    <div className="flex justify-between items-center text-xs text-gray-500 dark:text-gray-400">
+                      <span>Balance: {selectedMeToken?.balance || "0"}</span>
+                      {selectedMeToken && (
+                        <button
+                          type="button"
+                          onClick={() => setSendAmount(selectedMeToken.balance)}
+                          className="text-blue-600 hover:text-blue-700 dark:text-blue-400 font-medium px-3 py-1.5 rounded text-xs min-h-[32px] touch-manipulation"
+                        >
+                          MAX
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </>
               )}
@@ -1507,8 +1661,8 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
               </div>
             )}
 
-            {/* Member Access Links - Only for Members (hide if error or loading) */}
-            {!membershipError && !isMembershipLoading && isVerified && hasMembership && (
+            {/* Member Access Links — shown to connected users; each item gated by access rules */}
+            {!membershipError && !isMembershipLoading && isVerified && user && (
               <>
                 <div className="px-2 py-2 w-full">
                   <p className="text-xs text-muted-foreground mb-2">
@@ -1523,62 +1677,75 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
                     </div>
                   ) : (
                     <div className="grid grid-cols-2 gap-2">
-                      <Link href="/live" className="w-full">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className={
-                            "w-full flex flex-col items-center justify-center p-2 h-12 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                          }
-                          onClick={() => setIsDropdownOpen(false)}
-                        >
-                          <RadioTower className="h-3 w-3 mb-1" />
-                          <span className="text-xs">Live</span>
-                        </Button>
-                      </Link>
-                      <Link href="https://create.creativeplatform.xyz" className="w-full">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="w-full flex flex-col items-center justify-center p-2 h-12 hover:bg-gray-50 
+                      {/* Live: Creator or Brand pass */}
+                      {(hasValidCreatorPass(membershipDetails) || hasValidBrandPass(membershipDetails)) && (
+                        <Link href="/live" className="w-full">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className={
+                              "w-full flex flex-col items-center justify-center p-2 h-12 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                            }
+                            onClick={() => setIsDropdownOpen(false)}
+                          >
+                            <RadioTower className="h-3 w-3 mb-1" />
+                            <span className="text-xs">Live</span>
+                          </Button>
+                        </Link>
+                      )}
+
+                      {/* Pixels: any paid pass */}
+                      {hasAnyValidPass(membershipDetails) && (
+                        <Link href="https://create.creativeplatform.xyz" className="w-full">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full flex flex-col items-center justify-center p-2 h-12 hover:bg-gray-50
                           dark:hover:bg-gray-800 transition-colors relative"
-                          onClick={() => setIsDropdownOpen(false)}
-                        >
-                          <Bot className="h-3 w-3 mb-1" />
-                          <span className="text-xs">Pixels</span>
-                          <span className="absolute -top-1 -right-1 px-1 py-0.5 rounded bg-blue-500 text-white text-[8px]">
-                            Beta
-                          </span>
-                        </Button>
-                      </Link>
-                      {isBrandMember && (
+                            onClick={() => setIsDropdownOpen(false)}
+                          >
+                            <Bot className="h-3 w-3 mb-1" />
+                            <span className="text-xs">Pixels</span>
+                            <span className="absolute -top-1 -right-1 px-1 py-0.5 rounded bg-blue-500 text-white text-[8px]">
+                              Beta
+                            </span>
+                          </Button>
+                        </Link>
+                      )}
+
+                      {/* Campaigns/Polls: Brand pass only */}
+                      {hasValidBrandPass(membershipDetails) && (
                         <Link href="/vote/create" className="w-full">
                           <Button
                             variant="outline"
                             size="sm"
-                            className="w-full flex flex-col items-center justify-center p-2 h-12 hover:bg-green-50 
-                          dark:hover:bg-green-900 transition-colors text-green-600 dark:text-green-400 
+                            className="w-full flex flex-col items-center justify-center p-2 h-12 hover:bg-green-50
+                          dark:hover:bg-green-900 transition-colors text-green-600 dark:text-green-400
                           font-medium border-green-200 dark:border-green-800"
                             onClick={() => setIsDropdownOpen(false)}
                           >
                             <Plus className="h-3 w-3 mb-1" />
-                            <span className="text-xs">Poll</span>
+                            <span className="text-xs">Campaigns</span>
                           </Button>
                         </Link>
                       )}
-                      <Link href="/predict/create" className="w-full">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="w-full flex flex-col items-center justify-center p-2 h-12 hover:bg-blue-50 
-                          dark:hover:bg-blue-900 transition-colors text-blue-600 dark:text-blue-400 
+
+                      {/* Predict: non-members + Investor; blocked for Creator or Brand pass holders */}
+                      {!hasValidCreatorPass(membershipDetails) && !hasValidBrandPass(membershipDetails) && (
+                        <Link href="/predict/create" className="w-full">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full flex flex-col items-center justify-center p-2 h-12 hover:bg-blue-50
+                          dark:hover:bg-blue-900 transition-colors text-blue-600 dark:text-blue-400
                           font-medium border-blue-200 dark:border-blue-800"
-                          onClick={() => setIsDropdownOpen(false)}
-                        >
-                          <TrendingUp className="h-3 w-3 mb-1" />
-                          <span className="text-xs">Predict</span>
-                        </Button>
-                      </Link>
+                            onClick={() => setIsDropdownOpen(false)}
+                          >
+                            <TrendingUp className="h-3 w-3 mb-1" />
+                            <span className="text-xs">Predict</span>
+                          </Button>
+                        </Link>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1622,7 +1789,15 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
 
             <DropdownMenuSeparator />
 
-            {/* Wallet Actions and Balances - Moved to Bottom */}
+            {/* Balances Section */}
+            <div className="px-2 py-2">
+              <TokenBalance
+                isVisible={isDropdownOpen}
+                refreshKey={balanceRefreshKey}
+              />
+            </div>
+
+            <DropdownMenuSeparator />
 
             {/* Wallet Actions Section - Grid Layout */}
             <div className="px-2 py-2 w-full">
@@ -1656,16 +1831,6 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
                   <span className="text-xs">Swap</span>
                 </Button>
               </div>
-            </div>
-
-            <DropdownMenuSeparator />
-
-            {/* Balances Section */}
-            <div className="px-2 py-2">
-              <TokenBalance
-                isVisible={isDropdownOpen}
-                refreshKey={balanceRefreshKey}
-              />
             </div>
 
             {shouldShowMetokens && (
@@ -1715,6 +1880,7 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
           if (!open) {
             setDialogAction("buy");
             setSelectedNFT(null);
+            setSelectedMeToken(null);
             setSendType('token');
             setRecipientAddress("");
             setSendAmount("");
