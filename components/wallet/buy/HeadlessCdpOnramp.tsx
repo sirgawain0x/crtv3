@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -45,18 +45,15 @@ export function HeadlessCdpOnramp({
   const [status, setStatus] = useState<"idle" | "success" | "error" | "cancelled">("idle");
   const [statusMessage, setStatusMessage] = useState("");
 
-  const formattedPhone = useCallback(() => {
+  const formattedPhone = useMemo(() => {
     const digits = phone.replace(/\D/g, "");
     if (digits.length === 0) return "";
-    let formatted = digits;
     if (digits.length > 6) {
-      formatted = `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
+      return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
     } else if (digits.length > 3) {
-      formatted = `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
-    } else {
-      formatted = digits;
+      return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
     }
-    return formatted;
+    return digits;
   }, [phone]);
 
   const signAuthMessage = useCallback(async () => {
@@ -238,7 +235,7 @@ export function HeadlessCdpOnramp({
           id="onramp-phone"
           type="tel"
           placeholder="(555) 123-4567"
-          value={formattedPhone()}
+          value={formattedPhone}
           onChange={(e) => {
             const digits = e.target.value.replace(/\D/g, "").slice(0, 10);
             setPhone(digits);

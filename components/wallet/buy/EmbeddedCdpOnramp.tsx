@@ -93,13 +93,22 @@ export function EmbeddedCdpOnramp({
 
     // Listen for Coinbase Onramp postMessage events
     function handleMessage(event: MessageEvent) {
-      const trustedOrigins = ["https://pay.coinbase.com", "https://pay.coinbase.com"];
+      const trustedOrigins = ["https://pay.coinbase.com"];
       if (!trustedOrigins.includes(event.origin)) return;
 
+      let data = event.data;
+      if (typeof data === "string") {
+        try {
+          data = JSON.parse(data);
+        } catch {
+          return;
+        }
+      }
+
       if (
-        event.data?.event === "onramp_purchase_success" ||
-        event.data?.event === "onramp_purchase_complete" ||
-        event.data?.type === "success"
+        data?.event === "onramp_purchase_success" ||
+        data?.event === "onramp_purchase_complete" ||
+        data?.type === "success"
       ) {
         onSuccess?.();
       }

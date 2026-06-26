@@ -177,7 +177,7 @@ export async function POST(req: NextRequest) {
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return setCorsHeaders(req, NextResponse.json({ error: "Invalid email" }, { status: 400 }));
     }
-    if (!phoneNumber || !/^\+1\d{10}$/.test(phoneNumber.replace(/\D/g, ""))) {
+    if (!phoneNumber || !/^1\d{10}$/.test(phoneNumber.replace(/\D/g, ""))) {
       return setCorsHeaders(req, NextResponse.json({ error: "Invalid US phone number" }, { status: 400 }));
     }
     if (!fiatAmount || fiatAmount <= 0) {
@@ -240,7 +240,17 @@ export async function POST(req: NextRequest) {
         network: network.toLowerCase(),
         asset: asset.toUpperCase(),
       },
-      ...(process.env.NEXT_PUBLIC_APP_URL ? { domain: process.env.NEXT_PUBLIC_APP_URL.replace(/^https?:\/\//, "") } : {}),
+      ...(process.env.NEXT_PUBLIC_APP_URL
+        ? {
+            domain: (() => {
+              try {
+                return new URL(process.env.NEXT_PUBLIC_APP_URL).hostname;
+              } catch {
+                return process.env.NEXT_PUBLIC_APP_URL.replace(/^https?:\/\//, "").split("/")[0];
+              }
+            })(),
+          }
+        : {}),
     };
 
     const response = await fetch("https://api.cdp.coinbase.com/platform/v2/onramp/orders", {

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { FolderPlus, Sparkles, Scissors, Share2, Coins, ArrowRight } from "lucide-react";
 
 const steps = [
@@ -142,13 +143,13 @@ export function CreativePixelsSteps() {
 
         {/* Bottom Call to Action */}
         <div className="mt-12 text-center">
-          <button
-            type="button"
+          <Link
+            href="/upload"
             className="inline-flex items-center gap-2 rounded-full bg-white px-6 py-3 text-base font-bold text-slate-950 transition-colors duration-200 hover:bg-slate-200 focus:outline-none focus:ring-4 focus:ring-slate-500/50"
           >
             Start Your First Project
             <ArrowRight size={18} />
-          </button>
+          </Link>
         </div>
       </div>
     </div>

@@ -188,7 +188,7 @@ export function useUploadAttestation() {
 
       setStatus("submitting");
 
-      const txHash = await client.sendUserOperation({
+      const uoResult = await client.sendUserOperation({
         uo: {
           target: (EAS_CONTRACT_ADDRESS.startsWith("0x") ? EAS_CONTRACT_ADDRESS : `0x${EAS_CONTRACT_ADDRESS}`) as `0x${string}`,
           data: encodeFunctionData({
@@ -210,8 +210,15 @@ export function useUploadAttestation() {
         context,
       });
 
-      logger.debug("Attestation UserOp hash:", txHash);
+      logger.debug("Attestation UserOp hash:", uoResult.hash);
       toast.success("Attestation submitted — waiting for confirmation");
+
+      try {
+        await client.waitForUserOperationTransaction({ hash: uoResult.hash });
+      } catch (waitErr) {
+        logger.error("Attestation UserOp failed to mine:", waitErr);
+        throw new Error("Attestation transaction did not confirm. Please try again.");
+      }
 
       const found = await waitForAttestation(fetchAttestation);
       if (!found) {
