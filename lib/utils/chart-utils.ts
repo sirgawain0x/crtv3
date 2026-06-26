@@ -84,7 +84,8 @@ export function convertToVolumeDataWithColor(
   );
 
   return priceHistory.map((point, index) => {
-    const candle = candleMap.get(point.timestamp as UTCTimestamp);
+    const timeKey = Math.floor(point.timestamp / 3600) * 3600;
+    const candle = candleMap.get(timeKey as UTCTimestamp);
     let isUp: boolean;
     if (candle) {
       isUp = candle.close >= candle.open;

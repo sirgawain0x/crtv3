@@ -264,7 +264,13 @@ export function useVideoTip(): UseVideoTipReturn {
           setIsTipping(false);
           return null;
         }
-        const isNative = tokenInfo.address === null;
+        // Only ETH is native; never treat a missing token address as native.
+        const isNative = token === 'ETH';
+        if (!isNative && !tokenInfo.address) {
+          setError(new Error(`Invalid token address for ${tokenInfo.symbol}`));
+          setIsTipping(false);
+          return null;
+        }
 
         let transferCalldata: Hex | undefined;
         if (!isNative && tokenInfo.address) {

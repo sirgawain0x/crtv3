@@ -106,16 +106,20 @@ export function LiveChat({
       if (tipMessages.length === 0) return;
       await Promise.all(
         tipMessages.map(async (msg) => {
-          const tipData = msg.tipData!;
-          const amountNum = parseFloat(tipData.amount);
-          if (isNaN(amountNum) || amountNum <= 0) return;
-          let value: number;
-          if (tipData.token.startsWith("metoken:")) {
-            value = amountNum;
-          } else {
-            value = amountNum * (await priceService.getTokenPrice(tipData.token as SwapTokenSymbol));
+          try {
+            const tipData = msg.tipData!;
+            const amountNum = parseFloat(tipData.amount);
+            if (isNaN(amountNum) || amountNum <= 0) return;
+            let value: number;
+            if (tipData.token.startsWith("metoken:")) {
+              value = amountNum;
+            } else {
+              value = amountNum * (await priceService.getTokenPrice(tipData.token as SwapTokenSymbol));
+            }
+            newValues[msg.id] = PriceService.formatUSD(value);
+          } catch (err) {
+            logger.error(`Failed to compute USD value for message ${msg.id}:`, err);
           }
-          newValues[msg.id] = PriceService.formatUSD(value);
         })
       );
       if (!cancelled && Object.keys(newValues).length > 0) {
