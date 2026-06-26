@@ -10,6 +10,8 @@ import useModularAccount from "@/lib/hooks/accountkit/useModularAccount";
 import { logger } from '@/lib/utils/logger';
 
 
+import { TokenSymbol } from "@/lib/hooks/video/useVideoTip";
+
 export interface LiveChatMessage {
   id: string;
   content: string;
@@ -18,7 +20,7 @@ export interface LiveChatMessage {
   type?: 'text' | 'tip';
   tipData?: {
     amount: string;
-    token: 'ETH' | 'USDC' | 'DAI';
+    token: TokenSymbol;
     txHash: string;
   };
 }
@@ -28,7 +30,7 @@ export interface UseLiveChatReturn {
   isLoading: boolean;
   error: Error | null;
   sendMessage: (content: string) => Promise<void>;
-  sendTipMessage: (amount: string, token: 'ETH' | 'USDC' | 'DAI', txHash: string) => Promise<void>;
+  sendTipMessage: (amount: string, token: TokenSymbol, txHash: string) => Promise<void>;
   isSending: boolean;
   viewerCount?: number; // Optional: can be provided from stream stats
   /** XMTP group reference. Exposed for moderation actions (e.g. removing a banned member). */
@@ -416,7 +418,7 @@ export function useLiveChat(
 
   // Send tip message
   const sendTipMessage = useCallback(
-    async (amount: string, token: 'ETH' | 'USDC' | 'DAI', txHash: string) => {
+    async (amount: string, token: TokenSymbol, txHash: string) => {
       if (!group || !walletAddress) {
         return;
       }

@@ -1,23 +1,27 @@
 "use client";
 
 import { useEffect, useRef, useState } from 'react';
-import { createChart, IChartApi, ISeriesApi, LineStyleOptions, AreaStyleOptions, ColorType, HistogramStyleOptions, AreaSeries, LineSeries, HistogramSeries } from 'lightweight-charts';
+import { createChart, IChartApi, ISeriesApi, LineStyleOptions, AreaStyleOptions, CandlestickStyleOptions, ColorType, HistogramStyleOptions, AreaSeries, LineSeries, HistogramSeries, CandlestickSeries } from 'lightweight-charts';
 import { useTheme } from 'next-themes';
 import {
   ChartDataPoint,
   VolumeDataPoint,
   convertToChartData,
+  convertToCandlestickData,
   convertToVolumeData,
+  convertToVolumeDataWithColor,
   getChartColors,
   getLineSeriesOptions,
   getAreaSeriesOptions,
+  getCandlestickSeriesOptions,
   getVolumeSeriesOptions,
+  CandlestickDataPoint,
 } from '@/lib/utils/chart-utils';
 import { PriceHistoryPoint } from '@/app/api/market/tokens/[address]/price-history/route';
 import { logger } from '@/lib/utils/logger';
 
 
-export type ChartType = 'line' | 'area';
+export type ChartType = 'line' | 'area' | 'candlestick';
 
 interface TradingViewChartProps {
   data: PriceHistoryPoint[];
@@ -30,7 +34,7 @@ interface TradingViewChartProps {
 
 export function TradingViewChart({
   data,
-  chartType = 'line',
+  chartType = 'candlestick',
   showVolume = false,
   height = 400,
   width,
@@ -38,8 +42,9 @@ export function TradingViewChart({
 }: TradingViewChartProps) {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
-  const seriesRef = useRef<ISeriesApi<'Line' | 'Area'> | null>(null);
+  const seriesRef = useRef<ISeriesApi<'Line' | 'Area' | 'Candlestick'> | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
+  const candleDataRef = useRef<CandlestickDataPoint[]>([]);
   const { theme, systemTheme } = useTheme();
   const [isMounted, setIsMounted] = useState(false);
 
@@ -94,22 +99,31 @@ export function TradingViewChart({
 
     // Add price series
     const chartData = convertToChartData(data);
-    let series: ISeriesApi<'Line' | 'Area'>;
+    let series: ISeriesApi<'Line' | 'Area' | 'Candlestick'>;
 
     if (chartType === 'area') {
       const areaOptions = getAreaSeriesOptions(isDark);
       series = chart.addSeries(AreaSeries, areaOptions as AreaStyleOptions);
+      series.setData(chartData);
+    } else if (chartType === 'candlestick') {
+      const candleOptions = getCandlestickSeriesOptions(isDark);
+      series = chart.addSeries(CandlestickSeries, candleOptions as CandlestickStyleOptions);
+      const candleData = convertToCandlestickData(data);
+      candleDataRef.current = candleData;
+      series.setData(candleData);
     } else {
       const lineOptions = getLineSeriesOptions(isDark);
       series = chart.addSeries(LineSeries, lineOptions as LineStyleOptions);
+      series.setData(chartData);
     }
 
-    series.setData(chartData);
     seriesRef.current = series;
 
     // Add volume series if requested
     if (showVolume && data.length > 0) {
-      const volumeData = convertToVolumeData(data);
+      const volumeData = chartType === 'candlestick'
+        ? convertToVolumeDataWithColor(data, candleDataRef.current)
+        : convertToVolumeData(data);
       const volumeOptions = getVolumeSeriesOptions(isDark);
 
       // Create volume series on separate price scale using v5.x API
@@ -167,12 +181,20 @@ export function TradingViewChart({
   useEffect(() => {
     if (!seriesRef.current || data.length === 0) return;
 
-    const chartData = convertToChartData(data);
-    seriesRef.current.setData(chartData);
+    if (chartType === 'candlestick') {
+      const candleData = convertToCandlestickData(data);
+      candleDataRef.current = candleData;
+      seriesRef.current.setData(candleData);
+    } else {
+      const chartData = convertToChartData(data);
+      seriesRef.current.setData(chartData);
+    }
 
     // Update volume if shown
     if (showVolume && volumeSeriesRef.current) {
-      const volumeData = convertToVolumeData(data);
+      const volumeData = chartType === 'candlestick'
+        ? convertToVolumeDataWithColor(data, candleDataRef.current)
+        : convertToVolumeData(data);
       volumeSeriesRef.current.setData(volumeData);
     }
 
@@ -180,7 +202,7 @@ export function TradingViewChart({
     if (chartRef.current) {
       chartRef.current.timeScale().fitContent();
     }
-  }, [data, showVolume]);
+  }, [data, showVolume, chartType]);
 
   // Update theme when it changes
   useEffect(() => {
@@ -203,6 +225,9 @@ export function TradingViewChart({
       if (chartType === 'area') {
         const areaOptions = getAreaSeriesOptions(isDark);
         seriesRef.current.applyOptions(areaOptions as AreaStyleOptions);
+      } else if (chartType === 'candlestick') {
+        const candleOptions = getCandlestickSeriesOptions(isDark);
+        seriesRef.current.applyOptions(candleOptions as CandlestickStyleOptions);
       } else {
         const lineOptions = getLineSeriesOptions(isDark);
         seriesRef.current.applyOptions(lineOptions as LineStyleOptions);

@@ -6,6 +6,7 @@ import { useInterval } from "@/lib/hooks/useInterval";
 import { Player } from "@/components/Player/Player";
 import { getDetailPlaybackSource } from "@/lib/hooks/livepeer/useDetailPlaybackSources";
 import { getStreamByPlaybackId } from "@/services/streams";
+import { LiveTokenPanel } from "@/components/Live/LiveTokenPanel";
 import { LiveChat } from "@/components/Live/LiveChat";
 import { ClipCreator } from "@/components/Live/ClipCreator";
 import { DigitalTwinOverlay } from "@/components/Live/DigitalTwinOverlay";
@@ -45,6 +46,7 @@ interface WatchClientProps {
     address: string;
     symbol: string;
     name: string;
+    decimals?: number;
   } | null;
   videoTitle?: string;
   storyIpId?: string | null;
@@ -566,12 +568,20 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
           </div>
 
           {/* Live Chat Section */}
-          <div className="lg:col-span-1">
+          <div className="lg:col-span-1 space-y-4">
+            {playbackId && sessionId && streamData?.creator_id && (
+              <LiveTokenPanel
+                creatorAddress={streamData.creator_id}
+                creatorMeToken={tokenInfo ?? undefined}
+                streamId={streamId}
+                sessionId={sessionId}
+              />
+            )}
             {playbackId && sessionId ? (
               <LiveChat
                 streamId={streamId}
                 sessionId={sessionId}
-                creatorAddress={null}
+                creatorAddress={streamData?.creator_id ?? null}
               />
             ) : (
               <div className="border rounded-lg p-4 text-sm text-muted-foreground">

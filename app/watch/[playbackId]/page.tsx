@@ -103,7 +103,8 @@ export default async function WatchPage({ params }: WatchPageProps) {
                 tokenInfo = {
                     address: tokenAddress,
                     symbol: marketData.symbol,
-                    name: marketData.name
+                    name: marketData.name,
+                    decimals: marketData.decimals ?? 18,
                 };
             }
         } catch (err) {

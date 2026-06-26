@@ -67,6 +67,33 @@ export function convertToCandlestickData(priceHistory: PriceHistoryPoint[]): Can
 /**
  * Convert volume data to lightweight-charts format
  */
+export function convertToVolumeDataWithColor(
+  priceHistory: PriceHistoryPoint[],
+  candles?: CandlestickDataPoint[]
+): VolumeDataPoint[] {
+  if (!candles || candles.length === 0) {
+    return convertToVolumeData(priceHistory);
+  }
+
+  const candleMap = new Map<number, CandlestickDataPoint>(
+    candles.map((c) => [c.time, c])
+  );
+
+  return priceHistory.map((point) => {
+    const candle = candleMap.get(point.timestamp as UTCTimestamp);
+    const color = candle && candle.close >= candle.open ? '#22c55e' : '#ef4444';
+    return {
+      time: point.timestamp as UTCTimestamp,
+      value: point.volume,
+      color,
+    } as HistogramData<Time>;
+  });
+}
+
+/**
+ * Convert volume data to lightweight-charts format
+ * (uncolored fallback for line/area charts)
+ */
 export function convertToVolumeData(priceHistory: PriceHistoryPoint[]): VolumeDataPoint[] {
   return priceHistory.map((point) => ({
     time: point.timestamp as UTCTimestamp,
