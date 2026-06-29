@@ -11,6 +11,14 @@
   "plugins": [
     "@typescript-eslint"
   ],
+  "globals": {
+    "Deno": "readonly"
+  },
+  "ignorePatterns": [
+    "*.sql",
+    "*.md",
+    "supabase/functions/**/*.ts"
+  ],
   "rules": {
     "no-unused-vars": "off",
     "@typescript-eslint/no-unused-vars": "warn"

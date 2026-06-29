@@ -3,8 +3,8 @@ export const BASE_TOKEN_ICONS = {
   ETH: '/images/tokens/ETH_on_Base.png',
   USDC: '/images/tokens/USDC_on_Base.png',
   DAI: '/images/tokens/DAI_on_Base.png',
-  USDS: '/images/tokens/USDS_on_Base.png',
-  GHO: '/images/tokens/GHO_on_Base.png',
+  USDS: '/images/tokens/USDS_on_Base.svg',
+  GHO: '/images/tokens/GHO_on_Base.svg',
 } as const;
 
 export type BaseTokenIconSymbol = keyof typeof BASE_TOKEN_ICONS;

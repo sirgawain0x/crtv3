@@ -14,9 +14,17 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useUser, useSmartAccountClient } from '@/lib/wallet/react';
 import { useGasSponsorship } from '@/lib/hooks/wallet/useGasSponsorship';
-import { parseEther, formatEther, encodeFunctionData, decodeEventLog } from 'viem';
+import { formatEther, encodeFunctionData, decodeEventLog, erc20Abi, parseEther } from 'viem';
 import { parseBundlerError, shouldRetryError } from '@/lib/utils/bundlerErrorParser';
-import { getDaiTokenContract, DAI_TOKEN_ADDRESSES } from '@/lib/contracts/DAIToken';
+import {
+  getHubErc20Contract,
+  type HubAssetConfig,
+} from '@/lib/contracts/MeTokenHubs';
+import {
+  parseHubAssetAmount,
+  formatHubAssetAmount,
+  resolveHubAsset,
+} from '@/lib/utils/hubAssetUtils';
 import { logger } from '@/lib/utils/logger';
 import { appendBuilderCode } from "@/lib/utils/builder-code";
 import { METOKEN_DIAMOND_BASE, METOKEN_FACTORY_BASE } from '@/lib/contracts/metokens/deployments';
@@ -55,18 +63,6 @@ const SUBSCRIBE_EVENT_ABI = [{
   ],
   name: 'Subscribe',
   type: 'event'
-}] as const;
-
-// DAI Approve ABI
-const DAI_APPROVE_ABI = [{
-  inputs: [
-    { internalType: 'address', name: 'spender', type: 'address' },
-    { internalType: 'uint256', name: 'amount', type: 'uint256' }
-  ],
-  name: 'approve',
-  outputs: [{ internalType: 'bool', name: '', type: 'bool' }],
-  stateMutability: 'nonpayable',
-  type: 'function'
 }] as const;
 
 // Hub Info ABI
@@ -205,7 +201,7 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
   });
 
   const [pendingTransactions, setPendingTransactions] = useState<PendingMeTokenTransaction[]>([]);
-  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const address = user?.address;
 
@@ -345,35 +341,39 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
   }, [client]);
 
   /**
-   * Approve DAI for the vault
+   * Approve the selected hub's collateral token for a spender.
    */
-  const approveDai = useCallback(async (
-    vaultAddress: string,
+  const approveCollateral = useCallback(async (
+    asset: HubAssetConfig,
+    spender: string,
     amount: bigint
   ): Promise<string> => {
     if (!client || !address) throw new Error('Client or address not available');
 
-    const daiContract = getDaiTokenContract('base');
+    const tokenContract = {
+      address: asset.address as `0x${string}`,
+      abi: erc20Abi,
+    };
 
     // Check current allowance
     const currentAllowance = await client.readContract({
-      address: daiContract.address as `0x${string}`,
-      abi: daiContract.abi,
+      address: tokenContract.address,
+      abi: tokenContract.abi,
       functionName: 'allowance',
-      args: [address as `0x${string}`, vaultAddress as `0x${string}`],
+      args: [address as `0x${string}`, spender as `0x${string}`],
     }) as bigint;
 
     if (currentAllowance >= amount) {
-      logger.debug('✅ Sufficient DAI allowance already exists');
+      logger.debug(`✅ Sufficient ${asset.symbol} allowance already exists`);
       return 'skipped';
     }
 
-    logger.debug('🔓 Approving DAI for vault...');
+    logger.debug(`🔓 Approving ${asset.symbol} for ${spender}...`);
 
     const approveData = encodeFunctionData({
-      abi: DAI_APPROVE_ABI,
+      abi: erc20Abi,
       functionName: 'approve',
-      args: [vaultAddress as `0x${string}`, amount],
+      args: [spender as `0x${string}`, amount],
     });
 
     const gasContext = getGasContext('usdc');
@@ -381,7 +381,7 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
     // Send approval with timeout
     const approvePromise = client.sendUserOperation({
       uo: {
-        target: daiContract.address as `0x${string}`,
+        target: tokenContract.address,
         data: appendBuilderCode(approveData),
         value: BigInt(0),
       },
@@ -389,12 +389,12 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
     });
 
     const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error('DAI approval timed out after 90 seconds')), 90000);
+      setTimeout(() => reject(new Error(`${asset.symbol} approval timed out after 90 seconds`)), 90000);
     });
 
     const approveOp = await Promise.race([approvePromise, timeoutPromise]);
 
-    logger.debug('⏳ Waiting for approval confirmation...');
+    logger.debug(`⏳ Waiting for ${asset.symbol} approval confirmation...`);
 
     // Wait with timeout
     const waitPromise = client.waitForUserOperationTransaction({
@@ -402,12 +402,12 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
     });
 
     const waitTimeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error('Approval confirmation timed out after 120 seconds')), 120000);
+      setTimeout(() => reject(new Error(`${asset.symbol} approval confirmation timed out after 120 seconds`)), 120000);
     });
 
     const txHash = await Promise.race([waitPromise, waitTimeoutPromise]);
 
-    logger.debug('✅ DAI approval confirmed:', txHash);
+    logger.debug(`✅ ${asset.symbol} approval confirmed:`, txHash);
 
     // Verify the approval with retries
     let verified = false;
@@ -415,10 +415,10 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
       await new Promise(resolve => setTimeout(resolve, 2000 + i * 1000));
 
       const newAllowance = await client.readContract({
-        address: daiContract.address as `0x${string}`,
-        abi: daiContract.abi,
+        address: tokenContract.address,
+        abi: tokenContract.abi,
         functionName: 'allowance',
-        args: [address as `0x${string}`, vaultAddress as `0x${string}`],
+        args: [address as `0x${string}`, spender as `0x${string}`],
       }) as bigint;
 
       if (newAllowance >= amount) {
@@ -428,7 +428,7 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
     }
 
     if (!verified) {
-      throw new Error('DAI approval verification failed after multiple attempts');
+      throw new Error(`${asset.symbol} approval verification failed after multiple attempts`);
     }
 
     return txHash;
@@ -454,31 +454,34 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
     }
 
     const { name, symbol, hubId, assetsDeposited } = params;
-    const depositAmount = parseEther(assetsDeposited || '0');
+    const asset = resolveHubAsset(hubId);
+    const depositAmount = parseHubAssetAmount(assetsDeposited, asset);
 
     try {
       // Step 1: Check balance
       updateState({
         status: 'checking_balance',
-        message: 'Checking DAI balance...',
+        message: `Checking ${asset.symbol} balance...`,
         progress: 10,
       });
 
       if (depositAmount > BigInt(0)) {
-        const daiContract = getDaiTokenContract('base');
+        const tokenContract = getHubErc20Contract(hubId);
 
         const balance = await client.readContract({
-          address: daiContract.address as `0x${string}`,
-          abi: daiContract.abi,
+          address: tokenContract.address,
+          abi: tokenContract.abi,
           functionName: 'balanceOf',
           args: [address as `0x${string}`],
         }) as bigint;
 
         if (balance < depositAmount) {
-          throw new Error(`Insufficient DAI balance. You have ${formatEther(balance)} DAI but need ${formatEther(depositAmount)} DAI.`);
+          throw new Error(
+            `Insufficient ${asset.symbol} balance. You have ${formatHubAssetAmount(balance, asset)} ${asset.symbol} but need ${formatHubAssetAmount(depositAmount, asset)} ${asset.symbol}.`
+          );
         }
 
-        // Step 2: Get vault and approve DAI
+        // Step 2: Get vault and approve collateral
         updateState({
           status: 'approving_dai',
           message: 'Getting vault address...',
@@ -490,21 +493,21 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
         if (vaultAddress && vaultAddress !== '0x0000000000000000000000000000000000000000') {
           updateState({
             status: 'approving_dai',
-            message: 'Approving DAI for vault...',
+            message: `Approving ${asset.symbol} for vault...`,
             progress: 30,
           });
 
-          await approveDai(vaultAddress, depositAmount);
+          await approveCollateral(asset, vaultAddress, depositAmount);
         }
 
         // Also approve Diamond as fallback
         updateState({
           status: 'approving_dai',
-          message: 'Approving DAI for Diamond contract...',
+          message: `Approving ${asset.symbol} for Diamond contract...`,
           progress: 40,
         });
 
-        await approveDai(DIAMOND, depositAmount);
+        await approveCollateral(asset, DIAMOND, depositAmount);
       }
 
       // Step 3: Create MeToken via subscribe
@@ -821,7 +824,7 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
 
       throw err;
     }
-  }, [client, address, getGasContext, getVaultAddress, approveDai, pollForMeToken, updateState]);
+  }, [client, address, getGasContext, getVaultAddress, approveCollateral, pollForMeToken, updateState]);
 
   /**
    * Check and recover pending transactions

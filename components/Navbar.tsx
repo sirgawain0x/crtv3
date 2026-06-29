@@ -34,7 +34,6 @@ import {
   RadioTower,
   Bot,
   ShieldUser,
-  Music2,
   TrendingUp,
 } from "lucide-react";
 import type { User as AccountUser } from "@account-kit/signer";
@@ -523,14 +522,6 @@ export default function Navbar() {
                   id="mobile-nav-home-link"
                 >
                   Home
-                </Link>
-                <Link
-                  href="/songchain"
-                  className={mobileNavLinkClass}
-                  onClick={handleLinkClick}
-                  id="mobile-nav-songchain-link"
-                >
-                  <Music2 className="mr-2 h-4 w-4" /> Songchain
                 </Link>
                 <Link
                   href="/discover"

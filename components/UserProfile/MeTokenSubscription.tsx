@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, AlertCircle, CheckCircle, ExternalLink } from 'lucide-react';
 import Image from 'next/image';
-import { formatEther, parseEther, parseUnits, formatUnits, encodeFunctionData, maxUint256, type Address } from "viem";
+import { parseUnits, formatUnits, encodeFunctionData, maxUint256, type Address } from "viem";
 import { useSmartAccountClient, useChain } from '@/lib/wallet/react';
 import { useMeTokensSupabase, MeTokenData } from '@/lib/hooks/metokens/useMeTokensSupabase';
 import { getHubVaultAddress } from '@/lib/utils/metokenSubscriptionUtils';
@@ -78,6 +78,15 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
   const collateralAddress = selectedHubAsset.address;
   const collateralDecimals = selectedHubAsset.decimals;
   const collateralDisplayName = selectedHubAsset.displayName;
+
+  const depositAmount = useMemo(() => {
+    if (!assetsDeposited || parseFloat(assetsDeposited) <= 0) return 0n;
+    try {
+      return parseUnits(assetsDeposited, collateralDecimals);
+    } catch {
+      return 0n;
+    }
+  }, [assetsDeposited, collateralDecimals]);
 
   // Check collateral balance
   const checkCollateralBalance = useCallback(async () => {
@@ -212,7 +221,7 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
       setSuccess('Approval confirmed! Validating across network nodes...');
 
       const allowanceParams = {
-        token: '0x50c5725949a6f0c72e6c4a641f24049a917db0cb' as `0x${string}`,
+        token: collateralTokenAddress,
         owner: client.account?.address as `0x${string}`,
         spender: vaultAddress as `0x${string}`,
       };
@@ -237,7 +246,7 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
             getErc20Allowance(allowanceParams),
           ]);
 
-          const allowances = checks.map(a => formatEther(a));
+          const allowances = checks.map(a => formatUnits(a, collateralDecimals));
           logger.debug(`Allowance checks: Allowance checks:`, allowances);
 
           // All 3 checks must pass
@@ -847,28 +856,24 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
   // Check ${collateralSymbol} balance on mount and when client changes
   useEffect(() => {
     checkCollateralBalance();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [client]); // Only re-run when client changes
+  }, [client]);
 
   // Check real subscription status on mount and when meToken address changes
   useEffect(() => {
     checkRealSubscriptionStatus();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [meToken.address]); // Only re-run when meToken address changes
+  }, [meToken.address]);
 
   // Check allowance status on mount and when client/amount/hub changes
   useEffect(() => {
     if (client?.account?.address && assetsDeposited && parseFloat(assetsDeposited) > 0) {
       checkAllowanceStatus();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client?.account?.address, assetsDeposited, hubId]);
 
   // Check real subscription status on mount and when meToken address changes
   useEffect(() => {
     checkRealSubscriptionStatus();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [meToken.address]); // Only re-run when meToken address changes
+  }, [meToken.address]);
 
   return (
     <Card>
@@ -962,7 +967,7 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
             </p>
             {assetsDeposited && parseFloat(assetsDeposited) > 0 && (
               <div className="text-sm">
-                {daiBalance >= parseEther(assetsDeposited) ? (
+                {daiBalance >= depositAmount ? (
                   <span className="text-green-600">✓ Sufficient {collateralSymbol} balance</span>
                 ) : (
                   <div className="space-y-2">
@@ -978,9 +983,9 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
           </div>
 
           {/* Show funding options if insufficient collateral */}
-          {assetsDeposited && parseFloat(assetsDeposited) > 0 && daiBalance < parseEther(assetsDeposited) && (
+          {assetsDeposited && parseFloat(assetsDeposited) > 0 && daiBalance < depositAmount && (
             <DaiFundingOptions
-              requiredAmount={parseEther(assetsDeposited).toString()}
+              requiredAmount={depositAmount.toString()}
               onBalanceUpdate={(balance) => {
                 setDaiBalance(balance);
                 checkCollateralBalance(); // Refresh balance
@@ -991,7 +996,7 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
           <div className="flex gap-2">
             <Button
               onClick={handleApprove}
-              disabled={!client || isApproving || isMinting || !assetsDeposited || parseFloat(assetsDeposited) <= 0 || approvalComplete || daiBalance < parseEther(assetsDeposited)}
+              disabled={!client || isApproving || isMinting || !assetsDeposited || parseFloat(assetsDeposited) <= 0 || approvalComplete || daiBalance < depositAmount}
               className="flex-1"
               variant={approvalComplete ? "outline" : "default"}
             >
@@ -1012,7 +1017,7 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
 
             <Button
               onClick={handleMint}
-              disabled={!client || isApproving || isMinting || !assetsDeposited || parseFloat(assetsDeposited) <= 0 || daiBalance < parseEther(assetsDeposited)}
+              disabled={!client || isApproving || isMinting || !assetsDeposited || parseFloat(assetsDeposited) <= 0 || daiBalance < depositAmount}
               className="flex-1"
             >
               {isMinting ? (

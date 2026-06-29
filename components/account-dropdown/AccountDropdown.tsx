@@ -82,7 +82,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { HeadlessCdpOnramp } from "@/components/wallet/buy/HeadlessCdpOnramp";
+import { FundingOptions } from "@/components/wallet/buy/FundingOptions";
 import { LoginButton } from "@/components/auth/LoginButton";
 import { AlchemySwapWidget } from "@/components/wallet/swap/AlchemySwapWidget";
 import { useSmartWalletDisplayAddress } from "@/lib/hooks/accountkit/useSmartWalletDisplayAddress";
@@ -920,13 +920,17 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
       case "buy":
         return (
           <div className="space-y-4">
-            <HeadlessCdpOnramp
+            <FundingOptions
               presetFiatAmount={10}
               fiatCurrency="USD"
+              asset="USDC"
+              network="base"
+              prefillEmail={user?.email}
               onSuccess={() => {
                 setBalanceRefreshKey((key) => key + 1);
                 setTimeout(() => setIsDialogOpen(false), 1500);
               }}
+              onClose={() => setIsDialogOpen(false)}
             />
           </div>
         );
