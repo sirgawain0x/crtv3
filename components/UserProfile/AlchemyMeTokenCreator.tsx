@@ -7,13 +7,14 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, AlertCircle, CheckCircle, ExternalLink, Info } from 'lucide-react';
-import { formatEther, parseEther, encodeFunctionData, maxUint256 } from 'viem';
+import { formatEther, parseEther, encodeFunctionData, maxUint256, type Address } from 'viem';
 import { useSmartAccountClient, useChain } from '@/lib/wallet/react';
 import { useToast } from '@/components/ui/use-toast';
 import { DaiFundingOptions } from '@/components/wallet/funding/DaiFundingOptions';
 import { logger } from '@/lib/utils/logger';
 import { appendBuilderCode } from "@/lib/utils/builder-code";
 import { METOKEN_DIAMOND_BASE } from '@/lib/contracts/metokens/deployments';
+import { getErc20Balance, getErc20Allowance } from '@/lib/viem';
 
 // Contract addresses and ABIs
 const METOKEN_CONTRACTS = {
@@ -101,12 +102,10 @@ export function AlchemyMeTokenCreator({ onMeTokenCreated }: AlchemyMeTokenCreato
     if (!client?.account?.address) return;
     
     try {
-      const balance = await client.readContract({
-        address: METOKEN_CONTRACTS.DAI,
-        abi: ERC20_ABI,
-        functionName: 'balanceOf',
-        args: [client.account.address],
-      }) as bigint;
+      const balance = await getErc20Balance({
+        token: METOKEN_CONTRACTS.DAI as Address,
+        owner: client.account.address,
+      });
       
       setDaiBalance(balance);
     } catch (err) {
@@ -144,12 +143,11 @@ export function AlchemyMeTokenCreator({ onMeTokenCreated }: AlchemyMeTokenCreato
 
       // Step 1: Check current DAI allowance
       setSuccess('Checking DAI allowance...');
-      const currentAllowance = await client.readContract({
-        address: METOKEN_CONTRACTS.DAI,
-        abi: ERC20_ABI,
-        functionName: 'allowance',
-        args: [client.account.address, METOKEN_CONTRACTS.DIAMOND],
-      }) as bigint;
+      const currentAllowance = await getErc20Allowance({
+        token: METOKEN_CONTRACTS.DAI as Address,
+        owner: client.account.address,
+        spender: METOKEN_CONTRACTS.DIAMOND as Address,
+      });
 
       logger.debug('📊 Current DAI allowance:', {
         current: currentAllowance.toString(),

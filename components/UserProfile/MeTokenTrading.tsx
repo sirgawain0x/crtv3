@@ -8,14 +8,14 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useMeTokensSupabase, MeTokenData } from '@/lib/hooks/metokens/useMeTokensSupabase';
 import { Loader2, TrendingUp, TrendingDown, AlertCircle, CheckCircle, Lock, ExternalLink } from 'lucide-react';
-import { formatEther, parseEther, encodeFunctionData } from 'viem';
+import { formatEther, parseEther, encodeFunctionData, type Address } from 'viem';
 import { useSmartAccountClient, useChain, useAuthModal, useUser } from '@/lib/wallet/react';
 import { DAI_TOKEN_ADDRESSES, getDaiTokenContract } from '@/lib/contracts/DAIToken';
-import { erc20Abi } from 'viem';
 import { MeTokenSubscription } from './MeTokenSubscription';
 import { DaiFundingOptions } from '@/components/wallet/funding/DaiFundingOptions';
 import { useToast } from '@/components/ui/use-toast';
 import { logger } from '@/lib/utils/logger';
+import { getErc20Balance } from '@/lib/viem';
 
 interface MeTokenTradingProps {
   meToken: MeTokenData;
@@ -112,12 +112,10 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
     try {
       const daiContract = getDaiTokenContract('base');
 
-      const balance = await client.readContract({
-        address: daiContract.address as `0x${string}`,
-        abi: erc20Abi,
-        functionName: 'balanceOf',
-        args: [client.account?.address as `0x${string}`],
-      }) as bigint;
+      const balance = await getErc20Balance({
+        token: daiContract.address as Address,
+        owner: client.account?.address as Address,
+      });
 
       setDaiBalance(balance);
     } catch (err) {

@@ -2,13 +2,14 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Loader2, Radio, X } from "lucide-react";
+import { Loader2, Radio, X, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useSongchainPost } from "@/hooks/useSongchainPost";
-import { useCreatorVideoLibrary } from "@/hooks/useCreatorVideoLibrary";
 import { useCreatorLiveStream } from "@/hooks/useCreatorLiveStream";
-import { CreativeTVVideoPicker } from "@/components/songchain/CreativeTVVideoPicker";
+import { useUser } from "@/lib/wallet/react";
+import { GroveVideoUploader } from "@/components/songchain/GroveVideoUploader";
+import { songCupSubmissionsService } from "@/lib/sdk/supabase/song-cup-submissions";
 import type { SongchainCreatedPost } from "@/lib/songchain/feed-types";
 import type { VideoAsset } from "@/lib/types/video-asset";
 import type { StreamSummary } from "@/lib/songchain/build-lens-livestream-metadata";
@@ -26,44 +27,58 @@ export function SongchainComposePost({
   initialLiveStream = null,
 }: SongchainComposePostProps) {
   const [content, setContent] = useState("");
-  const [attachedVideo, setAttachedVideo] = useState<VideoAsset | null>(null);
+  const [uploadedVideoAsset, setUploadedVideoAsset] = useState<Partial<VideoAsset> | null>(null);
   const [attachedLiveStream, setAttachedLiveStream] = useState<StreamSummary | null>(
     initialLiveStream?.is_live ? initialLiveStream : null,
   );
 
   const { createPost, isPosting, canWrite, needsOrbReauth, promptWriteAccess } =
     useSongchainPost();
-  const { videos, loading: videosLoading, hasWallet } = useCreatorVideoLibrary();
   const { stream, isLive, loading: streamLoading } = useCreatorLiveStream();
+  const user = useUser();
 
   if (!feedId) return null;
 
   const liveAttached = !!attachedLiveStream?.is_live;
   const canSubmit =
-    content.trim().length > 0 || !!attachedVideo || liveAttached;
+    content.trim().length > 0 || !!uploadedVideoAsset || liveAttached;
 
   const handleAttachLive = () => {
     if (stream?.is_live) {
       setAttachedLiveStream(stream);
-      setAttachedVideo(null);
+      setUploadedVideoAsset(null);
     }
   };
 
-  const handleSelectVideo = (video: VideoAsset | null) => {
-    setAttachedVideo(video);
-    if (video) setAttachedLiveStream(null);
+  const handleUploadVideo = (asset: Partial<VideoAsset>) => {
+    setUploadedVideoAsset(asset);
+    if (asset) setAttachedLiveStream(null);
+  };
+
+  const handleRemoveVideo = () => {
+    setUploadedVideoAsset(null);
   };
 
   const handleSubmit = async () => {
     const created = await createPost({
       content,
       feedId,
-      attachedVideo: liveAttached ? null : attachedVideo,
+      attachedVideo: liveAttached ? null : (uploadedVideoAsset as VideoAsset | null),
       attachedLiveStream: liveAttached ? attachedLiveStream : null,
     });
     if (created) {
+      if (uploadedVideoAsset?.location && user?.address) {
+        await songCupSubmissionsService.create({
+          wallet_address: user.address,
+          grove_url: uploadedVideoAsset.location,
+          grove_hash: uploadedVideoAsset.metadata_uri ?? undefined,
+          title: uploadedVideoAsset.title ?? undefined,
+          description: content.trim() || undefined,
+          post_id: created.postId,
+        });
+      }
       setContent("");
-      setAttachedVideo(null);
+      setUploadedVideoAsset(null);
       setAttachedLiveStream(null);
       onPosted?.(created);
     }
@@ -79,6 +94,15 @@ export function SongchainComposePost({
             : "Connect wallet, sign in with Orb, and link your profile to post to this feed."}
         </p>
       )}
+
+      <Textarea
+        value={content}
+        onChange={(e) => setContent(e.target.value)}
+        placeholder="Share something with Songchain…"
+        rows={3}
+        disabled={isPosting}
+        maxLength={5000}
+      />
 
       {isLive && !liveAttached && (
         <Button
@@ -123,24 +147,24 @@ export function SongchainComposePost({
         </div>
       )}
 
-      {!liveAttached && (
-        <CreativeTVVideoPicker
-          videos={videos}
-          loading={videosLoading}
-          selected={attachedVideo}
-          onSelect={handleSelectVideo}
-          disabled={!hasWallet}
+      {!liveAttached && !uploadedVideoAsset && (
+        <GroveVideoUploader
+          onUploaded={handleUploadVideo}
+          onRemove={handleRemoveVideo}
+          uploadedAsset={uploadedVideoAsset}
+          disabled={isPosting}
         />
       )}
 
-      <Textarea
-        value={content}
-        onChange={(e) => setContent(e.target.value)}
-        placeholder="Share something with Songchain…"
-        rows={3}
-        disabled={isPosting}
-        maxLength={5000}
-      />
+      {uploadedVideoAsset && (
+        <GroveVideoUploader
+          onUploaded={handleUploadVideo}
+          onRemove={handleRemoveVideo}
+          uploadedAsset={uploadedVideoAsset}
+          disabled={isPosting}
+        />
+      )}
+
       <div className="flex justify-end gap-2">
         {!canWrite ? (
           <Button type="button" variant="outline" size="sm" onClick={promptWriteAccess}>
@@ -153,8 +177,8 @@ export function SongchainComposePost({
             disabled={isPosting || !canSubmit}
             onClick={() => void handleSubmit()}
           >
-            {isPosting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-            Post
+            {isPosting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Send className="h-4 w-4 mr-2" />}
+            Submit
           </Button>
         )}
       </div>

@@ -79,14 +79,15 @@ function ActivePanel({
   panel,
   props,
 }: {
-  panel: SongCupPanel;
+  panel: SongCupPanel | null;
   props: SongCupBottomSectionProps;
 }) {
   if (panel === "feed") return <FeedPanel {...props} />;
+  if (!panel) return null;
   return <PreviewPanel panel={panel} />;
 }
 
-function ActivePanelBanner({ panel }: { panel: SongCupPanel }) {
+function ActivePanelBanner({ panel }: { panel: SongCupPanel | null }) {
   const icon = SONG_CUP_BUTTON_ICONS.find(({ id }) => id === panel);
   if (!icon) return null;
   return (
@@ -105,7 +106,7 @@ function MobileDivider() {
 
 export function SongCupBottomSection(props: SongCupBottomSectionProps) {
   const { config } = props;
-  const [activePanel, setActivePanel] = useState<SongCupPanel>("feed");
+  const [activePanel, setActivePanel] = useState<SongCupPanel | null>("feed");
   const isDesktopQuery = useMediaQuery("(min-width: 1024px)");
   const isDesktop = isDesktopQuery ?? true;
 
@@ -168,7 +169,7 @@ export function SongCupBottomSection(props: SongCupBottomSectionProps) {
                     type="button"
                     onClick={() => {
                       if (isPanel) {
-                        setActivePanel(id as SongCupPanel);
+                        setActivePanel((current) => (current === id ? null : id) as SongCupPanel);
                       }
                     }}
                     className={cn(

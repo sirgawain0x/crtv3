@@ -37,6 +37,8 @@ export interface HubAssetConfig {
   bestFor: string;
   /** Honest tradeoff users should know. */
   tradeoff: string;
+  /** Logo path for UI. */
+  logo: string;
   /** Legacy token — still supported for existing MeTokens on Hub 1. */
   deprecated?: boolean;
   /** Preferred collateral for newly created MeTokens. */
@@ -54,6 +56,7 @@ export const HUB_ASSET_CONFIGS: Record<HubAssetSymbol, HubAssetConfig> = {
     tagline: 'Legacy stable — being replaced by USDS',
     bestFor: 'Existing MeTokens already on Hub 1',
     tradeoff: 'DAI is phased out on major exchanges; use USDS or USDC for new tokens.',
+    logo: '/images/tokens/dai-logo.svg',
     deprecated: true,
   },
   USDS: {
@@ -66,6 +69,7 @@ export const HUB_ASSET_CONFIGS: Record<HubAssetSymbol, HubAssetConfig> = {
     tagline: 'Decentralized stable with Sky savings rewards',
     bestFor: 'Creators and holders who want decentralized backing and built-in savings perks',
     tradeoff: 'The DAI → USDS rename may need a quick explainer; crypto-backed stability can wobble in extreme market crashes.',
+    logo: '/images/tokens/USDS_on_Base.svg',
   },
   USDC: {
     symbol: 'USDC',
@@ -77,6 +81,7 @@ export const HUB_ASSET_CONFIGS: Record<HubAssetSymbol, HubAssetConfig> = {
     tagline: 'Industry standard for everyday payments on Base',
     bestFor: 'Fast onboarding, paying creators, casual use, and smooth cash-out to banks',
     tradeoff: 'Centralized — Circle can freeze funds if required by law enforcement.',
+    logo: '/images/tokens/usdc-logo.svg',
     recommended: true,
   },
   GHO: {
@@ -89,6 +94,7 @@ export const HUB_ASSET_CONFIGS: Record<HubAssetSymbol, HubAssetConfig> = {
     tagline: 'Aave stable for DeFi power users',
     bestFor: 'Advanced lending, borrowing, and yield vaults without selling other assets',
     tradeoff: 'Smaller market and not widely used for everyday spending; loan health must be managed in volatile markets.',
+    logo: '/images/tokens/GHO_on_Base.png',
   },
 };
 

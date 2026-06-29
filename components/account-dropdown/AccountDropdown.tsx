@@ -103,7 +103,8 @@ import {
   AllowlistModule,
   installValidationActions,
 } from "@account-kit/smart-contracts/experimental";
-import { parseEther, type Address, type Hex, encodeFunctionData, parseAbi, parseUnits, formatUnits, erc20Abi } from "viem";
+import { parseEther, type Address, type Hex, encodeFunctionData, parseAbi, parseUnits, formatUnits } from "viem";
+import { getEthBalance, getErc20Balance } from "@/lib/viem";
 import { logger } from "@/lib/utils/logger";
 import { deferAfterOverlayClose } from "@/lib/utils/radixLayerFocus";
 import { appendBuilderCode } from "@/lib/utils/builder-code";
@@ -392,10 +393,8 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
       if (!client || !smartAccountAddress || dialogAction !== 'send' || !isDialogOpen) return;
 
       try {
-        // Get ETH balance
-        const ethBalance = await client.getBalance({
-          address: smartAccountAddress as Address,
-        });
+        // Get ETH balance via public client (smart-account client is write-only)
+        const ethBalance = await getEthBalance(smartAccountAddress as Address);
 
         const chainKey = chain?.id === base.id ? "base" : undefined;
         const erc20Balances = Object.fromEntries(
@@ -404,12 +403,10 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
               if (!chainKey) return [symbol, 0n] as const;
               const info = getTokenInfo(chain?.id)[symbol];
               if (!info.address) return [symbol, 0n] as const;
-              const balance = await client.readContract({
-                address: info.address as Address,
-                abi: erc20Abi,
-                functionName: 'balanceOf',
-                args: [smartAccountAddress as Address],
-              }) as bigint;
+              const balance = await getErc20Balance({
+                token: info.address as Address,
+                owner: smartAccountAddress as Address,
+              });
               return [symbol, balance] as const;
             })
           )

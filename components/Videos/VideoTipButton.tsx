@@ -34,14 +34,15 @@ interface CreatorMeToken {
 interface VideoTipButtonProps {
   creatorAddress: string;
   creatorMeToken?: CreatorMeToken | null;
+  availableMeTokens?: CreatorMeToken[];
   onTipSuccess?: (txHash: string, amount: string, token: TokenSymbol) => void;
 }
 
 /**
  * Tip button component for video creators
- * Allows users to send tips in ETH, USDC, DAI, USDS, GHO, or the creator's meToken
+ * Allows users to send tips in ETH, USDC, DAI, USDS, GHO, or any creator meToken they hold.
  */
-export function VideoTipButton({ creatorAddress, creatorMeToken, onTipSuccess }: VideoTipButtonProps) {
+export function VideoTipButton({ creatorAddress, creatorMeToken, availableMeTokens, onTipSuccess }: VideoTipButtonProps) {
   const [open, setOpen] = useState(false);
   const [selectedToken, setSelectedToken] = useState<TokenSymbol>("ETH");
   const [amount, setAmount] = useState("");
@@ -49,13 +50,35 @@ export function VideoTipButton({ creatorAddress, creatorMeToken, onTipSuccess }:
   const [isUsdLoading, setIsUsdLoading] = useState(false);
   const { sendTip, isTipping, error, balances, fetchBalances, getUsdValue } = useVideoTip();
 
+  const meTokenMap = useMemo(() => {
+    const map = new Map<string, CreatorMeToken>();
+    if (creatorMeToken?.address) {
+      map.set(creatorMeToken.address.toLowerCase(), creatorMeToken);
+    }
+    availableMeTokens?.forEach((t) => {
+      map.set(t.address.toLowerCase(), t);
+    });
+    return map;
+  }, [creatorMeToken, availableMeTokens]);
+
   const availableTokens = useMemo(() => {
     const tokens: TokenSymbol[] = [...TIP_TOKEN_OPTIONS];
-    if (creatorMeToken?.address) {
-      tokens.push(`metoken:${creatorMeToken.address}` as TokenSymbol);
-    }
-    return tokens;
-  }, [creatorMeToken]);
+    meTokenMap.forEach((token, addressKey) => {
+      const key = `metoken:${addressKey}` as TokenSymbol;
+      if (!tokens.includes(key)) {
+        tokens.push(key);
+      }
+    });
+    // Hide held meTokens with zero balance unless it's the primary creator token
+    return tokens.filter((token) => {
+      if (!token.startsWith('metoken:')) return true;
+      const addressKey = token.slice('metoken:'.length).toLowerCase();
+      const balance = balances[token];
+      const isPrimary = creatorMeToken?.address?.toLowerCase() === addressKey;
+      if (!balance || parseFloat(balance) <= 0) return isPrimary;
+      return true;
+    });
+  }, [meTokenMap, balances, creatorMeToken]);
 
   // Fetch balances when dialog opens
   useEffect(() => {
@@ -63,6 +86,12 @@ export function VideoTipButton({ creatorAddress, creatorMeToken, onTipSuccess }:
       fetchBalances(creatorMeToken ?? undefined);
     }
   }, [open, fetchBalances, creatorMeToken]);
+
+  const selectedMeToken = useMemo(() => {
+    if (!selectedToken.startsWith('metoken:')) return null;
+    const addressKey = selectedToken.slice('metoken:'.length).toLowerCase();
+    return meTokenMap.get(addressKey) ?? null;
+  }, [selectedToken, meTokenMap]);
 
   // Compute USD value as user types / changes token
   useEffect(() => {
@@ -75,7 +104,7 @@ export function VideoTipButton({ creatorAddress, creatorMeToken, onTipSuccess }:
       }
       setIsUsdLoading(true);
       try {
-        const value = await getUsdValue(amount, selectedToken, creatorMeToken ?? undefined);
+        const value = await getUsdValue(amount, selectedToken, selectedMeToken ?? creatorMeToken ?? undefined);
         if (!cancelled) {
           setUsdValue(PriceService.formatUSD(value));
         }
@@ -87,7 +116,7 @@ export function VideoTipButton({ creatorAddress, creatorMeToken, onTipSuccess }:
     return () => {
       cancelled = true;
     };
-  }, [amount, selectedToken, creatorMeToken, getUsdValue]);
+  }, [amount, selectedToken, creatorMeToken, selectedMeToken, getUsdValue]);
 
   const handleTip = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -96,7 +125,7 @@ export function VideoTipButton({ creatorAddress, creatorMeToken, onTipSuccess }:
       return;
     }
 
-    const result = await sendTip(amount, selectedToken, creatorAddress, creatorMeToken ?? undefined);
+    const result = await sendTip(amount, selectedToken, creatorAddress, selectedMeToken ?? creatorMeToken ?? undefined);
 
     if (result) {
       setOpen(false);
@@ -113,10 +142,11 @@ export function VideoTipButton({ creatorAddress, creatorMeToken, onTipSuccess }:
 
   const displaySymbol = useMemo(() => {
     if (selectedToken.startsWith('metoken:')) {
-      return creatorMeToken?.symbol ?? 'MeToken';
+      const addressKey = selectedToken.slice('metoken:'.length).toLowerCase();
+      return meTokenMap.get(addressKey)?.symbol ?? 'Creator Token';
     }
     return selectedToken;
-  }, [selectedToken, creatorMeToken]);
+  }, [selectedToken, meTokenMap]);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -148,7 +178,11 @@ export function VideoTipButton({ creatorAddress, creatorMeToken, onTipSuccess }:
                   {availableTokens.map((token) => (
                     token.startsWith('metoken:') ? (
                       <SelectItem key={token} value={token}>
-                        {creatorMeToken?.symbol ?? 'Creator Token'} (MeToken)
+                        {(() => {
+                          const addressKey = token.slice('metoken:'.length).toLowerCase();
+                          const info = meTokenMap.get(addressKey);
+                          return info ? `${info.symbol} (MeToken)` : 'Creator Token';
+                        })()}
                       </SelectItem>
                     ) : (
                       <SelectItem key={token} value={token}>
