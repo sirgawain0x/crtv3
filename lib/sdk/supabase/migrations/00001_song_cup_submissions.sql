@@ -41,10 +41,14 @@ CREATE POLICY IF NOT EXISTS allow_select_song_cup_submissions
     TO anon, authenticated
     USING (true);
 
--- Only the admin page/update service should update status; open to authenticated for app service role.
+-- Restrict UPDATE to the designated admin wallet address.
 CREATE POLICY IF NOT EXISTS allow_update_song_cup_submissions
     ON public.song_cup_submissions
     FOR UPDATE
     TO authenticated
-    USING (true)
-    WITH CHECK (true);
+    USING (
+        (SELECT current_setting('request.jwt.claims', true)::json->>'sub') = '0xdE4b0371BBa20602685916ceeE5B22025a811734'
+    )
+    WITH CHECK (
+        (SELECT current_setting('request.jwt.claims', true)::json->>'sub') = '0xdE4b0371BBa20602685916ceeE5B22025a811734'
+    );

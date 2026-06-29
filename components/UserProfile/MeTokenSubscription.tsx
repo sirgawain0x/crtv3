@@ -247,7 +247,7 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
             validated = true;
             const avgAllowance = checks.reduce((a, b) => a + b, BigInt(0)) / BigInt(checks.length);
             logger.debug(`Validation passed Validation passed after ${elapsedSeconds} seconds!`);
-            logger.debug(`Allowance checks: Average allowance across nodes: {formatUnits(avgAllowance, collateralDecimals)} {collateralSymbol}`);
+            logger.debug(`Allowance checks: Average allowance across nodes: ${formatUnits(avgAllowance, collateralDecimals)} ${collateralSymbol}`);
             setSuccess('Allowance validated across network! Ready to mint.');
             setApprovalComplete(true);
           } else {
@@ -273,7 +273,7 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
 
     } catch (err) {
       logger.error('❌ Approval failed:', err);
-      setError(err instanceof Error ? err.message : 'Failed to approve ${collateralSymbol}');
+      setError(err instanceof Error ? err.message : `Failed to approve ${collateralSymbol}`);
       throw err;
     } finally {
       setIsApproving(false);
@@ -327,8 +327,8 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
         vaultAddress = diamondAddress;
       }
 
-      // CRITICAL: Refresh and verify smart account has ${collateralSymbol} balance BEFORE attempting transaction
-      logger.debug('🔍 Verifying smart account ${collateralSymbol} balance...');
+      // CRITICAL: Refresh and verify smart account has enough collateral balance BEFORE attempting transaction
+      logger.debug(`🔍 Verifying smart account ${collateralSymbol} balance...`);
       await checkCollateralBalance(); // Refresh balance first to get latest state
 
       logger.debug('📊 Balance check:', {
@@ -340,8 +340,8 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
 
       if (daiBalance < depositAmount) {
         const errorMsg = `Insufficient ${collateralSymbol} balance in your smart account. ` +
-          `You have {formatUnits(daiBalance, collateralDecimals)} {collateralSymbol} but need {formatUnits(depositAmount, collateralDecimals)} {collateralSymbol}. ` +
-          `Please transfer {collateralSymbol} to your smart account (${client.account?.address}) first. ` +
+          `You have ${formatUnits(daiBalance, collateralDecimals)} ${collateralSymbol} but need ${formatUnits(depositAmount, collateralDecimals)} ${collateralSymbol}. ` +
+          `Please transfer ${collateralSymbol} to your smart account (${client.account?.address}) first. ` +
           `${collateralSymbol} must be in your smart account, not your EOA wallet.`;
         logger.error('❌', errorMsg);
         setError(errorMsg);
@@ -349,7 +349,7 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
         return;
       }
 
-      logger.debug('✅ Smart account has sufficient ${collateralSymbol} balance');
+      logger.debug(`✅ Smart account has sufficient ${collateralSymbol} balance`);
 
       // Try batched operations with client.sendUserOperation first
       // This bypasses wallet_prepareCalls and uses eth_estimateUserOperationGas directly
@@ -439,7 +439,7 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
       // If allowance exists, we'll try minting first and handle bundler sync issues via retry logic
       if (!hasUnlimitedAllowance && !hasSufficientAllowance) {
         logger.debug('📝 Allowance insufficient, sending approve transaction...');
-        setSuccess('Step 1: Approving {collateralSymbol}... Please sign in your wallet.');
+        setSuccess(`Step 1: Approving ${collateralSymbol}... Please sign in your wallet.`);
 
         logger.debug('📋 Approve transaction details:', {
           target: collateralTokenAddress,
@@ -925,7 +925,7 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
               min="1"
             />
             <p className="text-sm text-muted-foreground">
-              Choose the stablecoin hub used to back your MeToken (default: ${DEFAULT_HUB_ASSET})
+              Choose the stablecoin hub used to back your MeToken (default: {DEFAULT_HUB_ASSET})
             </p>
           </div>
 
@@ -938,7 +938,7 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
                 height={16}
                 className="w-4 h-4"
               />
-              <span>${collateralSymbol} Amount to Deposit</span>
+              <span>{collateralSymbol} Amount to Deposit</span>
             </Label>
             <Input
               id="assetsDeposited"
@@ -958,18 +958,18 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
                 height={12}
                 className="w-3 h-3"
               />
-              <span>Your ${collateralSymbol} balance: {formatUnits(daiBalance, collateralDecimals)}</span>
+              <span>Your {collateralSymbol} balance: {formatUnits(daiBalance, collateralDecimals)}</span>
             </p>
             {assetsDeposited && parseFloat(assetsDeposited) > 0 && (
               <div className="text-sm">
                 {daiBalance >= parseEther(assetsDeposited) ? (
-                  <span className="text-green-600">✓ Sufficient ${collateralSymbol} balance</span>
+                  <span className="text-green-600">✓ Sufficient {collateralSymbol} balance</span>
                 ) : (
                   <div className="space-y-2">
-                    <span className="text-orange-600 block">⚠ Insufficient ${collateralSymbol} balance</span>
+                    <span className="text-orange-600 block">⚠ Insufficient {collateralSymbol} balance</span>
                     <p className="text-xs text-muted-foreground">
-                      Your smart account ({client?.account?.address}) needs ${collateralSymbol} tokens.
-                      ${collateralSymbol} must be in your smart account, not your EOA wallet.
+                      Your smart account ({client?.account?.address}) needs {collateralSymbol} tokens.
+                      {collateralSymbol} must be in your smart account, not your EOA wallet.
                     </p>
                   </div>
                 )}
@@ -1006,7 +1006,7 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
                   Approved
                 </>
               ) : (
-                'Approve ${collateralSymbol}'
+                `Approve ${collateralSymbol}`
               )}
             </Button>
 
