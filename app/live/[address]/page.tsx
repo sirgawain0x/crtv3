@@ -534,16 +534,8 @@ export default function LivePage() {
                     <>
                       <LiveTokenPanel
                         creatorAddress={creatorAddress}
-                        creatorMeToken={
-                          playbackId
-                            ? {
-                                address: playbackId,
-                                symbol: streamName ? `${streamName} Token` : "Creator Token",
-                                name: streamName ? `${streamName} Token` : "Creator Token",
-                                decimals: 18,
-                              }
-                            : undefined
-                        }
+                        tokenInfo={undefined}
+                        creatorMeToken={undefined}
                         streamId={chatStreamId}
                         sessionId={chatSessionId}
                       />

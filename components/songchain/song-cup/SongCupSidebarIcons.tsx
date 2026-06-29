@@ -9,8 +9,8 @@ function SidebarDivider() {
 }
 
 type SongCupSidebarIconsProps = {
-  active: SongCupPanel;
-  onSelect: (panel: SongCupPanel) => void;
+  active: SongCupPanel | null;
+  onSelect: (panel: SongCupPanel | null) => void;
   className?: string;
 };
 

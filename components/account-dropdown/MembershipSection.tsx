@@ -6,7 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useMembershipContext } from "../../lib/context/MembershipContext";
 import { type MembershipDetails } from "../../lib/hooks/unlock/useMembershipVerification";
 import { LoginWithEthereumButton } from "@/components/auth/LoginWithEthereumButton";
-import { LockKeyhole, ShieldCheck, ShieldX, AlertTriangle } from "lucide-react";
+import { LockKeyhole, ShieldCheck, ShieldX, AlertTriangle, Calendar, ExternalLink } from "lucide-react";
 import {
   LOCK_ADDRESSES,
   type LockAddressValue,
@@ -14,6 +14,28 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useUser } from "@/lib/wallet/react";
 import { getPassDisplayName } from "../../lib/access/membership-labels";
+import { CancelMembershipButton } from "../UserProfile/CancelMembershipButton";
+import { getUnlockPaywallCheckoutUrl } from "@/lib/utils/unlock";
+
+function formatExpiration(expiration?: number): string {
+  if (!expiration) return "Unknown";
+  const ms = expiration * 1000;
+  if (ms > 32503680000000) return "Lifetime / Never expires";
+  const date = new Date(ms);
+  if (date.toString() === "Invalid Date") return "Unknown";
+  return date.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function isExpired(expiration?: number): boolean {
+  if (!expiration) return false;
+  const ms = expiration * 1000;
+  if (ms > 32503680000000) return false;
+  return ms < Date.now();
+}
 
 const MEMBERSHIP_NAMES: Record<LockAddressValue, string> = {
   [LOCK_ADDRESSES.BASE_CREATIVE_PASS]: getPassDisplayName(
@@ -150,31 +172,55 @@ export function MembershipSection({
         <span>Verified Member</span>
       </div>
       {membershipDetails && membershipDetails.length > 0 && (
-        <div className="space-y-2">
+        <div className="space-y-3">
           {membershipDetails
             .filter(({ isValid }: MembershipDetails) => isValid)
-            .map(({ address, lock }: MembershipDetails) => (
+            .map(({ address, lock, expiration, tokenId }: MembershipDetails) => {
+              const expired = isExpired(expiration);
+              return (
               <div
                 key={address}
-                className="flex items-center justify-between text-xs"
+                className="rounded-md border border-border/60 p-3 space-y-3"
               >
-                <span className="text-muted-foreground">
-                  {getPassDisplayName(address)}
-                </span>
-                <span className="font-medium">
-                  {getPassDisplayName(address)}
-                  {lock?.expirationDuration && (
-                    <span className="ml-1 text-muted-foreground">
-                      (Expires:{" "}
-                      {new Date(
-                        lock.expirationDuration * 1000
-                      ).toLocaleDateString()}
-                      )
-                    </span>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-medium text-foreground">
+                    {getPassDisplayName(address)}
+                  </span>
+                  {lock?.image && (
+                    <img
+                      src={lock.image}
+                      alt=""
+                      className="h-8 w-8 rounded-md object-cover"
+                    />
                   )}
-                </span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Calendar className="h-3.5 w-3.5" />
+                  <span>
+                    {expired ? "Expired on" : "Expires on"}{" "}
+                    {formatExpiration(expiration)}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {tokenId && (
+                    <CancelMembershipButton
+                      lockAddress={address}
+                      tokenId={tokenId}
+                    />
+                  )}
+                  <Button asChild variant="outline" size="sm" className="gap-1">
+                    <a
+                      href={getUnlockPaywallCheckoutUrl()}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {expired ? "Renew" : "Extend"}
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </Button>
+                </div>
               </div>
-            ))}
+            );})}
         </div>
       )}
       <div className="text-xs text-muted-foreground">

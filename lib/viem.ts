@@ -42,3 +42,34 @@ export async function getErc20Balance({
     args: [owner],
   }) as Promise<bigint>;
 }
+
+/** Helper to read an ERC-20 allowance on Base. */
+export async function getErc20Allowance({
+  token,
+  owner,
+  spender,
+}: {
+  token: Address;
+  owner: Address;
+  spender: Address;
+}) {
+  return publicClient.readContract({
+    address: token,
+    abi: [
+      {
+        constant: true,
+        inputs: [
+          { name: "_owner", type: "address" },
+          { name: "_spender", type: "address" },
+        ],
+        name: "allowance",
+        outputs: [{ name: "remaining", type: "uint256" }],
+        payable: false,
+        stateMutability: "view",
+        type: "function",
+      },
+    ] as const,
+    functionName: "allowance",
+    args: [owner, spender],
+  }) as Promise<bigint>;
+}

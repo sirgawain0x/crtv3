@@ -2,7 +2,8 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { useSmartAccountClient } from "@/lib/wallet/react";
-import { type Address, type Hex, encodeFunctionData, parseAbi, parseUnits, formatUnits, erc20Abi } from "viem";
+import { type Address, type Hex, encodeFunctionData, parseAbi, parseUnits, formatUnits } from "viem";
+import { getEthBalance, getErc20Balance } from "@/lib/viem";
 import { USDC_TOKEN_ADDRESSES, USDC_TOKEN_DECIMALS } from "@/lib/contracts/USDCToken";
 import { useGasSponsorship } from "@/lib/hooks/wallet/useGasSponsorship";
 import { DAI_TOKEN_ADDRESSES, DAI_TOKEN_DECIMALS } from "@/lib/contracts/DAIToken";
@@ -12,14 +13,16 @@ import { SWAP_UI_TOKENS, BASE_TOKENS, type TokenSymbol as SwapTokenSymbol } from
 import { priceService } from "@/lib/sdk/alchemy/price-service";
 import { toast } from "sonner";
 import { logger } from '@/lib/utils/logger';
+import { meTokenSupabaseService } from '@/lib/sdk/supabase/metokens';
 import { appendBuilderCode } from "@/lib/utils/builder-code";
 
 
 export type TokenSymbol = SwapTokenSymbol | `metoken:${string}`;
 
-interface MeTokenInfo {
+export interface MeTokenInfo {
   address: string;
   symbol: string;
+  name?: string;
   decimals?: number;
 }
 
@@ -95,8 +98,9 @@ function validateTipToken(token: TokenSymbol, meToken?: MeTokenInfo | null): Tok
   if (isMeTokenSymbol(token)) {
     const parsed = parseMeTokenSymbol(token);
     if (!parsed || !isAddressLike(parsed.address)) return null;
-    // Cross-check with the provided meToken address if available
-    if (meToken?.address && parsed.address.toLowerCase() !== meToken.address.toLowerCase()) return null;
+    // Accept any well-formed metoken address; a specific creator meToken can be
+    // passed in for display/decimals, but we no longer block tipping a creator
+    // meToken that the user holds just because it doesn't match a single address.
   }
   return config;
 }
@@ -112,6 +116,7 @@ export interface UseVideoTipReturn {
   isTipping: boolean;
   error: Error | null;
   balances: Record<TokenSymbol, string>;
+  heldMeTokens: MeTokenInfo[];
   fetchBalances: (meToken?: MeTokenInfo | null) => Promise<void>;
   getUsdValue: (amount: string, token: TokenSymbol, meToken?: MeTokenInfo | null) => Promise<number>;
   isLoadingPrice: boolean;
@@ -131,6 +136,7 @@ export function useVideoTip(): UseVideoTipReturn {
     USDS: '0',
     GHO: '0',
   });
+  const [heldMeTokens, setHeldMeTokens] = useState<MeTokenInfo[]>([]);
   const [isLoadingPrice, setIsLoadingPrice] = useState(false);
   const [prices, setPrices] = useState<Partial<Record<SwapTokenSymbol, number>>>({});
 
@@ -149,13 +155,11 @@ export function useVideoTip(): UseVideoTipReturn {
 
   // Fetch token balances
   const fetchBalances = useCallback(async (meToken?: MeTokenInfo | null) => {
-    if (!address || !client) return;
+    if (!address) return;
 
     try {
-      // Get ETH balance
-      const ethBalance = await client.getBalance({
-        address: address as Address,
-      });
+      // Get ETH balance via public client (smart-account client is write-only)
+      const ethBalance = await getEthBalance(address as Address);
 
       // Get ERC-20 balances for known tokens in parallel
       const newBalances: Record<TokenSymbol, string> = {
@@ -170,12 +174,10 @@ export function useVideoTip(): UseVideoTipReturn {
         (Object.keys(ERC20_TOKEN_INFO) as Array<Exclude<SwapTokenSymbol, 'ETH'>>).map(async (symbol) => {
           try {
             const info = ERC20_TOKEN_INFO[symbol];
-            const balance = await client.readContract({
-              address: info.address as Address,
-              abi: erc20Abi,
-              functionName: 'balanceOf',
-              args: [address as Address],
-            }) as bigint;
+            const balance = await getErc20Balance({
+              token: info.address as Address,
+              owner: address as Address,
+            });
             return { symbol, balance: formatUnits(balance, info.decimals) };
           } catch (err) {
             logger.debug(`Failed to fetch ${symbol} balance:`, err);
@@ -187,15 +189,13 @@ export function useVideoTip(): UseVideoTipReturn {
         newBalances[symbol] = balance;
       });
 
-      // Get creator meToken balance if provided
+      // Get creator meToken balance if provided (single-creator mode)
       if (meToken?.address) {
         try {
-          const balance = await client.readContract({
-            address: meToken.address as Address,
-            abi: erc20Abi,
-            functionName: 'balanceOf',
-            args: [address as Address],
-          }) as bigint;
+          const balance = await getErc20Balance({
+            token: meToken.address as Address,
+            owner: address as Address,
+          });
           newBalances[`metoken:${meToken.address}` as TokenSymbol] = formatUnits(balance, meToken.decimals ?? 18);
         } catch (err) {
           logger.debug('Failed to fetch meToken balance:', err);
@@ -203,11 +203,42 @@ export function useVideoTip(): UseVideoTipReturn {
         }
       }
 
+      // Discover any creator meTokens this wallet holds across the registry
+      try {
+        const registryTokens = await meTokenSupabaseService.getAllMeTokens({ limit: 500 });
+        const held: MeTokenInfo[] = [];
+        await Promise.all(
+          registryTokens.map(async (token) => {
+            try {
+              const balance = await getErc20Balance({
+                token: token.address as Address,
+                owner: address as Address,
+              });
+              const balanceFormatted = formatUnits(BigInt(balance), 18);
+              const key = `metoken:${token.address.toLowerCase()}` as TokenSymbol;
+              newBalances[key] = balanceFormatted;
+              if (BigInt(balance) > 0n) {
+                held.push({
+                  address: token.address,
+                  symbol: token.symbol,
+                  decimals: 18,
+                });
+              }
+            } catch (err) {
+              logger.debug(`Failed to fetch balance for meToken ${token.address}:`, err);
+            }
+          })
+        );
+        setHeldMeTokens(held);
+      } catch (err) {
+        logger.debug('Failed to discover held meTokens:', err);
+      }
+
       setBalances(newBalances);
     } catch (err) {
       logger.error("Error fetching balances:", err);
     }
-  }, [address, client]);
+  }, [address]);
 
   const getUsdValue = useCallback(async (amount: string, token: TokenSymbol, meToken?: MeTokenInfo | null): Promise<number> => {
     const amountNum = parseFloat(amount);
@@ -356,6 +387,7 @@ export function useVideoTip(): UseVideoTipReturn {
     isTipping,
     error,
     balances,
+    heldMeTokens,
     fetchBalances,
     getUsdValue,
     isLoadingPrice,

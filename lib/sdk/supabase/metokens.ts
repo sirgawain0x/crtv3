@@ -81,6 +81,28 @@ export class MeTokenSupabaseService {
     }
   }
 
+  async getMeTokensHeldByOwner(ownerAddress: string): Promise<MeToken[]> {
+    try {
+      const { data, error } = await supabase
+        .from('metokens')
+        .select('*')
+        .eq('owner_address', ownerAddress.toLowerCase());
+
+      if (error) {
+        serverLogger.error('Supabase error fetching MeTokens by owner:', error);
+        throw new Error(`Failed to fetch MeTokens by owner: ${error.message}`);
+      }
+
+      return data || [];
+    } catch (error) {
+      serverLogger.error('Error in getMeTokensHeldByOwner:', error);
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error('Unknown error occurred while fetching MeTokens by owner');
+    }
+  }
+
   // Get all MeTokens with pagination and sorting
   async getAllMeTokens(options: {
     limit?: number;

@@ -13,10 +13,9 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, AlertCircle, CheckCircle, TrendingUp } from 'lucide-react';
 import { useMeTokensSupabase } from '@/lib/hooks/metokens/useMeTokensSupabase';
-import { formatEther, parseEther, encodeFunctionData } from 'viem';
+import { formatEther, parseEther, encodeFunctionData, type Address } from 'viem';
 import { useSmartAccountClient, useAuthModal, useUser } from '@/lib/wallet/react';
 import { getDaiTokenContract } from '@/lib/contracts/DAIToken';
-import { erc20Abi } from 'viem';
 import { METOKEN_ABI } from '@/lib/contracts/MeToken';
 import { DaiFundingOptions } from '@/components/wallet/funding/DaiFundingOptions';
 import { fetchVideoAssetByPlaybackId } from '@/lib/utils/video-assets-client';
@@ -28,6 +27,7 @@ import { creatorProfileSupabaseService } from '@/lib/sdk/supabase/creator-profil
 import { convertFailingGateway } from '@/lib/utils/image-gateway';
 import { useVideoContribution } from '@/lib/hooks/metokens/useVideoContribution';
 import { logger } from '@/lib/utils/logger';
+import { getErc20Balance } from '@/lib/viem';
 
 interface VideoMeTokenBuyDialogProps {
   open: boolean;
@@ -188,12 +188,10 @@ export function VideoMeTokenBuyDialog({
 
     try {
       const daiContract = getDaiTokenContract('base');
-      const balance = await client.readContract({
-        address: daiContract.address as `0x${string}`,
-        abi: erc20Abi,
-        functionName: 'balanceOf',
-        args: [client.account?.address as `0x${string}`],
-      }) as bigint;
+      const balance = await getErc20Balance({
+        token: daiContract.address as Address,
+        owner: client.account?.address as Address,
+      });
 
       setDaiBalance(balance);
     } catch (err) {
@@ -214,12 +212,10 @@ export function VideoMeTokenBuyDialog({
     if (!client || !meToken) return;
 
     try {
-      const balance = await client.readContract({
-        address: meToken.address as `0x${string}`,
-        abi: erc20Abi,
-        functionName: 'balanceOf',
-        args: [client.account?.address as `0x${string}`],
-      }) as bigint;
+      const balance = await getErc20Balance({
+        token: meToken.address as Address,
+        owner: client.account?.address as Address,
+      });
 
       setMeTokenBalance(balance);
     } catch (err) {

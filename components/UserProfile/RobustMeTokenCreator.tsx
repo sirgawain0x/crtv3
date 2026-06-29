@@ -29,12 +29,13 @@ import {
   ArrowRight,
   X
 } from 'lucide-react';
-import { formatEther, parseEther } from 'viem';
+import { formatEther, parseEther, type Address } from 'viem';
 import { useSmartAccountClient, useChain } from '@/lib/wallet/react';
 import { useToast } from '@/components/ui/use-toast';
 import { useMeTokenCreation, PendingMeTokenTransaction, CreationStatus } from '@/lib/hooks/metokens/useMeTokenCreation';
 import { getDaiTokenContract } from '@/lib/contracts/DAIToken';
 import { logger } from '@/lib/utils/logger';
+import { getErc20Balance } from '@/lib/viem';
 
 
 interface RobustMeTokenCreatorProps {
@@ -82,12 +83,10 @@ export function RobustMeTokenCreator({ onMeTokenCreated, onClose }: RobustMeToke
 
     try {
       const daiContract = getDaiTokenContract('base');
-      const balance = await client.readContract({
-        address: daiContract.address as `0x${string}`,
-        abi: daiContract.abi,
-        functionName: 'balanceOf',
-        args: [client.account.address],
-      }) as bigint;
+      const balance = await getErc20Balance({
+        token: daiContract.address as Address,
+        owner: client.account.address,
+      });
 
       setDaiBalance(balance);
     } catch (err) {

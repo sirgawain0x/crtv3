@@ -36,7 +36,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, Send, CheckCircle, XCircle, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
-import { type Address, type Hex, encodeFunctionData, parseAbi, parseUnits, formatUnits, erc20Abi } from "viem";
+import { type Address, type Hex, encodeFunctionData, parseAbi, parseUnits, formatUnits } from "viem";
 import { USDC_TOKEN_ADDRESSES, USDC_TOKEN_DECIMALS } from "@/lib/contracts/USDCToken";
 import { DAI_TOKEN_ADDRESSES, DAI_TOKEN_DECIMALS } from "@/lib/contracts/DAIToken";
 import { logger } from '@/lib/utils/logger';
@@ -47,6 +47,7 @@ import {
   validateSendBalance,
   normalizeRecipientAddress,
 } from "@/lib/utils/sendHelpers";
+import { getEthBalance, getErc20Balance } from "@/lib/viem";
 
 
 // Token configuration
@@ -96,26 +97,20 @@ export default function SendTransaction() {
     try {
       logger.debug('Fetching balances for address:', address);
       
-      // Get ETH balance
-      const ethBalance = await client.getBalance({
-        address: address as Address,
-      });
+      // Get ETH balance via public client (smart-account client is write-only)
+      const ethBalance = await getEthBalance(address as Address);
       
       // Get USDC balance
-      const usdcBalance = await client.readContract({
-        address: USDC_TOKEN_ADDRESSES.base as Address,
-        abi: erc20Abi,
-        functionName: 'balanceOf',
-        args: [address as Address],
-      }) as bigint;
+      const usdcBalance = await getErc20Balance({
+        token: USDC_TOKEN_ADDRESSES.base as Address,
+        owner: address as Address,
+      });
       
       // Get DAI balance
-      const daiBalance = await client.readContract({
-        address: DAI_TOKEN_ADDRESSES.base as Address,
-        abi: erc20Abi,
-        functionName: 'balanceOf',
-        args: [address as Address],
-      }) as bigint;
+      const daiBalance = await getErc20Balance({
+        token: DAI_TOKEN_ADDRESSES.base as Address,
+        owner: address as Address,
+      });
 
       const newBalances: Record<TokenSymbol, string> = {
         ETH: formatUnits(ethBalance, 18),

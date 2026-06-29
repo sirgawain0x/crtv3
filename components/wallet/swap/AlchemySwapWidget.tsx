@@ -15,6 +15,7 @@ import { priceService, PriceService } from '@/lib/sdk/alchemy/price-service';
 import { CurrencyConverter } from '@/lib/utils/currency-converter';
 import { logger } from '@/lib/utils/logger';
 import { getTokenIcon } from '@/lib/utils/token-icons';
+import { getEthBalance, getErc20Balance } from '@/lib/viem';
 
 function formatSwapError(error: unknown): string {
   const errorStr = error instanceof Error ? error.message : String(error);
@@ -184,10 +185,8 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
       try {
         logger.debug('Fetching balances for address:', address);
 
-        // Get ETH balance
-        const ethBalance = await client.getBalance({
-          address: address as Address,
-        });
+        // Get ETH balance via public client (smart-account client is write-only)
+        const ethBalance = await getEthBalance(address);
 
         logger.debug('ETH balance (wei):', ethBalance.toString());
 
@@ -197,12 +196,10 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
 
         for (const token of SWAP_UI_TOKENS.filter((t) => t !== 'ETH')) {
           try {
-            const raw = await client.readContract({
-              address: BASE_TOKENS[token] as Address,
-              abi: ERC20_BALANCE_ABI,
-              functionName: 'balanceOf',
-              args: [address as Address],
-            }) as bigint;
+            const raw = await getErc20Balance({
+              token: BASE_TOKENS[token] as Address,
+              owner: address as Address,
+            });
             newBalances[token] = AlchemySwapService.parseAmount(`0x${raw.toString(16)}` as Hex, token);
           } catch (e) {
             logger.warn(`Failed to fetch ${token} balance:`, e);
