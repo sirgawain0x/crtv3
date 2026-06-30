@@ -19,13 +19,14 @@ function truncateAddress(address: string): string {
 
 export default function SongCupSubmissionsPage() {
   const user = useUser();
-  const { submissions, isLoading, error, refetch, updateStatus } = useSongCupSubmissions();
 
   const isAdmin = useMemo(() => {
     const connected = user?.address;
     if (!connected) return false;
     return connected.toLowerCase() === ADMIN_WALLET_ADDRESS.toLowerCase();
   }, [user?.address]);
+
+  const { submissions, isLoading, error, refetch, updateStatus } = useSongCupSubmissions(isAdmin);
 
   return (
     <div className="min-h-screen bg-background px-4 py-6 md:py-10">

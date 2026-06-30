@@ -8,9 +8,13 @@ import { Loader2, CreditCard, Smartphone, AlertCircle, CheckCircle2 } from "luci
 import { useAccount, useSignMessage } from "@/lib/wallet/react";
 import { toast } from "sonner";
 
-type PaymentMethod = "GUEST_CHECKOUT_APPLE_PAY" | "GUEST_CHECKOUT_GOOGLE_PAY";
+export type HeadlessPaymentMethod =
+  | "GUEST_CHECKOUT_APPLE_PAY"
+  | "GUEST_CHECKOUT_GOOGLE_PAY";
 
 interface HeadlessCdpOnrampProps {
+  paymentMethod: HeadlessPaymentMethod;
+  prefillEmail?: string;
   presetFiatAmount?: number;
   fiatCurrency?: string;
   asset?: string;
@@ -26,6 +30,8 @@ interface OnrampOrderResponse {
 }
 
 export function HeadlessCdpOnramp({
+  paymentMethod,
+  prefillEmail = "",
   presetFiatAmount = 10,
   fiatCurrency = "USD",
   asset = "USDC",
@@ -35,15 +41,23 @@ export function HeadlessCdpOnramp({
 }: HeadlessCdpOnrampProps) {
   const { address } = useAccount();
   const { signMessage } = useSignMessage();
-    const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(prefillEmail);
+  const [hasPrefilled, setHasPrefilled] = useState(false);
   const [phone, setPhone] = useState("");
   const [amount, setAmount] = useState(presetFiatAmount.toString());
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("GUEST_CHECKOUT_APPLE_PAY");
   const [loading, setLoading] = useState(false);
   const [paymentLink, setPaymentLink] = useState<string | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
   const [status, setStatus] = useState<"idle" | "success" | "error" | "cancelled">("idle");
   const [statusMessage, setStatusMessage] = useState("");
+
+  // Keep email in sync if the prefilled value arrives after mount, but only once.
+  useEffect(() => {
+    if (prefillEmail && !hasPrefilled) {
+      setEmail(prefillEmail);
+      setHasPrefilled(true);
+    }
+  }, [prefillEmail, hasPrefilled]);
 
   const formattedPhone = useMemo(() => {
     const digits = phone.replace(/\D/g, "");
@@ -119,7 +133,17 @@ export function HeadlessCdpOnramp({
     } finally {
       setLoading(false);
     }
-  }, [address, email, phone, amount, fiatCurrency, asset, network, paymentMethod, signAuthMessage]);
+  }, [
+    address,
+    email,
+    phone,
+    amount,
+    fiatCurrency,
+    asset,
+    network,
+    paymentMethod,
+    signAuthMessage,
+  ]);
 
   useEffect(() => {
     if (!paymentLink) return;
@@ -209,7 +233,15 @@ export function HeadlessCdpOnramp({
             <span>{statusMessage}</span>
           </div>
         )}
-        <Button variant="outline" onClick={() => { setPaymentLink(null); setStatus("idle"); setStatusMessage(""); }} className="w-full">
+        <Button
+          variant="outline"
+          onClick={() => {
+            setPaymentLink(null);
+            setStatus("idle");
+            setStatusMessage("");
+          }}
+          className="w-full"
+        >
           Back
         </Button>
       </div>
@@ -256,36 +288,6 @@ export function HeadlessCdpOnramp({
         />
       </div>
 
-      <div className="space-y-2">
-        <Label>Payment Method</Label>
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={() => setPaymentMethod("GUEST_CHECKOUT_APPLE_PAY")}
-            className={`flex items-center justify-center gap-2 rounded-lg border p-2 text-sm transition-colors ${
-              paymentMethod === "GUEST_CHECKOUT_APPLE_PAY"
-                ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300"
-                : "border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"
-            }`}
-          >
-            <CreditCard className="h-4 w-4" />
-            Apple Pay
-          </button>
-          <button
-            type="button"
-            onClick={() => setPaymentMethod("GUEST_CHECKOUT_GOOGLE_PAY")}
-            className={`flex items-center justify-center gap-2 rounded-lg border p-2 text-sm transition-colors ${
-              paymentMethod === "GUEST_CHECKOUT_GOOGLE_PAY"
-                ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300"
-                : "border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"
-            }`}
-          >
-            <Smartphone className="h-4 w-4" />
-            Google Pay
-          </button>
-        </div>
-      </div>
-
       <div className="rounded-md bg-muted p-3 text-xs text-muted-foreground">
         By purchasing, you agree to Coinbase’s
         {' '}
@@ -306,7 +308,11 @@ export function HeadlessCdpOnramp({
           </>
         ) : (
           <>
-            <CreditCard className="mr-2 h-4 w-4" />
+            {paymentMethod === "GUEST_CHECKOUT_APPLE_PAY" ? (
+              <CreditCard className="mr-2 h-4 w-4" />
+            ) : (
+              <Smartphone className="mr-2 h-4 w-4" />
+            )}
             Pay with {paymentMethod === "GUEST_CHECKOUT_APPLE_PAY" ? "Apple Pay" : "Google Pay"}
           </>
         )}

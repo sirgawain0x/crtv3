@@ -47,7 +47,6 @@ export interface GasRequirement {
   minEth: bigint;
   minUsdc: bigint;
   scaAddress: `0x${string}`;
-  onrampUrl?: string;
 }
 
 interface UploadAttestation {
@@ -215,34 +214,21 @@ export function useUploadAttestation() {
     return { ethBalance, usdcBalance: usdcBalanceRaw };
   }, []);
 
-  const buildOnrampUrl = useCallback((address: `0x${string}`) => {
-    const appId = process.env.NEXT_PUBLIC_COINBASE_ONRAMP_APP_ID || "";
-    const params = new URLSearchParams({
-      address,
-      presetFiatAmount: "50",
-      fiatCurrency: "USD",
-    });
-    if (appId) params.set("appId", appId);
-    return `https://pay.coinbase.com/buy/select-asset?${params.toString()}`;
-  }, []);
-
   const setNeedsGas = useCallback((
     scaAddress: `0x${string}`,
     ethBalance: bigint,
     usdcBalance: bigint,
   ) => {
-    const onrampUrl = buildOnrampUrl(scaAddress);
     setGasRequirement({
       ethBalance,
       usdcBalance,
       minEth: MIN_ETH_FOR_GAS,
       minUsdc: MIN_USDC_FOR_GAS,
       scaAddress,
-      onrampUrl,
     });
     setStatus("needsGas");
     setError(null);
-  }, [buildOnrampUrl]);
+  }, []);
 
   const signAttestation = useCallback(async () => {
     if (!address || !client) {

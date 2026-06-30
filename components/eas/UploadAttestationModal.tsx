@@ -23,6 +23,7 @@ import {
   Scale,
 } from "lucide-react";
 import { useUploadAttestation } from "@/lib/hooks/eas/useUploadAttestation";
+import CoinbaseFundButton from "@/components/wallet/buy/coinbase-fund-button";
 import {
   UPLOAD_ATTESTATION_TERMS_URL,
   UPLOAD_ATTESTATION_TERMS_VERSION,
@@ -128,11 +129,11 @@ export function UploadAttestationModal({
           </div>
 
           <div className="flex flex-col gap-2">
-            <Button asChild className="w-full">
-              <a href={gasRequirement.onrampUrl} target="_blank" rel="noopener noreferrer">
-                Buy ETH or USDC with Coinbase
-              </a>
-            </Button>
+            <CoinbaseFundButton
+              presetAmount={50}
+              onClose={clearGasRequirement}
+              className="w-full"
+            />
             <Button variant="outline" onClick={clearGasRequirement} className="w-full">
               I&apos;ve added gas — try again
             </Button>

@@ -7,15 +7,9 @@ import { useMembershipContext } from "../../lib/context/MembershipContext";
 import { type MembershipDetails } from "../../lib/hooks/unlock/useMembershipVerification";
 import { LoginWithEthereumButton } from "@/components/auth/LoginWithEthereumButton";
 import { LockKeyhole, ShieldCheck, ShieldX, AlertTriangle, Calendar, ExternalLink } from "lucide-react";
-import {
-  LOCK_ADDRESSES,
-  type LockAddressValue,
-} from "../../lib/sdk/unlock/services";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useUser } from "@/lib/wallet/react";
 import { getPassDisplayName } from "../../lib/access/membership-labels";
-import { CancelMembershipButton } from "../UserProfile/CancelMembershipButton";
-import { getUnlockPaywallCheckoutUrl } from "@/lib/utils/unlock";
 
 function formatExpiration(expiration?: number): string {
   if (!expiration) return "Unknown";
@@ -36,18 +30,6 @@ function isExpired(expiration?: number): boolean {
   if (ms > 32503680000000) return false;
   return ms < Date.now();
 }
-
-const MEMBERSHIP_NAMES: Record<LockAddressValue, string> = {
-  [LOCK_ADDRESSES.BASE_CREATIVE_PASS]: getPassDisplayName(
-    LOCK_ADDRESSES.BASE_CREATIVE_PASS
-  ),
-  [LOCK_ADDRESSES.BASE_CREATIVE_PASS_2]: getPassDisplayName(
-    LOCK_ADDRESSES.BASE_CREATIVE_PASS_2
-  ),
-  [LOCK_ADDRESSES.BASE_CREATIVE_PASS_3]: getPassDisplayName(
-    LOCK_ADDRESSES.BASE_CREATIVE_PASS_3
-  ),
-};
 
 const ERROR_MESSAGES: Record<string, string> = {
   LOCK_NOT_FOUND: "Unable to verify membership. Please try again later.",
@@ -175,7 +157,7 @@ export function MembershipSection({
         <div className="space-y-3">
           {membershipDetails
             .filter(({ isValid }: MembershipDetails) => isValid)
-            .map(({ address, lock, expiration, tokenId }: MembershipDetails) => {
+            .map(({ address, lock, expiration }: MembershipDetails) => {
               const expired = isExpired(expiration);
               return (
               <div
@@ -202,21 +184,11 @@ export function MembershipSection({
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  {tokenId && (
-                    <CancelMembershipButton
-                      lockAddress={address}
-                      tokenId={tokenId}
-                    />
-                  )}
                   <Button asChild variant="outline" size="sm" className="gap-1">
-                    <a
-                      href={getUnlockPaywallCheckoutUrl()}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {expired ? "Renew" : "Extend"}
+                    <Link href="/memberships" onClick={onNavigate}>
+                      View Memberships
                       <ExternalLink className="h-3 w-3" />
-                    </a>
+                    </Link>
                   </Button>
                 </div>
               </div>

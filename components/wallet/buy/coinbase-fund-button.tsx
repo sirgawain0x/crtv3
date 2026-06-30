@@ -46,8 +46,8 @@ function CoinbaseFundButton({
     baseCleanup: () => void,
     onSuccess?: () => void
   ) {
-    let focusTimeoutId: NodeJS.Timeout | null = null;
-    let maxWaitTimeoutId: NodeJS.Timeout | null = null;
+    let focusTimeoutId: ReturnType<typeof setTimeout> | null = null;
+    let maxWaitTimeoutId: ReturnType<typeof setTimeout> | null = null;
     let wasFocused = false;
 
     const fullCleanup = () => {
@@ -161,7 +161,7 @@ function CoinbaseFundButton({
       // Listen for the window to close (user completed or cancelled)
       // Note: Loading state remains true until popup closes (handled in invokeSuccess)
       if (newWindow) {
-        let checkClosedIntervalId: NodeJS.Timeout | null = null;
+        let checkClosedIntervalId: ReturnType<typeof setInterval> | null = null;
         let messageListener: ((event: MessageEvent) => void) | null = null;
         let fallbackActive = false; // Track if fallback detection is active
         let successCallbackInvoked = false; // Guard against duplicate onClose calls
