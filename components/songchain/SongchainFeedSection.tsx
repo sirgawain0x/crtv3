@@ -13,6 +13,7 @@ import {
 } from "@/components/songchain/SongchainPostTimeline";
 import { isQuotePost } from "@/lib/songchain/post-utils";
 import { getFeedDiagnosticInfo } from "@/lib/songchain/feed-diagnostics";
+import { cn } from "@/lib/utils/utils";
 import type { SongchainCreatedPost } from "@/lib/songchain/feed-types";
 
 type SongchainFeedSectionProps = {
@@ -28,6 +29,14 @@ type SongchainFeedSectionProps = {
   readOnly?: boolean;
   /** Enables a contained, scroll-driven animated feed where posts scale near the center. */
   animated?: boolean;
+  /** Render posts as a 4-column grid (Song Cup) or the default single-column timeline. */
+  layout?: "timeline" | "grid";
+  /** Hide the title/description header block. */
+  hideHeader?: boolean;
+  /** Extra classes applied to every post card. */
+  cardClassName?: string;
+  /** Visual variant passed through to each post card. */
+  cardVariant?: "default" | "song-cup";
 };
 
 export type SongchainFeedHandle = {
@@ -68,7 +77,7 @@ function FeedDiagnostics({
 
 export const SongchainFeedSection = forwardRef<SongchainFeedHandle, SongchainFeedSectionProps>(
   function SongchainFeedSection(
-    { title, description, feedId, graphId = null, emptyDescription, onPostUpdated, enabled = true, readOnly = false, animated = false },
+    { title, description, feedId, graphId = null, emptyDescription, onPostUpdated, enabled = true, readOnly = false, animated = false, layout = "timeline", hideHeader = false, cardClassName, cardVariant = "default" },
     ref,
   ) {
     const { posts, pendingPosts, loading, error, hasMore, reload, loadMore, registerNewPost } =
@@ -98,13 +107,15 @@ export const SongchainFeedSection = forwardRef<SongchainFeedHandle, SongchainFee
 
     return (
       <section>
-        <div className="mb-6">
-          <div className="flex items-center gap-2">
-            <h2 className="text-2xl font-bold">{title}</h2>
-            <SongchainFeedInfoTooltip feedId={feedId} />
+        {!hideHeader && (
+          <div className="mb-6">
+            <div className="flex items-center gap-2">
+              <h2 className="text-2xl font-bold">{title}</h2>
+              <SongchainFeedInfoTooltip feedId={feedId} />
+            </div>
+            <p className="text-muted-foreground mt-1">{description}</p>
           </div>
-          <p className="text-muted-foreground mt-1">{description}</p>
-        </div>
+        )}
 
         <FeedDiagnostics
           error={error}
@@ -128,6 +139,29 @@ export const SongchainFeedSection = forwardRef<SongchainFeedHandle, SongchainFee
           <div className="mx-auto max-w-2xl rounded-lg border border-dashed border-border/60 p-8 text-center">
             <p className="font-medium text-foreground">No posts found in this feed yet.</p>
             <p className="mt-2 text-sm text-muted-foreground">{emptyDescription}</p>
+          </div>
+        ) : layout === "grid" ? (
+          <div className={cn("grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4", cardClassName)}>
+            {pendingPosts.map((pending) => (
+              <SongchainPendingPostCard
+                key={pending.localId}
+                pending={pending}
+                onRefresh={() => reload()}
+              />
+            ))}
+            {posts.map((post) => (
+              <SongchainPostCard
+                key={post.id}
+                post={post}
+                feedId={feedId}
+                graphId={graphId}
+                compact
+                readOnly={readOnly}
+                variant={cardVariant}
+                onReactionChange={reload}
+                onPostUpdated={onPostUpdated}
+              />
+            ))}
           </div>
         ) : (
           <SongchainPostTimeline animated={animated}>

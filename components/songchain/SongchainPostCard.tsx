@@ -69,6 +69,8 @@ type SongchainPostCardProps = {
   readOnly?: boolean;
   onReactionChange?: () => void;
   onPostUpdated?: () => void;
+  /** Visual variant for the Song Cup grid. */
+  variant?: "default" | "song-cup";
 };
 
 export function SongchainPostCard({
@@ -79,6 +81,7 @@ export function SongchainPostCard({
   readOnly = false,
   onReactionChange,
   onPostUpdated,
+  variant = "default",
 }: SongchainPostCardProps) {
   const { canWrite, getSessionClient, promptWriteAccess, lensAccount } =
     useLensOrbWrite();
@@ -300,6 +303,7 @@ export function SongchainPostCard({
           compact && "text-sm",
           isQuote && "border-violet-500/30",
           pending === "edit" && "opacity-70",
+          variant === "song-cup" && "min-h-[155px] rounded-[20px] border border-[#fe01dc] bg-black p-3 text-[10px] text-white shadow-none",
         )}
       >
         {pending === "edit" && (
@@ -315,16 +319,19 @@ export function SongchainPostCard({
             <SongchainPostMedia media={media} compact={compact} />
           </div>
         )}
-        <div className="flex flex-col gap-3 p-4">
+        <div className={cn("flex flex-col gap-3", variant === "song-cup" ? "p-0" : "p-4")}>
           <div className="flex items-center justify-between gap-2">
             <button
               type="button"
-              className="text-xs text-muted-foreground text-left hover:text-violet-400 w-fit"
+              className={cn(
+                "text-left hover:text-violet-400 w-fit",
+                variant === "song-cup" ? "text-[10px] text-white/70" : "text-xs text-muted-foreground",
+              )}
               onClick={() => setTimelineOpen(true)}
             >
               {authorLabel(isQuote ? post : content)}
             </button>
-            {content && (
+            {content && variant !== "song-cup" && (
               <SongchainFollowButton
                 graphId={graphId}
                 accountAddress={
@@ -334,19 +341,22 @@ export function SongchainPostCard({
             )}
           </div>
           {compact && media.length > 0 && (
-            <SongchainPostMedia media={media} compact />
+            <div className={cn(variant === "song-cup" && "max-h-28 overflow-hidden rounded-[12px]")}>
+              <SongchainPostMedia media={media} compact={compact} />
+            </div>
           )}
           {resolvedPostText && (
             <SongchainPostContent
               text={resolvedPostText}
               compact={compact}
+              className={cn(variant === "song-cup" && "text-[10px] text-white/90")}
               embeddedCreativeTVUrls={embeddedCreativeTVUrls}
               skipAllInternalPreviews={skipAllInternalPreviews}
             />
           )}
           {quotedPost && <SongchainQuotedPostEmbed quotedPost={quotedPost} />}
-          <div className="mt-auto flex flex-wrap items-center gap-1 pt-2 border-t border-border/40">
-            <span className="text-xs text-muted-foreground mr-auto">
+          <div className={cn("mt-auto flex flex-wrap items-center gap-1 pt-2", variant === "song-cup" ? "border-t border-white/10" : "border-t border-border/40")}>
+            <span className={cn("mr-auto", variant === "song-cup" ? "text-[10px] text-white/60" : "text-xs text-muted-foreground")}>
               {reactions} upvote{reactions === 1 ? "" : "s"}
             </span>
             <Button
@@ -355,13 +365,17 @@ export function SongchainPostCard({
               size="sm"
               disabled={readOnly || pending === "upvote"}
               onClick={readOnly ? undefined : toggleUpvote}
-              className={cn(upvoted && "text-rose-500")}
+              className={cn(
+                "px-2",
+                upvoted && variant === "song-cup" ? "text-[#fe01dc]" : upvoted && "text-rose-500",
+                variant === "song-cup" && "h-7 text-white/80 hover:bg-white/10 hover:text-white",
+              )}
               aria-label="Upvote"
             >
               {pending === "upvote" ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2 className="h-3 w-3 animate-spin" />
               ) : (
-                <Heart className={cn("h-4 w-4", upvoted && "fill-current")} />
+                <Heart className={cn("h-3 w-3", upvoted && "fill-current")} />
               )}
             </Button>
             <Button
@@ -370,9 +384,13 @@ export function SongchainPostCard({
               size="sm"
               onClick={() => setCommentsOpen(true)}
               aria-label={`Comments${commentCount > 0 ? ` (${commentCount})` : ""}`}
-              className={cn("gap-1", readOnly && "text-muted-foreground")}
+              className={cn(
+                "gap-1 px-2",
+                readOnly && "text-muted-foreground",
+                variant === "song-cup" && "h-7 text-white/80 hover:bg-white/10 hover:text-white",
+              )}
             >
-              <MessageCircle className="h-4 w-4" />
+              <MessageCircle className="h-3 w-3" />
               {commentCount > 0 && (
                 <span className="text-[10px] tabular-nums">{commentCount}</span>
               )}
@@ -384,12 +402,15 @@ export function SongchainPostCard({
               disabled={readOnly || pending === "repost"}
               onClick={readOnly ? undefined : handleRepost}
               aria-label={`Repost${reposts > 0 ? ` (${reposts})` : ""}`}
-              className="gap-1"
+              className={cn(
+                "gap-1 px-2",
+                variant === "song-cup" && "h-7 text-white/80 hover:bg-white/10 hover:text-white",
+              )}
             >
               {pending === "repost" ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2 className="h-3 w-3 animate-spin" />
               ) : (
-                <Repeat2 className="h-4 w-4" />
+                <Repeat2 className="h-3 w-3" />
               )}
               {reposts > 0 && (
                 <span className="text-[10px] tabular-nums">{reposts}</span>
@@ -401,13 +422,17 @@ export function SongchainPostCard({
               size="sm"
               disabled={readOnly || pending === "bookmark"}
               onClick={readOnly ? undefined : toggleBookmark}
-              className={cn(bookmarked && "text-amber-500")}
+              className={cn(
+                "px-2",
+                bookmarked && variant === "song-cup" ? "text-[#fe01dc]" : bookmarked && "text-amber-500",
+                variant === "song-cup" && "h-7 text-white/80 hover:bg-white/10 hover:text-white",
+              )}
               aria-label="Bookmark"
             >
               {pending === "bookmark" ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2 className="h-3 w-3 animate-spin" />
               ) : (
-                <Bookmark className={cn("h-4 w-4", bookmarked && "fill-current")} />
+                <Bookmark className={cn("h-3 w-3", bookmarked && "fill-current")} />
               )}
             </Button>
             {isOwner && !readOnly && (
@@ -421,8 +446,11 @@ export function SongchainPostCard({
                     setEditOpen(true);
                   }}
                   aria-label="Edit post"
+                  className={cn(
+                    variant === "song-cup" && "h-7 px-2 text-white/80 hover:bg-white/10 hover:text-white",
+                  )}
                 >
-                  <Pencil className="h-4 w-4" />
+                  <Pencil className="h-3 w-3" />
                 </Button>
                 <Button
                   type="button"
@@ -430,13 +458,16 @@ export function SongchainPostCard({
                   size="sm"
                   disabled={pending === "delete"}
                   onClick={handleDelete}
-                  className="text-destructive"
+                  className={cn(
+                    "text-destructive",
+                    variant === "song-cup" && "h-7 px-2 text-white/80 hover:bg-white/10 hover:text-red-400",
+                  )}
                   aria-label="Delete post"
                 >
                   {pending === "delete" ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <Loader2 className="h-3 w-3 animate-spin" />
                   ) : (
-                    <Trash2 className="h-4 w-4" />
+                    <Trash2 className="h-3 w-3" />
                   )}
                 </Button>
               </>

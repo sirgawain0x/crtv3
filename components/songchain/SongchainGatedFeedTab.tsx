@@ -1,8 +1,8 @@
 "use client";
 
 import { useSongchainGroupMembership } from "@/hooks/useSongchainGroupMembership";
-import { SongchainComposePost } from "./SongchainComposePost";
-import { SongchainFeedSection } from "./SongchainFeedSection";
+import { SongchainComposePost } from "@/components/songchain/SongchainComposePost";
+import { SongchainFeedSection } from "@/components/songchain/SongchainFeedSection";
 import { Loader2, Lock, ExternalLink, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
