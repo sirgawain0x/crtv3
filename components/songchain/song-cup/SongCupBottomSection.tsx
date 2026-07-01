@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { SongchainGatedFeedTab } from "@/components/songchain/SongchainGatedFeedTab";
 import { SongCupPreviewPanel } from "./SongCupPreviewPanel";
 import { SongCupSidebarIcons } from "./SongCupSidebarIcons";
 import { SONG_CUP_BUTTON_ICONS, type SongCupPanel } from "./song-cup-icons";
+import { SongCupFeedPanel } from "./SongCupFeedPanel";
 import type { SongchainConfig } from "@/lib/songchain/config";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { cn } from "@/lib/utils/utils";
@@ -54,17 +54,15 @@ function getPreviewCopy(panel: SongCupPanel) {
 
 function FeedPanel(props: SongCupBottomSectionProps) {
   return (
-    <SongchainGatedFeedTab
-      gateGroupId={props.groupId}
+    <SongCupFeedPanel
       feedId={props.feedId}
+      groupId={props.groupId}
       graphId={props.graphId}
       feedTitle={props.publicFeedTitle ?? "Song Cup club feed"}
       feedDescription={
         props.publicFeedDescription ??
-        "Read the member feed. Join the club on Lens to post and react."
+        "Read the member feed. Join the club on Orb to post and react."
       }
-      clubGateTitle={props.clubGateTitle}
-      clubGateDescription={props.clubGateDescription}
       orbClubUrl={props.orbClubUrl}
     />
   );
@@ -89,7 +87,7 @@ function ActivePanel({
 
 function ActivePanelBanner({ panel }: { panel: SongCupPanel | null }) {
   const icon = SONG_CUP_BUTTON_ICONS.find(({ id }) => id === panel);
-  if (!icon) return null;
+  if (!icon || panel === "feed") return null;
   return (
     <div className="mb-3 inline-flex items-center gap-2 rounded-lg border border-fuchsia-500/20 bg-fuchsia-500/10 px-3 py-1.5">
       <img src={icon.src} alt="" className="h-5 w-5 object-contain" aria-hidden />
@@ -129,7 +127,14 @@ export function SongCupBottomSection(props: SongCupBottomSectionProps) {
     return (
       <div id="song-cup-feed" className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
         <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-          <main className="order-2 min-h-[480px] rounded-2xl border border-fuchsia-500/20 p-4 sm:p-6 lg:order-1">
+          <main
+            className={cn(
+              "order-2 min-h-[480px] p-4 sm:p-6 lg:order-1",
+              activePanel === "feed"
+                ? "border-0 bg-transparent p-0"
+                : "rounded-2xl border border-fuchsia-500/20",
+            )}
+          >
             <ActivePanelBanner panel={activePanel} />
             <ActivePanel panel={activePanel} props={props} />
           </main>
@@ -184,7 +189,14 @@ export function SongCupBottomSection(props: SongCupBottomSectionProps) {
                 )}
               </div>
               {isActive && isPanel && (
-                <div className="min-h-[320px] rounded-2xl border border-fuchsia-500/20 bg-black/40 p-4 sm:p-5">
+                <div
+                  className={cn(
+                    "min-h-[320px] p-4 sm:p-5",
+                    id === "feed"
+                      ? "border-0 bg-transparent p-0"
+                      : "rounded-2xl border border-fuchsia-500/20 bg-black/40",
+                  )}
+                >
                   <ActivePanel panel={id as SongCupPanel} props={props} />
                 </div>
               )}

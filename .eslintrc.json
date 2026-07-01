@@ -17,7 +17,9 @@
   "ignorePatterns": [
     "*.sql",
     "*.md",
-    "supabase/functions/**/*.ts"
+    "supabase/functions/**/*.ts",
+    "public/sw.js",
+    "public/workbox-*.js"
   ],
   "rules": {
     "no-unused-vars": "off",
