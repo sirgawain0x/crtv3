@@ -85,24 +85,24 @@ export function SongCupFeedPanel({
             </div>
           )}
 
-          {!membership.loading && membership.isMember && (
-            <SongCupFeedCompose feedId={feedId} />
-          )}
-
           {!membership.loading && (
-            <SongCupFeedMembersRow groupId={groupId} orbClubUrl={joinHref} />
-          )}
+            <>
+              {membership.isMember && <SongCupFeedCompose feedId={feedId} />}
 
-          {!membership.loading && membership.isMember && (
-            <SongchainFeedSection
-              title={feedTitle}
-              description={feedDescription}
-              feedId={feedId}
-              graphId={graphId}
-              emptyDescription="Lens custom feeds only show posts published to that feed contract. Existing Orb profile or global posts are not backfilled."
-              layout="grid"
-              hideHeader
-            />
+              <SongCupFeedMembersRow groupId={groupId} orbClubUrl={joinHref} />
+
+              <SongchainFeedSection
+                title={feedTitle}
+                description={feedDescription}
+                feedId={feedId}
+                graphId={graphId}
+                emptyDescription="Lens custom feeds only show posts published to that feed contract. Existing Orb profile or global posts are not backfilled."
+                layout="grid"
+                hideHeader
+                readOnly={!membership.isMember}
+                cardVariant="song-cup"
+              />
+            </>
           )}
         </div>
       </div>

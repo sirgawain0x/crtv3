@@ -9,6 +9,7 @@ import { useLensOrbWrite } from "@/hooks/useLensOrbWrite";
 import { clearStaleOrbSessionIfNeeded } from "@/lib/sdk/orb/session-errors";
 import { convertFailingGateway } from "@/lib/utils/image-gateway";
 import makeBlockie from "ethereum-blockies-base64";
+import { toast } from "sonner";
 
 type Member = {
   account: string;
@@ -93,7 +94,14 @@ export function SongCupFeedMembersRow({ groupId, orbClubUrl }: SongCupFeedMember
             };
           }),
         );
+      } else {
+        console.error("Failed to load group members", result.error);
+        toast.error("Could not load club members.");
       }
+    } catch (err) {
+      clearStaleOrbSessionIfNeeded(err);
+      console.error("Error loading group members", err);
+      toast.error("Could not load club members.");
     } finally {
       setLoading(false);
     }

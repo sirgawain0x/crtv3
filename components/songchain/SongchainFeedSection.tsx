@@ -35,6 +35,8 @@ type SongchainFeedSectionProps = {
   hideHeader?: boolean;
   /** Extra classes applied to every post card. */
   cardClassName?: string;
+  /** Visual variant passed through to each post card. */
+  cardVariant?: "default" | "song-cup";
 };
 
 export type SongchainFeedHandle = {
@@ -75,7 +77,7 @@ function FeedDiagnostics({
 
 export const SongchainFeedSection = forwardRef<SongchainFeedHandle, SongchainFeedSectionProps>(
   function SongchainFeedSection(
-    { title, description, feedId, graphId = null, emptyDescription, onPostUpdated, enabled = true, readOnly = false, animated = false, layout = "timeline", hideHeader = false, cardClassName },
+    { title, description, feedId, graphId = null, emptyDescription, onPostUpdated, enabled = true, readOnly = false, animated = false, layout = "timeline", hideHeader = false, cardClassName, cardVariant = "default" },
     ref,
   ) {
     const { posts, pendingPosts, loading, error, hasMore, reload, loadMore, registerNewPost } =
@@ -155,6 +157,7 @@ export const SongchainFeedSection = forwardRef<SongchainFeedHandle, SongchainFee
                 graphId={graphId}
                 compact
                 readOnly={readOnly}
+                variant={cardVariant}
                 onReactionChange={reload}
                 onPostUpdated={onPostUpdated}
               />

@@ -12,6 +12,7 @@ import { songCupSubmissionsService } from "@/lib/sdk/supabase/song-cup-submissio
 import type { SongchainCreatedPost } from "@/lib/songchain/feed-types";
 import type { VideoAsset } from "@/lib/types/video-asset";
 import type { StreamSummary } from "@/lib/songchain/build-lens-livestream-metadata";
+import { toast } from "sonner";
 
 type SongCupFeedComposeProps = {
   feedId: string | null;
@@ -68,14 +69,19 @@ export function SongCupFeedCompose({
     });
     if (created) {
       if (uploadedVideoAsset?.location && user?.address) {
-        await songCupSubmissionsService.create({
-          wallet_address: user.address,
-          grove_url: uploadedVideoAsset.location,
-          grove_hash: uploadedVideoAsset.metadata_uri ?? undefined,
-          title: uploadedVideoAsset.title ?? undefined,
-          description: content.trim() || undefined,
-          post_id: created.postId,
-        });
+        try {
+          await songCupSubmissionsService.create({
+            wallet_address: user.address,
+            grove_url: uploadedVideoAsset.location,
+            grove_hash: uploadedVideoAsset.metadata_uri ?? undefined,
+            title: uploadedVideoAsset.title ?? undefined,
+            description: content.trim() || undefined,
+            post_id: created.postId,
+          });
+        } catch (err) {
+          console.error("Song Cup submission sync failed", err);
+          toast.error("Post shared, but submission backup failed.");
+        }
       }
       setContent("");
       setUploadedVideoAsset(null);
@@ -160,7 +166,7 @@ export function SongCupFeedCompose({
             </div>
           )}
 
-          {!liveAttached && !uploadedVideoAsset && (
+          {!liveAttached && (
             <GroveVideoUploader
               onUploaded={handleUploadVideo}
               onRemove={handleRemoveVideo}
@@ -169,39 +175,28 @@ export function SongCupFeedCompose({
             />
           )}
 
-          {uploadedVideoAsset && (
-            <GroveVideoUploader
-              onUploaded={handleUploadVideo}
-              onRemove={handleRemoveVideo}
-              uploadedAsset={uploadedVideoAsset}
-              disabled={isPosting}
-            />
+          {!canWrite ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={promptWriteAccess}
+              className="w-fit border-white/20 text-white hover:bg-white/10 hover:text-white"
+            >
+              {needsOrbReauth ? "Sign in again" : "Link Orb to post"}
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              size="sm"
+              disabled={isPosting || !canSubmit}
+              onClick={() => void handleSubmit()}
+              className="ml-auto rounded-full bg-gradient-to-br from-[#DC2BB3] to-[#FDBE01] px-5 font-semibold text-black hover:opacity-90 disabled:opacity-50"
+            >
+              {isPosting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              POST
+            </Button>
           )}
-
-          <div className="flex justify-end gap-2">
-            {!canWrite ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={promptWriteAccess}
-                className="border-white/20 text-white hover:bg-white/10 hover:text-white"
-              >
-                {needsOrbReauth ? "Sign in again" : "Link Orb to post"}
-              </Button>
-            ) : (
-              <Button
-                type="button"
-                size="sm"
-                disabled={isPosting || !canSubmit}
-                onClick={() => void handleSubmit()}
-                className="rounded-full bg-gradient-to-br from-[#DC2BB3] to-[#FDBE01] px-5 font-semibold text-black hover:opacity-90 disabled:opacity-50"
-              >
-                {isPosting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                POST
-              </Button>
-            )}
-          </div>
         </div>
       )}
     </div>
