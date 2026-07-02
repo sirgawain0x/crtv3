@@ -141,7 +141,15 @@ export const SongchainFeedSection = forwardRef<SongchainFeedHandle, SongchainFee
             <p className="mt-2 text-sm text-muted-foreground">{emptyDescription}</p>
           </div>
         ) : layout === "grid" ? (
-          <div className={cn("grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4", cardClassName)}>
+          <div
+            className={cn(
+              "grid gap-4",
+              cardVariant === "song-cup"
+                ? "grid-cols-1 sm:grid-cols-2 xl:grid-cols-2"
+                : "grid-cols-1 sm:grid-cols-2 xl:grid-cols-4",
+              cardClassName,
+            )}
+          >
             {pendingPosts.map((pending) => (
               <SongchainPendingPostCard
                 key={pending.localId}

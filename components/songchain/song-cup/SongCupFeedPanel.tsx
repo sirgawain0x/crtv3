@@ -5,8 +5,15 @@ import { SongchainFeedSection } from "@/components/songchain/SongchainFeedSectio
 import { SongCupFeedCompose } from "./SongCupFeedCompose";
 import { SongCupFeedMembersRow } from "./SongCupFeedMembersRow";
 import { Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils/utils";
 import { SONG_CUP_PLAY_LINKS } from "@/lib/songchain/events";
+import {
+  songCupAccent,
+  songCupLabel,
+  songCupMuted,
+  songCupPanel,
+} from "@/lib/songchain/song-cup/panel-styles";
 
 type SongCupFeedPanelProps = {
   feedId: string | null;
@@ -30,56 +37,73 @@ export function SongCupFeedPanel({
   const joinHref = orbClubUrl ?? SONG_CUP_PLAY_LINKS.club;
 
   return (
-    <div className="rounded-[20px] border border-[#dc2bb3] bg-black p-4 sm:p-5">
+    <div className={cn(songCupPanel, "p-4 sm:p-5")}>
       <div className="flex flex-col gap-4 sm:flex-row">
-        {/* Feed icon + gate copy column */}
         <aside className="flex shrink-0 flex-col items-start gap-3 sm:w-[147px]">
           <img
             src="/songchain/button-icons/feed-icon.svg"
             alt="The Feed"
             className="h-[120px] w-[120px] object-contain"
           />
-          <div className="space-y-1.5">
-            <p className="text-[10px] font-semibold uppercase leading-tight tracking-wide text-white">
-              FOR ORB MEMBERS ONLY
-            </p>
+          <div className="w-full space-y-2">
+            <p className={songCupLabel}>For Orb members only</p>
             {membership.isMember ? (
-              <p className="text-[10px] font-semibold uppercase leading-tight tracking-wide text-white/70">
-                Joined
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className={cn(
+                  "h-8 w-full text-[10px] font-semibold uppercase tracking-wide",
+                  songCupAccent,
+                )}
+                disabled={membership.leaving}
+                onClick={() => void membership.leave()}
+              >
+                {membership.leaving ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  "Leave club"
+                )}
+              </Button>
+            ) : membership.isPendingApproval ? (
+              <p className={cn("text-[10px] font-semibold uppercase tracking-wide", songCupAccent)}>
+                Pending approval
               </p>
             ) : (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className={cn(
+                  "h-8 w-full text-[10px] font-semibold uppercase tracking-wide hover:border-fuchsia-500",
+                  songCupAccent,
+                )}
+                disabled={membership.joining || !membership.groupId}
+                onClick={() => void membership.join()}
+              >
+                {membership.joining ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  "Join club"
+                )}
+              </Button>
+            )}
+            {!membership.isMember && !membership.isPendingApproval && (
               <a
                 href={joinHref}
                 target="_blank"
                 rel="noopener noreferrer"
-                onClick={(e) => {
-                  if (membership.canWrite) {
-                    e.preventDefault();
-                    void membership.join();
-                  }
-                }}
-                className={cn(
-                  "block text-[10px] font-semibold uppercase leading-tight tracking-wide text-white hover:text-[#fe01dc]",
-                  membership.joining && "pointer-events-none opacity-60",
-                )}
+                className={cn("block text-[10px] underline", songCupMuted)}
               >
-                {membership.joining ? (
-                  <span className="inline-flex items-center gap-1">
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                    Joining…
-                  </span>
-                ) : (
-                  "JOIN ORB SONG CLUB"
-                )}
+                Or open on Orb
               </a>
             )}
           </div>
         </aside>
 
-        {/* Main column */}
-        <div className="flex flex-1 flex-col gap-4">
+        <div className="flex min-w-0 flex-1 flex-col gap-4">
           {membership.loading && (
-            <div className="flex h-24 items-center justify-center gap-2 text-sm text-white/70">
+            <div className={cn("flex h-24 items-center justify-center gap-2 text-sm", songCupMuted)}>
               <Loader2 className="h-4 w-4 animate-spin" />
               Checking club membership…
             </div>

@@ -36,7 +36,6 @@ interface FileUploadProps {
   newAssetTitle?: string;
   hideNavigation?: boolean;
   onAssetReady?: (asset: any) => void;
-  attestationVerified?: boolean;
 }
 
 async function pollForMetadataUri(
@@ -63,7 +62,6 @@ const FileUpload: React.FC<FileUploadProps> = ({
   newAssetTitle,
   hideNavigation = false,
   onAssetReady,
-  attestationVerified = false,
 }) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadedUri, setUploadedUri] = useState<string | null>(null);
@@ -151,11 +149,6 @@ const FileUpload: React.FC<FileUploadProps> = ({
   }, [loading, address]);
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (!attestationVerified) {
-      toast.error("Please sign the upload rights attestation before selecting a file.");
-      event.target.value = "";
-      return;
-    }
     const file = event.target.files?.[0] || null;
 
     // Reset state
@@ -176,10 +169,6 @@ const FileUpload: React.FC<FileUploadProps> = ({
   };
 
   const handleFileUpload = async () => {
-    if (!attestationVerified) {
-      setError("Please sign the upload rights attestation before uploading.");
-      return;
-    }
     if (!selectedFile) {
       setError("Please select a file to upload.");
       return;
@@ -342,8 +331,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
               sm:file:mr-4 sm:file:px-4 sm:file:text-sm file:font-semibold file:text-[#EC407A] hover:file:bg-accent"
               data-testid="file-upload-input"
               onChange={handleFileChange}
-            
-              disabled={!attestationVerified}/>
+            />
             <div className="mt-2 space-y-1">
               <p className="text-xs text-muted-foreground font-medium">
                 📹 Supported: MP4
@@ -376,7 +364,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
                 {uploadState === "idle" ? (
                   <button
                     onClick={handleFileUpload}
-                    disabled={!selectedFile || !attestationVerified}
+                    disabled={!selectedFile}
                     className={`${!selectedFile
                       ? "cursor-not-allowed bg-[#D63A6A] opacity-50"
                       : "bg-[#EC407A] hover:bg-[#D63A6A] active:bg-[#C62C5A]"

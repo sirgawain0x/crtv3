@@ -10,6 +10,8 @@ import { clearStaleOrbSessionIfNeeded } from "@/lib/sdk/orb/session-errors";
 import { convertFailingGateway } from "@/lib/utils/image-gateway";
 import makeBlockie from "ethereum-blockies-base64";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils/utils";
+import { songCupMuted } from "@/lib/songchain/song-cup/panel-styles";
 
 type Member = {
   account: string;
@@ -117,7 +119,7 @@ export function SongCupFeedMembersRow({ groupId, orbClubUrl }: SongCupFeedMember
     <div className="flex items-center justify-between gap-3">
       <div className="flex items-center">
         {loading && members.length === 0 ? (
-          <span className="text-xs text-white/60">Loading members…</span>
+          <span className={cn("text-xs", songCupMuted)}>Loading members…</span>
         ) : (
           members.map((member, index) => (
             <div
@@ -128,7 +130,7 @@ export function SongCupFeedMembersRow({ groupId, orbClubUrl }: SongCupFeedMember
               <img
                 src={member.avatarUrl || makeBlockie(member.account)}
                 alt={member.handle ?? member.account}
-                className="h-[58px] w-[58px] rounded-full border-2 border-black object-cover"
+                className="h-[58px] w-[58px] rounded-full border-2 border-background object-cover dark:border-black"
               />
             </div>
           ))
@@ -139,7 +141,7 @@ export function SongCupFeedMembersRow({ groupId, orbClubUrl }: SongCupFeedMember
           href={orbClubUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-[10px] font-semibold uppercase tracking-wide text-white/80 hover:text-[#fe01dc]"
+          className={cn("text-[10px] font-semibold uppercase tracking-wide hover:underline", songCupMuted, "hover:text-fuchsia-600 dark:hover:text-[#fe01dc]")}
         >
           more
         </a>

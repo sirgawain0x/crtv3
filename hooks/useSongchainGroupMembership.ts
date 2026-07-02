@@ -92,6 +92,7 @@ export function useSongchainGroupMembership({
   const [description, setDescription] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [isMember, setIsMember] = useState(false);
+  const [isPendingApproval, setIsPendingApproval] = useState(false);
   const [loading, setLoading] = useState(false);
   const [joining, setJoining] = useState(false);
   const [leaving, setLeaving] = useState(false);
@@ -106,6 +107,7 @@ export function useSongchainGroupMembership({
       setDescription(null);
       setImageUrl(null);
       setIsMember(false);
+      setIsPendingApproval(false);
       setError(null);
       return;
     }
@@ -160,6 +162,7 @@ export function useSongchainGroupMembership({
       const memberFromApi =
         ops && "isMember" in ops ? Boolean(ops.isMember) : false;
       applyMembershipFromApi(memberFromApi, optimisticMemberRef, setIsMember);
+      if (memberFromApi) setIsPendingApproval(false);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to load club";
       setError(message);
@@ -188,9 +191,7 @@ export function useSongchainGroupMembership({
       const client = await getSessionClient();
       const result = await joinGroup(client, { group: evmAddress(groupId) });
       if (result.isErr()) throw new Error(result.error.message);
-      toast.success("Joined club — you can now access the feed");
-      optimisticMemberRef.current = true;
-      setIsMember(true);
+      toast.success("Join request sent — you will get access once approved");
 
       void (async () => {
         for (const delayMs of MEMBERSHIP_SYNC_DELAYS_MS) {
@@ -205,15 +206,19 @@ export function useSongchainGroupMembership({
             const ops = groupResult.value.operations;
             const memberFromApi =
               ops && "isMember" in ops ? Boolean(ops.isMember) : false;
-            if (!memberFromApi) continue;
-
-            optimisticMemberRef.current = false;
-            await loadRef.current?.();
-            return;
+            if (memberFromApi) {
+              optimisticMemberRef.current = false;
+              setIsMember(true);
+              setIsPendingApproval(false);
+              toast.success("You are now a member — you can post and react");
+              await loadRef.current?.();
+              return;
+            }
           } catch {
             // Indexer may still be behind; keep polling.
           }
         }
+        setIsPendingApproval(true);
       })();
 
       return true;
@@ -238,8 +243,9 @@ export function useSongchainGroupMembership({
       const client = await getSessionClient();
       const result = await leaveGroup(client, { group: evmAddress(groupId) });
       if (result.isErr()) throw new Error(result.error.message);
-      toast.success("Left club — you will need to rejoin to post");
+      toast.success("Left club");
       setIsMember(false);
+      setIsPendingApproval(false);
       await loadRef.current?.();
       return true;
     } catch (err) {
@@ -256,6 +262,7 @@ export function useSongchainGroupMembership({
     description,
     imageUrl,
     isMember,
+    isPendingApproval,
     loading,
     joining,
     leaving,

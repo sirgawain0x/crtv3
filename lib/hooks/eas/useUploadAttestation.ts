@@ -30,6 +30,7 @@ import { toast } from "sonner";
 import { logger } from "@/lib/utils/logger";
 import { parseBundlerError } from "@/lib/utils/bundlerErrorParser";
 import { base } from "viem/chains";
+import { buildSponsoredAttestationGasContext } from "@/lib/eas/attestation-gas";
 
 export type AttestationStatus =
   | "idle"
@@ -49,6 +50,15 @@ export interface GasRequirement {
   scaAddress: `0x${string}`;
 }
 
+export interface AttestationTermsConfig {
+  platformName: string;
+  termsUrl: string;
+  termsVersion: string;
+  attestationVersion: string;
+  /** Alchemy Gas Manager policy ID for sponsored attestation UserOps on Base. */
+  paymasterPolicyId?: string;
+}
+
 interface UploadAttestation {
   uid: string;
   attester: string;
@@ -60,6 +70,24 @@ interface UploadAttestation {
   timestamp: number;
   version: string;
   txHash?: string;
+}
+
+const DEFAULT_ATTESTATION_TERMS: AttestationTermsConfig = {
+  platformName: UPLOAD_ATTESTATION_PLATFORM_NAME,
+  termsUrl: UPLOAD_ATTESTATION_TERMS_URL,
+  termsVersion: UPLOAD_ATTESTATION_TERMS_VERSION,
+  attestationVersion: UPLOAD_ATTESTATION_VERSION,
+};
+
+function attestationMatchesTerms(
+  attestation: UploadAttestation,
+  terms: AttestationTermsConfig,
+): boolean {
+  return (
+    attestation.termsVersion === terms.termsVersion &&
+    attestation.termsUrl === terms.termsUrl &&
+    attestation.platformName === terms.platformName
+  );
 }
 
 const EAS_SUBGRAPH_URL = "https://base.easscan.org/graphql";
@@ -89,7 +117,7 @@ function getBasePublicClient() {
   return createPublicClient({ chain: base, transport });
 }
 
-export function useUploadAttestation() {
+export function useUploadAttestation(termsConfig: AttestationTermsConfig = DEFAULT_ATTESTATION_TERMS) {
   const { address } = useAccount();
   const { client } = useSmartAccountClient({ type: "MultiOwnerModularAccount" });
   const { getAttestationGasContext, getGasContext } = useGasSponsorship();
@@ -140,7 +168,7 @@ export function useUploadAttestation() {
             revoked: { equals: false }
           }
           orderBy: { time: desc }
-          first: 1
+          first: 10
         ) {
           id
           attester { id }
@@ -163,10 +191,15 @@ export function useUploadAttestation() {
     });
 
     const json = await res.json();
-    const node = json?.data?.attestations?.[0];
-    if (!node) return null;
-    return decodeAttestation(node);
-  }, [address, decodeAttestation]);
+    const nodes = (json?.data?.attestations ?? []) as AttestationSubgraphNode[];
+    for (const node of nodes) {
+      const decoded = decodeAttestation(node);
+      if (decoded && attestationMatchesTerms(decoded, termsConfig)) {
+        return decoded;
+      }
+    }
+    return null;
+  }, [address, decodeAttestation, termsConfig]);
 
   const checkAttestation = useCallback(async () => {
     if (!address) {
@@ -251,23 +284,27 @@ export function useUploadAttestation() {
         { name: "attester", value: address as `0x${string}`, type: "address" },
         { name: "acceptedTerms", value: true, type: "bool" },
         { name: "ownsCopyright", value: true, type: "bool" },
-        { name: "platformName", value: UPLOAD_ATTESTATION_PLATFORM_NAME, type: "string" },
-        { name: "termsUrl", value: UPLOAD_ATTESTATION_TERMS_URL, type: "string" },
-        { name: "termsVersion", value: UPLOAD_ATTESTATION_TERMS_VERSION, type: "string" },
+        { name: "platformName", value: termsConfig.platformName, type: "string" },
+        { name: "termsUrl", value: termsConfig.termsUrl, type: "string" },
+        { name: "termsVersion", value: termsConfig.termsVersion, type: "string" },
         { name: "timestamp", value: timestamp, type: "uint64" },
-        { name: "version", value: UPLOAD_ATTESTATION_VERSION, type: "string" },
+        { name: "version", value: termsConfig.attestationVersion, type: "string" },
       ]) as `0x${string}`;
 
-      let { context, isSponsored } = getAttestationGasContext();
-      logger.debug("Attestation gas context:", { isSponsored, hasContext: !!context });
+      let { context, isSponsored, policyId: attestationPolicyId } =
+        buildSponsoredAttestationGasContext(termsConfig.paymasterPolicyId);
 
-      // Validate policy ID shape early so we don't send a malformed context to the paymaster.
-      const policyId = context?.paymasterService?.policyId;
-      if (context?.paymasterService && (!policyId || !/^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(policyId))) {
-        logger.warn("Attestation sponsor policy ID looks malformed, falling back to ETH gas", { policyId });
-        context = undefined;
-        isSponsored = false;
+      if (!context) {
+        const fallback = getAttestationGasContext();
+        context = fallback.context;
+        isSponsored = fallback.isSponsored;
       }
+
+      logger.debug("Attestation gas context:", {
+        isSponsored,
+        policyId: attestationPolicyId ?? context?.paymasterService?.policyId,
+        termsPlatform: termsConfig.platformName,
+      });
 
       const uoCall = {
         target: (EAS_CONTRACT_ADDRESS.startsWith("0x") ? EAS_CONTRACT_ADDRESS : `0x${EAS_CONTRACT_ADDRESS}`) as `0x${string}`,
@@ -303,7 +340,7 @@ export function useUploadAttestation() {
           error: firstError.message,
           isSponsored,
           hasContext: !!context,
-          policyId,
+          policyId: attestationPolicyId ?? context?.paymasterService?.policyId,
         });
 
         // If sponsorship failed, decide whether we can retry with ETH or USDC, or if the user needs to add gas.
@@ -373,7 +410,7 @@ export function useUploadAttestation() {
 
       setAttestation(found);
       setStatus("success");
-      toast.success("Upload rights attestation confirmed");
+      toast.success("Attestation confirmed");
       return found;
     } catch (err) {
       logger.error("Attestation signing failed:", err);
@@ -383,7 +420,7 @@ export function useUploadAttestation() {
       toast.error(msg);
       return null;
     }
-  }, [address, client, fetchAttestation, getAttestationGasContext, getGasContext, fetchGasBalances, setNeedsGas]);
+  }, [address, client, fetchAttestation, getAttestationGasContext, getGasContext, fetchGasBalances, setNeedsGas, termsConfig]);
 
   useEffect(() => {
     void checkAttestation();

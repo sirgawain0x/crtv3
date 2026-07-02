@@ -6,6 +6,7 @@ import type { SongchainConfig } from "@/lib/songchain/config";
 import { SongCupBottomSection } from "@/components/songchain/song-cup/SongCupBottomSection";
 import { SongCupBrandLogo } from "@/components/songchain/song-cup/SongCupBrandLogo";
 import { SongCupHero } from "@/components/songchain/song-cup/SongCupHero";
+import { SongCupAgentSearch } from "@/components/songchain/song-cup/SongCupAgentSearch";
 import { SongCupPlayModal } from "@/components/songchain/song-cup/SongCupPlayModal";
 import { SONG_CUP_PLAY_LINKS } from "@/lib/songchain/events";
 
@@ -38,6 +39,7 @@ export function SongCupPageClient({ config }: SongCupPageClientProps) {
         ariaLabel="Song Cup"
         animationPaused={playModalOpen}
         onCtaClick={() => setPlayModalOpen(true)}
+        agentSearch={<SongCupAgentSearch />}
       />
       <SongCupPlayModal open={playModalOpen} onOpenChange={setPlayModalOpen} />
 

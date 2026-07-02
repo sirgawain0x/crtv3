@@ -1,6 +1,7 @@
 "use client";
 
 import { useIsMember } from "../unlock/useIsMember";
+import { buildSponsoredAttestationGasContext } from "@/lib/eas/attestation-gas";
 
 // Base USDC Address
 const USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
@@ -21,7 +22,6 @@ export function useGasSponsorship() {
     const SPONSORED_POLICY_ID = process.env.NEXT_PUBLIC_ALCHEMY_PAYMASTER_POLICY_ID?.replace(/^["']|["']$/g, '');
     const USDC_POLICY_ID = process.env.NEXT_PUBLIC_ANYTOKEN_POLICY_ID?.replace(/^["']|["']$/g, '');
     const STORY_POLICY_ID = process.env.NEXT_PUBLIC_STORY_POLICY_ID?.replace(/^["']|["']$/g, '');
-    const ATTESTATION_SPONSORED_POLICY_ID = process.env.NEXT_PUBLIC_ATTESTATION_SPONSORED_POLICY_ID?.replace(/^["']|["']$/g, '');
 
     /**
      * Returns the appropriate UserOperation context based on membership status and target payment method.
@@ -111,26 +111,13 @@ export function useGasSponsorship() {
     };
 
     /**
-     * Returns a fully-sponsored gas context for upload attestation UserOperations.
-     * Uses NEXT_PUBLIC_ATTESTATION_SPONSORED_POLICY_ID when set, regardless of membership status.
+     * Returns a fully-sponsored gas context for EAS attestation UserOperations on Base.
+     * Uses NEXT_PUBLIC_ATTESTATION_SPONSORED_POLICY_ID, then repo default, then general paymaster policy.
      */
     const getAttestationGasContext = (): { context: GasSponsorshipContext | undefined; isSponsored: boolean } => {
-        if (ATTESTATION_SPONSORED_POLICY_ID) {
-            return {
-                context: {
-                    paymasterService: { policyId: ATTESTATION_SPONSORED_POLICY_ID },
-                },
-                isSponsored: true,
-            };
-        }
-        // Try the general membership sponsored policy as a fallback
-        if (SPONSORED_POLICY_ID) {
-            return {
-                context: {
-                    paymasterService: { policyId: SPONSORED_POLICY_ID },
-                },
-                isSponsored: true,
-            };
+        const sponsored = buildSponsoredAttestationGasContext();
+        if (sponsored.context) {
+            return { context: sponsored.context, isSponsored: sponsored.isSponsored };
         }
         return { context: undefined, isSponsored: false };
     };

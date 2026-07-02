@@ -17,11 +17,12 @@ type SongCupSidebarIconsProps = {
 export function SongCupSidebarIcons({ active, onSelect, className }: SongCupSidebarIconsProps) {
   return (
     <section className={className}>
-      {SONG_CUP_BUTTON_ICONS.map(({ id, src, alt, dividerAfter, externalHref }) => {
+      {SONG_CUP_BUTTON_ICONS.map(({ id, src, alt, dividerAfter, externalHref, iconBgClass }) => {
         const isActive = active === id;
         const baseClasses = [
-          "group relative block w-1/2 overflow-hidden bg-transparent transition-all duration-200 hover:scale-[1.02]",
-          isActive ? "ring-2 ring-fuchsia-500 rounded-xl" : "",
+          "group relative block w-1/2 overflow-hidden rounded-xl transition-all duration-200 hover:scale-[1.02]",
+          iconBgClass ?? "bg-transparent",
+          isActive ? "ring-2 ring-fuchsia-500" : "",
         ].join(" ");
 
         const image = (
