@@ -39,9 +39,13 @@ export function SongCupAgentSearch({ className }: SongCupAgentSearchProps) {
         reply?: string;
         session?: string;
         error?: string;
+        code?: string;
       };
 
       if (!res.ok || !data.success) {
+        if (res.status === 403 && data.code === "BOTID_DENIED") {
+          throw new Error("Request blocked — please refresh and try again.");
+        }
         throw new Error(data.error || `Agent returned ${res.status}`);
       }
 

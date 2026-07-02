@@ -108,6 +108,10 @@ export function SongCupAdminMatchupForm({
       } else {
         toast.error("Failed to save matchup");
       }
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Could not create matchup — try again",
+      );
     } finally {
       setSaving(false);
     }
