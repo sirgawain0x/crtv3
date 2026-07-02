@@ -1,6 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import { SongCupInfoPanel } from "./SongCupInfoPanel";
+import { SongCupPixelsPanel } from "./SongCupPixelsPanel";
+import { SongCupSubmitPanel } from "./SongCupSubmitPanel";
+import { SongCupVotePanel } from "./SongCupVotePanel";
 import { SongCupPreviewPanel } from "./SongCupPreviewPanel";
 import { SongCupSidebarIcons } from "./SongCupSidebarIcons";
 import { SONG_CUP_BUTTON_ICONS, type SongCupPanel } from "./song-cup-icons";
@@ -76,18 +80,24 @@ function PreviewPanel({ panel }: { panel: SongCupPanel }) {
 function ActivePanel({
   panel,
   props,
+  onGoToSubmit,
 }: {
   panel: SongCupPanel | null;
   props: SongCupBottomSectionProps;
+  onGoToSubmit?: () => void;
 }) {
   if (panel === "feed") return <FeedPanel {...props} />;
+  if (panel === "songcup") return <SongCupInfoPanel onGoToSubmit={onGoToSubmit} />;
+  if (panel === "pixels") return <SongCupPixelsPanel />;
+  if (panel === "submit") return <SongCupSubmitPanel />;
+  if (panel === "vote") return <SongCupVotePanel />;
   if (!panel) return null;
   return <PreviewPanel panel={panel} />;
 }
 
 function ActivePanelBanner({ panel }: { panel: SongCupPanel | null }) {
   const icon = SONG_CUP_BUTTON_ICONS.find(({ id }) => id === panel);
-  if (!icon || panel === "feed") return null;
+  if (!icon || panel === "feed" || panel === "songcup" || panel === "submit" || panel === "pixels" || panel === "vote") return null;
   return (
     <div className="mb-3 inline-flex items-center gap-2 rounded-lg border border-fuchsia-500/20 bg-fuchsia-500/10 px-3 py-1.5">
       <img src={icon.src} alt="" className="h-5 w-5 object-contain" aria-hidden />
@@ -130,13 +140,21 @@ export function SongCupBottomSection(props: SongCupBottomSectionProps) {
           <main
             className={cn(
               "order-2 min-h-[480px] p-4 sm:p-6 lg:order-1",
-              activePanel === "feed"
+              activePanel === "feed" ||
+              activePanel === "songcup" ||
+              activePanel === "submit" ||
+              activePanel === "pixels" ||
+              activePanel === "vote"
                 ? "border-0 bg-transparent p-0"
                 : "rounded-2xl border border-fuchsia-500/20",
             )}
           >
             <ActivePanelBanner panel={activePanel} />
-            <ActivePanel panel={activePanel} props={props} />
+            <ActivePanel
+              panel={activePanel}
+              props={props}
+              onGoToSubmit={() => setActivePanel("submit")}
+            />
           </main>
           <aside className="order-1 space-y-6 lg:order-2">
             <SongCupSidebarIcons
@@ -153,9 +171,13 @@ export function SongCupBottomSection(props: SongCupBottomSectionProps) {
   return (
     <div id="song-cup-feed" className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
       <div className="flex flex-col gap-4">
-        {SONG_CUP_BUTTON_ICONS.map(({ id, src, alt, externalHref, dividerAfter }) => {
+        {SONG_CUP_BUTTON_ICONS.map(({ id, src, alt, externalHref, dividerAfter, iconBgClass }) => {
           const isActive = activePanel === id;
           const isPanel = id !== "beatme" && id !== "worldcup";
+          const iconWrapClass = cn(
+            "flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-xl",
+            iconBgClass,
+          );
           return (
             <div key={id} className="flex flex-col gap-3">
               <div className="flex items-center justify-between gap-4">
@@ -166,7 +188,9 @@ export function SongCupBottomSection(props: SongCupBottomSectionProps) {
                     rel="noopener noreferrer"
                     className="flex items-center gap-3 rounded-xl p-2 transition-colors hover:bg-fuchsia-500/10"
                   >
-                    <img src={src} alt={alt} className="h-24 w-24 object-contain" />
+                    <div className={iconWrapClass}>
+                      <img src={src} alt={alt} className="h-full w-full object-contain" />
+                    </div>
                     <span className="font-medium">{alt}</span>
                   </a>
                 ) : (
@@ -183,7 +207,9 @@ export function SongCupBottomSection(props: SongCupBottomSectionProps) {
                     )}
                     aria-pressed={isPanel ? isActive : undefined}
                   >
-                    <img src={src} alt={alt} className="h-24 w-24 object-contain" />
+                    <div className={iconWrapClass}>
+                      <img src={src} alt={alt} className="h-full w-full object-contain" />
+                    </div>
                     <span className="font-medium">{alt}</span>
                   </button>
                 )}
@@ -192,12 +218,16 @@ export function SongCupBottomSection(props: SongCupBottomSectionProps) {
                 <div
                   className={cn(
                     "min-h-[320px] p-4 sm:p-5",
-                    id === "feed"
+                    id === "feed" || id === "songcup" || id === "submit" || id === "pixels" || id === "vote"
                       ? "border-0 bg-transparent p-0"
-                      : "rounded-2xl border border-fuchsia-500/20 bg-black/40",
+                      : "rounded-2xl border border-fuchsia-500/20 bg-muted/30 dark:bg-black/40",
                   )}
                 >
-                  <ActivePanel panel={id as SongCupPanel} props={props} />
+                  <ActivePanel
+                    panel={id as SongCupPanel}
+                    props={props}
+                    onGoToSubmit={() => setActivePanel("submit")}
+                  />
                 </div>
               )}
               {dividerAfter && <MobileDivider />}

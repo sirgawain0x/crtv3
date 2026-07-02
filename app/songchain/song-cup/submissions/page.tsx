@@ -1,6 +1,5 @@
 "use client";
 
-import { useMemo } from "react";
 import Link from "next/link";
 import { useUser } from "@/lib/wallet/react";
 import { useSongCupSubmissions } from "@/lib/hooks/song-cup/useSongCupSubmissions";
@@ -10,23 +9,17 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Film, ExternalLink, RefreshCw, AlertCircle, CheckCircle, XCircle } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
-
-const ADMIN_WALLET_ADDRESS = "0xdE4b0371BBa20602685916ceeE5B22025a811734";
-
-function truncateAddress(address: string): string {
-  return `${address.slice(0, 6)}…${address.slice(-4)}`;
-}
+import {
+  SONG_CUP_ADMIN_WALLETS,
+  truncateWalletAddress,
+} from "@/lib/songchain/song-cup/admin-config";
+import { resolveOrbMediaUrl } from "@/lib/sdk/orb/media";
 
 export default function SongCupSubmissionsPage() {
   const user = useUser();
 
-  const isAdmin = useMemo(() => {
-    const connected = user?.address;
-    if (!connected) return false;
-    return connected.toLowerCase() === ADMIN_WALLET_ADDRESS.toLowerCase();
-  }, [user?.address]);
-
-  const { submissions, isLoading, error, refetch, updateStatus } = useSongCupSubmissions(isAdmin);
+  const { submissions, isLoading, error, refetch, updateStatus, isAdmin } =
+    useSongCupSubmissions(true);
 
   return (
     <div className="min-h-screen bg-background px-4 py-6 md:py-10">
@@ -51,7 +44,7 @@ export default function SongCupSubmissionsPage() {
               <div className="space-y-1">
                 <p className="font-medium">Admin access only</p>
                 <p className="text-sm text-muted-foreground">
-                  Connect the admin wallet ({truncateAddress(ADMIN_WALLET_ADDRESS)}) to view submissions.
+                  Connect an admin wallet ({SONG_CUP_ADMIN_WALLETS.map(truncateWalletAddress).join(" or ")}) to view submissions.
                 </p>
               </div>
             </CardContent>
@@ -84,8 +77,21 @@ export default function SongCupSubmissionsPage() {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {submissions.map((submission) => (
               <Card key={submission.id} className="flex flex-col overflow-hidden">
-                <div className="flex aspect-video items-center justify-center bg-muted">
-                  <Film className="h-10 w-10 text-muted-foreground" />
+                <div className="flex aspect-video items-center justify-center bg-muted overflow-hidden">
+                  {submission.grove_url ? (
+                    <video
+                      src={
+                        resolveOrbMediaUrl(submission.grove_url, { type: "video" }) ??
+                        submission.grove_url
+                      }
+                      controls
+                      playsInline
+                      preload="metadata"
+                      className="h-full w-full object-contain"
+                    />
+                  ) : (
+                    <Film className="h-10 w-10 text-muted-foreground" />
+                  )}
                 </div>
                 <CardHeader className="pb-2">
                   <CardTitle className="line-clamp-1 text-base">
@@ -94,7 +100,7 @@ export default function SongCupSubmissionsPage() {
                 </CardHeader>
                 <CardContent className="flex-1 space-y-3">
                   <div className="space-y-1 text-xs text-muted-foreground">
-                    <p>From: {truncateAddress(submission.wallet_address)}</p>
+                    <p>From: {truncateWalletAddress(submission.wallet_address)}</p>
                     <p>{formatDistanceToNow(new Date(submission.created_at), { addSuffix: true })}</p>
                   </div>
 

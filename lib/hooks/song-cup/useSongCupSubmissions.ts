@@ -3,9 +3,8 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useUser } from "@/lib/wallet/react";
 import { songCupSubmissionsService, SongCupSubmission } from "@/lib/sdk/supabase/song-cup-submissions";
+import { isSongCupAdminWallet } from "@/lib/songchain/song-cup/admin-config";
 import { logger } from "@/lib/utils/logger";
-
-const ADMIN_WALLET_ADDRESS = "0xdE4b0371BBa20602685916ceeE5B22025a811734";
 
 export function useSongCupSubmissions(enabled: boolean = true) {
   const user = useUser();
@@ -13,11 +12,10 @@ export function useSongCupSubmissions(enabled: boolean = true) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const isAdmin = useMemo(() => {
-    const connected = user?.address;
-    if (!connected) return false;
-    return connected.toLowerCase() === ADMIN_WALLET_ADDRESS.toLowerCase();
-  }, [user?.address]);
+  const isAdmin = useMemo(
+    () => isSongCupAdminWallet(user?.address),
+    [user?.address],
+  );
 
   const fetch = useCallback(async () => {
     if (!isAdmin || !enabled) {
@@ -51,5 +49,5 @@ export function useSongCupSubmissions(enabled: boolean = true) {
     return ok;
   }, []);
 
-  return { submissions, isLoading, error, refetch: fetch, updateStatus };
+  return { submissions, isLoading, error, refetch: fetch, updateStatus, isAdmin };
 }

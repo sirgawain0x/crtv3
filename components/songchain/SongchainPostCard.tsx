@@ -54,6 +54,13 @@ import {
 } from "@/lib/songchain/post-utils";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils/utils";
+import {
+  songCupActionBtn,
+  songCupActionBtnActive,
+  songCupBody,
+  songCupMuted,
+  songCupPostCard,
+} from "@/lib/songchain/song-cup/panel-styles";
 
 function authorLabel(post: AnyPost): string {
   const author = post.author;
@@ -303,7 +310,7 @@ export function SongchainPostCard({
           compact && "text-sm",
           isQuote && "border-violet-500/30",
           pending === "edit" && "opacity-70",
-          variant === "song-cup" && "min-h-[155px] rounded-[20px] border border-[#fe01dc] bg-black p-3 text-[10px] text-white shadow-none",
+          variant === "song-cup" && cn(songCupPostCard, "p-3 text-xs shadow-none"),
         )}
       >
         {pending === "edit" && (
@@ -325,7 +332,7 @@ export function SongchainPostCard({
               type="button"
               className={cn(
                 "text-left hover:text-violet-400 w-fit",
-                variant === "song-cup" ? "text-[10px] text-white/70" : "text-xs text-muted-foreground",
+                variant === "song-cup" ? cn("text-xs", songCupMuted) : "text-xs text-muted-foreground",
               )}
               onClick={() => setTimelineOpen(true)}
             >
@@ -349,16 +356,18 @@ export function SongchainPostCard({
             <SongchainPostContent
               text={resolvedPostText}
               compact={compact}
-              className={cn(variant === "song-cup" && "text-[10px] text-white/90")}
+              className={cn(variant === "song-cup" && cn("text-xs", songCupBody))}
               embeddedCreativeTVUrls={embeddedCreativeTVUrls}
               skipAllInternalPreviews={skipAllInternalPreviews}
             />
           )}
           {quotedPost && <SongchainQuotedPostEmbed quotedPost={quotedPost} />}
-          <div className={cn("mt-auto flex flex-wrap items-center gap-1 pt-2", variant === "song-cup" ? "border-t border-white/10" : "border-t border-border/40")}>
-            <span className={cn("mr-auto", variant === "song-cup" ? "text-[10px] text-white/60" : "text-xs text-muted-foreground")}>
-              {reactions} upvote{reactions === 1 ? "" : "s"}
-            </span>
+          <div
+            className={cn(
+              "mt-auto flex flex-nowrap items-center gap-0.5 overflow-x-auto pt-2",
+              variant === "song-cup" ? "border-t border-border/50 dark:border-white/10" : "border-t border-border/40",
+            )}
+          >
             <Button
               type="button"
               variant="ghost"
@@ -366,16 +375,19 @@ export function SongchainPostCard({
               disabled={readOnly || pending === "upvote"}
               onClick={readOnly ? undefined : toggleUpvote}
               className={cn(
-                "px-2",
-                upvoted && variant === "song-cup" ? "text-[#fe01dc]" : upvoted && "text-rose-500",
-                variant === "song-cup" && "h-7 text-white/80 hover:bg-white/10 hover:text-white",
+                "shrink-0 gap-0.5 px-1.5",
+                upvoted && variant === "song-cup" ? songCupActionBtnActive : upvoted && "text-rose-500",
+                variant === "song-cup" ? songCupActionBtn : undefined,
               )}
-              aria-label="Upvote"
+              aria-label={`Upvote${reactions > 0 ? ` (${reactions})` : ""}`}
             >
               {pending === "upvote" ? (
                 <Loader2 className="h-3 w-3 animate-spin" />
               ) : (
                 <Heart className={cn("h-3 w-3", upvoted && "fill-current")} />
+              )}
+              {reactions > 0 && (
+                <span className="text-[10px] tabular-nums">{reactions}</span>
               )}
             </Button>
             <Button
@@ -385,9 +397,9 @@ export function SongchainPostCard({
               onClick={() => setCommentsOpen(true)}
               aria-label={`Comments${commentCount > 0 ? ` (${commentCount})` : ""}`}
               className={cn(
-                "gap-1 px-2",
+                "shrink-0 gap-0.5 px-1.5",
                 readOnly && "text-muted-foreground",
-                variant === "song-cup" && "h-7 text-white/80 hover:bg-white/10 hover:text-white",
+                variant === "song-cup" && songCupActionBtn,
               )}
             >
               <MessageCircle className="h-3 w-3" />
@@ -403,8 +415,8 @@ export function SongchainPostCard({
               onClick={readOnly ? undefined : handleRepost}
               aria-label={`Repost${reposts > 0 ? ` (${reposts})` : ""}`}
               className={cn(
-                "gap-1 px-2",
-                variant === "song-cup" && "h-7 text-white/80 hover:bg-white/10 hover:text-white",
+                "shrink-0 gap-0.5 px-1.5",
+                variant === "song-cup" && songCupActionBtn,
               )}
             >
               {pending === "repost" ? (
@@ -423,9 +435,9 @@ export function SongchainPostCard({
               disabled={readOnly || pending === "bookmark"}
               onClick={readOnly ? undefined : toggleBookmark}
               className={cn(
-                "px-2",
-                bookmarked && variant === "song-cup" ? "text-[#fe01dc]" : bookmarked && "text-amber-500",
-                variant === "song-cup" && "h-7 text-white/80 hover:bg-white/10 hover:text-white",
+                "shrink-0 px-1.5",
+                bookmarked && variant === "song-cup" ? songCupActionBtnActive : bookmarked && "text-amber-500",
+                variant === "song-cup" && songCupActionBtn,
               )}
               aria-label="Bookmark"
             >
@@ -446,9 +458,7 @@ export function SongchainPostCard({
                     setEditOpen(true);
                   }}
                   aria-label="Edit post"
-                  className={cn(
-                    variant === "song-cup" && "h-7 px-2 text-white/80 hover:bg-white/10 hover:text-white",
-                  )}
+                  className={cn("shrink-0 px-1.5", variant === "song-cup" && songCupActionBtn)}
                 >
                   <Pencil className="h-3 w-3" />
                 </Button>
@@ -459,8 +469,8 @@ export function SongchainPostCard({
                   disabled={pending === "delete"}
                   onClick={handleDelete}
                   className={cn(
-                    "text-destructive",
-                    variant === "song-cup" && "h-7 px-2 text-white/80 hover:bg-white/10 hover:text-red-400",
+                    "shrink-0 px-1.5 text-destructive",
+                    variant === "song-cup" && songCupActionBtn,
                   )}
                   aria-label="Delete post"
                 >

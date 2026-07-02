@@ -18,6 +18,10 @@ export const UPLOAD_ATTESTATION_TERMS_URL =
   "https://creativeplatform.xyz/community/legal/terms-conditions";
 export const UPLOAD_ATTESTATION_TERMS_VERSION = "2025.06.25";
 
+/** Alchemy Gas Manager policy for sponsored EAS attestation UserOps on Base. */
+export const DEFAULT_ATTESTATION_PAYMASTER_POLICY_ID =
+  "be126055-1844-4b45-aa54-03c4993097c0";
+
 // Schema records: attester identity, legal confirmations, source terms, and attestation versioning.
 // Order matters for SchemaEncoder.encodeData.
 export const EAS_UPLOAD_SCHEMA =

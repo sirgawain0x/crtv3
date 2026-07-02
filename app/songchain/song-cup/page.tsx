@@ -9,18 +9,18 @@ const SONG_CUP_OG_IMAGE = {
   url: "/songchain/song-cup-banner.png",
   width: 1024,
   height: 274,
-  alt: "Song Cup — Predict your winner. Guess your song.",
+  alt: "Song Cup — Where Music Meets the World's Game.",
   type: "image/png",
 } as const;
 
 export const metadata: Metadata = {
   title: "Song Cup | Songchain | Creative TV",
   description:
-    "Predict your winner. Guess your song. Song Cup on Songchain — music on Orb.",
+    "Song Cup is an audio-visual competition celebrating the passion, unity, and energy of the World Cup. Create original music and Pixel AI visuals, then submit your 30–60 second entry.",
   openGraph: {
     title: "Song Cup | Songchain | Creative TV",
     description:
-      "Predict your winner. Guess your song. Song Cup on Songchain — music on Orb.",
+      "Song Cup is an audio-visual competition celebrating the passion, unity, and energy of the World Cup. Create original music and Pixel AI visuals, then submit your 30–60 second entry.",
     type: "website",
     url: "/songchain/song-cup",
     images: [SONG_CUP_OG_IMAGE],
@@ -29,7 +29,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Song Cup | Songchain | Creative TV",
     description:
-      "Predict your winner. Guess your song. Song Cup on Songchain — music on Orb.",
+      "Song Cup is an audio-visual competition celebrating the passion, unity, and energy of the World Cup. Create original music and Pixel AI visuals, then submit your 30–60 second entry.",
     images: [SONG_CUP_OG_IMAGE.url],
   },
 };

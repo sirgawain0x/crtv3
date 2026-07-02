@@ -73,6 +73,7 @@ if (!botIdGlobal.__crtvBotIdInit) {
       botIdDeepAnalysisRoute('/api/search/videos', 'GET'),
       botIdDeepAnalysisRoute('/api/search/market', 'GET'),
       botIdDeepAnalysisRoute('/api/search/predictions', 'GET'),
+      botIdDeepAnalysisRoute('/api/song-cup/agent/chat', 'POST'),
       // Server actions: pages that invoke saveCreatorCollectionAction (Next.js POSTs to page URL)
       botIdDeepAnalysisRoute('/', 'POST'),
       botIdDeepAnalysisRoute('/studio', 'POST'),

@@ -17,7 +17,12 @@ Copy the contents of `00001_song_cup_submissions.sql` into the **Supabase Dashbo
 
 ## Admin wallet
 
-The seed admin wallet in the migration is `0xdE4b0371BBa20602685916ceeE5B22025a811734`. To add or change admins after the migration is applied:
+The seed admin wallets in the migration are:
+
+- `0xdE4b0371BBa20602685916ceeE5B22025a811734`
+- `0xa7383918cbd43a73d2391a09fdd429b832b2e2f6` (creative.eth)
+
+Apply `00002_song_cup_vote_matchups.sql` for vote matchups, votes, and the second admin wallet.
 
 ```sql
 INSERT INTO private.song_cup_admins (wallet_address)

@@ -15,6 +15,8 @@ export type SidebarIcon = {
   alt: string;
   dividerAfter?: boolean;
   externalHref?: string;
+  /** Fixed icon backdrop (e.g. Beat Me artwork needs black in light mode). */
+  iconBgClass?: string;
 };
 
 export const SONG_CUP_BUTTON_ICONS: SidebarIcon[] = [
@@ -60,6 +62,7 @@ export const SONG_CUP_BUTTON_ICONS: SidebarIcon[] = [
     src: "/songchain/button-icons/beat-me-icon.svg",
     alt: "Beat me",
     externalHref: "https://beatme.creativeplatform.xyz",
+    iconBgClass: "bg-black",
   },
   {
     id: "worldcup",

@@ -99,6 +99,24 @@
   pointer-events: none;
 }
 
+.song-cup-hero-scene .song-cup-hero-agent-search {
+  position: absolute;
+  top: clamp(5rem, 14vh, 8.5rem);
+  right: clamp(1rem, 4vw, 3.5rem);
+  left: auto;
+  z-index: 15;
+  width: min(calc(100% - 2rem), 367px);
+  pointer-events: auto;
+}
+
+@media (max-width: 640px) {
+  .song-cup-hero-scene .song-cup-hero-agent-search {
+    right: 1rem;
+    left: 1rem;
+    width: auto;
+  }
+}
+
 .song-cup-hero-scene .site-logo {
   width: min(90vw, 720px);
   max-width: 100%;
