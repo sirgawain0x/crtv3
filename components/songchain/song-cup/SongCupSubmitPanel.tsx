@@ -2,27 +2,37 @@
 
 import { useRef, useState } from "react";
 import Image from "next/image";
-import { Loader2, X, Film, ImageIcon, AlertCircle, ShieldCheck, CheckCircle2 } from "lucide-react";
+import {
+  Loader2,
+  X,
+  Film,
+  ImageIcon,
+  AlertCircle,
+  ShieldCheck,
+  CheckCircle2,
+  Check,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { GroveVideoUploader } from "@/components/songchain/GroveVideoUploader";
 import { SongCupAttestationModal } from "@/components/eas/SongCupAttestationModal";
 import { SongCupAdminSubmissionsList } from "@/components/songchain/song-cup/SongCupAdminSubmissionsList";
 import { useSongCupAttestation } from "@/lib/hooks/eas/useSongCupAttestation";
-import { ipfsService } from "@/lib/sdk/ipfs/service";
+import { useSongCupSubmitPrefill } from "@/lib/hooks/song-cup/useSongCupSubmitPrefill";
+import { useSongCupUserSubmission } from "@/lib/hooks/song-cup/useSongCupUserSubmission";
+import { uploadToGrove } from "@/lib/songchain/song-cup/upload-to-grove";
 import { songCupSubmissionsService } from "@/lib/sdk/supabase/song-cup-submissions";
 import { useUser } from "@/lib/wallet/react";
 import type { VideoAsset } from "@/lib/types/video-asset";
 import { cn } from "@/lib/utils/utils";
+import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import {
   songCupAccent,
   songCupAccentYellow,
-  songCupAdminSection,
   songCupBody,
-  songCupCheckboxClass,
-  songCupCheckboxMark,
   songCupDashedUpload,
   songCupField,
   songCupFormCard,
@@ -38,6 +48,7 @@ type SongCupSubmitPanelProps = {
 
 type CoverAsset = {
   url: string;
+  hash?: string;
   name: string;
 };
 
@@ -57,57 +68,61 @@ function SongCupCheckbox({
   return (
     <label
       htmlFor={id}
-      className={cn("flex cursor-pointer items-center gap-2 text-sm font-medium text-foreground dark:text-white", className)}
+      className={cn(
+        "flex cursor-pointer items-center gap-2 text-sm font-medium text-foreground dark:text-white",
+        className,
+      )}
     >
-      <input
-        id={id}
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        className={cn(songCupCheckboxClass, songCupCheckboxMark)}
-      />
+      <input id={id} type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="peer sr-only" />
+      <span
+        aria-hidden
+        className={cn(
+          "flex h-6 w-6 shrink-0 items-center justify-center rounded border transition-colors",
+          "border-fuchsia-500/60 bg-background",
+          "peer-checked:border-fuchsia-600 peer-checked:bg-fuchsia-600",
+          "peer-focus-visible:ring-2 peer-focus-visible:ring-fuchsia-500/50 peer-focus-visible:ring-offset-2",
+          "dark:border-[#fe01dc] dark:bg-black/40",
+          "dark:peer-checked:border-[#fe01dc] dark:peer-checked:bg-[#fe01dc]",
+          "dark:peer-focus-visible:ring-[#fe01dc]/50",
+        )}
+      >
+        <Check
+          className={cn(
+            "h-4 w-4 text-black transition-opacity",
+            checked ? "opacity-100" : "opacity-0",
+          )}
+          strokeWidth={3}
+          aria-hidden
+        />
+      </span>
       {label}
     </label>
   );
 }
 
-function buildSubmissionDescription({
-  artistHandle,
-  email,
-  description,
-  coverUrl,
-  tuneBooAi,
-  attestationUid,
-}: {
-  artistHandle: string;
-  email: string;
-  description: string;
-  coverUrl?: string;
-  tuneBooAi: boolean;
-  attestationUid?: string;
-}) {
-  const lines = [
-    description.trim(),
-    artistHandle.trim() ? `Handle: ${artistHandle.trim()}` : "",
-    email.trim() ? `Email: ${email.trim()}` : "",
-    coverUrl ? `Cover: ${coverUrl}` : "",
-    tuneBooAi ? "Tune Boo AI: opted in" : "",
-    attestationUid ? `Attestation: ${attestationUid}` : "",
-  ].filter(Boolean);
-  return lines.join("\n\n");
-}
-
 export function SongCupSubmitPanel({ className }: SongCupSubmitPanelProps) {
   const user = useUser();
+  const {
+    submission: existingSubmission,
+    hasSubmitted,
+    isLoading: isLoadingSubmission,
+    setSubmission: setExistingSubmission,
+  } = useSongCupUserSubmission(user?.address);
   const coverInputRef = useRef<HTMLInputElement>(null);
   const [attestationModalOpen, setAttestationModalOpen] = useState(false);
   const { isAttested, isLoading: isAttestationLoading, attestation } = useSongCupAttestation();
+  const {
+    email,
+    artistHandle,
+    emailFromAuth,
+    handleFromAuth,
+    isLoadingHandle,
+    setEmail,
+    setArtistHandle,
+  } = useSongCupSubmitPrefill();
 
   const [artistName, setArtistName] = useState("");
-  const [artistHandle, setArtistHandle] = useState("");
-  const [email, setEmail] = useState("");
   const [description, setDescription] = useState("");
-  const [tuneBooAi, setTuneBooAi] = useState(false);
   const [uploadVideoEnabled, setUploadVideoEnabled] = useState(false);
   const [uploadCoverEnabled, setUploadCoverEnabled] = useState(false);
   const [uploadedVideoAsset, setUploadedVideoAsset] = useState<Partial<VideoAsset> | null>(null);
@@ -124,11 +139,8 @@ export function SongCupSubmitPanel({ className }: SongCupSubmitPanelProps) {
     setIsUploadingCover(true);
     setCoverError(null);
     try {
-      const result = await ipfsService.uploadFile(file);
-      if (!result.success || !result.url) {
-        throw new Error(result.error || "Cover upload failed");
-      }
-      setCoverAsset({ url: result.url, name: file.name });
+      const result = await uploadToGrove(file);
+      setCoverAsset({ url: result.url, hash: result.hash, name: file.name });
     } catch (err) {
       setCoverError(err instanceof Error ? err.message : "Cover upload failed");
     } finally {
@@ -139,10 +151,7 @@ export function SongCupSubmitPanel({ className }: SongCupSubmitPanelProps) {
 
   const resetForm = () => {
     setArtistName("");
-    setArtistHandle("");
-    setEmail("");
     setDescription("");
-    setTuneBooAi(false);
     setUploadVideoEnabled(false);
     setUploadCoverEnabled(false);
     setUploadedVideoAsset(null);
@@ -153,6 +162,10 @@ export function SongCupSubmitPanel({ className }: SongCupSubmitPanelProps) {
   const handleSubmit = async () => {
     if (!user?.address) {
       toast.error("Connect your wallet to submit.");
+      return;
+    }
+    if (hasSubmitted) {
+      toast.message("You already submitted your Song Cup entry.");
       return;
     }
     if (!isAttested) {
@@ -175,27 +188,34 @@ export function SongCupSubmitPanel({ className }: SongCupSubmitPanelProps) {
 
     setIsSubmitting(true);
     try {
-      const row = await songCupSubmissionsService.create({
+      const result = await songCupSubmissionsService.create({
         wallet_address: user.address,
         grove_url: uploadedVideoAsset.location,
         grove_hash: uploadedVideoAsset.metadata_uri ?? undefined,
         title: artistName.trim(),
-        description: buildSubmissionDescription({
-          artistHandle,
-          email,
-          description,
-          coverUrl: coverAsset?.url,
-          tuneBooAi,
-          attestationUid: attestation?.uid,
-        }),
+        description: description.trim() || undefined,
+        artist_handle: artistHandle.trim() || undefined,
+        email: email.trim() || undefined,
+        cover_url: coverAsset?.url,
+        cover_hash: coverAsset?.hash,
+        attestation_uid: attestation?.uid,
       });
 
-      if (!row) {
-        toast.error("Submission failed. Please try again.");
+      if (!result.ok) {
+        if (result.reason === "duplicate") {
+          toast.message(result.message ?? "You already submitted an entry.");
+          if (user.address) {
+            const row = await songCupSubmissionsService.getForWallet(user.address);
+            if (row) setExistingSubmission(row);
+          }
+        } else {
+          toast.error(result.message ?? "Submission failed. Please try again.");
+        }
         return;
       }
 
       toast.success("Entry submitted successfully!");
+      setExistingSubmission(result.submission);
       resetForm();
     } catch (err) {
       console.error("Song Cup submission failed", err);
@@ -209,28 +229,50 @@ export function SongCupSubmitPanel({ className }: SongCupSubmitPanelProps) {
 
   return (
     <div className={cn("relative overflow-hidden p-4 sm:p-6", songCupPanel, className)}>
-      <img
-        src="/songchain/song-cup/submit-corner-ornament.png"
-        alt=""
-        aria-hidden
-        className="pointer-events-none absolute -left-2 -top-2 hidden h-24 w-24 rotate-180 object-contain sm:block"
-      />
-      <img
-        src="/songchain/song-cup/submit-corner-ornament.png"
-        alt=""
-        aria-hidden
-        className="pointer-events-none absolute -bottom-2 -right-2 hidden h-24 w-24 object-contain sm:block"
-      />
-
       <div className="relative flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-8">
         <div className="flex min-w-0 flex-1 flex-col gap-5">
-          <img
-            src="/songchain/button-icons/submit-icon.svg"
-            alt="Submit"
-            className="h-[120px] w-[120px] object-contain sm:h-[140px] sm:w-[140px]"
-          />
+          <div className="flex items-start gap-4">
+            <img
+              src="/songchain/button-icons/submit-icon.svg"
+              alt=""
+              aria-hidden
+              className="hidden h-[120px] w-[120px] object-contain mix-blend-multiply dark:mix-blend-normal lg:block"
+            />
+            <div>
+              <h2 className="text-[40px] font-bold leading-[20px] tracking-[-0.2px] text-foreground dark:text-white sm:text-[50px] sm:leading-none">
+                SUBMIT
+              </h2>
+              <p className={cn("mt-2 text-sm", songCupMuted)}>
+                Upload your Song Cup entry video and cover art.
+              </p>
+            </div>
+          </div>
 
           <div className={cn("relative mx-auto w-full max-w-[327px]", songCupFormCard)}>
+            {isLoadingSubmission ? (
+              <div className={cn("flex items-center justify-center gap-2 py-12 text-sm", songCupMuted)}>
+                <Loader2 className="h-5 w-5 animate-spin" />
+                Checking submission status…
+              </div>
+            ) : hasSubmitted && existingSubmission ? (
+              <div className="space-y-4 py-2 text-center">
+                <CheckCircle2 className={cn("mx-auto h-12 w-12", songCupAccentYellow)} />
+                <div>
+                  <h3 className={cn("text-lg font-bold", songCupBody)}>Entry submitted</h3>
+                  <p className={cn("mt-2 text-sm", songCupMuted)}>
+                    You submitted{" "}
+                    {formatDistanceToNow(new Date(existingSubmission.created_at), { addSuffix: true })}
+                    . Only one entry is allowed per wallet.
+                  </p>
+                </div>
+                {existingSubmission.title && (
+                  <p className={cn("text-sm font-medium", songCupBody)}>{existingSubmission.title}</p>
+                )}
+                <Badge variant="secondary" className="capitalize">
+                  {existingSubmission.status}
+                </Badge>
+              </div>
+            ) : (
             <div className="space-y-3">
               <div className="space-y-1.5">
                 <label htmlFor="artist-name" className={cn("text-sm font-medium", songCupBody)}>
@@ -253,9 +295,13 @@ export function SongCupSubmitPanel({ className }: SongCupSubmitPanelProps) {
                   id="artist-handle"
                   value={artistHandle}
                   onChange={(e) => setArtistHandle(e.target.value)}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || handleFromAuth || isLoadingHandle}
+                  placeholder={isLoadingHandle ? "Loading Lens handle…" : "@username"}
                   className={fieldClass}
                 />
+                {handleFromAuth && (
+                  <p className={cn("text-[11px]", songCupMuted)}>Linked from your Orb account</p>
+                )}
               </div>
 
               <div className="space-y-1.5">
@@ -267,9 +313,12 @@ export function SongCupSubmitPanel({ className }: SongCupSubmitPanelProps) {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || emailFromAuth}
                   className={fieldClass}
                 />
+                {emailFromAuth && (
+                  <p className={cn("text-[11px]", songCupMuted)}>From your Creative TV login</p>
+                )}
               </div>
 
               <div className="space-y-1.5">
@@ -287,14 +336,6 @@ export function SongCupSubmitPanel({ className }: SongCupSubmitPanelProps) {
               </div>
 
               <div className="space-y-2 pt-1">
-                <SongCupCheckbox
-                  id="tune-boo-ai"
-                  label="tune boo ai helps you"
-                  checked={tuneBooAi}
-                  onChange={setTuneBooAi}
-                  className="uppercase tracking-wide"
-                />
-
                 <div className={cn("rounded-[16px] border p-3", songCupPanelInset)}>
                   {isAttestationLoading ? (
                     <div className={cn("flex items-center gap-2 text-sm", songCupMuted)}>
@@ -336,7 +377,7 @@ export function SongCupSubmitPanel({ className }: SongCupSubmitPanelProps) {
                 />
                 <SongCupCheckbox
                   id="upload-cover"
-                  label="Upload Cover image"
+                  label="Upload Thumbnail"
                   checked={uploadCoverEnabled}
                   onChange={(checked) => {
                     setUploadCoverEnabled(checked);
@@ -380,7 +421,7 @@ export function SongCupSubmitPanel({ className }: SongCupSubmitPanelProps) {
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className={cn("truncate text-sm font-medium", songCupBody)}>{coverAsset.name}</p>
-                        <p className={cn("text-xs", songCupMuted)}>Uploaded via Grove/IPFS</p>
+                        <p className={cn("text-xs", songCupMuted)}>Uploaded to Grove</p>
                       </div>
                       <Button
                         type="button"
@@ -409,7 +450,7 @@ export function SongCupSubmitPanel({ className }: SongCupSubmitPanelProps) {
                         <ImageIcon className="h-6 w-6" />
                       )}
                       <span className="text-sm">
-                        {isUploadingCover ? "Uploading cover…" : "Click to upload cover image"}
+                        {isUploadingCover ? "Uploading to Grove…" : "Click to upload cover image"}
                       </span>
                     </button>
                   )}
@@ -436,11 +477,12 @@ export function SongCupSubmitPanel({ className }: SongCupSubmitPanelProps) {
                 SUBMIT
               </Button>
             </div>
+            )}
           </div>
         </div>
 
         <aside className="flex shrink-0 flex-col items-center gap-4 lg:pt-16">
-          <div className="relative h-[125px] w-[131px] overflow-hidden rounded-[15px]">
+          {/* <div className="relative h-[125px] w-[131px] overflow-hidden rounded-[15px]">
             <Image
               src="/songchain/song-cup/submit-qr.png"
               alt="Song Cup QR code"
@@ -448,7 +490,7 @@ export function SongCupSubmitPanel({ className }: SongCupSubmitPanelProps) {
               className="object-cover"
               sizes="131px"
             />
-          </div>
+          </div> */}
           {uploadedVideoAsset?.location && (
             <div className={cn("flex items-center gap-2 text-xs", songCupAccent)}>
               <Film className="h-4 w-4" />

@@ -17,8 +17,6 @@ type SongCupHeroProps = {
   ariaLabel?: string;
   /** Pause 3D hero animations (e.g. while a modal is open). */
   animationPaused?: boolean;
-  /** Optional slot — e.g. Pinata agent search (Figma node 151:42–151:50). */
-  agentSearch?: ReactNode;
 };
 
 function PolyhedronFaces() {
@@ -46,7 +44,6 @@ export function SongCupHero({
   showRings = true,
   ariaLabel = "Song Cup",
   animationPaused = false,
-  agentSearch,
 }: SongCupHeroProps) {
   return (
     <section
@@ -60,10 +57,6 @@ export function SongCupHero({
           {logo ?? <SongCupLogo />}
         </div>
       </div>
-
-      {agentSearch ? (
-        <div className="song-cup-hero-agent-search">{agentSearch}</div>
-      ) : null}
 
       <div className="song-cup-hero-animation">
         {showRings && <CirclingTextRings />}

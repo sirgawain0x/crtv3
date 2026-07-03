@@ -5,13 +5,22 @@ import { SongCupInfoPanel } from "./SongCupInfoPanel";
 import { SongCupPixelsPanel } from "./SongCupPixelsPanel";
 import { SongCupSubmitPanel } from "./SongCupSubmitPanel";
 import { SongCupVotePanel } from "./SongCupVotePanel";
+import { SongCupPredictPanel } from "./SongCupPredictPanel";
 import { SongCupPreviewPanel } from "./SongCupPreviewPanel";
 import { SongCupSidebarIcons } from "./SongCupSidebarIcons";
 import { SONG_CUP_BUTTON_ICONS, type SongCupPanel } from "./song-cup-icons";
 import { SongCupFeedPanel } from "./SongCupFeedPanel";
+import { SongCupAgentSearch } from "./SongCupAgentSearch";
 import type { SongchainConfig } from "@/lib/songchain/config";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { cn } from "@/lib/utils/utils";
+import {
+  songCupSidebarIconBtn,
+  songCupSidebarMobileLabel,
+  songCupSidebarMobileLabelActive,
+  songCupSidebarIconRingActive,
+  songCupSidebarIconRingHover,
+} from "@/lib/songchain/song-cup/panel-styles";
 
 type SongCupBottomSectionProps = {
   config: SongchainConfig;
@@ -90,14 +99,25 @@ function ActivePanel({
   if (panel === "songcup") return <SongCupInfoPanel onGoToSubmit={onGoToSubmit} />;
   if (panel === "pixels") return <SongCupPixelsPanel />;
   if (panel === "submit") return <SongCupSubmitPanel />;
-  if (panel === "vote") return <SongCupVotePanel />;
+  if (panel === "vote") return <SongCupVotePanel orbClubUrl={props.orbClubUrl} />;
+  if (panel === "predict") return <SongCupPredictPanel />;
   if (!panel) return null;
   return <PreviewPanel panel={panel} />;
 }
 
 function ActivePanelBanner({ panel }: { panel: SongCupPanel | null }) {
   const icon = SONG_CUP_BUTTON_ICONS.find(({ id }) => id === panel);
-  if (!icon || panel === "feed" || panel === "songcup" || panel === "submit" || panel === "pixels" || panel === "vote") return null;
+  if (
+    !icon ||
+    panel === "feed" ||
+    panel === "songcup" ||
+    panel === "submit" ||
+    panel === "pixels" ||
+    panel === "vote" ||
+    panel === "predict"
+  ) {
+    return null;
+  }
   return (
     <div className="mb-3 inline-flex items-center gap-2 rounded-lg border border-fuchsia-500/20 bg-fuchsia-500/10 px-3 py-1.5">
       <img src={icon.src} alt="" className="h-5 w-5 object-contain" aria-hidden />
@@ -144,7 +164,8 @@ export function SongCupBottomSection(props: SongCupBottomSectionProps) {
               activePanel === "songcup" ||
               activePanel === "submit" ||
               activePanel === "pixels" ||
-              activePanel === "vote"
+              activePanel === "vote" ||
+              activePanel === "predict"
                 ? "border-0 bg-transparent p-0"
                 : "rounded-2xl border border-fuchsia-500/20",
             )}
@@ -157,6 +178,7 @@ export function SongCupBottomSection(props: SongCupBottomSectionProps) {
             />
           </main>
           <aside className="order-1 space-y-6 lg:order-2">
+            <SongCupAgentSearch className="w-full max-w-[367px] lg:ml-auto" />
             <SongCupSidebarIcons
               active={activePanel}
               onSelect={setActivePanel}
@@ -170,6 +192,9 @@ export function SongCupBottomSection(props: SongCupBottomSectionProps) {
 
   return (
     <div id="song-cup-feed" className="mx-auto max-w-7xl px-4 py-6 sm:px-6">
+      <div className="flex justify-end">
+        <SongCupAgentSearch className="w-full max-w-[367px]" />
+      </div>
       <div className="flex flex-col gap-4">
         {SONG_CUP_BUTTON_ICONS.map(({ id, src, alt, externalHref, dividerAfter, iconBgClass }) => {
           const isActive = activePanel === id;
@@ -186,12 +211,15 @@ export function SongCupBottomSection(props: SongCupBottomSectionProps) {
                     href={externalHref}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-3 rounded-xl p-2 transition-colors hover:bg-fuchsia-500/10"
+                    className={cn(
+                      "group flex items-center gap-3 rounded-xl p-2 transition-colors hover:bg-black/20",
+                      songCupSidebarIconBtn,
+                    )}
                   >
                     <div className={iconWrapClass}>
                       <img src={src} alt={alt} className="h-full w-full object-contain" />
                     </div>
-                    <span className="font-medium">{alt}</span>
+                    <span className={songCupSidebarMobileLabel}>{alt}</span>
                   </a>
                 ) : (
                   <button
@@ -202,15 +230,25 @@ export function SongCupBottomSection(props: SongCupBottomSectionProps) {
                       }
                     }}
                     className={cn(
-                      "flex items-center gap-3 rounded-xl p-2 transition-all w-full text-left",
-                      isActive ? "bg-fuchsia-500/15 ring-1 ring-fuchsia-500" : "hover:bg-fuchsia-500/10",
+                      "group flex w-full items-center gap-3 rounded-xl p-2 text-left transition-all",
+                      songCupSidebarIconBtn,
+                      isActive
+                        ? cn("bg-black/20", songCupSidebarIconRingActive)
+                        : cn("hover:bg-black/20", songCupSidebarIconRingHover),
                     )}
                     aria-pressed={isPanel ? isActive : undefined}
                   >
                     <div className={iconWrapClass}>
                       <img src={src} alt={alt} className="h-full w-full object-contain" />
                     </div>
-                    <span className="font-medium">{alt}</span>
+                    <span
+                      className={cn(
+                        songCupSidebarMobileLabel,
+                        isActive && songCupSidebarMobileLabelActive,
+                      )}
+                    >
+                      {alt}
+                    </span>
                   </button>
                 )}
               </div>
@@ -218,7 +256,12 @@ export function SongCupBottomSection(props: SongCupBottomSectionProps) {
                 <div
                   className={cn(
                     "min-h-[320px] p-4 sm:p-5",
-                    id === "feed" || id === "songcup" || id === "submit" || id === "pixels" || id === "vote"
+                    id === "feed" ||
+                    id === "songcup" ||
+                    id === "submit" ||
+                    id === "pixels" ||
+                    id === "vote" ||
+                    id === "predict"
                       ? "border-0 bg-transparent p-0"
                       : "rounded-2xl border border-fuchsia-500/20 bg-muted/30 dark:bg-black/40",
                   )}

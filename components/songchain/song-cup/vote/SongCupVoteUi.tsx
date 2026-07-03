@@ -1,7 +1,8 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { Big_Shoulders } from "next/font/google";
+import { QRCodeSVG } from "qrcode.react";
+import { bigShoulders } from "@/lib/fonts/big-shoulders";
 import { cn } from "@/lib/utils/utils";
 import {
   SONG_CUP_VOTE_ASSETS,
@@ -10,13 +11,8 @@ import {
   SONG_CUP_VOTE_GRADIENT_CTA,
   SONG_CUP_VOTE_MATCHUP_GRADIENT,
 } from "@/lib/songchain/song-cup/vote-design";
-import { songCupPanel, songCupMuted } from "@/lib/songchain/song-cup/panel-styles";
-
-const bigShoulders = Big_Shoulders({
-  subsets: ["latin"],
-  weight: ["700"],
-  display: "swap",
-});
+import { songCupPanel } from "@/lib/songchain/song-cup/panel-styles";
+import { SONG_CUP_PLAY_LINKS } from "@/lib/songchain/events";
 
 /** 161:781 — blurred gradient glow */
 export function SongCupVoteGradientGlow({ className }: { className?: string }) {
@@ -63,7 +59,7 @@ export function SongCupVoteFilterPill({
       type="button"
       onClick={onClick}
       className={cn(
-        "inline-flex h-[47px] items-center justify-center rounded-[46px] px-[10px] py-[2px] text-[17px] font-medium leading-[22px] tracking-[0.2px] transition",
+        "inline-flex h-[44px] min-w-[120px] flex-1 items-center justify-center rounded-full px-6 py-2 text-base font-medium leading-none tracking-[0.2px] transition sm:h-[47px] sm:min-w-[140px] sm:px-8 sm:text-[17px]",
         active
           ? "text-black"
           : "bg-muted/60 text-foreground hover:bg-muted dark:bg-white/[0.08] dark:text-white dark:hover:bg-white/15",
@@ -265,7 +261,7 @@ export function SongCupVoteMatchupSurface({
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-[20px] bg-white/[0.12] px-4 py-6 sm:px-8 sm:py-8",
+        "relative overflow-hidden rounded-[20px] bg-white/[0.12] px-4 py-5 sm:px-8 sm:py-6",
         className,
       )}
     >
@@ -279,52 +275,45 @@ export function SongCupVoteMatchupSurface({
   );
 }
 
+/** 137:787 — club QR card (inside Vote panel only) */
+export function SongCupClubQrCard({
+  url = SONG_CUP_PLAY_LINKS.club,
+  className,
+}: {
+  url?: string;
+  className?: string;
+}) {
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label="Open Song Cup club on Orb"
+      className={cn(
+        "flex aspect-square w-full max-w-[92px] items-center justify-center overflow-hidden rounded-[20px] border border-[#dc2bb3] bg-white transition-opacity hover:opacity-90",
+        className,
+      )}
+    >
+      <QRCodeSVG value={url} size={64} bgColor="#ffffff" fgColor="#000000" level="M" className="h-full w-full" />
+    </a>
+  );
+}
+
 /** 163:959 — Song Cup logo strip above matchups */
 export function SongCupVoteLogoBanner({ className }: { className?: string }) {
   return (
     <div
       className={cn(
-        "relative mx-auto h-[49px] w-[153px] overflow-hidden rounded-[20px] border border-[#dc2bb3] bg-black",
+        "relative mx-auto flex h-[72px] w-[153px] items-center justify-center overflow-hidden rounded-[20px] border border-[#dc2bb3] bg-black",
         className,
       )}
     >
       <img
-        src={SONG_CUP_VOTE_ASSETS.songCupLogoStrip}
+        src="/songchain/button-icons/songcup-icon.svg"
         alt="Song Cup"
-        className="absolute left-[-8.8%] top-[-1%] h-[206%] w-[128%] max-w-none object-cover"
+        className="h-full w-full object-cover"
       />
     </div>
-  );
-}
-
-/** 163:957 — corner vote ornament */
-export function SongCupVoteCornerOrnament({
-  className,
-  position = "top-left",
-}: {
-  className?: string;
-  position?: "top-left" | "top-right" | "bottom-left" | "bottom-right";
-}) {
-  const positionClass =
-    position === "top-left"
-      ? "-left-2 -top-2"
-      : position === "top-right"
-        ? "-right-2 -top-2 rotate-90"
-        : position === "bottom-left"
-          ? "-bottom-2 -left-2 -rotate-90"
-          : "-bottom-2 -right-2 rotate-180";
-
-  return (
-    <img
-      src={SONG_CUP_VOTE_ASSETS.cornerOrnament}
-      alt=""
-      aria-hidden
-      className={cn(
-        "pointer-events-none absolute h-[60px] w-[60px] object-contain sm:h-[108px] sm:w-[108px]",
-        positionClass,
-        className,
-      )}
-    />
   );
 }
 
@@ -374,7 +363,7 @@ export function SongCupVoteContentWell({
   return (
     <div
       className={cn(
-        "relative min-h-[480px] overflow-hidden p-4 sm:p-6",
+        "relative min-h-[480px] overflow-visible p-4 sm:p-6",
         songCupPanel,
         className,
       )}

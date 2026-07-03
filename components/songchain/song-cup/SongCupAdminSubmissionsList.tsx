@@ -1,27 +1,22 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import {
-  CheckCircle,
-  ExternalLink,
-  Film,
-  RefreshCw,
-  XCircle,
-} from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSongCupSubmissions } from "@/lib/hooks/song-cup/useSongCupSubmissions";
-import { resolveOrbMediaUrl } from "@/lib/sdk/orb/media";
-import { truncateWalletAddress } from "@/lib/songchain/song-cup/admin-config";
+import {
+  SongCupSubmissionReviewCard,
+  SUBMISSION_STATUS_FILTERS,
+  filterSubmissionsByStatus,
+  type SongCupSubmissionStatusFilter,
+} from "@/components/songchain/song-cup/SongCupSubmissionReviewCard";
 import {
   songCupAccentYellow,
   songCupAdminSection,
-  songCupBody,
   songCupMuted,
-  songCupPostCard,
 } from "@/lib/songchain/song-cup/panel-styles";
 import { cn } from "@/lib/utils/utils";
 
@@ -30,30 +25,25 @@ type SongCupAdminSubmissionsListProps = {
   compact?: boolean;
 };
 
-function SubmissionVideo({ url }: { url: string }) {
-  const playback =
-    resolveOrbMediaUrl(url, { type: "video" }) ??
-    (url.startsWith("ipfs://")
-      ? url.replace("ipfs://", "https://gateway.lighthouse.storage/ipfs/")
-      : url);
-
-  return (
-    <video
-      src={playback}
-      controls
-      playsInline
-      preload="metadata"
-      className="aspect-video w-full rounded-lg bg-black object-contain"
-    />
-  );
-}
-
 export function SongCupAdminSubmissionsList({
   className,
   compact = false,
 }: SongCupAdminSubmissionsListProps) {
+  const [statusFilter, setStatusFilter] = useState<SongCupSubmissionStatusFilter>("pending");
+  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
   const { submissions, isLoading, error, refetch, updateStatus, isAdmin } =
     useSongCupSubmissions(true);
+
+  useEffect(() => {
+    if (!isLoading && !error) {
+      setLastRefreshed(new Date());
+    }
+  }, [isLoading, error]);
+
+  const filtered = useMemo(
+    () => filterSubmissionsByStatus(submissions, statusFilter),
+    [submissions, statusFilter],
+  );
 
   const pendingCount = useMemo(
     () => submissions.filter((s) => s.status === "pending").length,
@@ -64,7 +54,7 @@ export function SongCupAdminSubmissionsList({
 
   return (
     <section className={cn(songCupAdminSection, className)}>
-      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h3 className={cn("text-lg font-bold uppercase tracking-wide", songCupAccentYellow)}>
             Submissions review
@@ -73,7 +63,7 @@ export function SongCupAdminSubmissionsList({
             {pendingCount} pending · {submissions.length} total
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button
             variant="outline"
             size="sm"
@@ -92,94 +82,54 @@ export function SongCupAdminSubmissionsList({
         </div>
       </div>
 
+      <div className="mb-4 flex flex-wrap gap-2">
+        {SUBMISSION_STATUS_FILTERS.map(({ id, label }) => (
+          <Button
+            key={id}
+            type="button"
+            variant={statusFilter === id ? "default" : "outline"}
+            size="sm"
+            className="h-8 text-xs"
+            onClick={() => setStatusFilter(id)}
+          >
+            {label}
+          </Button>
+        ))}
+      </div>
+
       {error && <p className="mb-3 text-sm text-red-400">{error}</p>}
 
       {isLoading && (
-        <div className="grid gap-4 sm:grid-cols-2">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-56 rounded-lg bg-white/10" />
-          ))}
-        </div>
-      )}
-
-      {!isLoading && submissions.length === 0 && (
-        <p className={cn("py-8 text-center text-sm", songCupMuted)}>No submissions yet.</p>
-      )}
-
-      {!isLoading && submissions.length > 0 && (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {submissions.map((submission) => (
-            <article
-              key={submission.id}
-              className={cn("flex flex-col overflow-hidden rounded-xl", songCupPostCard)}
-            >
-              {submission.grove_url ? (
-                <SubmissionVideo url={submission.grove_url} />
-              ) : (
-                <div className="flex aspect-video items-center justify-center bg-muted/50 dark:bg-white/5">
-                  <Film className={cn("h-8 w-8", songCupMuted)} />
-                </div>
-              )}
-              <div className="flex flex-1 flex-col gap-2 p-3">
-                <h4 className={cn("line-clamp-1 text-sm font-semibold", songCupBody)}>
-                  {submission.title || "Untitled submission"}
-                </h4>
-                <p className={cn("text-[11px]", songCupMuted)}>
-                  {truncateWalletAddress(submission.wallet_address)} ·{" "}
-                  {formatDistanceToNow(new Date(submission.created_at), { addSuffix: true })}
-                </p>
-                {submission.description && (
-                  <p className={cn("line-clamp-2 text-xs", songCupMuted)}>{submission.description}</p>
-                )}
-                <div className="mt-auto flex flex-wrap items-center gap-2 pt-2">
-                  <Badge
-                    variant={
-                      submission.status === "approved"
-                        ? "default"
-                        : submission.status === "rejected"
-                          ? "destructive"
-                          : "secondary"
-                    }
-                    className="text-[10px]"
-                  >
-                    {submission.status}
-                  </Badge>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 gap-1 px-2 text-[10px]"
-                    asChild
-                  >
-                    <Link href={submission.grove_url} target="_blank" rel="noopener noreferrer">
-                      <ExternalLink className="h-3 w-3" />
-                      Grove
-                    </Link>
-                  </Button>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8 flex-1 gap-1 text-[11px] border-emerald-500/40 text-emerald-300"
-                    onClick={() => void updateStatus(submission.id, "approved")}
-                    disabled={submission.status === "approved"}
-                  >
-                    <CheckCircle className="h-3 w-3" /> Approve
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-8 flex-1 gap-1 text-[11px] border-red-500/40 text-red-300"
-                    onClick={() => void updateStatus(submission.id, "rejected")}
-                    disabled={submission.status === "rejected"}
-                  >
-                    <XCircle className="h-3 w-3" /> Reject
-                  </Button>
-                </div>
-              </div>
-            </article>
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-72 rounded-lg bg-white/10" />
           ))}
         </div>
+      )}
+
+      {!isLoading && filtered.length === 0 && (
+        <p className={cn("py-8 text-center text-sm", songCupMuted)}>
+          No {statusFilter === "all" ? "" : statusFilter} submissions yet.
+        </p>
+      )}
+
+      {!isLoading && filtered.length > 0 && (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {filtered.map((submission) => (
+            <SongCupSubmissionReviewCard
+              key={submission.id}
+              submission={submission}
+              onSelectFavorite={(id) => void updateStatus(id, "approved")}
+              onReject={(id) => void updateStatus(id, "rejected")}
+            />
+          ))}
+        </div>
+      )}
+
+      {!isLoading && filtered.length > 0 && lastRefreshed && (
+        <p className={cn("mt-3 text-[11px]", songCupMuted)}>
+          Last refreshed {formatDistanceToNow(lastRefreshed, { addSuffix: true })}
+        </p>
       )}
     </section>
   );

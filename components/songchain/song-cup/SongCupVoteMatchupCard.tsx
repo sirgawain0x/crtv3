@@ -5,6 +5,7 @@ import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils/utils";
 import { songCupMuted } from "@/lib/songchain/song-cup/panel-styles";
 import { SongCupOrbPostEmbed } from "./SongCupOrbPostEmbed";
+import { useSongCupOrbPollVote } from "@/lib/hooks/song-cup/useSongCupOrbPollVote";
 import type { SongCupMatchupWithVotes } from "@/lib/hooks/song-cup/useSongCupMatchups";
 import type { SongCupVoteChoice } from "@/lib/sdk/supabase/song-cup-votes";
 import {
@@ -42,12 +43,19 @@ export function SongCupVoteMatchupCard({
 }: SongCupVoteMatchupCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [voting, setVoting] = useState<SongCupVoteChoice | null>(null);
+  const { canWrite, promptWriteAccess } = useSongCupOrbPollVote();
 
   const leftParts = splitLabel(matchup.left_label);
   const rightParts = splitLabel(matchup.right_label);
+  const needsOrbForVote = matchup.usesOrbPoll;
 
   const handleVote = async (choice: SongCupVoteChoice) => {
-    if (!walletConnected) {
+    if (needsOrbForVote && !canWrite) {
+      promptWriteAccess();
+      toast.error("Link your Orb account to vote on Lens");
+      return;
+    }
+    if (!needsOrbForVote && !walletConnected) {
       toast.error("Connect your wallet to vote");
       return;
     }
@@ -55,11 +63,15 @@ export function SongCupVoteMatchupCard({
       toast.message("This matchup is not open for voting yet");
       return;
     }
+    if (needsOrbForVote && !matchup.poll_post_id) {
+      toast.error("Poll is still being set up — check back shortly");
+      return;
+    }
     setVoting(choice);
     const ok = await onVote(choice);
     setVoting(null);
-    if (ok) toast.success("Vote recorded");
-    else toast.error("Could not record vote");
+    if (ok) toast.success(needsOrbForVote ? "Vote submitted on Lens" : "Vote recorded");
+    else if (!needsOrbForVote) toast.error("Could not record vote");
   };
 
   return (
@@ -67,7 +79,7 @@ export function SongCupVoteMatchupCard({
       {matchup.subtitle && <SongCupVoteRoundDate>{matchup.subtitle}</SongCupVoteRoundDate>}
       <SongCupVoteRoundTitle className="mt-1">{matchup.title}</SongCupVoteRoundTitle>
 
-      <div className="mt-6 flex w-full items-end justify-center gap-2 sm:gap-4">
+      <div className="mt-5 flex w-full items-end justify-center gap-2 sm:gap-4">
         <div className="flex flex-1 flex-col items-end gap-2">
           <div className="flex w-full flex-col items-end gap-1">
             <SongCupVoteEntryName>{leftParts.name}</SongCupVoteEntryName>
@@ -85,7 +97,7 @@ export function SongCupVoteMatchupCard({
           <SongCupVotePercent value={matchup.tally.leftPct} />
         </div>
 
-        <SongCupVoteVs className="mb-16 shrink-0 self-center" />
+        <SongCupVoteVs className="mb-10 shrink-0 self-center" />
 
         <div className="flex flex-1 flex-col items-start gap-2">
           <div className="flex w-full flex-col items-start gap-1">
@@ -107,7 +119,7 @@ export function SongCupVoteMatchupCard({
         </div>
       </div>
 
-      <div className="mt-6 flex flex-col items-center gap-2">
+      <div className="mt-5 flex flex-col items-center gap-2">
         <SongCupVoteCtaButton
           disabled={voting !== null}
           onClick={() => {
