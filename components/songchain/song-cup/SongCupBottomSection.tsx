@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { SongCupInfoPanel } from "./SongCupInfoPanel";
 import { SongCupPixelsPanel } from "./SongCupPixelsPanel";
 import { SongCupSubmitPanel } from "./SongCupSubmitPanel";
@@ -135,8 +135,16 @@ function MobileDivider() {
 export function SongCupBottomSection(props: SongCupBottomSectionProps) {
   const { config } = props;
   const [activePanel, setActivePanel] = useState<SongCupPanel | null>("feed");
+  const panelAnchorRef = useRef<HTMLElement>(null);
   const isDesktopQuery = useMediaQuery("(min-width: 1024px)");
   const isDesktop = isDesktopQuery ?? true;
+
+  const handleSelectPanel = (panel: SongCupPanel | null) => {
+    setActivePanel(panel);
+    if (isDesktop && panel && panelAnchorRef.current) {
+      panelAnchorRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
 
   if (!config.enabled) {
     return (
@@ -158,8 +166,9 @@ export function SongCupBottomSection(props: SongCupBottomSectionProps) {
       <div id="song-cup-feed" className="mx-auto max-w-7xl px-4 py-10 sm:px-6">
         <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
           <main
+            ref={panelAnchorRef}
             className={cn(
-              "order-2 min-h-[480px] p-4 sm:p-6 lg:order-1",
+              "order-2 min-h-[480px] scroll-mt-4 p-4 sm:p-6 lg:order-1",
               activePanel === "feed" ||
               activePanel === "songcup" ||
               activePanel === "submit" ||
@@ -174,14 +183,14 @@ export function SongCupBottomSection(props: SongCupBottomSectionProps) {
             <ActivePanel
               panel={activePanel}
               props={props}
-              onGoToSubmit={() => setActivePanel("submit")}
+              onGoToSubmit={() => handleSelectPanel("submit")}
             />
           </main>
           <aside className="order-1 space-y-6 lg:order-2">
             <SongCupAgentSearch className="w-full max-w-[367px] lg:ml-auto" />
             <SongCupSidebarIcons
               active={activePanel}
-              onSelect={setActivePanel}
+              onSelect={handleSelectPanel}
               className="flex flex-col items-center gap-2"
             />
           </aside>
@@ -200,7 +209,11 @@ export function SongCupBottomSection(props: SongCupBottomSectionProps) {
           const isActive = activePanel === id;
           const isPanel = id !== "beatme" && id !== "worldcup";
           const iconWrapClass = cn(
-            "flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-xl",
+            "flex h-24 w-24 shrink-0 items-center justify-center rounded-xl",
+            !externalHref && isActive && songCupSidebarIconRingActive,
+          );
+          const iconInnerClass = cn(
+            "flex h-full w-full items-center justify-center overflow-hidden rounded-xl",
             iconBgClass,
           );
           return (
@@ -216,8 +229,15 @@ export function SongCupBottomSection(props: SongCupBottomSectionProps) {
                       songCupSidebarIconBtn,
                     )}
                   >
-                    <div className={iconWrapClass}>
-                      <img src={src} alt={alt} className="h-full w-full object-contain" />
+                    <div
+                      className={cn(
+                        iconWrapClass,
+                        !isActive && songCupSidebarIconRingHover,
+                      )}
+                    >
+                      <div className={iconInnerClass}>
+                        <img src={src} alt={alt} className="h-full w-full object-contain" />
+                      </div>
                     </div>
                     <span className={songCupSidebarMobileLabel}>{alt}</span>
                   </a>
@@ -232,14 +252,19 @@ export function SongCupBottomSection(props: SongCupBottomSectionProps) {
                     className={cn(
                       "group flex w-full items-center gap-3 rounded-xl p-2 text-left transition-all",
                       songCupSidebarIconBtn,
-                      isActive
-                        ? cn("bg-black/20", songCupSidebarIconRingActive)
-                        : cn("hover:bg-black/20", songCupSidebarIconRingHover),
+                      isActive ? "bg-black/20" : "hover:bg-black/20",
                     )}
                     aria-pressed={isPanel ? isActive : undefined}
                   >
-                    <div className={iconWrapClass}>
-                      <img src={src} alt={alt} className="h-full w-full object-contain" />
+                    <div
+                      className={cn(
+                        iconWrapClass,
+                        !isActive && songCupSidebarIconRingHover,
+                      )}
+                    >
+                      <div className={iconInnerClass}>
+                        <img src={src} alt={alt} className="h-full w-full object-contain" />
+                      </div>
                     </div>
                     <span
                       className={cn(
