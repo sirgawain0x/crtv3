@@ -111,7 +111,10 @@ export function SongchainPageClient({ config }: SongchainPageClientProps) {
                     )}
                   >
                     {event.slug === "song-cup" && (
-                      <div className="absolute inset-0 -z-10" aria-hidden>
+                      <div
+                        className="absolute inset-0 -z-10 origin-center motion-reduce:animate-none animate-songcup-charts-spin"
+                        aria-hidden
+                      >
                         <Image
                           src="/songchain/song-cup-banner-charts.png"
                           alt=""

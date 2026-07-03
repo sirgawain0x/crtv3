@@ -64,6 +64,7 @@ export default withAccountKitUi({
 			},
 			animation: {
 				'songcup-pulse': 'songcup-pulse 2.2s ease-in-out infinite',
+				'songcup-charts-spin': 'songcup-charts-spin 24s linear infinite',
 			},
 			keyframes: {
 				'songcup-pulse': {
@@ -75,6 +76,10 @@ export default withAccountKitUi({
 						transform: 'scale(1.04)',
 						filter: 'drop-shadow(0 0 12px rgba(255, 102, 204, 0.6))',
 					},
+				},
+				'songcup-charts-spin': {
+					from: { transform: 'rotate(0deg)' },
+					to: { transform: 'rotate(360deg)' },
 				},
 			},
 		}
