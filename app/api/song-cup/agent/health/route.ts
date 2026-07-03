@@ -3,6 +3,7 @@ import {
   getAgentDetailsResponse,
   PinataApiError,
   resolveAgentRuntimeStatus,
+  resolvePinataAgentGatewayWsUrl,
 } from "@/lib/pinata/api";
 import { getSongCupAgentConfig } from "@/lib/songchain/song-cup/agent-config";
 
@@ -51,7 +52,7 @@ export async function GET() {
     agentId,
     baseUrl,
     chatTransport: "websocket",
-    chatPath: "wss://{agentId}.agents.pinata.cloud/chat",
+    chatPath: agentId ? resolvePinataAgentGatewayWsUrl(agentId) : null,
     hasManagementJwt: Boolean(managementJwt),
     hasDeviceKey: Boolean(devicePrivateKeyPem),
     processStatus,

@@ -128,7 +128,11 @@ export async function POST(request: NextRequest) {
           ? AbortSignal.any([request.signal, AbortSignal.timeout(60_000)])
           : AbortSignal.timeout(60_000),
       });
-      return NextResponse.json({ success: true, reply: result.reply || "(no reply)" });
+      return NextResponse.json({
+        success: true,
+        reply: result.reply || "(no reply)",
+        ...(result.session ? { session: result.session } : {}),
+      });
     } catch (err) {
       serverLogger.error("Twin gateway chat failed:", err);
       const msg = err instanceof Error ? err.message : "Twin endpoint unreachable";
