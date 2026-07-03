@@ -12,7 +12,11 @@ export async function POST(request: NextRequest) {
 
   let body: { id?: string; limit?: number };
   try {
-    body = (await request.json()) as { id?: string; limit?: number };
+    const parsed: unknown = await request.json();
+    if (!parsed || typeof parsed !== "object") {
+      throw new Error("Invalid body");
+    }
+    body = parsed as { id?: string; limit?: number };
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }

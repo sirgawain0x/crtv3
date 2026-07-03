@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { RefreshCw } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
@@ -30,8 +30,15 @@ export function SongCupAdminSubmissionsList({
   compact = false,
 }: SongCupAdminSubmissionsListProps) {
   const [statusFilter, setStatusFilter] = useState<SongCupSubmissionStatusFilter>("pending");
+  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
   const { submissions, isLoading, error, refetch, updateStatus, isAdmin } =
     useSongCupSubmissions(true);
+
+  useEffect(() => {
+    if (!isLoading && !error) {
+      setLastRefreshed(new Date());
+    }
+  }, [isLoading, error]);
 
   const filtered = useMemo(
     () => filterSubmissionsByStatus(submissions, statusFilter),
@@ -119,9 +126,9 @@ export function SongCupAdminSubmissionsList({
         </div>
       )}
 
-      {!isLoading && filtered.length > 0 && (
+      {!isLoading && filtered.length > 0 && lastRefreshed && (
         <p className={cn("mt-3 text-[11px]", songCupMuted)}>
-          Last refreshed {formatDistanceToNow(new Date(), { addSuffix: true })}
+          Last refreshed {formatDistanceToNow(lastRefreshed, { addSuffix: true })}
         </p>
       )}
     </section>

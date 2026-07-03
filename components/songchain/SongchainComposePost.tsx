@@ -10,6 +10,7 @@ import { useCreatorLiveStream } from "@/hooks/useCreatorLiveStream";
 import { useUser } from "@/lib/wallet/react";
 import { GroveVideoUploader } from "@/components/songchain/GroveVideoUploader";
 import { songCupSubmissionsService } from "@/lib/sdk/supabase/song-cup-submissions";
+import { logger } from "@/lib/utils/logger";
 import type { SongchainCreatedPost } from "@/lib/songchain/feed-types";
 import type { VideoAsset } from "@/lib/types/video-asset";
 import type { StreamSummary } from "@/lib/songchain/build-lens-livestream-metadata";
@@ -76,8 +77,15 @@ export function SongchainComposePost({
           description: content.trim() || undefined,
           post_id: created.postId,
         });
-        if (!submissionResult.ok && submissionResult.reason === "duplicate") {
-          // Feed post succeeded; submission row already exists for this wallet.
+        if (!submissionResult.ok) {
+          if (submissionResult.reason === "duplicate") {
+            // Feed post succeeded; submission row already exists for this wallet.
+          } else {
+            logger.error(
+              "[SongchainComposePost] Song Cup submission failed:",
+              submissionResult.message,
+            );
+          }
         }
       }
       setContent("");

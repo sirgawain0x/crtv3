@@ -42,21 +42,26 @@ async function fetchPollResults(
   pollPostId: string,
   accessToken?: string | null,
 ): Promise<OrbPollVotersData | null> {
-  const headers: HeadersInit = { "Content-Type": "application/json" };
-  if (accessToken?.trim()) {
-    headers.Authorization = `Bearer ${accessToken.trim()}`;
+  try {
+    const headers: HeadersInit = { "Content-Type": "application/json" };
+    if (accessToken?.trim()) {
+      headers.Authorization = `Bearer ${accessToken.trim()}`;
+    }
+
+    const res = await fetch("/api/song-cup/orb-polls/get-voters", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ id: pollPostId, limit: 25 }),
+      cache: "no-store",
+    });
+
+    if (!res.ok) return null;
+    const json = (await res.json()) as { data?: OrbPollVotersData };
+    return json.data ?? null;
+  } catch (err) {
+    logger.error("[fetchPollResults] failed for id:", pollPostId, err);
+    return null;
   }
-
-  const res = await fetch("/api/song-cup/orb-polls/get-voters", {
-    method: "POST",
-    headers,
-    body: JSON.stringify({ id: pollPostId, limit: 25 }),
-    cache: "no-store",
-  });
-
-  if (!res.ok) return null;
-  const json = (await res.json()) as { data?: OrbPollVotersData };
-  return json.data ?? null;
 }
 
 export function useSongCupMatchups(
