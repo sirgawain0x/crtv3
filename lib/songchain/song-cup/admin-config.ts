@@ -2,7 +2,7 @@
 export const SONG_CUP_ADMIN_WALLETS = [
   "0xdE4b0371BBa20602685916ceeE5B22025a811734",
   /** creative.eth */
-  "0xa7383918cbd43a73d2391a09fdd429b832b2e2f6",
+  "0xf00f94794cE5B989e751b9D229b2786fBA8f6d63",
 ] as const;
 
 export function isSongCupAdminWallet(address: string | null | undefined): boolean {

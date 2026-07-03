@@ -30,24 +30,9 @@ function SectionHeading({ children }: { children: ReactNode }) {
 
 export function SongCupInfoPanel({ onGoToSubmit, className }: SongCupInfoPanelProps) {
   return (
-    <div
-      className={cn("relative overflow-hidden p-4 sm:p-6", songCupPanel, className)}
-    >
-      <img
-        src="/songchain/song-cup/song-cup-corner-ornament.png"
-        alt=""
-        aria-hidden
-        className="pointer-events-none absolute -left-2 -top-2 hidden h-20 w-20 -rotate-1 object-contain sm:block lg:h-24 lg:w-24"
-      />
-      <img
-        src="/songchain/song-cup/song-cup-corner-ornament.png"
-        alt=""
-        aria-hidden
-        className="pointer-events-none absolute -bottom-2 -right-2 hidden h-20 w-20 rotate-180 object-contain sm:block lg:h-24 lg:w-24"
-      />
-
-      <div className="relative flex flex-col gap-8 lg:flex-row lg:gap-8">
-        <div className="flex min-w-0 flex-1 flex-col gap-6">
+    <div className={cn("relative overflow-hidden p-4 sm:p-6", songCupPanel, className)}>
+      <div className="grid gap-8 lg:grid-cols-2 lg:items-start">
+        <div className="flex min-w-0 flex-col gap-6">
           <img
             src="/songchain/button-icons/songcup-icon.svg"
             alt="Song Cup"
@@ -126,14 +111,14 @@ export function SongCupInfoPanel({ onGoToSubmit, className }: SongCupInfoPanelPr
           </section>
         </div>
 
-        <div className="flex shrink-0 items-start justify-center lg:w-[504px]">
-          <div className="relative aspect-square w-full max-w-[482px] overflow-hidden rounded-[30px]">
+        <div className="flex min-w-0 items-start justify-center">
+          <div className="relative aspect-square w-full overflow-hidden rounded-[30px]">
             <Image
               src="/songchain/song-cup/song-cup-featured.jpg"
               alt="Song Cup featured visual"
               fill
               className="object-cover"
-              sizes="(max-width: 1024px) 100vw, 482px"
+              sizes="(max-width: 1024px) 100vw, 50vw"
             />
           </div>
         </div>

@@ -13,6 +13,7 @@ export interface SongCupMatchup {
   right_post_id?: string | null;
   left_label?: string | null;
   right_label?: string | null;
+  poll_post_id?: string | null;
   status: SongCupMatchupStatus;
   starts_at?: string | null;
   ends_at?: string | null;
@@ -29,6 +30,7 @@ export interface CreateSongCupMatchupData {
   right_post_id?: string;
   left_label?: string;
   right_label?: string;
+  poll_post_id?: string;
   status?: SongCupMatchupStatus;
   starts_at?: string;
   ends_at?: string;
@@ -68,6 +70,7 @@ export const songCupMatchupsService = {
           right_post_id: data.right_post_id ?? null,
           left_label: data.left_label ?? null,
           right_label: data.right_label ?? null,
+          poll_post_id: data.poll_post_id ?? null,
           status: data.status ?? 'upcoming',
           starts_at: data.starts_at ?? null,
           ends_at: data.ends_at ?? null,
@@ -84,6 +87,25 @@ export const songCupMatchupsService = {
     } catch (err) {
       serverLogger.error('[songCupMatchups] create exception:', err);
       return null;
+    }
+  },
+
+  async updatePollPostId(id: string, pollPostId: string): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from('song_cup_matchups')
+        .update({ poll_post_id: pollPostId, updated_at: new Date().toISOString() })
+        .eq('id', id);
+
+      if (error) {
+        serverLogger.error('[songCupMatchups] updatePollPostId error:', error);
+        return false;
+      }
+
+      return true;
+    } catch (err) {
+      serverLogger.error('[songCupMatchups] updatePollPostId exception:', err);
+      return false;
     }
   },
 

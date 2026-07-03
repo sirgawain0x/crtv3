@@ -1,5 +1,11 @@
 "use client";
 
+import { cn } from "@/lib/utils/utils";
+import {
+  songCupSidebarIconBtn,
+  songCupSidebarIconRingActive,
+  songCupSidebarIconRingHover,
+} from "@/lib/songchain/song-cup/panel-styles";
 import { SONG_CUP_BUTTON_ICONS, type SongCupPanel } from "./song-cup-icons";
 
 function SidebarDivider() {
@@ -19,22 +25,20 @@ export function SongCupSidebarIcons({ active, onSelect, className }: SongCupSide
     <section className={className}>
       {SONG_CUP_BUTTON_ICONS.map(({ id, src, alt, dividerAfter, externalHref, iconBgClass }) => {
         const isActive = active === id;
-        const baseClasses = [
-          "group relative block w-1/2 overflow-hidden rounded-xl transition-all duration-200 hover:scale-[1.02]",
+        const baseClasses = cn(
+          "block w-1/2 hover:scale-[1.02]",
+          songCupSidebarIconBtn,
           iconBgClass ?? "bg-transparent",
-          isActive ? "ring-2 ring-fuchsia-500" : "",
-        ].join(" ");
+          isActive ? songCupSidebarIconRingActive : songCupSidebarIconRingHover,
+        );
 
         const image = (
-          <>
-            <img
-              src={src}
-              alt={alt}
-              loading="lazy"
-              className="h-auto w-full object-contain"
-            />
-            <span className="sr-only">{alt}</span>
-          </>
+          <img
+            src={src}
+            alt={alt}
+            loading="lazy"
+            className="h-auto w-full object-contain"
+          />
         );
 
         return (

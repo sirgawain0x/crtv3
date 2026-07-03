@@ -80,3 +80,25 @@ export const songCupAdminSection = cn(
 export const songCupGradientCta = cn(
   "rounded-full bg-gradient-to-br from-[#DC2BB3] to-[#FDBE01] font-medium text-black hover:opacity-90",
 );
+
+/** Sidebar nav icon buttons (desktop + mobile). */
+export const songCupSidebarIconBtn = cn(
+  "group relative overflow-hidden rounded-xl transition-all duration-200",
+  "outline-none focus:outline-none focus-visible:outline-none",
+);
+
+export const songCupSidebarIconRingHover = "hover:ring-2 hover:ring-[#FDBE01]/80";
+
+/** Active/selected — keep branded orange on focus too (avoids default blue focus ring). */
+export const songCupSidebarIconRingActive = cn(
+  "ring-2 ring-[#FDBE01]",
+  "focus:ring-2 focus:ring-[#FDBE01]",
+  "focus-visible:ring-2 focus-visible:ring-[#FDBE01]",
+);
+
+export const songCupSidebarMobileLabel = cn(
+  "font-medium uppercase transition-colors duration-200",
+  "text-white group-hover:text-[#feed01] group-focus-visible:text-[#feed01]",
+);
+
+export const songCupSidebarMobileLabelActive = "text-[#feed01]";

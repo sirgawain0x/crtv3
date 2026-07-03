@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/select";
 import { parseOrbPostUrl } from "@/lib/songchain/song-cup/parse-orb-post-url";
 import { fetchOrbPost } from "./SongCupOrbPostEmbed";
-import type { SongCupMatchupStatus } from "@/lib/sdk/supabase/song-cup-matchups";
+import type { SongCupMatchup, SongCupMatchupStatus } from "@/lib/sdk/supabase/song-cup-matchups";
 import type { SongCupMatchupWithVotes } from "@/lib/hooks/song-cup/useSongCupMatchups";
 import { toast } from "sonner";
 import {
@@ -40,7 +40,7 @@ type SongCupAdminMatchupFormProps = {
     left_label?: string;
     right_label?: string;
     status?: SongCupMatchupStatus;
-  }) => Promise<unknown>;
+  }) => Promise<SongCupMatchup | null>;
   onUpdateStatus: (id: string, status: SongCupMatchupStatus) => Promise<boolean>;
   onRemove: (id: string) => Promise<boolean>;
   className?: string;
@@ -100,7 +100,11 @@ export function SongCupAdminMatchupForm({
       });
 
       if (row) {
-        toast.success("Matchup created");
+        if (!row.poll_post_id) {
+          toast.warning("Matchup saved, but Lens poll was not created — votes will use legacy mode");
+        } else {
+          toast.success("Matchup and Lens poll created");
+        }
         setLeftUrl("");
         setRightUrl("");
         setLeftLabel("");
@@ -125,8 +129,8 @@ export function SongCupAdminMatchupForm({
         Create vote matchup
       </h3>
       <p className={cn("mb-4 text-xs", songCupMuted)}>
-        Paste Orb post links from the Song Cup feed. Posts are resolved via Lens and displayed
-        side-by-side for voting.
+        Paste Orb post links from the Song Cup feed. A Lens poll is created automatically with
+        both entries as vote options.
       </p>
 
       <div className="grid gap-3 sm:grid-cols-2">

@@ -3,7 +3,7 @@
 import { useRef, useState, useCallback } from "react";
 import { Upload, X, Loader2, Film, AlertCircle, FileVideo } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { ipfsService } from "@/lib/sdk/ipfs/service";
+import { uploadToGrove } from "@/lib/songchain/song-cup/upload-to-grove";
 import type { VideoAsset } from "@/lib/types/video-asset";
 
 const MAX_VIDEO_SIZE_MB = 1024; // 1 GB ceiling for browser sanity
@@ -69,16 +69,12 @@ export function GroveVideoUploader({
     setProgress(0);
 
     try {
-      const result = await ipfsService.uploadFile(file);
-      if (!result.success || !result.url) {
-        throw new Error(result.error || "Grove/IPFS upload failed");
-      }
-
+      const result = await uploadToGrove(file);
       onUploaded({
         title: file.name,
         location: result.url,
         thumbnailUri: result.url,
-        metadata_uri: result.url,
+        metadata_uri: result.hash ?? result.url,
         duration: null,
         status: "draft",
       });
@@ -120,7 +116,7 @@ export function GroveVideoUploader({
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium">{uploadedAsset.title}</p>
           <p className="text-xs text-muted-foreground">
-            Uploaded via Grove/IPFS
+            Uploaded to Grove
           </p>
           {uploadedAsset.location && (
             <a
@@ -183,10 +179,10 @@ export function GroveVideoUploader({
         )}
         <div className="text-center">
           <p className="text-sm font-medium">
-            {isUploading ? "Uploading to Grove/IPFS…" : "Drag & drop a video, or click to upload"}
+            {isUploading ? "Uploading to Grove…" : "Drag & drop a video, or click to upload"}
           </p>
           <p className="text-xs text-muted-foreground">
-            Submit a raw video directly to Grove/IPFS.
+            Submit a raw video directly to Grove storage.
           </p>
         </div>
       </button>

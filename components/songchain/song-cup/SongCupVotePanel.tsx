@@ -12,8 +12,8 @@ import { SongCupVoteMatchupCard } from "./SongCupVoteMatchupCard";
 import { SongCupAdminMatchupForm } from "./SongCupAdminMatchupForm";
 import { SongCupAdminSubmissionsList } from "./SongCupAdminSubmissionsList";
 import {
+  SongCupClubQrCard,
   SongCupVoteContentWell,
-  SongCupVoteCornerOrnament,
   SongCupVoteFilterPill,
   SongCupVoteGradientGlow,
   SongCupVoteLogoBanner,
@@ -21,6 +21,7 @@ import {
 } from "./vote/SongCupVoteUi";
 import { cn } from "@/lib/utils/utils";
 import { songCupMuted } from "@/lib/songchain/song-cup/panel-styles";
+import { SONG_CUP_PLAY_LINKS } from "@/lib/songchain/events";
 
 const FILTERS: { id: SongCupMatchupFilter; label: string }[] = [
   { id: "upcoming", label: "Upcoming" },
@@ -30,9 +31,11 @@ const FILTERS: { id: SongCupMatchupFilter; label: string }[] = [
 
 type SongCupVotePanelProps = {
   className?: string;
+  orbClubUrl?: string;
 };
 
-export function SongCupVotePanel({ className }: SongCupVotePanelProps) {
+export function SongCupVotePanel({ className, orbClubUrl }: SongCupVotePanelProps) {
+  const clubUrl = orbClubUrl ?? SONG_CUP_PLAY_LINKS.club;
   const user = useUser();
   const { isAdmin } = useSongCupAdmin();
   const [filter, setFilter] = useState<SongCupMatchupFilter>("upcoming");
@@ -54,37 +57,27 @@ export function SongCupVotePanel({ className }: SongCupVotePanelProps) {
 
   return (
     <SongCupVoteContentWell className={className}>
-      <SongCupVoteCornerOrnament position="top-left" />
-      <SongCupVoteCornerOrnament position="bottom-right" />
+      <SongCupVoteGradientGlow className="left-1/2 top-0 h-[275px] w-[353px] -translate-x-1/2 sm:h-[413px] sm:w-[529px]" />
 
-      <SongCupVoteGradientGlow className="-left-20 top-0 h-[275px] w-[353px] sm:h-[413px] sm:w-[529px]" />
-
-      <div className="relative z-10 flex flex-col gap-6">
-        <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-          <div className="flex items-start gap-4">
-            <img
-              src="/songchain/button-icons/vote-icon.svg"
-              alt=""
-              aria-hidden
-              className="hidden h-[120px] w-[120px] object-contain lg:block"
-            />
+      <div className="relative z-10 flex flex-col gap-5">
+        <div className="relative flex flex-col items-center gap-4 xl:flex-row xl:items-start xl:justify-between">
+          <div className="flex flex-1 flex-col items-center gap-4 text-center">
+            <SongCupVoteLogoBanner />
             <SongCupVoteTitle />
           </div>
-          <SongCupVoteLogoBanner className="hidden sm:block" />
+          <SongCupClubQrCard
+            url={clubUrl}
+            className="hidden shrink-0 xl:flex"
+          />
         </div>
 
-        <div className="flex flex-wrap gap-2">
+        <div className="mx-auto flex w-full max-w-md flex-wrap justify-center gap-2">
           {FILTERS.map(({ id, label }) => (
             <SongCupVoteFilterPill
               key={id}
               label={label}
               active={filter === id}
               onClick={() => setFilter(id)}
-              className={cn(
-                id === "upcoming" && "min-w-[182px] justify-end pr-[6px]",
-                id === "past" && "min-w-[103px]",
-                id === "all" && "min-w-[76px]",
-              )}
             />
           ))}
         </div>

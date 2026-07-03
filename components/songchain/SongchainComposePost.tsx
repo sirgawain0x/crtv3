@@ -66,9 +66,9 @@ export function SongchainComposePost({
       attachedVideo: liveAttached ? null : (uploadedVideoAsset as VideoAsset | null),
       attachedLiveStream: liveAttached ? attachedLiveStream : null,
     });
-    if (created) {
+      if (created) {
       if (uploadedVideoAsset?.location && user?.address) {
-        await songCupSubmissionsService.create({
+        const submissionResult = await songCupSubmissionsService.create({
           wallet_address: user.address,
           grove_url: uploadedVideoAsset.location,
           grove_hash: uploadedVideoAsset.metadata_uri ?? undefined,
@@ -76,6 +76,9 @@ export function SongchainComposePost({
           description: content.trim() || undefined,
           post_id: created.postId,
         });
+        if (!submissionResult.ok && submissionResult.reason === "duplicate") {
+          // Feed post succeeded; submission row already exists for this wallet.
+        }
       }
       setContent("");
       setUploadedVideoAsset(null);

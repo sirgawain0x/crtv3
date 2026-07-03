@@ -8,6 +8,11 @@ export interface SongCupSubmission {
   grove_hash?: string | null;
   title?: string | null;
   description?: string | null;
+  artist_handle?: string | null;
+  email?: string | null;
+  cover_url?: string | null;
+  cover_hash?: string | null;
+  attestation_uid?: string | null;
   post_id?: string | null;
   status: 'pending' | 'approved' | 'rejected';
   created_at: string;
@@ -20,12 +25,47 @@ export interface CreateSongCupSubmissionData {
   grove_hash?: string;
   title?: string;
   description?: string;
+  artist_handle?: string;
+  email?: string;
+  cover_url?: string;
+  cover_hash?: string;
+  attestation_uid?: string;
   post_id?: string;
 }
 
+export type CreateSongCupSubmissionResult =
+  | { ok: true; submission: SongCupSubmission }
+  | { ok: false; reason: "duplicate" | "error"; message?: string };
+
 export const songCupSubmissionsService = {
-  async create(data: CreateSongCupSubmissionData): Promise<SongCupSubmission | null> {
+  async getForWallet(walletAddress: string): Promise<SongCupSubmission | null> {
     try {
+      const normalized = walletAddress.toLowerCase();
+      const { data, error } = await supabase
+        .from("song_cup_submissions")
+        .select("*")
+        .eq("wallet_address", normalized)
+        .maybeSingle();
+
+      if (error) {
+        serverLogger.error("[songCupSubmissions] getForWallet error:", error);
+        return null;
+      }
+
+      return (data as SongCupSubmission | null) ?? null;
+    } catch (err) {
+      serverLogger.error("[songCupSubmissions] getForWallet exception:", err);
+      return null;
+    }
+  },
+
+  async create(data: CreateSongCupSubmissionData): Promise<CreateSongCupSubmissionResult> {
+    try {
+      const existing = await songCupSubmissionsService.getForWallet(data.wallet_address);
+      if (existing) {
+        return { ok: false, reason: "duplicate", message: "You already submitted an entry." };
+      }
+
       const { data: row, error } = await supabase
         .from('song_cup_submissions')
         .insert({
@@ -34,6 +74,11 @@ export const songCupSubmissionsService = {
           grove_hash: data.grove_hash ?? null,
           title: data.title ?? null,
           description: data.description ?? null,
+          artist_handle: data.artist_handle ?? null,
+          email: data.email ?? null,
+          cover_url: data.cover_url ?? null,
+          cover_hash: data.cover_hash ?? null,
+          attestation_uid: data.attestation_uid ?? null,
           post_id: data.post_id ?? null,
           status: 'pending',
         })
@@ -41,14 +86,21 @@ export const songCupSubmissionsService = {
         .single();
 
       if (error) {
+        if (error.code === "23505") {
+          return { ok: false, reason: "duplicate", message: "You already submitted an entry." };
+        }
         serverLogger.error('[songCupSubmissions] insert error:', error);
-        return null;
+        return { ok: false, reason: "error", message: error.message };
       }
 
-      return row as SongCupSubmission;
+      return { ok: true, submission: row as SongCupSubmission };
     } catch (err) {
       serverLogger.error('[songCupSubmissions] create exception:', err);
-      return null;
+      return {
+        ok: false,
+        reason: "error",
+        message: err instanceof Error ? err.message : undefined,
+      };
     }
   },
 
