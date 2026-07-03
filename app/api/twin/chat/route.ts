@@ -3,6 +3,7 @@ import { supabaseService } from "@/lib/sdk/supabase/service";
 import { createClient } from "@/lib/sdk/supabase/server";
 import { serverLogger } from "@/lib/utils/logger";
 import { rateLimiters } from "@/lib/middleware/rateLimit";
+import { forwardPinataAgentChat } from "@/lib/pinata/chat";
 
 interface TwinChatBody {
   creatorAddress?: string;
@@ -49,8 +50,7 @@ async function loadRouting(creatorAddress: string): Promise<TwinRouting | null> 
 
 /**
  * Walk a JSONL response and concatenate the text from every `content_delta`
- * event. Other event types (tool_use_start, thinking_delta, etc.) are
- * intentionally dropped — the viewer chat panel only renders the reply text.
+ * event. Kept for legacy HTTP endpoints; Pinata agents use WebSocket chat.
  */
 function extractReplyFromJsonl(body: string): string {
   const lines = body.split("\n");
@@ -115,7 +115,24 @@ export async function POST(request: NextRequest) {
 
   const url = routing.legacyEndpoint
     ? routing.legacyEndpoint
-    : `${routing.baseUrl}/chat`;
+    : routing.baseUrl;
+
+  if (!routing.legacyEndpoint && routing.gatewayToken) {
+    try {
+      const result = await forwardPinataAgentChat({
+        baseUrl: routing.baseUrl,
+        gatewayToken: routing.gatewayToken,
+        message,
+        session,
+        signal: AbortSignal.timeout(60_000),
+      });
+      return NextResponse.json({ success: true, reply: result.reply || "(no reply)" });
+    } catch (err) {
+      serverLogger.error("Twin gateway chat failed:", err);
+      const msg = err instanceof Error ? err.message : "Twin endpoint unreachable";
+      return NextResponse.json({ success: false, error: msg }, { status: 503 });
+    }
+  }
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",

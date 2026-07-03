@@ -8,6 +8,8 @@ import {
   getAgentDetails,
   getGatewayToken,
   PinataApiError,
+  resolvePinataAgentGatewayWsUrl,
+  resolvePinataAgentPublicBaseUrl,
 } from "@/lib/pinata/api";
 import { requireWalletAuthFor, WalletAuthError } from "@/lib/auth/require-wallet";
 
@@ -99,14 +101,17 @@ export async function POST(request: NextRequest) {
     !!agent.snapshotCid &&
     template.snapshotCid === agent.snapshotCid;
 
+  const publicBaseUrl = resolvePinataAgentPublicBaseUrl(agentId);
+  const wsUrl = resolvePinataAgentGatewayWsUrl(agentId);
+
   const supabase = supabaseService ?? (await createClient());
   const payload = {
     owner_address: ownerAddress.toLowerCase(),
     twin_enabled: true,
     twin_pinata_agent_id: agentId,
     twin_pinata_gateway_token: gateway.token,
-    twin_pinata_base_url: gateway.baseUrl,
-    twin_pinata_ws_url: gateway.wsUrl,
+    twin_pinata_base_url: publicBaseUrl,
+    twin_pinata_ws_url: wsUrl,
     twin_pinata_snapshot_cid: agent.snapshotCid,
     twin_pinata_agent_name: agent.name,
     twin_pinata_connected_at: new Date().toISOString(),
@@ -130,7 +135,7 @@ export async function POST(request: NextRequest) {
     verified,
     agentName: agent.name,
     agentStatus: agent.status,
-    baseUrl: gateway.baseUrl,
-    wsUrl: gateway.wsUrl,
+    baseUrl: publicBaseUrl,
+    wsUrl,
   });
 }
