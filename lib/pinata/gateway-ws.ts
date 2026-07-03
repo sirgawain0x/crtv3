@@ -76,6 +76,23 @@ function parsePairingRequestId(error: GatewayFrame["error"]): string | null {
   return match?.[1] ?? null;
 }
 
+function resolveSessionFromChatPayload(
+  payload: Record<string, unknown>,
+  fallback: string,
+): string {
+  for (const key of ["session", "sessionKey", "session_key"] as const) {
+    const value = payload[key];
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+  return fallback;
+}
+
+function isChatMessageComplete(payload: Record<string, unknown>): boolean {
+  return payload.done === true || payload.finished === true;
+}
+
 function isPairingRequired(error: GatewayFrame["error"]): boolean {
   if (!error) return false;
   const code = (error.code ?? "").toUpperCase();
@@ -283,10 +300,10 @@ async function connectAndChat(options: {
           const delta = payload.delta as { text?: string } | undefined;
           if (typeof delta?.text === "string") parts.push(delta.text);
         }
-        if (type === "message" && payload.done) {
+        if (type === "message" && isChatMessageComplete(payload)) {
           finish(undefined, {
             reply: parts.join("") || "(no reply)",
-            session,
+            session: resolveSessionFromChatPayload(payload, session),
           });
         }
       }
