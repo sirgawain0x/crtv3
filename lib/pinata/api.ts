@@ -18,8 +18,6 @@
 
 const PINATA_AGENTS_BASE = "https://agents.pinata.cloud";
 
-export const PINATA_AGENT_HOST_SUFFIX = ".agents.pinata.cloud";
-
 export const CREATIVE_TWIN_TEMPLATE_SLUG = "creative-ai-digital-twin";
 
 /**
@@ -58,13 +56,6 @@ export interface PinataAgent {
   status: "starting" | "running" | "not_running" | string;
 }
 
-export type PinataProcessStatus = "starting" | "running" | "not_running" | string;
-
-export interface PinataAgentDetailsResponse {
-  agent: PinataAgent;
-  processStatus?: PinataProcessStatus;
-}
-
 export interface PinataGatewayToken {
   token: string;
   wsUrl: string;
@@ -82,7 +73,7 @@ type PinataFetchInit = Parameters<typeof fetch>[1] & { jwt?: string };
 
 async function pinataFetch<T>(
   path: string,
-  init: PinataFetchInit = {},
+  init: PinataFetchInit = {}
 ): Promise<T> {
   const { jwt, headers, ...rest } = init;
   const res = await fetch(`${PINATA_AGENTS_BASE}${path}`, {
@@ -97,28 +88,10 @@ async function pinataFetch<T>(
     const body = await res.text().catch(() => "");
     throw new PinataApiError(
       res.status,
-      `Pinata API ${path} → ${res.status}${body ? `: ${body.slice(0, 300)}` : ""}`,
+      `Pinata API ${path} → ${res.status}${body ? `: ${body.slice(0, 300)}` : ""}`
     );
   }
   return (await res.json()) as T;
-}
-
-export function resolvePinataAgentPublicBaseUrl(agentId: string): string {
-  return `https://${agentId}${PINATA_AGENT_HOST_SUFFIX}`;
-}
-
-export function resolvePinataAgentGatewayWsUrl(agentId: string): string {
-  return `wss://${agentId}${PINATA_AGENT_HOST_SUFFIX}/chat`;
-}
-
-export function resolveAgentRuntimeStatus(
-  details: PinataAgentDetailsResponse,
-): PinataProcessStatus {
-  return details.processStatus ?? details.agent.status ?? "unknown";
-}
-
-export function isAgentRuntimeRunning(status: PinataProcessStatus): boolean {
-  return status === "running";
 }
 
 /**
@@ -134,7 +107,7 @@ export async function listPublicTemplates(): Promise<PinataTemplate[]> {
     return templateCache.value;
   }
   const data = await pinataFetch<{ templates: PinataTemplate[] }>(
-    "/v0/public-templates",
+    "/v0/public-templates"
   );
   templateCache = { value: data.templates ?? [], expiresAt: now + TEMPLATE_TTL_MS };
   return templateCache.value;
@@ -145,99 +118,31 @@ export async function findCreativeTwinTemplate(): Promise<PinataTemplate | null>
   return all.find((t) => t.slug === CREATIVE_TWIN_TEMPLATE_SLUG) ?? null;
 }
 
-export async function getAgentDetailsResponse(
+export async function getAgentDetails(
   jwt: string,
-  agentId: string,
-): Promise<PinataAgentDetailsResponse> {
+  agentId: string
+): Promise<PinataAgent> {
   if (!jwt) throw new Error("Pinata JWT is required");
   if (!agentId) throw new Error("agentId is required");
-  const data = await pinataFetch<PinataAgentDetailsResponse>(
+  const data = await pinataFetch<{ agent: PinataAgent }>(
     `/v0/agents/${encodeURIComponent(agentId)}`,
-    { jwt, method: "GET" },
+    { jwt, method: "GET" }
   );
   if (!data?.agent) {
     throw new Error("Pinata returned no agent for that id");
   }
-  return data;
-}
-
-export async function getAgentDetails(
-  jwt: string,
-  agentId: string,
-): Promise<PinataAgent> {
-  const data = await getAgentDetailsResponse(jwt, agentId);
   return data.agent;
 }
 
 export async function getGatewayToken(
   jwt: string,
-  agentId: string,
+  agentId: string
 ): Promise<PinataGatewayToken> {
   if (!jwt) throw new Error("Pinata JWT is required");
   if (!agentId) throw new Error("agentId is required");
   return pinataFetch<PinataGatewayToken>(
     `/v0/agents/${encodeURIComponent(agentId)}/gateway-token`,
-    { jwt, method: "GET" },
-  );
-}
-
-export async function restartAgent(
-  jwt: string,
-  agentId: string,
-): Promise<void> {
-  if (!jwt) throw new Error("Pinata JWT is required");
-  if (!agentId) throw new Error("agentId is required");
-  await pinataFetch<unknown>(
-    `/v0/agents/${encodeURIComponent(agentId)}/restart`,
-    { jwt, method: "POST" },
-  );
-}
-
-export async function approveAllPendingDevices(
-  jwt: string,
-  agentId: string,
-): Promise<void> {
-  if (!jwt) throw new Error("Pinata JWT is required");
-  if (!agentId) throw new Error("agentId is required");
-  await pinataFetch<unknown>(
-    `/v0/agents/${encodeURIComponent(agentId)}/devices/approve-all`,
-    { jwt, method: "POST" },
-  );
-}
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-
-/**
- * Ensure the agent gateway is running before forwarding chat. Restarts stopped
- * agents and waits briefly for the OpenClaw gateway handler to come up.
- */
-export async function ensureAgentRunning(
-  jwt: string,
-  agentId: string,
-  options: { maxWaitMs?: number } = {},
-): Promise<PinataAgentDetailsResponse> {
-  const maxWaitMs = options.maxWaitMs ?? 20_000;
-  let details = await getAgentDetailsResponse(jwt, agentId);
-  let status = resolveAgentRuntimeStatus(details);
-
-  if (isAgentRuntimeRunning(status)) {
-    return details;
-  }
-
-  await restartAgent(jwt, agentId);
-
-  const deadline = Date.now() + maxWaitMs;
-  while (Date.now() < deadline) {
-    await sleep(1_500);
-    details = await getAgentDetailsResponse(jwt, agentId);
-    status = resolveAgentRuntimeStatus(details);
-    if (isAgentRuntimeRunning(status)) {
-      return details;
-    }
-  }
-
-  throw new Error(
-    `Pinata agent is ${status}. Start or restart it in the Pinata dashboard (Danger → Restart Gateway), then try again.`,
+    { jwt, method: "GET" }
   );
 }
 

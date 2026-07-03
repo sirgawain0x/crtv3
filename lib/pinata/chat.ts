@@ -1,13 +1,6 @@
 /**
- * Pinata agent chat — OpenClaw gateway over WebSocket (same path as `pinata agents chat`).
- * Bare HTTP POST /chat is not available on Pinata agent subdomains.
+ * Shared helpers for Pinata agent chat (JSONL streaming responses).
  */
-
-import {
-  gatewayWebSocketChat,
-  resolveGatewayChatWsUrl,
-  type GatewayChatResult,
-} from "@/lib/pinata/gateway-ws";
 
 export function extractReplyFromJsonl(body: string): string {
   const lines = body.split("\n");
@@ -30,49 +23,68 @@ export function extractReplyFromJsonl(body: string): string {
   return parts.join("");
 }
 
-export type PinataChatResult = GatewayChatResult;
+export type PinataChatResult = {
+  reply: string;
+  session?: string;
+};
 
 export async function forwardPinataAgentChat(options: {
   baseUrl: string;
   gatewayToken: string;
   message: string;
   session?: string;
-  devicePrivateKeyPem?: string | null;
   signal?: AbortSignal;
-  timeoutMs?: number;
 }): Promise<PinataChatResult> {
-  const {
-    baseUrl,
-    gatewayToken,
-    message,
-    session,
-    devicePrivateKeyPem,
-    signal,
-    timeoutMs,
-  } = options;
+  const { baseUrl, gatewayToken, message, session, signal } = options;
+  const url = `${baseUrl.replace(/\/+$/, "")}/chat`;
 
-  const wsUrl = resolveGatewayChatWsUrl(baseUrl, gatewayToken);
-
-  try {
-    return await gatewayWebSocketChat({
-      wsUrl,
-      gatewayToken,
+  const upstream = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${gatewayToken}`,
+    },
+    body: JSON.stringify({
       message,
-      session,
-      devicePrivateKeyPem,
-      signal,
-      timeoutMs: timeoutMs ?? 60_000,
-    });
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (msg.toLowerCase().includes("missing scope")) {
-      throw new Error(
-        `${msg} The gateway token connected but lacks write scope — approve the server device in Pinata (Danger → Devices) or refresh SONG_CUP_PINATA_GATEWAY_TOKEN.`,
-      );
-    }
-    if (msg.toLowerCase().includes("pairing")) {
-      throw new Error(msg);
-    }
-    throw err instanceof Error ? err : new Error(msg);
+      ...(session ? { session } : {}),
+    }),
+    signal,
+  });
+
+  if (!upstream.ok) {
+    const text = await upstream.text().catch(() => "");
+    throw new Error(
+      `Pinata agent returned ${upstream.status}${text ? `: ${text.slice(0, 300)}` : ""}`,
+    );
   }
+
+  const contentType = upstream.headers.get("content-type") || "";
+  const raw = await upstream.text();
+
+  if (
+    contentType.includes("ndjson") ||
+    contentType.includes("event-stream") ||
+    /\n\s*\{/.test(raw)
+  ) {
+    return { reply: extractReplyFromJsonl(raw) };
+  }
+
+  if (contentType.includes("application/json")) {
+    try {
+      const json = JSON.parse(raw) as {
+        reply?: string;
+        message?: string;
+        content?: string;
+        session?: string;
+      };
+      return {
+        reply: json.reply ?? json.message ?? json.content ?? "",
+        session: json.session,
+      };
+    } catch {
+      return { reply: raw };
+    }
+  }
+
+  return { reply: raw };
 }
