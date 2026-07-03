@@ -3,6 +3,7 @@
  * HTTP POST {baseUrl}/chat is not exposed on Pinata agents; chat is WS-only.
  */
 
+import crypto from "node:crypto";
 import {
   buildDeviceAuthPayloadV3,
   resolveDeviceIdentity,
@@ -252,7 +253,11 @@ async function connectAndChat(options: {
             type: "req",
             id: chatReqId,
             method: "chat.send",
-            params: { sessionKey: session, message },
+            params: {
+              sessionKey: session,
+              message,
+              idempotencyKey: crypto.randomUUID(),
+            },
           }),
         );
         return;
