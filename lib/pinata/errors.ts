@@ -16,7 +16,7 @@ export function mapSongCupAgentError(err: unknown): string {
 
   const msg = err instanceof Error ? err.message : "Agent unreachable";
 
-  if (msg.includes("Pinata agent chat timed out")) {
+  if (msg.toLowerCase().includes("pinata agent chat timed out")) {
     return `${msg} The agent may still be starting — try again in a few seconds.`;
   }
 

@@ -4,6 +4,7 @@ import { createClient } from "@/lib/sdk/supabase/server";
 import { serverLogger } from "@/lib/utils/logger";
 import { rateLimiters } from "@/lib/middleware/rateLimit";
 import { forwardPinataAgentChat } from "@/lib/pinata/chat";
+import { resolveServerDevicePrivateKeyPem } from "@/lib/pinata/device-identity";
 
 interface TwinChatBody {
   creatorAddress?: string;
@@ -124,6 +125,7 @@ export async function POST(request: NextRequest) {
         gatewayToken: routing.gatewayToken,
         message,
         session,
+        devicePrivateKeyPem: resolveServerDevicePrivateKeyPem(),
         signal: request.signal
           ? AbortSignal.any([request.signal, AbortSignal.timeout(60_000)])
           : AbortSignal.timeout(60_000),

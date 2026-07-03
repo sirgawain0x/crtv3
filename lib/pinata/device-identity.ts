@@ -118,3 +118,17 @@ export function resolveDeviceIdentity(
   }
   return generateDeviceIdentity();
 }
+
+/** Stable server-side Ed25519 PEM for gateway pairing (shared across Pinata agents). */
+export function resolveServerDevicePrivateKeyPem(
+  preferred?: string | null,
+): string | null {
+  const explicit = preferred?.trim();
+  if (explicit) return explicit;
+  return (
+    process.env.PINATA_SERVER_DEVICE_PRIVATE_KEY_PEM?.trim() ||
+    process.env.SONG_CUP_PINATA_DEVICE_PRIVATE_KEY_PEM?.trim() ||
+    process.env.PINATA_TWIN_DEVICE_PRIVATE_KEY_PEM?.trim() ||
+    null
+  );
+}
