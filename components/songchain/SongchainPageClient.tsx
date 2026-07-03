@@ -77,7 +77,7 @@ export function SongchainPageClient({ config }: SongchainPageClientProps) {
                 {event.slug === "song-cup" ? (
                   <div className="mt-2">
                     <Image
-                      src="/songchain/logo.svg"
+                      src="/songchain/song-cup/logo.svg"
                       alt="Song Cup"
                       width={260}
                       height={44}
@@ -111,7 +111,10 @@ export function SongchainPageClient({ config }: SongchainPageClientProps) {
                     )}
                   >
                     {event.slug === "song-cup" && (
-                      <div className="absolute inset-0 -z-10" aria-hidden>
+                      <div
+                        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 -z-10 w-[150%] h-[150%] aspect-square origin-center motion-reduce:animate-none animate-songcup-charts-spin"
+                        aria-hidden
+                      >
                         <Image
                           src="/songchain/song-cup-banner-charts.png"
                           alt=""

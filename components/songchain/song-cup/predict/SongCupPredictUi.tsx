@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { MapPin } from "lucide-react";
 import { bigShoulders } from "@/lib/fonts/big-shoulders";
 import { cn } from "@/lib/utils/utils";
-import { songCupPanel, songCupMuted } from "@/lib/songchain/song-cup/panel-styles";
+import { songCupPanel } from "@/lib/songchain/song-cup/panel-styles";
 import {
   SONG_CUP_PREDICT_ASSETS,
   SONG_CUP_PREDICT_COLORS,
@@ -82,65 +82,6 @@ export function SongCupPredictTitle({ className }: { className?: string }) {
   );
 }
 
-export function SongCupPredictPortfolioPill({
-  label = "Portfolio: $—",
-  className,
-}: {
-  label?: string;
-  className?: string;
-}) {
-  return (
-    <div
-      className={cn(
-        "inline-flex h-[42px] items-center justify-center rounded-full bg-white/[0.08] px-[14px] py-[10px] text-[17px] font-medium leading-[22px] tracking-[0.2px] text-foreground dark:text-white",
-        className,
-      )}
-    >
-      {label}
-    </div>
-  );
-}
-
-export type SongCupPredictTab = "games" | "feed";
-
-export function SongCupPredictFilterTabs({
-  active,
-  onChange,
-  className,
-}: {
-  active: SongCupPredictTab;
-  onChange: (tab: SongCupPredictTab) => void;
-  className?: string;
-}) {
-  const tabs: { id: SongCupPredictTab; label: string }[] = [
-    { id: "games", label: "Games" },
-    { id: "feed", label: "Feed" },
-  ];
-
-  return (
-    <div className={cn("flex flex-wrap items-center gap-1", className)}>
-      {tabs.map((tab) => {
-        const isActive = active === tab.id;
-        return (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => onChange(tab.id)}
-            className={cn(
-              "inline-flex h-[26px] items-center justify-center rounded-[46px] px-[10px] py-[2px] text-[17px] font-medium leading-[22px] tracking-[0.2px] transition",
-              isActive
-                ? "bg-white text-black"
-                : "bg-white/[0.08] text-foreground dark:text-white",
-            )}
-          >
-            {tab.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
 export function SongCupPredictEventHeader({
   event,
   className,
@@ -215,8 +156,8 @@ export function SongCupPredictGameSurface({
       className={cn(
         "relative h-20 overflow-hidden rounded-[20px]",
         variant === "live" || variant === "halftime"
-          ? "bg-white/[0.12] dark:bg-white/[0.12]"
-          : "bg-white/[0.08] dark:bg-white/[0.08]",
+          ? "bg-black/[0.08] dark:bg-white/[0.12]"
+          : "bg-black/[0.05] dark:bg-white/[0.08]",
         className,
       )}
     >
@@ -235,7 +176,7 @@ export function SongCupPredictStageLabel({
   return (
     <p
       className={cn(
-        "absolute left-1/2 top-[6px] -translate-x-1/2 whitespace-nowrap text-[10px] font-medium tracking-[0.4px] text-white/40",
+        "absolute left-1/2 top-[6px] -translate-x-1/2 whitespace-nowrap text-[10px] font-medium tracking-[0.4px] text-muted-foreground dark:text-white/40",
         className,
       )}
     >
@@ -263,7 +204,7 @@ function SongCupPredictTeamFlag({
       {resolvedFlag ? (
         <img src={resolvedFlag} alt="" className="h-full w-full object-cover" />
       ) : (
-        <span className="text-[10px] text-white/40">—</span>
+        <span className="text-[10px] text-muted-foreground dark:text-white/40">—</span>
       )}
     </div>
   );
@@ -292,7 +233,9 @@ export function SongCupPredictMatchRow({
   dimScores?: boolean;
   className?: string;
 }) {
-  const scoreClass = dimScores ? "text-white/[0.08]" : "text-white";
+  const scoreClass = dimScores
+    ? "text-foreground/15 dark:text-white/[0.08]"
+    : "text-foreground dark:text-white";
 
   return (
     <div
@@ -305,7 +248,7 @@ export function SongCupPredictMatchRow({
         <span
           className={cn(
             bigShoulders.className,
-            "shrink-0 text-[30px] font-bold leading-none tracking-[-0.3px] text-white",
+            "shrink-0 text-[30px] font-bold leading-none tracking-[-0.3px] text-foreground dark:text-white",
           )}
         >
           {homeCode}
@@ -342,7 +285,7 @@ export function SongCupPredictMatchRow({
         <span
           className={cn(
             bigShoulders.className,
-            "shrink-0 text-[30px] font-bold leading-none tracking-[-0.3px] text-white",
+            "shrink-0 text-[30px] font-bold leading-none tracking-[-0.3px] text-foreground dark:text-white",
           )}
         >
           {awayCode}
@@ -379,7 +322,7 @@ export function SongCupPredictStatusBadge({
     return (
       <span
         className={cn(
-          "text-[14px] font-medium leading-none tracking-[0.2px] text-white/60",
+          "text-[14px] font-medium leading-none tracking-[0.2px] text-muted-foreground dark:text-white/60",
           className,
         )}
       >
@@ -388,10 +331,20 @@ export function SongCupPredictStatusBadge({
     );
   }
 
-  const color =
-    variant === "live"
-      ? SONG_CUP_PREDICT_COLORS.live
-      : SONG_CUP_PREDICT_COLORS.finished;
+  if (variant === "finished") {
+    return (
+      <span
+        className={cn(
+          "text-[22px] font-bold leading-[20px] tracking-[-0.2px] tabular-nums text-muted-foreground dark:text-white/60",
+          className,
+        )}
+      >
+        {label}
+      </span>
+    );
+  }
+
+  const color = SONG_CUP_PREDICT_COLORS.live;
 
   return (
     <span
@@ -471,36 +424,22 @@ export function SongCupPredictOddsFooter({
         className,
       )}
     >
-      <span className="w-8 shrink-0 text-right text-[12px] font-bold leading-none tracking-[0.2px] text-white">
+      <span className="w-8 shrink-0 text-right text-[12px] font-bold leading-none tracking-[0.2px] text-foreground dark:text-white">
         {home > 0 ? `${home}%` : ""}
       </span>
       <SongCupPredictProgressLine pct={home} align="left" />
       {volumeLabel ? (
-        <span className="shrink-0 px-1 text-[12px] leading-none tracking-[0.2px] text-white/40">
+        <span className="shrink-0 px-1 text-[12px] leading-none tracking-[0.2px] text-muted-foreground dark:text-white/40">
           {volumeLabel}
         </span>
       ) : (
         <span className="w-16 shrink-0" />
       )}
       <SongCupPredictProgressLine pct={away} align="right" />
-      <span className="w-8 shrink-0 text-left text-[12px] font-bold leading-none tracking-[0.2px] text-white">
+      <span className="w-8 shrink-0 text-left text-[12px] font-bold leading-none tracking-[0.2px] text-foreground dark:text-white">
         {away > 0 ? `${away}%` : ""}
       </span>
     </div>
   );
 }
 
-export function SongCupPredictFeedPlaceholder({ className }: { className?: string }) {
-  return (
-    <div
-      className={cn(
-        "rounded-[20px] bg-muted/50 px-6 py-12 text-center dark:bg-white/[0.08]",
-        className,
-      )}
-    >
-      <p className={cn("text-sm", songCupMuted)}>
-        Feed is coming soon. Check back for match activity and updates.
-      </p>
-    </div>
-  );
-}

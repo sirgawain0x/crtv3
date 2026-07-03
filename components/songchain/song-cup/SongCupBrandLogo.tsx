@@ -9,7 +9,7 @@ type SongCupBrandLogoProps = {
 export function SongCupBrandLogo({ className, priority = false }: SongCupBrandLogoProps) {
   return (
     <Image
-      src="/songchain/logo.svg"
+      src="/songchain/song-cup/logo.svg"
       alt="Song Cup"
       width={1024}
       height={173}

@@ -71,16 +71,17 @@ export function SongCupAgentSearch({ className }: SongCupAgentSearchProps) {
         <div
           className={cn(
             "flex items-center gap-2 rounded-full py-2 pl-2 pr-3",
-            "bg-[rgba(173,153,219,0.08)] backdrop-blur-sm",
-            "ring-1 ring-white/10",
+            "bg-muted/60 ring-1 ring-fuchsia-500/25 backdrop-blur-sm",
+            "dark:bg-[rgba(173,153,219,0.08)] dark:ring-white/10",
           )}
         >
           <button
             type="submit"
             disabled={loading || !query.trim()}
             className={cn(
-              "flex size-9 shrink-0 items-center justify-center rounded-full",
-              "bg-[rgba(173,153,219,0.2)] text-white transition-opacity",
+              "flex size-9 shrink-0 items-center justify-center rounded-full transition-opacity",
+              "bg-fuchsia-500/15 text-foreground",
+              "dark:bg-[rgba(173,153,219,0.2)] dark:text-white",
               "hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50",
             )}
             aria-label="Ask Song Cup agent"
@@ -100,7 +101,8 @@ export function SongCupAgentSearch({ className }: SongCupAgentSearchProps) {
             maxLength={2000}
             className={cn(
               "min-w-0 flex-1 bg-transparent text-sm font-medium tracking-[-0.2px]",
-              "text-white placeholder:text-[#a1a1aa]",
+              "text-foreground placeholder:text-muted-foreground",
+              "dark:text-white dark:placeholder:text-[#a1a1aa]",
               "focus:outline-none",
             )}
           />
@@ -110,19 +112,21 @@ export function SongCupAgentSearch({ className }: SongCupAgentSearchProps) {
       {(reply || error) && (
         <div
           className={cn(
-            "mt-2 rounded-2xl border border-white/10 bg-black/60 p-3 text-sm backdrop-blur-md",
-            error ? "text-red-300" : "text-white/90",
+            "mt-2 rounded-2xl border p-3 text-sm backdrop-blur-md",
+            "border-fuchsia-500/25 bg-card text-foreground",
+            "dark:border-white/10 dark:bg-black/60",
+            error ? "text-red-600 dark:text-red-300" : "text-foreground/90 dark:text-white/90",
           )}
           role="status"
         >
           <div className="mb-1 flex items-start justify-between gap-2">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-[#a1a1aa]">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground dark:text-[#a1a1aa]">
               Song Cup agent
             </p>
             <button
               type="button"
               onClick={clearReply}
-              className="shrink-0 rounded p-0.5 text-white/60 hover:text-white"
+              className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground dark:text-white/60 dark:hover:text-white"
               aria-label="Dismiss"
             >
               <X className="size-3.5" />

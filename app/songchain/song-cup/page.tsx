@@ -6,9 +6,9 @@ import type { Metadata } from "next";
 export const dynamic = "force-dynamic";
 
 const SONG_CUP_OG_IMAGE = {
-  url: "/songchain/song-cup-banner.png",
-  width: 1024,
-  height: 274,
+  url: "/songchain/song-cup/song-cup-og.png",
+  width: 1220,
+  height: 321,
   alt: "Song Cup — Where Music Meets the World's Game.",
   type: "image/png",
 } as const;
