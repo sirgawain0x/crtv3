@@ -92,14 +92,14 @@ function StepRow({ step }: { step: StepCard }) {
   return (
     <article className={songCupStepCard}>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-        <div className="relative mx-auto h-[174px] w-[174px] shrink-0 sm:mx-0">
+        <div className="relative mx-auto h-[96px] w-[96px] shrink-0 sm:mx-0">
           <img
             src="/songchain/song-cup/pixels-step-circle.png"
             alt=""
             aria-hidden
             className="absolute inset-0 h-full w-full object-contain"
           />
-          <div className="absolute inset-0 flex items-center justify-center p-10">
+          <div className="absolute inset-0 flex items-center justify-center p-5">
             <img src={step.icon} alt={step.iconAlt} className="h-full w-full object-contain" />
           </div>
         </div>

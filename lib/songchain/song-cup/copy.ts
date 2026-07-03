@@ -14,7 +14,7 @@ export const SONG_CUP_HOW_IT_WORKS = [
   },
   {
     title: "Generate",
-    body: "Use Pixel AI by Creative Platform to create a stunning visual narrative for your music.",
+    body: "Use Pixels by Creative Platform to create a stunning visual narrative for your music.",
   },
   {
     title: "Produce",
@@ -60,7 +60,7 @@ export const SONG_CUP_CONTEST_REQUIREMENTS = {
   title: "Contest Requirements",
   items: [
     "Music must be 100% original and owned by the participant (no AI-generated music).",
-    "Videos must be created using Pixel AI by Creative Platform.",
+    "Videos must be created using Pixels by Creative Platform.",
     "Video length must be exactly 30 to 60 seconds.",
     "Entries must align with the World Cup theme and comply with community guidelines.",
   ],
@@ -71,7 +71,7 @@ export const SONG_CUP_ATTESTATION_TERMS_SECTIONS = [
     title: "Submission & Content Rules",
     body: [
       "Duration: Entries must strictly be between 30 and 60 seconds. Any other length will be disqualified.",
-      "Tooling: All video visuals must be generated explicitly using Pixel AI.",
+      "Tooling: All video visuals must be generated explicitly using Pixels.",
       "Format: High-definition .mp4 (1080p or 4K) is preferred.",
       "Theme & Safety: Content must celebrate the spirit of the World Cup. Videos must be free of harmful, explicit, or offensive content.",
       "Age Requirement: Participants must be 18 years or older.",
@@ -112,4 +112,4 @@ export const SONG_CUP_ATTESTATION_TERMS_SECTIONS = [
 ] as const;
 
 export const SONG_CUP_ATTESTATION_CERTIFICATION =
-  "I have read and agree to the Song Cup Contest Terms & Conditions. I confirm I am 18 or older, my music is 100% original (not AI-generated music), my video visuals were created with Pixel AI, my entry is 30–60 seconds, and I meet all contest requirements. I retain ownership of my IP and understand the platform license, warranties, and indemnification terms above.";
+  "I have read and agree to the Song Cup Contest Terms & Conditions. I confirm I am 18 or older, my music is 100% original (not AI-generated music), my video visuals were created with Pixels, my entry is 30–60 seconds, and I meet all contest requirements. I retain ownership of my IP and understand the platform license, warranties, and indemnification terms above.";

@@ -26,19 +26,31 @@ export function SongCupSidebarIcons({ active, onSelect, className }: SongCupSide
       {SONG_CUP_BUTTON_ICONS.map(({ id, src, alt, dividerAfter, externalHref, iconBgClass }) => {
         const isActive = active === id;
         const baseClasses = cn(
-          "block w-1/2 hover:scale-[1.02]",
+          "group block w-1/2 hover:scale-[1.02]",
           songCupSidebarIconBtn,
-          iconBgClass ?? "bg-transparent",
+        );
+
+        const imageWrapClass = cn(
+          "rounded-xl",
           isActive ? songCupSidebarIconRingActive : songCupSidebarIconRingHover,
         );
 
+        const imageInnerClass = cn(
+          "overflow-hidden rounded-xl",
+          iconBgClass ?? "bg-transparent",
+        );
+
         const image = (
-          <img
-            src={src}
-            alt={alt}
-            loading="lazy"
-            className="h-auto w-full object-contain"
-          />
+          <div className={imageWrapClass}>
+            <div className={imageInnerClass}>
+              <img
+                src={src}
+                alt={alt}
+                loading="lazy"
+                className="h-auto w-full object-contain"
+              />
+            </div>
+          </div>
         );
 
         return (

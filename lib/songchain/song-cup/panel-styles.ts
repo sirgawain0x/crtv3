@@ -83,13 +83,19 @@ export const songCupGradientCta = cn(
 
 /** Sidebar nav icon buttons (desktop + mobile). */
 export const songCupSidebarIconBtn = cn(
-  "group relative overflow-hidden rounded-xl transition-all duration-200",
+  "group relative rounded-xl transition-all duration-200",
   "outline-none focus:outline-none focus-visible:outline-none",
 );
 
-export const songCupSidebarIconRingHover = "hover:ring-2 hover:ring-[#FDBE01]/80";
+export const songCupSidebarIconRingHover = cn(
+  "ring-0 hover:ring-2 hover:ring-[#FDBE01]",
+  "group-hover:ring-2 group-hover:ring-[#FDBE01]",
+  "focus:ring-2 focus:ring-[#FDBE01]",
+  "group-focus-visible:ring-2 group-focus-visible:ring-[#FDBE01]",
+  "focus-visible:ring-2 focus-visible:ring-[#FDBE01]",
+);
 
-/** Active/selected — keep branded orange on focus too (avoids default blue focus ring). */
+/** Active/selected — burnt orange from Song Cup gradient (avoids default blue focus ring). */
 export const songCupSidebarIconRingActive = cn(
   "ring-2 ring-[#FDBE01]",
   "focus:ring-2 focus:ring-[#FDBE01]",
