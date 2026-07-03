@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { SongCupInfoPanel } from "./SongCupInfoPanel";
 import { SongCupPixelsPanel } from "./SongCupPixelsPanel";
 import { SongCupSubmitPanel } from "./SongCupSubmitPanel";
@@ -139,15 +139,12 @@ export function SongCupBottomSection(props: SongCupBottomSectionProps) {
   const isDesktopQuery = useMediaQuery("(min-width: 1024px)");
   const isDesktop = isDesktopQuery ?? true;
 
-  const handleSelectPanel = useCallback(
-    (panel: SongCupPanel | null) => {
-      setActivePanel(panel);
-      if (isDesktop && panel && panelAnchorRef.current) {
-        panelAnchorRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
-      }
-    },
-    [isDesktop],
-  );
+  const handleSelectPanel = (panel: SongCupPanel | null) => {
+    setActivePanel(panel);
+    if (isDesktop && panel && panelAnchorRef.current) {
+      panelAnchorRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
 
   if (!config.enabled) {
     return (
