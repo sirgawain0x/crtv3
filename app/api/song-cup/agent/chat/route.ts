@@ -21,10 +21,15 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const ROUTING_CACHE_TTL_MS = 5 * 60 * 1000;
 let cachedRouting: {
+  cacheKey: string;
   baseUrl: string;
   gatewayToken: string;
   expiresAt: number;
 } | null = null;
+
+function buildRoutingCacheKey(config: ReturnType<typeof getSongCupAgentConfig>): string {
+  return config.agentId ?? config.baseUrl ?? "default";
+}
 
 function clearCachedRouting() {
   cachedRouting = null;
@@ -37,7 +42,12 @@ function chatAbortSignal(requestSignal?: AbortSignal): AbortSignal {
 
 async function resolveRuntimeRouting(config: ReturnType<typeof getSongCupAgentConfig>) {
   const now = Date.now();
-  if (cachedRouting && cachedRouting.expiresAt > now) {
+  const cacheKey = buildRoutingCacheKey(config);
+  if (
+    cachedRouting &&
+    cachedRouting.cacheKey === cacheKey &&
+    cachedRouting.expiresAt > now
+  ) {
     return cachedRouting;
   }
 
@@ -56,7 +66,12 @@ async function resolveRuntimeRouting(config: ReturnType<typeof getSongCupAgentCo
     // gateway.baseUrl points at pinclaw (WebSocket/internal); chat uses the public subdomain.
   }
 
-  cachedRouting = { baseUrl, gatewayToken, expiresAt: now + ROUTING_CACHE_TTL_MS };
+  cachedRouting = {
+    cacheKey,
+    baseUrl,
+    gatewayToken,
+    expiresAt: now + ROUTING_CACHE_TTL_MS,
+  };
   return cachedRouting;
 }
 
