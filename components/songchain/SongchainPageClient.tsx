@@ -77,7 +77,7 @@ export function SongchainPageClient({ config }: SongchainPageClientProps) {
                 {event.slug === "song-cup" ? (
                   <div className="mt-2">
                     <Image
-                      src="/songchain/logo.svg"
+                      src="/songchain/song-cup/logo.svg"
                       alt="Song Cup"
                       width={260}
                       height={44}
