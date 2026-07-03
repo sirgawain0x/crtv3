@@ -10,11 +10,7 @@ export type PinataDeviceIdentity = {
 };
 
 function base64UrlEncode(buf: Buffer): string {
-  return buf
-    .toString("base64")
-    .replaceAll("+", "-")
-    .replaceAll("/", "_")
-    .replace(/=+$/g, "");
+  return buf.toString("base64url");
 }
 
 function derivePublicKeyRaw(publicKeyPem: string): Buffer {

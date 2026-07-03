@@ -124,7 +124,9 @@ export async function POST(request: NextRequest) {
         gatewayToken: routing.gatewayToken,
         message,
         session,
-        signal: AbortSignal.timeout(60_000),
+        signal: request.signal
+          ? AbortSignal.any([request.signal, AbortSignal.timeout(60_000)])
+          : AbortSignal.timeout(60_000),
       });
       return NextResponse.json({ success: true, reply: result.reply || "(no reply)" });
     } catch (err) {

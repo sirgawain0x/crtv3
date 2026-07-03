@@ -4,7 +4,6 @@ import {
   approveAllPendingDevices,
   ensureAgentRunning,
   getGatewayToken,
-  PinataApiError,
   restartAgent,
 } from "@/lib/pinata/api";
 import { mapSongCupAgentError } from "@/lib/pinata/errors";
@@ -20,7 +19,28 @@ interface AgentChatBody {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+const ROUTING_CACHE_TTL_MS = 5 * 60 * 1000;
+let cachedRouting: {
+  baseUrl: string;
+  gatewayToken: string;
+  expiresAt: number;
+} | null = null;
+
+function clearCachedRouting() {
+  cachedRouting = null;
+}
+
+function chatAbortSignal(requestSignal?: AbortSignal): AbortSignal {
+  const timeout = AbortSignal.timeout(60_000);
+  return requestSignal ? AbortSignal.any([requestSignal, timeout]) : timeout;
+}
+
 async function resolveRuntimeRouting(config: ReturnType<typeof getSongCupAgentConfig>) {
+  const now = Date.now();
+  if (cachedRouting && cachedRouting.expiresAt > now) {
+    return cachedRouting;
+  }
+
   let baseUrl = config.baseUrl!;
   let gatewayToken = config.gatewayToken!;
 
@@ -36,7 +56,8 @@ async function resolveRuntimeRouting(config: ReturnType<typeof getSongCupAgentCo
     // gateway.baseUrl points at pinclaw (WebSocket/internal); chat uses the public subdomain.
   }
 
-  return { baseUrl, gatewayToken };
+  cachedRouting = { baseUrl, gatewayToken, expiresAt: now + ROUTING_CACHE_TTL_MS };
+  return cachedRouting;
 }
 
 async function forwardWithRecovery(options: {
@@ -47,6 +68,7 @@ async function forwardWithRecovery(options: {
   devicePrivateKeyPem?: string | null;
   managementJwt?: string | null;
   agentId?: string | null;
+  signal?: AbortSignal;
 }) {
   const {
     baseUrl,
@@ -56,20 +78,21 @@ async function forwardWithRecovery(options: {
     devicePrivateKeyPem,
     managementJwt,
     agentId,
+    signal,
   } = options;
 
-  const attempt = () =>
+  const attempt = (token: string) =>
     forwardPinataAgentChat({
       baseUrl,
-      gatewayToken,
+      gatewayToken: token,
       message,
       session,
       devicePrivateKeyPem,
-      signal: AbortSignal.timeout(60_000),
+      signal: chatAbortSignal(signal),
     });
 
   try {
-    return await attempt();
+    return await attempt(gatewayToken);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     const isRetryable =
@@ -81,6 +104,7 @@ async function forwardWithRecovery(options: {
       throw err;
     }
 
+    clearCachedRouting();
     serverLogger.warn("Song Cup agent chat failed — restarting gateway and retrying");
     await restartAgent(managementJwt, agentId);
     await approveAllPendingDevices(managementJwt, agentId).catch((approveErr) => {
@@ -90,17 +114,13 @@ async function forwardWithRecovery(options: {
     const deadline = Date.now() + 20_000;
     let lastErr: unknown = err;
     while (Date.now() < deadline) {
+      if (signal?.aborted) {
+        throw new Error("Pinata agent chat timed out or was aborted");
+      }
       await sleep(2_000);
       try {
         const gateway = await getGatewayToken(managementJwt, agentId);
-        return await forwardPinataAgentChat({
-          baseUrl,
-          gatewayToken: gateway.token,
-          message,
-          session,
-          devicePrivateKeyPem,
-          signal: AbortSignal.timeout(60_000),
-        });
+        return await attempt(gateway.token);
       } catch (retryErr) {
         lastErr = retryErr;
       }
@@ -177,6 +197,7 @@ export async function POST(request: NextRequest) {
       devicePrivateKeyPem,
       managementJwt,
       agentId,
+      signal: request.signal,
     });
 
     return NextResponse.json({

@@ -106,6 +106,15 @@ async function connectAndChat(options: {
   } = options;
 
   return new Promise((resolve, reject) => {
+    if (typeof WebSocket === "undefined") {
+      reject(
+        new Error(
+          "WebSocket is not defined in this environment. Upgrade to Node.js 22+ or polyfill globalThis.WebSocket.",
+        ),
+      );
+      return;
+    }
+
     const ws = new WebSocket(wsUrl);
 
     let settled = false;
@@ -142,10 +151,21 @@ async function connectAndChat(options: {
       finish(new Error("Pinata gateway WebSocket connection failed"));
     });
 
+    ws.addEventListener("close", (event) => {
+      if (settled) return;
+      finish(
+        new Error(
+          `Pinata gateway WebSocket connection closed (code: ${event.code}${event.reason ? `: ${event.reason}` : ""})`,
+        ),
+      );
+    });
+
     ws.addEventListener("message", (event) => {
       let frame: GatewayFrame;
       try {
-        frame = JSON.parse(String(event.data)) as GatewayFrame;
+        const parsed: unknown = JSON.parse(String(event.data));
+        if (!parsed || typeof parsed !== "object") return;
+        frame = parsed as GatewayFrame;
       } catch {
         return;
       }
