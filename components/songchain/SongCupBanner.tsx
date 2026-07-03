@@ -32,7 +32,7 @@ export function SongCupBanner({
       )}
     >
       <div
-        className="pointer-events-none absolute inset-y-0 left-0 w-[62%] origin-center opacity-90 motion-reduce:animate-none animate-songcup-charts-spin lg:hidden"
+        className="pointer-events-none absolute left-[-20%] top-1/2 -translate-y-1/2 w-[100%] aspect-square origin-center opacity-90 motion-reduce:animate-none animate-songcup-charts-spin lg:hidden"
         aria-hidden
       >
         <Image
