@@ -32,7 +32,7 @@ export function SongCupBanner({
       )}
     >
       <div
-        className="pointer-events-none absolute left-[-20%] top-1/2 -translate-y-1/2 w-[100%] aspect-square origin-center opacity-90 motion-reduce:animate-none animate-songcup-charts-spin lg:hidden"
+        className="pointer-events-none absolute left-[-20%] top-1/2 -translate-y-1/2 w-[100%] aspect-square opacity-90 lg:hidden"
         aria-hidden
       >
         <Image
@@ -45,7 +45,7 @@ export function SongCupBanner({
       </div>
 
       <div
-        className="pointer-events-none absolute hidden origin-center opacity-100 motion-reduce:animate-none animate-songcup-charts-spin lg:block"
+        className="pointer-events-none absolute hidden opacity-100 lg:block"
         style={{
           left: `${(-878 / 2625) * 100}%`,
           top: `${(-92 / 704) * 100}%`,

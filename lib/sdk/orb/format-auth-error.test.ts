@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatOrbAuthError } from './format-auth-error';
+import { formatOrbAuthError, formatOrbLinkError } from './format-auth-error';
 
 describe('formatOrbAuthError', () => {
   it('maps incomplete Orb session to re-sign copy', () => {
@@ -46,5 +46,21 @@ describe('formatOrbAuthError', () => {
         'duplicate key value violates unique constraint "creator_profiles_orb_account_id_key"',
       ),
     ).toMatch(/different wallet profile/i);
+  });
+});
+
+describe('formatOrbLinkError', () => {
+  it('maps invalid wallet signature to actionable copy', () => {
+    expect(formatOrbLinkError(new Error('Invalid wallet signature'))).toMatch(
+      /Approve the signature prompt again/i,
+    );
+  });
+
+  it('maps verification unavailable to retry copy', () => {
+    expect(
+      formatOrbLinkError(
+        new Error('Wallet verification temporarily unavailable. Please retry.'),
+      ),
+    ).toMatch(/temporarily unavailable/i);
   });
 });

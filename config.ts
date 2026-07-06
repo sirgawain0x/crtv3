@@ -96,17 +96,23 @@ export const queryClient = new QueryClient({
   },
 });
 
+const socialAuthSection = [
+  { type: "social" as const, authProviderId: "google" as const, mode: "popup" as const },
+  { type: "social" as const, authProviderId: "twitch" as const, mode: "popup" as const },
+];
+
+const isLocalDev = process.env.NODE_ENV === "development";
+
 const uiConfig: AlchemyAccountsUIConfig = {
   illustrationStyle: "linear",
   auth: {
-    sections: [
-      [{ type: "email", emailMode: "otp" }, { type: "passkey" }],
-      [
-        { type: "social", authProviderId: "google", mode: "popup" },
-        { type: "social", authProviderId: "twitch", mode: "popup" },
-      ],
-    ],
-    addPasskeyOnSignup: true,
+    sections: isLocalDev
+      ? [[{ type: "email", emailMode: "otp" }], socialAuthSection]
+      : [
+          [{ type: "email", emailMode: "otp" }, { type: "passkey" }],
+          socialAuthSection,
+        ],
+    addPasskeyOnSignup: !isLocalDev,
     header: React.createElement(Image, {
       src: SITE_TOPIC_LOGO,
       alt: "Site Logo",

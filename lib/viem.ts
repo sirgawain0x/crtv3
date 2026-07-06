@@ -2,7 +2,7 @@ import { createPublicClient, http, type Address } from "viem";
 import { alchemy, base } from "@account-kit/infra";
 
 const apiKey = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY;
-const fallbackRpc = "https://mainnet.base.org";
+export const fallbackRpc = "https://mainnet.base.org";
 
 // Create a public client for reading blockchain data
 export const publicClient = createPublicClient({
@@ -10,6 +10,12 @@ export const publicClient = createPublicClient({
   transport: apiKey
     ? alchemy({ apiKey })
     : http(fallbackRpc),
+});
+
+/** Base public RPC client used when the primary Alchemy transport errors. */
+export const fallbackPublicClient = createPublicClient({
+  chain: base,
+  transport: http(fallbackRpc),
 });
 
 /** Helper to read the native ETH balance of an address on Base. */

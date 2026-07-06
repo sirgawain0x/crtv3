@@ -29,6 +29,9 @@ export function formatWalletAuthError(error: unknown): string {
   if (lower.includes('wallet not connected')) {
     return 'Connect your wallet with Get Started to continue.';
   }
+  if (lower.includes('sign in with your wallet')) {
+    return 'Connect your wallet with Get Started to continue.';
+  }
   if (isWalletSigningRejected(error)) {
     return 'Wallet signature was cancelled. Approve the signature to verify access.';
   }

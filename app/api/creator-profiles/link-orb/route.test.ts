@@ -63,6 +63,7 @@ vi.mock('@/lib/utils/logger', () => ({
 }));
 
 import { POST } from './route';
+import { WalletAuthError } from '@/lib/auth/require-wallet';
 
 function linkOrbRequest(body: Record<string, unknown>) {
   return new NextRequest('http://localhost/api/creator-profiles/link-orb', {
@@ -186,6 +187,24 @@ describe('link-orb POST security', () => {
       }),
       { onConflict: 'owner_address' },
     );
+  });
+
+  it('returns 401 when wallet signature verification fails', async () => {
+    mockRequireWalletAuthFor.mockRejectedValue(
+      new WalletAuthError(401, 'Invalid wallet signature'),
+    );
+
+    const response = await POST(
+      linkOrbRequest({
+        accessToken: 'valid-token',
+        owner_address: OWNER,
+      }),
+    );
+    const json = await response.json();
+
+    expect(response.status).toBe(401);
+    expect(json.success).toBe(false);
+    expect(json.error).toBe('Invalid wallet signature');
   });
 
   it('returns 409 with friendly message on duplicate orb_account_id upsert', async () => {
