@@ -239,8 +239,8 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
             return;
           }
 
-          const headerAddress = authHeaders['X-Wallet-Address']?.toLowerCase();
-          const ownerForBody = headerAddress || wallet;
+          const ownerAddressFromAuth = (headers: Record<string, string>) =>
+            headers['X-Wallet-Address']?.toLowerCase() || wallet;
 
           const retryDelays = [0, 5_000, 15_000, 30_000];
           let lastErr: unknown = null;
@@ -261,7 +261,7 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
                 body: JSON.stringify({
                   accessToken: active.accessToken,
                   authenticationId: active.authenticationId,
-                  owner_address: ownerForBody,
+                  owner_address: ownerAddressFromAuth(authHeaders),
                 }),
               });
 
