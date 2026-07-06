@@ -26,6 +26,12 @@ export function formatAccountKitAuthError(error: unknown): string {
   if (lower.includes("passkey") && lower.includes("cancel")) {
     return "Passkey sign-in was cancelled. Try again or use email instead.";
   }
+  if (
+    lower.includes("invalid origin") ||
+    (lower.includes("origin") && lower.includes("passkey"))
+  ) {
+    return "This passkey was created on another site (e.g. production). On localhost, sign in with email instead, or create a new passkey here.";
+  }
   if (lower.includes("turnkey") || lower.includes("iframe")) {
     return "Wallet sign-in could not initialize. Refresh the page and try again.";
   }

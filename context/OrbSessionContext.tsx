@@ -10,8 +10,7 @@ import React, {
   useState,
   useSyncExternalStore,
 } from 'react';
-import { useUser } from '@/lib/wallet/react';
-import useModularAccount from '@/lib/hooks/accountkit/useModularAccount';
+import { useCreatorWalletAddress } from '@/lib/hooks/accountkit/useCreatorWalletAddress';
 import {
   getOrbLogin,
   loadStoredOrbSession,
@@ -67,13 +66,17 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
   const [loginError, setLoginError] = useState<string | null>(null);
   const [linkStatus, setLinkStatus] = useState<OrbLinkStatus>('idle');
   const [accountMenuRefreshSignal, setAccountMenuRefreshSignal] = useState(0);
-  const user = useUser();
-  const { account: modularAccount } = useModularAccount();
-  const { getAuthHeaders, isReady: isWalletAuthReady } = useWalletAuth();
+  const { creatorAddress: walletAddress, isLoading: isWalletIdentityLoading } =
+    useCreatorWalletAddress();
+  const {
+    getAuthHeaders,
+    clearAuthCache,
+    address: authAddress,
+    isReady: isWalletAuthReady,
+  } = useWalletAuth();
   const orb = useMemo(() => getOrbLogin(), []);
   const linkProfileInFlightRef = useRef<Promise<void> | null>(null);
 
-  const walletAddress = modularAccount?.address || user?.address || null;
   const hasWallet = !!walletAddress;
 
   const lensAccount = useMemo(() => {
@@ -195,8 +198,8 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
 
         const wallet = (
           ownerAddress ||
-          modularAccount?.address ||
-          user?.address ||
+          authAddress ||
+          walletAddress ||
           undefined
         )?.toLowerCase();
 
@@ -215,7 +218,7 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
 
         setIsLinking(true);
         try {
-          if (!isWalletAuthReady) {
+          if (isWalletIdentityLoading || !isWalletAuthReady) {
             setLinkStatus('needs_wallet');
             const message =
               'Wallet is still initializing. Wait a moment, then tap Sync profile again.';
@@ -236,8 +239,12 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
             return;
           }
 
+          const headerAddress = authHeaders['X-Wallet-Address']?.toLowerCase();
+          const ownerForBody = headerAddress || wallet;
+
           const retryDelays = [0, 5_000, 15_000, 30_000];
           let lastErr: unknown = null;
+          let authRetried = false;
 
           for (let attempt = 0; attempt < retryDelays.length; attempt++) {
             if (retryDelays[attempt] > 0) {
@@ -254,7 +261,7 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
                 body: JSON.stringify({
                   accessToken: active.accessToken,
                   authenticationId: active.authenticationId,
-                  owner_address: wallet,
+                  owner_address: ownerForBody,
                 }),
               });
 
@@ -272,7 +279,25 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
                 return;
               }
 
-              lastErr = new Error(data.error || `Failed to link Orb profile (${res.status})`);
+              const errorText = data.error || `Failed to link Orb profile (${res.status})`;
+              const isInvalidSignature =
+                res.status === 401 &&
+                errorText.toLowerCase().includes('invalid wallet signature');
+
+              if (isInvalidSignature && !authRetried) {
+                authRetried = true;
+                clearAuthCache();
+                try {
+                  authHeaders = await getAuthHeaders();
+                  attempt -= 1;
+                  continue;
+                } catch (signErr) {
+                  lastErr = signErr;
+                  break;
+                }
+              }
+
+              lastErr = new Error(errorText);
               if (res.status !== 429 && !isOrbLinkRateLimitError(lastErr)) {
                 break;
               }
@@ -302,7 +327,15 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
       linkProfileInFlightRef.current = promise;
       return promise;
     },
-    [session, modularAccount?.address, user?.address, getAuthHeaders, isWalletAuthReady],
+    [
+      session,
+      authAddress,
+      walletAddress,
+      getAuthHeaders,
+      clearAuthCache,
+      isWalletAuthReady,
+      isWalletIdentityLoading,
+    ],
   );
 
   useEffect(() => {
@@ -364,9 +397,8 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
         bumpAccountMenuRefresh();
         toast.success('Signed in with Orb');
 
-        const wallet = modularAccount?.address || user?.address;
-        if (wallet) {
-          void linkProfile(wallet).catch(() => undefined);
+        if (walletAddress) {
+          void linkProfile(walletAddress).catch(() => undefined);
         } else {
           setLinkStatus('needs_wallet');
           toast.info(
@@ -379,7 +411,7 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
         throw new Error(message);
       }
     },
-    [orb, persistSession, bumpAccountMenuRefresh, modularAccount?.address, user?.address, linkProfile],
+    [orb, persistSession, bumpAccountMenuRefresh, walletAddress, linkProfile],
   );
 
   const logout = useCallback(async () => {

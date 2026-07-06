@@ -91,6 +91,15 @@ export function formatOrbLinkError(error: unknown): string {
       'link your profile',
     );
   }
+  if (lower.includes('invalid wallet signature')) {
+    return 'Wallet signature could not be verified. Approve the signature prompt again, or wait a moment and tap Sync profile.';
+  }
+  if (
+    lower.includes('wallet verification temporarily unavailable') ||
+    lower.includes('verification temporarily unavailable')
+  ) {
+    return "Profile link is temporarily unavailable. Wait a moment and tap Sync profile again.";
+  }
   if (
     lower.includes('lens_account_id') &&
     (lower.includes('schema cache') || lower.includes('could not find'))
