@@ -28,6 +28,25 @@ const MAX_AGE_SECONDS = 5 * 60;
 const HEADER_ADDRESS = "x-wallet-address";
 const HEADER_TIMESTAMP = "x-wallet-timestamp";
 const HEADER_SIGNATURE = "x-wallet-signature";
+const HEX_SIGNATURE_RE = /^0x([0-9a-fA-F]{2})+$/;
+
+function getWalletAuthHeaderValue(
+  headers: Record<string, string>,
+  headerName: string,
+): string | undefined {
+  const target = headerName.toLowerCase();
+  if (headers[headerName] !== undefined) return headers[headerName];
+  const entry = Object.entries(headers).find(([key]) => key.toLowerCase() === target);
+  return entry?.[1];
+}
+
+/** Case-insensitive read of the signed wallet address from client auth headers. */
+export function getWalletAddressFromAuthHeaders(
+  headers: Record<string, string>,
+): string | undefined {
+  const raw = getWalletAuthHeaderValue(headers, HEADER_ADDRESS);
+  return raw?.trim().toLowerCase() || undefined;
+}
 
 export class WalletAuthError extends Error {
   constructor(public status: number, message: string) {
@@ -58,6 +77,10 @@ export async function verifyWalletSignature(
   message: string,
   signature: `0x${string}`,
 ): Promise<VerifyWalletSignatureResult> {
+  if (!HEX_SIGNATURE_RE.test(signature)) {
+    return { ok: false, reason: "invalid" };
+  }
+
   let valid = false;
   try {
     valid = await verifyMessage({ address, message, signature });
@@ -195,9 +218,9 @@ export function walletAuthHeadersToArgs(
   headers: Record<string, string>,
 ): WalletAuthArgs {
   return {
-    address: headers[HEADER_ADDRESS] ?? headers["X-Wallet-Address"],
-    timestamp: Number(headers[HEADER_TIMESTAMP] ?? headers["X-Wallet-Timestamp"]),
-    signature: headers[HEADER_SIGNATURE] ?? headers["X-Wallet-Signature"],
+    address: getWalletAuthHeaderValue(headers, HEADER_ADDRESS) ?? "",
+    timestamp: Number(getWalletAuthHeaderValue(headers, HEADER_TIMESTAMP)),
+    signature: getWalletAuthHeaderValue(headers, HEADER_SIGNATURE) ?? "",
   };
 }
 

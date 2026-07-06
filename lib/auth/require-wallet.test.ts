@@ -27,8 +27,10 @@ vi.mock('@/lib/utils/logger', () => ({
 
 import {
   buildWalletAuthMessage,
+  getWalletAddressFromAuthHeaders,
   requireWalletAuth,
   verifyWalletSignature,
+  walletAuthHeadersToArgs,
   WalletAuthError,
 } from './require-wallet';
 
@@ -97,6 +99,19 @@ describe('verifyWalletSignature', () => {
     expect(result).toEqual({ ok: false, reason: 'invalid' });
     expect(mockFallbackVerifyMessage).not.toHaveBeenCalled();
   });
+
+  it('returns invalid for malformed signatures without calling RPC', async () => {
+    const result = await verifyWalletSignature(
+      ADDRESS,
+      'hello',
+      'not-a-signature' as `0x${string}`,
+    );
+
+    expect(result).toEqual({ ok: false, reason: 'invalid' });
+    expect(mockEoaVerifyMessage).not.toHaveBeenCalled();
+    expect(mockPrimaryVerifyMessage).not.toHaveBeenCalled();
+    expect(mockFallbackVerifyMessage).not.toHaveBeenCalled();
+  });
 });
 
 describe('requireWalletAuth', () => {
@@ -151,6 +166,44 @@ describe('requireWalletAuth', () => {
     await expect(requireWalletAuth(authRequest())).rejects.toMatchObject({
       status: 401,
       message: 'Invalid wallet signature',
+    });
+  });
+
+  it('throws 401 for malformed signatures instead of 503', async () => {
+    await expect(requireWalletAuth(authRequest('not-a-signature'))).rejects.toMatchObject({
+      status: 401,
+      message: 'Invalid wallet signature',
+    });
+    expect(mockPrimaryVerifyMessage).not.toHaveBeenCalled();
+    expect(mockFallbackVerifyMessage).not.toHaveBeenCalled();
+  });
+});
+
+describe('wallet auth header helpers', () => {
+  it('reads wallet address case-insensitively', () => {
+    expect(
+      getWalletAddressFromAuthHeaders({
+        'x-wallet-address': ADDRESS,
+      }),
+    ).toBe(ADDRESS);
+    expect(
+      getWalletAddressFromAuthHeaders({
+        'X-Wallet-Address': ADDRESS,
+      }),
+    ).toBe(ADDRESS);
+  });
+
+  it('maps auth headers to args case-insensitively', () => {
+    expect(
+      walletAuthHeadersToArgs({
+        'X-Wallet-Address': ADDRESS,
+        'X-Wallet-Timestamp': '1700000000',
+        'X-Wallet-Signature': SIGNATURE,
+      }),
+    ).toEqual({
+      address: ADDRESS,
+      timestamp: 1700000000,
+      signature: SIGNATURE,
     });
   });
 });

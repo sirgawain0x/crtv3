@@ -11,6 +11,7 @@ import React, {
   useSyncExternalStore,
 } from 'react';
 import { useCreatorWalletAddress } from '@/lib/hooks/accountkit/useCreatorWalletAddress';
+import { getWalletAddressFromAuthHeaders } from '@/lib/auth/require-wallet';
 import {
   getOrbLogin,
   loadStoredOrbSession,
@@ -240,7 +241,7 @@ export function OrbSessionProvider({ children }: { children: React.ReactNode }) 
           }
 
           const ownerAddressFromAuth = (headers: Record<string, string>) =>
-            headers['X-Wallet-Address']?.toLowerCase() || wallet;
+            getWalletAddressFromAuthHeaders(headers) || wallet;
 
           const retryDelays = [0, 5_000, 15_000, 30_000];
           let lastErr: unknown = null;
