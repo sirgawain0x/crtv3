@@ -69,7 +69,7 @@ export const HUB_ASSET_CONFIGS: Record<HubAssetSymbol, HubAssetConfig> = {
     tagline: 'Decentralized stable with Sky savings rewards',
     bestFor: 'Creators and holders who want decentralized backing and built-in savings perks',
     tradeoff: 'The DAI → USDS rename may need a quick explainer; crypto-backed stability can wobble in extreme market crashes.',
-    logo: '/images/tokens/USDS_on_Base.svg',
+    logo: '/images/tokens/USDS_on_Base.png',
   },
   USDC: {
     symbol: 'USDC',
@@ -94,7 +94,7 @@ export const HUB_ASSET_CONFIGS: Record<HubAssetSymbol, HubAssetConfig> = {
     tagline: 'Aave stable for DeFi power users',
     bestFor: 'Advanced lending, borrowing, and yield vaults without selling other assets',
     tradeoff: 'Smaller market and not widely used for everyday spending; loan health must be managed in volatile markets.',
-    logo: '/images/tokens/GHO_on_Base.svg',
+    logo: '/images/tokens/GHO_on_Base.png',
   },
 };
 
