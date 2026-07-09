@@ -20,6 +20,7 @@ import { Asset } from "livepeer/models/components";
 import { Collapsible } from "@/components/ui/collapsible";
 import { SplitsCollaboratorsForm } from "./SplitsCollaboratorsForm";
 import { Users } from "lucide-react";
+import { VIDEO_GENRES } from "@/lib/constants/video-genres";
 
 type CreateDetailsAndUploadProps = {
     onPressNext: (formData: TVideoMetaForm, livepeerAsset: Asset) => void;
@@ -135,22 +136,11 @@ const CreateDetailsAndUpload = ({ onPressNext }: CreateDetailsAndUploadProps) =>
                                                             </SelectTrigger>
                                                         </FormControl>
                                                         <SelectContent>
-                                                            <SelectItem value="Pop">Pop</SelectItem>
-                                                            <SelectItem value="Rock">Rock</SelectItem>
-                                                            <SelectItem value="Hip-Hop/Rap">Hip-Hop/Rap</SelectItem>
-                                                            <SelectItem value="R&B/Soul">R&B/Soul</SelectItem>
-                                                            <SelectItem value="EDM">EDM</SelectItem>
-                                                            <SelectItem value="Country">Country</SelectItem>
-                                                            <SelectItem value="Jazz">Jazz</SelectItem>
-                                                            <SelectItem value="Blues">Blues</SelectItem>
-                                                            <SelectItem value="Classical">Classical</SelectItem>
-                                                            <SelectItem value="Folk">Folk</SelectItem>
-                                                            <SelectItem value="Reggae">Reggae</SelectItem>
-                                                            <SelectItem value="Latin">Latin</SelectItem>
-                                                            <SelectItem value="Metal">Metal</SelectItem>
-                                                            <SelectItem value="Original">Original</SelectItem>
-                                                            <SelectItem value="Podcast">Podcast</SelectItem>
-                                                            <SelectItem value="World">World Music</SelectItem>
+                                                            {VIDEO_GENRES.map((genre) => (
+                                                                <SelectItem key={genre.value} value={genre.value}>
+                                                                    {genre.label}
+                                                                </SelectItem>
+                                                            ))}
                                                         </SelectContent>
                                                     </Select>
                                                 </FormItem>

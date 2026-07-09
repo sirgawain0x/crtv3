@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/select";
 import { X, SlidersHorizontal } from "lucide-react";
 import { PredictiveSearchInput } from "@/components/search/PredictiveSearchInput";
+import { VIDEO_GENRES } from "@/lib/constants/video-genres";
 
 interface VideoSearchProps {
   onSearchChange: (search: string) => void;
@@ -22,22 +23,7 @@ interface VideoSearchProps {
 
 const VIDEO_CATEGORIES = [
   { value: "all", label: "All Genres" },
-  { value: "Pop", label: "Pop" },
-  { value: "Rock", label: "Rock" },
-  { value: "Hip-Hop/Rap", label: "Hip-Hop/Rap" },
-  { value: "R&B/Soul", label: "R&B/Soul" },
-  { value: "EDM", label: "EDM" },
-  { value: "Country", label: "Country" },
-  { value: "Jazz", label: "Jazz" },
-  { value: "Blues", label: "Blues" },
-  { value: "Classical", label: "Classical" },
-  { value: "Folk", label: "Folk" },
-  { value: "Reggae", label: "Reggae" },
-  { value: "Latin", label: "Latin" },
-  { value: "Metal", label: "Metal" },
-  { value: "Original", label: "Original" },
-  { value: "Podcast", label: "Podcast" },
-  { value: "World", label: "World Music" },
+  ...VIDEO_GENRES,
 ];
 
 const SORT_OPTIONS = [

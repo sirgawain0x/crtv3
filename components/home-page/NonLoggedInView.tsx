@@ -2,7 +2,7 @@
 
 import React from "react";
 import HeroSection from "./HeroSection";
-import { SongCupBanner } from "@/components/songchain/SongCupBanner";
+import { ChannelBannersCarousel } from "@/components/channels/ChannelBannersCarousel";
 // import { TopChart } from "./TopChart";
 // import FeaturedVideo from './Featured';
 import { TopVideos } from "./TopVideos";
@@ -17,7 +17,7 @@ const NonLoggedInView: React.FC = () => {
     <div>
       <HeroSection />
       <div className="w-full max-w-7xl mx-auto py-3 px-4 sm:px-6">
-        <SongCupBanner />
+        <ChannelBannersCarousel />
       </div>
       {/* <TopChart /> */}
       {/* <FeaturedVideo /> */}

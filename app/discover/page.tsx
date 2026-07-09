@@ -4,7 +4,7 @@ import { useState } from "react";
 import VideoCardGrid from "@/components/Videos/VideoCardGrid";
 import { VideoSearch } from "@/components/Videos/VideoSearch";
 import LivestreamGrid from "@/components/Live/LivestreamGrid";
-import { SongCupBanner } from "@/components/songchain/SongCupBanner";
+import { ChannelBannersCarousel } from "@/components/channels/ChannelBannersCarousel";
 import Link from "next/link";
 import {
   Breadcrumb,
@@ -33,7 +33,7 @@ const AllVideosContent: React.FC = () => {
         </p>
       </div>
       <div className="mx-auto mb-8 max-w-7xl px-4 sm:px-0">
-        <SongCupBanner />
+        <ChannelBannersCarousel />
       </div>
       <div className="my-5 p-4">
         <Breadcrumb>

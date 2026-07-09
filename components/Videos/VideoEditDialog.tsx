@@ -33,6 +33,7 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { regenerateThumbnailFromLivepeer } from "@/lib/utils/thumbnail-regeneration";
 import { logger } from '@/lib/utils/logger';
+import { VIDEO_GENRES, getVideoGenreLabel } from "@/lib/constants/video-genres";
 
 
 interface VideoEditDialogProps {
@@ -48,25 +49,6 @@ interface VideoEditFormData {
   category: string;
   location: string;
 }
-
-const GENRES = [
-  "Pop",
-  "Rock",
-  "Hip-Hop/Rap",
-  "R&B/Soul",
-  "EDM",
-  "Country",
-  "Jazz",
-  "Blues",
-  "Classical",
-  "Folk",
-  "Reggae",
-  "Latin",
-  "Metal",
-  "Original",
-  "Podcast",
-  "World",
-];
 
 export function VideoEditDialog({
   open,
@@ -442,9 +424,9 @@ export function VideoEditDialog({
                   <SelectValue placeholder="Select a Genre" />
                 </SelectTrigger>
                 <SelectContent>
-                  {GENRES.map((genre) => (
-                    <SelectItem key={genre} value={genre}>
-                      {genre === "World" ? "World Music" : genre}
+                  {VIDEO_GENRES.map((genre) => (
+                    <SelectItem key={genre.value} value={genre.value}>
+                      {getVideoGenreLabel(genre.value)}
                     </SelectItem>
                   ))}
                 </SelectContent>
