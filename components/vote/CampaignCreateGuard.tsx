@@ -6,6 +6,9 @@ import { useCampaignCreateAccess } from "@/lib/hooks/vote/useCampaignCreateAcces
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
+import { useSmartAccountClient, useUser } from "@/lib/wallet/react";
+import useModularAccount from "@/lib/hooks/accountkit/useModularAccount";
+import { getProfileMembershipUrl } from "@/lib/utils/profile-urls";
 
 interface CampaignCreateGuardProps {
   children: ReactNode;
@@ -13,6 +16,10 @@ interface CampaignCreateGuardProps {
 
 export function CampaignCreateGuard({ children }: CampaignCreateGuardProps) {
   const { canCreateCampaign, isLoading, isConnected } = useCampaignCreateAccess();
+  const user = useUser();
+  const { address: scaAddress } = useSmartAccountClient({});
+  const { account } = useModularAccount();
+  const profileAddress = account?.address || scaAddress || user?.address;
 
   if (isLoading) {
     return (
@@ -47,7 +54,15 @@ export function CampaignCreateGuard({ children }: CampaignCreateGuardProps) {
         </CardHeader>
         <CardContent>
           <Button asChild>
-            <Link href="/memberships">View memberships</Link>
+            <Link
+              href={
+                profileAddress
+                  ? getProfileMembershipUrl(profileAddress)
+                  : "/memberships"
+              }
+            >
+              View memberships
+            </Link>
           </Button>
         </CardContent>
       </Card>

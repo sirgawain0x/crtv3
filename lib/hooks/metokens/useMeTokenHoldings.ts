@@ -9,6 +9,7 @@ import { creatorProfileSupabaseService, CreatorProfile } from '@/lib/sdk/supabas
 import { logger } from '@/lib/utils/logger';
 import { METOKEN_DIAMOND_BASE } from '@/lib/contracts/MeTokenHubs';
 import { formatHubAssetAmount, resolveHubAsset, type HubAssetSymbol } from '@/lib/utils/hubAssetUtils';
+import { publicClient } from '@/lib/viem';
 
 const DIAMOND = METOKEN_DIAMOND_BASE;
 
@@ -188,29 +189,29 @@ export function useMeTokenHoldings(targetAddress?: string): UseMeTokenHoldingsRe
             const meTokenAddress = meToken as `0x${string}`;
 
             const [info, onChainBalance, name, symbol, totalSupply] = await Promise.all([
-              client.readContract({
+              publicClient.readContract({
                 address: DIAMOND,
                 abi: DIAMOND_ABI,
                 functionName: 'getMeTokenInfo',
                 args: [meTokenAddress],
               }) as Promise<any>,
-              client.readContract({
+              publicClient.readContract({
                 address: meTokenAddress,
                 abi: ERC20_ABI,
                 functionName: 'balanceOf',
                 args: [address as `0x${string}`],
               }) as Promise<bigint>,
-              client.readContract({
+              publicClient.readContract({
                 address: meTokenAddress,
                 abi: ERC20_ABI,
                 functionName: 'name',
               }) as Promise<string>,
-              client.readContract({
+              publicClient.readContract({
                 address: meTokenAddress,
                 abi: ERC20_ABI,
                 functionName: 'symbol',
               }) as Promise<string>,
-              client.readContract({
+              publicClient.readContract({
                 address: meTokenAddress,
                 abi: ERC20_ABI,
                 functionName: 'totalSupply',

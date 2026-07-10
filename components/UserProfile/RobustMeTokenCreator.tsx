@@ -40,6 +40,7 @@ import {
   HUB_ASSET_CONFIGS,
   DEFAULT_HUB_ASSET,
   type HubAssetConfig,
+  type HubAssetSymbol,
 } from '@/lib/contracts/MeTokenHubs';
 import {
   formatHubAssetAmount,
@@ -71,6 +72,12 @@ const STATUS_STEPS: Record<
 };
 
 const DEFAULT_ASSET = HUB_ASSET_CONFIGS[DEFAULT_HUB_ASSET];
+
+/** Page-specific collateral logos for the creation form backing selector. */
+const CREATOR_COLLATERAL_LOGOS: Partial<Record<HubAssetSymbol, string>> = {
+  USDS: '/images/tokens/s_usds.webp',
+  GHO: '/images/tokens/gho-coin.png',
+};
 
 export function RobustMeTokenCreator({ onMeTokenCreated, onClose }: RobustMeTokenCreatorProps) {
   const [name, setName] = useState('');
@@ -369,7 +376,11 @@ export function RobustMeTokenCreator({ onMeTokenCreated, onClose }: RobustMeToke
                             : 'border-border hover:border-muted-foreground'
                         )}
                       >
-                        <TokenLogo config={config} className="h-10 w-10 flex-shrink-0" />
+                        <TokenLogo
+                          config={config}
+                          className="h-10 w-10 flex-shrink-0"
+                          logoSrc={CREATOR_COLLATERAL_LOGOS[config.symbol]}
+                        />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center flex-wrap gap-2">
                             <span className="font-semibold">{config.displayName}</span>
@@ -474,10 +485,19 @@ export function RobustMeTokenCreator({ onMeTokenCreated, onClose }: RobustMeToke
   );
 }
 
-function TokenLogo({ config, className }: { config: HubAssetConfig; className?: string }) {
+function TokenLogo({
+  config,
+  className,
+  logoSrc,
+}: {
+  config: HubAssetConfig;
+  className?: string;
+  logoSrc?: string;
+}) {
   const [errored, setErrored] = useState(false);
+  const src = logoSrc ?? config.logo;
 
-  if (errored || !config.logo) {
+  if (errored || !src) {
     return (
       <div
         className={cn(
@@ -492,7 +512,7 @@ function TokenLogo({ config, className }: { config: HubAssetConfig; className?: 
 
   return (
     <img
-      src={config.logo}
+      src={src}
       alt={config.symbol}
       className={cn('rounded-full object-contain', className)}
       onError={() => setErrored(true)}

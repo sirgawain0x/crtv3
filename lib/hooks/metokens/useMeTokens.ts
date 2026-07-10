@@ -6,6 +6,7 @@ import { meTokensSubgraph, MeToken } from '@/lib/sdk/metokens/subgraph';
 import { logger } from '@/lib/utils/logger';
 import { appendBuilderCode } from "@/lib/utils/builder-code";
 import { METOKEN_DIAMOND_BASE, METOKEN_FACTORY_BASE } from '@/lib/contracts/metokens/deployments';
+import { publicClient } from '@/lib/viem';
 
 
 // MeTokens contract addresses on Base
@@ -364,7 +365,7 @@ export function useMeTokens() {
       for (const meToken of meTokens) {
         try {
           // Get MeToken info from Diamond contract
-          const info = await client.readContract({
+          const info = await publicClient.readContract({
             address: DIAMOND,
             abi: DIAMOND_ABI,
             functionName: 'getMeTokenInfo',
@@ -374,25 +375,25 @@ export function useMeTokens() {
           // Check if this MeToken belongs to the current user
           if (info && info.owner.toLowerCase() === address.toLowerCase()) {
             // Get ERC20 token info
-            const name = await client.readContract({
+            const name = await publicClient.readContract({
               address: meToken.id as `0x${string}`,
               abi: ERC20_ABI,
               functionName: 'name',
             }) as string;
 
-            const symbol = await client.readContract({
+            const symbol = await publicClient.readContract({
               address: meToken.id as `0x${string}`,
               abi: ERC20_ABI,
               functionName: 'symbol',
             }) as string;
 
-            const totalSupply = await client.readContract({
+            const totalSupply = await publicClient.readContract({
               address: meToken.id as `0x${string}`,
               abi: ERC20_ABI,
               functionName: 'totalSupply',
             }) as bigint;
 
-            const balance = await client.readContract({
+            const balance = await publicClient.readContract({
               address: meToken.id as `0x${string}`,
               abi: ERC20_ABI,
               functionName: 'balanceOf',
@@ -554,7 +555,7 @@ export function useMeTokens() {
 
     try {
       // Get MeToken info from Diamond contract
-      const info = await client.readContract({
+      const info = await publicClient.readContract({
         address: DIAMOND,
         abi: DIAMOND_ABI,
         functionName: 'getMeTokenInfo',
@@ -564,25 +565,25 @@ export function useMeTokens() {
       // Check if this MeToken belongs to the current user
       if (info && info.owner.toLowerCase() === address.toLowerCase()) {
         // Get ERC20 token info
-        const name = await client.readContract({
+        const name = await publicClient.readContract({
           address: meTokenAddress as `0x${string}`,
           abi: ERC20_ABI,
           functionName: 'name',
         }) as string;
 
-        const symbol = await client.readContract({
+        const symbol = await publicClient.readContract({
           address: meTokenAddress as `0x${string}`,
           abi: ERC20_ABI,
           functionName: 'symbol',
         }) as string;
 
-        const totalSupply = await client.readContract({
+        const totalSupply = await publicClient.readContract({
           address: meTokenAddress as `0x${string}`,
           abi: ERC20_ABI,
           functionName: 'totalSupply',
         }) as bigint;
 
-        const balance = await client.readContract({
+        const balance = await publicClient.readContract({
           address: meTokenAddress as `0x${string}`,
           abi: ERC20_ABI,
           functionName: 'balanceOf',
@@ -677,7 +678,7 @@ export function useMeTokens() {
     try {
       if (!client) return '0';
 
-      const result = await client.readContract({
+      const result = await publicClient.readContract({
         address: DIAMOND,
         abi: DIAMOND_ABI,
         functionName: 'calculateMeTokensMinted',
@@ -696,7 +697,7 @@ export function useMeTokens() {
     try {
       if (!client || !address) return '0';
 
-      const result = await client.readContract({
+      const result = await publicClient.readContract({
         address: DIAMOND,
         abi: DIAMOND_ABI,
         functionName: 'calculateAssetsReturned',

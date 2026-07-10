@@ -3,8 +3,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { NextPage } from "next";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState, useEffect, useContext, type ReactNode } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useState, useEffect, type ReactNode } from "react";
 import { useUser } from "@/lib/wallet/react";
 import { userToAccount } from "@/lib/types/account";
 import { ListUploadedAssets } from "@/components/UserProfile/list-uploaded-assets/ListUploadedAssets";
@@ -19,86 +19,29 @@ import {
 import MemberCard from "./MemberCard";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { FaExclamationTriangle } from "react-icons/fa";
-import {
-  MembershipContext,
-} from "@/components/auth/MembershipGuard";
+import { useMembershipContext } from "@/lib/context/MembershipContext";
 import type { MembershipDetails } from "@/lib/hooks/unlock/useMembershipVerification";
 import { MeTokensSection } from "./MeTokensSection";
 import { UserDisplay } from "@/components/User/UserDisplay";
 import { CreativeBankTab } from "./CreativeBankTab";
 import { MembershipHome } from "@/components/memberships/MembershipHome";
-import { logger } from '@/lib/utils/logger';
 import { CancelMembershipButton } from "./CancelMembershipButton";
 import { getPassDisplayName } from "@/lib/access/membership-labels";
+import { isValidProfileTab, type ProfileTab } from "@/lib/utils/profile-urls";
+import { Skeleton } from "@/components/ui/skeleton";
 
+const LIFETIME_EXPIRATION_THRESHOLD = 32503680000;
 
-function useServerMembership(address?: string) {
-  const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!address) return;
-
-    const abortController = new AbortController();
-    setLoading(true);
-    setError(null);
-
-    fetch("/api/membership", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ address }),
-      signal: abortController.signal,
-    })
-      .then((res) => {
-        if (!res.ok) {
-          throw new Error(`HTTP error! status: ${res.status}`);
-        }
-        return res.json();
-      })
-      .then((res) => {
-        if (res.error) {
-          setError(res.error);
-        } else {
-          setData(res.memberships);
-          setError(null);
-        }
-      })
-      .catch((e) => {
-        // Only set error if it's not an abort or connection refused error
-        // Connection refused typically means server isn't ready yet
-        if (e.name === "AbortError") {
-          // Request was aborted, ignore
-          return;
-        }
-        // Connection errors are common during development hot reload
-        // Don't set error state for network/connection errors to avoid noise
-        const isConnectionError =
-          e.message.includes("ERR_CONNECTION_REFUSED") ||
-          e.message.includes("Failed to fetch") ||
-          e.message.includes("NetworkError") ||
-          e.message.includes("Network request failed");
-
-        if (isConnectionError) {
-          // Log but don't set error state - server may be restarting
-          logger.debug("Membership API not available:", e.message);
-          return;
-        }
-        setError(e.message);
-      })
-      .finally(() => {
-        if (!abortController.signal.aborted) {
-          setLoading(false);
-        }
-      });
-
-    return () => {
-      abortController.abort();
-    };
-  }, [address]);
-
-  return { data, loading, error };
-}
+const MEMBERSHIP_ERROR_MESSAGES: Record<string, string> = {
+  LOCK_NOT_FOUND: "Unable to verify membership. Please try again later.",
+  BALANCE_CHECK_ERROR: "Unable to check membership status. Please try again later.",
+  MEMBERSHIP_CHECK_ERROR: "Error verifying membership. Please try again later.",
+  INVALID_ADDRESS: "Invalid wallet address. Please reconnect your wallet.",
+  NO_VALID_ADDRESS: "Please connect your wallet to verify membership.",
+  PROVIDER_ERROR: "Network connection error. Please try again later.",
+  LOCK_FETCH_ERROR: "Unable to fetch membership details. Basic verification will continue.",
+  DEFAULT: "An error occurred while verifying membership.",
+};
 
 function ProfilePageGuard({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -119,30 +62,58 @@ interface ProfilePageProps {
 }
 
 const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
-  const membership = useContext(MembershipContext);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const membership = useMembershipContext();
   const {
     isLoading: membershipLoading,
     error: membershipError,
     membershipDetails,
     walletAddress,
     walletType,
-  } = membership || {};
+    refetch: refetchMembership,
+  } = membership;
+
+  const tabParam = searchParams.get("tab");
+  const initialTab = isValidProfileTab(tabParam) ? tabParam : "Uploads";
+  const [activeTab, setActiveTab] = useState<ProfileTab>(initialTab);
+
+  useEffect(() => {
+    if (isValidProfileTab(tabParam)) {
+      setActiveTab(tabParam);
+    }
+  }, [tabParam]);
 
   // Use targetAddress if provided, otherwise use the membership walletAddress
   const displayAddress = targetAddress || walletAddress;
 
-  const {
-    data: memberships,
-    loading,
-    error: serverMembershipError,
-  } = useServerMembership(displayAddress);
+  const handleTabChange = (value: string) => {
+    if (!isValidProfileTab(value)) return;
+    setActiveTab(value);
+    if (!displayAddress) return;
+    const params = new URLSearchParams();
+    if (value !== "Uploads") {
+      params.set("tab", value);
+    }
+    const query = params.toString();
+    router.replace(
+      `/profile/${displayAddress}${query ? `?${query}` : ""}`,
+      { scroll: false }
+    );
+  };
 
-  // Find the first valid membership
+  const switchToBankTab = () => {
+    handleTabChange("Bank");
+  };
+
   const validMembership = (
     membershipDetails as MembershipDetails[] | undefined
   )?.find((m: MembershipDetails) => m.isValid);
 
-  if (loading) return <div>Loading...</div>;
+  const membershipErrorMessage = membershipError
+    ? MEMBERSHIP_ERROR_MESSAGES[membershipError.code] ??
+      MEMBERSHIP_ERROR_MESSAGES.DEFAULT
+    : null;
 
   return (
     <ProfilePageGuard>
@@ -159,7 +130,7 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
             />
           </div>
         )}
-        <Tabs defaultValue="Uploads" className="w-full">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
           <TabsList className="flex h-auto min-h-10 w-full items-start justify-start gap-1 rounded-lg bg-muted p-1 overflow-x-auto">
             <TabsTrigger
               value="Uploads"
@@ -249,14 +220,19 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
 
             {/* Membership Tab Content */}
             <TabsContent value="Membership">
-              {serverMembershipError ? (
+              {membershipLoading ? (
+                <div className="space-y-4">
+                  <Skeleton className="h-8 w-48" />
+                  <Skeleton className="h-32 w-full" />
+                  <Skeleton className="h-64 w-full" />
+                </div>
+              ) : membershipErrorMessage ? (
                 <Alert variant="destructive" className="mb-4">
                   <FaExclamationTriangle className="h-4 w-4" />
-                  <AlertTitle>Membership lookup failed</AlertTitle>
-                  <AlertDescription>{serverMembershipError}</AlertDescription>
+                  <AlertTitle>Membership verification failed</AlertTitle>
+                  <AlertDescription>{membershipErrorMessage}</AlertDescription>
                 </Alert>
-              ) : null}
-              {validMembership ? (
+              ) : validMembership ? (
                 <Card>
                   <CardHeader className="space-y-1">
                     <CardTitle className="text-2xl">Membership</CardTitle>
@@ -275,7 +251,7 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
                             Active
                           </span>
                         </div>
-                        {validMembership.expiration && validMembership.expiration < 32503680000 ? (
+                        {validMembership.expiration && validMembership.expiration < LIFETIME_EXPIRATION_THRESHOLD ? (
                           <div className="space-y-1">
                             <p className="text-sm text-muted-foreground">
                               Expires on {new Date(validMembership.expiration * 1000).toLocaleDateString(undefined, {
@@ -298,7 +274,7 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
                           </div>
                         ) : (
                           <p className="text-sm text-muted-foreground">
-                            Lifetime Membership
+                            Lifetime / Never expires
                           </p>
                         )}
                       </div>
@@ -323,32 +299,27 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
                           <CancelMembershipButton
                             lockAddress={validMembership.address}
                             tokenId={validMembership.tokenId}
+                            onSuccess={refetchMembership}
                           />
                         )}
                       </div>
                     </div>
 
                     <div id="membership-renewal-options" className="space-y-4 pt-4 border-t">
-                      <h3 className="text-lg font-medium">Renewal Options</h3>
+                      <h3 className="text-lg font-medium">Upgrade or Renew</h3>
                       <MembershipHome
-                        setActiveTab={(tab) => {
-                          if (tab === "fund") {
-                            const bankTrigger = document.querySelector('[value="Bank"]') as HTMLElement;
-                            if (bankTrigger) bankTrigger.click();
-                          }
-                        }}
+                        currentMembershipAddress={validMembership.address}
+                        onPurchaseSuccess={refetchMembership}
+                        onSwitchToBankTab={switchToBankTab}
                       />
                     </div>
                   </CardContent>
                 </Card>
               ) : (
-                <MembershipHome setActiveTab={(tab) => {
-                  if (tab === "fund") {
-                    // Switch to Bank tab if funding is needed
-                    const bankTrigger = document.querySelector('[value="Bank"]') as HTMLElement;
-                    if (bankTrigger) bankTrigger.click();
-                  }
-                }} />
+                <MembershipHome
+                  onPurchaseSuccess={refetchMembership}
+                  onSwitchToBankTab={switchToBankTab}
+                />
               )}
             </TabsContent>
           </div>
