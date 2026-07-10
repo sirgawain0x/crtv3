@@ -19,10 +19,18 @@ import {
   Sparkles,
   Shield,
   ShoppingCart,
+  Wallet,
 } from "lucide-react";
 import { useWalletAuth } from "@/lib/auth/useWalletAuth";
 import { useAuthModal, useUser } from "@/lib/wallet/react";
+import { useSmartAccountClient } from "@/lib/wallet/react";
 import { logger } from "@/lib/utils/logger";
+import { HallidayOnramp } from "@/components/songchain/HallidayOnramp";
+import {
+  buildHallidayInputAssets,
+  buildHallidayStoryOutputAsset,
+  isHallidaySandboxEnabled,
+} from "@/lib/songchain/halliday";
 
 interface LicenseTerms {
   transferable: boolean;
@@ -53,9 +61,16 @@ export function LicensePurchaseDialog({
   open,
   onOpenChange,
 }: LicensePurchaseDialogProps) {
-  const { user } = useUser();
+  const user = useUser();
   const { openAuthModal } = useAuthModal();
   const { getAuthHeaders, address } = useWalletAuth();
+  const { client: smartAccountClient } = useSmartAccountClient({});
+
+  // Halliday onramp config for $DATA/IP purchase
+  const hallidayApiKey = process.env.NEXT_PUBLIC_HALLIDAY_API_KEY?.trim() || null;
+  const hallidayOutputAsset = buildHallidayStoryOutputAsset();
+  const hallidayInputAssets = buildHallidayInputAssets();
+  const hallidaySandbox = isHallidaySandboxEnabled();
 
   const [terms, setTerms] = useState<LicenseTerms | null>(null);
   const [loadingTerms, setLoadingTerms] = useState(false);
@@ -308,32 +323,56 @@ export function LicensePurchaseDialog({
 
           {/* Action buttons */}
           {!success && (
-            <div className="flex gap-3">
-              <Button
-                onClick={handleMint}
-                disabled={minting || loadingTerms || !terms}
-                className="flex-1"
-              >
-                {minting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Minting License...
-                  </>
-                ) : (
-                  <>
-                    <ShoppingCart className="mr-2 h-4 w-4" />
-                    Buy License
-                  </>
-                )}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                disabled={minting}
-              >
-                Cancel
-              </Button>
-            </div>
+            <>
+              {/* Halliday onramp: show when minting fee > 0 so users can buy $DATA */}
+              {terms && BigInt(terms.defaultMintingFee || "0") > 0n && hallidayApiKey && (
+                <div className="space-y-2 pt-2 border-t">
+                  <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                    <Wallet className="h-3.5 w-3.5" />
+                    Need $DATA to pay the minting fee? Buy with debit/credit:
+                  </p>
+                  <HallidayOnramp
+                    variant="story"
+                    hallidayApiKey={hallidayApiKey}
+                    hallidayOutputAsset={hallidayOutputAsset}
+                    hallidayInputAssets={hallidayInputAssets}
+                    hallidaySandbox={hallidaySandbox}
+                    destinationAddressOverride={
+                      smartAccountClient?.account?.address ?? address ?? null
+                    }
+                    lazyInit
+                    hideLensBlockedMessage
+                  />
+                </div>
+              )}
+
+              <div className="flex gap-3">
+                <Button
+                  onClick={handleMint}
+                  disabled={minting || loadingTerms || !terms}
+                  className="flex-1"
+                >
+                  {minting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Minting License...
+                    </>
+                  ) : (
+                    <>
+                      <ShoppingCart className="mr-2 h-4 w-4" />
+                      Buy License
+                    </>
+                  )}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => onOpenChange(false)}
+                  disabled={minting}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </>
           )}
 
           {/* Success: Creative Pixels CTA */}

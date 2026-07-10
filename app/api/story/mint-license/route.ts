@@ -125,8 +125,8 @@ export async function POST(request: NextRequest) {
     // (funding wallet pays). Free terms keep maxMintingFee at 0.
     let maxMintingFee = 0n;
     try {
-      const terms = await client.license.getLicenseTerms(termsId);
-      const fee = terms.defaultMintingFee;
+      const termsResponse = await client.license.getLicenseTerms(termsId);
+      const fee = termsResponse.terms.defaultMintingFee;
       if (fee !== undefined && fee !== null) {
         maxMintingFee = typeof fee === "bigint" ? fee : BigInt(fee);
       }
