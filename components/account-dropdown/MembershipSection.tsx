@@ -165,7 +165,7 @@ export function MembershipSection({
           <LockKeyhole className="h-4 w-4" />
           <span>No active membership</span>
         </div>
-        <BuyMembershipCta onNavigate={onNavigate} />
+        <BuyMembershipCta profileAddress={profileAddress} onNavigate={onNavigate} />
       </div>
     );
   }
