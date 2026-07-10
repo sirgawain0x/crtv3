@@ -3,8 +3,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { NextPage } from "next";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState, useEffect, useContext, type ReactNode } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useState, useEffect, type ReactNode } from "react";
 import { useUser } from "@/lib/wallet/react";
 import { userToAccount } from "@/lib/types/account";
 import { ListUploadedAssets } from "@/components/UserProfile/list-uploaded-assets/ListUploadedAssets";
@@ -19,9 +19,7 @@ import {
 import MemberCard from "./MemberCard";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { FaExclamationTriangle } from "react-icons/fa";
-import {
-  MembershipContext,
-} from "@/components/auth/MembershipGuard";
+import { useMembershipContext } from "@/lib/context/MembershipContext";
 import type { MembershipDetails } from "@/lib/hooks/unlock/useMembershipVerification";
 import { MeTokensSection } from "./MeTokensSection";
 import { UserDisplay } from "@/components/User/UserDisplay";
@@ -30,6 +28,9 @@ import { MembershipHome } from "@/components/memberships/MembershipHome";
 import { logger } from '@/lib/utils/logger';
 import { CancelMembershipButton } from "./CancelMembershipButton";
 import { getPassDisplayName } from "@/lib/access/membership-labels";
+import { isValidProfileTab, type ProfileTab } from "@/lib/utils/profile-urls";
+
+const LIFETIME_EXPIRATION_THRESHOLD = 32503680000;
 
 
 function useServerMembership(address?: string) {
@@ -119,17 +120,49 @@ interface ProfilePageProps {
 }
 
 const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
-  const membership = useContext(MembershipContext);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const membership = useMembershipContext();
   const {
     isLoading: membershipLoading,
     error: membershipError,
     membershipDetails,
     walletAddress,
     walletType,
-  } = membership || {};
+    refetch: refetchMembership,
+  } = membership;
+
+  const tabParam = searchParams.get("tab");
+  const initialTab = isValidProfileTab(tabParam) ? tabParam : "Uploads";
+  const [activeTab, setActiveTab] = useState<ProfileTab>(initialTab);
+
+  useEffect(() => {
+    if (isValidProfileTab(tabParam)) {
+      setActiveTab(tabParam);
+    }
+  }, [tabParam]);
 
   // Use targetAddress if provided, otherwise use the membership walletAddress
   const displayAddress = targetAddress || walletAddress;
+
+  const handleTabChange = (value: string) => {
+    if (!isValidProfileTab(value)) return;
+    setActiveTab(value);
+    if (!displayAddress) return;
+    const params = new URLSearchParams();
+    if (value !== "Uploads") {
+      params.set("tab", value);
+    }
+    const query = params.toString();
+    router.replace(
+      `/profile/${displayAddress}${query ? `?${query}` : ""}`,
+      { scroll: false }
+    );
+  };
+
+  const switchToBankTab = () => {
+    handleTabChange("Bank");
+  };
 
   const {
     data: memberships,
@@ -159,7 +192,7 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
             />
           </div>
         )}
-        <Tabs defaultValue="Uploads" className="w-full">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
           <TabsList className="flex h-auto min-h-10 w-full items-start justify-start gap-1 rounded-lg bg-muted p-1 overflow-x-auto">
             <TabsTrigger
               value="Uploads"
@@ -275,7 +308,7 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
                             Active
                           </span>
                         </div>
-                        {validMembership.expiration && validMembership.expiration < 32503680000 ? (
+                        {validMembership.expiration && validMembership.expiration < LIFETIME_EXPIRATION_THRESHOLD ? (
                           <div className="space-y-1">
                             <p className="text-sm text-muted-foreground">
                               Expires on {new Date(validMembership.expiration * 1000).toLocaleDateString(undefined, {
@@ -298,7 +331,7 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
                           </div>
                         ) : (
                           <p className="text-sm text-muted-foreground">
-                            Lifetime Membership
+                            Lifetime / Never expires
                           </p>
                         )}
                       </div>
@@ -323,32 +356,27 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
                           <CancelMembershipButton
                             lockAddress={validMembership.address}
                             tokenId={validMembership.tokenId}
+                            onSuccess={refetchMembership}
                           />
                         )}
                       </div>
                     </div>
 
                     <div id="membership-renewal-options" className="space-y-4 pt-4 border-t">
-                      <h3 className="text-lg font-medium">Renewal Options</h3>
+                      <h3 className="text-lg font-medium">Upgrade or Renew</h3>
                       <MembershipHome
-                        setActiveTab={(tab) => {
-                          if (tab === "fund") {
-                            const bankTrigger = document.querySelector('[value="Bank"]') as HTMLElement;
-                            if (bankTrigger) bankTrigger.click();
-                          }
-                        }}
+                        currentMembershipAddress={validMembership.address}
+                        onPurchaseSuccess={refetchMembership}
+                        onSwitchToBankTab={switchToBankTab}
                       />
                     </div>
                   </CardContent>
                 </Card>
               ) : (
-                <MembershipHome setActiveTab={(tab) => {
-                  if (tab === "fund") {
-                    // Switch to Bank tab if funding is needed
-                    const bankTrigger = document.querySelector('[value="Bank"]') as HTMLElement;
-                    if (bankTrigger) bankTrigger.click();
-                  }
-                }} />
+                <MembershipHome
+                  onPurchaseSuccess={refetchMembership}
+                  onSwitchToBankTab={switchToBankTab}
+                />
               )}
             </TabsContent>
           </div>

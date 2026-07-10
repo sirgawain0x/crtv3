@@ -5,10 +5,12 @@ import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMembershipContext } from "../../lib/context/MembershipContext";
 import { type MembershipDetails } from "../../lib/hooks/unlock/useMembershipVerification";
+import { getProfileMembershipUrl } from "@/lib/utils/profile-urls";
+import { useSmartAccountClient, useUser } from "@/lib/wallet/react";
+import useModularAccount from "@/lib/hooks/accountkit/useModularAccount";
 import { LoginWithEthereumButton } from "@/components/auth/LoginWithEthereumButton";
 import { LockKeyhole, ShieldCheck, ShieldX, AlertTriangle, Calendar, ExternalLink } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useUser } from "@/lib/wallet/react";
 import { getPassDisplayName } from "../../lib/access/membership-labels";
 
 function formatExpiration(expiration?: number): string {
@@ -50,19 +52,35 @@ interface MembershipSectionProps {
 }
 
 function BuyMembershipCta({
+  profileAddress,
   className,
   onNavigate,
 }: {
+  profileAddress?: string;
   className?: string;
   onNavigate?: () => void;
 }) {
+  if (!profileAddress) {
+    return (
+      <div className={`space-y-2 ${className || ""}`}>
+        <p className="text-xs text-muted-foreground">
+          Connect your wallet to view pricing and purchase memberships.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className={`space-y-2 ${className || ""}`}>
       <p className="text-xs text-muted-foreground">
         View pricing and purchase Unlock memberships on Base with USDC.
       </p>
       <Button asChild className="w-full bg-black hover:bg-gray-900 text-white">
-        <Link href="/memberships" className="w-full" onClick={onNavigate}>
+        <Link
+          href={getProfileMembershipUrl(profileAddress)}
+          className="w-full"
+          onClick={onNavigate}
+        >
           Buy Membership
         </Link>
       </Button>
@@ -75,8 +93,13 @@ export function MembershipSection({
   onNavigate,
 }: MembershipSectionProps) {
   const user = useUser();
-  const { isVerified, hasMembership, isLoading, error, membershipDetails } =
+  const { address: scaAddress } = useSmartAccountClient({});
+  const { account } = useModularAccount();
+  const { isVerified, hasMembership, isLoading, error, membershipDetails, walletAddress } =
     useMembershipContext();
+
+  const profileAddress =
+    walletAddress || account?.address || scaAddress || user?.address;
 
   if (isLoading) {
     return (
@@ -103,7 +126,7 @@ export function MembershipSection({
           <AlertDescription>{errorMessage}</AlertDescription>
         </Alert>
         {user ? (
-          <BuyMembershipCta onNavigate={onNavigate} />
+          <BuyMembershipCta profileAddress={profileAddress} onNavigate={onNavigate} />
         ) : (
           <LoginWithEthereumButton />
         )}
@@ -119,7 +142,7 @@ export function MembershipSection({
             <ShieldX className="h-4 w-4" />
             <span>No active membership</span>
           </div>
-          <BuyMembershipCta onNavigate={onNavigate} />
+          <BuyMembershipCta profileAddress={profileAddress} onNavigate={onNavigate} />
         </div>
       );
     }
@@ -185,8 +208,11 @@ export function MembershipSection({
                 </div>
                 <div className="flex items-center gap-2">
                   <Button asChild variant="outline" size="sm" className="gap-1">
-                    <Link href="/memberships" onClick={onNavigate}>
-                      View Memberships
+                    <Link
+                      href={profileAddress ? getProfileMembershipUrl(profileAddress) : "#"}
+                      onClick={onNavigate}
+                    >
+                      Manage Membership
                       <ExternalLink className="h-3 w-3" />
                     </Link>
                   </Button>
