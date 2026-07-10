@@ -63,6 +63,8 @@ export interface MeTokenCreationState {
   txHash?: string;
   meTokenAddress?: string;
   meTokenId?: string;
+  name?: string;
+  symbol?: string;
   error?: string;
 }
 
@@ -311,7 +313,42 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
           errorMessage.includes('initCode') ||
           errorMessage.includes('account not deployed');
 
-        if (isDeploymentError && meTokenGas.context) {
+        // If the batched approve+subscribe reverts, retry with 0 initial deposit.
+        // The approve+subscribe in a single UserOp can fail because the MeToken
+        // contract's transferFrom may not see the approval within the same batch.
+        // Retrying with 0 deposit creates the token; user can deposit later.
+        const isExecutionRevert =
+          errorMessage.includes('execution reverted') ||
+          errorMessage.includes('0x') && depositAmount > BigInt(0);
+
+        if (isExecutionRevert && depositAmount > BigInt(0)) {
+          logger.debug('🔄 Batched approve+subscribe reverted — retrying with 0 initial deposit...');
+          updateState({
+            status: 'creating_metoken',
+            message: 'Retrying without initial deposit (you can deposit later)...',
+            progress: 45,
+          });
+
+          const zeroDepositCalls = buildMeTokenCreationCalls({
+            collateral,
+            vaultAddress,
+            name,
+            symbol,
+            hubId,
+            depositAmount: BigInt(0),
+          });
+
+          try {
+            operation = await sendMeTokenCreationUserOp({
+              client,
+              calls: zeroDepositCalls,
+              gas: meTokenGas,
+              ethFallback: () => getGasContext('eth'),
+            });
+          } catch (retryError) {
+            throw retryError;
+          }
+        } else if (isDeploymentError && meTokenGas.context) {
           logger.debug('⚠️ Account deployment required — retrying without paymaster...');
           const ethBalance = await getEthBalance(address as `0x${string}`);
           const minGasEth = parseEther('0.001');
@@ -487,6 +524,8 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
           txHash: txHash || undefined,
           meTokenAddress,
           meTokenId,
+          name,
+          symbol,
         });
 
         return;
@@ -499,6 +538,8 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
           progress: 100,
           userOpHash: operation.hash,
           txHash,
+          name,
+          symbol,
         });
       } else {
         updateState({

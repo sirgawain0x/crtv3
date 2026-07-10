@@ -162,9 +162,11 @@ export function RobustMeTokenCreator({ onMeTokenCreated, onClose }: RobustMeToke
   // Handle successful creation
   useEffect(() => {
     if (state.status === 'success' && state.meTokenAddress) {
+      const tokenName = state.name || name;
+      const tokenSymbol = state.symbol || symbol;
       toast({
         title: 'MeToken Created Successfully!',
-        description: `Your MeToken "${name}" (${symbol}) is ready for trading.`,
+        description: `Your MeToken "${tokenName}" (${tokenSymbol}) is ready for trading.`,
       });
 
       onMeTokenCreated?.(state.meTokenAddress, state.txHash, state.meTokenId);
@@ -181,6 +183,8 @@ export function RobustMeTokenCreator({ onMeTokenCreated, onClose }: RobustMeToke
     state.meTokenAddress,
     state.txHash,
     state.meTokenId,
+    state.name,
+    state.symbol,
     name,
     symbol,
     toast,
