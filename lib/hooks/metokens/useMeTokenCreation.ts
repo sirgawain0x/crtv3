@@ -458,7 +458,7 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
       }
 
       // Build subscribe-only calls (approve already done separately if deposit > 0)
-      const calls = buildMeTokenCreationCalls({
+      let calls = buildMeTokenCreationCalls({
         collateral,
         vaultAddress,
         name,
@@ -466,6 +466,12 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
         hubId,
         depositAmount,
       });
+
+      // If we already sent a separate approve, filter it out to avoid
+      // sending a redundant approve+subscribe batch (bundler sync issue)
+      if (depositAmount > BigInt(0)) {
+        calls = calls.filter(call => call.target !== collateral.address);
+      }
 
       logger.debug('📤 MeToken creation gas context:', {
         policyId: meTokenGas.policyId,
