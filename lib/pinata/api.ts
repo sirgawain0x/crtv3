@@ -2,8 +2,10 @@
  * Server-only Pinata Agents API client.
  *
  * Endpoints we use:
- *  - `GET /v0/templates/id/{templateId}` (PINATA_JWT) — org template metadata
- *    for the Creative AI Digital Twin onboarding card + snapshotCid.
+ *  - `GET /v0/templates/id/{templateId}` / `GET /v0/templates/{slug}`
+ *    (PINATA_JWT) — org template metadata for the Creative AI Digital Twin
+ *    onboarding card + snapshotCid (id `tmernpdi`, slug
+ *    `creative-ai-digital-twin`).
  *  - `GET /v0/public-templates` (no auth) — marketplace fallback if the org
  *    template is later published under CREATIVE_TWIN_TEMPLATE_SLUG.
  *  - `GET /v0/agents/{agentId}` (Pinata JWT) — fetch the agent's name + the
@@ -260,13 +262,38 @@ export async function getTemplateById(
   jwt?: string,
 ): Promise<PinataTemplate | null> {
   if (!templateId) return null;
+  return fetchAuthenticatedTemplate(
+    `/v0/templates/id/${encodeURIComponent(templateId)}`,
+    jwt,
+  );
+}
+
+/**
+ * Fetch a template by slug (e.g. `creative-ai-digital-twin`).
+ * Requires PINATA_JWT for org/unpublished templates.
+ */
+export async function getTemplateBySlug(
+  slug: string,
+  jwt?: string,
+): Promise<PinataTemplate | null> {
+  if (!slug) return null;
+  return fetchAuthenticatedTemplate(
+    `/v0/templates/${encodeURIComponent(slug)}`,
+    jwt,
+  );
+}
+
+async function fetchAuthenticatedTemplate(
+  path: string,
+  jwt?: string,
+): Promise<PinataTemplate | null> {
   const token = jwt?.trim() || process.env.PINATA_JWT?.trim();
   if (!token) return null;
   try {
-    const data = await pinataFetch<unknown>(
-      `/v0/templates/id/${encodeURIComponent(templateId)}`,
-      { jwt: token, method: "GET" },
-    );
+    const data = await pinataFetch<unknown>(path, {
+      jwt: token,
+      method: "GET",
+    });
     return normalizeTemplate(data);
   } catch (err) {
     if (
@@ -283,9 +310,9 @@ export async function getTemplateById(
 }
 
 /**
- * Resolve the Creative Twin *template* (not a deployed agent). Prefers the
- * org template ID via PINATA_JWT, then public marketplace slug, then a
- * static fallback so the deploy CTA still points at tmernpdi.
+ * Resolve the Creative Twin *template* (not a deployed agent). Prefers org
+ * template ID, then slug `creative-ai-digital-twin` (auth + public catalog),
+ * then a static fallback so the deploy CTA still points at tmernpdi.
  */
 export async function findCreativeTwinTemplate(): Promise<PinataTemplate | null> {
   const now = Date.now();
@@ -294,7 +321,9 @@ export async function findCreativeTwinTemplate(): Promise<PinataTemplate | null>
   }
 
   let template =
-    (await getTemplateById(CREATIVE_TWIN_TEMPLATE_ID).catch(() => null)) ?? null;
+    (await getTemplateById(CREATIVE_TWIN_TEMPLATE_ID).catch(() => null)) ??
+    (await getTemplateBySlug(CREATIVE_TWIN_TEMPLATE_SLUG).catch(() => null)) ??
+    null;
 
   if (!template) {
     const all = await listPublicTemplates().catch(() => [] as PinataTemplate[]);
