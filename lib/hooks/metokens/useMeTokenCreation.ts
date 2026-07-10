@@ -28,6 +28,12 @@ import {
 import { logger } from '@/lib/utils/logger';
 import { appendBuilderCode } from "@/lib/utils/builder-code";
 import { METOKEN_DIAMOND_BASE, METOKEN_FACTORY_BASE } from '@/lib/contracts/metokens/deployments';
+import {
+  publicClient,
+  getErc20Balance,
+  getErc20Allowance,
+  getEthBalance,
+} from '@/lib/viem';
 
 
 // MeTokens contract addresses on Base
@@ -249,43 +255,41 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
           for (const meToken of allMeTokens) {
             try {
               // Verify ownership via Diamond contract
-              if (client) {
-                const info = await client.readContract({
-                  address: DIAMOND,
-                  abi: [{
-                    inputs: [{ internalType: 'address', name: 'meToken', type: 'address' }],
-                    name: 'getMeTokenInfo',
-                    outputs: [{
-                      components: [
-                        { internalType: 'address', name: 'owner', type: 'address' },
-                        { internalType: 'uint256', name: 'hubId', type: 'uint256' },
-                        { internalType: 'uint256', name: 'balancePooled', type: 'uint256' },
-                        { internalType: 'uint256', name: 'balanceLocked', type: 'uint256' },
-                        { internalType: 'uint256', name: 'startTime', type: 'uint256' },
-                        { internalType: 'uint256', name: 'endTime', type: 'uint256' },
-                        { internalType: 'uint256', name: 'targetHubId', type: 'uint256' },
-                        { internalType: 'address', name: 'migration', type: 'address' }
-                      ],
-                      internalType: 'struct MeTokenInfo',
-                      name: '',
-                      type: 'tuple'
-                    }],
-                    stateMutability: 'view',
-                    type: 'function'
+              const info = await publicClient.readContract({
+                address: DIAMOND,
+                abi: [{
+                  inputs: [{ internalType: 'address', name: 'meToken', type: 'address' }],
+                  name: 'getMeTokenInfo',
+                  outputs: [{
+                    components: [
+                      { internalType: 'address', name: 'owner', type: 'address' },
+                      { internalType: 'uint256', name: 'hubId', type: 'uint256' },
+                      { internalType: 'uint256', name: 'balancePooled', type: 'uint256' },
+                      { internalType: 'uint256', name: 'balanceLocked', type: 'uint256' },
+                      { internalType: 'uint256', name: 'startTime', type: 'uint256' },
+                      { internalType: 'uint256', name: 'endTime', type: 'uint256' },
+                      { internalType: 'uint256', name: 'targetHubId', type: 'uint256' },
+                      { internalType: 'address', name: 'migration', type: 'address' }
+                    ],
+                    internalType: 'struct MeTokenInfo',
+                    name: '',
+                    type: 'tuple'
                   }],
-                  functionName: 'getMeTokenInfo',
-                  args: [meToken.id as `0x${string}`],
-                }) as { owner: string };
+                  stateMutability: 'view',
+                  type: 'function'
+                }],
+                functionName: 'getMeTokenInfo',
+                args: [meToken.id as `0x${string}`],
+              }) as { owner: string };
 
-                if (info.owner.toLowerCase() === tx.creatorAddress.toLowerCase()) {
-                  logger.debug('✅ Found MeToken via polling:', meToken.id);
-                  if (pollingRef.current) {
-                    clearInterval(pollingRef.current);
-                    pollingRef.current = null;
-                  }
-                  resolve(meToken.id);
-                  return;
+              if (info.owner.toLowerCase() === tx.creatorAddress.toLowerCase()) {
+                logger.debug('✅ Found MeToken via polling:', meToken.id);
+                if (pollingRef.current) {
+                  clearInterval(pollingRef.current);
+                  pollingRef.current = null;
                 }
+                resolve(meToken.id);
+                return;
               }
             } catch (err) {
               // Continue checking other tokens
@@ -317,16 +321,14 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
       // Also poll immediately
       poll();
     });
-  }, [client]);
+  }, []);
 
   /**
    * Get vault address for a hub
    */
   const getVaultAddress = useCallback(async (hubId: number): Promise<string | null> => {
-    if (!client) return null;
-
     try {
-      const hubInfo = await client.readContract({
+      const hubInfo = await publicClient.readContract({
         address: DIAMOND,
         abi: HUB_INFO_ABI,
         functionName: 'getHubInfo',
@@ -338,7 +340,7 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
       logger.error('Failed to get vault address:', err);
       return null;
     }
-  }, [client]);
+  }, []);
 
   /**
    * Approve the selected hub's collateral token for a spender.
@@ -356,12 +358,11 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
     };
 
     // Check current allowance
-    const currentAllowance = await client.readContract({
-      address: tokenContract.address,
-      abi: tokenContract.abi,
-      functionName: 'allowance',
-      args: [address as `0x${string}`, spender as `0x${string}`],
-    }) as bigint;
+    const currentAllowance = await getErc20Allowance({
+      token: tokenContract.address,
+      owner: address as `0x${string}`,
+      spender: spender as `0x${string}`,
+    });
 
     if (currentAllowance >= amount) {
       logger.debug(`✅ Sufficient ${asset.symbol} allowance already exists`);
@@ -414,12 +415,11 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
     for (let i = 0; i < 5; i++) {
       await new Promise(resolve => setTimeout(resolve, 2000 + i * 1000));
 
-      const newAllowance = await client.readContract({
-        address: tokenContract.address,
-        abi: tokenContract.abi,
-        functionName: 'allowance',
-        args: [address as `0x${string}`, spender as `0x${string}`],
-      }) as bigint;
+      const newAllowance = await getErc20Allowance({
+        token: tokenContract.address,
+        owner: address as `0x${string}`,
+        spender: spender as `0x${string}`,
+      });
 
       if (newAllowance >= amount) {
         verified = true;
@@ -468,12 +468,10 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
       if (depositAmount > BigInt(0)) {
         const tokenContract = getHubErc20Contract(hubId);
 
-        const balance = await client.readContract({
-          address: tokenContract.address,
-          abi: tokenContract.abi,
-          functionName: 'balanceOf',
-          args: [address as `0x${string}`],
-        }) as bigint;
+        const balance = await getErc20Balance({
+          token: tokenContract.address,
+          owner: address as `0x${string}`,
+        });
 
         if (balance < depositAmount) {
           throw new Error(
@@ -564,7 +562,7 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
           logger.debug('⚠️ Account deployment detected. Paymasters cannot sponsor deployment transactions. Retrying without paymaster...');
 
           // Check ETH balance before deploying without paymaster
-          const ethBalance = await client.getBalance({ address });
+          const ethBalance = await getEthBalance(address as `0x${string}`);
           const minGasEth = parseEther('0.001');
 
           if (ethBalance < minGasEth) {
@@ -633,7 +631,7 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
 
           // For non-members: USDC paymaster failed, try ETH fallback
           // Only check ETH balance if we're going to retry with ETH
-          const ethBalance = await client.getBalance({ address });
+          const ethBalance = await getEthBalance(address as `0x${string}`);
           const minGasEth = parseEther('0.001');
 
           if (ethBalance < minGasEth) {

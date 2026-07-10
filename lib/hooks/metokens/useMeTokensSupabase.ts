@@ -20,6 +20,7 @@ import { useWalletAuth } from '@/lib/auth/useWalletAuth';
 import { logger } from '@/lib/utils/logger';
 import { appendBuilderCode } from "@/lib/utils/builder-code";
 import { METOKEN_DIAMOND_BASE, METOKEN_FACTORY_BASE } from '@/lib/contracts/metokens/deployments';
+import { publicClient } from '@/lib/viem';
 
 // MeTokens contract addresses on Base
 const METOKEN_FACTORY = METOKEN_FACTORY_BASE;
@@ -131,7 +132,7 @@ export function useMeTokensSupabase(targetAddress?: string) {
     try {
       if (client) {
         logger.debug('🔍 Fetching user balance for MeToken:', supabaseMeToken.address);
-        userBalance = await client.readContract({
+        userBalance = await publicClient.readContract({
           address: supabaseMeToken.address as `0x${string}`,
           abi: ERC20_ABI,
           functionName: 'balanceOf',
@@ -166,7 +167,7 @@ export function useMeTokensSupabase(targetAddress?: string) {
         logger.debug('🔍 Fetching fresh contract data for MeToken:', supabaseMeToken.address);
 
         // Fetch total supply
-        const supplyData = await client.readContract({
+        const supplyData = await publicClient.readContract({
           address: supabaseMeToken.address as `0x${string}`,
           abi: ERC20_ABI,
           functionName: 'totalSupply',
@@ -174,7 +175,7 @@ export function useMeTokensSupabase(targetAddress?: string) {
         currentTotalSupply = supplyData;
 
         // Fetch MeToken Info from Diamond
-        const infoData = await client.readContract({
+        const infoData = await publicClient.readContract({
           address: DIAMOND,
           abi: METOKEN_ABI,
           functionName: 'getMeTokenInfo',
@@ -245,9 +246,9 @@ export function useMeTokensSupabase(targetAddress?: string) {
             const contractAddress = latestToken.id as `0x${string}`;
 
             const [name, symbol, totalSupply] = await Promise.all([
-              client.readContract({ address: contractAddress, abi: ERC20_ABI, functionName: 'name' }),
-              client.readContract({ address: contractAddress, abi: ERC20_ABI, functionName: 'symbol' }),
-              client.readContract({ address: contractAddress, abi: ERC20_ABI, functionName: 'totalSupply' })
+              publicClient.readContract({ address: contractAddress, abi: ERC20_ABI, functionName: 'name' }),
+              publicClient.readContract({ address: contractAddress, abi: ERC20_ABI, functionName: 'symbol' }),
+              publicClient.readContract({ address: contractAddress, abi: ERC20_ABI, functionName: 'totalSupply' })
             ]) as [string, string, bigint];
 
             // Get fresh info from Diamond for pooled/locked
@@ -265,7 +266,7 @@ export function useMeTokensSupabase(targetAddress?: string) {
 
             // Try to refresh info from contract if possible
             try {
-              const infoData = await client.readContract({
+              const infoData = await publicClient.readContract({
                 address: DIAMOND,
                 abi: METOKEN_ABI,
                 functionName: 'getMeTokenInfo',
@@ -294,7 +295,7 @@ export function useMeTokensSupabase(targetAddress?: string) {
             // Get user balance
             let userBalance = BigInt(0);
             try {
-              userBalance = await client.readContract({
+              userBalance = await publicClient.readContract({
                 address: contractAddress,
                 abi: ERC20_ABI,
                 functionName: 'balanceOf',
@@ -494,7 +495,7 @@ export function useMeTokensSupabase(targetAddress?: string) {
 
     // Check if smart account is deployed
     try {
-      const code = await client.getCode({ address: address as `0x${string}` });
+      const code = await publicClient.getCode({ address: address as `0x${string}` });
       logger.debug('🏗️ Smart account deployment status:', {
         address: address,
         hasCode: code !== '0x',
@@ -548,7 +549,7 @@ export function useMeTokensSupabase(targetAddress?: string) {
 
         let collateralBalance: bigint;
         try {
-          collateralBalance = await client.readContract({
+          collateralBalance = await publicClient.readContract({
             address: collateralContract.address as `0x${string}`,
             abi: collateralContract.abi,
             functionName: 'balanceOf',
@@ -573,7 +574,7 @@ export function useMeTokensSupabase(targetAddress?: string) {
           if (user?.address && user.address !== address) {
             logger.debug(`🔍 Smart account has no ${hubAsset.symbol}, checking EOA balance...`);
             try {
-              const eoaBalance = await client.readContract({
+              const eoaBalance = await publicClient.readContract({
                 address: collateralContract.address as `0x${string}`,
                 abi: collateralContract.abi,
                 functionName: 'balanceOf',
@@ -607,7 +608,7 @@ export function useMeTokensSupabase(targetAddress?: string) {
         logger.debug('🔍 Fetching Vault address for Hub ID:', hubId);
         let vaultAddress: string | null = null;
         try {
-          const hubInfo = await client.readContract({
+          const hubInfo = await publicClient.readContract({
             address: DIAMOND,
             abi: METOKEN_ABI,
             functionName: 'getHubInfo',
@@ -640,7 +641,7 @@ export function useMeTokensSupabase(targetAddress?: string) {
         if (vaultAddress) {
           // Check current allowance for vault (the actual spender)
           logger.debug('🔍 Checking DAI allowance for vault...');
-          const currentAllowance = await client.readContract({
+          const currentAllowance = await publicClient.readContract({
             address: daiContract.address as `0x${string}`,
             abi: daiContract.abi,
             functionName: 'allowance',
@@ -739,7 +740,7 @@ export function useMeTokensSupabase(targetAddress?: string) {
 
               try {
                 // Verify the approval was successful
-                newAllowance = await client.readContract({
+                newAllowance = await publicClient.readContract({
                   address: daiContract.address as `0x${string}`,
                   abi: daiContract.abi,
                   functionName: 'allowance',
@@ -789,7 +790,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         // 3b. ALSO Check/Approve DAI for the DIAMOND (Just in case Diamond calls transferFrom directly)
         // This covers the case where Diamond is the spender, or Vault is the spender.
         logger.debug('🔍 Checking DAI allowance for DIAMOND (fallback)...');
-        const diamondAllowance = await client.readContract({
+        const diamondAllowance = await publicClient.readContract({
           address: daiContract.address as `0x${string}`,
           abi: daiContract.abi,
           functionName: 'allowance',
@@ -870,7 +871,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
 
             try {
               // Verify the approval was successful
-              diamondNewAllowance = await client.readContract({
+              diamondNewAllowance = await publicClient.readContract({
                 address: daiContract.address as `0x${string}`,
                 abi: daiContract.abi,
                 functionName: 'allowance',
@@ -1372,7 +1373,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
 
       // Get the vault address that will actually perform transferFrom
       // 1. Get meToken's hubId
-      const meTokenInfo = await client.readContract({
+      const meTokenInfo = await publicClient.readContract({
         address: DIAMOND,
         abi: METOKEN_ABI,
         functionName: 'getMeTokenInfo',
@@ -1384,7 +1385,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
 
       // 2. Get vault address for this hub
       logger.debug('🔍 Fetching Vault address for Hub ID:', hubIdNum);
-      const hubInfo = await client.readContract({
+      const hubInfo = await publicClient.readContract({
         address: DIAMOND,
         abi: METOKEN_ABI,
         functionName: 'getHubInfo',
@@ -1421,7 +1422,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
 
       // 3. Check and approve hub collateral for the vault (not Diamond!)
       logger.debug(`🔍 Checking ${hubAsset.symbol} allowance for vault...`);
-      const currentAllowance = await client.readContract({
+      const currentAllowance = await publicClient.readContract({
         address: collateralAddress,
         abi: collateralAbi,
         functionName: 'allowance',
@@ -1465,7 +1466,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
 
       // 3b. ALSO approve collateral for the DIAMOND (if Diamond calls transferFrom directly)
       logger.debug(`🔍 Checking ${hubAsset.symbol} allowance for DIAMOND...`);
-      const diamondAllowance = await client.readContract({
+      const diamondAllowance = await publicClient.readContract({
         address: collateralAddress,
         abi: collateralAbi,
         functionName: 'allowance',
@@ -1622,7 +1623,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         // Update user balance in Supabase via API route (uses service role client)
         try {
           // Read actual balance from chain to ensure accuracy
-          const actualBalance = await client.readContract({
+          const actualBalance = await publicClient.readContract({
             address: meTokenAddress as `0x${string}`,
             abi: ERC20_ABI,
             functionName: 'balanceOf',
@@ -1689,7 +1690,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
       // Get the vault address that will actually perform transferFrom
       // 1. Get meToken's hubId
       logger.debug('🔍 ensureDaiApproval: Fetching Hub ID for token:', meTokenAddress);
-      const meTokenInfo = await client.readContract({
+      const meTokenInfo = await publicClient.readContract({
         address: DIAMOND,
         abi: METOKEN_ABI,
         functionName: 'getMeTokenInfo',
@@ -1701,7 +1702,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
 
       // 2. Get vault address for this hub
       logger.debug('🔍 ensureDaiApproval: Fetching Vault for Hub ID:', hubIdNum);
-      const hubInfo = await client.readContract({
+      const hubInfo = await publicClient.readContract({
         address: DIAMOND,
         abi: METOKEN_ABI,
         functionName: 'getHubInfo',
@@ -1736,7 +1737,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
       const requiredAmount = parseHubAssetAmount(collateralAmount, hubAsset);
 
       // Check current allowance for vault (not Diamond!)
-      const currentAllowance = await client.readContract({
+      const currentAllowance = await publicClient.readContract({
         address: collateralAddress,
         abi: collateralAbi,
         functionName: 'allowance',
@@ -1796,7 +1797,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         diamondAddress: DIAMOND
       });
 
-      const result = await client.readContract({
+      const result = await publicClient.readContract({
         address: DIAMOND,
         abi: METOKEN_ABI,
         functionName: 'calculateAssetsReturned',
@@ -1838,7 +1839,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
 
       // Get the vault address that will actually perform transferFrom (same pattern as buyMeTokens)
       // 1. Get meToken's hubId
-      const meTokenInfo = await client.readContract({
+      const meTokenInfo = await publicClient.readContract({
         address: DIAMOND,
         abi: METOKEN_ABI,
         functionName: 'getMeTokenInfo',
@@ -1849,7 +1850,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
 
       // 2. Get vault address for this hub
       logger.debug('🔍 Fetching Vault address for Hub ID:', hubId.toString());
-      const hubInfo = await client.readContract({
+      const hubInfo = await publicClient.readContract({
         address: DIAMOND,
         abi: METOKEN_ABI,
         functionName: 'getHubInfo',
@@ -1878,7 +1879,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
 
       // 3. Check and approve MeToken for the vault (not Diamond!)
       logger.debug('🔍 Checking MeToken allowance for vault...');
-      const currentAllowance = await client.readContract({
+      const currentAllowance = await publicClient.readContract({
         address: meTokenAddress as `0x${string}`,
         abi: ERC20_ABI,
         functionName: 'allowance',
@@ -1922,7 +1923,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
       // 3b. ALSO Check/Approve MeToken for the DIAMOND (Just in case Diamond calls transferFrom directly)
       // This covers the case where Diamond is the spender, or Vault is the spender.
       logger.debug('🔍 Checking MeToken allowance for DIAMOND...');
-      const diamondAllowance = await client.readContract({
+      const diamondAllowance = await publicClient.readContract({
         address: meTokenAddress as `0x${string}`,
         abi: ERC20_ABI,
         functionName: 'allowance',
@@ -2076,7 +2077,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         // Update user balance in Supabase via API route (uses service role client)
         try {
           // Read actual balance from chain to ensure accuracy
-          const actualBalance = await client.readContract({
+          const actualBalance = await publicClient.readContract({
             address: meTokenAddress as `0x${string}`,
             abi: ERC20_ABI,
             functionName: 'balanceOf',
@@ -2140,7 +2141,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
     try {
       if (!client) return '0';
 
-      const meTokenInfo = await client.readContract({
+      const meTokenInfo = await publicClient.readContract({
         address: DIAMOND,
         abi: METOKEN_ABI,
         functionName: 'getMeTokenInfo',
@@ -2148,7 +2149,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
       }) as any;
 
       const hubIdNum = Number(meTokenInfo.hubId ?? meTokenInfo[1] ?? 1n);
-      const hubInfo = await client.readContract({
+      const hubInfo = await publicClient.readContract({
         address: DIAMOND,
         abi: METOKEN_ABI,
         functionName: 'getHubInfo',
@@ -2162,7 +2163,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
       const hubAsset = resolveHubAsset(hubIdNum, assetAddress);
       const collateralAmountWei = parseHubAssetAmount(collateralAmount, hubAsset);
 
-      const result = await client.readContract({
+      const result = await publicClient.readContract({
         address: DIAMOND,
         abi: METOKEN_ABI,
         functionName: 'calculateMeTokensMinted',
@@ -2258,14 +2259,14 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
     getMeTokenVaultAddress: async (meTokenAddress: string) => {
       if (!client) return null;
       try {
-        const meTokenInfo = await client.readContract({
+        const meTokenInfo = await publicClient.readContract({
           address: DIAMOND,
           abi: METOKEN_ABI,
           functionName: 'getMeTokenInfo',
           args: [meTokenAddress as `0x${string}`],
         });
         const hubId = (meTokenInfo as any).hubId;
-        const hubInfo = await client.readContract({
+        const hubInfo = await publicClient.readContract({
           address: DIAMOND,
           abi: METOKEN_ABI,
           functionName: 'getHubInfo',
