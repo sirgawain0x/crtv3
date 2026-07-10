@@ -2,6 +2,7 @@
 
 import { useIsMember } from "../unlock/useIsMember";
 import { buildSponsoredAttestationGasContext } from "@/lib/eas/attestation-gas";
+import { buildMeTokenCreationGasContext } from "@/lib/metokens/metoken-gas";
 
 // Base USDC Address
 const USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
@@ -122,8 +123,15 @@ export function useGasSponsorship() {
         return { context: undefined, isSponsored: false };
     };
 
+    /**
+     * ETH-sponsored paymaster for MeToken creation (not USDC any-token policy).
+     * Uses NEXT_PUBLIC_ALCHEMY_PAYMASTER_POLICY_ID for all users.
+     */
+    const getMeTokenCreationGasContext = () => buildMeTokenCreationGasContext();
+
     return {
         getGasContext,
+        getMeTokenCreationGasContext,
         getStoryGasContext,
         getAttestationGasContext,
         isMember,

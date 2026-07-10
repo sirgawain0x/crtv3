@@ -8,23 +8,25 @@ import {
   DEFAULT_HUB_ASSET,
   formatMeTokenBackingLabel,
 } from '@/lib/contracts/MeTokenHubs';
+import type { HubCollateralConfig } from '@/lib/metokens/hub-onchain';
 
 export type { HubAssetConfig, HubAssetSymbol };
 
-export function parseHubAssetAmount(amount: string, asset: HubAssetConfig | string): bigint {
-  const config =
-    typeof asset === 'string'
-      ? getHubAssetByAddress(asset) ?? HUB_ASSET_CONFIGS[DEFAULT_HUB_ASSET]
-      : asset;
-  return parseUnits(amount || '0', config.decimals);
+type AmountAsset = HubAssetConfig | string | HubCollateralConfig;
+
+function resolveDecimals(asset: AmountAsset): number {
+  if (typeof asset === 'string') {
+    return (getHubAssetByAddress(asset) ?? HUB_ASSET_CONFIGS[DEFAULT_HUB_ASSET]).decimals;
+  }
+  return asset.decimals;
 }
 
-export function formatHubAssetAmount(amount: bigint, asset: HubAssetConfig | string): string {
-  const config =
-    typeof asset === 'string'
-      ? getHubAssetByAddress(asset) ?? HUB_ASSET_CONFIGS[DEFAULT_HUB_ASSET]
-      : asset;
-  return formatUnits(amount, config.decimals);
+export function parseHubAssetAmount(amount: string, asset: AmountAsset): bigint {
+  return parseUnits(amount || '0', resolveDecimals(asset));
+}
+
+export function formatHubAssetAmount(amount: bigint, asset: AmountAsset): string {
+  return formatUnits(amount, resolveDecimals(asset));
 }
 
 export function resolveHubAsset(hubId?: number, assetAddress?: string): HubAssetConfig {
