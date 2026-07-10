@@ -3,26 +3,41 @@
 import Link from "next/link";
 import { SongchainOrbConnect } from "@/components/songchain/SongchainOrbConnect";
 import { SongCupFeedPanel } from "@/components/songchain/song-cup/SongCupFeedPanel";
-import type { ChonesConfig } from "@/lib/chones/config";
+import { ChonesXFollowStrip } from "@/components/chones/ChonesXFollowStrip";
 import { HackBetaHero } from "./HackBetaHero";
+import { HackBetaSubmitPanel } from "./HackBetaSubmitPanel";
+import { HackBetaGallery } from "./HackBetaGallery";
+import { HackBetaMixtapeSection } from "./HackBetaMixtapeSection";
+import { useHackBetaAdmin } from "@/lib/hooks/hack-beta/useHackBetaAdmin";
+import type { ChonesConfig } from "@/lib/chones/config";
+import { Button } from "@/components/ui/button";
 
 type HackBetaPageClientProps = {
   config: ChonesConfig;
 };
 
 export function HackBetaPageClient({ config }: HackBetaPageClientProps) {
+  const { isAdmin } = useHackBetaAdmin();
+
   return (
     <div className="w-full">
-      <nav className="mx-auto mb-4 max-w-7xl px-4 py-4 text-sm text-muted-foreground sm:px-6">
-        <Link href="/" className="hover:text-foreground">
-          Home
-        </Link>
-        <span className="mx-2">/</span>
-        <Link href="/chones" className="hover:text-foreground">
-          Chones
-        </Link>
-        <span className="mx-2">/</span>
-        <span className="text-foreground">HACKATHON BETA</span>
+      <nav className="mx-auto mb-4 flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-4 text-sm text-muted-foreground sm:px-6">
+        <div>
+          <Link href="/" className="hover:text-foreground">
+            Home
+          </Link>
+          <span className="mx-2">/</span>
+          <Link href="/chones" className="hover:text-foreground">
+            Chones
+          </Link>
+          <span className="mx-2">/</span>
+          <span className="text-foreground">HACKATHON BETA</span>
+        </div>
+        {isAdmin && (
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/chones/hack-beta/submissions">Admin submissions</Link>
+          </Button>
+        )}
       </nav>
 
       <div className="mx-auto max-w-7xl px-4 sm:px-6">
@@ -30,7 +45,13 @@ export function HackBetaPageClient({ config }: HackBetaPageClientProps) {
       </div>
 
       <div className="mx-auto max-w-7xl space-y-8 px-4 pb-12 sm:px-6">
+        <ChonesXFollowStrip />
         <SongchainOrbConnect />
+        <div id="hack-beta-submit" className="scroll-mt-8">
+          <HackBetaSubmitPanel />
+        </div>
+        <HackBetaMixtapeSection />
+        <HackBetaGallery />
 
         <div id="hack-beta-feed" className="scroll-mt-8">
           {config.enabled ? (

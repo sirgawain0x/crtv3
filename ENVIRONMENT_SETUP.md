@@ -167,6 +167,8 @@ Your Coinbase Developer Platform (CDP) Secret API Key for JWT authentication.
 **Important Notes:**
 - These keys are required for Coinbase Onramp/Offramp integration
 - Session tokens are generated server-side using these credentials
+- Never commit CDP secrets; set them only in Vercel / local `.env`
+- If keys were ever pasted into chat or a ticket, rotate them in the CDP portal before redeploying
 - The Secret API Key must never be exposed to the client
 - Session tokens expire after 5 minutes and are single-use
 

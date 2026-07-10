@@ -9,18 +9,20 @@ type HackBetaHeroProps = {
 };
 
 export function HackBetaHero({ className }: HackBetaHeroProps) {
-  const scrollToFeed = () => {
-    const element = document.getElementById("hack-beta-feed");
+  const scrollToSubmit = () => {
+    const element = document.getElementById("hack-beta-submit");
     if (element) {
       element.scrollIntoView({ behavior: "smooth" });
+      return;
     }
+    document.getElementById("hack-beta-feed")?.scrollIntoView({ behavior: "smooth" });
   };
 
   return (
     <section
       className={cn(
-        "relative mx-auto w-full max-w-7xl overflow-hidden rounded-xl min-h-[220px]",
-        "lg:aspect-[1016/572]",
+        "relative mx-auto min-h-[220px] w-full max-w-7xl overflow-hidden rounded-xl",
+        "lg:aspect-[1024/274]",
         className,
       )}
     >
@@ -38,8 +40,8 @@ export function HackBetaHero({ className }: HackBetaHeroProps) {
           July 20–24, 2026 · Virtual
         </p>
         <SongCupGoalButton
-          label="Proceed"
-          onClick={scrollToFeed}
+          label="Submit"
+          onClick={scrollToSubmit}
           className="animate-songcup-pulse hover:animate-none"
         />
       </div>
