@@ -91,7 +91,7 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
     if (!isValidProfileTab(value)) return;
     setActiveTab(value);
     if (!displayAddress) return;
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(searchParams?.toString() ?? "");
     if (value !== "Uploads") {
       params.set("tab", value);
     } else {
@@ -256,11 +256,7 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
                         {validMembership.expiration && validMembership.expiration < LIFETIME_EXPIRATION_THRESHOLD ? (
                           <div className="space-y-1">
                             <p className="text-sm text-muted-foreground">
-                              Expires on {new Date(validMembership.expiration * 1000).toLocaleDateString("en-US", {
-                                year: 'numeric',
-                                month: 'long',
-                                day: 'numeric'
-                              })}
+                              Expires on {new Date(validMembership.expiration * 1000).toISOString().split("T")[0]}
                             </p>
                             <p className="text-xs text-muted-foreground">
                               {(() => {
