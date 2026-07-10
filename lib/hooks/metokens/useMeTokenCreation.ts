@@ -12,7 +12,7 @@
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { useUser, useSmartAccountClient } from '@/lib/wallet/react';
+import { useSmartAccountClient } from '@/lib/wallet/react';
 import { useGasSponsorship } from '@/lib/hooks/wallet/useGasSponsorship';
 import { formatEther, encodeFunctionData, decodeEventLog, erc20Abi, parseEther } from 'viem';
 import { parseBundlerError, shouldRetryError } from '@/lib/utils/bundlerErrorParser';
@@ -196,8 +196,7 @@ function removePendingTransaction(userOpHash: string): void {
  * Main hook for robust MeToken creation
  */
 export function useMeTokenCreation(): UseMeTokenCreationReturn {
-  const user = useUser();
-  const { client } = useSmartAccountClient({});
+  const { client, address: scaAddress } = useSmartAccountClient({});
   const { getGasContext, isMember } = useGasSponsorship();
 
   const [state, setState] = useState<MeTokenCreationState>({
@@ -209,7 +208,8 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
   const [pendingTransactions, setPendingTransactions] = useState<PendingMeTokenTransaction[]>([]);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const address = user?.address;
+  // Use smart account address for reads and writes (matches RobustMeTokenCreator balance display).
+  const address = scaAddress ?? client?.account?.address;
 
   // Load pending transactions on mount
   useEffect(() => {
