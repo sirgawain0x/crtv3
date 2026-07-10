@@ -669,6 +669,7 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
 
           const isAllowanceError = mintErrorMessage.includes('insufficient allowance') ||
             mintErrorMessage.includes('ERC20') ||
+            mintErrorMessage.includes('execution reverted') ||
             parsedMintError.message.includes('allowance');
 
           if (!isAllowanceError || mintAttempt === maxMintRetries) {
