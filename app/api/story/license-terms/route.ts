@@ -100,9 +100,11 @@ export async function GET(request: NextRequest) {
     const client = createStoryClient(account.address, privateKey);
 
     try {
-      const terms = await client.license.getLicenseTerms(
+      const response = await client.license.getLicenseTerms(
         BigInt(resolvedLicenseTermsId)
       );
+
+      const terms = response.terms;
 
       return NextResponse.json({
         ipId: resolvedIpId,
@@ -111,7 +113,7 @@ export async function GET(request: NextRequest) {
           transferable: terms.transferable,
           commercialUse: terms.commercialUse,
           commercialAttribution: terms.commercialAttribution,
-          commercialRevShare: terms.commercialRevShare,
+          commercialRevShare: String(terms.commercialRevShare),
           commercialRevCeiling: terms.commercialRevCeiling?.toString(),
           derivativesAllowed: terms.derivativesAllowed,
           derivativesAttribution: terms.derivativesAttribution,
