@@ -149,6 +149,8 @@ let publicTemplateCache: { value: PinataTemplate[]; expiresAt: number } | null =
 let twinTemplateCache: { value: PinataTemplate | null; expiresAt: number } | null =
   null;
 const TEMPLATE_TTL_MS = 60 * 60 * 1000;
+/** Short TTL so a Pinata outage does not pin the static fallback for an hour. */
+const FALLBACK_TEMPLATE_TTL_MS = 30 * 1000;
 
 function normalizeTemplate(raw: unknown): PinataTemplate | null {
   if (!raw || typeof raw !== "object") return null;
@@ -234,11 +236,16 @@ export async function listPublicTemplates(): Promise<PinataTemplate[]> {
   if (publicTemplateCache && publicTemplateCache.expiresAt > now) {
     return publicTemplateCache.value;
   }
-  const data = await pinataFetch<{ templates: PinataTemplate[] }>(
+  const data = await pinataFetch<{ templates: unknown[] }>(
     "/v0/public-templates",
   );
+  const templates = Array.isArray(data?.templates)
+    ? data.templates
+        .map(normalizeTemplate)
+        .filter((t): t is PinataTemplate => t !== null)
+    : [];
   publicTemplateCache = {
-    value: data.templates ?? [],
+    value: templates,
     expiresAt: now + TEMPLATE_TTL_MS,
   };
   return publicTemplateCache.value;
@@ -297,11 +304,15 @@ export async function findCreativeTwinTemplate(): Promise<PinataTemplate | null>
       null;
   }
 
+  const isFallback = !template;
   if (!template) {
     template = creativeTwinTemplateFallback();
   }
 
-  twinTemplateCache = { value: template, expiresAt: now + TEMPLATE_TTL_MS };
+  twinTemplateCache = {
+    value: template,
+    expiresAt: now + (isFallback ? FALLBACK_TEMPLATE_TTL_MS : TEMPLATE_TTL_MS),
+  };
   return template;
 }
 
