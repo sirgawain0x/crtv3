@@ -29,7 +29,9 @@ Your Alchemy API key for blockchain interactions and smart account functionality
 **Documentation:** [How to Create Access Keys](https://docs.alchemy.com/docs/how-to-create-access-keys)
 
 #### `NEXT_PUBLIC_ALCHEMY_PAYMASTER_POLICY_ID`
-Your Alchemy Gas Manager policy ID for sponsoring user transaction fees.
+Your Alchemy Gas Manager policy ID for sponsoring user transaction fees on Base (native ETH sponsorship).
+
+Used for MeToken creation (batched approve + subscribe), member flows, and other sponsored UserOps. **Not** the USDC any-token policy (`NEXT_PUBLIC_ANYTOKEN_POLICY_ID`).
 
 **How to get it:**
 1. Go to [Alchemy Gas Manager](https://dashboard.alchemy.com/gas-manager)

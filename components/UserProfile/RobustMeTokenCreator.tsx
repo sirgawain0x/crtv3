@@ -36,6 +36,7 @@ import {
   type PendingMeTokenTransaction,
   type CreationStatus,
 } from '@/lib/hooks/metokens/useMeTokenCreation';
+import { useMeTokenHubs } from '@/lib/hooks/metokens/useMeTokenHubs';
 import {
   HUB_ASSET_CONFIGS,
   DEFAULT_HUB_ASSET,
@@ -71,8 +72,6 @@ const STATUS_STEPS: Record<
   error: { label: 'Error', icon: <AlertCircle className="h-4 w-4" />, color: 'text-red-500' },
 };
 
-const DEFAULT_ASSET = HUB_ASSET_CONFIGS[DEFAULT_HUB_ASSET];
-
 /** Page-specific collateral logos for the creation form backing selector. */
 const CREATOR_COLLATERAL_LOGOS: Partial<Record<HubAssetSymbol, string>> = {
   USDS: '/images/tokens/s_usds.webp',
@@ -82,13 +81,13 @@ const CREATOR_COLLATERAL_LOGOS: Partial<Record<HubAssetSymbol, string>> = {
 export function RobustMeTokenCreator({ onMeTokenCreated, onClose }: RobustMeTokenCreatorProps) {
   const [name, setName] = useState('');
   const [symbol, setSymbol] = useState('');
-  const [selectedHubId, setSelectedHubId] = useState<number>(DEFAULT_ASSET.hubId);
   const [assetsDeposited, setAssetsDeposited] = useState('');
   const [assetBalances, setAssetBalances] = useState<Record<string, bigint>>({});
   const [showPendingTransactions, setShowPendingTransactions] = useState(false);
 
   const { client } = useSmartAccountClient({});
   const { toast } = useToast();
+  const { activeHubs, defaultHub, loading: hubsLoading, error: hubsError } = useMeTokenHubs();
 
   const {
     state,
@@ -99,30 +98,60 @@ export function RobustMeTokenCreator({ onMeTokenCreated, onClose }: RobustMeToke
     retryPendingTransaction,
   } = useMeTokenCreation();
 
-  const selectedAsset = resolveHubAsset(selectedHubId);
-  const activeHubAssets = Object.values(HUB_ASSET_CONFIGS);
+  const hubOptions = activeHubs.map((hub) => {
+    const config =
+      hub.symbol !== 'UNKNOWN'
+        ? HUB_ASSET_CONFIGS[hub.symbol as HubAssetSymbol]
+        : null;
 
-  // Fetch balances for all active hub collateral tokens
+    return {
+      hubId: hub.hubId,
+      symbol: hub.symbol,
+      displayName: config?.displayName ?? hub.displayName,
+      tagline: config?.tagline ?? hub.description,
+      logo: config?.logo,
+      decimals: hub.decimals,
+      address: hub.asset,
+      recommended: config?.recommended,
+      deprecated: config?.deprecated,
+    };
+  });
+
+  const fallbackHubId = HUB_ASSET_CONFIGS[DEFAULT_HUB_ASSET].hubId;
+  const [selectedHubId, setSelectedHubId] = useState<number>(fallbackHubId);
+
+  useEffect(() => {
+    if (defaultHub && selectedHubId === fallbackHubId) {
+      setSelectedHubId(defaultHub.hubId);
+    }
+  }, [defaultHub, fallbackHubId, selectedHubId]);
+
+  const selectedHubOption =
+    hubOptions.find((hub) => hub.hubId === selectedHubId) ?? hubOptions[0];
+  const selectedAsset = selectedHubOption
+    ? resolveHubAsset(selectedHubOption.hubId)
+    : resolveHubAsset(fallbackHubId);
+
   const fetchBalances = useCallback(async () => {
-    if (!client?.account?.address) return;
+    if (!client?.account?.address || hubOptions.length === 0) return;
 
     const entries = await Promise.all(
-      activeHubAssets.map(async (config) => {
+      hubOptions.map(async (hub) => {
         try {
           const balance = await getErc20Balance({
-            token: config.address,
+            token: hub.address,
             owner: client.account.address,
           });
-          return [config.symbol, balance] as const;
+          return [hub.symbol, balance] as const;
         } catch (err) {
-          logger.error(`Failed to check ${config.symbol} balance:`, err);
-          return [config.symbol, BigInt(0)] as const;
+          logger.error(`Failed to check ${hub.symbol} balance:`, err);
+          return [hub.symbol, BigInt(0)] as const;
         }
       })
     );
 
     setAssetBalances(Object.fromEntries(entries));
-  }, [client, activeHubAssets]);
+  }, [client, hubOptions]);
 
   useEffect(() => {
     fetchBalances();
@@ -142,7 +171,7 @@ export function RobustMeTokenCreator({ onMeTokenCreated, onClose }: RobustMeToke
       setName('');
       setSymbol('');
       setAssetsDeposited('');
-      setSelectedHubId(DEFAULT_ASSET.hubId);
+      setSelectedHubId(defaultHub?.hubId ?? fallbackHubId);
       fetchBalances();
     }
   }, [
@@ -155,6 +184,8 @@ export function RobustMeTokenCreator({ onMeTokenCreated, onClose }: RobustMeToke
     toast,
     onMeTokenCreated,
     fetchBalances,
+    defaultHub,
+    fallbackHubId,
   ]);
 
   // Handle creation
@@ -362,51 +393,83 @@ export function RobustMeTokenCreator({ onMeTokenCreated, onClose }: RobustMeToke
                 {/* Hub / Backing Collateral Selector */}
                 <div className="space-y-2">
                   <Label>Backing Collateral</Label>
+                  {hubsLoading ? (
+                    <p className="text-sm text-muted-foreground flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Loading active hubs...
+                    </p>
+                  ) : hubsError ? (
+                    <Alert variant="destructive">
+                      <AlertDescription>{hubsError}</AlertDescription>
+                    </Alert>
+                  ) : hubOptions.length === 0 ? (
+                    <Alert>
+                      <AlertDescription>
+                        No active MeToken hubs are registered on-chain yet.
+                      </AlertDescription>
+                    </Alert>
+                  ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {activeHubAssets.map((config) => (
+                    {hubOptions.map((hub) => {
+                      const config =
+                        hub.symbol !== 'UNKNOWN'
+                          ? HUB_ASSET_CONFIGS[hub.symbol as HubAssetSymbol]
+                          : undefined;
+
+                      return (
                       <button
-                        key={config.hubId}
+                        key={hub.hubId}
                         type="button"
-                        onClick={() => setSelectedHubId(config.hubId)}
+                        onClick={() => setSelectedHubId(hub.hubId)}
                         disabled={isProcessing}
                         className={cn(
                           'flex items-start gap-3 p-3 border rounded-lg text-left transition-colors',
-                          selectedHubId === config.hubId
+                          selectedHubId === hub.hubId
                             ? 'border-primary bg-primary/5'
                             : 'border-border hover:border-muted-foreground'
                         )}
                       >
+                        {config ? (
                         <TokenLogo
                           config={config}
                           className="h-10 w-10 flex-shrink-0"
                           logoSrc={CREATOR_COLLATERAL_LOGOS[config.symbol]}
                         />
+                        ) : (
+                          <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center text-xs font-bold">
+                            {hub.symbol.slice(0, 2)}
+                          </div>
+                        )}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center flex-wrap gap-2">
-                            <span className="font-semibold">{config.displayName}</span>
-                            {config.symbol === 'USDC' && (
+                            <span className="font-semibold">{hub.displayName}</span>
+                            {hub.recommended && (
                               <span className="text-[10px] bg-primary text-primary-foreground px-1.5 py-0.5 rounded">
                                 Recommended
                               </span>
                             )}
-                            {config.symbol === 'DAI' && (
+                            {hub.deprecated && (
                               <span className="text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded">
                                 Legacy
                               </span>
                             )}
                           </div>
                           <p className="text-xs text-muted-foreground line-clamp-2">
-                            {config.tagline}
+                            {hub.tagline}
                           </p>
                           <p className="text-xs mt-1">
                             Balance:{' '}
-                            {formatHubAssetAmount(assetBalances[config.symbol] ?? BigInt(0), config)}{' '}
-                            {config.symbol}
+                            {formatHubAssetAmount(
+                              assetBalances[hub.symbol] ?? BigInt(0),
+                              resolveHubAsset(hub.hubId)
+                            )}{' '}
+                            {hub.symbol}
                           </p>
                         </div>
                       </button>
-                    ))}
+                    );})}
                   </div>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -442,6 +505,7 @@ export function RobustMeTokenCreator({ onMeTokenCreated, onClose }: RobustMeToke
                     isProcessing ||
                     !name ||
                     !symbol ||
+                    hubOptions.length === 0 ||
                     (depositAmount > BigInt(0) && !hasEnoughCollateral)
                   }
                   className="w-full"
@@ -471,7 +535,8 @@ export function RobustMeTokenCreator({ onMeTokenCreated, onClose }: RobustMeToke
                 <p><strong>What happens next:</strong></p>
                 <ul className="list-disc list-inside space-y-1 ml-2">
                   <li>Your MeToken will be created on the Base blockchain</li>
-                  <li>If depositing {selectedAsset.symbol}, you&apos;ll approve it first</li>
+                  <li>Gas is sponsored via Alchemy paymaster (no ETH required in most cases)</li>
+                  <li>If depositing {selectedAsset.symbol}, approval and subscribe run in one transaction</li>
                   <li>Transaction may take 30 seconds to 2 minutes</li>
                   <li>If it times out, we&apos;ll keep checking in the background</li>
                   <li>Your MeToken will be tradeable immediately after creation</li>

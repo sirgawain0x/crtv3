@@ -49,6 +49,21 @@ export async function getErc20Balance({
   }) as Promise<bigint>;
 }
 
+const ERC20_ALLOWANCE_ABI = [
+  {
+    constant: true,
+    inputs: [
+      { name: "_owner", type: "address" },
+      { name: "_spender", type: "address" },
+    ],
+    name: "allowance",
+    outputs: [{ name: "remaining", type: "uint256" }],
+    payable: false,
+    stateMutability: "view",
+    type: "function",
+  },
+] as const;
+
 /** Helper to read an ERC-20 allowance on Base. */
 export async function getErc20Allowance({
   token,
@@ -61,21 +76,68 @@ export async function getErc20Allowance({
 }) {
   return publicClient.readContract({
     address: token,
-    abi: [
-      {
-        constant: true,
-        inputs: [
-          { name: "_owner", type: "address" },
-          { name: "_spender", type: "address" },
-        ],
-        name: "allowance",
-        outputs: [{ name: "remaining", type: "uint256" }],
-        payable: false,
-        stateMutability: "view",
-        type: "function",
-      },
-    ] as const,
+    abi: ERC20_ALLOWANCE_ABI,
     functionName: "allowance",
     args: [owner, spender],
   }) as Promise<bigint>;
+}
+
+async function readErc20AllowanceFromClient(
+  client: typeof publicClient,
+  {
+    token,
+    owner,
+    spender,
+  }: {
+    token: Address;
+    owner: Address;
+    spender: Address;
+  }
+) {
+  return client.readContract({
+    address: token,
+    abi: ERC20_ALLOWANCE_ABI,
+    functionName: "allowance",
+    args: [owner, spender],
+  }) as Promise<bigint>;
+}
+
+/**
+ * Read ERC-20 allowance with Alchemy primary RPC and Base public RPC fallback.
+ */
+export async function getErc20AllowanceWithFallback({
+  token,
+  owner,
+  spender,
+}: {
+  token: Address;
+  owner: Address;
+  spender: Address;
+}): Promise<bigint> {
+  try {
+    return await readErc20AllowanceFromClient(publicClient, { token, owner, spender });
+  } catch {
+    return readErc20AllowanceFromClient(fallbackPublicClient, { token, owner, spender });
+  }
+}
+
+/**
+ * Parallel allowance reads across primary and fallback RPC for verification.
+ */
+export async function getErc20AllowanceParallel({
+  token,
+  owner,
+  spender,
+  reads = 3,
+}: {
+  token: Address;
+  owner: Address;
+  spender: Address;
+  reads?: number;
+}): Promise<bigint[]> {
+  return Promise.all(
+    Array.from({ length: reads }, () =>
+      getErc20AllowanceWithFallback({ token, owner, spender })
+    )
+  );
 }
