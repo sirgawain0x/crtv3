@@ -28,6 +28,8 @@ import { VideoShareButton } from "@/components/Videos/VideoShareButton";
 import { VideoBuyButton } from "@/components/Videos/VideoBuyButton";
 import { VideoEditButton } from "@/components/Videos/VideoEditButton";
 import { VideoSplitDistributeButton } from "@/components/Videos/VideoSplitDistributeButton";
+import { RemixInPixelsButton } from "@/components/Videos/RemixInPixelsButton";
+import { AddToMixtapeButton } from "@/components/Videos/AddToMixtapeButton";
 import { CreatorDisplay } from "@/components/Creator/CreatorDisplay";
 import { logger } from '@/lib/utils/logger';
 
@@ -165,6 +167,7 @@ export default async function VideoDetailsPage({
               livepeerAttestationId={videoAsset?.livepeer_attestation_id ?? null}
               storyIpRegistered={videoAsset?.story_ip_registered ?? false}
               storyIpId={videoAsset?.story_ip_id ?? null}
+              storyLicenseTermsId={videoAsset?.story_license_terms_id ?? null}
               contractAddress={videoAsset?.contract_address ?? null}
               tokenId={videoAsset?.token_id ?? null}
             />
@@ -201,6 +204,18 @@ export default async function VideoDetailsPage({
                     />
                   )}
                 </Suspense>
+                <Suspense fallback={<div className="h-9 w-9" />}>
+                  <AddToMixtapeButton
+                    assetId={id}
+                    videoTitle={videoAsset?.title || assetData?.name || "Video"}
+                    playbackId={assetData?.playbackId || undefined}
+                  />
+                </Suspense>
+                {videoAsset?.story_ip_registered && videoAsset?.story_license_terms_id && (
+                  <Suspense fallback={<div className="h-9 w-9" />}>
+                    <RemixInPixelsButton />
+                  </Suspense>
+                )}
                 <Suspense fallback={<div className="h-9 w-9" />}>
                   <VideoShareButton
                     videoId={id}

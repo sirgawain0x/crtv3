@@ -1,32 +1,61 @@
 "use client";
 
+import { useCallback, useEffect, useState } from "react";
 import {
   Carousel,
   CarouselContent,
   CarouselItem,
   CarouselNext,
   CarouselPrevious,
+  type CarouselApi,
 } from "@/components/ui/carousel";
 import { SongCupBanner } from "@/components/songchain/SongCupBanner";
-import { HackBetaBanner } from "@/components/chones/hack-beta/HackBetaBanner";
+import { ChonesBanner } from "@/components/chones/ChonesBanner";
 import { cn } from "@/lib/utils";
+
+const AUTOPLAY_MS = 6000;
 
 type ChannelBannersCarouselProps = {
   className?: string;
 };
 
 export function ChannelBannersCarousel({ className }: ChannelBannersCarouselProps) {
+  const [api, setApi] = useState<CarouselApi>();
+  const [paused, setPaused] = useState(false);
+
+  const onMouseEnter = useCallback(() => setPaused(true), []);
+  const onMouseLeave = useCallback(() => setPaused(false), []);
+  const onFocusCapture = useCallback(() => setPaused(true), []);
+  const onBlurCapture = useCallback((e: React.FocusEvent<HTMLDivElement>) => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+      setPaused(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!api || paused) return;
+    const id = window.setInterval(() => {
+      api.scrollNext();
+    }, AUTOPLAY_MS);
+    return () => window.clearInterval(id);
+  }, [api, paused]);
+
   return (
     <Carousel
       opts={{ loop: true, align: "start" }}
+      setApi={setApi}
       className={cn("w-full", className)}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+      onFocusCapture={onFocusCapture}
+      onBlurCapture={onBlurCapture}
     >
       <CarouselContent className="-ml-0">
         <CarouselItem className="pl-0">
           <SongCupBanner />
         </CarouselItem>
         <CarouselItem className="pl-0">
-          <HackBetaBanner />
+          <ChonesBanner href="/chones/hack-beta" buttonLabel="ENTER" />
         </CarouselItem>
       </CarouselContent>
       <CarouselPrevious className="left-2 sm:left-4" />

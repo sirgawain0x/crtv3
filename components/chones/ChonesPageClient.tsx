@@ -4,9 +4,11 @@ import Link from "next/link";
 import Image from "next/image";
 import { SongchainOrbConnect } from "@/components/songchain/SongchainOrbConnect";
 import { LensRewardsCard } from "@/components/songchain/LensRewardsCard";
+import { ChonesBanner } from "@/components/chones/ChonesBanner";
+import { ChonesXFollowStrip } from "@/components/chones/ChonesXFollowStrip";
 import type { ChonesConfig } from "@/lib/chones/config";
 import { CHONES_EVENTS } from "@/lib/chones/events";
-import { Code2, Trophy } from "lucide-react";
+import { Trophy } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type ChonesPageClientProps = {
@@ -15,7 +17,7 @@ type ChonesPageClientProps = {
 
 export function ChonesPageClient({ config }: ChonesPageClientProps) {
   return (
-    <div className="mx-auto w-full max-w-7xl py-10 px-4 sm:px-6">
+    <div className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6">
       <nav className="mb-6 text-sm text-muted-foreground">
         <Link href="/" className="hover:text-foreground">
           Home
@@ -24,21 +26,9 @@ export function ChonesPageClient({ config }: ChonesPageClientProps) {
         <span className="text-foreground">Chones</span>
       </nav>
 
-      <header className="relative mb-10 overflow-hidden rounded-xl border border-amber-500/20 bg-gradient-to-br from-amber-950/90 via-stone-950/80 to-slate-950 p-8 sm:p-10">
-        <div className="relative z-10 max-w-2xl">
-          <p className="mb-2 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-amber-300">
-            <Code2 className="h-4 w-4" aria-hidden />
-            Channel · Lens · Orb
-          </p>
-          <h1 className="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
-            Chones
-          </h1>
-          <p className="mt-3 text-amber-50/95">
-            A hackathon channel on Creative TV — join events, explore feeds, and connect
-            your Orb account to participate.
-          </p>
-        </div>
-      </header>
+      <ChonesBanner className="mb-6" href="/chones/hack-beta" buttonLabel="ENTER" />
+
+      <ChonesXFollowStrip className="mb-10" />
 
       <div className="mb-10 space-y-6">
         <SongchainOrbConnect />
@@ -97,10 +87,7 @@ export function ChonesPageClient({ config }: ChonesPageClientProps) {
                       "transition hover:border-amber-400/50 hover:shadow-md",
                     )}
                   >
-                    <div
-                      className="absolute inset-0 -z-10"
-                      aria-hidden
-                    >
+                    <div className="absolute inset-0 -z-10" aria-hidden>
                       <Image
                         src="/chones/hack-beta/hackathon-beta-tv-background.svg"
                         alt=""
