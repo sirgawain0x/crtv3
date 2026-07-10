@@ -45,6 +45,7 @@ import { fetchVideoAssetByPlaybackId } from "@/lib/utils/video-assets-client";
 import { getThumbnailUrl } from "@/lib/utils/thumbnail";
 import { convertFailingGateway } from "@/lib/utils/image-gateway";
 import Link from "next/link";
+import { LicensePurchaseDialog } from "@/components/Videos/LicensePurchaseDialog";
 
 const STORY_SCAN_IP_BASE =
   process.env.NEXT_PUBLIC_STORY_NETWORK === "mainnet"
@@ -56,14 +57,19 @@ const STORY_DISPUTE_DOCS_URL = "https://docs.story.foundation/concepts/dispute-m
 function StoryIPBlock({
   storyIpId,
   storyScanBase,
+  licenseTermsId,
+  videoTitle,
 }: {
   storyIpId: string;
   storyScanBase: string;
+  licenseTermsId?: string | null;
+  videoTitle?: string;
 }) {
   const [attestationStatus, setAttestationStatus] = useState<
     "idle" | "loading" | "ok" | "error"
   >("idle");
   const [infringementSummary, setInfringementSummary] = useState<string | null>(null);
+  const [licenseDialogOpen, setLicenseDialogOpen] = useState(false);
 
   useEffect(() => {
     if (!storyIpId) return;
@@ -127,12 +133,28 @@ function StoryIPBlock({
         >
           View on Story Protocol →
         </a>
-        <Link
-          href="/marketplace/ip"
-          className="text-xs text-primary hover:underline inline-flex items-center gap-1"
-        >
-          Purchase IP →
-        </Link>
+        {licenseTermsId ? (
+          <>
+            <button
+              type="button"
+              onClick={() => setLicenseDialogOpen(true)}
+              className="text-xs text-primary hover:underline inline-flex items-center gap-1"
+            >
+              Buy License →
+            </button>
+            <LicensePurchaseDialog
+              ipId={storyIpId}
+              licenseTermsId={licenseTermsId}
+              videoTitle={videoTitle ?? ""}
+              open={licenseDialogOpen}
+              onOpenChange={setLicenseDialogOpen}
+            />
+          </>
+        ) : (
+          <span className="text-xs text-muted-foreground">
+            Contact creator for licensing
+          </span>
+        )}
         <a
           href={STORY_DISPUTE_DOCS_URL}
           target="_blank"
@@ -154,6 +176,8 @@ type VideoDetailsProps = {
   /** Story Protocol: when true and storyIpId is set, shows "Registered as IP" block with View/Purchase CTAs. */
   storyIpRegistered?: boolean;
   storyIpId?: string | null;
+  /** Story Protocol license terms ID — when set, enables "Buy License" button. */
+  storyLicenseTermsId?: string | null;
   /** Optional: NFT contract and token ID for Story/IP links. */
   contractAddress?: string | null;
   tokenId?: string | null;
@@ -165,6 +189,7 @@ export default function VideoDetails({
   livepeerAttestationId,
   storyIpRegistered,
   storyIpId,
+  storyLicenseTermsId,
   contractAddress,
   tokenId,
 }: VideoDetailsProps) {
@@ -543,6 +568,8 @@ export default function VideoDetails({
             <StoryIPBlock
               storyIpId={storyIpId}
               storyScanBase={STORY_SCAN_IP_BASE}
+              licenseTermsId={storyLicenseTermsId}
+              videoTitle={videoTitle}
             />
           )}
           {/* Render other asset details */}
