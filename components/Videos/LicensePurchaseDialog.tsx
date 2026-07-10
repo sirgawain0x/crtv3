@@ -101,10 +101,10 @@ export function LicensePurchaseDialog({
   }, [ipId, licenseTermsId]);
 
   useEffect(() => {
-    if (open && !terms && !loadingTerms) {
+    if (open && !terms && !loadingTerms && !error) {
       void fetchTerms();
     }
-  }, [open, terms, loadingTerms, fetchTerms]);
+  }, [open, terms, loadingTerms, error, fetchTerms]);
 
   // Reset state when dialog closes
   useEffect(() => {

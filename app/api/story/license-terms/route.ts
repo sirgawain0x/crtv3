@@ -79,6 +79,13 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    if (!/^\d+$/.test(resolvedLicenseTermsId)) {
+      return NextResponse.json(
+        { error: "Invalid licenseTermsId format. Must be a numeric string." },
+        { status: 400 }
+      );
+    }
+
     // Fetch license terms from Story Protocol
     const privateKey = process.env.STORY_PROTOCOL_PRIVATE_KEY;
     if (!privateKey) {

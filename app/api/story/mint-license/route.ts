@@ -57,6 +57,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (!/^\d+$/.test(String(licenseTermsId))) {
+      return NextResponse.json(
+        { error: "Invalid licenseTermsId format. Must be a numeric string." },
+        { status: 400 }
+      );
+    }
+
+    if (
+      amount !== undefined &&
+      amount !== null &&
+      (!/^\d+$/.test(String(amount)) || BigInt(amount) <= 0n)
+    ) {
+      return NextResponse.json(
+        { error: "Invalid amount. Must be a positive integer." },
+        { status: 400 }
+      );
+    }
+
     const normalizedRecipient = recipient.toLowerCase();
 
     // Wallet auth — ensure the caller controls the recipient address
@@ -100,13 +118,32 @@ export async function POST(request: NextRequest) {
     // Create Story client with funding wallet for signing
     const client = createStoryClient(fundingAddress, privateKey);
 
+    const termsId = BigInt(licenseTermsId);
+    const mintAmount = amount ? BigInt(amount) : 1n;
+
+    // Use the terms' default minting fee as maxMintingFee so paid PILs can mint
+    // (funding wallet pays). Free terms keep maxMintingFee at 0.
+    let maxMintingFee = 0n;
+    try {
+      const terms = await client.license.getLicenseTerms(termsId);
+      const fee = terms.defaultMintingFee;
+      if (fee !== undefined && fee !== null) {
+        maxMintingFee = typeof fee === "bigint" ? fee : BigInt(fee);
+      }
+    } catch (termsErr) {
+      serverLogger.warn(
+        "Could not load license terms for maxMintingFee; defaulting to 0n:",
+        termsErr
+      );
+    }
+
     // Mint license tokens
     const result = await client.license.mintLicenseTokens({
       licensorIpId: ipId as Address,
-      licenseTermsId: BigInt(licenseTermsId),
+      licenseTermsId: termsId,
       receiver: normalizedRecipient as Address,
-      amount: amount ? BigInt(amount) : 1n,
-      maxMintingFee: 0n,
+      amount: mintAmount,
+      maxMintingFee,
       maxRevenueShare: 100,
     });
 
