@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/components/ui/use-toast';
 import { useMeTokensSupabase, MeTokenData } from '@/lib/hooks/metokens/useMeTokensSupabase';
 import { useUser } from '@/lib/wallet/react';
@@ -345,7 +346,23 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
 
       {userMeToken ? (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid h-auto w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1">
+          {/* Mobile: Select dropdown */}
+          <div className="sm:hidden mb-4">
+            <Select value={activeTab} onValueChange={setActiveTab}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select a tab" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="overview">Overview</SelectItem>
+                <SelectItem value="profile">Profile</SelectItem>
+                <SelectItem value="trading">Trading</SelectItem>
+                <SelectItem value="info">Details</SelectItem>
+                <SelectItem value="history">History</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          {/* Desktop: Tab grid */}
+          <TabsList className="hidden sm:grid h-auto w-full grid-cols-3 md:grid-cols-5 gap-1">
             <TabsTrigger value="overview" className="flex items-center justify-center gap-2">
               <Info className="h-4 w-4" />
               <span className="hidden sm:inline">Overview</span>
