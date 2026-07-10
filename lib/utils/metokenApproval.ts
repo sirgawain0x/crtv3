@@ -208,12 +208,8 @@ export async function sendMeTokenCreationUserOp(params: {
     }
 
     const fallbackGas = ethFallback();
-    if (fallbackGas.context) {
-      throw primaryError;
-    }
-
-    const operation = await sendWithContext(undefined);
-    return { hash: operation.hash, policyId: undefined, usedEthFallback: true };
+    const operation = await sendWithContext(fallbackGas.context);
+    return { hash: operation.hash, policyId: fallbackGas.policyId, usedEthFallback: true };
   }
 }
 

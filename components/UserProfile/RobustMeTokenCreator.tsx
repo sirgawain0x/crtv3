@@ -10,7 +10,7 @@
  * 4. Better UX for long blockchain transactions
  */
 
-import { useState, useEffect, useCallback, type ReactNode } from 'react';
+import { useState, useEffect, useCallback, useMemo, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -98,24 +98,26 @@ export function RobustMeTokenCreator({ onMeTokenCreated, onClose }: RobustMeToke
     retryPendingTransaction,
   } = useMeTokenCreation();
 
-  const hubOptions = activeHubs.map((hub) => {
-    const config =
-      hub.symbol !== 'UNKNOWN'
-        ? HUB_ASSET_CONFIGS[hub.symbol as HubAssetSymbol]
-        : null;
+  const hubOptions = useMemo(() => {
+    return activeHubs.map((hub) => {
+      const config =
+        hub.symbol !== 'UNKNOWN'
+          ? HUB_ASSET_CONFIGS[hub.symbol as HubAssetSymbol]
+          : null;
 
-    return {
-      hubId: hub.hubId,
-      symbol: hub.symbol,
-      displayName: config?.displayName ?? hub.displayName,
-      tagline: config?.tagline ?? hub.description,
-      logo: config?.logo,
-      decimals: hub.decimals,
-      address: hub.asset,
-      recommended: config?.recommended,
-      deprecated: config?.deprecated,
-    };
-  });
+      return {
+        hubId: hub.hubId,
+        symbol: hub.symbol,
+        displayName: config?.displayName ?? hub.displayName,
+        tagline: config?.tagline ?? hub.description,
+        logo: config?.logo,
+        decimals: hub.decimals,
+        address: hub.asset,
+        recommended: config?.recommended,
+        deprecated: config?.deprecated,
+      };
+    });
+  }, [activeHubs]);
 
   const fallbackHubId = HUB_ASSET_CONFIGS[DEFAULT_HUB_ASSET].hubId;
   const [selectedHubId, setSelectedHubId] = useState<number>(fallbackHubId);
