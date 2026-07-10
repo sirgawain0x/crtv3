@@ -1,14 +1,20 @@
 /**
  * Server-only Pinata Agents API client.
  *
- * Three endpoints we use:
- *  - `GET /v0/public-templates` (no auth) — discover the Creative AI Digital
- *    Twin template for the onboarding card and its snapshotCid.
+ * Endpoints we use:
+ *  - `GET /v0/templates/id/{templateId}` (PINATA_JWT) — org template metadata
+ *    for the Creative AI Digital Twin onboarding card + snapshotCid.
+ *  - `GET /v0/public-templates` (no auth) — marketplace fallback if the org
+ *    template is later published under CREATIVE_TWIN_TEMPLATE_SLUG.
  *  - `GET /v0/agents/{agentId}` (Pinata JWT) — fetch the agent's name + the
  *    snapshotCid we compare against the template for the verified badge.
  *  - `GET /v0/agents/{agentId}/gateway-token` (Pinata JWT) — exchange the
  *    creator's JWT for the per-agent gateway token + base URLs that we
  *    persist and use to forward chat requests later.
+ *
+ * Template ID (`tmernpdi`) is the Pinata *template*, not a deployed agent.
+ * Creators deploy their own agent from that template, then connect with
+ * their agent ID + JWT.
  *
  * The Pinata JWT is held in memory only — passed to these functions and
  * discarded after the connect flow completes. Only the per-agent gateway
@@ -20,7 +26,20 @@ const PINATA_AGENTS_BASE = "https://agents.pinata.cloud";
 
 export const PINATA_AGENT_HOST_SUFFIX = ".agents.pinata.cloud";
 
+/** Marketplace / public-catalog slug (used only as a fallback lookup key). */
 export const CREATIVE_TWIN_TEMPLATE_SLUG = "creative-ai-digital-twin";
+
+/**
+ * Org template ID for Creative AI Digital Twin.
+ * Override with CREATIVE_TWIN_TEMPLATE_ID if Pinata reissues the template.
+ */
+export const CREATIVE_TWIN_TEMPLATE_ID =
+  process.env.CREATIVE_TWIN_TEMPLATE_ID?.trim() || "tmernpdi";
+
+/** Direct deploy / template page (org-scoped, not the public marketplace). */
+export const CREATIVE_TWIN_TEMPLATE_URL =
+  process.env.CREATIVE_TWIN_TEMPLATE_URL?.trim() ||
+  "https://agents.pinata.cloud/org_3Ar9vPhBBqDLVh1GlNO9kFTsGlS/templates/tmernpdi";
 
 /**
  * Subset of the Template schema we render in the UI. The full schema has many
@@ -125,24 +144,165 @@ export function isAgentRuntimeRunning(status: PinataProcessStatus): boolean {
  * Public templates list. Cached in-process for 1 hour to avoid pounding the
  * upstream catalog on every page load.
  */
-let templateCache: { value: PinataTemplate[]; expiresAt: number } | null = null;
+let publicTemplateCache: { value: PinataTemplate[]; expiresAt: number } | null =
+  null;
+let twinTemplateCache: { value: PinataTemplate | null; expiresAt: number } | null =
+  null;
 const TEMPLATE_TTL_MS = 60 * 60 * 1000;
+
+function normalizeTemplate(raw: unknown): PinataTemplate | null {
+  if (!raw || typeof raw !== "object") return null;
+  const t = raw as Record<string, unknown> & {
+    template?: Record<string, unknown>;
+  };
+  const candidate = (t.template ?? t) as Record<string, unknown>;
+  const templateId =
+    (typeof candidate.templateId === "string" && candidate.templateId) ||
+    (typeof candidate.id === "string" && candidate.id) ||
+    null;
+  const snapshotCid =
+    (typeof candidate.snapshotCid === "string" && candidate.snapshotCid) ||
+    (typeof candidate.snapshot_cid === "string" && candidate.snapshot_cid) ||
+    null;
+  if (!templateId || !snapshotCid) return null;
+  return {
+    templateId,
+    name:
+      (typeof candidate.name === "string" && candidate.name) ||
+      "Creative AI Digital Twin",
+    slug:
+      (typeof candidate.slug === "string" && candidate.slug) ||
+      CREATIVE_TWIN_TEMPLATE_SLUG,
+    description:
+      (typeof candidate.description === "string" && candidate.description) ||
+      "",
+    longDescription:
+      typeof candidate.longDescription === "string"
+        ? candidate.longDescription
+        : null,
+    authorName:
+      (typeof candidate.authorName === "string" && candidate.authorName) ||
+      "Creative",
+    authorLogoUrl:
+      typeof candidate.authorLogoUrl === "string"
+        ? candidate.authorLogoUrl
+        : null,
+    authorUrl:
+      typeof candidate.authorUrl === "string" ? candidate.authorUrl : null,
+    category:
+      (typeof candidate.category === "string" && candidate.category) || "other",
+    snapshotCid,
+    defaultVibe:
+      typeof candidate.defaultVibe === "string" ? candidate.defaultVibe : null,
+    defaultEmoji:
+      typeof candidate.defaultEmoji === "string"
+        ? candidate.defaultEmoji
+        : null,
+    requiredSecrets: Array.isArray(candidate.requiredSecrets)
+      ? (candidate.requiredSecrets as PinataTemplate["requiredSecrets"])
+      : [],
+    isFree: candidate.isFree !== false,
+    version: typeof candidate.version === "number" ? candidate.version : 1,
+  };
+}
+
+/** Minimal card when Pinata auth is unavailable; deploy CTA still works. */
+function creativeTwinTemplateFallback(): PinataTemplate {
+  return {
+    templateId: CREATIVE_TWIN_TEMPLATE_ID,
+    name: "Creative AI Digital Twin",
+    slug: CREATIVE_TWIN_TEMPLATE_SLUG,
+    description:
+      "Deploy this Pinata template, then paste your agent ID and JWT below to connect.",
+    longDescription: null,
+    authorName: "Creative",
+    authorLogoUrl: null,
+    authorUrl: CREATIVE_TWIN_TEMPLATE_URL,
+    category: "other",
+    // Empty until a live fetch succeeds — verified badge stays off.
+    snapshotCid: "",
+    defaultVibe: null,
+    defaultEmoji: "🤖",
+    requiredSecrets: [],
+    isFree: true,
+    version: 1,
+  };
+}
 
 export async function listPublicTemplates(): Promise<PinataTemplate[]> {
   const now = Date.now();
-  if (templateCache && templateCache.expiresAt > now) {
-    return templateCache.value;
+  if (publicTemplateCache && publicTemplateCache.expiresAt > now) {
+    return publicTemplateCache.value;
   }
   const data = await pinataFetch<{ templates: PinataTemplate[] }>(
     "/v0/public-templates",
   );
-  templateCache = { value: data.templates ?? [], expiresAt: now + TEMPLATE_TTL_MS };
-  return templateCache.value;
+  publicTemplateCache = {
+    value: data.templates ?? [],
+    expiresAt: now + TEMPLATE_TTL_MS,
+  };
+  return publicTemplateCache.value;
 }
 
+/**
+ * Fetch an org template by ID. Requires PINATA_JWT — these are not in the
+ * public marketplace until published.
+ */
+export async function getTemplateById(
+  templateId: string,
+  jwt?: string,
+): Promise<PinataTemplate | null> {
+  if (!templateId) return null;
+  const token = jwt?.trim() || process.env.PINATA_JWT?.trim();
+  if (!token) return null;
+  try {
+    const data = await pinataFetch<unknown>(
+      `/v0/templates/id/${encodeURIComponent(templateId)}`,
+      { jwt: token, method: "GET" },
+    );
+    return normalizeTemplate(data);
+  } catch (err) {
+    if (
+      err instanceof PinataApiError &&
+      (err.status === 404 ||
+        err.status === 401 ||
+        err.status === 403 ||
+        err.status === 503)
+    ) {
+      return null;
+    }
+    throw err;
+  }
+}
+
+/**
+ * Resolve the Creative Twin *template* (not a deployed agent). Prefers the
+ * org template ID via PINATA_JWT, then public marketplace slug, then a
+ * static fallback so the deploy CTA still points at tmernpdi.
+ */
 export async function findCreativeTwinTemplate(): Promise<PinataTemplate | null> {
-  const all = await listPublicTemplates();
-  return all.find((t) => t.slug === CREATIVE_TWIN_TEMPLATE_SLUG) ?? null;
+  const now = Date.now();
+  if (twinTemplateCache && twinTemplateCache.expiresAt > now) {
+    return twinTemplateCache.value;
+  }
+
+  let template =
+    (await getTemplateById(CREATIVE_TWIN_TEMPLATE_ID).catch(() => null)) ?? null;
+
+  if (!template) {
+    const all = await listPublicTemplates().catch(() => [] as PinataTemplate[]);
+    template =
+      all.find((t) => t.templateId === CREATIVE_TWIN_TEMPLATE_ID) ??
+      all.find((t) => t.slug === CREATIVE_TWIN_TEMPLATE_SLUG) ??
+      null;
+  }
+
+  if (!template) {
+    template = creativeTwinTemplateFallback();
+  }
+
+  twinTemplateCache = { value: template, expiresAt: now + TEMPLATE_TTL_MS };
+  return template;
 }
 
 export async function getAgentDetailsResponse(
