@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import {
+  CREATIVE_TWIN_TEMPLATE_ID,
   CREATIVE_TWIN_TEMPLATE_URL,
   findCreativeTwinTemplate,
 } from "@/lib/pinata/api";
@@ -18,7 +19,7 @@ export async function GET() {
         {
           success: false,
           error:
-            "Twin template not found. Ensure PINATA_JWT can read template tmernpdi, or publish it to the marketplace.",
+            `Twin template not found. Ensure PINATA_JWT can read template ${CREATIVE_TWIN_TEMPLATE_ID} (slug creative-ai-digital-twin), or publish it to the marketplace.`,
           deployUrl: CREATIVE_TWIN_TEMPLATE_URL,
         },
         { status: 404 }
@@ -35,6 +36,7 @@ export async function GET() {
       {
         success: false,
         error: err instanceof Error ? err.message : "Failed to fetch template",
+        deployUrl: CREATIVE_TWIN_TEMPLATE_URL,
       },
       { status: 502 }
     );

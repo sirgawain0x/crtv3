@@ -38,10 +38,19 @@ export const CREATIVE_TWIN_TEMPLATE_SLUG = "creative-ai-digital-twin";
 export const CREATIVE_TWIN_TEMPLATE_ID =
   process.env.CREATIVE_TWIN_TEMPLATE_ID?.trim() || "tmernpdi";
 
-/** Direct deploy / template page (org-scoped, not the public marketplace). */
+/** Pinata org segment used when building the default template page URL. */
+const CREATIVE_TWIN_TEMPLATE_ORG =
+  process.env.CREATIVE_TWIN_TEMPLATE_ORG?.trim() ||
+  "org_3Ar9vPhBBqDLVh1GlNO9kFTsGlS";
+
+/**
+ * Direct deploy / template page (org-scoped, not the public marketplace).
+ * Derived from CREATIVE_TWIN_TEMPLATE_ID unless CREATIVE_TWIN_TEMPLATE_URL is set,
+ * so ID-only overrides stay consistent with the deploy CTA.
+ */
 export const CREATIVE_TWIN_TEMPLATE_URL =
   process.env.CREATIVE_TWIN_TEMPLATE_URL?.trim() ||
-  "https://agents.pinata.cloud/org_3Ar9vPhBBqDLVh1GlNO9kFTsGlS/templates/tmernpdi";
+  `https://agents.pinata.cloud/${CREATIVE_TWIN_TEMPLATE_ORG}/templates/${CREATIVE_TWIN_TEMPLATE_ID}`;
 
 /**
  * Subset of the Template schema we render in the UI. The full schema has many

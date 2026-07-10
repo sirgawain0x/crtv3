@@ -450,9 +450,21 @@ export function DigitalTwinSection({
                     )}
                   </div>
                 ) : templateError ? (
-                  <p className="text-xs text-muted-foreground">
-                    Couldn't load template metadata: {templateError}
-                  </p>
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground">
+                      Couldn't load template metadata: {templateError}
+                    </p>
+                    {!status?.connected && (
+                      <a
+                        href={deployUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
+                      >
+                        <ExternalLink className="h-3 w-3" /> Deploy this template on Pinata
+                      </a>
+                    )}
+                  </div>
                 ) : (
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <Loader2 className="h-3 w-3 animate-spin" /> Loading template…
