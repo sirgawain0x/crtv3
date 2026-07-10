@@ -19,7 +19,7 @@ function formatExpiration(expiration?: number): string {
   if (ms > 32503680000000) return "Lifetime / Never expires";
   const date = new Date(ms);
   if (date.toString() === "Invalid Date") return "Unknown";
-  return date.toLocaleDateString(undefined, {
+  return date.toLocaleDateString("en-US", {
     year: "numeric",
     month: "short",
     day: "numeric",
