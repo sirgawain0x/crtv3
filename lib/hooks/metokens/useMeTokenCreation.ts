@@ -8,7 +8,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useSmartAccountClient } from '@/lib/wallet/react';
 import { useGasSponsorship } from '@/lib/hooks/wallet/useGasSponsorship';
-import { formatEther, parseEther, type Address } from 'viem';
+import { formatEther, parseEther, encodeFunctionData, erc20Abi, maxUint256, type Address } from 'viem';
 import { parseBundlerError } from '@/lib/utils/bundlerErrorParser';
 import {
   parseHubAssetAmount,
@@ -19,6 +19,7 @@ import { logger } from '@/lib/utils/logger';
 import { METOKEN_DIAMOND_BASE } from '@/lib/contracts/metokens/deployments';
 import { publicClient, getErc20Balance, getEthBalance } from '@/lib/viem';
 import { formatMeTokenCreationError } from '@/lib/metokens/metoken-gas';
+import { appendBuilderCode } from '@/lib/utils/builder-code';
 import {
   buildMeTokenCreationCalls,
   sendMeTokenCreationUserOp,
@@ -276,11 +277,187 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
       updateState({
         status: 'creating_metoken',
         message: depositAmount > BigInt(0)
-          ? `Creating your MeToken (approve + subscribe)...`
+          ? `Approving ${collateral.symbol}...`
           : 'Creating your MeToken...',
         progress: 40,
       });
 
+      // When depositing collateral, send approve and subscribe as SEPARATE
+      // UserOperations instead of a batched one. The batched approach fails
+      // because the bundler's RPC node doesn't see the approval during
+      // gas estimation of the subscribe call.
+      if (depositAmount > BigInt(0)) {
+        const approveData = encodeFunctionData({
+          abi: erc20Abi,
+          functionName: 'approve',
+          args: [vaultAddress, maxUint256],
+        });
+
+        logger.debug('📝 Sending approve as separate UserOperation...');
+
+        try {
+          const approveOp = await sendMeTokenCreationUserOp({
+            client,
+            calls: [{
+              target: collateral.address,
+              data: appendBuilderCode(approveData),
+              value: BigInt(0),
+            }],
+            gas: meTokenGas,
+            ethFallback: () => getGasContext('eth'),
+          });
+
+          updateState({
+            status: 'creating_metoken',
+            message: 'Approval sent! Waiting for confirmation...',
+            progress: 50,
+            userOpHash: approveOp.hash,
+          });
+
+          try {
+            const approveTx = await waitForMeTokenCreationTx(client, approveOp.hash);
+            logger.debug('✅ Approve confirmed:', approveTx);
+          } catch (waitErr) {
+            logger.debug('⏰ Approve confirmation issue (continuing):', waitErr);
+          }
+
+          // Wait for state propagation
+          await new Promise(resolve => setTimeout(resolve, 5000));
+        } catch (approveErr) {
+          logger.warn('⚠️ Separate approve failed, falling back to 0 deposit...', approveErr);
+          // Fall back to 0 deposit if approve fails
+          const zeroDepositCalls = buildMeTokenCreationCalls({
+            collateral,
+            vaultAddress,
+            name,
+            symbol,
+            hubId,
+            depositAmount: BigInt(0),
+          });
+
+          updateState({
+            status: 'creating_metoken',
+            message: 'Creating your MeToken (no initial deposit)...',
+            progress: 55,
+          });
+
+          let fallbackOp: { hash: string; policyId?: string; usedEthFallback: boolean };
+          try {
+            fallbackOp = await sendMeTokenCreationUserOp({
+              client,
+              calls: zeroDepositCalls,
+              gas: meTokenGas,
+              ethFallback: () => getGasContext('eth'),
+            });
+          } catch (fbErr) {
+            throw fbErr;
+          }
+
+          // Continue with the zero-deposit operation
+          const pendingTx: PendingMeTokenTransaction = {
+            userOpHash: fallbackOp.hash,
+            creatorAddress: address,
+            name,
+            symbol,
+            hubId,
+            assetsDeposited: '0',
+            createdAt: Date.now(),
+            status: 'confirming',
+          };
+          savePendingTransaction(pendingTx);
+          setPendingTransactions(prev => [...prev.filter(t => t.userOpHash !== fallbackOp.hash), pendingTx]);
+
+          updateState({
+            status: 'waiting_confirmation',
+            message: 'Waiting for blockchain confirmation...',
+            progress: 60,
+            userOpHash: fallbackOp.hash,
+          });
+
+          // Jump to the confirmation flow
+          let fbTxHash: string | null = null;
+          try {
+            fbTxHash = await waitForMeTokenCreationTx(client, fallbackOp.hash);
+          } catch (waitErr) {
+            logger.debug('⏰ Confirmation issue:', waitErr);
+          }
+
+          // Poll for MeToken address
+          updateState({
+            status: 'polling_status',
+            message: 'Looking for your newly created MeToken...',
+            progress: 80,
+            userOpHash: fallbackOp.hash,
+            txHash: fbTxHash || undefined,
+          });
+
+          let fbMeTokenAddress: Address | undefined;
+          if (fbTxHash) {
+            try {
+              const receiptResult = await verifyMeTokenCreationReceipt({
+                txHash: fbTxHash as `0x${string}`,
+                owner: address as Address,
+                vaultAddress,
+                collateralToken: collateral.address,
+                depositAmount: BigInt(0),
+              });
+              fbMeTokenAddress = receiptResult.meTokenAddress;
+            } catch (e) {
+              logger.debug('Receipt verification failed:', e);
+            }
+          }
+
+          if (!fbMeTokenAddress) {
+            await new Promise(resolve => setTimeout(resolve, 5000));
+            fbMeTokenAddress = (await pollForMeToken(pendingTx, 30)) as Address | undefined;
+          }
+
+          if (fbMeTokenAddress) {
+            pendingTx.meTokenAddress = fbMeTokenAddress;
+            pendingTx.status = 'confirmed';
+            savePendingTransaction(pendingTx);
+            setTimeout(() => {
+              removePendingTransaction(pendingTx.userOpHash);
+              setPendingTransactions(prev => prev.filter(t => t.userOpHash !== pendingTx.userOpHash));
+            }, 5000);
+
+            updateState({
+              status: 'success',
+              message: 'MeToken created with 0 initial deposit. You can add collateral later.',
+              progress: 100,
+              userOpHash: fallbackOp.hash,
+              txHash: fbTxHash || undefined,
+              meTokenAddress: fbMeTokenAddress,
+              name,
+              symbol,
+            });
+            return;
+          }
+
+          if (fbTxHash) {
+            updateState({
+              status: 'success',
+              message: 'Transaction confirmed! Your MeToken should appear shortly.',
+              progress: 100,
+              userOpHash: fallbackOp.hash,
+              txHash: fbTxHash,
+              name,
+              symbol,
+            });
+            return;
+          }
+
+          throw new Error('MeToken creation failed — no transaction hash or MeToken address found.');
+        }
+
+        updateState({
+          status: 'creating_metoken',
+          message: 'Creating your MeToken (with initial deposit)...',
+          progress: 55,
+        });
+      }
+
+      // Build subscribe-only calls (approve already done separately if deposit > 0)
       const calls = buildMeTokenCreationCalls({
         collateral,
         vaultAddress,
