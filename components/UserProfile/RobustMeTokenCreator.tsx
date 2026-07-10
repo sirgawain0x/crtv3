@@ -496,6 +496,12 @@ function TokenLogo({
 }) {
   const [errored, setErrored] = useState(false);
   const src = logoSrc ?? config.logo;
+  const [prevSrc, setPrevSrc] = useState(src);
+
+  if (src !== prevSrc) {
+    setPrevSrc(src);
+    setErrored(false);
+  }
 
   if (errored || !src) {
     return (
