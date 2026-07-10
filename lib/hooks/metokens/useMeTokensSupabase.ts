@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useUser, useSmartAccountClient } from '@/lib/wallet/react';
-import { parseEther, formatEther, encodeFunctionData } from 'viem';
+import { parseEther, formatEther, formatUnits, encodeFunctionData } from 'viem';
 import { meTokenSupabaseService, MeToken, MeTokenBalance } from '@/lib/sdk/supabase/metokens';
 import { CreateMeTokenData, UpdateMeTokenData } from '@/lib/sdk/supabase/client';
 import { getMeTokenFactoryContract, METOKEN_FACTORY_ADDRESSES } from '@/lib/contracts/MeTokenFactory';
@@ -1804,11 +1804,35 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         args: [meTokenAddress as `0x${string}`, parseEther(meTokenAmount), address as `0x${string}`],
       });
 
-      const assetsReturned = formatEther(result as bigint);
+      // Determine the collateral token's decimals from the MeToken's hub
+      const meTokenInfo = await publicClient.readContract({
+        address: DIAMOND,
+        abi: METOKEN_ABI,
+        functionName: 'getMeTokenInfo',
+        args: [meTokenAddress as `0x${string}`],
+      }) as any;
+
+      const hubIdNum = Number(meTokenInfo.hubId ?? meTokenInfo[1] ?? 1n);
+      const hubInfo = await publicClient.readContract({
+        address: DIAMOND,
+        abi: METOKEN_ABI,
+        functionName: 'getHubInfo',
+        args: [BigInt(hubIdNum)],
+      }) as any;
+
+      const assetAddress = Array.isArray(hubInfo)
+        ? (hubInfo[7] as string)
+        : ((hubInfo as { asset?: string }).asset ?? (hubInfo as any)[7]);
+
+      const hubAsset = resolveHubAsset(hubIdNum, assetAddress);
+
+      const assetsReturned = formatUnits(result as bigint, hubAsset.decimals);
       logger.debug('✅ calculateAssetsReturned result:', {
         resultWei: (result as bigint).toString(),
         assetsReturned,
-        meTokenAmount
+        meTokenAmount,
+        hubId: hubIdNum,
+        decimals: hubAsset.decimals
       });
 
       return assetsReturned;

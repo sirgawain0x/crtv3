@@ -11,7 +11,7 @@ import { Loader2, TrendingUp, TrendingDown, AlertCircle, CheckCircle, Lock, Exte
 import { formatEther, formatUnits, parseEther, parseUnits, encodeFunctionData, type Address } from 'viem';
 import { useSmartAccountClient, useChain, useAuthModal, useUser } from '@/lib/wallet/react';
 import { MeTokenSubscription } from './MeTokenSubscription';
-import { DaiFundingOptions } from '@/components/wallet/funding/DaiFundingOptions';
+import { FundingOptions } from '@/components/wallet/buy/FundingOptions';
 import { useToast } from '@/components/ui/use-toast';
 import { logger } from '@/lib/utils/logger';
 import { getErc20Balance } from '@/lib/viem';
@@ -129,7 +129,6 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
 
   // Check subscription status on mount and when meToken data changes
   useEffect(() => {
-    checkSubscriptionStatus();
     checkSubscriptionStatus();
     checkCollateralBalance();
   }, [meToken.address, meToken.info?.balancePooled, meToken.info?.balanceLocked, meToken.hubId, checkSubscriptionStatus, checkCollateralBalance]);
@@ -499,12 +498,24 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
         </Card>
 
         {collateral.symbol === 'USDC' ? (
-          <DaiFundingOptions
-            onBalanceUpdate={(newBalance) => {
-              setCollateralBalance(newBalance);
-              // If user gets collateral, we'll automatically show the trading interface
-            }}
-          />
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <AlertCircle className="h-5 w-5 text-orange-500" />
+                Get {collateral.symbol}
+              </CardTitle>
+              <CardDescription>
+                You need {collateral.symbol} to trade {meToken.name} tokens.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <FundingOptions
+                asset="USDC"
+                presetFiatAmount={50}
+                onSuccess={() => checkCollateralBalance()}
+              />
+            </CardContent>
+          </Card>
         ) : (
           <Card>
             <CardHeader>
@@ -629,10 +640,10 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
 
             {buyAmount && parseFloat(buyAmount) > 0 && collateralBalance < parseUnits(buyAmount, collateral.decimals) && (
               collateral.symbol === 'USDC' ? (
-                <DaiFundingOptions
-                  requiredAmount={parseUnits(buyAmount, collateral.decimals).toString()}
-                  onBalanceUpdate={setCollateralBalance}
-                  className="mb-4"
+                <FundingOptions
+                  asset="USDC"
+                  presetFiatAmount={Math.ceil(parseFloat(buyAmount))}
+                  onSuccess={() => checkCollateralBalance()}
                 />
               ) : (
                 <Alert className="mb-4">
