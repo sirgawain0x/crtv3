@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   HUB_ASSET_CONFIGS,
   HUB_PREFERENCE_ORDER,
@@ -139,15 +139,24 @@ export function useMeTokenHubs() {
     fetchHubs();
   }, [fetchHubs]);
 
-  const activeHubs = hubs.filter((h) => h.active);
+  const activeHubs = useMemo(() => hubs.filter((h) => h.active), [hubs]);
 
-  const defaultHub =
-    HUB_PREFERENCE_ORDER.map((sym) => activeHubs.find((h) => h.symbol === sym)).find(Boolean) ??
-    activeHubs[0] ??
-    null;
+  const defaultHub = useMemo(
+    () =>
+      HUB_PREFERENCE_ORDER.map((sym) => activeHubs.find((h) => h.symbol === sym)).find(Boolean) ??
+      activeHubs[0] ??
+      null,
+    [activeHubs]
+  );
 
-  const recommendedHubs = activeHubs.filter((h) => h.recommended || h.symbol === 'USDC');
-  const legacyHubs = activeHubs.filter((h) => h.deprecated || h.symbol === 'DAI');
+  const recommendedHubs = useMemo(
+    () => activeHubs.filter((h) => h.recommended || h.symbol === 'USDC'),
+    [activeHubs]
+  );
+  const legacyHubs = useMemo(
+    () => activeHubs.filter((h) => h.deprecated || h.symbol === 'DAI'),
+    [activeHubs]
+  );
 
   return {
     hubs,
