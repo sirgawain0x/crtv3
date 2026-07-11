@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, forwardRef, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useRef, forwardRef, useMemo, useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   CheckIcon,
   ChevronDownIcon,
@@ -201,10 +202,52 @@ export default function VideoDetails({
   const [dbStatus, setDbStatus] = useState<"draft" | "published" | "minted" | "archived" | null>(null);
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
 
+  const containerRef = useRef<HTMLDivElement>(null);
+  const queryClient = useQueryClient();
+
   const user = useUser();
   const account = useMemo(() => userToAccount(user), [user]);
   const { openAuthModal } = useAuthModal();
   const isConnected = !!user;
+
+  useEffect(() => {
+    if (!asset?.playbackId) return;
+
+    const container = containerRef.current;
+    if (!container) return;
+
+    let incrementing = false;
+    let incremented = false;
+
+    const video = container.querySelector("video");
+    if (!video) return;
+
+    const handlePlay = async () => {
+      if (incremented || incrementing) return;
+      incrementing = true;
+      incremented = true;
+
+      try {
+        const response = await fetch(`/api/video-assets/views/increment/${encodeURIComponent(asset.playbackId!)}`, {
+          method: "POST",
+        });
+        if (response.ok) {
+          await queryClient.invalidateQueries({
+            queryKey: ["livepeer-view-metrics", asset.playbackId],
+          });
+        }
+      } catch (err) {
+        console.error("Failed to increment views:", err);
+      } finally {
+        incrementing = false;
+      }
+    };
+
+    video.addEventListener("play", handlePlay);
+    return () => {
+      video.removeEventListener("play", handlePlay);
+    };
+  }, [asset?.playbackId, queryClient]);
 
   const loadPlaybackSources = useCallback(async () => {
     if (!asset?.playbackId) {
@@ -624,7 +667,7 @@ export default function VideoDetails({
                 volume={0}
                 {...conditionalProps}
               >
-                <Player.Container className="aspect-video w-full overflow-hidden rounded-lg bg-gray-800">
+                <Player.Container ref={containerRef} className="aspect-video w-full overflow-hidden rounded-lg bg-gray-800">
                   <Player.Video
                     title={asset?.name}
                     className="h-full w-full"

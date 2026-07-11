@@ -101,7 +101,14 @@ CREATE POLICY allow_insert_song_cup_submissions
     ON public.song_cup_submissions
     FOR INSERT
     TO authenticated
-    WITH CHECK (true);
+    WITH CHECK (
+        LOWER(wallet_address) = LOWER((auth.jwt() -> 'app_metadata' ->> 'wallet_address'))
+        AND NOT EXISTS (
+            SELECT 1
+            FROM public.song_cup_submissions AS existing
+            WHERE LOWER(existing.wallet_address) = LOWER((auth.jwt() -> 'app_metadata' ->> 'wallet_address'))
+        )
+    );
 
 -- UPDATE: admins only
 CREATE POLICY allow_update_song_cup_submissions

@@ -1,3 +1,5 @@
+import { Calendar, type LucideIcon } from "lucide-react";
+
 export type SongCupPanel =
   | "feed"
   | "songcup"
@@ -5,7 +7,7 @@ export type SongCupPanel =
   | "submit"
   | "vote"
   | "predict"
-  | "leaderboard";
+  | "schedule";
 
 export type SidebarIconId = SongCupPanel | "beatme" | "worldcup";
 
@@ -17,6 +19,7 @@ export type SidebarIcon = {
   externalHref?: string;
   /** Fixed icon backdrop (e.g. Beat Me artwork needs black in light mode). */
   iconBgClass?: string;
+  lucideIcon?: LucideIcon;
 };
 
 export const SONG_CUP_BUTTON_ICONS: SidebarIcon[] = [
@@ -47,9 +50,10 @@ export const SONG_CUP_BUTTON_ICONS: SidebarIcon[] = [
     alt: "Predict",
   },
   {
-    id: "leaderboard",
-    src: "/songchain/button-icons/leaderboard-icon.svg",
-    alt: "Leaderboard",
+    id: "schedule",
+    src: "",
+    alt: "Schedule",
+    lucideIcon: Calendar,
   },
   {
     id: "feed",

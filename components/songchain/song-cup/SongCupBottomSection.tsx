@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import { SongCupInfoPanel } from "./SongCupInfoPanel";
 import { SongCupPixelsPanel } from "./SongCupPixelsPanel";
 import { SongCupSubmitPanel } from "./SongCupSubmitPanel";
@@ -58,8 +58,8 @@ function getPreviewCopy(panel: SongCupPanel) {
       return { title: "Vote", description: "Cast your votes for this round’s entries." };
     case "predict":
       return { title: "Predict", description: "Predict outcomes and compete on the leaderboard." };
-    case "leaderboard":
-      return { title: "Leaderboard", description: "Top contributors, voters, and creators this season." };
+    case "schedule":
+      return { title: "Schedule", description: "Event schedule, matches, and head-to-head vote results." };
     default:
       return { title: panel, description: `Preview content for ${panel}.` };
   }
@@ -99,7 +99,8 @@ function ActivePanel({
   if (panel === "songcup") return <SongCupInfoPanel onGoToSubmit={onGoToSubmit} />;
   if (panel === "pixels") return <SongCupPixelsPanel />;
   if (panel === "submit") return <SongCupSubmitPanel />;
-  if (panel === "vote") return <SongCupVotePanel orbClubUrl={props.orbClubUrl} />;
+  if (panel === "vote") return <SongCupVotePanel title="VOTE NOW" orbClubUrl={props.orbClubUrl} />;
+  if (panel === "schedule") return <SongCupVotePanel title="SCHEDULE" orbClubUrl={props.orbClubUrl} />;
   if (panel === "predict") return <SongCupPredictPanel />;
   if (!panel) return null;
   return <PreviewPanel panel={panel} />;
@@ -114,7 +115,8 @@ function ActivePanelBanner({ panel }: { panel: SongCupPanel | null }) {
     panel === "submit" ||
     panel === "pixels" ||
     panel === "vote" ||
-    panel === "predict"
+    panel === "predict" ||
+    panel === "schedule"
   ) {
     return null;
   }
@@ -174,7 +176,8 @@ export function SongCupBottomSection(props: SongCupBottomSectionProps) {
               activePanel === "submit" ||
               activePanel === "pixels" ||
               activePanel === "vote" ||
-              activePanel === "predict"
+              activePanel === "predict" ||
+              activePanel === "schedule"
                 ? "border-0 bg-transparent p-0"
                 : "rounded-2xl border border-fuchsia-500/20",
             )}
@@ -205,7 +208,7 @@ export function SongCupBottomSection(props: SongCupBottomSectionProps) {
         <SongCupAgentSearch className="w-full max-w-[367px]" />
       </div>
       <div className="flex flex-col gap-4">
-        {SONG_CUP_BUTTON_ICONS.map(({ id, src, alt, externalHref, dividerAfter, iconBgClass }) => {
+        {SONG_CUP_BUTTON_ICONS.map(({ id, src, alt, externalHref, dividerAfter, iconBgClass, lucideIcon }) => {
           const isActive = activePanel === id;
           const isPanel = id !== "beatme" && id !== "worldcup";
           const iconWrapClass = cn(
@@ -236,7 +239,15 @@ export function SongCupBottomSection(props: SongCupBottomSectionProps) {
                       )}
                     >
                       <div className={iconInnerClass}>
-                        <img src={src} alt={alt} className="h-full w-full object-contain" />
+                        {lucideIcon ? (
+                          <div className="flex h-12 w-12 items-center justify-center p-2.5">
+                            {React.createElement(lucideIcon, {
+                              className: "h-full w-full text-white",
+                            })}
+                          </div>
+                        ) : (
+                          <img src={src} alt={alt} className="h-full w-full object-contain" />
+                        )}
                       </div>
                     </div>
                     <span className={songCupSidebarMobileLabel}>{alt}</span>
@@ -263,7 +274,15 @@ export function SongCupBottomSection(props: SongCupBottomSectionProps) {
                       )}
                     >
                       <div className={iconInnerClass}>
-                        <img src={src} alt={alt} className="h-full w-full object-contain" />
+                        {lucideIcon ? (
+                          <div className="flex h-12 w-12 items-center justify-center p-2.5">
+                            {React.createElement(lucideIcon, {
+                              className: "h-full w-full text-white",
+                            })}
+                          </div>
+                        ) : (
+                          <img src={src} alt={alt} className="h-full w-full object-contain" />
+                        )}
                       </div>
                     </div>
                     <span
@@ -286,7 +305,8 @@ export function SongCupBottomSection(props: SongCupBottomSectionProps) {
                     id === "submit" ||
                     id === "pixels" ||
                     id === "vote" ||
-                    id === "predict"
+                    id === "predict" ||
+                    id === "schedule"
                       ? "border-0 bg-transparent p-0"
                       : "rounded-2xl border border-fuchsia-500/20 bg-muted/30 dark:bg-black/40",
                   )}

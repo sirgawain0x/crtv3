@@ -22,6 +22,7 @@ type SongCupFeedPanelProps = {
   feedTitle?: string;
   feedDescription?: string;
   orbClubUrl?: string;
+  placeholder?: string;
 };
 
 export function SongCupFeedPanel({
@@ -31,6 +32,7 @@ export function SongCupFeedPanel({
   feedTitle = "Song Cup club feed",
   feedDescription = "Read the member feed. Join the club on Orb to post and react.",
   orbClubUrl,
+  placeholder,
 }: SongCupFeedPanelProps) {
   const membership = useSongchainGroupMembership({ groupId });
 
@@ -111,7 +113,7 @@ export function SongCupFeedPanel({
 
           {!membership.loading && (
             <>
-              {membership.isMember && <SongCupFeedCompose feedId={feedId} />}
+              {membership.isMember && <SongCupFeedCompose feedId={feedId} placeholder={placeholder} />}
 
               <SongCupFeedMembersRow groupId={groupId} orbClubUrl={joinHref} />
 

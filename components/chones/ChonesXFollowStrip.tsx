@@ -44,6 +44,17 @@ export function ChonesXFollowStrip({ className }: ChonesXFollowStripProps) {
       >
         @{CREATIVE_TV_X_HANDLE}
       </a>
+      <span className="text-muted-foreground" aria-hidden>
+        ·
+      </span>
+      <a
+        href="https://x.com/trigs_0"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="rounded-md px-2 py-1 text-amber-600 transition hover:bg-amber-500/10 hover:text-amber-500 dark:text-amber-300"
+      >
+        @trigs_0
+      </a>
     </div>
   );
 }

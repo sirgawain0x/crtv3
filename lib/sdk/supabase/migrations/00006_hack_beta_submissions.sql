@@ -86,7 +86,14 @@ CREATE POLICY allow_insert_hack_beta_submissions
     ON public.hack_beta_submissions
     FOR INSERT
     TO authenticated
-    WITH CHECK (true);
+    WITH CHECK (
+        LOWER(wallet_address) = LOWER((auth.jwt() -> 'app_metadata' ->> 'wallet_address'))
+        AND NOT EXISTS (
+            SELECT 1
+            FROM public.hack_beta_submissions AS existing
+            WHERE LOWER(existing.wallet_address) = LOWER((auth.jwt() -> 'app_metadata' ->> 'wallet_address'))
+        )
+    );
 
 CREATE POLICY allow_update_hack_beta_submissions
     ON public.hack_beta_submissions

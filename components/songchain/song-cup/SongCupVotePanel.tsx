@@ -32,9 +32,10 @@ const FILTERS: { id: SongCupMatchupFilter; label: string }[] = [
 type SongCupVotePanelProps = {
   className?: string;
   orbClubUrl?: string;
+  title?: string;
 };
 
-export function SongCupVotePanel({ className, orbClubUrl }: SongCupVotePanelProps) {
+export function SongCupVotePanel({ className, orbClubUrl, title = "VOTE NOW" }: SongCupVotePanelProps) {
   const clubUrl = orbClubUrl ?? SONG_CUP_PLAY_LINKS.club;
   const user = useUser();
   const { isAdmin } = useSongCupAdmin();
@@ -63,7 +64,7 @@ export function SongCupVotePanel({ className, orbClubUrl }: SongCupVotePanelProp
         <div className="relative flex flex-col items-center gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div className="flex flex-1 flex-col items-center gap-4 text-center">
             <SongCupVoteLogoBanner />
-            <SongCupVoteTitle />
+            <SongCupVoteTitle title={title} />
           </div>
           <SongCupClubQrCard
             url={clubUrl}

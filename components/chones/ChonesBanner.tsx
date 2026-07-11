@@ -38,7 +38,7 @@ export function ChonesBanner({
 
         {/* Invisible spacer matching Song Cup tagline line so mobile heights match */}
         <p
-          className="invisible max-w-full text-balance text-center text-[clamp(10px,3.2vw,32px)] font-bold uppercase leading-tight tracking-[0.02em] lg:max-w-[95%] lg:leading-none lg:whitespace-nowrap"
+          className="invisible hidden lg:block max-w-full text-balance text-center text-[clamp(10px,3.2vw,32px)] font-bold uppercase leading-tight tracking-[0.02em] lg:max-w-[95%] lg:leading-none lg:whitespace-nowrap"
           aria-hidden
         >
           PREDICT YOUR WINNER. GUESS YOUR SONG

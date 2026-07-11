@@ -1,0 +1,48 @@
+import { NextRequest, NextResponse } from "next/server";
+import { createServiceClient } from "@/lib/sdk/supabase/service";
+import { serverLogger } from "@/lib/utils/logger";
+
+export const dynamic = "force-dynamic";
+
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ playbackId: string }> }
+) {
+  try {
+    const { playbackId } = await params;
+
+    if (!playbackId || !playbackId.trim()) {
+      return NextResponse.json(
+        { error: "Playback ID is required", code: "PLAYBACK_ID_REQUIRED" },
+        { status: 400 }
+      );
+    }
+
+    const supabase = createServiceClient();
+    
+    // Atomically increment view count in database via RPC to prevent race conditions
+    const { data: newViews, error } = await supabase.rpc("increment_video_views", {
+      p_playback_id: playbackId,
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    return NextResponse.json({
+      success: true,
+      playbackId,
+      viewCount: newViews,
+    });
+  } catch (error) {
+    serverLogger.error("Error incrementing view count:", error);
+    return NextResponse.json(
+      {
+        error: "Database error",
+        code: "DATABASE_ERROR",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 }
+    );
+  }
+}
