@@ -35,3 +35,8 @@ For admin checks, the signed-in user's `app_metadata.wallet_address` must match 
 - **INSERT**: authenticated users
 
 > To prevent `wallet_address` spoofing at insert time, set `app_metadata.wallet_address` server-side using the Supabase service role.
+
+## Admin RLS Policies (`00007_admin_rls_policies.sql`)
+
+Adds RLS policies targeting `service_role` on `private.song_cup_admins` and `private.hack_beta_admins` to satisfy database security audits/scanners that flag tables that have RLS enabled but no policies defined.
+

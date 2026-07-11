@@ -55,6 +55,13 @@ CREATE TABLE IF NOT EXISTS private.song_cup_admins (
 -- No policies for anon/authenticated => deny by default.
 ALTER TABLE private.song_cup_admins ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS allow_all_to_service_role ON private.song_cup_admins;
+CREATE POLICY allow_all_to_service_role ON private.song_cup_admins
+    FOR ALL
+    TO service_role
+    USING (true)
+    WITH CHECK (true);
+
 -- Seed admin wallet (replace with real admin wallet if different)
 INSERT INTO private.song_cup_admins (wallet_address)
 VALUES ('0xdE4b0371BBa20602685916ceeE5B22025a811734')
@@ -65,6 +72,7 @@ CREATE OR REPLACE FUNCTION private.is_song_cup_admin()
 RETURNS BOOLEAN
 LANGUAGE sql
 SECURITY DEFINER
+STABLE
 SET search_path = private, public
 AS $$
     SELECT EXISTS (
@@ -73,6 +81,9 @@ AS $$
         WHERE LOWER(wallet_address) = LOWER((auth.jwt() -> 'app_metadata' ->> 'wallet_address'))
     );
 $$;
+
+REVOKE EXECUTE ON FUNCTION private.is_song_cup_admin() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION private.is_song_cup_admin() TO service_role, anon, authenticated;
 
 -- 6. Enable RLS on submissions
 ALTER TABLE public.song_cup_submissions ENABLE ROW LEVEL SECURITY;
