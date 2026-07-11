@@ -2,6 +2,10 @@
 
 import Image from "next/image";
 import { SongCupGoalButton } from "@/components/songchain/song-cup/SongCupGoalButton";
+import {
+  channelBannerContentClassName,
+  channelBannerShell,
+} from "@/lib/banners/channel-banner-shell";
 import { cn } from "@/lib/utils";
 
 type ChonesBannerProps = {
@@ -18,55 +22,44 @@ export function ChonesBanner({
   className,
 }: ChonesBannerProps) {
   return (
-    <div
-      className={cn(
-        "relative mx-auto w-full max-w-7xl overflow-hidden rounded-xl bg-[#F5F0E8] py-5 lg:aspect-[1024/274] lg:py-0",
-        className,
-      )}
-    >
-      {/* Desktop: full-bleed cream banner */}
-      <div className="pointer-events-none absolute inset-0 hidden lg:block">
-        <Image
-          src="/chones/chones-banner.png"
-          alt="Chones"
-          fill
-          className="object-cover object-center"
-          priority
-          sizes="(max-width: 1280px) 100vw, 1280px"
-        />
-      </div>
-
-      {/* Mobile: centered logo + optional ENTER (Song Cup rhythm) */}
-      <div className="relative z-10 flex flex-col items-center justify-center gap-2 px-3 lg:hidden">
-        <div className="relative h-[72px] w-full max-w-[280px] sm:h-[88px] sm:max-w-[360px]">
+    <div className={cn(channelBannerShell("bg-[#F5F0E8]"), className)}>
+      <div className={channelBannerContentClassName}>
+        {/* Match SongCupBrandLogo footprint so banner height stays in lockstep */}
+        <div className="relative aspect-[1024/173] w-[min(78vw,720px)] max-w-full lg:w-[min(82vw,720px)]">
           <Image
             src="/chones/chones-banner.png"
             alt="Chones"
             fill
             className="object-contain object-center"
             priority
-            sizes="(max-width: 640px) 280px, 360px"
+            sizes="(max-width: 1280px) 78vw, 720px"
           />
         </div>
-        {showButton && (
+
+        {/* Invisible spacer matching Song Cup tagline line so mobile heights match */}
+        <p
+          className="invisible max-w-full text-balance text-center text-[clamp(10px,3.2vw,32px)] font-bold uppercase leading-tight tracking-[0.02em] lg:max-w-[95%] lg:leading-none lg:whitespace-nowrap"
+          aria-hidden
+        >
+          PREDICT YOUR WINNER. GUESS YOUR SONG
+        </p>
+
+        {showButton ? (
           <SongCupGoalButton
             href={href}
             label={buttonLabel}
             className="animate-songcup-pulse hover:animate-none"
           />
+        ) : (
+          /* Keep vertical rhythm when ENTER is hidden (e.g. /chones page) */
+          <span
+            className="invisible inline-flex w-[clamp(120px,38vw,330px)]"
+            aria-hidden
+          >
+            <span className="aspect-[296/129] w-full" />
+          </span>
         )}
       </div>
-
-      {/* Desktop: ENTER overlaid, nudged left + slightly down */}
-      {showButton && (
-        <div className="absolute inset-0 z-10 hidden items-center justify-end pr-12 lg:flex">
-          <SongCupGoalButton
-            href={href}
-            label={buttonLabel}
-            className="translate-y-2 animate-songcup-pulse hover:animate-none"
-          />
-        </div>
-      )}
     </div>
   );
 }

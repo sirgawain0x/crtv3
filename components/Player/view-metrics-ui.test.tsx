@@ -46,6 +46,20 @@ describe("restored view count UI", () => {
     expect(useLivepeerViewMetrics).toHaveBeenCalledWith("p1");
   });
 
+  it("ViewsComponent hides when metrics are missing", () => {
+    vi.mocked(useLivepeerViewMetrics).mockReturnValue({
+      viewMetrics: null,
+      totalViews: 0,
+      loading: false,
+      error: null,
+    });
+
+    const html = renderToStaticMarkup(
+      React.createElement(ViewsComponent, { playbackId: "p1" }),
+    );
+    expect(html).toBe("");
+  });
+
   it("ViewsComponent fails quietly on metrics error", () => {
     vi.mocked(useLivepeerViewMetrics).mockReturnValue({
       viewMetrics: null,

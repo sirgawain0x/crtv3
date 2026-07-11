@@ -29,12 +29,7 @@ export const ViewsComponent: React.FC<ViewsComponentProps> = ({
   }
 
   if (!viewMetrics) {
-    return (
-      <div className="flex items-center gap-1 text-sm text-muted-foreground">
-        <EyeIcon className="h-4 w-4" />
-        <span>0 views</span>
-      </div>
-    );
+    return null;
   }
 
   return (

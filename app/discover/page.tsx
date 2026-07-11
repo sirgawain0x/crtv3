@@ -60,13 +60,12 @@ const AllVideosContent: React.FC = () => {
         </Breadcrumb>
       </div>
 
-      {/* Live Streams Section - Public */}
-      <div className="mb-8">
-        <h2 className="mb-4 text-2xl font-bold flex items-center gap-2">
-          Live Now
-        </h2>
-        <LivestreamGrid />
-      </div>
+      {/* Live Streams Section - Public (hidden when none are live) */}
+      <LivestreamGrid
+        heading="Live Now"
+        hideWhenEmpty
+        className="mb-8"
+      />
 
       {/* Videos Section */}
       <div>

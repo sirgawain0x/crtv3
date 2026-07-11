@@ -50,12 +50,16 @@ export function ChannelBannersCarousel({ className }: ChannelBannersCarouselProp
       onFocusCapture={onFocusCapture}
       onBlurCapture={onBlurCapture}
     >
-      <CarouselContent className="-ml-0">
+      <CarouselContent className="-ml-0 items-stretch">
         <CarouselItem className="pl-0">
-          <SongCupBanner />
+          <SongCupBanner className="h-full" />
         </CarouselItem>
         <CarouselItem className="pl-0">
-          <ChonesBanner href="/chones/hack-beta" buttonLabel="ENTER" />
+          <ChonesBanner
+            className="h-full"
+            href="/chones/hack-beta"
+            buttonLabel="ENTER"
+          />
         </CarouselItem>
       </CarouselContent>
       <CarouselPrevious className="left-2 sm:left-4" />
