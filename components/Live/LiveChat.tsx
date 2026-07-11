@@ -210,7 +210,7 @@ export function LiveChat({
           {viewerCount !== undefined && (
             <div className="flex items-center gap-1 text-xs text-muted-foreground">
               <Users className="h-3 w-3" />
-              <span>{viewerCount}</span>
+              <span>{viewerCount.toLocaleString()}</span>
             </div>
           )}
         </div>

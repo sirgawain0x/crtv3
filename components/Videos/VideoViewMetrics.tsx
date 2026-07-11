@@ -16,7 +16,7 @@ const VideoViewMetrics: React.FC<VideoViewMetricsProps> = ({ playbackId }) => {
 
   return (
     <h3 className="text-sm font-medium text-muted-foreground md:text-base">
-      {`${totalViews.toLocaleString()} views`}
+      {`${(totalViews ?? 0).toLocaleString()} views`}
     </h3>
   );
 };

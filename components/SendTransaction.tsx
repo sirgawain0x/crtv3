@@ -381,7 +381,7 @@ export default function SendTransaction() {
 
         {/* Info */}
         <div className="text-xs text-muted-foreground space-y-1">
-          <p>• Supported tokens on Base: ETH, USDC, USDS, DAI, GHO</p>
+          <p>• Supported tokens on Base: ETH, USDC, DAI</p>
           <p>• Transactions are powered by Alchemy Smart Wallets</p>
           {selectedToken === 'ETH' && (
             <p>• A small amount of ETH will be reserved for gas fees</p>

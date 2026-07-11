@@ -34,7 +34,7 @@ export const RealtimeViewsComponent: React.FC<RealtimeViewsComponentProps> = ({
         <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
       </span>
       <span className="font-mono font-semibold text-white/90">
-        {viewerCount.toLocaleString()} watching
+        {(viewerCount ?? 0).toLocaleString()} watching
       </span>
     </div>
   );

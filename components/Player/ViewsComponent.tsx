@@ -40,7 +40,7 @@ export const ViewsComponent: React.FC<ViewsComponentProps> = ({
   return (
     <div className="flex items-center gap-1 text-sm text-muted-foreground">
       <EyeIcon className="h-4 w-4" />
-      <span>{totalViews.toLocaleString()} views</span>
+      <span>{(totalViews ?? 0).toLocaleString()} views</span>
     </div>
   );
 };
