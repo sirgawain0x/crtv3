@@ -47,6 +47,7 @@ import { Button } from "@/components/ui/button";
 import { LiveTokenPanel } from "@/components/Live/LiveTokenPanel";
 import { LiveChat } from "@/components/Live/LiveChat";
 import { ShareDialog } from "@/components/Videos/ShareDialog";
+import { useLivepeerRealtimeMetrics } from "@/lib/hooks/livepeer/useLivepeerRealtimeMetrics";
 import { ModeratorsDialog } from "@/components/Live/ModeratorsDialog";
 import { DigitalTwinOverlay } from "@/components/Live/DigitalTwinOverlay";
 import { logger } from '@/lib/utils/logger';
@@ -126,6 +127,7 @@ export default function LivePage() {
   // same XMTP group ID.
   const chatStreamId = playbackId || "";
   const chatSessionId = playbackId ? `session-${playbackId}` : "";
+  const { viewerCount } = useLivepeerRealtimeMetrics(playbackId || "");
 
 
   const identityReady =
@@ -543,6 +545,7 @@ export default function LivePage() {
                         streamId={chatStreamId}
                         sessionId={chatSessionId}
                         creatorAddress={creatorAddress!}
+                        viewerCount={viewerCount}
                         variant="host"
                         className="h-[min(70vh,520px)] mt-4"
                       />

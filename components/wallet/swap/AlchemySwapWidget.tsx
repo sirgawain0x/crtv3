@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, ArrowRightLeft, CheckCircle, XCircle, ExternalLink, DollarSign } from 'lucide-react';
+import { Loader2, ArrowRightLeft, CheckCircle, XCircle, ExternalLink, DollarSign, ChevronDown } from 'lucide-react';
 import Image from 'next/image';
 import { useSmartAccountClient, useChain, usePrepareSwap, useSignAndSendPreparedCalls } from '@/lib/wallet/react';
 import { type Hex, type Address, parseEther, formatEther, encodeFunctionData, erc20Abi, parseUnits, maxUint256 } from 'viem';
@@ -16,6 +16,77 @@ import { CurrencyConverter } from '@/lib/utils/currency-converter';
 import { logger } from '@/lib/utils/logger';
 import { getTokenIcon } from '@/lib/utils/token-icons';
 import { getEthBalance, getErc20Balance } from '@/lib/viem';
+import { cn } from '@/lib/utils';
+
+function SwapTokenSelect({
+  value,
+  onValueChange,
+  chainId,
+  disabled,
+}: {
+  value: TokenSymbol;
+  onValueChange: (token: TokenSymbol) => void;
+  chainId?: number;
+  disabled?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        'relative flex h-10 w-[7.25rem] shrink-0 items-center gap-1.5 overflow-hidden rounded-md border bg-background px-2',
+        'sm:w-32 sm:gap-2 sm:px-3',
+        disabled && 'opacity-50',
+      )}
+    >
+      {/* Native select covers the box on mobile */}
+      <select
+        className="absolute inset-0 z-10 cursor-pointer opacity-0 md:hidden"
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onValueChange(e.target.value as TokenSymbol)}
+        aria-label="Select token"
+      >
+        {SWAP_UI_TOKENS.map((token) => (
+          <option key={token} value={token}>
+            {token}
+          </option>
+        ))}
+      </select>
+
+      <Image
+        src={getTokenIcon(value, chainId)}
+        alt=""
+        width={24}
+        height={24}
+        className="h-6 w-6 shrink-0"
+        aria-hidden
+      />
+
+      {/* Mobile visual: label + chevron stay inside the box */}
+      <span className="min-w-0 flex-1 truncate text-sm font-medium md:hidden">{value}</span>
+      <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-50 md:hidden" aria-hidden />
+
+      {/* Desktop: Radix select */}
+      <Select value={value} onValueChange={(v) => onValueChange(v as TokenSymbol)} disabled={disabled}>
+        <SelectTrigger
+          className={cn(
+            'hidden h-auto min-w-0 flex-1 border-0 bg-transparent p-0 shadow-none',
+            'focus:ring-0 focus:ring-offset-0 md:flex',
+            '[&>span]:min-w-0 [&>span]:truncate',
+          )}
+        >
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {SWAP_UI_TOKENS.map((token) => (
+            <SelectItem key={token} value={token}>
+              {token}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
 
 function formatSwapError(error: unknown): string {
   const errorStr = error instanceof Error ? error.message : String(error);
@@ -636,38 +707,14 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
               </Button>
             </div>
           </div>
-          <div className="flex gap-2">
-            <div className="relative flex items-center space-x-2 px-3 border rounded-md bg-background w-28 sm:w-32 h-10">
-              {/* Native Select for Mobile */}
-              <select
-                className="absolute inset-0 w-full h-full opacity-0 z-10 cursor-pointer md:hidden"
-                value={swapState.fromToken}
-                onChange={(e) => handleFromTokenChange(e.target.value as TokenSymbol)}
-              >
-                {SWAP_UI_TOKENS.map((token) => (
-                  <option key={token} value={token}>{token}</option>
-                ))}
-              </select>
-
-              <Image
-                src={getTokenIcon(swapState.fromToken, client?.chain?.id ?? chain?.id)}
-                alt={swapState.fromToken}
-                width={32}
-                height={32}
-                className="w-8 h-8 shrink-0"
-              />
-              <Select value={swapState.fromToken} onValueChange={handleFromTokenChange}>
-                <SelectTrigger className="w-full bg-transparent border-none outline-none p-0 h-auto focus:ring-0">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {SWAP_UI_TOKENS.map((token) => (
-                    <SelectItem key={token} value={token}>{token}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex-1 relative">
+          <div className="flex items-center gap-2">
+            <SwapTokenSelect
+              value={swapState.fromToken}
+              onValueChange={handleFromTokenChange}
+              chainId={client?.chain?.id ?? chain?.id}
+              disabled={isSwapBusy}
+            />
+            <div className="relative min-w-0 flex-1">
               <Input
                 type="number"
                 placeholder={inputMode === 'usd' ? '0.00' : '0.0'}
@@ -677,11 +724,11 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
                     ? handleUSDInputChange(e.target.value)
                     : handleFromAmountChange(e.target.value)
                 }
-                className={inputMode === 'usd' ? 'pl-6 pr-20 h-10' : 'pr-20 h-10'}
+                className={inputMode === 'usd' ? 'h-10 pl-6 pr-20' : 'h-10 pr-20'}
                 disabled={isSwapBusy}
               />
               {inputMode === 'usd' && (
-                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground pointer-events-none">
+                <div className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
                   $
                 </div>
               )}
@@ -759,44 +806,20 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
         {/* To Token */}
         <div className="space-y-2">
           <label className="text-sm font-medium">You Receive</label>
-          <div className="flex gap-2">
-            <div className="relative flex items-center space-x-2 px-3 border rounded-md bg-background w-28 sm:w-32 h-10">
-              {/* Native Select for Mobile */}
-              <select
-                className="absolute inset-0 w-full h-full opacity-0 z-10 cursor-pointer md:hidden"
-                value={swapState.toToken}
-                onChange={(e) => handleToTokenChange(e.target.value as TokenSymbol)}
-              >
-                {SWAP_UI_TOKENS.map((token) => (
-                  <option key={token} value={token}>{token}</option>
-                ))}
-              </select>
-
-              <Image
-                src={getTokenIcon(swapState.toToken, client?.chain?.id ?? chain?.id)}
-                alt={swapState.toToken}
-                width={32}
-                height={32}
-                className="w-8 h-8 shrink-0"
-              />
-              <Select value={swapState.toToken} onValueChange={handleToTokenChange}>
-                <SelectTrigger className="w-full bg-transparent border-none outline-none p-0 h-auto focus:ring-0">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {SWAP_UI_TOKENS.map((token) => (
-                    <SelectItem key={token} value={token}>{token}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex-1 relative">
+          <div className="flex items-center gap-2">
+            <SwapTokenSelect
+              value={swapState.toToken}
+              onValueChange={handleToTokenChange}
+              chainId={client?.chain?.id ?? chain?.id}
+              disabled={isSwapBusy}
+            />
+            <div className="relative min-w-0 flex-1">
               <Input
                 type="number"
                 placeholder="0.0"
                 value={swapState.toAmount}
                 readOnly
-                className="bg-muted pr-20 h-10"
+                className="h-10 bg-muted pr-20"
               />
               {usdValues.toAmount > 0 && (
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
@@ -881,7 +904,7 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
 
         {/* Supported Tokens Info */}
         <div className={`text-xs text-muted-foreground ${compact ? 'hidden' : ''}`}>
-          <p>Supported tokens on Base: ETH, USDC, DAI</p>
+          <p>Supported tokens on Base: ETH, USDC, USDS, DAI, GHO</p>
           <p>Swaps powered by Alchemy Smart Wallets</p>
         </div>
       </CardContent>

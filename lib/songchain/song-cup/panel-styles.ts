@@ -104,7 +104,7 @@ export const songCupSidebarIconRingActive = cn(
 
 export const songCupSidebarMobileLabel = cn(
   "font-medium uppercase transition-colors duration-200",
-  "text-white group-hover:text-[#feed01] group-focus-visible:text-[#feed01]",
+  "text-foreground dark:text-white group-hover:text-[#feed01] group-focus-visible:text-[#feed01]",
 );
 
 export const songCupSidebarMobileLabelActive = "text-[#feed01]";

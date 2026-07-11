@@ -4,6 +4,10 @@ import { Montserrat_Alternates } from "next/font/google";
 import Image from "next/image";
 import { SongCupBrandLogo } from "@/components/songchain/song-cup/SongCupBrandLogo";
 import { SongCupGoalButton } from "@/components/songchain/song-cup/SongCupGoalButton";
+import {
+  channelBannerContentClassName,
+  channelBannerShell,
+} from "@/lib/banners/channel-banner-shell";
 import { cn } from "@/lib/utils";
 
 const montserratAlternates = Montserrat_Alternates({
@@ -27,12 +31,12 @@ export function SongCupBanner({
     <div
       className={cn(
         montserratAlternates.className,
-        "relative mx-auto w-full max-w-7xl overflow-hidden rounded-xl bg-black py-5 lg:aspect-[1024/274] lg:py-0",
+        channelBannerShell("bg-black"),
         className,
       )}
     >
       <div
-        className="pointer-events-none absolute left-[-20%] top-1/2 -translate-y-1/2 w-[100%] aspect-square opacity-90 lg:hidden"
+        className="pointer-events-none absolute left-[-20%] top-1/2 aspect-square w-[100%] -translate-y-1/2 opacity-90 lg:hidden"
         aria-hidden
       >
         <Image
@@ -64,7 +68,7 @@ export function SongCupBanner({
         />
       </div>
 
-      <div className="relative z-10 flex flex-col items-center justify-center gap-2 px-3 lg:h-full lg:gap-2 lg:px-4">
+      <div className={channelBannerContentClassName}>
         <SongCupBrandLogo priority />
 
         <p className="max-w-full text-balance text-center text-[clamp(10px,3.2vw,32px)] font-bold uppercase leading-tight tracking-[0.02em] text-white lg:max-w-[95%] lg:leading-none lg:whitespace-nowrap">
@@ -72,7 +76,11 @@ export function SongCupBanner({
         </p>
 
         {showButton && (
-          <SongCupGoalButton href="/songchain/song-cup" label={buttonLabel} className="animate-songcup-pulse hover:animate-none" />
+          <SongCupGoalButton
+            href="/songchain/song-cup"
+            label={buttonLabel}
+            className="animate-songcup-pulse hover:animate-none"
+          />
         )}
       </div>
     </div>

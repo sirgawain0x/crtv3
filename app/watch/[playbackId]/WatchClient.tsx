@@ -22,6 +22,7 @@ import {
 import Link from "next/link";
 import { RealtimeViewsComponent } from "@/components/Player/RealtimeViewsComponent";
 import { ViewsComponent } from "@/components/Player/ViewsComponent";
+import { useLivepeerRealtimeMetrics } from "@/lib/hooks/livepeer/useLivepeerRealtimeMetrics";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -83,6 +84,8 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
   const playbackId = Array.isArray(params.playbackId)
     ? params.playbackId[0]
     : params.playbackId;
+
+  const { viewerCount } = useLivepeerRealtimeMetrics(playbackId ?? "");
 
   const user = useUser();
   const { address: smartAccountAddress } = useModularAccount();
@@ -582,6 +585,7 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
                 streamId={streamId}
                 sessionId={sessionId}
                 creatorAddress={streamData?.creator_id ?? null}
+                viewerCount={viewerCount}
               />
             ) : (
               <div className="border rounded-lg p-4 text-sm text-muted-foreground">
