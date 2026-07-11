@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/sdk/supabase/service";
-import { getStoredViewsCount } from "@/lib/livepeer/sync-view-count";
 import { serverLogger } from "@/lib/utils/logger";
 
 export const dynamic = "force-dynamic";
@@ -21,15 +20,10 @@ export async function POST(
 
     const supabase = createServiceClient();
     
-    // Fetch current stored views count
-    const stored = await getStoredViewsCount(supabase, playbackId);
-    const newViews = stored + 1;
-    
-    // Update view count in database
-    const { error } = await supabase
-      .from("video_assets")
-      .update({ views_count: newViews })
-      .eq("playback_id", playbackId);
+    // Atomically increment view count in database via RPC to prevent race conditions
+    const { data: newViews, error } = await supabase.rpc("increment_video_views", {
+      p_playback_id: playbackId,
+    });
 
     if (error) {
       throw error;

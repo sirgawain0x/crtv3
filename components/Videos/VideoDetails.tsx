@@ -203,7 +203,6 @@ export default function VideoDetails({
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const [viewIncremented, setViewIncremented] = useState(false);
   const queryClient = useQueryClient();
 
   const user = useUser();
@@ -214,20 +213,19 @@ export default function VideoDetails({
   useEffect(() => {
     if (!asset?.playbackId) return;
 
-    setViewIncremented(false);
-
     const container = containerRef.current;
     if (!container) return;
 
     let incrementing = false;
+    let incremented = false;
 
     const video = container.querySelector("video");
     if (!video) return;
 
     const handlePlay = async () => {
-      if (viewIncremented || incrementing) return;
+      if (incremented || incrementing) return;
       incrementing = true;
-      setViewIncremented(true);
+      incremented = true;
 
       try {
         const response = await fetch(`/api/video-assets/views/increment/${encodeURIComponent(asset.playbackId!)}`, {
@@ -249,7 +247,7 @@ export default function VideoDetails({
     return () => {
       video.removeEventListener("play", handlePlay);
     };
-  }, [asset?.playbackId, viewIncremented, queryClient]);
+  }, [asset?.playbackId, queryClient]);
 
   const loadPlaybackSources = useCallback(async () => {
     if (!asset?.playbackId) {
