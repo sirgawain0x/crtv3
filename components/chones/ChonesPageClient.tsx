@@ -15,7 +15,7 @@ type ChonesPageClientProps = {
   config: ChonesConfig;
 };
 
-export function ChonesPageClient({ config }: ChonesPageClientProps) {
+export function ChonesPageClient({ config: _config }: ChonesPageClientProps) {
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6">
       <nav className="mb-6 text-sm text-muted-foreground">
@@ -26,7 +26,7 @@ export function ChonesPageClient({ config }: ChonesPageClientProps) {
         <span className="text-foreground">Chones</span>
       </nav>
 
-      <ChonesBanner className="mb-6" href="/chones/hack-beta" buttonLabel="ENTER" />
+      <ChonesBanner className="mb-6" showButton={false} />
 
       <ChonesXFollowStrip className="mb-10" />
 
@@ -117,13 +117,6 @@ export function ChonesPageClient({ config }: ChonesPageClientProps) {
           })}
         </ul>
       </section>
-
-      {!config.enabled && (
-        <p className="mt-10 text-center text-sm text-muted-foreground">
-          Configure Chones env vars and redeploy to enable Lens feeds. See{" "}
-          <code className="text-xs">.env.example</code> in the repo.
-        </p>
-      )}
     </div>
   );
 }

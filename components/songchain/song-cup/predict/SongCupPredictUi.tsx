@@ -370,8 +370,14 @@ export function SongCupPredictProgressLine({
 }) {
   const clamped = Math.min(100, Math.max(0, pct));
 
-  const bar = (
-    <div className={cn("relative h-[3px] w-full min-w-[42px] max-w-[58px] flex-1", className)}>
+  return (
+    <div
+      className={cn(
+        "relative h-[3px] w-full min-w-[42px] max-w-[58px] flex-1",
+        align === "right" && "scale-x-[-1]",
+        className,
+      )}
+    >
       <img
         src={SONG_CUP_PREDICT_ASSETS.progressLine}
         alt=""
@@ -386,17 +392,11 @@ export function SongCupPredictProgressLine({
           src={SONG_CUP_PREDICT_ASSETS.progressLine}
           alt=""
           aria-hidden
-          className="h-full w-full rotate-180 object-cover"
+          className="h-full w-[58px] max-w-none rotate-180 object-cover"
         />
       </div>
     </div>
   );
-
-  if (align === "right") {
-    return <div className="scale-x-[-1]">{bar}</div>;
-  }
-
-  return bar;
 }
 
 export function SongCupPredictOddsFooter({

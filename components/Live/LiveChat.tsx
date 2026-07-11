@@ -16,6 +16,7 @@ import {
   ChevronDown,
   EyeOff,
   UserX,
+  Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatAddress } from "@/lib/helpers";
@@ -206,6 +207,12 @@ export function LiveChat({
         <div className="flex items-center gap-2">
           <MessageCircle className="h-4 w-4 text-red-500" />
           <h3 className="font-semibold text-sm">Live Chat</h3>
+          {viewerCount !== undefined && (
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Users className="h-3 w-3" />
+              <span>{viewerCount}</span>
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {headerActions}
