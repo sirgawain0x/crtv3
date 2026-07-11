@@ -29,7 +29,7 @@ export function SongCupVoteGradientGlow({ className }: { className?: string }) {
 }
 
 /** 163:962 — VOTE NOW title */
-export function SongCupVoteTitle({ className }: { className?: string }) {
+export function SongCupVoteTitle({ className, title = "VOTE NOW" }: { className?: string; title?: string }) {
   return (
     <h2
       className={cn(
@@ -37,7 +37,7 @@ export function SongCupVoteTitle({ className }: { className?: string }) {
         className,
       )}
     >
-      VOTE NOW
+      {title}
     </h2>
   );
 }

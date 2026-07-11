@@ -71,7 +71,7 @@ export function SongCupBanner({
       <div className={channelBannerContentClassName}>
         <SongCupBrandLogo priority />
 
-        <p className="max-w-full text-balance text-center text-[clamp(10px,3.2vw,32px)] font-bold uppercase leading-tight tracking-[0.02em] text-white lg:max-w-[95%] lg:leading-none lg:whitespace-nowrap">
+        <p className="hidden lg:block max-w-full text-balance text-center text-[clamp(10px,3.2vw,32px)] font-bold uppercase leading-tight tracking-[0.02em] text-white lg:max-w-[95%] lg:leading-none lg:whitespace-nowrap">
           PREDICT YOUR WINNER. GUESS YOUR SONG
         </p>
 

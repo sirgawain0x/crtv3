@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import { cn } from "@/lib/utils/utils";
 import {
   songCupSidebarIconBtn,
@@ -23,7 +24,7 @@ type SongCupSidebarIconsProps = {
 export function SongCupSidebarIcons({ active, onSelect, className }: SongCupSidebarIconsProps) {
   return (
     <section className={className}>
-      {SONG_CUP_BUTTON_ICONS.map(({ id, src, alt, dividerAfter, externalHref, iconBgClass }) => {
+      {SONG_CUP_BUTTON_ICONS.map(({ id, src, alt, dividerAfter, externalHref, iconBgClass, lucideIcon }) => {
         const isActive = active === id;
         const baseClasses = cn(
           "group block w-1/2 hover:scale-[1.02]",
@@ -42,13 +43,21 @@ export function SongCupSidebarIcons({ active, onSelect, className }: SongCupSide
 
         const image = (
           <div className={imageWrapClass}>
-            <div className={imageInnerClass}>
-              <img
-                src={src}
-                alt={alt}
-                loading="lazy"
-                className="h-auto w-full object-contain"
-              />
+            <div className={cn("flex items-center justify-center", imageInnerClass)}>
+              {lucideIcon ? (
+                <div className="flex h-12 w-12 items-center justify-center p-2.5 sm:h-14 sm:w-14">
+                  {React.createElement(lucideIcon, {
+                    className: "h-full w-full text-white",
+                  })}
+                </div>
+              ) : (
+                <img
+                  src={src}
+                  alt={alt}
+                  loading="lazy"
+                  className="h-auto w-full object-contain"
+                />
+              )}
             </div>
           </div>
         );

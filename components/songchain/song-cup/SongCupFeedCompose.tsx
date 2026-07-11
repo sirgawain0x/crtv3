@@ -15,10 +15,15 @@ import {
 
 type SongCupFeedComposeProps = {
   feedId: string | null;
+  placeholder?: string;
   onPosted?: (created: SongchainCreatedPost) => void;
 };
 
-export function SongCupFeedCompose({ feedId, onPosted }: SongCupFeedComposeProps) {
+export function SongCupFeedCompose({
+  feedId,
+  placeholder = "Share something with Songchain…",
+  onPosted,
+}: SongCupFeedComposeProps) {
   const [content, setContent] = useState("");
   const [focused, setFocused] = useState(false);
 
@@ -74,7 +79,7 @@ export function SongCupFeedCompose({ feedId, onPosted }: SongCupFeedComposeProps
           <Textarea
             value={content}
             onChange={(e) => setContent(e.target.value)}
-            placeholder="Share something with Songchain…"
+            placeholder={placeholder}
             rows={3}
             disabled={isPosting}
             maxLength={5000}

@@ -61,6 +61,7 @@ export function HackBetaPageClient({ config }: HackBetaPageClientProps) {
               graphId={config.graphId}
               feedTitle="HACKATHON BETA feed"
               feedDescription="Member-only posts — join the club on Orb to read and post on the hackathon feed."
+              placeholder="Share something with Chones…"
             />
           ) : (
             <div className="rounded-xl border border-dashed border-muted-foreground/30 bg-muted/30 p-8 text-center text-sm text-muted-foreground">
