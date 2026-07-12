@@ -5,6 +5,7 @@ import { SongCupInfoPanel } from "./SongCupInfoPanel";
 import { SongCupPixelsPanel } from "./SongCupPixelsPanel";
 import { SongCupSubmitPanel } from "./SongCupSubmitPanel";
 import { SongCupVotePanel } from "./SongCupVotePanel";
+import { SongCupSchedulePanel } from "./SongCupSchedulePanel";
 import { SongCupPredictPanel } from "./SongCupPredictPanel";
 import { SongCupPreviewPanel } from "./SongCupPreviewPanel";
 import { SongCupSidebarIcons } from "./SongCupSidebarIcons";
@@ -102,7 +103,7 @@ function ActivePanel({
   if (panel === "pixels") return <SongCupPixelsPanel />;
   if (panel === "submit") return <SongCupSubmitPanel />;
   if (panel === "vote") return <SongCupVotePanel title="VOTE NOW" orbClubUrl={props.orbClubUrl} />;
-  if (panel === "schedule") return <SongCupVotePanel title="SCHEDULE" orbClubUrl={props.orbClubUrl} />;
+  if (panel === "schedule") return <SongCupSchedulePanel orbClubUrl={props.orbClubUrl} />;
   if (panel === "predict") return <SongCupPredictPanel />;
   if (!panel) return null;
   return <PreviewPanel panel={panel} />;

@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils/utils";
 
 type SongCupSubmissionReviewCardProps = {
   submission: SongCupSubmission;
-  onSelectFavorite: (id: string) => void;
+  onFavorite: (id: string, favorite: boolean) => void;
   onReject: (id: string) => void;
   className?: string;
 };
@@ -46,7 +46,7 @@ function SubmissionVideo({ url }: { url: string }) {
 
 export function SongCupSubmissionReviewCard({
   submission,
-  onSelectFavorite,
+  onFavorite,
   onReject,
   className,
 }: SongCupSubmissionReviewCardProps) {
@@ -107,6 +107,12 @@ export function SongCupSubmissionReviewCard({
           >
             {submission.status}
           </Badge>
+          {submission.is_favorite && (
+            <Badge variant="outline" className="gap-1 border-[#feed01]/50 text-[10px] text-[#feed01]">
+              <Star className="h-3 w-3 fill-[#feed01]" />
+              Favorite
+            </Badge>
+          )}
           <Button variant="outline" size="sm" className="h-7 gap-1 px-2 text-[10px]" asChild>
             <Link href={submission.grove_url} target="_blank" rel="noopener noreferrer">
               <ExternalLink className="h-3 w-3" />
@@ -119,12 +125,16 @@ export function SongCupSubmissionReviewCard({
           <Button
             variant="outline"
             size="sm"
-            className="h-8 flex-1 gap-1 text-[11px] border-emerald-500/40 text-emerald-300"
-            onClick={() => onSelectFavorite(submission.id)}
-            disabled={submission.status === "approved"}
+            className={cn(
+              "h-8 flex-1 gap-1 text-[11px]",
+              submission.is_favorite
+                ? "border-[#feed01]/60 bg-[#feed01]/10 text-[#feed01]"
+                : "border-emerald-500/40 text-emerald-300",
+            )}
+            onClick={() => onFavorite(submission.id, !submission.is_favorite)}
           >
-            <Star className="h-3 w-3" />
-            Select as favorite
+            <Star className={cn("h-3 w-3", submission.is_favorite && "fill-[#feed01]")} />
+            {submission.is_favorite ? "Unfavorite" : "Favorite"}
           </Button>
           <Button
             variant="outline"
@@ -138,10 +148,10 @@ export function SongCupSubmissionReviewCard({
           </Button>
         </div>
 
-        {submission.status === "approved" && (
+        {submission.is_favorite && (
           <p className={cn("flex items-center gap-1 text-[10px]", songCupMuted)}>
-            <CheckCircle className="h-3 w-3 text-emerald-400" />
-            Selected as judge favorite
+            <CheckCircle className="h-3 w-3 text-[#feed01]" />
+            Marked as judge favorite
           </p>
         )}
       </div>
@@ -149,12 +159,12 @@ export function SongCupSubmissionReviewCard({
   );
 }
 
-export type SongCupSubmissionStatusFilter = "all" | "pending" | "approved" | "rejected";
+export type SongCupSubmissionStatusFilter = "all" | "pending" | "favorites" | "rejected";
 
 export const SUBMISSION_STATUS_FILTERS: { id: SongCupSubmissionStatusFilter; label: string }[] = [
   { id: "all", label: "All" },
   { id: "pending", label: "Pending" },
-  { id: "approved", label: "Favorites" },
+  { id: "favorites", label: "Favorites" },
   { id: "rejected", label: "Rejected" },
 ];
 
@@ -163,5 +173,6 @@ export function filterSubmissionsByStatus(
   filter: SongCupSubmissionStatusFilter,
 ): SongCupSubmission[] {
   if (filter === "all") return submissions;
+  if (filter === "favorites") return submissions.filter((s) => s.is_favorite);
   return submissions.filter((s) => s.status === filter);
 }

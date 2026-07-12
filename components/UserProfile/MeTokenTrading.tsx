@@ -16,6 +16,10 @@ import { useToast } from '@/components/ui/use-toast';
 import { logger } from '@/lib/utils/logger';
 import { getErc20Balance } from '@/lib/viem';
 import { resolveHubAsset } from '@/lib/utils/hubAssetUtils';
+import {
+  clearMeTokenHoldingsCache,
+} from '@/lib/hooks/metokens/useMeTokenHoldings';
+import { notifyMeTokenBalancesChanged } from '@/lib/hooks/metokens/meTokenBalanceEvents';
 
 interface MeTokenTradingProps {
   meToken: MeTokenData;
@@ -50,6 +54,7 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
   const { chain } = useChain();
   const { openAuthModal } = useAuthModal();
   const user = useUser();
+  const walletAddress = client?.account?.address ?? user?.address;
   const { toast } = useToast();
   const isConnected = !!user && !!client;
 
@@ -254,10 +259,12 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
       // Refresh balances
       await checkCollateralBalance();
 
-      // Refresh parent data
+      if (walletAddress) {
+        clearMeTokenHoldingsCache(walletAddress);
+        notifyMeTokenBalancesChanged(walletAddress);
+      }
       if (onRefresh) {
-        // Add a small delay for RPC sync
-        setTimeout(() => onRefresh(), 2000);
+        await onRefresh();
       }
     } catch (err) {
       logger.error('❌ Error in handleBuy:', err);
@@ -371,10 +378,12 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
       // Refresh balances
       await checkCollateralBalance();
 
-      // Refresh parent data
+      if (walletAddress) {
+        clearMeTokenHoldingsCache(walletAddress);
+        notifyMeTokenBalancesChanged(walletAddress);
+      }
       if (onRefresh) {
-        // Add a small delay for RPC sync
-        setTimeout(() => onRefresh(), 2000);
+        await onRefresh();
       }
     } catch (err) {
       logger.error('❌ Error in handleSell:', err);

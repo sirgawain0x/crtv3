@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { subscribeMeTokenBalancesChanged } from '@/lib/hooks/metokens/meTokenBalanceEvents';
 import { useUser } from '@/lib/wallet/react';
 import { useSmartAccountClient } from '@/lib/wallet/react';
 import { formatEther, parseEther } from 'viem';
@@ -98,7 +99,16 @@ export interface UseMeTokenHoldingsResult {
   loading: boolean;
   error: string | null;
   totalValue: number;
-  refreshHoldings: () => Promise<void>;
+  refreshHoldings: (force?: boolean) => Promise<void>;
+}
+
+/** Clear cached holdings for one wallet or all wallets. */
+export function clearMeTokenHoldingsCache(address?: string): void {
+  if (address) {
+    holdingsCache.delete(address.toLowerCase());
+    return;
+  }
+  holdingsCache.clear();
 }
 
 interface BalanceCandidate {
@@ -160,7 +170,7 @@ export function useMeTokenHoldings(targetAddress?: string): UseMeTokenHoldingsRe
 
   const address = targetAddress || scaAddress || user?.address;
 
-  const fetchHoldings = useCallback(async () => {
+  const fetchHoldings = useCallback(async (force = false) => {
     if (!address || !client) {
       setHoldings([]);
       return;
@@ -168,7 +178,7 @@ export function useMeTokenHoldings(targetAddress?: string): UseMeTokenHoldingsRe
 
     const cacheKey = address.toLowerCase();
     const cached = holdingsCache.get(cacheKey);
-    if (cached && Date.now() - cached.timestamp < HOLDINGS_CACHE_TTL_MS) {
+    if (!force && cached && Date.now() - cached.timestamp < HOLDINGS_CACHE_TTL_MS) {
       setHoldings(cached.holdings);
       setLoading(false);
       setError(null);
@@ -293,10 +303,23 @@ export function useMeTokenHoldings(targetAddress?: string): UseMeTokenHoldingsRe
     return sum + (Number(holding.balance) * (holding.tvl / 1000000));
   }, 0);
 
+  const fetchHoldingsRef = useRef(fetchHoldings);
+  fetchHoldingsRef.current = fetchHoldings;
+
   useEffect(() => {
     fetchHoldings();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [targetAddress, address, client]);
+
+  useEffect(() => {
+    if (!address) return;
+    const normalized = address.toLowerCase();
+    return subscribeMeTokenBalancesChanged((changedAddress) => {
+      if (changedAddress === normalized) {
+        void fetchHoldingsRef.current(true);
+      }
+    });
+  }, [address]);
 
   return {
     holdings,

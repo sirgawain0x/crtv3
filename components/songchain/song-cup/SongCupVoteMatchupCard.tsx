@@ -18,7 +18,9 @@ import {
   SongCupVoteRoundDate,
   SongCupVoteRoundTitle,
   SongCupVoteVs,
+  SongCupMatchupStatusBadge,
 } from "./vote/SongCupVoteUi";
+import { getMatchupLifecycle } from "@/lib/songchain/song-cup/matchup-lifecycle";
 import { toast } from "sonner";
 
 type SongCupVoteMatchupCardProps = {
@@ -26,6 +28,8 @@ type SongCupVoteMatchupCardProps = {
   walletConnected: boolean;
   onVote: (choice: SongCupVoteChoice) => Promise<boolean>;
   className?: string;
+  displayMode?: "vote" | "schedule";
+  nowMs?: number;
 };
 
 function splitLabel(label: string | null | undefined): { name: string; tag?: string } {
@@ -40,10 +44,14 @@ export function SongCupVoteMatchupCard({
   walletConnected,
   onVote,
   className,
+  displayMode = "vote",
+  nowMs = Date.now(),
 }: SongCupVoteMatchupCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [voting, setVoting] = useState<SongCupVoteChoice | null>(null);
   const { canWrite, promptWriteAccess } = useSongCupOrbPollVote();
+  const isSchedule = displayMode === "schedule";
+  const lifecycle = getMatchupLifecycle(matchup.starts_at, matchup.ends_at, matchup.status, nowMs);
 
   const leftParts = splitLabel(matchup.left_label);
   const rightParts = splitLabel(matchup.right_label);
@@ -76,8 +84,15 @@ export function SongCupVoteMatchupCard({
 
   return (
     <SongCupVoteMatchupSurface className={className}>
-      {matchup.subtitle && <SongCupVoteRoundDate>{matchup.subtitle}</SongCupVoteRoundDate>}
-      <SongCupVoteRoundTitle className="mt-1">{matchup.title}</SongCupVoteRoundTitle>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          {matchup.subtitle && <SongCupVoteRoundDate>{matchup.subtitle}</SongCupVoteRoundDate>}
+          <SongCupVoteRoundTitle className="mt-1">{matchup.title}</SongCupVoteRoundTitle>
+        </div>
+        {isSchedule && (
+          <SongCupMatchupStatusBadge phase={lifecycle.phase} label={lifecycle.label} />
+        )}
+      </div>
 
       <div className="mt-5 flex w-full items-end justify-center gap-2 sm:gap-4">
         <div className="flex flex-1 flex-col items-end gap-2">
@@ -90,11 +105,15 @@ export function SongCupVoteMatchupCard({
             postId={matchup.left_post_id}
             compact
             hideLabels
-            selected={matchup.userChoice === "left"}
-            onSelect={expanded ? () => void handleVote("left") : undefined}
+            selected={!isSchedule && matchup.userChoice === "left"}
+            onSelect={!isSchedule && expanded ? () => void handleVote("left") : undefined}
           />
-          <SongCupVoteProgressLine pct={matchup.tally.leftPct} />
-          <SongCupVotePercent value={matchup.tally.leftPct} />
+          {!isSchedule && (
+            <>
+              <SongCupVoteProgressLine pct={matchup.tally.leftPct} />
+              <SongCupVotePercent value={matchup.tally.leftPct} />
+            </>
+          )}
         </div>
 
         <SongCupVoteVs className="mb-10 shrink-0 self-center" />
@@ -111,37 +130,43 @@ export function SongCupVoteMatchupCard({
             postId={matchup.right_post_id}
             compact
             hideLabels
-            selected={matchup.userChoice === "right"}
-            onSelect={expanded ? () => void handleVote("right") : undefined}
+            selected={!isSchedule && matchup.userChoice === "right"}
+            onSelect={!isSchedule && expanded ? () => void handleVote("right") : undefined}
           />
-          <SongCupVoteProgressLine pct={matchup.tally.rightPct} className="self-start" />
-          <SongCupVotePercent value={matchup.tally.rightPct} className="self-start text-left" />
+          {!isSchedule && (
+            <>
+              <SongCupVoteProgressLine pct={matchup.tally.rightPct} className="self-start" />
+              <SongCupVotePercent value={matchup.tally.rightPct} className="self-start text-left" />
+            </>
+          )}
         </div>
       </div>
 
-      <div className="mt-5 flex flex-col items-center gap-2">
-        <SongCupVoteCtaButton
-          disabled={voting !== null}
-          onClick={() => {
-            if (expanded) return;
-            setExpanded(true);
-          }}
-        >
-          {voting ? (
-            <Loader2 className="h-5 w-5 animate-spin" />
-          ) : expanded ? (
-            "Tap a side to vote"
-          ) : (
-            "VOTE NOW "
-          )}
-        </SongCupVoteCtaButton>
+      {!isSchedule && (
+        <div className="mt-5 flex flex-col items-center gap-2">
+          <SongCupVoteCtaButton
+            disabled={voting !== null}
+            onClick={() => {
+              if (expanded) return;
+              setExpanded(true);
+            }}
+          >
+            {voting ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : expanded ? (
+              "Tap a side to vote"
+            ) : (
+              "VOTE NOW "
+            )}
+          </SongCupVoteCtaButton>
 
-        {matchup.userChoice && (
-          <p className={cn("text-xs", songCupMuted)}>
-            You voted for the {matchup.userChoice === "left" ? "left" : "right"} entry
-          </p>
-        )}
-      </div>
+          {matchup.userChoice && (
+            <p className={cn("text-xs", songCupMuted)}>
+              You voted for the {matchup.userChoice === "left" ? "left" : "right"} entry
+            </p>
+          )}
+        </div>
+      )}
     </SongCupVoteMatchupSurface>
   );
 }

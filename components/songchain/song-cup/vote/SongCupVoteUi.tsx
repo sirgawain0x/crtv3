@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { bigShoulders } from "@/lib/fonts/big-shoulders";
 import { cn } from "@/lib/utils/utils";
+import type { MatchupLifecyclePhase } from "@/lib/songchain/song-cup/matchup-lifecycle";
 import {
   SONG_CUP_VOTE_ASSETS,
   SONG_CUP_VOTE_COLORS,
@@ -370,5 +371,60 @@ export function SongCupVoteContentWell({
     >
       {children}
     </div>
+  );
+}
+
+/** Countdown / LIVE / Ended badge for schedule matchups */
+export function SongCupMatchupStatusBadge({
+  phase,
+  label,
+  className,
+}: {
+  phase: MatchupLifecyclePhase;
+  label: string;
+  className?: string;
+}) {
+  if (!label || phase === "unknown") return null;
+
+  if (phase === "live") {
+    return (
+      <span
+        className={cn(
+          "inline-flex items-center gap-2 text-[18px] font-bold uppercase tracking-wide sm:text-[22px]",
+          className,
+        )}
+        style={{ color: SONG_CUP_VOTE_COLORS.magenta }}
+      >
+        <span className="relative flex h-2.5 w-2.5">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
+          <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500" />
+        </span>
+        {label}
+      </span>
+    );
+  }
+
+  if (phase === "ended") {
+    return (
+      <span
+        className={cn(
+          "text-[16px] font-bold uppercase tracking-wide text-muted-foreground dark:text-white/50 sm:text-[20px]",
+          className,
+        )}
+      >
+        {label}
+      </span>
+    );
+  }
+
+  return (
+    <span
+      className={cn(
+        "text-[14px] font-semibold tabular-nums tracking-wide text-[#feed01] sm:text-[18px]",
+        className,
+      )}
+    >
+      {label}
+    </span>
   );
 }
