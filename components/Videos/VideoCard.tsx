@@ -295,7 +295,7 @@ const VideoCard: React.FC<VideoCardProps> = ({
             assetId={asset?.id}
             title={asset?.name}
             initialThumbnailUrl={
-              asset.thumbnail_url || asset.thumbnailUri || null
+              asset.thumbnail_url || asset.thumbnailUri || undefined
             }
             enablePreview={true}
             priority={priority}
