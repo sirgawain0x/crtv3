@@ -34,7 +34,7 @@ export function resolveHubAsset(hubId?: number, assetAddress?: string): HubAsset
     const byAddress = getHubAssetByAddress(assetAddress);
     if (byAddress) return byAddress;
   }
-  if (hubId != null) {
+  if (hubId != null && Number.isFinite(hubId) && hubId > 0) {
     const byHub = getHubAssetByHubId(hubId);
     if (byHub) return byHub;
   }

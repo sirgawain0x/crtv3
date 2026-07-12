@@ -13,11 +13,10 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, AlertCircle, CheckCircle, TrendingUp } from 'lucide-react';
 import { useMeTokensSupabase } from '@/lib/hooks/metokens/useMeTokensSupabase';
-import { formatEther, parseEther, encodeFunctionData, type Address } from 'viem';
+import { formatEther, formatUnits, parseEther, parseUnits, type Address } from 'viem';
 import { useSmartAccountClient, useAuthModal, useUser } from '@/lib/wallet/react';
-import { getDaiTokenContract } from '@/lib/contracts/DAIToken';
-import { METOKEN_ABI } from '@/lib/contracts/MeToken';
-import { DaiFundingOptions } from '@/components/wallet/funding/DaiFundingOptions';
+import { FundingOptions } from '@/components/wallet/buy/FundingOptions';
+import { resolveHubAsset } from '@/lib/utils/hubAssetUtils';
 import { fetchVideoAssetByPlaybackId } from '@/lib/utils/video-assets-client';
 import { useToast } from '@/components/ui/use-toast';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -44,6 +43,8 @@ interface MeToken {
   name: string;
   symbol: string;
   owner_address: string;
+  hub_id?: number | string;
+  hubId?: number | string;
 }
 
 export function VideoMeTokenBuyDialog({
@@ -62,7 +63,7 @@ export function VideoMeTokenBuyDialog({
   const [success, setSuccess] = useState<string | null>(null);
   // const [daiAllowance, setDaiAllowance] = useState<bigint>(BigInt(0)); // removed
 
-  const [daiBalance, setDaiBalance] = useState<bigint>(BigInt(0));
+  const [collateralBalance, setCollateralBalance] = useState<bigint>(BigInt(0));
   const [meTokenBalance, setMeTokenBalance] = useState<bigint>(BigInt(0));
   const [isLoadingMeToken, setIsLoadingMeToken] = useState(false);
   const [creatorAvatarUrl, setCreatorAvatarUrl] = useState<string | null>(null);
@@ -94,6 +95,10 @@ export function VideoMeTokenBuyDialog({
     transactionError,
     // getMeTokenVaultAddress, // not needed locally if we use ensureDaiApproval
   } = useMeTokensSupabase();
+
+  const collateral = resolveHubAsset(
+    Number(meToken?.hub_id ?? meToken?.hubId),
+  );
 
   // Fetch video asset and MeToken
   useEffect(() => {
@@ -182,30 +187,29 @@ export function VideoMeTokenBuyDialog({
   // Vault Address fetch effect removed
 
 
-  // Check DAI balance
-  const checkDaiBalance = useCallback(async () => {
+  // Check collateral (backing asset) balance for this MeToken's hub
+  const checkCollateralBalance = useCallback(async () => {
     if (!client) return;
 
     try {
-      const daiContract = getDaiTokenContract('base');
       const balance = await getErc20Balance({
-        token: daiContract.address as Address,
+        token: collateral.address as Address,
         owner: client.account?.address as Address,
       });
 
-      setDaiBalance(balance);
+      setCollateralBalance(balance);
     } catch (err) {
-      logger.error('Failed to check DAI balance:', err);
-      setDaiBalance(BigInt(0));
+      logger.error(`Failed to check ${collateral.symbol} balance:`, err);
+      setCollateralBalance(BigInt(0));
     }
-  }, [client]);
+  }, [client, collateral.address, collateral.symbol]);
 
-  // Refresh DAI balance when dialog opens (only if connected)
+  // Refresh collateral balance when dialog opens (only if connected)
   useEffect(() => {
     if (open && isConnected && client && meToken) {
-      checkDaiBalance();
+      checkCollateralBalance();
     }
-  }, [open, isConnected, client, meToken, checkDaiBalance]);
+  }, [open, isConnected, client, meToken, checkCollateralBalance]);
 
   // Check user's MeToken balance
   const checkMeTokenBalance = useCallback(async () => {
@@ -337,7 +341,7 @@ export function VideoMeTokenBuyDialog({
       });
 
       // Refresh balances
-      await checkDaiBalance();
+      await checkCollateralBalance();
       await checkMeTokenBalance();
 
       // Close dialog after a short delay
@@ -444,11 +448,11 @@ export function VideoMeTokenBuyDialog({
       // Show success toast
       toast({
         title: "Sale Successful",
-        description: `Successfully sold ${amount} ${meToken.symbol} for ${parseFloat(preview).toFixed(4)} DAI`,
+        description: `Successfully sold ${amount} ${meToken.symbol} for ${parseFloat(preview).toFixed(4)} ${collateral.symbol}`,
       });
 
       // Refresh balances
-      await checkDaiBalance();
+      await checkCollateralBalance();
       await checkMeTokenBalance();
 
       // Close dialog after a short delay
@@ -569,16 +573,16 @@ export function VideoMeTokenBuyDialog({
                     <>
                       <div className="relative h-12 w-12 rounded-full overflow-hidden bg-white border-2 border-primary/20 flex-shrink-0">
                         <Image
-                          src="/images/tokens/dai-logo.svg"
-                          alt="DAI"
+                          src={collateral.logo}
+                          alt={collateral.symbol}
                           width={48}
                           height={48}
                           className="object-contain p-1"
                         />
                       </div>
                       <div>
-                        <p className="text-sm font-medium">DAI</p>
-                        <p className="text-xs text-muted-foreground">Dai Stablecoin</p>
+                        <p className="text-sm font-medium">{collateral.symbol}</p>
+                        <p className="text-xs text-muted-foreground">{collateral.displayName}</p>
                       </div>
                     </>
                   ) : (
@@ -604,7 +608,7 @@ export function VideoMeTokenBuyDialog({
                     {mode === 'buy' ? 'You pay' : 'You sell'}
                   </p>
                   <p className="text-lg font-semibold">
-                    {mode === 'buy' ? 'DAI' : meToken.symbol}
+                    {mode === 'buy' ? collateral.symbol : meToken.symbol}
                   </p>
                 </div>
               </div>
@@ -612,7 +616,7 @@ export function VideoMeTokenBuyDialog({
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="amount">
-                    {mode === 'buy' ? 'DAI Amount' : `${meToken.symbol} Amount`}
+                    {mode === 'buy' ? `${collateral.symbol} Amount` : `${meToken.symbol} Amount`}
                   </Label>
                   <Button
                     type="button"
@@ -622,7 +626,7 @@ export function VideoMeTokenBuyDialog({
                     disabled={isLoading || !isConnected}
                     onClick={() => {
                       if (mode === 'buy') {
-                        setAmount(formatEther(daiBalance));
+                        setAmount(formatUnits(collateralBalance, collateral.decimals));
                       } else {
                         setAmount(formatEther(meTokenBalance));
                       }
@@ -635,8 +639,8 @@ export function VideoMeTokenBuyDialog({
                   {mode === 'buy' && (
                     <div className="absolute left-3 top-1/2 -translate-y-1/2 z-10">
                       <Image
-                        src="/images/tokens/dai-logo.svg"
-                        alt="DAI"
+                        src={collateral.logo}
+                        alt={collateral.symbol}
                         width={20}
                         height={20}
                         className="object-contain"
@@ -692,8 +696,8 @@ export function VideoMeTokenBuyDialog({
                         <>
                           <div className="relative h-6 w-6 rounded-full overflow-hidden bg-white border border-primary/20 flex-shrink-0">
                             <Image
-                              src="/images/tokens/dai-logo.svg"
-                              alt="DAI"
+                              src={collateral.logo}
+                              alt={collateral.symbol}
                               width={24}
                               height={24}
                               className="object-contain p-0.5"
@@ -702,7 +706,7 @@ export function VideoMeTokenBuyDialog({
                           <p className="text-sm text-muted-foreground">
                             You will receive approximately{' '}
                             <span className="font-medium text-foreground">{parseFloat(preview).toFixed(4)}</span>{' '}
-                            <span className="font-medium">DAI</span>
+                            <span className="font-medium">{collateral.symbol}</span>
                           </p>
                         </>
                       )}
@@ -735,12 +739,24 @@ export function VideoMeTokenBuyDialog({
                 </Alert>
               )}
 
-              {mode === 'buy' && amount && parseFloat(amount) > 0 && isConnected && daiBalance < parseEther(amount) && (
-                <DaiFundingOptions
-                  requiredAmount={parseEther(amount).toString()}
-                  onBalanceUpdate={setDaiBalance}
-                  className="mb-4"
-                />
+              {mode === 'buy' && amount && parseFloat(amount) > 0 && isConnected && collateralBalance < parseUnits(amount || '0', collateral.decimals) && (
+                collateral.symbol === 'USDC' ? (
+                  <div className="mb-4 space-y-2 rounded-lg border p-3">
+                    <p className="text-sm font-medium">Get {collateral.symbol} to complete this purchase</p>
+                    <FundingOptions
+                      asset="USDC"
+                      presetFiatAmount={Math.max(5, Math.ceil(parseFloat(amount) || 5))}
+                      onSuccess={() => void checkCollateralBalance()}
+                    />
+                  </div>
+                ) : (
+                  <Alert className="mb-4 border-orange-200 bg-orange-50 dark:bg-orange-950/20 dark:border-orange-900">
+                    <AlertCircle className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                    <AlertDescription className="text-orange-800 dark:text-orange-200">
+                      Insufficient {collateral.symbol}. Swap for {collateral.symbol} on a DEX (Uniswap, Aerodrome), then return here.
+                    </AlertDescription>
+                  </Alert>
+                )
               )}
 
               <div className="flex gap-2">
@@ -774,7 +790,7 @@ export function VideoMeTokenBuyDialog({
                         isLoading ||
                         !amount ||
                         parseFloat(amount) <= 0 ||
-                        (mode === 'buy' && daiBalance < parseEther(amount || '0')) ||
+                        (mode === 'buy' && collateralBalance < parseUnits(amount || '0', collateral.decimals)) ||
                         (mode === 'sell' && meTokenBalance < parseEther(amount || '0'))
                       }
                       className={`flex-1 ${mode === 'buy'
@@ -830,14 +846,14 @@ export function VideoMeTokenBuyDialog({
                   ) : mode === 'buy' ? (
                     <div className="flex items-center gap-1.5">
                       <Image
-                        src="/images/tokens/dai-logo.svg"
-                        alt="DAI"
+                        src={collateral.logo}
+                        alt={collateral.symbol}
                         width={16}
                         height={16}
                         className="object-contain"
                       />
                       <span className="text-muted-foreground">
-                        <strong className="text-foreground">{formatEther(daiBalance)}</strong> DAI
+                        <strong className="text-foreground">{formatUnits(collateralBalance, collateral.decimals)}</strong> {collateral.symbol}
                       </span>
                     </div>
                   ) : (

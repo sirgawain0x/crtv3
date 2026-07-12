@@ -13,6 +13,8 @@ export interface MarketToken {
   symbol: string;
   owner_address: string;
   type: 'metoken' | 'content_coin';
+  /** MeToken collateral hub (1=DAI, 2=USDC, 3=USDS, 4=GHO) */
+  hubId?: number;
   price: number;
   tvl: number;
   total_supply: string;
@@ -222,6 +224,7 @@ export async function GET(request: NextRequest) {
 
     // Transform MeTokens with Supabase data first
     for (const meToken of meTokens) {
+      const hubId = Number(meToken.hub_id ?? meToken.hubId);
       allTokens.push({
         id: meToken.id,
         address: meToken.address,
@@ -229,6 +232,7 @@ export async function GET(request: NextRequest) {
         symbol: meToken.symbol,
         owner_address: meToken.owner_address,
         type: 'metoken' as const,
+        hubId: Number.isFinite(hubId) && hubId > 0 ? hubId : undefined,
         price: 0, // Will update below
         tvl: meToken.tvl,
         total_supply: meToken.total_supply?.toString() || '0',
@@ -239,6 +243,7 @@ export async function GET(request: NextRequest) {
 
     // Transform Content Coins with Supabase data first
     for (const contentCoin of contentCoins) {
+      const hubId = Number(contentCoin.hub_id ?? contentCoin.hubId);
       allTokens.push({
         id: contentCoin.id,
         address: contentCoin.address,
@@ -246,6 +251,7 @@ export async function GET(request: NextRequest) {
         symbol: contentCoin.symbol,
         owner_address: contentCoin.owner_address,
         type: 'content_coin' as const,
+        hubId: Number.isFinite(hubId) && hubId > 0 ? hubId : undefined,
         price: 0, // Will update below
         tvl: contentCoin.tvl,
         total_supply: contentCoin.total_supply?.toString() || '0',

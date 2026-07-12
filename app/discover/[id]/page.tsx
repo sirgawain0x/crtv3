@@ -15,11 +15,6 @@ import { Slash } from "lucide-react";
 import VideoViewMetrics from "@/components/Videos/VideoViewMetrics";
 import { VideoCommentsWrapper } from "@/components/Videos/VideoCommentsWrapper";
 import { Metadata } from "next";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { shortenAddress } from "@/lib/utils/utils";
-import { createClient } from "@/lib/sdk/supabase/server";
-import makeBlockie from "ethereum-blockies-base64";
-import { convertFailingGateway } from "@/lib/utils/image-gateway";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import Link from "next/link";
@@ -32,7 +27,7 @@ import { RemixInPixelsButton } from "@/components/Videos/RemixInPixelsButton";
 import { AddToMixtapeButton } from "@/components/Videos/AddToMixtapeButton";
 import { CreatorDisplay } from "@/components/Creator/CreatorDisplay";
 import { logger } from '@/lib/utils/logger';
-
+import { convertFailingGateway } from "@/lib/utils/image-gateway";
 
 type VideoDetailsPageProps = {
   params: Promise<{
@@ -92,37 +87,6 @@ export default async function VideoDetailsPage({
   }
   const creatorAddress = videoAsset?.creator_id || null;
 
-  // Fetch creator profile for avatar
-  let creatorProfile = null;
-  if (creatorAddress) {
-    try {
-      const supabase = await createClient();
-      const { data, error } = await supabase
-        .from('creator_profiles')
-        .select('avatar_url, username')
-        .eq('owner_address', creatorAddress.toLowerCase())
-        .single();
-
-      if (error) {
-        // PGRST116 means no rows found - this is acceptable (profile doesn't exist)
-        if (error.code === 'PGRST116') {
-          // Profile doesn't exist, that's okay
-          creatorProfile = null;
-        } else {
-          // Real database error - log it
-          logger.error('Error fetching creator profile:', error);
-          creatorProfile = null;
-        }
-      } else {
-        creatorProfile = data;
-      }
-    } catch (error) {
-      // Handle unexpected errors (network failures, etc.)
-      logger.error('Unexpected error fetching creator profile:', error);
-      creatorProfile = null;
-    }
-  }
-
   return (
     <div className="container max-w-7xl mx-auto px-4">
       <div className="my-5">
@@ -159,7 +123,12 @@ export default async function VideoDetailsPage({
       </div>
       <div className="py-10">
         <div className="max-w-4xl mx-auto space-y-6">
-          {/* Video Player */}
+          {/* Creator above title; action buttons stay under the player */}
+          {creatorAddress && (
+            <CreatorDisplay creatorAddress={creatorAddress} />
+          )}
+
+          {/* Video Player (includes title above player) */}
           <div>
             <VideoDetails
               asset={assetData}
@@ -171,14 +140,9 @@ export default async function VideoDetailsPage({
               contractAddress={videoAsset?.contract_address ?? null}
               tokenId={videoAsset?.token_id ?? null}
             />
-            {/* Uploader Section with Share Button */}
-            <div className="flex items-center justify-between mt-4">
-              {creatorAddress ? (
-                <CreatorDisplay creatorAddress={creatorAddress} />
-              ) : (
-                <div></div>
-              )}
-              <div className="flex items-center gap-2">
+            {/* Action row: buy / edit / mixtape / share (avatar moved above title) */}
+            <div className="flex items-center justify-end mt-4">
+              <div className="flex items-center gap-2 flex-wrap justify-end">
                 {creatorAddress && (
                   <>
                     <Suspense fallback={<div className="h-9 w-9" />}>

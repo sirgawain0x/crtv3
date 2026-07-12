@@ -125,23 +125,22 @@ export function useContentCoin() {
         } catch (e) {
             logger.error('Content Coin deployment error:', e);
             setIsPending(false);
-            
-            // Provide user-friendly error messages
+
+            // Soft warning only — Content Coin deploy is optional post-publish work
+            // and must not look like the video publish failed.
             const error = e instanceof Error ? e : new Error(String(e));
             if (error.message.includes('timeout')) {
                 toast({
-                    title: "Transaction Timeout",
-                    description: error.message || "The transaction took too long. Please check your wallet and try again.",
-                    variant: "destructive"
+                    title: "Content Coin deferred",
+                    description: "Video is published. Market deploy timed out and can be retried later.",
                 });
             } else {
                 toast({
-                    title: "Deployment Failed",
-                    description: error.message || "Failed to deploy content coin. Please try again.",
-                    variant: "destructive"
+                    title: "Content Coin not deployed",
+                    description: "Video is published. Market deploy can be finished later from the market page.",
                 });
             }
-            
+
             throw e;
         }
     };

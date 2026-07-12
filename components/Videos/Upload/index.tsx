@@ -457,11 +457,11 @@ const HookMultiStepForm = () => {
               // but usually user wants to see the result. The timeout provides the safety.
             }
 
-            // --- AUTO DEPLOY CONTENT COIN ---
-            // Fire-and-forget so navigation to /discover isn't blocked by the deploy transaction.
-            // handleUploadSuccess swallows its own errors; .catch is a safety net.
+            // --- AUTO DEPLOY CONTENT COIN (optional, non-blocking) ---
+            // Publish already succeeded above. Content Coin is experimental post-publish
+            // work — failures must only soft-warn, never look like publish failed.
             if (finalMeTokenId && address && metadata?.ticker) {
-              toast.info("Deploying Content Coin Market...");
+              toast.info("Setting up Content Coin market in the background…");
               handleUploadSuccess(
                 metadata.title,
                 metadata.ticker,
@@ -470,6 +470,9 @@ const HookMultiStepForm = () => {
                 livepeerAsset.playbackId
               ).catch((ccError) => {
                 logger.error("Content Coin deployment error:", ccError);
+                toast.warning("Video published — Content Coin market can be finished later", {
+                  description: "Your video is live. Market deploy is optional and did not block publish.",
+                });
               });
             }
           }}
