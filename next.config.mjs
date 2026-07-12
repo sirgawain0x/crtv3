@@ -240,6 +240,18 @@ const nextConfig = {
       })
     );
 
+    const alchemySolanaActionsStub = require.resolve('./lib/webpack/alchemy-solana-actions-stub.mjs');
+    config.plugins.push(
+      new webpack.NormalModuleReplacementPlugin(
+        /solanaSmartWalletActions\.js$/,
+        (resource) => {
+          if (/@alchemy[\\/]wallet-apis[\\/]dist[\\/]esm[\\/]client\.js$/.test(resource.contextInfo?.issuer || '')) {
+            resource.request = alchemySolanaActionsStub;
+          }
+        }
+      )
+    );
+
     return config;
   },
   // Reduce unnecessary rebuilds
