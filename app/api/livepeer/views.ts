@@ -16,6 +16,13 @@ export {
   resolveLivepeerStudioAuthToken,
 } from '@/lib/sdk/livepeer/studioAuth';
 
+/** Bound hung Livepeer Studio requests so views fallback can proceed. */
+const LIVEPEER_FETCH_TIMEOUT_MS = 10_000;
+
+function livepeerFetchSignal(): AbortSignal {
+  return AbortSignal.timeout(LIVEPEER_FETCH_TIMEOUT_MS);
+}
+
 export type LivepeerViewMetrics = {
   playbackId: string;
   viewCount: number;
@@ -81,6 +88,7 @@ async function livepeerAuthedGet(
     headers: myHeaders,
     redirect: 'follow',
     cache: 'no-store',
+    signal: livepeerFetchSignal(),
   });
 
   if (!response.ok) {
@@ -142,6 +150,7 @@ async function fetchPublicTotalViews(
         method: 'GET',
         redirect: 'follow',
         cache: 'no-store',
+        signal: livepeerFetchSignal(),
       },
     );
 

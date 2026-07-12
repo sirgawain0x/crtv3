@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useUser, useSmartAccountClient } from '@/lib/wallet/react';
-import { parseEther, formatEther, formatUnits, encodeFunctionData, maxUint256 } from 'viem';
+import { parseEther, formatEther, formatUnits, encodeFunctionData, maxUint256, type Abi } from 'viem';
 import { meTokenSupabaseService, MeToken, MeTokenBalance } from '@/lib/sdk/supabase/metokens';
 import { CreateMeTokenData, UpdateMeTokenData } from '@/lib/sdk/supabase/client';
 import { getMeTokenFactoryContract, METOKEN_FACTORY_ADDRESSES } from '@/lib/contracts/MeTokenFactory';
@@ -25,6 +25,49 @@ import { publicClient } from '@/lib/viem';
 // MeTokens contract addresses on Base
 const METOKEN_FACTORY = METOKEN_FACTORY_BASE;
 const DIAMOND = METOKEN_DIAMOND_BASE;
+
+/** Extra USDC reserved when the user pays AA gas in USDC (same token as collateral). */
+const USDC_GAS_BUFFER = '1';
+
+/**
+ * Re-read ERC-20 allowance after a UserOp confirms, with short retries for RPC lag.
+ */
+async function readAllowanceWithRetry(params: {
+  token: `0x${string}`;
+  owner: `0x${string}`;
+  spender: `0x${string}`;
+  abi: Abi;
+  minAmount: bigint;
+  label: string;
+}): Promise<bigint> {
+  const maxRetries = 5;
+  let allowance = BigInt(0);
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    if (attempt > 0) {
+      const waitTime = 2000 + (attempt - 1) * 1000;
+      logger.debug(
+        `⏳ Waiting ${waitTime}ms for ${params.label} allowance (attempt ${attempt + 1}/${maxRetries})...`,
+      );
+      await new Promise((resolve) => setTimeout(resolve, waitTime));
+    }
+
+    allowance = (await publicClient.readContract({
+      address: params.token,
+      abi: params.abi,
+      functionName: 'allowance',
+      args: [params.owner, params.spender],
+    })) as bigint;
+
+    if (allowance >= params.minAmount) {
+      return allowance;
+    }
+  }
+
+  throw new Error(
+    `${params.label} approval did not confirm in time. Please try again.`,
+  );
+}
 
 
 // ERC20 ABI for MeToken
@@ -1447,19 +1490,26 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
 
       logger.debug('🔍 Mint flow: Using vault address:', vaultAddress, 'for Hub ID:', hubIdNum, 'asset:', hubAsset.symbol);
 
-      // When paying gas in USDC and buying with USDC, ensure balance covers the mint amount
+      // Collateral is required for every mint; when gas is also paid in USDC, reserve a buffer.
+      const collateralBalance = (await publicClient.readContract({
+        address: collateralAddress,
+        abi: collateralAbi,
+        functionName: 'balanceOf',
+        args: [ownerAddress],
+      })) as bigint;
+
+      let requiredBalance = collateralAmountWei;
       if (!isSponsored && hubAsset.symbol === 'USDC') {
-        const usdcBalance = await publicClient.readContract({
-          address: collateralAddress,
-          abi: collateralAbi,
-          functionName: 'balanceOf',
-          args: [ownerAddress],
-        }) as bigint;
-        if (usdcBalance < collateralAmountWei) {
-          throw new Error(
-            `Insufficient ${hubAsset.symbol} in your smart account. You need at least ${collateralAmount} ${hubAsset.symbol} for this purchase (gas may also be paid in USDC).`,
-          );
-        }
+        requiredBalance += parseHubAssetAmount(USDC_GAS_BUFFER, hubAsset);
+      }
+
+      if (collateralBalance < requiredBalance) {
+        const needsGasBuffer = !isSponsored && hubAsset.symbol === 'USDC';
+        throw new Error(
+          needsGasBuffer
+            ? `Insufficient ${hubAsset.symbol} in your smart account. You need at least ${collateralAmount} ${hubAsset.symbol} for this purchase plus ~${USDC_GAS_BUFFER} ${hubAsset.symbol} for gas.`
+            : `Insufficient ${hubAsset.symbol} in your smart account. You need at least ${collateralAmount} ${hubAsset.symbol} for this purchase.`,
+        );
       }
 
       // 3. Check and approve hub collateral for the vault (not Diamond!)
@@ -1502,18 +1552,14 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
           hash: approveOp.hash,
         });
 
-        currentAllowance = await publicClient.readContract({
-          address: collateralAddress,
+        currentAllowance = await readAllowanceWithRetry({
+          token: collateralAddress,
+          owner: ownerAddress,
+          spender: vaultAddress as `0x${string}`,
           abi: collateralAbi,
-          functionName: 'allowance',
-          args: [ownerAddress, vaultAddress as `0x${string}`],
-        }) as bigint;
-
-        if (currentAllowance < collateralAmountWei) {
-          throw new Error(
-            `${hubAsset.symbol} approval for the vault did not confirm in time. Please try again.`,
-          );
-        }
+          minAmount: collateralAmountWei,
+          label: `${hubAsset.symbol} vault`,
+        });
 
         logger.debug(`✅ ${hubAsset.symbol} approved for vault`);
       } else {
@@ -1558,12 +1604,14 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
           hash: approveOp.hash,
         });
 
-        diamondAllowance = await publicClient.readContract({
-          address: collateralAddress,
+        diamondAllowance = await readAllowanceWithRetry({
+          token: collateralAddress,
+          owner: ownerAddress,
+          spender: DIAMOND as `0x${string}`,
           abi: collateralAbi,
-          functionName: 'allowance',
-          args: [ownerAddress, DIAMOND as `0x${string}`],
-        }) as bigint;
+          minAmount: collateralAmountWei,
+          label: `${hubAsset.symbol} Diamond`,
+        });
 
         logger.debug(`✅ ${hubAsset.symbol} approved for DIAMOND`);
       } else {
@@ -1842,6 +1890,15 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
           hash: operation.hash,
         });
 
+        await readAllowanceWithRetry({
+          token: collateralAddress,
+          owner: address as `0x${string}`,
+          spender: vaultAddress as `0x${string}`,
+          abi: collateralAbi,
+          minAmount: requiredAmount,
+          label: `${hubAsset.symbol} vault`,
+        });
+
         logger.debug(`✅ ${hubAsset.symbol} approved for vault`);
       } else {
         logger.debug(`✅ Sufficient ${hubAsset.symbol} allowance already exists for vault`);
@@ -2023,18 +2080,14 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
           hash: approveOp.hash,
         });
 
-        currentAllowance = await publicClient.readContract({
-          address: meTokenAddress as `0x${string}`,
-          abi: ERC20_ABI,
-          functionName: 'allowance',
-          args: [ownerAddress, vaultAddress as `0x${string}`],
-        }) as bigint;
-
-        if (currentAllowance < sellAmountWei) {
-          throw new Error(
-            'MeToken approval for the vault did not confirm in time. Please try again.',
-          );
-        }
+        currentAllowance = await readAllowanceWithRetry({
+          token: meTokenAddress as `0x${string}`,
+          owner: ownerAddress,
+          spender: vaultAddress as `0x${string}`,
+          abi: ERC20_ABI as Abi,
+          minAmount: sellAmountWei,
+          label: 'MeToken vault',
+        });
 
         logger.debug('✅ MeToken approved for vault');
       } else {
@@ -2044,7 +2097,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
       // 3b. ALSO Check/Approve MeToken for the DIAMOND (Just in case Diamond calls transferFrom directly)
       // This covers the case where Diamond is the spender, or Vault is the spender.
       logger.debug('🔍 Checking MeToken allowance for DIAMOND...');
-      const diamondAllowance = await publicClient.readContract({
+      let diamondAllowance = await publicClient.readContract({
         address: meTokenAddress as `0x${string}`,
         abi: ERC20_ABI,
         functionName: 'allowance',
@@ -2079,6 +2132,16 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         await client.waitForUserOperationTransaction({
           hash: approveOp.hash,
         });
+
+        diamondAllowance = await readAllowanceWithRetry({
+          token: meTokenAddress as `0x${string}`,
+          owner: ownerAddress,
+          spender: DIAMOND as `0x${string}`,
+          abi: ERC20_ABI as Abi,
+          minAmount: sellAmountWei,
+          label: 'MeToken Diamond',
+        });
+
         logger.debug('✅ MeToken approved for DIAMOND');
       } else {
         logger.debug('✅ Sufficient MeToken allowance already exists for DIAMOND');
