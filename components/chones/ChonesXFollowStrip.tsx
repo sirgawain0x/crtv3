@@ -1,12 +1,7 @@
 "use client";
 
 import { Twitter } from "lucide-react";
-import {
-  CHONES_X_HANDLE,
-  CHONES_X_URL,
-  CREATIVE_TV_X_HANDLE,
-  CREATIVE_TV_X_URL,
-} from "@/lib/chones/social";
+import { CHONES_X_HANDLE, CHONES_X_URL } from "@/lib/chones/social";
 import { cn } from "@/lib/utils";
 
 type ChonesXFollowStripProps = {
@@ -32,17 +27,6 @@ export function ChonesXFollowStrip({ className }: ChonesXFollowStripProps) {
         className="rounded-md px-2 py-1 text-amber-600 transition hover:bg-amber-500/10 hover:text-amber-500 dark:text-amber-300"
       >
         @{CHONES_X_HANDLE}
-      </a>
-      <span className="text-muted-foreground" aria-hidden>
-        ·
-      </span>
-      <a
-        href={CREATIVE_TV_X_URL}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="rounded-md px-2 py-1 text-amber-600 transition hover:bg-amber-500/10 hover:text-amber-500 dark:text-amber-300"
-      >
-        @{CREATIVE_TV_X_HANDLE}
       </a>
       <span className="text-muted-foreground" aria-hidden>
         ·

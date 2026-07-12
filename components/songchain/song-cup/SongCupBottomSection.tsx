@@ -77,6 +77,8 @@ function FeedPanel(props: SongCupBottomSectionProps) {
         "Read the member feed. Join the club on Orb to post and react."
       }
       orbClubUrl={props.orbClubUrl}
+      clubLogoUrl="/songchain/song-cup/logo.svg"
+      clubLabel="Song Cup"
     />
   );
 }

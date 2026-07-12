@@ -118,6 +118,7 @@
     "browser-image-compression": "^2.0.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "d3": "^7.9.0",
     "dotenv": "^17.2.2",
     "embla-carousel-react": "^8.6.0",
     "encoding": "^0.1.13",
@@ -168,6 +169,7 @@
   "devDependencies": {
     "@mark3labs/louper-cli": "^0.5.10",
     "@thirdweb-dev/contracts": "^3.15.0",
+    "@types/d3": "^7.4.3",
     "@types/node": "^22.15.18",
     "@types/react": "^18",
     "@types/react-dom": "^18",
