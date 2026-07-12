@@ -224,7 +224,7 @@ export async function GET(request: NextRequest) {
 
     // Transform MeTokens with Supabase data first
     for (const meToken of meTokens) {
-      const hubId = Number(meToken.hub_id ?? meToken.hubId);
+      const hubId = Number(meToken.hub_id);
       allTokens.push({
         id: meToken.id,
         address: meToken.address,
@@ -243,7 +243,7 @@ export async function GET(request: NextRequest) {
 
     // Transform Content Coins with Supabase data first
     for (const contentCoin of contentCoins) {
-      const hubId = Number(contentCoin.hub_id ?? contentCoin.hubId);
+      const hubId = Number(contentCoin.hub_id);
       allTokens.push({
         id: contentCoin.id,
         address: contentCoin.address,
