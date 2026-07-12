@@ -16,7 +16,7 @@ const nextConfig = {
   transpilePackages: ['@privy-io/react-auth', '@privy-io/alchemy-migration'],
   experimental: {
     // Reduce memory usage by optimizing compilation
-    optimizePackageImports: ['@privy-io/react-auth', '@privy-io/alchemy-migration', '@alchemy/wallet-apis', '@apollo/client', 'lucide-react', 'framer-motion'],
+    optimizePackageImports: ['@privy-io/react-auth', '@privy-io/alchemy-migration', '@apollo/client', 'lucide-react', 'framer-motion'],
   },
   // External packages that should not be processed by the bundler
   // Externalize thread-stream and pino packages on server to avoid bundling test files
@@ -238,6 +238,18 @@ const nextConfig = {
           return /FundSolWalletWithExternalSolanaWallet/.test(resource || "");
         },
       })
+    );
+
+    const alchemySolanaActionsStub = require.resolve('./lib/webpack/alchemy-solana-actions-stub.mjs');
+    config.plugins.push(
+      new webpack.NormalModuleReplacementPlugin(
+        /solanaSmartWalletActions\.js$/,
+        (resource) => {
+          if (/@alchemy[\\/]wallet-apis[\\/]dist[\\/]esm[\\/]client\.js$/.test(resource.contextInfo?.issuer || '')) {
+            resource.request = alchemySolanaActionsStub;
+          }
+        }
+      )
     );
 
     return config;
