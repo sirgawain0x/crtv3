@@ -47,6 +47,7 @@ import { getThumbnailUrl } from "@/lib/utils/thumbnail";
 import { convertFailingGateway } from "@/lib/utils/image-gateway";
 import Link from "next/link";
 import { LicensePurchaseDialog } from "@/components/Videos/LicensePurchaseDialog";
+import { CreatorDisplay } from "@/components/Creator/CreatorDisplay";
 
 const STORY_SCAN_IP_BASE =
   process.env.NEXT_PUBLIC_STORY_NETWORK === "mainnet"
@@ -172,6 +173,8 @@ function StoryIPBlock({
 type VideoDetailsProps = {
   asset: Asset;
   videoTitle?: string;
+  /** Creator wallet — shown below the title. */
+  creatorAddress?: string | null;
   /** When set, shows a "Verifiable" badge (Livepeer creator attestation). */
   livepeerAttestationId?: string | null;
   /** Story Protocol: when true and storyIpId is set, shows "Registered as IP" block with View/Purchase CTAs. */
@@ -187,6 +190,7 @@ type VideoDetailsProps = {
 export default function VideoDetails({
   asset,
   videoTitle,
+  creatorAddress,
   livepeerAttestationId,
   storyIpRegistered,
   storyIpId,
@@ -611,6 +615,9 @@ export default function VideoDetails({
       <div className="w-full">
         <div className="w-full space-y-6">
           <h1 className="text-2xl font-bold">{videoTitle || asset?.name}</h1>
+          {creatorAddress && (
+            <CreatorDisplay creatorAddress={creatorAddress} className="mt-2" />
+          )}
           <div className="flex items-center gap-2 flex-wrap">
             {isVideoAdmin && asset?.status?.phase && (
               <Badge>{asset.status.phase}</Badge>

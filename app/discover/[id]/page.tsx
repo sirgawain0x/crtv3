@@ -11,7 +11,6 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { Slash } from "lucide-react";
-// import { ViewsComponent } from "@/components/Player/ViewsComponent";
 import VideoViewMetrics from "@/components/Videos/VideoViewMetrics";
 import { VideoCommentsWrapper } from "@/components/Videos/VideoCommentsWrapper";
 import { Metadata } from "next";
@@ -25,7 +24,6 @@ import { VideoEditButton } from "@/components/Videos/VideoEditButton";
 import { VideoSplitDistributeButton } from "@/components/Videos/VideoSplitDistributeButton";
 import { RemixInPixelsButton } from "@/components/Videos/RemixInPixelsButton";
 import { AddToMixtapeButton } from "@/components/Videos/AddToMixtapeButton";
-import { CreatorDisplay } from "@/components/Creator/CreatorDisplay";
 import { logger } from '@/lib/utils/logger';
 import { convertFailingGateway } from "@/lib/utils/image-gateway";
 
@@ -35,56 +33,72 @@ type VideoDetailsPageProps = {
   }>;
 };
 
-const fetchAssetData = async (id: string): Promise<Asset | null> => {
-  try {
-    // Validate UUID format
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+type VideoAssetRow = Awaited<ReturnType<typeof getVideoAssetByAssetId>>;
 
-    if (!uuidRegex.test(id)) {
-      logger.error("Invalid video asset ID format:", id);
-      return null;
-    }
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-    // First, get the video asset from NeonDB using the asset_id (UUID)
-    const videoAsset = await getVideoAssetByAssetId(id);
+function assetFromVideoRow(
+  videoAsset: NonNullable<VideoAssetRow>,
+  assetId: string,
+): Asset {
+  return {
+    id: videoAsset.asset_id || assetId,
+    name: videoAsset.title || "Video",
+    playbackId: videoAsset.playback_id || undefined,
+  } as Asset;
+}
 
-    if (!videoAsset) {
-      logger.error("Video asset not found in database");
-      return null;
-    }
-
-    // Then, fetch the Livepeer asset using the same asset_id
-    const response = await fetchAssetId(id);
-
-    if (response?.asset) {
-      return response.asset;
-    }
-
-    return null;
-  } catch (error) {
-    logger.error("Error fetching asset:", error);
-    return null;
+async function loadVideoPageData(id: string): Promise<{
+  assetData: Asset | null;
+  videoAsset: VideoAssetRow | null;
+}> {
+  if (!UUID_REGEX.test(id)) {
+    logger.error("Invalid video asset ID format:", id);
+    return { assetData: null, videoAsset: null };
   }
-};
+
+  // Isolate Neon from Livepeer so a Livepeer outage cannot wipe a valid DB row.
+  const [dbResult, livepeerResult] = await Promise.allSettled([
+    getVideoAssetByAssetId(id),
+    fetchAssetId(id),
+  ]);
+
+  const videoAsset =
+    dbResult.status === "fulfilled" ? dbResult.value : null;
+  if (dbResult.status === "rejected") {
+    logger.error("Error fetching video asset from database:", dbResult.reason);
+  }
+
+  let assetData: Asset | null = null;
+  if (livepeerResult.status === "fulfilled") {
+    assetData = livepeerResult.value?.asset ?? null;
+  } else {
+    logger.error("Error fetching Livepeer asset:", livepeerResult.reason);
+  }
+
+  if (!videoAsset) {
+    logger.error("Video asset not found in database");
+    return { assetData: null, videoAsset: null };
+  }
+
+  if (!assetData) {
+    assetData = assetFromVideoRow(videoAsset, id);
+  }
+
+  return { assetData, videoAsset };
+}
 
 export default async function VideoDetailsPage({
   params,
 }: VideoDetailsPageProps) {
   const { id } = await params;
-  const assetData: Asset | null = await fetchAssetData(id);
+  const { assetData, videoAsset } = await loadVideoPageData(id);
 
-  if (!assetData) {
+  if (!videoAsset || !assetData) {
     return <div>Asset not found</div>;
   }
 
-  // Get video asset from database to access creator_id
-  let videoAsset = null;
-  try {
-    videoAsset = await getVideoAssetByAssetId(id);
-  } catch (error) {
-    logger.error("Error fetching video asset from database:", error);
-    // Continue with null videoAsset - page can still render with assetData
-  }
   const creatorAddress = videoAsset?.creator_id || null;
 
   return (
@@ -123,16 +137,11 @@ export default async function VideoDetailsPage({
       </div>
       <div className="py-10">
         <div className="max-w-4xl mx-auto space-y-6">
-          {/* Creator above title; action buttons stay under the player */}
-          {creatorAddress && (
-            <CreatorDisplay creatorAddress={creatorAddress} />
-          )}
-
-          {/* Video Player (includes title above player) */}
           <div>
             <VideoDetails
               asset={assetData}
               videoTitle={videoAsset?.title || assetData?.name}
+              creatorAddress={creatorAddress}
               livepeerAttestationId={videoAsset?.livepeer_attestation_id ?? null}
               storyIpRegistered={videoAsset?.story_ip_registered ?? false}
               storyIpId={videoAsset?.story_ip_id ?? null}
@@ -140,9 +149,14 @@ export default async function VideoDetailsPage({
               contractAddress={videoAsset?.contract_address ?? null}
               tokenId={videoAsset?.token_id ?? null}
             />
-            {/* Action row: buy / edit / mixtape / share (avatar moved above title) */}
-            <div className="flex items-center justify-end mt-4">
-              <div className="flex items-center gap-2 flex-wrap justify-end">
+            {/* Views (left) + actions/share (right) */}
+            <div className="flex items-center justify-between gap-4 mt-4 flex-wrap">
+              <div className="flex items-center min-h-4">
+                {assetData.playbackId && (
+                  <VideoViewMetrics playbackId={assetData.playbackId} />
+                )}
+              </div>
+              <div className="flex items-center gap-2 flex-wrap justify-end ml-auto">
                 {creatorAddress && (
                   <>
                     <Suspense fallback={<div className="h-9 w-9" />}>
@@ -189,14 +203,6 @@ export default async function VideoDetailsPage({
                 </Suspense>
               </div>
             </div>
-            {/* Metrics components */}
-            {assetData.playbackId && (
-              <div className="flex gap-4 items-center mt-4">
-                {/* <ViewsComponent playbackId={assetData.playbackId} /> */}
-                <VideoViewMetrics playbackId={assetData.playbackId} />
-              </div>
-            )}
-            {/* Description */}
             {videoAsset?.description && (
               <div className="mt-4">
                 <div className="prose prose-sm dark:prose-invert max-w-none">
@@ -208,7 +214,6 @@ export default async function VideoDetailsPage({
             )}
           </div>
 
-          {/* Comments Section - Below video like YouTube */}
           {videoAsset && (
             <div className="mt-8">
               <VideoCommentsWrapper
@@ -232,67 +237,48 @@ export async function generateMetadata({
   try {
     const { id } = await params;
 
-    // Validate UUID format
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-    if (!uuidRegex.test(id)) {
+    if (!UUID_REGEX.test(id)) {
       logger.error("Invalid video asset ID format for metadata:", id);
       return { title: "Video Not Found" };
     }
 
-    // First, get the video asset from NeonDB using the asset_id (UUID)
-    const videoAsset = await getVideoAssetByAssetId(id);
+    const { assetData, videoAsset } = await loadVideoPageData(id);
 
-    if (!videoAsset) {
+    if (!videoAsset || !assetData) {
       return { title: "Video Not Found" };
     }
 
-    // Then, fetch the Livepeer asset using the same asset_id
-    const asset = await fetchAssetId(id);
-
-    if (!asset?.asset) return { title: "Video Not Found" };
-
-    // Get thumbnail from database or use fallback
     let thumbnailUrl =
       (videoAsset as any)?.thumbnail_url?.trim() ||
-      (asset.asset as any)?.thumbnailUri?.trim() ||
+      (assetData as any)?.thumbnailUri?.trim() ||
       null;
 
-    // If no thumbnail or empty string, use default image
     if (!thumbnailUrl || thumbnailUrl === "") {
       thumbnailUrl = "/Creative_TV.png";
     } else {
-      // Apply gateway conversion for IPFS URLs (consistent with ShareDialog)
       thumbnailUrl = convertFailingGateway(thumbnailUrl);
     }
 
-    // Construct absolute URL for Open Graph
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ||
       (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` :
         "https://tv.creativeplatform.xyz");
     const absoluteUrl = `${baseUrl}/discover/${id}`;
 
-    // Construct absolute thumbnail URL with proper path joining
     let absoluteThumbnailUrl: string;
     if (thumbnailUrl.startsWith("http://") || thumbnailUrl.startsWith("https://")) {
-      // Already an absolute URL, use as-is
       absoluteThumbnailUrl = thumbnailUrl;
     } else {
-      // Relative URL - ensure proper path joining
       const normalizedPath = thumbnailUrl.startsWith("/")
         ? thumbnailUrl
         : `/${thumbnailUrl}`;
       absoluteThumbnailUrl = `${baseUrl}${normalizedPath}`;
     }
 
-    // Use database title (from video_assets table) instead of asset name
-    // Remove .mp4 extension if present
-    let videoTitle = (videoAsset as any)?.title || asset.asset.name || "Watch Video";
+    let videoTitle = (videoAsset as any)?.title || assetData.name || "Watch Video";
     if (videoTitle.endsWith('.mp4')) {
       videoTitle = videoTitle.slice(0, -4);
     }
 
-    // Use nullish coalescing to preserve empty strings (only replace null/undefined)
     const videoDescription = (videoAsset as any)?.description ?? `Watch ${videoTitle} on Creative TV`;
 
     return {
@@ -304,10 +290,10 @@ export async function generateMetadata({
         images: [absoluteThumbnailUrl],
         url: absoluteUrl,
         type: "video.other",
-        videos: asset.asset.playbackUrl
+        videos: assetData.playbackUrl
           ? [
             {
-              url: asset.asset.playbackUrl,
+              url: assetData.playbackUrl,
               type: "video/mp4",
               width: 1280,
               height: 720,

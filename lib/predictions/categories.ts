@@ -1,6 +1,6 @@
 export const PREDICTION_CATEGORIES = [
-  { value: "creative tv", label: "Creative TV" },
-  { value: "songchain", label: "Songchain" },
+  { value: "music", label: "Music" },
+  { value: "finance", label: "Finance" },
   { value: "general", label: "General" },
   { value: "technology", label: "Technology" },
   { value: "sports", label: "Sports" },

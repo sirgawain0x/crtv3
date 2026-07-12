@@ -12,11 +12,11 @@ const VideoViewMetrics: React.FC<VideoViewMetricsProps> = ({ playbackId }) => {
   const { totalViews, loading, error } = useLivepeerViewMetrics(playbackId);
 
   if (loading) return <Skeleton className="h-4 w-16" />;
-  if (error) return null;
+  if (error || !totalViews || totalViews <= 0) return null;
 
   return (
     <h3 className="text-sm font-medium text-muted-foreground md:text-base">
-      {`${(totalViews ?? 0).toLocaleString()} views`}
+      {`${totalViews.toLocaleString()} views`}
     </h3>
   );
 };

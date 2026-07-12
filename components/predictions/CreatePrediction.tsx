@@ -129,7 +129,7 @@ function CreatePrediction() {
       title: "",
       type: "bool",
       outcomes: [{ value: "Yes" }, { value: "No" }], // Default to Yes/No for bool type
-      category: "creative tv",
+      category: "general",
       description: "",
       closeDate: "",
       closeTime: "",
@@ -398,7 +398,7 @@ function CreatePrediction() {
             address,
             transactionHash: hash,
             title: values.title,
-            category: values.category || "creative tv",
+            category: values.category || "general",
             questionType: values.type,
             outcomes: finalOutcomes,
           }),
@@ -420,7 +420,7 @@ function CreatePrediction() {
       toast.success("Prediction created successfully! Transaction submitted.");
       setCreatedMeta({
         title: values.title,
-        category: values.category || "creative tv",
+        category: values.category || "general",
       });
       setShareOpen(true);
     } catch (error: any) {

@@ -62,6 +62,13 @@ export function HackBetaPageClient({ config }: HackBetaPageClientProps) {
               feedTitle="HACKATHON BETA feed"
               feedDescription="Member-only posts — join the club on Orb to read and post on the hackathon feed."
               placeholder="Share something with Chones…"
+              orbClubUrl={
+                config.groupId
+                  ? `https://orb.club/c/${config.groupId}`
+                  : undefined
+              }
+              clubLogoUrl="/chones/chonesbannerblackyellowlogo.svg"
+              clubLabel="HACKATHON BETA"
             />
           ) : (
             <div className="rounded-xl border border-dashed border-muted-foreground/30 bg-muted/30 p-8 text-center text-sm text-muted-foreground">
