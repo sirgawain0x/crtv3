@@ -38,6 +38,17 @@ type VideoAssetRow = Awaited<ReturnType<typeof getVideoAssetByAssetId>>;
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+function assetFromVideoRow(
+  videoAsset: NonNullable<VideoAssetRow>,
+  assetId: string,
+): Asset {
+  return {
+    id: videoAsset.asset_id || assetId,
+    name: videoAsset.title || "Video",
+    playbackId: videoAsset.playback_id || undefined,
+  } as Asset;
+}
+
 async function loadVideoPageData(id: string): Promise<{
   assetData: Asset | null;
   videoAsset: VideoAssetRow | null;
@@ -47,25 +58,35 @@ async function loadVideoPageData(id: string): Promise<{
     return { assetData: null, videoAsset: null };
   }
 
-  try {
-    const [videoAsset, livepeerResponse] = await Promise.all([
-      getVideoAssetByAssetId(id),
-      fetchAssetId(id),
-    ]);
+  // Isolate Neon from Livepeer so a Livepeer outage cannot wipe a valid DB row.
+  const [dbResult, livepeerResult] = await Promise.allSettled([
+    getVideoAssetByAssetId(id),
+    fetchAssetId(id),
+  ]);
 
-    if (!videoAsset) {
-      logger.error("Video asset not found in database");
-      return { assetData: null, videoAsset: null };
-    }
+  const videoAsset =
+    dbResult.status === "fulfilled" ? dbResult.value : null;
+  if (dbResult.status === "rejected") {
+    logger.error("Error fetching video asset from database:", dbResult.reason);
+  }
 
-    return {
-      assetData: livepeerResponse?.asset ?? null,
-      videoAsset,
-    };
-  } catch (error) {
-    logger.error("Error fetching video page data:", error);
+  let assetData: Asset | null = null;
+  if (livepeerResult.status === "fulfilled") {
+    assetData = livepeerResult.value?.asset ?? null;
+  } else {
+    logger.error("Error fetching Livepeer asset:", livepeerResult.reason);
+  }
+
+  if (!videoAsset) {
+    logger.error("Video asset not found in database");
     return { assetData: null, videoAsset: null };
   }
+
+  if (!assetData) {
+    assetData = assetFromVideoRow(videoAsset, id);
+  }
+
+  return { assetData, videoAsset };
 }
 
 export default async function VideoDetailsPage({
@@ -74,7 +95,7 @@ export default async function VideoDetailsPage({
   const { id } = await params;
   const { assetData, videoAsset } = await loadVideoPageData(id);
 
-  if (!assetData) {
+  if (!videoAsset || !assetData) {
     return <div>Asset not found</div>;
   }
 

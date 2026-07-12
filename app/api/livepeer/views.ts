@@ -314,22 +314,19 @@ export const fetchAllViews = async (
     );
   }
 
+  let zeroAuthedResult: FetchAllViewsResult | null =
+    sdkResult?.ok && isZeroMetrics(sdkResult.metrics) ? sdkResult : null;
+
   if (token) {
     try {
       const httpResult = await fetchAllViewsViaHttp(playbackId, token);
       if (httpResult.ok && !isZeroMetrics(httpResult.metrics)) {
         return httpResult;
       }
-      if (httpResult.ok && isZeroMetrics(httpResult.metrics)) {
-        const publicResult = await fetchPublicTotalViews(playbackId);
-        if (publicResult.ok && !isZeroMetrics(publicResult.metrics)) {
-          serverLogger.debug(
-            `Livepeer public total views used for playbackId=${playbackId} (authed total was zero)`,
-          );
-          return publicResult;
-        }
-        return httpResult;
+      if (httpResult.ok) {
+        zeroAuthedResult = httpResult;
       }
+      // Zero or failed authed metrics: fall through to shared public fallback.
     } catch (error) {
       serverLogger.error('Failed to fetch view metrics:', error);
     }
@@ -340,8 +337,19 @@ export const fetchAllViews = async (
   }
 
   const publicResult = await fetchPublicTotalViews(playbackId);
+  if (publicResult.ok && !isZeroMetrics(publicResult.metrics)) {
+    serverLogger.debug(
+      `Livepeer public total views used for playbackId=${playbackId} (authed total was zero or unavailable)`,
+    );
+    return publicResult;
+  }
   if (publicResult.ok) {
     return publicResult;
+  }
+
+  // Public failed — prefer a successful zero authed result over a hard error.
+  if (zeroAuthedResult?.ok) {
+    return zeroAuthedResult;
   }
 
   if (!token) {
