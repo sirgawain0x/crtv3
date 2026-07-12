@@ -606,27 +606,23 @@ export function QuickTradeDialog({
           )}
 
           {mode === 'buy' && amount && parseFloat(amount) > 0 && isConnected && collateralBalance < parseUnits(amount || '0', collateral.decimals) && (
-                collateral.symbol === 'USDC' ? (
-                  <div className="mb-4 space-y-2 rounded-lg border p-3">
-                    <p className="text-sm font-medium">Get {collateral.symbol} to complete this purchase</p>
-                    <FundingOptions
-                      asset="USDC"
-                      presetFiatAmount={Math.max(5, Math.ceil(parseFloat(amount) || 5))}
-                      onSuccess={() => void checkCollateralBalance()}
-                    />
-                  </div>
-                ) : (
-                  <Alert className="mb-4 border-orange-200 bg-orange-50 dark:bg-orange-950/20 dark:border-orange-900">
-                    <AlertCircle className="h-4 w-4 text-orange-600 dark:text-orange-400" />
-                    <AlertDescription className="text-orange-800 dark:text-orange-200">
-                      Insufficient {collateral.symbol}. Swap for {collateral.symbol} on a DEX (Uniswap, Aerodrome), then return here.
-                    </AlertDescription>
-                  </Alert>
-                )
-              )}
-              onBalanceUpdate={setCollateralBalance}
-              className="mb-4"
-            />
+            collateral.symbol === 'USDC' ? (
+              <div className="mb-4 space-y-2 rounded-lg border p-3">
+                <p className="text-sm font-medium">Get {collateral.symbol} to complete this purchase</p>
+                <FundingOptions
+                  asset="USDC"
+                  presetFiatAmount={Math.max(5, Math.ceil(parseFloat(amount) || 5))}
+                  onSuccess={() => void checkCollateralBalance()}
+                />
+              </div>
+            ) : (
+              <Alert className="mb-4 border-orange-200 bg-orange-50 dark:bg-orange-950/20 dark:border-orange-900">
+                <AlertCircle className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                <AlertDescription className="text-orange-800 dark:text-orange-200">
+                  Insufficient {collateral.symbol}. Swap for {collateral.symbol} on a DEX (Uniswap, Aerodrome), then return here.
+                </AlertDescription>
+              </Alert>
+            )
           )}
 
           <div className="flex gap-2">
