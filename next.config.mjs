@@ -16,7 +16,7 @@ const nextConfig = {
   transpilePackages: ['@privy-io/react-auth', '@privy-io/alchemy-migration'],
   experimental: {
     // Reduce memory usage by optimizing compilation
-    optimizePackageImports: ['@privy-io/react-auth', '@privy-io/alchemy-migration', '@alchemy/wallet-apis', '@apollo/client', 'lucide-react', 'framer-motion'],
+    optimizePackageImports: ['@privy-io/react-auth', '@privy-io/alchemy-migration', '@apollo/client', 'lucide-react', 'framer-motion'],
   },
   // External packages that should not be processed by the bundler
   // Externalize thread-stream and pino packages on server to avoid bundling test files
