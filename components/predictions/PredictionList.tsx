@@ -598,11 +598,28 @@ export function PredictionList() {
                             {formatCategoryLabel(question.parsedCategory)}
                           </Badge>
                         )}
-                        {question.leadingLabel && (
-                          <Badge variant="secondary" className="text-xs">
-                            Leading: {question.leadingLabel}
-                          </Badge>
-                        )}
+                        {(() => {
+                          const finalizeTs = Number(question.finalize_ts ?? 0);
+                          const isFinalized =
+                            Number.isFinite(finalizeTs) &&
+                            finalizeTs > 0 &&
+                            finalizeTs <= now;
+                          if (isFinalized && question.leadingLabel) {
+                            return (
+                              <Badge variant="default" className="text-xs">
+                                Final Answer: {question.leadingLabel}
+                              </Badge>
+                            );
+                          }
+                          if (question.leadingLabel) {
+                            return (
+                              <Badge variant="secondary" className="text-xs">
+                                Leading: {question.leadingLabel}
+                              </Badge>
+                            );
+                          }
+                          return null;
+                        })()}
                         {claimStatusMap[question.id] && (
                           <Badge className="text-xs bg-emerald-600 hover:bg-emerald-700">
                             <Gift className="h-3 w-3 mr-1" aria-hidden />

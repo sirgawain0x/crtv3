@@ -127,6 +127,56 @@ async function fetchTotalViewsViaHttp(
   return { ok: true, metrics: toLivepeerViewMetrics(parsed) };
 }
 
+/**
+ * Public total-views endpoint — works without auth / with CORS keys per Livepeer docs.
+ * Used when authenticated metrics are unavailable or empty.
+ */
+async function fetchPublicTotalViews(
+  playbackId: string,
+): Promise<FetchAllViewsResult> {
+  try {
+    const base = livepeerStudioApiBaseUrl();
+    const response = await fetch(
+      `${base}/api/data/views/query/total/${encodeURIComponent(playbackId)}`,
+      {
+        method: 'GET',
+        redirect: 'follow',
+        cache: 'no-store',
+      },
+    );
+
+    if (!response.ok) {
+      serverLogger.warn(
+        `Livepeer public total views API ${response.status} for playbackId=${playbackId}`,
+      );
+      return {
+        ok: false,
+        reason: 'upstream_error',
+        status: response.status,
+      };
+    }
+
+    const rawData = await response.json();
+    if (hasLivepeerErrors(rawData)) {
+      return { ok: false, reason: 'upstream_error', status: response.status };
+    }
+
+    const parsed = parseLivepeerViewMetricsBody(rawData, playbackId);
+    if (!parsed) {
+      return { ok: false, reason: 'upstream_error', status: response.status };
+    }
+
+    return { ok: true, metrics: toLivepeerViewMetrics(parsed) };
+  } catch (error) {
+    serverLogger.warn(
+      `Livepeer public total views failed for playbackId=${playbackId}: ${
+        error instanceof Error ? error.message : error
+      }`,
+    );
+    return { ok: false, reason: 'network_error' };
+  }
+}
+
 /** Studio dashboard can show views before the /total endpoint reflects them. */
 async function fetchViewershipQueryViaHttp(
   playbackId: string,
@@ -251,14 +301,8 @@ export const fetchAllViews = async (
   playbackId: string,
 ): Promise<FetchAllViewsResult> => {
   const token = resolveLivepeerStudioAuthToken();
-  if (!token) {
-    serverLogger.warn(
-      'Livepeer view metrics skipped: set LIVEPEER_FULL_API_KEY or LIVEPEER_API_KEY',
-    );
-    return { ok: false, reason: 'not_configured' };
-  }
 
-  const sdkResult = hasLivepeerPrivateApiKey()
+  const sdkResult = token && hasLivepeerPrivateApiKey()
     ? await fetchViewsViaSdk(playbackId)
     : null;
   if (sdkResult?.ok && !isZeroMetrics(sdkResult.metrics)) {
@@ -270,10 +314,39 @@ export const fetchAllViews = async (
     );
   }
 
-  try {
-    return await fetchAllViewsViaHttp(playbackId, token);
-  } catch (error) {
-    serverLogger.error('Failed to fetch view metrics:', error);
-    return { ok: false, reason: 'network_error' };
+  if (token) {
+    try {
+      const httpResult = await fetchAllViewsViaHttp(playbackId, token);
+      if (httpResult.ok && !isZeroMetrics(httpResult.metrics)) {
+        return httpResult;
+      }
+      if (httpResult.ok && isZeroMetrics(httpResult.metrics)) {
+        const publicResult = await fetchPublicTotalViews(playbackId);
+        if (publicResult.ok && !isZeroMetrics(publicResult.metrics)) {
+          serverLogger.debug(
+            `Livepeer public total views used for playbackId=${playbackId} (authed total was zero)`,
+          );
+          return publicResult;
+        }
+        return httpResult;
+      }
+    } catch (error) {
+      serverLogger.error('Failed to fetch view metrics:', error);
+    }
+  } else {
+    serverLogger.warn(
+      'Livepeer view metrics: no API key; trying public total views endpoint',
+    );
   }
+
+  const publicResult = await fetchPublicTotalViews(playbackId);
+  if (publicResult.ok) {
+    return publicResult;
+  }
+
+  if (!token) {
+    return { ok: false, reason: 'not_configured' };
+  }
+
+  return publicResult;
 };
