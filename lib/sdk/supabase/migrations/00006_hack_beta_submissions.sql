@@ -44,6 +44,13 @@ CREATE TABLE IF NOT EXISTS private.hack_beta_admins (
 
 ALTER TABLE private.hack_beta_admins ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS allow_all_to_service_role ON private.hack_beta_admins;
+CREATE POLICY allow_all_to_service_role ON private.hack_beta_admins
+    FOR ALL
+    TO service_role
+    USING (true)
+    WITH CHECK (true);
+
 INSERT INTO private.hack_beta_admins (wallet_address)
 VALUES
     ('0xdE4b0371BBa20602685916ceeE5B22025a811734'),
@@ -54,6 +61,7 @@ CREATE OR REPLACE FUNCTION private.is_hack_beta_admin()
 RETURNS BOOLEAN
 LANGUAGE sql
 SECURITY DEFINER
+STABLE
 SET search_path = private, public
 AS $$
     SELECT EXISTS (
@@ -62,6 +70,9 @@ AS $$
         WHERE LOWER(wallet_address) = LOWER((auth.jwt() -> 'app_metadata' ->> 'wallet_address'))
     );
 $$;
+
+REVOKE EXECUTE ON FUNCTION private.is_hack_beta_admin() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION private.is_hack_beta_admin() TO service_role, anon, authenticated;
 
 ALTER TABLE public.hack_beta_submissions ENABLE ROW LEVEL SECURITY;
 

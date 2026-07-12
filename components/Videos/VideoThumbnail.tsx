@@ -19,6 +19,8 @@ interface VideoThumbnailProps {
   /** When provided (e.g. from list response), used immediately to avoid extra fetch and improve display */
   initialThumbnailUrl?: string;
   onPlay?: () => void;
+  /** Prefetch Livepeer playback sources (hover / intent) when parent defers fetch */
+  onRequestPlayback?: () => void;
   className?: string;
   enablePreview?: boolean;
   priority?: boolean; // If true, uses loading="eager" for above-the-fold images (LCP optimization)
@@ -32,6 +34,7 @@ const VideoThumbnail: React.FC<VideoThumbnailProps> = ({
   assetId,
   initialThumbnailUrl,
   onPlay,
+  onRequestPlayback,
   className = "",
   enablePreview = false,
   priority = false,
@@ -277,6 +280,7 @@ const VideoThumbnail: React.FC<VideoThumbnailProps> = ({
   );
 
   const handleThumbnailClick = (e: React.MouseEvent) => {
+    onRequestPlayback?.();
     if (enablePreview) {
       // If preview is enabled, we don't want to expand the player inline.
       // The parent Link component will handle navigation.
@@ -288,6 +292,7 @@ const VideoThumbnail: React.FC<VideoThumbnailProps> = ({
   };
 
   const handleMouseEnter = () => {
+    onRequestPlayback?.();
     if (enablePreview && !showPlayer) {
       setIsMuted(true);
       setIsPreviewing(true);

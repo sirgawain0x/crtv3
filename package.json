@@ -96,7 +96,7 @@
     "@solana-program/system": "^0.8.0",
     "@solana-program/token": "^0.9.0",
     "@solana-program/token-2022": "^0.6.1",
-    "@solana/kit": "^5.5.1",
+    "@solana/kit": "5.5.1",
     "@stackso/js-core": "^0.5.11",
     "@storacha/client": "^1.8.14",
     "@story-protocol/core-sdk": "^1.4.2",
@@ -203,6 +203,8 @@
     "@reown/appkit-scaffold-ui": "1.7.8",
     "@reown/appkit-ui": "1.7.8",
     "@reown/appkit-utils": "1.7.8",
-    "@reown/appkit-wallet": "1.7.8"
+    "@reown/appkit-wallet": "1.7.8",
+    "@solana/errors": "5.5.1",
+    "@solana/instruction-plans": "5.5.1"
   }
 }

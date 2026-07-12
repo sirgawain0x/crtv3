@@ -211,27 +211,26 @@ export default function VideoDetails({
   const isConnected = !!user;
 
   useEffect(() => {
-    if (!asset?.playbackId) return;
+    if (!asset?.playbackId || !playbackSources?.length) return;
 
     const container = containerRef.current;
     if (!container) return;
 
     let incrementing = false;
     let incremented = false;
-
-    const video = container.querySelector("video");
-    if (!video) return;
+    let attachedVideo: HTMLVideoElement | null = null;
 
     const handlePlay = async () => {
       if (incremented || incrementing) return;
       incrementing = true;
-      incremented = true;
 
       try {
-        const response = await fetch(`/api/video-assets/views/increment/${encodeURIComponent(asset.playbackId!)}`, {
-          method: "POST",
-        });
+        const response = await fetch(
+          `/api/video-assets/views/increment/${encodeURIComponent(asset.playbackId!)}`,
+          { method: "POST" },
+        );
         if (response.ok) {
+          incremented = true;
           await queryClient.invalidateQueries({
             queryKey: ["livepeer-view-metrics", asset.playbackId],
           });
@@ -243,11 +242,32 @@ export default function VideoDetails({
       }
     };
 
-    video.addEventListener("play", handlePlay);
-    return () => {
-      video.removeEventListener("play", handlePlay);
+    const attach = (video: HTMLVideoElement) => {
+      if (attachedVideo === video) return;
+      if (attachedVideo) {
+        attachedVideo.removeEventListener("play", handlePlay);
+      }
+      attachedVideo = video;
+      video.addEventListener("play", handlePlay);
     };
-  }, [asset?.playbackId, queryClient]);
+
+    // Player may mount after this effect — observe until <video> exists
+    const existing = container.querySelector("video");
+    if (existing) attach(existing);
+
+    const observer = new MutationObserver(() => {
+      const video = container.querySelector("video");
+      if (video) attach(video);
+    });
+    observer.observe(container, { childList: true, subtree: true });
+
+    return () => {
+      observer.disconnect();
+      if (attachedVideo) {
+        attachedVideo.removeEventListener("play", handlePlay);
+      }
+    };
+  }, [asset?.playbackId, playbackSources, queryClient]);
 
   const loadPlaybackSources = useCallback(async () => {
     if (!asset?.playbackId) {
