@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readFile } from "node:fs/promises";
+import dns from "node:dns";
 import path from "node:path";
 import {
   getVideoAssetByAssetId,
@@ -17,6 +18,33 @@ const CACHE_HEADER =
 const UUID_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+/** Host suffixes permitted for remote OG thumbnail fetches (SSRF mitigation). */
+const ALLOWED_HOST_SUFFIXES = [
+  "creativeplatform.xyz",
+  "ipfs.io",
+  "dweb.link",
+  "w3s.link",
+  "cf-ipfs.com",
+  "gateway.ipfscdn.io",
+  "4everland.io",
+  "pinata.cloud",
+  "gateway.pinata.cloud",
+  "grove.storage",
+  "api.grove.storage",
+  "lighthouse.storage",
+  "gateway.lighthouse.storage",
+  "livepeer.studio",
+  "livepeercdn.com",
+  "livepeercdn.studio",
+  "lp-playback.studio",
+  "vod-cdn.lp-playback.studio",
+  "storage.googleapis.com",
+  "cloudflare-ipfs.com",
+  "orb.club",
+  "vercel-storage.com",
+  "public.blob.vercel-storage.com",
+] as const;
+
 async function fallbackImage(): Promise<NextResponse> {
   const filePath = path.join(process.cwd(), "public", "Creative_TV.png");
   const buffer = await readFile(filePath);
@@ -29,15 +57,69 @@ async function fallbackImage(): Promise<NextResponse> {
   });
 }
 
-function isUsableRemoteUrl(url: string): boolean {
+function isPrivateIp(ip: string): boolean {
+  if (
+    ip.startsWith("127.") ||
+    ip.startsWith("10.") ||
+    ip.startsWith("192.168.") ||
+    ip.startsWith("169.254.") ||
+    ip.startsWith("0.")
+  ) {
+    return true;
+  }
+  if (ip.startsWith("172.")) {
+    const second = parseInt(ip.split(".")[1] ?? "", 10);
+    if (second >= 16 && second <= 31) return true;
+  }
+  if (
+    ip === "::1" ||
+    ip.startsWith("fe80:") ||
+    ip.startsWith("fc00:") ||
+    ip.startsWith("fd00:")
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function isAllowedHostname(hostname: string): boolean {
+  const host = hostname.toLowerCase();
+  if (
+    host === "localhost" ||
+    host.endsWith(".local") ||
+    host === "0.0.0.0" ||
+    host === "[::1]"
+  ) {
+    return false;
+  }
+  return ALLOWED_HOST_SUFFIXES.some(
+    (suffix) => host === suffix || host.endsWith(`.${suffix}`)
+  );
+}
+
+async function isSafeRemoteThumbnailUrl(url: string): Promise<boolean> {
   if (!url) return false;
   if (url.includes("storage.googleapis.com/lp-ai-generate-com")) return false;
+
+  let parsed: URL;
   try {
-    const parsed = new URL(url);
-    return parsed.protocol === "http:" || parsed.protocol === "https:";
+    parsed = new URL(url);
   } catch {
     return false;
   }
+
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false;
+  if (!isAllowedHostname(parsed.hostname)) return false;
+
+  try {
+    const addresses = await dns.promises.lookup(parsed.hostname, { all: true });
+    if (addresses.length === 0) return false;
+    if (addresses.some(({ address }) => isPrivateIp(address))) return false;
+  } catch {
+    return false;
+  }
+
+  return true;
 }
 
 async function fetchRemoteImage(
@@ -46,22 +128,36 @@ async function fetchRemoteImage(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch(url, {
-      signal: controller.signal,
-      headers: { Accept: "image/*,*/*" },
-      redirect: "follow",
-    });
-    if (!res.ok) return null;
-    const contentType = res.headers.get("content-type") || "";
-    if (contentType && !contentType.startsWith("image/")) return null;
-    const body = await res.arrayBuffer();
-    if (!body.byteLength) return null;
-    return {
-      body,
-      contentType: contentType.startsWith("image/")
-        ? contentType
-        : "image/jpeg",
-    };
+    // Manual redirects so each hop is re-checked against the allowlist.
+    let current = url;
+    for (let hop = 0; hop < 3; hop++) {
+      if (!(await isSafeRemoteThumbnailUrl(current))) return null;
+      const res = await fetch(current, {
+        signal: controller.signal,
+        headers: { Accept: "image/*,*/*" },
+        redirect: "manual",
+      });
+
+      if (res.status >= 300 && res.status < 400) {
+        const location = res.headers.get("location");
+        if (!location) return null;
+        current = new URL(location, current).toString();
+        continue;
+      }
+
+      if (!res.ok) return null;
+      const contentType = res.headers.get("content-type") || "";
+      if (contentType && !contentType.startsWith("image/")) return null;
+      const body = await res.arrayBuffer();
+      if (!body.byteLength) return null;
+      return {
+        body,
+        contentType: contentType.startsWith("image/")
+          ? contentType
+          : "image/jpeg",
+      };
+    }
+    return null;
   } catch (err) {
     serverLogger.warn("OG video image fetch failed:", { url, err });
     return null;
@@ -109,7 +205,7 @@ export async function GET(request: NextRequest) {
 
     const thumbnailUrl = await resolveThumbnailUrl(id, playbackId);
 
-    if (thumbnailUrl && isUsableRemoteUrl(thumbnailUrl)) {
+    if (thumbnailUrl && (await isSafeRemoteThumbnailUrl(thumbnailUrl))) {
       const remote = await fetchRemoteImage(thumbnailUrl);
       if (remote) {
         return new NextResponse(remote.body, {

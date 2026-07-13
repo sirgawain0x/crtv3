@@ -362,6 +362,26 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
     status.kind === "offline-temporary" ? 15000 : null
   );
 
+  // While live (or gated), refresh stream metadata until Lens chat is activated
+  // so viewers who joined early pick up lens_live_post_id without a full reload.
+  useInterval(
+    useCallback(async () => {
+      if (!playbackId) return;
+      try {
+        const streamRecord = await getStreamByPlaybackId(playbackId);
+        if (streamRecord) {
+          setStreamData(streamRecord as import("@/services/streams").Stream);
+        }
+      } catch (err) {
+        logger.warn("Stream metadata refresh failed:", err);
+      }
+    }, [playbackId]),
+    (status.kind === "live" || status.kind === "metoken-gated") &&
+      !streamData?.lens_live_post_id
+      ? 15000
+      : null
+  );
+
   // Generate a consistent sessionId based on playbackId so viewers share the same chat session.
   const sessionId = playbackId ? `session-${playbackId}` : "";
   const streamId = playbackId || "";
