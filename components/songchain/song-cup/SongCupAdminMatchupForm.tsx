@@ -71,8 +71,15 @@ export function SongCupAdminMatchupForm({
 
   const toIsoOrUndefined = (local: string): string | undefined => {
     if (!local.trim()) return undefined;
-    const ms = Date.parse(local);
-    return Number.isFinite(ms) ? new Date(ms).toISOString() : undefined;
+    const [datePart, timePart] = local.split("T");
+    if (!datePart || !timePart) return undefined;
+    const [year, month, day] = datePart.split("-").map(Number);
+    const [hours, minutes] = timePart.split(":").map(Number);
+    if ([year, month, day, hours, minutes].some((n) => !Number.isFinite(n))) {
+      return undefined;
+    }
+    const date = new Date(year, month - 1, day, hours, minutes);
+    return Number.isFinite(date.getTime()) ? date.toISOString() : undefined;
   };
 
   const handleCreate = async () => {
@@ -102,6 +109,10 @@ export function SongCupAdminMatchupForm({
 
       const startsIso = toIsoOrUndefined(startsAt);
       const endsIso = toIsoOrUndefined(endsAt);
+      if (startsIso && endsIso && new Date(startsIso) >= new Date(endsIso)) {
+        toast.error("Start time must be before end time");
+        return;
+      }
       const derivedStatus =
         startsIso || endsIso
           ? deriveMatchupStatusFromTimes(startsIso, endsIso)

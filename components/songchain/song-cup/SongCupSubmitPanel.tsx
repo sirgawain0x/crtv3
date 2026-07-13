@@ -75,12 +75,13 @@ function SongCupCheckbox({
         type="checkbox"
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
-        className="sr-only"
+        className="peer sr-only"
       />
       <span
         aria-hidden
         className={cn(
           "flex h-6 w-6 shrink-0 items-center justify-center rounded border-2 transition-colors",
+          "peer-focus-visible:ring-2 peer-focus-visible:ring-[#fe01dc]/50 peer-focus-visible:ring-offset-2",
           checked
             ? "border-[#fe01dc] bg-[#fe01dc]"
             : "border-[#fe01dc]/70 bg-background dark:bg-black/40",
