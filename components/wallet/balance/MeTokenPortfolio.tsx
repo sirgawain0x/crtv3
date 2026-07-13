@@ -21,6 +21,7 @@ import { useUser } from '@/lib/wallet/react';
 import { useSmartAccountClient } from '@/lib/wallet/react';
 import Link from 'next/link';
 import { convertFailingGateway } from '@/lib/utils/image-gateway';
+import { formatMeTokenHoldingUsd } from '@/lib/utils/meTokenHoldingValue';
 
 interface MeTokenPortfolioProps {
   targetAddress?: string;
@@ -29,23 +30,13 @@ interface MeTokenPortfolioProps {
 
 export function MeTokenPortfolio({ targetAddress, className }: MeTokenPortfolioProps) {
   const user = useUser();
-  const { holdings, loading, error, totalValue, refreshHoldings } = useMeTokenHoldings(targetAddress);
+  const { holdings, loading, error, refreshHoldings } = useMeTokenHoldings(targetAddress);
   const [refreshing, setRefreshing] = useState(false);
 
   const handleRefresh = async () => {
     setRefreshing(true);
     await refreshHoldings(true);
     setRefreshing(false);
-  };
-
-  const formatValue = (value: number) => {
-    if (value >= 1000000) {
-      return `$${(value / 1000000).toFixed(1)}M`;
-    } else if (value >= 1000) {
-      return `$${(value / 1000).toFixed(1)}K`;
-    } else {
-      return `$${value.toFixed(2)}`;
-    }
   };
 
   const formatBalance = (balance: string) => {
@@ -137,6 +128,7 @@ export function MeTokenPortfolio({ targetAddress, className }: MeTokenPortfolioP
 
   const ownMeToken = holdings.find(h => h.isOwnMeToken);
   const otherHoldings = holdings.filter(h => !h.isOwnMeToken);
+  const totalValue = holdings.reduce((sum, h) => sum + (h.holdingValueUsd || 0), 0);
 
   return (
     <div className={className}>
@@ -168,9 +160,9 @@ export function MeTokenPortfolio({ targetAddress, className }: MeTokenPortfolioP
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="text-center">
               <div className="text-2xl font-bold text-primary">
-                {formatValue(totalValue)}
+                {formatMeTokenHoldingUsd(totalValue)}
               </div>
-              <div className="text-sm text-muted-foreground">Total Value</div>
+              <div className="text-sm text-muted-foreground">Est. holding value</div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold">
@@ -297,7 +289,8 @@ function MeTokenHoldingCard({ holding, showCreatorProfile }: MeTokenHoldingCardP
 
           <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
             <span>Balance: {formatBalance(holding.balance)}</span>
-            <span>TVL: {formatTVL(holding.tvl)}</span>
+            <span>Est. value: {formatMeTokenHoldingUsd(holding.holdingValueUsd)}</span>
+            <span>Vault TVL: {formatTVL(holding.tvl)}</span>
           </div>
         </div>
       </div>
