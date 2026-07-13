@@ -56,13 +56,21 @@ interface LensLiveChatProps {
 }
 
 function commentAuthorLabel(item: AnyPost): string {
-  const author = (item as any)?.author;
+  // Lens canary / Songchain posts use `author` (not V2 `by`).
+  const raw = item as any;
+  const author = raw?.author ?? raw?.by;
   const handle =
     author?.username?.localName ||
     author?.username?.value ||
-    author?.username;
-  if (typeof handle === "string" && handle.length > 0) return `@${handle}`;
-  const addr = author?.address as string | undefined;
+    author?.handle?.localName ||
+    author?.handle?.fullHandle ||
+    (typeof author?.username === "string" ? author.username : null);
+  if (typeof handle === "string" && handle.length > 0) {
+    return handle.startsWith("@") ? handle : `@${handle}`;
+  }
+  const addr =
+    (author?.address as string | undefined) ||
+    (author?.ownedBy?.address as string | undefined);
   if (addr) return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
   return "anon";
 }

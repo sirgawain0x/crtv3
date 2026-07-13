@@ -557,16 +557,17 @@ export default function LivePage() {
                           playbackId
                             ? buildGoingLivePostContent({
                                 streamName: streamName || "Live stream",
-                                watchUrl: `${typeof window !== "undefined" ? window.location.origin : "https://tv.creativeplatform.xyz"}/watch/${playbackId}`,
+                                watchUrl: `${(process.env.NEXT_PUBLIC_SITE_URL || "https://tv.creativeplatform.xyz").replace(/\/$/, "")}/watch/${playbackId}`,
                               })
                             : null
                         }
                         onEnsurePost={async () => {
                           if (!playbackId || !creatorAddress) return null;
-                          const watchUrl =
-                            typeof window !== "undefined"
-                              ? `${window.location.origin}/watch/${playbackId}`
-                              : undefined;
+                          const siteOrigin = (
+                            process.env.NEXT_PUBLIC_SITE_URL ||
+                            "https://tv.creativeplatform.xyz"
+                          ).replace(/\/$/, "");
+                          const watchUrl = `${siteOrigin}/watch/${playbackId}`;
                           const content = buildGoingLivePostContent({
                             streamName: streamName || "Live stream",
                             watchUrl,

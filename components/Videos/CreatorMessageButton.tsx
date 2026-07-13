@@ -127,6 +127,8 @@ export function CreatorMessageButton({
         await anyClient.conversations.newDm(creatorAddress);
       } else if (typeof anyClient.conversations?.createDm === "function") {
         await anyClient.conversations.createDm(creatorAddress);
+      } else if (typeof anyClient.conversations?.newConversation === "function") {
+        await anyClient.conversations.newConversation(creatorAddress);
       } else {
         throw new Error("XMTP DM API not available in this SDK build");
       }

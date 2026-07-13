@@ -160,7 +160,7 @@ export function LicensePurchaseDialog({
         transport: http("/api/story/rpc-proxy"),
       });
 
-      const [native, wip] = await Promise.all([
+      const [nativeResult, wipResult] = await Promise.allSettled([
         publicClient.getBalance({
           address: walletAddress as Address,
         }),
@@ -169,10 +169,14 @@ export function LicensePurchaseDialog({
           abi: ERC20_BALANCE_ABI,
           functionName: "balanceOf",
           args: [walletAddress as Address],
-        }) as Promise<bigint>,
+        }),
       ]);
-      setIpBalance(native);
-      setWipBalance(wip);
+      setIpBalance(
+        nativeResult.status === "fulfilled" ? nativeResult.value : null
+      );
+      setWipBalance(
+        wipResult.status === "fulfilled" ? (wipResult.value as bigint) : null
+      );
     } catch (err) {
       logger.warn("Failed to fetch Story balances:", err);
       setIpBalance(null);

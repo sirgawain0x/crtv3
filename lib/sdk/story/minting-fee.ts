@@ -17,7 +17,9 @@ export function mintingFeeToWei(amount: number | string | undefined | null): big
   const n = typeof amount === "number" ? amount : Number(amount);
   if (!Number.isFinite(n) || n <= 0) return 0n;
   try {
-    return parseEther(String(n));
+    // Avoid scientific notation (e.g. 1e-7) which parseEther rejects.
+    const fixed = n.toFixed(18).replace(/\.?0+$/, "");
+    return parseEther(fixed);
   } catch {
     return 0n;
   }
