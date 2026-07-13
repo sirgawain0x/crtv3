@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { useSongCupAdmin } from "@/lib/hooks/song-cup/useSongCupAdmin";
 import {
@@ -46,7 +46,13 @@ export function SongCupSchedulePanel({ className, orbClubUrl }: SongCupScheduleP
     createMatchup,
     updateMatchupStatus,
     removeMatchup,
-  } = useSongCupMatchups(null, filter);
+  } = useSongCupMatchups(null, "all");
+
+  const createScheduleMatchup = useCallback(
+    (data: Parameters<typeof createMatchup>[0]) =>
+      createMatchup(data, { skipPoll: true }),
+    [createMatchup],
+  );
 
   useEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), 1000);
@@ -54,13 +60,21 @@ export function SongCupSchedulePanel({ className, orbClubUrl }: SongCupScheduleP
   }, []);
 
   const scheduleMatchups = useMemo(() => {
-    const rows =
-      filter === "upcoming"
-        ? matchups.filter((m) => {
-            const phase = getMatchupLifecycle(m.starts_at, m.ends_at, m.status, now).phase;
-            return phase === "countdown" || phase === "live" || m.status === "upcoming" || m.status === "active";
-          })
-        : matchups;
+    const rows = matchups.filter((m) => {
+      const phase = getMatchupLifecycle(m.starts_at, m.ends_at, m.status, now).phase;
+      if (filter === "upcoming") {
+        return (
+          phase === "countdown" ||
+          phase === "live" ||
+          m.status === "upcoming" ||
+          m.status === "active"
+        );
+      }
+      if (filter === "past") {
+        return phase === "ended" || m.status === "past";
+      }
+      return true;
+    });
 
     return [...rows].sort((a, b) => {
       const aStart = a.starts_at ? Date.parse(a.starts_at) : 0;
@@ -129,7 +143,7 @@ export function SongCupSchedulePanel({ className, orbClubUrl }: SongCupScheduleP
           <div className="mt-4 flex flex-col gap-6 border-t border-[#dc2bb3]/30 pt-6">
             <SongCupAdminMatchupForm
               matchups={matchups}
-              onCreate={createMatchup}
+              onCreate={createScheduleMatchup}
               onUpdateStatus={updateMatchupStatus}
               onRemove={removeMatchup}
               scheduleMode

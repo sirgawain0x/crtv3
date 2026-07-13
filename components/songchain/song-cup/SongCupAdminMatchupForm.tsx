@@ -122,7 +122,9 @@ export function SongCupAdminMatchupForm({
       });
 
       if (row) {
-        if (!row.poll_post_id) {
+        if (scheduleMode) {
+          toast.success("Scheduled matchup saved");
+        } else if (!row.poll_post_id) {
           toast.warning("Matchup saved, but Lens poll was not created — votes will use legacy mode");
         } else {
           toast.success("Matchup and Lens poll created");

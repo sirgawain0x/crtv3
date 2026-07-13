@@ -24,6 +24,7 @@ import { useCreatorVideoLibrary } from "@/hooks/useCreatorVideoLibrary";
 import { songCupSubmissionsService } from "@/lib/sdk/supabase/song-cup-submissions";
 import { useUser } from "@/lib/wallet/react";
 import type { VideoAsset } from "@/lib/types/video-asset";
+import { resolveVideoPlaybackUrl } from "@/lib/songchain/build-lens-video-metadata";
 import { cn } from "@/lib/utils/utils";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
@@ -41,6 +42,12 @@ import {
 type SongCupSubmitPanelProps = {
   className?: string;
 };
+
+function thumbnailFromVideoAsset(video: VideoAsset): string | undefined {
+  const url =
+    (video as { thumbnail_url?: string }).thumbnail_url ?? video.thumbnailUri;
+  return url?.trim() || undefined;
+}
 
 function SongCupCheckbox({
   id,
@@ -145,22 +152,28 @@ export function SongCupSubmitPanel({ className }: SongCupSubmitPanelProps) {
       toast.error("Artist name is required.");
       return;
     }
-    if (!uploadVideoEnabled || !selectedVideo?.location) {
+    if (!uploadVideoEnabled || !selectedVideo?.playback_id) {
       toast.error("Enable Upload Video and select a video from your library.");
       return;
     }
 
     setIsSubmitting(true);
     try {
+      const playbackUrl = await resolveVideoPlaybackUrl(selectedVideo.playback_id);
+      if (!playbackUrl) {
+        toast.error("Could not resolve video playback URL. Try another video.");
+        return;
+      }
+
       const result = await songCupSubmissionsService.create({
         wallet_address: user.address,
-        grove_url: selectedVideo.location,
+        grove_url: playbackUrl,
         grove_hash: selectedVideo.metadata_uri ?? undefined,
         title: artistName.trim(),
         description: description.trim() || undefined,
         artist_handle: artistHandle.trim() || undefined,
         email: email.trim() || undefined,
-        cover_url: selectedVideo.thumbnailUri || undefined,
+        cover_url: thumbnailFromVideoAsset(selectedVideo),
         attestation_uid: attestation?.uid,
       });
 
