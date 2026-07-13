@@ -51,7 +51,7 @@ export const SONG_CUP_BUTTON_ICONS: SidebarIcon[] = [
   },
   {
     id: "schedule",
-    src: "/songchain/button-icons/schedule-icon.png",
+    src: "/songchain/button-icons/schedule-icon.svg",
     alt: "Schedule",
   },
   {
