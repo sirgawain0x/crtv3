@@ -14,6 +14,7 @@ export interface SongCupSubmission {
   cover_hash?: string | null;
   attestation_uid?: string | null;
   post_id?: string | null;
+  is_favorite: boolean;
   status: 'pending' | 'approved' | 'rejected';
   created_at: string;
   updated_at?: string | null;
@@ -81,6 +82,7 @@ export const songCupSubmissionsService = {
           attestation_uid: data.attestation_uid ?? null,
           post_id: data.post_id ?? null,
           status: 'pending',
+          is_favorite: false,
         })
         .select('*')
         .single();
@@ -109,6 +111,7 @@ export const songCupSubmissionsService = {
       const { data, error } = await supabase
         .from('song_cup_submissions')
         .select('*')
+        .order('is_favorite', { ascending: false })
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -138,6 +141,33 @@ export const songCupSubmissionsService = {
       return true;
     } catch (err) {
       serverLogger.error('[songCupSubmissions] updateStatus exception:', err);
+      return false;
+    }
+  },
+
+  async setFavorite(id: string, isFavorite: boolean): Promise<boolean> {
+    try {
+      const updates: Record<string, unknown> = {
+        is_favorite: isFavorite,
+        updated_at: new Date().toISOString(),
+      };
+      if (isFavorite) {
+        updates.status = 'approved';
+      }
+
+      const { error } = await supabase
+        .from('song_cup_submissions')
+        .update(updates)
+        .eq('id', id);
+
+      if (error) {
+        serverLogger.error('[songCupSubmissions] setFavorite error:', error);
+        return false;
+      }
+
+      return true;
+    } catch (err) {
+      serverLogger.error('[songCupSubmissions] setFavorite exception:', err);
       return false;
     }
   },

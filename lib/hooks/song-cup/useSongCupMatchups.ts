@@ -203,10 +203,18 @@ export function useSongCupMatchups(
   );
 
   const createMatchup = useCallback(
-    async (data: Parameters<typeof songCupMatchupsService.create>[0]) => {
+    async (
+      data: Parameters<typeof songCupMatchupsService.create>[0],
+      options?: { skipPoll?: boolean },
+    ) => {
       let pollPostId = data.poll_post_id?.trim() || null;
 
-      if (!pollPostId && data.left_label && data.right_label) {
+      if (
+        !options?.skipPoll &&
+        !pollPostId &&
+        data.left_label &&
+        data.right_label
+      ) {
         pollPostId = await createPollPost({
           title: data.title,
           leftLabel: data.left_label,

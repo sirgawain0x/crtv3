@@ -34,7 +34,7 @@ export function MeTokenPortfolio({ targetAddress, className }: MeTokenPortfolioP
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await refreshHoldings();
+    await refreshHoldings(true);
     setRefreshing(false);
   };
 

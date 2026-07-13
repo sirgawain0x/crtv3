@@ -31,7 +31,7 @@ export function SongCupAdminSubmissionsList({
 }: SongCupAdminSubmissionsListProps) {
   const [statusFilter, setStatusFilter] = useState<SongCupSubmissionStatusFilter>("pending");
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
-  const { submissions, isLoading, error, refetch, updateStatus, isAdmin } =
+  const { submissions, isLoading, error, refetch, updateStatus, setFavorite, isAdmin } =
     useSongCupSubmissions(true);
 
   useEffect(() => {
@@ -119,7 +119,7 @@ export function SongCupAdminSubmissionsList({
             <SongCupSubmissionReviewCard
               key={submission.id}
               submission={submission}
-              onSelectFavorite={(id) => void updateStatus(id, "approved")}
+              onFavorite={(id, favorite) => void setFavorite(id, favorite)}
               onReject={(id) => void updateStatus(id, "rejected")}
             />
           ))}

@@ -21,6 +21,11 @@ import { logger } from '@/lib/utils/logger';
 import { appendBuilderCode } from "@/lib/utils/builder-code";
 import { METOKEN_DIAMOND_BASE, METOKEN_FACTORY_BASE } from '@/lib/contracts/metokens/deployments';
 import { publicClient } from '@/lib/viem';
+import {
+  notifyMeTokenBalancesChanged,
+  pollMeTokenBalanceRefresh,
+} from '@/lib/hooks/metokens/meTokenBalanceEvents';
+import { clearMeTokenHoldingsCache } from '@/lib/hooks/metokens/useMeTokenHoldings';
 
 // MeTokens contract addresses on Base
 const METOKEN_FACTORY = METOKEN_FACTORY_BASE;
@@ -171,6 +176,21 @@ export function useMeTokensSupabase(targetAddress?: string) {
     }
     return getGasContext('usdc');
   }, [getGasContext, isMember]);
+
+  const pokeHoldingsRefresh = useCallback(
+    (opts?: { poll?: boolean }) => {
+      if (!address) return;
+      clearMeTokenHoldingsCache(address);
+      notifyMeTokenBalancesChanged(address);
+      if (opts?.poll) {
+        void pollMeTokenBalanceRefresh(() => {
+          clearMeTokenHoldingsCache(address);
+          notifyMeTokenBalancesChanged(address);
+        });
+      }
+    },
+    [address],
+  );
 
   const toFriendlyTradeError = (err: unknown, fallback: string): Error => {
     const message = err instanceof Error ? err.message : String(err);
@@ -1790,6 +1810,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
 
       // Refresh data
       await checkUserMeToken();
+      pokeHoldingsRefresh({ poll: true });
       return txHash;
     } catch (err) {
       logger.error('❌ Error in buyMeTokens:', err);
@@ -2319,6 +2340,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
 
       // Refresh data
       await checkUserMeToken();
+      pokeHoldingsRefresh();
       return txHash;
     } catch (err) {
       logger.error('❌ Error in sellMeTokens:', err);
@@ -2420,6 +2442,8 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
       logger.debug('Balance update received:', payload);
       // Use the ref to call the latest version without causing re-subscriptions
       checkUserMeTokenRef.current();
+      clearMeTokenHoldingsCache(address);
+      notifyMeTokenBalancesChanged(address);
     });
 
     return () => {

@@ -1,12 +1,10 @@
 "use client";
 
-import { useRef, useState } from "react";
-import Image from "next/image";
+import { useState } from "react";
+import Link from "next/link";
 import {
   Loader2,
-  X,
   Film,
-  ImageIcon,
   AlertCircle,
   ShieldCheck,
   CheckCircle2,
@@ -16,24 +14,23 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { GroveVideoUploader } from "@/components/songchain/GroveVideoUploader";
+import { CreativeTVVideoPicker } from "@/components/songchain/CreativeTVVideoPicker";
 import { SongCupAttestationModal } from "@/components/eas/SongCupAttestationModal";
 import { SongCupAdminSubmissionsList } from "@/components/songchain/song-cup/SongCupAdminSubmissionsList";
 import { useSongCupAttestation } from "@/lib/hooks/eas/useSongCupAttestation";
 import { useSongCupSubmitPrefill } from "@/lib/hooks/song-cup/useSongCupSubmitPrefill";
 import { useSongCupUserSubmission } from "@/lib/hooks/song-cup/useSongCupUserSubmission";
-import { uploadToGrove } from "@/lib/songchain/song-cup/upload-to-grove";
+import { useCreatorVideoLibrary } from "@/hooks/useCreatorVideoLibrary";
 import { songCupSubmissionsService } from "@/lib/sdk/supabase/song-cup-submissions";
 import { useUser } from "@/lib/wallet/react";
 import type { VideoAsset } from "@/lib/types/video-asset";
+import { resolveVideoPlaybackUrl } from "@/lib/songchain/build-lens-video-metadata";
 import { cn } from "@/lib/utils/utils";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import {
-  songCupAccent,
   songCupAccentYellow,
   songCupBody,
-  songCupDashedUpload,
   songCupField,
   songCupFormCard,
   songCupGradientCta,
@@ -46,11 +43,11 @@ type SongCupSubmitPanelProps = {
   className?: string;
 };
 
-type CoverAsset = {
-  url: string;
-  hash?: string;
-  name: string;
-};
+function thumbnailFromVideoAsset(video: VideoAsset): string | undefined {
+  const url =
+    (video as { thumbnail_url?: string }).thumbnail_url ?? video.thumbnailUri;
+  return url?.trim() || undefined;
+}
 
 function SongCupCheckbox({
   id,
@@ -73,22 +70,26 @@ function SongCupCheckbox({
         className,
       )}
     >
-      <input id={id} type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="peer sr-only" />
+      <input
+        id={id}
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className="peer sr-only"
+      />
       <span
         aria-hidden
         className={cn(
-          "flex h-6 w-6 shrink-0 items-center justify-center rounded border transition-colors",
-          "border-fuchsia-500/60 bg-background",
-          "peer-checked:border-fuchsia-600 peer-checked:bg-fuchsia-600",
-          "peer-focus-visible:ring-2 peer-focus-visible:ring-fuchsia-500/50 peer-focus-visible:ring-offset-2",
-          "dark:border-[#fe01dc] dark:bg-black/40",
-          "dark:peer-checked:border-[#fe01dc] dark:peer-checked:bg-[#fe01dc]",
-          "dark:peer-focus-visible:ring-[#fe01dc]/50",
+          "flex h-6 w-6 shrink-0 items-center justify-center rounded border-2 transition-colors",
+          "peer-focus-visible:ring-2 peer-focus-visible:ring-[#fe01dc]/50 peer-focus-visible:ring-offset-2",
+          checked
+            ? "border-[#fe01dc] bg-[#fe01dc]"
+            : "border-[#fe01dc]/70 bg-background dark:bg-black/40",
         )}
       >
         <Check
           className={cn(
-            "h-4 w-4 text-black transition-opacity",
+            "h-4 w-4 text-[#feed01] transition-opacity",
             checked ? "opacity-100" : "opacity-0",
           )}
           strokeWidth={3}
@@ -102,13 +103,13 @@ function SongCupCheckbox({
 
 export function SongCupSubmitPanel({ className }: SongCupSubmitPanelProps) {
   const user = useUser();
+  const { videos, loading: libraryLoading, hasWallet } = useCreatorVideoLibrary();
   const {
     submission: existingSubmission,
     hasSubmitted,
     isLoading: isLoadingSubmission,
     setSubmission: setExistingSubmission,
   } = useSongCupUserSubmission(user?.address);
-  const coverInputRef = useRef<HTMLInputElement>(null);
   const [attestationModalOpen, setAttestationModalOpen] = useState(false);
   const { isAttested, isLoading: isAttestationLoading, attestation } = useSongCupAttestation();
   const {
@@ -124,39 +125,14 @@ export function SongCupSubmitPanel({ className }: SongCupSubmitPanelProps) {
   const [artistName, setArtistName] = useState("");
   const [description, setDescription] = useState("");
   const [uploadVideoEnabled, setUploadVideoEnabled] = useState(false);
-  const [uploadCoverEnabled, setUploadCoverEnabled] = useState(false);
-  const [uploadedVideoAsset, setUploadedVideoAsset] = useState<Partial<VideoAsset> | null>(null);
-  const [coverAsset, setCoverAsset] = useState<CoverAsset | null>(null);
-  const [isUploadingCover, setIsUploadingCover] = useState(false);
-  const [coverError, setCoverError] = useState<string | null>(null);
+  const [selectedVideo, setSelectedVideo] = useState<VideoAsset | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const uploadCoverFile = async (file: File) => {
-    if (!file.type.startsWith("image/")) {
-      setCoverError("Please select an image file.");
-      return;
-    }
-    setIsUploadingCover(true);
-    setCoverError(null);
-    try {
-      const result = await uploadToGrove(file);
-      setCoverAsset({ url: result.url, hash: result.hash, name: file.name });
-    } catch (err) {
-      setCoverError(err instanceof Error ? err.message : "Cover upload failed");
-    } finally {
-      setIsUploadingCover(false);
-      if (coverInputRef.current) coverInputRef.current.value = "";
-    }
-  };
 
   const resetForm = () => {
     setArtistName("");
     setDescription("");
     setUploadVideoEnabled(false);
-    setUploadCoverEnabled(false);
-    setUploadedVideoAsset(null);
-    setCoverAsset(null);
-    setCoverError(null);
+    setSelectedVideo(null);
   };
 
   const handleSubmit = async () => {
@@ -177,27 +153,28 @@ export function SongCupSubmitPanel({ className }: SongCupSubmitPanelProps) {
       toast.error("Artist name is required.");
       return;
     }
-    if (!uploadVideoEnabled || !uploadedVideoAsset?.location) {
-      toast.error("Enable Upload Video and add your entry video.");
-      return;
-    }
-    if (uploadCoverEnabled && !coverAsset?.url) {
-      toast.error("Upload a cover image or uncheck Upload Cover image.");
+    if (!uploadVideoEnabled || !selectedVideo?.playback_id) {
+      toast.error("Enable Upload Video and select a video from your library.");
       return;
     }
 
     setIsSubmitting(true);
     try {
+      const playbackUrl = await resolveVideoPlaybackUrl(selectedVideo.playback_id);
+      if (!playbackUrl) {
+        toast.error("Could not resolve video playback URL. Try another video.");
+        return;
+      }
+
       const result = await songCupSubmissionsService.create({
         wallet_address: user.address,
-        grove_url: uploadedVideoAsset.location,
-        grove_hash: uploadedVideoAsset.metadata_uri ?? undefined,
+        grove_url: playbackUrl,
+        grove_hash: selectedVideo.metadata_uri ?? undefined,
         title: artistName.trim(),
         description: description.trim() || undefined,
         artist_handle: artistHandle.trim() || undefined,
         email: email.trim() || undefined,
-        cover_url: coverAsset?.url,
-        cover_hash: coverAsset?.hash,
+        cover_url: thumbnailFromVideoAsset(selectedVideo),
         attestation_uid: attestation?.uid,
       });
 
@@ -243,7 +220,7 @@ export function SongCupSubmitPanel({ className }: SongCupSubmitPanelProps) {
                 SUBMIT
               </h2>
               <p className={cn("mt-2 text-sm", songCupMuted)}>
-                Upload your Song Cup entry video and cover art.
+                Select a video from your Creative TV library to enter the Song Cup.
               </p>
             </div>
           </div>
@@ -372,92 +349,33 @@ export function SongCupSubmitPanel({ className }: SongCupSubmitPanelProps) {
                   checked={uploadVideoEnabled}
                   onChange={(checked) => {
                     setUploadVideoEnabled(checked);
-                    if (!checked) setUploadedVideoAsset(null);
-                  }}
-                />
-                <SongCupCheckbox
-                  id="upload-cover"
-                  label="Upload Thumbnail"
-                  checked={uploadCoverEnabled}
-                  onChange={(checked) => {
-                    setUploadCoverEnabled(checked);
-                    if (!checked) setCoverAsset(null);
+                    if (!checked) setSelectedVideo(null);
                   }}
                 />
               </div>
 
               {uploadVideoEnabled && (
-                <div className={cn("rounded-[20px] p-3", songCupPanelInset)}>
-                  <GroveVideoUploader
-                    onUploaded={setUploadedVideoAsset}
-                    onRemove={() => setUploadedVideoAsset(null)}
-                    uploadedAsset={uploadedVideoAsset}
-                    disabled={isSubmitting}
-                  />
-                </div>
-              )}
-
-              {uploadCoverEnabled && (
-                <div className={cn("space-y-2 rounded-[20px] p-3", songCupPanelInset)}>
-                  <input
-                    ref={coverInputRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    disabled={isSubmitting || isUploadingCover}
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) void uploadCoverFile(file);
-                    }}
-                  />
-                  {coverAsset ? (
-                    <div className="flex items-start gap-3">
-                      <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-md">
-                        <img
-                          src={coverAsset.url}
-                          alt={coverAsset.name}
-                          className="h-full w-full object-cover"
-                        />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className={cn("truncate text-sm font-medium", songCupBody)}>{coverAsset.name}</p>
-                        <p className={cn("text-xs", songCupMuted)}>Uploaded to Grove</p>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 shrink-0"
-                        onClick={() => setCoverAsset(null)}
-                        aria-label="Remove cover image"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <button
-                      type="button"
-                      disabled={isSubmitting || isUploadingCover}
-                      onClick={() => coverInputRef.current?.click()}
-                      className={cn(
-                        "flex w-full flex-col items-center justify-center gap-2 rounded-md p-4 disabled:opacity-60",
-                        songCupDashedUpload,
-                      )}
-                    >
-                      {isUploadingCover ? (
-                        <Loader2 className={cn("h-6 w-6 animate-spin", songCupAccent)} />
-                      ) : (
-                        <ImageIcon className="h-6 w-6" />
-                      )}
-                      <span className="text-sm">
-                        {isUploadingCover ? "Uploading to Grove…" : "Click to upload cover image"}
-                      </span>
-                    </button>
+                <div className={cn("space-y-3 rounded-[20px] p-3", songCupPanelInset)}>
+                  {!hasWallet && (
+                    <p className={cn("flex items-center gap-2 text-xs", songCupMuted)}>
+                      <AlertCircle className="h-3.5 w-3.5" />
+                      Connect your wallet to load your library.
+                    </p>
                   )}
-                  {coverError && (
-                    <p className="flex items-center gap-1.5 text-xs text-red-400">
-                      <AlertCircle className="h-3 w-3" />
-                      {coverError}
+                  <CreativeTVVideoPicker
+                    videos={videos}
+                    loading={libraryLoading}
+                    selected={selectedVideo}
+                    onSelect={setSelectedVideo}
+                    disabled={!hasWallet || isSubmitting}
+                  />
+                  {!libraryLoading && hasWallet && videos.length === 0 && (
+                    <p className={cn("text-xs", songCupMuted)}>
+                      No published videos yet.{" "}
+                      <Link href="/upload" className="underline text-[#feed01]">
+                        Upload on Creative TV
+                      </Link>{" "}
+                      first, then return here to submit.
                     </p>
                   )}
                 </div>
@@ -482,19 +400,10 @@ export function SongCupSubmitPanel({ className }: SongCupSubmitPanelProps) {
         </div>
 
         <aside className="flex shrink-0 flex-col items-center gap-4 lg:pt-16">
-          {/* <div className="relative h-[125px] w-[131px] overflow-hidden rounded-[15px]">
-            <Image
-              src="/songchain/song-cup/submit-qr.png"
-              alt="Song Cup QR code"
-              fill
-              className="object-cover"
-              sizes="131px"
-            />
-          </div> */}
-          {uploadedVideoAsset?.location && (
-            <div className={cn("flex items-center gap-2 text-xs", songCupAccent)}>
+          {selectedVideo?.location && (
+            <div className={cn("flex items-center gap-2 text-xs text-[#feed01]")}>
               <Film className="h-4 w-4" />
-              Video ready
+              Video selected
             </div>
           )}
         </aside>

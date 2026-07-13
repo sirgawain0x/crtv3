@@ -2,7 +2,10 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useUser } from "@/lib/wallet/react";
-import { songCupSubmissionsService, SongCupSubmission } from "@/lib/sdk/supabase/song-cup-submissions";
+import {
+  songCupSubmissionsService,
+  type SongCupSubmission,
+} from "@/lib/sdk/supabase/song-cup-submissions";
 import { isSongCupAdminWallet } from "@/lib/songchain/song-cup/admin-config";
 import { logger } from "@/lib/utils/logger";
 
@@ -49,5 +52,28 @@ export function useSongCupSubmissions(enabled: boolean = true) {
     return ok;
   }, []);
 
-  return { submissions, isLoading, error, refetch: fetch, updateStatus, isAdmin };
+  const setFavorite = useCallback(async (id: string, isFavorite: boolean) => {
+    const ok = await songCupSubmissionsService.setFavorite(id, isFavorite);
+    if (ok) {
+      setSubmissions((prev) => {
+        const next = prev.map((s) =>
+          s.id === id
+            ? {
+                ...s,
+                is_favorite: isFavorite,
+                status: isFavorite ? "approved" : s.status,
+                updated_at: new Date().toISOString(),
+              }
+            : s,
+        );
+        return [...next].sort((a, b) => {
+          if (a.is_favorite !== b.is_favorite) return a.is_favorite ? -1 : 1;
+          return Date.parse(b.created_at) - Date.parse(a.created_at);
+        });
+      });
+    }
+    return ok;
+  }, []);
+
+  return { submissions, isLoading, error, refetch: fetch, updateStatus, setFavorite, isAdmin };
 }

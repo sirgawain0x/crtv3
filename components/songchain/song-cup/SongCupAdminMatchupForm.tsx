@@ -15,6 +15,7 @@ import { parseOrbPostUrl } from "@/lib/songchain/song-cup/parse-orb-post-url";
 import { fetchOrbPost } from "./SongCupOrbPostEmbed";
 import type { SongCupMatchup, SongCupMatchupStatus } from "@/lib/sdk/supabase/song-cup-matchups";
 import type { SongCupMatchupWithVotes } from "@/lib/hooks/song-cup/useSongCupMatchups";
+import { deriveMatchupStatusFromTimes } from "@/lib/songchain/song-cup/matchup-lifecycle";
 import { toast } from "sonner";
 import {
   songCupAccentYellow,
@@ -40,10 +41,13 @@ type SongCupAdminMatchupFormProps = {
     left_label?: string;
     right_label?: string;
     status?: SongCupMatchupStatus;
+    starts_at?: string;
+    ends_at?: string;
   }) => Promise<SongCupMatchup | null>;
   onUpdateStatus: (id: string, status: SongCupMatchupStatus) => Promise<boolean>;
   onRemove: (id: string) => Promise<boolean>;
   className?: string;
+  scheduleMode?: boolean;
 };
 
 export function SongCupAdminMatchupForm({
@@ -52,6 +56,7 @@ export function SongCupAdminMatchupForm({
   onUpdateStatus,
   onRemove,
   className,
+  scheduleMode = false,
 }: SongCupAdminMatchupFormProps) {
   const [title, setTitle] = useState("SEMI FINALS");
   const [subtitle, setSubtitle] = useState("");
@@ -59,8 +64,23 @@ export function SongCupAdminMatchupForm({
   const [rightUrl, setRightUrl] = useState("");
   const [leftLabel, setLeftLabel] = useState("");
   const [rightLabel, setRightLabel] = useState("");
+  const [startsAt, setStartsAt] = useState("");
+  const [endsAt, setEndsAt] = useState("");
   const [status, setStatus] = useState<SongCupMatchupStatus>("active");
   const [saving, setSaving] = useState(false);
+
+  const toIsoOrUndefined = (local: string): string | undefined => {
+    if (!local.trim()) return undefined;
+    const [datePart, timePart] = local.split("T");
+    if (!datePart || !timePart) return undefined;
+    const [year, month, day] = datePart.split("-").map(Number);
+    const [hours, minutes] = timePart.split(":").map(Number);
+    if ([year, month, day, hours, minutes].some((n) => !Number.isFinite(n))) {
+      return undefined;
+    }
+    const date = new Date(year, month - 1, day, hours, minutes);
+    return Number.isFinite(date.getTime()) ? date.toISOString() : undefined;
+  };
 
   const handleCreate = async () => {
     if (!title.trim() || !leftUrl.trim() || !rightUrl.trim()) {
@@ -87,6 +107,17 @@ export function SongCupAdminMatchupForm({
         return;
       }
 
+      const startsIso = toIsoOrUndefined(startsAt);
+      const endsIso = toIsoOrUndefined(endsAt);
+      if (startsIso && endsIso && new Date(startsIso) >= new Date(endsIso)) {
+        toast.error("Start time must be before end time");
+        return;
+      }
+      const derivedStatus =
+        startsIso || endsIso
+          ? deriveMatchupStatusFromTimes(startsIso, endsIso)
+          : status;
+
       const row = await onCreate({
         title: title.trim(),
         subtitle: subtitle.trim() || undefined,
@@ -96,11 +127,15 @@ export function SongCupAdminMatchupForm({
         right_post_id: rightPostId,
         left_label: leftLabel.trim() || leftPost.author,
         right_label: rightLabel.trim() || rightPost.author,
-        status,
+        status: derivedStatus,
+        starts_at: startsIso,
+        ends_at: endsIso,
       });
 
       if (row) {
-        if (!row.poll_post_id) {
+        if (scheduleMode) {
+          toast.success("Scheduled matchup saved");
+        } else if (!row.poll_post_id) {
           toast.warning("Matchup saved, but Lens poll was not created — votes will use legacy mode");
         } else {
           toast.success("Matchup and Lens poll created");
@@ -126,11 +161,11 @@ export function SongCupAdminMatchupForm({
   return (
     <section className={cn(songCupAdminSection, className)}>
       <h3 className={cn("mb-4 text-lg font-bold uppercase tracking-wide", songCupAccentYellow)}>
-        Create vote matchup
+        {scheduleMode ? "Schedule matchup" : "Create vote matchup"}
       </h3>
       <p className={cn("mb-4 text-xs", songCupMuted)}>
-        Paste Orb post links from the Song Cup feed. A Lens poll is created automatically with
-        both entries as vote options.
+        Paste Orb post links from the Song Cup feed.
+        {!scheduleMode && " A Lens poll is created automatically with both entries as vote options."}
       </p>
 
       <div className="grid gap-3 sm:grid-cols-2">
@@ -169,6 +204,20 @@ export function SongCupAdminMatchupForm({
           onChange={(e) => setRightLabel(e.target.value)}
           placeholder="Right label (optional)"
           className={inputClass}
+        />
+        <Input
+          type="datetime-local"
+          value={startsAt}
+          onChange={(e) => setStartsAt(e.target.value)}
+          className={inputClass}
+          aria-label="Start time"
+        />
+        <Input
+          type="datetime-local"
+          value={endsAt}
+          onChange={(e) => setEndsAt(e.target.value)}
+          className={inputClass}
+          aria-label="End time"
         />
         <Select value={status} onValueChange={(v) => setStatus(v as SongCupMatchupStatus)}>
           <SelectTrigger className={inputClass}>

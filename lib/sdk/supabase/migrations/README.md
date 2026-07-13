@@ -27,6 +27,10 @@ ON CONFLICT (wallet_address) DO NOTHING;
 
 For admin checks, the signed-in user's `app_metadata.wallet_address` must match (same as Song Cup).
 
+## Song Cup favorites (`00008_song_cup_submission_is_favorite.sql`)
+
+Adds `is_favorite BOOLEAN` to `song_cup_submissions` (same pattern as Hack Beta). Admins toggle favorite in the review UI; favoriting also sets `status = 'approved'`. Existing approved rows are backfilled as favorites.
+
 ## Security model (shared)
 
 - **Public SELECT**: only `status = 'approved'`

@@ -22,7 +22,7 @@ export default function SongCupSubmissionsPage() {
   const user = useUser();
   const [statusFilter, setStatusFilter] = useState<SongCupSubmissionStatusFilter>("pending");
 
-  const { submissions, isLoading, error, refetch, updateStatus, isAdmin } =
+  const { submissions, isLoading, error, refetch, updateStatus, setFavorite, isAdmin } =
     useSongCupSubmissions(true);
 
   const filtered = useMemo(
@@ -42,7 +42,7 @@ export default function SongCupSubmissionsPage() {
           <div>
             <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Song Cup Submissions</h1>
             <p className="text-sm text-muted-foreground">
-              Review entries uploaded via Grove. Select favorites to advance entries.
+              Review entries from Creative TV. Vote favorites to rank submissions.
             </p>
             {isAdmin && (
               <p className="mt-1 text-xs text-muted-foreground">
@@ -122,7 +122,7 @@ export default function SongCupSubmissionsPage() {
               <SongCupSubmissionReviewCard
                 key={submission.id}
                 submission={submission}
-                onSelectFavorite={(id) => void updateStatus(id, "approved")}
+                onFavorite={(id, favorite) => void setFavorite(id, favorite)}
                 onReject={(id) => void updateStatus(id, "rejected")}
               />
             ))}

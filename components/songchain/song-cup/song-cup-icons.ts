@@ -1,4 +1,4 @@
-import { Calendar, type LucideIcon } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 export type SongCupPanel =
   | "feed"
@@ -51,9 +51,8 @@ export const SONG_CUP_BUTTON_ICONS: SidebarIcon[] = [
   },
   {
     id: "schedule",
-    src: "",
+    src: "/songchain/button-icons/schedule-icon.png",
     alt: "Schedule",
-    lucideIcon: Calendar,
   },
   {
     id: "feed",
