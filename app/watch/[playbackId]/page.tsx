@@ -1,6 +1,10 @@
 import { Metadata, ResolvingMetadata } from "next";
 import { getVideoAssetByPlaybackId } from "@/services/video-assets";
 import { getTokenMarketData } from "@/lib/services/market";
+import {
+  getVideoOgImageUrl,
+  VIDEO_OG_IMAGE,
+} from "@/lib/utils/og-image";
 import WatchClient from "./WatchClient";
 
 interface WatchPageProps {
@@ -29,48 +33,66 @@ export async function generateMetadata(
 
         const title = videoAsset?.title || "Live Stream";
         const desc = "Watch on Creative TV";
+        const ogImageUrl = getVideoOgImageUrl({ playbackId });
+        const ogImage = {
+            url: ogImageUrl,
+            width: VIDEO_OG_IMAGE.width,
+            height: VIDEO_OG_IMAGE.height,
+            alt: title || VIDEO_OG_IMAGE.alt,
+            type: VIDEO_OG_IMAGE.type,
+        };
 
-        if (!tokenAddress) {
-            return {
-                title: videoAsset?.title ? `Watch ${title}` : 'Watch Live',
-                description: desc,
-            };
-        }
+        if (tokenAddress) {
+            const marketData = await getTokenMarketData(tokenAddress).catch((err) => {
+                console.error("Watch page metadata: market data fetch failed", err);
+                return null;
+            });
 
-        const marketData = await getTokenMarketData(tokenAddress).catch((err) => {
-            console.error("Watch page metadata: market data fetch failed", err);
-            return null;
-        });
+            if (marketData) {
+                const price = `$${marketData.price.toFixed(4)}`;
+                const tvl = marketData.tvl >= 1000
+                    ? `$${(marketData.tvl / 1000).toFixed(1)}K`
+                    : `$${marketData.tvl.toFixed(2)}`;
 
-        if (marketData) {
-            const price = `$${marketData.price.toFixed(4)}`;
-            const tvl = marketData.tvl >= 1000
-                ? `$${(marketData.tvl / 1000).toFixed(1)}K`
-                : `$${marketData.tvl.toFixed(2)}`;
+                const metaTitle = `${marketData.symbol} ($${price}) - ${title}`;
+                const metaDesc = `Watch & Trade ${marketData.symbol}. TVL: ${tvl}. ${desc}`;
 
-            const metaTitle = `${marketData.symbol} ($${price}) - ${title}`;
-            const metaDesc = `Watch & Trade ${marketData.symbol}. TVL: ${tvl}. ${desc}`;
-
-            return {
-                title: metaTitle,
-                description: metaDesc,
-                openGraph: {
+                return {
                     title: metaTitle,
                     description: metaDesc,
-                    images: videoAsset?.thumbnail_url ? [videoAsset.thumbnail_url] : [],
-                },
-                twitter: {
-                    card: "summary_large_image",
-                    title: metaTitle,
-                    description: metaDesc,
-                    images: videoAsset?.thumbnail_url ? [videoAsset.thumbnail_url] : [],
-                }
-            };
+                    openGraph: {
+                        title: metaTitle,
+                        description: metaDesc,
+                        type: "website",
+                        images: [ogImage],
+                    },
+                    twitter: {
+                        card: "summary_large_image",
+                        title: metaTitle,
+                        description: metaDesc,
+                        images: [ogImageUrl],
+                    },
+                };
+            }
         }
+
+        const metaTitle = videoAsset?.title ? `Watch ${title}` : "Watch Live";
 
         return {
-            title: `Watch ${title}`,
+            title: metaTitle,
             description: desc,
+            openGraph: {
+                title: metaTitle,
+                description: desc,
+                type: "website",
+                images: [ogImage],
+            },
+            twitter: {
+                card: "summary_large_image",
+                title: metaTitle,
+                description: desc,
+                images: [ogImageUrl],
+            },
         };
     } catch (err) {
         console.error("Watch page generateMetadata failed", err);

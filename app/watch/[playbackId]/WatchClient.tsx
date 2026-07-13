@@ -7,7 +7,7 @@ import { Player } from "@/components/Player/Player";
 import { getDetailPlaybackSource } from "@/lib/hooks/livepeer/useDetailPlaybackSources";
 import { getStreamByPlaybackId } from "@/services/streams";
 import { LiveTokenPanel } from "@/components/Live/LiveTokenPanel";
-import { LiveChat } from "@/components/Live/LiveChat";
+import { LensLiveChat } from "@/components/Live/LensLiveChat";
 import { ClipCreator } from "@/components/Live/ClipCreator";
 import { DigitalTwinOverlay } from "@/components/Live/DigitalTwinOverlay";
 import { Src } from "@livepeer/react";
@@ -581,11 +581,8 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
               />
             )}
             {playbackId && sessionId ? (
-              <LiveChat
-                streamId={streamId}
-                sessionId={sessionId}
-                creatorAddress={streamData?.creator_id ?? null}
-                viewerCount={viewerCount}
+              <LensLiveChat
+                lensPostId={streamData?.lens_live_post_id ?? null}
               />
             ) : (
               <div className="border rounded-lg p-4 text-sm text-muted-foreground">

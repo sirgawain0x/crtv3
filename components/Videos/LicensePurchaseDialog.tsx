@@ -31,6 +31,26 @@ import {
   buildHallidayStoryOutputAsset,
   isHallidaySandboxEnabled,
 } from "@/lib/songchain/halliday";
+import { createPublicClient, formatEther, http, type Address } from "viem";
+import { WIP_TOKEN_ADDRESS } from "@/lib/sdk/story/constants";
+
+const ERC20_BALANCE_ABI = [
+  {
+    type: "function",
+    name: "balanceOf",
+    stateMutability: "view",
+    inputs: [{ name: "account", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+] as const;
+
+function formatTokenAmount(wei: bigint, digits = 4): string {
+  const n = Number(formatEther(wei));
+  if (!Number.isFinite(n)) return "0";
+  if (n === 0) return "0";
+  if (n < 0.0001) return "<0.0001";
+  return n.toLocaleString(undefined, { maximumFractionDigits: digits });
+}
 
 interface LicenseTerms {
   transferable: boolean;
@@ -66,7 +86,10 @@ export function LicensePurchaseDialog({
   const { getAuthHeaders, address } = useWalletAuth();
   const { client: smartAccountClient } = useSmartAccountClient({});
 
-  // Halliday onramp config for $DATA/IP purchase
+  const walletAddress =
+    (smartAccountClient?.account?.address as string | undefined) ?? address ?? null;
+
+  // Halliday onramp config for $IP / gas funding
   const hallidayApiKey = process.env.NEXT_PUBLIC_HALLIDAY_API_KEY?.trim() || null;
   const hallidayOutputAsset = buildHallidayStoryOutputAsset();
   const hallidayInputAssets = buildHallidayInputAssets();
@@ -80,6 +103,9 @@ export function LicensePurchaseDialog({
     licenseTokenIds: string[];
     txHash: string;
   } | null>(null);
+  const [ipBalance, setIpBalance] = useState<bigint | null>(null);
+  const [wipBalance, setWipBalance] = useState<bigint | null>(null);
+  const [loadingBalances, setLoadingBalances] = useState(false);
 
   const network = process.env.NEXT_PUBLIC_STORY_NETWORK || "testnet";
   const storyScanBaseUrl =
@@ -115,11 +141,58 @@ export function LicensePurchaseDialog({
     }
   }, [ipId, licenseTermsId]);
 
+  const fetchBalances = useCallback(async () => {
+    if (!walletAddress) {
+      setIpBalance(null);
+      setWipBalance(null);
+      return;
+    }
+    setLoadingBalances(true);
+    try {
+      const chainId = network === "mainnet" ? 1514 : 1315;
+      const publicClient = createPublicClient({
+        chain: {
+          id: chainId,
+          name: "Story",
+          nativeCurrency: { name: "IP", symbol: "IP", decimals: 18 },
+          rpcUrls: { default: { http: ["/api/story/rpc-proxy"] } },
+        } as any,
+        transport: http("/api/story/rpc-proxy"),
+      });
+
+      const [native, wip] = await Promise.all([
+        publicClient.getBalance({
+          address: walletAddress as Address,
+        }),
+        publicClient.readContract({
+          address: WIP_TOKEN_ADDRESS,
+          abi: ERC20_BALANCE_ABI,
+          functionName: "balanceOf",
+          args: [walletAddress as Address],
+        }) as Promise<bigint>,
+      ]);
+      setIpBalance(native);
+      setWipBalance(wip);
+    } catch (err) {
+      logger.warn("Failed to fetch Story balances:", err);
+      setIpBalance(null);
+      setWipBalance(null);
+    } finally {
+      setLoadingBalances(false);
+    }
+  }, [walletAddress, network]);
+
   useEffect(() => {
     if (open && !terms && !loadingTerms && !error) {
       void fetchTerms();
     }
   }, [open, terms, loadingTerms, error, fetchTerms]);
+
+  useEffect(() => {
+    if (open) {
+      void fetchBalances();
+    }
+  }, [open, fetchBalances]);
 
   // Reset state when dialog closes
   useEffect(() => {
@@ -184,14 +257,20 @@ export function LicensePurchaseDialog({
     const feeBigInt = BigInt(fee || "0");
     if (feeBigInt === 0n) return "Free";
     const feeNum = Number(feeBigInt) / 1e18;
+    const currencyLower = (currency || "").toLowerCase();
     const tokenSymbol =
+      currencyLower === WIP_TOKEN_ADDRESS.toLowerCase() ||
       currency === "0x1514000000000000000000000000000000000000"
-        ? "$DATA"
+        ? "WIP"
         : currency === "0x0000000000000000000000000000000000000000"
-          ? "Native"
+          ? "IP"
           : "tokens";
     return `${feeNum} ${tokenSymbol}`;
   };
+
+  const feeWei = terms ? BigInt(terms.defaultMintingFee || "0") : 0n;
+  const isPaid = feeWei > 0n;
+  const hasEnoughWip = wipBalance !== null ? wipBalance >= feeWei : null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -281,6 +360,46 @@ export function LicensePurchaseDialog({
                   {formatFee(terms.defaultMintingFee, terms.currency)}
                 </span>
               </div>
+
+              {/* Wallet balances */}
+              <div className="rounded-lg border p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium flex items-center gap-1.5">
+                    <Wallet className="h-3.5 w-3.5" />
+                    Your Story balances
+                  </span>
+                  {loadingBalances && (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />
+                  )}
+                </div>
+                {!walletAddress ? (
+                  <p className="text-xs text-muted-foreground">
+                    Connect a wallet to see balances.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">IP </span>
+                      <span className="font-medium">
+                        {ipBalance === null ? "—" : formatTokenAmount(ipBalance)}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">WIP </span>
+                      <span className="font-medium">
+                        {wipBalance === null
+                          ? "—"
+                          : formatTokenAmount(wipBalance)}
+                      </span>
+                    </div>
+                  </div>
+                )}
+                {isPaid && hasEnoughWip === false && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400">
+                    You need more WIP to cover this license fee. Top up below.
+                  </p>
+                )}
+              </div>
             </div>
           )}
 
@@ -324,12 +443,12 @@ export function LicensePurchaseDialog({
           {/* Action buttons */}
           {!success && (
             <>
-              {/* Halliday onramp: show when minting fee > 0 so users can buy $DATA */}
-              {terms && BigInt(terms.defaultMintingFee || "0") > 0n && hallidayApiKey && (
+              {/* Halliday: top-up IP/WIP for paid licenses */}
+              {isPaid && hallidayApiKey && (
                 <div className="space-y-2 pt-2 border-t">
                   <p className="text-xs text-muted-foreground flex items-center gap-1.5">
                     <Wallet className="h-3.5 w-3.5" />
-                    Need $DATA to pay the minting fee? Buy with debit/credit:
+                    Need IP or WIP for fees? Top up with debit/credit:
                   </p>
                   <HallidayOnramp
                     variant="story"
@@ -337,9 +456,7 @@ export function LicensePurchaseDialog({
                     hallidayOutputAsset={hallidayOutputAsset}
                     hallidayInputAssets={hallidayInputAssets}
                     hallidaySandbox={hallidaySandbox}
-                    destinationAddressOverride={
-                      smartAccountClient?.account?.address ?? address ?? null
-                    }
+                    destinationAddressOverride={walletAddress}
                     lazyInit
                     hideLensBlockedMessage
                   />
@@ -360,7 +477,12 @@ export function LicensePurchaseDialog({
                   ) : (
                     <>
                       <ShoppingCart className="mr-2 h-4 w-4" />
-                      Buy License
+                      {isPaid && terms
+                        ? `Buy License (${formatFee(
+                            terms.defaultMintingFee,
+                            terms.currency
+                          )})`
+                        : "Get Free License"}
                     </>
                   )}
                 </Button>

@@ -14,6 +14,7 @@ export const VIDEO_GENRES = [
   { value: "Metal", label: "Metal" },
   { value: "Original", label: "Original" },
   { value: "Podcast", label: "Podcast" },
+  { value: "Education", label: "Education" },
   { value: "World", label: "World Music" },
   { value: "Hackathon", label: "Hackathon" },
 ] as const;

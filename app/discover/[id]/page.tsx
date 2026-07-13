@@ -20,12 +20,18 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { VideoShareButton } from "@/components/Videos/VideoShareButton";
 import { VideoBuyButton } from "@/components/Videos/VideoBuyButton";
+import { BuyIPButton } from "@/components/Videos/BuyIPButton";
+import { CreatorMessageButton } from "@/components/Videos/CreatorMessageButton";
 import { VideoEditButton } from "@/components/Videos/VideoEditButton";
 import { VideoSplitDistributeButton } from "@/components/Videos/VideoSplitDistributeButton";
 import { RemixInPixelsButton } from "@/components/Videos/RemixInPixelsButton";
 import { AddToMixtapeButton } from "@/components/Videos/AddToMixtapeButton";
 import { logger } from '@/lib/utils/logger';
-import { convertFailingGateway } from "@/lib/utils/image-gateway";
+import {
+  getSiteOrigin,
+  getVideoOgImageUrl,
+  VIDEO_OG_IMAGE,
+} from "@/lib/utils/og-image";
 
 type VideoDetailsPageProps = {
   params: Promise<{
@@ -182,6 +188,28 @@ export default async function VideoDetailsPage({
                     />
                   )}
                 </Suspense>
+                {creatorAddress &&
+                  videoAsset?.attributes?.content_coin_id && (
+                    <Suspense fallback={<div className="h-9 w-9" />}>
+                      <CreatorMessageButton
+                        creatorAddress={creatorAddress}
+                        meTokenAddress={
+                          videoAsset.attributes.content_coin_id as string
+                        }
+                      />
+                    </Suspense>
+                  )}
+                {videoAsset?.story_ip_registered &&
+                  videoAsset?.story_ip_id &&
+                  videoAsset?.story_license_terms_id && (
+                    <Suspense fallback={<div className="h-9 w-9" />}>
+                      <BuyIPButton
+                        ipId={videoAsset.story_ip_id}
+                        licenseTermsId={String(videoAsset.story_license_terms_id)}
+                        videoTitle={videoAsset?.title || assetData?.name || "Video"}
+                      />
+                    </Suspense>
+                  )}
                 <Suspense fallback={<div className="h-9 w-9" />}>
                   <AddToMixtapeButton
                     assetId={id}
@@ -248,31 +276,9 @@ export async function generateMetadata({
       return { title: "Video Not Found" };
     }
 
-    let thumbnailUrl =
-      (videoAsset as any)?.thumbnail_url?.trim() ||
-      (assetData as any)?.thumbnailUri?.trim() ||
-      null;
-
-    if (!thumbnailUrl || thumbnailUrl === "") {
-      thumbnailUrl = "/Creative_TV.png";
-    } else {
-      thumbnailUrl = convertFailingGateway(thumbnailUrl);
-    }
-
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ||
-      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` :
-        "https://tv.creativeplatform.xyz");
+    const baseUrl = getSiteOrigin();
     const absoluteUrl = `${baseUrl}/discover/${id}`;
-
-    let absoluteThumbnailUrl: string;
-    if (thumbnailUrl.startsWith("http://") || thumbnailUrl.startsWith("https://")) {
-      absoluteThumbnailUrl = thumbnailUrl;
-    } else {
-      const normalizedPath = thumbnailUrl.startsWith("/")
-        ? thumbnailUrl
-        : `/${thumbnailUrl}`;
-      absoluteThumbnailUrl = `${baseUrl}${normalizedPath}`;
-    }
+    const ogImageUrl = getVideoOgImageUrl({ id });
 
     let videoTitle = (videoAsset as any)?.title || assetData.name || "Watch Video";
     if (videoTitle.endsWith('.mp4')) {
@@ -281,31 +287,29 @@ export async function generateMetadata({
 
     const videoDescription = (videoAsset as any)?.description ?? `Watch ${videoTitle} on Creative TV`;
 
+    const ogImage = {
+      url: ogImageUrl,
+      width: VIDEO_OG_IMAGE.width,
+      height: VIDEO_OG_IMAGE.height,
+      alt: videoTitle || VIDEO_OG_IMAGE.alt,
+      type: VIDEO_OG_IMAGE.type,
+    };
+
     return {
       title: videoTitle,
       description: videoDescription,
       openGraph: {
         title: videoTitle,
         description: videoDescription,
-        images: [absoluteThumbnailUrl],
+        images: [ogImage],
         url: absoluteUrl,
-        type: "video.other",
-        videos: assetData.playbackUrl
-          ? [
-            {
-              url: assetData.playbackUrl,
-              type: "video/mp4",
-              width: 1280,
-              height: 720,
-            },
-          ]
-          : [],
+        type: "website",
       },
       twitter: {
         card: "summary_large_image",
         title: videoTitle,
         description: videoDescription,
-        images: [absoluteThumbnailUrl],
+        images: [ogImageUrl],
       },
     };
   } catch (error) {
