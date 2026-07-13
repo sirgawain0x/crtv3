@@ -2,22 +2,17 @@
 
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMeTokensSupabase } from "@/lib/hooks/metokens/useMeTokensSupabase";
-import { useMeTokenHoldings, type MeTokenHolding } from "@/lib/hooks/metokens/useMeTokenHoldings";
+import { useMeTokenHoldings } from "@/lib/hooks/metokens/useMeTokenHoldings";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Coins, ExternalLink, Wallet, Users, Crown } from "lucide-react";
 import Link from "next/link";
 import { MeTokenPortfolio } from "./MeTokenPortfolio";
 import { useSmartAccountClient, useUser } from "@/lib/wallet/react";
-import { formatEther } from "viem";
 import { useMemo, useState } from "react";
-import {
-  estimateMeTokenHoldingValueUsd,
-  formatMeTokenHoldingUsd,
-} from "@/lib/utils/meTokenHoldingValue";
-import { resolveHubAsset } from "@/lib/utils/hubAssetUtils";
+import { formatMeTokenHoldingUsd } from "@/lib/utils/meTokenHoldingValue";
+import { mergeHoldingsWithOwnMeToken } from "@/lib/utils/meTokenPortfolioHoldings";
 
-// Utility function to format balance with proper precision
 function formatBalance(balance: string, symbol: string): string {
   const num = parseFloat(balance);
   if (num === 0) return `0 ${symbol}`;
@@ -39,46 +34,6 @@ function formatBalance(balance: string, symbol: string): string {
     : `${integerPart} ${symbol}`;
 }
 
-function buildOwnHoldingFallback(
-  userMeToken: NonNullable<ReturnType<typeof useMeTokensSupabase>["userMeToken"]>,
-  ownerAddress: string
-): MeTokenHolding {
-  const balanceRaw =
-    typeof userMeToken.balance === "bigint" ? userMeToken.balance : BigInt(0);
-  const totalSupply =
-    typeof userMeToken.totalSupply === "bigint" ? userMeToken.totalSupply : BigInt(0);
-  const collateral = resolveHubAsset(userMeToken.hubId);
-  const holdingValueUsd = estimateMeTokenHoldingValueUsd({
-    balanceRaw,
-    totalSupply,
-    vaultTvlUsd: userMeToken.tvl || 0,
-  });
-
-  return {
-    address: userMeToken.address,
-    name: userMeToken.name,
-    symbol: userMeToken.symbol,
-    balance: formatEther(balanceRaw),
-    balanceRaw,
-    totalSupply,
-    tvl: userMeToken.tvl || 0,
-    holdingValueUsd,
-    creatorProfile: null,
-    ownerAddress,
-    isOwnMeToken: true,
-    hubId: userMeToken.hubId || 0,
-    balancePooled: userMeToken.balancePooled || BigInt(0),
-    balanceLocked: userMeToken.balanceLocked || BigInt(0),
-    startTime: BigInt(0),
-    endTime: BigInt(0),
-    endCooldown: BigInt(0),
-    targetHubId: 0,
-    migration: false,
-    collateralSymbol: collateral.symbol,
-    collateralDisplayName: collateral.displayName,
-  };
-}
-
 export function MeTokenBalances() {
   const { address: scaAddress } = useSmartAccountClient({});
   const user = useUser();
@@ -86,19 +41,15 @@ export function MeTokenBalances() {
   const maxVisibleItems = 3;
 
   const { userMeToken, loading: meTokenLoading, error: meTokenError } = useMeTokensSupabase();
-  const { holdings, loading: holdingsLoading, error: holdingsError } =
+  const { holdings, loading: holdingsLoading, error: holdingsError, refreshHoldings } =
     useMeTokenHoldings();
 
   const ownerAddress = scaAddress || user?.address || "";
 
-  const allMeTokens = useMemo(() => {
-    const fromHoldings = holdings;
-    const hasOwnInHoldings = fromHoldings.some((h) => h.isOwnMeToken);
-    if (userMeToken && !hasOwnInHoldings) {
-      return [buildOwnHoldingFallback(userMeToken, ownerAddress), ...fromHoldings];
-    }
-    return fromHoldings;
-  }, [holdings, userMeToken, ownerAddress]);
+  const allMeTokens = useMemo(
+    () => mergeHoldingsWithOwnMeToken(holdings, userMeToken, ownerAddress),
+    [holdings, userMeToken, ownerAddress]
+  );
 
   const portfolioTotal = useMemo(
     () => allMeTokens.reduce((sum, t) => sum + (t.holdingValueUsd || 0), 0),
@@ -113,7 +64,15 @@ export function MeTokenBalances() {
   const error = meTokenError || holdingsError;
 
   if (showPortfolio) {
-    return <MeTokenPortfolio />;
+    return (
+      <MeTokenPortfolio
+        holdingsOverride={allMeTokens}
+        onBack={() => setShowPortfolio(false)}
+        onRefresh={async () => {
+          await refreshHoldings(true);
+        }}
+      />
+    );
   }
 
   if (isLoading && holdings.length === 0 && !userMeToken) {

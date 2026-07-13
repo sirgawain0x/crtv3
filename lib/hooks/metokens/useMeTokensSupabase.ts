@@ -305,7 +305,7 @@ export function useMeTokensSupabase(targetAddress?: string) {
       totalSupply: currentTotalSupply,
       balance: userBalance,
       info: currentInfo,
-      tvl: calculatedTvl > 0 ? calculatedTvl : supabaseMeToken.tvl,
+      tvl: calculatedTvl,
       hubId: Number(currentInfo.hubId),
       balancePooled: currentInfo.balancePooled,
       balanceLocked: currentInfo.balanceLocked,
