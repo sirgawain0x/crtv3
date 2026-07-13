@@ -40,7 +40,7 @@ export async function GET(
     // Get MeToken info
     const { data: meToken, error: meTokenError } = await supabase
       .from('metokens')
-      .select('id, address, total_supply, tvl')
+      .select('id, address, total_supply, tvl, hub_id')
       .eq('address', address.toLowerCase())
       .single();
 
