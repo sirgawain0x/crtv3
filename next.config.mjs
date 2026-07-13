@@ -240,14 +240,18 @@ const nextConfig = {
       })
     );
 
+    // Creative TV only uses the EVM path from @alchemy/wallet-apis.
+    // The package imports @solana/kit transitively through multiple Solana
+    // helper files (resolveSignerSlot, signSignatureRequest, signPreparedCalls,
+    // solanaSmartWalletActions, adapters/*, actions/solana/*). Stub ALL of them
+    // so @solana/kit never enters the webpack graph — different nested
+    // @solana/errors majors conflict and break the build.
     const alchemySolanaActionsStub = require.resolve('./lib/webpack/alchemy-solana-actions-stub.mjs');
     config.plugins.push(
       new webpack.NormalModuleReplacementPlugin(
-        /solanaSmartWalletActions\.js$/,
+        /@alchemy[\\/]wallet-apis[\\/]dist[\\/]esm[\\/](?:decorators[\\/]solana.*|actions[\\/]solana[\\/].*|adapters[\\/].*|decorators[\\/]solanaSmartWalletActions)\.js$/,
         (resource) => {
-          if (/@alchemy[\\/]wallet-apis[\\/]dist[\\/]esm[\\/]client\.js$/.test(resource.contextInfo?.issuer || '')) {
-            resource.request = alchemySolanaActionsStub;
-          }
+          resource.request = alchemySolanaActionsStub;
         }
       )
     );
