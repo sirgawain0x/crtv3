@@ -1,9 +1,16 @@
 /**
  * Estimate a wallet's redeemable MeToken value from vault TVL.
  *
- * MeToken hubs on Creative use USD-pegged stables (USDC/DAI/USDS/GHO), so vault
- * collateral amount ≈ USD. Holding value is ownership share of that vault:
+ * MeToken hubs on Creative use USD-pegged stables, so vault collateral ≈ USD:
  *   (balance / totalSupply) × vaultTvlUsd
+ *
+ * Decimals:
+ * - MeToken ERC-20 balances / supply: always 18
+ * - Vault collateral (balancePooled/Locked): hub-dependent
+ *   - USDC hub → 6 decimals
+ *   - DAI / USDS / GHO hubs → 18 decimals
+ * Callers must pass vaultTvlUsd already converted with hub-aware formatting
+ * (see calculateMeTokenVaultTvlUsd).
  *
  * This is an estimate — bonding-curve exit price can differ slightly from pro-rata.
  */

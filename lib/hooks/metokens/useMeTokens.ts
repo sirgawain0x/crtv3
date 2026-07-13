@@ -7,7 +7,7 @@ import { logger } from '@/lib/utils/logger';
 import { appendBuilderCode } from "@/lib/utils/builder-code";
 import { METOKEN_DIAMOND_BASE, METOKEN_FACTORY_BASE } from '@/lib/contracts/metokens/deployments';
 import { publicClient } from '@/lib/viem';
-
+import { calculateMeTokenVaultTvlUsd } from '@/lib/utils/hubAssetUtils';
 
 // MeTokens contract addresses on Base
 const METOKEN_FACTORY = METOKEN_FACTORY_BASE;
@@ -542,11 +542,13 @@ export function useMeTokens() {
     }
   };
 
-  // Calculate TVL
+  // Calculate TVL using hub collateral decimals (USDC=6; DAI/USDS/GHO=18)
   const calculateTVL = (info: MeTokenInfo): number => {
-    const totalBalance = info.balancePooled + info.balanceLocked;
-    // Convert from wei to ether and assume 1:1 with USD for DAI
-    return parseFloat(formatEther(totalBalance));
+    return calculateMeTokenVaultTvlUsd(
+      info.balancePooled,
+      info.balanceLocked,
+      Number(info.hubId)
+    );
   };
 
   // Check for a specific MeToken by address (useful for newly created MeTokens)

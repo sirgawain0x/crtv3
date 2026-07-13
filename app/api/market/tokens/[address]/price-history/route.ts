@@ -5,6 +5,7 @@ import { baseMainnet } from '@/lib/utils/chains/base';
 import { METOKEN_ABI } from '@/lib/contracts/MeToken';
 import { serverLogger } from '@/lib/utils/logger';
 import { METOKEN_DIAMOND_BASE } from '@/lib/contracts/metokens/deployments';
+import { calculateMeTokenVaultTvlUsd } from '@/lib/utils/hubAssetUtils';
 
 const DIAMOND = METOKEN_DIAMOND_BASE;
 
@@ -142,7 +143,8 @@ export async function GET(
           // Based on useMeTokensSupabase, it seems to return an object property access compatible result
           const balancePooled = BigInt(infoData.balancePooled || infoData[2] || 0);
           const balanceLocked = BigInt(infoData.balanceLocked || infoData[3] || 0);
-          currentTvl = parseFloat(formatEther(balancePooled + balanceLocked));
+          const hubId = Number(infoData.hubId ?? infoData[1] ?? meToken.hub_id ?? 0);
+          currentTvl = calculateMeTokenVaultTvlUsd(balancePooled, balanceLocked, hubId);
         }
 
         serverLogger.debug('Fetched live data:', {

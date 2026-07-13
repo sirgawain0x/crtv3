@@ -9,7 +9,7 @@ import { meTokensSubgraph } from '@/lib/sdk/metokens/subgraph';
 import { creatorProfileSupabaseService, CreatorProfile } from '@/lib/sdk/supabase/creator-profiles';
 import { logger } from '@/lib/utils/logger';
 import { METOKEN_DIAMOND_BASE } from '@/lib/contracts/MeTokenHubs';
-import { formatHubAssetAmount, resolveHubAsset, type HubAssetSymbol } from '@/lib/utils/hubAssetUtils';
+import { resolveHubAsset, calculateMeTokenVaultTvlUsd, type HubAssetSymbol } from '@/lib/utils/hubAssetUtils';
 import { estimateMeTokenHoldingValueUsd } from '@/lib/utils/meTokenHoldingValue';
 import { publicClient } from '@/lib/viem';
 
@@ -161,11 +161,12 @@ function calculateTVL(info: {
   balanceLocked?: bigint | number | string;
   hubId?: number;
 }, assetAddress?: string): number {
-  const balancePooled = BigInt(info.balancePooled ?? 0);
-  const balanceLocked = BigInt(info.balanceLocked ?? 0);
-  const totalBalance = balancePooled + balanceLocked;
-  const asset = resolveHubAsset(info.hubId, assetAddress);
-  return Number(formatHubAssetAmount(totalBalance, asset));
+  return calculateMeTokenVaultTvlUsd(
+    info.balancePooled ?? 0,
+    info.balanceLocked ?? 0,
+    info.hubId,
+    assetAddress
+  );
 }
 
 export function useMeTokenHoldings(targetAddress?: string): UseMeTokenHoldingsResult {

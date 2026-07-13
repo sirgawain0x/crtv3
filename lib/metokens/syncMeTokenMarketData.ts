@@ -3,6 +3,7 @@ import { baseMainnet } from '@/lib/utils/chains/base';
 import { getMeTokenProtocolInfo } from '@/lib/utils/metokenUtils';
 import { createServiceClient } from '@/lib/sdk/supabase/service';
 import { serverLogger } from '@/lib/utils/logger';
+import { calculateMeTokenVaultTvlUsd } from '@/lib/utils/hubAssetUtils';
 
 const ERC20_ABI = parseAbi(['function totalSupply() view returns (uint256)']);
 
@@ -47,7 +48,12 @@ export async function syncMeTokenMarketData(
 
     const balancePooled = BigInt(protocolInfo.balancePooled || 0);
     const balanceLocked = BigInt(protocolInfo.balanceLocked || 0);
-    const tvl = parseFloat(formatEther(balancePooled + balanceLocked));
+    // Collateral decimals depend on hub (USDC=6; DAI/USDS/GHO=18). MeToken supply is always 18.
+    const tvl = calculateMeTokenVaultTvlUsd(
+      balancePooled,
+      balanceLocked,
+      protocolInfo.hubId
+    );
     const supply = parseFloat(formatEther(totalSupply));
     const price = supply > 0 ? tvl / supply : 0;
 
