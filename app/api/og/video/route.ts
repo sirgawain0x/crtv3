@@ -188,6 +188,17 @@ async function resolveThumbnailUrl(
     });
     const raw = asset?.thumbnail_url;
     if (raw?.trim()) return convertFailingGateway(raw.trim());
+
+    // Fallback: fetch thumbnail directly from Livepeer API
+    if (!raw) {
+      try {
+        const { getClipThumbnailUrl } = await import("@/services/livepeer-clips");
+        const lpThumb = await getClipThumbnailUrl(playbackId);
+        if (lpThumb?.trim()) return convertFailingGateway(lpThumb.trim());
+      } catch (err) {
+        serverLogger.warn("OG video: Livepeer thumbnail fallback failed", err);
+      }
+    }
   }
 
   return null;

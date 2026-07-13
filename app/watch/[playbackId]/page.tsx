@@ -33,7 +33,12 @@ export async function generateMetadata(
 
         const title = videoAsset?.title || "Live Stream";
         const desc = "Watch on Creative TV";
-        const ogImageUrl = getVideoOgImageUrl({ playbackId });
+
+        // Use the direct thumbnail URL when available (works for SMS, Twitter, etc).
+        // Fall back to the same-origin proxy for crawlers that need same-origin images.
+        const directThumb = videoAsset?.thumbnail_url;
+        const proxyUrl = getVideoOgImageUrl({ playbackId });
+        const ogImageUrl = directThumb || proxyUrl;
         const ogImage = {
             url: ogImageUrl,
             width: VIDEO_OG_IMAGE.width,
