@@ -9,7 +9,8 @@ import { meTokensSubgraph } from '@/lib/sdk/metokens/subgraph';
 import { creatorProfileSupabaseService, CreatorProfile } from '@/lib/sdk/supabase/creator-profiles';
 import { logger } from '@/lib/utils/logger';
 import { METOKEN_DIAMOND_BASE } from '@/lib/contracts/MeTokenHubs';
-import { formatHubAssetAmount, resolveHubAsset, type HubAssetSymbol } from '@/lib/utils/hubAssetUtils';
+import { resolveHubAsset, calculateMeTokenVaultTvlUsd, type HubAssetSymbol } from '@/lib/utils/hubAssetUtils';
+import { estimateMeTokenHoldingValueUsd } from '@/lib/utils/meTokenHoldingValue';
 import { publicClient } from '@/lib/viem';
 
 const DIAMOND = METOKEN_DIAMOND_BASE;
@@ -78,7 +79,13 @@ export interface MeTokenHolding {
   balance: string;
   balanceRaw: bigint;
   totalSupply: bigint;
+  /** Full vault collateral TVL in USD-stable units (not the wallet's share). */
   tvl: number;
+  /**
+   * Estimated USD value of this wallet's balance:
+   * (balance / totalSupply) × vault TVL. Includes the creator's own holdings.
+   */
+  holdingValueUsd: number;
   creatorProfile: CreatorProfile | null;
   ownerAddress: string;
   isOwnMeToken: boolean;
@@ -154,11 +161,12 @@ function calculateTVL(info: {
   balanceLocked?: bigint | number | string;
   hubId?: number;
 }, assetAddress?: string): number {
-  const balancePooled = BigInt(info.balancePooled ?? 0);
-  const balanceLocked = BigInt(info.balanceLocked ?? 0);
-  const totalBalance = balancePooled + balanceLocked;
-  const asset = resolveHubAsset(info.hubId, assetAddress);
-  return Number(formatHubAssetAmount(totalBalance, asset));
+  return calculateMeTokenVaultTvlUsd(
+    info.balancePooled ?? 0,
+    info.balanceLocked ?? 0,
+    info.hubId,
+    assetAddress
+  );
 }
 
 export function useMeTokenHoldings(targetAddress?: string): UseMeTokenHoldingsResult {
@@ -243,6 +251,11 @@ export function useMeTokenHoldings(targetAddress?: string): UseMeTokenHoldingsRe
                 hubId,
               }
             );
+            const holdingValueUsd = estimateMeTokenHoldingValueUsd({
+              balanceRaw: balance,
+              totalSupply,
+              vaultTvlUsd: tvl,
+            });
 
             let creatorProfile: CreatorProfile | null = null;
             try {
@@ -259,6 +272,7 @@ export function useMeTokenHoldings(targetAddress?: string): UseMeTokenHoldingsRe
               balanceRaw: balance,
               totalSupply,
               tvl,
+              holdingValueUsd,
               creatorProfile,
               ownerAddress: info.owner,
               isOwnMeToken,
@@ -285,7 +299,7 @@ export function useMeTokenHoldings(targetAddress?: string): UseMeTokenHoldingsRe
       userHoldings.sort((a, b) => {
         if (a.isOwnMeToken && !b.isOwnMeToken) return -1;
         if (!a.isOwnMeToken && b.isOwnMeToken) return 1;
-        return Number(b.balance) - Number(a.balance);
+        return b.holdingValueUsd - a.holdingValueUsd;
       });
 
       holdingsCache.set(cacheKey, { holdings: userHoldings, timestamp: Date.now() });
@@ -299,9 +313,10 @@ export function useMeTokenHoldings(targetAddress?: string): UseMeTokenHoldingsRe
     }
   }, [address, client]);
 
-  const totalValue = holdings.reduce((sum, holding) => {
-    return sum + (Number(holding.balance) * (holding.tvl / 1000000));
-  }, 0);
+  const totalValue = holdings.reduce(
+    (sum, holding) => sum + (holding.holdingValueUsd || 0),
+    0
+  );
 
   const fetchHoldingsRef = useRef(fetchHoldings);
   fetchHoldingsRef.current = fetchHoldings;

@@ -13,7 +13,7 @@ import {
   collateralSymbol,
   getCollateralErc20Abi,
 } from '@/lib/utils/metokenCollateralApproval';
-import { resolveHubAsset, parseHubAssetAmount } from '@/lib/utils/hubAssetUtils';
+import { resolveHubAsset, parseHubAssetAmount, formatHubAssetAmount, calculateMeTokenVaultTvlUsd } from '@/lib/utils/hubAssetUtils';
 import { useToast } from '@/components/ui/use-toast';
 import { useGasSponsorship } from '@/lib/hooks/wallet/useGasSponsorship';
 import { useWalletAuth } from '@/lib/auth/useWalletAuth';
@@ -289,9 +289,12 @@ export function useMeTokensSupabase(targetAddress?: string) {
       logger.warn('⚠️ Failed to fetch fresh contract data, using Supabase fallback:', err);
     }
 
-    // Calculate TVL (simplified: pooled DAI + locked DAI)
-    // Note: Only DAI is considered for value here. 
-    const calculatedTvl = parseFloat(formatEther(currentInfo.balancePooled + currentInfo.balanceLocked));
+    // Vault TVL in USD-stable units using the hub asset decimals (USDC=6, DAI=18, …).
+    const calculatedTvl = calculateMeTokenVaultTvlUsd(
+      currentInfo.balancePooled,
+      currentInfo.balanceLocked,
+      Number(currentInfo.hubId)
+    );
 
     return {
       address: supabaseMeToken.address,
@@ -300,7 +303,7 @@ export function useMeTokensSupabase(targetAddress?: string) {
       totalSupply: currentTotalSupply,
       balance: userBalance,
       info: currentInfo,
-      tvl: calculatedTvl > 0 ? calculatedTvl : supabaseMeToken.tvl,
+      tvl: calculatedTvl,
       hubId: Number(currentInfo.hubId),
       balancePooled: currentInfo.balancePooled,
       balanceLocked: currentInfo.balanceLocked,
@@ -378,8 +381,12 @@ export function useMeTokensSupabase(targetAddress?: string) {
               logger.warn('⚠️ Failed to refresh info from contract, using subgraph data', e);
             }
 
-            // Calculate TVL
-            const calculatedTvl = parseFloat(formatEther(currentInfo.balancePooled + currentInfo.balanceLocked));
+            // Vault TVL in USD-stable units (hub asset decimals: USDC=6, others=18)
+            const calculatedTvl = calculateMeTokenVaultTvlUsd(
+              currentInfo.balancePooled,
+              currentInfo.balanceLocked,
+              Number(currentInfo.hubId)
+            );
 
             // Get user balance
             let userBalance = BigInt(0);

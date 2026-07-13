@@ -2,6 +2,7 @@ import { createPublicClient, http, parseAbi, formatEther } from 'viem';
 import { baseMainnet } from '@/lib/utils/chains/base';
 import { logger } from '@/lib/utils/logger';
 import { METOKEN_DIAMOND_BASE, METOKEN_FACTORY_BASE } from '@/lib/contracts/metokens/deployments';
+import { calculateMeTokenVaultTvlUsd } from '@/lib/utils/hubAssetUtils';
 
 // MeTokenFactory ABI - we only need the MeTokenCreated event
 const METOKEN_FACTORY_ABI = parseAbi([
@@ -425,15 +426,16 @@ async function fetchBulkMeTokenInfoBatch(meTokenAddresses: string[]): Promise<Bu
       const totalSupply = supplyResult.result as bigint;
       const info = diamondResult.result as {
         owner: string;
+        hubId?: bigint | number;
         balancePooled?: bigint;
         balanceLocked?: bigint;
       };
 
       const balancePooled = BigInt(info.balancePooled || 0);
       const balanceLocked = BigInt(info.balanceLocked || 0);
-      const totalBalance = balancePooled + balanceLocked;
+      const hubId = Number(info.hubId ?? 0);
 
-      const tvl = parseFloat(formatEther(totalBalance));
+      const tvl = calculateMeTokenVaultTvlUsd(balancePooled, balanceLocked, hubId);
       const supplyLog = parseFloat(formatEther(totalSupply));
       const price = supplyLog > 0 ? tvl / supplyLog : 0;
 
