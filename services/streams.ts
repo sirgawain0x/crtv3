@@ -28,6 +28,8 @@ export interface Stream {
     story_commercial_rev_share?: number | null;
     requires_metoken?: boolean;
     metoken_price?: number | null;
+    /** Lens post ID for going-live announcement; chat = comments on this post. */
+    lens_live_post_id?: string | null;
     created_at: string;
     updated_at: string;
 }
@@ -43,6 +45,7 @@ export type UpdateStreamParams = Partial<
     | "allow_clipping"
     | "requires_metoken"
     | "metoken_price"
+    | "lens_live_post_id"
   >
 >;
 
@@ -54,6 +57,7 @@ const CLIENT_MUTABLE_STREAM_FIELDS = new Set<keyof UpdateStreamParams>([
   "allow_clipping",
   "requires_metoken",
   "metoken_price",
+  "lens_live_post_id",
 ]);
 
 async function authorizeStreamOwner(
@@ -255,7 +259,7 @@ export async function getStreamByPlaybackId(playbackId: string) {
 
     const { data, error } = await supabase
         .from("streams")
-        .select("id, creator_id, playback_id, thumbnail_url, name, is_live, last_live_at, allow_clipping, requires_metoken, metoken_price, story_ip_id, story_license_terms_id, story_commercial_rev_share, story_ip_registered_at")
+        .select("id, creator_id, playback_id, thumbnail_url, name, is_live, last_live_at, allow_clipping, requires_metoken, metoken_price, story_ip_id, story_license_terms_id, story_commercial_rev_share, story_ip_registered_at, lens_live_post_id")
         .eq("playback_id", playbackId)
         .maybeSingle();
 

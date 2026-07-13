@@ -31,6 +31,7 @@ export async function GET(
         story_ip_id: null,
         story_license_terms_id: null,
         story_commercial_rev_share: null,
+        lens_live_post_id: null,
       });
     }
 
@@ -47,6 +48,7 @@ export async function GET(
       story_ip_id: stream.story_ip_id ?? null,
       story_license_terms_id: stream.story_license_terms_id ?? null,
       story_commercial_rev_share: stream.story_commercial_rev_share ?? null,
+      lens_live_post_id: stream.lens_live_post_id ?? null,
     });
   } catch (error) {
     return NextResponse.json(

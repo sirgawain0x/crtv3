@@ -45,7 +45,9 @@ import { getThumbnailUrl } from "@/services/livepeer-thumbnails";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { LiveTokenPanel } from "@/components/Live/LiveTokenPanel";
-import { LiveChat } from "@/components/Live/LiveChat";
+import { LensLiveChat } from "@/components/Live/LensLiveChat";
+import { useEnsureLiveLensPost } from "@/hooks/useEnsureLiveLensPost";
+import { buildGoingLivePostContent } from "@/lib/live/lens-live-feed";
 import { ShareDialog } from "@/components/Videos/ShareDialog";
 import { useLivepeerRealtimeMetrics } from "@/lib/hooks/livepeer/useLivepeerRealtimeMetrics";
 import { ModeratorsDialog } from "@/components/Live/ModeratorsDialog";
@@ -115,6 +117,9 @@ export default function LivePage() {
   const [storyIpId, setStoryIpId] = useState<string | null>(null);
   const [storyLicenseTermsId, setStoryLicenseTermsId] = useState<string | null>(null);
   const [storyRevShare, setStoryRevShare] = useState<number | null>(null);
+  const [lensLivePostId, setLensLivePostId] = useState<string | null>(null);
+  const { ensureLivePost, isPosting: isEnsuringLensPost } =
+    useEnsureLiveLensPost();
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
   const [songchainShareOpen, setSongchainShareOpen] = useState(false);
   const [moderatorsDialogOpen, setModeratorsDialogOpen] = useState(false);
@@ -220,6 +225,7 @@ export default function LivePage() {
           setStoryIpId(stream.story_ip_id ?? null);
           setStoryLicenseTermsId(stream.story_license_terms_id ?? null);
           setStoryRevShare(stream.story_commercial_rev_share ?? null);
+          setLensLivePostId(stream.lens_live_post_id ?? null);
         } else {
           logger.error("Error fetching stream metadata:", await res.text());
         }
@@ -541,13 +547,45 @@ export default function LivePage() {
                         streamId={chatStreamId}
                         sessionId={chatSessionId}
                       />
-                      <LiveChat
-                        streamId={chatStreamId}
-                        sessionId={chatSessionId}
-                        creatorAddress={creatorAddress!}
-                        viewerCount={viewerCount}
+                      <LensLiveChat
+                        lensPostId={lensLivePostId}
                         variant="host"
                         className="h-[min(70vh,520px)] mt-4"
+                        ensuringPost={isEnsuringLensPost}
+                        streamName={streamName}
+                        goingLivePreview={
+                          playbackId
+                            ? buildGoingLivePostContent({
+                                streamName: streamName || "Live stream",
+                                watchUrl: `${(process.env.NEXT_PUBLIC_SITE_URL || "https://tv.creativeplatform.xyz").replace(/\/$/, "")}/watch/${playbackId}`,
+                              })
+                            : null
+                        }
+                        onEnsurePost={async () => {
+                          if (!playbackId || !creatorAddress) return null;
+                          const siteOrigin = (
+                            process.env.NEXT_PUBLIC_SITE_URL ||
+                            "https://tv.creativeplatform.xyz"
+                          ).replace(/\/$/, "");
+                          const watchUrl = `${siteOrigin}/watch/${playbackId}`;
+                          const content = buildGoingLivePostContent({
+                            streamName: streamName || "Live stream",
+                            watchUrl,
+                          });
+                          const postId = await ensureLivePost({
+                            creatorAddress,
+                            existingPostId: lensLivePostId,
+                            stream: {
+                              playback_id: playbackId,
+                              name: streamName,
+                              thumbnail_url: thumbnailUrl,
+                              is_live: true,
+                            },
+                            contentOverride: content,
+                          });
+                          if (postId) setLensLivePostId(postId);
+                          return postId;
+                        }}
                       />
                     </>
                   )}

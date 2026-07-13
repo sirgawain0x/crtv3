@@ -7,7 +7,7 @@ import { Player } from "@/components/Player/Player";
 import { getDetailPlaybackSource } from "@/lib/hooks/livepeer/useDetailPlaybackSources";
 import { getStreamByPlaybackId } from "@/services/streams";
 import { LiveTokenPanel } from "@/components/Live/LiveTokenPanel";
-import { LiveChat } from "@/components/Live/LiveChat";
+import { LensLiveChat } from "@/components/Live/LensLiveChat";
 import { ClipCreator } from "@/components/Live/ClipCreator";
 import { DigitalTwinOverlay } from "@/components/Live/DigitalTwinOverlay";
 import { Src } from "@livepeer/react";
@@ -362,6 +362,26 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
     status.kind === "offline-temporary" ? 15000 : null
   );
 
+  // While live (or gated), refresh stream metadata until Lens chat is activated
+  // so viewers who joined early pick up lens_live_post_id without a full reload.
+  useInterval(
+    useCallback(async () => {
+      if (!playbackId) return;
+      try {
+        const streamRecord = await getStreamByPlaybackId(playbackId);
+        if (streamRecord) {
+          setStreamData(streamRecord as import("@/services/streams").Stream);
+        }
+      } catch (err) {
+        logger.warn("Stream metadata refresh failed:", err);
+      }
+    }, [playbackId]),
+    (status.kind === "live" || status.kind === "metoken-gated") &&
+      !streamData?.lens_live_post_id
+      ? 15000
+      : null
+  );
+
   // Generate a consistent sessionId based on playbackId so viewers share the same chat session.
   const sessionId = playbackId ? `session-${playbackId}` : "";
   const streamId = playbackId || "";
@@ -581,11 +601,8 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
               />
             )}
             {playbackId && sessionId ? (
-              <LiveChat
-                streamId={streamId}
-                sessionId={sessionId}
-                creatorAddress={streamData?.creator_id ?? null}
-                viewerCount={viewerCount}
+              <LensLiveChat
+                lensPostId={streamData?.lens_live_post_id ?? null}
               />
             ) : (
               <div className="border rounded-lg p-4 text-sm text-muted-foreground">

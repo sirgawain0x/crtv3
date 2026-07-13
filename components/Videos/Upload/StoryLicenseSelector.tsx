@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -31,25 +32,42 @@ export function StoryLicenseSelector({
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>(
     selectedLicense?.templateId || ""
   );
+  const [mintingFee, setMintingFee] = useState<string>(
+    selectedLicense?.defaultMintingFee != null
+      ? String(selectedLicense.defaultMintingFee)
+      : "0"
+  );
+
+  const buildTerms = (
+    templateId: string,
+    feeStr: string
+  ): StoryLicenseTerms | null => {
+    const template = PIL_TEMPLATES.find((t) => t.id === templateId);
+    if (!template) return null;
+    const feeNum = Number(feeStr);
+    return {
+      templateId: template.id,
+      commercialUse: template.terms.commercialUse ?? false,
+      derivativesAllowed: template.terms.derivativesAllowed ?? false,
+      derivativesAttribution: template.terms.derivativesAttribution ?? false,
+      derivativesApproval: template.terms.derivativesApproval ?? false,
+      derivativesReciprocal: template.terms.derivativesReciprocal ?? false,
+      distributionMethod: template.terms.distributionMethod,
+      revenueShare: template.terms.revenueShare,
+      defaultMintingFee: Number.isFinite(feeNum) && feeNum > 0 ? feeNum : 0,
+    };
+  };
 
   const handleTemplateChange = (templateId: string) => {
     setSelectedTemplateId(templateId);
-    const template = PIL_TEMPLATES.find((t) => t.id === templateId);
-    
-    if (template) {
-      const licenseTerms: StoryLicenseTerms = {
-        templateId: template.id,
-        commercialUse: template.terms.commercialUse ?? false,
-        derivativesAllowed: template.terms.derivativesAllowed ?? false,
-        derivativesAttribution: template.terms.derivativesAttribution ?? false,
-        derivativesApproval: template.terms.derivativesApproval ?? false,
-        derivativesReciprocal: template.terms.derivativesReciprocal ?? false,
-        distributionMethod: template.terms.distributionMethod,
-        revenueShare: template.terms.revenueShare,
-      };
-      onLicenseChange(licenseTerms);
-    } else {
-      onLicenseChange(null);
+    onLicenseChange(buildTerms(templateId, mintingFee));
+  };
+
+  const handleFeeChange = (value: string) => {
+    if (value !== "" && !/^\d*\.?\d*$/.test(value)) return;
+    setMintingFee(value);
+    if (selectedTemplateId) {
+      onLicenseChange(buildTerms(selectedTemplateId, value));
     }
   };
 
@@ -131,6 +149,24 @@ export function StoryLicenseSelector({
               </div>
             )}
           </div>
+
+          {selectedTemplateId && (
+            <div className="space-y-2">
+              <Label htmlFor="minting-fee">License price (WIP / $DATA)</Label>
+              <Input
+                id="minting-fee"
+                type="text"
+                inputMode="decimal"
+                placeholder="0"
+                value={mintingFee}
+                onChange={(e) => handleFeeChange(e.target.value)}
+                disabled={!enabled}
+              />
+              <p className="text-xs text-muted-foreground">
+                Amount buyers pay in WIP to mint a license token. Use 0 for a free license.
+              </p>
+            </div>
+          )}
         </CardContent>
       )}
     </Card>
