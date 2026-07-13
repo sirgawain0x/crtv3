@@ -53,6 +53,17 @@ describe("estimateMeTokenHoldingValueUsd", () => {
       })
     ).toBe(0);
   });
+
+  it("does not underflow tiny ownership shares to zero", () => {
+    // 1 of 10,000,000 tokens with $10,000 TVL ≈ $0.001
+    const value = estimateMeTokenHoldingValueUsd({
+      balanceRaw: parseEther("1"),
+      totalSupply: parseEther("10000000"),
+      vaultTvlUsd: 10_000,
+    });
+    expect(value).toBeGreaterThan(0);
+    expect(value).toBeCloseTo(0.001, 6);
+  });
 });
 
 describe("formatMeTokenHoldingUsd", () => {

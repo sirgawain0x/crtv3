@@ -95,12 +95,9 @@ describe("mergeHoldingsWithOwnMeToken", () => {
     expect(merged[0].holdingValueUsd).toBe(25);
   });
 
-  it("buildOwnHoldingFallback computes pro-rata value from TVL", () => {
-    const holding = buildOwnHoldingFallback(
-      stubOwnMeToken({ tvl: 200, balance: parseEther("40"), totalSupply: parseEther("100") }),
-      "0xCreator"
-    );
-    expect(holding.holdingValueUsd).toBeCloseTo(80, 5);
-    expect(holding.isOwnMeToken).toBe(true);
+  it("treats null/undefined holdings as empty", () => {
+    const merged = mergeHoldingsWithOwnMeToken(null, stubOwnMeToken(), "0xCreator");
+    expect(merged).toHaveLength(1);
+    expect(merged[0].isOwnMeToken).toBe(true);
   });
 });

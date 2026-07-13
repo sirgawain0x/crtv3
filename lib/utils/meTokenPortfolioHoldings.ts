@@ -55,24 +55,25 @@ export function buildOwnHoldingFallback(
  * indexed row as owned when the addresses match.
  */
 export function mergeHoldingsWithOwnMeToken(
-  holdings: MeTokenHolding[],
+  holdings: MeTokenHolding[] | null | undefined,
   userMeToken: MeTokenData | null | undefined,
   ownerAddress: string
 ): MeTokenHolding[] {
-  if (!userMeToken?.address) return holdings;
+  const list = holdings ?? [];
+  if (!userMeToken?.address) return list;
 
   const ownAddress = userMeToken.address.toLowerCase();
-  const alreadyPresent = holdings.some(
+  const alreadyPresent = list.some(
     (h) => h.address.toLowerCase() === ownAddress
   );
 
   if (alreadyPresent) {
-    return holdings.map((h) =>
+    return list.map((h) =>
       h.address.toLowerCase() === ownAddress
         ? { ...h, isOwnMeToken: true }
         : h
     );
   }
 
-  return [buildOwnHoldingFallback(userMeToken, ownerAddress), ...holdings];
+  return [buildOwnHoldingFallback(userMeToken, ownerAddress), ...list];
 }

@@ -51,7 +51,7 @@ export function MeTokenPortfolio({
 
   const displayHoldings = useMemo(() => {
     if (holdingsOverride) return holdingsOverride;
-    return mergeHoldingsWithOwnMeToken(holdings, userMeToken, ownerAddress);
+    return mergeHoldingsWithOwnMeToken(holdings ?? [], userMeToken, ownerAddress);
   }, [holdingsOverride, holdings, userMeToken, ownerAddress]);
 
   const handleRefresh = async () => {
@@ -174,8 +174,8 @@ export function MeTokenPortfolio({
                 MeToken Portfolio
               </CardTitle>
               <CardDescription>
-                {displayHoldings.length} MeToken
-                {displayHoldings.length !== 1 ? 's' : ''} in your portfolio
+                {displayHoldings.length} MeToken{displayHoldings.length !== 1 ? "s" : ""} in your
+                portfolio
               </CardDescription>
             </div>
             <Button

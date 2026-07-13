@@ -29,10 +29,14 @@ export function estimateMeTokenHoldingValueUsd({
     return 0;
   }
 
-  // Scale fraction in bigint to avoid float/bigint loss for large supplies.
-  const SCALE = BigInt(1_000_000);
-  const fractionScaled = (balanceRaw * SCALE) / totalSupply;
-  return (Number(fractionScaled) / Number(SCALE)) * vaultTvlUsd;
+  // Apply share first in float so tiny ownership (balance << supply) does not
+  // truncate to 0 under fixed-scale bigint division (e.g. SCALE=1e6).
+  // Number() loses absolute bigint precision, but the ratio is what we need for USD UI.
+  const share = Number(balanceRaw) / Number(totalSupply);
+  if (!Number.isFinite(share) || share <= 0) return 0;
+
+  const value = share * vaultTvlUsd;
+  return Number.isFinite(value) && value > 0 ? value : 0;
 }
 
 /**

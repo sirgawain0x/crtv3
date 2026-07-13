@@ -47,7 +47,7 @@ export function MeTokenBalances() {
   const ownerAddress = scaAddress || user?.address || "";
 
   const allMeTokens = useMemo(
-    () => mergeHoldingsWithOwnMeToken(holdings, userMeToken, ownerAddress),
+    () => mergeHoldingsWithOwnMeToken(holdings ?? [], userMeToken, ownerAddress),
     [holdings, userMeToken, ownerAddress]
   );
 
@@ -115,8 +115,8 @@ export function MeTokenBalances() {
         <div className="flex flex-col">
           <span className="text-sm font-medium text-gray-500">MeToken Portfolio</span>
           <span className="text-xs text-gray-400">
-            {totalCount} MeToken{totalCount !== 1 ? "s" : ""} • {uniqueCreators} Creator
-            {uniqueCreators !== 1 ? "s" : ""}
+            {totalCount} MeToken{totalCount !== 1 ? "s" : ""} • {uniqueCreators}{" "}
+            Creator{uniqueCreators !== 1 ? "s" : ""}
           </span>
         </div>
         {totalCount > maxVisibleItems && (
