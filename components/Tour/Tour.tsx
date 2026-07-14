@@ -109,13 +109,25 @@ const MOBILE_STEPS: TourStep[] = [
     },
 ];
 
+// Map step IDs to the page they require (if not on home)
+const STEP_PAGE_MAP: Record<string, string> = {
+    'upload-form': '/upload',
+    'publish-btn': '/upload',
+    'discover': '/discover',
+    'trade': '/market',
+};
+
+function getStepPage(stepId: string): string | null {
+    return STEP_PAGE_MAP[stepId] ?? null;
+}
+
 function openMobileMenuForTour() {
     if (typeof window !== 'undefined') {
         window.dispatchEvent(new Event('crtv:open-mobile-menu'));
     }
 }
 
-function waitForElement(selector: string, timeoutMs = 2500): Promise<boolean> {
+function waitForElement(selector: string, timeoutMs = 5000): Promise<boolean> {
     return new Promise((resolve) => {
         if (document.querySelector(selector)) {
             resolve(true);
@@ -201,11 +213,24 @@ export const Tour = () => {
         if ([STATUS.FINISHED, STATUS.SKIPPED].includes(status as typeof STATUS.FINISHED)) {
             setRun(false);
             localStorage.setItem('crtv3_tour_completed', 'true');
+            localStorage.removeItem('crtv3_tour_running');
             return;
         }
 
         if (type === EVENTS.TARGET_NOT_FOUND) {
             logger.warn('Tour: target not found', { target: currentStep?.target, index });
+            const stepId = currentStep?.data?.id;
+            const requiredPage = stepId ? getStepPage(stepId) : null;
+            const currentPath = window.location.pathname;
+
+            // If the target is on a different page, navigate there instead of skipping
+            if (requiredPage && !currentPath.startsWith(requiredPage)) {
+                logger.debug('Tour: navigating to required page', { requiredPage, stepId });
+                window.location.href = requiredPage;
+                return;
+            }
+
+            // Same page but element not found — skip to next step
             if (index < steps.length - 1) {
                 window.setTimeout(() => {
                     void advanceToStep(index + 1);
