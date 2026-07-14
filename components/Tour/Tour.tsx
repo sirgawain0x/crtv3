@@ -21,44 +21,22 @@ type TourStep = Step & {
 const DESKTOP_STEPS: TourStep[] = [
     {
         target: '#connect-wallet-btn',
-        content: 'Sign in to get started! Click "Get Started" to create your account with just your email.',
+        content: 'Click "Get Started" to create your account with just your email. This gives you access to your profile, wallet, video uploads, and token swaps.',
         skipBeacon: true,
         blockTargetInteraction: false,
         placement: 'bottom',
         data: { id: 'connect' },
     },
     {
-        target: '#nav-user-menu',
-        content: 'Click your profile to open the menu, then select "Upload" to start adding content.',
-        skipBeacon: true,
-        blockTargetInteraction: false,
-        placement: 'bottom',
-        data: { id: 'user-menu' },
-    },
-    {
-        target: '#upload-video-form',
-        content: 'Upload your video file here. You can drag and drop or select a file.',
-        skipBeacon: true,
-        placement: 'bottom',
-        data: { id: 'upload-form' },
-    },
-    {
-        target: '#publish-video-btn',
-        content: 'Once uploaded, click Publish to share it with the world!',
-        skipBeacon: true,
-        placement: 'top',
-        data: { id: 'publish-btn' },
-    },
-    {
         target: '#nav-discover-link',
-        content: 'Check out what others are creating on the Discover page.',
+        content: 'Discover the latest videos from creators on Creative TV.',
         skipBeacon: true,
         placement: 'bottom',
         data: { id: 'discover' },
     },
     {
         target: '#nav-trade-link',
-        content: 'Buy or sell Creative Coins by creators on the platform in the Trading Market.',
+        content: 'Buy or sell Creative Coins by creators in the Trading Market.',
         skipBeacon: true,
         placement: 'bottom',
         data: { id: 'trade' },
@@ -68,52 +46,30 @@ const DESKTOP_STEPS: TourStep[] = [
 const MOBILE_STEPS: TourStep[] = [
     {
         target: '#mobile-menu-btn',
-        content: 'Tap the menu icon to open navigation and sign in.',
+        content: 'Tap the menu icon to open navigation.',
         skipBeacon: true,
         blockTargetInteraction: false,
         placement: 'bottom',
-        data: { id: 'connect', openMobileMenu: false },
+        data: { id: 'menu', openMobileMenu: false },
     },
     {
         target: '#connect-wallet-btn-mobile',
-        content: 'Tap "Get Started" to create your account with just your email.',
+        content: 'Tap "Get Started" to create your account with just your email. This gives you access to your profile, wallet, video uploads, and token swaps.',
         skipBeacon: true,
         blockTargetInteraction: false,
         placement: 'bottom',
         data: { id: 'connect-wallet', openMobileMenu: true },
     },
     {
-        target: '#nav-user-menu',
-        content: 'After signing in, tap your profile avatar to open account options.',
-        skipBeacon: true,
-        blockTargetInteraction: false,
-        placement: 'bottom',
-        data: { id: 'user-menu' },
-    },
-    {
-        target: '#nav-upload-link',
-        content: 'Open the menu and choose Upload to add your video.',
-        skipBeacon: true,
-        placement: 'bottom',
-        data: { id: 'upload-form', openMobileMenu: true },
-    },
-    {
-        target: '#publish-video-btn',
-        content: 'After selecting a file, tap Publish to share your video.',
-        skipBeacon: true,
-        placement: 'top',
-        data: { id: 'publish-btn' },
-    },
-    {
         target: '#mobile-nav-discover-link',
-        content: 'Use Discover in the menu to see what others are creating.',
+        content: 'Discover the latest videos from creators on Creative TV.',
         skipBeacon: true,
         placement: 'bottom',
         data: { id: 'discover', openMobileMenu: true },
     },
     {
         target: '#mobile-nav-trade-link',
-        content: 'Open Trade in the menu to buy or sell Creative Coins.',
+        content: 'Buy or sell Creative Coins by creators in the Trading Market.',
         skipBeacon: true,
         placement: 'bottom',
         data: { id: 'trade', openMobileMenu: true },
@@ -122,8 +78,6 @@ const MOBILE_STEPS: TourStep[] = [
 
 // Map step IDs to the page they require (if not on home)
 const STEP_PAGE_MAP: Record<string, string> = {
-    'upload-form': '/upload',
-    'publish-btn': '/upload',
     'discover': '/discover',
     'trade': '/market',
 };
@@ -310,29 +264,29 @@ export const Tour = () => {
         }
     }, [isConnected, stepIndex, run, isMobile, getStepIndex, setStepIndex]);
 
-    useEffect(() => {
-        if (pathname.startsWith('/upload') && run) {
-            const uploadFormIndex = getStepIndex('upload-form');
-            if (stepIndex < uploadFormIndex && uploadFormIndex !== -1) {
-                setStepIndex(uploadFormIndex);
-            }
-        }
-    }, [pathname, stepIndex, run, getStepIndex, setStepIndex]);
+    // useEffect(() => {
+    //     if (pathname.startsWith('/upload') && run) {
+    //         const uploadFormIndex = getStepIndex('upload-form');
+    //         if (stepIndex < uploadFormIndex && uploadFormIndex !== -1) {
+    //             setStepIndex(uploadFormIndex);
+    //         }
+    //     }
+    // }, [pathname, stepIndex, run, getStepIndex, setStepIndex]);
 
-    useEffect(() => {
-        let interval: NodeJS.Timeout;
-        const uploadFormIndex = getStepIndex('upload-form');
-        const publishBtnIndex = getStepIndex('publish-btn');
+    // useEffect(() => {
+    //     let interval: NodeJS.Timeout;
+    //     const uploadFormIndex = getStepIndex('upload-form');
+    //     const publishBtnIndex = getStepIndex('publish-btn');
 
-        if (stepIndex === uploadFormIndex && run && uploadFormIndex !== -1 && publishBtnIndex !== -1) {
-            interval = setInterval(() => {
-                if (document.getElementById('publish-video-btn')) {
-                    setStepIndex(publishBtnIndex);
-                }
-            }, 1000);
-        }
-        return () => clearInterval(interval);
-    }, [stepIndex, run, getStepIndex, setStepIndex]);
+    //     if (stepIndex === uploadFormIndex && run && uploadFormIndex !== -1 && publishBtnIndex !== -1) {
+    //         interval = setInterval(() => {
+    //             if (document.getElementById('publish-video-btn')) {
+    //                 setStepIndex(publishBtnIndex);
+    //             }
+    //         }, 1000);
+    //     }
+    //     return () => clearInterval(interval);
+    // }, [stepIndex, run, getStepIndex, setStepIndex]);
 
     useEffect(() => {
         if (pathname.startsWith('/discover') && run) {
