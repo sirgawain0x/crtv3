@@ -20,24 +20,26 @@ type TourStep = Step & {
 
 const DESKTOP_STEPS: TourStep[] = [
     {
-        target: '#connect-wallet-btn',
-        content: 'Click "Get Started" to create your account with just your email. This gives you access to your profile, wallet, video uploads, and token swaps.',
+        target: '#desktop-get-started',
+        content: 'Click here to securely sign in with your email address.',
         skipBeacon: true,
-        blockTargetInteraction: false,
+        blockTargetInteraction: true,
         placement: 'bottom',
         data: { id: 'connect' },
     },
     {
-        target: '#nav-discover-link',
-        content: 'Discover the latest videos from creators on Creative TV.',
+        target: '#discover-tab',
+        content: 'Discover new videos, view metrics, and directly buy a creator\'s token through the video view to support them.',
         skipBeacon: true,
+        blockTargetInteraction: false,
         placement: 'bottom',
         data: { id: 'discover' },
     },
     {
-        target: '#nav-trade-link',
-        content: 'Buy or sell Creative Coins by creators in the Trading Market.',
+        target: '#trade-tab',
+        content: 'This is where you can swap, trade, or manage your asset portfolios.',
         skipBeacon: true,
+        blockTargetInteraction: false,
         placement: 'bottom',
         data: { id: 'trade' },
     },
@@ -45,41 +47,35 @@ const DESKTOP_STEPS: TourStep[] = [
 
 const MOBILE_STEPS: TourStep[] = [
     {
-        target: '#mobile-menu-btn',
-        content: 'Tap the menu icon to open navigation.',
+        target: '.mobile-menu-hamburger',
+        content: 'Open the mobile menu first to access the Get Started action.',
+        skipBeacon: true,
+        blockTargetInteraction: true,
+        placement: 'bottom',
+        data: { id: 'menu' },
+    },
+    {
+        target: '#discover-tab',
+        content: 'Discover new videos, view metrics, and directly buy a creator\'s token through the video view to support them.',
         skipBeacon: true,
         blockTargetInteraction: false,
         placement: 'bottom',
-        data: { id: 'menu', openMobileMenu: false },
+        data: { id: 'discover' },
     },
     {
-        target: '#connect-wallet-btn-mobile',
-        content: 'Tap "Get Started" to create your account with just your email. This gives you access to your profile, wallet, video uploads, and token swaps.',
+        target: '#trade-tab',
+        content: 'This is where you can swap, trade, or manage your asset portfolios.',
         skipBeacon: true,
         blockTargetInteraction: false,
         placement: 'bottom',
-        data: { id: 'connect-wallet', openMobileMenu: true },
-    },
-    {
-        target: '#mobile-nav-discover-link',
-        content: 'Discover the latest videos from creators on Creative TV.',
-        skipBeacon: true,
-        placement: 'bottom',
-        data: { id: 'discover', openMobileMenu: true },
-    },
-    {
-        target: '#mobile-nav-trade-link',
-        content: 'Buy or sell Creative Coins by creators in the Trading Market.',
-        skipBeacon: true,
-        placement: 'bottom',
-        data: { id: 'trade', openMobileMenu: true },
+        data: { id: 'trade' },
     },
 ];
 
 // Map step IDs to the page they require (if not on home)
 const STEP_PAGE_MAP: Record<string, string> = {
     'discover': '/discover',
-    'trade': '/market',
+    'trade': '/trade',
 };
 
 function getStepPage(stepId: string): string | null {
@@ -145,13 +141,10 @@ export const Tour = () => {
 
     const prepareStepTarget = useCallback(
         async (step?: TourStep) => {
-            if (!step?.data?.openMobileMenu || !isMobile) {
-                return true;
-            }
-            openMobileMenuForTour();
-            return waitForElement(String(step.target));
+            // No special preparation needed for the new flow
+            return true;
         },
-        [isMobile],
+        [],
     );
 
     const advanceToStep = useCallback(
@@ -221,48 +214,34 @@ export const Tour = () => {
             return;
         }
 
-        const currentStep = steps[stepIndex];
-        if (!currentStep?.data?.openMobileMenu) {
-            return;
-        }
-
-        let cancelled = false;
-        void (async () => {
-            await prepareStepTarget(currentStep);
-            if (cancelled) {
-                return;
-            }
-        })();
-
-        return () => {
-            cancelled = true;
-        };
+        // No special mobile handling needed for the new flow
+        return () => {};
     }, [run, stepIndex, isMobile, steps, prepareStepTarget]);
 
-    useEffect(() => {
-        if (!isConnected || !run || !isMobile) {
-            return;
-        }
+    // useEffect(() => {
+    //     if (!isConnected || !run || !isMobile) {
+    //         return;
+    //     }
 
-        const connectIndex = getStepIndex('connect');
-        const connectWalletIndex = getStepIndex('connect-wallet');
-        if (stepIndex === connectIndex || stepIndex === connectWalletIndex) {
-            window.setTimeout(() => {
-                setStepIndex(getStepIndex('user-menu'));
-            }, 400);
-        }
-    }, [isConnected, stepIndex, run, isMobile, getStepIndex, setStepIndex]);
+    //     const connectIndex = getStepIndex('connect');
+    //     const connectWalletIndex = getStepIndex('connect-wallet');
+    //     if (stepIndex === connectIndex || stepIndex === connectWalletIndex) {
+    //         window.setTimeout(() => {
+    //             setStepIndex(getStepIndex('user-menu'));
+    //         }, 400);
+    //     }
+    // }, [isConnected, stepIndex, run, isMobile, getStepIndex, setStepIndex]);
 
-    useEffect(() => {
-        if (!isConnected || !run || isMobile) {
-            return;
-        }
+    // useEffect(() => {
+    //     if (!isConnected || !run || isMobile) {
+    //         return;
+    //     }
 
-        const connectIndex = getStepIndex('connect');
-        if (stepIndex === connectIndex) {
-            window.setTimeout(() => setStepIndex(connectIndex + 1), 300);
-        }
-    }, [isConnected, stepIndex, run, isMobile, getStepIndex, setStepIndex]);
+    //     const connectIndex = getStepIndex('connect');
+    //     if (stepIndex === connectIndex) {
+    //         window.setTimeout(() => setStepIndex(connectIndex + 1), 300);
+    //     }
+    // }, [isConnected, stepIndex, run, isMobile, getStepIndex, setStepIndex]);
 
     // useEffect(() => {
     //     if (pathname.startsWith('/upload') && run) {
