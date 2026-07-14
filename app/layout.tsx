@@ -4,7 +4,6 @@ import { headers } from "next/headers";
 import "./globals.css";
 import { Providers } from "./providers";
 import Navbar from "@/components/Navbar";
-import { Tour } from '@/components/Tour/Tour';
 import { cn } from "@/lib/utils/utils";
 import { Toaster } from "@/components/ui/toaster";
 import Footer from "@/components/Footer";
@@ -79,7 +78,6 @@ export default async function RootLayout({
         <LayoutClientChunks />
         <Providers>
           <ErrorBoundary>
-            {!isEmbedRoute ? <Tour /> : null}
             {!isEmbedRoute ? <Navbar /> : null}
             <div className="min-h-screen flex flex-col">
               <main className="flex-1">{children}</main>
