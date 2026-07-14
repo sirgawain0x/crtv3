@@ -216,16 +216,39 @@ export async function GET(request: NextRequest) {
 
     const thumbnailUrl = await resolveThumbnailUrl(id, playbackId);
 
-    if (thumbnailUrl && (await isSafeRemoteThumbnailUrl(thumbnailUrl))) {
-      const remote = await fetchRemoteImage(thumbnailUrl);
-      if (remote) {
-        return new NextResponse(remote.body, {
-          status: 200,
-          headers: {
-            "Content-Type": remote.contentType,
-            "Cache-Control": CACHE_HEADER,
-          },
-        });
+    if (thumbnailUrl) {
+      // Try the primary URL first
+      if (await isSafeRemoteThumbnailUrl(thumbnailUrl)) {
+        const remote = await fetchRemoteImage(thumbnailUrl);
+        if (remote) {
+          return new NextResponse(remote.body, {
+            status: 200,
+            headers: {
+              "Content-Type": remote.contentType,
+              "Cache-Control": CACHE_HEADER,
+            },
+          });
+        }
+      }
+
+      // If primary URL failed and it's an IPFS URL, try fallback gateways
+      const { getAllIpfsGateways } = await import("@/lib/utils/image-gateway");
+      const gatewayUrls = getAllIpfsGateways(thumbnailUrl);
+      for (const gatewayUrl of gatewayUrls) {
+        if (gatewayUrl === thumbnailUrl) continue; // Already tried
+        if (await isSafeRemoteThumbnailUrl(gatewayUrl)) {
+          const remote = await fetchRemoteImage(gatewayUrl);
+          if (remote) {
+            serverLogger.debug("OG video: fetched via fallback gateway", { gatewayUrl });
+            return new NextResponse(remote.body, {
+              status: 200,
+              headers: {
+                "Content-Type": remote.contentType,
+                "Cache-Control": CACHE_HEADER,
+              },
+            });
+          }
+        }
       }
     }
 

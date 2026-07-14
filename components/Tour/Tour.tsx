@@ -30,6 +30,7 @@ const DESKTOP_STEPS: TourStep[] = [
     {
         target: '#nav-user-menu',
         content: 'Click your profile to open the menu, then select "Upload" to start adding content.',
+        skipBeacon: true,
         blockTargetInteraction: false,
         placement: 'bottom',
         data: { id: 'user-menu' },
@@ -37,24 +38,28 @@ const DESKTOP_STEPS: TourStep[] = [
     {
         target: '#upload-video-form',
         content: 'Upload your video file here. You can drag and drop or select a file.',
+        skipBeacon: true,
         placement: 'bottom',
         data: { id: 'upload-form' },
     },
     {
         target: '#publish-video-btn',
         content: 'Once uploaded, click Publish to share it with the world!',
+        skipBeacon: true,
         placement: 'top',
         data: { id: 'publish-btn' },
     },
     {
         target: '#nav-discover-link',
         content: 'Check out what others are creating on the Discover page.',
+        skipBeacon: true,
         placement: 'bottom',
         data: { id: 'discover' },
     },
     {
         target: '#nav-trade-link',
         content: 'Buy or sell Creative Coins by creators on the platform in the Trading Market.',
+        skipBeacon: true,
         placement: 'bottom',
         data: { id: 'trade' },
     },
@@ -72,6 +77,7 @@ const MOBILE_STEPS: TourStep[] = [
     {
         target: '#connect-wallet-btn-mobile',
         content: 'Tap "Get Started" to create your account with just your email.',
+        skipBeacon: true,
         blockTargetInteraction: false,
         placement: 'bottom',
         data: { id: 'connect-wallet', openMobileMenu: true },
@@ -79,6 +85,7 @@ const MOBILE_STEPS: TourStep[] = [
     {
         target: '#nav-user-menu',
         content: 'After signing in, tap your profile avatar to open account options.',
+        skipBeacon: true,
         blockTargetInteraction: false,
         placement: 'bottom',
         data: { id: 'user-menu' },
@@ -86,24 +93,28 @@ const MOBILE_STEPS: TourStep[] = [
     {
         target: '#nav-upload-link',
         content: 'Open the menu and choose Upload to add your video.',
+        skipBeacon: true,
         placement: 'bottom',
         data: { id: 'upload-form', openMobileMenu: true },
     },
     {
         target: '#publish-video-btn',
         content: 'After selecting a file, tap Publish to share your video.',
+        skipBeacon: true,
         placement: 'top',
         data: { id: 'publish-btn' },
     },
     {
         target: '#mobile-nav-discover-link',
         content: 'Use Discover in the menu to see what others are creating.',
+        skipBeacon: true,
         placement: 'bottom',
         data: { id: 'discover', openMobileMenu: true },
     },
     {
         target: '#mobile-nav-trade-link',
         content: 'Open Trade in the menu to buy or sell Creative Coins.',
+        skipBeacon: true,
         placement: 'bottom',
         data: { id: 'trade', openMobileMenu: true },
     },
@@ -156,6 +167,7 @@ export const Tour = () => {
     const isConnected = !!user;
 
     const [isMobile, setIsMobile] = useState(false);
+    const [tourKey, setTourKey] = useState(0); // Force re-mount to clear overlay
 
     useEffect(() => {
         const checkMobile = () => {
@@ -212,6 +224,8 @@ export const Tour = () => {
 
         if ([STATUS.FINISHED, STATUS.SKIPPED].includes(status as typeof STATUS.FINISHED)) {
             setRun(false);
+            setStepIndex(0);
+            setTourKey(k => k + 1); // Force Joyride to unmount/remount — clears overlay + beacons
             localStorage.setItem('crtv3_tour_completed', 'true');
             localStorage.removeItem('crtv3_tour_running');
             return;
@@ -226,15 +240,17 @@ export const Tour = () => {
             // If the target is on a different page, navigate there instead of skipping
             if (requiredPage && !currentPath.startsWith(requiredPage)) {
                 logger.debug('Tour: navigating to required page', { requiredPage, stepId });
+                // Save the current step so it resumes on the new page
+                localStorage.setItem('crtv3_tour_step', index.toString());
                 window.location.href = requiredPage;
                 return;
             }
 
-            // Same page but element not found — skip to next step
+            // Same page but element not found — wait longer then skip
             if (index < steps.length - 1) {
                 window.setTimeout(() => {
                     void advanceToStep(index + 1);
-                }, 400);
+                }, 1000);
             }
             return;
         }
@@ -381,6 +397,7 @@ export const Tour = () => {
 
     return (
         <Joyride
+            key={tourKey}
             steps={steps}
             run={run}
             stepIndex={stepIndex}
