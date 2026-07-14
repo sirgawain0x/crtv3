@@ -34,11 +34,10 @@ export async function generateMetadata(
         const title = videoAsset?.title || "Live Stream";
         const desc = "Watch on Creative TV";
 
-        // Use the direct thumbnail URL when available (works for SMS, Twitter, etc).
-        // Fall back to the same-origin proxy for crawlers that need same-origin images.
-        const directThumb = videoAsset?.thumbnail_url;
-        const proxyUrl = getVideoOgImageUrl({ playbackId });
-        const ogImageUrl = directThumb || proxyUrl;
+        // Use the same-origin proxy for OG images — Telegram/SMS crawlers can't
+        // fetch IPFS gateway URLs (grove.storage, ipfs.io, etc). The proxy fetches
+        // the image server-side and serves it from our domain.
+        const ogImageUrl = getVideoOgImageUrl({ playbackId });
         const ogImage = {
             url: ogImageUrl,
             width: VIDEO_OG_IMAGE.width,
