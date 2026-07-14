@@ -16,7 +16,6 @@ import { PropsWithChildren, Suspense, useEffect, useState } from "react";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "sonner";
 import { VideoProvider } from "../context/VideoContext";
-import { TourProvider } from "../context/TourContext";
 import { HeliaProvider } from "../context/HeliaContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ApolloNextAppProvider } from "@apollo/client-integration-nextjs";
@@ -95,21 +94,19 @@ export const Providers = (props: PropsWithChildren) => {
                         <NoSSR>
                           <RadixProvider>
                             <HeliaProvider>
-                              <TourProvider>
-                                <VideoProvider>
-                                  <MembershipProvider>
-                                    <WalletReadyGuard>
-                                      <AuthErrorMonitor />
-                                      <OrbSessionProvider>
-                                        {props.children}
-                                        <OrbLoginModal />
-                                        <OrbLinkingOverlay />
-                                        <Toaster position="top-right" richColors />
-                                      </OrbSessionProvider>
-                                    </WalletReadyGuard>
-                                  </MembershipProvider>
-                                </VideoProvider>
-                              </TourProvider>
+                              <VideoProvider>
+                                <MembershipProvider>
+                                  <WalletReadyGuard>
+                                    <AuthErrorMonitor />
+                                    <OrbSessionProvider>
+                                      {props.children}
+                                      <OrbLoginModal />
+                                      <OrbLinkingOverlay />
+                                      <Toaster position="top-right" richColors />
+                                    </OrbSessionProvider>
+                                  </WalletReadyGuard>
+                                </MembershipProvider>
+                              </VideoProvider>
                             </HeliaProvider>
                           </RadixProvider>
                         </NoSSR>

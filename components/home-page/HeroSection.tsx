@@ -11,7 +11,6 @@ import { Src } from "@livepeer/react";
 import { HeroPlayer } from "../Player/HeroPlayer";
 import { PlayerLoading } from "../Player/Player";
 import { getHeroPlaybackSource } from "../../lib/hooks/livepeer/useHeroPlaybackSource";
-import { useTour } from "@/context/TourContext";
 import { logger } from '@/lib/utils/logger';
 
 
@@ -40,10 +39,9 @@ const HeroSection: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  const { startTour } = useTour();
-
   const handleWatchDemo = () => {
-    startTour();
+    // Tour has been disabled
+    logger.debug("Tour is disabled - watch demo button clicked");
   };
 
   useEffect(() => {
