@@ -22,14 +22,20 @@ export const TourProvider = ({ children }: { children: ReactNode }) => {
     useEffect(() => {
         const tourCompleted = localStorage.getItem("crtv3_tour_completed");
         const storedStep = localStorage.getItem("crtv3_tour_step");
+        const tourRunning = localStorage.getItem("crtv3_tour_running");
 
-        logger.debug("TourContext: Checking localStorage:", { tourCompleted, storedStep });
+        logger.debug("TourContext: Checking localStorage:", { tourCompleted, storedStep, tourRunning });
 
         if (storedStep) {
             setStepIndex(parseInt(storedStep, 10));
         }
 
-        if (!tourCompleted) {
+        // Resume tour if it was running (e.g. after page navigation)
+        // Or start fresh if never completed
+        if (tourRunning === "true") {
+            logger.debug("TourContext: Resuming tour");
+            setRun(true);
+        } else if (!tourCompleted) {
             logger.debug("TourContext: No completion found, setting run=true");
             setRun(true);
         } else {
@@ -51,12 +57,14 @@ export const TourProvider = ({ children }: { children: ReactNode }) => {
         // Clear completion and saved step
         localStorage.removeItem("crtv3_tour_completed");
         localStorage.setItem("crtv3_tour_step", "0");
+        localStorage.setItem("crtv3_tour_running", "true");
     };
 
     const resetTour = () => {
         logger.debug("TourContext: resetTour called");
         setRun(false);
         setStepIndex(0);
+        localStorage.removeItem("crtv3_tour_running");
     };
 
     return (

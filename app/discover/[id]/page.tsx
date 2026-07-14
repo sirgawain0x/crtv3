@@ -278,7 +278,12 @@ export async function generateMetadata({
 
     const baseUrl = getSiteOrigin();
     const absoluteUrl = `${baseUrl}/discover/${id}`;
-    const ogImageUrl = getVideoOgImageUrl({ id });
+
+    // Use the direct thumbnail URL when available (works for SMS, Twitter, etc).
+    // Fall back to the same-origin proxy for crawlers that need same-origin images.
+    const directThumb = (videoAsset as any)?.thumbnail_url;
+    const proxyUrl = getVideoOgImageUrl({ id });
+    const ogImageUrl = directThumb || proxyUrl;
 
     let videoTitle = (videoAsset as any)?.title || assetData.name || "Watch Video";
     if (videoTitle.endsWith('.mp4')) {
