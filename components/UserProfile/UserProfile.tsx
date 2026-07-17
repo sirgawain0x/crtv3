@@ -29,6 +29,7 @@ import { CancelMembershipButton } from "./CancelMembershipButton";
 import { getPassDisplayName } from "@/lib/access/membership-labels";
 import { isValidProfileTab, type ProfileTab } from "@/lib/utils/profile-urls";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CreatorAnalyticsTab } from "./CreatorAnalyticsTab";
 
 const LIFETIME_EXPIRATION_THRESHOLD = 32503680000;
 
@@ -141,6 +142,12 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
               Uploads
             </TabsTrigger>
             <TabsTrigger
+              value="Analytics"
+              className="flex-shrink-0 rounded-md px-3 py-2 text-sm font-medium"
+            >
+              Analytics
+            </TabsTrigger>
+            <TabsTrigger
               value="MeTokens"
               className="flex-shrink-0 rounded-md px-3 py-2 text-sm font-medium"
             >
@@ -191,6 +198,10 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
               </Card>
             </TabsContent>
 
+            <TabsContent value="Analytics">
+              <CreatorAnalyticsTab />
+            </TabsContent>
+
             <TabsContent value="MeTokens">
               <MeTokensSection walletAddress={displayAddress} />
             </TabsContent>
@@ -198,27 +209,6 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
             <TabsContent value="Bank">
               <CreativeBankTab />
             </TabsContent>
-
-            {/* Revenue content will be implemented later */}
-            {/* <TabsContent value="Revenue">
-                <Card>
-                  <CardHeader className="space-y-1">
-                    <CardTitle className="text-2xl">Revenue</CardTitle>
-                    <CardDescription>
-                      Track your earnings and revenue streams
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <Alert>
-                      <FaExclamationTriangle className="h-4 w-4" />
-                      <AlertTitle>Coming Soon</AlertTitle>
-                      <AlertDescription>
-                        Revenue tracking features are under development
-                      </AlertDescription>
-                    </Alert>
-                  </CardContent>
-                </Card>
-              </TabsContent> */}
 
             {/* Membership Tab Content */}
             <TabsContent value="Membership">

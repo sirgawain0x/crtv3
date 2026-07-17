@@ -46,7 +46,7 @@ describe("restored view count UI", () => {
     expect(useLivepeerViewMetrics).toHaveBeenCalledWith("p1");
   });
 
-  it("ViewsComponent hides when metrics are missing", () => {
+  it("ViewsComponent shows fallbackViews when Livepeer metrics are missing", () => {
     vi.mocked(useLivepeerViewMetrics).mockReturnValue({
       viewMetrics: null,
       totalViews: 0,
@@ -55,17 +55,39 @@ describe("restored view count UI", () => {
     });
 
     const html = renderToStaticMarkup(
-      React.createElement(ViewsComponent, { playbackId: "p1" }),
+      React.createElement(ViewsComponent, {
+        playbackId: "p1",
+        fallbackViews: 42,
+      }),
     );
-    expect(html).toBe("");
+    expect(html).toContain("42");
+    expect(html.toLowerCase()).toContain("views");
   });
 
-  it("ViewsComponent fails quietly on metrics error", () => {
+  it("ViewsComponent shows fallbackViews on metrics error", () => {
     vi.mocked(useLivepeerViewMetrics).mockReturnValue({
       viewMetrics: null,
       totalViews: 0,
       loading: false,
       error: "upstream down",
+    });
+
+    const html = renderToStaticMarkup(
+      React.createElement(ViewsComponent, {
+        playbackId: "p1",
+        fallbackViews: 17,
+      }),
+    );
+    expect(html).toContain("17");
+    expect(html.toLowerCase()).toContain("views");
+  });
+
+  it("ViewsComponent hides when metrics and fallback are both empty", () => {
+    vi.mocked(useLivepeerViewMetrics).mockReturnValue({
+      viewMetrics: null,
+      totalViews: 0,
+      loading: false,
+      error: null,
     });
 
     const html = renderToStaticMarkup(
@@ -92,6 +114,51 @@ describe("restored view count UI", () => {
       React.createElement(VideoViewMetrics, { playbackId: "p2" }),
     );
     expect(html).toContain("42");
+    expect(html.toLowerCase()).toContain("views");
+  });
+
+  it("VideoViewMetrics uses fallbackViews when Livepeer returns 0", () => {
+    vi.mocked(useLivepeerViewMetrics).mockReturnValue({
+      viewMetrics: {
+        playbackId: "p2",
+        viewCount: 0,
+        playtimeMins: 0,
+        legacyViewCount: 0,
+        totalViews: 0,
+      },
+      totalViews: 0,
+      loading: false,
+      error: null,
+    });
+
+    const html = renderToStaticMarkup(
+      React.createElement(VideoViewMetrics, {
+        playbackId: "p2",
+        fallbackViews: 99,
+      }),
+    );
+    expect(html).toContain("99");
+    expect(html.toLowerCase()).toContain("views");
+  });
+
+  it("VideoViewMetrics shows 0 views when both Livepeer and fallback are 0", () => {
+    vi.mocked(useLivepeerViewMetrics).mockReturnValue({
+      viewMetrics: {
+        playbackId: "p2",
+        viewCount: 0,
+        playtimeMins: 0,
+        legacyViewCount: 0,
+        totalViews: 0,
+      },
+      totalViews: 0,
+      loading: false,
+      error: null,
+    });
+
+    const html = renderToStaticMarkup(
+      React.createElement(VideoViewMetrics, { playbackId: "p2" }),
+    );
+    expect(html).toContain("0");
     expect(html.toLowerCase()).toContain("views");
   });
 

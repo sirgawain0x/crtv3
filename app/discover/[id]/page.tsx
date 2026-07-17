@@ -159,7 +159,10 @@ export default async function VideoDetailsPage({
             <div className="flex items-center justify-between gap-4 mt-4 flex-wrap">
               <div className="flex items-center min-h-4">
                 {assetData.playbackId && (
-                  <VideoViewMetrics playbackId={assetData.playbackId} />
+                  <VideoViewMetrics
+                    playbackId={assetData.playbackId}
+                    fallbackViews={videoAsset?.views_count ?? 0}
+                  />
                 )}
               </div>
               <div className="flex items-center gap-2 flex-wrap justify-end ml-auto">

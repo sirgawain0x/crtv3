@@ -102,7 +102,16 @@ export async function POST(req: NextRequest) {
         "Content-Type": "application/json",
         Authorization: `Bearer ${process.env.LIVEPEER_FULL_API_KEY}`,
       },
-      body: JSON.stringify({ name, profiles, record, playbackPolicy }),
+      body: JSON.stringify({
+        name,
+        profiles,
+        record,
+        playbackPolicy,
+        creatorId: {
+          type: "unverified",
+          value: normalizedCreator,
+        },
+      }),
     });
 
     let data: Record<string, unknown> = {};

@@ -7,7 +7,7 @@ type HackBetaBannerProps = {
   className?: string;
 };
 
-/** @deprecated Prefer ChonesBanner; kept for any remaining imports. */
+/** @deprecated Prefer HackBetaHero / ChonesBanner; kept for any remaining imports. */
 export function HackBetaBanner({ className }: HackBetaBannerProps) {
   return (
     <ChonesBanner

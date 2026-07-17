@@ -28,6 +28,8 @@ import { logger } from "@/lib/utils/logger";
 import { useIsVideoAdmin } from "@/hooks/useIsVideoAdmin";
 import { getDetailPlaybackSource } from "@/lib/hooks/livepeer/useDetailPlaybackSources";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
+import { useQueryClient } from "@tanstack/react-query";
+import { livepeerViewMetricsQueryKey } from "@/lib/hooks/livepeer/useLivepeerViewMetrics";
 
 type DiscoverAssetExtras = {
   thumbnail_url?: string | null;
@@ -37,6 +39,7 @@ type DiscoverAssetExtras = {
   creator_metoken_id?: string | null;
   attributes?: Record<string, unknown> | null;
   title?: string;
+  views_count?: number;
 };
 
 interface VideoCardProps {
@@ -61,6 +64,7 @@ const VideoCard: React.FC<VideoCardProps> = ({
   priority = false,
 }) => {
   const isVideoAdmin = useIsVideoAdmin();
+  const queryClient = useQueryClient();
   const [dbStatus, setDbStatus] = useState<
     "draft" | "published" | "minted" | "archived" | null
   >(() => asset.dbStatus ?? null);
@@ -69,13 +73,17 @@ const VideoCard: React.FC<VideoCardProps> = ({
   const playbackFetchedRef = useRef(false);
   const [lazySrc, setLazySrc] = useState<Src[] | null>(playbackSources);
   const [nearViewport, setNearViewport] = useState(false);
+  const [syncedViewsCount, setSyncedViewsCount] = useState<number>(
+    () => Math.max(0, Number(asset.views_count) || 0),
+  );
 
   // Reset deferred playback when the card's video changes (pagination / filter)
   useEffect(() => {
     playbackFetchedRef.current = Boolean(playbackSources?.length);
     setLazySrc(playbackSources);
     setNearViewport(false);
-  }, [asset.playbackId, playbackSources]);
+    setSyncedViewsCount(Math.max(0, Number(asset.views_count) || 0));
+  }, [asset.playbackId, asset.views_count, playbackSources]);
 
   const isDesktop = useMediaQuery("(min-width: 768px)");
   const rootMargin = isDesktop ? "400px" : "200px";
@@ -218,6 +226,13 @@ const VideoCard: React.FC<VideoCardProps> = ({
           const result = await response.json();
           if (result.success) {
             localStorage.setItem(lastSyncKey, now.toString());
+            const nextViews = Number(result.viewCount ?? 0);
+            if (Number.isFinite(nextViews) && nextViews >= 0) {
+              setSyncedViewsCount((prev) => Math.max(prev, nextViews));
+            }
+            void queryClient.invalidateQueries({
+              queryKey: livepeerViewMetricsQueryKey(asset.playbackId!),
+            });
           }
         }
       } catch (error) {
@@ -228,7 +243,7 @@ const VideoCard: React.FC<VideoCardProps> = ({
     if (dbStatus === "published" || dbStatus === "minted") {
       void syncViewCount();
     }
-  }, [asset?.playbackId, dbStatus, nearViewport]);
+  }, [asset?.playbackId, dbStatus, nearViewport, queryClient]);
 
   if (!asset) {
     logger.warn("VideoCard: No asset provided");
@@ -321,7 +336,10 @@ const VideoCard: React.FC<VideoCardProps> = ({
               )}
             </div>
             {nearViewport ? (
-              <VideoViewMetrics playbackId={asset.playbackId || ""} />
+              <VideoViewMetrics
+                playbackId={asset.playbackId || ""}
+                fallbackViews={syncedViewsCount}
+              />
             ) : (
               <span className="text-xs text-muted-foreground">—</span>
             )}
