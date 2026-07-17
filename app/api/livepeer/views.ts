@@ -230,22 +230,27 @@ async function fetchAllViewsViaHttp(
   token: string,
 ): Promise<FetchAllViewsResult> {
   const totalResult = await fetchTotalViewsViaHttp(playbackId, token);
-  if (!totalResult.ok) {
+
+  // Non-zero /total is authoritative.
+  if (totalResult.ok && !isZeroMetrics(totalResult.metrics)) {
     return totalResult;
   }
 
-  if (!isZeroMetrics(totalResult.metrics)) {
-    return totalResult;
-  }
-
+  // Studio can show views before /total catches up; also recover when /total errors.
   const queryResult = await fetchViewershipQueryViaHttp(playbackId, token);
   if (queryResult.ok && !isZeroMetrics(queryResult.metrics)) {
     serverLogger.debug(
-      `Livepeer viewership query fallback used for playbackId=${playbackId} (total=0, query=${queryResult.metrics.viewCount + queryResult.metrics.legacyViewCount})`,
+      `Livepeer viewership query fallback used for playbackId=${playbackId} (total=${
+        totalResult.ok
+          ? totalResult.metrics.viewCount + totalResult.metrics.legacyViewCount
+          : `error:${totalResult.status ?? totalResult.reason}`
+      }, query=${queryResult.metrics.viewCount + queryResult.metrics.legacyViewCount})`,
     );
     return queryResult;
   }
 
+  if (totalResult.ok) return totalResult;
+  if (queryResult.ok) return queryResult;
   return totalResult;
 }
 

@@ -7,10 +7,13 @@ import { useLivepeerViewMetrics } from "@/lib/hooks/livepeer/useLivepeerViewMetr
 
 interface ViewsComponentProps {
   playbackId: string;
+  /** DB-synced views_count used when Livepeer temporarily returns 0 or errors. */
+  fallbackViews?: number;
 }
 
 export const ViewsComponent: React.FC<ViewsComponentProps> = ({
   playbackId,
+  fallbackViews = 0,
 }) => {
   const { totalViews, viewMetrics, loading, error } =
     useLivepeerViewMetrics(playbackId);
@@ -24,18 +27,23 @@ export const ViewsComponent: React.FC<ViewsComponentProps> = ({
     );
   }
 
-  if (error) {
+  const fallback = Math.max(0, Number(fallbackViews) || 0);
+  const livepeer = Math.max(0, Number(totalViews) || 0);
+  const displayViews = Math.max(livepeer, fallback);
+
+  // Prefer Livepeer metrics or a DB fallback — never blank when we have a number.
+  if (error && !viewMetrics && displayViews <= 0) {
     return null;
   }
 
-  if (!viewMetrics) {
+  if (!viewMetrics && displayViews <= 0) {
     return null;
   }
 
   return (
     <div className="flex items-center gap-1 text-sm text-muted-foreground">
       <EyeIcon className="h-4 w-4" />
-      <span>{(totalViews ?? 0).toLocaleString()} views</span>
+      <span>{displayViews.toLocaleString()} views</span>
     </div>
   );
 };

@@ -132,6 +132,13 @@ describe("POST /api/livepeer/livepeer-proxy", () => {
     expect(json.streamId).toBe("stream-1");
     expect(json.playbackId).toBe("playback-1");
     expect(json.streamKey).toBe("secret-key");
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining("/api/stream"),
+      expect.objectContaining({
+        method: "POST",
+        body: expect.stringContaining('"creatorId"'),
+      }),
+    );
     expect(mockCreateStreamRecord).toHaveBeenCalledWith(
       expect.objectContaining({
         creator_id: CREATOR,

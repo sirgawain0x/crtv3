@@ -166,6 +166,19 @@ async function fetchRemoteImage(
   }
 }
 
+async function livepeerThumbnailFallback(
+  playbackId: string
+): Promise<string | null> {
+  try {
+    const { getClipThumbnailUrl } = await import("@/services/livepeer-clips");
+    const lpThumb = await getClipThumbnailUrl(playbackId);
+    if (lpThumb?.trim()) return convertFailingGateway(lpThumb.trim());
+  } catch (err) {
+    serverLogger.warn("OG video: Livepeer thumbnail fallback failed", err);
+  }
+  return null;
+}
+
 async function resolveThumbnailUrl(
   id: string | null,
   playbackId: string | null
@@ -176,9 +189,19 @@ async function resolveThumbnailUrl(
       serverLogger.warn("OG video: getVideoAssetByAssetId failed", err);
       return null;
     });
-    const raw = (asset as { thumbnail_url?: string | null } | null)
-      ?.thumbnail_url;
+    const typed = asset as {
+      thumbnail_url?: string | null;
+      playback_id?: string | null;
+    } | null;
+    const raw = typed?.thumbnail_url;
     if (raw?.trim()) return convertFailingGateway(raw.trim());
+
+    // Discover pages pass asset id only — fall back to Livepeer via playback_id
+    const assetPlaybackId = typed?.playback_id?.trim();
+    if (assetPlaybackId) {
+      const lpThumb = await livepeerThumbnailFallback(assetPlaybackId);
+      if (lpThumb) return lpThumb;
+    }
   }
 
   if (playbackId) {
@@ -191,13 +214,8 @@ async function resolveThumbnailUrl(
 
     // Fallback: fetch thumbnail directly from Livepeer API
     if (!raw) {
-      try {
-        const { getClipThumbnailUrl } = await import("@/services/livepeer-clips");
-        const lpThumb = await getClipThumbnailUrl(playbackId);
-        if (lpThumb?.trim()) return convertFailingGateway(lpThumb.trim());
-      } catch (err) {
-        serverLogger.warn("OG video: Livepeer thumbnail fallback failed", err);
-      }
+      const lpThumb = await livepeerThumbnailFallback(playbackId);
+      if (lpThumb) return lpThumb;
     }
   }
 

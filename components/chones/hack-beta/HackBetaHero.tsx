@@ -21,13 +21,13 @@ export function HackBetaHero({ className }: HackBetaHeroProps) {
   return (
     <section
       className={cn(
-        "relative mx-auto min-h-[220px] w-full max-w-7xl overflow-hidden rounded-xl",
+        "relative mx-auto min-h-[220px] w-full max-w-7xl overflow-hidden rounded-xl bg-[#f0e6da]",
         "lg:aspect-[1024/274]",
         className,
       )}
     >
       <Image
-        src="/chones/hack-beta/hackathon-beta-tv-combined-outlined.svg"
+        src="/chones/hack-beta/hackathonbetacreativebanner.svg"
         alt="Chones HACKATHON BETA — July 20–24, 2026 Virtual"
         fill
         className="object-cover object-center"
