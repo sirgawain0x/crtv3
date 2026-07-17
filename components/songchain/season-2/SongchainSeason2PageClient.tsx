@@ -52,6 +52,7 @@ export function SongchainSeason2PageClient({
           id="songchain-season-2-feeds"
           publicFeedId={publicFeedId}
           exclusiveFeedId={exclusiveFeedId}
+          exclusiveUnlockLockAddress={config.season2LockAddress}
         />
       </div>
     </div>

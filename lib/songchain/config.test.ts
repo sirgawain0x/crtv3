@@ -65,6 +65,22 @@ describe('getSongchainConfig', () => {
     );
     expect(config.enabled).toBe(true);
   });
+
+  it('reads Season 2 Unlock lock address from env', () => {
+    process.env.NEXT_PUBLIC_SONGCHAIN_SEASON_2_LOCK_ADDRESS =
+      '0xAbC0000000000000000000000000000000000099';
+    const config = getSongchainConfig();
+    expect(config.season2LockAddress).toBe(
+      '0xabc0000000000000000000000000000000000099',
+    );
+  });
+
+  it('defaults Season 2 lock address to null when unset', () => {
+    delete process.env.NEXT_PUBLIC_SONGCHAIN_SEASON_2_LOCK_ADDRESS;
+    delete process.env.SONGCHAIN_SEASON_2_LOCK_ADDRESS;
+    const config = getSongchainConfig();
+    expect(config.season2LockAddress).toBeNull();
+  });
 });
 
 describe('getSongCupConfig', () => {
@@ -100,6 +116,7 @@ describe('getSongCupConfig', () => {
     expect(config.season2Enabled).toBe(false);
     expect(config.season2PublicFeedId).toBeNull();
     expect(config.season2ExclusiveFeedId).toBeNull();
+    expect(config.season2LockAddress).toBeNull();
   });
 
   it('uses built-in Song Cup club defaults when Song Cup feed/group vars are unset', () => {

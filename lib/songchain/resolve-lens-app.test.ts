@@ -31,6 +31,7 @@ const baseConfig: SongchainConfig = {
   season2Enabled: false,
   season2PublicFeedId: null,
   season2ExclusiveFeedId: null,
+  season2LockAddress: null,
 };
 
 describe('resolveSongchainConfig', () => {
