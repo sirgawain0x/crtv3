@@ -296,10 +296,10 @@ export async function generateMetadata({
 
     const ogImage = {
       url: ogImageUrl,
+      secureUrl: ogImageUrl,
       width: VIDEO_OG_IMAGE.width,
       height: VIDEO_OG_IMAGE.height,
       alt: videoTitle || VIDEO_OG_IMAGE.alt,
-      type: VIDEO_OG_IMAGE.type,
     };
 
     return {
@@ -311,11 +311,13 @@ export async function generateMetadata({
         images: [ogImage],
         url: absoluteUrl,
         type: "website",
+        siteName: "Creative TV",
       },
       twitter: {
         card: "summary_large_image",
         title: videoTitle,
         description: videoDescription,
+        // Same absolute proxy URL as og:image so each video ID has a thumbnail card
         images: [ogImageUrl],
       },
     };
