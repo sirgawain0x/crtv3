@@ -1,10 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import PublicLockV14Json from "@unlock-protocol/contracts/dist/abis/PublicLock/PublicLockV14.json";
-import { type Address, type Abi, getAddress, isAddress } from "viem";
+import {
+  type Address,
+  type Abi,
+  createPublicClient,
+  getAddress,
+  http,
+  isAddress,
+} from "viem";
 import { useSmartAccountClient, useUser } from "@/lib/wallet/react";
-import { createPublicClient, http } from "viem";
 import { getLensChain, resolveLensRpcUrl } from "@/lib/sdk/lens/chains";
 
 type UseSeason2UnlockKeyArgs = {
@@ -19,14 +25,10 @@ export type Season2UnlockKeyState = {
   refetch: () => Promise<void>;
 };
 
-function createSeason2UnlockPublicClient() {
-  const chain = getLensChain("mainnet");
-  const rpcUrl = resolveLensRpcUrl("mainnet");
-  return createPublicClient({
-    chain,
-    transport: http(rpcUrl),
-  });
-}
+const season2UnlockPublicClient = createPublicClient({
+  chain: getLensChain("mainnet"),
+  transport: http(resolveLensRpcUrl("mainnet")),
+});
 
 export function useSeason2UnlockKey({
   lockAddress,
@@ -40,8 +42,11 @@ export function useSeason2UnlockKey({
     null;
 
   const [hasValidKey, setHasValidKey] = useState(false);
-  const [isLoading, setIsLoading] = useState(Boolean(lockAddress));
+  const [isLoading, setIsLoading] = useState(
+    Boolean(lockAddress && isAddress(lockAddress)),
+  );
   const [error, setError] = useState<string | null>(null);
+  const activeRequestRef = useRef(0);
 
   const refetch = useCallback(async () => {
     if (!lockAddress || !isAddress(lockAddress)) {
@@ -58,27 +63,35 @@ export function useSeason2UnlockKey({
       return;
     }
 
+    const requestId = ++activeRequestRef.current;
     setIsLoading(true);
     setError(null);
 
     try {
-      const publicClient = createSeason2UnlockPublicClient();
       const lock = getAddress(lockAddress);
-      const result = await publicClient.readContract({
+      const result = await season2UnlockPublicClient.readContract({
         address: lock,
         abi: PublicLockV14Json.abi as Abi,
         functionName: "getHasValidKey",
         args: [ownerAddress],
       });
-      setHasValidKey(Boolean(result));
+      if (requestId === activeRequestRef.current) {
+        setHasValidKey(Boolean(result));
+      }
     } catch (err) {
       console.error("[useSeason2UnlockKey]", err);
-      setHasValidKey(false);
-      setError(
-        err instanceof Error ? err.message : "Failed to check Season 2 Unlock key",
-      );
+      if (requestId === activeRequestRef.current) {
+        setHasValidKey(false);
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Failed to check Season 2 Unlock key",
+        );
+      }
     } finally {
-      setIsLoading(false);
+      if (requestId === activeRequestRef.current) {
+        setIsLoading(false);
+      }
     }
   }, [lockAddress, ownerAddress]);
 

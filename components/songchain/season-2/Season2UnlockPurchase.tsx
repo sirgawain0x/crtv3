@@ -37,13 +37,10 @@ type Season2UnlockPurchaseProps = {
   onPurchaseSuccess?: () => void | Promise<void>;
 };
 
-function createLensMainnetPublicClient() {
-  const chain = getLensChain("mainnet");
-  return createPublicClient({
-    chain,
-    transport: http(resolveLensRpcUrl("mainnet")),
-  });
-}
+const lensMainnetPublicClient = createPublicClient({
+  chain: getLensChain("mainnet"),
+  transport: http(resolveLensRpcUrl("mainnet")),
+});
 
 export function Season2UnlockPurchase({
   lockAddress,
@@ -74,34 +71,48 @@ export function Season2UnlockPurchase({
   });
 
   useEffect(() => {
+    let active = true;
+
     async function fetchBalance() {
       if (!address || !isAddress(address)) {
-        setGhoBalance("0");
-        setIsBalanceLoading(false);
+        if (active) {
+          setGhoBalance("0");
+          setIsBalanceLoading(false);
+        }
         return;
       }
 
-      setIsBalanceLoading(true);
+      if (active) {
+        setIsBalanceLoading(true);
+      }
       try {
-        const publicClient = createLensMainnetPublicClient();
-        const balance = await publicClient.readContract({
+        const balance = await lensMainnetPublicClient.readContract({
           address: SEASON_2_UNLOCK_CURRENCY,
           abi: erc20Abi,
           functionName: "balanceOf",
           args: [address],
         });
-        setGhoBalance(formatUnits(balance, SEASON_2_UNLOCK_GHO_DECIMALS));
+        if (active) {
+          setGhoBalance(formatUnits(balance, SEASON_2_UNLOCK_GHO_DECIMALS));
+        }
       } catch (error) {
         console.error("[Season2UnlockPurchase] balance", error);
-        setGhoBalance("0");
+        if (active) {
+          setGhoBalance("0");
+        }
       } finally {
-        setIsBalanceLoading(false);
+        if (active) {
+          setIsBalanceLoading(false);
+        }
       }
     }
 
     void fetchBalance();
     const interval = setInterval(() => void fetchBalance(), 10_000);
-    return () => clearInterval(interval);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
   }, [address]);
 
   const handleSwitchToLens = () => {
@@ -140,6 +151,7 @@ export function Season2UnlockPurchase({
     }
 
     const lock = getAddress(lockAddress);
+    const userAddress = getAddress(address);
     const zeroAddress =
       "0x0000000000000000000000000000000000000000" as const;
 
@@ -154,9 +166,9 @@ export function Season2UnlockPurchase({
       functionName: "purchase",
       args: [
         [SEASON_2_UNLOCK_KEY_PRICE],
-        [address],
+        [userAddress],
         [zeroAddress],
-        [address],
+        [userAddress],
         ["0x"],
       ],
     });
