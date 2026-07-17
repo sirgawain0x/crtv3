@@ -20,6 +20,10 @@ import { useLensOrbWrite } from "@/hooks/useLensOrbWrite";
 import { extractCreatedPostId } from "@/lib/songchain/post-utils";
 import { buildLensVideoMetadataFromAsset } from "@/lib/songchain/build-lens-video-metadata";
 import {
+  buildLensImageMetadata,
+  type SongchainAttachedImage,
+} from "@/lib/songchain/build-lens-image-metadata";
+import {
   buildLensLiveStreamMetadata,
   type StreamSummary,
 } from "@/lib/songchain/build-lens-livestream-metadata";
@@ -33,6 +37,8 @@ export type CreateSongchainPostParams = {
   title?: string;
   attachedVideo?: VideoAsset | null;
   attachedLiveStream?: StreamSummary | null;
+  /** Grove gateway URL + mime type from uploadToGrove */
+  attachedImage?: SongchainAttachedImage | null;
 };
 
 function thumbnailFromAsset(asset: VideoAsset): string | undefined {
@@ -60,13 +66,15 @@ export function useSongchainPost() {
       title = "Songchain post",
       attachedVideo,
       attachedLiveStream,
+      attachedImage,
     }: CreateSongchainPostParams): Promise<SongchainCreatedPost | null> => {
       const trimmed = content.trim();
       const hasLive =
         !!attachedLiveStream?.is_live && !!attachedLiveStream.playback_id;
       const hasVideo = !!attachedVideo?.playback_id;
+      const hasImage = !!attachedImage?.url?.trim();
 
-      if (!trimmed && !hasVideo && !hasLive) {
+      if (!trimmed && !hasVideo && !hasLive && !hasImage) {
         toast.error("Write something or attach media before posting.");
         return null;
       }
@@ -117,6 +125,10 @@ export function useSongchainPost() {
           metadata = await buildLensVideoMetadataFromAsset(attachedVideo, trimmed);
           displayTitle = attachedVideo.title;
           thumbnailUrl = thumbnailFromAsset(attachedVideo);
+        } else if (hasImage && attachedImage) {
+          metadata = buildLensImageMetadata(attachedImage, trimmed);
+          displayTitle = trimmed || "Image post";
+          thumbnailUrl = attachedImage.url.trim();
         } else {
           metadata = textOnly({
             content: trimmed,
