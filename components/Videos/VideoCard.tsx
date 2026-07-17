@@ -4,7 +4,6 @@ import { convertFailingGateway } from "@/lib/utils/image-gateway";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
@@ -346,13 +345,6 @@ const VideoCard: React.FC<VideoCardProps> = ({
           </div>
           {videoAssetId && <div className="my-2" />}
           <div className="mt-6 grid grid-flow-row auto-rows-max space-y-3 overflow-hidden">
-            <CardDescription className="text-xl" color={"brand.300"}>
-              <span className="text-xs">
-                {asset?.createdAt
-                  ? new Date(asset.createdAt).toLocaleDateString()
-                  : ""}
-              </span>
-            </CardDescription>
             <CardTitle>
               <Link href={`/discover/${asset.id}`}>
                 <h1

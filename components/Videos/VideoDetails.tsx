@@ -37,6 +37,10 @@ import {
   useSubtitles,
 } from "@/components/Player/Subtitles";
 import { getDetailPlaybackSource } from "@/lib/hooks/livepeer/useDetailPlaybackSources";
+import {
+  livepeerViewMetricsQueryKey,
+  type LivepeerViewMetrics,
+} from "@/lib/hooks/livepeer/useLivepeerViewMetrics";
 import { generateAccessKey, WebhookContext } from "@/lib/access-key";
 import { Skeleton } from "../ui/skeleton";
 import { Badge } from "../ui/badge";
@@ -217,26 +221,44 @@ export default function VideoDetails({
   useEffect(() => {
     if (!asset?.playbackId || !playbackSources?.length) return;
 
-    const container = containerRef.current;
-    if (!container) return;
-
+    let cancelled = false;
     let incrementing = false;
     let incremented = false;
     let attachedVideo: HTMLVideoElement | null = null;
+    let observer: MutationObserver | null = null;
+    let rafId = 0;
 
     const handlePlay = async () => {
-      if (incremented || incrementing) return;
+      if (incremented || incrementing || !asset.playbackId) return;
       incrementing = true;
 
       try {
         const response = await fetch(
-          `/api/video-assets/views/increment/${encodeURIComponent(asset.playbackId!)}`,
+          `/api/video-assets/views/increment/${encodeURIComponent(asset.playbackId)}`,
           { method: "POST" },
         );
-        if (response.ok) {
+        let payload: { viewCount?: unknown } | null = null;
+        try {
+          payload = (await response.json()) as { viewCount?: unknown };
+        } catch {
+          payload = null;
+        }
+
+        const viewCount = Number(payload?.viewCount);
+        if (response.ok && Number.isFinite(viewCount) && viewCount > 0) {
           incremented = true;
+          queryClient.setQueryData<LivepeerViewMetrics>(
+            livepeerViewMetricsQueryKey(asset.playbackId),
+            (prev) => ({
+              playbackId: asset.playbackId!,
+              viewCount,
+              playtimeMins: prev?.playtimeMins ?? 0,
+              legacyViewCount: prev?.legacyViewCount ?? 0,
+              totalViews: Math.max(viewCount, prev?.totalViews ?? 0),
+            }),
+          );
           await queryClient.invalidateQueries({
-            queryKey: ["livepeer-view-metrics", asset.playbackId],
+            queryKey: livepeerViewMetricsQueryKey(asset.playbackId),
           });
         }
       } catch (err) {
@@ -255,18 +277,31 @@ export default function VideoDetails({
       video.addEventListener("play", handlePlay);
     };
 
-    // Player may mount after this effect — observe until <video> exists
-    const existing = container.querySelector("video");
-    if (existing) attach(existing);
+    const setup = () => {
+      if (cancelled) return;
+      const container = containerRef.current;
+      if (!container) {
+        rafId = requestAnimationFrame(setup);
+        return;
+      }
 
-    const observer = new MutationObserver(() => {
-      const video = container.querySelector("video");
-      if (video) attach(video);
-    });
-    observer.observe(container, { childList: true, subtree: true });
+      // Player may mount after this effect — observe until <video> exists
+      const existing = container.querySelector("video");
+      if (existing) attach(existing);
+
+      observer = new MutationObserver(() => {
+        const video = container.querySelector("video");
+        if (video) attach(video);
+      });
+      observer.observe(container, { childList: true, subtree: true });
+    };
+
+    setup();
 
     return () => {
-      observer.disconnect();
+      cancelled = true;
+      cancelAnimationFrame(rafId);
+      observer?.disconnect();
       if (attachedVideo) {
         attachedVideo.removeEventListener("play", handlePlay);
       }
