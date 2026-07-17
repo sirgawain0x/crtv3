@@ -35,7 +35,9 @@ export function SongCupFeedCompose({
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [isPickingFile, setIsPickingFile] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   const { createPost, isPosting, canWrite, needsOrbReauth, promptWriteAccess } =
     useSongchainPost();
@@ -52,13 +54,23 @@ export function SongCupFeedCompose({
     };
   }, [imageFile]);
 
+  // Native file dialog steals focus; keep compose open until dialog closes.
+  useEffect(() => {
+    if (!isPickingFile) return;
+    const onWindowFocus = () => {
+      window.setTimeout(() => setIsPickingFile(false), 300);
+    };
+    window.addEventListener("focus", onWindowFocus);
+    return () => window.removeEventListener("focus", onWindowFocus);
+  }, [isPickingFile]);
+
   if (!feedId) return null;
 
   const hasContent = content.trim().length > 0;
   const hasImage = !!imageFile;
   const canSubmit = hasContent || hasImage;
   const busy = isPosting || isUploadingImage;
-  const showExpanded = focused || hasContent || hasImage;
+  const showExpanded = focused || hasContent || hasImage || isPickingFile;
 
   const clearImage = () => {
     setImageFile(null);
@@ -113,8 +125,17 @@ export function SongCupFeedCompose({
     }
   };
 
+  const openImagePicker = () => {
+    setFocused(true);
+    setIsPickingFile(true);
+    fileInputRef.current?.click();
+  };
+
   return (
-    <div className={cn("relative min-h-[117px] p-4", songCupPanelInset, songCupBorderAccent, "border")}>
+    <div
+      ref={rootRef}
+      className={cn("relative min-h-[117px] p-4", songCupPanelInset, songCupBorderAccent, "border")}
+    >
       <input
         ref={fileInputRef}
         type="file"
@@ -124,6 +145,7 @@ export function SongCupFeedCompose({
         onChange={(e) => {
           handleImagePick(e.target.files?.[0]);
           e.target.value = "";
+          setIsPickingFile(false);
         }}
       />
 
@@ -160,7 +182,10 @@ export function SongCupFeedCompose({
             disabled={busy}
             maxLength={5000}
             autoFocus={focused}
-            onBlur={() => {
+            onBlur={(e) => {
+              if (isPickingFile) return;
+              const next = e.relatedTarget as Node | null;
+              if (rootRef.current?.contains(next)) return;
               if (!hasContent && !hasImage) setFocused(false);
             }}
             className="border-0 bg-transparent p-0 text-sm text-foreground placeholder:text-muted-foreground focus-visible:ring-0 focus-visible:ring-offset-0 dark:text-white dark:placeholder:text-white/40"
@@ -188,7 +213,14 @@ export function SongCupFeedCompose({
           )}
 
           {!canWrite ? (
-            <Button type="button" variant="outline" size="sm" onClick={promptWriteAccess} className="w-fit">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={promptWriteAccess}
+              className="w-fit"
+            >
               {needsOrbReauth ? "Sign in again" : "Link Orb to post"}
             </Button>
           ) : (
@@ -198,7 +230,8 @@ export function SongCupFeedCompose({
                 variant="ghost"
                 size="sm"
                 disabled={busy}
-                onClick={() => fileInputRef.current?.click()}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={openImagePicker}
                 className={cn("gap-1.5 px-2", songCupMuted)}
                 aria-label="Attach image"
               >
@@ -209,6 +242,7 @@ export function SongCupFeedCompose({
                 type="button"
                 size="sm"
                 disabled={busy || !canSubmit}
+                onMouseDown={(e) => e.preventDefault()}
                 onClick={() => void handleSubmit()}
                 className="rounded-full bg-gradient-to-br from-[#DC2BB3] to-[#FDBE01] px-5 font-semibold text-black hover:opacity-90 disabled:opacity-50"
               >
