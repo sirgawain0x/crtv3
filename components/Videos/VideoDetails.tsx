@@ -219,7 +219,8 @@ export default function VideoDetails({
   const isConnected = !!user;
 
   useEffect(() => {
-    if (!asset?.playbackId || !playbackSources?.length) return;
+    // Player (and containerRef) only mount when wallet is connected
+    if (!isConnected || !asset?.playbackId || !playbackSources?.length) return;
 
     let cancelled = false;
     let incrementing = false;
@@ -227,6 +228,8 @@ export default function VideoDetails({
     let attachedVideo: HTMLVideoElement | null = null;
     let observer: MutationObserver | null = null;
     let rafId = 0;
+    let rafAttempts = 0;
+    const MAX_RAF_ATTEMPTS = 120; // ~2s at 60fps, then stop
 
     const handlePlay = async () => {
       if (incremented || incrementing || !asset.playbackId) return;
@@ -244,19 +247,22 @@ export default function VideoDetails({
           payload = null;
         }
 
-        const viewCount = Number(payload?.viewCount);
-        if (response.ok && Number.isFinite(viewCount) && viewCount > 0) {
+        // DB mutates before the response — treat any 2xx as consumed so we don't double-count
+        if (response.ok) {
           incremented = true;
-          queryClient.setQueryData<LivepeerViewMetrics>(
-            livepeerViewMetricsQueryKey(asset.playbackId),
-            (prev) => ({
-              playbackId: asset.playbackId!,
-              viewCount,
-              playtimeMins: prev?.playtimeMins ?? 0,
-              legacyViewCount: prev?.legacyViewCount ?? 0,
-              totalViews: Math.max(viewCount, prev?.totalViews ?? 0),
-            }),
-          );
+          const viewCount = Number(payload?.viewCount);
+          if (Number.isFinite(viewCount) && viewCount > 0) {
+            queryClient.setQueryData<LivepeerViewMetrics>(
+              livepeerViewMetricsQueryKey(asset.playbackId),
+              (prev) => ({
+                playbackId: asset.playbackId!,
+                viewCount,
+                playtimeMins: prev?.playtimeMins ?? 0,
+                legacyViewCount: prev?.legacyViewCount ?? 0,
+                totalViews: Math.max(viewCount, prev?.totalViews ?? 0),
+              }),
+            );
+          }
           await queryClient.invalidateQueries({
             queryKey: livepeerViewMetricsQueryKey(asset.playbackId),
           });
@@ -281,7 +287,10 @@ export default function VideoDetails({
       if (cancelled) return;
       const container = containerRef.current;
       if (!container) {
-        rafId = requestAnimationFrame(setup);
+        rafAttempts += 1;
+        if (rafAttempts < MAX_RAF_ATTEMPTS) {
+          rafId = requestAnimationFrame(setup);
+        }
         return;
       }
 
@@ -306,7 +315,7 @@ export default function VideoDetails({
         attachedVideo.removeEventListener("play", handlePlay);
       }
     };
-  }, [asset?.playbackId, playbackSources, queryClient]);
+  }, [isConnected, asset?.playbackId, playbackSources, queryClient]);
 
   const loadPlaybackSources = useCallback(async () => {
     if (!asset?.playbackId) {
