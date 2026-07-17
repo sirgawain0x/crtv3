@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useRef, useEffect } from "react";
 import { toast } from "sonner";
-import { CopyIcon, ExternalLink } from "lucide-react";
+import { Clapperboard, CopyIcon, ExternalLink } from "lucide-react";
 import {
   getLivepeerUploadUrl,
   getLivepeerAsset,
@@ -38,12 +38,7 @@ function EditInPixelsCta() {
           aria-label="Edit video in Creative Pixels"
           data-testid="edit-in-pixels-button"
         >
-          <img
-            src="/songchain/button-icons/Pixels-icon.svg"
-            alt=""
-            aria-hidden
-            className="h-4 w-4"
-          />
+          <Clapperboard className="h-4 w-4" aria-hidden />
           Edit in Pixels
           <ExternalLink className="h-3.5 w-3.5 opacity-70" />
         </a>

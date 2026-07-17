@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireHumanOrVerifiedBot } from "@/lib/middleware/botIdGuard";
 import { createServiceClient } from "@/lib/sdk/supabase/service";
 import { serverLogger } from "@/lib/utils/logger";
 
@@ -8,6 +9,13 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ playbackId: string }> }
 ) {
+  const botCheck = await requireHumanOrVerifiedBot(
+    "video-assets.views.increment",
+  );
+  if (!botCheck.allowed) {
+    return botCheck.response;
+  }
+
   try {
     const { playbackId } = await params;
 
@@ -19,7 +27,7 @@ export async function POST(
     }
 
     const supabase = createServiceClient();
-    
+
     // Atomically increment view count in database via RPC to prevent race conditions
     const { data: newViews, error } = await supabase.rpc("increment_video_views", {
       p_playback_id: playbackId,
@@ -29,10 +37,21 @@ export async function POST(
       throw error;
     }
 
+    // RPC returns NULL when no video_assets row matches playback_id
+    if (newViews == null) {
+      return NextResponse.json(
+        {
+          error: "Video not found for playback ID",
+          code: "VIDEO_NOT_FOUND",
+        },
+        { status: 404 }
+      );
+    }
+
     return NextResponse.json({
       success: true,
       playbackId,
-      viewCount: newViews,
+      viewCount: Number(newViews),
     });
   } catch (error) {
     serverLogger.error("Error incrementing view count:", error);

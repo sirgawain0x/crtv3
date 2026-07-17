@@ -155,9 +155,14 @@ export default async function VideoDetailsPage({
               contractAddress={videoAsset?.contract_address ?? null}
               tokenId={videoAsset?.token_id ?? null}
             />
-            {/* Views (left) + actions/share (right) */}
+            {/* Date + views (left) + actions/share (right) */}
             <div className="flex items-center justify-between gap-4 mt-4 flex-wrap">
-              <div className="flex items-center min-h-4">
+              <div className="flex items-center gap-3 min-h-4 flex-wrap">
+                {videoAsset?.created_at ? (
+                  <span className="text-sm text-muted-foreground md:text-base">
+                    {new Date(videoAsset.created_at).toLocaleDateString()}
+                  </span>
+                ) : null}
                 {assetData.playbackId && (
                   <VideoViewMetrics
                     playbackId={assetData.playbackId}

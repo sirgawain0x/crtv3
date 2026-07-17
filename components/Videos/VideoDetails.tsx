@@ -37,6 +37,10 @@ import {
   useSubtitles,
 } from "@/components/Player/Subtitles";
 import { getDetailPlaybackSource } from "@/lib/hooks/livepeer/useDetailPlaybackSources";
+import {
+  livepeerViewMetricsQueryKey,
+  type LivepeerViewMetrics,
+} from "@/lib/hooks/livepeer/useLivepeerViewMetrics";
 import { generateAccessKey, WebhookContext } from "@/lib/access-key";
 import { Skeleton } from "../ui/skeleton";
 import { Badge } from "../ui/badge";
@@ -215,28 +219,52 @@ export default function VideoDetails({
   const isConnected = !!user;
 
   useEffect(() => {
-    if (!asset?.playbackId || !playbackSources?.length) return;
+    // Player (and containerRef) only mount when wallet is connected
+    if (!isConnected || !asset?.playbackId || !playbackSources?.length) return;
 
-    const container = containerRef.current;
-    if (!container) return;
-
+    let cancelled = false;
     let incrementing = false;
     let incremented = false;
     let attachedVideo: HTMLVideoElement | null = null;
+    let observer: MutationObserver | null = null;
+    let rafId = 0;
+    let rafAttempts = 0;
+    const MAX_RAF_ATTEMPTS = 120; // ~2s at 60fps, then stop
 
     const handlePlay = async () => {
-      if (incremented || incrementing) return;
+      if (incremented || incrementing || !asset.playbackId) return;
       incrementing = true;
 
       try {
         const response = await fetch(
-          `/api/video-assets/views/increment/${encodeURIComponent(asset.playbackId!)}`,
+          `/api/video-assets/views/increment/${encodeURIComponent(asset.playbackId)}`,
           { method: "POST" },
         );
+        let payload: { viewCount?: unknown } | null = null;
+        try {
+          payload = (await response.json()) as { viewCount?: unknown };
+        } catch {
+          payload = null;
+        }
+
+        // DB mutates before the response — treat any 2xx as consumed so we don't double-count
         if (response.ok) {
           incremented = true;
+          const viewCount = Number(payload?.viewCount);
+          if (Number.isFinite(viewCount) && viewCount > 0) {
+            queryClient.setQueryData<LivepeerViewMetrics>(
+              livepeerViewMetricsQueryKey(asset.playbackId),
+              (prev) => ({
+                playbackId: asset.playbackId!,
+                viewCount,
+                playtimeMins: prev?.playtimeMins ?? 0,
+                legacyViewCount: prev?.legacyViewCount ?? 0,
+                totalViews: Math.max(viewCount, prev?.totalViews ?? 0),
+              }),
+            );
+          }
           await queryClient.invalidateQueries({
-            queryKey: ["livepeer-view-metrics", asset.playbackId],
+            queryKey: livepeerViewMetricsQueryKey(asset.playbackId),
           });
         }
       } catch (err) {
@@ -255,23 +283,39 @@ export default function VideoDetails({
       video.addEventListener("play", handlePlay);
     };
 
-    // Player may mount after this effect — observe until <video> exists
-    const existing = container.querySelector("video");
-    if (existing) attach(existing);
+    const setup = () => {
+      if (cancelled) return;
+      const container = containerRef.current;
+      if (!container) {
+        rafAttempts += 1;
+        if (rafAttempts < MAX_RAF_ATTEMPTS) {
+          rafId = requestAnimationFrame(setup);
+        }
+        return;
+      }
 
-    const observer = new MutationObserver(() => {
-      const video = container.querySelector("video");
-      if (video) attach(video);
-    });
-    observer.observe(container, { childList: true, subtree: true });
+      // Player may mount after this effect — observe until <video> exists
+      const existing = container.querySelector("video");
+      if (existing) attach(existing);
+
+      observer = new MutationObserver(() => {
+        const video = container.querySelector("video");
+        if (video) attach(video);
+      });
+      observer.observe(container, { childList: true, subtree: true });
+    };
+
+    setup();
 
     return () => {
-      observer.disconnect();
+      cancelled = true;
+      cancelAnimationFrame(rafId);
+      observer?.disconnect();
       if (attachedVideo) {
         attachedVideo.removeEventListener("play", handlePlay);
       }
     };
-  }, [asset?.playbackId, playbackSources, queryClient]);
+  }, [isConnected, asset?.playbackId, playbackSources, queryClient]);
 
   const loadPlaybackSources = useCallback(async () => {
     if (!asset?.playbackId) {
