@@ -27,6 +27,8 @@ export type SongchainConfig = {
   season2Enabled: boolean;
   season2PublicFeedId: string | null;
   season2ExclusiveFeedId: string | null;
+  /** Unlock PublicLock on Lens mainnet for Season 2 exclusive access (10 GHO). */
+  season2LockAddress: string | null;
 };
 
 function readEnv(...keys: string[]): string | null {
@@ -93,6 +95,10 @@ export function getSongchainConfig(): SongchainConfig {
     'NEXT_PUBLIC_SONGCHAIN_SEASON_2_EXCLUSIVE_FEED_ID',
     'SONGCHAIN_SEASON_2_EXCLUSIVE_FEED_ID',
   );
+  const season2LockAddress = readLensPrimitiveEnv(
+    'NEXT_PUBLIC_SONGCHAIN_SEASON_2_LOCK_ADDRESS',
+    'SONGCHAIN_SEASON_2_LOCK_ADDRESS',
+  );
 
   const network = getLensNetwork();
 
@@ -113,6 +119,7 @@ export function getSongchainConfig(): SongchainConfig {
     season2Enabled,
     season2PublicFeedId,
     season2ExclusiveFeedId,
+    season2LockAddress,
   };
 }
 
@@ -160,5 +167,6 @@ export function getSongCupConfig(): SongchainConfig {
     season2Enabled: false,
     season2PublicFeedId: null,
     season2ExclusiveFeedId: null,
+    season2LockAddress: null,
   };
 }

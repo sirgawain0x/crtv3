@@ -10,6 +10,7 @@ import { SongchainComposePost } from "@/components/songchain/SongchainComposePos
 import { SongchainBookmarksSection } from "@/components/songchain/SongchainBookmarksSection";
 import { HallidayOnramp } from "@/components/songchain/HallidayOnramp";
 import { SongchainGatedFeedTab } from "@/components/songchain/SongchainGatedFeedTab";
+import { Season2ExclusiveGatedTab } from "@/components/songchain/season-2/Season2ExclusiveGatedTab";
 import type { SongchainConfig } from "@/lib/songchain/config";
 import type { SongchainFeedHandle } from "@/components/songchain/SongchainFeedSection";
 
@@ -36,6 +37,11 @@ type SongchainFeedExperienceProps = {
   clubGateTitle?: string;
   clubGateDescription?: string;
   orbClubUrl?: string;
+  /**
+   * When set, gate the Exclusive tab behind a valid Unlock key on this lock
+   * (Season 2 only — 10 GHO on Lens mainnet).
+   */
+  exclusiveUnlockLockAddress?: string | null;
 };
 
 export function SongchainFeedExperience({
@@ -53,6 +59,7 @@ export function SongchainFeedExperience({
   clubGateTitle,
   clubGateDescription,
   orbClubUrl,
+  exclusiveUnlockLockAddress,
 }: SongchainFeedExperienceProps) {
   const publicFeedRef = useRef<SongchainFeedHandle>(null);
   const exclusiveFeedRef = useRef<SongchainFeedHandle>(null);
@@ -147,19 +154,29 @@ export function SongchainFeedExperience({
 
         {!hidden.has("exclusive") && (
           <TabsContent value="exclusive" className="space-y-6">
-            <SongchainComposePost
-              feedId={resolvedExclusiveFeedId}
-              onPosted={(created) => exclusiveFeedRef.current?.registerNewPost(created)}
-            />
-            <SongchainFeedSection
-              ref={exclusiveFeedRef}
-              title="Exclusive feed"
-              description="Members-only drops and announcements on Lens."
-              feedId={resolvedExclusiveFeedId}
-              graphId={config.graphId}
-              onPostUpdated={() => exclusiveFeedRef.current?.reload()}
-              emptyDescription="Exclusive feeds can require an Orb-linked Lens session, and posts still need to be published directly to the exclusive feed contract before they appear here."
-            />
+            {exclusiveUnlockLockAddress ? (
+              <Season2ExclusiveGatedTab
+                lockAddress={exclusiveUnlockLockAddress}
+                feedId={resolvedExclusiveFeedId}
+                graphId={config.graphId}
+              />
+            ) : (
+              <>
+                <SongchainComposePost
+                  feedId={resolvedExclusiveFeedId}
+                  onPosted={(created) => exclusiveFeedRef.current?.registerNewPost(created)}
+                />
+                <SongchainFeedSection
+                  ref={exclusiveFeedRef}
+                  title="Exclusive feed"
+                  description="Members-only drops and announcements on Lens."
+                  feedId={resolvedExclusiveFeedId}
+                  graphId={config.graphId}
+                  onPostUpdated={() => exclusiveFeedRef.current?.reload()}
+                  emptyDescription="Exclusive feeds can require an Orb-linked Lens session, and posts still need to be published directly to the exclusive feed contract before they appear here."
+                />
+              </>
+            )}
           </TabsContent>
         )}
 

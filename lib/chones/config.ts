@@ -77,6 +77,7 @@ export function getChonesConfig(): ChonesConfig {
     season2Enabled: false,
     season2PublicFeedId: null,
     season2ExclusiveFeedId: null,
+    season2LockAddress: null,
   };
 }
 
@@ -121,5 +122,6 @@ export function getHackBetaConfig(): ChonesConfig {
     season2Enabled: false,
     season2PublicFeedId: null,
     season2ExclusiveFeedId: null,
+    season2LockAddress: null,
   };
 }
