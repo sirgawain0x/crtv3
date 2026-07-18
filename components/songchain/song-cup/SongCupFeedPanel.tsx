@@ -1,7 +1,11 @@
 "use client";
 
+import { useRef } from "react";
 import { useSongchainGroupMembership } from "@/hooks/useSongchainGroupMembership";
-import { SongchainFeedSection } from "@/components/songchain/SongchainFeedSection";
+import {
+  SongchainFeedSection,
+  type SongchainFeedHandle,
+} from "@/components/songchain/SongchainFeedSection";
 import { SongCupFeedCompose } from "./SongCupFeedCompose";
 import { SongCupFeedMembersRow } from "./SongCupFeedMembersRow";
 import { Loader2 } from "lucide-react";
@@ -38,6 +42,7 @@ export function SongCupFeedPanel({
   clubLogoUrl,
   clubLabel,
 }: SongCupFeedPanelProps) {
+  const feedRef = useRef<SongchainFeedHandle>(null);
   const membership = useSongchainGroupMembership({ groupId });
 
   const joinHref = orbClubUrl ?? SONG_CUP_PLAY_LINKS.club;
@@ -117,7 +122,13 @@ export function SongCupFeedPanel({
 
           {!membership.loading && (
             <>
-              {membership.isMember && <SongCupFeedCompose feedId={feedId} placeholder={placeholder} />}
+              {membership.isMember && (
+                <SongCupFeedCompose
+                  feedId={feedId}
+                  placeholder={placeholder}
+                  onPosted={(created) => feedRef.current?.registerNewPost(created)}
+                />
+              )}
 
               <SongCupFeedMembersRow
                 groupId={groupId}
@@ -127,10 +138,12 @@ export function SongCupFeedPanel({
               />
 
               <SongchainFeedSection
+                ref={feedRef}
                 title={feedTitle}
                 description={feedDescription}
                 feedId={feedId}
                 graphId={graphId}
+                onPostUpdated={() => feedRef.current?.reload()}
                 emptyDescription="Lens custom feeds only show posts published to that feed contract. Existing Orb profile or global posts are not backfilled."
                 layout="grid"
                 hideHeader
