@@ -12,6 +12,8 @@ import {
   resolvePinataAgentPublicBaseUrl,
 } from "@/lib/pinata/api";
 import { requireWalletAuthFor, WalletAuthError } from "@/lib/auth/require-wallet";
+import { unlockService } from "@/lib/sdk/unlock/services";
+import { hasValidPlusPass } from "@/lib/access/creator-membership";
 
 interface ConnectBody {
   ownerAddress?: string;
@@ -64,6 +66,26 @@ export async function POST(request: NextRequest) {
       );
     }
     throw authErr;
+  }
+
+  try {
+    const memberships = await unlockService.getAllMemberships(ownerAddress);
+    if (!hasValidPlusPass(memberships)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "A Creator, Investor, or Brand Plus pass is required to connect a Digital Twin.",
+        },
+        { status: 403 }
+      );
+    }
+  } catch (membershipErr) {
+    serverLogger.error("Pinata connect: membership check failed:", membershipErr);
+    return NextResponse.json(
+      { success: false, error: "Failed to verify Plus membership" },
+      { status: 500 }
+    );
   }
 
   let agent, gateway, template;

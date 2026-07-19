@@ -15,6 +15,7 @@ import { ViewsComponent } from "./ViewsComponent";
 import { useVideo } from "@/context/VideoContext";
 import { safelyPauseVideo, safelyPlayVideo } from "@/lib/utils/video-controls";
 import { logger } from '@/lib/utils/logger';
+import { CreativeBrandOverlay } from "./CreativeBrandOverlay";
 
 
 export const PreviewPlayer: React.FC<{
@@ -217,6 +218,8 @@ export const PreviewPlayer: React.FC<{
               }
             }}
           />
+
+          <CreativeBrandOverlay />
 
           <Player.LoadingIndicator className="absolute inset-0 flex items-center justify-center bg-black">
             <div className="flex flex-col items-center space-y-4">

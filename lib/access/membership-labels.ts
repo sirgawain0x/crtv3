@@ -9,8 +9,11 @@ import { LOCK_ADDRESSES, type LockAddressValue } from "@/lib/sdk/unlock/services
  */
 export const PASS_DISPLAY_NAMES: Record<LockAddressValue, string> = {
   [LOCK_ADDRESSES.BASE_CREATIVE_PASS]: "Creative Creator Pass",
+  [LOCK_ADDRESSES.BASE_CREATIVE_CREATOR_PLUS]: "Creative Creator Plus",
   [LOCK_ADDRESSES.BASE_CREATIVE_PASS_2]: "Creative Investor Pass",
+  [LOCK_ADDRESSES.BASE_CREATIVE_INVESTOR_PLUS]: "Creative Investor Plus",
   [LOCK_ADDRESSES.BASE_CREATIVE_PASS_3]: "Creative Brand Pass",
+  [LOCK_ADDRESSES.BASE_CREATIVE_BRAND_PLUS]: "Creative Brand Plus",
 } as const;
 
 const PASS_DISPLAY_NAMES_BY_LOWER = Object.fromEntries(
