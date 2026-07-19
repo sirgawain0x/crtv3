@@ -69,6 +69,7 @@ import {
   ArrowRight,
   AlertTriangle,
   TrendingUp,
+  Disc3,
 } from "lucide-react";
 import { CheckIcon } from "@radix-ui/react-icons";
 import Image from "next/image";
@@ -1708,6 +1709,25 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
                           >
                             <Bot className="h-3 w-3 mb-1" />
                             <span className="text-xs">Pixels</span>
+                            <span className="absolute -top-1 -right-1 px-1 py-0.5 rounded bg-blue-500 text-white text-[8px]">
+                              Beta
+                            </span>
+                          </Button>
+                        </Link>
+                      )}
+
+                      {/* Mixtape: any paid pass */}
+                      {hasAnyValidPass(membershipDetails) && (
+                        <Link href="https://air.creativeplatform.xyz/app" className="w-full">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full flex flex-col items-center justify-center p-2 h-12 hover:bg-gray-50
+                          dark:hover:bg-gray-800 transition-colors relative"
+                            onClick={() => setIsDropdownOpen(false)}
+                          >
+                            <Disc3 className="h-3 w-3 mb-1" />
+                            <span className="text-xs">Mixtape</span>
                             <span className="absolute -top-1 -right-1 px-1 py-0.5 rounded bg-blue-500 text-white text-[8px]">
                               Beta
                             </span>

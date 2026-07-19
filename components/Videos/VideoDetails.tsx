@@ -52,6 +52,7 @@ import { convertFailingGateway } from "@/lib/utils/image-gateway";
 import Link from "next/link";
 import { LicensePurchaseDialog } from "@/components/Videos/LicensePurchaseDialog";
 import { CreatorDisplay } from "@/components/Creator/CreatorDisplay";
+import { CreativeBrandOverlay } from "@/components/Player/CreativeBrandOverlay";
 
 const STORY_SCAN_IP_BASE =
   process.env.NEXT_PUBLIC_STORY_NETWORK === "mainnet"
@@ -738,12 +739,13 @@ export default function VideoDetails({
                 volume={0}
                 {...conditionalProps}
               >
-                <Player.Container ref={containerRef} className="aspect-video w-full overflow-hidden rounded-lg bg-gray-800">
+                <Player.Container ref={containerRef} className="relative aspect-video w-full overflow-hidden rounded-lg bg-gray-800">
                   <Player.Video
                     title={asset?.name}
                     className="h-full w-full"
                     poster={thumbnailUrl || undefined}
                   />
+                  <CreativeBrandOverlay />
                   <Player.LoadingIndicator
                     className="relative h-full w-full bg-black/50 backdrop-blur data-[visible=true]:animate-in 
                   data-[visible=false]:animate-out data-[visible=false]:fade-out-0 data-[visible=true]:fade-in-0"

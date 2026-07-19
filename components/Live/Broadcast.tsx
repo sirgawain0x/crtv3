@@ -36,6 +36,7 @@ import { updateStream } from "@/services/streams";
 import { useWalletAuth } from "@/lib/auth/useWalletAuth";
 import { walletAuthHeadersToArgs } from "@/lib/auth/require-wallet";
 import { parseStreamProxyFailure } from "@/lib/livepeer/stream-proxy-errors";
+import { CreativeBrandOverlay } from "@/components/Player/CreativeBrandOverlay";
 
 interface BroadcastProps {
   streamKey: string;
@@ -245,6 +246,8 @@ function BroadcastWithControls({ streamKey, streamId: propStreamId, creatorAddre
           playsInline
           className="h-full w-full object-contain bg-black"
         />
+
+        <CreativeBrandOverlay />
 
         {/* Loading / Status Overlay */}
         {(status === 'loading' || status === 'error') && (
