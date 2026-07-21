@@ -23,8 +23,12 @@ export function ChonesBanner({
 }: ChonesBannerProps) {
   return (
     <div className={cn("h-full w-full", className)}>
-      {/* Mobile: original cream logo — scales better on phones */}
-      <div className={channelBannerShell("bg-[#f0e6da] md:hidden")}>
+      {/* Mobile: original cream logo — scales better on phones (incl. landscape) */}
+      <div
+        className={channelBannerShell(
+          "chones-banner-mobile bg-[#f0e6da] md:hidden",
+        )}
+      >
         <div className={channelBannerContentClassName}>
           <div className="relative aspect-[1024/173] w-[min(78vw,720px)] max-w-full">
             <Image
@@ -58,7 +62,7 @@ export function ChonesBanner({
       {/* Tablet/Desktop: full-bleed creative SVG */}
       <div
         className={channelBannerShell(
-          "hidden aspect-[1024/274] bg-[#f0e6da] py-0 md:block",
+          "chones-banner-desktop hidden aspect-[1024/274] bg-[#f0e6da] py-0 md:block",
         )}
       >
         <Image

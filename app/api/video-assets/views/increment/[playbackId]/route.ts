@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireHumanOrVerifiedBot } from "@/lib/middleware/botIdGuard";
+import { rateLimiters } from "@/lib/middleware/rateLimit";
 import { createServiceClient } from "@/lib/sdk/supabase/service";
 import { serverLogger } from "@/lib/utils/logger";
 
@@ -9,12 +9,8 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ playbackId: string }> }
 ) {
-  const botCheck = await requireHumanOrVerifiedBot(
-    "video-assets.views.increment",
-  );
-  if (!botCheck.allowed) {
-    return botCheck.response;
-  }
+  const rl = await rateLimiters.viewIncrement(request);
+  if (rl) return rl;
 
   try {
     const { playbackId } = await params;
