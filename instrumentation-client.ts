@@ -64,7 +64,7 @@ if (!botIdGlobal.__crtvBotIdInit) {
       botIdDeepAnalysisRoute('/api/unlock-nft', 'POST'),
       botIdDeepAnalysisRoute('/api/video-assets/sync-views/*', 'POST'),
       // views/increment omitted: Deep Analysis false-positives blocked legitimate play views;
-      // route uses rateLimiters.standard instead.
+      // route uses rateLimiters.viewIncrement instead.
       botIdDeepAnalysisRoute('/api/video-assets/*/regenerate-thumbnail', 'POST'),
       botIdDeepAnalysisRoute('/api/coinbase/session-token', 'POST'),
       botIdDeepAnalysisRoute('/api/metokens/*/transactions', 'POST'),

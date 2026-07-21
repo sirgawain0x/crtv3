@@ -9,7 +9,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ playbackId: string }> }
 ) {
-  const rl = await rateLimiters.standard(request);
+  const rl = await rateLimiters.viewIncrement(request);
   if (rl) return rl;
 
   try {
