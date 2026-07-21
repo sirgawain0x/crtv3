@@ -14,7 +14,7 @@ const VideoViewMetrics: React.FC<VideoViewMetricsProps> = ({
   playbackId,
   fallbackViews = 0,
 }) => {
-  const { totalViews, loading, error } = useLivepeerViewMetrics(playbackId);
+  const { totalViews, loading } = useLivepeerViewMetrics(playbackId);
 
   if (loading) return <Skeleton className="h-4 w-16" />;
 
@@ -22,8 +22,8 @@ const VideoViewMetrics: React.FC<VideoViewMetricsProps> = ({
   const livepeer = Math.max(0, Number(totalViews) || 0);
   const displayViews = Math.max(livepeer, fallback);
 
-  // Hard failure with nothing to show — stay blank rather than flash "0 views"
-  if (error && displayViews <= 0) return null;
+  // Never show "0 views" — blank until we have a real count.
+  if (displayViews <= 0) return null;
 
   return (
     <h3 className="text-sm font-medium text-muted-foreground md:text-base">

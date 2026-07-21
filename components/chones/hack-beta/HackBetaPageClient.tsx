@@ -52,8 +52,8 @@ export function HackBetaPageClient({ config }: HackBetaPageClientProps) {
         <div id="hack-beta-submit" className="scroll-mt-8">
           <HackBetaSubmitPanel />
         </div>
-        <HackBetaMixtapeSection />
         <HackBetaGallery />
+        <HackBetaMixtapeSection />
 
         <div id="hack-beta-feed" className="scroll-mt-8">
           {config.enabled ? (

@@ -9,6 +9,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ playbackId: string }> }
 ) {
+  // BotID omitted: Deep Analysis false-positives blocked legitimate play increments.
   const rl = await rateLimiters.viewIncrement(request);
   if (rl) return rl;
 
