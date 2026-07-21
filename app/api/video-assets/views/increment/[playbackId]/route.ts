@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireHumanOrVerifiedBot } from "@/lib/middleware/botIdGuard";
 import { createServiceClient } from "@/lib/sdk/supabase/service";
+import { rateLimiters } from "@/lib/middleware/rateLimit";
 import { serverLogger } from "@/lib/utils/logger";
 
 export const dynamic = "force-dynamic";
@@ -9,12 +9,9 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ playbackId: string }> }
 ) {
-  const botCheck = await requireHumanOrVerifiedBot(
-    "video-assets.views.increment",
-  );
-  if (!botCheck.allowed) {
-    return botCheck.response;
-  }
+  // BotID removed: Deep Analysis false-positives blocked legitimate play increments.
+  const rl = await rateLimiters.generous(request);
+  if (rl) return rl;
 
   try {
     const { playbackId } = await params;

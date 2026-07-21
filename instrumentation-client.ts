@@ -63,7 +63,7 @@ if (!botIdGlobal.__crtvBotIdInit) {
       botIdDeepAnalysisRoute('/api/ai/generate-thumbnail', 'POST'),
       botIdDeepAnalysisRoute('/api/unlock-nft', 'POST'),
       botIdDeepAnalysisRoute('/api/video-assets/sync-views/*', 'POST'),
-      botIdDeepAnalysisRoute('/api/video-assets/views/increment/*', 'POST'),
+      // views/increment omitted: BotID Deep Analysis false-positives block legitimate play increments.
       botIdDeepAnalysisRoute('/api/video-assets/*/regenerate-thumbnail', 'POST'),
       botIdDeepAnalysisRoute('/api/coinbase/session-token', 'POST'),
       botIdDeepAnalysisRoute('/api/metokens/*/transactions', 'POST'),

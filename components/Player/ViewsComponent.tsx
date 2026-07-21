@@ -15,8 +15,7 @@ export const ViewsComponent: React.FC<ViewsComponentProps> = ({
   playbackId,
   fallbackViews = 0,
 }) => {
-  const { totalViews, viewMetrics, loading, error } =
-    useLivepeerViewMetrics(playbackId);
+  const { totalViews, loading } = useLivepeerViewMetrics(playbackId);
 
   if (loading) {
     return (
@@ -31,12 +30,8 @@ export const ViewsComponent: React.FC<ViewsComponentProps> = ({
   const livepeer = Math.max(0, Number(totalViews) || 0);
   const displayViews = Math.max(livepeer, fallback);
 
-  // Prefer Livepeer metrics or a DB fallback — never blank when we have a number.
-  if (error && !viewMetrics && displayViews <= 0) {
-    return null;
-  }
-
-  if (!viewMetrics && displayViews <= 0) {
+  // Never show "0 views", even when Livepeer returns a zeroed metrics object.
+  if (displayViews <= 0) {
     return null;
   }
 

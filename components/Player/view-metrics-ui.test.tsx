@@ -141,7 +141,7 @@ describe("restored view count UI", () => {
     expect(html.toLowerCase()).toContain("views");
   });
 
-  it("VideoViewMetrics shows 0 views when both Livepeer and fallback are 0", () => {
+  it("VideoViewMetrics hides when both Livepeer and fallback are 0", () => {
     vi.mocked(useLivepeerViewMetrics).mockReturnValue({
       viewMetrics: {
         playbackId: "p2",
@@ -158,8 +158,27 @@ describe("restored view count UI", () => {
     const html = renderToStaticMarkup(
       React.createElement(VideoViewMetrics, { playbackId: "p2" }),
     );
-    expect(html).toContain("0");
-    expect(html.toLowerCase()).toContain("views");
+    expect(html).toBe("");
+  });
+
+  it("ViewsComponent hides when Livepeer metrics exist but total is 0", () => {
+    vi.mocked(useLivepeerViewMetrics).mockReturnValue({
+      viewMetrics: {
+        playbackId: "p1",
+        viewCount: 0,
+        playtimeMins: 3,
+        legacyViewCount: 0,
+        totalViews: 0,
+      },
+      totalViews: 0,
+      loading: false,
+      error: null,
+    });
+
+    const html = renderToStaticMarkup(
+      React.createElement(ViewsComponent, { playbackId: "p1" }),
+    );
+    expect(html).toBe("");
   });
 
   it("RealtimeViewsComponent renders concurrent watching count", () => {

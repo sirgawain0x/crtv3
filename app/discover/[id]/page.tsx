@@ -155,21 +155,8 @@ export default async function VideoDetailsPage({
               contractAddress={videoAsset?.contract_address ?? null}
               tokenId={videoAsset?.token_id ?? null}
             />
-            {/* Date + views (left) + actions/share (right) */}
-            <div className="flex items-center justify-between gap-4 mt-4 flex-wrap">
-              <div className="flex items-center gap-3 min-h-4 flex-wrap">
-                {videoAsset?.created_at ? (
-                  <span className="text-sm text-muted-foreground md:text-base">
-                    {new Date(videoAsset.created_at).toLocaleDateString()}
-                  </span>
-                ) : null}
-                {assetData.playbackId && (
-                  <VideoViewMetrics
-                    playbackId={assetData.playbackId}
-                    fallbackViews={videoAsset?.views_count ?? 0}
-                  />
-                )}
-              </div>
+            {/* Actions (right-aligned) → views → date, each on its own row */}
+            <div className="mt-4 space-y-2">
               <div className="flex items-center gap-2 flex-wrap justify-end ml-auto">
                 {creatorAddress && (
                   <>
@@ -238,6 +225,21 @@ export default async function VideoDetailsPage({
                   />
                 </Suspense>
               </div>
+              {assetData.playbackId && (
+                <div className="min-h-4">
+                  <VideoViewMetrics
+                    playbackId={assetData.playbackId}
+                    fallbackViews={videoAsset?.views_count ?? 0}
+                  />
+                </div>
+              )}
+              {videoAsset?.created_at ? (
+                <div>
+                  <span className="text-sm text-muted-foreground md:text-base">
+                    {new Date(videoAsset.created_at).toLocaleDateString()}
+                  </span>
+                </div>
+              ) : null}
             </div>
             {videoAsset?.description && (
               <div className="mt-4">
