@@ -241,9 +241,12 @@ export default function VideoDetails({
           `/api/video-assets/views/increment/${encodeURIComponent(asset.playbackId)}`,
           { method: "POST" },
         );
-        let payload: { viewCount?: unknown } | null = null;
+        let payload: { viewCount?: unknown; code?: unknown } | null = null;
         try {
-          payload = (await response.json()) as { viewCount?: unknown };
+          payload = (await response.json()) as {
+            viewCount?: unknown;
+            code?: unknown;
+          };
         } catch {
           payload = null;
         }
@@ -253,6 +256,8 @@ export default function VideoDetails({
           incremented = true;
           const viewCount = Number(payload?.viewCount);
           if (Number.isFinite(viewCount) && viewCount > 0) {
+            // Keep optimistic DB count for this session; do not invalidate Livepeer
+            // metrics (refetch often returns a stale lower total and wipes the bump).
             queryClient.setQueryData<LivepeerViewMetrics>(
               livepeerViewMetricsQueryKey(asset.playbackId),
               (prev) => ({
@@ -264,8 +269,10 @@ export default function VideoDetails({
               }),
             );
           }
-          await queryClient.invalidateQueries({
-            queryKey: livepeerViewMetricsQueryKey(asset.playbackId),
+        } else {
+          console.warn("Failed to increment views:", {
+            status: response.status,
+            code: payload?.code ?? null,
           });
         }
       } catch (err) {
