@@ -8,7 +8,6 @@ import { HackBetaHero } from "./HackBetaHero";
 import { HackBetaPlaylistEmbed } from "./HackBetaPlaylistEmbed";
 import { HackBetaSubmitPanel } from "./HackBetaSubmitPanel";
 import { HackBetaGallery } from "./HackBetaGallery";
-import { HackBetaMixtapeSection } from "./HackBetaMixtapeSection";
 import { useHackBetaAdmin } from "@/lib/hooks/hack-beta/useHackBetaAdmin";
 import type { ChonesConfig } from "@/lib/chones/config";
 import { Button } from "@/components/ui/button";
@@ -46,14 +45,13 @@ export function HackBetaPageClient({ config }: HackBetaPageClientProps) {
       </div>
 
       <div className="mx-auto max-w-7xl space-y-8 px-4 pb-12 sm:px-6">
-        <HackBetaPlaylistEmbed />
         <ChonesXFollowStrip />
         <SongchainOrbConnect />
         <div id="hack-beta-submit" className="scroll-mt-8">
           <HackBetaSubmitPanel />
         </div>
         <HackBetaGallery />
-        <HackBetaMixtapeSection />
+        <HackBetaPlaylistEmbed />
 
         <div id="hack-beta-feed" className="scroll-mt-8">
           {config.enabled ? (
