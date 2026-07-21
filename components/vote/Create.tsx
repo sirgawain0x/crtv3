@@ -29,6 +29,8 @@ import { useLinkedIdentity } from "@/lib/hooks/useLinkedIdentity";
 import { formatProposalAuthor } from "@/lib/utils/linked-identity";
 import { shortenAddress } from "@/lib/utils/utils";
 import { logger } from "@/lib/utils/logger";
+import { useCreateCampaignSticker } from "@/lib/hooks/stickers/useCreateCampaignSticker";
+import { toast } from "sonner";
 
 const proposalSchema = z.object({
   title: z.string().min(3, "Title is required"),
@@ -46,6 +48,10 @@ const proposalSchema = z.object({
   poapDescription: z.string().optional(),
   poapImageUrl: z.string().url("Must be a valid URL").optional().or(z.literal("")),
   poapEventUrl: z.string().url("Must be a valid URL").optional().or(z.literal("")),
+  // Campaign sticker (optional)
+  createSticker: z.boolean(),
+  stickerName: z.string().optional(),
+  stickerDescription: z.string().optional(),
 });
 type ProposalForm = z.infer<typeof proposalSchema>;
 
@@ -108,6 +114,8 @@ function Create() {
    * to get "credit" for proposals while EOA does the actual signing.
    */
   const signer = useSigner();
+  const { createSticker, isCreating: isCreatingSticker } = useCreateCampaignSticker();
+  const [stickerFile, setStickerFile] = useState<File | null>(null);
 
   // Debug info on mount
   useEffect(() => {
@@ -133,11 +141,15 @@ function Create() {
       poapDescription: "",
       poapImageUrl: "",
       poapEventUrl: "",
+      createSticker: false,
+      stickerName: "",
+      stickerDescription: "",
     },
     mode: "onTouched",
   });
 
   const createPoap = form.watch("createPoap");
+  const createStickerEnabled = form.watch("createSticker");
 
   const { fields, append, remove } = useFieldArray<ProposalForm>({
     control: form.control,
@@ -441,6 +453,29 @@ function Create() {
       }
 
       logger.debug("Proposal created successfully:", result.data);
+
+      // Optionally deploy campaign sticker for this proposal (permissionless)
+      const proposalId = result.data.id as string;
+      if (values.createSticker && stickerFile && proposalId) {
+        try {
+          const stickerResult = await createSticker({
+            file: stickerFile,
+            name: values.stickerName || values.title,
+            description: values.stickerDescription || values.content.slice(0, 200),
+            proposalId,
+          });
+          if (stickerResult) {
+            toast.success(`Sticker #${stickerResult.tokenId} deployed`);
+          } else {
+            toast.warning(
+              "Proposal created, but sticker deployment failed. You can retry later."
+            );
+          }
+        } catch (stickerErr) {
+          logger.error("Sticker deployment error:", stickerErr);
+          toast.warning("Proposal created, but sticker deployment failed.");
+        }
+      }
       
       // Show success message with linked identity
       const authorDisplay = linkedIdentity?.isLinked
@@ -696,16 +731,105 @@ function Create() {
               )}
             </div>
 
+            <Separator />
+
+            {/* Campaign Sticker Section */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <FormLabel className="text-base font-semibold">
+                    Campaign Sticker
+                  </FormLabel>
+                  <p className="text-sm text-muted-foreground">
+                    Deploy an ERC-1155 sticker on Base that voters can claim
+                  </p>
+                </div>
+                <FormField
+                  name="createSticker"
+                  control={form.control}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormControl>
+                        <Switch
+                          checked={field.value ?? false}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {createStickerEnabled && (
+                <div className="space-y-4 pl-4 border-l-2">
+                  <FormField
+                    name="stickerName"
+                    control={form.control}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Sticker Name</FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="e.g., Pizza Day Sticker"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    name="stickerDescription"
+                    control={form.control}
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Sticker Description</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder="Describe the sticker..."
+                            rows={2}
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormItem>
+                    <FormLabel>Sticker Artwork</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) =>
+                          setStickerFile(e.target.files?.[0] ?? null)
+                        }
+                      />
+                    </FormControl>
+                    {!stickerFile && (
+                      <p className="text-xs text-muted-foreground">
+                        Upload PNG/JPG/WebP artwork (uploaded to IPFS via Lighthouse)
+                      </p>
+                    )}
+                  </FormItem>
+                </div>
+              )}
+            </div>
+
             {formError && (
               <div className="text-red-500 text-sm font-medium">
                 {formError}
               </div>
             )}
-            <Button type="submit" className="w-full" disabled={isSubmitting}>
-              {isSubmitting ? (
+            <Button
+              type="submit"
+              className="w-full"
+              disabled={isSubmitting || isCreatingSticker}
+            >
+              {isSubmitting || isCreatingSticker ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />{" "}
-                  Submitting...
+                  {isCreatingSticker ? "Deploying sticker..." : "Submitting..."}
                 </>
               ) : (
                 "Submit"
