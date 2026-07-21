@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { Proposal } from "@/components/proposal-list/ProposalList";
 import { VotingForm } from "@/components/proposal-list/ProposalList";
 import ClaimPoap from "@/components/vote/ClaimPoap";
+import { ClaimStickerButton } from "@/components/stickers/ClaimStickerButton";
 import { shortenAddress } from "@/lib/utils/utils";
 import { LinkedIdentityDisplay } from "@/components/vote/LinkedIdentityDisplay";
 import { SNAPSHOT_SPACE } from "@/context/context";
@@ -307,6 +308,10 @@ export default async function ProposalDetailsPage({
             <div className="mt-2 text-sm text-gray-500">
               Total votes: {proposal.scores_total ?? 0}
             </div>
+          </Card>
+          <Card className="p-6 mb-6">
+            <h2 className="text-lg font-bold mb-2">Claim Campaign Sticker</h2>
+            <ClaimStickerButton proposalId={proposal.id} />
           </Card>
           <Card className="p-6 mb-6">
             <h2 className="text-lg font-bold mb-2">Claim POAP</h2>

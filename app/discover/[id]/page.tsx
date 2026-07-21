@@ -19,6 +19,7 @@ import remarkGfm from "remark-gfm";
 import Link from "next/link";
 import { Suspense } from "react";
 import { VideoShareButton } from "@/components/Videos/VideoShareButton";
+import { VideoHeartBitSection } from "@/components/heartbit/VideoHeartBitSection";
 import { VideoBuyButton } from "@/components/Videos/VideoBuyButton";
 import { BuyIPButton } from "@/components/Videos/BuyIPButton";
 import { CreatorMessageButton } from "@/components/Videos/CreatorMessageButton";
@@ -155,6 +156,15 @@ export default async function VideoDetailsPage({
               contractAddress={videoAsset?.contract_address ?? null}
               tokenId={videoAsset?.token_id ?? null}
             />
+            {creatorAddress && (
+              <div className="mt-4">
+                <VideoHeartBitSection
+                  videoId={assetData.playbackId || id}
+                  videoIpfsHash={videoAsset?.metadata_uri ?? null}
+                  creatorAddress={creatorAddress}
+                />
+              </div>
+            )}
             {/* Actions (right-aligned) → views → date, each on its own row */}
             <div className="mt-4 space-y-2">
               <div className="flex items-center gap-2 flex-wrap justify-end ml-auto">

@@ -224,8 +224,18 @@ export function walletAuthHeadersToArgs(
   };
 }
 
+/**
+ * Verify a wallet-auth triple. By default the signature must cover the
+ * generic canonical message; pass `buildMessage` to bind the signature to a
+ * purpose-specific message (e.g. sticker claim delegation) so a generic auth
+ * signature can't be replayed for that action.
+ */
 export async function verifyWalletAuthArgs(
-  auth: WalletAuthArgs | undefined
+  auth: WalletAuthArgs | undefined,
+  buildMessage: (
+    address: string,
+    timestamp: number,
+  ) => string = buildWalletAuthMessage,
 ): Promise<VerifiedWallet> {
   if (!auth || !auth.address || !auth.timestamp || !auth.signature) {
     throw new WalletAuthError(
@@ -253,7 +263,7 @@ export async function verifyWalletAuthArgs(
     );
   }
 
-  const message = buildWalletAuthMessage(address, auth.timestamp);
+  const message = buildMessage(address, auth.timestamp);
   const result = await verifyWalletSignature(
     address as `0x${string}`,
     message,
