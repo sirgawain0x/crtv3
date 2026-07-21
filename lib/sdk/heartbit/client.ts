@@ -101,6 +101,11 @@ export class HeartBitClient {
   }
 }
 
-export function buildCompositeHash(videoHash: string, stickerHash: string): string {
+/** Video-only hash when no sticker; composite `video|sticker` when attached. */
+export function buildCompositeHash(
+  videoHash: string,
+  stickerHash?: string | null
+): string {
+  if (!stickerHash) return videoHash;
   return `${videoHash}|${stickerHash}`;
 }

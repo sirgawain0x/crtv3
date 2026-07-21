@@ -5,7 +5,8 @@ import { SongchainOrbConnect } from "@/components/songchain/SongchainOrbConnect"
 import { SongCupFeedPanel } from "@/components/songchain/song-cup/SongCupFeedPanel";
 import { ChonesXFollowStrip } from "@/components/chones/ChonesXFollowStrip";
 import { HackBetaHero } from "./HackBetaHero";
-import { HackBetaMixtapeSection } from "./HackBetaMixtapeSection";
+// import { HackBetaMixtapeSection } from "./HackBetaMixtapeSection";
+import { HackBetaPlaylistEmbed } from "./HackBetaPlaylistEmbed";
 import { HackBetaSubmitPanel } from "./HackBetaSubmitPanel";
 import { HackBetaGallery } from "./HackBetaGallery";
 import { useHackBetaAdmin } from "@/lib/hooks/hack-beta/useHackBetaAdmin";
@@ -51,7 +52,7 @@ export function HackBetaPageClient({ config }: HackBetaPageClientProps) {
           <HackBetaSubmitPanel />
         </div>
         <HackBetaGallery />
-        <HackBetaMixtapeSection />
+        <HackBetaPlaylistEmbed />
 
         <div id="hack-beta-feed" className="scroll-mt-8">
           {config.enabled ? (
