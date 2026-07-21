@@ -12,7 +12,7 @@ type VideoHeartBitSectionProps = {
 };
 
 /**
- * Hold-to-tip with campaign stickers + engagement chips + tip ledger.
+ * Hold-to-tip with optional campaign sticker + engagement chips + tip ledger.
  * Scoped HeartBitProvider so the rest of the app stays untouched.
  */
 export function VideoHeartBitSection({
@@ -27,9 +27,9 @@ export function VideoHeartBitSection({
       <div className="space-y-3 rounded-lg border p-4">
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <div>
-            <h3 className="text-sm font-semibold">Sticker tip</h3>
+            <h3 className="text-sm font-semibold">Tip</h3>
             <p className="text-xs text-muted-foreground">
-              Hold the heart to tip USDC · $0.01/sec · attach a claimed sticker
+              Hold heart · $0.01/s · sticker optional
             </p>
           </div>
           <div className="flex items-center gap-2">
