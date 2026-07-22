@@ -668,7 +668,11 @@ export default function VideoDetails({
         <div className="w-full space-y-6">
           <h1 className="text-2xl font-bold">{videoTitle || asset?.name}</h1>
           {creatorAddress && (
-            <CreatorDisplay creatorAddress={creatorAddress} className="mt-2" />
+            <CreatorDisplay
+              creatorAddress={creatorAddress}
+              playbackId={asset?.playbackId || undefined}
+              className="mt-2"
+            />
           )}
           <div className="flex items-center gap-2 flex-wrap">
             {isVideoAdmin && asset?.status?.phase && (

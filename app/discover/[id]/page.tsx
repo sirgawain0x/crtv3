@@ -20,7 +20,6 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { VideoShareButton } from "@/components/Videos/VideoShareButton";
 import { VideoHeartBitSection } from "@/components/heartbit/VideoHeartBitSection";
-import { VideoBuyButton } from "@/components/Videos/VideoBuyButton";
 import { BuyIPButton } from "@/components/Videos/BuyIPButton";
 import { CreatorMessageButton } from "@/components/Videos/CreatorMessageButton";
 import { VideoEditButton } from "@/components/Videos/VideoEditButton";
@@ -186,24 +185,16 @@ export default async function VideoDetailsPage({
                   </>
                 )}
                 <Suspense fallback={<div className="h-9 w-9" />}>
-                  {assetData?.playbackId && (
-                    <VideoBuyButton
-                      playbackId={assetData.playbackId}
-                      videoTitle={videoAsset?.title || assetData?.name || "Video"}
-                    />
-                  )}
-                </Suspense>
-                {creatorAddress &&
-                  videoAsset?.attributes?.content_coin_id && (
-                    <Suspense fallback={<div className="h-9 w-9" />}>
+                  {creatorAddress &&
+                    videoAsset?.attributes?.content_coin_id && (
                       <CreatorMessageButton
                         creatorAddress={creatorAddress}
                         meTokenAddress={
                           videoAsset.attributes.content_coin_id as string
                         }
                       />
-                    </Suspense>
-                  )}
+                    )}
+                </Suspense>
                 {videoAsset?.story_ip_registered &&
                   videoAsset?.story_ip_id &&
                   videoAsset?.story_license_terms_id && (
