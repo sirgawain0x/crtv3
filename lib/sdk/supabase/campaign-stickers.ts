@@ -151,14 +151,22 @@ export async function insertStickerTip(input: {
 
 export async function listStickerTipsForVideo(
   videoId: string,
+  wallet?: string,
   limit = 100
 ): Promise<StickerTipRow[]> {
-  const { data, error } = await db()
+  const normalized = wallet ? normalizeAddress(wallet) : null;
+  const query = db()
     .from("sticker_tips")
     .select("*")
     .eq("video_id", videoId)
     .order("created_at", { ascending: false })
     .limit(limit);
+
+  if (normalized) {
+    query.eq("wallet", normalized);
+  }
+
+  const { data, error } = await query;
 
   if (error) throw error;
   return (data as StickerTipRow[]) ?? [];

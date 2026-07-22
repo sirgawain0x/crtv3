@@ -90,7 +90,8 @@ export async function GET(req: NextRequest) {
     if (!videoId) {
       return NextResponse.json({ error: "videoId required" }, { status: 400 });
     }
-    const tips = await listStickerTipsForVideo(videoId);
+    const wallet = req.nextUrl.searchParams.get("wallet");
+    const tips = await listStickerTipsForVideo(videoId, wallet ?? undefined);
     return NextResponse.json({ tips });
   } catch (error) {
     serverLogger.error("list tips failed:", error);
