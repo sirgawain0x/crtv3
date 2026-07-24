@@ -23,43 +23,48 @@ export function BeatMeBanner({
   className,
 }: BeatMeBannerProps) {
   return (
-    <div className={cn(channelBannerShell("bg-black"), className)}>
-      {/* Mobile: content-driven height via native image aspect + shell py-5 */}
-      <div className="relative aspect-[1080/566] w-full lg:hidden">
+    <div className={cn("h-full w-full", className)}>
+      {/* Mobile: preserve original 1080/566 aspect with black background and overlaid Play button */}
+      <div className={cn(channelBannerShell("bg-black md:hidden"), "aspect-[1080/566] py-0")}>
         <Image
           src="/banners/BEAT_ME_thumbnail.png"
           alt="Beat Me — interactive guess that tune. Beat Me and win USDC."
           fill
-          className="rounded-lg object-cover object-center"
+          className="object-cover object-center"
           sizes="100vw"
           priority
         />
+        {showButton ? (
+          <div className={cn(channelBannerContentClassName, "justify-end pb-4")}>
+            <SongCupGoalButton
+              href={href}
+              label={buttonLabel}
+              className="animate-songcup-pulse hover:animate-none"
+            />
+          </div>
+        ) : null}
       </div>
 
-      {/* Desktop: fill shared 1024/274 shell */}
-      <Image
-        src="/banners/BEAT_ME_thumbnail.png"
-        alt="Beat Me — interactive guess that tune. Beat Me and win USDC."
-        fill
-        className="hidden object-cover object-center lg:block"
-        sizes="(max-width: 1280px) 100vw, 1280px"
-        priority
-      />
-
-      {showButton ? (
-        <div
-          className={cn(
-            channelBannerContentClassName,
-            "lg:absolute lg:inset-0 lg:justify-end lg:pb-5",
-          )}
-        >
-          <SongCupGoalButton
-            href={href}
-            label={buttonLabel}
-            className="animate-songcup-pulse hover:animate-none"
-          />
-        </div>
-      ) : null}
+      {/* Tablet/Desktop: fit shared 1024/274 shell, letterbox on black so the art stays fully visible */}
+      <div className={cn(channelBannerShell("bg-black hidden md:block"))}>
+        <Image
+          src="/banners/BEAT_ME_thumbnail.png"
+          alt="Beat Me — interactive guess that tune. Beat Me and win USDC."
+          fill
+          className="object-contain object-center"
+          sizes="(max-width: 1280px) 100vw, 1280px"
+          priority
+        />
+        {showButton ? (
+          <div className={cn(channelBannerContentClassName, "justify-end pb-4 lg:pb-6")}>
+            <SongCupGoalButton
+              href={href}
+              label={buttonLabel}
+              className="animate-songcup-pulse hover:animate-none"
+            />
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
