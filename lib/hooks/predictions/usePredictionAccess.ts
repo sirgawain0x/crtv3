@@ -10,7 +10,7 @@ import { useMembershipVerification } from "@/lib/hooks/unlock/useMembershipVerif
 import { useWalletStatus } from "@/lib/hooks/accountkit/useWalletStatus";
 
 export const PREDICTION_BLOCK_MESSAGE =
-  "Only non-members and investor members can create or bet on predictions — this keeps markets fair for fans.";
+  "Creator memberships cannot create or bet on predictions — this keeps markets fair for fans.";
 
 export function usePredictionAccess() {
   const { isConnected, walletAddress, smartAccountAddress } = useWalletStatus();
@@ -21,7 +21,8 @@ export function usePredictionAccess() {
   const isAdmin = isPlatformAdmin(address);
   const isCreatorTier = hasValidCreatorPass(membershipDetails);
   const isBrandTier = hasValidBrandPass(membershipDetails);
-  const isBlockedTier = isCreatorTier || isBrandTier;
+  // Only Creator tier is blocked from prediction create/bet.
+  const isBlockedTier = isCreatorTier;
 
   const canCreatePrediction = useMemo(() => {
     if (!isConnected || !address) return false;

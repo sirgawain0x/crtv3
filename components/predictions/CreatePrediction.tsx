@@ -547,7 +547,7 @@ function CreatePrediction({
                       <span>Investor membership: unlimited prediction markets. </span>
                     )}
                     {quota.premiumTier === "brand" && (
-                      <span>Brand membership does not include prediction creation. </span>
+                      <span>Brand membership: unlimited prediction markets. </span>
                     )}
                     {!quota.premiumTier && (
                       <span>Unlimited prediction markets for your account. </span>
@@ -564,7 +564,7 @@ function CreatePrediction({
                           href="/"
                           className="underline font-medium text-foreground"
                         >
-                          Upgrade to Investor
+                          Upgrade to Investor or Brand
                         </Link>{" "}
                         for unlimited markets.
                       </span>
@@ -574,7 +574,7 @@ function CreatePrediction({
                           href="/"
                           className="underline font-medium text-foreground"
                         >
-                          Upgrade to Investor
+                          Upgrade to Investor or Brand
                         </Link>{" "}
                         for unlimited markets.
                       </span>
