@@ -51,7 +51,7 @@ export function ChannelBannersCarousel({ className }: ChannelBannersCarouselProp
       onFocusCapture={onFocusCapture}
       onBlurCapture={onBlurCapture}
     >
-      <CarouselContent className="-ml-0 items-stretch">
+      <CarouselContent className="-ml-0">
         <CarouselItem className="pl-0">
           <BeatMeBanner className="h-full" />
         </CarouselItem>
