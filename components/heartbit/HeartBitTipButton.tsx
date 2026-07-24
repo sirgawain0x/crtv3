@@ -547,11 +547,10 @@ export function HeartBitTipButton({
         <Button
           type="button"
           size="icon"
-          variant={holding || myTipTotal != null ? "default" : "secondary"}
+          variant="secondary"
           className={cn(
             "h-10 w-10 rounded-full select-none touch-none",
-            holding && "bg-pink-600 hover:bg-pink-600 scale-110",
-            myTipTotal != null && !holding && "bg-pink-600 hover:bg-pink-600"
+            holding && "scale-110",
           )}
           disabled={isTipping || loadingHistory}
           onPointerDown={(e) => {
