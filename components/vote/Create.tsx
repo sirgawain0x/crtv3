@@ -42,12 +42,6 @@ const proposalSchema = z.object({
   startTime: z.string().min(1, "Start time required"),
   end: z.string().min(1, "End date required"),
   endTime: z.string().min(1, "End time required"),
-  // POAP fields (optional)
-  createPoap: z.boolean(),
-  poapName: z.string().optional(),
-  poapDescription: z.string().optional(),
-  poapImageUrl: z.string().url("Must be a valid URL").optional().or(z.literal("")),
-  poapEventUrl: z.string().url("Must be a valid URL").optional().or(z.literal("")),
   // Campaign sticker (optional)
   createSticker: z.boolean(),
   stickerName: z.string().optional(),
@@ -136,11 +130,6 @@ function Create() {
       startTime: "",
       end: "",
       endTime: "",
-      createPoap: false,
-      poapName: "",
-      poapDescription: "",
-      poapImageUrl: "",
-      poapEventUrl: "",
       createSticker: false,
       stickerName: "",
       stickerDescription: "",
@@ -148,7 +137,6 @@ function Create() {
     mode: "onTouched",
   });
 
-  const createPoap = form.watch("createPoap");
   const createStickerEnabled = form.watch("createSticker");
 
   const { fields, append, remove } = useFieldArray<ProposalForm>({
@@ -221,43 +209,6 @@ function Create() {
       const blockNumber = Number(block);
       logger.debug("Block number fetched:", blockNumber);
 
-      // Create POAP event if requested
-      let poapEventId: string | null = null;
-      let poapTokenId: string | null = null;
-
-      if (values.createPoap && values.poapName && values.poapDescription) {
-        try {
-          logger.debug("Creating POAP event...");
-          const poapResponse = await fetch("/api/poap/create-event", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              name: values.poapName,
-              description: values.poapDescription,
-              image_url: values.poapImageUrl || undefined,
-              start_date: new Date(start * 1000).toISOString(),
-              end_date: new Date(end * 1000).toISOString(),
-              event_url: values.poapEventUrl || undefined,
-              virtual_event: true,
-            }),
-          });
-
-          if (poapResponse.ok) {
-            const poapData = await poapResponse.json();
-            poapEventId = poapData.data?.id || poapData.data?.fancy_id;
-            poapTokenId = poapData.data?.token_id || "1";
-            logger.debug("POAP event created:", poapEventId);
-          } else {
-            const error = await poapResponse.json();
-            logger.warn("Failed to create POAP event:", error);
-            // Continue with proposal creation even if POAP creation fails
-          }
-        } catch (poapError) {
-          logger.error("Error creating POAP event:", poapError);
-          // Continue with proposal creation even if POAP creation fails
-        }
-      }
-
       // Prepare EIP-712 typed data for signing
       // Using Snapshot's exact proposal types from @snapshot-labs/snapshot.js
       logger.debug("Preparing typed data to sign...");
@@ -295,26 +246,26 @@ function Create() {
 
       const now = Math.floor(Date.now() / 1000);
 
-      // Build the message with all required fields matching Snapshot's schema
-      // Message used for SIGNING (includes privacy, because it's in the types)
+      // Build the message with all required fields matching Snapshot's schema.
+      // Message used for SIGNING (includes privacy, because it's in the types).
+      //
+      // IMPORTANT: Use plain numbers for uint fields — not BigInt.
+      // Privy's toViemAccount signs via eth_signTypedData_v4, which JSON-serializes
+      // the payload. JSON.stringify throws "Do not know how to serialize a BigInt".
       const typedMessage = {
         from: walletAddress, // EOA address (Snapshot requires EOA signature)
         space: SNAPSHOT_SPACE,
-        timestamp: BigInt(now),
+        timestamp: now,
         type: "single-choice" as const,
         title: values.title,
         body: values.content,
         discussion: "",
         choices: values.choices.map((c) => c.value),
         labels: [] as string[],
-        start: BigInt(start),
-        end: BigInt(end),
-        snapshot: BigInt(blockNumber),
+        start,
+        end,
+        snapshot: blockNumber,
         plugins: JSON.stringify({
-          poap: {
-            address: poapEventId ? `0x${poapEventId}` : "0x0000000000000000000000000000000000000000",
-            tokenId: poapTokenId || "1",
-          },
           // Store Smart Wallet address for linked identity display
           creativeTv: {
             smartWallet: address || null, // Primary identity (Smart Wallet)
@@ -381,8 +332,7 @@ function Create() {
       logger.debug("Submitting proposal to server...");
 
       // Snapshot.js expects the EIP-712 envelope format: { domain, types, message }
-      // The 'message' contains the actual signed data structure
-      // Note: Convert BigInts to numbers for JSON serialization
+      // Keep uint fields as numbers so they match the signed typed data exactly.
       const envelope = {
         domain,
         types,
@@ -400,10 +350,6 @@ function Create() {
           end: end, // number for JSON
           snapshot: blockNumber, // number for JSON
           plugins: JSON.stringify({
-            poap: {
-              address: poapEventId ? `0x${poapEventId}` : "0x0000000000000000000000000000000000000000",
-              tokenId: poapTokenId || "1",
-            },
             // Store Smart Wallet address for linked identity display
             creativeTv: {
               smartWallet: address || null, // Primary identity (Smart Wallet)
@@ -630,109 +576,6 @@ function Create() {
 
             <Separator />
 
-            {/* POAP Configuration Section */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <FormLabel className="text-base font-semibold">Create POAP</FormLabel>
-                  <p className="text-sm text-muted-foreground">
-                    Create a POAP event for voters to claim after voting
-                  </p>
-                </div>
-                <FormField
-                  name="createPoap"
-                  control={form.control}
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormControl>
-                        <Switch
-                          checked={field.value ?? false}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              {createPoap && (
-                <div className="space-y-4 pl-4 border-l-2">
-                  <FormField
-                    name="poapName"
-                    control={form.control}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>POAP Name</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="e.g., Vote on Proposal #123"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    name="poapDescription"
-                    control={form.control}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>POAP Description</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            placeholder="Describe the POAP event..."
-                            rows={3}
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    name="poapImageUrl"
-                    control={form.control}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>POAP Image URL (Optional)</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="url"
-                            placeholder="https://example.com/image.png"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    name="poapEventUrl"
-                    control={form.control}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Event URL (Optional)</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="url"
-                            placeholder="https://example.com/event"
-                            {...field}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-              )}
-            </div>
-
-            <Separator />
-
             {/* Campaign Sticker Section */}
             <div className="space-y-4">
               <div className="flex items-center justify-between">
@@ -808,7 +651,7 @@ function Create() {
                     </FormControl>
                     {!stickerFile && (
                       <p className="text-xs text-muted-foreground">
-                        Upload PNG/JPG/WebP artwork (uploaded to IPFS via Lighthouse)
+                        Upload PNG/JPG/WebP artwork (uploaded to IPFS)
                       </p>
                     )}
                   </FormItem>

@@ -357,12 +357,15 @@ function VotingForm({ proposal }: { proposal: Proposal }) {
       // comes from membership NFT stored in the smart account. The signature will
       // still be from the EOA (walletAddress), but Snapshot will check voting power
       // for the smart account address.
+      // Use plain numbers for uint fields — not BigInt.
+      // Privy's eth_signTypedData_v4 path JSON-serializes the payload and cannot
+      // handle BigInt ("Do not know how to serialize a BigInt").
       const typedMessage = {
         from: smartAccountAddress, // Smart account address (holds membership NFT for voting power)
         space: SNAPSHOT_SPACE,
-        timestamp: BigInt(now),
+        timestamp: now,
         proposal: proposal.id,
-        choice: BigInt(snapshotChoice),
+        choice: snapshotChoice,
         reason: "",
         app: "creative-tv",
         metadata: JSON.stringify({}),

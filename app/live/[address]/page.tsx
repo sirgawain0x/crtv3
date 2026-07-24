@@ -499,7 +499,12 @@ export default function LivePage() {
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-6">
                 <div className="lg:col-span-2 relative">
-                  <Broadcast streamKey={streamKey} streamId={streamId} creatorAddress={creatorAddress!} />
+                  <Broadcast
+                    streamKey={streamKey}
+                    streamId={streamId}
+                    playbackId={playbackId}
+                    creatorAddress={creatorAddress!}
+                  />
                   {creatorAddress && (
                     <DigitalTwinOverlay creatorAddress={creatorAddress} />
                   )}
@@ -546,6 +551,7 @@ export default function LivePage() {
                         creatorMeToken={undefined}
                         streamId={chatStreamId}
                         sessionId={chatSessionId}
+                        variant="host"
                       />
                       <LensLiveChat
                         lensPostId={lensLivePostId}

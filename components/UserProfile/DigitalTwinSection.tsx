@@ -14,9 +14,7 @@ import {
   CheckCircle2,
   KeyRound,
   Send,
-  Lock,
 } from "lucide-react";
-import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -39,10 +37,7 @@ import {
   type CreatorProfile,
 } from "@/lib/sdk/supabase/creator-profiles";
 import { useWalletAuth } from "@/lib/auth/useWalletAuth";
-import { hasValidPlusPass } from "@/lib/access/creator-membership";
-import { unlockService } from "@/lib/sdk/unlock/services";
 import { logger } from "@/lib/utils/logger";
-import { cn } from "@/lib/utils/utils";
 
 interface DigitalTwinSectionProps {
   ownerAddress: string;
@@ -86,10 +81,11 @@ const PINATA_API_KEYS_URL = "https://app.pinata.cloud/developers/api-keys";
 
 /**
  * Profile-page section for connecting an external Creative AI Digital Twin
- * deployed on Pinata. Two paths:
+ * deployed on Pinata (bring-your-own). Two paths:
  *
  *  1) Onboarding: shows the live *template* card, a Deploy CTA pointing at
- *     the org template page, and a checklist of secrets the creator will need.
+ *     the org template page (purchase/deploy on Pinata), and a checklist of
+ *     secrets the creator will need.
  *  2) Connect: the creator's *agent* ID + Pinata JWT one-shot exchange. The
  *     JWT is sent once to /api/twin/connect, traded for the per-agent gateway
  *     token + URLs, then forgotten. After that the proxy at /api/twin/chat
@@ -106,13 +102,6 @@ export function DigitalTwinSection({
   onSaved,
 }: DigitalTwinSectionProps) {
   const { toast } = useToast();
-  // Check Plus on the same address used for /api/twin/connect (ownerAddress),
-  // not the SCA address from useMembershipVerification — they can diverge.
-  const [membershipLoading, setMembershipLoading] = useState(isOwner);
-  const [hasPlusPass, setHasPlusPass] = useState(false);
-  // Lock agent controls while loading or without Plus; still allow disconnect.
-  const agentControlsLocked = isOwner && (membershipLoading || !hasPlusPass);
-  const showPlusUpsell = isOwner && !membershipLoading && !hasPlusPass;
   const [twinEnabled, setTwinEnabled] = useState<boolean>(!!initialProfile?.twin_enabled);
   const [glbUrl, setGlbUrl] = useState<string>(initialProfile?.twin_avatar_glb_url || "");
   const [twinAddress, setTwinAddress] = useState<string>(initialProfile?.twin_address || "");
@@ -138,35 +127,6 @@ export function DigitalTwinSection({
   const [disconnectOpen, setDisconnectOpen] = useState(false);
 
   const { getAuthHeaders } = useWalletAuth();
-
-  // Plus membership for the profile owner address (matches server connect gate).
-  useEffect(() => {
-    if (!isOwner || !ownerAddress) {
-      setMembershipLoading(false);
-      setHasPlusPass(false);
-      return;
-    }
-    let cancelled = false;
-    setMembershipLoading(true);
-    unlockService
-      .getAllMemberships(ownerAddress)
-      .then((memberships) => {
-        if (!cancelled) {
-          setHasPlusPass(hasValidPlusPass(memberships));
-          setMembershipLoading(false);
-        }
-      })
-      .catch((err) => {
-        logger.error("Failed to check Plus membership for twin:", err);
-        if (!cancelled) {
-          setHasPlusPass(false);
-          setMembershipLoading(false);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [isOwner, ownerAddress]);
 
   // Profile (avatar GLB + twin address fields).
   useEffect(() => {
@@ -257,16 +217,6 @@ export function DigitalTwinSection({
   };
 
   const handleSaveMeta = async () => {
-    if (membershipLoading) {
-      setError("Checking Plus membership… try again in a moment.");
-      return;
-    }
-    if (twinEnabled && !hasPlusPass) {
-      setError(
-        "A Creator, Investor, or Brand Plus pass is required to enable Digital Twin."
-      );
-      return;
-    }
     const err = validateMeta();
     if (err) {
       setError(err);
@@ -298,12 +248,6 @@ export function DigitalTwinSection({
 
   const handleConnect = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (agentControlsLocked) {
-      setConnectError(
-        "A Creator, Investor, or Brand Plus pass is required to connect a Digital Twin."
-      );
-      return;
-    }
     setConnectError(null);
     if (!agentIdInput.trim() || !jwtInput.trim()) {
       setConnectError("Both Agent ID and Pinata JWT are required");
@@ -408,8 +352,8 @@ export function DigitalTwinSection({
           Creative AI Digital Twin
         </CardTitle>
         <CardDescription>
-          Deploy your own AI agent on Pinata, then connect it here so viewers
-          can chat with your twin during streams.
+          Purchase and deploy your own AI agent on Pinata, then connect it here
+          so viewers can chat with your twin during streams.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -420,21 +364,6 @@ export function DigitalTwinSection({
           </Alert>
         )}
 
-        {showPlusUpsell && (
-          <div className="flex items-start gap-2 rounded-md border border-dashed border-muted-foreground/30 bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-            <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            <p>
-              Requires a Creator, Investor, or Brand Plus pass.{" "}
-              <Link
-                href="/memberships"
-                className="text-primary underline-offset-2 hover:underline"
-              >
-                View Plus plans
-              </Link>
-            </p>
-          </div>
-        )}
-
         {profileLoading ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" /> Loading…
@@ -442,12 +371,7 @@ export function DigitalTwinSection({
         ) : (
           <>
             {/* Enable toggle */}
-            <div
-              className={cn(
-                "flex items-center justify-between rounded-md border p-3",
-                agentControlsLocked && "opacity-60"
-              )}
-            >
+            <div className="flex items-center justify-between rounded-md border p-3">
               <div>
                 <p className="text-sm font-semibold">Enable digital twin</p>
                 <p className="text-xs text-muted-foreground">
@@ -457,23 +381,12 @@ export function DigitalTwinSection({
               <Switch
                 checked={twinEnabled}
                 onCheckedChange={setTwinEnabled}
-                disabled={
-                  !isOwner ||
-                  savingMeta ||
-                  membershipLoading ||
-                  (!hasPlusPass && !twinEnabled)
-                }
+                disabled={!isOwner || savingMeta}
               />
             </div>
 
-            {/* Marketplace template card — visible when enabled, or locked preview for upsell */}
-            {(twinEnabled || showPlusUpsell) && (
-              <div
-                className={cn(
-                  "rounded-md border p-3 bg-muted/30",
-                  agentControlsLocked && "opacity-60 pointer-events-none"
-                )}
-              >
+            {twinEnabled && (
+              <div className="rounded-md border p-3 bg-muted/30">
                 {template ? (
                   <div className="space-y-3">
                     <div className="flex items-start gap-3">
@@ -532,7 +445,7 @@ export function DigitalTwinSection({
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
                       >
-                        <ExternalLink className="h-3 w-3" /> Deploy this template on Pinata
+                        <ExternalLink className="h-3 w-3" /> Get this template on Pinata
                       </a>
                     )}
                   </div>
@@ -548,7 +461,7 @@ export function DigitalTwinSection({
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
                       >
-                        <ExternalLink className="h-3 w-3" /> Deploy this template on Pinata
+                        <ExternalLink className="h-3 w-3" /> Get this template on Pinata
                       </a>
                     )}
                   </div>
@@ -560,15 +473,8 @@ export function DigitalTwinSection({
               </div>
             )}
 
-            {/* Connection state — visible when enabled, or locked preview for upsell */}
-            {(twinEnabled || showPlusUpsell) && (
-              <div
-                className={cn(
-                  "rounded-md border p-3",
-                  // Don't fade the whole card when connected — Disconnect must stay usable.
-                  agentControlsLocked && !status?.connected && "opacity-60"
-                )}
-              >
+            {twinEnabled && (
+              <div className="rounded-md border p-3">
                 {statusLoading ? (
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <Loader2 className="h-3 w-3 animate-spin" /> Checking connection…
@@ -595,19 +501,13 @@ export function DigitalTwinSection({
                         just not the verified upstream version.
                       </p>
                     )}
-                    {showPlusUpsell && (
-                      <p className="text-[11px] text-muted-foreground">
-                        Plus membership lapsed — reconnect requires a Plus pass. You can
-                        still disconnect.
-                      </p>
-                    )}
                     <div className="flex flex-wrap gap-2 pt-1">
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
                         onClick={handleTest}
-                        disabled={testing || agentControlsLocked}
+                        disabled={testing}
                       >
                         {testing ? (
                           <Loader2 className="h-3 w-3 mr-1 animate-spin" />
@@ -639,10 +539,10 @@ export function DigitalTwinSection({
                   <form onSubmit={handleConnect} className="space-y-2">
                     <div className="flex items-center gap-1.5">
                       <Plug className="h-4 w-4" />
-                      <p className="text-sm font-semibold">Connect your deployed agent</p>
+                      <p className="text-sm font-semibold">Connect your Pinata agent</p>
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      After deploying on Pinata, find your agent's{" "}
+                      After purchasing and deploying on Pinata, find your agent's{" "}
                       <strong>Agent ID</strong> in the agent header (e.g.{" "}
                       <code className="text-[10px]">xljs9fuy</code>) and create a Pinata
                       JWT at{" "}
@@ -664,7 +564,7 @@ export function DigitalTwinSection({
                         placeholder="xljs9fuy"
                         value={agentIdInput}
                         onChange={(e) => setAgentIdInput(e.target.value)}
-                        disabled={!isOwner || connecting || agentControlsLocked}
+                        disabled={!isOwner || connecting}
                       />
                     </div>
                     <div className="space-y-1.5">
@@ -677,7 +577,7 @@ export function DigitalTwinSection({
                         placeholder="eyJhbGciOi…"
                         value={jwtInput}
                         onChange={(e) => setJwtInput(e.target.value)}
-                        disabled={!isOwner || connecting || agentControlsLocked}
+                        disabled={!isOwner || connecting}
                         autoComplete="off"
                       />
                     </div>
@@ -687,11 +587,7 @@ export function DigitalTwinSection({
                       </Alert>
                     )}
                     {isOwner && (
-                      <Button
-                        type="submit"
-                        disabled={connecting || agentControlsLocked}
-                        size="sm"
-                      >
+                      <Button type="submit" disabled={connecting} size="sm">
                         {connecting ? (
                           <Loader2 className="h-3 w-3 mr-1 animate-spin" />
                         ) : (

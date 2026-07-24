@@ -37,10 +37,13 @@ import { useWalletAuth } from "@/lib/auth/useWalletAuth";
 import { walletAuthHeadersToArgs } from "@/lib/auth/require-wallet";
 import { parseStreamProxyFailure } from "@/lib/livepeer/stream-proxy-errors";
 import { CreativeBrandOverlay } from "@/components/Player/CreativeBrandOverlay";
+import { FloatingTipHearts } from "@/components/Live/FloatingTipHearts";
 
 interface BroadcastProps {
   streamKey: string;
   streamId?: string | null;
+  /** Playback id used for tip ledger / floating hearts (`stream:{playbackId}`). */
+  playbackId?: string | null;
   creatorAddress: string;
 }
 
@@ -142,7 +145,12 @@ async function finalizeStreamRecordings(streamId: string) {
   }
 }
 
-function BroadcastWithControls({ streamKey, streamId: propStreamId, creatorAddress }: BroadcastProps) {
+function BroadcastWithControls({
+  streamKey,
+  streamId: propStreamId,
+  playbackId,
+  creatorAddress,
+}: BroadcastProps) {
   const { getAuthHeaders } = useWalletAuth();
   const ingestUrl = React.useMemo(() => {
     return `https://ingest.livepeer.studio/whip/${streamKey}`;
@@ -248,6 +256,7 @@ function BroadcastWithControls({ streamKey, streamId: propStreamId, creatorAddre
         />
 
         <CreativeBrandOverlay />
+        <FloatingTipHearts streamId={playbackId || undefined} />
 
         {/* Loading / Status Overlay */}
         {(status === 'loading' || status === 'error') && (

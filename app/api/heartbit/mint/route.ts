@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { isAddress } from "viem";
 import { z } from "zod";
 import { HeartBitClient } from "@/lib/sdk/heartbit/client";
-import { DEFAULT_HEARTBIT_CHAIN } from "@/lib/sdk/heartbit/config";
+import {
+  DEFAULT_HEARTBIT_CHAIN,
+  MAX_HOLD_SECONDS,
+} from "@/lib/sdk/heartbit/config";
 import { serverLogger } from "@/lib/utils/logger";
 import { checkBotIdDeep } from "@/lib/middleware/botIdGuard";
 import { rateLimiters } from "@/lib/middleware/rateLimit";
@@ -66,9 +69,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (body.endTime - body.startTime > 300) {
+    if (body.endTime - body.startTime > MAX_HOLD_SECONDS) {
       return NextResponse.json(
-        { error: "Hold duration exceeds maximum (300s)" },
+        {
+          error: `Hold duration exceeds maximum (${MAX_HOLD_SECONDS}s)`,
+        },
         { status: 400 }
       );
     }

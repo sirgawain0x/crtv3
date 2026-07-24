@@ -598,6 +598,7 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
                 creatorMeToken={tokenInfo ?? undefined}
                 streamId={streamId}
                 sessionId={sessionId}
+                variant="viewer"
               />
             )}
             {playbackId && sessionId ? (

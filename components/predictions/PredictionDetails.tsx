@@ -31,6 +31,8 @@ import { Clock, Share2 } from "lucide-react";
 import { logger } from "@/lib/utils/logger";
 import { EvidenceSubmissionModal } from "./EvidenceSubmissionModal";
 import { ShareDialog } from "@/components/Videos/ShareDialog";
+import { Collapsible } from "@/components/ui/collapsible";
+import { shortenAddress } from "@/lib/utils/utils";
 
 interface PredictionDetailsProps {
   questionId: string;
@@ -343,7 +345,7 @@ export function PredictionDetails({ questionId }: PredictionDetailsProps) {
           {question.bounty && Number(question.bounty) > 0 && (
             <div>Bounty: {Number(formatEther(question.bounty)).toFixed(3)} ETH</div>
           )}
-          {question.bond && Number(question.bond) > 0 && (
+          {!isResolved && question.bond && Number(question.bond) > 0 && (
             <div>
               Current bond backing:{" "}
               {Number(formatEther(question.bond)).toFixed(4)} ETH
@@ -359,7 +361,7 @@ export function PredictionDetails({ questionId }: PredictionDetailsProps) {
       {stakeStats && stakeStats.totalPrizePool > 0n && (
         <Card className="p-4 bg-violet-50 dark:bg-violet-950/30 border-violet-200 dark:border-violet-800">
           <h3 className="text-sm font-medium text-violet-700 dark:text-violet-300 mb-1">
-            At stake
+            {isResolved ? "Settled pool" : "At stake"}
           </h3>
           <div className="text-2xl font-bold text-violet-900 dark:text-violet-100">
             {formatEth(stakeStats.totalPrizePool)} ETH
@@ -368,10 +370,10 @@ export function PredictionDetails({ questionId }: PredictionDetailsProps) {
             {stakeStats.bounty > 0n && (
               <div>Bounty: {formatEth(stakeStats.bounty)} ETH</div>
             )}
-            {stakeStats.totalBonded > 0n && (
+            {!isResolved && stakeStats.totalBonded > 0n && (
               <div>Total bonded: {formatEth(stakeStats.totalBonded)} ETH</div>
             )}
-            {stakeStats.minBond > 0n && (
+            {!isResolved && stakeStats.minBond > 0n && (
               <div>Min bond: {formatEth(stakeStats.minBond)} ETH</div>
             )}
           </div>
@@ -396,10 +398,12 @@ export function PredictionDetails({ questionId }: PredictionDetailsProps) {
                   variant={isFinal || isLeading ? "default" : "outline"}
                 >
                   {o}
-                  {outcomeStake && outcomeStake.totalBond > 0n
+                  {!isResolved &&
+                  outcomeStake &&
+                  outcomeStake.totalBond > 0n
                     ? ` · ${formatEth(outcomeStake.totalBond)} ETH`
                     : ""}
-                  {isFinal ? " · final" : isLeading ? " · leading" : ""}
+                  {!isResolved && isLeading ? " · leading" : ""}
                 </Badge>
               );
             })}
@@ -449,28 +453,66 @@ export function PredictionDetails({ questionId }: PredictionDetailsProps) {
         )
       )}
 
-      {answerTimeline.length > 0 && (
-        <Card className="p-4">
-          <h3 className="text-sm font-medium text-muted-foreground mb-3">
-            Recent answers
-          </h3>
-          <ul className="space-y-2 text-sm">
-            {answerTimeline.map((entry, idx) => (
-              <li
-                key={`${entry.answerer}-${entry.created}-${idx}`}
-                className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 pb-2 last:border-0 last:pb-0"
-              >
-                <span className="font-medium">
-                  {entry.label ?? "Unknown answer"}
-                </span>
-                <span className="text-muted-foreground text-xs">
-                  {Number(formatEther(BigInt(entry.bond || "0"))).toFixed(4)} ETH
-                </span>
-              </li>
-            ))}
-          </ul>
-        </Card>
-      )}
+      {answerTimeline.length > 0 &&
+        (isResolved ? (
+          <Collapsible
+            defaultOpen={false}
+            trigger={`Answer history (${answerTimeline.length})`}
+          >
+            <ul className="space-y-2 text-sm">
+              {answerTimeline.map((entry, idx) => (
+                <li
+                  key={`${entry.answerer}-${entry.created}-${idx}`}
+                  className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 pb-2 last:border-0 last:pb-0"
+                >
+                  <div className="min-w-0">
+                    <span className="font-medium">
+                      {entry.label ?? "Unknown answer"}
+                    </span>
+                    {entry.answerer && (
+                      <span className="ml-2 text-xs text-muted-foreground font-mono">
+                        {shortenAddress(entry.answerer)}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-muted-foreground text-xs">
+                    {Number(formatEther(BigInt(entry.bond || "0"))).toFixed(4)}{" "}
+                    ETH
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </Collapsible>
+        ) : (
+          <Card className="p-4">
+            <h3 className="text-sm font-medium text-muted-foreground mb-3">
+              Recent answers
+            </h3>
+            <ul className="space-y-2 text-sm">
+              {answerTimeline.map((entry, idx) => (
+                <li
+                  key={`${entry.answerer}-${entry.created}-${idx}`}
+                  className="flex flex-wrap items-center justify-between gap-2 border-b border-border/50 pb-2 last:border-0 last:pb-0"
+                >
+                  <div className="min-w-0">
+                    <span className="font-medium">
+                      {entry.label ?? "Unknown answer"}
+                    </span>
+                    {entry.answerer && (
+                      <span className="ml-2 text-xs text-muted-foreground font-mono">
+                        {shortenAddress(entry.answerer)}
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-muted-foreground text-xs">
+                    {Number(formatEther(BigInt(entry.bond || "0"))).toFixed(4)}{" "}
+                    ETH
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        ))}
 
       {isActive && !isResolved && (
         <Card className="p-6">

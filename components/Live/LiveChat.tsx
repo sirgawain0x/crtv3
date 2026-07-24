@@ -21,7 +21,8 @@ import {
 import { cn } from "@/lib/utils";
 import { formatAddress } from "@/lib/helpers";
 import { toast } from "sonner";
-import { VideoTipButton } from "../Videos/VideoTipButton";
+import { HeartBitProvider } from "@/components/heartbit/HeartBitProvider";
+import { HeartBitTipButton } from "@/components/heartbit/HeartBitTipButton";
 import { getExplorerUrl, formatTipToken } from "@/lib/utils/video-tip";
 import { priceService, PriceService } from "@/lib/sdk/alchemy/price-service";
 import { TokenSymbol } from "@/lib/hooks/video/useVideoTip";
@@ -217,12 +218,16 @@ export function LiveChat({
         <div className="flex items-center gap-2">
           {headerActions}
           {!isHost && creatorAddress && user && user.address?.toLowerCase() !== creatorAddress.toLowerCase() && (
-            <VideoTipButton
-              creatorAddress={creatorAddress}
-              onTipSuccess={(txHash, amount, token) => {
-                sendTipMessage(amount, token, txHash);
-              }}
-            />
+            <HeartBitProvider chain="0x2105">
+              <HeartBitTipButton
+                videoId={`stream:${streamId}`}
+                creatorAddress={creatorAddress}
+                showStickerPicker={false}
+                onTipSuccess={(txHash, amount, token) => {
+                  void sendTipMessage(amount, token, txHash);
+                }}
+              />
+            </HeartBitProvider>
           )}
         </div>
       </div>

@@ -35,4 +35,11 @@ export const HEART_BIT_CONFIG: Record<
 /** Default to Base mainnet for Creative TV */
 export const DEFAULT_HEARTBIT_CHAIN: HeartBitChain = "0x2105";
 
+/** USDC charged per second of hold (uncapped — tip size = hold duration × rate). */
 export const USDC_TIP_RATE_PER_SECOND = 0.01;
+
+/**
+ * Soft ceiling for a single hold session (mint + ledger validation).
+ * Not a tip-amount cap — users may tip repeatedly. 1 hour supports long live holds.
+ */
+export const MAX_HOLD_SECONDS = 3600;

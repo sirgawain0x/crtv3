@@ -37,11 +37,15 @@ import { useVideoTip } from "@/lib/hooks/video/useVideoTip";
 import { useSmartAccountClient } from "@/lib/wallet/react";
 import { useWalletAuth } from "@/lib/auth/useWalletAuth";
 import { buildCompositeHash } from "@/lib/sdk/heartbit/client";
-import { USDC_TIP_RATE_PER_SECOND } from "@/lib/sdk/heartbit/config";
+import {
+  MAX_HOLD_SECONDS,
+  USDC_TIP_RATE_PER_SECOND,
+} from "@/lib/sdk/heartbit/config";
 import { getErc20Balance } from "@/lib/viem";
 import { cn } from "@/lib/utils";
 import { logger } from "@/lib/utils/logger";
 import type { StickerTipRow } from "@/lib/sdk/supabase/campaign-stickers";
+import type { TokenSymbol } from "@/lib/hooks/video/useVideoTip";
 
 type StickerOption = {
   token_id: number;
@@ -56,18 +60,32 @@ type HeartBitTipButtonProps = {
   videoIpfsHash?: string | null;
   creatorAddress: string;
   className?: string;
+  /** Hide the optional sticker picker (useful in dense live chat headers). */
+  showStickerPicker?: boolean;
+  /** Fired after a successful USDC tip (for live chat announcements, etc.). */
+  onTipSuccess?: (txHash: string, amount: string, token: TokenSymbol) => void;
 };
 
 const MIN_TIP_USDC = 0.01;
-const MAX_FILL_SECONDS = 5; // heart fills completely over 5s of holding
+/** Heart fill animation reaches 100% at this hold time — visual only, not a tip cap. */
+const FILL_SECONDS = 5;
 
 const HEART_PATH =
   "M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z";
 
-function AnimatedHeart({ fillPct }: { fillPct: number }) {
+function AnimatedHeart({
+  fillPct,
+  pulsing,
+}: {
+  fillPct: number;
+  pulsing?: boolean;
+}) {
   const clamped = Math.max(0, Math.min(100, fillPct));
   return (
-    <svg viewBox="0 0 24 24" className="h-5 w-5">
+    <svg
+      viewBox="0 0 24 24"
+      className={cn("h-5 w-5", pulsing && "animate-pulse")}
+    >
       <path
         d={HEART_PATH}
         fill="none"
@@ -109,9 +127,11 @@ export function HeartBitTipButton({
   videoIpfsHash,
   creatorAddress,
   className,
+  showStickerPicker = true,
+  onTipSuccess,
 }: HeartBitTipButtonProps) {
   const { address } = useSmartAccountClient({});
-  const { mintHeartBit, getTotalHeartMintsByUser } = useHeartBit();
+  const { mintHeartBit } = useHeartBit();
   const { sendTip, isTipping, balances, fetchBalances } = useVideoTip();
   const { getAuthHeaders } = useWalletAuth();
 
@@ -119,9 +139,9 @@ export function HeartBitTipButton({
   const [selected, setSelected] = useState<StickerOption | null>(null);
   const [holding, setHolding] = useState(false);
   const [elapsed, setElapsed] = useState(0);
-  const [hasTipped, setHasTipped] = useState(false);
-  const [myTipAmount, setMyTipAmount] = useState<number | null>(null);
-  const [checkingTipped, setCheckingTipped] = useState(false);
+  const [myTipTotal, setMyTipTotal] = useState<number | null>(null);
+  const [myLastTipSeconds, setMyLastTipSeconds] = useState<number | null>(null);
+  const [loadingHistory, setLoadingHistory] = useState(false);
   const startTimeRef = useRef<number | null>(null);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const holdingRef = useRef(false);
@@ -134,9 +154,11 @@ export function HeartBitTipButton({
   );
 
   const fillPercentage = useMemo(() => {
-    if (hasTipped) return 100;
-    return Math.min(100, (elapsed / MAX_FILL_SECONDS) * 100);
-  }, [elapsed, hasTipped]);
+    // Visual only — amount keeps accruing past FILL_SECONDS.
+    return Math.min(100, (elapsed / FILL_SECONDS) * 100);
+  }, [elapsed]);
+
+  const overfillPulsing = holding && elapsed > FILL_SECONDS;
 
   const cachedUsdcBalance = useMemo(
     () => parseFloat(balances.USDC || "0") || 0,
@@ -222,46 +244,40 @@ export function HeartBitTipButton({
     void loadInventory();
   }, [loadInventory]);
 
-  const checkTipped = useCallback(async () => {
+  const loadTipHistory = useCallback(async () => {
     if (!address) return;
-    setCheckingTipped(true);
+    setLoadingHistory(true);
     try {
-      const [apiRes, onChainCount] = await Promise.all([
-        fetch(
-          `/api/stickers/tips?videoId=${encodeURIComponent(
-            videoId
-          )}&wallet=${encodeURIComponent(address)}`
-        ),
-        getTotalHeartMintsByUser({
-          hash: videoHash,
-          account: address,
-        }).catch(() => 0),
-      ]);
+      const apiRes = await fetch(
+        `/api/stickers/tips?videoId=${encodeURIComponent(
+          videoId
+        )}&wallet=${encodeURIComponent(address)}`
+      );
 
-      let dbHasTip = false;
-      let dbTotal = 0;
       if (apiRes.ok) {
         const json = await apiRes.json();
         const myTips = (json.tips ?? []) as StickerTipRow[];
         if (myTips.length > 0) {
-          dbHasTip = true;
-          dbTotal = myTips.reduce((sum, t) => sum + Number(t.usdc_amount), 0);
+          const total = myTips.reduce((sum, t) => sum + Number(t.usdc_amount), 0);
+          // API returns newest first (created_at DESC).
+          const latest = myTips[0];
+          setMyTipTotal(total);
+          setMyLastTipSeconds(latest?.seconds ?? null);
+        } else {
+          setMyTipTotal(null);
+          setMyLastTipSeconds(null);
         }
       }
-
-      const tipped = dbHasTip || onChainCount > 0;
-      setHasTipped(tipped);
-      if (tipped) setMyTipAmount(dbTotal || null);
     } catch (err) {
-      logger.debug("check tipped state failed:", err);
+      logger.debug("load tip history failed:", err);
     } finally {
-      setCheckingTipped(false);
+      setLoadingHistory(false);
     }
-  }, [address, getTotalHeartMintsByUser, videoHash, videoId]);
+  }, [address, videoId]);
 
   useEffect(() => {
-    void checkTipped();
-  }, [checkTipped]);
+    void loadTipHistory();
+  }, [loadTipHistory]);
 
   const stopTimer = useCallback(() => {
     if (tickRef.current) {
@@ -280,7 +296,7 @@ export function HeartBitTipButton({
 
   const onPointerDown = useCallback(
     (e: ReactPointerEvent<HTMLButtonElement>) => {
-      if (!address || isTipping || hasTipped) return;
+      if (!address || isTipping) return;
 
       // Fast path from cache; live check runs on release before sending.
       if (cachedUsdcBalance > 0 && cachedUsdcBalance < MIN_TIP_USDC) {
@@ -296,12 +312,15 @@ export function HeartBitTipButton({
       setElapsed(0);
       pulseHaptic();
       tickRef.current = setInterval(() => {
-        const next = Math.floor(Date.now() / 1000) - start;
+        const next = Math.min(
+          MAX_HOLD_SECONDS,
+          Math.floor(Date.now() / 1000) - start
+        );
         setElapsed(next);
         pulseHaptic();
       }, 1000);
     },
-    [address, isTipping, hasTipped, cachedUsdcBalance]
+    [address, isTipping, cachedUsdcBalance]
   );
 
   const onPointerUp = useCallback(
@@ -320,7 +339,10 @@ export function HeartBitTipButton({
       if (!start || !address) return;
 
       const endTime = Math.floor(Date.now() / 1000);
-      const seconds = Math.max(1, endTime - start);
+      const seconds = Math.min(
+        MAX_HOLD_SECONDS,
+        Math.max(1, endTime - start)
+      );
       const usdcAmount = Number((seconds * USDC_TIP_RATE_PER_SECOND).toFixed(2));
       setElapsed(seconds);
 
@@ -347,11 +369,12 @@ export function HeartBitTipButton({
       );
 
       try {
+        const mintEnd = start + seconds;
         const [tipResult] = await Promise.all([
           sendTip(usdcAmount.toFixed(2), "USDC", creatorAddress),
           mintHeartBit({
             startTime: start,
-            endTime,
+            endTime: mintEnd,
             hash: compositeHash,
             account: address,
           }).catch((err) => {
@@ -390,6 +413,11 @@ export function HeartBitTipButton({
             toast.warning(
               `Sent $${usdcAmount.toFixed(2)} USDC, but tip ledger failed: ${recordError}`
             );
+            setMyTipTotal((prev) => (prev ?? 0) + usdcAmount);
+            setMyLastTipSeconds(seconds);
+            if (tipResult.txHash) {
+              onTipSuccess?.(tipResult.txHash, usdcAmount.toFixed(2), "USDC");
+            }
           } else {
             throw new Error(recordError);
           }
@@ -399,9 +427,11 @@ export function HeartBitTipButton({
               ? `Tipped $${usdcAmount.toFixed(2)} USDC with sticker`
               : `Tipped $${usdcAmount.toFixed(2)} USDC`
           );
-          // Mark heart as permanently filled now that the tip succeeded.
-          setHasTipped(true);
-          setMyTipAmount((prev) => (prev ?? 0) + usdcAmount);
+          setMyTipTotal((prev) => (prev ?? 0) + usdcAmount);
+          setMyLastTipSeconds(seconds);
+          if (tipResult.txHash) {
+            onTipSuccess?.(tipResult.txHash, usdcAmount.toFixed(2), "USDC");
+          }
         }
       } catch (err) {
         logger.error("hold-to-tip failed:", err);
@@ -423,6 +453,7 @@ export function HeartBitTipButton({
       getAuthHeaders,
       readUsdcBalance,
       fetchBalances,
+      onTipSuccess,
     ]
   );
 
@@ -444,6 +475,7 @@ export function HeartBitTipButton({
 
   return (
     <div className={cn("relative flex items-center gap-2", className)}>
+      {showStickerPicker && (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button type="button" variant="outline" size="sm" className="gap-1">
@@ -504,6 +536,7 @@ export function HeartBitTipButton({
           )}
         </DropdownMenuContent>
       </DropdownMenu>
+      )}
 
       <div className="relative">
         {holding && (
@@ -514,13 +547,13 @@ export function HeartBitTipButton({
         <Button
           type="button"
           size="icon"
-          variant={hasTipped ? "default" : holding ? "default" : "secondary"}
+          variant={holding || myTipTotal != null ? "default" : "secondary"}
           className={cn(
             "h-10 w-10 rounded-full select-none touch-none",
             holding && "bg-pink-600 hover:bg-pink-600 scale-110",
-            hasTipped && "bg-pink-600 hover:bg-pink-600"
+            myTipTotal != null && !holding && "bg-pink-600 hover:bg-pink-600"
           )}
-          disabled={isTipping || checkingTipped || hasTipped}
+          disabled={isTipping || loadingHistory}
           onPointerDown={(e) => {
             e.preventDefault();
             onPointerDown(e);
@@ -534,13 +567,17 @@ export function HeartBitTipButton({
             onPointerCancel(e);
           }}
           onContextMenu={(e) => e.preventDefault()}
-          aria-label={hasTipped ? "You already tipped this video" : "Hold to tip USDC"}
+          aria-label="Hold to tip USDC — tip as much as you want"
         >
-          <AnimatedHeart fillPct={fillPercentage} />
+          <AnimatedHeart
+            fillPct={myTipTotal != null && !holding ? 100 : fillPercentage}
+            pulsing={overfillPulsing}
+          />
         </Button>
-        {hasTipped && myTipAmount != null && (
+        {myTipTotal != null && !holding && (
           <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] font-semibold text-pink-600">
-            You tipped ${myTipAmount.toFixed(2)}
+            ${myTipTotal.toFixed(2)}
+            {myLastTipSeconds != null ? ` · last ${myLastTipSeconds}s` : ""}
           </div>
         )}
       </div>

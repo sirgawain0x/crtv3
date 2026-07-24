@@ -165,6 +165,39 @@ type TypedDataPayload = {
   message: Record<string, unknown>;
 };
 
+/**
+ * Privy's toViemAccount signs via eth_signTypedData_v4, which JSON-serializes
+ * params. Convert BigInt fields to numbers/strings so signing does not throw
+ * "Do not know how to serialize a BigInt".
+ */
+function jsonSafeTypedDataValue(value: unknown): unknown {
+  if (typeof value === "bigint") {
+    return value <= BigInt(Number.MAX_SAFE_INTEGER) &&
+      value >= BigInt(Number.MIN_SAFE_INTEGER)
+      ? Number(value)
+      : value.toString();
+  }
+  if (Array.isArray(value)) {
+    return value.map(jsonSafeTypedDataValue);
+  }
+  if (value && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      out[k] = jsonSafeTypedDataValue(v);
+    }
+    return out;
+  }
+  return value;
+}
+
+function toJsonSafeTypedData(typedData: TypedDataPayload): TypedDataPayload {
+  return {
+    ...typedData,
+    domain: jsonSafeTypedDataValue(typedData.domain) as Record<string, unknown>,
+    message: jsonSafeTypedDataValue(typedData.message) as Record<string, unknown>,
+  };
+}
+
 type SignTypedDataHookOptions = {
   client?: CompatSmartAccountClient;
   onSuccess?: (signature: Hex) => void;
@@ -182,7 +215,9 @@ export function useSignTypedData(options: SignTypedDataHookOptions = {}) {
 
   const signTypedData = useCallback(
     async (args: { typedData: TypedDataPayload } | TypedDataPayload) => {
-      const typedData = "typedData" in args ? args.typedData : args;
+      const raw = "typedData" in args ? args.typedData : args;
+      // Always JSON-safe: Privy eth_signTypedData_v4 cannot serialize BigInt.
+      const typedData = toJsonSafeTypedData(raw);
 
       setIsSigningTypedData(true);
       setError(null);
