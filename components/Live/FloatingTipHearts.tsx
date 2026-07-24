@@ -70,7 +70,9 @@ function TipHeartBubble({
  */
 export function FloatingTipHearts({ streamId, className }: FloatingTipHeartsProps) {
   const [hearts, setHearts] = useState<FloatingHeart[]>([]);
-  const timeoutIdsRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
+  const timeoutIdsRef = useRef<Set<ReturnType<typeof window.setTimeout>>>(
+    new Set()
+  );
 
   useEffect(() => {
     const timeoutIds = timeoutIdsRef.current;
