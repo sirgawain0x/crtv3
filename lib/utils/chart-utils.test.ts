@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { LineStyle } from "lightweight-charts";
 import {
   CHART_DOWN,
   CHART_UP,
   getBaselineSeriesOptions,
   getCandlestickSeriesOptions,
+  getPeriodOpenPriceLineOptions,
 } from "./chart-utils";
 
 describe("chart-utils PnL colors", () => {
@@ -22,5 +24,13 @@ describe("chart-utils PnL colors", () => {
     expect(opts.baseValue).toEqual({ type: "price", price: 1.25 });
     expect(opts.topLineColor).toBe(CHART_UP);
     expect(opts.bottomLineColor).toBe(CHART_DOWN);
+  });
+
+  it("labels period-open price line for baseline cue", () => {
+    const opts = getPeriodOpenPriceLineOptions(0.5568, false);
+    expect(opts.price).toBe(0.5568);
+    expect(opts.title).toBe("Period open");
+    expect(opts.lineStyle).toBe(LineStyle.Dashed);
+    expect(opts.axisLabelVisible).toBe(true);
   });
 });

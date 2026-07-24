@@ -16,7 +16,10 @@ function hasValidLock(
   );
 }
 
-/** Creative Creator Pass or Creator Plus — blocked from prediction create/bet (anti-cheat). */
+/**
+ * Creative Creator Pass (or legacy Creator Plus) — blocked from prediction
+ * create/bet (anti-cheat). Plus locks remain recognized for existing holders.
+ */
 export function hasValidCreatorPass(
   memberships: MembershipLike[] | null | undefined
 ): boolean {
@@ -26,7 +29,10 @@ export function hasValidCreatorPass(
   ]);
 }
 
-/** Brand pass or Brand Plus — required to create Snapshot campaigns (plus admin). */
+/**
+ * Brand pass (or legacy Brand Plus) — required to create Snapshot campaigns
+ * (plus admin). Plus locks remain recognized for existing holders.
+ */
 export function hasValidBrandPass(
   memberships: MembershipLike[] | null | undefined
 ): boolean {
@@ -36,7 +42,10 @@ export function hasValidBrandPass(
   ]);
 }
 
-/** Investor pass or Investor Plus — unlimited predictions, but no live/campaign access. */
+/**
+ * Investor pass (or legacy Investor Plus) — unlimited predictions, but no
+ * live/campaign access. Plus locks remain recognized for existing holders.
+ */
 export function hasValidInvestorPass(
   memberships: MembershipLike[] | null | undefined
 ): boolean {
@@ -46,18 +55,7 @@ export function hasValidInvestorPass(
   ]);
 }
 
-/** Any Plus pass (Creator, Investor, or Brand Plus) — gates Digital Twin / Pinata agent. */
-export function hasValidPlusPass(
-  memberships: MembershipLike[] | null | undefined
-): boolean {
-  return hasValidLock(memberships, [
-    LOCK_ADDRESSES.BASE_CREATIVE_CREATOR_PLUS,
-    LOCK_ADDRESSES.BASE_CREATIVE_INVESTOR_PLUS,
-    LOCK_ADDRESSES.BASE_CREATIVE_BRAND_PLUS,
-  ]);
-}
-
-/** Any paid Creative Platform pass (base or Plus). */
+/** Any paid Creative Platform pass (base or legacy Plus). */
 export function hasAnyValidPass(
   memberships: MembershipLike[] | null | undefined
 ): boolean {

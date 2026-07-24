@@ -1,15 +1,17 @@
 import { PriceHistoryPoint } from '@/app/api/market/tokens/[address]/price-history/route';
-import type {
-  LineStyleOptions,
-  AreaStyleOptions,
-  CandlestickStyleOptions,
-  HistogramStyleOptions,
-  BaselineStyleOptions,
-  UTCTimestamp,
-  Time,
-  LineData,
-  AreaData,
-  HistogramData,
+import {
+  LineStyle,
+  type LineStyleOptions,
+  type AreaStyleOptions,
+  type CandlestickStyleOptions,
+  type HistogramStyleOptions,
+  type BaselineStyleOptions,
+  type CreatePriceLineOptions,
+  type UTCTimestamp,
+  type Time,
+  type LineData,
+  type AreaData,
+  type HistogramData,
 } from 'lightweight-charts';
 
 // Use the actual types from lightweight-charts
@@ -271,6 +273,23 @@ export function getBaselineSeriesOptions(
     lineWidth: 2,
     crosshairMarkerVisible: true,
     crosshairMarkerRadius: 4,
+  };
+}
+
+/**
+ * Labeled price line at period open (createPriceLine cue for baseline charts).
+ */
+export function getPeriodOpenPriceLineOptions(
+  basePrice: number,
+  isDark: boolean
+): CreatePriceLineOptions {
+  return {
+    price: basePrice,
+    color: isDark ? '#9ca3af' : '#6b7280',
+    lineWidth: 1,
+    lineStyle: LineStyle.Dashed,
+    axisLabelVisible: true,
+    title: 'Period open',
   };
 }
 

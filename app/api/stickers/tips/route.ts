@@ -5,6 +5,7 @@ import {
   insertStickerTip,
   listStickerTipsForVideo,
 } from "@/lib/sdk/supabase/campaign-stickers";
+import { MAX_HOLD_SECONDS } from "@/lib/sdk/heartbit/config";
 import { serverLogger } from "@/lib/utils/logger";
 import { checkBotIdDeep } from "@/lib/middleware/botIdGuard";
 import { rateLimiters } from "@/lib/middleware/rateLimit";
@@ -16,8 +17,9 @@ const tipSchema = z.object({
   stickerTokenId: z.number().nullable().optional(),
   stickerIpfsHash: z.string().nullable().optional(),
   compositeHash: z.string().min(1),
-  seconds: z.number().int().positive().max(300),
-  usdcAmount: z.number().positive().max(1000),
+  seconds: z.number().int().positive().max(MAX_HOLD_SECONDS),
+  // Soft sanity bound only — not a product tip cap (rate × hold drives amount).
+  usdcAmount: z.number().positive().max(MAX_HOLD_SECONDS),
   txHash: z
     .string()
     .regex(/^0x[a-fA-F0-9]{64}$/)

@@ -31,8 +31,16 @@ function SongCupGoalButtonContent({ label }: { label: string }) {
 
 export function SongCupGoalButton({ label, className, href, onClick }: SongCupGoalButtonProps) {
   if (href) {
+    const isExternal = /^https?:\/\//i.test(href);
     return (
-      <Link href={href} onClick={onClick} className={cn(buttonClassName, className)}>
+      <Link
+        href={href}
+        onClick={onClick}
+        className={cn(buttonClassName, className)}
+        {...(isExternal
+          ? { target: "_blank", rel: "noopener noreferrer" }
+          : {})}
+      >
         <SongCupGoalButtonContent label={label} />
       </Link>
     );

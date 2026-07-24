@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Sheet,
   SheetContent,
@@ -11,6 +11,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { ListOrdered } from "lucide-react";
 import { shortenAddress } from "@/lib/utils/utils";
+import {
+  useStreamTipEvents,
+  type StreamTipEvent,
+} from "@/lib/hooks/live/useStreamTipEvents";
 
 type TipRow = {
   id: string;
@@ -25,9 +29,33 @@ type TipRow = {
 
 type TipLedgerDrawerProps = {
   videoId: string;
+  /** When true, append new tips via Supabase Realtime while the sheet is open. */
+  liveUpdates?: boolean;
 };
 
-export function TipLedgerDrawer({ videoId }: TipLedgerDrawerProps) {
+function tipFromEvent(tip: StreamTipEvent): TipRow {
+  return {
+    id: tip.id,
+    wallet: tip.wallet,
+    sticker_token_id: tip.sticker_token_id,
+    sticker_ipfs_hash: tip.sticker_ipfs_hash,
+    seconds: tip.seconds,
+    usdc_amount: tip.usdc_amount,
+    tx_hash: tip.tx_hash,
+    created_at: tip.created_at,
+  };
+}
+
+/** Extract stream id from `stream:{id}` video keys used for live tips. */
+function streamIdFromVideoId(videoId: string): string | null {
+  if (!videoId.startsWith("stream:")) return null;
+  return videoId.slice("stream:".length) || null;
+}
+
+export function TipLedgerDrawer({
+  videoId,
+  liveUpdates = false,
+}: TipLedgerDrawerProps) {
   const [open, setOpen] = useState(false);
   const [tips, setTips] = useState<TipRow[]>([]);
   const [loading, setLoading] = useState(false);
@@ -57,6 +85,16 @@ export function TipLedgerDrawer({ videoId }: TipLedgerDrawerProps) {
     };
   }, [open, videoId]);
 
+  const onLiveTip = useCallback((tip: StreamTipEvent) => {
+    setTips((prev) => {
+      if (prev.some((t) => t.id === tip.id)) return prev;
+      return [tipFromEvent(tip), ...prev];
+    });
+  }, []);
+
+  const streamId = streamIdFromVideoId(videoId);
+  useStreamTipEvents(streamId, onLiveTip, liveUpdates && open && !!streamId);
+
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
@@ -67,14 +105,14 @@ export function TipLedgerDrawer({ videoId }: TipLedgerDrawerProps) {
       </SheetTrigger>
       <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
         <SheetHeader>
-          <SheetTitle>Sticker tip ledger</SheetTitle>
+          <SheetTitle>Tip ledger</SheetTitle>
         </SheetHeader>
         <div className="mt-4 space-y-2">
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : tips.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              No sticker tips yet for this video.
+              No tips yet for this video.
             </p>
           ) : (
             <div className="rounded-md border">

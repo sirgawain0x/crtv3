@@ -29,7 +29,7 @@ export function VideoHeartBitSection({
           <div>
             <h3 className="text-sm font-semibold">Tip</h3>
             <p className="text-xs text-muted-foreground">
-              Hold heart · $0.01/s · sticker optional
+              Hold heart · $0.01/s · tip again anytime
             </p>
           </div>
           <div className="flex items-center gap-2">

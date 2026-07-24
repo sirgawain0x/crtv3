@@ -16,6 +16,7 @@ import "./Player.css";
 import { Src } from "@livepeer/react";
 import { SubtitlesControl } from "./Subtitles";
 import { CreativeBrandOverlay } from "./CreativeBrandOverlay";
+import { FloatingTipHearts } from "@/components/Live/FloatingTipHearts";
 import { safelyPauseVideo } from "@/lib/utils/video-controls";
 import { logger } from '@/lib/utils/logger';
 
@@ -154,6 +155,7 @@ export function Player(props: {
         />
 
         <CreativeBrandOverlay />
+        {playbackId ? <FloatingTipHearts streamId={playbackId} /> : null}
 
         <LivepeerPlayer.LoadingIndicator
           style={{

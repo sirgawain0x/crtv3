@@ -9,6 +9,7 @@ import {
   CarouselPrevious,
   type CarouselApi,
 } from "@/components/ui/carousel";
+import { BeatMeBanner } from "@/components/songchain/BeatMeBanner";
 import { SongCupBanner } from "@/components/songchain/SongCupBanner";
 import { ChonesBanner } from "@/components/chones/ChonesBanner";
 import { cn } from "@/lib/utils";
@@ -51,6 +52,9 @@ export function ChannelBannersCarousel({ className }: ChannelBannersCarouselProp
       onBlurCapture={onBlurCapture}
     >
       <CarouselContent className="-ml-0 items-stretch">
+        <CarouselItem className="pl-0">
+          <BeatMeBanner className="h-full" />
+        </CarouselItem>
         <CarouselItem className="pl-0">
           <SongCupBanner className="h-full" />
         </CarouselItem>

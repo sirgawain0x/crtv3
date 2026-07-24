@@ -189,6 +189,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         eligible: false,
         tokenId: sticker.token_id,
+        name: sticker.name,
+        imageUri: sticker.image_uri,
+        ipfsHash: sticker.ipfs_hash,
         votes: [],
       });
     }

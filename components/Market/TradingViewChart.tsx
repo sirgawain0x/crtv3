@@ -5,6 +5,7 @@ import {
   createChart,
   IChartApi,
   ISeriesApi,
+  IPriceLine,
   LineStyleOptions,
   AreaStyleOptions,
   CandlestickStyleOptions,
@@ -27,6 +28,7 @@ import {
   getLineSeriesOptions,
   getAreaSeriesOptions,
   getBaselineSeriesOptions,
+  getPeriodOpenPriceLineOptions,
   getCandlestickSeriesOptions,
   getVolumeSeriesOptions,
   CandlestickDataPoint,
@@ -65,6 +67,7 @@ export function TradingViewChart({
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<MainSeriesApi | null>(null);
   const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
+  const periodOpenLineRef = useRef<IPriceLine | null>(null);
   const candleDataRef = useRef<CandlestickDataPoint[]>([]);
   const { theme, systemTheme } = useTheme();
   const [isMounted, setIsMounted] = useState(false);
@@ -72,6 +75,27 @@ export function TradingViewChart({
   const isDark = theme === 'dark' || (theme === 'system' && systemTheme === 'dark') || false;
   const resolvedBasePrice =
     basePrice ?? (data.length > 0 ? data[0].price : 0);
+
+  const syncPeriodOpenLine = (
+    series: MainSeriesApi,
+    price: number,
+    dark: boolean
+  ) => {
+    if (!(price > 0)) {
+      if (periodOpenLineRef.current) {
+        series.removePriceLine(periodOpenLineRef.current);
+        periodOpenLineRef.current = null;
+      }
+      return;
+    }
+
+    const options = getPeriodOpenPriceLineOptions(price, dark);
+    if (periodOpenLineRef.current) {
+      periodOpenLineRef.current.applyOptions(options);
+      return;
+    }
+    periodOpenLineRef.current = series.createPriceLine(options);
+  };
 
   // Mount check for SSR
   useEffect(() => {
@@ -88,6 +112,7 @@ export function TradingViewChart({
       chartRef.current = null;
       seriesRef.current = null;
       volumeSeriesRef.current = null;
+      periodOpenLineRef.current = null;
     }
 
     const colors = getChartColors(isDark);
@@ -128,6 +153,7 @@ export function TradingViewChart({
         baselineOptions as BaselineStyleOptions
       );
       series.setData(chartData);
+      syncPeriodOpenLine(series, resolvedBasePrice || 0, isDark);
     } else if (chartType === 'area') {
       const areaOptions = getAreaSeriesOptions(isDark, isPositive);
       series = chart.addSeries(AreaSeries, areaOptions as AreaStyleOptions);
@@ -197,6 +223,7 @@ export function TradingViewChart({
         chartRef.current = null;
         seriesRef.current = null;
         volumeSeriesRef.current = null;
+        periodOpenLineRef.current = null;
       }
     };
     // data intentionally omitted — updated in separate effect to avoid full remounts
@@ -215,9 +242,11 @@ export function TradingViewChart({
       const chartData = convertToChartData(data);
       seriesRef.current.setData(chartData);
       if (chartType === 'baseline') {
+        const nextBase = resolvedBasePrice || data[0].price;
         seriesRef.current.applyOptions(
-          getBaselineSeriesOptions(resolvedBasePrice || data[0].price) as BaselineStyleOptions
+          getBaselineSeriesOptions(nextBase) as BaselineStyleOptions
         );
+        syncPeriodOpenLine(seriesRef.current, nextBase, isDark);
       }
     }
 
@@ -255,6 +284,7 @@ export function TradingViewChart({
         seriesRef.current.applyOptions(
           getBaselineSeriesOptions(resolvedBasePrice || 0) as BaselineStyleOptions
         );
+        syncPeriodOpenLine(seriesRef.current, resolvedBasePrice || 0, isDark);
       } else if (chartType === 'area') {
         seriesRef.current.applyOptions(
           getAreaSeriesOptions(isDark, isPositive) as AreaStyleOptions

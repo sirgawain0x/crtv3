@@ -580,99 +580,149 @@ export function PredictionList() {
           const now = Math.floor(Date.now() / 1000);
           const openingTs = Number(question.opening_ts);
           const timeout = Number(question.timeout);
-          const isActive = openingTs <= now && (timeout === 0 || (openingTs + timeout) > now);
-          const isClosed = timeout > 0 && (openingTs + timeout) <= now;
+          const isActive =
+            openingTs <= now &&
+            (timeout === 0 || openingTs + timeout > now);
+          const isClosed = timeout > 0 && openingTs + timeout <= now;
+          const finalizeTs = Number(question.finalize_ts ?? 0);
+          const lastBondTs = Number(question.last_bond_ts ?? 0);
+          // Creative subgraph only sets finalize_ts on LogFinalize; on-chain
+          // Reality.eth sets it to answer_ts + timeout. Infer when missing.
+          const inferredFinalizeTs =
+            Number.isFinite(lastBondTs) &&
+            lastBondTs > 0 &&
+            Number.isFinite(timeout) &&
+            timeout > 0
+              ? lastBondTs + timeout
+              : 0;
+          const effectiveFinalizeTs =
+            Number.isFinite(finalizeTs) && finalizeTs > 0
+              ? finalizeTs
+              : inferredFinalizeTs;
+          const isFinalizing =
+            Boolean(question.leadingLabel) &&
+            Number.isFinite(effectiveFinalizeTs) &&
+            effectiveFinalizeTs > now;
+          const claimImpliesResolved = Boolean(claimStatusMap[question.id]);
+          const isResolved =
+            claimImpliesResolved ||
+            (Boolean(question.leadingLabel) &&
+              Number.isFinite(effectiveFinalizeTs) &&
+              effectiveFinalizeTs > 0 &&
+              effectiveFinalizeTs <= now &&
+              !question.is_pending_arbitration);
+
+          const statusLabel = isResolved
+            ? "Resolved"
+            : isFinalizing
+              ? "Finalizing"
+              : isActive
+                ? "Active"
+                : isClosed
+                  ? "Closed"
+                  : "Pending";
+          const statusVariant =
+            isResolved || isClosed
+              ? "secondary"
+              : isActive
+                ? "default"
+                : isFinalizing
+                  ? "outline"
+                  : "outline";
 
           return (
-            <Card key={question.id} className="p-4 sm:p-6 hover:shadow-md transition-shadow">
-              <div className="flex flex-col md:flex-row items-start justify-between gap-4">
-                <div className="flex-1 min-w-0 w-full">
-                  <div className="flex justify-between items-start gap-2 mb-2">
-                    <div className="min-w-0 flex-1">
-                      <h3 className="text-lg font-semibold leading-tight">
-                        {question.title || "Untitled Prediction"}
-                      </h3>
-                      <div className="flex flex-wrap gap-1.5 mt-1.5">
-                        {question.parsedCategory && (
-                          <Badge variant="outline" className="text-xs">
-                            {formatCategoryLabel(question.parsedCategory)}
-                          </Badge>
-                        )}
-                        {(() => {
-                          const finalizeTs = Number(question.finalize_ts ?? 0);
-                          const isFinalized =
-                            Number.isFinite(finalizeTs) &&
-                            finalizeTs > 0 &&
-                            finalizeTs <= now;
-                          if (isFinalized && question.leadingLabel) {
-                            return (
+            <Link
+              key={question.id}
+              href={`/predict/${question.id}`}
+              className="block"
+            >
+              <Card className="p-4 sm:p-6 cursor-pointer hover:shadow-lg transition-shadow">
+                <div className="flex flex-col md:flex-row items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0 w-full">
+                    <div className="flex justify-between items-start gap-2 mb-2">
+                      <div className="min-w-0 flex-1">
+                        <h3 className="text-lg font-semibold leading-tight">
+                          {question.title || "Untitled Prediction"}
+                        </h3>
+                        <div className="flex flex-wrap gap-1.5 mt-1.5">
+                          {question.parsedCategory && (
+                            <Badge variant="outline" className="text-xs">
+                              {formatCategoryLabel(question.parsedCategory)}
+                            </Badge>
+                          )}
+                          {question.leadingLabel &&
+                            (isResolved ? (
                               <Badge variant="default" className="text-xs">
                                 Final Answer: {question.leadingLabel}
                               </Badge>
-                            );
-                          }
-                          if (question.leadingLabel) {
-                            return (
+                            ) : (
                               <Badge variant="secondary" className="text-xs">
                                 Leading: {question.leadingLabel}
                               </Badge>
-                            );
-                          }
-                          return null;
-                        })()}
-                        {claimStatusMap[question.id] && (
-                          <Badge className="text-xs bg-emerald-600 hover:bg-emerald-700">
-                            <Gift className="h-3 w-3 mr-1" aria-hidden />
-                            Claim winnings
-                          </Badge>
-                        )}
+                            ))}
+                          {claimStatusMap[question.id] && (
+                            <Badge className="text-xs bg-emerald-600 hover:bg-emerald-700">
+                              <Gift className="h-3 w-3 mr-1" aria-hidden />
+                              Claim winnings
+                            </Badge>
+                          )}
+                        </div>
                       </div>
+                      <Badge
+                        className={`shrink-0 mt-0.5${
+                          isFinalizing && !isResolved
+                            ? " bg-yellow-500 hover:bg-yellow-600 text-white"
+                            : ""
+                        }`}
+                        variant={statusVariant}
+                      >
+                        {statusLabel}
+                      </Badge>
                     </div>
-                    <Badge className="shrink-0 mt-0.5" variant={isActive ? "default" : isClosed ? "secondary" : "outline"}>
-                      {isActive ? "Active" : isClosed ? "Closed" : "Pending"}
-                    </Badge>
-                  </div>
-                  {question.description && (
-                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">
-                      {question.description}
-                    </p>
-                  )}
-                  <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs text-gray-500">
-                    <div className="flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      <span>
-                        {Number(question.timeout) > 0
-                          ? `Closes: ${new Date((Number(question.opening_ts) + Number(question.timeout)) * 1000).toLocaleString()}`
-                          : "No timeout"}
-                      </span>
+                    {question.description && (
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-2">
+                        {question.description}
+                      </p>
+                    )}
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs text-gray-500">
+                      <div className="flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        <span>
+                          {Number(question.timeout) > 0
+                            ? `Closes: ${new Date(
+                                (Number(question.opening_ts) +
+                                  Number(question.timeout)) *
+                                  1000
+                              ).toLocaleString()}`
+                            : "No timeout"}
+                        </span>
+                      </div>
+                      {(() => {
+                        const stakeSummary =
+                          stakeStatsMap[question.id.toLowerCase()];
+                        return stakeSummary &&
+                          BigInt(stakeSummary.totalPrizePool) > 0n ? (
+                          <div>
+                            Pool:{" "}
+                            {formatEth(BigInt(stakeSummary.totalPrizePool))} ETH
+                          </div>
+                        ) : question.bounty && Number(question.bounty) > 0 ? (
+                          <div>
+                            Bounty:{" "}
+                            {(Number(question.bounty) / 1e18).toFixed(4)} ETH
+                          </div>
+                        ) : null;
+                      })()}
                     </div>
-                    {(() => {
-                      const stakeSummary =
-                        stakeStatsMap[question.id.toLowerCase()];
-                      return stakeSummary &&
-                        BigInt(stakeSummary.totalPrizePool) > 0n ? (
-                        <div>
-                          Pool:{" "}
-                          {formatEth(BigInt(stakeSummary.totalPrizePool))} ETH
-                        </div>
-                      ) : question.bounty && Number(question.bounty) > 0 ? (
-                        <div>
-                          Bounty: {(Number(question.bounty) / 1e18).toFixed(4)}{" "}
-                          ETH
-                        </div>
-                      ) : null;
-                    })()}
                   </div>
-                </div>
-                <div className="flex flex-col gap-2 w-full md:w-auto mt-2 md:mt-0">
-                  <Link href={`/predict/${question.id}`}>
-                    <Button variant="outline" size="sm" className="w-full md:w-auto">
+                  <div className="flex flex-col gap-2 w-full md:w-auto mt-2 md:mt-0">
+                    <span className="inline-flex items-center justify-center whitespace-nowrap rounded-md border border-input bg-background px-3 py-1.5 text-sm font-medium w-full md:w-auto pointer-events-none">
                       View Details
-                    </Button>
-                  </Link>
+                    </span>
+                  </div>
                 </div>
-              </div>
-            </Card>
+              </Card>
+            </Link>
           );
         })}
       </div>

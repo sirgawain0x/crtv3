@@ -12,6 +12,12 @@ export type MembershipTierConfig = {
   recommended?: boolean;
 };
 
+/**
+ * Memberships offered for purchase. Plus locks are retired — AI agents are
+ * purchased/deployed on Pinata and connected from the creator profile.
+ * Existing Plus holders still map to the matching base tier via
+ * {@link getTierIndexByAddress}.
+ */
 export const MEMBERSHIP_TIERS: MembershipTierConfig[] = [
   {
     name: "Creative Creator Pass",
@@ -20,37 +26,19 @@ export const MEMBERSHIP_TIERS: MembershipTierConfig[] = [
     priceLabel: "$10 USD per month",
     decimals: 6,
     address: LOCK_ADDRESSES.BASE_CREATIVE_PASS,
-    features: ["Community Access", "Weekly Challenges", "Resource Library"],
-    detailedFeatures: [
-      "Access to exclusive creative resources and events",
-      "Media exposure opportunities",
-      "Seasonal creative challenges and competitions",
-      "Competitive revenue sharing and earning opportunities",
-      "Access to creative Web3/AI software and tools",
-      "Community feedback and collaboration spaces",
-    ],
-  },
-  {
-    name: "Creative Creator Plus",
-    price: "30",
-    periodLabel: "per month",
-    priceLabel: "$30 USD per month",
-    decimals: 6,
-    address: LOCK_ADDRESSES.BASE_CREATIVE_CREATOR_PLUS,
     features: [
       "Community Access",
       "Weekly Challenges",
-      "Pinata Agent / Digital Twin",
+      "Bring Your Own Pinata Agent",
     ],
     detailedFeatures: [
-      "Everything in Creative Creator Pass",
-      "Pinata Agent / Digital Twin for your creator profile",
       "Access to exclusive creative resources and events",
       "Media exposure opportunities",
       "Seasonal creative challenges and competitions",
       "Competitive revenue sharing and earning opportunities",
       "Access to creative Web3/AI software and tools",
       "Community feedback and collaboration spaces",
+      "Attach a Pinata AI agent to your profile for live streams (purchase/deploy on Pinata)",
     ],
   },
   {
@@ -71,30 +59,6 @@ export const MEMBERSHIP_TIERS: MembershipTierConfig[] = [
       "Advanced analytics and performance tracking",
     ],
     recommended: true,
-  },
-  {
-    name: "Creative Investor Plus",
-    price: "120",
-    periodLabel: "per month",
-    priceLabel: "$120 USD per month",
-    decimals: 6,
-    address: LOCK_ADDRESSES.BASE_CREATIVE_INVESTOR_PLUS,
-    features: [
-      "Priority Access",
-      "Investment Reports",
-      "Pinata Agent / Digital Twin",
-    ],
-    detailedFeatures: [
-      "Everything in Creative Investor Pass",
-      "Pinata Agent / Digital Twin for your creator profile",
-      "Exclusive access to emerging creative talent",
-      "Priority investment opportunities in creative projects",
-      "Detailed market analysis and trend reports",
-      "Direct connections with top-tier creators",
-      "Portfolio diversification strategies",
-      "Exclusive investor-only events and networking",
-      "Advanced analytics and performance tracking",
-    ],
   },
   {
     name: "Creative Brand Pass",
@@ -118,37 +82,25 @@ export const MEMBERSHIP_TIERS: MembershipTierConfig[] = [
       "Comprehensive brand analytics and ROI tracking",
     ],
   },
-  {
-    name: "Creative Brand Plus",
-    price: "1100",
-    periodLabel: "per month",
-    priceLabel: "$1,100 USD per month",
-    decimals: 6,
-    address: LOCK_ADDRESSES.BASE_CREATIVE_BRAND_PLUS,
-    features: [
-      "Partnership Opportunities",
-      "Brand Showcase",
-      "Pinata Agent / Digital Twin",
-    ],
-    detailedFeatures: [
-      "Everything in Creative Brand Pass",
-      "Pinata Agent / Digital Twin for your creator profile",
-      "Curated creator partnerships and collaborations",
-      "Custom brand integration and storytelling campaigns",
-      "Access to premium creative talent pool",
-      "Strategic marketing consultation and campaign planning",
-      "Exclusive brand showcase and visibility opportunities",
-      "Priority access to trending creators and influencers",
-      "Comprehensive brand analytics and ROI tracking",
-    ],
-  },
 ];
+
+/** Retired Plus locks → matching base tier address (for UI highlight / upgrades). */
+const PLUS_TO_BASE_TIER: Record<string, LockAddressValue> = {
+  [LOCK_ADDRESSES.BASE_CREATIVE_CREATOR_PLUS.toLowerCase()]:
+    LOCK_ADDRESSES.BASE_CREATIVE_PASS,
+  [LOCK_ADDRESSES.BASE_CREATIVE_INVESTOR_PLUS.toLowerCase()]:
+    LOCK_ADDRESSES.BASE_CREATIVE_PASS_2,
+  [LOCK_ADDRESSES.BASE_CREATIVE_BRAND_PLUS.toLowerCase()]:
+    LOCK_ADDRESSES.BASE_CREATIVE_PASS_3,
+};
 
 export function getTierIndexByAddress(address?: string | null): number {
   if (!address) return 0;
   const normalized = address.toLowerCase();
+  const resolved =
+    PLUS_TO_BASE_TIER[normalized] ?? (address as LockAddressValue);
   const index = MEMBERSHIP_TIERS.findIndex(
-    (tier) => tier.address.toLowerCase() === normalized
+    (tier) => tier.address.toLowerCase() === resolved.toLowerCase()
   );
   return index >= 0 ? index : 0;
 }
@@ -158,5 +110,9 @@ export function isCurrentTier(
   currentMembershipAddress?: string
 ): boolean {
   if (!currentMembershipAddress) return false;
-  return tierAddress.toLowerCase() === currentMembershipAddress.toLowerCase();
+  const current = currentMembershipAddress.toLowerCase();
+  const tier = tierAddress.toLowerCase();
+  if (tier === current) return true;
+  // Treat a Plus lock as "current" for its matching base tier card.
+  return PLUS_TO_BASE_TIER[current]?.toLowerCase() === tier;
 }

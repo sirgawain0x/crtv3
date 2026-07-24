@@ -41,11 +41,24 @@ import { ShareDialog } from "@/components/Videos/ShareDialog";
 import { useSongchainPost } from "@/hooks/useSongchainPost";
 import { getSongchainConfig } from "@/lib/songchain/config";
 import { getTemplateIdForQuestionType } from "@/lib/predictions/reality-template";
-import { PREDICTION_CATEGORIES } from "@/lib/predictions/categories";
+import {
+  PREDICTION_CATEGORIES,
+  type PredictionCategoryValue,
+} from "@/lib/predictions/categories";
 import {
   REALITY_QUESTION_TYPES,
   getRealityQuestionTypeOption,
 } from "@/lib/predictions/reality-question-types";
+import { cn } from "@/lib/utils/utils";
+
+export type CreatePredictionProps = {
+  /** Tighter layout for embedding (e.g. Song Cup Predict panel). */
+  embedded?: boolean;
+  /** Prefill category; defaults to general on the standalone create page. */
+  defaultCategory?: PredictionCategoryValue;
+  /** Where to send the user after create/share closes. */
+  successHref?: string;
+};
 
 const predictionSchema = z.object({
   title: z.string().min(3, "Title is required"),
@@ -94,7 +107,11 @@ type PredictionQuota = {
   remaining: number | null;
 };
 
-function CreatePrediction() {
+function CreatePrediction({
+  embedded = false,
+  defaultCategory = "general",
+  successHref = "/predict",
+}: CreatePredictionProps) {
   const { chain } = useChain();
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -129,7 +146,7 @@ function CreatePrediction() {
       title: "",
       type: "bool",
       outcomes: [{ value: "Yes" }, { value: "No" }], // Default to Yes/No for bool type
-      category: "general",
+      category: defaultCategory,
       description: "",
       closeDate: "",
       closeTime: "",
@@ -473,11 +490,34 @@ function CreatePrediction() {
   };
 
   return (
-    <div className="flex flex-wrap items-start justify-center p-2">
+    <div
+      className={cn(
+        "flex flex-wrap items-start justify-center",
+        embedded ? "w-full p-0" : "p-2",
+      )}
+    >
+      {embedded && !isConnected ? (
+        <div className="mb-4 w-full rounded-xl border border-border/60 bg-muted/40 px-4 py-3 dark:bg-white/[0.06]">
+          <p className="text-sm text-muted-foreground">
+            Connect your wallet to create a prediction market.
+          </p>
+          <Button
+            type="button"
+            size="sm"
+            className="mt-2"
+            onClick={() => openAuthModal()}
+          >
+            Connect wallet
+          </Button>
+        </div>
+      ) : null}
       <Form {...form}>
         <form
           onSubmit={handleFormSubmit}
-          className="w-full p-5 md:w-2/5 space-y-6"
+          className={cn(
+            "w-full",
+            embedded ? "space-y-4 p-0" : "space-y-6 p-5 md:w-2/5",
+          )}
         >
           {isBlockedTier && blockReason && (
             <Alert variant="destructive">
@@ -755,7 +795,12 @@ function CreatePrediction() {
       </Form>
 
       {createdMeta && (
-        <div className="w-full p-5 md:w-2/5 space-y-3">
+        <div
+          className={cn(
+            "w-full space-y-3",
+            embedded ? "p-0 pt-3" : "p-5 md:w-2/5",
+          )}
+        >
           <Button
             type="button"
             variant="secondary"
@@ -766,7 +811,7 @@ function CreatePrediction() {
                 typeof window !== "undefined" ? window.location.origin : "";
               void createPost({
                 feedId: songchainConfig.publicFeedId!,
-                content: `New prediction: ${createdMeta.title}\n\n${origin}/predict`,
+                content: `New prediction: ${createdMeta.title}\n\n${origin}${successHref}`,
                 title: createdMeta.title,
               });
             }}
@@ -777,7 +822,7 @@ function CreatePrediction() {
             type="button"
             variant="outline"
             className="w-full"
-            onClick={() => router.push("/predict")}
+            onClick={() => router.push(successHref)}
           >
             View all predictions
           </Button>
@@ -789,12 +834,12 @@ function CreatePrediction() {
         onOpenChange={(open) => {
           setShareOpen(open);
           if (!open && createdMeta) {
-            router.push("/predict");
+            router.push(successHref);
           }
         }}
         videoTitle={createdMeta?.title ?? "Prediction"}
         videoId="new"
-        shareUrlOverride="/predict"
+        shareUrlOverride={successHref}
         titleOverride={createdMeta?.title}
         dialogTitle="Share Prediction"
         shareNoun="prediction"

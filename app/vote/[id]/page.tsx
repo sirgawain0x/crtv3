@@ -6,7 +6,6 @@ import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { Proposal } from "@/components/proposal-list/ProposalList";
 import { VotingForm } from "@/components/proposal-list/ProposalList";
-import ClaimPoap from "@/components/vote/ClaimPoap";
 import { ClaimStickerButton } from "@/components/stickers/ClaimStickerButton";
 import { shortenAddress } from "@/lib/utils/utils";
 import { LinkedIdentityDisplay } from "@/components/vote/LinkedIdentityDisplay";
@@ -309,21 +308,7 @@ export default async function ProposalDetailsPage({
               Total votes: {proposal.scores_total ?? 0}
             </div>
           </Card>
-          <Card className="p-6 mb-6">
-            <h2 className="text-lg font-bold mb-2">Claim Campaign Sticker</h2>
-            <ClaimStickerButton proposalId={proposal.id} />
-          </Card>
-          <Card className="p-6 mb-6">
-            <h2 className="text-lg font-bold mb-2">Claim POAP</h2>
-            {/* TODO: POAP claim component goes here */}
-            <div className="text-gray-400">
-              <ClaimPoap
-                address={proposal.author}
-                proposalId={proposal.id}
-                snapshot={proposal.snapshot}
-              />
-            </div>
-          </Card>
+          <ClaimStickerButton proposalId={proposal.id} />
         </div >
       </div >
     </Suspense >
