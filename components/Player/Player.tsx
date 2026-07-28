@@ -32,7 +32,7 @@ export const PlayerLoading: React.FC<{ title: string }> = ({ title }) => {
   );
 };
 
-export function Player(props: {
+interface PlayerProps {
   src: Src[] | null;
   title: string;
   playbackId?: string;
@@ -41,8 +41,12 @@ export function Player(props: {
   onPlay?: () => void;
   autoPlay?: boolean;
   lowLatency?: boolean;
-}) {
-  const { src, title, playbackId, assetId, jwt, onPlay, autoPlay = true, lowLatency = true } = props;
+  /** Called when the player has been trying to load too long or the stream goes offline. */
+  onStalled?: () => void;
+}
+
+export function Player(props: PlayerProps) {
+  const { src, title, playbackId, assetId, jwt, onPlay, onStalled, autoPlay = true, lowLatency = true } = props;
 
   const [controlsVisible, setControlsVisible] = useState(true);
   const fadeTimeoutRef = useRef<NodeJS.Timeout>();
@@ -50,6 +54,23 @@ export function Player(props: {
   const { currentPlayingId, setCurrentPlayingId } = useVideo();
   const playerId = useRef(Math.random().toString(36).substring(7)).current;
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const stalledTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Cap livestream manifest loading at 10s and surface stalls to the parent.
+  useEffect(() => {
+    if (!onStalled) return;
+    const timer = setTimeout(() => {
+      onStalled();
+    }, 10_000);
+    stalledTimerRef.current = timer;
+
+    return () => {
+      if (stalledTimerRef.current) {
+        clearTimeout(stalledTimerRef.current);
+        stalledTimerRef.current = null;
+      }
+    };
+  }, [src, onStalled]);
 
   useEffect(() => {
     const video = containerRef.current?.querySelector("video");
@@ -153,6 +174,13 @@ export function Player(props: {
           className="h-full w-full"
           playsInline
           controls={false}
+          hlsConfig={{
+            manifestLoadingTimeOut: 10_000,
+            manifestLoadingMaxRetry: 2,
+            manifestLoadingRetryDelay: 1_000,
+            levelLoadingTimeOut: 10_000,
+            fragLoadingTimeOut: 10_000,
+          }}
         />
 
         <CreativeBrandOverlay />

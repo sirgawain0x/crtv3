@@ -364,6 +364,7 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
 
   // While live (or gated), refresh stream metadata until Lens chat is activated
   // so viewers who joined early pick up lens_live_post_id without a full reload.
+  // Also use this interval to detect when a live stream has gone idle.
   useInterval(
     useCallback(async () => {
       if (!playbackId) return;
@@ -372,14 +373,39 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
         if (streamRecord) {
           setStreamData(streamRecord as import("@/services/streams").Stream);
         }
+
+        // If Livepeer no longer reports sources, the stream has ended.
+        if (status.kind === "live" || status.kind === "metoken-gated") {
+          const sources = await getDetailPlaybackSource(playbackId);
+          if (!sources || sources.length === 0) {
+            setStatus({ kind: "offline-temporary", attempts: 0 });
+          }
+        }
       } catch (err) {
         logger.warn("Stream metadata refresh failed:", err);
       }
-    }, [playbackId]),
+    }, [playbackId, status.kind]),
     (status.kind === "live" || status.kind === "metoken-gated") &&
       !streamData?.lens_live_post_id
       ? 15000
       : null
+  );
+
+  // Always poll for live-source health while we think the stream is live,
+  // even after Lens chat is already active.
+  useInterval(
+    useCallback(async () => {
+      if (!playbackId) return;
+      try {
+        const sources = await getDetailPlaybackSource(playbackId);
+        if (!sources || sources.length === 0) {
+          setStatus({ kind: "offline-temporary", attempts: 0 });
+        }
+      } catch (err) {
+        logger.warn("Live source health check failed:", err);
+      }
+    }, [playbackId]),
+    status.kind === "live" || status.kind === "metoken-gated" ? 15000 : null
   );
 
   // Generate a consistent sessionId based on playbackId so viewers share the same chat session.
@@ -483,6 +509,10 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
                     title={videoTitle || streamData?.name || "Live Stream"}
                     jwt={jwt}
                     lowLatency={false}
+                    onStalled={() => {
+                      // Stream went idle after we entered live state.
+                      setStatus({ kind: "offline-temporary", attempts: 0 });
+                    }}
                   />
                 </div>
                 {/* Live Stream Viewership Stats */}
@@ -501,6 +531,19 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
                     {playbackId && <RealtimeViewsComponent playbackId={playbackId} />}
                   </div>
                 </div>
+
+                {/* Clip Creator - placed directly under the live stats bar */}
+                {playbackId && sessionId && (
+                  <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-4">
+                    <ClipCreator
+                      playbackId={playbackId}
+                      sessionId={sessionId}
+                      allowClipping={streamData?.allow_clipping ?? true}
+                      parentStoryIpId={streamData?.story_ip_id ?? storyIpId ?? null}
+                      parentCommercialRevShare={streamData?.story_commercial_rev_share ?? null}
+                    />
+                  </div>
+                )}
               </div>
             )}
 
@@ -613,19 +656,6 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
             )}
           </div>
         </div>
-
-        {/* Clip Creator Section - Below video and chat for viewers */}
-        {playbackId && sessionId && (
-          <div className="mt-6">
-            <ClipCreator
-              playbackId={playbackId}
-              sessionId={sessionId}
-              allowClipping={streamData?.allow_clipping ?? true}
-              parentStoryIpId={streamData?.story_ip_id ?? storyIpId ?? null}
-              parentCommercialRevShare={streamData?.story_commercial_rev_share ?? null}
-            />
-          </div>
-        )}
       </div>
     </div>
   );
