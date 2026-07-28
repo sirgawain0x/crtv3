@@ -200,7 +200,7 @@ function BroadcastWithControls({
           );
           logger.info("Stream marked as live in DB");
         } else if (status === 'idle' || status === 'error') {
-          await updateStream(creatorAddress, { is_live: false }, auth);
+          await updateStream(creatorAddress, { is_live: false, last_live_at: new Date().toISOString() }, auth);
           logger.info("Stream marked as offline in DB");
           if (status === 'idle' && propStreamId && saveRecording) {
             // Recording assets may take a minute to process; retry a few times.

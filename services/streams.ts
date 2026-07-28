@@ -387,6 +387,28 @@ export interface ActiveStream {
 }
 
 /**
+ * Server-side helper to mark a stream offline by Livepeer stream ID.
+ * Used by webhooks when Livepeer reports stream.idle; bypasses wallet-auth
+ * because the caller is Livepeer, not an end user.
+ */
+export async function markStreamOfflineByStreamId(streamId: string) {
+    const supabase = await createServiceClient();
+
+    const { error } = await supabase
+        .from("streams")
+        .update({
+            is_live: false,
+            updated_at: new Date().toISOString(),
+        })
+        .ilike("stream_id", streamId);
+
+    if (error) {
+        serverLogger.error("Error marking stream offline by stream ID:", error);
+        throw new Error(`Failed to mark stream offline: ${error.message}`);
+    }
+}
+
+/**
  * Get all active streams from the database
  */
 export async function getActiveStreams() {
