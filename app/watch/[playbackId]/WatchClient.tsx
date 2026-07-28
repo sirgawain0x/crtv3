@@ -482,20 +482,21 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
                     playbackId={playbackId}
                     title={videoTitle || streamData?.name || "Live Stream"}
                     jwt={jwt}
+                    lowLatency={false}
                   />
                 </div>
                 {/* Live Stream Viewership Stats */}
-                <div className="flex items-center justify-between p-4 rounded-xl bg-slate-900/60 backdrop-blur border border-slate-800">
-                  <div className="flex flex-col">
-                    <h1 className="text-xl font-bold text-white truncate max-w-lg">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-4 rounded-xl bg-slate-900/60 backdrop-blur border border-slate-800">
+                  <div className="min-w-0 flex-1">
+                    <h1 className="text-lg sm:text-xl font-bold text-white truncate">
                       {videoTitle || streamData?.name || "Live Stream"}
                     </h1>
-                    <p className="text-sm text-gray-400 mt-1">
+                    <p className="text-sm text-gray-400 mt-0.5">
                       Broadcasting Live
                     </p>
                   </div>
                   {/* Total + realtime concurrent viewers */}
-                  <div className="flex items-center gap-4">
+                  <div className="flex flex-wrap items-center gap-3 shrink-0">
                     {playbackId && <ViewsComponent playbackId={playbackId} />}
                     {playbackId && <RealtimeViewsComponent playbackId={playbackId} />}
                   </div>
