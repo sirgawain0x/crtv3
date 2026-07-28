@@ -28,6 +28,7 @@ export type DiscoverVideoCard = Omit<
   /** Numeric DB id for contributions / buy button */
   videoAssetDbId?: number;
   dbStatus?: VideoAsset["status"];
+  sourceType?: VideoAsset["source_type"];
 };
 
 interface VideoCardGridProps {
@@ -58,6 +59,7 @@ function mapPublishedToCard(video: VideoAsset): DiscoverVideoCard {
     detailedSrc: null,
     videoAssetDbId: video.id,
     dbStatus: video.status,
+    sourceType: video.source_type,
   };
 }
 

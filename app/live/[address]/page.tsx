@@ -112,6 +112,8 @@ export default function LivePage() {
   const [allowClipping, setAllowClipping] = useState(true);
   const [isUpdatingClipPref, setIsUpdatingClipPref] = useState(false);
   const [streamName, setStreamName] = useState<string | null>(null);
+  const [saveRecording, setSaveRecording] = useState(true);
+  const [isUpdatingSaveRecording, setIsUpdatingSaveRecording] = useState(false);
   const [requiresMetoken, setRequiresMetoken] = useState(false);
   const [metokenPrice, setMetokenPrice] = useState<number | null>(null);
   const [storyIpId, setStoryIpId] = useState<string | null>(null);
@@ -153,6 +155,7 @@ export default function LivePage() {
     setThumbnailUrl(null);
     setAllowClipping(true);
     setStreamName(null);
+    setSaveRecording(true);
     setRequiresMetoken(false);
     setMetokenPrice(null);
     setStoryIpId(null);
@@ -184,7 +187,9 @@ export default function LivePage() {
             recordingEnableRequestedRef.current.add(keyData.streamId);
             fetch(`/api/livepeer/stream/${encodeURIComponent(keyData.streamId)}/recording`, {
               method: "POST",
-            }).catch((err) => logger.error("Failed to enable stream recording:", err));
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ record: saveRecording }),
+            }).catch((err) => logger.error("Failed to set stream recording state:", err));
           }
 
           setIsLoadingTargets(true);
@@ -220,6 +225,7 @@ export default function LivePage() {
           setThumbnailUrl(stream.thumbnail_url || null);
           setAllowClipping(stream.allow_clipping ?? true);
           setStreamName(stream.name ?? null);
+          setSaveRecording(stream.save_recording ?? true);
           setRequiresMetoken(stream.requires_metoken ?? false);
           setMetokenPrice(stream.metoken_price ?? null);
           setStoryIpId(stream.story_ip_id ?? null);
@@ -311,6 +317,28 @@ export default function LivePage() {
     }
   }
 
+  async function handleToggleSaveRecording(next: boolean) {
+    if (!creatorAddress || !streamId) return;
+    const previous = saveRecording;
+    setSaveRecording(next);
+    setIsUpdatingSaveRecording(true);
+    try {
+      const auth = walletAuthHeadersToArgs(await getAuthHeaders());
+      await updateStream(creatorAddress, { save_recording: next }, auth);
+      // Sync the recording flag on the Livepeer stream object as well.
+      await fetch(`/api/livepeer/stream/${encodeURIComponent(streamId)}/recording`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ record: next }),
+      });
+    } catch (err) {
+      logger.error("Failed to update save-recording preference:", err);
+      setSaveRecording(previous);
+    } finally {
+      setIsUpdatingSaveRecording(false);
+    }
+  }
+
   async function handleCreateStream() {
     if (!creatorAddress) return;
     if (!identityReady || !isWalletAuthReady) {
@@ -366,7 +394,7 @@ export default function LivePage() {
             profile: "H264Baseline",
           },
         ],
-        record: true,
+        record: saveRecording,
         playbackPolicy: { type: "jwt" },
         authHeaders,
       });
@@ -504,6 +532,7 @@ export default function LivePage() {
                     streamId={streamId}
                     playbackId={playbackId}
                     creatorAddress={creatorAddress!}
+                    saveRecording={saveRecording}
                   />
                   {creatorAddress && (
                     <DigitalTwinOverlay creatorAddress={creatorAddress} />
@@ -604,7 +633,25 @@ export default function LivePage() {
               </div>
             )}
 
-            {streamKey && streamId && creatorAddress && (
+            {streamId && (
+              <div className="mt-4 border-t border-white/20 pt-3 max-w-[576px] mx-auto">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold">Save live stream replay</p>
+                    <p className="text-xs text-gray-400">
+                      When the broadcast ends, publish the recording to your Discover feed.
+                    </p>
+                  </div>
+                  <Switch
+                    checked={saveRecording}
+                    onCheckedChange={handleToggleSaveRecording}
+                    disabled={isUpdatingSaveRecording}
+                    aria-label="Save live stream replay"
+                  />
+                </div>
+              </div>
+            )}
+            {streamId && creatorAddress && (
               <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-5xl mx-auto">
                 <StreamThumbnailUploader
                   creatorAddress={creatorAddress}

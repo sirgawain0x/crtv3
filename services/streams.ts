@@ -21,6 +21,7 @@ export interface Stream {
     is_live: boolean;
     last_live_at?: string | null;
     allow_clipping?: boolean;
+    save_recording?: boolean;
     story_ip_id?: string | null;
     story_license_terms_id?: string | null;
     story_ip_registration_tx?: string | null;
@@ -43,6 +44,7 @@ export type UpdateStreamParams = Partial<
     | "is_live"
     | "last_live_at"
     | "allow_clipping"
+    | "save_recording"
     | "requires_metoken"
     | "metoken_price"
     | "lens_live_post_id"
@@ -55,6 +57,7 @@ const CLIENT_MUTABLE_STREAM_FIELDS = new Set<keyof UpdateStreamParams>([
   "is_live",
   "last_live_at",
   "allow_clipping",
+  "save_recording",
   "requires_metoken",
   "metoken_price",
   "lens_live_post_id",
@@ -259,7 +262,7 @@ export async function getStreamByPlaybackId(playbackId: string) {
 
     const { data, error } = await supabase
         .from("streams")
-        .select("id, creator_id, playback_id, thumbnail_url, name, is_live, last_live_at, allow_clipping, requires_metoken, metoken_price, story_ip_id, story_license_terms_id, story_commercial_rev_share, story_ip_registered_at, lens_live_post_id")
+        .select("id, creator_id, playback_id, thumbnail_url, name, is_live, last_live_at, allow_clipping, save_recording, requires_metoken, metoken_price, story_ip_id, story_license_terms_id, story_commercial_rev_share, story_ip_registered_at, lens_live_post_id")
         .eq("playback_id", playbackId)
         .maybeSingle();
 

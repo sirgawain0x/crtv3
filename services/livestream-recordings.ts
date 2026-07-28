@@ -43,6 +43,14 @@ export async function persistRecordingAsset(
     return null;
   }
 
+  if (stream.save_recording === false) {
+    serverLogger.debug("Skipping recording persistence because save_recording is false", {
+      streamId,
+      assetId: asset.id,
+    });
+    return null;
+  }
+
   const thumbnailUrl = await resolveThumbnail(asset.playbackId, stream.thumbnail_url);
   const durationSec =
     asset.videoSpec?.duration != null
@@ -89,6 +97,10 @@ export async function finalizeStreamRecordings(streamId: string) {
   const stream = await getStreamByStreamId(streamId);
   if (!stream) {
     return { created: 0, skipped: 0, error: "Stream not found" };
+  }
+
+  if (stream.save_recording === false) {
+    return { created: 0, skipped: 0, ignored: true };
   }
 
   const sessions = await getStreamSessions(streamId, { record: true });
