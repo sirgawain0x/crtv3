@@ -45,6 +45,7 @@ interface BroadcastProps {
   /** Playback id used for tip ledger / floating hearts (`stream:{playbackId}`). */
   playbackId?: string | null;
   creatorAddress: string;
+  saveRecording?: boolean;
 }
 
 export interface StreamProfile {
@@ -150,6 +151,7 @@ function BroadcastWithControls({
   streamId: propStreamId,
   playbackId,
   creatorAddress,
+  saveRecording = true,
 }: BroadcastProps) {
   const { getAuthHeaders } = useWalletAuth();
   const ingestUrl = React.useMemo(() => {
@@ -200,7 +202,7 @@ function BroadcastWithControls({
         } else if (status === 'idle' || status === 'error') {
           await updateStream(creatorAddress, { is_live: false }, auth);
           logger.info("Stream marked as offline in DB");
-          if (status === 'idle' && propStreamId) {
+          if (status === 'idle' && propStreamId && saveRecording) {
             // Recording assets may take a minute to process; retry a few times.
             const delays = [15_000, 45_000, 120_000];
             finalizeTimeoutsRef.current = delays.map((delay) =>
@@ -219,7 +221,7 @@ function BroadcastWithControls({
       finalizeTimeoutsRef.current.forEach(clearTimeout);
       finalizeTimeoutsRef.current = [];
     };
-  }, [status, creatorAddress, propStreamId, getAuthHeaders]);
+  }, [status, creatorAddress, propStreamId, getAuthHeaders, saveRecording]);
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);

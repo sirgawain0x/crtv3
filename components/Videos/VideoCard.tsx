@@ -39,6 +39,7 @@ type DiscoverAssetExtras = {
   attributes?: Record<string, unknown> | null;
   title?: string;
   views_count?: number;
+  sourceType?: "Upload" | "Livestream" | "Clip";
 };
 
 interface VideoCardProps {
@@ -332,6 +333,11 @@ const VideoCard: React.FC<VideoCardProps> = ({
                   </Badge>
                   {dbStatus && <Badge variant="secondary">{dbStatus}</Badge>}
                 </>
+              )}
+              {asset.sourceType === "Livestream" && (
+                <Badge variant="outline" className="border-orange-500/50 text-orange-400">
+                  Livestream Replay
+                </Badge>
               )}
             </div>
             {nearViewport ? (

@@ -40,16 +40,16 @@ export type LivepeerAssetSummary = {
   status?: { phase?: string };
 };
 
-export async function enableStreamRecording(streamId: string): Promise<void> {
+export async function enableStreamRecording(streamId: string, record: boolean = true): Promise<void> {
   const base = livepeerStudioApiBaseUrl();
   const res = await fetch(`${base}/api/stream/${streamId}`, {
     method: "PATCH",
     headers: authHeaders(),
-    body: JSON.stringify({ record: true }),
+    body: JSON.stringify({ record }),
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(`Failed to enable stream recording: ${res.status} ${text}`);
+    throw new Error(`Failed to ${record ? "enable" : "disable"} stream recording: ${res.status} ${text}`);
   }
 }
 

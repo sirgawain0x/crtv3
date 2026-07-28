@@ -21,13 +21,23 @@ export async function POST(
     return NextResponse.json({ error: "streamId is required" }, { status: 400 });
   }
 
+  let body: { record?: boolean } = {};
   try {
-    await enableStreamRecording(streamId.trim());
-    return NextResponse.json({ ok: true, record: true });
+    body = await request.json();
+  } catch {
+    // no body is fine
+  }
+
+  // Default to true unless explicitly false.
+  const record = body.record !== false;
+
+  try {
+    await enableStreamRecording(streamId.trim(), record);
+    return NextResponse.json({ ok: true, record });
   } catch (e: unknown) {
-    serverLogger.error("Failed to enable stream recording:", e);
+    serverLogger.error("Failed to set stream recording state:", e);
     const message =
-      e instanceof Error ? e.message : "Failed to enable stream recording";
+      e instanceof Error ? e.message : "Failed to set stream recording state";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

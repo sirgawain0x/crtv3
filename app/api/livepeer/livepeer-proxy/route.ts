@@ -187,6 +187,7 @@ export async function POST(req: NextRequest) {
       playback_id: playbackIdValue,
       name: name || `Channel-${normalizedCreator.slice(0, 6)}`,
       is_live: false,
+      save_recording: record,
     });
 
     serverLogger.debug("[livepeer-proxy] stream created", {
