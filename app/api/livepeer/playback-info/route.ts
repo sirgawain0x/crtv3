@@ -2,22 +2,24 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getFullLivepeer } from '@/lib/sdk/livepeer/fullClient';
 import { isLivepeerConfigured, LIVEPEER_NOT_CONFIGURED } from '@/lib/sdk/livepeer/studioAuth';
 import { serverLogger } from '@/lib/utils/logger';
-import {
-  platformApiOptionsResponse,
-  requirePlatformApiAccess,
-} from '@/lib/middleware/platformApiAccess';
+import { rateLimiters } from '@/lib/middleware/rateLimit';
 
 const ethereumAddressRegex = /^0x[a-fA-F0-9]{40}$/;
 
 export async function OPTIONS() {
-  return platformApiOptionsResponse();
+  return new NextResponse(null, {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    },
+  });
 }
 
 export async function GET(request: NextRequest) {
-  const access = await requirePlatformApiAccess(request, { resource: 'playback.info' });
-  if (!access.allowed) {
-    return access.response;
-  }
+  const rl = await rateLimiters.playbackInfo(request);
+  if (rl) return rl;
 
   try {
     if (!isLivepeerConfigured()) {
