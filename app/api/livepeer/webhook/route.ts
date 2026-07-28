@@ -11,6 +11,7 @@ import {
   finalizeStreamRecordings,
   persistRecordingAsset,
 } from "@/services/livestream-recordings";
+import { markStreamOfflineByStreamId } from "@/services/streams";
 import { serverLogger } from "@/lib/utils/logger";
 
 export async function POST(request: NextRequest) {
@@ -45,6 +46,10 @@ export async function POST(request: NextRequest) {
       }
     } else if (event === "recording.ready" || event === "stream.idle") {
       if (streamId) {
+        if (event === "stream.idle") {
+          await markStreamOfflineByStreamId(streamId);
+          serverLogger.info("Marked stream offline from stream.idle webhook", { streamId });
+        }
         await finalizeStreamRecordings(streamId);
       }
     }
