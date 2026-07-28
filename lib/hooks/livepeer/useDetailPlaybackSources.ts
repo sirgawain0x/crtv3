@@ -12,13 +12,33 @@ async function fetchPlaybackInfo(
   id: string,
   signal?: AbortSignal,
 ): Promise<Response> {
+  const internalUrl = `/api/internal/playback-info?playbackId=${id}`;
+
   for (let attempt = 0; attempt <= MAX_429_RETRIES; attempt++) {
-    const response = await fetch(`/api/livepeer/playback-info?playbackId=${id}`, {
+    const response = await fetch(internalUrl, {
       signal,
       headers: {
         'Content-Type': 'application/json',
       },
     });
+
+    // If the internal endpoint somehow 404s (e.g. route not deployed), fall
+    // back to the public route so a missing /api/internal path doesn't break
+    // older deploy previews.
+    if (response.status === 404 && attempt === 0) {
+      logger.warn(
+        `[getDetailPlaybackSource] Internal playback-info not found for ${id}; falling back to public route`,
+      );
+      const publicResponse = await fetch(`/api/livepeer/playback-info?playbackId=${id}`, {
+        signal,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      if (publicResponse.status !== 429) {
+        return publicResponse;
+      }
+    }
 
     if (response.status !== 429 || attempt === MAX_429_RETRIES) {
       return response;

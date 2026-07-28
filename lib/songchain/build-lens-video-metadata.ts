@@ -24,7 +24,7 @@ export async function resolveVideoPlaybackUrl(playbackId: string): Promise<strin
   if (!playbackId?.trim()) return null;
   try {
     const response = await fetch(
-      `/api/livepeer/playback-info?playbackId=${encodeURIComponent(playbackId)}`,
+      `/api/internal/playback-info?playbackId=${encodeURIComponent(playbackId)}`,
     );
     if (!response.ok) return null;
     const res = await response.json();

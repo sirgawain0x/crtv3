@@ -186,38 +186,55 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
       }
     }
 
-    const jwtRes = await fetch("/api/livepeer/sign-jwt", {
+    const jwtRes = await fetch("/api/internal/sign-jwt", {
       method: "POST",
       headers,
       body: JSON.stringify(body),
     });
 
-    if (jwtRes.ok) {
-      const { token } = await jwtRes.json();
-      return { ok: true, token };
+    const parseJwtResult = async (res: Response): Promise<
+      | { ok: true; token: string }
+      | { ok: false; gate?: LiveStreamGateInfo }
+    > => {
+      if (res.ok) {
+        const { token } = await res.json();
+        return { ok: true, token };
+      }
+
+      const errData = await res.json().catch(() => ({}));
+      if (res.status === 403 && errData.code === "METOKEN_REQUIRED") {
+        return {
+          ok: false,
+          gate: {
+            code: errData.code,
+            connectWallet: errData.connectWallet,
+            signingRequired: errData.signingRequired,
+            message: errData.message,
+            meTokenAddress: errData.meTokenAddress,
+            symbol: errData.symbol,
+            required: errData.required,
+            balance: errData.balance,
+            creatorAddress: errData.creatorAddress,
+            streamName,
+          },
+        };
+      }
+
+      logger.warn("Failed to sign JWT for stream:", errData);
+      return { ok: false };
+    };
+
+    if (jwtRes.status === 404) {
+      logger.warn("[requestStreamJwt] Internal sign-jwt not found; falling back to public route");
+      const publicRes = await fetch("/api/livepeer/sign-jwt", {
+        method: "POST",
+        headers,
+        body: JSON.stringify(body),
+      });
+      return parseJwtResult(publicRes);
     }
 
-    const errData = await jwtRes.json().catch(() => ({}));
-    if (jwtRes.status === 403 && errData.code === "METOKEN_REQUIRED") {
-      return {
-        ok: false,
-        gate: {
-          code: errData.code,
-          connectWallet: errData.connectWallet,
-          signingRequired: errData.signingRequired,
-          message: errData.message,
-          meTokenAddress: errData.meTokenAddress,
-          symbol: errData.symbol,
-          required: errData.required,
-          balance: errData.balance,
-          creatorAddress: errData.creatorAddress,
-          streamName,
-        },
-      };
-    }
-
-    logger.warn("Failed to sign JWT for stream:", errData);
-    return { ok: false };
+    return parseJwtResult(jwtRes);
   }, [
     playbackId,
     user?.address,

@@ -18,7 +18,7 @@ export const getHeroPlaybackSource = async (): Promise<HeroPlaybackSource | null
     const playbackId = LIVEPEER_HERO_PLAYBACK_ID;
 
     const playbackResponse = await fetch(
-      `/api/livepeer/playback-info?playbackId=${encodeURIComponent(playbackId)}`,
+      `/api/internal/playback-info?playbackId=${encodeURIComponent(playbackId)}`,
     );
     if (!playbackResponse.ok) {
       throw new Error(
