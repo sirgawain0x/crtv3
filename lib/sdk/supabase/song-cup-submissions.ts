@@ -62,37 +62,24 @@ export const songCupSubmissionsService = {
 
   async create(data: CreateSongCupSubmissionData): Promise<CreateSongCupSubmissionResult> {
     try {
-      const existing = await songCupSubmissionsService.getForWallet(data.wallet_address);
-      if (existing) {
-        return { ok: false, reason: "duplicate", message: "You already submitted an entry." };
-      }
-
       const { data: row, error } = await supabase
-        .from('song_cup_submissions')
-        .insert({
-          wallet_address: data.wallet_address.toLowerCase(),
-          grove_url: data.grove_url,
-          grove_hash: data.grove_hash ?? null,
-          title: data.title ?? null,
-          description: data.description ?? null,
-          artist_handle: data.artist_handle ?? null,
-          email: data.email ?? null,
-          cover_url: data.cover_url ?? null,
-          cover_hash: data.cover_hash ?? null,
-          attestation_uid: data.attestation_uid ?? null,
-          post_id: data.post_id ?? null,
-          status: 'pending',
-          is_favorite: false,
+        .rpc('upsert_song_cup_submission', {
+          p_grove_url: data.grove_url,
+          p_grove_hash: data.grove_hash ?? null,
+          p_title: data.title ?? null,
+          p_description: data.description ?? null,
+          p_artist_handle: data.artist_handle ?? null,
+          p_email: data.email ?? null,
+          p_cover_url: data.cover_url ?? null,
+          p_cover_hash: data.cover_hash ?? null,
+          p_attestation_uid: data.attestation_uid ?? null,
+          p_post_id: data.post_id ?? null,
         })
-        .select('*')
         .single();
 
       if (error) {
-        if (error.code === "23505") {
-          return { ok: false, reason: "duplicate", message: "You already submitted an entry." };
-        }
-        serverLogger.error('[songCupSubmissions] insert error:', error);
-        return { ok: false, reason: "error", message: error.message };
+        serverLogger.error('[songCupSubmissions] rpc create/upsert error:', error);
+        return { ok: false, reason: 'error', message: error.message };
       }
 
       return { ok: true, submission: row as SongCupSubmission };
@@ -100,7 +87,7 @@ export const songCupSubmissionsService = {
       serverLogger.error('[songCupSubmissions] create exception:', err);
       return {
         ok: false,
-        reason: "error",
+        reason: 'error',
         message: err instanceof Error ? err.message : undefined,
       };
     }

@@ -70,7 +70,7 @@ export function HackBetaSubmitPanel({ className }: HackBetaSubmitPanelProps) {
         throw new Error(grove.error || "Grove receipt upload failed");
       }
 
-      const result = await hackBetaSubmissionsService.create({
+      const result = await hackBetaSubmissionsService.upsert({
         wallet_address: user.address,
         video_asset_id: selected.asset_id,
         title: selected.title,
@@ -87,7 +87,7 @@ export function HackBetaSubmitPanel({ className }: HackBetaSubmitPanelProps) {
       }
 
       setSubmission(result.submission);
-      toast.success("Submitted to HACKATHON BETA!");
+      toast.success(hasSubmitted ? "Updated your HACKATHON BETA submission!" : "Submitted to HACKATHON BETA!");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Submission failed");
     } finally {

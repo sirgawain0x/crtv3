@@ -54,13 +54,38 @@ export const hackBetaSubmissionsService = {
     }
   },
 
-  async create(data: CreateHackBetaSubmissionData): Promise<CreateHackBetaSubmissionResult> {
+  async upsert(data: CreateHackBetaSubmissionData): Promise<CreateHackBetaSubmissionResult> {
     try {
-      const existing = await hackBetaSubmissionsService.getForWallet(data.wallet_address);
-      if (existing) {
-        return { ok: false, reason: 'duplicate', message: 'You already submitted an entry.' };
+      const { data: row, error } = await supabase
+        .rpc('upsert_hack_beta_submission', {
+          p_video_asset_id: data.video_asset_id,
+          p_title: data.title ?? null,
+          p_description: data.description ?? null,
+          p_playback_id: data.playback_id ?? null,
+          p_thumbnail_url: data.thumbnail_url ?? null,
+          p_grove_url: data.grove_url ?? null,
+          p_grove_hash: data.grove_hash ?? null,
+        })
+        .single();
+
+      if (error) {
+        serverLogger.error('[hackBetaSubmissions] rpc upsert error:', error);
+        return { ok: false, reason: 'error', message: error.message };
       }
 
+      return { ok: true, submission: row as HackBetaSubmission };
+    } catch (err) {
+      serverLogger.error('[hackBetaSubmissions] upsert exception:', err);
+      return {
+        ok: false,
+        reason: 'error',
+        message: err instanceof Error ? err.message : undefined,
+      };
+    }
+  },
+
+  async create(data: CreateHackBetaSubmissionData): Promise<CreateHackBetaSubmissionResult> {
+    try {
       const { data: row, error } = await supabase
         .from('hack_beta_submissions')
         .insert({
