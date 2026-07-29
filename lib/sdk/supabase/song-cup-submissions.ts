@@ -62,11 +62,6 @@ export const songCupSubmissionsService = {
 
   async create(data: CreateSongCupSubmissionData): Promise<CreateSongCupSubmissionResult> {
     try {
-      const existing = await songCupSubmissionsService.getForWallet(data.wallet_address);
-      if (existing) {
-        return { ok: false, reason: "duplicate", message: "You already submitted an entry." };
-      }
-
       const { data: row, error } = await supabase
         .from('song_cup_submissions')
         .insert({
