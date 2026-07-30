@@ -96,7 +96,8 @@ export function SongchainPostCard({
   const [pending, setPending] = useState<string | null>(null);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [comments, setComments] = useState<AnyPost[]>([]);
-  const [commentCount, setCommentCount] = useState(0);
+  const [commentDelta, setCommentDelta] = useState(0);
+  const [repostDelta, setRepostDelta] = useState(0);
   const [commentText, setCommentText] = useState("");
   const [editOpen, setEditOpen] = useState(false);
   const [editText, setEditText] = useState("");
@@ -115,8 +116,12 @@ export function SongchainPostCard({
   const [upvoted, setUpvoted] = useState(hasReacted);
   const reactions =
     content != null && "stats" in content ? (content.stats?.upvotes ?? 0) : 0;
-  const reposts =
+  const statsComments =
+    content != null && "stats" in content ? (content.stats?.comments ?? 0) : 0;
+  const statsReposts =
     content != null && "stats" in content ? (content.stats?.reposts ?? 0) : 0;
+  const commentCount = statsComments + commentDelta;
+  const reposts = statsReposts + repostDelta;
   const embeddedCreativeTVUrls = useMemo(
     () => getEmbeddedCreativeTVUrls(media),
     [media],
@@ -142,6 +147,14 @@ export function SongchainPostCard({
     }
   }, [ops, content?.id]);
 
+  useEffect(() => {
+    setCommentDelta(0);
+  }, [content?.id, statsComments]);
+
+  useEffect(() => {
+    setRepostDelta(0);
+  }, [content?.id, statsReposts]);
+
   const loadComments = useCallback(async () => {
     if (!content) return;
     try {
@@ -150,9 +163,9 @@ export function SongchainPostCard({
         referenceTypes: [PostReferenceType.CommentOn],
       });
       if (result.isOk()) {
-        const items = [...result.value.items];
-        setComments(items);
-        setCommentCount(items.length);
+        // Update the modal list only — badge count comes from stats + local delta
+        // so a partial/stale page does not undercount the feed button.
+        setComments([...result.value.items]);
       }
     } catch {
       // Non-fatal
@@ -179,7 +192,11 @@ export function SongchainPostCard({
 
   if (!content) return null;
 
-  const withWrite = async (action: string, fn: () => Promise<void>) => {
+  const withWrite = async (
+    action: string,
+    fn: () => Promise<void>,
+    opts?: { refresh?: "immediate" | "delayed" | "none" },
+  ) => {
     if (!canWrite) {
       promptWriteAccess();
       return;
@@ -187,6 +204,12 @@ export function SongchainPostCard({
     setPending(action);
     try {
       await fn();
+      const refresh = opts?.refresh ?? "immediate";
+      if (refresh === "none") return;
+      if (refresh === "delayed") {
+        window.setTimeout(() => onReactionChange?.(), 3000);
+        return;
+      }
       onReactionChange?.();
     } catch (err) {
       clearStaleOrbSessionIfNeeded(err);
@@ -220,78 +243,90 @@ export function SongchainPostCard({
     });
 
   const handleRepost = () =>
-    void withWrite("repost", async () => {
-      const client = await getSessionClient();
-      const result = await repost(client, {
-        post: postId(content.id),
-        ...(feedId ? { feed: evmAddress(feedId) } : {}),
-      });
-      if (result.isErr()) throw new Error(result.error.message);
-      toast.success("Reposted");
-    });
+    void withWrite(
+      "repost",
+      async () => {
+        const client = await getSessionClient();
+        const result = await repost(client, {
+          post: postId(content.id),
+          ...(feedId ? { feed: evmAddress(feedId) } : {}),
+        });
+        if (result.isErr()) throw new Error(result.error.message);
+        setRepostDelta((d) => d + 1);
+        toast.success("Reposted");
+      },
+      { refresh: "delayed" },
+    );
 
   const submitComment = () =>
-    void withWrite("comment", async () => {
-      const trimmed = commentText.trim();
-      if (!trimmed) return;
+    void withWrite(
+      "comment",
+      async () => {
+        const trimmed = commentText.trim();
+        if (!trimmed) return;
 
-      const optimisticId = `pending-comment-${Date.now()}`;
-      const optimisticComment = {
-        id: optimisticId,
-        __typename: "Post",
-        author: {
-          address: lensAccount ?? "",
-          username: null,
-        },
-        metadata: { content: trimmed, __typename: "TextOnlyMetadata" },
-      } as unknown as AnyPost;
+        const optimisticId = `pending-comment-${Date.now()}`;
+        const optimisticComment = {
+          id: optimisticId,
+          __typename: "Post",
+          author: {
+            address: lensAccount ?? "",
+            username: null,
+          },
+          metadata: { content: trimmed, __typename: "TextOnlyMetadata" },
+        } as unknown as AnyPost;
 
-      setComments((prev) => [...prev, optimisticComment]);
-      setCommentCount((c) => c + 1);
+        setComments((prev) => [...prev, optimisticComment]);
+        setCommentDelta((d) => d + 1);
 
-      const client = await getSessionClient();
-      const metadata = textOnly({ content: trimmed, locale: "en" });
-      const upload = await groveService.uploadJson(metadata);
-      if (!upload.success || !upload.url) {
-        setComments((prev) => prev.filter((c) => c.id !== optimisticId));
-        setCommentCount((c) => Math.max(0, c - 1));
-        throw new Error("Failed to upload comment metadata");
-      }
-      const result = await createLensPost(client, {
-        contentUri: uri(upload.url),
-        commentOn: { post: postId(content.id) },
-      });
-      if (result.isErr()) {
-        setComments((prev) => prev.filter((c) => c.id !== optimisticId));
-        setCommentCount((c) => Math.max(0, c - 1));
-        throw new Error(result.error.message);
-      }
-      setCommentText("");
-      toast.success("Comment posted");
-      void loadComments();
-    });
+        const client = await getSessionClient();
+        const metadata = textOnly({ content: trimmed, locale: "en" });
+        const upload = await groveService.uploadJson(metadata);
+        if (!upload.success || !upload.url) {
+          setComments((prev) => prev.filter((c) => c.id !== optimisticId));
+          setCommentDelta((d) => Math.max(0, d - 1));
+          throw new Error("Failed to upload comment metadata");
+        }
+        const result = await createLensPost(client, {
+          contentUri: uri(upload.url),
+          commentOn: { post: postId(content.id) },
+        });
+        if (result.isErr()) {
+          setComments((prev) => prev.filter((c) => c.id !== optimisticId));
+          setCommentDelta((d) => Math.max(0, d - 1));
+          throw new Error(result.error.message);
+        }
+        setCommentText("");
+        toast.success("Comment posted");
+        void loadComments();
+      },
+      { refresh: "delayed" },
+    );
 
   const submitEdit = () =>
-    void withWrite("edit", async () => {
-      const trimmed = editText.trim();
-      if (!trimmed) return;
-      const client = await getSessionClient();
-      const metadata = textOnly({ content: trimmed, locale: "en" });
-      const upload = await groveService.uploadJson(metadata);
-      if (!upload.success || !upload.url) {
-        throw new Error("Failed to upload edit metadata");
-      }
-      const result = await editPost(client, {
-        post: postId(content.id),
-        contentUri: uri(upload.url),
-      });
-      if (result.isErr()) throw new Error(result.error.message);
-      setDisplayText(trimmed);
-      setEditOpen(false);
-      toast.success("Post updated");
-      onPostUpdated?.();
-      window.setTimeout(() => onReactionChange?.(), 3000);
-    });
+    void withWrite(
+      "edit",
+      async () => {
+        const trimmed = editText.trim();
+        if (!trimmed) return;
+        const client = await getSessionClient();
+        const metadata = textOnly({ content: trimmed, locale: "en" });
+        const upload = await groveService.uploadJson(metadata);
+        if (!upload.success || !upload.url) {
+          throw new Error("Failed to upload edit metadata");
+        }
+        const result = await editPost(client, {
+          post: postId(content.id),
+          contentUri: uri(upload.url),
+        });
+        if (result.isErr()) throw new Error(result.error.message);
+        setDisplayText(trimmed);
+        setEditOpen(false);
+        toast.success("Post updated");
+        onPostUpdated?.();
+      },
+      { refresh: "delayed" },
+    );
 
   const handleDelete = () => {
     if (!window.confirm("Delete this post? This cannot be undone.")) return;
