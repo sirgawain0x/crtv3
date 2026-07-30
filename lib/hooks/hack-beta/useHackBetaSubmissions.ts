@@ -52,23 +52,32 @@ export function useHackBetaSubmissions(enabled: boolean = true) {
       status?: HackBetaSubmission["status"];
       is_favorite?: boolean;
     }) => {
-      const authHeaders = await getAuthHeaders();
-      const res = await fetch("/api/hack-beta/admin/submissions", {
-        method: "PATCH",
-        headers: {
-          ...authHeaders,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) {
-        const errBody = (await res.json().catch(() => null)) as { error?: string } | null;
-        logger.error("[useHackBetaSubmissions] patch failed:", errBody ?? res.status);
+      if (!isReady) {
+        logger.error("[useHackBetaSubmissions] patch skipped: wallet auth not ready");
         return false;
       }
-      return true;
+      try {
+        const authHeaders = await getAuthHeaders();
+        const res = await fetch("/api/hack-beta/admin/submissions", {
+          method: "PATCH",
+          headers: {
+            ...authHeaders,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) {
+          const errBody = (await res.json().catch(() => null)) as { error?: string } | null;
+          logger.error("[useHackBetaSubmissions] patch failed:", errBody ?? res.status);
+          return false;
+        }
+        return true;
+      } catch (err) {
+        logger.error("[useHackBetaSubmissions] patch exception:", err);
+        return false;
+      }
     },
-    [getAuthHeaders],
+    [getAuthHeaders, isReady],
   );
 
   const updateStatus = useCallback(
@@ -110,7 +119,7 @@ export function useHackBetaSubmissions(enabled: boolean = true) {
 
   return {
     submissions,
-    isLoading: isLoading || isAdminLoading,
+    isLoading: isLoading || isAdminLoading || (isAdmin && !isReady),
     error,
     refetch: fetchRows,
     updateStatus,
@@ -118,5 +127,6 @@ export function useHackBetaSubmissions(enabled: boolean = true) {
     isAdmin,
     walletAddress,
     isAdminLoading,
+    isReady,
   };
 }

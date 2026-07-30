@@ -16,6 +16,10 @@ import { serverLogger } from "@/lib/utils/logger";
  * Wallet-auth + admin-list check; returns all statuses via service role.
  */
 export async function GET(req: NextRequest) {
+  const verification = await checkBotIdDeep();
+  if (verification.isBot) {
+    return NextResponse.json({ error: "Access denied" }, { status: 403 });
+  }
   const rl = await rateLimiters.standard(req);
   if (rl) return rl;
 
