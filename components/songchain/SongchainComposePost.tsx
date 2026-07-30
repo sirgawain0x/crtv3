@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useSongchainPost } from "@/hooks/useSongchainPost";
 import { useCreatorLiveStream } from "@/hooks/useCreatorLiveStream";
 import { useUser } from "@/lib/wallet/react";
+import { useWalletAuth } from "@/lib/auth/useWalletAuth";
 import { GroveVideoUploader } from "@/components/songchain/GroveVideoUploader";
 import { songCupSubmissionsService } from "@/lib/sdk/supabase/song-cup-submissions";
 import { logger } from "@/lib/utils/logger";
@@ -37,6 +38,7 @@ export function SongchainComposePost({
     useSongchainPost();
   const { stream, isLive, loading: streamLoading } = useCreatorLiveStream();
   const user = useUser();
+  const { getAuthHeaders } = useWalletAuth();
 
   if (!feedId) return null;
 
@@ -69,22 +71,32 @@ export function SongchainComposePost({
     });
       if (created) {
       if (uploadedVideoAsset?.location && user?.address) {
-        const submissionResult = await songCupSubmissionsService.create({
-          wallet_address: user.address,
-          grove_url: uploadedVideoAsset.location,
-          grove_hash: uploadedVideoAsset.metadata_uri ?? undefined,
-          title: uploadedVideoAsset.title ?? undefined,
-          description: content.trim() || undefined,
-          post_id: created.postId,
-        });
-        if (!submissionResult.ok) {
-          // The RPC upsert path now handles existing rows silently on the server.
-          if (submissionResult.reason === "error") {
-            logger.error(
-              "[SongchainComposePost] Song Cup submission failed:",
-              submissionResult.message,
-            );
+        try {
+          const authHeaders = await getAuthHeaders();
+          const submissionResult = await songCupSubmissionsService.create(
+            {
+              wallet_address: user.address,
+              grove_url: uploadedVideoAsset.location,
+              grove_hash: uploadedVideoAsset.metadata_uri ?? undefined,
+              title: uploadedVideoAsset.title ?? undefined,
+              description: content.trim() || undefined,
+              post_id: created.postId,
+            },
+            authHeaders,
+          );
+          if (!submissionResult.ok) {
+            if (submissionResult.reason === "error") {
+              logger.error(
+                "[SongchainComposePost] Song Cup submission failed:",
+                submissionResult.message,
+              );
+            }
           }
+        } catch (authErr) {
+          logger.error(
+            "[SongchainComposePost] Song Cup submission auth failed:",
+            authErr,
+          );
         }
       }
       setContent("");

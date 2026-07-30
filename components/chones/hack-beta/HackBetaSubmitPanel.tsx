@@ -10,6 +10,7 @@ import { HackBetaShareToXButton } from "@/components/chones/hack-beta/HackBetaSh
 import { useCreatorVideoLibrary } from "@/hooks/useCreatorVideoLibrary";
 import { useHackBetaUserSubmission } from "@/lib/hooks/hack-beta/useHackBetaUserSubmission";
 import { useUser } from "@/lib/wallet/react";
+import { useWalletAuth } from "@/lib/auth/useWalletAuth";
 import { groveService } from "@/lib/sdk/grove/service";
 import { hackBetaSubmissionsService } from "@/lib/sdk/supabase/hack-beta-submissions";
 import type { VideoAsset } from "@/lib/types/video-asset";
@@ -22,6 +23,7 @@ type HackBetaSubmitPanelProps = {
 
 export function HackBetaSubmitPanel({ className }: HackBetaSubmitPanelProps) {
   const user = useUser();
+  const { getAuthHeaders } = useWalletAuth();
   const { videos, loading: libraryLoading, hasWallet } = useCreatorVideoLibrary();
   const {
     submission: existing,
@@ -70,16 +72,20 @@ export function HackBetaSubmitPanel({ className }: HackBetaSubmitPanelProps) {
         throw new Error(grove.error || "Grove receipt upload failed");
       }
 
-      const result = await hackBetaSubmissionsService.upsert({
-        wallet_address: user.address,
-        video_asset_id: selected.asset_id,
-        title: selected.title,
-        description: notes.trim() || selected.description || undefined,
-        playback_id: selected.playback_id,
-        thumbnail_url: selected.thumbnailUri || undefined,
-        grove_url: grove.url,
-        grove_hash: grove.hash,
-      });
+      const authHeaders = await getAuthHeaders();
+      const result = await hackBetaSubmissionsService.upsert(
+        {
+          wallet_address: user.address,
+          video_asset_id: selected.asset_id,
+          title: selected.title,
+          description: notes.trim() || selected.description || undefined,
+          playback_id: selected.playback_id,
+          thumbnail_url: selected.thumbnailUri || undefined,
+          grove_url: grove.url,
+          grove_hash: grove.hash,
+        },
+        authHeaders,
+      );
 
       if (!result.ok) {
         toast.error(result.message || "Submission failed");

@@ -54,26 +54,38 @@ export const hackBetaSubmissionsService = {
     }
   },
 
-  async upsert(data: CreateHackBetaSubmissionData): Promise<CreateHackBetaSubmissionResult> {
+  async upsert(
+    data: CreateHackBetaSubmissionData,
+    authHeaders: Record<string, string>,
+  ): Promise<CreateHackBetaSubmissionResult> {
     try {
-      const { data: row, error } = await supabase
-        .rpc('upsert_hack_beta_submission', {
-          p_video_asset_id: data.video_asset_id,
-          p_title: data.title ?? null,
-          p_description: data.description ?? null,
-          p_playback_id: data.playback_id ?? null,
-          p_thumbnail_url: data.thumbnail_url ?? null,
-          p_grove_url: data.grove_url ?? null,
-          p_grove_hash: data.grove_hash ?? null,
-        })
-        .single();
+      const res = await fetch('/api/hack-beta/submit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeaders,
+        },
+        body: JSON.stringify(data),
+      });
+      const json = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        submission?: HackBetaSubmission;
+        error?: string | Record<string, unknown>;
+      };
 
-      if (error) {
-        serverLogger.error('[hackBetaSubmissions] rpc upsert error:', error);
-        return { ok: false, reason: 'error', message: error.message };
+      if (!res.ok || !json.ok || !json.submission) {
+        const message =
+          typeof json.error === 'string'
+            ? json.error
+            : res.statusText || 'Submission failed';
+        serverLogger.error('[hackBetaSubmissions] api upsert error:', {
+          status: res.status,
+          error: json.error,
+        });
+        return { ok: false, reason: 'error', message };
       }
 
-      return { ok: true, submission: row as HackBetaSubmission };
+      return { ok: true, submission: json.submission };
     } catch (err) {
       serverLogger.error('[hackBetaSubmissions] upsert exception:', err);
       return {
