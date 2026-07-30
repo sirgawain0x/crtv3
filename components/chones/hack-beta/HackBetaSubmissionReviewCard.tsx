@@ -1,15 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
-import { CheckCircle, ExternalLink, Film, Star, XCircle } from "lucide-react";
+import { CheckCircle, ExternalLink, Star, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
+import { HackBetaSubmissionThumbnail } from "@/components/chones/hack-beta/HackBetaSubmissionThumbnail";
 import type { HackBetaSubmission } from "@/lib/sdk/supabase/hack-beta-submissions";
 import { truncateWalletAddress } from "@/lib/chones/hack-beta/admin-config";
-import { getThumbnailUrl } from "@/lib/utils/thumbnail";
 import { cn } from "@/lib/utils";
 
 type HackBetaSubmissionReviewCardProps = {
@@ -20,42 +18,6 @@ type HackBetaSubmissionReviewCardProps = {
   className?: string;
 };
 
-function useSubmissionThumbnail(
-  thumbnailUrl?: string | null,
-  playbackId?: string | null,
-) {
-  const stored = thumbnailUrl?.trim() || null;
-  const [url, setUrl] = useState<string | null>(stored);
-  const [isLoading, setIsLoading] = useState(!stored && Boolean(playbackId));
-
-  useEffect(() => {
-    if (stored) {
-      setUrl(stored);
-      setIsLoading(false);
-      return;
-    }
-    if (!playbackId) {
-      setUrl(null);
-      setIsLoading(false);
-      return;
-    }
-
-    let cancelled = false;
-    setIsLoading(true);
-    void getThumbnailUrl(playbackId).then((resolved) => {
-      if (cancelled) return;
-      setUrl(resolved);
-      setIsLoading(false);
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [stored, playbackId]);
-
-  return { url, isLoading };
-}
-
 export function HackBetaSubmissionReviewCard({
   submission,
   onApprove,
@@ -63,11 +25,6 @@ export function HackBetaSubmissionReviewCard({
   onReject,
   className,
 }: HackBetaSubmissionReviewCardProps) {
-  const { url: thumbnailSrc, isLoading: thumbnailLoading } = useSubmissionThumbnail(
-    submission.thumbnail_url,
-    submission.playback_id,
-  );
-
   return (
     <article
       className={cn(
@@ -75,20 +32,12 @@ export function HackBetaSubmissionReviewCard({
         className,
       )}
     >
-      {thumbnailSrc ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={thumbnailSrc}
-          alt=""
-          className="aspect-video w-full bg-black object-cover"
-        />
-      ) : thumbnailLoading ? (
-        <Skeleton className="aspect-video w-full rounded-none" />
-      ) : (
-        <div className="flex aspect-video items-center justify-center bg-muted/40">
-          <Film className="h-8 w-8 text-muted-foreground" />
-        </div>
-      )}
+      <HackBetaSubmissionThumbnail
+        playbackId={submission.playback_id}
+        thumbnailUrl={submission.thumbnail_url}
+        title={submission.title}
+        assetId={submission.video_asset_id}
+      />
 
       <div className="flex flex-1 flex-col gap-2 p-3">
         <h4 className="line-clamp-1 text-sm font-semibold">

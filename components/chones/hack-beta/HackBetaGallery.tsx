@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Film, Loader2, Star } from "lucide-react";
 import { HackBetaShareToXButton } from "@/components/chones/hack-beta/HackBetaShareToXButton";
+import { HackBetaSubmissionThumbnail } from "@/components/chones/hack-beta/HackBetaSubmissionThumbnail";
 import { useHackBetaApprovedSubmissions } from "@/lib/hooks/hack-beta/useHackBetaApprovedSubmissions";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -48,18 +49,12 @@ export function HackBetaGallery({ className }: HackBetaGalleryProps) {
             className="overflow-hidden rounded-xl border border-border/60 bg-card/40"
           >
             <Link href={`/discover/${s.video_asset_id}`} className="block">
-              {s.thumbnail_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={s.thumbnail_url}
-                  alt={s.title || "Demo"}
-                  className="aspect-video w-full bg-black object-cover"
-                />
-              ) : (
-                <div className="flex aspect-video items-center justify-center bg-muted/40">
-                  <Film className="h-8 w-8 text-muted-foreground" />
-                </div>
-              )}
+              <HackBetaSubmissionThumbnail
+                playbackId={s.playback_id}
+                thumbnailUrl={s.thumbnail_url}
+                title={s.title}
+                assetId={s.video_asset_id}
+              />
             </Link>
             <div className="space-y-2 p-3">
               <div className="flex items-start justify-between gap-2">
