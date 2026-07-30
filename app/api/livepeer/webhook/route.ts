@@ -11,7 +11,10 @@ import {
   finalizeStreamRecordings,
   persistRecordingAsset,
 } from "@/services/livestream-recordings";
-import { markStreamOfflineByStreamId } from "@/services/streams";
+import {
+  markStreamLiveByStreamId,
+  markStreamOfflineByStreamId,
+} from "@/services/streams";
 import { serverLogger } from "@/lib/utils/logger";
 
 export async function POST(request: NextRequest) {
@@ -43,6 +46,11 @@ export async function POST(request: NextRequest) {
       }
       if (asset?.id) {
         await persistRecordingAsset(asset, { streamId });
+      }
+    } else if (event === "stream.started") {
+      if (streamId) {
+        await markStreamLiveByStreamId(streamId);
+        serverLogger.info("Marked stream live from stream.started webhook", { streamId });
       }
     } else if (event === "recording.ready" || event === "stream.idle") {
       if (streamId) {

@@ -387,6 +387,30 @@ export interface ActiveStream {
 }
 
 /**
+ * Server-side helper to mark a stream live by Livepeer stream ID.
+ * Used by webhooks when Livepeer reports stream.started; bypasses wallet-auth
+ * because the caller is Livepeer, not an end user.
+ */
+export async function markStreamLiveByStreamId(streamId: string) {
+    const supabase = await createServiceClient();
+    const now = new Date().toISOString();
+
+    const { error } = await supabase
+        .from("streams")
+        .update({
+            is_live: true,
+            last_live_at: now,
+            updated_at: now,
+        })
+        .ilike("stream_id", streamId);
+
+    if (error) {
+        serverLogger.error("Error marking stream live by stream ID:", error);
+        throw new Error(`Failed to mark stream live: ${error.message}`);
+    }
+}
+
+/**
  * Server-side helper to mark a stream offline by Livepeer stream ID.
  * Used by webhooks when Livepeer reports stream.idle; bypasses wallet-auth
  * because the caller is Livepeer, not an end user.
