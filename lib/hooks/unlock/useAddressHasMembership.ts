@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { isAddress } from "viem";
+import { hasValidBrandPass } from "@/lib/access/creator-membership";
 
 type MembershipApiItem = {
   name?: string;
+  address?: string;
   isValid?: boolean;
 };
 
@@ -15,7 +17,7 @@ type MembershipApiResponse = {
 
 export type AddressMembershipStatus = {
   hasMembership: boolean;
-  /** Valid Creative Brand Plus lock. */
+  /** Valid Creative Brand Pass (or legacy Brand Plus). */
   hasBrandMembership: boolean;
 };
 
@@ -30,12 +32,15 @@ const inflight = new Map<string, Promise<AddressMembershipStatus>>();
 function summarizeMemberships(
   memberships: MembershipApiItem[] | undefined,
 ): AddressMembershipStatus {
-  const valid = memberships?.filter((m) => m.isValid === true) ?? [];
-  const hasBrandMembership = valid.some(
-    (m) => m.name === "BASE_CREATIVE_BRAND_PLUS",
-  );
+  const withAddress =
+    memberships?.filter(
+      (m): m is MembershipApiItem & { address: string } =>
+        typeof m.address === "string" && m.address.length > 0,
+    ) ?? [];
+  const hasMembership = withAddress.some((m) => m.isValid === true);
+  const hasBrandMembership = hasValidBrandPass(withAddress);
   return {
-    hasMembership: valid.length > 0,
+    hasMembership,
     hasBrandMembership,
   };
 }
@@ -79,7 +84,7 @@ async function fetchMembershipStatus(
 
 /**
  * Whether `address` holds a valid Unlock Creative membership (any lock),
- * and whether Brand Plus specifically is held (gold badge).
+ * and whether Brand Pass specifically is held (gold badge).
  * Results are cached in-memory for the session.
  */
 export function useAddressHasMembership(address?: string | null) {
