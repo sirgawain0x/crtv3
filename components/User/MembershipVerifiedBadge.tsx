@@ -23,7 +23,7 @@ const sizeClass = {
 
 /**
  * Twitter/Instagram-style verified badge for Unlock Creative Pass holders.
- * Brand Plus members get a gold badge; other members get blue.
+ * Brand Pass members get a gold badge; other members get blue.
  */
 export function MembershipVerifiedBadge({
   address,
@@ -39,7 +39,7 @@ export function MembershipVerifiedBadge({
   if (!visible) return null;
 
   const isBrand = brand ?? hasBrandMembership;
-  const title = isBrand ? "Creative Brand member" : "Creative member";
+  const title = isBrand ? "Creative Brand Pass" : "Creative member";
 
   return (
     <span
