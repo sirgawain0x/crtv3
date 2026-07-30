@@ -78,7 +78,10 @@ export function HackBetaSubmitPanel({ className }: HackBetaSubmitPanelProps) {
           title: selected.title,
           description: notes.trim() || selected.description || undefined,
           playback_id: selected.playback_id,
-          thumbnail_url: selected.thumbnailUri || undefined,
+          thumbnail_url:
+            selected.thumbnailUri ||
+            (selected as { thumbnail_url?: string }).thumbnail_url ||
+            undefined,
           grove_url: grove.url,
           grove_hash: grove.hash,
         },
