@@ -32,13 +32,17 @@ const inflight = new Map<string, Promise<AddressMembershipStatus>>();
 function summarizeMemberships(
   memberships: MembershipApiItem[] | undefined,
 ): AddressMembershipStatus {
-  const withAddress =
-    memberships?.filter(
-      (m): m is MembershipApiItem & { address: string } =>
-        typeof m.address === "string" && m.address.length > 0,
-    ) ?? [];
-  const hasMembership = withAddress.some((m) => m.isValid === true);
-  const hasBrandMembership = hasValidBrandPass(withAddress);
+  const normalized =
+    memberships
+      ?.filter(
+        (m): m is MembershipApiItem & { address: string; isValid: boolean } =>
+          typeof m.address === "string" &&
+          m.address.length > 0 &&
+          typeof m.isValid === "boolean",
+      )
+      .map((m) => ({ address: m.address, isValid: m.isValid })) ?? [];
+  const hasMembership = normalized.some((m) => m.isValid);
+  const hasBrandMembership = hasValidBrandPass(normalized);
   return {
     hasMembership,
     hasBrandMembership,
