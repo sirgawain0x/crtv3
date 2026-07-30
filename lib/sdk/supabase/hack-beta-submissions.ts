@@ -33,24 +33,36 @@ export type CreateHackBetaSubmissionResult =
   | { ok: false; reason: 'duplicate' | 'error'; message?: string };
 
 export const hackBetaSubmissionsService = {
+  /** Latest submission for a wallet (non-admins typically have at most one). */
   async getForWallet(walletAddress: string): Promise<HackBetaSubmission | null> {
+    try {
+      const rows = await this.listForWallet(walletAddress);
+      return rows[0] ?? null;
+    } catch (err) {
+      serverLogger.error('[hackBetaSubmissions] getForWallet exception:', err);
+      return null;
+    }
+  },
+
+  /** All submissions for a wallet (admins may have many). Newest first. */
+  async listForWallet(walletAddress: string): Promise<HackBetaSubmission[]> {
     try {
       const normalized = walletAddress.toLowerCase();
       const { data, error } = await supabase
         .from('hack_beta_submissions')
         .select('*')
         .eq('wallet_address', normalized)
-        .maybeSingle();
+        .order('created_at', { ascending: false });
 
       if (error) {
-        serverLogger.error('[hackBetaSubmissions] getForWallet error:', error);
-        return null;
+        serverLogger.error('[hackBetaSubmissions] listForWallet error:', error);
+        return [];
       }
 
-      return (data as HackBetaSubmission | null) ?? null;
+      return (data ?? []) as HackBetaSubmission[];
     } catch (err) {
-      serverLogger.error('[hackBetaSubmissions] getForWallet exception:', err);
-      return null;
+      serverLogger.error('[hackBetaSubmissions] listForWallet exception:', err);
+      return [];
     }
   },
 

@@ -25,9 +25,12 @@ export function HackBetaSubmitPanel({ className }: HackBetaSubmitPanelProps) {
   const { videos, loading: libraryLoading, hasWallet } = useCreatorVideoLibrary();
   const {
     submission: existing,
+    submissions,
     hasSubmitted,
+    isAdmin,
     isLoading: loadingSubmission,
     setSubmission,
+    reload,
   } = useHackBetaUserSubmission(authAddress);
 
   const [selected, setSelected] = useState<VideoAsset | null>(null);
@@ -41,6 +44,11 @@ export function HackBetaSubmitPanel({ className }: HackBetaSubmitPanelProps) {
     return tagged.length > 0 ? tagged : videos;
   }, [videos]);
 
+  const submittedAssetIds = useMemo(
+    () => new Set(submissions.map((s) => s.video_asset_id)),
+    [submissions],
+  );
+
   const handleSubmit = async () => {
     if (!authAddress) {
       toast.error("Connect your wallet to submit.");
@@ -48,6 +56,10 @@ export function HackBetaSubmitPanel({ className }: HackBetaSubmitPanelProps) {
     }
     if (!selected) {
       toast.error("Select a video from your library.");
+      return;
+    }
+    if (isAdmin && submittedAssetIds.has(selected.asset_id)) {
+      toast.error("That video is already in your submissions. Pick another.");
       return;
     }
 
@@ -94,7 +106,18 @@ export function HackBetaSubmitPanel({ className }: HackBetaSubmitPanelProps) {
       }
 
       setSubmission(result.submission);
-      toast.success(hasSubmitted ? "Updated your HACKATHON BETA submission!" : "Submitted to HACKATHON BETA!");
+      setSelected(null);
+      setNotes("");
+      if (isAdmin) {
+        await reload();
+        toast.success("Submitted another demo to HACKATHON BETA!");
+      } else {
+        toast.success(
+          hasSubmitted
+            ? "Updated your HACKATHON BETA submission!"
+            : "Submitted to HACKATHON BETA!",
+        );
+      }
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Submission failed");
     } finally {
@@ -111,7 +134,8 @@ export function HackBetaSubmitPanel({ className }: HackBetaSubmitPanelProps) {
     );
   }
 
-  if (hasSubmitted && existing) {
+  // Non-admins: lock after first submission.
+  if (hasSubmitted && existing && !isAdmin) {
     return (
       <div
         className={cn(
@@ -149,12 +173,41 @@ export function HackBetaSubmitPanel({ className }: HackBetaSubmitPanelProps) {
       )}
     >
       <div>
-        <h3 className="text-lg font-semibold text-foreground">Submit your demo</h3>
+        <h3 className="text-lg font-semibold text-foreground">
+          {isAdmin && submissions.length > 0 ? "Submit another demo" : "Submit your demo"}
+        </h3>
         <p className="mt-1 text-sm text-muted-foreground">
           Upload on Creative TV with genre <strong>Hackathon</strong>, then pick it from your
           library. We&apos;ll pin a Grove receipt for your submission.
+          {isAdmin ? " Admins can submit multiple demos." : null}
         </p>
       </div>
+
+      {isAdmin && submissions.length > 0 && (
+        <div className="space-y-2 rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
+          <p className="text-sm font-medium text-foreground">
+            Your submissions ({submissions.length})
+          </p>
+          <ul className="space-y-1.5">
+            {submissions.map((row) => (
+              <li
+                key={row.id}
+                className="flex flex-wrap items-center justify-between gap-2 text-sm text-muted-foreground"
+              >
+                <span>
+                  {row.title || "Demo"} · {row.status}
+                  {row.is_favorite ? " · favorite" : ""}
+                </span>
+                {row.video_asset_id && (
+                  <Button variant="ghost" size="sm" className="h-7 px-2" asChild>
+                    <Link href={`/discover/${row.video_asset_id}`}>View</Link>
+                  </Button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {!hasWallet && (
         <p className="flex items-center gap-2 text-sm text-amber-600 dark:text-amber-300">
@@ -202,6 +255,8 @@ export function HackBetaSubmitPanel({ className }: HackBetaSubmitPanelProps) {
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             Submitting…
           </>
+        ) : isAdmin && submissions.length > 0 ? (
+          "Submit another to HACKATHON BETA"
         ) : (
           "Submit to HACKATHON BETA"
         )}
