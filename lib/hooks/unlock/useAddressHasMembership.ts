@@ -3,15 +3,46 @@
 import { useEffect, useState } from "react";
 import { isAddress } from "viem";
 
+type MembershipApiItem = {
+  name?: string;
+  isValid?: boolean;
+};
+
 type MembershipApiResponse = {
-  memberships?: Array<{ isValid?: boolean }>;
+  memberships?: MembershipApiItem[];
   error?: string;
 };
 
-const cache = new Map<string, boolean>();
-const inflight = new Map<string, Promise<boolean>>();
+export type AddressMembershipStatus = {
+  hasMembership: boolean;
+  /** Valid Creative Brand Plus lock. */
+  hasBrandMembership: boolean;
+};
 
-async function fetchHasMembership(address: string): Promise<boolean> {
+const EMPTY_STATUS: AddressMembershipStatus = {
+  hasMembership: false,
+  hasBrandMembership: false,
+};
+
+const cache = new Map<string, AddressMembershipStatus>();
+const inflight = new Map<string, Promise<AddressMembershipStatus>>();
+
+function summarizeMemberships(
+  memberships: MembershipApiItem[] | undefined,
+): AddressMembershipStatus {
+  const valid = memberships?.filter((m) => m.isValid === true) ?? [];
+  const hasBrandMembership = valid.some(
+    (m) => m.name === "BASE_CREATIVE_BRAND_PLUS",
+  );
+  return {
+    hasMembership: valid.length > 0,
+    hasBrandMembership,
+  };
+}
+
+async function fetchMembershipStatus(
+  address: string,
+): Promise<AddressMembershipStatus> {
   const key = address.toLowerCase();
   const cached = cache.get(key);
   if (cached !== undefined) return cached;
@@ -27,18 +58,16 @@ async function fetchHasMembership(address: string): Promise<boolean> {
         body: JSON.stringify({ address: key }),
       });
       if (!res.ok) {
-        cache.set(key, false);
-        return false;
+        cache.set(key, EMPTY_STATUS);
+        return EMPTY_STATUS;
       }
       const data = (await res.json()) as MembershipApiResponse;
-      const hasMembership = Boolean(
-        data.memberships?.some((m) => m.isValid === true),
-      );
-      cache.set(key, hasMembership);
-      return hasMembership;
+      const status = summarizeMemberships(data.memberships);
+      cache.set(key, status);
+      return status;
     } catch {
-      cache.set(key, false);
-      return false;
+      cache.set(key, EMPTY_STATUS);
+      return EMPTY_STATUS;
     } finally {
       inflight.delete(key);
     }
@@ -49,14 +78,15 @@ async function fetchHasMembership(address: string): Promise<boolean> {
 }
 
 /**
- * Whether `address` holds a valid Unlock Creative membership (any lock).
- * Results are cached in-memory for the session to avoid repeat RPC lookups.
+ * Whether `address` holds a valid Unlock Creative membership (any lock),
+ * and whether Brand Plus specifically is held (gold badge).
+ * Results are cached in-memory for the session.
  */
 export function useAddressHasMembership(address?: string | null) {
   const normalized =
     address && isAddress(address) ? address.toLowerCase() : null;
-  const [hasMembership, setHasMembership] = useState(() =>
-    normalized ? (cache.get(normalized) ?? false) : false,
+  const [status, setStatus] = useState<AddressMembershipStatus>(() =>
+    normalized ? (cache.get(normalized) ?? EMPTY_STATUS) : EMPTY_STATUS,
   );
   const [isLoading, setIsLoading] = useState(() =>
     normalized ? !cache.has(normalized) : false,
@@ -64,22 +94,22 @@ export function useAddressHasMembership(address?: string | null) {
 
   useEffect(() => {
     if (!normalized) {
-      setHasMembership(false);
+      setStatus(EMPTY_STATUS);
       setIsLoading(false);
       return;
     }
 
     if (cache.has(normalized)) {
-      setHasMembership(cache.get(normalized) ?? false);
+      setStatus(cache.get(normalized) ?? EMPTY_STATUS);
       setIsLoading(false);
       return;
     }
 
     let cancelled = false;
     setIsLoading(true);
-    void fetchHasMembership(normalized).then((value) => {
+    void fetchMembershipStatus(normalized).then((value) => {
       if (cancelled) return;
-      setHasMembership(value);
+      setStatus(value);
       setIsLoading(false);
     });
 
@@ -88,5 +118,9 @@ export function useAddressHasMembership(address?: string | null) {
     };
   }, [normalized]);
 
-  return { hasMembership, isLoading };
+  return {
+    hasMembership: status.hasMembership,
+    hasBrandMembership: status.hasBrandMembership,
+    isLoading,
+  };
 }

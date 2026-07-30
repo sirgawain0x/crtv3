@@ -10,8 +10,9 @@ type MembershipVerifiedBadgeProps = {
    * When omitted, membership is looked up for `address`.
    */
   show?: boolean;
+  /** Force brand (gold) vs standard (blue) when parent already knows the tier. */
+  brand?: boolean;
   className?: string;
-  title?: string;
   size?: "sm" | "md";
 };
 
@@ -22,25 +23,29 @@ const sizeClass = {
 
 /**
  * Twitter/Instagram-style verified badge for Unlock Creative Pass holders.
+ * Brand Plus members get a gold badge; other members get blue.
  */
 export function MembershipVerifiedBadge({
   address,
   show,
+  brand,
   className,
-  title = "Creative member",
   size = "sm",
 }: MembershipVerifiedBadgeProps) {
-  const { hasMembership, isLoading } = useAddressHasMembership(
-    show === undefined ? address : null,
-  );
+  const { hasMembership, hasBrandMembership, isLoading } =
+    useAddressHasMembership(show === undefined ? address : null);
 
   const visible = show ?? (!isLoading && hasMembership);
   if (!visible) return null;
 
+  const isBrand = brand ?? hasBrandMembership;
+  const title = isBrand ? "Creative Brand member" : "Creative member";
+
   return (
     <span
       className={cn(
-        "inline-flex shrink-0 items-center justify-center text-[#1D9BF0]",
+        "inline-flex shrink-0 items-center justify-center",
+        isBrand ? "text-[#EAB308]" : "text-[#1D9BF0]",
         sizeClass[size],
         className,
       )}
