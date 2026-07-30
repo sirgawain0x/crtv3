@@ -78,9 +78,8 @@ export function SongchainComposePost({
           post_id: created.postId,
         });
         if (!submissionResult.ok) {
-          if (submissionResult.reason === "duplicate") {
-            // Feed post succeeded; submission row already exists for this wallet.
-          } else {
+          // The RPC upsert path now handles existing rows silently on the server.
+          if (submissionResult.reason === "error") {
             logger.error(
               "[SongchainComposePost] Song Cup submission failed:",
               submissionResult.message,
