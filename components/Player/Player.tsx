@@ -45,6 +45,9 @@ interface PlayerProps {
   onStalled?: () => void;
 }
 
+/** HLS live warm-up can take ~10–20s; allow headroom before declaring a stall. */
+const HLS_WARMUP_MS = 45_000;
+
 export function Player(props: PlayerProps) {
   const { src, title, playbackId, assetId, jwt, onPlay, onStalled, autoPlay = true, lowLatency = true } = props;
 
@@ -55,36 +58,70 @@ export function Player(props: PlayerProps) {
   const playerId = useRef(Math.random().toString(36).substring(7)).current;
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const stalledTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const hasPlayedRef = useRef(false);
 
-  // Cap livestream manifest loading at 10s and surface stalls to the parent.
+  const clearStalledTimer = useCallback(() => {
+    if (stalledTimerRef.current) {
+      clearTimeout(stalledTimerRef.current);
+      stalledTimerRef.current = null;
+    }
+  }, []);
+
+  const markPlaybackStarted = useCallback(() => {
+    if (hasPlayedRef.current) return;
+    hasPlayedRef.current = true;
+    clearStalledTimer();
+    logger.debug("[Player] Playback started; cleared stall warm-up timer", {
+      playbackId,
+    });
+  }, [clearStalledTimer, playbackId]);
+
+  // Only report a stall if we never reached playable media within the HLS warm-up budget.
   useEffect(() => {
+    hasPlayedRef.current = false;
     if (!onStalled) return;
-    const timer = setTimeout(() => {
-      onStalled();
-    }, 10_000);
-    stalledTimerRef.current = timer;
 
-    return () => {
-      if (stalledTimerRef.current) {
-        clearTimeout(stalledTimerRef.current);
-        stalledTimerRef.current = null;
-      }
-    };
-  }, [src, onStalled]);
+    clearStalledTimer();
+    stalledTimerRef.current = setTimeout(() => {
+      if (hasPlayedRef.current) return;
+      logger.warn("[Player] HLS warm-up exceeded without playback; reporting stall", {
+        playbackId,
+        budgetMs: HLS_WARMUP_MS,
+        hasJwt: Boolean(jwt),
+      });
+      onStalled();
+    }, HLS_WARMUP_MS);
+
+    return () => clearStalledTimer();
+  }, [src, onStalled, playbackId, jwt, clearStalledTimer]);
 
   useEffect(() => {
     const video = containerRef.current?.querySelector("video");
     if (video) {
       videoRef.current = video;
     }
-  }, []);
+  }, [src]);
 
   useEffect(() => {
-    if (!videoRef.current) return;
+    const video = videoRef.current ?? containerRef.current?.querySelector("video");
+    if (!video) return;
+    videoRef.current = video;
 
     const handlePlay = () => {
+      markPlaybackStarted();
       setCurrentPlayingId(assetId || playerId);
       onPlay?.();
+    };
+
+    const handlePlaying = () => {
+      markPlaybackStarted();
+    };
+
+    const handleLoadedData = () => {
+      // First frame / segment available — treat as successful warm-up.
+      if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+        markPlaybackStarted();
+      }
     };
 
     const handlePause = () => {
@@ -93,16 +130,18 @@ export function Player(props: PlayerProps) {
       }
     };
 
-    videoRef.current.addEventListener("play", handlePlay);
-    videoRef.current.addEventListener("pause", handlePause);
+    video.addEventListener("play", handlePlay);
+    video.addEventListener("playing", handlePlaying);
+    video.addEventListener("loadeddata", handleLoadedData);
+    video.addEventListener("pause", handlePause);
 
     return () => {
-      if (videoRef.current) {
-        videoRef.current.removeEventListener("play", handlePlay);
-        videoRef.current.removeEventListener("pause", handlePause);
-      }
+      video.removeEventListener("play", handlePlay);
+      video.removeEventListener("playing", handlePlaying);
+      video.removeEventListener("loadeddata", handleLoadedData);
+      video.removeEventListener("pause", handlePause);
     };
-  }, [playerId, currentPlayingId, setCurrentPlayingId, assetId, onPlay]);
+  }, [playerId, currentPlayingId, setCurrentPlayingId, assetId, onPlay, src, markPlaybackStarted]);
 
   const safelyPauseCurrentVideo = useCallback(async () => {
     if (videoRef.current) {
@@ -175,11 +214,11 @@ export function Player(props: PlayerProps) {
           playsInline
           controls={false}
           hlsConfig={{
-            manifestLoadingTimeOut: 10_000,
-            manifestLoadingMaxRetry: 2,
-            manifestLoadingRetryDelay: 1_000,
-            levelLoadingTimeOut: 10_000,
-            fragLoadingTimeOut: 10_000,
+            manifestLoadingTimeOut: HLS_WARMUP_MS,
+            manifestLoadingMaxRetry: 6,
+            manifestLoadingRetryDelay: 1_500,
+            levelLoadingTimeOut: 20_000,
+            fragLoadingTimeOut: 20_000,
           }}
         />
 

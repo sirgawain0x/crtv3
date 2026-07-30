@@ -125,9 +125,10 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
     ok: boolean;
     token?: string;
     gate?: LiveStreamGateInfo;
+    errorMessage?: string;
   }> => {
     if (!playbackId) {
-      return { ok: false };
+      return { ok: false, errorMessage: "No playback ID provided." };
     }
 
     const gateActive = isGateLikelyActive();
@@ -194,7 +195,7 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
 
     const parseJwtResult = async (res: Response): Promise<
       | { ok: true; token: string }
-      | { ok: false; gate?: LiveStreamGateInfo }
+      | { ok: false; gate?: LiveStreamGateInfo; errorMessage?: string }
     > => {
       if (res.ok) {
         const { token } = await res.json();
@@ -221,7 +222,13 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
       }
 
       logger.warn("Failed to sign JWT for stream:", errData);
-      return { ok: false };
+      const message =
+        typeof errData.message === "string" && errData.message.trim()
+          ? errData.message
+          : res.status === 500
+            ? "Playback authorization is misconfigured. Please try again later."
+            : "Unable to authorize playback for this private stream.";
+      return { ok: false, errorMessage: message };
     };
 
     if (jwtRes.status === 404) {
@@ -278,23 +285,44 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
         setStreamData(streamRecord as import("@/services/streams").Stream);
       }
 
-      // Happy path — stream is live; JWT required for playback.
+      // Happy path — stream has sources; JWT is required for jwt playbackPolicy streams.
       if (sources && sources.length > 0) {
+        logger.info("[WatchClient] Playback sources ready", {
+          playbackId,
+          sourceCount: sources.length,
+          sourceTypes: sources.map((s) => s.type),
+        });
         try {
           const jwtResult = await requestStreamJwt();
           if (jwtResult.ok && jwtResult.token) {
+            logger.info("[WatchClient] JWT issued for playback", { playbackId });
             setJwt(jwtResult.token);
             setStatus({ kind: "live", sources });
           } else if (jwtResult.gate) {
             setJwt(undefined);
             setStatus({ kind: "metoken-gated", gate: jwtResult.gate, sources });
           } else {
+            // JWT-gated livestreams cannot play without a token — do not mount a black player.
             setJwt(undefined);
-            setStatus({ kind: "live", sources });
+            logger.error("[WatchClient] JWT missing for gated stream; blocking live render", {
+              playbackId,
+              errorMessage: jwtResult.errorMessage,
+            });
+            setStatus({
+              kind: "error",
+              userMessage:
+                jwtResult.errorMessage ??
+                "This stream is private and we couldn't issue a playback token. Please refresh and try again.",
+            });
           }
         } catch (jwtErr) {
           logger.error("Error signing JWT:", jwtErr);
-          setStatus({ kind: "live", sources });
+          setJwt(undefined);
+          setStatus({
+            kind: "error",
+            userMessage:
+              "Unable to authorize playback for this private stream. Please try again.",
+          });
         }
         return;
       }
@@ -349,6 +377,13 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
         setStatus({ kind: "live", sources: status.sources });
       } else if (jwtResult.gate) {
         setStatus({ kind: "metoken-gated", gate: jwtResult.gate, sources: status.sources });
+      } else {
+        setJwt(undefined);
+        setStatus({
+          kind: "error",
+          userMessage:
+            "This stream is private and we couldn't issue a playback token. Please refresh and try again.",
+        });
       }
     } finally {
       setIsChecking(false);
@@ -527,7 +562,10 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
                     jwt={jwt}
                     lowLatency={false}
                     onStalled={() => {
-                      // Stream went idle after we entered live state.
+                      // Only fires after HLS warm-up budget with no playable media.
+                      logger.warn("[WatchClient] Player reported stall; returning to offline poll", {
+                        playbackId,
+                      });
                       setStatus({ kind: "offline-temporary", attempts: 0 });
                     }}
                   />

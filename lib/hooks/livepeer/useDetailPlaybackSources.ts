@@ -87,14 +87,24 @@ export const getDetailPlaybackSource = async (
     }
 
     const res = await response.json();
-    logger.debug("[getDetailPlaybackSource] Playback info:", res);
+    const meta = res?.meta as
+      | { live?: number; source?: Array<{ hrn?: string; type?: string }> }
+      | undefined;
+    logger.info("[getDetailPlaybackSource] Playback info received", {
+      id,
+      type: res?.type,
+      live: meta?.live,
+      sourceCount: meta?.source?.length ?? 0,
+      sourceTypes: meta?.source?.map((s) => s.hrn ?? s.type) ?? [],
+    });
 
     const src = getSrc(res) as Src[];
     logger.debug("[getDetailPlaybackSource] Generated sources:", src);
     if (!src?.length) {
-      logger.error(
-        "[getDetailPlaybackSource] No valid sources generated for ID:",
-        id
+      logger.warn(
+        "[getDetailPlaybackSource] No playable sources yet for ID (stream may still be warming up):",
+        id,
+        { live: meta?.live, sourceCount: meta?.source?.length ?? 0 },
       );
       return null;
     }
