@@ -38,8 +38,12 @@ export async function POST(req: NextRequest) {
     }
 
     const body = parsed.data;
+    let verifiedAddress: string;
     try {
-      await requireWalletAuthFor(req, body.wallet_address);
+      ({ address: verifiedAddress } = await requireWalletAuthFor(
+        req,
+        body.wallet_address,
+      ));
     } catch (authErr) {
       if (authErr instanceof WalletAuthError) {
         return NextResponse.json(
@@ -50,7 +54,10 @@ export async function POST(req: NextRequest) {
       throw authErr;
     }
 
-    const submission = await upsertHackBetaSubmission(body);
+    const submission = await upsertHackBetaSubmission({
+      ...body,
+      wallet_address: verifiedAddress,
+    });
     return NextResponse.json({ ok: true, submission });
   } catch (error) {
     serverLogger.error("[hack-beta/submit] failed:", error);

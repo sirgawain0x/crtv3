@@ -104,14 +104,14 @@ function SongCupCheckbox({
 
 export function SongCupSubmitPanel({ className }: SongCupSubmitPanelProps) {
   const user = useUser();
-  const { getAuthHeaders } = useWalletAuth();
+  const { getAuthHeaders, address: authAddress } = useWalletAuth();
   const { videos, loading: libraryLoading, hasWallet } = useCreatorVideoLibrary();
   const {
     submission: existingSubmission,
     hasSubmitted,
     isLoading: isLoadingSubmission,
     setSubmission: setExistingSubmission,
-  } = useSongCupUserSubmission(user?.address);
+  } = useSongCupUserSubmission(authAddress);
   const [attestationModalOpen, setAttestationModalOpen] = useState(false);
   const { isAttested, isLoading: isAttestationLoading, attestation } = useSongCupAttestation();
   const {
@@ -138,7 +138,7 @@ export function SongCupSubmitPanel({ className }: SongCupSubmitPanelProps) {
   };
 
   const handleSubmit = async () => {
-    if (!user?.address) {
+    if (!authAddress) {
       toast.error("Connect your wallet to submit.");
       return;
     }
@@ -171,7 +171,7 @@ export function SongCupSubmitPanel({ className }: SongCupSubmitPanelProps) {
       const authHeaders = await getAuthHeaders();
       const result = await songCupSubmissionsService.create(
         {
-          wallet_address: user.address,
+          wallet_address: authAddress,
           grove_url: playbackUrl,
           grove_hash: selectedVideo.metadata_uri ?? undefined,
           title: artistName.trim(),
@@ -187,8 +187,8 @@ export function SongCupSubmitPanel({ className }: SongCupSubmitPanelProps) {
       if (!result.ok) {
         if (result.reason === "duplicate") {
           toast.message(result.message ?? "You already submitted an entry.");
-          if (user.address) {
-            const row = await songCupSubmissionsService.getForWallet(user.address);
+          if (authAddress) {
+            const row = await songCupSubmissionsService.getForWallet(authAddress);
             if (row) setExistingSubmission(row);
           }
         } else {

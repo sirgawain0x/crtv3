@@ -41,8 +41,12 @@ export async function POST(req: NextRequest) {
     }
 
     const body = parsed.data;
+    let verifiedAddress: string;
     try {
-      await requireWalletAuthFor(req, body.wallet_address);
+      ({ address: verifiedAddress } = await requireWalletAuthFor(
+        req,
+        body.wallet_address,
+      ));
     } catch (authErr) {
       if (authErr instanceof WalletAuthError) {
         return NextResponse.json(
@@ -53,7 +57,10 @@ export async function POST(req: NextRequest) {
       throw authErr;
     }
 
-    const submission = await upsertSongCupSubmission(body);
+    const submission = await upsertSongCupSubmission({
+      ...body,
+      wallet_address: verifiedAddress,
+    });
     return NextResponse.json({ ok: true, submission });
   } catch (error) {
     serverLogger.error("[song-cup/submit] failed:", error);
