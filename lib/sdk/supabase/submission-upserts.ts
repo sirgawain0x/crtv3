@@ -4,6 +4,7 @@
  * `requireWalletAuthFor` has verified the wallet owns the request.
  */
 
+import { isHackBetaAdminWallet } from "@/lib/chones/hack-beta/admin-config";
 import { createServiceClient } from "@/lib/sdk/supabase/service";
 import type { HackBetaSubmission } from "@/lib/sdk/supabase/hack-beta-submissions";
 import type { SongCupSubmission } from "@/lib/sdk/supabase/song-cup-submissions";
@@ -34,11 +35,65 @@ export type SongCupUpsertInput = {
   post_id?: string | null;
 };
 
+async function insertHackBetaSubmission(
+  supabase: ReturnType<typeof createServiceClient>,
+  wallet: string,
+  input: HackBetaUpsertInput,
+): Promise<HackBetaSubmission> {
+  const { data: inserted, error: insertError } = await supabase
+    .from("hack_beta_submissions")
+    .insert({
+      wallet_address: wallet,
+      video_asset_id: input.video_asset_id,
+      title: input.title ?? null,
+      description: input.description ?? null,
+      playback_id: input.playback_id ?? null,
+      thumbnail_url: input.thumbnail_url ?? null,
+      grove_url: input.grove_url ?? null,
+      grove_hash: input.grove_hash ?? null,
+      status: "pending",
+      is_favorite: false,
+    })
+    .select("*")
+    .single();
+
+  if (insertError) {
+    const err = new Error(insertError.message) as Error & { code?: string };
+    err.code = insertError.code;
+    serverLogger.error("[submission-upserts] hack-beta insert error:", insertError);
+    throw err;
+  }
+
+  return inserted as HackBetaSubmission;
+}
+
+/**
+ * Non-admins: one row per wallet (update-or-insert).
+ * Admins: always insert a new row so they can submit multiple demos.
+ * Re-submitting the same video_asset_id for a wallet still hits the
+ * (wallet, video_asset_id) unique index and fails with a clear error.
+ */
 export async function upsertHackBetaSubmission(
   input: HackBetaUpsertInput,
 ): Promise<HackBetaSubmission> {
   const supabase = createServiceClient();
   const wallet = input.wallet_address.toLowerCase();
+  const isAdmin = isHackBetaAdminWallet(wallet);
+
+  // Admins always get a new submission row (multi-submit for hack-beta only).
+  if (isAdmin) {
+    try {
+      return await insertHackBetaSubmission(supabase, wallet, input);
+    } catch (err) {
+      const code = (err as { code?: string })?.code;
+      if (code === "23505") {
+        throw new Error(
+          "This video is already submitted under your admin wallet. Pick a different video.",
+        );
+      }
+      throw err;
+    }
+  }
 
   const { data: updated, error: updateError } = await supabase
     .from("hack_beta_submissions")
@@ -63,53 +118,35 @@ export async function upsertHackBetaSubmission(
   }
   if (updated) return updated as HackBetaSubmission;
 
-  const { data: inserted, error: insertError } = await supabase
-    .from("hack_beta_submissions")
-    .insert({
-      wallet_address: wallet,
-      video_asset_id: input.video_asset_id,
-      title: input.title ?? null,
-      description: input.description ?? null,
-      playback_id: input.playback_id ?? null,
-      thumbnail_url: input.thumbnail_url ?? null,
-      grove_url: input.grove_url ?? null,
-      grove_hash: input.grove_hash ?? null,
-      status: "pending",
-      is_favorite: false,
-    })
-    .select("*")
-    .single();
+  try {
+    return await insertHackBetaSubmission(supabase, wallet, input);
+  } catch (err) {
+    // Concurrent insert race for non-admins — fetch the row and update.
+    const code = (err as { code?: string })?.code;
+    if (code !== "23505") throw err;
 
-  if (insertError) {
-    // Concurrent insert race: unique on lower(wallet) — fetch the row and update.
-    if (insertError.code === "23505") {
-      const { data: raced, error: raceError } = await supabase
-        .from("hack_beta_submissions")
-        .update({
-          video_asset_id: input.video_asset_id,
-          title: input.title ?? null,
-          description: input.description ?? null,
-          playback_id: input.playback_id ?? null,
-          thumbnail_url: input.thumbnail_url ?? null,
-          grove_url: input.grove_url ?? null,
-          grove_hash: input.grove_hash ?? null,
-          status: "pending",
-          updated_at: new Date().toISOString(),
-        })
-        .ilike("wallet_address", wallet)
-        .select("*")
-        .single();
-      if (raceError || !raced) {
-        serverLogger.error("[submission-upserts] hack-beta race update error:", raceError);
-        throw new Error(raceError?.message ?? "Failed to upsert hack beta submission");
-      }
-      return raced as HackBetaSubmission;
+    const { data: raced, error: raceError } = await supabase
+      .from("hack_beta_submissions")
+      .update({
+        video_asset_id: input.video_asset_id,
+        title: input.title ?? null,
+        description: input.description ?? null,
+        playback_id: input.playback_id ?? null,
+        thumbnail_url: input.thumbnail_url ?? null,
+        grove_url: input.grove_url ?? null,
+        grove_hash: input.grove_hash ?? null,
+        status: "pending",
+        updated_at: new Date().toISOString(),
+      })
+      .ilike("wallet_address", wallet)
+      .select("*")
+      .maybeSingle();
+    if (raceError || !raced) {
+      serverLogger.error("[submission-upserts] hack-beta race update error:", raceError);
+      throw new Error(raceError?.message ?? "Failed to upsert hack beta submission");
     }
-    serverLogger.error("[submission-upserts] hack-beta insert error:", insertError);
-    throw new Error(insertError.message);
+    return raced as HackBetaSubmission;
   }
-
-  return inserted as HackBetaSubmission;
 }
 
 export async function upsertSongCupSubmission(
