@@ -38,6 +38,7 @@ import { useLensOrbWrite } from "@/hooks/useLensOrbWrite";
 import { groveService } from "@/lib/sdk/grove/service";
 import { clearStaleOrbSessionIfNeeded } from "@/lib/sdk/orb/session-errors";
 import { SongchainAuthorTimeline } from "@/components/songchain/SongchainAuthorTimeline";
+import { MembershipVerifiedBadge } from "@/components/User/MembershipVerifiedBadge";
 import { SongchainQuotedPostEmbed } from "@/components/songchain/SongchainQuotedPostEmbed";
 import { SongchainPostContent } from "@/components/songchain/SongchainPostContent";
 import { SongchainFollowButton } from "@/components/songchain/SongchainGraphPanel";
@@ -331,12 +332,19 @@ export function SongchainPostCard({
             <button
               type="button"
               className={cn(
-                "text-left hover:text-violet-400 w-fit",
+                "inline-flex w-fit items-center gap-1 text-left hover:text-violet-400",
                 variant === "song-cup" ? cn("text-xs", songCupMuted) : "text-xs text-muted-foreground",
               )}
               onClick={() => setTimelineOpen(true)}
             >
               {authorLabel(isQuote ? post : content)}
+              <MembershipVerifiedBadge
+                address={
+                  isQuote
+                    ? post.author.address
+                    : content?.author.address ?? post.author.address
+                }
+              />
             </button>
             {content && variant !== "song-cup" && (
               <SongchainFollowButton

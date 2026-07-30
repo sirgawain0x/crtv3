@@ -22,6 +22,7 @@ import { fetchVideoAssetByPlaybackId } from "@/lib/utils/video-assets-client";
 import VideoThumbnail from "./VideoThumbnail";
 import { ShareDialog } from "./ShareDialog";
 import { useCreatorProfile } from "@/lib/hooks/metokens/useCreatorProfile";
+import { MembershipVerifiedBadge } from "@/components/User/MembershipVerifiedBadge";
 import { VideoBuyButton } from "./VideoBuyButton";
 import { logger } from "@/lib/utils/logger";
 import { useIsVideoAdmin } from "@/hooks/useIsVideoAdmin";
@@ -296,8 +297,9 @@ const VideoCard: React.FC<VideoCardProps> = ({
                 </AvatarFallback>
               </Avatar>
               <div className="flex flex-col">
-                <span className="text-sm font-medium">
+                <span className="inline-flex items-center gap-1 text-sm font-medium">
                   {creatorProfile?.username || shortenAddress(address)}
+                  <MembershipVerifiedBadge address={address} />
                 </span>
               </div>
             </Link>
