@@ -36,6 +36,7 @@ import { updateStream } from "@/services/streams";
 import { useWalletAuth } from "@/lib/auth/useWalletAuth";
 import { walletAuthHeadersToArgs } from "@/lib/auth/require-wallet";
 import { parseStreamProxyFailure } from "@/lib/livepeer/stream-proxy-errors";
+import { getDetailPlaybackSource } from "@/lib/hooks/livepeer/useDetailPlaybackSources";
 import { CreativeBrandOverlay } from "@/components/Player/CreativeBrandOverlay";
 import { FloatingTipHearts } from "@/components/Live/FloatingTipHearts";
 
@@ -146,6 +147,44 @@ async function finalizeStreamRecordings(streamId: string) {
   }
 }
 
+/** Poll until Livepeer reports playable sources (HLS warm-up), or give up. */
+async function waitForPlaybackSources(
+  playbackId: string,
+  opts?: { signal?: AbortSignal; maxAttempts?: number; intervalMs?: number },
+): Promise<boolean> {
+  const maxAttempts = opts?.maxAttempts ?? 15;
+  const intervalMs = opts?.intervalMs ?? 2_000;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    if (opts?.signal?.aborted) return false;
+    try {
+      const sources = await getDetailPlaybackSource(playbackId, {
+        signal: opts?.signal,
+      });
+      if (sources && sources.length > 0) {
+        logger.info("Playback sources ready after WHIP live", {
+          playbackId,
+          attempt,
+          sourceCount: sources.length,
+        });
+        return true;
+      }
+    } catch (err) {
+      if (opts?.signal?.aborted) return false;
+      logger.debug("Playback readiness poll failed:", err);
+    }
+    if (attempt < maxAttempts) {
+      await new Promise((resolve) => setTimeout(resolve, intervalMs));
+    }
+  }
+
+  logger.warn("Playback sources not ready before is_live timeout; marking live anyway", {
+    playbackId,
+    maxAttempts,
+  });
+  return false;
+}
+
 function BroadcastWithControls({
   streamKey,
   streamId: propStreamId,
@@ -185,20 +224,30 @@ function BroadcastWithControls({
 
   const finalizeTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
-  // Sync is_live status with DB; finalize recordings when broadcast ends
+  // Sync is_live with DB only after Livepeer playback is ready (or warm-up budget expires).
+  // Finalize recordings when broadcast ends.
   useEffect(() => {
     if (!creatorAddress) return;
+
+    const abort = new AbortController();
 
     const syncStatus = async () => {
       try {
         const auth = walletAuthHeadersToArgs(await getAuthHeaders());
         if (status === 'live') {
+          if (playbackId) {
+            await waitForPlaybackSources(playbackId, { signal: abort.signal });
+            if (abort.signal.aborted) return;
+          }
+          if (abort.signal.aborted) return;
           await updateStream(
             creatorAddress,
             { is_live: true, last_live_at: new Date().toISOString() },
             auth,
           );
-          logger.info("Stream marked as live in DB");
+          logger.info("Stream marked as live in DB (playback-ready gated)", {
+            playbackId,
+          });
         } else if (status === 'idle' || status === 'error') {
           await updateStream(creatorAddress, { is_live: false, last_live_at: new Date().toISOString() }, auth);
           logger.info("Stream marked as offline in DB");
@@ -211,6 +260,7 @@ function BroadcastWithControls({
           }
         }
       } catch (err) {
+        if (abort.signal.aborted) return;
         logger.error("Failed to sync stream status:", err);
       }
     };
@@ -218,10 +268,11 @@ function BroadcastWithControls({
     void syncStatus();
 
     return () => {
+      abort.abort();
       finalizeTimeoutsRef.current.forEach(clearTimeout);
       finalizeTimeoutsRef.current = [];
     };
-  }, [status, creatorAddress, propStreamId, getAuthHeaders, saveRecording]);
+  }, [status, creatorAddress, propStreamId, playbackId, getAuthHeaders, saveRecording]);
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
