@@ -1,12 +1,15 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { CheckCircle, ExternalLink, Film, Star, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { HackBetaSubmission } from "@/lib/sdk/supabase/hack-beta-submissions";
 import { truncateWalletAddress } from "@/lib/chones/hack-beta/admin-config";
+import { getThumbnailUrl } from "@/lib/utils/thumbnail";
 import { cn } from "@/lib/utils";
 
 type HackBetaSubmissionReviewCardProps = {
@@ -17,6 +20,42 @@ type HackBetaSubmissionReviewCardProps = {
   className?: string;
 };
 
+function useSubmissionThumbnail(
+  thumbnailUrl?: string | null,
+  playbackId?: string | null,
+) {
+  const stored = thumbnailUrl?.trim() || null;
+  const [url, setUrl] = useState<string | null>(stored);
+  const [isLoading, setIsLoading] = useState(!stored && Boolean(playbackId));
+
+  useEffect(() => {
+    if (stored) {
+      setUrl(stored);
+      setIsLoading(false);
+      return;
+    }
+    if (!playbackId) {
+      setUrl(null);
+      setIsLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsLoading(true);
+    void getThumbnailUrl(playbackId).then((resolved) => {
+      if (cancelled) return;
+      setUrl(resolved);
+      setIsLoading(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [stored, playbackId]);
+
+  return { url, isLoading };
+}
+
 export function HackBetaSubmissionReviewCard({
   submission,
   onApprove,
@@ -24,6 +63,11 @@ export function HackBetaSubmissionReviewCard({
   onReject,
   className,
 }: HackBetaSubmissionReviewCardProps) {
+  const { url: thumbnailSrc, isLoading: thumbnailLoading } = useSubmissionThumbnail(
+    submission.thumbnail_url,
+    submission.playback_id,
+  );
+
   return (
     <article
       className={cn(
@@ -31,13 +75,15 @@ export function HackBetaSubmissionReviewCard({
         className,
       )}
     >
-      {submission.thumbnail_url ? (
+      {thumbnailSrc ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={submission.thumbnail_url}
+          src={thumbnailSrc}
           alt=""
-          className="aspect-video w-full object-cover bg-black"
+          className="aspect-video w-full bg-black object-cover"
         />
+      ) : thumbnailLoading ? (
+        <Skeleton className="aspect-video w-full rounded-none" />
       ) : (
         <div className="flex aspect-video items-center justify-center bg-muted/40">
           <Film className="h-8 w-8 text-muted-foreground" />
@@ -104,7 +150,7 @@ export function HackBetaSubmissionReviewCard({
           <Button
             variant="outline"
             size="sm"
-            className="h-8 flex-1 gap-1 text-[11px] border-amber-500/40"
+            className="h-8 flex-1 gap-1 border-amber-500/40 text-[11px]"
             onClick={() => onFavorite(submission.id, !submission.is_favorite)}
           >
             <Star className="h-3 w-3" />
@@ -113,7 +159,7 @@ export function HackBetaSubmissionReviewCard({
           <Button
             variant="outline"
             size="sm"
-            className="h-8 flex-1 gap-1 text-[11px] border-red-500/40 text-red-600"
+            className="h-8 flex-1 gap-1 border-red-500/40 text-[11px] text-red-600"
             onClick={() => onReject(submission.id)}
             disabled={submission.status === "rejected"}
           >
@@ -126,7 +172,12 @@ export function HackBetaSubmissionReviewCard({
   );
 }
 
-export type HackBetaSubmissionStatusFilter = "all" | "pending" | "approved" | "rejected" | "favorite";
+export type HackBetaSubmissionStatusFilter =
+  | "all"
+  | "pending"
+  | "approved"
+  | "rejected"
+  | "favorite";
 
 export const HACK_BETA_STATUS_FILTERS: {
   id: HackBetaSubmissionStatusFilter;
