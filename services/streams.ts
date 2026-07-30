@@ -402,7 +402,7 @@ export async function markStreamLiveByStreamId(streamId: string) {
             last_live_at: now,
             updated_at: now,
         })
-        .ilike("stream_id", streamId);
+        .eq("stream_id", streamId);
 
     if (error) {
         serverLogger.error("Error marking stream live by stream ID:", error);
@@ -424,7 +424,7 @@ export async function markStreamOfflineByStreamId(streamId: string) {
             is_live: false,
             updated_at: new Date().toISOString(),
         })
-        .ilike("stream_id", streamId);
+        .eq("stream_id", streamId);
 
     if (error) {
         serverLogger.error("Error marking stream offline by stream ID:", error);
