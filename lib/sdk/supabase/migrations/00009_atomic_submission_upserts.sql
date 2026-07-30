@@ -1,4 +1,10 @@
 -- Migration 00009: atomic upsert RPC for hack beta and song cup submissions
+--
+-- NOTE (2026-07-30): Client submits no longer call these RPCs. Wallet users
+-- authenticate via signed headers and POST to /api/hack-beta/submit and
+-- /api/song-cup/submit, which upsert with the service-role client.
+-- Kept for reference / optional PostgREST use with a real Supabase Auth JWT.
+--
 -- Replaces the client-side SELECT / UPDATE / INSERT race with a single Postgres
 -- call. The real logic lives in private.* (SECURITY DEFINER) and is exposed via
 -- thin public.* wrappers (SECURITY INVOKER) so PostgREST can reach them without

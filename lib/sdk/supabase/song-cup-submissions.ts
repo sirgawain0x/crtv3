@@ -60,29 +60,38 @@ export const songCupSubmissionsService = {
     }
   },
 
-  async create(data: CreateSongCupSubmissionData): Promise<CreateSongCupSubmissionResult> {
+  async create(
+    data: CreateSongCupSubmissionData,
+    authHeaders: Record<string, string>,
+  ): Promise<CreateSongCupSubmissionResult> {
     try {
-      const { data: row, error } = await supabase
-        .rpc('upsert_song_cup_submission', {
-          p_grove_url: data.grove_url,
-          p_grove_hash: data.grove_hash ?? null,
-          p_title: data.title ?? null,
-          p_description: data.description ?? null,
-          p_artist_handle: data.artist_handle ?? null,
-          p_email: data.email ?? null,
-          p_cover_url: data.cover_url ?? null,
-          p_cover_hash: data.cover_hash ?? null,
-          p_attestation_uid: data.attestation_uid ?? null,
-          p_post_id: data.post_id ?? null,
-        })
-        .single();
+      const res = await fetch('/api/song-cup/submit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeaders,
+        },
+        body: JSON.stringify(data),
+      });
+      const json = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        submission?: SongCupSubmission;
+        error?: string | Record<string, unknown>;
+      };
 
-      if (error) {
-        serverLogger.error('[songCupSubmissions] rpc create/upsert error:', error);
-        return { ok: false, reason: 'error', message: error.message };
+      if (!res.ok || !json.ok || !json.submission) {
+        const message =
+          typeof json.error === 'string'
+            ? json.error
+            : res.statusText || 'Submission failed';
+        serverLogger.error('[songCupSubmissions] api create/upsert error:', {
+          status: res.status,
+          error: json.error,
+        });
+        return { ok: false, reason: 'error', message };
       }
 
-      return { ok: true, submission: row as SongCupSubmission };
+      return { ok: true, submission: json.submission };
     } catch (err) {
       serverLogger.error('[songCupSubmissions] create exception:', err);
       return {

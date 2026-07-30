@@ -75,6 +75,8 @@ if (!botIdGlobal.__crtvBotIdInit) {
       botIdDeepAnalysisRoute('/api/stickers/verify-vote', 'POST'),
       botIdDeepAnalysisRoute('/api/stickers/record-claim', 'POST'),
       botIdDeepAnalysisRoute('/api/stickers/tips', 'POST'),
+      botIdDeepAnalysisRoute('/api/hack-beta/submit', 'POST'),
+      botIdDeepAnalysisRoute('/api/song-cup/submit', 'POST'),
       botIdDeepAnalysisRoute('/api/heartbit/mint', 'POST'),
       // claim-status omitted: read-only on-chain claim lookup; BotID 403 breaks list badges.
       botIdDeepAnalysisRoute('/api/search/videos', 'GET'),

@@ -23,6 +23,7 @@ import { useSongCupUserSubmission } from "@/lib/hooks/song-cup/useSongCupUserSub
 import { useCreatorVideoLibrary } from "@/hooks/useCreatorVideoLibrary";
 import { songCupSubmissionsService } from "@/lib/sdk/supabase/song-cup-submissions";
 import { useUser } from "@/lib/wallet/react";
+import { useWalletAuth } from "@/lib/auth/useWalletAuth";
 import type { VideoAsset } from "@/lib/types/video-asset";
 import { resolveVideoPlaybackUrl } from "@/lib/songchain/build-lens-video-metadata";
 import { cn } from "@/lib/utils/utils";
@@ -103,6 +104,7 @@ function SongCupCheckbox({
 
 export function SongCupSubmitPanel({ className }: SongCupSubmitPanelProps) {
   const user = useUser();
+  const { getAuthHeaders } = useWalletAuth();
   const { videos, loading: libraryLoading, hasWallet } = useCreatorVideoLibrary();
   const {
     submission: existingSubmission,
@@ -166,17 +168,21 @@ export function SongCupSubmitPanel({ className }: SongCupSubmitPanelProps) {
         return;
       }
 
-      const result = await songCupSubmissionsService.create({
-        wallet_address: user.address,
-        grove_url: playbackUrl,
-        grove_hash: selectedVideo.metadata_uri ?? undefined,
-        title: artistName.trim(),
-        description: description.trim() || undefined,
-        artist_handle: artistHandle.trim() || undefined,
-        email: email.trim() || undefined,
-        cover_url: thumbnailFromVideoAsset(selectedVideo),
-        attestation_uid: attestation?.uid,
-      });
+      const authHeaders = await getAuthHeaders();
+      const result = await songCupSubmissionsService.create(
+        {
+          wallet_address: user.address,
+          grove_url: playbackUrl,
+          grove_hash: selectedVideo.metadata_uri ?? undefined,
+          title: artistName.trim(),
+          description: description.trim() || undefined,
+          artist_handle: artistHandle.trim() || undefined,
+          email: email.trim() || undefined,
+          cover_url: thumbnailFromVideoAsset(selectedVideo),
+          attestation_uid: attestation?.uid,
+        },
+        authHeaders,
+      );
 
       if (!result.ok) {
         if (result.reason === "duplicate") {
