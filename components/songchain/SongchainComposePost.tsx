@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useSongchainPost } from "@/hooks/useSongchainPost";
 import { useCreatorLiveStream } from "@/hooks/useCreatorLiveStream";
-import { useUser } from "@/lib/wallet/react";
 import { useWalletAuth } from "@/lib/auth/useWalletAuth";
 import { GroveVideoUploader } from "@/components/songchain/GroveVideoUploader";
 import { songCupSubmissionsService } from "@/lib/sdk/supabase/song-cup-submissions";
@@ -37,8 +36,7 @@ export function SongchainComposePost({
   const { createPost, isPosting, canWrite, needsOrbReauth, promptWriteAccess } =
     useSongchainPost();
   const { stream, isLive, loading: streamLoading } = useCreatorLiveStream();
-  const user = useUser();
-  const { getAuthHeaders } = useWalletAuth();
+  const { getAuthHeaders, address: authAddress } = useWalletAuth();
 
   if (!feedId) return null;
 
@@ -70,12 +68,12 @@ export function SongchainComposePost({
       attachedLiveStream: liveAttached ? attachedLiveStream : null,
     });
       if (created) {
-      if (uploadedVideoAsset?.location && user?.address) {
+      if (uploadedVideoAsset?.location && authAddress) {
         try {
           const authHeaders = await getAuthHeaders();
           const submissionResult = await songCupSubmissionsService.create(
             {
-              wallet_address: user.address,
+              wallet_address: authAddress,
               grove_url: uploadedVideoAsset.location,
               grove_hash: uploadedVideoAsset.metadata_uri ?? undefined,
               title: uploadedVideoAsset.title ?? undefined,

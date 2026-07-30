@@ -9,7 +9,6 @@ import { CreativeTVVideoPicker } from "@/components/songchain/CreativeTVVideoPic
 import { HackBetaShareToXButton } from "@/components/chones/hack-beta/HackBetaShareToXButton";
 import { useCreatorVideoLibrary } from "@/hooks/useCreatorVideoLibrary";
 import { useHackBetaUserSubmission } from "@/lib/hooks/hack-beta/useHackBetaUserSubmission";
-import { useUser } from "@/lib/wallet/react";
 import { useWalletAuth } from "@/lib/auth/useWalletAuth";
 import { groveService } from "@/lib/sdk/grove/service";
 import { hackBetaSubmissionsService } from "@/lib/sdk/supabase/hack-beta-submissions";
@@ -22,15 +21,14 @@ type HackBetaSubmitPanelProps = {
 };
 
 export function HackBetaSubmitPanel({ className }: HackBetaSubmitPanelProps) {
-  const user = useUser();
-  const { getAuthHeaders } = useWalletAuth();
+  const { getAuthHeaders, address: authAddress } = useWalletAuth();
   const { videos, loading: libraryLoading, hasWallet } = useCreatorVideoLibrary();
   const {
     submission: existing,
     hasSubmitted,
     isLoading: loadingSubmission,
     setSubmission,
-  } = useHackBetaUserSubmission(user?.address);
+  } = useHackBetaUserSubmission(authAddress);
 
   const [selected, setSelected] = useState<VideoAsset | null>(null);
   const [notes, setNotes] = useState("");
@@ -44,7 +42,7 @@ export function HackBetaSubmitPanel({ className }: HackBetaSubmitPanelProps) {
   }, [videos]);
 
   const handleSubmit = async () => {
-    if (!user?.address) {
+    if (!authAddress) {
       toast.error("Connect your wallet to submit.");
       return;
     }
@@ -58,7 +56,7 @@ export function HackBetaSubmitPanel({ className }: HackBetaSubmitPanelProps) {
       const receipt = {
         type: "hack-beta-submission",
         event: "HACKATHON BETA",
-        wallet: user.address.toLowerCase(),
+        wallet: authAddress.toLowerCase(),
         video_asset_id: selected.asset_id,
         title: selected.title,
         category: selected.category,
@@ -75,7 +73,7 @@ export function HackBetaSubmitPanel({ className }: HackBetaSubmitPanelProps) {
       const authHeaders = await getAuthHeaders();
       const result = await hackBetaSubmissionsService.upsert(
         {
-          wallet_address: user.address,
+          wallet_address: authAddress,
           video_asset_id: selected.asset_id,
           title: selected.title,
           description: notes.trim() || selected.description || undefined,
