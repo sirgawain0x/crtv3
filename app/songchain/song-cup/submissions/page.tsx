@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useUser } from "@/lib/wallet/react";
 import { useSongCupSubmissions } from "@/lib/hooks/song-cup/useSongCupSubmissions";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,11 +18,19 @@ import {
 } from "@/lib/songchain/song-cup/admin-config";
 
 export default function SongCupSubmissionsPage() {
-  const user = useUser();
   const [statusFilter, setStatusFilter] = useState<SongCupSubmissionStatusFilter>("pending");
 
-  const { submissions, isLoading, error, refetch, updateStatus, setFavorite, isAdmin } =
-    useSongCupSubmissions(true);
+  const {
+    submissions,
+    isLoading,
+    error,
+    refetch,
+    updateStatus,
+    setFavorite,
+    isAdmin,
+    walletAddress,
+    isAdminLoading,
+  } = useSongCupSubmissions(true);
 
   const filtered = useMemo(
     () => filterSubmissionsByStatus(submissions, statusFilter),
@@ -62,7 +69,15 @@ export default function SongCupSubmissionsPage() {
           </Button>
         </div>
 
-        {!isAdmin && (
+        {isAdminLoading && (
+          <Card>
+            <CardContent className="py-4 text-sm text-muted-foreground">
+              Resolving smart wallet…
+            </CardContent>
+          </Card>
+        )}
+
+        {!isAdminLoading && !isAdmin && (
           <Card className="border-yellow-500/30 bg-yellow-950/20">
             <CardContent className="flex items-start gap-3 py-4">
               <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-yellow-500" />
@@ -129,9 +144,9 @@ export default function SongCupSubmissionsPage() {
           </div>
         )}
 
-        {isAdmin && user?.address && (
+        {isAdmin && walletAddress && (
           <p className="text-center text-xs text-muted-foreground">
-            Signed in as {truncateWalletAddress(user.address)}
+            Signed in as {truncateWalletAddress(walletAddress)}
           </p>
         )}
       </div>

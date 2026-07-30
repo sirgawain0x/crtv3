@@ -1,24 +1,18 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
-import { useUser } from "@/lib/wallet/react";
+import { useState, useEffect, useCallback } from "react";
 import {
   hackBetaSubmissionsService,
   type HackBetaSubmission,
 } from "@/lib/sdk/supabase/hack-beta-submissions";
-import { isHackBetaAdminWallet } from "@/lib/chones/hack-beta/admin-config";
+import { useHackBetaAdmin } from "@/lib/hooks/hack-beta/useHackBetaAdmin";
 import { logger } from "@/lib/utils/logger";
 
 export function useHackBetaSubmissions(enabled: boolean = true) {
-  const user = useUser();
+  const { isAdmin, walletAddress, isLoading: isAdminLoading } = useHackBetaAdmin();
   const [submissions, setSubmissions] = useState<HackBetaSubmission[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const isAdmin = useMemo(
-    () => isHackBetaAdminWallet(user?.address),
-    [user?.address],
-  );
 
   const fetchRows = useCallback(async () => {
     if (!isAdmin || !enabled) {
@@ -84,5 +78,7 @@ export function useHackBetaSubmissions(enabled: boolean = true) {
     updateStatus,
     setFavorite,
     isAdmin,
+    walletAddress,
+    isAdminLoading,
   };
 }

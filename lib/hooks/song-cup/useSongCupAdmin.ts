@@ -1,16 +1,24 @@
 "use client";
 
 import { useMemo } from "react";
-import { useUser } from "@/lib/wallet/react";
+import { useCreatorWalletAddress } from "@/lib/hooks/accountkit/useCreatorWalletAddress";
 import { isSongCupAdminWallet } from "@/lib/songchain/song-cup/admin-config";
 
 export function useSongCupAdmin() {
-  const user = useUser();
+  const { creatorAddress, smartAccountAddress, eoaAddress, isLoading } =
+    useCreatorWalletAddress();
 
+  // Admin lists store smart-wallet addresses; also accept EOA if listed.
   const isAdmin = useMemo(
-    () => isSongCupAdminWallet(user?.address),
-    [user?.address],
+    () =>
+      isSongCupAdminWallet(smartAccountAddress) ||
+      isSongCupAdminWallet(eoaAddress),
+    [smartAccountAddress, eoaAddress],
   );
 
-  return { isAdmin, walletAddress: user?.address ?? null };
+  return {
+    isAdmin,
+    walletAddress: creatorAddress,
+    isLoading,
+  };
 }

@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { useUser } from "@/lib/wallet/react";
 import { useHackBetaSubmissions } from "@/lib/hooks/hack-beta/useHackBetaSubmissions";
 import { useHackBetaSettings } from "@/lib/hooks/hack-beta/useHackBetaSettings";
 import { Card, CardContent } from "@/components/ui/card";
@@ -23,10 +22,18 @@ import {
 import { toast } from "sonner";
 
 export default function HackBetaSubmissionsPage() {
-  const user = useUser();
   const [statusFilter, setStatusFilter] = useState<HackBetaSubmissionStatusFilter>("pending");
-  const { submissions, isLoading, error, refetch, updateStatus, setFavorite, isAdmin } =
-    useHackBetaSubmissions(true);
+  const {
+    submissions,
+    isLoading,
+    error,
+    refetch,
+    updateStatus,
+    setFavorite,
+    isAdmin,
+    walletAddress,
+    isAdminLoading,
+  } = useHackBetaSubmissions(true);
   const { mixtapePlaylistUrl, updateMixtapeUrl, isLoading: settingsLoading } =
     useHackBetaSettings();
   const [mixtapeDraft, setMixtapeDraft] = useState<string | null>(null);
@@ -48,7 +55,7 @@ export default function HackBetaSubmissionsPage() {
     if (!isAdmin) return;
     setSavingMixtape(true);
     try {
-      const row = await updateMixtapeUrl(mixtapeValue.trim() || null, user?.address);
+      const row = await updateMixtapeUrl(mixtapeValue.trim() || null, walletAddress);
       if (!row) {
         toast.error("Failed to save mixtape URL");
         return;
@@ -101,7 +108,15 @@ export default function HackBetaSubmissionsPage() {
           </Button>
         </div>
 
-        {!user?.address && (
+        {isAdminLoading && (
+          <Card>
+            <CardContent className="flex items-center gap-2 p-4 text-sm text-muted-foreground">
+              Resolving smart wallet…
+            </CardContent>
+          </Card>
+        )}
+
+        {!isAdminLoading && !walletAddress && (
           <Card>
             <CardContent className="flex items-center gap-2 p-4 text-sm text-muted-foreground">
               <AlertCircle className="h-4 w-4" />
@@ -110,12 +125,12 @@ export default function HackBetaSubmissionsPage() {
           </Card>
         )}
 
-        {user?.address && !isAdmin && (
+        {!isAdminLoading && walletAddress && !isAdmin && (
           <Card>
             <CardContent className="space-y-2 p-4 text-sm">
               <p className="flex items-center gap-2 text-muted-foreground">
                 <AlertCircle className="h-4 w-4" />
-                {truncateWalletAddress(user.address)} is not an admin wallet.
+                {truncateWalletAddress(walletAddress)} is not an admin wallet.
               </p>
               <p className="text-xs text-muted-foreground">
                 Admins:{" "}

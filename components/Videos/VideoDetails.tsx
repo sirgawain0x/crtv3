@@ -713,10 +713,10 @@ export default function VideoDetails({
                 <div className="flex flex-col items-center gap-6 p-8 max-w-md text-center">
                   <div className="flex flex-col gap-2">
                     <h2 className="text-2xl font-bold text-white">
-                      Connect Your Wallet
+                      Connect Your Account
                     </h2>
                     <p className="text-gray-300">
-                      Please connect your wallet to watch this video.
+                      Please select &quot;Get Started&quot; to watch this video.
                     </p>
                   </div>
                   <Button
