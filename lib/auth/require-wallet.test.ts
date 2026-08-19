@@ -170,7 +170,7 @@ describe('requireWalletAuth', () => {
   });
 
   it('throws 401 for malformed signatures instead of 503', async () => {
-    await expect(requireWalletAuth(authRequest('not-a-signature'))).rejects.toMatchObject({
+    await expect(requireWalletAuth(authRequest('not-a-signature' as any))).rejects.toMatchObject({
       status: 401,
       message: 'Invalid wallet signature',
     });

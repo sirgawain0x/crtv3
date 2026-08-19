@@ -10,6 +10,7 @@ import Footer from "@/components/Footer";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Analytics } from "@vercel/analytics/next";
 import { LayoutClientChunks } from "@/components/LayoutClientChunks";
+import { OrbGuideChat } from "@/components/agent/OrbGuideChat";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -86,6 +87,7 @@ export default async function RootLayout({
           </ErrorBoundary>
         </Providers>
         <Toaster />
+        <OrbGuideChat />
         <Analytics />
       </body>
     </html>
