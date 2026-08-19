@@ -85,9 +85,9 @@ export default async function RootLayout({
               {!isEmbedRoute ? <Footer /> : null}
             </div>
           </ErrorBoundary>
+          <OrbGuideChat />
         </Providers>
         <Toaster />
-        <OrbGuideChat />
         <Analytics />
       </body>
     </html>
