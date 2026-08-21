@@ -10,7 +10,7 @@
  * 4. Better UX for long blockchain transactions
  */
 
-import { useState, useEffect, useCallback, useMemo, type ReactNode } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -84,6 +84,14 @@ export function RobustMeTokenCreator({ onMeTokenCreated, onClose }: RobustMeToke
   const [assetsDeposited, setAssetsDeposited] = useState('');
   const [assetBalances, setAssetBalances] = useState<Record<string, bigint>>({});
   const [showPendingTransactions, setShowPendingTransactions] = useState(false);
+
+  // Keep the latest callback in a ref so the success effect below can depend on
+  // a stable value instead of re-firing every time the parent re-renders with a
+  // new inline `onMeTokenCreated` reference (React error #185 loop).
+  const onMeTokenCreatedRef = useRef(onMeTokenCreated);
+  useEffect(() => {
+    onMeTokenCreatedRef.current = onMeTokenCreated;
+  }, [onMeTokenCreated]);
 
   const { client } = useSmartAccountClient({});
   const { toast } = useToast();
@@ -169,7 +177,7 @@ export function RobustMeTokenCreator({ onMeTokenCreated, onClose }: RobustMeToke
         description: `Your MeToken "${tokenName}" (${tokenSymbol}) is ready for trading.`,
       });
 
-      onMeTokenCreated?.(state.meTokenAddress, state.txHash, state.meTokenId);
+      onMeTokenCreatedRef.current?.(state.meTokenAddress, state.txHash, state.meTokenId);
 
       // Reset form
       setName('');
@@ -188,7 +196,6 @@ export function RobustMeTokenCreator({ onMeTokenCreated, onClose }: RobustMeToke
     name,
     symbol,
     toast,
-    onMeTokenCreated,
     fetchBalances,
     defaultHub,
     fallbackHubId,
