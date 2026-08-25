@@ -15,6 +15,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { InfoIcon } from "lucide-react";
 import { PIL_TEMPLATES, type StoryLicenseTerms } from "@/lib/types/story-protocol";
+import { useWipPrice } from "@/lib/hooks/story/useWipPrice";
 
 interface StoryLicenseSelectorProps {
   enabled: boolean;
@@ -37,6 +38,14 @@ export function StoryLicenseSelector({
       ? String(selectedLicense.defaultMintingFee)
       : "0"
   );
+
+  const { price: wipUsdPrice, loading: wipPriceLoading } = useWipPrice();
+
+  const feeNum = Number(mintingFee);
+  const feeUsd =
+    wipUsdPrice != null && Number.isFinite(feeNum) && feeNum > 0
+      ? feeNum * wipUsdPrice
+      : null;
 
   const buildTerms = (
     templateId: string,
@@ -165,6 +174,12 @@ export function StoryLicenseSelector({
               <p className="text-xs text-muted-foreground">
                 Amount buyers pay in WIP to mint a license token. Use 0 for a free license.
               </p>
+              {feeUsd != null && (
+                <p className="text-xs text-muted-foreground">
+                  ≈ ${feeUsd.toFixed(2)} USD
+                  {wipPriceLoading && " (price loading…)"}
+                </p>
+              )}
             </div>
           )}
         </CardContent>
