@@ -302,9 +302,15 @@ const HookMultiStepForm = () => {
 
             toast.success("Video uploaded and published successfully!");
 
-            // Navigate to Discover so the user can see their published video
+            // Navigate to Discover so the user can see their published video.
+            // Wrapped defensively: the video is already live, so a navigation
+            // hiccup must not surface a false "Failed to publish" toast.
             logger.debug("Redirecting to discover page...");
-            router.replace("/discover");
+            try {
+              router.replace("/discover");
+            } catch (navError) {
+              logger.error("Navigation to /discover failed:", navError);
+            }
 
             // --- STORY PROTOCOL IP REGISTRATION ---
             if (data.storyConfig?.registerIP && address) {

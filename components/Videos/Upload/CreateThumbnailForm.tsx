@@ -1019,8 +1019,21 @@ const CreateThumbnailForm = ({
           }}
         />
 
-        {/* NFT Minting Step - Show when Story Protocol is enabled and minting is configured */}
-        {storyIPEnabled && videoAssetId && creatorAddress && metadataURI && (
+        {/* NFT Minting Step - Show when Story Protocol is enabled, a license
+            template is selected, and minting is configured. A license template
+            is required before minting/registering on Story Protocol. */}
+        {storyIPEnabled && !selectedStoryLicense && (
+          <Alert className="bg-amber-50 border-amber-200">
+            <AlertCircle className="h-4 w-4 text-amber-600" />
+            <AlertTitle className="text-amber-800">Select a license template</AlertTitle>
+            <AlertDescription className="text-amber-700">
+              You must choose a license template above before you can mint and
+              register your video on Story Protocol.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {storyIPEnabled && selectedStoryLicense && videoAssetId && creatorAddress && metadataURI && (
           <div className="mt-4">
             {nftMintingConfigLoading ? (
               <Skeleton className="h-24 w-full" />
