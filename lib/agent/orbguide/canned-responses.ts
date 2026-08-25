@@ -104,7 +104,7 @@ const PATTERNS: { patterns: string[]; response: string }[] = [
       'hey',
     ],
     response:
-      "I'm OrbGuide. I can walk you through uploading, explain Mixtape, IP licensing, minting, memberships, and more. Ask me anything or tap 'Start my first upload'.",
+      "I'm Creative Guide. I can walk you through uploading, explain Mixtape, IP licensing, minting, memberships, and more. Ask me anything or tap 'Start my first upload'.",
   },
   {
     patterns: [

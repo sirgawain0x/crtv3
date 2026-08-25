@@ -95,7 +95,7 @@ export function OrbGuideChat({
           {
             role: 'assistant',
             content:
-              '⚠️ OrbGuide requires a connected wallet and a USDC payment proof to chat.',
+              '⚠️ Creative Guide requires a connected wallet and a USDC payment proof to chat.',
           },
         ]);
         return;
@@ -159,7 +159,7 @@ export function OrbGuideChat({
         logger.warn('[OrbGuideChat] chat error:', err);
         setMessages((m) => [
           ...m,
-          { role: 'assistant', content: '⚠️ Could not reach OrbGuide.' },
+          { role: 'assistant', content: '⚠️ Could not reach Creative Guide.' },
         ]);
       } finally {
         setBusy(false);
@@ -207,7 +207,7 @@ export function OrbGuideChat({
       logger.warn('[OrbGuideChat] startUpload error:', err);
       setMessages((m) => [
         ...m,
-        { role: 'assistant', content: '⚠️ Could not reach OrbGuide.' },
+        { role: 'assistant', content: '⚠️ Could not reach Creative Guide.' },
       ]);
     } finally {
       setBusy(false);
@@ -219,9 +219,9 @@ export function OrbGuideChat({
       <button
         onClick={() => setOpen(true)}
         className="fixed bottom-4 right-4 z-50 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-lg"
-        aria-label="Open OrbGuide"
+        aria-label="Open Creative Guide"
       >
-        🛰️ OrbGuide
+        📺 Creative Guide
       </button>
     );
   }
@@ -229,7 +229,7 @@ export function OrbGuideChat({
   return (
     <div className="fixed bottom-4 right-4 z-50 flex h-[28rem] w-80 flex-col rounded-xl border bg-background shadow-2xl">
       <div className="flex items-center justify-between border-b px-3 py-2">
-        <span className="text-sm font-semibold">🛰️ OrbGuide</span>
+        <span className="text-sm font-semibold">📺 Creative Guide</span>
         <button
           onClick={() => setOpen(false)}
           className="text-xs text-muted-foreground"
@@ -293,7 +293,7 @@ export function OrbGuideChat({
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask OrbGuide…"
+            placeholder="Ask Creative Guide…"
             className="flex-1 rounded-md border bg-background px-2 py-1 text-xs outline-none"
           />
           <button
