@@ -28,7 +28,7 @@ import {
  *  - mode "action": perform a UI action and return JSON the client applies.
  */
 
-const SYSTEM_PROMPT = `You are OrbGuide, the onboarding and navigation assistant for the
+const SYSTEM_PROMPT = `You are Creative Guide, the onboarding and navigation assistant for the
 Creative Platform (crtv3). You help creators upload their first clip. Be concise,
 plain-spoken, and never use crypto/web3 jargon without a one-line plain explanation.
 The upload flow is: 1) connect wallet (already done), 2) choose a video file,
@@ -273,7 +273,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     serverLogger.error('[OrbGuide] streamText error:', error);
     const message =
-      error instanceof Error ? error.message : 'OrbGuide response failed';
+      error instanceof Error ? error.message : 'Creative Guide response failed';
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

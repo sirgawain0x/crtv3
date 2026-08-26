@@ -1,4 +1,4 @@
-# OrbGuide — Local-First Onboarding & Navigation Agent
+# Creative Guide — Local-First Onboarding & Navigation Agent
 
 **Status:** Draft (RFC) · **Owner:** CTO · **Branch target:** `main` (staging first)
 **Scope:** In-app AI agent that onboards, navigates, and coaches users across the

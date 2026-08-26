@@ -24,7 +24,7 @@ describe('matchCannedResponse', () => {
   it('answers greeting/help questions without escalating', () => {
     const result = matchCannedResponse('Hello, what can you do?');
     expect(result.escalate).toBe(false);
-    expect(result.content).toContain('OrbGuide');
+    expect(result.content).toContain('Creative Guide');
   });
 
   it('escalates unknown or advanced questions to Gemini', () => {

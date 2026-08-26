@@ -43,8 +43,6 @@ if (!botIdGlobal.__crtvBotIdInit) {
       // metokens-subgraph omitted: read-only GraphQL proxy; BotID 403 breaks portfolio balance queries.
       // reality-eth-subgraph omitted: read-only GraphQL proxy; BotID 403 breaks predictions list queries.
       botIdDeepAnalysisRoute('/api/story/factory/deploy-collection', 'POST'),
-      botIdDeepAnalysisRoute('/api/poap/create-event', 'POST'),
-      botIdDeepAnalysisRoute('/api/poap-proxy', 'POST'),
       botIdDeepAnalysisRoute('/api/metokens/sync', 'POST'),
       botIdDeepAnalysisRoute('/api/metokens/alchemy', 'POST'),
       botIdDeepAnalysisRoute('/api/metokens', 'POST'),
