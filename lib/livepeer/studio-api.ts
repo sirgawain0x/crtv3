@@ -14,6 +14,13 @@ function authHeaders(): HeadersInit {
   };
 }
 
+function sanitizeLivepeerId(value: string): string | null {
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > 128) return null;
+  if (!/^[A-Za-z0-9_-]+$/.test(trimmed)) return null;
+  return trimmed;
+}
+
 export type LivepeerStreamSession = {
   id: string;
   parentId?: string;
@@ -72,8 +79,13 @@ export async function getStreamSessions(
 }
 
 export async function getLivepeerAsset(assetId: string): Promise<LivepeerAssetSummary | null> {
+  const safeAssetId = sanitizeLivepeerId(assetId);
+  if (!safeAssetId) return null;
+
   const base = livepeerStudioApiBaseUrl();
-  const res = await fetch(`${base}/api/asset/${assetId}`, { headers: authHeaders() });
+  const res = await fetch(`${base}/api/asset/${encodeURIComponent(safeAssetId)}`, {
+    headers: authHeaders(),
+  });
   if (!res.ok) return null;
   const data = await res.json();
   return (data?.asset ?? data) as LivepeerAssetSummary;
