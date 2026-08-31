@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS public.prediction_video_links (
   created_by text NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT prediction_video_links_question_unique UNIQUE (question_id),
-  CONSTRAINT prediction_video_links_address_lower CHECK (created_by ~ '^0x[a-fA-F0-9]{40}$')
+  CONSTRAINT prediction_video_links_address_lower CHECK (created_by ~ '^0x[a-f0-9]{40}$')
 );
 
 -- Fast lookup for the video strip: all links for one video, newest first.
@@ -40,4 +40,11 @@ DROP POLICY IF EXISTS "Anyone can read prediction video links" ON public.predict
 CREATE POLICY "Anyone can read prediction video links"
   ON public.prediction_video_links
   FOR SELECT
+  TO anon, authenticated
   USING (TRUE);
+
+GRANT SELECT ON public.prediction_video_links TO anon, authenticated;
+GRANT ALL ON public.prediction_video_links TO service_role;
+
+-- Defense-in-depth: RLS already blocks client writes (no INSERT/UPDATE/DELETE policies).
+REVOKE INSERT, UPDATE, DELETE ON public.prediction_video_links FROM anon, authenticated;
