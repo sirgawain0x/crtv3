@@ -20,7 +20,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Info, Loader2 } from "lucide-react";
+import { Info, Loader2, Sparkles } from "lucide-react";
 import { useWalletStatus } from "@/lib/hooks/accountkit/useWalletStatus";
 import { useWalletAuth } from "@/lib/auth/useWalletAuth";
 import { toast } from "sonner";
@@ -33,7 +33,7 @@ import {
 } from "@/components/ui/select";
 import { createQuestionWithData } from "@/lib/sdk/reality-eth/reality-eth-question-wrapper";
 import { getCanonicalRealityEthArbitratorAddress } from "@/lib/sdk/reality-eth/reality-eth-client";
-import type { QuestionData } from "@/lib/sdk/reality-eth/reality-eth-utils";
+import type { QuestionType, QuestionData } from "@/lib/sdk/reality-eth/reality-eth-utils";
 import { logger } from "@/lib/utils/logger";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { usePredictionAccess } from "@/lib/hooks/predictions/usePredictionAccess";
@@ -66,6 +66,8 @@ export type CreatePredictionProps = {
    * server component re-renders with the new link.
    */
   onCreated?: () => void;
+  /** If true, show one-tap preset suggestions above the form. */
+  showPresets?: boolean;
 };
 
 const predictionSchema = z.object({
@@ -86,7 +88,7 @@ const predictionSchema = z.object({
   }
   // For select types, outcomes are required and must have at least 2 non-empty values
   if (data.type === "single-select" || data.type === "multiple-select") {
-    return data.outcomes && data.outcomes.length >= 2 && 
+    return data.outcomes && data.outcomes.length >= 2 &&
            data.outcomes.every(o => o.value && o.value.trim().length > 0);
   }
   return true;
@@ -115,12 +117,82 @@ type PredictionQuota = {
   remaining: number | null;
 };
 
+/** Human-facing seed label. */
+export type PredictionPreset = {
+  id: string;
+  label: string;
+  /** bool or uint; bool always yields Yes/No outcomes. */
+  type: QuestionType;
+  /** Factory: receives a video title if available, returns the seed title. */
+  makeTitle: (videoTitle?: string | null) => string;
+  /** Days from now for the default close date. */
+  closeDays: number;
+  /** Category the preset should land in. */
+  category: PredictionCategoryValue;
+  /** Optional description seeded into the form. */
+  description?: string;
+};
+
+/**
+ * Resolvable-from-local-data presets for video pages.
+ * Avoids view counts, likes, trending, mixtapes, and off-platform remixes,
+ * all of which lack a write ledger today.
+ */
+export const VIDEO_PREDICTION_PRESETS: PredictionPreset[] = [
+  {
+    id: "5-comments",
+    label: "5 comments",
+    type: "bool",
+    makeTitle: (videoTitle) =>
+      `Will "${shortVideoTitle(videoTitle)}" get 5 comments?`,
+    closeDays: 14,
+    category: "general",
+    description: "Resolves Yes once the video has 5 top-level comments.",
+  },
+  {
+    id: "first-tip",
+    label: "First sticker tip",
+    type: "bool",
+    makeTitle: (videoTitle) =>
+      `Will "${shortVideoTitle(videoTitle)}" earn its first sticker tip?`,
+    closeDays: 30,
+    category: "general",
+    description: "Resolves Yes once someone sends a sticker tip on this video.",
+  },
+  {
+    id: "10-tips",
+    label: "10 sticker tips",
+    type: "bool",
+    makeTitle: (videoTitle) =>
+      `Will "${shortVideoTitle(videoTitle)}" earn 10 sticker tips?`,
+    closeDays: 30,
+    category: "general",
+    description: "Resolves Yes once the video has received 10 sticker tips.",
+  },
+];
+
+function shortVideoTitle(videoTitle?: string | null): string {
+  if (!videoTitle) return "this video";
+  const clean = videoTitle.trim();
+  if (!clean) return "this video";
+  if (clean.length <= 40) return clean;
+  return `${clean.slice(0, 37).trim()}...`;
+}
+
+function formatLocalDateInput(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function CreatePrediction({
   embedded = false,
   defaultCategory = "general",
   successHref = "/predict",
   videoAssetId,
   onCreated,
+  showPresets = false,
 }: CreatePredictionProps) {
   const { chain } = useChain();
   const router = useRouter();
@@ -155,11 +227,11 @@ function CreatePrediction({
     defaultValues: {
       title: "",
       type: "bool",
-      outcomes: [{ value: "Yes" }, { value: "No" }], // Default to Yes/No for bool type
+      outcomes: [{ value: "Yes" }, { value: "No" }],
       category: defaultCategory,
       description: "",
       closeDate: "",
-      closeTime: "",
+      closeTime: "23:59",
       bond: "0",
     },
   });
@@ -230,6 +302,21 @@ function CreatePrediction({
       }
     }
   }, [questionType, form]);
+
+  const applyPreset = (preset: PredictionPreset, videoTitle?: string | null) => {
+    const close = new Date();
+    close.setDate(close.getDate() + preset.closeDays);
+
+    form.setValue("type", preset.type);
+    form.setValue("title", preset.makeTitle(videoTitle));
+    form.setValue("category", preset.category);
+    form.setValue("description", preset.description ?? "");
+    form.setValue("closeDate", formatLocalDateInput(close));
+    form.setValue("closeTime", "23:59");
+    if (preset.type === "bool") {
+      form.setValue("outcomes", [{ value: "Yes" }, { value: "No" }]);
+    }
+  };
 
   async function onSubmit(values: PredictionForm) {
     setFormError(null);
@@ -314,7 +401,7 @@ function CreatePrediction({
 
       // Ensure outcomes are set for bool type
       let finalOutcomes: string[] | undefined = undefined;
-      
+
       if (values.type === "bool") {
         // For bool type, always use Yes/No
         finalOutcomes = ["Yes", "No"];
@@ -323,7 +410,7 @@ function CreatePrediction({
         finalOutcomes = values.outcomes
           ?.map((o) => o?.value)
           .filter((o): o is string => !!o && typeof o === 'string' && o.trim().length > 0);
-        
+
         if (!finalOutcomes || finalOutcomes.length === 0) {
           setFormError("At least 2 outcomes are required for select questions.");
           setIsSubmitting(false);
@@ -466,10 +553,10 @@ function CreatePrediction({
       onCreated?.();
     } catch (error: any) {
       logger.error("❌ Error creating prediction:", error);
-      
+
       // Provide more detailed error messages
       let errorMessage = "Failed to create prediction. Please try again.";
-      
+
       if (error?.message) {
         errorMessage = error.message;
       } else if (error?.cause?.message) {
@@ -500,16 +587,16 @@ function CreatePrediction({
       values: form.getValues(),
       errors: form.formState.errors,
     });
-    
+
     // Check form validation
     const isValid = await form.trigger();
     logger.debug("Form is valid:", isValid);
-    
+
     if (!isValid) {
       logger.debug("❌ Form validation failed:", form.formState.errors);
       return;
     }
-    
+
     await form.handleSubmit(onSubmit)(e);
   };
 
@@ -543,6 +630,50 @@ function CreatePrediction({
             embedded ? "space-y-4 p-0" : "space-y-6 p-5 md:w-2/5",
           )}
         >
+          {embedded && showPresets && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium text-muted-foreground">
+                  Quick predictions
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {VIDEO_PREDICTION_PRESETS.map((preset) => (
+                  <Button
+                    key={preset.id}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={isSubmitting || !canCreatePrediction}
+                    onClick={() => applyPreset(preset, createdMeta?.title ?? undefined)}
+                    className="text-xs"
+                  >
+                    {preset.label}
+                  </Button>
+                ))}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={isSubmitting || !canCreatePrediction}
+                  onClick={() => {
+                    form.setValue("type", "bool");
+                    form.setValue("title", "");
+                    form.setValue("description", "");
+                    form.setValue("category", defaultCategory);
+                  }}
+                  className="text-xs"
+                >
+                  Custom
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Tap a preset to auto-fill, then edit the title or close date before submitting.
+              </p>
+            </div>
+          )}
+
           {isBlockedTier && blockReason && (
             <Alert variant="destructive">
               <AlertTitle>Cannot create predictions</AlertTitle>
@@ -873,3 +1004,4 @@ function CreatePrediction({
 }
 
 export { CreatePrediction };
+export default CreatePrediction;

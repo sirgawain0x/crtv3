@@ -94,6 +94,7 @@ export function VideoPredictButton({
             successHref={`/discover/${videoAssetId}`}
             videoAssetId={videoAssetId}
             onCreated={handleCreated}
+            showPresets
           />
         </DialogContent>
       </Dialog>
