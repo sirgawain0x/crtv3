@@ -64,6 +64,15 @@ export async function GET(
     });
 
     if (error || !data?.proposal) {
+      // Distinguish a real miss (404) from a hub/transport failure (502) so
+      // callers polling this endpoint (campaign presets, future strips) don't
+      // treat a transient Snapshot outage as "campaign gone".
+      if (error) {
+        return NextResponse.json(
+          { error: "Failed to fetch campaign results" },
+          { status: 502 }
+        );
+      }
       return NextResponse.json(
         { error: "Campaign not found" },
         { status: 404 }
