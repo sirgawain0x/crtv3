@@ -72,11 +72,8 @@ export function CreatorProfileHeader({
         </AvatarFallback>
       </Avatar>
       <div className="flex-1">
-        <div className="flex items-center gap-2 mb-2">
-          <h1 className="text-3xl font-bold flex items-center gap-1.5">
-            {displayName}
-            <MembershipVerifiedBadge address={address} size="md" />
-          </h1>
+        <div className="flex items-center gap-2 mb-2 flex-wrap">
+          <h1 className="text-3xl font-bold">{displayName}</h1>
           {displaySymbol && (
             <Badge variant="secondary" className="text-sm">
               {displaySymbol}
@@ -88,8 +85,9 @@ export function CreatorProfileHeader({
         </div>
 
         {creatorProfile?.username && (
-          <p className="text-lg font-medium mb-2">
+          <p className="text-lg font-medium mb-2 flex items-center gap-1.5">
             {creatorProfile.username}
+            <MembershipVerifiedBadge address={address} size="md" />
           </p>
         )}
 
