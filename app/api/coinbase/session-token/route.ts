@@ -219,8 +219,12 @@ function validateAuthMessage(
  */
 async function generateJWT(): Promise<string> {
   // Support both naming conventions for flexibility
-  const apiKeyId = process.env.CDP_API_KEY || process.env.COINBASE_CDP_API_KEY_ID;
-  const apiKeySecret = process.env.CDP_API_SECRET || process.env.COINBASE_CDP_API_KEY_SECRET;
+  const apiKeyId =
+    process.env.CDP_API_KEY ||
+    process.env.COINBASE_CDP_API_KEY_ID ||
+    process.env.COINBASE_CDP_API_KEY_NAME;
+  const apiKeySecret =
+    process.env.CDP_API_SECRET || process.env.COINBASE_CDP_API_KEY_SECRET;
 
   if (!apiKeyId || !apiKeySecret) {
     throw new Error(

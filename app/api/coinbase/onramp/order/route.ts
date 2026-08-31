@@ -93,10 +93,16 @@ function validateAuthMessage(message: string, expectedAddress: string, maxAgeSec
 }
 
 async function generateCdpJwt(): Promise<string> {
-  const apiKeyId = process.env.COINBASE_CDP_API_KEY_ID || process.env.CDP_API_KEY;
-  const apiKeySecret = process.env.COINBASE_CDP_API_KEY_SECRET || process.env.CDP_API_SECRET;
+  const apiKeyId =
+    process.env.COINBASE_CDP_API_KEY_ID ||
+    process.env.COINBASE_CDP_API_KEY_NAME ||
+    process.env.CDP_API_KEY;
+  const apiKeySecret =
+    process.env.COINBASE_CDP_API_KEY_SECRET || process.env.CDP_API_SECRET;
   if (!apiKeyId || !apiKeySecret) {
-    throw new Error("COINBASE_CDP_API_KEY_ID and COINBASE_CDP_API_KEY_SECRET must be set");
+    throw new Error(
+      "COINBASE_CDP_API_KEY_ID (or COINBASE_CDP_API_KEY_NAME) and COINBASE_CDP_API_KEY_SECRET must be set"
+    );
   }
   return generateJwt({
     apiKeyId,
