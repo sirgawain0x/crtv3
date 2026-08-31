@@ -16,6 +16,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { TrendingUp } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { CreatePrediction } from "@/components/predictions/CreatePrediction";
 import { usePredictionAccess } from "@/lib/hooks/predictions/usePredictionAccess";
 import { useWalletStatus } from "@/lib/hooks/accountkit/useWalletStatus";
@@ -34,8 +35,16 @@ export function VideoPredictButton({
   className = "",
 }: VideoPredictButtonProps) {
   const [open, setOpen] = useState(false);
+  const router = useRouter();
   const { isConnected } = useWalletStatus();
   const { canCreatePrediction, blockReason, isLoading } = usePredictionAccess();
+
+  // After a successful create, refresh the page's server components so the
+  // strip re-fetches links and shows the new pending card immediately.
+  const handleCreated = () => {
+    onCreated?.();
+    router.refresh();
+  };
 
   const disabled = !isConnected || isLoading || !canCreatePrediction;
   const blocked = !isLoading && !canCreatePrediction && Boolean(blockReason);
@@ -84,6 +93,7 @@ export function VideoPredictButton({
             defaultCategory="general"
             successHref={`/discover/${videoAssetId}`}
             videoAssetId={videoAssetId}
+            onCreated={handleCreated}
           />
         </DialogContent>
       </Dialog>

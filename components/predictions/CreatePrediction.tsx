@@ -60,6 +60,12 @@ export type CreatePredictionProps = {
   successHref?: string;
   /** Optional video asset UUID so the prediction is linked to a video page. */
   videoAssetId?: string;
+  /**
+   * Called once the on-chain create + record POST complete (before the share
+   * dialog). VideoPredictButton uses it to router.refresh() so the strip's
+   * server component re-renders with the new link.
+   */
+  onCreated?: () => void;
 };
 
 const predictionSchema = z.object({
@@ -114,6 +120,7 @@ function CreatePrediction({
   defaultCategory = "general",
   successHref = "/predict",
   videoAssetId,
+  onCreated,
 }: CreatePredictionProps) {
   const { chain } = useChain();
   const router = useRouter();
@@ -454,6 +461,9 @@ function CreatePrediction({
         category: values.category || "general",
       });
       setShareOpen(true);
+      // Let the host page (video strip) refresh its server data now, while
+      // the user is still in the share dialog.
+      onCreated?.();
     } catch (error: any) {
       logger.error("❌ Error creating prediction:", error);
       
