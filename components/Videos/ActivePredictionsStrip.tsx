@@ -66,6 +66,7 @@ interface ActivePredictionsStripProps {
 }
 
 export function ActivePredictionsStrip({
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- reserved for the preset picker (follow-up PR)
   videoAssetId,
   linkedPredictions,
 }: ActivePredictionsStripProps) {
