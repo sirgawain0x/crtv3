@@ -58,6 +58,14 @@ export type CreatePredictionProps = {
   defaultCategory?: PredictionCategoryValue;
   /** Where to send the user after create/share closes. */
   successHref?: string;
+  /** Optional video asset UUID so the prediction is linked to a video page. */
+  videoAssetId?: string;
+  /**
+   * Called once the on-chain create + record POST complete (before the share
+   * dialog). VideoPredictButton uses it to router.refresh() so the strip's
+   * server component re-renders with the new link.
+   */
+  onCreated?: () => void;
 };
 
 const predictionSchema = z.object({
@@ -111,6 +119,8 @@ function CreatePrediction({
   embedded = false,
   defaultCategory = "general",
   successHref = "/predict",
+  videoAssetId,
+  onCreated,
 }: CreatePredictionProps) {
   const { chain } = useChain();
   const router = useRouter();
@@ -406,6 +416,7 @@ function CreatePrediction({
 
       logger.debug("✅ Transaction hash:", hash);
 
+      let recData: { duplicate?: boolean; linked?: boolean | null } | null = null;
       try {
         const authHeaders = await getAuthHeaders();
         const rec = await fetch("/api/predictions/record", {
@@ -418,14 +429,21 @@ function CreatePrediction({
             category: values.category || "general",
             questionType: values.type,
             outcomes: finalOutcomes,
+            videoAssetId,
           }),
         });
-        const recData = await rec.json();
-        if (!rec.ok && !recData.duplicate) {
-          logger.warn("Prediction quota record failed:", recData);
-          toast.warning(
-            "Prediction submitted, but usage could not be synced. If your monthly count looks wrong, contact support."
-          );
+        recData = await rec.json();
+        if (!rec.ok) {
+          if (recData?.duplicate) {
+            toast.warning(
+              "Prediction submitted, but usage could not be synced. If your monthly count looks wrong, contact support."
+            );
+          } else {
+            logger.warn("Prediction quota record failed:", recData);
+            toast.warning(
+              "Prediction submitted, but usage could not be synced. If your monthly count looks wrong, contact support."
+            );
+          }
         }
       } catch (recErr) {
         logger.warn("Prediction quota record error:", recErr);
@@ -435,11 +453,17 @@ function CreatePrediction({
       }
 
       toast.success("Prediction created successfully! Transaction submitted.");
+      if (recData?.linked === false && videoAssetId) {
+        toast.warning("Prediction created, but it may not appear on the video page.");
+      }
       setCreatedMeta({
         title: values.title,
         category: values.category || "general",
       });
       setShareOpen(true);
+      // Let the host page (video strip) refresh its server data now, while
+      // the user is still in the share dialog.
+      onCreated?.();
     } catch (error: any) {
       logger.error("❌ Error creating prediction:", error);
       

@@ -26,6 +26,9 @@ import { VideoEditButton } from "@/components/Videos/VideoEditButton";
 import { VideoSplitDistributeButton } from "@/components/Videos/VideoSplitDistributeButton";
 import { RemixInPixelsButton } from "@/components/Videos/RemixInPixelsButton";
 import { AddToMixtapeButton } from "@/components/Videos/AddToMixtapeButton";
+import { VideoPredictButton } from "@/components/Videos/VideoPredictButton";
+import { ActivePredictionsStrip } from "@/components/Videos/ActivePredictionsStrip";
+import { ActivePredictionsStripServer } from "./ActivePredictionsStripServer";
 import { logger } from '@/lib/utils/logger';
 import {
   getSiteOrigin,
@@ -225,6 +228,12 @@ export default async function VideoDetailsPage({
                     playbackId={assetData?.playbackId || undefined}
                   />
                 </Suspense>
+                <Suspense fallback={<div className="h-9 w-9" />}>
+                  <VideoPredictButton
+                    videoAssetId={id}
+                    videoTitle={videoAsset?.title || assetData?.name || "Video"}
+                  />
+                </Suspense>
               </div>
               {assetData.playbackId && (
                 <div className="min-h-4">
@@ -251,6 +260,10 @@ export default async function VideoDetailsPage({
                 </div>
               </div>
             )}
+
+          <Suspense fallback={<div className="h-24" />}>
+            <ActivePredictionsStripServer videoAssetId={id} />
+          </Suspense>
           </div>
 
           {videoAsset && (
