@@ -95,6 +95,7 @@ export function VideoPredictButton({
             videoAssetId={videoAssetId}
             onCreated={handleCreated}
             showPresets
+            videoTitle={videoTitle}
           />
         </DialogContent>
       </Dialog>

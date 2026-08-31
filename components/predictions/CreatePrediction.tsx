@@ -68,6 +68,11 @@ export type CreatePredictionProps = {
   onCreated?: () => void;
   /** If true, show one-tap preset suggestions above the form. */
   showPresets?: boolean;
+  /**
+   * Video title for preset seed titles (video-page embedded mode). Presets
+   * fall back to "this video" when absent.
+   */
+  videoTitle?: string | null;
 };
 
 const predictionSchema = z.object({
@@ -193,6 +198,7 @@ function CreatePrediction({
   videoAssetId,
   onCreated,
   showPresets = false,
+  videoTitle,
 }: CreatePredictionProps) {
   const { chain } = useChain();
   const router = useRouter();
@@ -646,7 +652,7 @@ function CreatePrediction({
                     variant="outline"
                     size="sm"
                     disabled={isSubmitting || !canCreatePrediction}
-                    onClick={() => applyPreset(preset, createdMeta?.title ?? undefined)}
+                    onClick={() => applyPreset(preset, videoTitle)}
                     className="text-xs"
                   >
                     {preset.label}
