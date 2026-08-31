@@ -27,6 +27,7 @@ const bodySchema = z.object({
   category: z.string().optional(),
   questionType: z.string().optional(),
   outcomes: z.array(z.string()).optional(),
+  videoAssetId: z.string().uuid("Invalid videoAssetId").optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -59,7 +60,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { address, transactionHash, questionId, title, category, questionType, outcomes } =
+  const { address, transactionHash, questionId, title, category, questionType, outcomes, videoAssetId } =
     parsed.data;
 
   try {
@@ -105,8 +106,45 @@ export async function POST(request: NextRequest) {
 
     const { unlimited } = getPremiumPredictionAccess(memberships);
 
+    const finalQuestionId = questionId ?? verifiedQuestionId ?? null;
+
+    // Video link is attempted for ALL creators (including admin/premium, who
+    // skip the quota insert) so video-page strips never miss their markets.
+    // Best-effort: the market already exists on-chain at this point, so a link
+    // failure must not fail the record (that would also skip quota counting
+    // and dead-end client retries). `linked` in the response tells the client
+    // whether the video strip will show this market.
+    let linked: boolean | null = null;
+    if (videoAssetId && finalQuestionId) {
+      linked = false;
+      const { data: videoRow, error: videoLookupError } = await supabaseService
+        .from("video_assets")
+        .select("id")
+        .eq("asset_id", videoAssetId)
+        .maybeSingle();
+
+      if (!videoLookupError && videoRow) {
+        // Upsert: a question links to exactly one video; re-recording the same
+        // tx (client retry) must not 23505 the quota insert below.
+        const { error: linkError } = await supabaseService
+          .from("prediction_video_links")
+          .upsert(
+            {
+              question_id: finalQuestionId.toLowerCase(),
+              video_asset_id: videoRow.id,
+              created_by: normalized,
+            },
+            { onConflict: "question_id", ignoreDuplicates: true }
+          );
+
+        if (!linkError) {
+          linked = true;
+        }
+      }
+    }
+
     if (unlimited || isPlatformAdmin(normalized)) {
-      return NextResponse.json({ recorded: false, unlimited: true });
+      return NextResponse.json({ recorded: false, unlimited: true, linked });
     }
 
     const used = await countPredictionMarketsThisMonthUtc(normalized);
@@ -127,7 +165,7 @@ export async function POST(request: NextRequest) {
       .insert({
         creator_address: normalized,
         transaction_hash: transactionHash.toLowerCase(),
-        question_id: questionId ?? verifiedQuestionId ?? null,
+        question_id: finalQuestionId,
         title: title ?? null,
         category: category ?? null,
         question_type: questionType ?? null,
@@ -136,7 +174,7 @@ export async function POST(request: NextRequest) {
 
     if (insertError) {
       if (insertError.code === "23505") {
-        return NextResponse.json({ recorded: true, duplicate: true });
+        return NextResponse.json({ recorded: true, duplicate: true, linked });
       }
       return NextResponse.json(
         { error: insertError.message },
@@ -144,7 +182,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({ recorded: true, unlimited: false });
+    return NextResponse.json({ recorded: true, unlimited: false, linked });
   } catch (e) {
     return NextResponse.json(
       { error: e instanceof Error ? e.message : "Failed to record" },
