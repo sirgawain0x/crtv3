@@ -221,16 +221,16 @@ export default async function VideoDetailsPage({
                   </Suspense>
                 )}
                 <Suspense fallback={<div className="h-9 w-9" />}>
+                  <VideoPredictButton
+                    videoAssetId={id}
+                    videoTitle={videoAsset?.title || assetData?.name || "Video"}
+                  />
+                </Suspense>
+                <Suspense fallback={<div className="h-9 w-9" />}>
                   <VideoShareButton
                     videoId={id}
                     videoTitle={videoAsset?.title || "Video"}
                     playbackId={assetData?.playbackId || undefined}
-                  />
-                </Suspense>
-                <Suspense fallback={<div className="h-9 w-9" />}>
-                  <VideoPredictButton
-                    videoAssetId={id}
-                    videoTitle={videoAsset?.title || assetData?.name || "Video"}
                   />
                 </Suspense>
               </div>
