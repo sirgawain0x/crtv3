@@ -72,6 +72,18 @@ export function ActivePredictionsStrip({
   const [hydrated, setHydrated] = useState<HydratedPrediction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Quiet retry attempts while some links are not yet indexed by the
+  // Reality.eth subgraph (see load() for why that happens).
+  const [refetchCount, setRefetchCount] = useState(0);
+
+  // 10s apart, capped — enough for normal subgraph indexing lag without
+  // spinning forever on a link the subgraph will never index.
+  const UNINDEXED_REFETCH_MS = 10_000;
+  const MAX_UNINDEXED_REFETCHS = 6;
+
+  function scheduleUnindexedRetry() {
+    window.setTimeout(() => setRefetchCount((n) => n + 1), UNINDEXED_REFETCH_MS);
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -97,9 +109,43 @@ export function ActivePredictionsStrip({
         where: { id_in: ids },
       });
 
-      if (!data?.questions?.length) {
+      // Subgraph indexing lag: a just-created market's link row exists (written
+      // by the record POST) before the Reality.eth subgraph indexes the
+      // question. Missing questions render as pending fallback cards from the
+      // stored metadata instead of vanishing the strip.
+      const indexedQuestions = data?.questions ?? [];
+      const indexedIds = new Set(
+        indexedQuestions.map((q) => q.id.toLowerCase()),
+      );
+      const unindexed = linkedPredictions.filter(
+        (p) => !indexedIds.has(p.questionId.toLowerCase()),
+      );
+
+      // While some links are unindexed, retry quietly so the card flips to a
+      // fully hydrated one without a manual refresh. Cap to avoid an infinite
+      // loop if a link points at a question the subgraph will never index
+      // (e.g. created outside Creative TV and pruned).
+      if (unindexed.length > 0 && refetchCount < MAX_UNINDEXED_REFETCHS) {
+        scheduleUnindexedRetry();
+      }
+
+      if (!indexedQuestions.length) {
+        // Every linked question is still unindexed: render pending cards
+        // from stored metadata rather than an empty "not indexed" state.
+        const allPending: HydratedPrediction[] = linkedPredictions.map((p) => ({
+          questionId: p.questionId,
+          title: p.title || "Pending prediction",
+          category: p.category ?? "general",
+          outcomes: p.outcomes ?? ["Yes", "No"],
+          leadingLabel: null,
+          isActive: false,
+          isClosed: false,
+          isResolved: false,
+          closingDate: null,
+          poolEth: null,
+        }));
         if (!cancelled) {
-          setHydrated([]);
+          setHydrated(allPending);
           setLoading(false);
         }
         return;
@@ -116,7 +162,7 @@ export function ActivePredictionsStrip({
         ? (await statsRes.json()).stats ?? {}
         : {};
 
-      const parsed: HydratedPrediction[] = data.questions.map((q) => {
+      const parsed: HydratedPrediction[] = indexedQuestions.map((q) => {
         const rawQuestion = q.question || "";
         const subgraphOutcomes: string[] =
           typeof q.outcomes === "string"
@@ -208,8 +254,24 @@ export function ActivePredictionsStrip({
         return score(b) - score(a);
       });
 
+      // Pending fallback cards for links the subgraph has not indexed yet:
+      // title/category/outcomes from the stored record metadata, no pool or
+      // leading answer yet. Sorted after everything already live.
+      const pending: HydratedPrediction[] = unindexed.map((p) => ({
+        questionId: p.questionId,
+        title: p.title || "Pending prediction",
+        category: p.category ?? "general",
+        outcomes: p.outcomes ?? ["Yes", "No"],
+        leadingLabel: null,
+        isActive: false,
+        isClosed: false,
+        isResolved: false,
+        closingDate: null,
+        poolEth: null,
+      }));
+
       if (!cancelled) {
-        setHydrated(parsed);
+        setHydrated([...pending, ...parsed]);
       }
     }
 
@@ -224,7 +286,7 @@ export function ActivePredictionsStrip({
     return () => {
       cancelled = true;
     };
-  }, [linkedPredictions]);
+  }, [linkedPredictions, refetchCount]);
 
   if (linkedPredictions.length === 0) return null;
 
