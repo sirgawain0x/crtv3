@@ -14,6 +14,8 @@ import { QuickTradeDialog } from "@/components/Market/QuickTradeDialog";
 import { TokenChartDialog } from "@/components/Market/TokenChartDialog";
 import { MarketToken } from "@/app/api/market/tokens/route";
 import { MeTokenShareButton } from "@/components/Market/MeTokenShareButton";
+import { MembershipVerifiedBadge } from "@/components/User/MembershipVerifiedBadge";
+import { CreatorPredictButton } from "@/components/Creator/CreatorPredictButton";
 
 interface CreatorProfileHeaderProps {
   address: string;
@@ -71,7 +73,10 @@ export function CreatorProfileHeader({
       </Avatar>
       <div className="flex-1">
         <div className="flex items-center gap-2 mb-2">
-          <h1 className="text-3xl font-bold">{displayName}</h1>
+          <h1 className="text-3xl font-bold flex items-center gap-1.5">
+            {displayName}
+            <MembershipVerifiedBadge address={address} size="md" />
+          </h1>
           {displaySymbol && (
             <Badge variant="secondary" className="text-sm">
               {displaySymbol}
@@ -111,6 +116,10 @@ export function CreatorProfileHeader({
               <BarChart3 className="h-4 w-4 mr-2" />
               View Chart
             </Button>
+            <CreatorPredictButton
+              creatorAddress={address}
+              creatorName={creatorProfile?.username || marketToken.name}
+            />
             <MeTokenShareButton
               address={marketToken.address}
               symbol={marketToken.symbol}
