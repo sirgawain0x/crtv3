@@ -1,23 +1,26 @@
-import { ActivePredictionsStrip, type PredictionStripItem } from "@/components/Videos/ActivePredictionsStrip";
+import { ActivePredictionsStrip } from "@/components/Videos/ActivePredictionsStrip";
+import { getVideoPredictionLinks } from "@/lib/predictions/video-prediction-links";
+import type { PredictionStripItem } from "@/components/Videos/ActivePredictionsStrip";
 
 interface ActivePredictionsStripServerProps {
   videoAssetId: string;
 }
 
+/**
+ * Server-side wrapper for the video-page predictions strip.
+ *
+ * Calls getVideoPredictionLinks() directly instead of self-fetching
+ * /api/predictions/by-video over HTTP — the route sits behind BotID deep
+ * analysis (Kasada), which 403s server-to-server requests with no browser
+ * headers; the old self-fetch would have made the strip silently empty.
+ */
 export async function ActivePredictionsStripServer({
   videoAssetId,
 }: ActivePredictionsStripServerProps) {
-  const baseUrl =
-    process.env.NEXT_PUBLIC_SITE_URL ||
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000");
+  const result = await getVideoPredictionLinks(videoAssetId);
 
-  const linkedPredictions: PredictionStripItem[] = await fetch(
-    `${baseUrl}/api/predictions/by-video?videoAssetId=${encodeURIComponent(videoAssetId)}`,
-    { next: { revalidate: 30 } }
-  )
-    .then((res) => (res.ok ? res.json() : { predictions: [] }))
-    .then((json) => json.predictions ?? [])
-    .catch(() => []);
+  const linkedPredictions: PredictionStripItem[] =
+    result.ok ? result.predictions : [];
 
   return (
     <ActivePredictionsStrip
