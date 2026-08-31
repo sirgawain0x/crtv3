@@ -15,10 +15,11 @@ function getClientProxyUrl(): string {
  * (Graph Studio, Goldsky, or dual mode per SUBGRAPH_PROVIDER_MODE).
  */
 export async function queryRealityEthSubgraph<T extends Record<string, unknown>>(
-  query: string,
+  query: string | { loc?: { source: { body: string } } },
   variables: Record<string, unknown> = {},
 ): Promise<T | null> {
-  const body = JSON.stringify({ query, variables });
+  const queryString = typeof query === "string" ? query : query.loc?.source.body ?? "";
+  const body = JSON.stringify({ query: queryString, variables });
 
   if (typeof window !== 'undefined') {
     const response = await fetch(getClientProxyUrl(), {

@@ -1,6 +1,7 @@
 import {
   parsePredictionDisplay,
   applyPredictionMetadataOverride,
+  type PredictionMetadataInput,
   type ParsedPredictionDisplay,
 } from "@/lib/predictions/parse-prediction-display";
 import {
@@ -57,7 +58,7 @@ export function enrichPredictionDisplaySync(
   options?: {
     subgraphOutcomes?: unknown;
     subgraphCategory?: string | null;
-    metadata?: PredictionMetadataOverride | null;
+    metadata?: PredictionMetadataOverride | PredictionMetadataInput | null;
   }
 ): EnrichedPredictionDisplay {
   let parsed = parsePredictionDisplay(questionText, templateId);
@@ -91,7 +92,7 @@ export async function enrichPredictionDisplay(
   options?: {
     subgraphOutcomes?: unknown;
     subgraphCategory?: string | null;
-    metadata?: PredictionMetadataOverride | null;
+    metadata?: PredictionMetadataOverride | PredictionMetadataInput | null;
     fetchImpl?: typeof fetch;
   }
 ): Promise<EnrichedPredictionDisplay> {
