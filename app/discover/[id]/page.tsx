@@ -27,7 +27,6 @@ import { VideoSplitDistributeButton } from "@/components/Videos/VideoSplitDistri
 import { RemixInPixelsButton } from "@/components/Videos/RemixInPixelsButton";
 import { AddToMixtapeButton } from "@/components/Videos/AddToMixtapeButton";
 import { VideoPredictButton } from "@/components/Videos/VideoPredictButton";
-import { ActivePredictionsStrip } from "@/components/Videos/ActivePredictionsStrip";
 import { ActivePredictionsStripServer } from "./ActivePredictionsStripServer";
 import { logger } from '@/lib/utils/logger';
 import {
@@ -264,7 +263,7 @@ export default async function VideoDetailsPage({
           <Suspense fallback={<div className="h-24" />}>
             <ActivePredictionsStripServer videoAssetId={id} />
           </Suspense>
-          </div>
+        </div>
 
           {videoAsset && (
             <div className="mt-8">
