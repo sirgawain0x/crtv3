@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { processDataStream } from 'ai';
 import { useWalletAuth } from '@/lib/auth/useWalletAuth';
 import { useX402Payment } from '@/lib/hooks/payments/useX402Payment';
 import {
@@ -187,20 +188,27 @@ export function CreativeGuideChat({
         return true;
       }
 
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
       let acc = '';
       setMessages((m) => [...m, { role: 'assistant', content: '' }]);
-      for (;;) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        acc += decoder.decode(value, { stream: true });
-        setMessages((m) => {
-          const copy = [...m];
-          copy[copy.length - 1] = { role: 'assistant', content: acc };
-          return copy;
-        });
-      }
+      await processDataStream({
+        stream: res.body,
+        onTextPart: (text) => {
+          acc += text;
+          setMessages((m) => {
+            const copy = [...m];
+            copy[copy.length - 1] = { role: 'assistant', content: acc };
+            return copy;
+          });
+        },
+        onErrorPart: (error) => {
+          const message = typeof error === 'string' ? error : 'Stream error';
+          setMessages((m) => {
+            const copy = [...m];
+            copy[copy.length - 1] = { role: 'assistant', content: `⚠️ ${message}` };
+            return copy;
+          });
+        },
+      });
       return true;
     },
     [obtainPaymentProof, onRevealDropzone],
