@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { processDataStream } from 'ai';
+import { Trash2 } from 'lucide-react';
 import { useWalletAuth } from '@/lib/auth/useWalletAuth';
 import { useX402Payment } from '@/lib/hooks/payments/useX402Payment';
 import {
@@ -79,6 +80,9 @@ export function CreativeGuideChat({
 
   useEffect(() => {
     try {
+      // Don't write or remove on empty — initial mount is [] before hydrate,
+      // and clearChat already removeItem's both keys.
+      if (messages.length === 0) return;
       localStorage.setItem(MEMORY_KEY, JSON.stringify(messages.slice(-MAX_MEMORY)));
     } catch {
       /* ignore */
@@ -88,6 +92,19 @@ export function CreativeGuideChat({
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages, busy]);
+
+  const clearChat = useCallback(() => {
+    if (busy || isPaymentProcessing) return;
+    setMessages([]);
+    setSteps(null);
+    setInput('');
+    try {
+      localStorage.removeItem(MEMORY_KEY);
+      localStorage.removeItem(LEGACY_MEMORY_KEY);
+    } catch {
+      /* ignore */
+    }
+  }, [busy, isPaymentProcessing]);
 
   const walletGateMessage = useCallback((): string | null => {
     if (!address) return 'Connect your wallet to use Creative Guide.';
@@ -349,13 +366,28 @@ export function CreativeGuideChat({
     <div className="fixed bottom-4 right-4 z-50 flex h-[28rem] w-80 flex-col rounded-xl border bg-background shadow-2xl">
       <div className="flex items-center justify-between border-b px-3 py-2">
         <span className="text-sm font-semibold">📺 Creative Guide</span>
-        <button
-          onClick={() => setOpen(false)}
-          className="text-xs text-muted-foreground"
-          aria-label="Close"
-        >
-          ✕
-        </button>
+        <div className="flex items-center gap-2">
+          {(messages.length > 0 || steps) && (
+            <button
+              type="button"
+              onClick={clearChat}
+              disabled={busy || isPaymentProcessing}
+              className="rounded p-1 text-muted-foreground hover:text-foreground disabled:opacity-50"
+              aria-label="Clear chat"
+              title="Clear chat"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            className="text-xs text-muted-foreground"
+            aria-label="Close"
+          >
+            ✕
+          </button>
+        </div>
       </div>
 
       <div ref={scrollRef} className="flex-1 space-y-2 overflow-y-auto p-3 text-sm">
