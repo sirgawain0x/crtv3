@@ -13,8 +13,8 @@ import { SNAPSHOT_SPACE } from "@/context/context";
 import Link from "next/link";
 import { ExternalLink, Slash } from "lucide-react";
 import { Metadata, ResolvingMetadata } from "next";
-import { CampaignShareButton } from "@/components/vote/CampaignShareButton";
 import { CampaignPredictButton } from "@/components/vote/CampaignPredictButton";
+import { CampaignShareButton } from "@/components/vote/CampaignShareButton";
 import {
   Breadcrumb,
   BreadcrumbItem,

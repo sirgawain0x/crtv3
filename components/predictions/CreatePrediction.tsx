@@ -68,6 +68,8 @@ export type CreatePredictionProps = {
   onCreated?: () => void;
   /** If true, show one-tap preset suggestions above the form. */
   showPresets?: boolean;
+  /** Optional preset list to override the default video presets. */
+  presets?: PredictionPreset[];
 };
 
 const predictionSchema = z.object({
@@ -193,6 +195,7 @@ function CreatePrediction({
   videoAssetId,
   onCreated,
   showPresets = false,
+  presets,
 }: CreatePredictionProps) {
   const { chain } = useChain();
   const router = useRouter();
@@ -639,7 +642,7 @@ function CreatePrediction({
                 </span>
               </div>
               <div className="flex flex-wrap gap-2">
-                {VIDEO_PREDICTION_PRESETS.map((preset) => (
+                {(presets ?? VIDEO_PREDICTION_PRESETS).map((preset) => (
                   <Button
                     key={preset.id}
                     type="button"
