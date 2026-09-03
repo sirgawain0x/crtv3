@@ -45,6 +45,7 @@ import { getThumbnailUrl } from "@/services/livepeer-thumbnails";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { LiveTokenPanel } from "@/components/Live/LiveTokenPanel";
+import { StreamHealthCard } from "@/components/Live/StreamHealthCard";
 import { LensLiveChat } from "@/components/Live/LensLiveChat";
 import { useEnsureLiveLensPost } from "@/hooks/useEnsureLiveLensPost";
 import { buildGoingLivePostContent } from "@/lib/live/lens-live-feed";
@@ -634,7 +635,7 @@ export default function LivePage() {
             )}
 
             {streamId && (
-              <div className="mt-4 border-t border-white/20 pt-3 max-w-[576px] mx-auto">
+              <div className="mt-4 border-t border-white/20 pt-3 w-full">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-semibold">Save live stream replay</p>
@@ -652,7 +653,7 @@ export default function LivePage() {
               </div>
             )}
             {streamId && creatorAddress && (
-              <div className="mt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-5xl mx-auto">
+              <div className="mt-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 w-full">
                 <StreamThumbnailUploader
                   creatorAddress={creatorAddress}
                   playbackId={playbackId || streamId}
@@ -670,9 +671,11 @@ export default function LivePage() {
                   metokenPrice={metokenPrice}
                   onGateUpdated={handleGateUpdated}
                 />
+                <StreamHealthCard playbackId={playbackId} />
               </div>
             )}
             {streamId && creatorAddress && (
+              <div className="w-full">
               <StreamIPRegistration
                 creatorAddress={creatorAddress}
                 streamName={streamName}
@@ -686,9 +689,10 @@ export default function LivePage() {
                   setStoryRevShare(commercialRevShare);
                 }}
               />
+              </div>
             )}
             {streamId && (
-              <div className="mt-4 border-t border-white/20 pt-3 max-w-[576px] mx-auto">
+              <div className="mt-4 border-t border-white/20 pt-3 w-full">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-semibold">Allow viewer clipping</p>
@@ -706,9 +710,11 @@ export default function LivePage() {
               </div>
             )}
             {playbackId && (
-              <CreatorClipsList playbackId={playbackId} />
+              <div className="w-full">
+                <CreatorClipsList playbackId={playbackId} />
+              </div>
             )}
-            <div className="mt-4 border-t border-white/20 pt-3 max-w-[576px] mx-auto">
+            <div className="mt-4 border-t border-white/20 pt-3 w-full">
               <p className="mb-2 text-sm font-semibold">Multistream Targets</p>
               {streamId ? (
                 <>
