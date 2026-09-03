@@ -212,10 +212,13 @@ export function useBroadcast({ ingestUrl, streamKey }: UseBroadcastProps): UseBr
                 }
             };
 
-            // Add tracks — use screen stream if screen sharing, otherwise camera
+            // Add tracks — use screen stream if screen sharing, otherwise camera.
+            // addTrack binds an RTP sender per track; addTransceiver(track) only
+            // references the track, so the WHIP session connects but sends no
+            // media (verified: stream.started fired, sourceSegments stayed 0).
             const activeStream = screenStreamRef.current || mediaStreamRef.current;
             activeStream.getTracks().forEach(track => {
-                pc.addTransceiver(track, { direction: 'sendonly' });
+                pc.addTrack(track, activeStream);
             });
 
             // Create Offer
