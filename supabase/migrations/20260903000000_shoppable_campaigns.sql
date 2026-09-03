@@ -67,7 +67,8 @@ CREATE TABLE IF NOT EXISTS public.shoppable_product_kits (
   title text NOT NULL,
   description text,
   created_at timestamptz NOT NULL DEFAULT now(),
-  CONSTRAINT shoppable_product_kits_campaign_unique UNIQUE (campaign_id)
+  CONSTRAINT shoppable_product_kits_campaign_unique UNIQUE (campaign_id),
+  CONSTRAINT shoppable_product_kits_id_campaign_unique UNIQUE (id, campaign_id)
 );
 
 CREATE TABLE IF NOT EXISTS public.shoppable_videos (
@@ -83,8 +84,10 @@ CREATE TABLE IF NOT EXISTS public.shoppable_videos (
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT shoppable_videos_campaign_unique UNIQUE (campaign_id),
+  CONSTRAINT shoppable_videos_id_campaign_unique UNIQUE (id, campaign_id),
   CONSTRAINT shoppable_videos_livepeer_asset_unique UNIQUE (livepeer_asset_id),
-  CONSTRAINT shoppable_videos_livepeer_playback_unique UNIQUE (livepeer_playback_id)
+  CONSTRAINT shoppable_videos_livepeer_playback_unique UNIQUE (livepeer_playback_id),
+  CONSTRAINT shoppable_videos_duration_nonnegative CHECK (duration IS NULL OR duration >= 0)
 );
 
 CREATE INDEX IF NOT EXISTS idx_shoppable_videos_detection
@@ -111,9 +114,10 @@ CREATE TABLE IF NOT EXISTS public.shoppable_annotations (
     FOREIGN KEY (product_kit_id, campaign_id)
     REFERENCES public.shoppable_product_kits(id, campaign_id)
     ON DELETE CASCADE,
-  CONSTRAINT shoppable_annotations_times CHECK (end_time >= start_time),
-  CONSTRAINT shoppable_annotations_times_positive CHECK (start_time >= 0 AND end_time >= 0),
-  CONSTRAINT shoppable_annotations_times_nonzero CHECK (end_time > start_time),
+  CONSTRAINT shoppable_annotations_times_valid CHECK (
+    start_time >= 0
+    AND end_time > start_time
+  ),
   CONSTRAINT shoppable_annotations_bbox_len CHECK (cardinality(bounding_box) = 4),
   CONSTRAINT shoppable_annotations_bbox_values CHECK (
     bounding_box[1] BETWEEN 0 AND 1000 AND
