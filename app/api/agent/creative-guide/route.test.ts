@@ -15,6 +15,7 @@ vi.mock('botid/server', () => ({
 
 vi.mock('@/lib/middleware/botIdGuard', () => ({
   checkBotIdDeep: vi.fn(async () => ({ isBot: false })),
+  requireHumanOrVerifiedBot: vi.fn(async () => ({ allowed: true })),
 }));
 
 vi.mock('@/lib/middleware/rateLimit', () => ({

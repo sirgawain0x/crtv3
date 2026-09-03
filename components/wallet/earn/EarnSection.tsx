@@ -43,8 +43,9 @@ export function EarnSection({ isVisible, onSuccess }: EarnSectionProps) {
   const positionFormatted = position?.assetsInVaultFormatted ?? "0";
   const earnedYieldFormatted = position?.earnedYieldFormatted ?? "0";
   const hasPosition = position ? BigInt(position.assetsInVault) > 0n : false;
-
-  if (!isConfigured) return null;
+  const displayAmount = hasPosition
+    ? formatBalanceDisplay(positionFormatted)
+    : "0";
 
   const handleDeposit = async () => {
     try {
@@ -108,111 +109,119 @@ export function EarnSection({ isVisible, onSuccess }: EarnSectionProps) {
             <p className="text-xs text-muted-foreground">In vault</p>
             <p className="text-lg font-semibold flex items-center gap-1.5">
               <TrendingUp className="h-4 w-4 text-green-500" />
-              {formatBalanceDisplay(positionFormatted)} USDC
+              {displayAmount} USDC
             </p>
-            {hasPosition && Number.parseFloat(earnedYieldFormatted) > 0 ? (
+            {!hasPosition ? (
+              <p className="text-xs text-muted-foreground">Nothing earning yet</p>
+            ) : Number.parseFloat(earnedYieldFormatted) > 0 ? (
               <p className="text-xs text-green-600 dark:text-green-400">
                 +{formatBalanceDisplay(earnedYieldFormatted)} earned
               </p>
             ) : null}
           </div>
 
-          <p className="text-xs text-muted-foreground">
-            Available to deposit: {embeddedUsdcFormatted} USDC
-          </p>
+          {isConfigured ? (
+            <>
+              <p className="text-xs text-muted-foreground">
+                Available to deposit: {embeddedUsdcFormatted} USDC
+              </p>
 
-          {Number.parseFloat(embeddedUsdcFormatted) === 0 && !hasPosition ? (
-            <p className="text-xs text-amber-600 dark:text-amber-400">
-              Earn uses your embedded wallet. Transfer USDC via Send first.
-            </p>
-          ) : null}
+              {Number.parseFloat(embeddedUsdcFormatted) === 0 && !hasPosition ? (
+                <p className="text-xs text-amber-600 dark:text-amber-400">
+                  Earn uses your embedded wallet. Transfer USDC via Send first.
+                </p>
+              ) : null}
 
-          {error ? (
-            <p className="text-xs text-red-500">{error}</p>
-          ) : null}
+              {error ? (
+                <p className="text-xs text-red-500">{error}</p>
+              ) : null}
 
-          {mode ? (
-            <div className="space-y-2 pt-1">
-              <Input
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="Amount (USDC)"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                disabled={isPending}
-              />
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  className="flex-1"
-                  disabled={isPending || (!amount && mode === "deposit")}
-                  onClick={() =>
-                    mode === "deposit"
-                      ? void handleDeposit()
-                      : void handleWithdraw(false)
-                  }
-                >
-                  {isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : mode === "deposit" ? (
-                    "Confirm deposit"
-                  ) : (
-                    "Confirm withdraw"
-                  )}
-                </Button>
-                {mode === "withdraw" && hasPosition ? (
-                  <Button
-                    size="sm"
-                    variant="outline"
+              {mode ? (
+                <div className="space-y-2 pt-1">
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="Amount (USDC)"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
                     disabled={isPending}
-                    onClick={() => void handleWithdraw(true)}
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      className="flex-1"
+                      disabled={isPending || (!amount && mode === "deposit")}
+                      onClick={() =>
+                        mode === "deposit"
+                          ? void handleDeposit()
+                          : void handleWithdraw(false)
+                      }
+                    >
+                      {isPending ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : mode === "deposit" ? (
+                        "Confirm deposit"
+                      ) : (
+                        "Confirm withdraw"
+                      )}
+                    </Button>
+                    {mode === "withdraw" && hasPosition ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={isPending}
+                        onClick={() => void handleWithdraw(true)}
+                      >
+                        Max
+                      </Button>
+                    ) : null}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={isPending}
+                      onClick={() => {
+                        setMode(null);
+                        setAmount("");
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex items-center gap-1.5"
+                    disabled={
+                      isPending || Number.parseFloat(embeddedUsdcFormatted) <= 0
+                    }
+                    onClick={() => setMode("deposit")}
                   >
-                    Max
+                    <ArrowDownToLine className="h-3.5 w-3.5" />
+                    Deposit
                   </Button>
-                ) : null}
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  disabled={isPending}
-                  onClick={() => {
-                    setMode(null);
-                    setAmount("");
-                  }}
-                >
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-1.5"
-                disabled={isPending || Number.parseFloat(embeddedUsdcFormatted) <= 0}
-                onClick={() => setMode("deposit")}
-              >
-                <ArrowDownToLine className="h-3.5 w-3.5" />
-                Deposit
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-1.5"
-                disabled={isPending || !hasPosition}
-                onClick={() => setMode("withdraw")}
-              >
-                <ArrowUpFromLine className="h-3.5 w-3.5" />
-                Withdraw
-              </Button>
-            </div>
-          )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex items-center gap-1.5"
+                    disabled={isPending || !hasPosition}
+                    onClick={() => setMode("withdraw")}
+                  >
+                    <ArrowUpFromLine className="h-3.5 w-3.5" />
+                    Withdraw
+                  </Button>
+                </div>
+              )}
 
-          <p className="text-[10px] leading-snug text-muted-foreground">
-            Yield is generated by third-party DeFi vaults and is not guaranteed.
-            Using vaults involves risk, including loss of funds.
-          </p>
+              <p className="text-[10px] leading-snug text-muted-foreground">
+                Yield is generated by third-party DeFi vaults and is not
+                guaranteed. Using vaults involves risk, including loss of funds.
+              </p>
+            </>
+          ) : null}
         </>
       )}
     </div>
