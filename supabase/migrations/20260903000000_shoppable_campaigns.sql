@@ -93,6 +93,9 @@ CREATE TABLE IF NOT EXISTS public.shoppable_videos (
 CREATE INDEX IF NOT EXISTS idx_shoppable_videos_detection
   ON public.shoppable_videos (detection_status);
 
+CREATE INDEX IF NOT EXISTS idx_shoppable_videos_video_asset
+  ON public.shoppable_videos (video_asset_id);
+
 CREATE TABLE IF NOT EXISTS public.shoppable_annotations (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   campaign_id uuid NOT NULL,
@@ -138,6 +141,12 @@ CREATE INDEX IF NOT EXISTS idx_shoppable_annotations_campaign
 CREATE INDEX IF NOT EXISTS idx_shoppable_annotations_product_kit
   ON public.shoppable_annotations (product_kit_id);
 
+CREATE INDEX IF NOT EXISTS idx_shoppable_annotations_product_campaign
+  ON public.shoppable_annotations (product_kit_id, campaign_id);
+
+CREATE INDEX IF NOT EXISTS idx_shoppable_annotations_video_campaign
+  ON public.shoppable_annotations (video_id, campaign_id);
+
 COMMENT ON TABLE public.shoppable_campaigns IS 'Brand shoppable overlay campaigns linked to Snapshot proposals';
 COMMENT ON TABLE public.shoppable_product_kits IS 'Grove-backed product kit metadata for a campaign';
 COMMENT ON TABLE public.shoppable_videos IS 'Creator Livepeer VOD linked to a shoppable campaign';
@@ -146,6 +155,7 @@ COMMENT ON TABLE public.shoppable_annotations IS 'Gemini temporal product detect
 CREATE OR REPLACE FUNCTION public.set_shoppable_updated_at()
 RETURNS trigger
 LANGUAGE plpgsql
+SET search_path = ''
 AS $$
 BEGIN
   NEW.updated_at = now();
