@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { streamText, tool } from 'ai';
 import { z } from 'zod';
-import { checkBotIdDeep } from '@/lib/middleware/botIdGuard';
+import { requireHumanOrVerifiedBot } from '@/lib/middleware/botIdGuard';
 import { rateLimiters } from '@/lib/middleware/rateLimit';
 import { requireWalletAuth } from '@/lib/auth/require-wallet';
 import { serverLogger } from '@/lib/utils/logger';
@@ -20,7 +20,7 @@ import { verifyCreativeGuidePaymentProof } from '@/lib/agent/creative-guide/veri
  * Creative Guide — onboarding/navigation agent.
  *
  * Production guardrails:
- *  - BotId deep check
+ *  - BotId deep check (humans + verified bots)
  *  - Standard IP rate limiting
  *  - Wallet-auth required for all calls (prevents unauthenticated API-key burn)
  *  - x402 USDC payment proof required only for paid Gemini escalation
@@ -62,10 +62,8 @@ function paymentRequiredResponse() {
 }
 
 export async function POST(req: NextRequest) {
-  const botCheck = await checkBotIdDeep();
-  if (botCheck.isBot) {
-    return NextResponse.json({ error: 'Access denied' }, { status: 403 });
-  }
+  const botGuard = await requireHumanOrVerifiedBot('creative-guide');
+  if (!botGuard.allowed) return botGuard.response;
 
   const rl = await rateLimiters.standard(req);
   if (rl) return rl;

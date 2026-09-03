@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { processDataStream } from 'ai';
 import { useWalletAuth } from '@/lib/auth/useWalletAuth';
 import { useX402Payment } from '@/lib/hooks/payments/useX402Payment';
@@ -25,6 +26,19 @@ const MEMORY_KEY = 'creative-guide:memory';
 const LEGACY_MEMORY_KEY = 'orbguide:memory';
 const MAX_MEMORY = 12;
 
+/** Matches BOTID_DENIED_CODE from lib/middleware/botIdGuard (keep client-safe). */
+const BOTID_DENIED = 'BOTID_DENIED';
+
+const SESSION_VERIFY_ERROR =
+  "Couldn't verify this session. Refresh and try again.";
+
+function formatGuideError(data: { error?: string; code?: string } | null | undefined) {
+  if (data?.code === BOTID_DENIED || data?.error === 'Access denied') {
+    return SESSION_VERIFY_ERROR;
+  }
+  return data?.error ?? 'Agent error';
+}
+
 /**
  * CreativeGuideChat — collapsible onboarding assistant.
  * - Streams from /api/agent/creative-guide (Gemini) for advanced questions.
@@ -36,6 +50,7 @@ export function CreativeGuideChat({
 }: {
   onRevealDropzone?: (steps: string[]) => void;
 }) {
+  const router = useRouter();
   const { address, getAuthHeaders, isReady } = useWalletAuth();
   const { makePayment, isProcessing: isPaymentProcessing } = useX402Payment();
 
@@ -171,7 +186,7 @@ export function CreativeGuideChat({
         } else if (!res.ok) {
           setMessages((m) => [
             ...m,
-            { role: 'assistant', content: `⚠️ ${data.error ?? 'Agent error'}` },
+            { role: 'assistant', content: `⚠️ ${formatGuideError(data)}` },
           ]);
         } else {
           throw new Error('Unexpected response shape');
@@ -183,7 +198,7 @@ export function CreativeGuideChat({
         const e = await res.json().catch(() => ({}));
         setMessages((m) => [
           ...m,
-          { role: 'assistant', content: `⚠️ ${e.error ?? 'Agent error'}` },
+          { role: 'assistant', content: `⚠️ ${formatGuideError(e)}` },
         ]);
         return true;
       }
@@ -275,21 +290,23 @@ export function CreativeGuideChat({
       const res = await makeRequest({ action: 'reveal_dropzone' });
       const data = await res.json().catch(() => ({}));
       if (data?.reveal) {
-        setSteps(data.steps ?? null);
-        onRevealDropzone?.(data.steps ?? []);
+        const stepsList = data.steps ?? [];
+        setSteps(stepsList);
+        onRevealDropzone?.(stepsList);
+        router.push('/upload');
         setMessages((m) => [
           ...m,
           {
             role: 'assistant',
             content:
-              "Let's get your first clip up. I've opened the upload area below — " +
+              "Let's get your first clip up. I've opened the upload area — " +
               'pick a video, add a title, and publish. Need the steps broken down?',
           },
         ]);
       } else {
         setMessages((m) => [
           ...m,
-          { role: 'assistant', content: `⚠️ ${data.error ?? 'Agent error'}` },
+          { role: 'assistant', content: `⚠️ ${formatGuideError(data)}` },
         ]);
       }
     } catch (err) {
@@ -307,7 +324,14 @@ export function CreativeGuideChat({
     } finally {
       setBusy(false);
     }
-  }, [busy, isPaymentProcessing, walletGateMessage, makeRequest, onRevealDropzone]);
+  }, [
+    busy,
+    isPaymentProcessing,
+    walletGateMessage,
+    makeRequest,
+    onRevealDropzone,
+    router,
+  ]);
 
   if (!open) {
     return (
