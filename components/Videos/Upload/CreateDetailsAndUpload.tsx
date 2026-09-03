@@ -37,7 +37,6 @@ const CreateDetailsAndUpload = ({ onPressNext }: CreateDetailsAndUploadProps) =>
             description: "",
             location: "",
             category: "",
-            ticker: "",
             collaborators: []
         },
     });
@@ -48,13 +47,7 @@ const CreateDetailsAndUpload = ({ onPressNext }: CreateDetailsAndUploadProps) =>
             return;
         }
 
-        // Prepend '$' to the ticker
-        const formattedData = {
-            ...data,
-            ticker: `$${data.ticker}`
-        };
-
-        onPressNext(formattedData, livepeerAsset);
+        onPressNext(data, livepeerAsset);
     };
 
     const isFormValid = form.formState.isValid;
@@ -148,37 +141,6 @@ const CreateDetailsAndUpload = ({ onPressNext }: CreateDetailsAndUploadProps) =>
                                         />
                                     </div>
 
-                                    <FormField
-                                        control={form.control}
-                                        name="ticker"
-                                        rules={{
-                                            required: "Ticker is required",
-                                            pattern: { value: /^[A-Z0-9]+$/, message: "Uppercase alphanumeric only" }
-                                        }}
-                                        render={({ field }) => (
-                                            <FormItem>
-                                                <Label>Content Coin Ticker</Label>
-                                                <FormControl>
-                                                    <div className="relative">
-                                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground font-semibold">
-                                                            $
-                                                        </span>
-                                                        <Input
-                                                            placeholder="VID1"
-                                                            maxLength={10}
-                                                            {...field}
-                                                            className="pl-7 uppercase"
-                                                            onChange={(e) => {
-                                                                const value = e.target.value.toUpperCase();
-                                                                field.onChange(value);
-                                                            }}
-                                                        />
-                                                    </div>
-                                                </FormControl>
-                                                {form.formState.errors.ticker && <p className="text-xs text-red-500">{form.formState.errors.ticker.message}</p>}
-                                            </FormItem>
-                                        )}
-                                    />
 
                                     {/* Revenue Splits Section */}
                                     <div className="pt-2">
