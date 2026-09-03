@@ -100,6 +100,19 @@ export const getDetailPlaybackSource = async (
 
     const src = getSrc(res) as Src[];
     logger.debug("[getDetailPlaybackSource] Generated sources:", src);
+
+    // Livepeer may return sources for an idle stream (meta.live === 0). If we
+    // hand those to the player, the CDN rejects the session and the UI spins
+    // forever. Treat an idle live stream as having no sources yet so the
+    // polling fallback/offline card can take over.
+    if (res?.type === "live" && meta?.live === 0) {
+      logger.warn(
+        "[getDetailPlaybackSource] Stream is idle (meta.live=0) for ID:",
+        id,
+      );
+      return null;
+    }
+
     if (!src?.length) {
       logger.warn(
         "[getDetailPlaybackSource] No playable sources yet for ID (stream may still be warming up):",
