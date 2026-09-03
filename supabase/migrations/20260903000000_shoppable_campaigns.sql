@@ -132,6 +132,12 @@ CREATE TABLE IF NOT EXISTS public.shoppable_annotations (
 CREATE INDEX IF NOT EXISTS idx_shoppable_annotations_video
   ON public.shoppable_annotations (video_id, start_time);
 
+CREATE INDEX IF NOT EXISTS idx_shoppable_annotations_campaign
+  ON public.shoppable_annotations (campaign_id);
+
+CREATE INDEX IF NOT EXISTS idx_shoppable_annotations_product_kit
+  ON public.shoppable_annotations (product_kit_id);
+
 COMMENT ON TABLE public.shoppable_campaigns IS 'Brand shoppable overlay campaigns linked to Snapshot proposals';
 COMMENT ON TABLE public.shoppable_product_kits IS 'Grove-backed product kit metadata for a campaign';
 COMMENT ON TABLE public.shoppable_videos IS 'Creator Livepeer VOD linked to a shoppable campaign';
