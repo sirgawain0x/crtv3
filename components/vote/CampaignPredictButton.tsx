@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -17,41 +17,83 @@ import {
 } from "@/components/ui/tooltip";
 import { TrendingUp } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { CreatePrediction } from "@/components/predictions/CreatePrediction";
+import { CreatePrediction, type PredictionPreset } from "@/components/predictions/CreatePrediction";
 import { usePredictionAccess } from "@/lib/hooks/predictions/usePredictionAccess";
 import { useWalletStatus } from "@/lib/hooks/accountkit/useWalletStatus";
 import type { PredictionCategoryValue } from "@/lib/predictions/categories";
 
-export const CAMPAIGN_PREDICTION_PRESETS: {
-  id: string;
-  label: string;
+export interface CampaignResults {
+  campaignId: string;
   title: string;
-  description: string;
-  closeDays: number;
-}[] = [
-  {
-    id: "yes-wins",
-    label: "Yes will win",
-    title: 'Will the "[CAMPAIGN_TITLE]" campaign pass with a Yes majority?',
-    description:
-      "Resolves Yes if the winning choice has more voting power than every other choice when voting closes.",
-    closeDays: 14,
-  },
-  {
-    id: "high-turnout",
-    label: "10+ total votes",
-    title: 'Will "[CAMPAIGN_TITLE]" reach 10 total votes?',
-    description:
-      "Resolves Yes once the campaign's total vote count reaches 10 when voting closes.",
-    closeDays: 21,
-  },
-];
+  state: string;
+  choices: string[];
+  scores: number[];
+  totalVotingPower: number;
+  totalVotes: number;
+  leadingChoice: string | null;
+  end: number;
+}
 
 interface CampaignPredictButtonProps {
   campaignId: string;
   campaignTitle: string;
   onCreated?: () => void;
   className?: string;
+}
+
+function shortCampaignTitle(title?: string | null): string {
+  if (!title) return "this campaign";
+  const clean = title.trim();
+  if (!clean) return "this campaign";
+  if (clean.length <= 40) return clean;
+  return `${clean.slice(0, 37).trim()}...`;
+}
+
+/**
+ * Build campaign-flavored prediction presets from live Snapshot results.
+ * Seeds are resolved against /api/campaigns/[id]/results at tap-time so the
+ * leading choice / totals are current when the user picks one.
+ */
+function buildCampaignPresets(
+  campaignTitle: string,
+  results: CampaignResults | null
+): PredictionPreset[] {
+  const title = shortCampaignTitle(campaignTitle);
+  const leading = results?.leadingChoice ?? "the leading choice";
+  const totalVotes = results?.totalVotes ?? 0;
+
+  return [
+    {
+      id: "yes-wins",
+      label: "Yes will win",
+      type: "bool",
+      makeTitle: () => `Will "${title}" pass with a Yes majority?`,
+      closeDays: 14,
+      category: "general",
+      description:
+        "Resolves Yes if the winning choice has more voting power than every other choice when voting closes.",
+    },
+    {
+      id: "leading-choice-wins",
+      label: `${leading} wins`,
+      type: "bool",
+      makeTitle: () => `Will "${leading}" be the winning choice in "${title}"?`,
+      closeDays: 14,
+      category: "general",
+      description: `Resolves Yes if "${leading}" ends with the highest voting power when voting closes.`,
+    },
+    {
+      id: "high-turnout",
+      label: `${Math.max(10, totalVotes + 5)}+ total votes`,
+      type: "bool",
+      makeTitle: () =>
+        `Will "${title}" reach ${Math.max(10, totalVotes + 5)} total votes?`,
+      closeDays: 21,
+      category: "general",
+      description:
+        "Resolves Yes if the campaign's total vote count reaches the target when voting closes.",
+    },
+  ];
 }
 
 /**
@@ -69,9 +111,34 @@ export function CampaignPredictButton({
   className = "",
 }: CampaignPredictButtonProps) {
   const [open, setOpen] = useState(false);
+  const [results, setResults] = useState<CampaignResults | null>(null);
+  const [resultsError, setResultsError] = useState<string | null>(null);
   const router = useRouter();
   const { isConnected } = useWalletStatus();
   const { canCreatePrediction, blockReason, isLoading } = usePredictionAccess();
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    setResultsError(null);
+    fetch(`/api/campaigns/${encodeURIComponent(campaignId)}/results`)
+      .then(async (res) => {
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.error || `HTTP ${res.status}`);
+        }
+        return res.json() as Promise<CampaignResults>;
+      })
+      .then((data) => {
+        if (!cancelled) setResults(data);
+      })
+      .catch((err) => {
+        if (!cancelled) setResultsError(err instanceof Error ? err.message : String(err));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, campaignId]);
 
   const handleCreated = () => {
     onCreated?.();
@@ -120,11 +187,18 @@ export function CampaignPredictButton({
                 : "Make a prediction about this campaign."}
             </DialogDescription>
           </DialogHeader>
+          {resultsError && (
+            <p className="text-xs text-destructive">
+              Could not load live results for presets: {resultsError}
+            </p>
+          )}
           <CreatePrediction
             embedded
             defaultCategory={"general" as PredictionCategoryValue}
             successHref={`/vote/${campaignId}`}
             onCreated={handleCreated}
+            showPresets
+            presets={buildCampaignPresets(campaignTitle, results)}
           />
         </DialogContent>
       </Dialog>
