@@ -466,21 +466,23 @@ const HookMultiStepForm = () => {
             // --- AUTO DEPLOY CONTENT COIN (optional, non-blocking) ---
             // Publish already succeeded above. Content Coin is experimental post-publish
             // work — failures must only soft-warn, never look like publish failed.
-            if (finalMeTokenId && address && metadata?.ticker) {
-              toast.info("Setting up Content Coin market in the background…");
-              handleUploadSuccess(
-                metadata.title,
-                metadata.ticker,
-                finalMeTokenId,
-                address,
-                livepeerAsset.playbackId
-              ).catch((ccError) => {
-                logger.error("Content Coin deployment error:", ccError);
-                toast.warning("Video published — Content Coin market can be finished later", {
-                  description: "Your video is live. Market deploy is optional and did not block publish.",
-                });
-              });
-            }
+            // Content Coin auto-deploy is disabled while ticker collection is removed from upload.
+            // Re-enable once a non-upload ticker source (e.g. meToken symbol) is wired.
+            // if (finalMeTokenId && address && metadata?.ticker) {
+            //   toast.info("Setting up Content Coin market in the background…");
+            //   handleUploadSuccess(
+            //     metadata.title,
+            //     metadata.ticker,
+            //     finalMeTokenId,
+            //     address,
+            //     livepeerAsset.playbackId
+            //   ).catch((ccError) => {
+            //     logger.error("Content Coin deployment error:", ccError);
+            //     toast.warning("Video published — Content Coin market can be finished later", {
+            //       description: "Your video is live. Market deploy is optional and did not block publish.",
+            //     });
+            //   });
+            // }
           }}
         />
       )}
