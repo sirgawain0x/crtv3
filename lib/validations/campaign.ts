@@ -4,8 +4,7 @@ const ethAddress = z
   .string()
   .regex(/^0x[a-fA-F0-9]{40}$/, "Invalid EVM address");
 
-export const CampaignFormSchema = z
-  .object({
+export const CampaignFormSchemaBase = z.object({
     brandName: z.string().min(2),
     brandHandle: z.string().min(2),
     brandLogoUrl: z.string().url(),
@@ -18,7 +17,9 @@ export const CampaignFormSchema = z
     targetCreator: ethAddress,
     budgetUsdc: z.number().nonnegative().optional(),
     brandAddress: ethAddress.optional(),
-  })
+  });
+
+export const CampaignFormSchema = CampaignFormSchemaBase
   .refine((data) => data.endDate > data.startDate, {
     message: "endDate must be after startDate",
     path: ["endDate"],

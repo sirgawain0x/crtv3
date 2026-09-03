@@ -14,7 +14,7 @@ import { useWalletStatus } from "@/lib/hooks/accountkit/useWalletStatus";
 import { useWalletAuth } from "@/lib/auth/useWalletAuth";
 import { createProposal } from "@/app/vote/create/[address]/actions";
 import { SNAPSHOT_SPACE } from "@/context/context";
-import { CampaignFormSchema } from "@/lib/validations/campaign";
+import { CampaignFormSchemaBase } from "@/lib/validations/campaign";
 import {
   Form,
   FormControl,
@@ -28,7 +28,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { logger } from "@/lib/utils/logger";
 
-const formSchema = CampaignFormSchema.omit({ brandAddress: true });
+const formSchema = CampaignFormSchemaBase.omit({ brandAddress: true });
 type FormValues = z.infer<typeof formSchema>;
 
 function toDateInputValue(d: Date) {
