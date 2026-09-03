@@ -138,9 +138,6 @@ CREATE INDEX IF NOT EXISTS idx_shoppable_annotations_video
 CREATE INDEX IF NOT EXISTS idx_shoppable_annotations_campaign
   ON public.shoppable_annotations (campaign_id);
 
-CREATE INDEX IF NOT EXISTS idx_shoppable_annotations_product_kit
-  ON public.shoppable_annotations (product_kit_id);
-
 CREATE INDEX IF NOT EXISTS idx_shoppable_annotations_product_campaign
   ON public.shoppable_annotations (product_kit_id, campaign_id);
 
