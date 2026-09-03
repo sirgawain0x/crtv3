@@ -47,9 +47,9 @@ export function ShoppableOverlay({
     <div className="absolute inset-0 pointer-events-none z-10 p-4 md:p-6 overflow-hidden">
       <AnimatePresence>
         {activeAnnotations.map((item) => {
-          const [, xmin, ymax] = item.boundingBox;
+          const [ymin, xmin] = item.boundingBox;
           const left = Math.min(xmin / 10, 72);
-          const top = Math.min(ymax / 10, 65);
+          const top = Math.min(ymin / 10, 65);
 
           let destinationUrl = item.productKit.purchaseUrl;
           try {

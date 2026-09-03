@@ -236,7 +236,7 @@ export default function VideoDetails({
     const map = new Map<number, ShoppableAnnotation[]>();
     for (const a of shoppableAnnotations) {
       const start = Math.floor(a.startTime);
-      const end = Math.ceil(a.endTime);
+      const end = Math.floor(a.endTime);
       for (let s = start; s <= end; s++) {
         if (!map.has(s)) map.set(s, []);
         map.get(s)!.push(a);

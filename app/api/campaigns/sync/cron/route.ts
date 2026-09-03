@@ -78,8 +78,16 @@ export async function GET(request: NextRequest) {
       try {
         const proposal = await fetchProposal(campaign.snapshot_proposal_id);
         if (!proposal || proposal.state !== "closed") continue;
-        const winnerIdx = winningChoiceIndex(proposal.scores ?? []);
-        const winner = (proposal.choices?.[winnerIdx] || "").toLowerCase();
+        const scores = proposal.scores ?? [];
+        const choices = proposal.choices ?? [];
+        if (scores.length === 0 || choices.length === 0) {
+          summary.errors.push(
+            `proposal ${campaign.snapshot_proposal_id}: empty scores or choices`
+          );
+          continue;
+        }
+        const winnerIdx = winningChoiceIndex(scores);
+        const winner = (choices[winnerIdx] || "").toLowerCase();
         if (winner === "yes") {
           await updateShoppableCampaignStatus(campaign.id, "active");
           summary.activated += 1;
