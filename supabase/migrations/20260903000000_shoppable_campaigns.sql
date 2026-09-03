@@ -37,11 +37,9 @@ CREATE TABLE IF NOT EXISTS public.shoppable_campaigns (
   updated_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT shoppable_campaigns_brand_lower CHECK (brand_address ~ '^0x[a-f0-9]{40}$'),
   CONSTRAINT shoppable_campaigns_creator_lower CHECK (creator_address ~ '^0x[a-f0-9]{40}$'),
-  CONSTRAINT shoppable_campaigns_dates CHECK (end_date > start_date)
+  CONSTRAINT shoppable_campaigns_dates CHECK (end_date > start_date),
+  CONSTRAINT shoppable_campaigns_budget_nonnegative CHECK (budget_usdc IS NULL OR budget_usdc >= 0)
 );
-
-CREATE INDEX IF NOT EXISTS idx_shoppable_campaigns_snapshot
-  ON public.shoppable_campaigns (snapshot_proposal_id);
 
 CREATE INDEX IF NOT EXISTS idx_shoppable_campaigns_creator
   ON public.shoppable_campaigns (creator_address);
@@ -52,9 +50,13 @@ CREATE INDEX IF NOT EXISTS idx_shoppable_campaigns_brand
 CREATE INDEX IF NOT EXISTS idx_shoppable_campaigns_status
   ON public.shoppable_campaigns (status);
 
+CREATE INDEX IF NOT EXISTS idx_shoppable_campaigns_active_window
+  ON public.shoppable_campaigns (start_date, end_date)
+  WHERE status = 'active';
+
 CREATE TABLE IF NOT EXISTS public.shoppable_product_kits (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  campaign_id uuid NOT NULL UNIQUE
+  campaign_id uuid NOT NULL
     REFERENCES public.shoppable_campaigns(id) ON DELETE CASCADE,
   ipfs_hash text NOT NULL,
   brand_name text NOT NULL,
@@ -64,12 +66,13 @@ CREATE TABLE IF NOT EXISTS public.shoppable_product_kits (
   purchase_url text NOT NULL,
   title text NOT NULL,
   description text,
-  created_at timestamptz NOT NULL DEFAULT now()
+  created_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT shoppable_product_kits_campaign_unique UNIQUE (campaign_id)
 );
 
 CREATE TABLE IF NOT EXISTS public.shoppable_videos (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  campaign_id uuid NOT NULL UNIQUE
+  campaign_id uuid NOT NULL
     REFERENCES public.shoppable_campaigns(id) ON DELETE CASCADE,
   livepeer_asset_id text NOT NULL,
   livepeer_playback_id text NOT NULL,
@@ -79,28 +82,47 @@ CREATE TABLE IF NOT EXISTS public.shoppable_videos (
   detection_error text,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT shoppable_videos_campaign_unique UNIQUE (campaign_id),
   CONSTRAINT shoppable_videos_livepeer_asset_unique UNIQUE (livepeer_asset_id),
   CONSTRAINT shoppable_videos_livepeer_playback_unique UNIQUE (livepeer_playback_id)
 );
-
-CREATE INDEX IF NOT EXISTS idx_shoppable_videos_playback
-  ON public.shoppable_videos (livepeer_playback_id);
 
 CREATE INDEX IF NOT EXISTS idx_shoppable_videos_detection
   ON public.shoppable_videos (detection_status);
 
 CREATE TABLE IF NOT EXISTS public.shoppable_annotations (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  video_id uuid NOT NULL
-    REFERENCES public.shoppable_videos(id) ON DELETE CASCADE,
-  product_kit_id uuid NOT NULL
-    REFERENCES public.shoppable_product_kits(id) ON DELETE CASCADE,
+  campaign_id uuid NOT NULL,
+  video_id uuid NOT NULL,
+  product_kit_id uuid NOT NULL,
   start_time double precision NOT NULL,
   end_time double precision NOT NULL,
   bounding_box integer[] NOT NULL,
   created_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT shoppable_annotations_campaign_fk
+    FOREIGN KEY (campaign_id)
+    REFERENCES public.shoppable_campaigns(id)
+    ON DELETE CASCADE,
+  CONSTRAINT shoppable_annotations_video_campaign_fk
+    FOREIGN KEY (video_id, campaign_id)
+    REFERENCES public.shoppable_videos(id, campaign_id)
+    ON DELETE CASCADE,
+  CONSTRAINT shoppable_annotations_product_campaign_fk
+    FOREIGN KEY (product_kit_id, campaign_id)
+    REFERENCES public.shoppable_product_kits(id, campaign_id)
+    ON DELETE CASCADE,
   CONSTRAINT shoppable_annotations_times CHECK (end_time >= start_time),
-  CONSTRAINT shoppable_annotations_bbox_len CHECK (cardinality(bounding_box) = 4)
+  CONSTRAINT shoppable_annotations_times_positive CHECK (start_time >= 0 AND end_time >= 0),
+  CONSTRAINT shoppable_annotations_times_nonzero CHECK (end_time > start_time),
+  CONSTRAINT shoppable_annotations_bbox_len CHECK (cardinality(bounding_box) = 4),
+  CONSTRAINT shoppable_annotations_bbox_values CHECK (
+    bounding_box[1] BETWEEN 0 AND 1000 AND
+    bounding_box[2] BETWEEN 0 AND 1000 AND
+    bounding_box[3] BETWEEN 0 AND 1000 AND
+    bounding_box[4] BETWEEN 0 AND 1000 AND
+    bounding_box[3] >= bounding_box[1] AND
+    bounding_box[4] >= bounding_box[2]
+  )
 );
 
 CREATE INDEX IF NOT EXISTS idx_shoppable_annotations_video
@@ -195,12 +217,18 @@ CREATE POLICY shoppable_annotations_select_active
     )
   );
 
+-- Strict public access: revoke from public, then grant exact client privileges.
+REVOKE ALL ON public.shoppable_campaigns FROM public;
+REVOKE ALL ON public.shoppable_product_kits FROM public;
+REVOKE ALL ON public.shoppable_videos FROM public;
+REVOKE ALL ON public.shoppable_annotations FROM public;
+
 GRANT SELECT ON public.shoppable_campaigns TO anon, authenticated;
 GRANT SELECT ON public.shoppable_product_kits TO anon, authenticated;
 GRANT SELECT ON public.shoppable_videos TO anon, authenticated;
 GRANT SELECT ON public.shoppable_annotations TO anon, authenticated;
 
-REVOKE INSERT, UPDATE, DELETE ON public.shoppable_campaigns FROM anon, authenticated;
-REVOKE INSERT, UPDATE, DELETE ON public.shoppable_product_kits FROM anon, authenticated;
-REVOKE INSERT, UPDATE, DELETE ON public.shoppable_videos FROM anon, authenticated;
-REVOKE INSERT, UPDATE, DELETE ON public.shoppable_annotations FROM anon, authenticated;
+GRANT ALL ON public.shoppable_campaigns TO service_role;
+GRANT ALL ON public.shoppable_product_kits TO service_role;
+GRANT ALL ON public.shoppable_videos TO service_role;
+GRANT ALL ON public.shoppable_annotations TO service_role;
