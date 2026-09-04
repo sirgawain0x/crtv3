@@ -47,6 +47,12 @@ interface BroadcastProps {
   playbackId?: string | null;
   creatorAddress: string;
   saveRecording?: boolean;
+  /** Called when stream-key heal returns fresh Livepeer credentials. */
+  onCredentialsChange?: (creds: {
+    streamKey: string;
+    streamId: string;
+    playbackId: string;
+  }) => void;
 }
 
 export interface StreamProfile {
@@ -191,11 +197,49 @@ function BroadcastWithControls({
   playbackId,
   creatorAddress,
   saveRecording = true,
+  onCredentialsChange,
 }: BroadcastProps) {
   const { getAuthHeaders } = useWalletAuth();
-  const ingestUrl = React.useMemo(() => {
-    return `https://ingest.livepeer.studio/whip/${streamKey}`;
+  const [activeStreamKey, setActiveStreamKey] = useState(streamKey);
+  const [activeStreamId, setActiveStreamId] = useState(propStreamId ?? null);
+  const [activePlaybackId, setActivePlaybackId] = useState(playbackId ?? null);
+
+  useEffect(() => {
+    setActiveStreamKey(streamKey);
   }, [streamKey]);
+  useEffect(() => {
+    setActiveStreamId(propStreamId ?? null);
+  }, [propStreamId]);
+  useEffect(() => {
+    setActivePlaybackId(playbackId ?? null);
+  }, [playbackId]);
+
+  const ingestUrl = React.useMemo(() => {
+    return `https://ingest.livepeer.studio/whip/${activeStreamKey}`;
+  }, [activeStreamKey]);
+
+  const refreshStreamKey = React.useCallback(async () => {
+    try {
+      const authHeaders = await getAuthHeaders();
+      const data = await fetchStreamKeyForCreator(creatorAddress, authHeaders);
+      setActiveStreamKey(data.streamKey);
+      setActiveStreamId(data.streamId);
+      setActivePlaybackId(data.playbackId);
+      onCredentialsChange?.({
+        streamKey: data.streamKey,
+        streamId: data.streamId,
+        playbackId: data.playbackId,
+      });
+      logger.info("Refreshed Livepeer stream credentials after WHIP 404", {
+        streamId: data.streamId,
+        playbackId: data.playbackId,
+      });
+      return data.streamKey;
+    } catch (err) {
+      logger.error("Failed to refresh stream key after WHIP 404:", err);
+      return null;
+    }
+  }, [creatorAddress, getAuthHeaders, onCredentialsChange]);
 
   const {
     status,
@@ -214,13 +258,11 @@ function BroadcastWithControls({
     error: broadcastError,
     isScreenSharing,
     toggleScreenShare
-  } = useBroadcast({ ingestUrl, streamKey });
-
-  useEffect(() => {
-    if (broadcastError) {
-      toast.error(broadcastError);
-    }
-  }, [broadcastError]);
+  } = useBroadcast({
+    ingestUrl,
+    streamKey: activeStreamKey,
+    refreshStreamKey,
+  });
 
   const finalizeTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
@@ -235,8 +277,8 @@ function BroadcastWithControls({
       try {
         const auth = walletAuthHeadersToArgs(await getAuthHeaders());
         if (status === 'live') {
-          if (playbackId) {
-            await waitForPlaybackSources(playbackId, { signal: abort.signal });
+          if (activePlaybackId) {
+            await waitForPlaybackSources(activePlaybackId, { signal: abort.signal });
             if (abort.signal.aborted) return;
           }
           if (abort.signal.aborted) return;
@@ -246,16 +288,16 @@ function BroadcastWithControls({
             auth,
           );
           logger.info("Stream marked as live in DB (playback-ready gated)", {
-            playbackId,
+            playbackId: activePlaybackId,
           });
         } else if (status === 'idle' || status === 'error') {
           await updateStream(creatorAddress, { is_live: false, last_live_at: new Date().toISOString() }, auth);
           logger.info("Stream marked as offline in DB");
-          if (status === 'idle' && propStreamId && saveRecording) {
+          if (status === 'idle' && activeStreamId && saveRecording) {
             // Recording assets may take a minute to process; retry a few times.
             const delays = [15_000, 45_000, 120_000];
             finalizeTimeoutsRef.current = delays.map((delay) =>
-              setTimeout(() => finalizeStreamRecordings(propStreamId), delay)
+              setTimeout(() => finalizeStreamRecordings(activeStreamId), delay)
             );
           }
         }
@@ -272,7 +314,7 @@ function BroadcastWithControls({
       finalizeTimeoutsRef.current.forEach(clearTimeout);
       finalizeTimeoutsRef.current = [];
     };
-  }, [status, creatorAddress, propStreamId, playbackId, getAuthHeaders, saveRecording]);
+  }, [status, creatorAddress, activeStreamId, activePlaybackId, getAuthHeaders, saveRecording]);
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -309,7 +351,7 @@ function BroadcastWithControls({
         />
 
         <CreativeBrandOverlay />
-        <FloatingTipHearts streamId={playbackId || undefined} />
+        <FloatingTipHearts streamId={activePlaybackId || undefined} />
 
         {/* Loading / Status Overlay */}
         {(status === 'loading' || status === 'error') && (
@@ -381,8 +423,8 @@ function BroadcastWithControls({
             {/* Right Controls */}
             <div className="flex items-center gap-2">
               <Settings
-                streamId={propStreamId || ""}
-                streamKey={streamKey}
+                streamId={activeStreamId || ""}
+                streamKey={activeStreamKey}
                 ingestUrl={ingestUrl}
                 devices={devices}
                 selectedAudioDeviceId={selectedAudioDeviceId}

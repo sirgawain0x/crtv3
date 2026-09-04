@@ -9,8 +9,7 @@ const CREATOR = "0xcccccccccccccccccccccccccccccccccccccccc";
 
 const mockRequireWalletAuthFor = vi.fn();
 const mockResolveStreamForCreator = vi.fn();
-const mockCreateStreamRecord = vi.fn();
-const mockFetch = vi.fn();
+const mockEnsureLivepeerStreamForCreator = vi.fn();
 
 vi.mock("@/lib/middleware/rateLimit", () => ({
   rateLimiters: { standard: vi.fn(async () => null) },
@@ -31,11 +30,15 @@ vi.mock("@/lib/auth/require-wallet", () => ({
 
 vi.mock("@/services/streams", () => ({
   resolveStreamForCreator: (...args: unknown[]) => mockResolveStreamForCreator(...args),
-  createStreamRecord: (...args: unknown[]) => mockCreateStreamRecord(...args),
+}));
+
+vi.mock("@/lib/livepeer/ensure-stream", () => ({
+  ensureLivepeerStreamForCreator: (...args: unknown[]) =>
+    mockEnsureLivepeerStreamForCreator(...args),
 }));
 
 vi.mock("@/lib/utils/logger", () => ({
-  serverLogger: { warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
+  serverLogger: { warn: vi.fn(), error: vi.fn(), debug: vi.fn(), info: vi.fn() },
 }));
 
 import { POST } from "./route";
@@ -73,13 +76,7 @@ describe("POST /api/livepeer/livepeer-proxy", () => {
     vi.clearAllMocks();
     mockRequireWalletAuthFor.mockResolvedValue({ address: CREATOR });
     mockResolveStreamForCreator.mockResolvedValue(null);
-    mockCreateStreamRecord.mockResolvedValue({ id: "db-1" });
     process.env.LIVEPEER_FULL_API_KEY = "test-full-key";
-    global.fetch = mockFetch as typeof fetch;
-  });
-
-  afterEach(() => {
-    vi.unstubAllGlobals();
   });
 
   it("returns MISSING_API_KEY when full key is absent", async () => {
@@ -97,15 +94,13 @@ describe("POST /api/livepeer/livepeer-proxy", () => {
 
     const res = await POST(streamRequest(validBody));
     expect(res.status).toBe(401);
-    expect(mockCreateStreamRecord).not.toHaveBeenCalled();
+    expect(mockEnsureLivepeerStreamForCreator).not.toHaveBeenCalled();
   });
 
-  it("returns LIVEPEER_ERROR when upstream fails", async () => {
-    mockFetch.mockResolvedValue({
-      ok: false,
-      status: 402,
-      json: async () => ({ error: "quota exceeded" }),
-    });
+  it("returns LIVEPEER_ERROR when ensure throws", async () => {
+    const err = new Error("quota exceeded") as Error & { status?: number };
+    err.status = 402;
+    mockEnsureLivepeerStreamForCreator.mockRejectedValue(err);
 
     const res = await POST(streamRequest(validBody));
     expect(res.status).toBe(402);
@@ -114,15 +109,13 @@ describe("POST /api/livepeer/livepeer-proxy", () => {
     expect(body.error).toBe("quota exceeded");
   });
 
-  it("creates stream and persists record for authenticated creator", async () => {
-    mockFetch.mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => ({
-        id: "stream-1",
-        playbackId: "playback-1",
-        streamKey: "secret-key",
-      }),
+  it("creates stream for authenticated creator with no existing row", async () => {
+    mockEnsureLivepeerStreamForCreator.mockResolvedValue({
+      streamId: "stream-1",
+      playbackId: "playback-1",
+      streamKey: "secret-key",
+      reused: false,
+      replaced: false,
     });
 
     const res = await POST(streamRequest(validBody));
@@ -132,18 +125,62 @@ describe("POST /api/livepeer/livepeer-proxy", () => {
     expect(json.streamId).toBe("stream-1");
     expect(json.playbackId).toBe("playback-1");
     expect(json.streamKey).toBe("secret-key");
-    expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining("/api/stream"),
+    expect(mockEnsureLivepeerStreamForCreator).toHaveBeenCalledWith(
       expect.objectContaining({
-        method: "POST",
-        body: expect.stringContaining('"creatorId"'),
+        creatorId: CREATOR,
+        existing: null,
       }),
     );
-    expect(mockCreateStreamRecord).toHaveBeenCalledWith(
-      expect.objectContaining({
-        creator_id: CREATOR,
-        stream_key: "secret-key",
-      }),
-    );
+  });
+
+  it("returns 409 STREAM_EXISTS when Livepeer stream is still valid", async () => {
+    const existing = {
+      id: "db-1",
+      creator_id: CREATOR,
+      stream_id: "old-stream",
+      playback_id: "old-playback",
+      stream_key: "old-key",
+    };
+    mockResolveStreamForCreator.mockResolvedValue(existing);
+    mockEnsureLivepeerStreamForCreator.mockResolvedValue({
+      streamId: "old-stream",
+      playbackId: "old-playback",
+      streamKey: "old-key",
+      reused: true,
+      replaced: false,
+    });
+
+    const res = await POST(streamRequest(validBody));
+    const json = await res.json();
+
+    expect(res.status).toBe(409);
+    expect(json.code).toBe("STREAM_EXISTS");
+    expect(json.streamKey).toBe("old-key");
+  });
+
+  it("returns 200 with new credentials when stale Livepeer stream is healed", async () => {
+    const existing = {
+      id: "db-1",
+      creator_id: CREATOR,
+      stream_id: "dead-stream",
+      playback_id: "dead-playback",
+      stream_key: "dead-key",
+    };
+    mockResolveStreamForCreator.mockResolvedValue(existing);
+    mockEnsureLivepeerStreamForCreator.mockResolvedValue({
+      streamId: "new-stream",
+      playbackId: "new-playback",
+      streamKey: "new-key",
+      reused: false,
+      replaced: true,
+    });
+
+    const res = await POST(streamRequest(validBody));
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json.streamId).toBe("new-stream");
+    expect(json.streamKey).toBe("new-key");
+    expect(json.replaced).toBe(true);
   });
 });

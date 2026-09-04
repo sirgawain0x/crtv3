@@ -7,6 +7,11 @@ export type BroadcastStatus = 'idle' | 'loading' | 'live' | 'error';
 interface UseBroadcastProps {
     ingestUrl?: string | null;
     streamKey?: string | null;
+    /**
+     * Called once on WHIP 404 so the host can refresh stale Livepeer credentials
+     * (stream-key route auto-heals) and retry Go Live without killing the camera.
+     */
+    refreshStreamKey?: () => Promise<string | null>;
 }
 
 interface UseBroadcastReturn {
@@ -28,7 +33,11 @@ interface UseBroadcastReturn {
     toggleScreenShare: () => Promise<void>;
 }
 
-export function useBroadcast({ ingestUrl, streamKey }: UseBroadcastProps): UseBroadcastReturn {
+export function useBroadcast({
+    ingestUrl,
+    streamKey,
+    refreshStreamKey,
+}: UseBroadcastProps): UseBroadcastReturn {
     const [status, setStatus] = useState<BroadcastStatus>('idle');
     const [error, setError] = useState<string | null>(null);
     const [isAudioEnabled, setIsAudioEnabled] = useState(true);
@@ -43,6 +52,11 @@ export function useBroadcast({ ingestUrl, streamKey }: UseBroadcastProps): UseBr
     const mediaStreamRef = useRef<MediaStream | null>(null);
     const screenStreamRef = useRef<MediaStream | null>(null);
     const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+    const activeStreamKeyRef = useRef<string | null>(streamKey ?? null);
+
+    useEffect(() => {
+        activeStreamKeyRef.current = streamKey ?? null;
+    }, [streamKey]);
 
     // Enumerate devices
     useEffect(() => {
@@ -121,8 +135,186 @@ export function useBroadcast({ ingestUrl, streamKey }: UseBroadcastProps): UseBr
     }, [initStream]);
 
 
+    const teardownPeerConnection = useCallback(() => {
+        if (peerConnectionRef.current) {
+            peerConnectionRef.current.close();
+            peerConnectionRef.current = null;
+        }
+    }, []);
+
+    const connectWhip = async (keyForIngest: string | null | undefined) => {
+        let endpointUrl =
+            (keyForIngest
+                ? `https://ingest.livepeer.studio/whip/${keyForIngest}`
+                : null) ||
+            ingestUrl ||
+            null;
+        let iceServers: RTCIceServer[] = [
+            { urls: 'stun:stun.l.google.com:19302' },
+        ];
+
+        // Prioritize explicit stream key discovery as per Livepeer documentation
+        // "Get the SDP Host ... make a HEAD request to the WebRTC redirect endpoint"
+        if (keyForIngest) {
+            const discoveryUrl = `https://livepeer.studio/webrtc/${keyForIngest}`;
+            logger.debug('Discovering WHIP endpoint from:', discoveryUrl);
+
+            try {
+                const headRes = await fetch(discoveryUrl, { method: 'HEAD' });
+
+                if (headRes.status === 404) {
+                    const err = new Error(
+                        `WHIP discovery failed: 404 ${headRes.statusText}`,
+                    ) as Error & { status?: number };
+                    err.status = 404;
+                    throw err;
+                }
+
+                if (!headRes.ok) {
+                    logger.warn(
+                        'WHIP discovery HEAD not ok; falling back to ingest URL',
+                        { status: headRes.status },
+                    );
+                } else {
+                    // fetch follows redirects; .url is the final destination
+                    endpointUrl = headRes.url;
+                    logger.debug('Resolved WHIP endpoint:', endpointUrl);
+
+                    const host = new URL(endpointUrl).host;
+                    iceServers = [
+                        { urls: `stun:${host}` },
+                        {
+                            urls: `turn:${host}`,
+                            username: 'livepeer',
+                            credential: 'livepeer',
+                        },
+                    ];
+                }
+            } catch (e) {
+                if (
+                    e instanceof Error &&
+                    'status' in e &&
+                    (e as Error & { status?: number }).status === 404
+                ) {
+                    throw e;
+                }
+                logger.error('Failed to discover optimized WHIP endpoint:', e);
+                // Fallback to ingestUrl if available, otherwise error below
+            }
+        }
+
+        if (!endpointUrl) {
+            throw new Error('Could not resolve valid WHIP endpoint.');
+        }
+
+        teardownPeerConnection();
+
+        const pc = new RTCPeerConnection({ iceServers });
+        peerConnectionRef.current = pc;
+
+        // Monitor connection state for mid-stream failures
+        pc.onconnectionstatechange = () => {
+            const state = pc.connectionState;
+            logger.debug('WebRTC connection state:', state);
+
+            switch (state) {
+                case 'disconnected':
+                    toast.warning('Connection unstable, attempting to recover...');
+                    break;
+                case 'failed':
+                    setError('Broadcast connection failed');
+                    setStatus('error');
+                    toast.error('Broadcast connection lost');
+                    stopBroadcast();
+                    break;
+                case 'closed':
+                    if (status === 'live') {
+                        setStatus('idle');
+                    }
+                    break;
+            }
+        };
+
+        pc.oniceconnectionstatechange = () => {
+            const state = pc.iceConnectionState;
+            logger.debug('ICE connection state:', state);
+
+            if (state === 'failed') {
+                setError('Network connection failed');
+                setStatus('error');
+                toast.error('Network connection lost');
+                stopBroadcast();
+            }
+        };
+
+        // Add tracks — use screen stream if screen sharing, otherwise camera.
+        // addTrack binds an RTP sender per track; addTransceiver(track) only
+        // references the track, so the WHIP session connects but sends no
+        // media (verified: stream.started fired, sourceSegments stayed 0).
+        const activeStream = screenStreamRef.current || mediaStreamRef.current;
+        if (!activeStream) {
+            throw new Error('No media stream available');
+        }
+        activeStream.getTracks().forEach((track) => {
+            pc.addTrack(track, activeStream);
+        });
+
+        // Create Offer
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+
+        // Wait for ICE gathering
+        await new Promise<void>((resolve) => {
+            if (pc.iceGatheringState === 'complete') {
+                resolve();
+            } else {
+                const checkState = () => {
+                    if (pc.iceGatheringState === 'complete') {
+                        pc.removeEventListener('icegatheringstatechange', checkState);
+                        resolve();
+                    }
+                };
+                pc.addEventListener('icegatheringstatechange', checkState);
+                // Fallback timeout
+                setTimeout(() => {
+                    pc.removeEventListener('icegatheringstatechange', checkState);
+                    resolve();
+                }, 2000);
+            }
+        });
+
+        const offerSdp = pc.localDescription?.sdp;
+        if (!offerSdp) throw new Error('Failed to generate SDP offer');
+
+        // WHIP Request
+        logger.debug(`Posting SDP offer to: ${endpointUrl}`);
+
+        const response = await fetch(endpointUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/sdp',
+            },
+            body: offerSdp,
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            const err = new Error(
+                `WHIP Request failed: ${response.status} ${response.statusText} - ${errorText}`,
+            ) as Error & { status?: number };
+            err.status = response.status;
+            throw err;
+        }
+
+        const answerSdp = await response.text();
+        await pc.setRemoteDescription(
+            new RTCSessionDescription({ type: 'answer', sdp: answerSdp }),
+        );
+    };
+
     const startBroadcast = async () => {
-        if (!ingestUrl && !streamKey) {
+        const initialKey = activeStreamKeyRef.current || streamKey;
+        if (!ingestUrl && !initialKey) {
             toast.error('No stream key or ingest URL provided');
             return;
         }
@@ -135,166 +327,84 @@ export function useBroadcast({ ingestUrl, streamKey }: UseBroadcastProps): UseBr
         setError(null);
 
         try {
-            let endpointUrl = ingestUrl;
-            let iceServers: RTCIceServer[] = [
-                { urls: 'stun:stun.l.google.com:19302' }
-            ];
-
-            // Prioritize explicit stream key discovery as per Livepeer documentation
-            // "Get the SDP Host ... make a HEAD request to the WebRTC redirect endpoint"
-            if (streamKey) {
-                try {
-                    // Rule: livepeer-in-browser-broadcasting.md
-                    const discoveryUrl = `https://livepeer.studio/webrtc/${streamKey}`;
-                    logger.debug("Discovering WHIP endpoint from:", discoveryUrl);
-
-                    const headRes = await fetch(discoveryUrl, { method: 'HEAD' });
-
-                    // The fetch API follows redirects by default, so .url is the final destination
-                    endpointUrl = headRes.url;
-                    logger.debug("Resolved WHIP endpoint:", endpointUrl);
-
-                    // Use host for ICE
-                    const host = new URL(endpointUrl).host;
-                    iceServers = [
-                        { urls: `stun:${host}` },
-                        {
-                            urls: `turn:${host}`,
-                            username: 'livepeer',
-                            credential: 'livepeer'
-                        }
-                    ];
-                } catch (e) {
-                    logger.error("Failed to discover optimized WHIP endpoint:", e);
-                    // Fallback to ingestUrl if available, otherwise error
-                }
-            }
-
-            if (!endpointUrl) {
-                throw new Error("Could not resolve valid WHIP endpoint.");
-            }
-
-            const pc = new RTCPeerConnection({ iceServers });
-            peerConnectionRef.current = pc;
-
-            // Monitor connection state for mid-stream failures
-            pc.onconnectionstatechange = () => {
-                const state = pc.connectionState;
-                logger.debug('WebRTC connection state:', state);
-
-                switch (state) {
-                    case 'disconnected':
-                        toast.warning('Connection unstable, attempting to recover...');
-                        break;
-                    case 'failed':
-                        setError('Broadcast connection failed');
-                        setStatus('error');
-                        toast.error('Broadcast connection lost');
-                        stopBroadcast();
-                        break;
-                    case 'closed':
-                        if (status === 'live') {
-                            setStatus('idle');
-                        }
-                        break;
-                }
-            };
-
-            pc.oniceconnectionstatechange = () => {
-                const state = pc.iceConnectionState;
-                logger.debug('ICE connection state:', state);
-
-                if (state === 'failed') {
-                    setError('Network connection failed');
-                    setStatus('error');
-                    toast.error('Network connection lost');
-                    stopBroadcast();
-                }
-            };
-
-            // Add tracks — use screen stream if screen sharing, otherwise camera.
-            // addTrack binds an RTP sender per track; addTransceiver(track) only
-            // references the track, so the WHIP session connects but sends no
-            // media (verified: stream.started fired, sourceSegments stayed 0).
-            const activeStream = screenStreamRef.current || mediaStreamRef.current;
-            activeStream.getTracks().forEach(track => {
-                pc.addTrack(track, activeStream);
-            });
-
-            // Create Offer
-            const offer = await pc.createOffer();
-            await pc.setLocalDescription(offer);
-
-            // Wait for ICE gathering
-            await new Promise<void>((resolve) => {
-                if (pc.iceGatheringState === 'complete') {
-                    resolve();
-                } else {
-                    const checkState = () => {
-                        if (pc.iceGatheringState === 'complete') {
-                            pc.removeEventListener('icegatheringstatechange', checkState);
-                            resolve();
-                        }
-                    };
-                    pc.addEventListener('icegatheringstatechange', checkState);
-                    // Fallback timeout
-                    setTimeout(() => {
-                        pc.removeEventListener('icegatheringstatechange', checkState);
-                        resolve();
-                    }, 2000);
-                }
-            });
-
-            const offerSdp = pc.localDescription?.sdp;
-            if (!offerSdp) throw new Error('Failed to generate SDP offer');
-
-            // WHIP Request
-            logger.debug(`Posting SDP offer to: ${endpointUrl}`);
-
-            const response = await fetch(endpointUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/sdp'
-                },
-                body: offerSdp
-            });
-
-            if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`WHIP Request failed: ${response.status} ${response.statusText} - ${errorText}`);
-            }
-
-            const answerSdp = await response.text();
-            await pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: answerSdp }));
-
+            await connectWhip(initialKey);
             setStatus('live');
             toast.success('Broadcast started successfully!');
+        } catch (err: unknown) {
+            const message =
+                err instanceof Error ? err.message : 'Failed to start broadcast';
+            const statusCode =
+                err instanceof Error && 'status' in err
+                    ? (err as Error & { status?: number }).status
+                    : undefined;
+            const isWhip404 =
+                statusCode === 404 ||
+                /WHIP Request failed:\s*404/i.test(message) ||
+                /WHIP discovery failed:\s*404/i.test(message);
 
-        } catch (err: any) {
             logger.error('Broadcast error:', err);
-            setError(err.message || 'Failed to start broadcast');
-            setStatus('error');
-            toast.error(`Broadcast failed: ${err.message}`);
-            stopBroadcast(); // Cleanup
+
+            // Stale stream key: refresh once (server heals), keep camera, retry WHIP.
+            if (isWhip404 && refreshStreamKey) {
+                teardownPeerConnection();
+                toast.message('Stream credentials expired — refreshing…');
+                try {
+                    const newKey = await refreshStreamKey();
+                    if (!newKey) {
+                        const refreshFailMessage =
+                            'Could not refresh stream credentials. Try again or recreate your stream.';
+                        logger.error('Stream credential refresh returned no key');
+                        setError(refreshFailMessage);
+                        setStatus('idle');
+                        toast.error(refreshFailMessage);
+                        return;
+                    }
+                    activeStreamKeyRef.current = newKey;
+                    await connectWhip(newKey);
+                    setStatus('live');
+                    toast.success('Broadcast started successfully!');
+                    return;
+                } catch (retryErr) {
+                    logger.error('WHIP retry after credential refresh failed:', retryErr);
+                    const retryMessage =
+                        retryErr instanceof Error
+                            ? retryErr.message
+                            : 'Failed to start broadcast after refresh';
+                    setError(retryMessage);
+                    setStatus('idle');
+                    toast.error(
+                        `Broadcast failed after refreshing stream key: ${retryMessage}`,
+                    );
+                    teardownPeerConnection();
+                    return;
+                }
+            }
+
+            setError(message);
+            setStatus('idle');
+            toast.error(
+                isWhip404
+                    ? 'Broadcast failed: stream not found on Livepeer. Refresh the page or recreate your stream.'
+                    : `Broadcast failed: ${message}`,
+            );
+            // Keep camera/mic preview alive so the creator can retry Go Live.
+            teardownPeerConnection();
         }
     };
 
     const stopBroadcast = () => {
         // Stop screen sharing if active
         if (screenStreamRef.current) {
-            screenStreamRef.current.getTracks().forEach(track => track.stop());
+            screenStreamRef.current.getTracks().forEach((track) => track.stop());
             screenStreamRef.current = null;
             setIsScreenSharing(false);
         }
 
-        if (peerConnectionRef.current) {
-            peerConnectionRef.current.close();
-            peerConnectionRef.current = null;
-        }
+        teardownPeerConnection();
 
         // Stop media tracks to release camera/mic
         if (mediaStreamRef.current) {
-            mediaStreamRef.current.getTracks().forEach(track => track.stop());
+            mediaStreamRef.current.getTracks().forEach((track) => track.stop());
             mediaStreamRef.current = null;
         }
 

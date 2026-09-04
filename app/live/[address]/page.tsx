@@ -534,6 +534,11 @@ export default function LivePage() {
                     playbackId={playbackId}
                     creatorAddress={creatorAddress!}
                     saveRecording={saveRecording}
+                    onCredentialsChange={({ streamKey: key, streamId: id, playbackId: pb }) => {
+                      setStreamKey(key);
+                      setStreamId(id);
+                      setPlaybackId(pb);
+                    }}
                   />
                   {creatorAddress && (
                     <DigitalTwinOverlay creatorAddress={creatorAddress} />
@@ -634,6 +639,30 @@ export default function LivePage() {
               </div>
             )}
 
+            {streamId && creatorAddress && (
+              <div className="w-full flex flex-col gap-4">
+                <StreamHealthCard playbackId={playbackId} />
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 w-full">
+                  <StreamThumbnailUploader
+                    creatorAddress={creatorAddress}
+                    playbackId={playbackId || streamId}
+                    currentThumbnailUrl={thumbnailUrl}
+                    onThumbnailUpdated={handleThumbnailUpdated}
+                  />
+                  <StreamNameEditor
+                    creatorAddress={creatorAddress}
+                    currentName={streamName}
+                    onNameUpdated={handleNameUpdated}
+                  />
+                  <StreamMeTokenGateEditor
+                    creatorAddress={creatorAddress}
+                    requiresMetoken={requiresMetoken}
+                    metokenPrice={metokenPrice}
+                    onGateUpdated={handleGateUpdated}
+                  />
+                </div>
+              </div>
+            )}
             {streamId && (
               <div className="mt-4 border-t border-white/20 pt-3 w-full">
                 <div className="flex items-center justify-between">
@@ -650,28 +679,6 @@ export default function LivePage() {
                     aria-label="Save live stream replay"
                   />
                 </div>
-              </div>
-            )}
-            {streamId && creatorAddress && (
-              <div className="mt-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 w-full">
-                <StreamThumbnailUploader
-                  creatorAddress={creatorAddress}
-                  playbackId={playbackId || streamId}
-                  currentThumbnailUrl={thumbnailUrl}
-                  onThumbnailUpdated={handleThumbnailUpdated}
-                />
-                <StreamNameEditor
-                  creatorAddress={creatorAddress}
-                  currentName={streamName}
-                  onNameUpdated={handleNameUpdated}
-                />
-                <StreamMeTokenGateEditor
-                  creatorAddress={creatorAddress}
-                  requiresMetoken={requiresMetoken}
-                  metokenPrice={metokenPrice}
-                  onGateUpdated={handleGateUpdated}
-                />
-                <StreamHealthCard playbackId={playbackId} />
               </div>
             )}
             {streamId && creatorAddress && (
