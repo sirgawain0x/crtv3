@@ -337,7 +337,7 @@ function BroadcastWithControls({
   }, []);
 
   return (
-    <div className="mx-auto max-w-[576px]">
+    <div className="mx-auto w-full">
       <div
         ref={containerRef}
         className="group relative h-full w-full overflow-hidden rounded-sm bg-gray-950 aspect-video flex flex-col"
