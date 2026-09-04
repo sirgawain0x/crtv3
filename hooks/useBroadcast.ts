@@ -350,13 +350,20 @@ export function useBroadcast({
                 toast.message('Stream credentials expired — refreshing…');
                 try {
                     const newKey = await refreshStreamKey();
-                    if (newKey) {
-                        activeStreamKeyRef.current = newKey;
-                        await connectWhip(newKey);
-                        setStatus('live');
-                        toast.success('Broadcast started successfully!');
+                    if (!newKey) {
+                        const refreshFailMessage =
+                            'Could not refresh stream credentials. Try again or recreate your stream.';
+                        logger.error('Stream credential refresh returned no key');
+                        setError(refreshFailMessage);
+                        setStatus('idle');
+                        toast.error(refreshFailMessage);
                         return;
                     }
+                    activeStreamKeyRef.current = newKey;
+                    await connectWhip(newKey);
+                    setStatus('live');
+                    toast.success('Broadcast started successfully!');
+                    return;
                 } catch (retryErr) {
                     logger.error('WHIP retry after credential refresh failed:', retryErr);
                     const retryMessage =
