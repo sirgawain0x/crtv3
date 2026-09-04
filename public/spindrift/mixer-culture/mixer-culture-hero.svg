@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 274" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1024" y2="274" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#064e3b"/>
+      <stop offset="1" stop-color="#7c3aed"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="274" fill="url(#bg)"/>
+  <text x="512" y="100" text-anchor="middle" font-family="system-ui, sans-serif" font-size="48" font-weight="700" fill="#ffffff">Mixer Culture</text>
+  <text x="512" y="155" text-anchor="middle" font-family="system-ui, sans-serif" font-size="22" fill="#d1fae5">Grapeade mocktail pours</text>
+  <text x="512" y="200" text-anchor="middle" font-family="system-ui, sans-serif" font-size="16" fill="#ecfdf5">Spindrift × Creative TV</text>
+</svg>
