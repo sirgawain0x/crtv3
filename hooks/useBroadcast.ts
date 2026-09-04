@@ -1,8 +1,29 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { getIngest } from '@livepeer/react/external';
 import { toast } from 'sonner';
 import { logger } from '@/lib/utils/logger';
 
 export type BroadcastStatus = 'idle' | 'loading' | 'live' | 'error';
+
+/** Match @livepeer/core-web WHIP: prefer H264 payload type on the video m-line. */
+function preferCodec(sdp: string, codec: string): string {
+    const lines = sdp.split('\r\n');
+    const mLineIndex = lines.findIndex((line) => line.startsWith('m=video'));
+    if (mLineIndex === -1) return sdp;
+    const codecRegex = new RegExp(`a=rtpmap:(\\d+) ${codec}(/\\d+)+`);
+    const codecLine = lines.find((line) => codecRegex.test(line));
+    if (!codecLine) return sdp;
+    const match = codecRegex.exec(codecLine);
+    if (!match?.[1]) return sdp;
+    const codecPayload = match[1];
+    const mLineElements = lines[mLineIndex].split(' ');
+    lines[mLineIndex] = [
+        ...mLineElements.slice(0, 3),
+        codecPayload,
+        ...mLineElements.slice(3).filter((payload) => payload !== codecPayload),
+    ].join(' ');
+    return lines.join('\r\n');
+}
 
 interface UseBroadcastProps {
     ingestUrl?: string | null;
@@ -144,6 +165,9 @@ export function useBroadcast({
 
     const analyzeOfferSdp = (sdp: string) => ({
         mediaLineCount: (sdp.match(/^m=/gm) || []).length,
+        hasH264: /a=rtpmap:\d+ H264\//i.test(sdp),
+        hasVideo: /^m=video\s/m.test(sdp),
+        hasAudio: /^m=audio\s/m.test(sdp),
     });
 
     const ensureLiveMediaStream = async (): Promise<MediaStream> => {
@@ -163,23 +187,28 @@ export function useBroadcast({
     };
 
     const connectWhip = async (keyForIngest: string | null | undefined) => {
-        // Livepeer WHIP must use the Studio WebRTC discovery URL (redirects to
-        // catalyst). ingest.livepeer.studio/whip/* returns 404 even for valid keys.
-        const webrtcDiscoveryUrl = keyForIngest
-            ? `https://livepeer.studio/webrtc/${keyForIngest}`
-            : null;
+        // Official @livepeer/react getIngest default:
+        // https://playback.livepeer.studio/webrtc/{streamKey}
+        // (HEAD-redirects to regional catalyst). /whip hosts 404.
+        const webrtcDiscoveryUrl =
+            (keyForIngest ? getIngest(keyForIngest) : null) ||
+            (keyForIngest
+                ? `https://playback.livepeer.studio/webrtc/${keyForIngest}`
+                : null);
         let endpointUrl = webrtcDiscoveryUrl || ingestUrl || null;
         let iceServers: RTCIceServer[] = [
             { urls: 'stun:stun.l.google.com:19302' },
         ];
 
-        // Prioritize explicit stream key discovery as per Livepeer documentation
-        // "Get the SDP Host ... make a HEAD request to the WebRTC redirect endpoint"
+        // Livepeer docs: HEAD the webrtc redirect endpoint, use Location host for ICE.
         if (webrtcDiscoveryUrl) {
             logger.debug('Discovering WHIP endpoint from:', webrtcDiscoveryUrl);
 
             try {
-                const headRes = await fetch(webrtcDiscoveryUrl, { method: 'HEAD' });
+                const headRes = await fetch(webrtcDiscoveryUrl, {
+                    method: 'HEAD',
+                    mode: 'cors',
+                });
 
                 if (headRes.status === 404) {
                     const err = new Error(
@@ -191,12 +220,11 @@ export function useBroadcast({
 
                 if (!headRes.ok) {
                     logger.warn(
-                        'WHIP discovery HEAD not ok; posting to Studio webrtc URL',
+                        'WHIP discovery HEAD not ok; posting to playback webrtc URL',
                         { status: headRes.status },
                     );
                     endpointUrl = webrtcDiscoveryUrl;
                 } else {
-                    // fetch follows redirects; .url is the final destination
                     endpointUrl = headRes.url || webrtcDiscoveryUrl;
                     logger.debug('Resolved WHIP endpoint:', endpointUrl);
 
@@ -268,9 +296,7 @@ export function useBroadcast({
         };
 
         // Add tracks — use screen stream if screen sharing, otherwise camera.
-        // addTrack binds an RTP sender per track; addTransceiver(track) only
-        // references the track, so the WHIP session connects but sends no
-        // media (verified: stream.started fired, sourceSegments stayed 0).
+        // addTrack binds an RTP sender per track (required for media to flow).
         // Livepeer returns 404 "Stream open failed" when the offer has no m= lines.
         const activeStream = await ensureLiveMediaStream();
         const liveTracks = activeStream
@@ -280,34 +306,38 @@ export function useBroadcast({
             pc.addTrack(track, activeStream);
         });
 
-        // Create Offer
-        const offer = await pc.createOffer();
-        await pc.setLocalDescription(offer);
+        // Match @livepeer/core-web constructClientOffer: prefer H264 in the SDP.
+        const rawOffer = await pc.createOffer();
+        const h264Offer = new RTCSessionDescription({
+            type: rawOffer.type,
+            sdp: preferCodec(rawOffer.sdp ?? '', 'H264'),
+        });
+        await pc.setLocalDescription(h264Offer);
 
-        // Wait for ICE gathering
+        // Livepeer waits up to 5s for ICE gathering before posting WHIP.
         await new Promise<void>((resolve) => {
             if (pc.iceGatheringState === 'complete') {
                 resolve();
-            } else {
-                const checkState = () => {
-                    if (pc.iceGatheringState === 'complete') {
-                        pc.removeEventListener('icegatheringstatechange', checkState);
-                        resolve();
-                    }
-                };
-                pc.addEventListener('icegatheringstatechange', checkState);
-                // Fallback timeout
-                setTimeout(() => {
+                return;
+            }
+            const checkState = () => {
+                if (pc.iceGatheringState === 'complete') {
                     pc.removeEventListener('icegatheringstatechange', checkState);
                     resolve();
-                }, 2000);
-            }
+                }
+            };
+            pc.addEventListener('icegatheringstatechange', checkState);
+            setTimeout(() => {
+                pc.removeEventListener('icegatheringstatechange', checkState);
+                resolve();
+            }, 5000);
         });
 
         const offerSdp = pc.localDescription?.sdp;
         if (!offerSdp) throw new Error('Failed to generate SDP offer');
 
         const sdpInfo = analyzeOfferSdp(offerSdp);
+
         if (sdpInfo.mediaLineCount === 0) {
             const err = new Error(
                 'Broadcast offer missing media tracks. Check camera/mic permissions and try again.',
@@ -316,11 +346,11 @@ export function useBroadcast({
             throw err;
         }
 
-        // WHIP Request
         logger.debug(`Posting SDP offer to: ${endpointUrl}`);
 
         const response = await fetch(endpointUrl, {
             method: 'POST',
+            mode: 'cors',
             headers: {
                 'Content-Type': 'application/sdp',
             },
