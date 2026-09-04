@@ -142,25 +142,44 @@ export function useBroadcast({
         }
     }, []);
 
+    const analyzeOfferSdp = (sdp: string) => ({
+        mediaLineCount: (sdp.match(/^m=/gm) || []).length,
+    });
+
+    const ensureLiveMediaStream = async (): Promise<MediaStream> => {
+        let stream = screenStreamRef.current || mediaStreamRef.current;
+        const liveTracks =
+            stream?.getTracks().filter((t) => t.readyState === 'live') ?? [];
+        if (!stream || liveTracks.length === 0) {
+            await initStream();
+            stream = screenStreamRef.current || mediaStreamRef.current;
+        }
+        const refreshedLive =
+            stream?.getTracks().filter((t) => t.readyState === 'live') ?? [];
+        if (!stream || refreshedLive.length === 0) {
+            throw new Error('No live camera/microphone tracks available');
+        }
+        return stream;
+    };
+
     const connectWhip = async (keyForIngest: string | null | undefined) => {
-        let endpointUrl =
-            (keyForIngest
-                ? `https://ingest.livepeer.studio/whip/${keyForIngest}`
-                : null) ||
-            ingestUrl ||
-            null;
+        // Livepeer WHIP must use the Studio WebRTC discovery URL (redirects to
+        // catalyst). ingest.livepeer.studio/whip/* returns 404 even for valid keys.
+        const webrtcDiscoveryUrl = keyForIngest
+            ? `https://livepeer.studio/webrtc/${keyForIngest}`
+            : null;
+        let endpointUrl = webrtcDiscoveryUrl || ingestUrl || null;
         let iceServers: RTCIceServer[] = [
             { urls: 'stun:stun.l.google.com:19302' },
         ];
 
         // Prioritize explicit stream key discovery as per Livepeer documentation
         // "Get the SDP Host ... make a HEAD request to the WebRTC redirect endpoint"
-        if (keyForIngest) {
-            const discoveryUrl = `https://livepeer.studio/webrtc/${keyForIngest}`;
-            logger.debug('Discovering WHIP endpoint from:', discoveryUrl);
+        if (webrtcDiscoveryUrl) {
+            logger.debug('Discovering WHIP endpoint from:', webrtcDiscoveryUrl);
 
             try {
-                const headRes = await fetch(discoveryUrl, { method: 'HEAD' });
+                const headRes = await fetch(webrtcDiscoveryUrl, { method: 'HEAD' });
 
                 if (headRes.status === 404) {
                     const err = new Error(
@@ -172,12 +191,13 @@ export function useBroadcast({
 
                 if (!headRes.ok) {
                     logger.warn(
-                        'WHIP discovery HEAD not ok; falling back to ingest URL',
+                        'WHIP discovery HEAD not ok; posting to Studio webrtc URL',
                         { status: headRes.status },
                     );
+                    endpointUrl = webrtcDiscoveryUrl;
                 } else {
                     // fetch follows redirects; .url is the final destination
-                    endpointUrl = headRes.url;
+                    endpointUrl = headRes.url || webrtcDiscoveryUrl;
                     logger.debug('Resolved WHIP endpoint:', endpointUrl);
 
                     const host = new URL(endpointUrl).host;
@@ -199,7 +219,7 @@ export function useBroadcast({
                     throw e;
                 }
                 logger.error('Failed to discover optimized WHIP endpoint:', e);
-                // Fallback to ingestUrl if available, otherwise error below
+                endpointUrl = webrtcDiscoveryUrl;
             }
         }
 
@@ -251,11 +271,12 @@ export function useBroadcast({
         // addTrack binds an RTP sender per track; addTransceiver(track) only
         // references the track, so the WHIP session connects but sends no
         // media (verified: stream.started fired, sourceSegments stayed 0).
-        const activeStream = screenStreamRef.current || mediaStreamRef.current;
-        if (!activeStream) {
-            throw new Error('No media stream available');
-        }
-        activeStream.getTracks().forEach((track) => {
+        // Livepeer returns 404 "Stream open failed" when the offer has no m= lines.
+        const activeStream = await ensureLiveMediaStream();
+        const liveTracks = activeStream
+            .getTracks()
+            .filter((t) => t.readyState === 'live');
+        liveTracks.forEach((track) => {
             pc.addTrack(track, activeStream);
         });
 
@@ -286,6 +307,15 @@ export function useBroadcast({
         const offerSdp = pc.localDescription?.sdp;
         if (!offerSdp) throw new Error('Failed to generate SDP offer');
 
+        const sdpInfo = analyzeOfferSdp(offerSdp);
+        if (sdpInfo.mediaLineCount === 0) {
+            const err = new Error(
+                'Broadcast offer missing media tracks. Check camera/mic permissions and try again.',
+            ) as Error & { status?: number; offerHadMedia?: boolean };
+            err.offerHadMedia = false;
+            throw err;
+        }
+
         // WHIP Request
         logger.debug(`Posting SDP offer to: ${endpointUrl}`);
 
@@ -301,8 +331,9 @@ export function useBroadcast({
             const errorText = await response.text();
             const err = new Error(
                 `WHIP Request failed: ${response.status} ${response.statusText} - ${errorText}`,
-            ) as Error & { status?: number };
+            ) as Error & { status?: number; offerHadMedia?: boolean };
             err.status = response.status;
+            err.offerHadMedia = sdpInfo.mediaLineCount > 0;
             throw err;
         }
 
@@ -337,15 +368,23 @@ export function useBroadcast({
                 err instanceof Error && 'status' in err
                     ? (err as Error & { status?: number }).status
                     : undefined;
-            const isWhip404 =
-                statusCode === 404 ||
-                /WHIP Request failed:\s*404/i.test(message) ||
-                /WHIP discovery failed:\s*404/i.test(message);
+            const offerHadMedia =
+                err instanceof Error && 'offerHadMedia' in err
+                    ? Boolean((err as Error & { offerHadMedia?: boolean }).offerHadMedia)
+                    : undefined;
+            const isDiscovery404 = /WHIP discovery failed:\s*404/i.test(message);
+            const isWhipPost404 =
+                statusCode === 404 || /WHIP Request failed:\s*404/i.test(message);
+            // Livepeer returns the same 404 body for media-less offers; only refresh
+            // credentials when discovery misses the stream or a media-bearing offer fails.
+            const shouldRefreshKey =
+                Boolean(refreshStreamKey) &&
+                (isDiscovery404 || (isWhipPost404 && offerHadMedia === true));
 
             logger.error('Broadcast error:', err);
 
             // Stale stream key: refresh once (server heals), keep camera, retry WHIP.
-            if (isWhip404 && refreshStreamKey) {
+            if (shouldRefreshKey && refreshStreamKey) {
                 teardownPeerConnection();
                 toast.message('Stream credentials expired — refreshing…');
                 try {
@@ -383,7 +422,7 @@ export function useBroadcast({
             setError(message);
             setStatus('idle');
             toast.error(
-                isWhip404
+                isDiscovery404
                     ? 'Broadcast failed: stream not found on Livepeer. Refresh the page or recreate your stream.'
                     : `Broadcast failed: ${message}`,
             );

@@ -96,6 +96,7 @@ describe("GET /api/livepeer/stream-key", () => {
       playbackId: "playback-1",
       streamKey: "key-1",
       replaced: false,
+      reused: true,
     });
   });
 
