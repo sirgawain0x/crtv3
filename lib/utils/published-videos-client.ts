@@ -35,7 +35,8 @@ export async function fetchPublishedVideos(
   if (options.category) params.set("category", options.category);
   if (options.search) params.set("search", options.search);
 
-  const response = await fetch(`/api/video-assets/published?${params.toString()}`, {
+  const url = `/api/video-assets/published?${params.toString()}`;
+  const response = await fetch(url, {
     method: "GET",
     cache: "no-store",
     headers: {
@@ -61,4 +62,3 @@ export async function fetchPublishedVideos(
 export const publishedVideosQueryKey = (options: FetchPublishedVideosOptions = {}) => {
   return ['published-videos', options] as const;
 };
-

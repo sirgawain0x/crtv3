@@ -2,6 +2,7 @@
 import { cn } from "@/lib/utils";
 import * as React from "react";
 import { useRef, useEffect, useState } from "react";
+import { getIngest } from "@livepeer/react/external";
 import { useBroadcast } from "@/hooks/useBroadcast";
 import { toast } from "sonner";
 import * as Popover from "@radix-ui/react-popover";
@@ -216,9 +217,12 @@ function BroadcastWithControls({
     setActivePlaybackId(playbackId ?? null);
   }, [playbackId]);
 
-  // WHIP uses Studio webrtc discovery; OBS/RTMP still uses the Livepeer RTMP ingest host.
+  // Official getIngest base (playback.livepeer.studio/webrtc). OBS still uses RTMP.
   const whipIngestUrl = React.useMemo(() => {
-    return `https://livepeer.studio/webrtc/${activeStreamKey}`;
+    return (
+      getIngest(activeStreamKey) ??
+      `https://playback.livepeer.studio/webrtc/${activeStreamKey}`
+    );
   }, [activeStreamKey]);
   const rtmpIngestUrl = "rtmp://rtmp.livepeer.studio/live";
 

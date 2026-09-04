@@ -154,17 +154,29 @@ export function patchGlobalFetch(): void {
       if (typeof input === 'string') {
         url = input;
 
-        // CRITICAL FIX: Livepeer SDK sometimes targets playback/ingest /whip hosts that
-        // 404 even for valid keys. Studio WebRTC discovery is the working WHIP path.
+        // CRITICAL FIX: Livepeer SDK sometimes targets /whip hosts that 404.
+        // Official getIngest / Broadcast path uses playback.livepeer.studio/webrtc.
         if (
           url.includes('playback.livepeer.studio/whip/') ||
           url.includes('ingest.livepeer.studio/whip/')
         ) {
           const fixedUrl = url
-            .replace('https://playback.livepeer.studio/whip/', 'https://livepeer.studio/webrtc/')
-            .replace('https://ingest.livepeer.studio/whip/', 'https://livepeer.studio/webrtc/')
-            .replace('http://playback.livepeer.studio/whip/', 'https://livepeer.studio/webrtc/')
-            .replace('http://ingest.livepeer.studio/whip/', 'https://livepeer.studio/webrtc/');
+            .replace(
+              'https://playback.livepeer.studio/whip/',
+              'https://playback.livepeer.studio/webrtc/',
+            )
+            .replace(
+              'https://ingest.livepeer.studio/whip/',
+              'https://playback.livepeer.studio/webrtc/',
+            )
+            .replace(
+              'http://playback.livepeer.studio/whip/',
+              'https://playback.livepeer.studio/webrtc/',
+            )
+            .replace(
+              'http://ingest.livepeer.studio/whip/',
+              'https://playback.livepeer.studio/webrtc/',
+            );
           logger.warn('[WASM Patch] Repairing incorrect Livepeer WHIP URL:', url, '->', fixedUrl);
           return originalFetch(fixedUrl, init);
         }
