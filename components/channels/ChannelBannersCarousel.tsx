@@ -12,6 +12,7 @@ import {
 import { BeatMeBanner } from "@/components/songchain/BeatMeBanner";
 import { SongCupBanner } from "@/components/songchain/SongCupBanner";
 import { ChonesBanner } from "@/components/chones/ChonesBanner";
+import { SpindriftBanner } from "@/components/spindrift/SpindriftBanner";
 import { cn } from "@/lib/utils";
 
 const AUTOPLAY_MS = 6000;
@@ -62,6 +63,13 @@ export function ChannelBannersCarousel({ className }: ChannelBannersCarouselProp
           <ChonesBanner
             className="h-full"
             href="/chones/hack-beta"
+            buttonLabel="ENTER"
+          />
+        </CarouselItem>
+        <CarouselItem className="pl-0">
+          <SpindriftBanner
+            className="h-full"
+            href="/spindrift/mixer-culture"
             buttonLabel="ENTER"
           />
         </CarouselItem>

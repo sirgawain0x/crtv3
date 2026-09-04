@@ -29,6 +29,7 @@ const PUBLIC_PATHS = [
   '/memberships',
   '/songchain',
   '/chones',
+  '/spindrift',
 ];
 
 export function MembershipGuard({ children }: MembershipGuardProps) {
