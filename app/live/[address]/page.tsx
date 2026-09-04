@@ -533,6 +533,11 @@ export default function LivePage() {
                     playbackId={playbackId}
                     creatorAddress={creatorAddress!}
                     saveRecording={saveRecording}
+                    onCredentialsChange={({ streamKey: key, streamId: id, playbackId: pb }) => {
+                      setStreamKey(key);
+                      setStreamId(id);
+                      setPlaybackId(pb);
+                    }}
                   />
                   {creatorAddress && (
                     <DigitalTwinOverlay creatorAddress={creatorAddress} />

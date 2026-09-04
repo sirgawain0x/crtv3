@@ -298,6 +298,51 @@ export async function createStreamRecord(params: CreateStreamParams) {
 }
 
 /**
+ * Service-only: replace Livepeer ingest credentials on a creator's stream row.
+ * Used when the Studio stream was deleted / moved but Supabase still holds the old key.
+ */
+export async function replaceStreamLivepeerCredentials(
+    creatorId: string,
+    credentials: {
+        stream_id: string;
+        stream_key: string;
+        playback_id: string;
+    },
+): Promise<Stream> {
+    const supabase = await createServiceClient();
+    const normalizedCreator = creatorId.trim().toLowerCase();
+
+    const { data, error } = await supabase
+        .from("streams")
+        .update({
+            stream_id: credentials.stream_id,
+            stream_key: credentials.stream_key,
+            playback_id: credentials.playback_id,
+            is_live: false,
+            updated_at: new Date().toISOString(),
+        })
+        .ilike("creator_id", normalizedCreator)
+        .select()
+        .single();
+
+    if (error) {
+        serverLogger.error("[replaceStreamLivepeerCredentials] update failed", {
+            creatorId: normalizedCreator,
+            error: error.message,
+        });
+        throw new Error(`Failed to replace stream credentials: ${error.message}`);
+    }
+
+    serverLogger.info("[replaceStreamLivepeerCredentials] credentials replaced", {
+        creatorId: normalizedCreator,
+        streamId: credentials.stream_id,
+        playbackId: credentials.playback_id,
+    });
+
+    return data as Stream;
+}
+
+/**
  * Update an existing stream record
  */
 export async function updateStream(
