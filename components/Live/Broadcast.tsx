@@ -138,6 +138,8 @@ export async function fetchStreamKeyForCreator(
     streamId: string;
     playbackId: string;
     streamKey: string;
+    replaced?: boolean;
+    reused?: boolean;
   }>;
 }
 
@@ -214,9 +216,11 @@ function BroadcastWithControls({
     setActivePlaybackId(playbackId ?? null);
   }, [playbackId]);
 
-  const ingestUrl = React.useMemo(() => {
-    return `https://ingest.livepeer.studio/whip/${activeStreamKey}`;
+  // WHIP uses Studio webrtc discovery; OBS/RTMP still uses the Livepeer RTMP ingest host.
+  const whipIngestUrl = React.useMemo(() => {
+    return `https://livepeer.studio/webrtc/${activeStreamKey}`;
   }, [activeStreamKey]);
+  const rtmpIngestUrl = "rtmp://rtmp.livepeer.studio/live";
 
   const refreshStreamKey = React.useCallback(async () => {
     try {
@@ -259,7 +263,7 @@ function BroadcastWithControls({
     isScreenSharing,
     toggleScreenShare
   } = useBroadcast({
-    ingestUrl,
+    ingestUrl: whipIngestUrl,
     streamKey: activeStreamKey,
     refreshStreamKey,
   });
@@ -425,7 +429,7 @@ function BroadcastWithControls({
               <Settings
                 streamId={activeStreamId || ""}
                 streamKey={activeStreamKey}
-                ingestUrl={ingestUrl}
+                ingestUrl={rtmpIngestUrl}
                 devices={devices}
                 selectedAudioDeviceId={selectedAudioDeviceId}
                 selectedVideoDeviceId={selectedVideoDeviceId}

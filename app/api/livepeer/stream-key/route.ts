@@ -64,6 +64,7 @@ export async function GET(req: NextRequest) {
       playbackId: ensured.playbackId,
       streamKey: ensured.streamKey,
       replaced: ensured.replaced,
+      reused: ensured.reused,
     });
   } catch (error) {
     if (error instanceof Error && error.message === "MISSING_API_KEY") {
