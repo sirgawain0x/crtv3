@@ -30,6 +30,7 @@ import { getPassDisplayName } from "@/lib/access/membership-labels";
 import { isValidProfileTab, type ProfileTab } from "@/lib/utils/profile-urls";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CreatorAnalyticsTab } from "./CreatorAnalyticsTab";
+import { ProfileGoLiveButton } from "@/components/Live/ProfileGoLiveButton";
 
 const LIFETIME_EXPIRATION_THRESHOLD = 32503680000;
 
@@ -123,7 +124,7 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
       <div className="container mx-auto px-4 py-8">
         {/* Profile Header */}
         {displayAddress && (
-          <div className="mb-6">
+          <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <UserDisplay
               address={displayAddress}
               avatarSize="lg"
@@ -131,6 +132,7 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
               clickable={false}
               variant="inline"
             />
+            <ProfileGoLiveButton profileAddress={displayAddress} />
           </div>
         )}
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">

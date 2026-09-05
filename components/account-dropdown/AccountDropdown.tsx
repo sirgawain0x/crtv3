@@ -273,7 +273,10 @@ const SESSION_KEY_TYPES: SessionKeyConfig[] = [
 ];
 
 export type AccountDropdownHandle = {
-  openAction: (action: "buy" | "send" | "swap" | "session-keys") => void;
+  openAction: (
+    action: "buy" | "send" | "swap" | "session-keys",
+    options?: { recipientAddress?: string; token?: TokenSymbol },
+  ) => void;
 };
 
 export const AccountDropdown = forwardRef<AccountDropdownHandle>(
@@ -445,10 +448,24 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
   };
 
   const handleActionClick = useCallback(
-    (action: "buy" | "send" | "swap" | "session-keys") => {
+    (
+      action: "buy" | "send" | "swap" | "session-keys",
+      options?: { recipientAddress?: string; token?: TokenSymbol },
+    ) => {
       deferAfterOverlayClose(
         () => setIsDropdownOpen(false),
         () => {
+          if (action === "send") {
+            setSendType("token");
+            setSelectedNFT(null);
+            setSelectedMeToken(null);
+            if (options?.recipientAddress) {
+              setRecipientAddress(options.recipientAddress);
+            }
+            if (options?.token) {
+              setSelectedToken(options.token);
+            }
+          }
           setDialogAction(action);
           setIsDialogOpen(true);
         }
@@ -1826,6 +1843,12 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
               <EarnSection
                 isVisible={isDropdownOpen}
                 onSuccess={() => setBalanceRefreshKey((k) => k + 1)}
+                onTopUp={(embeddedAddress) =>
+                  handleActionClick("send", {
+                    recipientAddress: embeddedAddress,
+                    token: "USDC",
+                  })
+                }
               />
             </div>
 
