@@ -16,6 +16,7 @@ import { MarketToken } from "@/app/api/market/tokens/route";
 import { MeTokenShareButton } from "@/components/Market/MeTokenShareButton";
 import { MembershipVerifiedBadge } from "@/components/User/MembershipVerifiedBadge";
 import { CreatorPredictButton } from "@/components/Creator/CreatorPredictButton";
+import { ProfileGoLiveButton } from "@/components/Live/ProfileGoLiveButton";
 
 interface CreatorProfileHeaderProps {
   address: string;
@@ -97,35 +98,38 @@ export function CreatorProfileHeader({
           </p>
         )}
 
-        {marketToken && (
-          <div className="flex flex-wrap gap-2 mt-4">
-            <Button
-              variant="default"
-              size="sm"
-              onClick={() => setQuickTradeOpen(true)}
-            >
-              Quick Trade
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setChartDialogOpen(true)}
-            >
-              <BarChart3 className="h-4 w-4 mr-2" />
-              View Chart
-            </Button>
-            <CreatorPredictButton
-              creatorAddress={address}
-              creatorName={creatorProfile?.username || marketToken.name}
-            />
-            <MeTokenShareButton
-              address={marketToken.address}
-              symbol={marketToken.symbol}
-              name={marketToken.name}
-              type="creator"
-            />
-          </div>
-        )}
+        <div className="flex flex-wrap gap-2 mt-4">
+          <ProfileGoLiveButton profileAddress={address} />
+          {marketToken ? (
+            <>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => setQuickTradeOpen(true)}
+              >
+                Quick Trade
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setChartDialogOpen(true)}
+              >
+                <BarChart3 className="h-4 w-4 mr-2" />
+                View Chart
+              </Button>
+              <CreatorPredictButton
+                creatorAddress={address}
+                creatorName={creatorProfile?.username || marketToken.name}
+              />
+              <MeTokenShareButton
+                address={marketToken.address}
+                symbol={marketToken.symbol}
+                name={marketToken.name}
+                type="creator"
+              />
+            </>
+          ) : null}
+        </div>
       </div>
 
       <QuickTradeDialog
