@@ -102,6 +102,8 @@ export interface CreatorProfile {
   lens_account_id?: string | null;
   lens_handle?: string | null;
   lens_avatar_uri?: string | null;
+  /** Brand channel slug (chones, spindrift, songchain) when linked by a Brand Pass holder */
+  brand_channel_slug?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -119,6 +121,7 @@ export interface CreateCreatorProfileData {
   lens_account_id?: string | null;
   lens_handle?: string | null;
   lens_avatar_uri?: string | null;
+  brand_channel_slug?: string | null;
 }
 
 export interface UpdateCreatorProfileData {
@@ -133,6 +136,7 @@ export interface UpdateCreatorProfileData {
   lens_account_id?: string | null;
   lens_handle?: string | null;
   lens_avatar_uri?: string | null;
+  brand_channel_slug?: string | null;
 }
 
 // Types for Song Cup submissions
