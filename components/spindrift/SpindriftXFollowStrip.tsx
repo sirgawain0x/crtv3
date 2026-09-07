@@ -11,9 +11,20 @@ import { cn } from "@/lib/utils";
 
 type SpindriftXFollowStripProps = {
   className?: string;
+  accent?: "channel" | "grapeade";
 };
 
-export function SpindriftXFollowStrip({ className }: SpindriftXFollowStripProps) {
+const linkAccentClass = {
+  channel:
+    "text-emerald-600 transition hover:bg-emerald-500/10 hover:text-emerald-500 dark:text-emerald-300",
+  grapeade:
+    "text-violet-600 transition hover:bg-violet-500/10 hover:text-violet-500 dark:text-violet-300",
+} as const;
+
+export function SpindriftXFollowStrip({
+  className,
+  accent = "channel",
+}: SpindriftXFollowStripProps) {
   return (
     <div
       className={cn(
@@ -29,7 +40,7 @@ export function SpindriftXFollowStrip({ className }: SpindriftXFollowStripProps)
         href={SPINDRIFT_X_URL}
         target="_blank"
         rel="noopener noreferrer"
-        className="rounded-md px-2 py-1 text-emerald-600 transition hover:bg-emerald-500/10 hover:text-emerald-500 dark:text-emerald-300"
+        className={cn("rounded-md px-2 py-1", linkAccentClass[accent])}
       >
         @{SPINDRIFT_X_HANDLE}
       </a>
@@ -40,7 +51,7 @@ export function SpindriftXFollowStrip({ className }: SpindriftXFollowStripProps)
         href={CREATIVE_TV_X_URL}
         target="_blank"
         rel="noopener noreferrer"
-        className="rounded-md px-2 py-1 text-emerald-600 transition hover:bg-emerald-500/10 hover:text-emerald-500 dark:text-emerald-300"
+        className={cn("rounded-md px-2 py-1", linkAccentClass[accent])}
       >
         @{CREATIVE_TV_X_HANDLE}
       </a>
