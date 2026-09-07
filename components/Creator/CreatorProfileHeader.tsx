@@ -17,6 +17,7 @@ import { MeTokenShareButton } from "@/components/Market/MeTokenShareButton";
 import { MembershipVerifiedBadge } from "@/components/User/MembershipVerifiedBadge";
 import { CreatorPredictButton } from "@/components/Creator/CreatorPredictButton";
 import { ProfileGoLiveButton } from "@/components/Live/ProfileGoLiveButton";
+import { CreatorBrandChannelButton } from "@/components/Creator/CreatorBrandChannelButton";
 
 interface CreatorProfileHeaderProps {
   address: string;
@@ -100,6 +101,9 @@ export function CreatorProfileHeader({
 
         <div className="flex flex-wrap gap-2 mt-4">
           <ProfileGoLiveButton profileAddress={address} />
+          <CreatorBrandChannelButton
+            brandChannelSlug={creatorProfile?.brand_channel_slug}
+          />
           {marketToken ? (
             <>
               <Button
