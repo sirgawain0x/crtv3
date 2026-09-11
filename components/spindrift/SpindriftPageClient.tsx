@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { SpindriftBanner } from "@/components/spindrift/SpindriftBanner";
+import { SpindriftHubHero } from "@/components/spindrift/SpindriftHubHero";
 import { SpindriftXFollowStrip } from "@/components/spindrift/SpindriftXFollowStrip";
 import type { SpindriftConfig } from "@/lib/spindrift/config";
 import { SPINDRIFT_EVENTS } from "@/lib/spindrift/events";
@@ -24,7 +24,7 @@ export function SpindriftPageClient({ config: _config }: SpindriftPageClientProp
         <span className="text-foreground">Spindrift</span>
       </nav>
 
-      <SpindriftBanner className="mb-6" showButton={false} />
+      <SpindriftHubHero className="mb-6" />
 
       <section className="mb-10 space-y-3 rounded-xl border border-border/60 bg-muted/20 p-6">
         <h2 className="text-lg font-semibold text-foreground">About Spindrift</h2>

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Film, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { mixerCultureAccent } from "@/lib/spindrift/mixer-culture-theme";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -46,13 +47,19 @@ export function MixerCultureSubmitPanel({ className }: MixerCultureSubmitPanelPr
           Share a photo or short video of your Grapeade mocktail with the recipe. Keep Spindrift
           visible in the frame.
         </p>
-        <p className="mt-2 text-sm font-medium text-emerald-700 dark:text-emerald-400">
+        <p className={cn("mt-2 text-sm font-medium", mixerCultureAccent.highlight)}>
           Real Fruit / Zero Artificial Shortcuts
         </p>
       </div>
 
-      <div className="rounded-lg border border-dashed border-emerald-500/30 bg-emerald-500/5 p-6 text-center">
-        <Upload className="mx-auto mb-2 h-8 w-8 text-emerald-600/70" aria-hidden />
+      <div
+        className={cn(
+          "rounded-lg p-6 text-center",
+          mixerCultureAccent.borderDashed,
+          mixerCultureAccent.bgTint,
+        )}
+      >
+        <Upload className={cn("mx-auto mb-2 h-8 w-8", mixerCultureAccent.iconMuted)} aria-hidden />
         <p className="text-sm font-medium text-foreground">Photo or short video</p>
         <p className="mt-1 text-xs text-muted-foreground">
           {/* TODO: integrate Creative TV media picker when submission API is live */}
@@ -73,8 +80,14 @@ export function MixerCultureSubmitPanel({ className }: MixerCultureSubmitPanelPr
         />
       </div>
 
-      <div className="flex flex-wrap gap-2 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3 text-xs text-muted-foreground">
-        <Film className="h-4 w-4 shrink-0 text-emerald-600" aria-hidden />
+      <div
+        className={cn(
+          "flex flex-wrap gap-2 rounded-lg p-3 text-xs text-muted-foreground",
+          mixerCultureAccent.borderSubtle,
+          mixerCultureAccent.bgTint,
+        )}
+      >
+        <Film className={cn("h-4 w-4 shrink-0", mixerCultureAccent.icon)} aria-hidden />
         <p>
           Top pours earn a <strong className="text-foreground">Grand Feature on Creative TV</strong>{" "}
           and a <strong className="text-foreground">Verified Badge</strong>.
@@ -84,7 +97,7 @@ export function MixerCultureSubmitPanel({ className }: MixerCultureSubmitPanelPr
       <Button
         onClick={() => void handleSubmit()}
         disabled={isSubmitting}
-        className="w-full sm:w-auto"
+        className={cn("w-full sm:w-auto", mixerCultureAccent.submitButton)}
       >
         {isSubmitting ? "Submitting…" : "Submit pour"}
       </Button>

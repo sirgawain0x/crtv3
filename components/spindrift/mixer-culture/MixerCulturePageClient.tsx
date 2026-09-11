@@ -8,6 +8,8 @@ import { MixerCulturePlaylistEmbed } from "./MixerCulturePlaylistEmbed";
 import { MixerCultureSubmitPanel } from "./MixerCultureSubmitPanel";
 import { MixerCultureGallery } from "./MixerCultureGallery";
 import type { SpindriftConfig } from "@/lib/spindrift/config";
+import { mixerCultureAccent } from "@/lib/spindrift/mixer-culture-theme";
+import { cn } from "@/lib/utils";
 
 type MixerCulturePageClientProps = {
   config: SpindriftConfig;
@@ -43,19 +45,29 @@ export function MixerCulturePageClient({ config }: MixerCulturePageClientProps) 
             hard way.
           </p>
           <div className="flex flex-wrap gap-3 pt-1">
-            <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+            <span
+              className={cn(
+                "rounded-full px-3 py-1 text-xs font-semibold",
+                mixerCultureAccent.badge,
+              )}
+            >
               Grand Feature on Creative TV
             </span>
-            <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+            <span
+              className={cn(
+                "rounded-full px-3 py-1 text-xs font-semibold",
+                mixerCultureAccent.badge,
+              )}
+            >
               Verified Badge
             </span>
           </div>
-          <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
+          <p className={cn("text-sm font-medium", mixerCultureAccent.highlight)}>
             Real Fruit / Zero Artificial Shortcuts
           </p>
         </section>
 
-        <SpindriftXFollowStrip />
+        <SpindriftXFollowStrip accent="grapeade" />
 
         <div id="mixer-culture-submit" className="scroll-mt-8">
           <MixerCultureSubmitPanel />

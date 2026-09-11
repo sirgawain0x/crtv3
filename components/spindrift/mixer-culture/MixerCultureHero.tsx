@@ -21,7 +21,7 @@ export function MixerCultureHero({ className }: MixerCultureHeroProps) {
   return (
     <section
       className={cn(
-        "relative mx-auto min-h-[220px] w-full max-w-7xl overflow-hidden rounded-xl bg-[#f5f9f6]",
+        "relative mx-auto min-h-[220px] w-full max-w-7xl overflow-hidden rounded-xl bg-[#2e1065]",
         "lg:aspect-[1024/274]",
         className,
       )}
