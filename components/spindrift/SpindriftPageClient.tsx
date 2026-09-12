@@ -56,21 +56,9 @@ export function SpindriftPageClient({ config: _config }: SpindriftPageClientProp
                 <span className="text-xs font-semibold uppercase tracking-wider text-emerald-300">
                   {isActive ? "Live now" : "Coming soon"}
                 </span>
-                {event.slug === "mixer-culture" ? (
-                  <div className="mt-2">
-                    <Image
-                      src="/spindrift/mixer-culture/mixer-culture-title.svg"
-                      alt="Mixer Culture"
-                      width={320}
-                      height={80}
-                      className="h-auto w-[min(70%,280px)]"
-                      priority
-                      unoptimized
-                    />
-                  </div>
-                ) : (
-                  <span className="mt-1 block text-lg font-bold text-white">{event.title}</span>
-                )}
+                <span className="mt-1 block text-2xl font-bold tracking-tight text-white">
+                  {event.title}
+                </span>
                 {event.description && (
                   <span className="mt-1 block text-sm text-emerald-100/90">{event.description}</span>
                 )}
@@ -94,14 +82,17 @@ export function SpindriftPageClient({ config: _config }: SpindriftPageClientProp
                   >
                     <div className="absolute inset-0 -z-10" aria-hidden>
                       <Image
-                        src="/spindrift/mixer-culture/mixer-culture-background.svg"
+                        src={
+                          event.slug === "mixer-culture"
+                            ? "/spindrift/mixer-culture/event-card.png"
+                            : "/spindrift/hero-pour.png"
+                        }
                         alt=""
                         fill
-                        className="object-cover object-center opacity-70 transition duration-500 group-hover:opacity-85"
+                        className="object-cover object-center transition duration-500 group-hover:scale-[1.02]"
                         sizes="(max-width: 640px) 100vw, 50vw"
-                        unoptimized
                       />
-                      <div className="absolute inset-0 bg-gradient-to-r from-stone-950/85 via-stone-950/60 to-stone-950/80" />
+                      <div className="absolute inset-0 bg-gradient-to-r from-stone-950/80 via-stone-950/50 to-stone-950/70" />
                     </div>
                     {cardContent}
                   </Link>

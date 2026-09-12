@@ -35,6 +35,7 @@ export function CreatorProfileHeader({
   // Determine display name and symbol
   const displayName = meToken?.name || creatorProfile?.username || shortenAddress(address);
   const displaySymbol = meToken?.symbol || null;
+  const copyAddress = meToken?.address ?? address;
   const avatarUrl = creatorProfile?.avatar_url
     ? convertFailingGateway(creatorProfile.avatar_url)
     : makeBlockie(address);
@@ -83,7 +84,7 @@ export function CreatorProfileHeader({
           )}
         </div>
         <div className="mb-4">
-          <AddressWithCopy address={address} />
+          <AddressWithCopy address={copyAddress} />
         </div>
 
         {creatorProfile?.username && (

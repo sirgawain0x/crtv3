@@ -14,7 +14,6 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import makeBlockie from "ethereum-blockies-base64";
 import { shortenAddress } from "@/lib/utils/utils";
-import { AddressWithCopy } from "@/components/Creator/AddressWithCopy";
 import { convertFailingGateway } from "@/lib/utils/image-gateway";
 import { meTokenSupabaseService } from "@/lib/sdk/supabase/metokens";
 import { CreatorProfileHeader } from "@/components/Creator/CreatorProfileHeader";
