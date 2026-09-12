@@ -21,6 +21,15 @@ export function proxy(req: NextRequest) {
     });
   }
 
+  // SMS opt-in evidence page: standalone marketing/legal layout (no wallet nav)
+  if (pathname === "/sms" || pathname.startsWith("/sms/")) {
+    const requestHeaders = new Headers(req.headers);
+    requestHeaders.set("x-crtv-tv-route", "1");
+    return NextResponse.next({
+      request: { headers: requestHeaders },
+    });
+  }
+
   // CORS for API routes
   if (pathname.startsWith("/api")) {
     const origin = req.headers.get("origin");
@@ -60,5 +69,5 @@ export function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/api/:path*", "/embed/:path*", "/tv", "/tv/:path*"],
+  matcher: ["/api/:path*", "/embed/:path*", "/tv", "/tv/:path*", "/sms", "/sms/:path*"],
 };
