@@ -702,10 +702,14 @@ function CreatePrediction({
                 {quota.unlimited ? (
                   <>
                     {quota.premiumTier === "investor" && (
-                      <span>Investor membership: unlimited prediction markets. </span>
+                      <span>
+                        Creative Investor Pass: unlimited prediction markets.{" "}
+                      </span>
                     )}
                     {quota.premiumTier === "brand" && (
-                      <span>Brand membership: unlimited prediction markets. </span>
+                      <span>
+                        Creative Brand Pass: unlimited prediction markets.{" "}
+                      </span>
                     )}
                     {!quota.premiumTier && (
                       <span>Unlimited prediction markets for your account. </span>

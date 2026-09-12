@@ -8,12 +8,12 @@ export const PREDICTION_MARKETS_MONTHLY_LIMIT = 3;
 
 /**
  * Investor and Brand passes (MembershipHome naming).
- * Creator tier (BASE_CREATIVE_PASS_2) shares the monthly limit with non-members.
+ * Creator tier shares the monthly limit with non-members.
  */
 export const UNLIMITED_PREDICTION_LOCK_ADDRESSES = new Set(
   [
-    LOCK_ADDRESSES.BASE_CREATIVE_PASS,
-    LOCK_ADDRESSES.BASE_CREATIVE_CREATOR_PLUS,
+    LOCK_ADDRESSES.BASE_CREATIVE_PASS_2,
+    LOCK_ADDRESSES.BASE_CREATIVE_INVESTOR_PLUS,
     LOCK_ADDRESSES.BASE_CREATIVE_PASS_3,
     LOCK_ADDRESSES.BASE_CREATIVE_BRAND_PLUS,
   ].map((a) => a.toLowerCase())
@@ -31,26 +31,31 @@ export function normalizeCreatorAddress(address: string): string {
 export function getPremiumPredictionAccess(
   memberships: Awaited<ReturnType<typeof unlockService.getAllMemberships>>
 ): { unlimited: boolean; tier: PredictionPremiumTier | null } {
-  let tier: PredictionPremiumTier | null = null;
-  for (const m of memberships) {
-    if (!m.isValid) continue;
+  const valid = memberships.filter((m) => m.isValid);
+
+  const hasBrand = valid.some((m) => {
     const a = m.address.toLowerCase();
-    if (
-      a === LOCK_ADDRESSES.BASE_CREATIVE_PASS.toLowerCase() ||
-      a === LOCK_ADDRESSES.BASE_CREATIVE_CREATOR_PLUS.toLowerCase()
-    ) {
-      tier = "brand";
-      break;
-    }
-    if (
+    return (
       a === LOCK_ADDRESSES.BASE_CREATIVE_PASS_3.toLowerCase() ||
       a === LOCK_ADDRESSES.BASE_CREATIVE_BRAND_PLUS.toLowerCase()
-    ) {
-      tier = "investor";
-      break;
-    }
+    );
+  });
+  if (hasBrand) {
+    return { unlimited: true, tier: "brand" };
   }
-  return { unlimited: tier !== null, tier };
+
+  const hasInvestor = valid.some((m) => {
+    const a = m.address.toLowerCase();
+    return (
+      a === LOCK_ADDRESSES.BASE_CREATIVE_PASS_2.toLowerCase() ||
+      a === LOCK_ADDRESSES.BASE_CREATIVE_INVESTOR_PLUS.toLowerCase()
+    );
+  });
+  if (hasInvestor) {
+    return { unlimited: true, tier: "investor" };
+  }
+
+  return { unlimited: false, tier: null };
 }
 
 export async function hasUnlimitedPredictionMarkets(
