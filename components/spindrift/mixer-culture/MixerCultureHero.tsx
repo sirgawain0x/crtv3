@@ -27,12 +27,11 @@ export function MixerCultureHero({ className }: MixerCultureHeroProps) {
       )}
     >
       <Image
-        src="/spindrift/mixer-culture/mixer-culture-hero.svg"
+        src="/spindrift/hero-pour.png"
         alt="Spindrift Mixer Culture — Grapeade mocktail pours"
         fill
         className="object-cover object-center"
         priority
-        unoptimized
         sizes="(max-width: 1280px) 100vw, 1280px"
       />
       <div className="absolute inset-0 flex flex-col items-center justify-end gap-3 bg-gradient-to-t from-black/50 via-transparent to-transparent px-4 pb-6 sm:pb-8">
