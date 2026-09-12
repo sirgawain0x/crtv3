@@ -407,6 +407,7 @@ const nextConfig = {
       "https://*.rpc.privy.systems",
       "https://explorer-api.walletconnect.com",
       "https://api.g.alchemy.com",
+      "https://www.gstatic.com",
       "https:",
       "wss:",
       "ws:",
@@ -420,6 +421,8 @@ const nextConfig = {
       "https://challenges.cloudflare.com",
       "https://va.vercel-scripts.com",
       "https://vercel.live",
+      // Chromecast Web Sender (CAF) for Creative TV living-room mode
+      "https://www.gstatic.com",
     ].join(" ");
 
     const mainCsp = [

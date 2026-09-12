@@ -12,6 +12,15 @@ export function proxy(req: NextRequest) {
     });
   }
 
+  // Living-room TV routes: strip primary site chrome (Bank/DAO/trading nav)
+  if (pathname.startsWith("/tv")) {
+    const requestHeaders = new Headers(req.headers);
+    requestHeaders.set("x-crtv-tv-route", "1");
+    return NextResponse.next({
+      request: { headers: requestHeaders },
+    });
+  }
+
   // CORS for API routes
   if (pathname.startsWith("/api")) {
     const origin = req.headers.get("origin");
@@ -51,5 +60,5 @@ export function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/api/:path*", "/embed/:path*"],
+  matcher: ["/api/:path*", "/embed/:path*", "/tv", "/tv/:path*"],
 };

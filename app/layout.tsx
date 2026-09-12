@@ -56,6 +56,8 @@ export default async function RootLayout({
 }>) {
   const headersList = await headers();
   const isEmbedRoute = headersList.get("x-crtv-embed-route") === "1";
+  const isTvRoute = headersList.get("x-crtv-tv-route") === "1";
+  const hideSiteChrome = isEmbedRoute || isTvRoute;
 
   return (
     <html lang="en" suppressHydrationWarning>
@@ -79,13 +81,13 @@ export default async function RootLayout({
         <LayoutClientChunks />
         <Providers>
           <ErrorBoundary>
-            {!isEmbedRoute ? <Navbar /> : null}
+            {!hideSiteChrome ? <Navbar /> : null}
             <div className="min-h-screen flex flex-col">
               <main className="flex-1">{children}</main>
-              {!isEmbedRoute ? <Footer /> : null}
+              {!hideSiteChrome ? <Footer /> : null}
             </div>
           </ErrorBoundary>
-          <CreativeGuideChat />
+          {!hideSiteChrome ? <CreativeGuideChat /> : null}
         </Providers>
         <Toaster />
         <Analytics />
