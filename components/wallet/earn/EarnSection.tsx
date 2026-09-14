@@ -8,6 +8,7 @@ import {
   ArrowUpFromLine,
   Copy,
   Check,
+  Gift,
   Wallet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -38,6 +39,7 @@ export function EarnSection({ isVisible, onSuccess, onTopUp }: EarnSectionProps)
     isConfigured,
     deposit,
     withdraw,
+    claim,
   } = useEarn({ isVisible });
 
   const [mode, setMode] = useState<"deposit" | "withdraw" | "topup" | null>(null);
@@ -60,6 +62,9 @@ export function EarnSection({ isVisible, onSuccess, onTopUp }: EarnSectionProps)
   const hasEmbeddedUsdc = Number.parseFloat(embeddedUsdcFormatted) > 0;
   const needsTopUp = !hasEmbeddedUsdc && !hasPosition;
   const embeddedAddress = embeddedWallet?.address ?? null;
+  const rewardsApr = Number.parseFloat(vault?.totalRewardsAprPercent ?? "0");
+  const canClaimRewards =
+    vault?.provider === "morpho" && rewardsApr > 0 && hasPosition;
 
   const handleDeposit = async () => {
     try {
@@ -74,6 +79,23 @@ export function EarnSection({ isVisible, onSuccess, onTopUp }: EarnSectionProps)
     } catch (err) {
       toast({
         title: "Deposit failed",
+        description: err instanceof Error ? err.message : "Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleClaim = async () => {
+    try {
+      await claim();
+      toast({
+        title: "Rewards claimed",
+        description: "Incentive tokens are on the way to your embedded wallet.",
+      });
+      onSuccess?.();
+    } catch (err) {
+      toast({
+        title: "Claim failed",
         description: err instanceof Error ? err.message : "Please try again.",
         variant: "destructive",
       });
@@ -130,6 +152,7 @@ export function EarnSection({ isVisible, onSuccess, onTopUp }: EarnSectionProps)
         {vault?.userApyPercent ? (
           <span className="text-xs text-green-600 dark:text-green-400">
             {vault.userApyPercent}% APY
+            {canClaimRewards ? ` +${vault.totalRewardsAprPercent}% rewards` : ""}
           </span>
         ) : null}
       </div>
@@ -224,6 +247,13 @@ export function EarnSection({ isVisible, onSuccess, onTopUp }: EarnSectionProps)
                 </div>
               ) : mode ? (
                 <div className="space-y-2 pt-1">
+                  {mode === "withdraw" &&
+                  vault?.availableLiquidityUsd === 0 ? (
+                    <p className="text-xs text-amber-600 dark:text-amber-400">
+                      Vault liquidity is currently limited. A large withdrawal
+                      may fail or only partially fill.
+                    </p>
+                  ) : null}
                   <Input
                     type="number"
                     min="0"
@@ -310,6 +340,22 @@ export function EarnSection({ isVisible, onSuccess, onTopUp }: EarnSectionProps)
                     <ArrowUpFromLine className="h-3.5 w-3.5" />
                     Withdraw
                   </Button>
+                  {canClaimRewards ? (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="col-span-2 flex items-center gap-1.5"
+                      disabled={isPending}
+                      onClick={() => void handleClaim()}
+                    >
+                      {isPending ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Gift className="h-3.5 w-3.5" />
+                      )}
+                      Claim rewards
+                    </Button>
+                  ) : null}
                 </div>
               )}
 
