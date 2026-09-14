@@ -37,7 +37,11 @@ import {
   type CreatorProfile,
 } from "@/lib/sdk/supabase/creator-profiles";
 import { useWalletAuth } from "@/lib/auth/useWalletAuth";
+import { useMembershipVerification } from "@/lib/hooks/unlock/useMembershipVerification";
+import { hasAnyValidPass } from "@/lib/access/creator-membership";
+import { getProfileMembershipUrl } from "@/lib/utils/profile-urls";
 import { logger } from "@/lib/utils/logger";
+import Link from "next/link";
 
 interface DigitalTwinSectionProps {
   ownerAddress: string;
@@ -102,6 +106,10 @@ export function DigitalTwinSection({
   onSaved,
 }: DigitalTwinSectionProps) {
   const { toast } = useToast();
+  const { membershipDetails, isLoading: membershipLoading } =
+    useMembershipVerification();
+  const canConnectAgent =
+    !isOwner || hasAnyValidPass(membershipDetails);
   const [twinEnabled, setTwinEnabled] = useState<boolean>(!!initialProfile?.twin_enabled);
   const [glbUrl, setGlbUrl] = useState<string>(initialProfile?.twin_avatar_glb_url || "");
   const [twinAddress, setTwinAddress] = useState<string>(initialProfile?.twin_address || "");
@@ -249,6 +257,12 @@ export function DigitalTwinSection({
   const handleConnect = async (e: React.FormEvent) => {
     e.preventDefault();
     setConnectError(null);
+    if (!canConnectAgent) {
+      setConnectError(
+        "A Creative Platform membership is required to connect a Pinata AI agent."
+      );
+      return;
+    }
     if (!agentIdInput.trim() || !jwtInput.trim()) {
       setConnectError("Both Agent ID and Pinata JWT are required");
       return;
@@ -352,8 +366,9 @@ export function DigitalTwinSection({
           Creative AI Digital Twin
         </CardTitle>
         <CardDescription>
-          Purchase and deploy your own AI agent on Pinata, then connect it here
-          so viewers can chat with your twin during streams.
+          Available with any Creative Platform membership. Purchase and deploy
+          your own AI agent on Pinata, then connect it here so viewers can chat
+          with your twin during streams.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -361,6 +376,23 @@ export function DigitalTwinSection({
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        {isOwner && !membershipLoading && !canConnectAgent && (
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <span>
+                Connect a Pinata AI agent with any Creator, Professional, or
+                Brand pass.
+              </span>
+              <Button asChild size="sm" variant="outline" className="shrink-0">
+                <Link href={getProfileMembershipUrl(ownerAddress)}>
+                  View memberships
+                </Link>
+              </Button>
+            </AlertDescription>
           </Alert>
         )}
 
@@ -564,7 +596,7 @@ export function DigitalTwinSection({
                         placeholder="xljs9fuy"
                         value={agentIdInput}
                         onChange={(e) => setAgentIdInput(e.target.value)}
-                        disabled={!isOwner || connecting}
+                        disabled={!isOwner || !canConnectAgent || connecting}
                       />
                     </div>
                     <div className="space-y-1.5">
@@ -577,7 +609,7 @@ export function DigitalTwinSection({
                         placeholder="eyJhbGciOi…"
                         value={jwtInput}
                         onChange={(e) => setJwtInput(e.target.value)}
-                        disabled={!isOwner || connecting}
+                        disabled={!isOwner || !canConnectAgent || connecting}
                         autoComplete="off"
                       />
                     </div>
@@ -587,7 +619,7 @@ export function DigitalTwinSection({
                       </Alert>
                     )}
                     {isOwner && (
-                      <Button type="submit" disabled={connecting} size="sm">
+                      <Button type="submit" disabled={!canConnectAgent || connecting} size="sm">
                         {connecting ? (
                           <Loader2 className="h-3 w-3 mr-1 animate-spin" />
                         ) : (

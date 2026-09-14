@@ -346,7 +346,7 @@ function CreatePrediction({
       quota.remaining <= 0
     ) {
       setFormError(
-        "You've reached your limit of 3 prediction markets this month (UTC). Investor or Brand members can create unlimited markets."
+        "You've reached your limit of 3 prediction markets this month (UTC). Professional or Brand members can create unlimited markets."
       );
       return;
     }
@@ -382,7 +382,7 @@ function CreatePrediction({
           fresh.remaining <= 0
         ) {
           setFormError(
-            "You've reached your limit of 3 prediction markets this month (UTC). Investor members can create unlimited markets."
+            "You've reached your limit of 3 prediction markets this month (UTC). Professional members can create unlimited markets."
           );
           setIsSubmitting(false);
           return;
@@ -703,7 +703,7 @@ function CreatePrediction({
                   <>
                     {quota.premiumTier === "investor" && (
                       <span>
-                        Creative Investor Pass: unlimited prediction markets.{" "}
+                        Creative Professional Pass: unlimited prediction markets.{" "}
                       </span>
                     )}
                     {quota.premiumTier === "brand" && (
@@ -726,7 +726,7 @@ function CreatePrediction({
                           href="/"
                           className="underline font-medium text-foreground"
                         >
-                          Upgrade to Investor or Brand
+                          Upgrade to Professional or Brand
                         </Link>{" "}
                         for unlimited markets.
                       </span>
@@ -736,7 +736,7 @@ function CreatePrediction({
                           href="/"
                           className="underline font-medium text-foreground"
                         >
-                          Upgrade to Investor or Brand
+                          Upgrade to Professional or Brand
                         </Link>{" "}
                         for unlimited markets.
                       </span>
