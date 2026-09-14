@@ -30,6 +30,19 @@ export function isEarnConfigured(): boolean {
   );
 }
 
+export function getPrivyWebhookSigningSecret(): string | undefined {
+  const secret = process.env.PRIVY_WEBHOOK_SIGNING_SECRET?.trim();
+  return secret || undefined;
+}
+
+export function isPrivyWebhookConfigured(): boolean {
+  return Boolean(
+    process.env.NEXT_PUBLIC_PRIVY_APP_ID &&
+      process.env.PRIVY_APP_SECRET &&
+      getPrivyWebhookSigningSecret(),
+  );
+}
+
 /** Convert basis points (e.g. 361) to a display percentage string (e.g. "3.61"). */
 export function basisPointsToPercent(bps: number | null | undefined): string | null {
   if (bps == null) return null;
