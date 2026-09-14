@@ -27,7 +27,7 @@ type CreatorStreamMeta = {
 /**
  * Profile CTA for live channels.
  * - Owner with Creator/Brand pass: "Go Live" → /live/[address]
- * - Visitors when a stream exists: "Watch" / "Live" → /live/[address]
+ * - Visitors when a stream exists: "Watch" / "Live" → /watch/[playback_id]
  */
 export function ProfileGoLiveButton({
   profileAddress,
@@ -94,7 +94,8 @@ export function ProfileGoLiveButton({
     (hasValidCreatorPass(membershipDetails) ||
       hasValidBrandPass(membershipDetails));
 
-  const hasStream = Boolean(stream?.playback_id);
+  const playbackId = stream?.playback_id ?? null;
+  const hasStream = Boolean(playbackId);
   const isLive = Boolean(stream?.is_live);
 
   if (streamLoading || (isOwner && membershipLoading)) {
@@ -105,7 +106,10 @@ export function ProfileGoLiveButton({
     return null;
   }
 
-  const href = `/live/${normalizedProfile}`;
+  // Owners go to the broadcast studio; visitors watch via playback (same as LivestreamGrid).
+  const href = canBroadcast
+    ? `/live/${normalizedProfile}`
+    : `/watch/${playbackId}`;
   const label = canBroadcast ? "Go Live" : isLive ? "Live" : "Watch";
   const buttonVariant =
     variant ?? (canBroadcast || isLive ? "default" : "outline");
