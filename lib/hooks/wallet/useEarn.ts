@@ -10,6 +10,9 @@ export type EarnVaultData = {
   userApyPercent: string | null;
   tvlUsd: number | null;
   availableLiquidityUsd: number | null;
+  totalRewardsAprPercent: string | null;
+  adminWalletId: string | null;
+  adminWalletAddress: string | null;
   assetSymbol: string;
   assetDecimals: number;
 };
@@ -68,11 +71,16 @@ async function authFetch(
   return payload;
 }
 
+type PolledEarnAction = {
+  status: EarnActionStatus;
+  failureReason: string | null;
+};
+
 async function pollEarnAction(
   getAccessToken: () => Promise<string | null>,
   actionId: string,
   walletId: string,
-): Promise<EarnActionStatus> {
+): Promise<PolledEarnAction> {
   const maxAttempts = 30;
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const payload = await authFetch(
@@ -80,7 +88,15 @@ async function pollEarnAction(
       `/api/earn/actions/${actionId}?walletId=${encodeURIComponent(walletId)}`,
     );
     const status = payload.action?.status as EarnActionStatus;
-    if (TERMINAL_STATUSES.has(status)) return status;
+    if (TERMINAL_STATUSES.has(status)) {
+      return {
+        status,
+        failureReason:
+          typeof payload.action?.failureReason === "string"
+            ? payload.action.failureReason
+            : null,
+      };
+    }
     await new Promise((resolve) => setTimeout(resolve, 2000));
   }
   throw new Error("Timed out waiting for transaction confirmation");
@@ -158,18 +174,21 @@ export function useEarn(options: { isVisible?: boolean } = {}) {
             body: JSON.stringify({ amount }),
           },
         );
-        const status = await pollEarnAction(
+        const { status, failureReason } = await pollEarnAction(
           getAccessTokenRef.current,
           payload.action.id,
           payload.walletId,
         );
         if (status === "rejected") {
           throw new Error(
-            "Deposit rejected — check your USDC balance and try again.",
+            failureReason ??
+              "Deposit rejected — check your USDC balance and try again.",
           );
         }
         if (status === "failed") {
-          throw new Error("Deposit failed onchain. Please try again.");
+          throw new Error(
+            failureReason ?? "Deposit failed onchain. Please try again.",
+          );
         }
         await refetch();
         return status;
@@ -198,16 +217,20 @@ export function useEarn(options: { isVisible?: boolean } = {}) {
             body: JSON.stringify(args),
           },
         );
-        const status = await pollEarnAction(
+        const { status, failureReason } = await pollEarnAction(
           getAccessTokenRef.current,
           payload.action.id,
           payload.walletId,
         );
         if (status === "rejected") {
-          throw new Error("Withdrawal rejected. Please try again.");
+          throw new Error(
+            failureReason ?? "Withdrawal rejected. Please try again.",
+          );
         }
         if (status === "failed") {
-          throw new Error("Withdrawal failed onchain. Please try again.");
+          throw new Error(
+            failureReason ?? "Withdrawal failed onchain. Please try again.",
+          );
         }
         await refetch();
         return status;
@@ -223,6 +246,43 @@ export function useEarn(options: { isVisible?: boolean } = {}) {
     [refetch],
   );
 
+  const claim = useCallback(async () => {
+    setIsPending(true);
+    setError(null);
+    try {
+      const payload = await authFetch(
+        getAccessTokenRef.current,
+        "/api/earn/claim",
+        { method: "POST" },
+      );
+      const { status, failureReason } = await pollEarnAction(
+        getAccessTokenRef.current,
+        payload.action.id,
+        payload.walletId,
+      );
+      if (status === "rejected") {
+        throw new Error(
+          failureReason ??
+            "No claimable rewards right now. Try again later.",
+        );
+      }
+      if (status === "failed") {
+        throw new Error(
+          failureReason ?? "Reward claim failed onchain. Please try again.",
+        );
+      }
+      await refetch();
+      return status;
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Reward claim failed";
+      setError(message);
+      throw err;
+    } finally {
+      setIsPending(false);
+    }
+  }, [refetch]);
+
   return {
     vault,
     position,
@@ -234,5 +294,6 @@ export function useEarn(options: { isVisible?: boolean } = {}) {
     refetch,
     deposit,
     withdraw,
+    claim,
   };
 }

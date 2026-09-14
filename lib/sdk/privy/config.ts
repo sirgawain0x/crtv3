@@ -22,6 +22,9 @@ export function getEarnVaultId(): string {
   return vaultId;
 }
 
+/** Earn deposits and incentive claims run on Base. */
+export const EARN_CLAIM_CHAIN = "base";
+
 export function isEarnConfigured(): boolean {
   return Boolean(
     process.env.NEXT_PUBLIC_PRIVY_APP_ID &&
