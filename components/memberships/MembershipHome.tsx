@@ -21,13 +21,13 @@ import {
 type HomeProps = {
   currentMembershipAddress?: string;
   onPurchaseSuccess?: () => void | Promise<void>;
-  onSwitchToBankTab?: () => void;
+  onSwitchToFinanceTab?: () => void;
 };
 
 export function MembershipHome({
   currentMembershipAddress,
   onPurchaseSuccess,
-  onSwitchToBankTab,
+  onSwitchToFinanceTab,
 }: HomeProps) {
   const user = useUser();
   const { chain } = useChain();
@@ -113,7 +113,7 @@ export function MembershipHome({
 
     if (parseFloat(usdcBalance) < parseFloat(tier.price)) {
       toast.error("Insufficient USDC balance. Add funds via your wallet to continue.");
-      onSwitchToBankTab?.();
+      onSwitchToFinanceTab?.();
       return;
     }
 

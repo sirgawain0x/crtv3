@@ -7,15 +7,13 @@ import { getAddress, isAddress } from "viem";
 export const PREDICTION_MARKETS_MONTHLY_LIMIT = 3;
 
 /**
- * Investor and Brand passes (MembershipHome naming).
+ * Professional and Brand passes (MembershipHome naming).
  * Creator tier shares the monthly limit with non-members.
  */
 export const UNLIMITED_PREDICTION_LOCK_ADDRESSES = new Set(
   [
     LOCK_ADDRESSES.BASE_CREATIVE_PASS_2,
-    LOCK_ADDRESSES.BASE_CREATIVE_INVESTOR_PLUS,
     LOCK_ADDRESSES.BASE_CREATIVE_PASS_3,
-    LOCK_ADDRESSES.BASE_CREATIVE_BRAND_PLUS,
   ].map((a) => a.toLowerCase())
 );
 
@@ -33,24 +31,16 @@ export function getPremiumPredictionAccess(
 ): { unlimited: boolean; tier: PredictionPremiumTier | null } {
   const valid = memberships.filter((m) => m.isValid);
 
-  const hasBrand = valid.some((m) => {
-    const a = m.address.toLowerCase();
-    return (
-      a === LOCK_ADDRESSES.BASE_CREATIVE_PASS_3.toLowerCase() ||
-      a === LOCK_ADDRESSES.BASE_CREATIVE_BRAND_PLUS.toLowerCase()
-    );
-  });
+  const hasBrand = valid.some(
+    (m) => m.address.toLowerCase() === LOCK_ADDRESSES.BASE_CREATIVE_PASS_3.toLowerCase()
+  );
   if (hasBrand) {
     return { unlimited: true, tier: "brand" };
   }
 
-  const hasInvestor = valid.some((m) => {
-    const a = m.address.toLowerCase();
-    return (
-      a === LOCK_ADDRESSES.BASE_CREATIVE_PASS_2.toLowerCase() ||
-      a === LOCK_ADDRESSES.BASE_CREATIVE_INVESTOR_PLUS.toLowerCase()
-    );
-  });
+  const hasInvestor = valid.some(
+    (m) => m.address.toLowerCase() === LOCK_ADDRESSES.BASE_CREATIVE_PASS_2.toLowerCase()
+  );
   if (hasInvestor) {
     return { unlimited: true, tier: "investor" };
   }
@@ -79,7 +69,6 @@ export async function countPredictionMarketsThisMonthUtc(
   }
 
   const start = startOfUtcMonth().toISOString();
-
   const { count, error } = await supabaseService
     .from("prediction_market_creations")
     .select("*", { count: "exact", head: true })

@@ -23,7 +23,7 @@ import { useMembershipContext } from "@/lib/context/MembershipContext";
 import type { MembershipDetails } from "@/lib/hooks/unlock/useMembershipVerification";
 import { MeTokensSection } from "./MeTokensSection";
 import { UserDisplay } from "@/components/User/UserDisplay";
-import { CreativeBankTab } from "./CreativeBankTab";
+import { CreativeFinanceTab } from "./CreativeFinanceTab";
 import { MembershipHome } from "@/components/memberships/MembershipHome";
 import { CancelMembershipButton } from "./CancelMembershipButton";
 import { getPassDisplayName } from "@/lib/access/membership-labels";
@@ -106,8 +106,8 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
     );
   };
 
-  const switchToBankTab = () => {
-    handleTabChange("Bank");
+  const switchToFinanceTab = () => {
+    handleTabChange("Finance");
   };
 
   const validMembership = (
@@ -156,10 +156,10 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
               MeTokens
             </TabsTrigger>
             <TabsTrigger
-              value="Bank"
+              value="Finance"
               className="flex-shrink-0 rounded-md px-3 py-2 text-sm font-medium"
             >
-              Bank
+              Finance
             </TabsTrigger>
             <TabsTrigger
               value="Membership"
@@ -208,8 +208,8 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
               <MeTokensSection walletAddress={displayAddress} />
             </TabsContent>
 
-            <TabsContent value="Bank">
-              <CreativeBankTab />
+            <TabsContent value="Finance">
+              <CreativeFinanceTab />
             </TabsContent>
 
             {/* Membership Tab Content */}
@@ -300,7 +300,7 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
                       <MembershipHome
                         currentMembershipAddress={validMembership.address}
                         onPurchaseSuccess={refetchMembership}
-                        onSwitchToBankTab={switchToBankTab}
+                        onSwitchToFinanceTab={switchToFinanceTab}
                       />
                     </div>
                   </CardContent>
@@ -308,7 +308,7 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
               ) : (
                 <MembershipHome
                   onPurchaseSuccess={refetchMembership}
-                  onSwitchToBankTab={switchToBankTab}
+                  onSwitchToFinanceTab={switchToFinanceTab}
                 />
               )}
             </TabsContent>

@@ -4,6 +4,7 @@ import Link from "next/link";
 import {
   LayoutGrid,
   Newspaper,
+  BookOpen,
   Tv,
   Bot,
   Landmark,
@@ -30,6 +31,12 @@ const CREATIVE_PLATFORM_APPS = [
     href: "https://news.creativeplatform.xyz",
     icon: Newspaper,
     description: "Stories and updates from the platform",
+  },
+  {
+    name: "Books",
+    href: "https://books.creativeplatform.xyz",
+    icon: BookOpen,
+    description: "Read and publish creative books",
   },
   {
     name: "TV",

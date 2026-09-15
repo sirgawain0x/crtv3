@@ -17,45 +17,33 @@ function hasValidLock(
 }
 
 /**
- * Creative Creator Pass (or legacy Creator Plus) — blocked from prediction
- * create/bet (anti-cheat). Plus locks remain recognized for existing holders.
+ * Creative Creator Pass — blocked from prediction create/bet (anti-cheat).
  */
 export function hasValidCreatorPass(
   memberships: MembershipLike[] | null | undefined
 ): boolean {
-  return hasValidLock(memberships, [
-    LOCK_ADDRESSES.BASE_CREATIVE_PASS,
-    LOCK_ADDRESSES.BASE_CREATIVE_CREATOR_PLUS,
-  ]);
+  return hasValidLock(memberships, [LOCK_ADDRESSES.BASE_CREATIVE_PASS]);
 }
 
 /**
- * Brand pass (or legacy Brand Plus) — required to create Snapshot campaigns
- * (plus admin). Plus locks remain recognized for existing holders.
+ * Brand pass — required to create Snapshot campaigns (plus admin).
  */
 export function hasValidBrandPass(
   memberships: MembershipLike[] | null | undefined
 ): boolean {
-  return hasValidLock(memberships, [
-    LOCK_ADDRESSES.BASE_CREATIVE_PASS_3,
-    LOCK_ADDRESSES.BASE_CREATIVE_BRAND_PLUS,
-  ]);
+  return hasValidLock(memberships, [LOCK_ADDRESSES.BASE_CREATIVE_PASS_3]);
 }
 
 /**
- * Investor pass (or legacy Investor Plus) — unlimited predictions, but no
- * live/campaign access. Plus locks remain recognized for existing holders.
+ * Professional pass — unlimited predictions, but no live/campaign access.
  */
 export function hasValidInvestorPass(
   memberships: MembershipLike[] | null | undefined
 ): boolean {
-  return hasValidLock(memberships, [
-    LOCK_ADDRESSES.BASE_CREATIVE_PASS_2,
-    LOCK_ADDRESSES.BASE_CREATIVE_INVESTOR_PLUS,
-  ]);
+  return hasValidLock(memberships, [LOCK_ADDRESSES.BASE_CREATIVE_PASS_2]);
 }
 
-/** Any paid Creative Platform pass (base or legacy Plus). */
+/** Any paid Creative Platform pass. */
 export function hasAnyValidPass(
   memberships: MembershipLike[] | null | undefined
 ): boolean {

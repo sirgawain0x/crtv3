@@ -1770,7 +1770,7 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
                         </Link>
                       )}
 
-                      {/* Predict: non-members + Investor; blocked for Creator or Brand pass holders */}
+                      {/* Predict: non-members + Professional; blocked for Creator or Brand pass holders */}
                       {!hasValidCreatorPass(membershipDetails) && !hasValidBrandPass(membershipDetails) && (
                         <Link href="/predict/create" className="w-full">
                           <Button
