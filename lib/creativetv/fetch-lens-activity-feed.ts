@@ -11,7 +11,7 @@ const DEFAULT_LIMIT = 12;
 export async function fetchCreativeTVLensActivityFeed(
   limit = DEFAULT_LIMIT,
 ): Promise<CreativeTVLensActivityResult> {
-  const apiKey = process.env.LENS_API_KEY?.trim();
+  const apiKey = process.env.LENS_SERVER_API_KEY?.trim();
   if (!apiKey) {
     return { items: [], skipStrip: true };
   }
