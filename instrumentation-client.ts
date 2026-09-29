@@ -1,4 +1,7 @@
 import { initBotId } from 'botid/client/core';
+import { runRealityLocalStorageSecurityMigration } from '@/lib/predictions/reality-localstorage-security';
+
+runRealityLocalStorageSecurityMigration();
 
 /**
  * BotID protected routes: client attaches headers for these paths so server
