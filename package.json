@@ -92,7 +92,7 @@
     "@react-three/drei": "^9.114.0",
     "@react-three/fiber": "^8.17.10",
     "@reality.eth/contracts": "^3.2.25",
-    "@reality.eth/reality-eth-lib": "^3.4.28",
+    "@reality.eth/reality-eth-lib": "^3.4.32",
     "@simplewebauthn/browser": "^13.1.0",
     "@snapshot-labs/snapshot.js": "^0.14.18",
     "@solana-program/system": "^0.8.0",
@@ -198,10 +198,12 @@
       "next@16.2.4": "patches/next@16.2.4.patch"
     },
     "overrides": {
-      "viem": "2.48.8"
+      "viem": "2.48.8",
+      "@reality.eth/reality-eth-lib": "3.4.32"
     }
   },
   "resolutions": {
+    "@reality.eth/reality-eth-lib": "3.4.32",
     "@lens-protocol/client": "0.0.0-canary-20250820102520",
     "@lens-protocol/env": "0.0.0-canary-20250820102520",
     "@lens-protocol/graphql": "0.0.0-canary-20250820102520",
