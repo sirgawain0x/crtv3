@@ -37,6 +37,8 @@ function oauthHeader(config: TwitterOAuthConfig, method: string, url: string): s
   const signingKey = `${percentEncode(config.consumerSecret)}&${percentEncode(
     config.accessTokenSecret,
   )}`;
+  // Twitter API v1.1 OAuth 1.0a mandates HMAC-SHA1 request signing (not password hashing).
+  // codeql[js/insufficient-password-hash]
   const signature = crypto
     .createHmac("sha1", signingKey)
     .update(baseString)
