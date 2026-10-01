@@ -8,8 +8,13 @@ declare module "@reality.eth/reality-eth-lib/formatters/question.js" {
   ): string;
   export function populatedJSONForTemplate(
     templateText: string,
-    questionText: string
+    questionText: string,
+    lenient?: boolean
   ): Record<string, unknown>;
+  export function getAnswerString(
+    questionJson: Record<string, unknown>,
+    answerBytes: string
+  ): string;
 }
 
 declare module "@reality.eth/reality-eth-lib/formatters/template.js" {

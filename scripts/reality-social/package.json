@@ -1,0 +1,16 @@
+{
+  "name": "creativetv-reality-social",
+  "private": true,
+  "type": "module",
+  "description": "Optional wrappers around @reality.eth/twitter-bot and @reality.eth/mastodon-bot",
+  "scripts": {
+    "twitter:init": "node node_modules/@reality.eth/twitter-bot/index.js 8453 init",
+    "twitter:run": "node node_modules/@reality.eth/twitter-bot/index.js 8453",
+    "mastodon:init": "node node_modules/@reality.eth/mastodon-bot/index.js 8453 init",
+    "mastodon:run": "node node_modules/@reality.eth/mastodon-bot/index.js 8453"
+  },
+  "dependencies": {
+    "@reality.eth/mastodon-bot": "1.2.33",
+    "@reality.eth/twitter-bot": "1.2.33"
+  }
+}

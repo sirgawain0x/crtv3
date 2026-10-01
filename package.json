@@ -91,8 +91,8 @@
     "@radix-ui/react-visually-hidden": "^1.1.2",
     "@react-three/drei": "^9.114.0",
     "@react-three/fiber": "^8.17.10",
-    "@reality.eth/contracts": "^3.2.25",
-    "@reality.eth/reality-eth-lib": "^3.4.32",
+    "@reality.eth/contracts": "^3.2.30",
+    "@reality.eth/reality-eth-lib": "^3.4.34",
     "@simplewebauthn/browser": "^13.1.0",
     "@snapshot-labs/snapshot.js": "^0.14.18",
     "@solana-program/system": "^0.8.0",
@@ -199,11 +199,11 @@
     },
     "overrides": {
       "viem": "2.48.8",
-      "@reality.eth/reality-eth-lib": "3.4.32"
+      "@reality.eth/reality-eth-lib": "3.4.34"
     }
   },
   "resolutions": {
-    "@reality.eth/reality-eth-lib": "3.4.32",
+    "@reality.eth/reality-eth-lib": "3.4.34",
     "@lens-protocol/client": "0.0.0-canary-20250820102520",
     "@lens-protocol/env": "0.0.0-canary-20250820102520",
     "@lens-protocol/graphql": "0.0.0-canary-20250820102520",
