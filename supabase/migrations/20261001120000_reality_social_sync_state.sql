@@ -1,4 +1,6 @@
 -- Tracks Reality.eth social bot cursor per chain (mirrors upstream bot state/*.json).
+-- IF NOT EXISTS: if an older table row exists without these CHECKs, use a follow-up ALTER migration
+-- (this file will not retro-fit column constraints). Grants, function, and trigger still apply on re-run.
 create table if not exists public.reality_social_sync_state (
   chain_id integer primary key,
   last_timestamp bigint not null default 0,
