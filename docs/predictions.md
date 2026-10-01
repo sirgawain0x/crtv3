@@ -190,7 +190,10 @@ New questions and finalized answers can be dual-posted automatically:
 - **Hosted cron:** `GET /api/predictions/social-sync/cron` (Bearer `CRON_SECRET`) uses `lib/reality-social/*`, links to `/predict/{id}`, and stores cursors in Supabase.
 - **Upstream bots:** Optional CLI packages in `scripts/reality-social/` ([@reality.eth/twitter-bot](https://www.npmjs.com/package/@reality.eth/twitter-bot), [@reality.eth/mastodon-bot](https://www.npmjs.com/package/@reality.eth/mastodon-bot)).
 
-Prioritize **X** for reach; enable **Mastodon** as a low-cost secondary channel with transparency-focused copy and `#OpenData` hashtags. See [scripts/reality-social/README.md](../scripts/reality-social/README.md).
+Prioritize **X** for reach; enable **Mastodon** as a low-cost secondary channel with transparency-focused copy and `#OpenData` hashtags.
+
+- **X setup spec (developer portal, tokens, prod checklist):** [reality-social-twitter-integration.md](./reality-social-twitter-integration.md)
+- **Overview + Mastodon (later):** [scripts/reality-social/README.md](../scripts/reality-social/README.md)
 
 ## Environment
 
