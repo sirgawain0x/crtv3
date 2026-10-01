@@ -1,7 +1,8 @@
 import "server-only";
-import Twit from "twit";
+import type Twit from "twit";
 
-function loadTwitterClient(): Twit {
+async function loadTwitterClient(): Promise<Twit> {
+  const { default: TwitCtor } = await import("twit");
   const consumer_key = process.env.TWITTER_CONSUMER_KEY ?? "";
   const consumer_secret = process.env.TWITTER_CONSUMER_SECRET ?? "";
   const access_token = process.env.TWITTER_ACCESS_TOKEN ?? "";
@@ -11,7 +12,7 @@ function loadTwitterClient(): Twit {
     throw new Error("Twitter credentials are not configured");
   }
 
-  return new Twit({
+  return new TwitCtor({
     consumer_key,
     consumer_secret,
     access_token,
@@ -21,7 +22,7 @@ function loadTwitterClient(): Twit {
 
 /** Posts a status via Twitter API v1.1 (same client as @reality.eth/twitter-bot). */
 export async function postTwitterStatus(status: string): Promise<void> {
-  const client = loadTwitterClient();
+  const client = await loadTwitterClient();
 
   await new Promise<void>((resolve, reject) => {
     client.post("statuses/update", { status }, (error, _data, response) => {
