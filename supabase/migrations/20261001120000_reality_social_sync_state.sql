@@ -3,7 +3,11 @@ create table if not exists public.reality_social_sync_state (
   chain_id integer primary key,
   last_timestamp bigint not null default 0,
   last_index integer not null default 0,
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default pg_catalog.now(),
+  constraint reality_social_sync_state_chain_id_positive check (chain_id > 0),
+  constraint reality_social_sync_state_last_timestamp_non_negative
+    check (last_timestamp >= 0),
+  constraint reality_social_sync_state_last_index_non_negative check (last_index >= 0)
 );
 
 alter table public.reality_social_sync_state enable row level security;
@@ -18,10 +22,15 @@ language plpgsql
 set search_path = ''
 as $$
 begin
-  new.updated_at = now();
+  new.updated_at = pg_catalog.now();
   return new;
 end;
 $$;
+
+revoke all on function public.set_reality_social_sync_state_updated_at()
+  from public, anon, authenticated;
+grant execute on function public.set_reality_social_sync_state_updated_at()
+  to service_role;
 
 drop trigger if exists reality_social_sync_state_updated_at on public.reality_social_sync_state;
 create trigger reality_social_sync_state_updated_at
