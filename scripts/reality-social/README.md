@@ -31,7 +31,7 @@ The app includes **`GET /api/predictions/social-sync/cron`**, which:
 | `REALITY_SOCIAL_NOOP` | `true` logs payloads without posting |
 | `REALITY_SOCIAL_MAX_POSTS_PER_RUN` | Cap posts per invocation (default `5`, max `25`) |
 
-Apply migration `supabase/migrations/20261001120000_reality_social_sync_state.sql`.
+Apply the database migration in **[PR #354](https://github.com/sirgawain0x/crtv3/pull/354)** (`20261001120000_reality_social_sync_state.sql`) before enabling the hosted cron.
 
 ### First run
 

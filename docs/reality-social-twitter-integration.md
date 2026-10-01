@@ -120,7 +120,7 @@ Keep this aligned with actual behavior — portal use case is contractually bind
 | `SUPABASE_SERVICE_ROLE_KEY` | Writes sync cursor to `reality_social_sync_state` |
 | Subgraph vars | Same as predictions (`GRAPH_STUDIO_CREATIVE_PLATFORM_URL`, etc.) |
 
-Apply migration: `supabase/migrations/20261001120000_reality_social_sync_state.sql` (RLS on with no client policies; table and trigger function privileges limited to `service_role`; `updated_at` via trigger + app upsert; non-negative cursor checks).
+**Database (separate PR):** Apply [PR #354](https://github.com/sirgawain0x/crtv3/pull/354) first — migration `supabase/migrations/20261001120000_reality_social_sync_state.sql` (service-role-only table, CHECK constraints, `updated_at` trigger).
 
 ### 4.3 Optional tuning (Twitter)
 
@@ -152,7 +152,7 @@ We intentionally match **@reality.eth/twitter-bot** behavior. Migrating to **API
 
 ### Step A — Database
 
-1. Run Supabase migration `20261001120000_reality_social_sync_state.sql` on production.
+1. Merge and apply **PR #354** (Supabase migration) on production before enabling the cron.
 
 ### Step B — Vercel (or host) secrets
 
