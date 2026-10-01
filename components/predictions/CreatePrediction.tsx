@@ -422,6 +422,64 @@ function CreatePrediction({
       }
       // For uint type, outcomes can be undefined
 
+      // Decision-model gate: type/category/clarity/resolvability only.
+      // Never used to settle Reality.eth markets. Soft-fail if the API is down.
+      try {
+        const gateRes = await fetch("/api/predictions/gate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: values.title,
+            description: values.description,
+            questionType: values.type,
+            outcomes: finalOutcomes,
+            category: values.category || "general",
+            closeDate: values.closeDate,
+            closeTime: values.closeTime,
+          }),
+        });
+        if (gateRes.ok) {
+          const gateJson = (await gateRes.json()) as {
+            decision?: {
+              blockCreate?: boolean;
+              reasons?: string[];
+              suggestedType?: string | null;
+              suggestedCategory?: string | null;
+              clarityScore?: number | null;
+            };
+          };
+          const decision = gateJson.decision;
+          if (decision?.blockCreate) {
+            setFormError(
+              decision.reasons?.[0] ||
+                "This question looks too ambiguous to create a fair market. Please clarify resolution criteria."
+            );
+            setIsSubmitting(false);
+            return;
+          }
+          if (
+            decision?.suggestedCategory &&
+            (!values.category || values.category === "general")
+          ) {
+            form.setValue(
+              "category",
+              decision.suggestedCategory as PredictionCategoryValue
+            );
+          }
+          if (
+            decision?.reasons?.length &&
+            !decision.blockCreate &&
+            (decision.clarityScore ?? 3) < 1.5
+          ) {
+            toast.message("Market clarity tip", {
+              description: decision.reasons[0],
+            });
+          }
+        }
+      } catch (gateErr) {
+        logger.warn("Prediction gate skipped:", gateErr);
+      }
+
       const questionData: QuestionData = {
         type: values.type,
         title: values.title,

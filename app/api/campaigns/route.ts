@@ -9,6 +9,7 @@ import {
   insertShoppableProductKit,
 } from "@/lib/sdk/supabase/shoppable-campaigns";
 import { serverLogger } from "@/lib/utils/logger";
+import { evaluateCampaignDraft } from "@/lib/decision-models/campaign-gate";
 
 /**
  * POST /api/campaigns
@@ -86,6 +87,33 @@ export async function POST(req: NextRequest) {
       ? grove.hash
       : `ipfs://${grove.hash}`;
 
+    // Decision-model gate (nimble when configured): policy/quality/niche only.
+    // Does not write copy or replace Gemini product-in-video detection.
+    // Campaigns still start as Snapshot-pending; gate is advisory metadata.
+    const decision = await evaluateCampaignDraft({
+      brandName: body.brandName,
+      brandHandle: body.brandHandle,
+      campaignTitle: body.campaignTitle,
+      campaignDescription: body.campaignDescription,
+      purchaseUrl: body.purchaseUrl,
+      productImageUrl: body.productImageUrl,
+      startDate: body.startDate,
+      endDate: body.endDate,
+      targetCreator: body.targetCreator,
+      budgetUsdc: body.budgetUsdc,
+    });
+
+    if (decision.evaluated && !decision.brandSafe) {
+      return NextResponse.json(
+        {
+          error: "Campaign failed brand-safety review",
+          code: "CAMPAIGN_GATE_REJECTED",
+          decision,
+        },
+        { status: 422 }
+      );
+    }
+
     const campaign = await insertShoppableCampaign({
       brandAddress,
       creatorAddress: body.targetCreator,
@@ -113,6 +141,7 @@ export async function POST(req: NextRequest) {
       ipfsUri,
       hash: grove.hash,
       url: grove.url,
+      decision,
     });
   } catch (error) {
     serverLogger.error("[POST /api/campaigns] failed:", error);

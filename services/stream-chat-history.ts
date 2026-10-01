@@ -5,6 +5,11 @@ import {
   verifyWalletAuthArgs,
   type WalletAuthArgs,
 } from "../lib/auth/require-wallet";
+import {
+  ChatModerationBlockedError,
+  moderateChatMessage,
+} from "@/lib/decision-models/chat-moderation";
+import { serverLogger } from "@/lib/utils/logger";
 
 import { TokenSymbol } from "@/lib/hooks/video/useVideoTip";
 
@@ -48,6 +53,31 @@ export async function recordChatMessage(
   auth: WalletAuthArgs
 ) {
   await verifyWalletAuthArgs(auth);
+
+  // Decision-model spam/toxicity filter (when OLLAMA_BASE_URL is set).
+  // Does not ban wallets — human moderators remain the authority.
+  if ((input.messageType ?? "text") === "text") {
+    const moderation = await moderateChatMessage({
+      content: input.content,
+      streamId: input.streamId,
+      senderInboxId: input.senderInboxId,
+    });
+    if (moderation.blockPersist) {
+      throw new ChatModerationBlockedError(
+        "Message blocked by chat safety filter",
+        moderation
+      );
+    }
+    if (moderation.flagged) {
+      serverLogger.info("[stream-chat-history] message flagged for review", {
+        streamId: input.streamId,
+        messageId: input.messageId,
+        toxicProbability: moderation.toxicProbability,
+        spamScore: moderation.spamScore,
+      });
+    }
+  }
+
   const supabase = createServiceClient();
   const sentAt =
     typeof input.sentAt === "string" ? input.sentAt : input.sentAt.toISOString();
@@ -76,9 +106,33 @@ export async function recordChatMessages(
 ) {
   if (inputs.length === 0) return;
   await verifyWalletAuthArgs(auth);
+
+  const allowed: RecordChatMessageInput[] = [];
+  for (const input of inputs) {
+    if ((input.messageType ?? "text") !== "text") {
+      allowed.push(input);
+      continue;
+    }
+    const moderation = await moderateChatMessage({
+      content: input.content,
+      streamId: input.streamId,
+      senderInboxId: input.senderInboxId,
+    });
+    if (moderation.blockPersist) {
+      serverLogger.info("[stream-chat-history] batch skip blocked message", {
+        streamId: input.streamId,
+        messageId: input.messageId,
+      });
+      continue;
+    }
+    allowed.push(input);
+  }
+
+  if (allowed.length === 0) return;
+
   const supabase = createServiceClient();
 
-  const rows = inputs.map((input) => ({
+  const rows = allowed.map((input) => ({
     stream_id: input.streamId,
     message_id: input.messageId,
     sender_inbox_id: input.senderInboxId,

@@ -106,6 +106,20 @@ export function CreateShoppableCampaign() {
         );
       }
 
+      if (created?.decision?.review === "needs_review") {
+        toast.message("Campaign queued for review", {
+          description:
+            created.decision.reasons?.[0] ||
+            "Decision checks flagged this draft for human review before going live.",
+        });
+      } else if (created?.decision?.review === "auto_eligible") {
+        toast.success(
+          created.decision.niche
+            ? `Campaign looks strong for ${created.decision.niche} creators`
+            : "Campaign passed automated quality checks"
+        );
+      }
+
       const publicClient = createPublicClient({
         chain: base,
         transport: alchemy({ apiKey: process.env.NEXT_PUBLIC_ALCHEMY_API_KEY! }),

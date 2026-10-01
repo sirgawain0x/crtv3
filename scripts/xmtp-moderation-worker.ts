@@ -23,6 +23,9 @@
  *   STREAM_ID_RESOLVER_URL (optional) HTTPS endpoint that maps an XMTP group
  *                                     id to a stream id; falls back to the
  *                                     conversation id.
+ *   OLLAMA_BASE_URL (optional)        When set, skip persisting high-confidence
+ *                                     toxic/spam messages via /v1/systemone.
+ *   OLLAMA_DECISION_MODEL_STRICT      Default nimble (policy/moderation model).
  *
  * Install (once, in a deploy package separate from the Next.js app):
  *   npm i @xmtp/node-sdk @supabase/supabase-js viem dotenv
@@ -149,6 +152,63 @@ async function resolveStreamId(
   return (data?.stream_id as string) || conversationId;
 }
 
+/**
+ * Optional decision-model filter (Ollama /v1/systemone). Kept inline so this
+ * standalone worker does not import the Next.js app. Human bans remain authority.
+ */
+async function shouldBlockPersist(content: string): Promise<boolean> {
+  const baseUrl = process.env.OLLAMA_BASE_URL?.replace(/\/+$/, "");
+  if (!baseUrl || content.trim().length < 2) return false;
+  const model =
+    process.env.OLLAMA_DECISION_MODEL_STRICT?.trim() ||
+    process.env.OLLAMA_DECISION_MODEL?.trim() ||
+    "nimble";
+  try {
+    const res = await fetch(`${baseUrl}/v1/systemone`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model,
+        state: { message: content.slice(0, 2000) },
+        questions: {
+          toxic: {
+            type: "noul",
+            instructions:
+              "Is this live-stream chat message toxic, hateful, harassing, or clearly abusive?",
+          },
+          spam: {
+            type: "score",
+            instructions: "How spammy or scam-like is this chat message?",
+            criteria: [
+              "Normal conversation",
+              "Mildly repetitive or promotional",
+              "Likely spam or low-signal flooding",
+              "Clear spam / scam / abuse flood",
+            ],
+          },
+        },
+      }),
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (!res.ok) return false;
+    const json = (await res.json()) as {
+      answers?: {
+        toxic?: { noul?: number };
+        spam?: { score?: number };
+      };
+    };
+    const toxic = json.answers?.toxic?.noul;
+    const spam = json.answers?.spam?.score;
+    return (
+      (typeof toxic === "number" && toxic >= 0.85) ||
+      (typeof spam === "number" && spam >= 2.5)
+    );
+  } catch (err) {
+    console.warn("[moderation] decision model skipped:", err);
+    return false;
+  }
+}
+
 async function persistMessage(
   supabase: ReturnType<typeof createClient>,
   streamId: string,
@@ -159,6 +219,16 @@ async function persistMessage(
       ? message.content
       : JSON.stringify(message.content);
   const sentAt = new Date(Number(message.sentAtNs / BigInt(1_000_000)));
+
+  if (await shouldBlockPersist(content)) {
+    console.log(
+      "[persist] skipped blocked message",
+      message.id,
+      "on",
+      streamId
+    );
+    return;
+  }
 
   const { error } = await supabase.from("stream_chat_messages").upsert(
     {
