@@ -1,4 +1,3 @@
-import * as realityQuestion from "@reality.eth/reality-eth-lib/formatters/question.js";
 import { formatUnits } from "viem";
 import { buildContractTokenMap } from "@/lib/reality-social/contract-map";
 import {
@@ -39,6 +38,7 @@ export async function syncRealitySocialForChain(
   chainId: number,
   options?: { init?: boolean },
 ): Promise<ChainSyncResult> {
+  const realityQuestion = await import("@reality.eth/reality-eth-lib/formatters/question.js");
   const config = getRealitySocialConfig();
   const { contractTokens, tokenDecimals } = buildContractTokenMap(chainId);
 
