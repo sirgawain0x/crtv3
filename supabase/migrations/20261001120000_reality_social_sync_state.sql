@@ -8,5 +8,25 @@ create table if not exists public.reality_social_sync_state (
 
 alter table public.reality_social_sync_state enable row level security;
 
+-- Service-role-only: no RLS policies for anon/authenticated; explicit grants below.
+revoke all on table public.reality_social_sync_state from public, anon, authenticated;
+grant all on table public.reality_social_sync_state to service_role;
+
+create or replace function public.set_reality_social_sync_state_updated_at()
+returns trigger
+language plpgsql
+set search_path = ''
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+drop trigger if exists reality_social_sync_state_updated_at on public.reality_social_sync_state;
+create trigger reality_social_sync_state_updated_at
+  before update on public.reality_social_sync_state
+  for each row execute function public.set_reality_social_sync_state_updated_at();
+
 comment on table public.reality_social_sync_state is
   'Cursor for /api/predictions/social-sync/cron (Twitter + Mastodon dual-post). Service role only.';
