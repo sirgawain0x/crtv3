@@ -206,6 +206,7 @@
   },
   "resolutions": {
     "@reality.eth/reality-eth-lib": "3.4.34",
+    "html-encoding-sniffer": "4.0.0",
     "@lens-protocol/client": "0.0.0-canary-20250820102520",
     "@lens-protocol/env": "0.0.0-canary-20250820102520",
     "@lens-protocol/graphql": "0.0.0-canary-20250820102520",

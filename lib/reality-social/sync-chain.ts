@@ -18,6 +18,10 @@ import {
   saveChainSyncState,
   type ChainSyncState,
 } from "@/lib/reality-social/state";
+import {
+  answerStringLocal,
+  parseQuestionLocal,
+} from "@/lib/reality-social/parse-question-local";
 import { serverLogger } from "@/lib/utils/logger";
 
 export type ChainSyncResult = {
@@ -38,7 +42,9 @@ export async function syncRealitySocialForChain(
   chainId: number,
   options?: { init?: boolean },
 ): Promise<ChainSyncResult> {
-  const realityQuestion = await import("@reality.eth/reality-eth-lib/formatters/question.js");
+  // Do NOT import @reality.eth/reality-eth-lib here — its isomorphic-dompurify →
+  // jsdom → html-encoding-sniffer → @exodus/bytes chain throws ERR_REQUIRE_ESM
+  // on Vercel Node. Local unit-sep parsing is enough for social post text.
   const config = getRealitySocialConfig();
   const { contractTokens, tokenDecimals } = buildContractTokenMap(chainId);
 
@@ -82,29 +88,13 @@ export async function syncRealitySocialForChain(
       continue;
     }
 
-    let questionJson: Record<string, unknown>;
-    try {
-      questionJson = realityQuestion.populatedJSONForTemplate(
-        templateText,
-        q.data,
-        true,
-      ) as Record<string, unknown>;
-    } catch {
+    const parsed = parseQuestionLocal(q.data, templateText);
+    if (!parsed?.title) {
       result.skipped += 1;
       continue;
     }
 
-    if ("errors" in questionJson) {
-      result.skipped += 1;
-      continue;
-    }
-
-    const title = typeof questionJson.title === "string" ? questionJson.title : "";
-    if (!title) {
-      result.skipped += 1;
-      continue;
-    }
-
+    const title = parsed.title;
     const token = contractTokens[q.contract.toLowerCase()];
     const decimals = token ? tokenDecimals[token] : 18;
     const url = buildCreativeTvQuestionUrl(config.siteBaseUrl, q.id);
@@ -115,7 +105,7 @@ export async function syncRealitySocialForChain(
     let seenTs = Number(q.createdTimestamp);
 
     if (q.currentAnswerTimestamp && Number(q.currentAnswerTimestamp) > 0 && q.currentAnswer) {
-      answerText = realityQuestion.getAnswerString(questionJson, q.currentAnswer);
+      answerText = answerStringLocal(parsed, q.currentAnswer);
       seenTs = Number(q.currentAnswerTimestamp);
       if (q.currentAnswerBond && token) {
         bondText = `(${formatTokenAmount(q.currentAnswerBond, decimals, token)})`;
