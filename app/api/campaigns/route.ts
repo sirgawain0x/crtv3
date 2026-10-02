@@ -10,10 +10,19 @@ import {
 } from "@/lib/sdk/supabase/shoppable-campaigns";
 import { serverLogger } from "@/lib/utils/logger";
 import { evaluateCampaignDraft } from "@/lib/decision-models/campaign-gate";
+import { isDecisionModelConfigured } from "@/lib/decision-models/config";
+import {
+  CAMPAIGN_GATE_PRICE,
+  DECISION_GATE_PAYMENT_MAX_AGE_MS,
+  DECISION_GATE_RECIPIENT,
+  paymentRequiredBody,
+} from "@/lib/decision-models/billing";
+import { verifyUsdcPaymentProof } from "@/lib/payments/verify-usdc-payment";
 
 /**
  * POST /api/campaigns
  * Brand creates a pending shoppable campaign + Grove product kit.
+ * When TypeSafe Jev is configured, AI review requires x402 USDC payment proof.
  */
 export async function POST(req: NextRequest) {
   const verification = await checkBotIdDeep();
@@ -52,6 +61,32 @@ export async function POST(req: NextRequest) {
         );
       }
       throw authErr;
+    }
+
+    const paymentProof = (json as { paymentProof?: { transactionHash?: string; amount?: string } })
+      .paymentProof;
+    const aiReviewEnabled = isDecisionModelConfigured();
+
+    if (aiReviewEnabled) {
+      if (!paymentProof?.transactionHash || !paymentProof?.amount) {
+        return NextResponse.json(paymentRequiredBody("campaign-gate"), {
+          status: 402,
+        });
+      }
+      const paymentVerification = await verifyUsdcPaymentProof({
+        transactionHash: paymentProof.transactionHash,
+        amount: paymentProof.amount,
+        recipient: DECISION_GATE_RECIPIENT,
+        requiredAmount: CAMPAIGN_GATE_PRICE,
+        maxAgeMs: DECISION_GATE_PAYMENT_MAX_AGE_MS,
+        logLabel: "CampaignGate",
+      });
+      if (!paymentVerification.valid) {
+        return NextResponse.json(
+          { error: paymentVerification.error ?? "Invalid payment proof" },
+          { status: 402 }
+        );
+      }
     }
 
     const grovePayload = {

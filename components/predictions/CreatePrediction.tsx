@@ -37,6 +37,7 @@ import type { QuestionType, QuestionData } from "@/lib/sdk/reality-eth/reality-e
 import { logger } from "@/lib/utils/logger";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { usePredictionAccess } from "@/lib/hooks/predictions/usePredictionAccess";
+import { useX402Payment } from "@/lib/hooks/payments/useX402Payment";
 import { ShareDialog } from "@/components/Videos/ShareDialog";
 import { useSongchainPost } from "@/hooks/useSongchainPost";
 import { getSongchainConfig } from "@/lib/songchain/config";
@@ -49,6 +50,11 @@ import {
   REALITY_QUESTION_TYPES,
   getRealityQuestionTypeOption,
 } from "@/lib/predictions/reality-question-types";
+import {
+  DECISION_GATE_RECIPIENT,
+  DECISION_GATE_X402_ENDPOINT,
+  PREDICTION_GATE_PRICE,
+} from "@/lib/decision-models/billing";
 import { cn } from "@/lib/utils/utils";
 
 export type CreatePredictionProps = {
@@ -213,6 +219,7 @@ function CreatePrediction({
     smartAccountAddress: address,
   } = useWalletStatus();
   const { getAuthHeaders } = useWalletAuth();
+  const { makePayment } = useX402Payment();
 
   const { openAuthModal } = useAuthModal();
   const { client: accountKitClient } = useSmartAccountClient({});
@@ -424,30 +431,72 @@ function CreatePrediction({
 
       // Decision-model gate: type/category/clarity/resolvability only.
       // Never used to settle Reality.eth markets. Soft-fail if the API is down.
+      // When TypeSafe is configured, server returns 402 and we pay x402 USDC.
       try {
-        const gateRes = await fetch("/api/predictions/gate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title: values.title,
-            description: values.description,
-            questionType: values.type,
-            outcomes: finalOutcomes,
-            category: values.category || "general",
-            closeDate: values.closeDate,
-            closeTime: values.closeTime,
-          }),
-        });
-        if (gateRes.ok) {
-          const gateJson = (await gateRes.json()) as {
-            decision?: {
-              blockCreate?: boolean;
-              reasons?: string[];
-              suggestedType?: string | null;
-              suggestedCategory?: string | null;
-              clarityScore?: number | null;
-            };
+        const gatePayload = {
+          title: values.title,
+          description: values.description,
+          questionType: values.type,
+          outcomes: finalOutcomes,
+          category: values.category || "general",
+          closeDate: values.closeDate,
+          closeTime: values.closeTime,
+        };
+
+        const postGate = (paymentProof?: {
+          transactionHash: string;
+          amount: string;
+        }) =>
+          fetch("/api/predictions/gate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ...gatePayload, paymentProof }),
+          });
+
+        let gateRes = await postGate();
+        let gateJson = (await gateRes.json().catch(() => ({}))) as {
+          code?: string;
+          amount?: string;
+          endpoint?: string;
+          recipient?: string;
+          error?: string;
+          decision?: {
+            blockCreate?: boolean;
+            reasons?: string[];
+            suggestedType?: string | null;
+            suggestedCategory?: string | null;
+            clarityScore?: number | null;
           };
+        };
+
+        if (gateRes.status === 402 && gateJson.code === "PAYMENT_REQUIRED") {
+          toast.message("AI market review", {
+            description: "Paying $0.005 USDC for resolvability checks…",
+          });
+          const paymentResult = await makePayment({
+            service: "prediction-gate",
+            amount: gateJson.amount ?? PREDICTION_GATE_PRICE,
+            endpoint: gateJson.endpoint ?? DECISION_GATE_X402_ENDPOINT,
+            recipientAddress: gateJson.recipient ?? DECISION_GATE_RECIPIENT,
+          });
+          if (
+            !paymentResult.success ||
+            !paymentResult.paymentResponse?.transactionHash
+          ) {
+            setFormError(
+              paymentResult.error || "USDC payment for AI review failed"
+            );
+            setIsSubmitting(false);
+            return;
+          }
+          gateRes = await postGate({
+            transactionHash: paymentResult.paymentResponse.transactionHash,
+            amount: gateJson.amount ?? PREDICTION_GATE_PRICE,
+          });
+          gateJson = (await gateRes.json().catch(() => ({}))) as typeof gateJson;
+        }
+
+        if (gateRes.ok) {
           const decision = gateJson.decision;
           if (decision?.blockCreate) {
             setFormError(

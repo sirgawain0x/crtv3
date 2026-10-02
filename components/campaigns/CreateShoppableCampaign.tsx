@@ -12,9 +12,15 @@ import { alchemy, base } from "@account-kit/infra";
 import { useChain, useAuthModal, useSigner } from "@/lib/wallet/react";
 import { useWalletStatus } from "@/lib/hooks/accountkit/useWalletStatus";
 import { useWalletAuth } from "@/lib/auth/useWalletAuth";
+import { useX402Payment } from "@/lib/hooks/payments/useX402Payment";
 import { createProposal } from "@/app/vote/create/[address]/actions";
 import { SNAPSHOT_SPACE } from "@/context/context";
 import { CampaignFormSchemaBase } from "@/lib/validations/campaign";
+import {
+  CAMPAIGN_GATE_PRICE,
+  DECISION_GATE_RECIPIENT,
+  DECISION_GATE_X402_ENDPOINT,
+} from "@/lib/decision-models/billing";
 import {
   Form,
   FormControl,
@@ -50,6 +56,7 @@ export function CreateShoppableCampaign() {
     smartAccountAddress,
   } = useWalletStatus();
   const { getAuthHeaders } = useWalletAuth();
+  const { makePayment } = useX402Payment();
   const brandAddress = (smartAccountAddress || walletAddress || "").toLowerCase();
 
   const [submitting, setSubmitting] = useState(false);
@@ -88,16 +95,47 @@ export function CreateShoppableCampaign() {
     setSubmitting(true);
     try {
       const headers = await getAuthHeaders();
-      const createRes = await fetch("/api/campaigns", {
-        method: "POST",
-        headers: { "content-type": "application/json", ...headers },
-        body: JSON.stringify({
-          ...values,
-          brandAddress,
-          targetCreator: values.targetCreator.toLowerCase(),
-        }),
-      });
-      const created = await createRes.json();
+      const payload = {
+        ...values,
+        brandAddress,
+        targetCreator: values.targetCreator.toLowerCase(),
+      };
+
+      const postCampaign = (paymentProof?: {
+        transactionHash: string;
+        amount: string;
+      }) =>
+        fetch("/api/campaigns", {
+          method: "POST",
+          headers: { "content-type": "application/json", ...headers },
+          body: JSON.stringify({ ...payload, paymentProof }),
+        });
+
+      let createRes = await postCampaign();
+      let created = await createRes.json();
+
+      if (createRes.status === 402 && created?.code === "PAYMENT_REQUIRED") {
+        toast.message("AI campaign review", {
+          description: "Paying $0.01 USDC for TypeSafe quality/safety checks…",
+        });
+        const paymentResult = await makePayment({
+          service: "campaign-gate",
+          amount: created.amount ?? CAMPAIGN_GATE_PRICE,
+          endpoint: created.endpoint ?? DECISION_GATE_X402_ENDPOINT,
+          recipientAddress: created.recipient ?? DECISION_GATE_RECIPIENT,
+        });
+        if (!paymentResult.success || !paymentResult.paymentResponse?.transactionHash) {
+          throw new Error(
+            paymentResult.error || "USDC payment for AI review failed"
+          );
+        }
+        createRes = await postCampaign({
+          transactionHash: paymentResult.paymentResponse.transactionHash,
+          amount: created.amount ?? CAMPAIGN_GATE_PRICE,
+        });
+        created = await createRes.json();
+      }
+
       if (!createRes.ok) {
         throw new Error(
           typeof created.error === "string"
