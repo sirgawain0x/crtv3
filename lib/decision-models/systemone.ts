@@ -62,6 +62,7 @@ export function retryAfterDelayMs(
  * Returns null when `TYPESAFE_API_KEY` is not configured.
  *
  * Retries 429 / 529 with exponential backoff and honors `Retry-After`.
+ * Each attempt gets its own timeout so backoff sleep does not burn the budget.
  *
  * Default model alias `jev-latest` currently resolves to `jev-1.13.0`.
  * Input tokens are billed (~$0.042 / Mtok); output tokens are free.
@@ -88,14 +89,14 @@ export async function systemOne(
   const sleepImpl = options.sleepImpl ?? sleep;
   const maxRetries = Math.max(1, options.maxRetries ?? DEFAULT_MAX_RETRIES);
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let lastErrorText = "";
+  let lastStatus = 0;
 
-  try {
-    let lastErrorText = "";
-    let lastStatus = 0;
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
       const res = await fetchImpl(`${baseUrl}/v1/systemone`, {
         method: "POST",
         headers: {
@@ -118,6 +119,8 @@ export async function systemOne(
       lastErrorText = await res.text().catch(() => "");
 
       if (RETRYABLE_STATUSES.has(res.status) && attempt < maxRetries - 1) {
+        // Sleep outside this attempt's timeout so Retry-After does not abort the next try.
+        clearTimeout(timer);
         await sleepImpl(retryAfterDelayMs(res, attempt));
         continue;
       }
@@ -125,23 +128,23 @@ export async function systemOne(
       throw new DecisionModelError(
         `Decision model HTTP ${res.status}: ${lastErrorText.slice(0, 200)}`
       );
+    } catch (err) {
+      if (err instanceof DecisionModelError) throw err;
+      if (err instanceof Error && err.name === "AbortError") {
+        throw new DecisionModelError("Decision model request timed out", err);
+      }
+      throw new DecisionModelError(
+        err instanceof Error ? err.message : "Decision model request failed",
+        err
+      );
+    } finally {
+      clearTimeout(timer);
     }
-
-    throw new DecisionModelError(
-      `Decision model HTTP ${lastStatus}: ${lastErrorText.slice(0, 200)}`
-    );
-  } catch (err) {
-    if (err instanceof DecisionModelError) throw err;
-    if (err instanceof Error && err.name === "AbortError") {
-      throw new DecisionModelError("Decision model request timed out", err);
-    }
-    throw new DecisionModelError(
-      err instanceof Error ? err.message : "Decision model request failed",
-      err
-    );
-  } finally {
-    clearTimeout(timer);
   }
+
+  throw new DecisionModelError(
+    `Decision model HTTP ${lastStatus}: ${lastErrorText.slice(0, 200)}`
+  );
 }
 
 /** Safe wrapper: returns null on misconfig or any failure (never throws). */

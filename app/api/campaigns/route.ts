@@ -54,6 +54,33 @@ export async function POST(req: NextRequest) {
       throw authErr;
     }
 
+    // Decision-model gate before Grove upload so rejected drafts never hit IPFS.
+    // Does not write copy or replace Gemini product-in-video detection.
+    // Campaigns still start as Snapshot-pending; gate is advisory metadata.
+    const decision = await evaluateCampaignDraft({
+      brandName: body.brandName,
+      brandHandle: body.brandHandle,
+      campaignTitle: body.campaignTitle,
+      campaignDescription: body.campaignDescription,
+      purchaseUrl: body.purchaseUrl,
+      productImageUrl: body.productImageUrl,
+      startDate: body.startDate,
+      endDate: body.endDate,
+      targetCreator: body.targetCreator,
+      budgetUsdc: body.budgetUsdc,
+    });
+
+    if (decision.evaluated && !decision.brandSafe) {
+      return NextResponse.json(
+        {
+          error: "Campaign failed brand-safety review",
+          code: "CAMPAIGN_GATE_REJECTED",
+          decision,
+        },
+        { status: 422 }
+      );
+    }
+
     const grovePayload = {
       version: "1.0",
       brand: {
@@ -86,33 +113,6 @@ export async function POST(req: NextRequest) {
     const ipfsUri = grove.hash.startsWith("ipfs://")
       ? grove.hash
       : `ipfs://${grove.hash}`;
-
-    // Decision-model gate (TypeSafe Jev when configured): policy/quality/niche.
-    // Does not write copy or replace Gemini product-in-video detection.
-    // Campaigns still start as Snapshot-pending; gate is advisory metadata.
-    const decision = await evaluateCampaignDraft({
-      brandName: body.brandName,
-      brandHandle: body.brandHandle,
-      campaignTitle: body.campaignTitle,
-      campaignDescription: body.campaignDescription,
-      purchaseUrl: body.purchaseUrl,
-      productImageUrl: body.productImageUrl,
-      startDate: body.startDate,
-      endDate: body.endDate,
-      targetCreator: body.targetCreator,
-      budgetUsdc: body.budgetUsdc,
-    });
-
-    if (decision.evaluated && !decision.brandSafe) {
-      return NextResponse.json(
-        {
-          error: "Campaign failed brand-safety review",
-          code: "CAMPAIGN_GATE_REJECTED",
-          decision,
-        },
-        { status: 422 }
-      );
-    }
 
     const campaign = await insertShoppableCampaign({
       brandAddress,

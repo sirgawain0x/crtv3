@@ -425,6 +425,9 @@ function CreatePrediction({
       // Decision-model gate: type/category/clarity/resolvability only.
       // Never used to settle Reality.eth markets. Soft-fail if the API is down.
       // Jev review is free (platform absorbs negligible TypeSafe COGS).
+      // Keep a local category so gate suggestions apply to create/record (not only the form).
+      let category: PredictionCategoryValue =
+        values.category || defaultCategory || "general";
       try {
         const gateRes = await fetch("/api/predictions/gate", {
           method: "POST",
@@ -434,7 +437,7 @@ function CreatePrediction({
             description: values.description,
             questionType: values.type,
             outcomes: finalOutcomes,
-            category: values.category || "general",
+            category,
             closeDate: values.closeDate,
             closeTime: values.closeTime,
           }),
@@ -463,10 +466,8 @@ function CreatePrediction({
             decision?.suggestedCategory &&
             (!values.category || values.category === "general")
           ) {
-            form.setValue(
-              "category",
-              decision.suggestedCategory as PredictionCategoryValue
-            );
+            category = decision.suggestedCategory as PredictionCategoryValue;
+            form.setValue("category", category);
           }
           if (
             decision?.reasons?.length &&
@@ -486,7 +487,7 @@ function CreatePrediction({
         type: values.type,
         title: values.title,
         outcomes: finalOutcomes,
-        category: values.category || "general",
+        category,
         description: values.description,
         language: "en_US",
       };
@@ -576,7 +577,7 @@ function CreatePrediction({
             address,
             transactionHash: hash,
             title: values.title,
-            category: values.category || "general",
+            category,
             questionType: values.type,
             outcomes: finalOutcomes,
             videoAssetId,
@@ -608,7 +609,7 @@ function CreatePrediction({
       }
       setCreatedMeta({
         title: values.title,
-        category: values.category || "general",
+        category,
       });
       setShareOpen(true);
       // Let the host page (video strip) refresh its server data now, while
