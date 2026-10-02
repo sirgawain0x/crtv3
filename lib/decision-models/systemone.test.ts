@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { systemOne, trySystemOne } from "./systemone";
+import { retryAfterDelayMs, systemOne, trySystemOne } from "./systemone";
 import { DecisionModelError } from "./types";
 
 afterEach(() => {
@@ -25,6 +25,7 @@ describe("systemOne (TypeSafe Jev)", () => {
       Response.json({
         model: "jev-1.13.0",
         answers: { q: { type: "noul", noul: 0.91 } },
+        usage: { input_tokens: 120, output_tokens: 8 },
       })
     );
 
@@ -42,10 +43,67 @@ describe("systemOne (TypeSafe Jev)", () => {
     expect(JSON.parse((init as RequestInit).body as string).model).toBe(
       "jev-latest"
     );
+    expect(result?.model).toBe("jev-1.13.0");
     expect(result?.answers.q).toEqual({ type: "noul", noul: 0.91 });
   });
 
-  it("throws DecisionModelError on HTTP failure", async () => {
+  it("retries 429 when Retry-After is present, then succeeds", async () => {
+    const sleepImpl = vi.fn(async () => undefined);
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response("slow down", {
+          status: 429,
+          headers: { "retry-after": "0" },
+        })
+      )
+      .mockResolvedValueOnce(
+        Response.json({
+          model: "jev-1.13.0",
+          answers: { q: { type: "noul", noul: 0.5 } },
+        })
+      );
+
+    const result = await systemOne(
+      "x",
+      { q: { type: "noul", instructions: "y" } },
+      {
+        apiKey: "tsk_test",
+        baseUrl: "https://api.typesafe.ai",
+        fetchImpl: fetchImpl as unknown as typeof fetch,
+        sleepImpl,
+        maxRetries: 3,
+      }
+    );
+
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(sleepImpl).toHaveBeenCalledOnce();
+    expect(result?.answers.q).toEqual({ type: "noul", noul: 0.5 });
+  });
+
+  it("retries 529 Overloaded once then throws if still failing", async () => {
+    const sleepImpl = vi.fn(async () => undefined);
+    const fetchImpl = vi.fn(async () => new Response("busy", { status: 529 }));
+
+    await expect(
+      systemOne(
+        "x",
+        { q: { type: "noul", instructions: "y" } },
+        {
+          apiKey: "tsk_test",
+          baseUrl: "https://api.typesafe.ai",
+          fetchImpl: fetchImpl as unknown as typeof fetch,
+          sleepImpl,
+          maxRetries: 2,
+        }
+      )
+    ).rejects.toBeInstanceOf(DecisionModelError);
+
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+    expect(sleepImpl).toHaveBeenCalledOnce();
+  });
+
+  it("throws DecisionModelError on non-retryable HTTP failure", async () => {
     const fetchImpl = vi.fn(async () => new Response("nope", { status: 500 }));
     await expect(
       systemOne(
@@ -58,6 +116,7 @@ describe("systemOne (TypeSafe Jev)", () => {
         }
       )
     ).rejects.toBeInstanceOf(DecisionModelError);
+    expect(fetchImpl).toHaveBeenCalledOnce();
   });
 
   it("trySystemOne swallows errors", async () => {
@@ -74,3 +133,20 @@ describe("systemOne (TypeSafe Jev)", () => {
     expect(result).toBeNull();
   });
 });
+
+describe("retryAfterDelayMs", () => {
+  it("prefers Retry-After seconds", () => {
+    const res = new Response(null, {
+      status: 429,
+      headers: { "retry-after": "2" },
+    });
+    expect(retryAfterDelayMs(res, 0)).toBe(2000);
+  });
+
+  it("falls back to exponential backoff without header", () => {
+    const res = new Response(null, { status: 429 });
+    expect(retryAfterDelayMs(res, 0)).toBe(500);
+    expect(retryAfterDelayMs(res, 1)).toBe(1000);
+  });
+});
+

@@ -4,6 +4,10 @@
  * When `TYPESAFE_API_KEY` is unset, all gates fall back to existing
  * non-model behavior (substring match, advisory no-ops, etc.).
  *
+ * Default model alias `jev-latest` → `jev-1.13.0` (see Models docs).
+ * Pin `TYPESAFE_MODEL=jev-1.13.0` if thresholds are tuned to that version.
+ * Pricing (Jev 1.13): ~$0.042 / Mtok input; output free. Text-only state.
+ *
  * @see https://docs.typesafe.ai/api.md
  * @see https://docs.typesafe.ai/models.md
  */
@@ -11,6 +15,7 @@
 export type DecisionModelRole = "routing" | "strict";
 
 const DEFAULT_BASE_URL = "https://api.typesafe.ai";
+/** Alias for the current stable Jev release (`jev-1.13.0` as of Models docs). */
 const DEFAULT_MODEL = "jev-latest";
 
 export function getTypeSafeBaseUrl(): string {

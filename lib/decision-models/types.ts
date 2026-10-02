@@ -50,12 +50,13 @@ export type SystemOneRequest = {
   model: string;
   state: string | Record<string, unknown> | unknown[];
   questions: Record<string, SystemOneQuestion>;
-  keep_alive?: string | number;
 };
 
 export type SystemOneResponse = {
+  /** Versioned ID that answered (e.g. `jev-1.13.0`), even when request used an alias. */
   model: string;
   answers: Record<string, SystemOneAnswer>;
+  /** Input tokens are billed; output tokens are free on Jev. */
   usage?: { input_tokens?: number; output_tokens?: number };
 };
 

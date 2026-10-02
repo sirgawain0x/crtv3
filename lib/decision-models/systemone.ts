@@ -15,17 +15,59 @@ export type SystemOneCallOptions = {
   role?: DecisionModelRole;
   model?: string;
   timeoutMs?: number;
+  /** Max attempts for 429/529 (includes the first try). Default 3. */
+  maxRetries?: number;
   /** Injected for tests. */
   fetchImpl?: typeof fetch;
+  /** Injected for tests. */
+  sleepImpl?: (ms: number) => Promise<void>;
   baseUrl?: string | null;
   apiKey?: string | null;
 };
+
+const RETRYABLE_STATUSES = new Set([429, 529]);
+const DEFAULT_MAX_RETRIES = 3;
+const DEFAULT_BACKOFF_MS = 500;
+const MAX_BACKOFF_MS = 8_000;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Honor `Retry-After` (seconds or HTTP-date). Fall back to exponential backoff.
+ * @see https://docs.typesafe.ai/api.md#handling-rate-limits
+ * @see https://docs.typesafe.ai/models.md
+ */
+export function retryAfterDelayMs(
+  res: Response,
+  attemptIndex: number
+): number {
+  const header = res.headers.get("retry-after");
+  if (header) {
+    const asSeconds = Number(header);
+    if (Number.isFinite(asSeconds) && asSeconds >= 0) {
+      return Math.min(asSeconds * 1000, MAX_BACKOFF_MS);
+    }
+    const asDate = Date.parse(header);
+    if (!Number.isNaN(asDate)) {
+      return Math.min(Math.max(0, asDate - Date.now()), MAX_BACKOFF_MS);
+    }
+  }
+  return Math.min(DEFAULT_BACKOFF_MS * 2 ** attemptIndex, MAX_BACKOFF_MS);
+}
 
 /**
  * Call TypeSafe `POST /v1/systemone` with typed decision questions (Jev).
  * Returns null when `TYPESAFE_API_KEY` is not configured.
  *
+ * Retries 429 / 529 with exponential backoff and honors `Retry-After`.
+ *
+ * Default model alias `jev-latest` currently resolves to `jev-1.13.0`.
+ * Input tokens are billed (~$0.042 / Mtok); output tokens are free.
+ *
  * @see https://docs.typesafe.ai/api.md
+ * @see https://docs.typesafe.ai/models.md
  */
 export async function systemOne(
   state: string | Record<string, unknown> | unknown[],
@@ -43,33 +85,51 @@ export async function systemOne(
   const model = options.model ?? getDecisionModel(options.role ?? "routing");
   const timeoutMs = options.timeoutMs ?? getDecisionModelTimeoutMs();
   const fetchImpl = options.fetchImpl ?? fetch;
+  const sleepImpl = options.sleepImpl ?? sleep;
+  const maxRetries = Math.max(1, options.maxRetries ?? DEFAULT_MAX_RETRIES);
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    const res = await fetchImpl(`${baseUrl}/v1/systemone`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({ model, state, questions }),
-      signal: controller.signal,
-    });
+    let lastErrorText = "";
+    let lastStatus = 0;
 
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      const res = await fetchImpl(`${baseUrl}/v1/systemone`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({ model, state, questions }),
+        signal: controller.signal,
+      });
+
+      if (res.ok) {
+        const json = (await res.json()) as SystemOneResponse;
+        if (!json || typeof json !== "object" || !json.answers) {
+          throw new DecisionModelError("Decision model returned an invalid body");
+        }
+        return json;
+      }
+
+      lastStatus = res.status;
+      lastErrorText = await res.text().catch(() => "");
+
+      if (RETRYABLE_STATUSES.has(res.status) && attempt < maxRetries - 1) {
+        await sleepImpl(retryAfterDelayMs(res, attempt));
+        continue;
+      }
+
       throw new DecisionModelError(
-        `Decision model HTTP ${res.status}: ${text.slice(0, 200)}`
+        `Decision model HTTP ${res.status}: ${lastErrorText.slice(0, 200)}`
       );
     }
 
-    const json = (await res.json()) as SystemOneResponse;
-    if (!json || typeof json !== "object" || !json.answers) {
-      throw new DecisionModelError("Decision model returned an invalid body");
-    }
-    return json;
+    throw new DecisionModelError(
+      `Decision model HTTP ${lastStatus}: ${lastErrorText.slice(0, 200)}`
+    );
   } catch (err) {
     if (err instanceof DecisionModelError) throw err;
     if (err instanceof Error && err.name === "AbortError") {
