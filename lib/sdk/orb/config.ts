@@ -4,6 +4,7 @@ import type { QrAuthPluginConfig } from '@orbclub/modules/auth/qr';
 import type { OrbLoginConfig } from '@orbclub/modules/auth';
 import type { GroveUploadPluginConfig } from '@orbclub/modules/upload/grove';
 import { getLensChainId } from '@/lib/sdk/lens/chains';
+import { parseOrbQrInitResponse } from '@/lib/sdk/orb/qr-init-response';
 
 /** @orbclub/modules defaults when using `createOrbLogin()` with no overrides. */
 export const ORB_SDK_QR_INIT_DEFAULT = 'https://orbapi.xyz/init-sign-in';
@@ -61,6 +62,8 @@ export function getOrbLoginConfig(): OrbLoginConfig {
 
   qr.initUrl = resolveClientUrl(initPath);
   qr.pollUrl = resolveClientUrl(pollPath);
+  // Prefer Orb's FAILED `msg` over the SDK's opaque missing qrCode/secret error.
+  qr.parseInitResponse = parseOrbQrInitResponse;
 
   return { qr, lens };
 }
