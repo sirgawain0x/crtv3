@@ -78,7 +78,14 @@ const predictionSchema = z.object({
   outcomes: z
     .array(z.object({ value: z.string().min(1, "Outcome cannot be empty") }))
     .optional(),
-  category: z.string().optional(),
+  category: z
+    .enum(
+      PREDICTION_CATEGORIES.map((c) => c.value) as [
+        PredictionCategoryValue,
+        ...PredictionCategoryValue[],
+      ]
+    )
+    .optional(),
   description: z.string().optional(),
   closeDate: z.string().min(1, "Close date is required"),
   closeTime: z.string().min(1, "Close time is required"),
