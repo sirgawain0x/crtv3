@@ -6,15 +6,13 @@ import { requireHumanOrVerifiedBot } from '@/lib/middleware/botIdGuard';
 import { rateLimiters } from '@/lib/middleware/rateLimit';
 import { requireWalletAuth } from '@/lib/auth/require-wallet';
 import { serverLogger } from '@/lib/utils/logger';
-import {
-  matchCannedResponse,
-  UPLOAD_STEPS,
-} from '@/lib/agent/creative-guide/canned-responses';
+import { UPLOAD_STEPS } from '@/lib/agent/creative-guide/canned-responses';
 import {
   CREATIVE_GUIDE_PRICE,
   CREATIVE_GUIDE_RECIPIENT,
 } from '@/lib/agent/creative-guide/constants';
 import { verifyCreativeGuidePaymentProof } from '@/lib/agent/creative-guide/verify-payment';
+import { routeCreativeGuideMessage } from '@/lib/decision-models/creative-guide-router';
 
 /**
  * Creative Guide — onboarding/navigation agent.
@@ -109,14 +107,22 @@ export async function POST(req: NextRequest) {
     const userText =
       typeof lastUserMessage?.content === 'string' ? lastUserMessage.content : '';
 
-    const canned = userText ? matchCannedResponse(userText) : { escalate: true };
+    const canned = userText
+      ? await routeCreativeGuideMessage(userText)
+      : { escalate: true as const, source: 'substring' as const };
 
     if (!canned.escalate && canned.content) {
-      serverLogger.debug('[CreativeGuide] canned response used for:', verifiedAddress);
+      serverLogger.debug(
+        '[CreativeGuide] canned response used for:',
+        verifiedAddress,
+        'source=',
+        canned.source,
+      );
       return NextResponse.json({
         type: 'canned',
         content: canned.content,
         action: canned.action,
+        source: canned.source,
       });
     }
   }

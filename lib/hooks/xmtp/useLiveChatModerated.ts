@@ -129,6 +129,13 @@ export function useLiveChatModerated(
             headersToAuthArgs(headers as AuthHeaders)
           );
         } catch (err) {
+          // Decision-model filter may refuse high-confidence toxic/spam
+          // persistence; that is intentional and not a hard failure.
+          const name = err instanceof Error ? err.name : "";
+          if (name === "ChatModerationBlockedError") {
+            logger.info("Chat message skipped by safety filter");
+            return;
+          }
           // Best-effort: log and move on. The long-lived worker will catch
           // any messages we miss here.
           logger.warn("Failed to persist chat message:", err);

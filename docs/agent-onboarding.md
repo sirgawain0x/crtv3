@@ -34,6 +34,10 @@ the user across sessions and across apps.
   + `@ai-sdk/google`), Supabase, and the x402/USDC billing gate already exist.
 - **Billing parity.** Any hosted/paid model call goes through the same
   CRTVAI-credit / x402 gate as `app/api/ai/generate-thumbnail/route.ts`.
+- **External agents ≠ in-app agents.** Out-of-browser bots must use the
+  [Platform API](./platform-api.md) (partner/admin key or x402 on the four GET
+  routes). They must not call BotID-protected create/AI routes; API keys are not
+  a BotID bypass. See [BotID vs Platform API](./platform-api.md#botid-vs-platform-api-external-agents).
 - **Surgical & staged.** Minimal changes; staging → prod after final review +
   Gemini bot review; CI must be green. No global CSS changes for third-party widgets.
 

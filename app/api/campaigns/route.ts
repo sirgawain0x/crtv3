@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { checkBotIdDeep } from "@/lib/middleware/botIdGuard";
+import { requireHumanOrVerifiedBot } from "@/lib/middleware/botIdGuard";
 import { rateLimiters } from "@/lib/middleware/rateLimit";
 import { requireWalletAuthFor, WalletAuthError } from "@/lib/auth/require-wallet";
 import { CampaignFormSchema } from "@/lib/validations/campaign";
@@ -9,16 +9,17 @@ import {
   insertShoppableProductKit,
 } from "@/lib/sdk/supabase/shoppable-campaigns";
 import { serverLogger } from "@/lib/utils/logger";
+import { evaluateCampaignDraft } from "@/lib/decision-models/campaign-gate";
 
 /**
  * POST /api/campaigns
  * Brand creates a pending shoppable campaign + Grove product kit.
+ * TypeSafe Jev review (when configured) is free — COGS is negligible vs UX friction.
+ * BotID: humans + verified bots (must stay in instrumentation-client protect list).
  */
 export async function POST(req: NextRequest) {
-  const verification = await checkBotIdDeep();
-  if (verification.isBot) {
-    return NextResponse.json({ error: "Access denied" }, { status: 403 });
-  }
+  const botGuard = await requireHumanOrVerifiedBot("campaigns-create");
+  if (!botGuard.allowed) return botGuard.response;
   const rl = await rateLimiters.standard(req);
   if (rl) return rl;
 
@@ -51,6 +52,33 @@ export async function POST(req: NextRequest) {
         );
       }
       throw authErr;
+    }
+
+    // Decision-model gate before Grove upload so rejected drafts never hit IPFS.
+    // Does not write copy or replace Gemini product-in-video detection.
+    // Campaigns still start as Snapshot-pending; gate is advisory metadata.
+    const decision = await evaluateCampaignDraft({
+      brandName: body.brandName,
+      brandHandle: body.brandHandle,
+      campaignTitle: body.campaignTitle,
+      campaignDescription: body.campaignDescription,
+      purchaseUrl: body.purchaseUrl,
+      productImageUrl: body.productImageUrl,
+      startDate: body.startDate,
+      endDate: body.endDate,
+      targetCreator: body.targetCreator,
+      budgetUsdc: body.budgetUsdc,
+    });
+
+    if (decision.evaluated && !decision.brandSafe) {
+      return NextResponse.json(
+        {
+          error: "Campaign failed brand-safety review",
+          code: "CAMPAIGN_GATE_REJECTED",
+          decision,
+        },
+        { status: 422 }
+      );
     }
 
     const grovePayload = {
@@ -113,6 +141,7 @@ export async function POST(req: NextRequest) {
       ipfsUri,
       hash: grove.hash,
       url: grove.url,
+      decision,
     });
   } catch (error) {
     serverLogger.error("[POST /api/campaigns] failed:", error);

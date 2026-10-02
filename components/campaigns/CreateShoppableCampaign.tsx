@@ -88,21 +88,38 @@ export function CreateShoppableCampaign() {
     setSubmitting(true);
     try {
       const headers = await getAuthHeaders();
+      const payload = {
+        ...values,
+        brandAddress,
+        targetCreator: values.targetCreator.toLowerCase(),
+      };
+
       const createRes = await fetch("/api/campaigns", {
         method: "POST",
         headers: { "content-type": "application/json", ...headers },
-        body: JSON.stringify({
-          ...values,
-          brandAddress,
-          targetCreator: values.targetCreator.toLowerCase(),
-        }),
+        body: JSON.stringify(payload),
       });
       const created = await createRes.json();
+
       if (!createRes.ok) {
         throw new Error(
           typeof created.error === "string"
             ? created.error
             : "Failed to create campaign"
+        );
+      }
+
+      if (created?.decision?.review === "needs_review") {
+        toast.message("Campaign queued for review", {
+          description:
+            created.decision.reasons?.[0] ||
+            "Decision checks flagged this draft for human review before going live.",
+        });
+      } else if (created?.decision?.review === "auto_eligible") {
+        toast.success(
+          created.decision.niche
+            ? `Campaign looks strong for ${created.decision.niche} creators`
+            : "Campaign passed automated quality checks"
         );
       }
 
