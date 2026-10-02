@@ -1,6 +1,8 @@
 export {
   getDecisionModel,
   getDecisionModelTimeoutMs,
+  getTypeSafeApiKey,
+  getTypeSafeBaseUrl,
   getOllamaBaseUrl,
   isDecisionModelConfigured,
 } from "./config";

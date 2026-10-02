@@ -7,8 +7,8 @@ afterEach(() => {
 });
 
 describe("evaluatePredictionDraft", () => {
-  it("no-ops pass when Ollama is unset", async () => {
-    vi.stubEnv("OLLAMA_BASE_URL", "");
+  it("no-ops pass when TypeSafe is unset", async () => {
+    vi.stubEnv("TYPESAFE_API_KEY", ""); vi.stubEnv("OLLAMA_API_KEY", "");
     const result = await evaluatePredictionDraft({
       title: "Will ETH be above $5000 by Dec 2026?",
       questionType: "bool",
@@ -19,7 +19,7 @@ describe("evaluatePredictionDraft", () => {
   });
 
   it("suggests type/category and blocks unresolvable drafts", async () => {
-    vi.stubEnv("OLLAMA_BASE_URL", "http://ollama.test");
+    vi.stubEnv("TYPESAFE_API_KEY", "tsk_test");
 
     const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
       const body = JSON.parse(String(init?.body ?? "{}")) as {
@@ -27,12 +27,12 @@ describe("evaluatePredictionDraft", () => {
       };
       if (body.questions && "resolvable" in body.questions) {
         return Response.json({
-          model: "nimble",
+          model: "jev-1.13.0",
           answers: { resolvable: { type: "noul", noul: 0.1 } },
         });
       }
       return Response.json({
-        model: "tev1:4b",
+        model: "jev-1.13.0",
         answers: {
           question_type: { type: "choice", choice: "bool" },
           category: { type: "choice", choice: "finance" },
@@ -55,7 +55,7 @@ describe("evaluatePredictionDraft", () => {
   });
 
   it("passes a clear resolvable market", async () => {
-    vi.stubEnv("OLLAMA_BASE_URL", "http://ollama.test");
+    vi.stubEnv("TYPESAFE_API_KEY", "tsk_test");
     vi.stubGlobal(
       "fetch",
       vi.fn(async (_url: string, init?: RequestInit) => {
@@ -64,12 +64,12 @@ describe("evaluatePredictionDraft", () => {
         };
         if (body.questions && "resolvable" in body.questions) {
           return Response.json({
-            model: "nimble",
+            model: "jev-1.13.0",
             answers: { resolvable: { type: "noul", noul: 0.92 } },
           });
         }
         return Response.json({
-          model: "tev1:4b",
+          model: "jev-1.13.0",
           answers: {
             question_type: { type: "choice", choice: "bool" },
             category: { type: "choice", choice: "sports" },

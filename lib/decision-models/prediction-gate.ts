@@ -84,7 +84,7 @@ export async function evaluatePredictionDraft(
     PREDICTION_CATEGORIES.map((c) => [c.value, c.label])
   );
 
-  // Type/category use routing model; resolvability uses strict (nimble).
+  // Type/category suggestions (Jev); resolvability checked in a second call.
   const routing = await trySystemOne(
     state,
     {

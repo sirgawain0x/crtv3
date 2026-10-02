@@ -7,21 +7,21 @@ afterEach(() => {
 });
 
 describe("moderateChatMessage", () => {
-  it("skips when Ollama is unset", async () => {
-    vi.stubEnv("OLLAMA_BASE_URL", "");
+  it("skips when TypeSafe is unset", async () => {
+    vi.stubEnv("TYPESAFE_API_KEY", ""); vi.stubEnv("OLLAMA_API_KEY", "");
     const result = await moderateChatMessage({ content: "hello chat" });
     expect(result.evaluated).toBe(false);
     expect(result.blockPersist).toBe(false);
   });
 
   it("flags and blocks high-confidence toxicity", async () => {
-    vi.stubEnv("OLLAMA_BASE_URL", "http://ollama.test");
-    vi.stubEnv("OLLAMA_DECISION_MODEL_STRICT", "nimble");
+    vi.stubEnv("TYPESAFE_API_KEY", "tsk_test");
+    vi.stubEnv("TYPESAFE_MODEL", "jev-latest");
     vi.stubGlobal(
       "fetch",
       vi.fn(async () =>
         Response.json({
-          model: "nimble",
+          model: "jev-1.13.0",
           answers: {
             toxic: { type: "noul", noul: 0.95 },
             spam: { type: "score", score: 0.2 },
@@ -40,12 +40,12 @@ describe("moderateChatMessage", () => {
   });
 
   it("does not block mild spam", async () => {
-    vi.stubEnv("OLLAMA_BASE_URL", "http://ollama.test");
+    vi.stubEnv("TYPESAFE_API_KEY", "tsk_test");
     vi.stubGlobal(
       "fetch",
       vi.fn(async () =>
         Response.json({
-          model: "nimble",
+          model: "jev-1.13.0",
           answers: {
             toxic: { type: "noul", noul: 0.1 },
             spam: { type: "score", score: 1.2 },

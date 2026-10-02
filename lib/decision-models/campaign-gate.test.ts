@@ -20,21 +20,21 @@ afterEach(() => {
 });
 
 describe("evaluateCampaignDraft", () => {
-  it("skips when Ollama is not configured", async () => {
-    vi.stubEnv("OLLAMA_BASE_URL", "");
+  it("skips when TypeSafe is not configured", async () => {
+    vi.stubEnv("TYPESAFE_API_KEY", ""); vi.stubEnv("OLLAMA_API_KEY", "");
     const result = await evaluateCampaignDraft(baseInput);
     expect(result.evaluated).toBe(false);
     expect(result.review).toBe("skipped");
   });
 
   it("marks auto_eligible on strong policy + quality", async () => {
-    vi.stubEnv("OLLAMA_BASE_URL", "http://ollama.test");
-    vi.stubEnv("OLLAMA_DECISION_MODEL_STRICT", "nimble");
+    vi.stubEnv("TYPESAFE_API_KEY", "tsk_test");
+    vi.stubEnv("TYPESAFE_MODEL", "jev-latest");
     vi.stubGlobal(
       "fetch",
       vi.fn(async () =>
         Response.json({
-          model: "nimble",
+          model: "jev-1.13.0",
           answers: {
             brand_safe: { type: "noul", noul: 0.96 },
             dates_sensible: { type: "noul", noul: 0.9 },
@@ -53,12 +53,12 @@ describe("evaluateCampaignDraft", () => {
   });
 
   it("needs_review when brand-safety fails", async () => {
-    vi.stubEnv("OLLAMA_BASE_URL", "http://ollama.test");
+    vi.stubEnv("TYPESAFE_API_KEY", "tsk_test");
     vi.stubGlobal(
       "fetch",
       vi.fn(async () =>
         Response.json({
-          model: "nimble",
+          model: "jev-1.13.0",
           answers: {
             brand_safe: { type: "noul", noul: 0.1 },
             dates_sensible: { type: "noul", noul: 0.9 },

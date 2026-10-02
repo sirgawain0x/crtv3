@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
       ? grove.hash
       : `ipfs://${grove.hash}`;
 
-    // Decision-model gate (nimble when configured): policy/quality/niche only.
+    // Decision-model gate (TypeSafe Jev when configured): policy/quality/niche.
     // Does not write copy or replace Gemini product-in-video detection.
     // Campaigns still start as Snapshot-pending; gate is advisory metadata.
     const decision = await evaluateCampaignDraft({

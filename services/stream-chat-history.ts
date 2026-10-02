@@ -54,7 +54,7 @@ export async function recordChatMessage(
 ) {
   await verifyWalletAuthArgs(auth);
 
-  // Decision-model spam/toxicity filter (when OLLAMA_BASE_URL is set).
+  // Decision-model spam/toxicity filter (when TYPESAFE_API_KEY is set).
   // Does not ban wallets — human moderators remain the authority.
   if ((input.messageType ?? "text") === "text") {
     const moderation = await moderateChatMessage({

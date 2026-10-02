@@ -18,8 +18,9 @@ function isIntentId(value: string): value is CreativeGuideIntentId {
 }
 
 /**
- * Route a Creative Guide user message via tev1 (when configured), falling back
- * to substring canned matching. Never replaces Gemini for escalated answers.
+ * Route a Creative Guide user message via TypeSafe Jev (when configured),
+ * falling back to substring canned matching. Never replaces Gemini for
+ * escalated answers.
  */
 export async function routeCreativeGuideMessage(
   message: string

@@ -7,22 +7,23 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("systemOne", () => {
-  it("returns null when OLLAMA_BASE_URL is unset", async () => {
-    vi.stubEnv("OLLAMA_BASE_URL", "");
+describe("systemOne (TypeSafe Jev)", () => {
+  it("returns null when TYPESAFE_API_KEY is unset", async () => {
+    vi.stubEnv("TYPESAFE_API_KEY", "");
+    vi.stubEnv("OLLAMA_API_KEY", "");
     const result = await systemOne("hello", {
       q: { type: "noul", instructions: "Is greeting?" },
     });
     expect(result).toBeNull();
   });
 
-  it("posts to /v1/systemone and returns answers", async () => {
-    vi.stubEnv("OLLAMA_BASE_URL", "http://ollama.test");
-    vi.stubEnv("OLLAMA_DECISION_MODEL_ROUTING", "tev1:4b");
+  it("posts to TypeSafe /v1/systemone with Bearer auth", async () => {
+    vi.stubEnv("TYPESAFE_API_KEY", "tsk_test");
+    vi.stubEnv("TYPESAFE_MODEL", "jev-latest");
 
     const fetchImpl = vi.fn(async () =>
       Response.json({
-        model: "tev1:4b",
+        model: "jev-1.13.0",
         answers: { q: { type: "noul", noul: 0.91 } },
       })
     );
@@ -35,9 +36,11 @@ describe("systemOne", () => {
 
     expect(fetchImpl).toHaveBeenCalledOnce();
     const [url, init] = fetchImpl.mock.calls[0];
-    expect(url).toBe("http://ollama.test/v1/systemone");
+    expect(url).toBe("https://api.typesafe.ai/v1/systemone");
+    const headers = (init as RequestInit).headers as Record<string, string>;
+    expect(headers.Authorization).toBe("Bearer tsk_test");
     expect(JSON.parse((init as RequestInit).body as string).model).toBe(
-      "tev1:4b"
+      "jev-latest"
     );
     expect(result?.answers.q).toEqual({ type: "noul", noul: 0.91 });
   });
@@ -48,7 +51,11 @@ describe("systemOne", () => {
       systemOne(
         "x",
         { q: { type: "noul", instructions: "y" } },
-        { baseUrl: "http://ollama.test", fetchImpl: fetchImpl as unknown as typeof fetch }
+        {
+          apiKey: "tsk_test",
+          baseUrl: "https://api.typesafe.ai",
+          fetchImpl: fetchImpl as unknown as typeof fetch,
+        }
       )
     ).rejects.toBeInstanceOf(DecisionModelError);
   });
@@ -58,7 +65,11 @@ describe("systemOne", () => {
     const result = await trySystemOne(
       "x",
       { q: { type: "noul", instructions: "y" } },
-      { baseUrl: "http://ollama.test", fetchImpl: fetchImpl as unknown as typeof fetch }
+      {
+        apiKey: "tsk_test",
+        baseUrl: "https://api.typesafe.ai",
+        fetchImpl: fetchImpl as unknown as typeof fetch,
+      }
     );
     expect(result).toBeNull();
   });

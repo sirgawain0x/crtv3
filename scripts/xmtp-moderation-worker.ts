@@ -23,9 +23,10 @@
  *   STREAM_ID_RESOLVER_URL (optional) HTTPS endpoint that maps an XMTP group
  *                                     id to a stream id; falls back to the
  *                                     conversation id.
- *   OLLAMA_BASE_URL (optional)        When set, skip persisting high-confidence
- *                                     toxic/spam messages via /v1/systemone.
- *   OLLAMA_DECISION_MODEL_STRICT      Default nimble (policy/moderation model).
+ *   TYPESAFE_API_KEY (optional)       When set, skip persisting high-confidence
+ *                                     toxic/spam messages via TypeSafe Jev.
+ *   TYPESAFE_MODEL                    Default jev-latest.
+ *   TYPESAFE_BASE_URL                 Default https://api.typesafe.ai
  *
  * Install (once, in a deploy package separate from the Next.js app):
  *   npm i @xmtp/node-sdk @supabase/supabase-js viem dotenv
@@ -153,20 +154,25 @@ async function resolveStreamId(
 }
 
 /**
- * Optional decision-model filter (Ollama /v1/systemone). Kept inline so this
- * standalone worker does not import the Next.js app. Human bans remain authority.
+ * Optional TypeSafe Jev filter (/v1/systemone). Kept inline so this standalone
+ * worker does not import the Next.js app. Human bans remain authority.
  */
 async function shouldBlockPersist(content: string): Promise<boolean> {
-  const baseUrl = process.env.OLLAMA_BASE_URL?.replace(/\/+$/, "");
-  if (!baseUrl || content.trim().length < 2) return false;
-  const model =
-    process.env.OLLAMA_DECISION_MODEL_STRICT?.trim() ||
-    process.env.OLLAMA_DECISION_MODEL?.trim() ||
-    "nimble";
+  const apiKey =
+    process.env.TYPESAFE_API_KEY?.trim() ||
+    process.env.OLLAMA_API_KEY?.trim();
+  if (!apiKey || content.trim().length < 2) return false;
+  const baseUrl = (
+    process.env.TYPESAFE_BASE_URL?.trim() || "https://api.typesafe.ai"
+  ).replace(/\/+$/, "");
+  const model = process.env.TYPESAFE_MODEL?.trim() || "jev-latest";
   try {
     const res = await fetch(`${baseUrl}/v1/systemone`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
       body: JSON.stringify({
         model,
         state: { message: content.slice(0, 2000) },
@@ -188,7 +194,7 @@ async function shouldBlockPersist(content: string): Promise<boolean> {
           },
         },
       }),
-      signal: AbortSignal.timeout(8_000),
+      signal: AbortSignal.timeout(15_000),
     });
     if (!res.ok) return false;
     const json = (await res.json()) as {

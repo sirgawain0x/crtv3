@@ -57,7 +57,7 @@ function asDate(value: Date | string): Date {
 /**
  * Score a shoppable campaign draft for policy, quality, and creator niche.
  * Does not write copy or replace Gemini product detection.
- * When Ollama is unset, returns evaluated:false / review:skipped.
+ * When TYPESAFE_API_KEY is unset, returns evaluated:false / review:skipped.
  */
 export async function evaluateCampaignDraft(
   input: CampaignGateInput

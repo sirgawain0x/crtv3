@@ -7,8 +7,8 @@ afterEach(() => {
 });
 
 describe("routeCreativeGuideMessage", () => {
-  it("falls back to substring match when decision models are unset", async () => {
-    vi.stubEnv("OLLAMA_BASE_URL", "");
+  it("falls back to substring match when TypeSafe is unset", async () => {
+    vi.stubEnv("TYPESAFE_API_KEY", ""); vi.stubEnv("OLLAMA_API_KEY", "");
     const result = await routeCreativeGuideMessage("How do I upload my first clip?");
     expect(result.escalate).toBe(false);
     expect(result.content).toContain("pick a video");
@@ -16,14 +16,14 @@ describe("routeCreativeGuideMessage", () => {
   });
 
   it("uses decision-model intent when configured", async () => {
-    vi.stubEnv("OLLAMA_BASE_URL", "http://ollama.test");
-    vi.stubEnv("OLLAMA_DECISION_MODEL_ROUTING", "tev1:4b");
+    vi.stubEnv("TYPESAFE_API_KEY", "tsk_test");
+    vi.stubEnv("TYPESAFE_MODEL", "jev-latest");
 
     vi.stubGlobal(
       "fetch",
       vi.fn(async () =>
         Response.json({
-          model: "tev1:4b",
+          model: "jev-1.13.0",
           answers: {
             intent: { type: "choice", choice: "metoken_explain", confidence: 0.9 },
           },
@@ -41,12 +41,12 @@ describe("routeCreativeGuideMessage", () => {
   });
 
   it("escalates when the model chooses escalate", async () => {
-    vi.stubEnv("OLLAMA_BASE_URL", "http://ollama.test");
+    vi.stubEnv("TYPESAFE_API_KEY", "tsk_test");
     vi.stubGlobal(
       "fetch",
       vi.fn(async () =>
         Response.json({
-          model: "tev1:4b",
+          model: "jev-1.13.0",
           answers: { intent: { type: "choice", choice: "escalate" } },
         })
       )

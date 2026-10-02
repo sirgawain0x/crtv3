@@ -59,7 +59,7 @@ export async function moderateChatMessage(
     };
   }
 
-  // Tips and very short messages are not worth a model call.
+  // Very short messages are not worth a model call.
   if (content.length < 2) {
     return {
       evaluated: false,

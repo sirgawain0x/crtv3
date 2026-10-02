@@ -37,6 +37,12 @@
       "skillPath": "skills/ecosystem/opensea/SKILL.md",
       "computedHash": "44e503f60847825ffa413b7ffe5b7a72936d3cf10d0297e04a8c2624190db98c"
     },
+    "typesafe-ai": {
+      "source": "typesafe-ai/skills",
+      "sourceType": "github",
+      "skillPath": "skills/typesafe-ai/SKILL.md",
+      "computedHash": "9cd84c5e535dec8dec59917c110f9c00b4a61faadb86b432ec7e41051170af12"
+    },
     "upstash-qstash-js": {
       "source": "upstash/skills",
       "sourceType": "github",

@@ -1,4 +1,4 @@
-/** Question types for Ollama `/v1/systemone` (TypeSafe Jev API). */
+/** Question types for TypeSafe `/v1/systemone` (Jev / System One API). */
 
 export type SystemOneQuestionType = "choice" | "noul" | "score";
 
