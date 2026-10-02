@@ -16,8 +16,6 @@ import { REALITY_ETH_DAPP_URL, REALITY_ETH_CHAIN_ID } from "@/context/context";
 import { getRealityEthContractAddress } from "@/lib/sdk/reality-eth/reality-eth-client";
 import { createPublicClient, http, fallback, formatEther } from "viem";
 import { baseMainnet } from "@/lib/utils/chains/base";
-import { getQuestion } from "@/lib/sdk/reality-eth/reality-eth-question-wrapper";
-import { enrichPredictionDisplaySync } from "@/lib/predictions/enrich-prediction-display";
 import { logger } from "@/lib/utils/logger";
 
 
@@ -44,6 +42,13 @@ export async function generateMetadata(
   const defaultDescription = "Predict the outcome of real-world events on Creative TV.";
 
   try {
+    const { getQuestion } = await import(
+      "@/lib/sdk/reality-eth/reality-eth-question-wrapper"
+    );
+    const { enrichPredictionDisplaySync } = await import(
+      "@/lib/predictions/enrich-prediction-display"
+    );
+
     const publicClient = createPublicClient({
       chain: baseMainnet,
       transport: fallback([
