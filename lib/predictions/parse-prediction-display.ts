@@ -1,7 +1,6 @@
 import { keccak256, stringToHex } from "viem";
-import { parseQuestionText } from "@/lib/sdk/reality-eth/reality-eth-utils";
 import type { QuestionType } from "@/lib/sdk/reality-eth/reality-eth-utils";
-import { getTemplateTextForId } from "@/lib/predictions/reality-template";
+import { parseQuestionLocal } from "@/lib/reality-social/parse-question-local";
 
 const UNIT_SEP = "\u241F";
 
@@ -18,38 +17,6 @@ const ZERO_ANSWER =
   "0x0000000000000000000000000000000000000000000000000000000000000000" as const;
 const ONE_ANSWER =
   "0x0000000000000000000000000000000000000000000000000000000000000001" as const;
-
-function isBadParsedTitle(title: string): boolean {
-  const t = title.trim();
-  if (!t) return true;
-  if (t.startsWith("[Badly formatted question]")) return true;
-  if (/^␟+$/.test(t) || /^[\u241F]+$/.test(t)) return true;
-  return false;
-}
-
-function buildDisplayFromParsed(
-  parsed: Record<string, unknown>,
-  raw: string
-): ParsedPredictionDisplay | null {
-  const title = String(parsed.title ?? "").trim();
-  if (isBadParsedTitle(title)) return null;
-
-  const outcomes = Array.isArray(parsed.outcomes)
-    ? parsed.outcomes.map(String)
-    : parseOutcomesSegment(String(parsed.outcomes ?? ""));
-  const type =
-    (parsed.type as ParsedPredictionDisplay["type"]) ??
-    inferTypeFromOutcomes(outcomes);
-
-  return {
-    title,
-    type,
-    outcomes: outcomes.length ? outcomes : type === "bool" ? ["Yes", "No"] : [],
-    category: String(parsed.category ?? "general"),
-    language: String(parsed.lang ?? parsed.language ?? "en_US"),
-    description: parsed.description ? String(parsed.description) : undefined,
-  };
-}
 
 function parseOutcomesSegment(segment: string): string[] {
   const trimmed = segment.trim();
@@ -154,7 +121,7 @@ export function applyPredictionMetadataOverride(
  */
 export function parsePredictionDisplay(
   questionText: string,
-  templateId?: string | number | bigint | null
+  _templateId?: string | number | bigint | null
 ): ParsedPredictionDisplay {
   const raw = (questionText ?? "").trim();
   if (!raw) {
@@ -167,18 +134,14 @@ export function parsePredictionDisplay(
     };
   }
 
-  const tid = templateId != null ? Number(templateId) : NaN;
-  if (!Number.isNaN(tid)) {
-    const templateText = getTemplateTextForId(tid);
-    if (templateText) {
-      try {
-        const parsed = parseQuestionText(templateText, raw);
-        const display = buildDisplayFromParsed(parsed, raw);
-        if (display) return display;
-      } catch {
-        // fall through to manual split
-      }
-    }
+  // Unit-separator format (Creative TV default). Avoid @reality.eth/reality-eth-lib here —
+  // it pulls jsdom/html-encoding-sniffer and crashes Vercel Node (ERR_REQUIRE_ESM).
+  const local = parseQuestionLocal(raw);
+  if (local) {
+    return {
+      ...local,
+      language: "en_US",
+    };
   }
 
   const parts = raw.split(UNIT_SEP);
