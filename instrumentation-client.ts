@@ -71,6 +71,9 @@ if (!botIdGlobal.__crtvBotIdInit) {
       botIdDeepAnalysisRoute('/api/predictions/quota', 'GET'),
       botIdDeepAnalysisRoute('/api/predictions/record', 'POST'),
       botIdDeepAnalysisRoute('/api/predictions/metadata', 'GET'),
+      // Soft BotID (requireHumanOrVerifiedBot): humans + Vercel-verified bots.
+      botIdDeepAnalysisRoute('/api/predictions/gate', 'POST'),
+      botIdDeepAnalysisRoute('/api/campaigns', 'POST'),
       botIdDeepAnalysisRoute('/api/stickers/upload', 'POST'),
       botIdDeepAnalysisRoute('/api/stickers/register', 'POST'),
       botIdDeepAnalysisRoute('/api/stickers/verify-vote', 'POST'),

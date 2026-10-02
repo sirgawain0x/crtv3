@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { checkBotIdDeep } from "@/lib/middleware/botIdGuard";
+import { requireHumanOrVerifiedBot } from "@/lib/middleware/botIdGuard";
 import { rateLimiters } from "@/lib/middleware/rateLimit";
 import { requireWalletAuthFor, WalletAuthError } from "@/lib/auth/require-wallet";
 import { CampaignFormSchema } from "@/lib/validations/campaign";
@@ -15,12 +15,11 @@ import { evaluateCampaignDraft } from "@/lib/decision-models/campaign-gate";
  * POST /api/campaigns
  * Brand creates a pending shoppable campaign + Grove product kit.
  * TypeSafe Jev review (when configured) is free — COGS is negligible vs UX friction.
+ * BotID: humans + verified bots (must stay in instrumentation-client protect list).
  */
 export async function POST(req: NextRequest) {
-  const verification = await checkBotIdDeep();
-  if (verification.isBot) {
-    return NextResponse.json({ error: "Access denied" }, { status: 403 });
-  }
+  const botGuard = await requireHumanOrVerifiedBot("campaigns-create");
+  if (!botGuard.allowed) return botGuard.response;
   const rl = await rateLimiters.standard(req);
   if (rl) return rl;
 

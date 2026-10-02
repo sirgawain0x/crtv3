@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { checkBotIdDeep } from "@/lib/middleware/botIdGuard";
+import { requireHumanOrVerifiedBot } from "@/lib/middleware/botIdGuard";
 import { rateLimiters } from "@/lib/middleware/rateLimit";
 import { evaluatePredictionDraft } from "@/lib/decision-models/prediction-gate";
 
@@ -22,13 +22,12 @@ const bodySchema = z.object({
  * Decision-model quality/structure check for a prediction draft.
  * Never resolves markets or picks winning outcomes.
  * TypeSafe Jev review (when configured) is free — abuse is handled by
- * BotID, rate limits, and prediction quotas, not per-call USDC.
+ * BotID (humans + verified bots), rate limits, and prediction quotas.
+ * Must stay in instrumentation-client protect list for browser header injection.
  */
 export async function POST(request: NextRequest) {
-  const verification = await checkBotIdDeep();
-  if (verification.isBot) {
-    return NextResponse.json({ error: "Access denied" }, { status: 403 });
-  }
+  const botGuard = await requireHumanOrVerifiedBot("predictions-gate");
+  if (!botGuard.allowed) return botGuard.response;
   const rl = await rateLimiters.standard(request);
   if (rl) return rl;
 

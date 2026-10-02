@@ -58,6 +58,24 @@ Prices are USDC base units (6 decimals). `10000` = $0.01 USDC.
 | `GET /api/livepeer/playback-info?playbackId=` | `playback.info` | 50000 |
 | `GET /api/livepeer/views/{playbackId}` | `views.metrics` | 50000 |
 
+## BotID vs Platform API (external agents)
+
+**External AI agents and partner bots must use only the Platform API routes above** (admin/partner key or x402). Those four routes are **not** behind Vercel BotID.
+
+Do **not** call in-app mutating or decision routes from external agents:
+
+- `/api/campaigns`, `/api/predictions/gate`, `/api/predictions/record`, …
+- `/api/ai/generate-thumbnail`, mint, swap, upload, etc.
+
+Those routes use BotID Deep Analysis. Partner/admin API keys and x402 proofs are **not** a BotID bypass. Unverified automated clients get `403` with `code: "BOTID_DENIED"`.
+
+| Caller | Intended path |
+|--------|----------------|
+| External agent / Mixtape / partner app | Platform API (keys or x402) on the four GET routes |
+| In-app browser (Creative Guide, create campaign/predict) | Soft BotID (`requireHumanOrVerifiedBot`) + wallet auth where required |
+| Vercel-verified bots (Kasada allowlist) | Soft BotID routes only — still not a substitute for Platform API |
+| Cron / XMTP workers | Own routes with `CRON_SECRET` or no BotID; never HTTP self-fetch into hard-BotID APIs |
+
 ## Mixtape integration (air.creativeplatform.xyz)
 
 **Use a server-side proxy.** Do not expose the partner key in the browser.
