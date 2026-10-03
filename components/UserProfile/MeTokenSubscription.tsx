@@ -9,6 +9,8 @@ import { Loader2, AlertCircle, CheckCircle, ExternalLink } from 'lucide-react';
 import Image from 'next/image';
 import { parseUnits, formatUnits, encodeFunctionData, maxUint256, type Address } from "viem";
 import { useSmartAccountClient, useChain } from '@/lib/wallet/react';
+import { useGasSponsorship } from '@/lib/hooks/wallet/useGasSponsorship';
+import { sendMeTokenSponsoredUserOp } from '@/lib/utils/metokenApproval';
 import { useMeTokensSupabase, MeTokenData } from '@/lib/hooks/metokens/useMeTokensSupabase';
 import { getHubVaultAddress } from '@/lib/utils/metokenSubscriptionUtils';
 import { getErc20Balance, getErc20Allowance } from "@/lib/viem";
@@ -59,7 +61,24 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
 
   const { client } = useSmartAccountClient({});
   const { chain } = useChain();
+  const { getMeTokenCreationGasContext, getGasContext } = useGasSponsorship();
   const { isPending, isConfirming, isConfirmed, transactionError } = useMeTokensSupabase();
+
+  const sendSponsoredUserOperation = async (uo: {
+    target: Address;
+    data: `0x${string}`;
+    value: bigint;
+  }) => {
+    if (!client) {
+      throw new Error('Wallet not connected');
+    }
+    return sendMeTokenSponsoredUserOp({
+      client,
+      call: uo,
+      gas: getMeTokenCreationGasContext(),
+      ethFallback: () => getGasContext('eth'),
+    });
+  };
 
   // Helper function to wait with countdown
   const waitWithCountdown = async (seconds: number) => {
@@ -189,13 +208,11 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
       logger.debug('💡 If this hangs, check your wallet - you may need to approve the transaction');
 
       // Add timeout wrapper
-      const approvePromise = client.sendUserOperation({
-        uo: {
-          target: collateralTokenAddress,
-          data: appendBuilderCode(approveData),
-          value: BigInt(0),
-          },
-          });
+      const approvePromise = sendSponsoredUserOperation({
+        target: collateralTokenAddress,
+        data: appendBuilderCode(approveData),
+        value: BigInt(0),
+      });
 
       const timeoutPromise = new Promise((_, reject) => {
         setTimeout(() => {
@@ -203,7 +220,7 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
         }, 120000); // 2 minutes timeout
       });
 
-      const approveOperation = await Promise.race([approvePromise, timeoutPromise]) as Awaited<ReturnType<typeof client.sendUserOperation>>;
+      const approveOperation = await Promise.race([approvePromise, timeoutPromise]);
 
       logger.debug('✅ Approve UserOperation sent:', approveOperation.hash);
       logger.debug('⏳ Waiting for approval confirmation...');
@@ -463,13 +480,11 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
         try {
           // Add timeout wrapper to prevent hanging
           logger.debug('⏳ Sending approve UserOperation (this may require wallet signature)...');
-          const approvePromise = client.sendUserOperation({
-            uo: {
-              target: collateralTokenAddress,
-              data: appendBuilderCode(approveData),
-              value: BigInt(0),
-              },
-              });
+          const approvePromise = sendSponsoredUserOperation({
+            target: collateralTokenAddress,
+            data: appendBuilderCode(approveData),
+            value: BigInt(0),
+          });
 
           const timeoutPromise = new Promise<never>((_, reject) => {
             setTimeout(() => {
@@ -614,12 +629,10 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
       for (let mintAttempt = 1; mintAttempt <= maxMintRetries; mintAttempt++) {
         try {
           logger.debug(`Mint attempt Mint attempt ${mintAttempt}/${maxMintRetries}...`);
-          const mintOperation = await client.sendUserOperation({
-            uo: {
-              target: diamondAddress,
-              data: appendBuilderCode(mintCalldata),
-              value: BigInt(0),
-            },
+          const mintOperation = await sendSponsoredUserOperation({
+            target: diamondAddress,
+            data: appendBuilderCode(mintCalldata),
+            value: BigInt(0),
           });
 
           logger.debug('✅ Mint UserOperation sent:', mintOperation.hash);
@@ -701,13 +714,11 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
             try {
               // Send a fresh approval transaction to force the bundler's node to see the allowance
               logger.debug('📝 Sending fresh approval to sync bundler state...');
-              const freshApproveOperation = await client.sendUserOperation({
-                uo: {
-                  target: collateralTokenAddress,
-                  data: appendBuilderCode(approveData),
-                  value: BigInt(0),
-                  },
-                  });
+              const freshApproveOperation = await sendSponsoredUserOperation({
+                target: collateralTokenAddress,
+                data: appendBuilderCode(approveData),
+                value: BigInt(0),
+              });
 
               logger.debug('✅ Fresh approve UserOperation sent:', freshApproveOperation.hash);
               setSuccess('Fresh approval sent! Waiting for confirmation...');
