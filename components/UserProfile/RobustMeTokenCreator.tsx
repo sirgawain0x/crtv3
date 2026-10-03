@@ -47,6 +47,8 @@ import {
   formatHubAssetAmount,
   parseHubAssetAmount,
   resolveHubAsset,
+  getMinimumMeTokenCreateDepositRaw,
+  isMeTokenCreateDepositSufficient,
 } from '@/lib/utils/hubAssetUtils';
 import { logger } from '@/lib/utils/logger';
 import { getErc20Balance } from '@/lib/viem';
@@ -213,9 +215,19 @@ export function RobustMeTokenCreator({ onMeTokenCreated, onClose }: RobustMeToke
     }
 
     const depositAmount = parseHubAssetAmount(assetsDeposited || '0', selectedAsset);
+    const minDeposit = getMinimumMeTokenCreateDepositRaw(selectedAsset);
     const selectedBalance = assetBalances[selectedAsset.symbol] ?? BigInt(0);
 
-    if (depositAmount > BigInt(0) && selectedBalance < depositAmount) {
+    if (!isMeTokenCreateDepositSufficient(depositAmount, selectedAsset)) {
+      toast({
+        title: 'Minimum deposit required',
+        description: `Deposit at least $1 (${formatHubAssetAmount(minDeposit, selectedAsset)} ${selectedAsset.symbol}) to create your MeToken.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (selectedBalance < depositAmount) {
       toast({
         title: `Insufficient ${selectedAsset.symbol}`,
         description: `You need ${formatHubAssetAmount(depositAmount, selectedAsset)} ${selectedAsset.symbol} but only have ${formatHubAssetAmount(selectedBalance, selectedAsset)} ${selectedAsset.symbol}.`,
@@ -244,6 +256,8 @@ export function RobustMeTokenCreator({ onMeTokenCreated, onClose }: RobustMeToke
   const isProcessing = !['idle', 'success', 'error'].includes(state.status);
   const selectedBalance = assetBalances[selectedAsset.symbol] ?? BigInt(0);
   const depositAmount = parseHubAssetAmount(assetsDeposited || '0', selectedAsset);
+  const minDeposit = getMinimumMeTokenCreateDepositRaw(selectedAsset);
+  const meetsMinDeposit = isMeTokenCreateDepositSufficient(depositAmount, selectedAsset);
   const hasEnoughCollateral = selectedBalance >= depositAmount;
   const currentStep = STATUS_STEPS[state.status];
 
@@ -487,26 +501,36 @@ export function RobustMeTokenCreator({ onMeTokenCreated, onClose }: RobustMeToke
 
                 <div className="space-y-2">
                   <Label htmlFor="assetsDeposited">
-                    Initial {selectedAsset.symbol} Deposit (Optional)
+                    Initial {selectedAsset.symbol} Deposit (minimum $1)
                   </Label>
                   <Input
                     id="assetsDeposited"
                     type="number"
-                    placeholder="0.00"
+                    placeholder={formatHubAssetAmount(minDeposit, selectedAsset)}
                     value={assetsDeposited}
                     onChange={(e) => setAssetsDeposited(e.target.value)}
                     disabled={isProcessing}
                     step="0.01"
-                    min="0"
+                    min={formatHubAssetAmount(minDeposit, selectedAsset)}
                   />
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
                     <span>
                       Your {selectedAsset.symbol} balance:{' '}
                       {formatHubAssetAmount(selectedBalance, selectedAsset)} {selectedAsset.symbol}
                     </span>
-                    {assetsDeposited && depositAmount > BigInt(0) && (
-                      <span className={hasEnoughCollateral ? 'text-green-600' : 'text-red-600'}>
-                        {hasEnoughCollateral ? '✓ Sufficient' : '✗ Insufficient'}
+                    {assetsDeposited && (
+                      <span
+                        className={
+                          meetsMinDeposit && hasEnoughCollateral
+                            ? 'text-green-600'
+                            : 'text-red-600'
+                        }
+                      >
+                        {meetsMinDeposit && hasEnoughCollateral
+                          ? '✓ Sufficient'
+                          : !meetsMinDeposit
+                            ? `✗ Min ${formatHubAssetAmount(minDeposit, selectedAsset)} ${selectedAsset.symbol}`
+                            : '✗ Insufficient'}
                       </span>
                     )}
                   </div>
@@ -519,7 +543,8 @@ export function RobustMeTokenCreator({ onMeTokenCreated, onClose }: RobustMeToke
                     !name ||
                     !symbol ||
                     hubOptions.length === 0 ||
-                    (depositAmount > BigInt(0) && !hasEnoughCollateral)
+                    !meetsMinDeposit ||
+                    !hasEnoughCollateral
                   }
                   className="w-full"
                   size="lg"

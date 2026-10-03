@@ -77,15 +77,46 @@ const DIAMOND_ABI = [
   }
 ] as const;
 
+function readMeTokenBigInt(
+  meToken: MeTokenData | MeTokenInfo,
+  field: 'balancePooled' | 'balanceLocked' | 'hubId'
+): bigint {
+  const withInfo = meToken as MeTokenData;
+  if ('info' in withInfo && withInfo.info) {
+    const fromInfo = withInfo.info[field];
+    if (fromInfo != null) {
+      return typeof fromInfo === 'bigint' ? fromInfo : BigInt(String(fromInfo));
+    }
+  }
+
+  if (field in meToken && (meToken as Record<string, unknown>)[field] != null) {
+    const value = (meToken as Record<string, unknown>)[field];
+    return typeof value === 'bigint' ? value : BigInt(String(value));
+  }
+
+  const fallback = (meToken as MeTokenInfo)[field];
+  return typeof fallback === 'bigint' ? fallback : BigInt(String(fallback ?? '0'));
+}
+
+/** Subscribed when assigned to a hub or when collateral is pooled/locked. */
+function evaluateMeTokenSubscription(
+  hubId: bigint,
+  balancePooled: bigint,
+  balanceLocked: bigint
+): boolean {
+  return hubId > BigInt(0) || balancePooled > BigInt(0) || balanceLocked > BigInt(0);
+}
+
 /**
  * Check if a MeToken is subscribed to a hub
- * A MeToken is considered subscribed if it has balancePooled > 0 or balanceLocked > 0
+ * A MeToken is subscribed when hubId is set or it has pooled/locked collateral
  */
 export function isMeTokenSubscribed(meToken: MeTokenData | MeTokenInfo): boolean {
-  const balancePooled = 'balancePooled' in meToken ? meToken.balancePooled : BigInt((meToken as MeTokenInfo).balancePooled || '0');
-  const balanceLocked = 'balanceLocked' in meToken ? meToken.balanceLocked : BigInt((meToken as MeTokenInfo).balanceLocked || '0');
+  const hubId = readMeTokenBigInt(meToken, 'hubId');
+  const balancePooled = readMeTokenBigInt(meToken, 'balancePooled');
+  const balanceLocked = readMeTokenBigInt(meToken, 'balanceLocked');
 
-  return balancePooled > BigInt(0) || balanceLocked > BigInt(0);
+  return evaluateMeTokenSubscription(hubId, balancePooled, balanceLocked);
 }
 
 /**
@@ -106,11 +137,11 @@ export function getMeTokenSubscriptionStatus(meToken: MeTokenData | MeTokenInfo)
  * Get detailed subscription information
  */
 export function getMeTokenSubscriptionDetails(meToken: MeTokenData | MeTokenInfo) {
-  const balancePooled = 'balancePooled' in meToken ? meToken.balancePooled : BigInt((meToken as MeTokenInfo).balancePooled || '0');
-  const balanceLocked = 'balanceLocked' in meToken ? meToken.balanceLocked : BigInt((meToken as MeTokenInfo).balanceLocked || '0');
-  const hubId = 'hubId' in meToken ? meToken.hubId : BigInt((meToken as MeTokenInfo).hubId || '0');
+  const balancePooled = readMeTokenBigInt(meToken, 'balancePooled');
+  const balanceLocked = readMeTokenBigInt(meToken, 'balanceLocked');
+  const hubId = readMeTokenBigInt(meToken, 'hubId');
 
-  const isSubscribed = balancePooled > BigInt(0) || balanceLocked > BigInt(0);
+  const isSubscribed = evaluateMeTokenSubscription(hubId, balancePooled, balanceLocked);
 
   return {
     isSubscribed,
@@ -283,7 +314,7 @@ export async function checkMeTokenSubscriptionFromBlockchain(meTokenAddress: str
       migration = meTokenInfo.migration ?? '0x0000000000000000000000000000000000000000';
     }
 
-    const isSubscribed = balancePooled > BigInt(0) || balanceLocked > BigInt(0);
+    const isSubscribed = evaluateMeTokenSubscription(hubId, balancePooled, balanceLocked);
     const totalLocked = balancePooled + balanceLocked;
 
     logger.debug('📊 Subscription status:', {
