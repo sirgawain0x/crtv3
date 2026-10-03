@@ -25,6 +25,18 @@ export function parseHubAssetAmount(amount: string, asset: AmountAsset): bigint 
   return parseUnits(amount || '0', resolveDecimals(asset));
 }
 
+/** Minimum initial collateral for MeToken create ($1 in hub token raw units). */
+export function getMinimumMeTokenCreateDepositRaw(asset: AmountAsset): bigint {
+  return parseUnits('1', resolveDecimals(asset));
+}
+
+export function isMeTokenCreateDepositSufficient(
+  amount: bigint,
+  asset: AmountAsset
+): boolean {
+  return amount >= getMinimumMeTokenCreateDepositRaw(asset);
+}
+
 export function formatHubAssetAmount(amount: bigint, asset: AmountAsset): string {
   return formatUnits(amount, resolveDecimals(asset));
 }

@@ -16,6 +16,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { logger } from '@/lib/utils/logger';
 import { getErc20Balance } from '@/lib/viem';
 import { resolveHubAsset } from '@/lib/utils/hubAssetUtils';
+import { isMeTokenSubscribed } from '@/lib/utils/metokenSubscriptionUtils';
 import {
   clearMeTokenHoldingsCache,
 } from '@/lib/hooks/metokens/useMeTokenHoldings';
@@ -37,12 +38,8 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
 
   // Initialize subscription status from meToken prop data immediately
   // This prevents showing "not subscribed" while waiting for blockchain check
-  const getInitialSubscriptionStatus = (meToken: MeTokenData): boolean => {
-    // Check balancePooled and balanceLocked directly from prop data
-    const balancePooled = meToken.info?.balancePooled ?? BigInt(0);
-    const balanceLocked = meToken.info?.balanceLocked ?? BigInt(0);
-    return balancePooled > BigInt(0) || balanceLocked > BigInt(0);
-  };
+  const getInitialSubscriptionStatus = (meToken: MeTokenData): boolean =>
+    isMeTokenSubscribed(meToken);
 
   const [isSubscribed, setIsSubscribed] = useState<boolean | null>(() =>
     getInitialSubscriptionStatus(meToken)

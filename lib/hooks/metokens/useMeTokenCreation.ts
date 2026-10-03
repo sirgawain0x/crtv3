@@ -13,6 +13,8 @@ import { parseBundlerError } from '@/lib/utils/bundlerErrorParser';
 import {
   parseHubAssetAmount,
   formatHubAssetAmount,
+  getMinimumMeTokenCreateDepositRaw,
+  isMeTokenCreateDepositSufficient,
 } from '@/lib/utils/hubAssetUtils';
 import { fetchHubCreationContext } from '@/lib/metokens/hub-onchain';
 import { logger } from '@/lib/utils/logger';
@@ -254,6 +256,13 @@ export function useMeTokenCreation(): UseMeTokenCreationReturn {
 
       const { collateral, vault: vaultAddress } = hubContext;
       const depositAmount = parseHubAssetAmount(assetsDeposited, collateral);
+      const minDeposit = getMinimumMeTokenCreateDepositRaw(collateral);
+
+      if (!isMeTokenCreateDepositSufficient(depositAmount, collateral)) {
+        throw new Error(
+          `Initial deposit must be at least $1 (${formatHubAssetAmount(minDeposit, collateral)} ${collateral.symbol}).`
+        );
+      }
 
       updateState({
         status: 'checking_balance',
