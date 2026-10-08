@@ -16,14 +16,15 @@
 ## Architecture
 
 ```
-Creators (TV) ──► crtv3 API (draft/publish/subscribe)
+Creators (TV) ──► crtv3 (compose UI, /news archive, TV feeds, MeTokens)
                       │
-                      ├── Supabase (publications, issues, subscribers)
-                      ├── Mailgun (send issue, confirm subscribe)
-                      └── RSS/JSON public feeds for TV listing
+                      ├── Supabase newsletter_* (mirror / owned reader)
+                      └── listmonk API (lists + campaigns + send)
 
-agency-os agents ──► (future) POST drafts to crtv3 internal API or shared DB
-Dear Creative TV  ──► NEWSLETTER_PROVIDER=paragraph | creative
+listmonk ──SMTP──► Mailgun
+agency-os ──HTTP──► listmonk (invite, suppress pull, billing gate phase 2)
+
+Dear Creative TV: NEWSLETTER_PROVIDER=paragraph | creative | listmonk (future)
 ```
 
 ## `NEWSLETTER_PROVIDER`
@@ -32,6 +33,7 @@ Dear Creative TV  ──► NEWSLETTER_PROVIDER=paragraph | creative
 |-------|-----|
 | `paragraph` (default) | Production Dear Creative until cutover |
 | `creative` | Issues from Supabase + public URLs on TV |
+| `listmonk` (planned) | Issues/lists from listmonk API; canonical on `news.*` when DNS ready |
 
 ## G2 blockers (unchanged themes)
 
