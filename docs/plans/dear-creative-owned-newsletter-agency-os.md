@@ -6,8 +6,10 @@
 ## Decision (G2 / product)
 
 - **Per-creator newsletters** on Creative Platform: compose, list, send, public archive on TV.
-- **Mailgun** for transactional/broadcast send from `crtv3` (env-gated).
-- **agency-os** for agent drafting and outbound workflows; not the primary list host. Its codebase today has **SMTP/Smartlead** and a **Listmonk integration spec** (`docs/LISTMONK_INTEGRATION.md`) — **no Mailgun env vars yet**. Creative-owned lists live in **Supabase** (`newsletter_*` tables).
+- **listmonk** ([`sirgawain0x/listmonk`](https://github.com/sirgawain0x/listmonk)) for **lists, send, unsubscribes** (upstream-style fork; deploy Docker/Railway per agency-os §5).
+- **Mailgun** as **SMTP relay inside listmonk** (and optional transactional mail from crtv3 until listmonk is live).
+- **agency-os** (`docs/LISTMONK_INTEGRATION.md`, status: proposed): sync subscribers, suppressions, billing gate — **not** duplicate send logic in Python.
+- **crtv3** Supabase `newsletter_*` tables: creator UX + TV archive mirror until `NEWSLETTER_PROVIDER=listmonk` adapter lands.
 - **Beehiiv / Buttondown:** not the long-term platform path. Paragraph remains production for `news.creativeplatform.xyz` until owned send + TV listing are proven (same dual-run rule as before).
 - **MeTokens:** optional `metoken_address` on a publication for author economics; independent of send provider.
 
