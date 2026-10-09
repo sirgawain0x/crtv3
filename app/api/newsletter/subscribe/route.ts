@@ -5,7 +5,29 @@ import { createServiceClient } from "@/lib/sdk/supabase/service";
 import { isMailgunConfigured, sendMailgunMessage } from "@/lib/mailgun/send";
 import { serverLogger } from "@/lib/utils/logger";
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+/** Linear-time email check — avoids ReDoS from unbounded negated classes. */
+function isValidEmail(email: string): boolean {
+  if (email.length < 3 || email.length > 254) return false;
+  const at = email.indexOf("@");
+  if (at <= 0 || at !== email.lastIndexOf("@")) return false;
+
+  const local = email.slice(0, at);
+  const domain = email.slice(at + 1);
+  if (!local || local.length > 64 || !domain) return false;
+  if (domain.startsWith(".") || domain.endsWith(".") || domain.includes("..")) {
+    return false;
+  }
+
+  const dot = domain.lastIndexOf(".");
+  if (dot <= 0 || dot === domain.length - 1) return false;
+
+  for (let i = 0; i < email.length; i++) {
+    const c = email.charCodeAt(i);
+    // disallow whitespace / control chars
+    if (c <= 32 || c === 127) return false;
+  }
+  return true;
+}
 
 export async function POST(request: NextRequest) {
   const verification = await checkBotIdDeep();
@@ -26,7 +48,7 @@ export async function POST(request: NextRequest) {
   const publicationSlug = body.publicationSlug?.trim();
   const email = body.email?.trim().toLowerCase();
 
-  if (!publicationSlug || !email || !EMAIL_RE.test(email)) {
+  if (!publicationSlug || !email || !isValidEmail(email)) {
     return NextResponse.json(
       { error: "publicationSlug and valid email are required" },
       { status: 400 }
