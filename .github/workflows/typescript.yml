@@ -1,0 +1,24 @@
+name: TypeScript
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.22.2"
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn install --production=false --network-timeout 600000
+
+      - name: TypeScript (tsc --noEmit)
+        run: npx tsc --noEmit
