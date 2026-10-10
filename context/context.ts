@@ -25,8 +25,9 @@ export const SITE_PRODUCT = "TV";
 
 // Hero section constants - used on landing page
 export const HERO_NAME = {
-  top: "Record Once,",
-  bottom: "Use Everywhere!",
+  first: "Make\u00A0it.",
+  second: "Share\u00A0it.",
+  third: "Own\u00A0it.",
 };
 
 /**
@@ -34,8 +35,7 @@ export const HERO_NAME = {
  * References SITE_NAME to maintain consistency if branding changes
  */
 export const HERO_DESCRIPTION =
-  `${SITE_NAME} is a decentralized live-streaming platform that puts you in control of your content and earnings. ` +
-  `Get paid 100% of streaming revenue, have access to your own token, and monetize your content.`;
+  `${SITE_NAME} is home for creator video\u00A0— music, code, campaigns, culture. Create, stream, and grow your audience while your work stays yours.`;
 
 /**
  * Primary call to action buttons on the hero section
@@ -43,12 +43,12 @@ export const HERO_DESCRIPTION =
  */
 export const HERO_BUTTONS = {
   primary: {
-    text: "Get Started",
-    href: "/",
+    text: "Start Streaming",
+    href: "/upload",
   },
   secondary: {
-    text: "Watch Demo",
-    href: "/",
+    text: "Explore Channels",
+    href: "/discover",
   },
 };
 
