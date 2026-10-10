@@ -214,7 +214,7 @@ export function MeTokenSubscription({ meToken, onSubscriptionSuccess }: MeTokenS
         value: BigInt(0),
       });
 
-      const timeoutPromise = new Promise((_, reject) => {
+      const timeoutPromise = new Promise<never>((_, reject) => {
         setTimeout(() => {
           reject(new Error('Transaction signature timeout. Please check your wallet and approve the transaction, or try again.'));
         }, 120000); // 2 minutes timeout

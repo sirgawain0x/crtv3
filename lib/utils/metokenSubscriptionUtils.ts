@@ -89,8 +89,8 @@ function readMeTokenBigInt(
     }
   }
 
-  if (field in meToken && (meToken as Record<string, unknown>)[field] != null) {
-    const value = (meToken as Record<string, unknown>)[field];
+  if (field in meToken && (meToken as unknown as Record<string, unknown>)[field] != null) {
+    const value = (meToken as unknown as Record<string, unknown>)[field];
     return typeof value === 'bigint' ? value : BigInt(String(value));
   }
 
