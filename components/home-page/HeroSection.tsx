@@ -91,11 +91,16 @@ const HeroSection: React.FC = () => {
             }
           >
             <span className="relative inline-block">
-              <span className="absolute inset-0 bottom-1 left-0 -z-10 h-1/3 w-full bg-orange-500"></span>
-              {HERO_NAME.top}
+              <span
+                className="absolute left-0 bottom-[0.12em] -z-10 h-[0.28em] w-full bg-orange-500"
+                aria-hidden="true"
+              />
+              {HERO_NAME.first}
             </span>
             <br />
-            <span className="text-orange-600">{HERO_NAME.bottom}</span>
+            <span className="text-orange-600">{HERO_NAME.second}</span>
+            <br />
+            <span className="text-orange-600">{HERO_NAME.third}</span>
           </h1>
           <p className="text-lg text-gray-800 dark:text-gray-200 md:text-xl">
             {HERO_DESCRIPTION}

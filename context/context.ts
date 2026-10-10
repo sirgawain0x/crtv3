@@ -25,8 +25,9 @@ export const SITE_PRODUCT = "TV";
 
 // Hero section constants - used on landing page
 export const HERO_NAME = {
-  top: "Make it.",
-  bottom: "Share it. Own it.",
+  first: "Make\u00A0it.",
+  second: "Share\u00A0it.",
+  third: "Own\u00A0it.",
 };
 
 /**
