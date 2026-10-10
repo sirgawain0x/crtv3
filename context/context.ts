@@ -25,8 +25,8 @@ export const SITE_PRODUCT = "TV";
 
 // Hero section constants - used on landing page
 export const HERO_NAME = {
-  top: "Record Once,",
-  bottom: "Use Everywhere!",
+  top: "Make it.",
+  bottom: "Share it. Own it.",
 };
 
 /**
@@ -34,9 +34,7 @@ export const HERO_NAME = {
  * References SITE_NAME to maintain consistency if branding changes
  */
 export const HERO_DESCRIPTION =
-  `${SITE_NAME} is where music videos get made, shared, and watched. Upload once, stream everywhere, and keep ownership of your work.`;
-// Option B: "Make it, share it, own it. Creative TV is home for music videos: create, stream, and grow your audience while your work stays yours."
-// Option C: "Creative TV is a home for music videos and the people who make them. Create, share, and watch, and keep the rights to everything you make."
+  `${SITE_NAME} is home for creator video\u00A0— music, code, campaigns, culture. Create, stream, and grow your audience while your work stays yours.`;
 
 /**
  * Primary call to action buttons on the hero section
@@ -44,12 +42,12 @@ export const HERO_DESCRIPTION =
  */
 export const HERO_BUTTONS = {
   primary: {
-    text: "Get Started",
-    href: "/",
+    text: "Start Streaming",
+    href: "/upload",
   },
   secondary: {
-    text: "Watch Demo",
-    href: "/",
+    text: "Explore Channels",
+    href: "/discover",
   },
 };
 
