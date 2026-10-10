@@ -34,8 +34,9 @@ export const HERO_NAME = {
  * References SITE_NAME to maintain consistency if branding changes
  */
 export const HERO_DESCRIPTION =
-  `${SITE_NAME} is a decentralized live-streaming platform that puts you in control of your content and earnings. ` +
-  `Get paid 100% of streaming revenue, have access to your own token, and monetize your content.`;
+  `${SITE_NAME} is where music videos get made, shared, and watched. Upload once, stream everywhere, and keep ownership of your work.`;
+// Option B: "Make it, share it, own it. Creative TV is home for music videos: create, stream, and grow your audience while your work stays yours."
+// Option C: "Creative TV is a home for music videos and the people who make them. Create, share, and watch, and keep the rights to everything you make."
 
 /**
  * Primary call to action buttons on the hero section

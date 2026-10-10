@@ -117,9 +117,9 @@ const FeaturedVideo: React.FC = () => {
             <h4 className="text-lg font-medium mb-4">Episode Highlights</h4>
             <ul className="list-inside list-disc space-y-2">
               <li>The evolution of creative platforms</li>
-              <li>How Web3 is changing content monetization</li>
+              <li>How independent artists are reaching fans directly</li>
               <li>Building direct creator-audience relationships</li>
-              <li>The future of decentralized media</li>
+              <li>What's next for music video culture</li>
             </ul>
           </div>
         </div>
