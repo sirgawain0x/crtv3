@@ -20,5 +20,8 @@ jobs:
       - name: Install dependencies
         run: yarn install --production=false --network-timeout 600000
 
+      - name: Generate Next.js types
+        run: npx next typegen
+
       - name: TypeScript (tsc --noEmit)
         run: npx tsc --noEmit
