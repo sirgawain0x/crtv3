@@ -82,35 +82,54 @@ const HeroSection: React.FC = () => {
   }
 
   return (
-    <div className="md:py-18 mx-auto max-w-7xl py-10">
+    <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 md:py-18">
       <div className="flex flex-col-reverse items-center justify-between md:flex-row">
         <div className="mt-8 flex-1 space-y-5 md:mt-0 md:space-y-10 text-center md:text-left">
           <h1
             className={
-              "text-[clamp(3rem,5vw,4rem)] font-bold leading-tight text-gray-900 dark:text-white"
+              "text-[clamp(2.25rem,6.5vw,2.75rem)] font-bold leading-tight text-gray-900 " +
+              "dark:text-white sm:text-[clamp(2.5rem,5vw,3rem)] " +
+              "md:text-[clamp(1.75rem,2.6vw,2.25rem)] lg:text-[clamp(2.5rem,2.6vw,3.5rem)]"
             }
           >
-            <span className="relative inline-block">
-              <span
-                className="absolute left-0 bottom-[0.12em] -z-10 h-[0.28em] w-full bg-orange-500"
-                aria-hidden="true"
-              />
+            <span className="block text-orange-600 md:inline">
               {HERO_NAME.first}
             </span>
-            <br />
-            <span className="text-orange-600">{HERO_NAME.second}</span>
-            <br />
-            <span className="text-orange-600">{HERO_NAME.third}</span>
+            <span
+              className={
+                "block text-orange-600 md:inline md:before:inline md:before:whitespace-pre md:before:content-['_']"
+              }
+            >
+              {HERO_NAME.second}
+            </span>
+            <span
+              className={
+                "block md:inline md:before:inline md:before:whitespace-pre md:before:content-['_']"
+              }
+            >
+              <span className="relative inline-block text-gray-900 dark:text-white">
+                <span
+                  className="absolute left-0 bottom-[0.12em] -z-10 h-[0.28em] w-full bg-orange-500"
+                  aria-hidden="true"
+                />
+                {HERO_NAME.third}
+              </span>
+            </span>
           </h1>
           <p className="text-lg text-gray-800 dark:text-gray-200 md:text-xl">
             {HERO_DESCRIPTION}
           </p>
-          <div className="flex flex-col items-center space-y-4 sm:flex-row sm:justify-center sm:space-x-6 sm:space-y-0 md:justify-start">
+          <div
+            className={
+              "flex flex-col items-center gap-4 sm:flex-row sm:flex-wrap sm:justify-center " +
+              "md:justify-start md:gap-x-4 lg:gap-x-6"
+            }
+          >
             <Link
               href={HERO_BUTTONS.primary.href}
               className={
-                "rounded-full bg-pink-600 px-6 py-2 text-lg font-semibold text-white " +
-                "transition duration-200 hover:bg-pink-700 lg:py-3"
+                "whitespace-nowrap rounded-full bg-pink-600 px-5 py-2 text-base font-semibold text-white " +
+                "transition duration-200 hover:bg-pink-700 lg:px-6 lg:py-3 lg:text-lg"
               }
             >
               {HERO_BUTTONS.primary.text}
@@ -118,9 +137,10 @@ const HeroSection: React.FC = () => {
             <Link
               href={HERO_BUTTONS.secondary.href}
               className={
-                "rounded-full border-2 border-gray-900 px-6 py-2 text-lg font-semibold text-gray-900 " +
-                "transition duration-200 hover:bg-gray-900 hover:text-white dark:border-white dark:text-white " +
-                "dark:hover:bg-white dark:hover:text-gray-900 lg:py-3"
+                "whitespace-nowrap rounded-full border-2 border-gray-900 px-5 py-2 text-base font-semibold " +
+                "text-gray-900 transition duration-200 hover:bg-gray-900 hover:text-white " +
+                "dark:border-white dark:text-white dark:hover:bg-white dark:hover:text-gray-900 " +
+                "lg:px-6 lg:py-3 lg:text-lg"
               }
             >
               {HERO_BUTTONS.secondary.text}
