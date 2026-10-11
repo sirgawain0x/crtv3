@@ -87,7 +87,9 @@ const HeroSection: React.FC = () => {
         <div className="mt-8 flex-1 space-y-5 md:mt-0 md:space-y-10 text-center md:text-left">
           <h1
             className={
-              "text-[clamp(3rem,5vw,4rem)] font-bold leading-tight text-gray-900 dark:text-white"
+              "text-[clamp(2.25rem,6.5vw,2.75rem)] font-bold leading-tight text-gray-900 " +
+              "dark:text-white sm:text-[clamp(2.5rem,5vw,3rem)] " +
+              "md:text-[clamp(1.75rem,2.6vw,2.25rem)] lg:text-[clamp(2.5rem,2.6vw,3.5rem)]"
             }
           >
             <span className="relative inline-block">
@@ -97,10 +99,20 @@ const HeroSection: React.FC = () => {
               />
               {HERO_NAME.first}
             </span>
-            <br />
-            <span className="text-orange-600">{HERO_NAME.second}</span>
-            <br />
-            <span className="text-orange-600">{HERO_NAME.third}</span>
+            <span
+              className={
+                "block text-orange-600 md:inline md:before:inline md:before:whitespace-pre md:before:content-['_']"
+              }
+            >
+              {HERO_NAME.second}
+            </span>
+            <span
+              className={
+                "block text-orange-600 md:inline md:before:inline md:before:whitespace-pre md:before:content-['_']"
+              }
+            >
+              {HERO_NAME.third}
+            </span>
           </h1>
           <p className="text-lg text-gray-800 dark:text-gray-200 md:text-xl">
             {HERO_DESCRIPTION}
