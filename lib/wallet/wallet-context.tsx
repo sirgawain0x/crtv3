@@ -17,6 +17,7 @@ import {
   createCompatSmartAccountClient,
   type CompatSmartAccountClient,
 } from "./smart-wallet-client";
+import { WALLET_INIT_TIMEOUT_MS } from "./wallet-init-timeout";
 
 type WalletClientContextValue = {
   signer: LocalAccount | undefined;
@@ -41,10 +42,18 @@ export function WalletClientProvider({ children }: { children: ReactNode }) {
   const [isLoadingClient, setIsLoadingClient] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [refreshToken, setRefreshToken] = useState(0);
+  const [initTimedOut, setInitTimedOut] = useState(false);
 
   const refreshClient = useCallback(() => {
     setRefreshToken((n) => n + 1);
   }, []);
+
+  useEffect(() => {
+    setInitTimedOut(false);
+    if (!authenticated || !ready) return;
+    const timer = setTimeout(() => setInitTimedOut(true), WALLET_INIT_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [authenticated, ready, wallets, refreshToken]);
 
   useEffect(() => {
     let cancelled = false;
@@ -112,13 +121,14 @@ export function WalletClientProvider({ children }: { children: ReactNode }) {
       client,
       address: client?.scaAddress,
       isLoadingClient:
-        !ready ||
-        (authenticated && !error && (!privyWallet || !signer)) ||
-        isLoadingClient,
+        !initTimedOut &&
+        (!ready ||
+          (authenticated && !error && (!privyWallet || !signer)) ||
+          isLoadingClient),
       error,
       refreshClient,
     }),
-    [signer, client, isLoadingClient, ready, authenticated, privyWallet, error, refreshClient],
+    [signer, client, isLoadingClient, ready, authenticated, privyWallet, error, refreshClient, initTimedOut],
   );
 
   return (

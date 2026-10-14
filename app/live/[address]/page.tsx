@@ -87,7 +87,16 @@ async function fetchStreamKeyWithRetry(
 
 
 export default function LivePage() {
-  const { creatorAddress, signerAddress, smartAccountAddress, eoaAddress, isConnected, isLoading: isWalletLoading } = useCreatorWalletAddress();
+  const {
+    creatorAddress,
+    signerAddress,
+    smartAccountAddress,
+    eoaAddress,
+    isConnected,
+    isAuthenticated,
+    walletInitTimedOut,
+    isLoading: isWalletLoading,
+  } = useCreatorWalletAddress();
   const { getAuthHeaders, isReady: isWalletAuthReady } = useWalletAuth();
   const { membershipDetails, isLoading: isMembershipLoading } = useMembershipVerification();
   const canStream =
@@ -421,21 +430,45 @@ export default function LivePage() {
     }
   }
 
+  if (!isAuthenticated) {
+    return (
+      <MembershipGuard>
+        <div className="min-h-screen p-6">
+          <Alert variant="destructive">
+            <FaExclamationTriangle className="h-4 w-4" />
+            <AlertTitle>Authentication Required</AlertTitle>
+            <AlertDescription>
+              Please connect your wallet to access the live streaming feature.
+            </AlertDescription>
+          </Alert>
+        </div>
+      </MembershipGuard>
+    );
+  }
+
+  if (!isConnected && isWalletLoading && !walletInitTimedOut) {
+    return (
+      <MembershipGuard>
+        <div className="min-h-screen p-6 flex items-center justify-center text-sm text-muted-foreground">
+          Preparing your wallet…
+        </div>
+      </MembershipGuard>
+    );
+  }
+
   if (!isConnected) {
     return (
-      <ProfilePageGuard>
-        <MembershipGuard>
-          <div className="min-h-screen p-6">
-            <Alert variant="destructive">
-              <FaExclamationTriangle className="h-4 w-4" />
-              <AlertTitle>Authentication Required</AlertTitle>
-              <AlertDescription>
-                Please connect your wallet to access the live streaming feature.
-              </AlertDescription>
-            </Alert>
-          </div>
-        </MembershipGuard>
-      </ProfilePageGuard>
+      <MembershipGuard>
+        <div className="min-h-screen p-6">
+          <Alert variant="destructive">
+            <FaExclamationTriangle className="h-4 w-4" />
+            <AlertTitle>Could not load wallet</AlertTitle>
+            <AlertDescription>
+              Sign in again or reset your session, then return to Live Studio.
+            </AlertDescription>
+          </Alert>
+        </div>
+      </MembershipGuard>
     );
   }
 

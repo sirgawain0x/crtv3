@@ -22,6 +22,8 @@ const PUBLIC_PATHS = [
   '/vote',
   '/news',
   '/live',
+  '/go-live',
+  '/stream',
   '/watch',
   '/profile',
   '/upload',

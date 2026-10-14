@@ -5,7 +5,9 @@ import { NextPage } from "next";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, type ReactNode } from "react";
+import { usePrivy } from "@privy-io/react-auth";
 import { useUser } from "@/lib/wallet/react";
+import { GuardLoadingFallback } from "@/components/auth/GuardLoadingFallback";
 import { userToAccount } from "@/lib/types/account";
 import { ListUploadedAssets } from "@/components/UserProfile/list-uploaded-assets/ListUploadedAssets";
 import {
@@ -46,6 +48,7 @@ const MEMBERSHIP_ERROR_MESSAGES: Record<string, string> = {
 
 function ProfilePageGuard({ children }: { children: ReactNode }) {
   const router = useRouter();
+  const { ready, authenticated } = usePrivy();
   const activeAccount = useUser();
   const account = userToAccount(activeAccount);
 
@@ -54,7 +57,23 @@ function ProfilePageGuard({ children }: { children: ReactNode }) {
     // if (!account?.address && typeof window !== "undefined") router.replace("/");
   }, [account?.address, router]);
 
-  if (!account?.address) return null;
+  if (!ready) {
+    return (
+      <GuardLoadingFallback isLoading allowBypass message="Loading your session…">
+        {null}
+      </GuardLoadingFallback>
+    );
+  }
+
+  if (!authenticated) return null;
+
+  if (!account?.address) {
+    return (
+      <GuardLoadingFallback isLoading allowBypass message="Loading your session…">
+        {null}
+      </GuardLoadingFallback>
+    );
+  }
   return <>{children}</>;
 }
 

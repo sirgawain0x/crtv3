@@ -12,6 +12,7 @@ import { HeroPlayer } from "../Player/HeroPlayer";
 import { PlayerLoading } from "../Player/Player";
 import { getHeroPlaybackSource } from "../../lib/hooks/livepeer/useHeroPlaybackSource";
 import { logger } from '@/lib/utils/logger';
+import Link from "next/link";
 
 
 // Custom PlayIcon component
@@ -119,6 +120,17 @@ const HeroSection: React.FC = () => {
             <span className="text-orange-600">{HERO_NAME.bottom}</span>
           </h1>
           <p className="text-gray-500">{HERO_DESCRIPTION}</p>
+          <div className="flex flex-col items-center space-y-4 sm:flex-row sm:justify-center sm:space-x-4 sm:space-y-0 md:justify-start">
+            <Link
+              href="/go-live"
+              className={
+                "inline-flex items-center justify-center rounded-full bg-red-600 px-6 py-2 text-lg font-normal text-white " +
+                "transition duration-200 hover:bg-red-700 lg:py-3"
+              }
+            >
+              Start Streaming
+            </Link>
+          </div>
           {SHOW_WATCH_DEMO ? (
             <div className="flex flex-col items-center space-y-4 sm:flex-row sm:justify-center sm:space-x-6 sm:space-y-0 md:justify-start">
               <button

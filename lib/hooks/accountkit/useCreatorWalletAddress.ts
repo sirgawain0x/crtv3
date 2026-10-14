@@ -1,20 +1,25 @@
 "use client";
 
 import { useMemo } from "react";
+import { usePrivy } from "@privy-io/react-auth";
 import { useUser, useSmartAccountClient } from "@/lib/wallet/react";
 import useModularAccount from "@/lib/hooks/accountkit/useModularAccount";
+import { useWalletInitTimeout } from "@/lib/hooks/accountkit/useWalletInitTimeout";
+import { useWalletClientContext } from "@/lib/wallet/wallet-context";
 
 /**
  * Canonical creator identity for streams, uploads, and wallet-auth APIs.
  * Prefers the smart account address; falls back to EOA for pure EOA users.
  */
 export function useCreatorWalletAddress() {
+  const { authenticated, ready } = usePrivy();
   const user = useUser();
+  const { eoaAddress: contextEoa } = useWalletClientContext();
   const { address: scaFromClient, isLoadingClient } = useSmartAccountClient({});
   const { address: scaFromModular, loading: isModularLoading } = useModularAccount();
 
   const smartAccountAddress = scaFromModular || scaFromClient || null;
-  const eoaAddress = user?.address ?? null;
+  const eoaAddress = user?.address ?? contextEoa ?? null;
 
   const creatorAddress = useMemo(() => {
     return smartAccountAddress || eoaAddress || null;
@@ -26,8 +31,14 @@ export function useCreatorWalletAddress() {
     return eoaAddress;
   }, [eoaAddress, creatorAddress]);
 
+  const isAuthenticated = ready && authenticated;
+  const waitingForCreatorAddress =
+    isAuthenticated && !creatorAddress && (isLoadingClient || isModularLoading);
+  const walletInitTimedOut = useWalletInitTimeout(waitingForCreatorAddress);
+
   const isLoading =
-    isLoadingClient || isModularLoading || (!!user && !creatorAddress);
+    !ready ||
+    (waitingForCreatorAddress && !walletInitTimedOut);
 
   return {
     creatorAddress,
@@ -35,6 +46,9 @@ export function useCreatorWalletAddress() {
     eoaAddress,
     signerAddress,
     isLoading,
-    isConnected: !!user?.address,
+    isAuthenticated,
+    walletInitTimedOut,
+    /** Signed in with a resolvable creator address (or timed out / fallback EOA). */
+    isConnected: isAuthenticated && !!creatorAddress,
   };
 }

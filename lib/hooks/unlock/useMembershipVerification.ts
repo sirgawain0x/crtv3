@@ -11,6 +11,8 @@ import {
   fetchLockAndKey,
 } from "../../sdk/unlock/services";
 import useModularAccount from "@/lib/hooks/accountkit/useModularAccount";
+import { usePrivy } from "@privy-io/react-auth";
+import { useWalletInitTimeout } from "@/lib/hooks/accountkit/useWalletInitTimeout";
 
 export interface MembershipDetails {
   name: LockAddress;
@@ -33,12 +35,15 @@ export interface MembershipStatus {
 }
 
 export function useMembershipVerification() {
+  const { authenticated, ready } = usePrivy();
   const user = useUser();
   const {
     smartAccountClient: client,
     address: modularAddress,
     loading: isModularLoading,
   } = useModularAccount();
+  const waitingForSca = authenticated && user?.type === "sca" && isModularLoading;
+  const scaWaitTimedOut = useWalletInitTimeout(waitingForSca);
 
   const [status, setStatus] = useState<Omit<MembershipStatus, "refetch">>({
     isVerified: false,
@@ -79,15 +84,38 @@ export function useMembershipVerification() {
   );
 
   const refetch = useCallback(async () => {
-    const userAddress = user?.address;
+    if (!ready) {
+      setStatus((prev) => ({ ...prev, isLoading: true }));
+      return;
+    }
 
-    if (!userAddress) {
+    if (!authenticated) {
       setStatus({
         isVerified: false,
         hasMembership: false,
         isLoading: false,
         error: null,
       });
+      return;
+    }
+
+    const userAddress = user?.address;
+
+    if (!userAddress) {
+      if (scaWaitTimedOut) {
+        setStatus({
+          isVerified: false,
+          hasMembership: false,
+          isLoading: false,
+          error: {
+            name: "Error",
+            message: "Wallet address unavailable",
+            code: "NO_VALID_ADDRESS",
+          } as MembershipError,
+        });
+        return;
+      }
+      setStatus((prev) => ({ ...prev, isLoading: true }));
       return;
     }
 
@@ -100,7 +128,7 @@ export function useMembershipVerification() {
       }
 
       const scaAddress = client?.account?.address ?? modularAddress ?? null;
-      const waitingForClient = isModularLoading;
+      const waitingForClient = isModularLoading && !scaWaitTimedOut;
 
       if (!scaAddress) {
         if (waitingForClient) {
@@ -110,16 +138,8 @@ export function useMembershipVerification() {
           return;
         }
 
-        setStatus({
-          isVerified: false,
-          hasMembership: false,
-          isLoading: false,
-          error: {
-            name: "Error",
-            message: "No valid address found for verification",
-            code: "NO_VALID_ADDRESS",
-          } as MembershipError,
-        });
+        // Timed out or client failed — verify with EOA so public routes can render.
+        await verifyMembership(userAddress, "eoa");
         return;
       }
 
@@ -134,11 +154,14 @@ export function useMembershipVerification() {
       });
     }
   }, [
+    ready,
+    authenticated,
     user?.address,
     user?.type,
     client?.account?.address,
     modularAddress,
     isModularLoading,
+    scaWaitTimedOut,
     verifyMembership,
   ]);
 
