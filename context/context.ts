@@ -43,7 +43,7 @@ export const HERO_DESCRIPTION =
  */
 export const HERO_BUTTONS = {
   primary: {
-    text: "Start Streaming",
+    text: "Upload a Video",
     href: "/upload",
   },
   secondary: {
