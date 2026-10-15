@@ -6,24 +6,33 @@ import { useUser, useSmartAccountClient } from "@/lib/wallet/react";
 import useModularAccount from "@/lib/hooks/accountkit/useModularAccount";
 import { useWalletInitTimeout } from "@/lib/hooks/accountkit/useWalletInitTimeout";
 import { useWalletClientContext } from "@/lib/wallet/wallet-context";
+import {
+  isAwaitingSmartAccountAddress,
+  resolveCreatorWalletAddress,
+} from "@/lib/hooks/accountkit/creator-wallet-address";
 
 /**
  * Canonical creator identity for streams, uploads, and wallet-auth APIs.
- * Prefers the smart account address; falls back to EOA for pure EOA users.
+ * Uses smart account when present; EOA only for confirmed pure-EOA users.
  */
 export function useCreatorWalletAddress() {
   const { authenticated, ready } = usePrivy();
   const user = useUser();
   const { eoaAddress: contextEoa } = useWalletClientContext();
-  const { address: scaFromClient, isLoadingClient } = useSmartAccountClient({});
-  const { address: scaFromModular, loading: isModularLoading } = useModularAccount();
+  const { address: scaFromClient } = useSmartAccountClient({});
+  const { address: scaFromModular } = useModularAccount();
 
   const smartAccountAddress = scaFromModular || scaFromClient || null;
-  const eoaAddress = user?.address ?? contextEoa ?? null;
+  const eoaAddress = contextEoa ?? user?.address ?? null;
 
-  const creatorAddress = useMemo(() => {
-    return smartAccountAddress || eoaAddress || null;
-  }, [smartAccountAddress, eoaAddress]);
+  const creatorAddress = useMemo(
+    () =>
+      resolveCreatorWalletAddress({
+        smartAccountAddress,
+        user,
+      }),
+    [smartAccountAddress, user],
+  );
 
   const signerAddress = useMemo(() => {
     if (!eoaAddress || !creatorAddress) return null;
@@ -32,13 +41,14 @@ export function useCreatorWalletAddress() {
   }, [eoaAddress, creatorAddress]);
 
   const isAuthenticated = ready && authenticated;
-  const waitingForCreatorAddress =
-    isAuthenticated && !creatorAddress && (isLoadingClient || isModularLoading);
-  const walletInitTimedOut = useWalletInitTimeout(waitingForCreatorAddress);
+  const awaitingSmartAccount = isAwaitingSmartAccountAddress({
+    authenticated: isAuthenticated,
+    user,
+    smartAccountAddress,
+  });
+  const walletInitTimedOut = useWalletInitTimeout(awaitingSmartAccount);
 
-  const isLoading =
-    !ready ||
-    (waitingForCreatorAddress && !walletInitTimedOut);
+  const isLoading = !ready || (awaitingSmartAccount && !walletInitTimedOut);
 
   return {
     creatorAddress,
@@ -48,7 +58,7 @@ export function useCreatorWalletAddress() {
     isLoading,
     isAuthenticated,
     walletInitTimedOut,
-    /** Signed in with a resolvable creator address (or timed out / fallback EOA). */
+    awaitingSmartAccount,
     isConnected: isAuthenticated && !!creatorAddress,
   };
 }
