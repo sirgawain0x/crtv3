@@ -13,6 +13,10 @@ import {
 import useModularAccount from "@/lib/hooks/accountkit/useModularAccount";
 import { usePrivy } from "@privy-io/react-auth";
 import { useWalletInitTimeout } from "@/lib/hooks/accountkit/useWalletInitTimeout";
+import {
+  shouldWaitForMembershipSmartAccount,
+  WALLET_INIT_TIMEOUT_CODE,
+} from "@/lib/hooks/unlock/membership-wallet-wait";
 
 export interface MembershipDetails {
   name: LockAddress;
@@ -42,7 +46,14 @@ export function useMembershipVerification() {
     address: modularAddress,
     loading: isModularLoading,
   } = useModularAccount();
-  const waitingForSca = authenticated && user?.type === "sca" && isModularLoading;
+  const scaAddressForWait =
+    client?.account?.address ?? modularAddress ?? null;
+  const waitingForSca = shouldWaitForMembershipSmartAccount({
+    ready,
+    authenticated,
+    userType: user?.type,
+    smartAccountAddress: scaAddressForWait,
+  });
   const scaWaitTimedOut = useWalletInitTimeout(waitingForSca);
 
   const [status, setStatus] = useState<Omit<MembershipStatus, "refetch">>({
@@ -99,23 +110,38 @@ export function useMembershipVerification() {
       return;
     }
 
+    if (waitingForSca && !scaWaitTimedOut) {
+      setStatus((prev) => ({ ...prev, isLoading: true }));
+      return;
+    }
+
+    if (waitingForSca && scaWaitTimedOut) {
+      setStatus({
+        isVerified: false,
+        hasMembership: false,
+        isLoading: false,
+        error: {
+          name: "Error",
+          message: "Smart wallet did not finish loading. Try again.",
+          code: WALLET_INIT_TIMEOUT_CODE,
+        } as MembershipError,
+      });
+      return;
+    }
+
     const userAddress = user?.address;
 
     if (!userAddress) {
-      if (scaWaitTimedOut) {
-        setStatus({
-          isVerified: false,
-          hasMembership: false,
-          isLoading: false,
-          error: {
-            name: "Error",
-            message: "Wallet address unavailable",
-            code: "NO_VALID_ADDRESS",
-          } as MembershipError,
-        });
-        return;
-      }
-      setStatus((prev) => ({ ...prev, isLoading: true }));
+      setStatus({
+        isVerified: false,
+        hasMembership: false,
+        isLoading: false,
+        error: {
+          name: "Error",
+          message: "Wallet address unavailable",
+          code: "NO_VALID_ADDRESS",
+        } as MembershipError,
+      });
       return;
     }
 
@@ -128,18 +154,18 @@ export function useMembershipVerification() {
       }
 
       const scaAddress = client?.account?.address ?? modularAddress ?? null;
-      const waitingForClient = isModularLoading && !scaWaitTimedOut;
 
       if (!scaAddress) {
-        if (waitingForClient) {
-          setStatus((prev) =>
-            prev.isLoading ? prev : { ...prev, isLoading: true },
-          );
-          return;
-        }
-
-        // Timed out or client failed — verify with EOA so public routes can render.
-        await verifyMembership(userAddress, "eoa");
+        setStatus({
+          isVerified: false,
+          hasMembership: false,
+          isLoading: false,
+          error: {
+            name: "Error",
+            message: "Smart wallet address unavailable",
+            code: "NO_VALID_ADDRESS",
+          } as MembershipError,
+        });
         return;
       }
 
@@ -160,7 +186,7 @@ export function useMembershipVerification() {
     user?.type,
     client?.account?.address,
     modularAddress,
-    isModularLoading,
+    waitingForSca,
     scaWaitTimedOut,
     verifyMembership,
   ]);

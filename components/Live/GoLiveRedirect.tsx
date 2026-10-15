@@ -19,13 +19,13 @@ export function GoLiveRedirect() {
   const { openAuthModal } = useAuthModal();
   const {
     creatorAddress,
-    isLoading: isIdentityLoading,
     isAuthenticated,
     walletInitTimedOut,
+    awaitingSmartAccount,
   } = useCreatorWalletAddress();
 
-  const waitingForAddress =
-    isAuthenticated && !creatorAddress && isIdentityLoading && !walletInitTimedOut;
+  const preparingWallet =
+    isAuthenticated && awaitingSmartAccount && !walletInitTimedOut;
 
   useEffect(() => {
     if (!ready || !creatorAddress) return;
@@ -76,9 +76,9 @@ export function GoLiveRedirect() {
     );
   }
 
-  if (waitingForAddress) {
+  if (preparingWallet) {
     return (
-      <GuardLoadingFallback isLoading allowBypass message="Loading your session…">
+      <GuardLoadingFallback isLoading allowBypass message="Preparing wallet…">
         {null}
       </GuardLoadingFallback>
     );
