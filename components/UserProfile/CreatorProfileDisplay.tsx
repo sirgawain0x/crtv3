@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { useCreatorProfileWithMeToken } from '@/lib/hooks/metokens/useCreatorProfile';
 import { Loader2, User, TrendingUp, Wallet } from 'lucide-react';
 import { convertFailingGateway } from '@/lib/utils/image-gateway';
+import { ProfileGoLiveButton } from '@/components/Live/ProfileGoLiveButton';
 
 interface CreatorProfileDisplayProps {
   ownerAddress: string;
@@ -78,6 +79,9 @@ export function CreatorProfileDisplay({
                 <span className="font-mono">{ownerAddress}</span>
               </div>
             </CardDescription>
+            <div className="mt-3">
+              <ProfileGoLiveButton profileAddress={ownerAddress} />
+            </div>
           </div>
         </div>
       </CardHeader>

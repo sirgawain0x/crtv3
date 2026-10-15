@@ -78,7 +78,14 @@ const predictionSchema = z.object({
   outcomes: z
     .array(z.object({ value: z.string().min(1, "Outcome cannot be empty") }))
     .optional(),
-  category: z.string().optional(),
+  category: z
+    .enum(
+      PREDICTION_CATEGORIES.map((c) => c.value) as [
+        PredictionCategoryValue,
+        ...PredictionCategoryValue[],
+      ]
+    )
+    .optional(),
   description: z.string().optional(),
   closeDate: z.string().min(1, "Close date is required"),
   closeTime: z.string().min(1, "Close time is required"),
@@ -346,7 +353,7 @@ function CreatePrediction({
       quota.remaining <= 0
     ) {
       setFormError(
-        "You've reached your limit of 3 prediction markets this month (UTC). Investor or Brand members can create unlimited markets."
+        "You've reached your limit of 3 prediction markets this month (UTC). Professional or Brand members can create unlimited markets."
       );
       return;
     }
@@ -382,7 +389,7 @@ function CreatePrediction({
           fresh.remaining <= 0
         ) {
           setFormError(
-            "You've reached your limit of 3 prediction markets this month (UTC). Investor members can create unlimited markets."
+            "You've reached your limit of 3 prediction markets this month (UTC). Professional members can create unlimited markets."
           );
           setIsSubmitting(false);
           return;
@@ -422,11 +429,72 @@ function CreatePrediction({
       }
       // For uint type, outcomes can be undefined
 
+      // Decision-model gate: type/category/clarity/resolvability only.
+      // Never used to settle Reality.eth markets. Soft-fail if the API is down.
+      // Jev review is free (platform absorbs negligible TypeSafe COGS).
+      // Keep a local category so gate suggestions apply to create/record (not only the form).
+      let category: PredictionCategoryValue =
+        values.category || defaultCategory || "general";
+      try {
+        const gateRes = await fetch("/api/predictions/gate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: values.title,
+            description: values.description,
+            questionType: values.type,
+            outcomes: finalOutcomes,
+            category,
+            closeDate: values.closeDate,
+            closeTime: values.closeTime,
+          }),
+        });
+        const gateJson = (await gateRes.json().catch(() => ({}))) as {
+          decision?: {
+            blockCreate?: boolean;
+            reasons?: string[];
+            suggestedType?: string | null;
+            suggestedCategory?: string | null;
+            clarityScore?: number | null;
+          };
+        };
+
+        if (gateRes.ok) {
+          const decision = gateJson.decision;
+          if (decision?.blockCreate) {
+            setFormError(
+              decision.reasons?.[0] ||
+                "This question looks too ambiguous to create a fair market. Please clarify resolution criteria."
+            );
+            setIsSubmitting(false);
+            return;
+          }
+          if (
+            decision?.suggestedCategory &&
+            (!values.category || values.category === "general")
+          ) {
+            category = decision.suggestedCategory as PredictionCategoryValue;
+            form.setValue("category", category);
+          }
+          if (
+            decision?.reasons?.length &&
+            !decision.blockCreate &&
+            (decision.clarityScore ?? 3) < 1.5
+          ) {
+            toast.message("Market clarity tip", {
+              description: decision.reasons[0],
+            });
+          }
+        }
+      } catch (gateErr) {
+        logger.warn("Prediction gate skipped:", gateErr);
+      }
+
       const questionData: QuestionData = {
         type: values.type,
         title: values.title,
         outcomes: finalOutcomes,
-        category: values.category || "general",
+        category,
         description: values.description,
         language: "en_US",
       };
@@ -516,7 +584,7 @@ function CreatePrediction({
             address,
             transactionHash: hash,
             title: values.title,
-            category: values.category || "general",
+            category,
             questionType: values.type,
             outcomes: finalOutcomes,
             videoAssetId,
@@ -548,7 +616,7 @@ function CreatePrediction({
       }
       setCreatedMeta({
         title: values.title,
-        category: values.category || "general",
+        category,
       });
       setShareOpen(true);
       // Let the host page (video strip) refresh its server data now, while
@@ -702,10 +770,14 @@ function CreatePrediction({
                 {quota.unlimited ? (
                   <>
                     {quota.premiumTier === "investor" && (
-                      <span>Investor membership: unlimited prediction markets. </span>
+                      <span>
+                        Creative Professional Pass: unlimited prediction markets.{" "}
+                      </span>
                     )}
                     {quota.premiumTier === "brand" && (
-                      <span>Brand membership: unlimited prediction markets. </span>
+                      <span>
+                        Creative Brand Pass: unlimited prediction markets.{" "}
+                      </span>
                     )}
                     {!quota.premiumTier && (
                       <span>Unlimited prediction markets for your account. </span>
@@ -722,7 +794,7 @@ function CreatePrediction({
                           href="/"
                           className="underline font-medium text-foreground"
                         >
-                          Upgrade to Investor or Brand
+                          Upgrade to Professional or Brand
                         </Link>{" "}
                         for unlimited markets.
                       </span>
@@ -732,7 +804,7 @@ function CreatePrediction({
                           href="/"
                           className="underline font-medium text-foreground"
                         >
-                          Upgrade to Investor or Brand
+                          Upgrade to Professional or Brand
                         </Link>{" "}
                         for unlimited markets.
                       </span>

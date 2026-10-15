@@ -12,6 +12,8 @@ import {
   resolvePinataAgentPublicBaseUrl,
 } from "@/lib/pinata/api";
 import { requireWalletAuthFor, WalletAuthError } from "@/lib/auth/require-wallet";
+import { unlockService } from "@/lib/sdk/unlock/services";
+import { hasAnyValidPass } from "@/lib/access/creator-membership";
 
 interface ConnectBody {
   ownerAddress?: string;
@@ -52,9 +54,9 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Verify the caller actually controls ownerAddress before persisting any
-  // Pinata credentials against their profile. Agents are purchased/deployed
-  // on Pinata (bring-your-own) — no Plus membership gate.
+  // Verify the caller controls ownerAddress, then require any paid Creative
+  // Platform pass. Pinata AI agents are available to all pass holders
+  // (formerly a Plus-only benefit).
   try {
     await requireWalletAuthFor(request, ownerAddress);
   } catch (authErr) {
@@ -65,6 +67,26 @@ export async function POST(request: NextRequest) {
       );
     }
     throw authErr;
+  }
+
+  try {
+    const memberships = await unlockService.getAllMemberships(ownerAddress);
+    if (!hasAnyValidPass(memberships)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error:
+            "A Creative Platform membership is required to connect a Pinata AI agent.",
+        },
+        { status: 403 }
+      );
+    }
+  } catch (membershipErr) {
+    serverLogger.error("Pinata connect: membership check failed:", membershipErr);
+    return NextResponse.json(
+      { success: false, error: "Unable to verify membership. Please try again." },
+      { status: 503 }
+    );
   }
 
   let agent, gateway, template;

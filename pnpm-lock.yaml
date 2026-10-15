@@ -18,6 +18,7 @@ overrides:
   '@reown/appkit-utils': 1.7.8
   '@reown/appkit-wallet': 1.7.8
   viem: 2.48.8
+  '@reality.eth/reality-eth-lib': 3.4.32
 
 patchedDependencies:
   next@16.2.4:
@@ -218,8 +219,8 @@ importers:
         specifier: ^3.2.25
         version: 3.2.25(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       '@reality.eth/reality-eth-lib':
-        specifier: ^3.4.28
-        version: 3.4.28(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+        specifier: ^3.4.32
+        version: 3.4.32(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       '@simplewebauthn/browser':
         specifier: ^13.1.0
         version: 13.3.0
@@ -3882,8 +3883,8 @@ packages:
   '@reality.eth/contracts@3.2.25':
     resolution: {integrity: sha512-MO36RaAPhb/lJq2z85bxo7WaU5wbsrx1+Va9968eUvOG1yyQLIkuHhpEB602JYaUfCVQizvHdTLhcwvmbMSQsQ==}
 
-  '@reality.eth/reality-eth-lib@3.4.28':
-    resolution: {integrity: sha512-Qydja7drrt7zTvirDgMeBOI4Q4kbA6DQ/gPclqPGOgGDcW/bPeFnT06fDfbQM6fQndb+1BSiOhesOHQILY+bpw==}
+  '@reality.eth/reality-eth-lib@3.4.32':
+    resolution: {integrity: sha512-H/5JXiPdhp79VznTMZ+f/PcS8gmYVt3sYS9tGEzkFXWjEik+wSUFKzVkj3UgGSR5ePcUkh2Flr9ThXsSNxXUng==}
 
   '@remix-run/node@2.17.4':
     resolution: {integrity: sha512-9A29JaYiGHDEmaiQuD1IlO/TrQxnnkj98GpytihU+Nz6yTt6RwzzyMMqTAoasRd1dPD4OeSaSqbwkcim/eE76Q==}
@@ -18342,16 +18343,12 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  '@reality.eth/reality-eth-lib@3.4.28(bufferutil@4.1.0)(utf-8-validate@6.0.6)':
+  '@reality.eth/reality-eth-lib@3.4.32(bufferutil@4.1.0)(utf-8-validate@6.0.6)':
     dependencies:
       '@reality.eth/contracts': 3.2.25(bufferutil@4.1.0)(utf-8-validate@6.0.6)
-      bignumber.js: 7.2.1
-      bn.js: 5.2.3
-      ethereumjs-abi: 0.6.8
-      html-to-text: 8.2.1
+      ethers: 6.16.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       isomorphic-dompurify: 0.23.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       marked: 4.3.0
-      sprintf-js: 1.1.3
     transitivePeerDependencies:
       - bufferutil
       - canvas

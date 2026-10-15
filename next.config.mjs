@@ -20,7 +20,20 @@ const nextConfig = {
   },
   // External packages that should not be processed by the bundler
   // Externalize thread-stream and pino packages on server to avoid bundling test files
-  serverExternalPackages: ['thread-stream', 'pino', 'pino-pretty', 'node-datachannel'],
+  serverExternalPackages: [
+    'thread-stream',
+    'pino',
+    'pino-pretty',
+    'node-datachannel',
+    // Reality social cron: keep CJS/ESM boundary in node_modules (jsdom → html-encoding-sniffer → @exodus/bytes).
+    '@reality.eth/reality-eth-lib',
+    'isomorphic-dompurify',
+    'dompurify',
+    'jsdom',
+    'html-encoding-sniffer',
+    '@exodus/bytes',
+    'twit',
+  ],
   // Webpack configuration for WebAssembly support
   webpack: (config, { isServer, webpack, dev }) => {
     // Enable async WebAssembly loading (required for XMTP WASM bindings)
@@ -261,6 +274,20 @@ const nextConfig = {
     // number of pages that should be kept simultaneously without being disposed
     pagesBufferLength: 2,
   },
+  async redirects() {
+    return [
+      {
+        source: "/clips",
+        destination: "/discover",
+        permanent: true,
+      },
+      {
+        source: "/clips/:path*",
+        destination: "/discover",
+        permanent: true,
+      },
+    ];
+  },
   images: {
     remotePatterns: [
       {
@@ -407,6 +434,7 @@ const nextConfig = {
       "https://*.rpc.privy.systems",
       "https://explorer-api.walletconnect.com",
       "https://api.g.alchemy.com",
+      "https://www.gstatic.com",
       "https:",
       "wss:",
       "ws:",
@@ -420,6 +448,8 @@ const nextConfig = {
       "https://challenges.cloudflare.com",
       "https://va.vercel-scripts.com",
       "https://vercel.live",
+      // Chromecast Web Sender (CAF) for Creative TV living-room mode
+      "https://www.gstatic.com",
     ].join(" ");
 
     const mainCsp = [

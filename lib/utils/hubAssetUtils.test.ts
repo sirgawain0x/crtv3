@@ -3,6 +3,8 @@ import { parseEther, parseUnits } from "viem";
 import {
   calculateMeTokenVaultTvlUsd,
   resolveHubAsset,
+  getMinimumMeTokenCreateDepositRaw,
+  isMeTokenCreateDepositSufficient,
 } from "./hubAssetUtils";
 import { DAI_HUB_ID, USDC_HUB_ID, USDS_HUB_ID, GHO_HUB_ID } from "@/lib/contracts/MeTokenHubs";
 
@@ -34,5 +36,21 @@ describe("hub collateral decimals", () => {
     const oneUsdc = parseUnits("1", 6);
     expect(calculateMeTokenVaultTvlUsd(oneUsdc, 0n, USDC_HUB_ID)).toBeCloseTo(1, 6);
     expect(Number(oneUsdc) / 1e18).toBeLessThan(0.001);
+  });
+
+  it("requires $1 minimum create deposit in hub-native raw units", () => {
+    expect(getMinimumMeTokenCreateDepositRaw(resolveHubAsset(USDC_HUB_ID))).toBe(
+      1_000_000n
+    );
+    expect(getMinimumMeTokenCreateDepositRaw(resolveHubAsset(DAI_HUB_ID))).toBe(
+      parseEther("1")
+    );
+
+    expect(
+      isMeTokenCreateDepositSufficient(parseUnits("0.99", 6), USDC_HUB_ID)
+    ).toBe(false);
+    expect(
+      isMeTokenCreateDepositSufficient(parseUnits("1", 6), USDC_HUB_ID)
+    ).toBe(true);
   });
 });

@@ -85,6 +85,7 @@ describe("GET /api/livepeer/stream-key", () => {
       streamKey: "key-1",
       reused: true,
       replaced: false,
+      synced: false,
     });
 
     const res = await GET(keyRequest(CREATOR));
@@ -97,6 +98,7 @@ describe("GET /api/livepeer/stream-key", () => {
       streamKey: "key-1",
       replaced: false,
       reused: true,
+      synced: false,
     });
   });
 
@@ -116,6 +118,7 @@ describe("GET /api/livepeer/stream-key", () => {
       streamKey: "new-key",
       reused: false,
       replaced: true,
+      synced: false,
     });
 
     const res = await GET(keyRequest(CREATOR));
@@ -124,5 +127,72 @@ describe("GET /api/livepeer/stream-key", () => {
     expect(res.status).toBe(200);
     expect(json.streamKey).toBe("new-key");
     expect(json.replaced).toBe(true);
+  });
+
+  it("passes forceReplace to ensure when query param is set", async () => {
+    mockResolveStreamForCreator.mockResolvedValue({
+      id: "db-1",
+      creator_id: CREATOR,
+      stream_id: "stream-1",
+      playback_id: "playback-1",
+      stream_key: "key-1",
+      name: "My Stream",
+      save_recording: true,
+    });
+    mockEnsureLivepeerStreamForCreator.mockResolvedValue({
+      streamId: "forced-stream",
+      playbackId: "forced-playback",
+      streamKey: "forced-key",
+      reused: false,
+      replaced: true,
+      synced: false,
+    });
+
+    const res = await GET(
+      new NextRequest(
+        `http://localhost/api/livepeer/stream-key?creatorAddress=${CREATOR}&forceReplace=1`,
+      ),
+    );
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(mockEnsureLivepeerStreamForCreator).toHaveBeenCalledWith(
+      expect.objectContaining({ forceReplace: true }),
+    );
+    expect(json.streamKey).toBe("forced-key");
+    expect(json.replaced).toBe(true);
+  });
+
+  it("returns synced credentials when Studio key differed from DB", async () => {
+    mockResolveStreamForCreator.mockResolvedValue({
+      id: "db-1",
+      creator_id: CREATOR,
+      stream_id: "stream-1",
+      playback_id: "playback-1",
+      stream_key: "stale-key",
+      name: "My Stream",
+      save_recording: true,
+    });
+    mockEnsureLivepeerStreamForCreator.mockResolvedValue({
+      streamId: "stream-1",
+      playbackId: "playback-1",
+      streamKey: "studio-key",
+      reused: false,
+      replaced: false,
+      synced: true,
+    });
+
+    const res = await GET(keyRequest(CREATOR));
+    const json = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(json).toEqual({
+      streamId: "stream-1",
+      playbackId: "playback-1",
+      streamKey: "studio-key",
+      replaced: false,
+      reused: false,
+      synced: true,
+    });
   });
 });

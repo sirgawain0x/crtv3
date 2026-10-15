@@ -24,9 +24,30 @@ const UPLOAD_STEPS = [
   'Hit Publish. Your clip goes live and is mintable.',
 ];
 
+/** Stable intent ids used by the decision-model router and substring fallback. */
+export type CreativeGuideIntentId =
+  | 'upload_howto'
+  | 'upload_steps'
+  | 'ip_licensing'
+  | 'minting'
+  | 'about_creative_tv'
+  | 'greeting'
+  | 'metoken_explain'
+  | 'metoken_create'
+  | 'metoken_buy'
+  | 'membership'
+  | 'wallet_help'
+  | 'pricing'
+  | 'escalate';
+
 /** Common question patterns and their exact canned answers. */
-const PATTERNS: { patterns: string[]; response: string }[] = [
+const PATTERNS: {
+  intent: CreativeGuideIntentId;
+  patterns: string[];
+  response: string;
+}[] = [
   {
+    intent: 'upload_howto',
     patterns: [
       'how do i upload',
       'how to upload',
@@ -43,6 +64,7 @@ const PATTERNS: { patterns: string[]; response: string }[] = [
       'IP licensing is optional — your clip goes live either way.',
   },
   {
+    intent: 'upload_steps',
     patterns: [
       'what are the upload steps',
       'upload steps',
@@ -54,6 +76,7 @@ const PATTERNS: { patterns: string[]; response: string }[] = [
     response: `Here are the steps:\n${UPLOAD_STEPS.map((s, i) => `${i + 1}. ${s}`).join('\n')}`,
   },
   {
+    intent: 'ip_licensing',
     patterns: [
       'do i need ip licensing',
       'is ip required',
@@ -66,6 +89,7 @@ const PATTERNS: { patterns: string[]; response: string }[] = [
       'IP licensing is optional. You can publish clips without it. It helps protect and monetize your work, but it is never required to upload on Creative TV.',
   },
   {
+    intent: 'minting',
     patterns: [
       'how do i mint',
       'what is minting',
@@ -77,6 +101,7 @@ const PATTERNS: { patterns: string[]; response: string }[] = [
       'Minting turns your clip into an on-chain digital asset. It is optional after upload. If you want to sell, license, or prove ownership, you can mint from the clip page or during upload.',
   },
   {
+    intent: 'about_creative_tv',
     patterns: [
       'what is creative tv',
       'what is crtv',
@@ -88,6 +113,7 @@ const PATTERNS: { patterns: string[]; response: string }[] = [
       'Creative TV is the creator video platform on Creative Platform. Upload clips, optionally license your IP, mint on-chain, launch a MeToken, and build your creator economy — all from one place.',
   },
   {
+    intent: 'greeting',
     patterns: [
       'who are you',
       'what can you do',
@@ -100,6 +126,7 @@ const PATTERNS: { patterns: string[]; response: string }[] = [
       "I'm Creative Guide. I can walk you through uploading on Creative TV, explain IP licensing, minting, MeTokens, memberships, and more. Ask me anything or tap 'Start my first upload'.",
   },
   {
+    intent: 'metoken_explain',
     patterns: [
       'what is a metoken',
       'what is me token',
@@ -111,6 +138,7 @@ const PATTERNS: { patterns: string[]; response: string }[] = [
       'A MeToken is a creator personal token fans can buy and hold. It ties your audience to your success — as you grow, supporters can invest in you directly on Creative TV.',
   },
   {
+    intent: 'metoken_create',
     patterns: [
       'how do i create a metoken',
       'how to create metoken',
@@ -124,6 +152,7 @@ const PATTERNS: { patterns: string[]; response: string }[] = [
       'To create your MeToken: go to Profile (/profile) or Portfolio → Create MeToken (/portfolio). Connect your wallet, pick a name and symbol, then deposit collateral (USDC hub). Confirm the transaction and your MeToken is live.',
   },
   {
+    intent: 'metoken_buy',
     patterns: [
       'how do i buy metoken',
       'buy metoken',
@@ -135,6 +164,7 @@ const PATTERNS: { patterns: string[]; response: string }[] = [
       'Visit a creator profile, find their MeToken section, and use Subscribe or Buy. You will need a connected wallet and USDC for the purchase.',
   },
   {
+    intent: 'membership',
     patterns: [
       'what is membership',
       'how do memberships work',
@@ -146,6 +176,7 @@ const PATTERNS: { patterns: string[]; response: string }[] = [
       'Memberships unlock extra features like gated content, badges, and creator perks. They are optional — you can upload and use Creative TV without one.',
   },
   {
+    intent: 'wallet_help',
     patterns: [
       'wallet not working',
       'connect wallet failed',
@@ -158,6 +189,7 @@ const PATTERNS: { patterns: string[]; response: string }[] = [
       'Make sure you complete the Orb/Privy sign-in popup. If it is blocked, check your browser for pop-up blockers. Still stuck? Try refreshing the page and signing in again.',
   },
   {
+    intent: 'pricing',
     patterns: [
       'how much does it cost',
       'is this free',
@@ -170,6 +202,35 @@ const PATTERNS: { patterns: string[]; response: string }[] = [
       'Uploading on Creative TV is free. Basic help from Creative Guide is free too. Advanced AI questions that need Gemini cost a small USDC payment per message.',
   },
 ];
+
+/** Intent → canned answer for decision-model routing. */
+export const CANNED_INTENT_RESPONSES: Record<
+  Exclude<CreativeGuideIntentId, 'escalate'>,
+  string
+> = Object.fromEntries(
+  PATTERNS.map((p) => [p.intent, p.response])
+) as Record<Exclude<CreativeGuideIntentId, 'escalate'>, string>;
+
+/** Criteria descriptions for `/v1/systemone` choice questions. */
+export const CREATIVE_GUIDE_INTENT_CRITERIA: Record<
+  CreativeGuideIntentId,
+  string
+> = {
+  upload_howto: 'How to upload or publish a video/clip on Creative TV.',
+  upload_steps: 'Step-by-step upload flow explanation.',
+  ip_licensing: 'Whether IP licensing is required or what it means.',
+  minting: 'Minting a clip as an on-chain asset.',
+  about_creative_tv: 'What Creative TV / Creative Platform is.',
+  greeting: 'Hello, help, who are you, what can you do.',
+  metoken_explain: 'What a MeToken is.',
+  metoken_create: 'How to create or launch a MeToken.',
+  metoken_buy: 'How to buy or subscribe to a MeToken.',
+  membership: 'Memberships, passes, and membership benefits.',
+  wallet_help: 'Wallet connect / Orb / Privy login problems.',
+  pricing: 'Whether Creative TV or Creative Guide is free / costs.',
+  escalate:
+    'Advanced, novel, or off-topic questions that need the paid Gemini assistant.',
+};
 
 function normalize(text: string): string {
   return text

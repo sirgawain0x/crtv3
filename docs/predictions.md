@@ -183,12 +183,22 @@ Question titles may suffix:
 - `https://core.precog.markets/api/markets/{chainId}/{marketId}`
 - `https://core.precog.markets/api/v1/markets/{chainId}/{marketId}`
 
+## Social distribution (X + Mastodon)
+
+New questions and finalized answers can be dual-posted automatically:
+
+- **Hosted cron:** `GET /api/predictions/social-sync/cron` (Bearer `CRON_SECRET`) uses `lib/reality-social/*`, links to `/predict/{id}`, and stores cursors in Supabase.
+- **Upstream bots:** Optional CLI packages in `scripts/reality-social/` ([@reality.eth/twitter-bot](https://www.npmjs.com/package/@reality.eth/twitter-bot), [@reality.eth/mastodon-bot](https://www.npmjs.com/package/@reality.eth/mastodon-bot)).
+
+Prioritize **X** for reach; enable **Mastodon** as a low-cost secondary channel with transparency-focused copy and `#OpenData` hashtags. See [scripts/reality-social/README.md](../scripts/reality-social/README.md).
+
 ## Environment
 
 | Variable | Required for |
 |----------|--------------|
 | `NEXT_PUBLIC_ALCHEMY_API_KEY` | Base RPC (read questions, claim status) |
 | Supabase service role (via `supabaseService`) | Quota, record, metadata, search |
+| Twitter / Mastodon vars (optional) | Social sync cron — see `scripts/reality-social/README.md` |
 
 Reality.eth contract on Base: see `REALITY_ETH_SUBGRAPH_CONFIG.md` (`0x2F39f464d16402Ca3D8527dA89617b73DE2F60e8`).
 

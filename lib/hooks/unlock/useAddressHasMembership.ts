@@ -17,7 +17,7 @@ type MembershipApiResponse = {
 
 export type AddressMembershipStatus = {
   hasMembership: boolean;
-  /** Valid Creative Brand Pass (or legacy Brand Plus). */
+  /** Valid Creative Brand Pass. */
   hasBrandMembership: boolean;
 };
 

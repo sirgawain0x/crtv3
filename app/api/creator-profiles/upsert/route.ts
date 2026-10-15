@@ -5,6 +5,8 @@ import { createClient } from '@/lib/sdk/supabase/server';
 import { serverLogger } from '@/lib/utils/logger';
 import { rateLimiters } from '@/lib/middleware/rateLimit';
 import { requireWalletAuthFor, WalletAuthError } from '@/lib/auth/require-wallet';
+import { addressHasBrandPass } from '@/lib/channels/brand-channel-access';
+import { isValidBrandChannelSlug } from '@/lib/channels/brand-channels';
 
 export async function POST(request: NextRequest) {
   const verification = await checkBotIdDeep();
@@ -43,6 +45,7 @@ export async function POST(request: NextRequest) {
       lens_account_id,
       lens_handle,
       lens_avatar_uri,
+      brand_channel_slug,
     } = body;
 
     if (!owner_address) {
@@ -85,6 +88,34 @@ export async function POST(request: NextRequest) {
     if (lens_account_id !== undefined) payload.lens_account_id = lens_account_id;
     if (lens_handle !== undefined) payload.lens_handle = lens_handle;
     if (lens_avatar_uri !== undefined) payload.lens_avatar_uri = lens_avatar_uri;
+
+    if (brand_channel_slug !== undefined) {
+      const normalizedOwner = owner_address.toLowerCase();
+      const hasBrandPass = await addressHasBrandPass(normalizedOwner);
+      if (!hasBrandPass) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Brand Pass required to link a brand channel',
+          },
+          { status: 403 }
+        );
+      }
+
+      if (brand_channel_slug === null || brand_channel_slug === '') {
+        payload.brand_channel_slug = null;
+      } else if (isValidBrandChannelSlug(String(brand_channel_slug))) {
+        payload.brand_channel_slug = brand_channel_slug;
+      } else {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Invalid brand channel slug',
+          },
+          { status: 400 }
+        );
+      }
+    }
 
     let data, error;
 

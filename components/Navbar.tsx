@@ -192,6 +192,7 @@ export default function Navbar() {
   const shouldShowMetokens = hasMetokens || meTokenLoading || holdingsLoading;
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [balanceRefreshKey, setBalanceRefreshKey] = useState(0);
   const pathname = usePathname();
   const accountDropdownRef = useRef<AccountDropdownHandle>(null);
   const [copySuccess, setCopySuccess] = useState(false);
@@ -274,10 +275,11 @@ export default function Navbar() {
   };
 
   const openAccountAction = (
-    action: "buy" | "send" | "swap" | "session-keys"
+    action: "buy" | "send" | "swap" | "session-keys",
+    options?: { recipientAddress?: string; token?: "ETH" | "USDC" | "DAI" | "USDS" | "GHO" },
   ) => {
     if (accountDropdownRef.current) {
-      accountDropdownRef.current.openAction(action);
+      accountDropdownRef.current.openAction(action, options);
       setIsMenuOpen(false);
     }
   };
@@ -674,12 +676,24 @@ export default function Navbar() {
 
                     {/* Balances */}
                     <div className="mt-4">
-                      <TokenBalance />
+                      <TokenBalance
+                        isVisible={isMenuOpen}
+                        refreshKey={balanceRefreshKey}
+                      />
                     </div>
 
                     {/* Earn */}
                     <div className="mt-4">
-                      <EarnSection isVisible={isMenuOpen} />
+                      <EarnSection
+                        isVisible={isMenuOpen}
+                        onSuccess={() => setBalanceRefreshKey((k) => k + 1)}
+                        onTopUp={(embeddedAddress) =>
+                          openAccountAction("send", {
+                            recipientAddress: embeddedAddress,
+                            token: "USDC",
+                          })
+                        }
+                      />
                     </div>
 
                     {/* Wallet Actions */}

@@ -283,7 +283,7 @@ function VotingForm({ proposal }: { proposal: Proposal }) {
 
     // Check membership first
     if (!canVote) {
-      setError("You need a Creative Platform membership (Creative Creator Pass, Creative Investor Pass, or Creative Brand Pass) to vote. Please purchase a membership to participate in voting.");
+      setError("You need a Creative Platform membership (Creative Creator Pass, Creative Professional Pass, or Creative Brand Pass) to vote. Please purchase a membership to participate in voting.");
       return;
     }
 
@@ -519,7 +519,7 @@ function VotingForm({ proposal }: { proposal: Proposal }) {
           </p>
           <ul className="text-sm text-yellow-700 dark:text-yellow-300 list-disc list-inside space-y-1 mb-3">
             <li>Creative Creator Pass</li>
-            <li>Creative Investor Pass</li>
+            <li>Creative Professional Pass</li>
             <li>Creative Brand Pass</li>
           </ul>
           <p className="text-sm text-yellow-700 dark:text-yellow-300">

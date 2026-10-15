@@ -18,7 +18,7 @@ import { appendBuilderCode } from "@/lib/utils/builder-code";
 import { getErc20Balance } from '@/lib/viem';
 
 
-export function CreativeBankTab() {
+export function CreativeFinanceTab() {
     const { address: userAddress, client } = useSmartAccountClient({});
     const { getGasContext } = useGasSponsorship();
 
@@ -32,7 +32,7 @@ export function CreativeBankTab() {
     const [showSwap, setShowSwap] = useState(false);
 
     // Constants
-    const CREATIVE_BANK_URL = "https://bank.creativeplatform.xyz";
+    const CREATIVE_FINANCE_URL = "https://finance.creativeplatform.xyz";
 
     // Fetch USDC Balance
     const fetchBalance = async () => {
@@ -59,7 +59,7 @@ export function CreativeBankTab() {
     }, [userAddress, client]);
 
     // Provide quick way to fill known address (placeholder for now if needed, but keeping generic as requested)
-    // The user said "The address that I want in there will come from Creative Bank", implying manual input or copy-paste from that site.
+    // The user said "The address that I want in there will come from Creative Finance", implying manual input or copy-paste from that site.
 
     const handleSend = async () => {
         if (!userAddress || !client || !destinationAddress || !amount) return;
@@ -133,12 +133,12 @@ export function CreativeBankTab() {
                 <CardHeader>
                     <CardTitle className="text-2xl flex items-center gap-2">
                         <Wallet className="w-6 h-6" />
-                        Creative Bank
+                        Creative Finance
                     </CardTitle>
                     <CardDescription>
-                        Deposit USDC directly to your Creative Bank account.
+                        Deposit USDC directly to your Creative Finance account.
                         <br />
-                        Don't have an account? <a href={CREATIVE_BANK_URL} target="_blank" rel="noopener noreferrer" className="text-primary underline hover:opacity-80">Connect or create one here</a>.
+                        Don't have an account? <a href={CREATIVE_FINANCE_URL} target="_blank" rel="noopener noreferrer" className="text-primary underline hover:opacity-80">Connect or create one here</a>.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -159,7 +159,7 @@ export function CreativeBankTab() {
                     {/* Transfer Form */}
                     <div className="space-y-4">
                         <div className="space-y-2">
-                            <Label htmlFor="destination">Bank Recipient Address</Label>
+                            <Label htmlFor="destination">Finance Recipient Address</Label>
                             <Input
                                 id="destination"
                                 placeholder="0x..."
@@ -167,7 +167,7 @@ export function CreativeBankTab() {
                                 onChange={(e) => setDestinationAddress(e.target.value)}
                             />
                             <p className="text-xs text-muted-foreground">
-                                Enter the address provided by <a href={CREATIVE_BANK_URL} target="_blank" rel="noreferrer" className="underline">Creative Bank</a>.
+                                Enter the address provided by <a href={CREATIVE_FINANCE_URL} target="_blank" rel="noreferrer" className="underline">Creative Finance</a>.
                             </p>
                         </div>
 
@@ -226,7 +226,7 @@ export function CreativeBankTab() {
                                 ) : (
                                     <>
                                         <Send className="mr-2 h-4 w-4" />
-                                        Deposit to Bank
+                                        Deposit to Finance
                                     </>
                                 )}
                             </Button>

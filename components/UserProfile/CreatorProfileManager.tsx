@@ -13,6 +13,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { useWalletStatus } from '@/lib/hooks/accountkit/useWalletStatus';
 import { AvatarUpload } from './AvatarUpload';
 import { DigitalTwinSection } from './DigitalTwinSection';
+import { BrandChannelSection } from './BrandChannelSection';
 import { Loader2, CheckCircle, AlertCircle, User, Save, Edit3 } from 'lucide-react';
 
 interface CreatorProfileManagerProps {
@@ -243,6 +244,12 @@ export function CreatorProfileManager({ targetAddress, onProfileUpdated }: Creat
         ownerAddress={(targetAddress || user?.address) as string}
         initialProfile={profile ?? null}
         isOwner={isOwner}
+        onSaved={onProfileUpdated}
+      />
+    )}
+    {isOwner && (
+      <BrandChannelSection
+        targetAddress={targetAddress}
         onSaved={onProfileUpdated}
       />
     )}

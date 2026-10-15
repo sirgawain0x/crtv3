@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requirePrivyAuth } from "@/lib/auth/privy-server-auth";
 import { isEarnConfigured } from "@/lib/sdk/privy/config";
-import { fetchWalletAction } from "@/lib/sdk/privy/earn";
+import { fetchWalletAction, toActionSummary } from "@/lib/sdk/privy/earn";
 
 export async function GET(
   request: NextRequest,
@@ -29,11 +29,7 @@ export async function GET(
   try {
     const action = await fetchWalletAction(walletId, id);
     return NextResponse.json({
-      action: {
-        id: action.id,
-        status: action.status,
-        type: action.type,
-      },
+      action: toActionSummary(action),
     });
   } catch (error) {
     const message =

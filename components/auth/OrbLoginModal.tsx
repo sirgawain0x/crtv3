@@ -15,6 +15,11 @@ import { useOrbSession } from '@/context/OrbSessionContext';
 
 const QR_TIMEOUT_MS = 120_000;
 
+function isMobileViewport(): boolean {
+  if (typeof window === 'undefined') return false;
+  return window.matchMedia('(max-width: 1023px)').matches;
+}
+
 export function OrbLoginModal() {
   const {
     isLoginModalOpen,
@@ -31,6 +36,7 @@ export function OrbLoginModal() {
   const [localError, setLocalError] = useState<string | null>(null);
   const [timedOut, setTimedOut] = useState(false);
   const startedRef = useRef(false);
+  const autoOpenedDeepLinkRef = useRef(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const displayError =
@@ -45,6 +51,7 @@ export function OrbLoginModal() {
     setTimedOut(false);
     clearLoginError();
     startedRef.current = false;
+    autoOpenedDeepLinkRef.current = false;
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
@@ -56,6 +63,7 @@ export function OrbLoginModal() {
     setLocalError(null);
     setTimedOut(false);
     clearLoginError();
+    autoOpenedDeepLinkRef.current = false;
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     timeoutRef.current = setTimeout(() => {
       setTimedOut(true);
@@ -108,6 +116,14 @@ export function OrbLoginModal() {
     startConnect,
   ]);
 
+  // On phones, open the Orb app deep link once it arrives (same-tab; blank tabs break app schemes).
+  useEffect(() => {
+    if (!deepLink || displayError || autoOpenedDeepLinkRef.current) return;
+    if (!isMobileViewport()) return;
+    autoOpenedDeepLinkRef.current = true;
+    window.location.href = deepLink;
+  }, [deepLink, displayError]);
+
   useEffect(() => {
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -130,8 +146,9 @@ export function OrbLoginModal() {
         <DialogHeader>
           <DialogTitle>Link Lens with Orb</DialogTitle>
           <DialogDescription>
-            Scan the QR code with the Orb app to connect your Lens identity to the
-            wallet you signed in with.
+            {deepLink && !displayError
+              ? 'Scan the QR on desktop, or open the Orb app on this phone to approve sign-in.'
+              : 'Scan the QR code with the Orb app to connect your Lens identity to the wallet you signed in with.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -151,11 +168,14 @@ export function OrbLoginModal() {
             </div>
           )}
           {deepLink && !displayError && (
-            <Button variant="outline" size="sm" className="lg:hidden" asChild>
-              <a href={deepLink} target="_blank" rel="noopener noreferrer">
-                Open in Orb app
-              </a>
-            </Button>
+            <div className="flex w-full flex-col items-center gap-2">
+              <Button className="w-full sm:w-auto lg:hidden" asChild>
+                <a href={deepLink}>Open Orb app</a>
+              </Button>
+              <p className="hidden text-center text-xs text-muted-foreground lg:block">
+                Prefer your phone? Open this page there and tap Open Orb app.
+              </p>
+            </div>
           )}
           {displayError && (
             <p className="text-center text-sm text-destructive">{displayError}</p>

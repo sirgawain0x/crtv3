@@ -22,9 +22,17 @@ export function formatOrbAuthError(error: unknown): string {
   if (lower.includes('access denied') || lower.includes('403')) {
     return 'Sign-in was blocked by security checks. Try a private window with extensions off, or try again in a minute.';
   }
+  if (lower.includes('missing origin')) {
+    return 'Orb sign-in could not verify this site origin. Refresh and try again, or check that the app URL is configured correctly.';
+  }
   if (
+    lower.includes('did not include qrcode') ||
+    lower.includes('qrcode and secret') ||
+    lower.includes('qr init request failed') ||
+    lower.includes('temporarily unavailable') ||
     lower.includes('failed to reach orb') ||
     lower.includes('502') ||
+    lower.includes('503') ||
     lower.includes('network') ||
     lower.includes('fetch failed')
   ) {

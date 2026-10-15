@@ -1,4 +1,4 @@
-import { template as realityTemplate } from "@reality.eth/reality-eth-lib";
+import * as realityTemplate from "@reality.eth/reality-eth-lib/formatters/template.js";
 import type { QuestionType } from "@/lib/sdk/reality-eth/reality-eth-utils";
 
 /** Standard Reality.eth template IDs (see @reality.eth/contracts/config/templates.json). */

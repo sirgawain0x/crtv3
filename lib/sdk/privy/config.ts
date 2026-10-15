@@ -22,11 +22,27 @@ export function getEarnVaultId(): string {
   return vaultId;
 }
 
+/** Earn deposits and incentive claims run on Base. */
+export const EARN_CLAIM_CHAIN = "base";
+
 export function isEarnConfigured(): boolean {
   return Boolean(
     process.env.NEXT_PUBLIC_PRIVY_APP_ID &&
       process.env.PRIVY_APP_SECRET &&
       process.env.PRIVY_EARN_VAULT_ID,
+  );
+}
+
+export function getPrivyWebhookSigningSecret(): string | undefined {
+  const secret = process.env.PRIVY_WEBHOOK_SIGNING_SECRET?.trim();
+  return secret || undefined;
+}
+
+export function isPrivyWebhookConfigured(): boolean {
+  return Boolean(
+    process.env.NEXT_PUBLIC_PRIVY_APP_ID &&
+      process.env.PRIVY_APP_SECRET &&
+      getPrivyWebhookSigningSecret(),
   );
 }
 
