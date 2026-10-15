@@ -75,6 +75,26 @@ describe("useMembershipVerification wallet timeout", () => {
     vi.clearAllMocks();
   });
 
+  it("exposes retryable error after Privy stays not ready", async () => {
+    vi.mocked(usePrivy).mockReturnValue({
+      ready: false,
+      authenticated: false,
+    } as ReturnType<typeof usePrivy>);
+
+    const view = await renderMembershipHook();
+
+    expect(view.result.isLoading).toBe(true);
+
+    await act(async () => {
+      vi.advanceTimersByTime(WALLET_INIT_TIMEOUT_MS + 100);
+    });
+
+    expect(view.result.isLoading).toBe(false);
+    expect(view.result.error?.code).toBe(WALLET_INIT_TIMEOUT_CODE);
+
+    view.unmount();
+  });
+
   it("exposes retryable error after timeout while useUser stays null", async () => {
     const view = await renderMembershipHook();
 

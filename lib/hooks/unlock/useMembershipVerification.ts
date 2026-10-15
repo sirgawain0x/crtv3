@@ -14,7 +14,7 @@ import useModularAccount from "@/lib/hooks/accountkit/useModularAccount";
 import { usePrivy } from "@privy-io/react-auth";
 import { useWalletInitTimeout } from "@/lib/hooks/accountkit/useWalletInitTimeout";
 import {
-  shouldWaitForMembershipSmartAccount,
+  shouldWaitForMembershipWalletInit,
   WALLET_INIT_TIMEOUT_CODE,
 } from "@/lib/hooks/unlock/membership-wallet-wait";
 
@@ -48,13 +48,14 @@ export function useMembershipVerification() {
   } = useModularAccount();
   const scaAddressForWait =
     client?.account?.address ?? modularAddress ?? null;
-  const waitingForSca = shouldWaitForMembershipSmartAccount({
+  const waitingForWalletInit = shouldWaitForMembershipWalletInit({
     ready,
     authenticated,
     userType: user?.type,
     smartAccountAddress: scaAddressForWait,
+    userAddress: user?.address ?? null,
   });
-  const scaWaitTimedOut = useWalletInitTimeout(waitingForSca);
+  const walletInitTimedOut = useWalletInitTimeout(waitingForWalletInit);
 
   const [status, setStatus] = useState<Omit<MembershipStatus, "refetch">>({
     isVerified: false,
@@ -95,12 +96,24 @@ export function useMembershipVerification() {
   );
 
   const refetch = useCallback(async () => {
-    if (!ready) {
-      setStatus((prev) => ({ ...prev, isLoading: true }));
-      return;
-    }
-
     if (!authenticated) {
+      if (!ready) {
+        if (walletInitTimedOut) {
+          setStatus({
+            isVerified: false,
+            hasMembership: false,
+            isLoading: false,
+            error: {
+              name: "Error",
+              message: "Wallet session did not finish loading. Try again.",
+              code: WALLET_INIT_TIMEOUT_CODE,
+            } as MembershipError,
+          });
+          return;
+        }
+        setStatus((prev) => ({ ...prev, isLoading: true }));
+        return;
+      }
       setStatus({
         isVerified: false,
         hasMembership: false,
@@ -110,12 +123,12 @@ export function useMembershipVerification() {
       return;
     }
 
-    if (waitingForSca && !scaWaitTimedOut) {
+    if (waitingForWalletInit && !walletInitTimedOut) {
       setStatus((prev) => ({ ...prev, isLoading: true }));
       return;
     }
 
-    if (waitingForSca && scaWaitTimedOut) {
+    if (waitingForWalletInit && walletInitTimedOut) {
       setStatus({
         isVerified: false,
         hasMembership: false,
@@ -186,8 +199,8 @@ export function useMembershipVerification() {
     user?.type,
     client?.account?.address,
     modularAddress,
-    waitingForSca,
-    scaWaitTimedOut,
+    waitingForWalletInit,
+    walletInitTimedOut,
     verifyMembership,
   ]);
 

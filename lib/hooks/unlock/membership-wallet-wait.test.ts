@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { shouldWaitForMembershipSmartAccount } from "./membership-wallet-wait";
+import {
+  shouldWaitForMembershipSmartAccount,
+  shouldWaitForMembershipWalletInit,
+} from "./membership-wallet-wait";
 
 describe("shouldWaitForMembershipSmartAccount", () => {
   it("waits when authenticated and user is null (timeout should still run)", () => {
@@ -33,5 +36,31 @@ describe("shouldWaitForMembershipSmartAccount", () => {
         smartAccountAddress: "0xSca000000000000000000000000000000000001",
       }),
     ).toBe(false);
+  });
+});
+
+describe("shouldWaitForMembershipWalletInit", () => {
+  it("waits while Privy is not ready", () => {
+    expect(
+      shouldWaitForMembershipWalletInit({
+        ready: false,
+        authenticated: false,
+        userType: undefined,
+        smartAccountAddress: null,
+        userAddress: null,
+      }),
+    ).toBe(true);
+  });
+
+  it("waits for EOA address when type is eoa", () => {
+    expect(
+      shouldWaitForMembershipWalletInit({
+        ready: true,
+        authenticated: true,
+        userType: "eoa",
+        smartAccountAddress: null,
+        userAddress: null,
+      }),
+    ).toBe(true);
   });
 });

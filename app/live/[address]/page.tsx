@@ -6,6 +6,7 @@ import {
   fetchStreamKeyForCreator,
 } from "@/components/Live/Broadcast";
 import { updateStream } from "@/services/streams";
+import { usePrivy } from "@privy-io/react-auth";
 import { useCreatorWalletAddress } from "@/lib/hooks/accountkit/useCreatorWalletAddress";
 import { useWalletAuth } from "@/lib/auth/useWalletAuth";
 import { walletAuthHeadersToArgs } from "@/lib/auth/require-wallet";
@@ -55,6 +56,7 @@ import { ModeratorsDialog } from "@/components/Live/ModeratorsDialog";
 import { DigitalTwinOverlay } from "@/components/Live/DigitalTwinOverlay";
 import { logger } from '@/lib/utils/logger';
 import { isPlatformAdmin } from "@/lib/access/platform-admin";
+import { resolveLiveStudioAuthPhase } from "@/lib/live/live-studio-auth";
 import { useMembershipVerification } from "@/lib/hooks/unlock/useMembershipVerification";
 import {
   hasValidCreatorPass,
@@ -87,6 +89,7 @@ async function fetchStreamKeyWithRetry(
 
 
 export default function LivePage() {
+  const { ready: privyReady } = usePrivy();
   const {
     creatorAddress,
     signerAddress,
@@ -430,7 +433,22 @@ export default function LivePage() {
     }
   }
 
-  if (!isAuthenticated) {
+  const authPhase = resolveLiveStudioAuthPhase({
+    privyReady,
+    isAuthenticated,
+  });
+
+  if (authPhase === "privy_init") {
+    return (
+      <MembershipGuard>
+        <div className="min-h-screen p-6 flex items-center justify-center text-sm text-muted-foreground">
+          Loading session…
+        </div>
+      </MembershipGuard>
+    );
+  }
+
+  if (authPhase === "logged_out") {
     return (
       <MembershipGuard>
         <div className="min-h-screen p-6">
