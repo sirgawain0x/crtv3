@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   HERO_NAME,
   HERO_DESCRIPTION,
@@ -13,38 +13,13 @@ import { PlayerLoading } from "../Player/Player";
 import { getHeroPlaybackSource } from "../../lib/hooks/livepeer/useHeroPlaybackSource";
 import { logger } from '@/lib/utils/logger';
 
-
-// Custom PlayIcon component
-const PlayIcon = (props: React.SVGProps<SVGSVGElement>) => {
-  return (
-    <svg
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      {...props}
-    >
-      <path d="M8 5V19L19 12L8 5Z" fill="currentColor" />
-    </svg>
-  );
-};
-
 const HeroSection: React.FC = () => {
-  const router = useRouter();
-  /** Set to true to restore the homepage Watch Demo CTA. */
-  const SHOW_WATCH_DEMO = false;
   const [src, setSrc] = useState<Src[] | null>(null);
   const [heroPlaybackId, setHeroPlaybackId] = useState<string | undefined>(
     undefined,
   );
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-
-  const handleWatchDemo = () => {
-    // Tour has been disabled
-    logger.debug("Tour is disabled - watch demo button clicked");
-  };
 
   useEffect(() => {
     let isMounted = true;
@@ -107,32 +82,70 @@ const HeroSection: React.FC = () => {
   }
 
   return (
-    <div className="md:py-18 mx-auto max-w-7xl py-10">
+    <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 md:py-18">
       <div className="flex flex-col-reverse items-center justify-between md:flex-row">
         <div className="mt-8 flex-1 space-y-5 md:mt-0 md:space-y-10 text-center md:text-left">
-          <h1 className="text-3xl font-bold leading-tight sm:text-4xl lg:text-6xl">
-            <span className="relative inline-block">
-              <span className="absolute inset-0 bottom-1 left-0 -z-10 h-1/3 w-full bg-orange-500"></span>
-              {HERO_NAME.top}
+          <h1
+            className={
+              "text-[clamp(2.25rem,6.5vw,2.75rem)] font-bold leading-tight text-gray-900 " +
+              "dark:text-white sm:text-[clamp(2.5rem,5vw,3rem)] " +
+              "md:text-[clamp(1.75rem,2.6vw,2.25rem)] lg:text-[clamp(2.5rem,2.6vw,3.5rem)]"
+            }
+          >
+            <span className="block text-orange-600 md:inline">
+              {HERO_NAME.first}
             </span>
-            <br />
-            <span className="text-orange-600">{HERO_NAME.bottom}</span>
+            <span
+              className={
+                "block text-orange-600 md:inline md:before:inline md:before:whitespace-pre md:before:content-['_']"
+              }
+            >
+              {HERO_NAME.second}
+            </span>
+            <span
+              className={
+                "block md:inline md:before:inline md:before:whitespace-pre md:before:content-['_']"
+              }
+            >
+              <span className="relative inline-block text-gray-900 dark:text-white">
+                <span
+                  className="absolute left-0 bottom-[0.12em] -z-10 h-[0.28em] w-full bg-orange-500"
+                  aria-hidden="true"
+                />
+                {HERO_NAME.third}
+              </span>
+            </span>
           </h1>
-          <p className="text-gray-500">{HERO_DESCRIPTION}</p>
-          {SHOW_WATCH_DEMO ? (
-            <div className="flex flex-col items-center space-y-4 sm:flex-row sm:justify-center sm:space-x-6 sm:space-y-0 md:justify-start">
-              <button
-                className={
-                  "flex items-center space-x-2 rounded-full bg-pink-600 px-6 py-2 text-lg font-normal text-white " +
-                  "transition duration-200 hover:bg-pink-700 lg:py-3"
-                }
-                onClick={handleWatchDemo}
-              >
-                <PlayIcon className="h-5 w-5" />
-                <span>{HERO_BUTTONS.secondary.text}</span>
-              </button>
-            </div>
-          ) : null}
+          <p className="text-lg text-gray-800 dark:text-gray-200 md:text-xl">
+            {HERO_DESCRIPTION}
+          </p>
+          <div
+            className={
+              "flex flex-col items-center gap-4 sm:flex-row sm:flex-wrap sm:justify-center " +
+              "md:justify-start md:gap-x-4 lg:gap-x-6"
+            }
+          >
+            <Link
+              href={HERO_BUTTONS.primary.href}
+              className={
+                "whitespace-nowrap rounded-full bg-pink-600 px-5 py-2 text-base font-semibold text-white " +
+                "transition duration-200 hover:bg-pink-700 lg:px-6 lg:py-3 lg:text-lg"
+              }
+            >
+              {HERO_BUTTONS.primary.text}
+            </Link>
+            <Link
+              href={HERO_BUTTONS.secondary.href}
+              className={
+                "whitespace-nowrap rounded-full border-2 border-gray-900 px-5 py-2 text-base font-semibold " +
+                "text-gray-900 transition duration-200 hover:bg-gray-900 hover:text-white " +
+                "dark:border-white dark:text-white dark:hover:bg-white dark:hover:text-gray-900 " +
+                "lg:px-6 lg:py-3 lg:text-lg"
+              }
+            >
+              {HERO_BUTTONS.secondary.text}
+            </Link>
+          </div>
         </div>
         <div className="w-full md:ml-8 md:flex-1">
           <div className="relative w-full overflow-hidden rounded-2xl bg-black shadow-2xl">

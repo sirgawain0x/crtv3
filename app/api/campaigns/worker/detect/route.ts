@@ -1,4 +1,3 @@
-import { verifySignatureAppRouter } from "@upstash/qstash/nextjs";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { detectProductInVideo } from "@/lib/shoppable/detect-product";
@@ -75,4 +74,7 @@ async function handler(request: Request) {
   }
 }
 
-export const POST = verifySignatureAppRouter(handler);
+export async function POST(request: Request) {
+  const { verifySignatureAppRouter } = await import("@upstash/qstash/nextjs");
+  return verifySignatureAppRouter(handler)(request);
+}

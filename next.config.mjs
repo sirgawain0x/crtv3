@@ -274,6 +274,20 @@ const nextConfig = {
     // number of pages that should be kept simultaneously without being disposed
     pagesBufferLength: 2,
   },
+  async redirects() {
+    return [
+      {
+        source: "/clips",
+        destination: "/discover",
+        permanent: true,
+      },
+      {
+        source: "/clips/:path*",
+        destination: "/discover",
+        permanent: true,
+      },
+    ];
+  },
   images: {
     remotePatterns: [
       {

@@ -6773,15 +6773,10 @@
     js-base64 "^3.7.5"
     qrcode "^1.5.4"
 
-"@solana-program/compute-budget@^0.11.0":
+"@solana-program/compute-budget@0.11.0", "@solana-program/compute-budget@^0.11.0", "@solana-program/compute-budget@^0.8.0":
   version "0.11.0"
-  resolved "https://registry.npmjs.org/@solana-program/compute-budget/-/compute-budget-0.11.0.tgz"
+  resolved "https://registry.npmjs.org/@solana-program/compute-budget/-/compute-budget-0.11.0.tgz#0c18ac6fd9641fd8fe3d882f5784a626f57c965c"
   integrity sha512-7f1ePqB/eURkTwTOO9TNIdUXZcyrZoX3Uy2hNo7cXMfNhPFWp9AVgIyRNBc2jf15sdUa9gNpW+PfP2iV8AYAaw==
-
-"@solana-program/compute-budget@^0.8.0":
-  version "0.8.0"
-  resolved "https://registry.npmjs.org/@solana-program/compute-budget/-/compute-budget-0.8.0.tgz"
-  integrity sha512-qPKxdxaEsFxebZ4K5RPuy7VQIm/tfJLa1+Nlt3KNA8EYQkz9Xm8htdoEaXVrer9kpgzzp9R3I3Bh6omwCM06tQ==
 
 "@solana-program/stake@^0.2.1":
   version "0.2.1"
