@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { NewsletterModal } from "./NewsletterModal";
-import { getPublicationPosts, getSubscriberCount, getCoinData } from "@/app/actions/paragraph";
+import { fetchNewsletterIssues } from "@/app/actions/newsletter";
+import { getSubscriberCount, getCoinData } from "@/app/actions/paragraph";
 import { useUser } from "@/lib/wallet/react";
 import { Newspaper } from "lucide-react";
 import { logger } from '@/lib/utils/logger';
@@ -27,7 +28,7 @@ export default function DearCreativePublications() {
             try {
                 setLoading(true);
                 // Fetch public posts
-                const fetchedPosts = await getPublicationPosts(3);
+                const fetchedPosts = await fetchNewsletterIssues(3);
 
                 if (isMounted) {
                     setPosts(fetchedPosts);
@@ -151,7 +152,7 @@ export default function DearCreativePublications() {
                 {posts.map((post) => (
                     <Link
                         key={post.id}
-                        href={`https://news.creativeplatform.xyz/${post.slug}`}
+                        href={post.canonicalUrl ?? `https://news.creativeplatform.xyz/${post.slug}`}
                         onClick={(e) => handlePostClick(e, post)}
                         className="group block h-full cursor-pointer"
                     >
@@ -206,7 +207,7 @@ export default function DearCreativePublications() {
                 <NewsletterModal
                     isOpen={!!activePost}
                     onClose={() => setActivePost(null)}
-                    postUrl={`https://news.creativeplatform.xyz/${activePost.slug}`}
+                    postUrl={activePost.canonicalUrl ?? `https://news.creativeplatform.xyz/${activePost.slug}`}
                     title={activePost.title}
                 />
             )}
