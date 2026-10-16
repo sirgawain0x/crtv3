@@ -1,0 +1,40 @@
+# Minimal Question schema for social-sync query validation (matches Graph Studio creative-platform).
+scalar BigInt
+scalar Bytes
+
+enum OrderDirection {
+  asc
+  desc
+}
+
+enum Question_orderBy {
+  created
+  last_bond_ts
+}
+
+input Question_filter {
+  created_gt: BigInt
+  best_answer: Bytes
+  best_answer_not: Bytes
+  last_bond_ts_gt: BigInt
+}
+
+type Question {
+  id: Bytes!
+  template_id: BigInt!
+  question: String!
+  created: BigInt!
+  best_answer: Bytes!
+  last_bond_ts: BigInt!
+  last_bond: BigInt!
+  bounty: BigInt!
+}
+
+type Query {
+  questions(
+    first: Int
+    orderBy: Question_orderBy
+    orderDirection: OrderDirection
+    where: Question_filter
+  ): [Question!]!
+}
