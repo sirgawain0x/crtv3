@@ -1,12 +1,12 @@
 import type { SubgraphQuestionRow } from "@/lib/reality-social/subgraph";
 import type { GraphQuestionEntity } from "@/lib/reality-social/reality-social-subgraph-queries";
-import { questionHasBondedAnswer } from "@/lib/reality-social/question-answer-state";
+import { questionIsAnswered } from "@/lib/reality-social/question-answer-state";
 
 export function mapGraphQuestionToRow(
   row: GraphQuestionEntity,
   contractAddress: string,
 ): SubgraphQuestionRow {
-  const hasAnswer = questionHasBondedAnswer(row);
+  const hasAnswer = questionIsAnswered(row);
 
   return {
     id: row.id,

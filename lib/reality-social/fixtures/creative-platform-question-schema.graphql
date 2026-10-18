@@ -17,6 +17,9 @@ input Question_filter {
   last_bond: BigInt
   last_bond_gt: BigInt
   last_bond_ts_gt: BigInt
+  finalize_ts: BigInt
+  finalize_ts_not: BigInt
+  or: [Question_filter]
 }
 
 type Question {
@@ -28,6 +31,7 @@ type Question {
   last_bond_ts: BigInt!
   last_bond: BigInt!
   bounty: BigInt!
+  finalize_ts: BigInt
 }
 
 type Query {

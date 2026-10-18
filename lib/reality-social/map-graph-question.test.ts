@@ -13,6 +13,7 @@ describe("mapGraphQuestionToRow", () => {
         last_bond: "0",
         bounty: "1000",
         template_id: "2",
+        finalize_ts: null,
       },
       "0x2F39f464d16402Ca3D8527dA89617b73DE2F60e8",
     );

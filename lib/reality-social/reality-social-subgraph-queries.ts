@@ -9,6 +9,7 @@ export type GraphQuestionEntity = {
   last_bond: string;
   bounty: string;
   template_id: string;
+  finalize_ts: string | null;
 };
 
 /** GraphQL documents for creative-platform / Graph Studio `Question` entity (not legacy Goldsky twitter-bot schema). */
@@ -26,7 +27,8 @@ export function buildSocialSyncQuestionQueries(afterTimestamp: number): {
         last_bond_ts
         last_bond
         bounty
-        template_id`;
+        template_id
+        finalize_ts`;
 
   const newQuestionsQuery = `
     {
@@ -34,7 +36,7 @@ export function buildSocialSyncQuestionQueries(afterTimestamp: number): {
         orderBy: created
         orderDirection: asc
         first: ${PER_QUERY}
-        where: { created_gt: ${ts}, last_bond: "0" }
+        where: { created_gt: ${ts}, last_bond: "0", finalize_ts: null }
       ) {
         ${fields}
       }
@@ -47,7 +49,10 @@ export function buildSocialSyncQuestionQueries(afterTimestamp: number): {
         orderBy: last_bond_ts
         orderDirection: asc
         first: ${PER_QUERY}
-        where: { last_bond_ts_gt: ${ts}, last_bond_gt: "0" }
+        where: {
+          last_bond_ts_gt: ${ts},
+          or: [{ last_bond_gt: "0" }, { finalize_ts_not: null }]
+        }
       ) {
         ${fields}
       }
