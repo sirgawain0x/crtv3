@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   assertGraphQlQuestionsWhereNoOrColumnMix,
   extractGraphQlWhereInner,
-  topLevelWhereKeysBeforeOr,
+  topLevelWhereKeys,
 } from "@/lib/reality-social/__tests__/graphql-where-helpers";
 import { buildSocialSyncQuestionQueries } from "@/lib/reality-social/reality-social-subgraph-queries";
 import {
@@ -35,12 +35,11 @@ describe("social-sync where filters", () => {
     ).not.toThrow();
 
     const whereInner = extractGraphQlWhereInner(answeredQuestionsQuery);
-    expect(topLevelWhereKeysBeforeOr(whereInner)).toEqual([]);
-    expect(whereInner).toMatch(/^\s*or\s*:\s*\[/);
+    expect(topLevelWhereKeys(whereInner)).toEqual(["or"]);
     expect(whereInner).toMatch(/last_bond_ts_gt:\s*1700000000/);
   });
 
-  it("rejects the pre-#375 mixed answered where GraphQL shape", () => {
+  it("rejects the pre-#375 mixed answered where GraphQL shape (column before or)", () => {
     const brokenAnsweredQuery = `
     {
       questions(
@@ -61,6 +60,28 @@ describe("social-sync where filters", () => {
       assertGraphQlQuestionsWhereNoOrColumnMix(
         brokenAnsweredQuery,
         "brokenAnsweredQuery",
+      ),
+    ).toThrow(/top-level where mixes `or` with column filters \(last_bond_ts_gt\)/);
+  });
+
+  it("rejects top-level column filters after or", () => {
+    const brokenAnsweredQuery = `
+    {
+      questions(
+        where: {
+          or: [{ last_bond_gt: "0" }, { finalize_ts_not: null }],
+          last_bond_ts_gt: 1700000000
+        }
+      ) {
+        id
+      }
+    }
+  `;
+
+    expect(() =>
+      assertGraphQlQuestionsWhereNoOrColumnMix(
+        brokenAnsweredQuery,
+        "brokenAnsweredQueryAfterOr",
       ),
     ).toThrow(/top-level where mixes `or` with column filters \(last_bond_ts_gt\)/);
   });
