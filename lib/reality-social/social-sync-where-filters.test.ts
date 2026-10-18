@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { buildSocialSyncQuestionQueries } from "@/lib/reality-social/reality-social-subgraph-queries";
 import {
   assertGraphQlQuestionsWhereNoOrColumnMix,
-  assertNoOrMixedWithColumns,
-  buildSocialSyncWhereFilters,
   extractGraphQlWhereInner,
   topLevelWhereKeysBeforeOr,
+} from "@/lib/reality-social/__tests__/graphql-where-helpers";
+import { buildSocialSyncQuestionQueries } from "@/lib/reality-social/reality-social-subgraph-queries";
+import {
+  assertNoOrMixedWithColumns,
+  buildSocialSyncWhereFilters,
 } from "@/lib/reality-social/social-sync-where-filters";
 
 describe("social-sync where filters", () => {
