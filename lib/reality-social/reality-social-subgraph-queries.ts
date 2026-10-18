@@ -1,3 +1,5 @@
+import { buildSocialSyncWhereFilters } from "@/lib/reality-social/social-sync-where-filters";
+
 const PER_QUERY = 100;
 
 export type GraphQuestionEntity = {
@@ -18,6 +20,7 @@ export function buildSocialSyncQuestionQueries(afterTimestamp: number): {
   answeredQuestionsQuery: string;
 } {
   const ts = Math.max(0, afterTimestamp);
+  const { newQuestions: newWhere } = buildSocialSyncWhereFilters(ts);
 
   const fields = `
         id
@@ -36,7 +39,7 @@ export function buildSocialSyncQuestionQueries(afterTimestamp: number): {
         orderBy: created
         orderDirection: asc
         first: ${PER_QUERY}
-        where: { created_gt: ${ts}, last_bond: "0", finalize_ts: null }
+        where: { created_gt: ${newWhere.created_gt as number}, last_bond: "${newWhere.last_bond}", finalize_ts: null }
       ) {
         ${fields}
       }
@@ -50,8 +53,10 @@ export function buildSocialSyncQuestionQueries(afterTimestamp: number): {
         orderDirection: asc
         first: ${PER_QUERY}
         where: {
-          last_bond_ts_gt: ${ts},
-          or: [{ last_bond_gt: "0" }, { finalize_ts_not: null }]
+          or: [
+            { last_bond_ts_gt: ${ts}, last_bond_gt: "0" },
+            { last_bond_ts_gt: ${ts}, finalize_ts_not: null }
+          ]
         }
       ) {
         ${fields}
