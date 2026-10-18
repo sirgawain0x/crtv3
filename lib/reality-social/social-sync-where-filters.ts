@@ -22,7 +22,7 @@ export function buildSocialSyncWhereFilters(afterTimestamp: number): {
   };
 }
 
-const COLUMN_KEYS = new Set(["and"]);
+const LOGICAL_KEYS = new Set(["and"]);
 
 export function assertNoOrMixedWithColumns(
   where: WhereFilter,
@@ -30,7 +30,7 @@ export function assertNoOrMixedWithColumns(
 ): void {
   const keys = Object.keys(where);
   const hasOr = Object.prototype.hasOwnProperty.call(where, "or");
-  const columnKeys = keys.filter((k) => k !== "or" && !COLUMN_KEYS.has(k));
+  const columnKeys = keys.filter((k) => k !== "or" && !LOGICAL_KEYS.has(k));
 
   if (hasOr && columnKeys.length > 0) {
     throw new Error(
