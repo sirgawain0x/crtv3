@@ -1,7 +1,3 @@
-/** Zero bytes32 — unanswered Reality.eth questions use this for `best_answer`. */
-export const ZERO_BEST_ANSWER =
-  "0x0000000000000000000000000000000000000000000000000000000000000000";
-
 const PER_QUERY = 100;
 
 export type GraphQuestionEntity = {
@@ -38,7 +34,7 @@ export function buildSocialSyncQuestionQueries(afterTimestamp: number): {
         orderBy: created
         orderDirection: asc
         first: ${PER_QUERY}
-        where: { created_gt: ${ts}, best_answer: "${ZERO_BEST_ANSWER}" }
+        where: { created_gt: ${ts}, last_bond: "0" }
       ) {
         ${fields}
       }
@@ -51,7 +47,7 @@ export function buildSocialSyncQuestionQueries(afterTimestamp: number): {
         orderBy: last_bond_ts
         orderDirection: asc
         first: ${PER_QUERY}
-        where: { last_bond_ts_gt: ${ts}, best_answer_not: "${ZERO_BEST_ANSWER}" }
+        where: { last_bond_ts_gt: ${ts}, last_bond_gt: "0" }
       ) {
         ${fields}
       }

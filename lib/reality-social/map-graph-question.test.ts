@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { mapGraphQuestionToRow } from "@/lib/reality-social/map-graph-question";
-import { ZERO_BEST_ANSWER } from "@/lib/reality-social/reality-social-subgraph-queries";
 
 describe("mapGraphQuestionToRow", () => {
   it("maps unanswered questions without answer timestamps", () => {
@@ -9,7 +8,7 @@ describe("mapGraphQuestionToRow", () => {
         id: "0xabc",
         question: "Will it rain?␟Yes,No␟",
         created: "100",
-        best_answer: ZERO_BEST_ANSWER,
+        best_answer: "0x",
         last_bond_ts: "100",
         last_bond: "0",
         bounty: "1000",

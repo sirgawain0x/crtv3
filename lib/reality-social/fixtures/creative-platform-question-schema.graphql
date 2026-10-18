@@ -14,8 +14,8 @@ enum Question_orderBy {
 
 input Question_filter {
   created_gt: BigInt
-  best_answer: Bytes
-  best_answer_not: Bytes
+  last_bond: BigInt
+  last_bond_gt: BigInt
   last_bond_ts_gt: BigInt
 }
 
