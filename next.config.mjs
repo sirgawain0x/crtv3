@@ -32,7 +32,6 @@ const nextConfig = {
     'jsdom',
     'html-encoding-sniffer',
     '@exodus/bytes',
-    'twit',
   ],
   // Webpack configuration for WebAssembly support
   webpack: (config, { isServer, webpack, dev }) => {
