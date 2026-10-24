@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
  * One-time: ?init=1 seeds Supabase cursor from the current timestamp.
  *
  * Auth first, then cron-handler. Question text is parsed locally (no
- * reality-eth-lib/jsdom). Twitter client (twit) loads lazily when posting.
+ * reality-eth-lib/jsdom). X posts use API v2 /2/tweets (OAuth 1.0a) when posting.
  */
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
