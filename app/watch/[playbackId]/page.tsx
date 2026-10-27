@@ -53,12 +53,12 @@ export async function generateMetadata(
             });
 
             if (marketData) {
-                const price = `$${marketData.price.toFixed(4)}`;
+                const priceFormatted = marketData.price.toFixed(4);
                 const tvl = marketData.tvl >= 1000
                     ? `$${(marketData.tvl / 1000).toFixed(1)}K`
                     : `$${marketData.tvl.toFixed(2)}`;
 
-                const metaTitle = `${marketData.symbol} ($${price}) - ${title}`;
+                const metaTitle = `${marketData.symbol} ($${priceFormatted}) - ${title}`;
                 const metaDesc = `Watch & Trade ${marketData.symbol}. TVL: ${tvl}. ${desc}`;
 
                 return {

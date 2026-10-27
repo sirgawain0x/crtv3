@@ -92,7 +92,10 @@ export async function generateMetadata(
   // Fetch market data for the token
   const marketData = await getTokenMarketData(meToken.address);
 
-  const price = marketData?.price ? `$${marketData.price.toFixed(4)}` : 'N/A';
+  const priceFormatted =
+    marketData?.price != null && marketData.price > 0
+      ? marketData.price.toFixed(4)
+      : null;
   // Format TVL: e.g. $1.5K
   const tvl = marketData?.tvl
     ? marketData.tvl >= 1000
@@ -104,7 +107,9 @@ export async function generateMetadata(
   const symbol = meToken.symbol;
   const displayName = creatorProfile?.username || name;
 
-  const title = `${symbol} ($${price}) - ${displayName}`;
+  const title = priceFormatted
+    ? `${symbol} ($${priceFormatted}) - ${displayName}`
+    : `${symbol} - ${displayName}`;
   const description = `Trade ${symbol} on Creative TV. TVL: ${tvl}. ${creatorProfile?.bio || ''}`.trim();
 
   return {

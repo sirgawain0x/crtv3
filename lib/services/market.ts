@@ -2,6 +2,7 @@ import { createClient } from '@/lib/sdk/supabase/server';
 import { getMeTokenProtocolInfo, getMeTokenInfoFromBlockchain } from '@/lib/utils/metokenUtils';
 import { formatEther } from 'viem';
 import { meTokenSupabaseService } from '@/lib/sdk/supabase/metokens';
+import { computeMeTokenSpotPriceUsd } from '@/lib/metokens/spotPrice';
 
 export interface TokenMarketData {
     price: number;
@@ -36,12 +37,15 @@ export async function getTokenMarketData(tokenAddress: string): Promise<TokenMar
 
         const balancePooled = BigInt(protocolInfo.balancePooled);
         const balanceLocked = BigInt(protocolInfo.balanceLocked);
-        const totalTvlWei = balancePooled + balanceLocked;
-        const tvl = parseFloat(formatEther(totalTvlWei));
-
+        const hubId = Number(protocolInfo.hubId);
         const totalSupplyWei = BigInt(tokenInfo.totalSupply);
-        const price = totalSupplyWei > 0n ? tvl / parseFloat(formatEther(totalSupplyWei)) : 0;
-        const marketCap = tvl; // Simplified as TVL for now, or price * supply (which is strictly TVL in this model?)
+        const { tvl, price } = computeMeTokenSpotPriceUsd(
+            balancePooled,
+            balanceLocked,
+            hubId,
+            totalSupplyWei
+        );
+        const marketCap = tvl;
 
         // 2. Calculate 24h Change
         // We'll reuse the logic from the market API but scoped to one token
