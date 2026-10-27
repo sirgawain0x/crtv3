@@ -1,6 +1,7 @@
 import { supabase, MeToken, MeTokenBalance, MeTokenTransaction, CreateMeTokenData, UpdateMeTokenData } from './client';
 import { createServiceClient } from './service';
 import { serverLogger } from '@/lib/utils/logger';
+import { resolveMeTokenSupabaseSearch } from './metokenSearchFilter';
 
 // Re-export types for external use
 export type { MeToken, MeTokenBalance, MeTokenTransaction, CreateMeTokenData, UpdateMeTokenData };
@@ -126,14 +127,13 @@ export class MeTokenSupabaseService {
 
     // Add search functionality
     if (search) {
-      const trimmed = search.trim();
-      const isContractAddress = /^0x[a-fA-F0-9]{40}$/.test(trimmed);
-      if (isContractAddress) {
-        query = query.eq('address', trimmed.toLowerCase());
-      } else {
+      const resolved = resolveMeTokenSupabaseSearch(search);
+      if (resolved.kind === 'exact_address') {
         query = query.or(
-          `name.ilike.%${trimmed}%,symbol.ilike.%${trimmed}%,owner_address.ilike.%${trimmed}%,address.ilike.%${trimmed}%`
+          `address.eq.${resolved.normalized},owner_address.eq.${resolved.normalized}`
         );
+      } else {
+        query = query.or(resolved.orClause);
       }
     }
 
