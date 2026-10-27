@@ -79,7 +79,7 @@ export async function getTokenMarketData(tokenAddress: string): Promise<TokenMar
             // Let's try to implement the replay logic quickly
 
             let replaySupply = totalSupplyWei;
-            let replayTvl = totalTvlWei;
+            let replayTvl = tvl;
 
             for (const tx of recentTxs) {
                 const amount = BigInt(Math.floor(tx.amount || 0));
