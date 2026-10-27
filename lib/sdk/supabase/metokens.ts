@@ -126,7 +126,15 @@ export class MeTokenSupabaseService {
 
     // Add search functionality
     if (search) {
-      query = query.or(`name.ilike.%${search}%,symbol.ilike.%${search}%,owner_address.ilike.%${search}%`);
+      const trimmed = search.trim();
+      const isContractAddress = /^0x[a-fA-F0-9]{40}$/.test(trimmed);
+      if (isContractAddress) {
+        query = query.eq('address', trimmed.toLowerCase());
+      } else {
+        query = query.or(
+          `name.ilike.%${trimmed}%,symbol.ilike.%${trimmed}%,owner_address.ilike.%${trimmed}%,address.ilike.%${trimmed}%`
+        );
+      }
     }
 
     // Add sorting

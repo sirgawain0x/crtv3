@@ -4,6 +4,7 @@ import { meTokenSupabaseService } from '@/lib/sdk/supabase/metokens';
 import { formatEther } from 'viem';
 import { getMeTokenProtocolInfo, getMeTokenInfoFromBlockchain, getBulkMeTokenInfo } from '@/lib/utils/metokenUtils';
 import { isActiveMarketToken } from '@/lib/metokens/syncMeTokenMarketData';
+import { filterMarketTokensBySearch } from '@/lib/market/tokenSearch';
 import { serverLogger } from '@/lib/utils/logger';
 
 export interface MarketToken {
@@ -295,15 +296,9 @@ export async function GET(request: NextRequest) {
     // Hide liquidated / zero-liquidity tokens from the market
     allTokens = allTokens.filter((token) => isActiveMarketToken(token.tvl));
 
-    // Apply search filter if provided
+    // Apply search filter if provided (includes MeToken contract address)
     if (search) {
-      const searchLower = search.toLowerCase();
-      allTokens = allTokens.filter((token) =>
-        token.name.toLowerCase().includes(searchLower) ||
-        token.symbol.toLowerCase().includes(searchLower) ||
-        token.owner_address.toLowerCase().includes(searchLower) ||
-        (token.video_title && token.video_title.toLowerCase().includes(searchLower))
-      );
+      allTokens = filterMarketTokensBySearch(allTokens, search);
     }
 
     // Apply type filter
