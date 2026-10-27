@@ -40,6 +40,15 @@ describe("normalizeXProfileUrl", () => {
     });
     expect(normalizeXProfileUrl("bad handle!")).toMatchObject({ ok: false });
   });
+
+  it("rejects hostname spoof URLs", () => {
+    expect(
+      normalizeXProfileUrl("https://evil.com/x.com/foo"),
+    ).toMatchObject({ ok: false });
+    expect(
+      normalizeXProfileUrl("https://x.com.evil.com/foo"),
+    ).toMatchObject({ ok: false });
+  });
 });
 
 describe("normalizeInstagramProfileUrl", () => {
@@ -59,6 +68,15 @@ describe("normalizeInstagramProfileUrl", () => {
   it("rejects non-profile instagram paths", () => {
     expect(
       normalizeInstagramProfileUrl("https://instagram.com/reels/abc"),
+    ).toMatchObject({ ok: false });
+  });
+
+  it("rejects hostname spoof URLs", () => {
+    expect(
+      normalizeInstagramProfileUrl("https://evil.com/instagram.com/foo"),
+    ).toMatchObject({ ok: false });
+    expect(
+      normalizeInstagramProfileUrl("https://instagram.com.evil.com/foo"),
     ).toMatchObject({ ok: false });
   });
 });
@@ -89,6 +107,15 @@ describe("normalizeOrbProfileUrl", () => {
   it("rejects club URLs and invalid paths", () => {
     expect(
       normalizeOrbProfileUrl("https://orb.club/c/worldcup"),
+    ).toMatchObject({ ok: false });
+  });
+
+  it("rejects hostname spoof URLs", () => {
+    expect(
+      normalizeOrbProfileUrl("https://evil.com/orb.club/p/foo"),
+    ).toMatchObject({ ok: false });
+    expect(
+      normalizeOrbProfileUrl("https://orb.club.evil.com/p/foo"),
     ).toMatchObject({ ok: false });
   });
 });
