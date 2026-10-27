@@ -29,6 +29,28 @@ describe('buildMeTokenSharePath', () => {
       })
     ).toBe('/watch/abc123');
   });
+
+  it('falls back to /market when creator owner address is missing', () => {
+    expect(
+      buildMeTokenSharePath({
+        type: 'creator',
+      })
+    ).toBe('/market');
+
+    expect(
+      buildMeTokenShareUrl('https://tv.creativeplatform.xyz', {
+        type: 'creator',
+      })
+    ).toBe('https://tv.creativeplatform.xyz/market');
+  });
+
+  it('falls back to /market for content shares without playbackId', () => {
+    expect(
+      buildMeTokenSharePath({
+        type: 'content',
+      })
+    ).toBe('/market');
+  });
 });
 
 describe('buildMeTokenShareUrl', () => {

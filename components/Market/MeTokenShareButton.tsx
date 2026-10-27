@@ -17,8 +17,6 @@ import { toast } from "sonner";
 import { buildMeTokenShareUrl } from "@/lib/market/metokenShareUrl";
 
 interface MeTokenShareButtonProps {
-    /** MeToken contract address (display only; not used for creator share URLs). */
-    address?: string;
     /** Creator wallet address — used to build `/creator/<owner>` share links. */
     creatorOwnerAddress?: string;
     symbol: string;
@@ -40,7 +38,7 @@ export function MeTokenShareButton({
     const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
     const shareUrl = buildMeTokenShareUrl(baseUrl, {
         type,
-        creatorOwnerAddress: creatorOwnerAddress ?? "",
+        creatorOwnerAddress,
         playbackId,
     });
 
