@@ -35,7 +35,9 @@ async function fetchCreatorProfile(address: string) {
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("creator_profiles")
-      .select("id, owner_address, username, bio, avatar_url, brand_channel_slug, created_at, updated_at")
+      .select(
+        "id, owner_address, username, bio, avatar_url, brand_channel_slug, social_orb_url, social_instagram_url, social_x_url, created_at, updated_at",
+      )
       .eq("owner_address", address.toLowerCase())
       .single();
 

@@ -15,6 +15,10 @@ import { AvatarUpload } from './AvatarUpload';
 import { DigitalTwinSection } from './DigitalTwinSection';
 import { BrandChannelSection } from './BrandChannelSection';
 import { Loader2, CheckCircle, AlertCircle, User, Save, Edit3 } from 'lucide-react';
+import {
+  normalizeCreatorSocialProfileUrl,
+  type CreatorSocialPlatform,
+} from '@/lib/creator/social-profile-urls';
 
 interface CreatorProfileManagerProps {
   targetAddress?: string;
@@ -32,8 +36,39 @@ export function CreatorProfileManager({ targetAddress, onProfileUpdated }: Creat
     username: '',
     bio: '',
     avatar_url: '',
+    social_orb_url: '',
+    social_instagram_url: '',
+    social_x_url: '',
   });
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
+
+  const validateSocialField = (platform: CreatorSocialPlatform, value: string) => {
+    const fieldKey =
+      platform === 'orb'
+        ? 'social_orb_url'
+        : platform === 'instagram'
+          ? 'social_instagram_url'
+          : 'social_x_url';
+    const result = normalizeCreatorSocialProfileUrl(platform, value);
+    setFieldErrors((prev) => {
+      const next = { ...prev };
+      if (result.ok) {
+        delete next[fieldKey];
+      } else {
+        next[fieldKey] = result.error;
+      }
+      return next;
+    });
+    return result;
+  };
+
+  const validateAllSocialFields = () => {
+    const orb = validateSocialField('orb', formData.social_orb_url);
+    const instagram = validateSocialField('instagram', formData.social_instagram_url);
+    const x = validateSocialField('x', formData.social_x_url);
+    return orb.ok && instagram.ok && x.ok;
+  };
 
   // Initialize form data when profile loads
   useEffect(() => {
@@ -42,6 +77,9 @@ export function CreatorProfileManager({ targetAddress, onProfileUpdated }: Creat
         username: profile.username || '',
         bio: profile.bio || '',
         avatar_url: profile.avatar_url || '',
+        social_orb_url: profile.social_orb_url || '',
+        social_instagram_url: profile.social_instagram_url || '',
+        social_x_url: profile.social_x_url || '',
       });
     }
   }, [profile]);
@@ -56,11 +94,37 @@ export function CreatorProfileManager({ targetAddress, onProfileUpdated }: Creat
       return;
     }
 
+    if (!validateAllSocialFields()) {
+      toast({
+        variant: "destructive",
+        title: "Fix social links",
+        description: "One or more social profile fields are invalid.",
+      });
+      return;
+    }
+
+    const orb = normalizeCreatorSocialProfileUrl('orb', formData.social_orb_url);
+    const instagram = normalizeCreatorSocialProfileUrl(
+      'instagram',
+      formData.social_instagram_url,
+    );
+    const x = normalizeCreatorSocialProfileUrl('x', formData.social_x_url);
+    const socialPayload = {
+      social_orb_url: orb.ok ? orb.url : null,
+      social_instagram_url: instagram.ok ? instagram.url : null,
+      social_x_url: x.ok ? x.url : null,
+    };
+
     setIsSaving(true);
     try {
       if (profile) {
         // Update existing profile
-        await updateProfile(formData);
+        await updateProfile({
+          username: formData.username,
+          bio: formData.bio,
+          avatar_url: formData.avatar_url,
+          ...socialPayload,
+        });
         toast({
           title: "Profile Updated",
           description: "Your creator profile has been updated successfully",
@@ -69,7 +133,10 @@ export function CreatorProfileManager({ targetAddress, onProfileUpdated }: Creat
         // Create new profile
         await upsertProfile({
           owner_address: user.address,
-          ...formData,
+          username: formData.username,
+          bio: formData.bio,
+          avatar_url: formData.avatar_url,
+          ...socialPayload,
         });
         toast({
           title: "Profile Created",
@@ -95,10 +162,65 @@ export function CreatorProfileManager({ targetAddress, onProfileUpdated }: Creat
         username: profile.username || '',
         bio: profile.bio || '',
         avatar_url: profile.avatar_url || '',
+        social_orb_url: profile.social_orb_url || '',
+        social_instagram_url: profile.social_instagram_url || '',
+        social_x_url: profile.social_x_url || '',
       });
+      setFieldErrors({});
     }
     setIsEditing(false);
   };
+
+  const renderSocialField = (
+    id: keyof Pick<
+      typeof formData,
+      'social_orb_url' | 'social_instagram_url' | 'social_x_url'
+    >,
+    label: string,
+    placeholder: string,
+    platform: CreatorSocialPlatform,
+  ) => (
+    <div className="space-y-2">
+      <Label htmlFor={id}>{label}</Label>
+      {isEditing ? (
+        <>
+          <Input
+            id={id}
+            placeholder={placeholder}
+            value={formData[id]}
+            onChange={(e) => {
+              const value = e.target.value;
+              setFormData((prev) => ({ ...prev, [id]: value }));
+              if (fieldErrors[id]) {
+                validateSocialField(platform, value);
+              }
+            }}
+            onBlur={(e) => validateSocialField(platform, e.target.value)}
+            disabled={!isOwner}
+            aria-invalid={Boolean(fieldErrors[id])}
+            aria-describedby={fieldErrors[id] ? `${id}-error` : undefined}
+          />
+          {fieldErrors[id] ? (
+            <p id={`${id}-error`} className="text-sm text-destructive" role="alert">
+              {fieldErrors[id]}
+            </p>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Handle or full profile URL. Leave blank to hide on your creator page.
+            </p>
+          )}
+        </>
+      ) : (
+        <div className="p-2 border rounded-md bg-muted">
+          {formData[id] ? (
+            <span className="break-all">{formData[id]}</span>
+          ) : (
+            <span className="text-muted-foreground">Not set</span>
+          )}
+        </div>
+      )}
+    </div>
+  );
 
   const isOwner = !targetAddress || targetAddress === user?.address || targetAddress === smartAccountAddress;
 
@@ -188,6 +310,28 @@ export function CreatorProfileManager({ targetAddress, onProfileUpdated }: Creat
                 <div className="p-2 border rounded-md bg-muted min-h-[80px]">
                   {formData.bio || <span className="text-muted-foreground">No bio set</span>}
                 </div>
+              )}
+            </div>
+
+            <div className="space-y-4 pt-2 border-t">
+              <p className="text-sm font-medium">Social profiles</p>
+              {renderSocialField(
+                'social_orb_url',
+                'Orb',
+                '@handle or https://orb.club/p/handle',
+                'orb',
+              )}
+              {renderSocialField(
+                'social_instagram_url',
+                'Instagram',
+                '@handle or https://instagram.com/handle',
+                'instagram',
+              )}
+              {renderSocialField(
+                'social_x_url',
+                'X',
+                '@handle or https://x.com/handle',
+                'x',
               )}
             </div>
           </div>

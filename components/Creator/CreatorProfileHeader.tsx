@@ -18,6 +18,7 @@ import { MembershipVerifiedBadge } from "@/components/User/MembershipVerifiedBad
 import { CreatorPredictButton } from "@/components/Creator/CreatorPredictButton";
 import { ProfileGoLiveButton } from "@/components/Live/ProfileGoLiveButton";
 import { CreatorBrandChannelButton } from "@/components/Creator/CreatorBrandChannelButton";
+import { CreatorSocialLinks } from "@/components/Creator/CreatorSocialLinks";
 
 interface CreatorProfileHeaderProps {
   address: string;
@@ -99,6 +100,13 @@ export function CreatorProfileHeader({
             {bio}
           </p>
         )}
+
+        <CreatorSocialLinks
+          className="mt-3"
+          socialOrbUrl={creatorProfile?.social_orb_url}
+          socialInstagramUrl={creatorProfile?.social_instagram_url}
+          socialXUrl={creatorProfile?.social_x_url}
+        />
 
         <div className="flex flex-wrap gap-2 mt-4">
           <ProfileGoLiveButton profileAddress={address} />
