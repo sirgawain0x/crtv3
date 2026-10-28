@@ -70,6 +70,14 @@ function isValidOrbProfileKey(key: string): boolean {
   return /^[\w.-]{1,100}$/.test(key);
 }
 
+function safeDecodeUriComponent(segment: string): string | null {
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return null;
+  }
+}
+
 export function normalizeOrbProfileUrl(input: string): SocialProfileNormalizeResult {
   const raw = input.trim();
   if (!raw) {
@@ -92,8 +100,8 @@ export function normalizeOrbProfileUrl(input: string): SocialProfileNormalizeRes
           "Use an Orb profile link (orb.club/p/your-handle), not a club or invalid path",
       };
     }
-    const profileKey = decodeURIComponent(segments[1]);
-    if (!isValidOrbProfileKey(profileKey)) {
+    const profileKey = safeDecodeUriComponent(segments[1]);
+    if (profileKey === null || !isValidOrbProfileKey(profileKey)) {
       return { ok: false, error: "Enter a valid Orb profile handle or address" };
     }
     const normalizedKey = profileKey.startsWith("0x")

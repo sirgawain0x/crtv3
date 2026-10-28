@@ -118,6 +118,12 @@ describe("normalizeOrbProfileUrl", () => {
       normalizeOrbProfileUrl("https://orb.club.evil.com/p/foo"),
     ).toMatchObject({ ok: false });
   });
+
+  it("rejects malformed percent-encoding in profile URLs", () => {
+    expect(
+      normalizeOrbProfileUrl("https://orb.club/p/%E0%A4%A"),
+    ).toMatchObject({ ok: false });
+  });
 });
 
 describe("normalizeCreatorSocialProfileUrl", () => {
