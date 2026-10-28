@@ -25,3 +25,6 @@ jobs:
 
       - name: TypeScript (tsc --noEmit)
         run: npx tsc --noEmit
+
+      - name: Vitest
+        run: npx vitest run

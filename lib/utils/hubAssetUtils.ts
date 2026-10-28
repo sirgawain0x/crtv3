@@ -12,13 +12,21 @@ import type { HubCollateralConfig } from '@/lib/metokens/hub-onchain';
 
 export type { HubAssetConfig, HubAssetSymbol };
 
-type AmountAsset = HubAssetConfig | string | HubCollateralConfig;
+/** Hub id, token address, or collateral config with decimals. */
+type AmountAsset = HubAssetConfig | string | HubCollateralConfig | number;
+
+function resolveAmountAsset(asset: AmountAsset): HubAssetConfig | HubCollateralConfig {
+  if (typeof asset === 'number') {
+    return resolveHubAsset(asset);
+  }
+  if (typeof asset === 'string') {
+    return getHubAssetByAddress(asset) ?? HUB_ASSET_CONFIGS[DEFAULT_HUB_ASSET];
+  }
+  return asset;
+}
 
 function resolveDecimals(asset: AmountAsset): number {
-  if (typeof asset === 'string') {
-    return (getHubAssetByAddress(asset) ?? HUB_ASSET_CONFIGS[DEFAULT_HUB_ASSET]).decimals;
-  }
-  return asset.decimals;
+  return resolveAmountAsset(asset).decimals;
 }
 
 export function parseHubAssetAmount(amount: string, asset: AmountAsset): bigint {

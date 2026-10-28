@@ -57,6 +57,37 @@ function inferTypeFromOutcomes(outcomes: string[]): ParsedPredictionDisplay["typ
   return "bool";
 }
 
+/** Mirrors Reality.eth template IDs from `getTemplateIdForQuestionType` / templates.json. */
+const REALITY_TEMPLATE_ID_TO_TYPE: Record<
+  number,
+  ParsedPredictionDisplay["type"]
+> = {
+  0: "bool",
+  1: "uint",
+  2: "single-select",
+  3: "multiple-select",
+};
+
+function applyTemplateIdToDisplay(
+  parsed: ParsedPredictionDisplay,
+  templateId?: string | number | bigint | null
+): ParsedPredictionDisplay {
+  if (templateId == null) return parsed;
+  const id = Number(templateId);
+  if (!Number.isFinite(id)) return parsed;
+
+  const fromTemplate = REALITY_TEMPLATE_ID_TO_TYPE[id];
+  if (!fromTemplate) return parsed;
+
+  const next = { ...parsed, type: fromTemplate };
+  if (fromTemplate === "uint") {
+    next.outcomes = [];
+  } else if (fromTemplate === "bool" && next.outcomes.length === 0) {
+    next.outcomes = ["Yes", "No"];
+  }
+  return next;
+}
+
 function isValidQuestionType(value: string): value is ParsedPredictionDisplay["type"] {
   return (
     value === "bool" ||
@@ -121,7 +152,7 @@ export function applyPredictionMetadataOverride(
  */
 export function parsePredictionDisplay(
   questionText: string,
-  _templateId?: string | number | bigint | null
+  templateId?: string | number | bigint | null
 ): ParsedPredictionDisplay {
   const raw = (questionText ?? "").trim();
   if (!raw) {
@@ -138,10 +169,13 @@ export function parsePredictionDisplay(
   // it pulls jsdom/html-encoding-sniffer and crashes Vercel Node (ERR_REQUIRE_ESM).
   const local = parseQuestionLocal(raw);
   if (local) {
-    return {
-      ...local,
-      language: "en_US",
-    };
+    return applyTemplateIdToDisplay(
+      {
+        ...local,
+        language: "en_US",
+      },
+      templateId
+    );
   }
 
   const parts = raw.split(UNIT_SEP);
@@ -160,13 +194,16 @@ export function parsePredictionDisplay(
 
   const type = inferTypeFromOutcomes(outcomes);
 
-  return {
-    title,
-    type,
-    outcomes: outcomes.length ? outcomes : type === "bool" ? ["Yes", "No"] : [],
-    category: resolvedCategory,
-    language: language.match(/^[a-z]{2}_[A-Z]{2}$/) ? language : "en_US",
-  };
+  return applyTemplateIdToDisplay(
+    {
+      title,
+      type,
+      outcomes: outcomes.length ? outcomes : type === "bool" ? ["Yes", "No"] : [],
+      category: resolvedCategory,
+      language: language.match(/^[a-z]{2}_[A-Z]{2}$/) ? language : "en_US",
+    },
+    templateId
+  );
 }
 
 function looksLikeUintAnswer(normalized: string): boolean {
