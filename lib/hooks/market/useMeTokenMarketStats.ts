@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { MarketToken } from '@/app/api/market/tokens/route';
 import { logger } from '@/lib/utils/logger';
+import { resolveMeTokenMarketStatsFromResponse } from '@/lib/hooks/market/marketStatsSelection';
 
 export interface MeTokenMarketStats {
     price: number;
@@ -27,7 +28,9 @@ export function useMeTokenMarketStats(address?: string) {
             setError(null);
             try {
                 // Fetch from market API to get 24h change and other computed stats
-                const response = await fetch(`/api/market/tokens?search=${address}&limit=1&includeStats=true`);
+                const response = await fetch(
+                    `/api/market/tokens?search=${encodeURIComponent(address)}&limit=1&includeStats=true`
+                );
 
                 if (!response.ok) {
                     throw new Error('Failed to fetch market stats');
@@ -35,19 +38,12 @@ export function useMeTokenMarketStats(address?: string) {
 
                 const data = await response.json();
 
-                if (data.data && data.data.length > 0) {
-                    // Find the exact generic token match (search is fuzzy)
-                    const token = data.data.find((t: MarketToken) => t.address.toLowerCase() === address.toLowerCase());
-
-                    if (token) {
-                        setStats(token);
-                    } else {
-                        // If explicit match not found, but we searched by address, it should be the first one ideally
-                        // But let's be safe and check
-                        if (data.data[0].address.toLowerCase() === address.toLowerCase()) {
-                            setStats(data.data[0]);
-                        }
-                    }
+                const token = resolveMeTokenMarketStatsFromResponse(
+                    data.data as MarketToken[] | undefined,
+                    address
+                );
+                if (token) {
+                    setStats(token);
                 }
             } catch (err) {
                 logger.error('Error fetching MeToken market stats:', err);
