@@ -14,9 +14,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { buildMeTokenShareUrl } from "@/lib/market/metokenShareUrl";
 
 interface MeTokenShareButtonProps {
-    address: string;
+    /** Creator wallet address — used to build `/creator/<owner>` share links. */
+    creatorOwnerAddress?: string;
     symbol: string;
     name: string;
     type: 'creator' | 'content';
@@ -24,7 +26,7 @@ interface MeTokenShareButtonProps {
 }
 
 export function MeTokenShareButton({
-    address,
+    creatorOwnerAddress,
     symbol,
     name,
     type,
@@ -33,20 +35,12 @@ export function MeTokenShareButton({
     const [isOpen, setIsOpen] = useState(false);
     const [copied, setCopied] = useState(false);
 
-    // Construct the full URL
     const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
-
-    let sharePath = "";
-    if (type === 'creator') {
-        sharePath = `/creator/${address}`;
-    } else if (type === 'content' && playbackId) {
-        sharePath = `/watch/${playbackId}`;
-    } else {
-        // Fallback or error
-        sharePath = `/market`;
-    }
-
-    const shareUrl = `${baseUrl}${sharePath}`;
+    const shareUrl = buildMeTokenShareUrl(baseUrl, {
+        type,
+        creatorOwnerAddress,
+        playbackId,
+    });
 
     const handleCopy = async () => {
         try {
