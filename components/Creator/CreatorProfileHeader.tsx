@@ -18,6 +18,7 @@ import { MembershipVerifiedBadge } from "@/components/User/MembershipVerifiedBad
 import { CreatorPredictButton } from "@/components/Creator/CreatorPredictButton";
 import { ProfileGoLiveButton } from "@/components/Live/ProfileGoLiveButton";
 import { CreatorBrandChannelButton } from "@/components/Creator/CreatorBrandChannelButton";
+import { CreatorSocialLinks } from "@/components/Creator/CreatorSocialLinks";
 import { useMeTokenMarketStats } from "@/lib/hooks/market/useMeTokenMarketStats";
 import { formatUsdTokenPrice } from "@/lib/metokens/spotPrice";
 
@@ -108,6 +109,13 @@ export function CreatorProfileHeader({
           </p>
         )}
 
+        <CreatorSocialLinks
+          className="mt-3"
+          socialOrbUrl={creatorProfile?.social_orb_url}
+          socialInstagramUrl={creatorProfile?.social_instagram_url}
+          socialXUrl={creatorProfile?.social_x_url}
+        />
+
         {meToken && displayPrice != null && (
           <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 mt-3 text-sm">
             <p>
@@ -176,4 +184,3 @@ export function CreatorProfileHeader({
     </div>
   );
 }
-

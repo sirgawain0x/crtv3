@@ -104,6 +104,9 @@ export interface CreatorProfile {
   lens_avatar_uri?: string | null;
   /** Brand channel slug (chones, spindrift, songchain) when linked by a Brand Pass holder */
   brand_channel_slug?: string | null;
+  social_orb_url?: string | null;
+  social_instagram_url?: string | null;
+  social_x_url?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -122,6 +125,9 @@ export interface CreateCreatorProfileData {
   lens_handle?: string | null;
   lens_avatar_uri?: string | null;
   brand_channel_slug?: string | null;
+  social_orb_url?: string | null;
+  social_instagram_url?: string | null;
+  social_x_url?: string | null;
 }
 
 export interface UpdateCreatorProfileData {
@@ -137,6 +143,9 @@ export interface UpdateCreatorProfileData {
   lens_handle?: string | null;
   lens_avatar_uri?: string | null;
   brand_channel_slug?: string | null;
+  social_orb_url?: string | null;
+  social_instagram_url?: string | null;
+  social_x_url?: string | null;
 }
 
 // Types for Song Cup submissions
