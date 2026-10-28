@@ -56,7 +56,7 @@ function hostnameIsAllowed(parsed: URL, allowedHosts: ReadonlySet<string>): bool
 }
 
 function isValidXHandle(handle: string): boolean {
-  return /^[A-Za-z0-9_]{1,50}$/.test(handle);
+  return /^[A-Za-z0-9_]{1,15}$/.test(handle);
 }
 
 function isValidInstagramHandle(handle: string): boolean {
@@ -64,6 +64,9 @@ function isValidInstagramHandle(handle: string): boolean {
 }
 
 function isValidOrbProfileKey(key: string): boolean {
+  if (key.includes("..")) {
+    return false;
+  }
   if (/^0x[0-9a-fA-F]{40}$/.test(key)) {
     return true;
   }
@@ -196,10 +199,25 @@ export function normalizeXProfileUrl(input: string): SocialProfileNormalizeResul
   if (!isValidXHandle(handle)) {
     return {
       ok: false,
-      error: "X handles use letters, numbers, and underscores (1–50 characters)",
+      error: "X handles use letters, numbers, and underscores (1–15 characters)",
     };
   }
   return { ok: true, url: `https://x.com/${handle}` };
+}
+
+/** Re-validates a stored DB URL before rendering or trusting client-side. */
+export function sanitizeStoredSocialUrl(
+  platform: CreatorSocialPlatform,
+  stored: string | null | undefined,
+): string | null {
+  if (stored == null || stored.trim() === "") {
+    return null;
+  }
+  const result = normalizeCreatorSocialProfileUrl(platform, stored);
+  if (!result.ok || !result.url) {
+    return null;
+  }
+  return result.url;
 }
 
 export function normalizeCreatorSocialProfileUrl(

@@ -39,6 +39,9 @@ describe("normalizeXProfileUrl", () => {
       ok: false,
     });
     expect(normalizeXProfileUrl("bad handle!")).toMatchObject({ ok: false });
+    expect(normalizeXProfileUrl("sixteen_characters")).toMatchObject({
+      ok: false,
+    });
   });
 
   it("rejects hostname spoof URLs", () => {
@@ -123,6 +126,13 @@ describe("normalizeOrbProfileUrl", () => {
     expect(
       normalizeOrbProfileUrl("https://orb.club/p/%E0%A4%A"),
     ).toMatchObject({ ok: false });
+  });
+
+  it("rejects path traversal in orb profile keys", () => {
+    expect(normalizeOrbProfileUrl("https://orb.club/p/foo..bar")).toMatchObject({
+      ok: false,
+    });
+    expect(normalizeOrbProfileUrl("@foo..bar")).toMatchObject({ ok: false });
   });
 });
 

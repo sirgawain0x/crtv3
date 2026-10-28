@@ -1,6 +1,10 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { Instagram, Twitter } from "lucide-react";
+import {
+  sanitizeStoredSocialUrl,
+  type CreatorSocialPlatform,
+} from "@/lib/creator/social-profile-urls";
 
 export type CreatorSocialLinksProps = {
   socialOrbUrl?: string | null;
@@ -45,38 +49,55 @@ function SocialIconLink({
   );
 }
 
+const SOCIAL_LINK_CONFIG: {
+  key: string;
+  platform: CreatorSocialPlatform;
+  label: string;
+  icon: ReactNode;
+  prop: keyof Pick<
+    CreatorSocialLinksProps,
+    "socialOrbUrl" | "socialInstagramUrl" | "socialXUrl"
+  >;
+}[] = [
+  {
+    key: "orb",
+    platform: "orb",
+    prop: "socialOrbUrl",
+    label: "Orb profile",
+    icon: <OrbMark className="h-4 w-4 text-[#ff7800]" />,
+  },
+  {
+    key: "instagram",
+    platform: "instagram",
+    prop: "socialInstagramUrl",
+    label: "Instagram profile",
+    icon: <Instagram className="h-4 w-4" aria-hidden />,
+  },
+  {
+    key: "x",
+    platform: "x",
+    prop: "socialXUrl",
+    label: "X profile",
+    icon: <Twitter className="h-4 w-4" aria-hidden />,
+  },
+];
+
 export function CreatorSocialLinks({
   socialOrbUrl,
   socialInstagramUrl,
   socialXUrl,
   className,
 }: CreatorSocialLinksProps) {
-  const links = [
-    socialOrbUrl
-      ? { key: "orb", href: socialOrbUrl, label: "Orb profile", icon: <OrbMark className="h-4 w-4 text-[#ff7800]" /> }
-      : null,
-    socialInstagramUrl
-      ? {
-          key: "instagram",
-          href: socialInstagramUrl,
-          label: "Instagram profile",
-          icon: <Instagram className="h-4 w-4" aria-hidden />,
-        }
-      : null,
-    socialXUrl
-      ? {
-          key: "x",
-          href: socialXUrl,
-          label: "X profile",
-          icon: <Twitter className="h-4 w-4" aria-hidden />,
-        }
-      : null,
-  ].filter(Boolean) as {
-    key: string;
-    href: string;
-    label: string;
-    icon: ReactNode;
-  }[];
+  const propsByKey = { socialOrbUrl, socialInstagramUrl, socialXUrl };
+
+  const links = SOCIAL_LINK_CONFIG.flatMap((config) => {
+    const raw = propsByKey[config.prop];
+    const href = sanitizeStoredSocialUrl(config.platform, raw);
+    if (!href) {
+      return [];
+    }
+    return [{ key: config.key, href, label: config.label, icon: config.icon }];
+  });
 
   if (links.length === 0) {
     return null;

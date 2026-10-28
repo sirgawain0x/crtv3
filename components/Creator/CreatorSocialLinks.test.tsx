@@ -32,4 +32,17 @@ describe("CreatorSocialLinks", () => {
     expect(html).toContain('rel="noopener noreferrer"');
     expect(html).toContain('target="_blank"');
   });
+
+  it("does not render javascript: or off-allowlist stored URLs", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(CreatorSocialLinks, {
+        socialXUrl: "javascript:alert(1)",
+        socialInstagramUrl: "https://evil.com/instagram.com/foo",
+        socialOrbUrl: "https://orb.club.evil.com/p/foo",
+      }),
+    );
+    expect(html).toBe("");
+    expect(html).not.toContain("javascript:");
+    expect(html).not.toContain("evil.com");
+  });
 });
