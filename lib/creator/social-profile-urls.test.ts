@@ -52,6 +52,25 @@ describe("normalizeXProfileUrl", () => {
       normalizeXProfileUrl("https://x.com.evil.com/foo"),
     ).toMatchObject({ ok: false });
   });
+
+  it("rejects reserved path names with @ prefix and mixed case", () => {
+    expect(normalizeXProfileUrl("https://x.com/@home")).toMatchObject({
+      ok: false,
+    });
+    expect(normalizeXProfileUrl("https://x.com/Home")).toMatchObject({
+      ok: false,
+    });
+    expect(normalizeXProfileUrl("https://x.com/@SEARCH")).toMatchObject({
+      ok: false,
+    });
+  });
+
+  it("still accepts a normal @handle", () => {
+    expect(normalizeXProfileUrl("@CreativeCrtv")).toEqual({
+      ok: true,
+      url: "https://x.com/CreativeCrtv",
+    });
+  });
 });
 
 describe("normalizeInstagramProfileUrl", () => {
@@ -72,6 +91,25 @@ describe("normalizeInstagramProfileUrl", () => {
     expect(
       normalizeInstagramProfileUrl("https://instagram.com/reels/abc"),
     ).toMatchObject({ ok: false });
+  });
+
+  it("rejects reserved path names with @ prefix and mixed case", () => {
+    expect(
+      normalizeInstagramProfileUrl("https://instagram.com/@explore"),
+    ).toMatchObject({ ok: false });
+    expect(
+      normalizeInstagramProfileUrl("https://instagram.com/Explore"),
+    ).toMatchObject({ ok: false });
+    expect(
+      normalizeInstagramProfileUrl("https://instagram.com/@EXPLORE"),
+    ).toMatchObject({ ok: false });
+  });
+
+  it("still accepts a normal @handle", () => {
+    expect(normalizeInstagramProfileUrl("@creativetv")).toEqual({
+      ok: true,
+      url: "https://instagram.com/creativetv",
+    });
   });
 
   it("rejects hostname spoof URLs", () => {

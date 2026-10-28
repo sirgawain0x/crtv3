@@ -147,7 +147,11 @@ export function normalizeInstagramProfileUrl(
       };
     }
     const handle = parsed.pathname.split("/").filter(Boolean)[0];
-    if (!handle || ["p", "reel", "reels", "stories", "explore"].includes(handle)) {
+    const pathName = stripAt(handle ?? "").toLowerCase();
+    if (
+      !pathName ||
+      ["p", "reel", "reels", "stories", "explore"].includes(pathName)
+    ) {
       return { ok: false, error: "Enter a valid Instagram profile handle" };
     }
     const cleaned = stripAt(handle);
@@ -180,11 +184,10 @@ export function normalizeXProfileUrl(input: string): SocialProfileNormalizeResul
       return { ok: false, error: "Enter an X profile URL or @handle" };
     }
     const segment = parsed.pathname.split("/").filter(Boolean)[0];
+    const pathName = stripAt(segment ?? "").toLowerCase();
     if (
-      !segment ||
-      ["home", "intent", "share", "i", "hashtag", "search"].includes(
-        segment.toLowerCase(),
-      )
+      !pathName ||
+      ["home", "intent", "share", "i", "hashtag", "search"].includes(pathName)
     ) {
       return { ok: false, error: "Enter a valid X profile handle" };
     }
