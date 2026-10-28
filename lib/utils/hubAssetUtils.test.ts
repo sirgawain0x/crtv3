@@ -52,5 +52,11 @@ describe("hub collateral decimals", () => {
     expect(
       isMeTokenCreateDepositSufficient(parseUnits("1", 6), USDC_HUB_ID)
     ).toBe(true);
+    expect(
+      isMeTokenCreateDepositSufficient(parseUnits("1.00", 6), USDC_HUB_ID)
+    ).toBe(true);
+    expect(
+      isMeTokenCreateDepositSufficient(parseUnits("0.999999", 6), USDC_HUB_ID)
+    ).toBe(false);
   });
 });
