@@ -21,6 +21,17 @@ import {
   clearMeTokenHoldingsCache,
 } from '@/lib/hooks/metokens/useMeTokenHoldings';
 import { notifyMeTokenBalancesChanged } from '@/lib/hooks/metokens/meTokenBalanceEvents';
+import {
+  isMeTokenTradeUserFacingError,
+  type MeTokenTradeErrorKind,
+} from '@/lib/wallet/meTokenTradeErrors';
+import { useMeTokenTradeInFlight } from '@/lib/wallet/useMeTokenTradeInFlight';
+import { isMeTokenTradingDisabled } from '@/lib/metokens/meTokenTradingTradeDisabled';
+import { AlchemySwapWidget } from '@/components/wallet/swap/AlchemySwapWidget';
+import {
+  isMeTokenTradingSellDisabled,
+  parseSellAmountWei,
+} from '@/lib/metokens/meTokenTradingSellGuard';
 
 interface MeTokenTradingProps {
   meToken: MeTokenData;
@@ -34,6 +45,10 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
   const [buyPreview, setBuyPreview] = useState('0');
   const [sellPreview, setSellPreview] = useState('0');
   const [error, setError] = useState<string | null>(null);
+  const [tradeUserErrorKind, setTradeUserErrorKind] =
+    useState<MeTokenTradeErrorKind | null>(null);
+  const [showLowUsdcForGas, setShowLowUsdcForGas] = useState(false);
+  const [showUsdcToEthSwap, setShowUsdcToEthSwap] = useState(false);
   const [success, setSuccess] = useState<React.ReactNode | null>(null);
 
   // Initialize subscription status from meToken prop data immediately
@@ -219,6 +234,9 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
     }
 
     setError(null);
+    setTradeUserErrorKind(null);
+    setShowLowUsdcForGas(false);
+    setShowUsdcToEthSwap(false);
     setSuccess(null);
 
     try {
@@ -265,16 +283,8 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
       }
     } catch (err) {
       logger.error('❌ Error in handleBuy:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Failed to buy MeTokens';
-      setError(errorMessage);
       setSuccess(null);
-
-      // Show error toast
-      toast({
-        title: "Purchase Failed",
-        description: errorMessage,
-        variant: "destructive",
-      });
+      applyTradeFailure(err, 'buy');
     }
   };
 
@@ -325,7 +335,16 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
       return;
     }
 
-    const sellAmountWei = parseEther(sellAmount);
+    const sellAmountWei = parseSellAmountWei(sellAmount);
+    if (sellAmountWei === null) {
+      setError('Please enter a valid amount');
+      toast({
+        title: "Error",
+        description: "Please enter a valid amount",
+        variant: "destructive",
+      });
+      return;
+    }
     if (meToken.balance < sellAmountWei) {
       setError(`Insufficient balance. You have ${formatEther(meToken.balance)} ${meToken.symbol}`);
       toast({
@@ -337,6 +356,9 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
     }
 
     setError(null);
+    setTradeUserErrorKind(null);
+    setShowLowUsdcForGas(false);
+    setShowUsdcToEthSwap(false);
     setSuccess(null);
 
     try {
@@ -384,21 +406,51 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
       }
     } catch (err) {
       logger.error('❌ Error in handleSell:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Failed to sell MeTokens';
-      setError(errorMessage);
       setSuccess(null);
-
-      // Show error toast
-      toast({
-        title: "Sale Failed",
-        description: errorMessage,
-        variant: "destructive",
-      });
+      applyTradeFailure(err, 'sell');
     }
   };
 
+  const applyTradeFailure = useCallback((err: unknown, action: 'buy' | 'sell') => {
+    if (isMeTokenTradeUserFacingError(err)) {
+      setError(err.message);
+      setTradeUserErrorKind(err.kind);
+      setShowLowUsdcForGas(err.kind === 'low_usdc_gas');
+      setShowUsdcToEthSwap(false);
+      if (err.kind === 'generic') {
+        toast({
+          title: action === 'buy' ? 'Purchase Failed' : 'Sale Failed',
+          description: err.message,
+          variant: 'destructive',
+        });
+      }
+      if (err.kind === 'trade_pending') {
+        toast({
+          title: action === 'buy' ? 'Purchase status unknown' : 'Sale status unknown',
+          description: err.message,
+        });
+      }
+      return;
+    }
+
+    const errorMessage = err instanceof Error ? err.message : `Failed to ${action} MeTokens`;
+    setError(errorMessage);
+    setTradeUserErrorKind(null);
+    setShowLowUsdcForGas(false);
+    toast({
+      title: action === 'buy' ? 'Purchase Failed' : 'Sale Failed',
+      description: errorMessage,
+      variant: 'destructive',
+    });
+  }, [toast]);
+
   const isLoading = isPending || isConfirming;
-  const tradeDisabled = isLoading || isMembershipLoading;
+  const tradeInFlight = useMeTokenTradeInFlight(meToken.address);
+  const tradeDisabled = isMeTokenTradingDisabled({
+    isLoading,
+    isMembershipLoading,
+    tradeInFlight,
+  });
 
   // Show loading state while checking subscription
   if (isCheckingSubscription) {
@@ -560,18 +612,58 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {error && (
-          <Alert variant="destructive">
+        {showLowUsdcForGas && (
+          <Alert className="border-orange-200 bg-orange-50 dark:bg-orange-950/20 dark:border-orange-900">
+            <AlertCircle className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+            <AlertDescription className="space-y-3 text-orange-900 dark:text-orange-100">
+              <p>You need a little USDC on Base to pay gas.</p>
+              <FundingOptions
+                asset="USDC"
+                presetFiatAmount={10}
+                onSuccess={() => {
+                  void checkCollateralBalance();
+                  setShowLowUsdcForGas(false);
+                  setError(null);
+                }}
+              />
+              <button
+                type="button"
+                className="text-sm underline underline-offset-2"
+                onClick={() => setShowUsdcToEthSwap((v) => !v)}
+              >
+                Swap USDC to ETH
+              </button>
+              {showUsdcToEthSwap && (
+                <AlchemySwapWidget
+                  compact
+                  hideHeader
+                  defaultFromToken="USDC"
+                  defaultToToken="ETH"
+                  className="border-0 bg-transparent shadow-none"
+                />
+              )}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {error && !showLowUsdcForGas && (
+          <Alert
+            variant={
+              tradeUserErrorKind === 'trade_pending' ? 'default' : 'destructive'
+            }
+          >
             <AlertCircle className="h-4 w-4" />
             <AlertDescription className="break-words">{error}</AlertDescription>
           </Alert>
         )}
 
-        {transactionError && (
+        {transactionError && !error && !showLowUsdcForGas && (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription className="break-words">
-              Transaction failed: {transactionError.message}
+              {isMeTokenTradeUserFacingError(transactionError)
+                ? transactionError.message
+                : `Transaction failed: ${transactionError.message}`}
             </AlertDescription>
           </Alert>
         )}
@@ -728,7 +820,14 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
             ) : (
               <Button
                 onClick={handleSell}
-                disabled={tradeDisabled || !sellAmount || parseFloat(sellAmount) <= 0}
+                disabled={
+                  tradeDisabled ||
+                  isMeTokenTradingSellDisabled(
+                    isLoading,
+                    sellAmount,
+                    meToken.balance,
+                  )
+                }
                 className="w-full bg-red-600 hover:bg-red-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? (

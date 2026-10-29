@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useUser, useSmartAccountClient } from '@/lib/wallet/react';
-import { parseEther, formatEther, formatUnits, encodeFunctionData, maxUint256, type Abi } from 'viem';
+import { parseEther, formatEther, formatUnits, encodeFunctionData, maxUint256, erc20Abi, type Abi } from 'viem';
 import { meTokenSupabaseService, MeToken, MeTokenBalance } from '@/lib/sdk/supabase/metokens';
 import { CreateMeTokenData, UpdateMeTokenData } from '@/lib/sdk/supabase/client';
 import { getMeTokenFactoryContract, METOKEN_FACTORY_ADDRESSES } from '@/lib/contracts/MeTokenFactory';
@@ -26,6 +26,23 @@ import {
   pollMeTokenBalanceRefresh,
 } from '@/lib/hooks/metokens/meTokenBalanceEvents';
 import { clearMeTokenHoldingsCache } from '@/lib/hooks/metokens/useMeTokenHoldings';
+import {
+  sendMeTokenTradeUserOp,
+  BASE_USDC_ADDRESS,
+} from '@/lib/wallet/sendMeTokenTradeUserOp';
+import { raceMeTokenTradeUserOp } from '@/lib/wallet/raceMeTokenTradeUserOp';
+import {
+  isMeTokenTradeUserFacingError,
+  MeTokenTradeUserFacingError,
+  METOKEN_TRADE_GENERIC_MESSAGE,
+  METOKEN_TRADE_LOW_USDC_MESSAGE,
+} from '@/lib/wallet/meTokenTradeErrors';
+import { isInsufficientUsdcForGasError } from '@/lib/wallet/classifyGasError';
+import { reportUnexpectedTradeError } from '@/lib/wallet/reportUnexpectedTradeError';
+import {
+  classifyUsdcBuyBalanceShortfall,
+  shouldReserveUsdcGasBufferForBuy,
+} from '@/lib/metokens/meTokenTradeUsdcBuffer';
 import { buildTradeGasLogFields } from '@/lib/hooks/metokens/tradeGasContext';
 
 // MeTokens contract addresses on Base
@@ -172,6 +189,49 @@ export function useMeTokensSupabase(targetAddress?: string) {
   // Use targetAddress if provided, otherwise use the smart account address from client
   const address = targetAddress || client?.account?.address || user?.address;
 
+  const usdcTradeGasContext = useCallback(
+    () => getGasContext('usdc', { isMember: false }).context,
+    [getGasContext],
+  );
+
+  const readUsdcBalance = useCallback(async (owner: `0x${string}`) => {
+    return (await publicClient.readContract({
+      address: BASE_USDC_ADDRESS,
+      abi: erc20Abi,
+      functionName: 'balanceOf',
+      args: [owner],
+    })) as bigint;
+  }, []);
+
+  const sendTradeUserOp = useCallback(
+    async (
+      uo: Parameters<typeof sendMeTokenTradeUserOp>[0]['uo'],
+      ownerAddress: `0x${string}`,
+      memberForGas: boolean,
+      options?: {
+        simulationTimeout?: boolean;
+        meTokenAddress?: `0x${string}`;
+      },
+    ) => {
+      if (!client) throw new Error('Smart account client not initialized');
+      const params = {
+        client,
+        uo,
+        ownerAddress,
+        primary: resolveTradeGasContext(memberForGas),
+        usdcContext: usdcTradeGasContext(),
+        readUsdcBalance,
+      };
+      if (options?.simulationTimeout) {
+        return raceMeTokenTradeUserOp(params, {
+          meTokenAddress: options.meTokenAddress,
+        });
+      }
+      return sendMeTokenTradeUserOp(params);
+    },
+    [client, readUsdcBalance, resolveTradeGasContext, usdcTradeGasContext],
+  );
+
   const pokeHoldingsRefresh = useCallback(
     (opts?: { poll?: boolean }) => {
       if (!address) return;
@@ -188,7 +248,20 @@ export function useMeTokensSupabase(targetAddress?: string) {
   );
 
   const toFriendlyTradeError = (err: unknown, fallback: string): Error => {
+    if (isMeTokenTradeUserFacingError(err)) return err;
+
     const message = err instanceof Error ? err.message : String(err);
+    if (
+      message.includes('Insufficient USDC') ||
+      message.includes('for this purchase plus') ||
+      message.includes(METOKEN_TRADE_LOW_USDC_MESSAGE)
+    ) {
+      return new MeTokenTradeUserFacingError(
+        'low_usdc_gas',
+        METOKEN_TRADE_LOW_USDC_MESSAGE,
+        err,
+      );
+    }
     if (
       message.includes('transfer amount exceeds allowance') ||
       message.includes('insufficient allowance') ||
@@ -198,7 +271,19 @@ export function useMeTokensSupabase(targetAddress?: string) {
         'USDC/meToken approval is missing or too low for this trade. Please try again so the wallet can approve the vault, then complete the swap.',
       );
     }
-    return err instanceof Error ? err : new Error(fallback);
+    if (isInsufficientUsdcForGasError(err)) {
+      return new MeTokenTradeUserFacingError(
+        'low_usdc_gas',
+        METOKEN_TRADE_LOW_USDC_MESSAGE,
+        err,
+      );
+    }
+    reportUnexpectedTradeError(err, { fallback });
+    return new MeTokenTradeUserFacingError(
+      'generic',
+      METOKEN_TRADE_GENERIC_MESSAGE,
+      err,
+    );
   };
 
   const [userMeToken, setUserMeToken] = useState<MeTokenData | null>(null);
@@ -1519,17 +1604,33 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         args: [ownerAddress],
       })) as bigint;
 
+      const gasBufferWei = parseHubAssetAmount(USDC_GAS_BUFFER, hubAsset);
+      const reserveUsdcGasBuffer = shouldReserveUsdcGasBufferForBuy({
+        collateralSymbol: hubAsset.symbol,
+        isSponsored,
+        usdcAnyTokenPolicyConfigured: !!usdcTradeGasContext(),
+      });
       let requiredBalance = collateralAmountWei;
-      if (!isSponsored && hubAsset.symbol === 'USDC') {
-        requiredBalance += parseHubAssetAmount(USDC_GAS_BUFFER, hubAsset);
+      if (reserveUsdcGasBuffer) {
+        requiredBalance += gasBufferWei;
       }
 
-      if (collateralBalance < requiredBalance) {
-        const needsGasBuffer = !isSponsored && hubAsset.symbol === 'USDC';
+      const shortfall = classifyUsdcBuyBalanceShortfall({
+        collateralBalance,
+        requiredBalance,
+        collateralSymbol: hubAsset.symbol,
+        reserveUsdcGasBuffer,
+        minGasBuffer: gasBufferWei,
+      });
+      if (shortfall === 'low_usdc_gas') {
+        throw new MeTokenTradeUserFacingError(
+          'low_usdc_gas',
+          METOKEN_TRADE_LOW_USDC_MESSAGE,
+        );
+      }
+      if (shortfall === 'insufficient_collateral') {
         throw new Error(
-          needsGasBuffer
-            ? `Insufficient ${hubAsset.symbol} in your smart account. You need at least ${collateralAmount} ${hubAsset.symbol} for this purchase plus ~${USDC_GAS_BUFFER} ${hubAsset.symbol} for gas.`
-            : `Insufficient ${hubAsset.symbol} in your smart account. You need at least ${collateralAmount} ${hubAsset.symbol} for this purchase.`,
+          `Insufficient ${hubAsset.symbol} in your smart account. You need at least ${collateralAmount} ${hubAsset.symbol} for this purchase.`,
         );
       }
 
@@ -1559,14 +1660,15 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         });
 
         logger.debug(`📤 Sending ${hubAsset.symbol} approve UserOp...`);
-        const approveOp = await client.sendUserOperation({
-          uo: {
+        const approveOp = await sendTradeUserOp(
+          {
             target: collateralAddress,
             data: appendBuilderCode(approveData),
             value: BigInt(0),
           },
-          context: gasContext,
-        });
+          ownerAddress,
+          memberForGas,
+        );
 
         logger.debug('⏳ Waiting for approval confirmation...', approveOp.hash);
         await client.waitForUserOperationTransaction({
@@ -1611,14 +1713,15 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
           args: [DIAMOND as `0x${string}`, maxUint256],
         });
 
-        const approveOp = await client.sendUserOperation({
-          uo: {
+        const approveOp = await sendTradeUserOp(
+          {
             target: collateralAddress,
             data: appendBuilderCode(approveData),
             value: BigInt(0),
           },
-          context: gasContext,
-        });
+          ownerAddress,
+          memberForGas,
+        );
 
         logger.debug('⏳ Waiting for DIAMOND approval confirmation...', approveOp.hash);
         await client.waitForUserOperationTransaction({
@@ -1655,8 +1758,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         logger.warn('⚠️ Failed to calculate expected mint amount:', calcErr);
       }
 
-      // 4. Now mint with retry logic for timeout errors
-
+      // 4. Mint — single in-flight UserOp (sponsor + USDC fallback); no timeout resubmit
       logger.debug('📤 Sending Mint UserOp to DIAMOND...');
 
       const mintOperation = {
@@ -1671,50 +1773,15 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         },
       };
 
-      // Retry logic for transaction simulation timeouts
-      let operation: any;
-      let mintAttempts = 0;
-      const maxMintAttempts = 3;
-      const baseRetryDelay = 3000; // 3 seconds
-
-      while (mintAttempts < maxMintAttempts) {
-        mintAttempts++;
-        try {
-          logger.debug(`🔄 Mint attempt ${mintAttempts}/${maxMintAttempts}...`);
-
-          // Create a timeout promise (90 seconds per attempt)
-          const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('Transaction simulation timed out.')), 90000);
-          });
-
-          // Race the sendUserOperation with timeout
-          const sendMintOpPromise = client.sendUserOperation({
-            ...mintOperation,
-            context: gasContext,
-          });
-          operation = await Promise.race([sendMintOpPromise, timeoutPromise]) as any;
-
-          // Success - break out of retry loop
-          break;
-        } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          const isTimeoutError = errorMessage.includes('timed out') || errorMessage.includes('timeout');
-
-          if (isTimeoutError && mintAttempts < maxMintAttempts) {
-            // Calculate exponential backoff delay
-            const retryDelay = baseRetryDelay * Math.pow(2, mintAttempts - 1);
-            logger.debug(`⏳ Mint attempt ${mintAttempts} timed out. Retrying in ${retryDelay}ms...`);
-            await new Promise(resolve => setTimeout(resolve, retryDelay));
-            continue;
-          } else {
-            // Not a timeout error, or we've exhausted retries
-            if (isTimeoutError && mintAttempts >= maxMintAttempts) {
-              throw new Error('Transaction simulation timed out after multiple retries. The network may be busy. Please try again in a few moments.');
-            }
-            throw error;
-          }
-        }
-      }
+      const operation = await sendTradeUserOp(
+        mintOperation.uo,
+        ownerAddress,
+        memberForGas,
+        {
+          simulationTimeout: true,
+          meTokenAddress: meTokenAddress as `0x${string}`,
+        },
+      );
 
       logger.debug('🎉 Mint UserOp sent! Hash:', operation.hash);
       setIsPending(false);
@@ -2087,14 +2154,15 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         });
 
         logger.debug('📤 Sending MeToken approve UserOp...');
-        const approveOp = await client.sendUserOperation({
-          uo: {
+        const approveOp = await sendTradeUserOp(
+          {
             target: meTokenAddress as `0x${string}`,
             data: appendBuilderCode(approveData),
             value: BigInt(0),
           },
-          context: gasContext,
-        });
+          ownerAddress,
+          memberForGas,
+        );
 
         logger.debug('⏳ Waiting for approval confirmation...', approveOp.hash);
         await client.waitForUserOperationTransaction({
@@ -2140,14 +2208,15 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
           args: [DIAMOND as `0x${string}`, maxUint256],
         });
 
-        const approveOp = await client.sendUserOperation({
-          uo: {
+        const approveOp = await sendTradeUserOp(
+          {
             target: meTokenAddress as `0x${string}`,
             data: appendBuilderCode(approveData),
             value: BigInt(0),
           },
-          context: gasContext,
-        });
+          ownerAddress,
+          memberForGas,
+        );
 
         logger.debug('⏳ Waiting for DIAMOND approval confirmation...', approveOp.hash);
         await client.waitForUserOperationTransaction({
@@ -2186,7 +2255,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         // Continue - we'll try to calculate it again after if needed
       }
 
-      // Send burn operation with retry logic for timeout errors
+      // Burn — single in-flight UserOp (sponsor + USDC fallback); no timeout resubmit
       logger.debug('📤 Sending Burn UserOp to DIAMOND...');
 
       const burnOperation = {
@@ -2201,50 +2270,15 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         },
       };
 
-      // Retry logic for transaction simulation timeouts
-      let operation: any;
-      let burnAttempts = 0;
-      const maxBurnAttempts = 3;
-      const baseRetryDelay = 3000; // 3 seconds
-
-      while (burnAttempts < maxBurnAttempts) {
-        burnAttempts++;
-        try {
-          logger.debug(`🔄 Burn attempt ${burnAttempts}/${maxBurnAttempts}...`);
-
-          // Create a timeout promise (90 seconds per attempt)
-          const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('Transaction simulation timed out.')), 90000);
-          });
-
-          // Race the sendUserOperation with timeout
-          const sendBurnOpPromise = client.sendUserOperation({
-            ...burnOperation,
-            context: gasContext,
-          });
-          operation = await Promise.race([sendBurnOpPromise, timeoutPromise]) as any;
-
-          // Success - break out of retry loop
-          break;
-        } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          const isTimeoutError = errorMessage.includes('timed out') || errorMessage.includes('timeout');
-
-          if (isTimeoutError && burnAttempts < maxBurnAttempts) {
-            // Calculate exponential backoff delay
-            const retryDelay = baseRetryDelay * Math.pow(2, burnAttempts - 1);
-            logger.debug(`⏳ Burn attempt ${burnAttempts} timed out. Retrying in ${retryDelay}ms...`);
-            await new Promise(resolve => setTimeout(resolve, retryDelay));
-            continue;
-          } else {
-            // Not a timeout error, or we've exhausted retries
-            if (isTimeoutError && burnAttempts >= maxBurnAttempts) {
-              throw new Error('Transaction simulation timed out after multiple retries. The network may be busy. Please try again in a few moments.');
-            }
-            throw error;
-          }
-        }
-      }
+      const operation = await sendTradeUserOp(
+        burnOperation.uo,
+        ownerAddress,
+        memberForGas,
+        {
+          simulationTimeout: true,
+          meTokenAddress: meTokenAddress as `0x${string}`,
+        },
+      );
 
       logger.debug('🎉 Burn UserOp sent! Hash:', operation.hash);
       setIsPending(false);
