@@ -364,7 +364,22 @@ export function EarnSection({ isVisible, onSuccess, onTopUp }: EarnSectionProps)
                 guaranteed. Using vaults involves risk, including loss of funds.
               </p>
             </>
-          ) : null}
+          ) : (
+            <div
+              role="status"
+              aria-live="polite"
+              data-testid="earn-unavailable"
+              className="space-y-1 rounded-md border border-border bg-muted/40 p-2"
+            >
+              <p className="text-sm font-medium text-foreground">
+                Earn unavailable right now
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Deposits and withdrawals are not enabled in this environment.
+                Check back later.
+              </p>
+            </div>
+          )}
         </>
       )}
     </div>
