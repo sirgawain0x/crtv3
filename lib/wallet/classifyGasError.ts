@@ -5,14 +5,23 @@
  * TODO(G2): Replace/adjust rows using captured error bodies from G2 test buy.
  */
 
-import { logger } from '@/lib/utils/logger';
-import { reportUnexpectedTradeError } from '@/lib/wallet/reportUnexpectedTradeError';
-
 export const GAS_ERROR_LOG_MAX_LENGTH = 2000;
 
 /** Redact secrets before logging classified gas error bodies. */
 export function redactGasErrorLogBody(raw: string): string {
   let body = raw;
+  body = body.replace(/\/v2\/[A-Za-z0-9_-]+/gi, '/v2/[REDACTED]');
+  body = body.replace(/"rpcUrl"\s*:\s*"[^"]*"/gi, '"rpcUrl":"[REDACTED]"');
+  body = body.replace(/rpcUrl\s*[=:]\s*[^\s,}\]"']+/gi, 'rpcUrl=[REDACTED]');
+  body = body.replace(/URL:\s*\S+/gi, 'URL: [REDACTED]');
+  body = body.replace(
+    /"(paymasterAndData|paymaster|signature)"\s*:\s*"[^"]*"/gi,
+    '"$1":"[REDACTED]"',
+  );
+  body = body.replace(
+    /(paymasterAndData|paymaster|signature)\s*[=:]\s*[^\s,}\]]+/gi,
+    '$1=[REDACTED]',
+  );
   body = body.replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer [REDACTED]');
   body = body.replace(
     /(?:api[_-]?key|x-api-key|authorization)["':\s]*["']?[A-Za-z0-9._~+/=-]{8,}/gi,
@@ -38,21 +47,6 @@ export function redactGasErrorLogBody(raw: string): string {
     return `${body.slice(0, GAS_ERROR_LOG_MAX_LENGTH)}…[truncated]`;
   }
   return body;
-}
-
-function logClassifiedGasError(
-  classified: ClassifiedGasError,
-  raw: string,
-): void {
-  const redactedErrorBody = redactGasErrorLogBody(raw);
-  logger.warn('[MeToken gas classification]', {
-    ...classified,
-    redactedErrorBody,
-  });
-  reportUnexpectedTradeError(new Error('MeToken gas error classified'), {
-    gasClassification: classified,
-    redactedErrorBody,
-  });
 }
 
 export type GasErrorPhase = 'pre_submit' | 'post_submit' | 'unknown';
@@ -191,6 +185,10 @@ function normalizeErrorMessage(error: unknown): string {
   }
 }
 
+export function gasErrorLogRawBody(error: unknown): string {
+  return normalizeErrorMessage(error);
+}
+
 export function inferGasErrorPhase(
   message: string,
   options?: { userOpHash?: string | null },
@@ -218,13 +216,11 @@ export function classifyGasError(
       continue;
     }
     if (matcher.test(normalized, raw)) {
-      const classified: ClassifiedGasError = {
+      return {
         kind: 'sponsor_policy_rejection',
         phase,
         provisionalMatcherId: matcher.id,
       };
-      logClassifiedGasError(classified, raw);
-      return classified;
     }
   }
 
@@ -232,29 +228,17 @@ export function classifyGasError(
     (m) => m.id === 'wallet_erc20_gas_insufficient_balance',
   );
   if (usdcMatcher?.test(normalized, raw)) {
-    const classified: ClassifiedGasError = {
-      kind: 'insufficient_usdc_for_gas',
-      phase,
-    };
-    logClassifiedGasError(classified, raw);
-    return classified;
+    return { kind: 'insufficient_usdc_for_gas', phase };
   }
 
   const precheckMatcher = PROVISIONAL_GAS_ERROR_MATCHERS.find(
     (m) => m.id === 'wallet_precheck_sender_balance',
   );
   if (precheckMatcher?.test(normalized, raw)) {
-    const classified: ClassifiedGasError = {
-      kind: 'insufficient_usdc_for_gas',
-      phase,
-    };
-    logClassifiedGasError(classified, raw);
-    return classified;
+    return { kind: 'insufficient_usdc_for_gas', phase };
   }
 
-  const classified: ClassifiedGasError = { kind: 'other', phase };
-  logClassifiedGasError(classified, raw);
-  return classified;
+  return { kind: 'other', phase };
 }
 
 /**

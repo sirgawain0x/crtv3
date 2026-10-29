@@ -427,89 +427,89 @@ export function useMeTokensSupabase(targetAddress?: string) {
                 latestToken.id,
               );
             } else {
-            const [name, symbol, totalSupply] = await Promise.all([
-              publicClient.readContract({ address: contractAddress, abi: ERC20_ABI, functionName: 'name' }),
-              publicClient.readContract({ address: contractAddress, abi: ERC20_ABI, functionName: 'symbol' }),
-              publicClient.readContract({ address: contractAddress, abi: ERC20_ABI, functionName: 'totalSupply' })
-            ]) as [string, string, bigint];
+              const [name, symbol, totalSupply] = await Promise.all([
+                publicClient.readContract({ address: contractAddress, abi: ERC20_ABI, functionName: 'name' }),
+                publicClient.readContract({ address: contractAddress, abi: ERC20_ABI, functionName: 'symbol' }),
+                publicClient.readContract({ address: contractAddress, abi: ERC20_ABI, functionName: 'totalSupply' })
+              ]) as [string, string, bigint];
 
-            // Get fresh info from Diamond for pooled/locked
-            let currentInfo = {
-              owner: latestToken.owner || address,
-              hubId: BigInt(latestToken.hubId || 1),
-              balancePooled: BigInt(latestToken.balancePooled || 0),
-              balanceLocked: BigInt(latestToken.balanceLocked || 0),
-              startTime: BigInt(latestToken.startTime || 0),
-              endTime: BigInt(latestToken.endTime || 0),
-              endCooldown: BigInt(latestToken.endCooldown || 0),
-              targetHubId: BigInt(latestToken.targetHubId || 0),
-              migration: latestToken.migration || "0x0000000000000000000000000000000000000000",
-            };
+              // Get fresh info from Diamond for pooled/locked
+              let currentInfo = {
+                owner: latestToken.owner || address,
+                hubId: BigInt(latestToken.hubId || 1),
+                balancePooled: BigInt(latestToken.balancePooled || 0),
+                balanceLocked: BigInt(latestToken.balanceLocked || 0),
+                startTime: BigInt(latestToken.startTime || 0),
+                endTime: BigInt(latestToken.endTime || 0),
+                endCooldown: BigInt(latestToken.endCooldown || 0),
+                targetHubId: BigInt(latestToken.targetHubId || 0),
+                migration: latestToken.migration || "0x0000000000000000000000000000000000000000",
+              };
 
-            // Try to refresh info from contract if possible
-            try {
-              const infoData = await publicClient.readContract({
-                address: DIAMOND,
-                abi: METOKEN_ABI,
-                functionName: 'getMeTokenInfo',
-                args: [contractAddress],
-              }) as any;
-              if (infoData) {
-                currentInfo = {
-                  owner: infoData.owner,
-                  hubId: BigInt(infoData.hubId),
-                  balancePooled: BigInt(infoData.balancePooled),
-                  balanceLocked: BigInt(infoData.balanceLocked),
-                  startTime: BigInt(infoData.startTime),
-                  endTime: BigInt(infoData.endTime),
-                  endCooldown: BigInt(infoData.endCooldown),
-                  targetHubId: BigInt(infoData.targetHubId),
-                  migration: infoData.migration,
-                };
+              // Try to refresh info from contract if possible
+              try {
+                const infoData = await publicClient.readContract({
+                  address: DIAMOND,
+                  abi: METOKEN_ABI,
+                  functionName: 'getMeTokenInfo',
+                  args: [contractAddress],
+                }) as any;
+                if (infoData) {
+                  currentInfo = {
+                    owner: infoData.owner,
+                    hubId: BigInt(infoData.hubId),
+                    balancePooled: BigInt(infoData.balancePooled),
+                    balanceLocked: BigInt(infoData.balanceLocked),
+                    startTime: BigInt(infoData.startTime),
+                    endTime: BigInt(infoData.endTime),
+                    endCooldown: BigInt(infoData.endCooldown),
+                    targetHubId: BigInt(infoData.targetHubId),
+                    migration: infoData.migration,
+                  };
+                }
+              } catch (e) {
+                logger.warn('⚠️ Failed to refresh info from contract, using subgraph data', e);
               }
-            } catch (e) {
-              logger.warn('⚠️ Failed to refresh info from contract, using subgraph data', e);
-            }
 
-            // Vault TVL in USD-stable units (hub asset decimals: USDC=6, others=18)
-            const calculatedTvl = calculateMeTokenVaultTvlUsd(
-              currentInfo.balancePooled,
-              currentInfo.balanceLocked,
-              Number(currentInfo.hubId)
-            );
+              // Vault TVL in USD-stable units (hub asset decimals: USDC=6, others=18)
+              const calculatedTvl = calculateMeTokenVaultTvlUsd(
+                currentInfo.balancePooled,
+                currentInfo.balanceLocked,
+                Number(currentInfo.hubId)
+              );
 
-            // Get user balance
-            let userBalance = BigInt(0);
-            const holderAddress = resolveEvmAddress(address);
-            try {
-              if (holderAddress) {
-                userBalance = await publicClient.readContract({
-                  address: contractAddress,
-                  abi: ERC20_ABI,
-                  functionName: 'balanceOf',
-                  args: [holderAddress],
-                }) as bigint;
-              }
-            } catch (e) { }
+              // Get user balance
+              let userBalance = BigInt(0);
+              const holderAddress = resolveEvmAddress(address);
+              try {
+                if (holderAddress) {
+                  userBalance = await publicClient.readContract({
+                    address: contractAddress,
+                    abi: ERC20_ABI,
+                    functionName: 'balanceOf',
+                    args: [holderAddress],
+                  }) as bigint;
+                }
+              } catch (e) { }
 
-            const meTokenData: MeTokenData = {
-              address: contractAddress,
-              name,
-              symbol,
-              totalSupply,
-              balance: userBalance,
-              info: currentInfo,
-              tvl: calculatedTvl,
-              hubId: Number(currentInfo.hubId),
-              balancePooled: currentInfo.balancePooled,
-              balanceLocked: currentInfo.balanceLocked,
-              owner: currentInfo.owner,
-              created_at: new Date(Number(currentInfo.startTime) * 1000).toISOString(),
-              updated_at: new Date().toISOString(),
-            };
+              const meTokenData: MeTokenData = {
+                address: contractAddress,
+                name,
+                symbol,
+                totalSupply,
+                balance: userBalance,
+                info: currentInfo,
+                tvl: calculatedTvl,
+                hubId: Number(currentInfo.hubId),
+                balancePooled: currentInfo.balancePooled,
+                balanceLocked: currentInfo.balanceLocked,
+                owner: currentInfo.owner,
+                created_at: new Date(Number(currentInfo.startTime) * 1000).toISOString(),
+                updated_at: new Date().toISOString(),
+              };
 
-            setUserMeToken(meTokenData);
-            foundInSubgraph = true;
+              setUserMeToken(meTokenData);
+              foundInSubgraph = true;
             }
           }
         }

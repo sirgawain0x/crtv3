@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
 import type { Address } from 'viem';
 import {
   MIN_USDC_BALANCE_FOR_GAS,
@@ -6,6 +6,16 @@ import {
 } from './sendMeTokenTradeUserOp';
 import type { CompatSmartAccountClient } from '@/lib/wallet/smart-wallet-client';
 import { isMeTokenTradeUserFacingError } from './meTokenTradeErrors';
+import { logger } from '@/lib/utils/logger';
+import { reportUnexpectedTradeError } from '@/lib/wallet/reportUnexpectedTradeError';
+
+vi.mock('@/lib/utils/logger', () => ({
+  logger: { warn: vi.fn(), error: vi.fn(), debug: vi.fn(), info: vi.fn() },
+}));
+
+vi.mock('@/lib/wallet/reportUnexpectedTradeError', () => ({
+  reportUnexpectedTradeError: vi.fn(),
+}));
 
 const OWNER = '0x0000000000000000000000000000000000000001' as Address;
 const UO = {
@@ -31,6 +41,76 @@ function mockClient(sendUserOperation: ReturnType<typeof vi.fn>) {
 }
 
 describe('sendMeTokenTradeUserOp', () => {
+  beforeEach(() => {
+    vi.mocked(logger.debug).mockClear();
+    vi.mocked(logger.warn).mockClear();
+    vi.mocked(reportUnexpectedTradeError).mockClear();
+  });
+
+  it('logs classified gas failures exactly once per terminal trade error', async () => {
+    const sendUserOperation = vi
+      .fn()
+      .mockRejectedValue(new Error('ERC20: transfer amount exceeds balance'));
+
+    await expect(
+      sendMeTokenTradeUserOp({
+        client: mockClient(sendUserOperation),
+        uo: UO,
+        ownerAddress: OWNER,
+        primary: { context: undefined, isSponsored: false },
+        usdcContext: USDC,
+        readUsdcBalance: async () => MIN_USDC_BALANCE_FOR_GAS,
+      }),
+    ).rejects.toMatchObject({ kind: 'low_usdc_gas' });
+
+    expect(logger.warn).toHaveBeenCalledTimes(1);
+    expect(logger.debug).not.toHaveBeenCalled();
+    expect(reportUnexpectedTradeError).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not log gas classification when sponsor failure is silently retried with USDC', async () => {
+    const sendUserOperation = vi
+      .fn()
+      .mockRejectedValueOnce(
+        new Error('Sponsorship failed: max number of userOps for this policy'),
+      )
+      .mockResolvedValueOnce({ hash: 'call-usdc' });
+
+    await sendMeTokenTradeUserOp({
+      client: mockClient(sendUserOperation),
+      uo: UO,
+      ownerAddress: OWNER,
+      primary: { context: SPONSORED, isSponsored: true },
+      usdcContext: USDC,
+      readUsdcBalance: async () => 5_000_000n,
+    });
+
+    expect(logger.debug).not.toHaveBeenCalled();
+    expect(logger.warn).not.toHaveBeenCalled();
+    expect(reportUnexpectedTradeError).not.toHaveBeenCalled();
+  });
+
+  it('uses debug-only logging for terminal sponsor-policy failures', async () => {
+    const sendUserOperation = vi
+      .fn()
+      .mockRejectedValue(new Error('Policy rejected'));
+
+    await expect(
+      sendMeTokenTradeUserOp({
+        client: mockClient(sendUserOperation),
+        uo: UO,
+        ownerAddress: OWNER,
+        primary: { context: undefined, isSponsored: false },
+        usdcContext: USDC,
+        readUsdcBalance: async () => MIN_USDC_BALANCE_FOR_GAS,
+      }),
+    ).rejects.toMatchObject({ kind: 'generic' });
+
+    expect(logger.debug).toHaveBeenCalledTimes(1);
+    expect(logger.warn).not.toHaveBeenCalled();
+    expect(reportUnexpectedTradeError).not.toHaveBeenCalled();
+  });
+
   it('succeeds on sponsored gas for members', async () => {
     const sendUserOperation = vi.fn().mockResolvedValue({ hash: 'call-1' });
     const result = await sendMeTokenTradeUserOp({

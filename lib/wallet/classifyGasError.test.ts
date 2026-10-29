@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   classifyGasError,
   isSponsorFallbackEligible,
@@ -6,23 +6,10 @@ import {
   redactGasErrorLogBody,
   GAS_ERROR_LOG_MAX_LENGTH,
 } from './classifyGasError';
-import { logger } from '@/lib/utils/logger';
-import { reportUnexpectedTradeError } from '@/lib/wallet/reportUnexpectedTradeError';
 
-vi.mock('@/lib/utils/logger', () => ({
-  logger: { warn: vi.fn(), error: vi.fn(), debug: vi.fn(), info: vi.fn() },
-}));
-
-vi.mock('@/lib/wallet/reportUnexpectedTradeError', () => ({
-  reportUnexpectedTradeError: vi.fn(),
-}));
+const ALCHEMY_KEY = 'super-secret-alchemy-key-12345';
 
 describe('classifyGasError', () => {
-  beforeEach(() => {
-    vi.mocked(logger.warn).mockClear();
-    vi.mocked(reportUnexpectedTradeError).mockClear();
-  });
-
   it('redacts policy ids, bearer tokens, and truncates long bodies', () => {
     const policyId = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
     const longTail = 'x'.repeat(GAS_ERROR_LOG_MAX_LENGTH + 50);
@@ -37,22 +24,40 @@ describe('classifyGasError', () => {
     );
   });
 
-  it('logs redacted body when a gas error is classified', () => {
-    const policyId = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
-    const err = new Error(`Policy rejected policy_id=${policyId}`);
-    classifyGasError(err);
+  it('redacts Alchemy /v2/ keys embedded in error message URLs', () => {
+    const raw = `RPC error at https://base-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY} failed`;
+    const redacted = redactGasErrorLogBody(raw);
+    expect(redacted).not.toContain(ALCHEMY_KEY);
+    expect(redacted).toContain('/v2/[REDACTED]');
+  });
 
-    expect(logger.warn).toHaveBeenCalled();
-    const warnPayload = vi.mocked(logger.warn).mock.calls[0][1] as {
-      redactedErrorBody: string;
-    };
-    expect(warnPayload.redactedErrorBody).not.toContain(policyId);
-    expect(reportUnexpectedTradeError).toHaveBeenCalledWith(
-      expect.any(Error),
-      expect.objectContaining({
-        redactedErrorBody: expect.not.stringContaining(policyId),
-      }),
-    );
+  it('redacts rpcUrl field values', () => {
+    const raw = `{"rpcUrl":"https://base-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY}"}`;
+    const redacted = redactGasErrorLogBody(raw);
+    expect(redacted).not.toContain(ALCHEMY_KEY);
+    expect(redacted).toContain('"rpcUrl":"[REDACTED]"');
+  });
+
+  it('redacts URL: line values', () => {
+    const raw = `HTTP request failed URL: https://base-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY}`;
+    const redacted = redactGasErrorLogBody(raw);
+    expect(redacted).not.toContain(ALCHEMY_KEY);
+    expect(redacted).toMatch(/URL:\s*\[REDACTED\]/);
+  });
+
+  it('redacts paymasterAndData by key name', () => {
+    const raw = '"paymasterAndData":"0xdeadbeef"';
+    expect(redactGasErrorLogBody(raw)).toBe('"paymasterAndData":"[REDACTED]"');
+  });
+
+  it('redacts paymaster by key name', () => {
+    const raw = 'paymaster=0xabc123';
+    expect(redactGasErrorLogBody(raw)).toBe('paymaster=[REDACTED]');
+  });
+
+  it('redacts signature by key name', () => {
+    const raw = '"signature":"0xshortsig"';
+    expect(redactGasErrorLogBody(raw)).toBe('"signature":"[REDACTED]"');
   });
 
   it('lists provisional matchers with doc sources', () => {
