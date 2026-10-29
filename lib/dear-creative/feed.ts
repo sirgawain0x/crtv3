@@ -106,6 +106,17 @@ function normalizePostsPayload(data: unknown, origin: string): DearCreativePost[
     .filter((post): post is DearCreativePost => post !== null);
 }
 
+export function parseRssPublishedAt(pubDate: string | undefined): string {
+  if (!pubDate) {
+    return "";
+  }
+  const parsed = Date.parse(pubDate);
+  if (Number.isNaN(parsed)) {
+    return "";
+  }
+  return new Date(parsed).toISOString();
+}
+
 export function parseDearCreativeRss(xml: string, origin: string): DearCreativePost[] {
   const itemBlocks = xml.match(/<item[\s\S]*?<\/item>/gi) ?? [];
   const posts: DearCreativePost[] = [];
@@ -127,7 +138,7 @@ export function parseDearCreativeRss(xml: string, origin: string): DearCreativeP
     posts.push({
       slug,
       title,
-      publishedAt: pubDate ? new Date(pubDate).toISOString() : "",
+      publishedAt: parseRssPublishedAt(pubDate),
       excerpt: description,
       coverImage: enclosure,
       canonicalUrl: buildDearCreativePostUrl(origin, slug),

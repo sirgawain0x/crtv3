@@ -75,6 +75,27 @@ describe("fetchRecentDearCreativePosts", () => {
 });
 
 describe("parseDearCreativeRss", () => {
+  it("keeps valid RSS items when another item has an invalid pubDate", () => {
+    const xml = `<rss><channel>
+<item>
+<title>Bad Date Post</title>
+<link>${ORIGIN}/posts/bad-date</link>
+<pubDate>not-a-real-date</pubDate>
+</item>
+<item>
+<title>Good Date Post</title>
+<link>${ORIGIN}/posts/good-date</link>
+<pubDate>Wed, 01 Jan 2026 00:00:00 GMT</pubDate>
+</item>
+</channel></rss>`;
+    const posts = parseDearCreativeRss(xml, ORIGIN);
+    expect(posts).toHaveLength(2);
+    expect(posts[0]?.slug).toBe("bad-date");
+    expect(posts[0]?.publishedAt).toBe("");
+    expect(posts[1]?.slug).toBe("good-date");
+    expect(posts[1]?.publishedAt).toBe("2026-01-01T00:00:00.000Z");
+  });
+
   it("builds /posts/ canonical URLs from item links", () => {
     const xml = `<rss><channel><item>
 <title>Onchain Beats</title>
