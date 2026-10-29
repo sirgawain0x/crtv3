@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useUser, useSmartAccountClient } from '@/lib/wallet/react';
-import { parseEther, formatEther, formatUnits, encodeFunctionData, maxUint256, type Abi } from 'viem';
+import { parseEther, formatEther, formatUnits, encodeFunctionData, maxUint256, erc20Abi, type Abi } from 'viem';
 import { meTokenSupabaseService, MeToken, MeTokenBalance } from '@/lib/sdk/supabase/metokens';
 import { CreateMeTokenData, UpdateMeTokenData } from '@/lib/sdk/supabase/client';
 import { getMeTokenFactoryContract, METOKEN_FACTORY_ADDRESSES } from '@/lib/contracts/MeTokenFactory';
@@ -26,6 +26,18 @@ import {
   pollMeTokenBalanceRefresh,
 } from '@/lib/hooks/metokens/meTokenBalanceEvents';
 import { clearMeTokenHoldingsCache } from '@/lib/hooks/metokens/useMeTokenHoldings';
+import {
+  sendMeTokenTradeUserOp,
+  BASE_USDC_ADDRESS,
+} from '@/lib/wallet/sendMeTokenTradeUserOp';
+import {
+  isMeTokenTradeUserFacingError,
+  MeTokenTradeUserFacingError,
+  METOKEN_TRADE_GENERIC_MESSAGE,
+  METOKEN_TRADE_LOW_USDC_MESSAGE,
+} from '@/lib/wallet/meTokenTradeErrors';
+import { isInsufficientUsdcForGasError } from '@/lib/wallet/classifyGasError';
+import { reportUnexpectedTradeError } from '@/lib/wallet/reportUnexpectedTradeError';
 
 // MeTokens contract addresses on Base
 const METOKEN_FACTORY = METOKEN_FACTORY_BASE;
@@ -177,6 +189,38 @@ export function useMeTokensSupabase(targetAddress?: string) {
     return getGasContext('usdc');
   }, [getGasContext, isMember]);
 
+  const usdcTradeGasContext = useCallback(
+    () => getGasContext('usdc').context,
+    [getGasContext],
+  );
+
+  const readUsdcBalance = useCallback(async (owner: `0x${string}`) => {
+    return (await publicClient.readContract({
+      address: BASE_USDC_ADDRESS,
+      abi: erc20Abi,
+      functionName: 'balanceOf',
+      args: [owner],
+    })) as bigint;
+  }, []);
+
+  const sendTradeUserOp = useCallback(
+    async (
+      uo: Parameters<typeof sendMeTokenTradeUserOp>[0]['uo'],
+      ownerAddress: `0x${string}`,
+    ) => {
+      if (!client) throw new Error('Smart account client not initialized');
+      return sendMeTokenTradeUserOp({
+        client,
+        uo,
+        ownerAddress,
+        primary: resolveTradeGasContext(),
+        usdcContext: usdcTradeGasContext(),
+        readUsdcBalance,
+      });
+    },
+    [client, readUsdcBalance, resolveTradeGasContext, usdcTradeGasContext],
+  );
+
   const pokeHoldingsRefresh = useCallback(
     (opts?: { poll?: boolean }) => {
       if (!address) return;
@@ -193,6 +237,8 @@ export function useMeTokensSupabase(targetAddress?: string) {
   );
 
   const toFriendlyTradeError = (err: unknown, fallback: string): Error => {
+    if (isMeTokenTradeUserFacingError(err)) return err;
+
     const message = err instanceof Error ? err.message : String(err);
     if (
       message.includes('transfer amount exceeds allowance') ||
@@ -203,7 +249,19 @@ export function useMeTokensSupabase(targetAddress?: string) {
         'USDC/meToken approval is missing or too low for this trade. Please try again so the wallet can approve the vault, then complete the swap.',
       );
     }
-    return err instanceof Error ? err : new Error(fallback);
+    if (isInsufficientUsdcForGasError(err)) {
+      return new MeTokenTradeUserFacingError(
+        'low_usdc_gas',
+        METOKEN_TRADE_LOW_USDC_MESSAGE,
+        err,
+      );
+    }
+    reportUnexpectedTradeError(err, { fallback });
+    return new MeTokenTradeUserFacingError(
+      'generic',
+      METOKEN_TRADE_GENERIC_MESSAGE,
+      err,
+    );
   };
 
   const [userMeToken, setUserMeToken] = useState<MeTokenData | null>(null);
@@ -1565,14 +1623,14 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         });
 
         logger.debug(`📤 Sending ${hubAsset.symbol} approve UserOp...`);
-        const approveOp = await client.sendUserOperation({
-          uo: {
+        const approveOp = await sendTradeUserOp(
+          {
             target: collateralAddress,
             data: appendBuilderCode(approveData),
             value: BigInt(0),
           },
-          context: gasContext,
-        });
+          ownerAddress,
+        );
 
         logger.debug('⏳ Waiting for approval confirmation...', approveOp.hash);
         await client.waitForUserOperationTransaction({
@@ -1617,14 +1675,14 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
           args: [DIAMOND as `0x${string}`, maxUint256],
         });
 
-        const approveOp = await client.sendUserOperation({
-          uo: {
+        const approveOp = await sendTradeUserOp(
+          {
             target: collateralAddress,
             data: appendBuilderCode(approveData),
             value: BigInt(0),
           },
-          context: gasContext,
-        });
+          ownerAddress,
+        );
 
         logger.debug('⏳ Waiting for DIAMOND approval confirmation...', approveOp.hash);
         await client.waitForUserOperationTransaction({
@@ -1694,10 +1752,10 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
           });
 
           // Race the sendUserOperation with timeout
-          const sendMintOpPromise = client.sendUserOperation({
-            ...mintOperation,
-            context: gasContext,
-          });
+          const sendMintOpPromise = sendTradeUserOp(
+            mintOperation.uo,
+            ownerAddress,
+          );
           operation = await Promise.race([sendMintOpPromise, timeoutPromise]) as any;
 
           // Success - break out of retry loop
@@ -2094,14 +2152,14 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         });
 
         logger.debug('📤 Sending MeToken approve UserOp...');
-        const approveOp = await client.sendUserOperation({
-          uo: {
+        const approveOp = await sendTradeUserOp(
+          {
             target: meTokenAddress as `0x${string}`,
             data: appendBuilderCode(approveData),
             value: BigInt(0),
           },
-          context: gasContext,
-        });
+          ownerAddress,
+        );
 
         logger.debug('⏳ Waiting for approval confirmation...', approveOp.hash);
         await client.waitForUserOperationTransaction({
@@ -2147,14 +2205,14 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
           args: [DIAMOND as `0x${string}`, maxUint256],
         });
 
-        const approveOp = await client.sendUserOperation({
-          uo: {
+        const approveOp = await sendTradeUserOp(
+          {
             target: meTokenAddress as `0x${string}`,
             data: appendBuilderCode(approveData),
             value: BigInt(0),
           },
-          context: gasContext,
-        });
+          ownerAddress,
+        );
 
         logger.debug('⏳ Waiting for DIAMOND approval confirmation...', approveOp.hash);
         await client.waitForUserOperationTransaction({
@@ -2225,10 +2283,10 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
           });
 
           // Race the sendUserOperation with timeout
-          const sendBurnOpPromise = client.sendUserOperation({
-            ...burnOperation,
-            context: gasContext,
-          });
+          const sendBurnOpPromise = sendTradeUserOp(
+            burnOperation.uo,
+            ownerAddress,
+          );
           operation = await Promise.race([sendBurnOpPromise, timeoutPromise]) as any;
 
           // Success - break out of retry loop
