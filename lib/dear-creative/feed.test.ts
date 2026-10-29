@@ -2,7 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 import {
   fetchRecentDearCreativePosts,
   filterMusicDearCreativePosts,
+  isTrustedDearCreativeCanonicalUrl,
   parseDearCreativeRss,
+  resolveDearCreativeCanonicalUrl,
   shouldShowSubscriberContentBadge,
 } from "./feed";
 import { buildDearCreativePostUrl } from "./origin";
@@ -71,6 +73,126 @@ describe("fetchRecentDearCreativePosts", () => {
     const fetchFn = vi.fn(async () => new Response("nope", { status: 503 }));
     const posts = await fetchRecentDearCreativePosts(ORIGIN, 3, fetchFn as typeof fetch);
     expect(posts).toEqual([]);
+  });
+
+  it("falls back to RSS when the JSON request hangs until timeout", async () => {
+    const rss = `<?xml version="1.0"?>
+<rss><channel>
+<item>
+<title>After Timeout</title>
+<link>${ORIGIN}/posts/after-timeout</link>
+<pubDate>Wed, 01 Jan 2026 00:00:00 GMT</pubDate>
+</item>
+</channel></rss>`;
+
+    const fetchFn = vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.includes("/api/posts/recent")) {
+        return new Promise<Response>((_resolve, reject) => {
+          const signal = init?.signal;
+          if (!signal) {
+            reject(new Error("expected AbortSignal"));
+            return;
+          }
+          if (signal.aborted) {
+            reject(signal.reason ?? new DOMException("Aborted", "AbortError"));
+            return;
+          }
+          signal.addEventListener("abort", () => {
+            reject(signal.reason ?? new DOMException("Aborted", "AbortError"));
+          });
+        });
+      }
+      if (url.endsWith("/rss.xml")) {
+        return new Response(rss, { status: 200 });
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    });
+
+    const posts = await fetchRecentDearCreativePosts(ORIGIN, 3, fetchFn as typeof fetch);
+    expect(posts).toHaveLength(1);
+    expect(posts[0]?.slug).toBe("after-timeout");
+    expect(fetchFn).toHaveBeenCalledWith(
+      `${ORIGIN}/api/posts/recent?limit=3`,
+      expect.objectContaining({
+        signal: expect.any(AbortSignal),
+      }),
+    );
+  });
+
+  it("uses trusted https canonical URLs on the Dear Creative origin", async () => {
+    const trusted = `${ORIGIN}/posts/trusted-slug`;
+    const fetchFn = vi.fn(async (url: string) => {
+      if (url.includes("/api/posts/recent")) {
+        return new Response(
+          JSON.stringify([
+            {
+              slug: "trusted-slug",
+              title: "Trusted",
+              publishedAt: "2026-01-01T00:00:00.000Z",
+              canonicalUrl: trusted,
+            },
+          ]),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    });
+
+    const posts = await fetchRecentDearCreativePosts(ORIGIN, 3, fetchFn as typeof fetch);
+    expect(posts[0]?.canonicalUrl).toBe(trusted);
+  });
+
+  it("rejects foreign, http, and javascript canonical URLs", async () => {
+    const fetchFn = vi.fn(async (url: string) => {
+      if (url.includes("/api/posts/recent")) {
+        return new Response(
+          JSON.stringify([
+            {
+              slug: "evil-a",
+              title: "A",
+              publishedAt: "",
+              canonicalUrl: "https://evil.example/phish",
+            },
+            {
+              slug: "evil-b",
+              title: "B",
+              publishedAt: "",
+              canonicalUrl: `${ORIGIN.replace("https", "http")}/posts/evil-b`,
+            },
+            {
+              slug: "evil-c",
+              title: "C",
+              publishedAt: "",
+              canonicalUrl: "javascript:alert(1)",
+            },
+          ]),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    });
+
+    const posts = await fetchRecentDearCreativePosts(ORIGIN, 5, fetchFn as typeof fetch);
+    expect(posts[0]?.canonicalUrl).toBe(buildDearCreativePostUrl(ORIGIN, "evil-a"));
+    expect(posts[1]?.canonicalUrl).toBe(buildDearCreativePostUrl(ORIGIN, "evil-b"));
+    expect(posts[2]?.canonicalUrl).toBe(buildDearCreativePostUrl(ORIGIN, "evil-c"));
+  });
+});
+
+describe("resolveDearCreativeCanonicalUrl", () => {
+  it("accepts only https on the configured origin", () => {
+    const trusted = `${ORIGIN}/posts/safe`;
+    expect(isTrustedDearCreativeCanonicalUrl(trusted, ORIGIN)).toBe(true);
+    expect(resolveDearCreativeCanonicalUrl(trusted, ORIGIN, "safe")).toBe(trusted);
+    expect(resolveDearCreativeCanonicalUrl("https://other.test/x", ORIGIN, "safe")).toBe(
+      buildDearCreativePostUrl(ORIGIN, "safe"),
+    );
+    expect(resolveDearCreativeCanonicalUrl("http://news.creativeplatform.xyz/posts/x", ORIGIN, "safe")).toBe(
+      buildDearCreativePostUrl(ORIGIN, "safe"),
+    );
+    expect(resolveDearCreativeCanonicalUrl("javascript:alert(1)", ORIGIN, "safe")).toBe(
+      buildDearCreativePostUrl(ORIGIN, "safe"),
+    );
   });
 });
 

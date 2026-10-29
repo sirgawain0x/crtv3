@@ -3,6 +3,43 @@ import { buildDearCreativePostUrl } from "./origin";
 
 type FetchLike = typeof fetch;
 
+const DEAR_CREATIVE_FETCH_TIMEOUT_MS = 5000;
+
+function dearCreativeFetchInit(headers: Record<string, string>): RequestInit {
+  return {
+    headers,
+    signal: AbortSignal.timeout(DEAR_CREATIVE_FETCH_TIMEOUT_MS),
+  };
+}
+
+export function isTrustedDearCreativeCanonicalUrl(
+  urlString: string,
+  origin: string,
+): boolean {
+  try {
+    const url = new URL(urlString);
+    const base = new URL(origin.replace(/\/+$/, "") || origin);
+    return url.protocol === "https:" && url.origin === base.origin;
+  } catch {
+    return false;
+  }
+}
+
+export function resolveDearCreativeCanonicalUrl(
+  rawCanonical: unknown,
+  origin: string,
+  slug: string,
+): string {
+  if (
+    typeof rawCanonical === "string" &&
+    rawCanonical &&
+    isTrustedDearCreativeCanonicalUrl(rawCanonical, origin)
+  ) {
+    return rawCanonical;
+  }
+  return buildDearCreativePostUrl(origin, slug);
+}
+
 function extractXmlTag(block: string, tag: string): string | undefined {
   const cdata = new RegExp(`<${tag}[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]><\\/${tag}>`, "i");
   const cdataMatch = block.match(cdata);
@@ -61,10 +98,7 @@ function normalizePost(raw: Record<string, unknown>, origin: string): DearCreati
         ? raw.tag
         : undefined;
 
-  const canonicalUrl =
-    typeof raw.canonicalUrl === "string" && raw.canonicalUrl
-      ? raw.canonicalUrl
-      : buildDearCreativePostUrl(origin, slug);
+  const canonicalUrl = resolveDearCreativeCanonicalUrl(raw.canonicalUrl, origin, slug);
 
   return {
     slug,
@@ -154,9 +188,10 @@ async function fetchJsonRecentPosts(
   fetchFn: FetchLike,
 ): Promise<DearCreativePost[] | null> {
   const url = `${origin.replace(/\/+$/, "")}/api/posts/recent?limit=${limit}`;
-  const response = await fetchFn(url, {
-    headers: { Accept: "application/json" },
-  });
+  const response = await fetchFn(
+    url,
+    dearCreativeFetchInit({ Accept: "application/json" }),
+  );
 
   if (!response.ok) {
     return null;
@@ -173,9 +208,12 @@ async function fetchRssRecentPosts(
   fetchFn: FetchLike,
 ): Promise<DearCreativePost[] | null> {
   const url = `${origin.replace(/\/+$/, "")}/rss.xml`;
-  const response = await fetchFn(url, {
-    headers: { Accept: "application/rss+xml, application/xml, text/xml" },
-  });
+  const response = await fetchFn(
+    url,
+    dearCreativeFetchInit({
+      Accept: "application/rss+xml, application/xml, text/xml",
+    }),
+  );
 
   if (!response.ok) {
     return null;
@@ -218,9 +256,10 @@ export async function fetchDearCreativePublicStats(
 ): Promise<DearCreativePublicStats | null> {
   const url = `${origin.replace(/\/+$/, "")}/api/public/stats`;
   try {
-    const response = await fetchFn(url, {
-      headers: { Accept: "application/json" },
-    });
+    const response = await fetchFn(
+      url,
+      dearCreativeFetchInit({ Accept: "application/json" }),
+    );
     if (!response.ok) {
       return null;
     }
