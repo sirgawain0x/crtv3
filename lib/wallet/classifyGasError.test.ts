@@ -3,9 +3,87 @@ import {
   classifyGasError,
   isSponsorFallbackEligible,
   PROVISIONAL_GAS_ERROR_MATCHERS,
+  redactGasErrorLogBody,
+  GAS_ERROR_LOG_MAX_LENGTH,
 } from './classifyGasError';
 
+const ALCHEMY_KEY = 'super-secret-alchemy-key-12345';
+
 describe('classifyGasError', () => {
+  it('redacts policy ids, bearer tokens, and truncates long bodies', () => {
+    const policyId = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
+    const longTail = 'x'.repeat(GAS_ERROR_LOG_MAX_LENGTH + 50);
+    const raw = `Bearer secret-token policy_id=${policyId} "policyId":"${policyId}" ${longTail}`;
+    const redacted = redactGasErrorLogBody(raw);
+    expect(redacted).not.toContain('secret-token');
+    expect(redacted).not.toContain(policyId);
+    expect(redacted).toContain('[REDACTED]');
+    expect(redacted).toContain('…[truncated]');
+    expect(redacted.length).toBeLessThanOrEqual(
+      GAS_ERROR_LOG_MAX_LENGTH + '…[truncated]'.length,
+    );
+  });
+
+  it('redacts Alchemy /v2/ keys embedded in error message URLs', () => {
+    const raw = `RPC error at https://base-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY} failed`;
+    const redacted = redactGasErrorLogBody(raw);
+    expect(redacted).not.toContain(ALCHEMY_KEY);
+    expect(redacted).toContain('/v2/[REDACTED]');
+  });
+
+  it('redacts Alchemy /v3/ keys embedded in error message URLs', () => {
+    const raw = `RPC error at https://base-mainnet.g.alchemy.com/v3/${ALCHEMY_KEY} failed`;
+    const redacted = redactGasErrorLogBody(raw);
+    expect(redacted).not.toContain(ALCHEMY_KEY);
+    expect(redacted).toContain('/v3/[REDACTED]');
+  });
+
+  it('redacts rpcUrl field values', () => {
+    const raw = `{"rpcUrl":"https://base-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY}"}`;
+    const redacted = redactGasErrorLogBody(raw);
+    expect(redacted).not.toContain(ALCHEMY_KEY);
+    expect(redacted).toContain('"rpcUrl":"[REDACTED]"');
+  });
+
+  it('redacts URL: line values', () => {
+    const raw = `HTTP request failed URL: https://base-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY}`;
+    const redacted = redactGasErrorLogBody(raw);
+    expect(redacted).not.toContain(ALCHEMY_KEY);
+    expect(redacted).toMatch(/URL:\s*\[REDACTED\]/);
+  });
+
+  it('redacts paymasterAndData by key name', () => {
+    const raw = '"paymasterAndData":"0xdeadbeef"';
+    expect(redactGasErrorLogBody(raw)).toBe('"paymasterAndData":"[REDACTED]"');
+  });
+
+  it('redacts paymaster by key name', () => {
+    const raw = 'paymaster=0xabc123';
+    expect(redactGasErrorLogBody(raw)).toBe('paymaster=[REDACTED]');
+  });
+
+  it('redacts signature by key name', () => {
+    const raw = '"signature":"0xshortsig"';
+    expect(redactGasErrorLogBody(raw)).toBe('"signature":"[REDACTED]"');
+  });
+
+  it('redacts paymasterData by key name', () => {
+    const raw = '"paymasterData":"0xfeed"';
+    expect(redactGasErrorLogBody(raw)).toBe('"paymasterData":"[REDACTED]"');
+  });
+
+  it('redacts paymasterSignature by key name', () => {
+    const raw = 'paymasterSignature=0xabc';
+    expect(redactGasErrorLogBody(raw)).toBe('paymasterSignature=[REDACTED]');
+  });
+
+  it('redacts paymasterPostOpGasLimit by key name', () => {
+    const raw = '"paymasterPostOpGasLimit":"99999"';
+    expect(redactGasErrorLogBody(raw)).toBe(
+      '"paymasterPostOpGasLimit":"[REDACTED]"',
+    );
+  });
+
   it('lists provisional matchers with doc sources', () => {
     expect(PROVISIONAL_GAS_ERROR_MATCHERS.length).toBeGreaterThan(0);
     for (const row of PROVISIONAL_GAS_ERROR_MATCHERS) {

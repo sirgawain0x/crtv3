@@ -30,10 +30,12 @@ export function registerMeTokenTradeInFlight(
   const key = tokenKey(meTokenAddress);
   inFlightByToken.set(key, operation);
   notifyListeners();
-  void operation.finally(() => {
-    if (inFlightByToken.get(key) === operation) {
-      inFlightByToken.delete(key);
-      notifyListeners();
-    }
-  });
+  void operation
+    .finally(() => {
+      if (inFlightByToken.get(key) === operation) {
+        inFlightByToken.delete(key);
+        notifyListeners();
+      }
+    })
+    .catch(() => {});
 }

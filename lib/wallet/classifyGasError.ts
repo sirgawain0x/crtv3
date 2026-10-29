@@ -5,6 +5,54 @@
  * TODO(G2): Replace/adjust rows using captured error bodies from G2 test buy.
  */
 
+export const GAS_ERROR_LOG_MAX_LENGTH = 2000;
+
+/** Redact secrets before logging classified gas error bodies. */
+const PAYMASTER_FIELD_KEYS =
+  'paymasterAndData|paymasterData|paymasterSignature|paymasterPostOpGasLimit|paymaster|signature';
+
+export function redactGasErrorLogBody(raw: string): string {
+  let body = raw;
+  body = body.replace(/\/v2\/[A-Za-z0-9_-]+/gi, '/v2/[REDACTED]');
+  body = body.replace(/\/v3\/[A-Za-z0-9_-]+/gi, '/v3/[REDACTED]');
+  body = body.replace(/"rpcUrl"\s*:\s*"[^"]*"/gi, '"rpcUrl":"[REDACTED]"');
+  body = body.replace(/rpcUrl\s*[=:]\s*[^\s,}\]"']+/gi, 'rpcUrl=[REDACTED]');
+  body = body.replace(/URL:\s*\S+/gi, 'URL: [REDACTED]');
+  body = body.replace(
+    new RegExp(`"(${PAYMASTER_FIELD_KEYS})"\\s*:\\s*"[^"]*"`, 'gi'),
+    '"$1":"[REDACTED]"',
+  );
+  body = body.replace(
+    new RegExp(`(${PAYMASTER_FIELD_KEYS})\\s*[=:]\\s*[^\\s,}\\]]+`, 'gi'),
+    '$1=[REDACTED]',
+  );
+  body = body.replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer [REDACTED]');
+  body = body.replace(
+    /(?:api[_-]?key|x-api-key|authorization)["':\s]*["']?[A-Za-z0-9._~+/=-]{8,}/gi,
+    'api_key=[REDACTED]',
+  );
+  body = body.replace(
+    /policy[_-]?id(?:["':\s=]+)["']?[a-f0-9-]{36}/gi,
+    'policy_id=[REDACTED]',
+  );
+  body = body.replace(
+    /"policyId"\s*:\s*"[^"]+"/gi,
+    '"policyId":"[REDACTED]"',
+  );
+  body = body.replace(
+    /0x[a-fA-F0-9]{128,}/g,
+    '0x[SIGNATURE_REDACTED]',
+  );
+  body = body.replace(
+    /(?:private[_-]?key|secret)["':\s]*["']?[A-Za-z0-9+/=._-]{16,}/gi,
+    'secret=[REDACTED]',
+  );
+  if (body.length > GAS_ERROR_LOG_MAX_LENGTH) {
+    return `${body.slice(0, GAS_ERROR_LOG_MAX_LENGTH)}…[truncated]`;
+  }
+  return body;
+}
+
 export type GasErrorPhase = 'pre_submit' | 'post_submit' | 'unknown';
 
 export type GasErrorKind =
@@ -108,6 +156,7 @@ const PRE_SUBMIT_MARKERS = [
   /sponsorship failed/i,
   /policy id/i,
   /gas manager/i,
+  // TODO(G2): Narrow generic markers (/paymaster/, -32000, -32500) once real failures are captured.
   /paymaster/i,
   /max number of userops/i,
   /policy rejected/i,
@@ -138,6 +187,10 @@ function normalizeErrorMessage(error: unknown): string {
   } catch {
     return String(error);
   }
+}
+
+export function gasErrorLogRawBody(error: unknown): string {
+  return normalizeErrorMessage(error);
 }
 
 export function inferGasErrorPhase(

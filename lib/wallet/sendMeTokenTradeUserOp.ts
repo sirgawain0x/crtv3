@@ -4,9 +4,10 @@ import type {
   UserOperationCall,
 } from '@/lib/wallet/smart-wallet-client';
 import {
-  isInsufficientUsdcForGasError,
+  classifyGasError,
   isSponsorFallbackEligible,
 } from '@/lib/wallet/classifyGasError';
+import { logMeTokenGasTradeFailureFromClassification } from '@/lib/wallet/logMeTokenGasTradeFailure';
 import {
   MeTokenTradeUserFacingError,
   METOKEN_TRADE_GENERIC_MESSAGE,
@@ -53,13 +54,27 @@ function errorIndicatesSubmittedUserOp(error: unknown): boolean {
 
 function toUserFacingError(error: unknown): MeTokenTradeUserFacingError {
   if (error instanceof MeTokenTradeUserFacingError) return error;
-  if (isInsufficientUsdcForGasError(error)) {
+
+  const userOpHash = errorIndicatesSubmittedUserOp(error) ? 'submitted' : null;
+  const classified = classifyGasError(error, { userOpHash });
+  logMeTokenGasTradeFailureFromClassification(error, classified);
+
+  if (classified.kind === 'insufficient_usdc_for_gas') {
     return new MeTokenTradeUserFacingError(
       'low_usdc_gas',
       METOKEN_TRADE_LOW_USDC_MESSAGE,
       error,
     );
   }
+
+  if (classified.kind === 'sponsor_policy_rejection') {
+    return new MeTokenTradeUserFacingError(
+      'generic',
+      METOKEN_TRADE_GENERIC_MESSAGE,
+      error,
+    );
+  }
+
   reportUnexpectedTradeError(error);
   return new MeTokenTradeUserFacingError(
     'generic',
