@@ -69,7 +69,6 @@
     "@livepeer/react": "^4.3.6",
     "@neondatabase/serverless": "^1.0.0",
     "@orbclub/modules": "^0.1.1",
-    "@paragraph-com/sdk": "^1.1.0",
     "@privy-io/alchemy-migration": "^0.0.5",
     "@privy-io/node": "^0.34.0",
     "@privy-io/react-auth": "^3.32.2",

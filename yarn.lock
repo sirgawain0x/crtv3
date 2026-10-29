@@ -5005,16 +5005,6 @@
   resolved "https://registry.npmjs.org/@oxc-resolver/binding-win32-x64-msvc/-/binding-win32-x64-msvc-9.0.2.tgz#15dc9cecd2e89bbcad07247477fc04dd8c3ffbbe"
   integrity sha512-Qc40GDkaad9rZksSQr2l/V9UubigIHsW69g94Gswc2sKYB3XfJXfIfyV8WTJ67u6ZMXsZ7BH1msSC6Aen75mCg==
 
-"@paragraph-com/sdk@^1.1.0":
-  version "1.1.0"
-  resolved "https://registry.npmjs.org/@paragraph-com/sdk/-/sdk-1.1.0.tgz"
-  integrity sha512-R39Kn6qaMP0VMMGUssNBPD3Rf2OU91yy+bUGH388wWyjgewfH7u84f8S56VEq+6ZiUSfvQRVhxbOHLpWD73v/Q==
-  dependencies:
-    "@whetstone-research/doppler-sdk" "^0.0.1-alpha.62"
-    axios "^1.7.7"
-    doppler-router "^1.0.15"
-    viem "^2.40.3"
-
 "@particle-network/analytics@^1.0.1":
   version "1.0.2"
   resolved "https://registry.npmjs.org/@particle-network/analytics/-/analytics-1.0.2.tgz"
@@ -11160,13 +11150,6 @@
   resolved "https://registry.npmjs.org/@webgpu/types/-/types-0.1.38.tgz"
   integrity sha512-7LrhVKz2PRh+DD7+S+PVaFd5HxaWQvoMqBbsV9fNJO1pjUs1P8bM2vQVNfk+3URTqbuTI7gkXi0rfsN0IadoBA==
 
-"@whetstone-research/doppler-sdk@^0.0.1-alpha.62":
-  version "0.0.1"
-  resolved "https://registry.npmjs.org/@whetstone-research/doppler-sdk/-/doppler-sdk-0.0.1.tgz"
-  integrity sha512-XBcAWvxWF9tlPm8w4lx1U+wG7G/JuhKisfNAae0tA1pahrzqzHxYumQ5PTbFLhz54o3nY8FVqCPkq+k9ffgf0w==
-  dependencies:
-    viem "^2.33.3"
-
 "@wry/caches@^1.0.0":
   version "1.0.1"
   resolved "https://registry.npmjs.org/@wry/caches/-/caches-1.0.1.tgz"
@@ -11817,7 +11800,7 @@ axios@1.6.7:
     form-data "^4.0.0"
     proxy-from-env "^1.1.0"
 
-axios@^1.12.0, axios@^1.12.2, axios@^1.5.1, axios@^1.6.2, axios@^1.7.2, axios@^1.7.7, axios@^1.8.4:
+axios@^1.12.0, axios@^1.12.2, axios@^1.5.1, axios@^1.6.2, axios@^1.7.2, axios@^1.8.4:
   version "1.13.2"
   resolved "https://registry.npmjs.org/axios/-/axios-1.13.2.tgz"
   integrity sha512-VPk9ebNqPcy5lRGuSlKx752IlDatOjT9paPlm8A7yOuW2Fbvp4X3JznJtT4f0GzGLLiWE9W8onz51SqLYwzGaA==
@@ -13816,11 +13799,6 @@ dompurify@^3.4.12:
   integrity sha512-sqo+pNp3qRhCIpbgRi1y8Tgk27Bo2Ry7w0dC1NBeNTdZChWjz9Xb/KOoZbRP/R6pQZ80Qw8YhXw13hWWBbMRnQ==
   optionalDependencies:
     "@types/trusted-types" "^2.0.7"
-
-doppler-router@^1.0.15:
-  version "1.0.15"
-  resolved "https://registry.npmjs.org/doppler-router/-/doppler-router-1.0.15.tgz"
-  integrity sha512-81OHFrqcWzl2Qhfx0tdEmSo7/ZfM8KEFYIcUCYw8M1I+NqMJyk1lM8gTZIOHHbb5z4dourYwueHT4CQ/sPzV6g==
 
 dot-prop@^7.2.0:
   version "7.2.0"
@@ -23823,7 +23801,7 @@ viem@2.52.0:
     ox "0.14.27"
     ws "8.20.1"
 
-viem@>=2.29.0, viem@^2.1.1, viem@^2.21.26, viem@^2.21.35, viem@^2.27.2, viem@^2.29.2, viem@^2.31.7, viem@^2.32.0, viem@^2.33.3, viem@^2.40.3, viem@^2.45.0, viem@^2.45.1, viem@^2.7.12, viem@^2.8.12:
+viem@>=2.29.0, viem@^2.1.1, viem@^2.21.26, viem@^2.21.35, viem@^2.27.2, viem@^2.29.2, viem@^2.31.7, viem@^2.32.0, viem@^2.45.0, viem@^2.45.1, viem@^2.7.12, viem@^2.8.12:
   version "2.53.1"
   resolved "https://registry.npmjs.org/viem/-/viem-2.53.1.tgz"
   integrity sha512-FhfJ/SW73CVosiyVLmIMVgKDRKYV1AGCLzZoHYvmNayyVff63Qi1ocPCk59LqC/cNw244RbBJjHnmxqXkE7NpA==

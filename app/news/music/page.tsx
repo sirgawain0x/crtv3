@@ -3,42 +3,39 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ParagraphAPI } from "@paragraph-com/sdk";
-import { DearCreativeTradeButton } from "@/components/home-page/DearCreativeTradeButton";
-import { Button } from "@/components/ui/button";
+import {
+    getDearCreativeMusicPosts,
+    getDearCreativeOriginForClient,
+} from "@/app/actions/dear-creative";
+import type { DearCreativePost } from "@/lib/dear-creative/types";
+import { buildDearCreativePostUrl } from "@/lib/dear-creative/origin";
+import { shouldShowSubscriberContentBadge } from "@/lib/dear-creative/feed";
 import { NewsletterModal } from "@/components/home-page/NewsletterModal";
 import { logger } from '@/lib/utils/logger';
 
+function formatPublishedDate(publishedAt: string): string {
+    const date = new Date(publishedAt);
+    if (Number.isNaN(date.getTime())) {
+        return "";
+    }
+    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
 
 export default function MusicNewsPage() {
-    const [posts, setPosts] = useState<any[]>([]);
+    const [posts, setPosts] = useState<DearCreativePost[]>([]);
+    const [origin, setOrigin] = useState("https://news.creativeplatform.xyz");
     const [loading, setLoading] = useState(true);
-    const [selectedPost, setSelectedPost] = useState<any | null>(null);
-
+    const [selectedPost, setSelectedPost] = useState<DearCreativePost | null>(null);
 
     useEffect(() => {
         async function fetchMusicPosts() {
             try {
-                const api = new ParagraphAPI();
-                const domain = "news.creativeplatform.xyz";
-
-                // 1. Get Publication by Domain
-                // @ts-ignore
-                const pub = await api.publications.get({ domain }).single();
-
-                if (pub?.id) {
-                    // 2. Get All Posts (or first page)
-                    const { items } = await api.posts.get({ publicationId: pub.id });
-
-                    // 3. Filter for "music"
-                    const musicPosts = items.filter((post: any) => {
-                        const titleMatch = post.title?.toLowerCase().includes("music");
-                        const bodyMatch = post.markdown?.toLowerCase().includes("music");
-                        return titleMatch || bodyMatch;
-                    });
-
-                    setPosts(musicPosts);
-                }
+                const [musicPosts, resolvedOrigin] = await Promise.all([
+                    getDearCreativeMusicPosts(48),
+                    getDearCreativeOriginForClient(),
+                ]);
+                setPosts(musicPosts);
+                setOrigin(resolvedOrigin);
             } catch (error) {
                 logger.error("Failed to fetch music news:", error);
             } finally {
@@ -49,22 +46,14 @@ export default function MusicNewsPage() {
         fetchMusicPosts();
     }, []);
 
-    const handlePostClick = (e: React.MouseEvent, post: any) => {
+    const handlePostClick = (e: React.MouseEvent, post: DearCreativePost) => {
         e.preventDefault();
         setSelectedPost(post);
     };
 
     return (
         <div className="mx-auto w-full max-w-7xl py-12 px-4">
-            <div className="mb-12 text-center relative">
-                <div className="absolute right-0 top-0 hidden sm:block">
-                    <DearCreativeTradeButton />
-                </div>
-
-                <div className="sm:hidden mb-6 flex justify-center">
-                    <DearCreativeTradeButton />
-                </div>
-
+            <div className="mb-12 text-center">
                 <h1 className="text-4xl font-extrabold tracking-tight lg:text-5xl mb-4">
                     Music News
                 </h1>
@@ -94,18 +83,21 @@ export default function MusicNewsPage() {
                 </div>
             ) : posts.length > 0 ? (
                 <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3">
-                    {posts.map((post) => (
+                    {posts.map((post) => {
+                        const postUrl = post.canonicalUrl ?? buildDearCreativePostUrl(origin, post.slug);
+                        const publishedLabel = formatPublishedDate(post.publishedAt);
+                        return (
                         <Link
-                            key={post.id}
-                            href={`https://news.creativeplatform.xyz/${post.slug}`}
+                            key={post.slug}
+                            href={postUrl}
                             onClick={(e) => handlePostClick(e, post)}
                             className="group block h-full cursor-pointer"
                         >
                             <div className="relative flex h-full flex-col overflow-hidden rounded-xl bg-card border border-border/50 shadow-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-md">
                                 <div className="relative aspect-video w-full overflow-hidden bg-muted">
-                                    {post.imageUrl ? (
+                                    {post.coverImage ? (
                                         <Image
-                                            src={post.imageUrl}
+                                            src={post.coverImage}
                                             alt={post.title}
                                             fill
                                             className="object-cover transition-transform duration-500 group-hover:scale-110"
@@ -115,22 +107,31 @@ export default function MusicNewsPage() {
                                             No Image
                                         </div>
                                     )}
-                                    {/* Overlay Gradient */}
                                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-60 transition-opacity group-hover:opacity-40" />
 
-                                    <div className="absolute bottom-4 left-4 right-4">
-                                        <span className="inline-block rounded-full bg-primary/90 px-2 py-1 text-xs font-medium text-primary-foreground backdrop-blur-sm">
-                                            {new Date(Number(post.publishedAt)).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                                        </span>
+                                    <div className="absolute top-4 left-4 flex flex-wrap gap-2">
+                                        {shouldShowSubscriberContentBadge(post.isGated) && (
+                                            <span className="inline-block rounded-full bg-amber-500/90 px-2 py-1 text-xs font-medium text-white backdrop-blur-sm">
+                                                Subscriber content
+                                            </span>
+                                        )}
                                     </div>
+
+                                    {publishedLabel && (
+                                        <div className="absolute bottom-4 left-4 right-4">
+                                            <span className="inline-block rounded-full bg-primary/90 px-2 py-1 text-xs font-medium text-primary-foreground backdrop-blur-sm">
+                                                {publishedLabel}
+                                            </span>
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="flex flex-grow flex-col p-6">
                                     <h2 className="mb-3 text-2xl font-bold leading-tight tracking-tight text-card-foreground group-hover:text-primary transition-colors line-clamp-2">
                                         {post.title}
                                     </h2>
-                                    {post.subtitle && (
+                                    {post.excerpt && (
                                         <p className="text-sm text-muted-foreground line-clamp-3 mb-6 flex-grow">
-                                            {post.subtitle}
+                                            {post.excerpt}
                                         </p>
                                     )}
                                     <div className="mt-auto pt-4 flex items-center text-sm font-medium text-primary/80 group-hover:text-primary group-hover:translate-x-1 transition-all border-t border-border/50">
@@ -142,7 +143,8 @@ export default function MusicNewsPage() {
                                 </div>
                             </div>
                         </Link>
-                    ))}
+                        );
+                    })}
                 </div>
             ) : (
                 <div className="flex flex-col items-center justify-center py-20 text-center rounded-xl bg-muted/30 border border-dashed">
@@ -162,11 +164,10 @@ export default function MusicNewsPage() {
                 <NewsletterModal
                     isOpen={!!selectedPost}
                     onClose={() => setSelectedPost(null)}
-                    postUrl={`https://news.creativeplatform.xyz/${selectedPost.slug}`}
+                    postUrl={selectedPost.canonicalUrl ?? buildDearCreativePostUrl(origin, selectedPost.slug)}
                     title={selectedPost.title}
                 />
             )}
         </div>
     );
 }
-
