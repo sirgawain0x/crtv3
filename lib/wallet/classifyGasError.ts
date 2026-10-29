@@ -8,18 +8,22 @@
 export const GAS_ERROR_LOG_MAX_LENGTH = 2000;
 
 /** Redact secrets before logging classified gas error bodies. */
+const PAYMASTER_FIELD_KEYS =
+  'paymasterAndData|paymasterData|paymasterSignature|paymasterPostOpGasLimit|paymaster|signature';
+
 export function redactGasErrorLogBody(raw: string): string {
   let body = raw;
   body = body.replace(/\/v2\/[A-Za-z0-9_-]+/gi, '/v2/[REDACTED]');
+  body = body.replace(/\/v3\/[A-Za-z0-9_-]+/gi, '/v3/[REDACTED]');
   body = body.replace(/"rpcUrl"\s*:\s*"[^"]*"/gi, '"rpcUrl":"[REDACTED]"');
   body = body.replace(/rpcUrl\s*[=:]\s*[^\s,}\]"']+/gi, 'rpcUrl=[REDACTED]');
   body = body.replace(/URL:\s*\S+/gi, 'URL: [REDACTED]');
   body = body.replace(
-    /"(paymasterAndData|paymaster|signature)"\s*:\s*"[^"]*"/gi,
+    new RegExp(`"(${PAYMASTER_FIELD_KEYS})"\\s*:\\s*"[^"]*"`, 'gi'),
     '"$1":"[REDACTED]"',
   );
   body = body.replace(
-    /(paymasterAndData|paymaster|signature)\s*[=:]\s*[^\s,}\]]+/gi,
+    new RegExp(`(${PAYMASTER_FIELD_KEYS})\\s*[=:]\\s*[^\\s,}\\]]+`, 'gi'),
     '$1=[REDACTED]',
   );
   body = body.replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer [REDACTED]');

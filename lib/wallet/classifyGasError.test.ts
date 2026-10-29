@@ -31,6 +31,13 @@ describe('classifyGasError', () => {
     expect(redacted).toContain('/v2/[REDACTED]');
   });
 
+  it('redacts Alchemy /v3/ keys embedded in error message URLs', () => {
+    const raw = `RPC error at https://base-mainnet.g.alchemy.com/v3/${ALCHEMY_KEY} failed`;
+    const redacted = redactGasErrorLogBody(raw);
+    expect(redacted).not.toContain(ALCHEMY_KEY);
+    expect(redacted).toContain('/v3/[REDACTED]');
+  });
+
   it('redacts rpcUrl field values', () => {
     const raw = `{"rpcUrl":"https://base-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY}"}`;
     const redacted = redactGasErrorLogBody(raw);
@@ -58,6 +65,23 @@ describe('classifyGasError', () => {
   it('redacts signature by key name', () => {
     const raw = '"signature":"0xshortsig"';
     expect(redactGasErrorLogBody(raw)).toBe('"signature":"[REDACTED]"');
+  });
+
+  it('redacts paymasterData by key name', () => {
+    const raw = '"paymasterData":"0xfeed"';
+    expect(redactGasErrorLogBody(raw)).toBe('"paymasterData":"[REDACTED]"');
+  });
+
+  it('redacts paymasterSignature by key name', () => {
+    const raw = 'paymasterSignature=0xabc';
+    expect(redactGasErrorLogBody(raw)).toBe('paymasterSignature=[REDACTED]');
+  });
+
+  it('redacts paymasterPostOpGasLimit by key name', () => {
+    const raw = '"paymasterPostOpGasLimit":"99999"';
+    expect(redactGasErrorLogBody(raw)).toBe(
+      '"paymasterPostOpGasLimit":"[REDACTED]"',
+    );
   });
 
   it('lists provisional matchers with doc sources', () => {
