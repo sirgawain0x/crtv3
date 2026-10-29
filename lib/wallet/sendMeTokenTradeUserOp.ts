@@ -18,8 +18,8 @@ import { reportUnexpectedTradeError } from '@/lib/wallet/reportUnexpectedTradeEr
 export const BASE_USDC_ADDRESS =
   '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913' as const;
 
-/** Cheap pre-check before attempting USDC paymaster gas (6 decimals). */
-export const MIN_USDC_BALANCE_FOR_GAS = 1_000_000n;
+/** Cheap pre-check before attempting USDC paymaster gas (6 decimals, ~$0.10). */
+export const MIN_USDC_BALANCE_FOR_GAS = 100_000n;
 
 export type TradeGasContext = SendUserOperationArgs['context'];
 
@@ -84,9 +84,13 @@ export async function sendMeTokenTradeUserOp(
 
   const ensureUsdcForGas = async () => {
     if (!usdcContext) {
+      reportUnexpectedTradeError(
+        new Error('USDC any-token gas policy is not configured'),
+        { missingEnv: 'NEXT_PUBLIC_ANYTOKEN_POLICY_ID' },
+      );
       throw new MeTokenTradeUserFacingError(
-        'low_usdc_gas',
-        METOKEN_TRADE_LOW_USDC_MESSAGE,
+        'generic',
+        METOKEN_TRADE_GENERIC_MESSAGE,
       );
     }
     const balance = await readUsdc(ownerAddress);

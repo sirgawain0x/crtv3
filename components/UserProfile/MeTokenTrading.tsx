@@ -21,7 +21,10 @@ import {
   clearMeTokenHoldingsCache,
 } from '@/lib/hooks/metokens/useMeTokenHoldings';
 import { notifyMeTokenBalancesChanged } from '@/lib/hooks/metokens/meTokenBalanceEvents';
-import { isMeTokenTradeUserFacingError } from '@/lib/wallet/meTokenTradeErrors';
+import {
+  isMeTokenTradeUserFacingError,
+  METOKEN_TRADE_PENDING_MESSAGE,
+} from '@/lib/wallet/meTokenTradeErrors';
 import { AlchemySwapWidget } from '@/components/wallet/swap/AlchemySwapWidget';
 import {
   isMeTokenTradingSellDisabled,
@@ -414,6 +417,12 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
           variant: 'destructive',
         });
       }
+      if (err.kind === 'trade_pending') {
+        toast({
+          title: action === 'buy' ? 'Purchase status unknown' : 'Sale status unknown',
+          description: err.message,
+        });
+      }
       return;
     }
 
@@ -625,7 +634,11 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
         )}
 
         {error && !showLowUsdcForGas && (
-          <Alert variant="destructive">
+          <Alert
+            variant={
+              error === METOKEN_TRADE_PENDING_MESSAGE ? 'default' : 'destructive'
+            }
+          >
             <AlertCircle className="h-4 w-4" />
             <AlertDescription className="break-words">{error}</AlertDescription>
           </Alert>

@@ -1,5 +1,11 @@
 /** User-visible MeToken trade errors (buy/sell). */
-export type MeTokenTradeErrorKind = 'low_usdc_gas' | 'generic';
+export type MeTokenTradeErrorKind =
+  | 'low_usdc_gas'
+  | 'generic'
+  | 'trade_pending';
+
+export const METOKEN_TRADE_PENDING_MESSAGE =
+  'Your trade may still be pending. Check your wallet activity before trying again.';
 
 export class MeTokenTradeUserFacingError extends Error {
   readonly kind: MeTokenTradeErrorKind;

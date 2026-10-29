@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Address } from 'viem';
 import type { CompatSmartAccountClient } from '@/lib/wallet/smart-wallet-client';
+import { METOKEN_TRADE_PENDING_MESSAGE } from '@/lib/wallet/meTokenTradeErrors';
 import { raceMeTokenTradeUserOp } from './raceMeTokenTradeUserOp';
 
 const OWNER = '0x0000000000000000000000000000000000000001' as Address;
@@ -31,7 +32,61 @@ describe('raceMeTokenTradeUserOp', () => {
     vi.useRealTimers();
   });
 
-  it('waits on the in-flight USDC fallback after timeout (no second trade send)', async () => {
+  it('returns pending state on timeout without hanging (single send, no resubmit)', async () => {
+    vi.useFakeTimers();
+
+    const sendUserOperation = vi.fn(
+      () =>
+        new Promise<{ hash: string }>(() => {
+          /* never settles */
+        }),
+    );
+
+    const params = {
+      client: mockClient(sendUserOperation),
+      uo: UO,
+      ownerAddress: OWNER,
+      primary: { context: undefined, isSponsored: false },
+      usdcContext: USDC,
+      readUsdcBalance: async () => 5_000_000n,
+    };
+
+    const resultPromise = raceMeTokenTradeUserOp(params, { timeoutMs: 50 });
+    const assertion = expect(resultPromise).rejects.toMatchObject({
+      kind: 'trade_pending',
+      message: METOKEN_TRADE_PENDING_MESSAGE,
+    });
+    await vi.advanceTimersByTimeAsync(50);
+    await assertion;
+    expect(sendUserOperation).toHaveBeenCalledOnce();
+
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(sendUserOperation).toHaveBeenCalledOnce();
+  });
+
+  it('clears the timeout timer when the send completes before the UI deadline', async () => {
+    vi.useFakeTimers();
+    const clearTimeoutSpy = vi.spyOn(global, 'clearTimeout');
+
+    const sendUserOperation = vi.fn().mockResolvedValue({ hash: 'fast' });
+    const result = await raceMeTokenTradeUserOp(
+      {
+        client: mockClient(sendUserOperation),
+        uo: UO,
+        ownerAddress: OWNER,
+        primary: { context: undefined, isSponsored: false },
+        usdcContext: USDC,
+        readUsdcBalance: async () => 5_000_000n,
+      },
+      { timeoutMs: 50 },
+    );
+
+    expect(result.hash).toBe('fast');
+    expect(clearTimeoutSpy).toHaveBeenCalled();
+    clearTimeoutSpy.mockRestore();
+  });
+
+  it('does not start a second trade send when USDC fallback is still in flight at timeout', async () => {
     vi.useFakeTimers();
 
     let resolveUsdc!: (value: { hash: string }) => void;
@@ -56,46 +111,16 @@ describe('raceMeTokenTradeUserOp', () => {
     };
 
     const resultPromise = raceMeTokenTradeUserOp(params, { timeoutMs: 50 });
-
+    const assertion = expect(resultPromise).rejects.toMatchObject({
+      kind: 'trade_pending',
+      message: METOKEN_TRADE_PENDING_MESSAGE,
+    });
     await vi.advanceTimersByTimeAsync(50);
-    resolveUsdc({ hash: 'fallback-only' });
-
-    await expect(resultPromise).resolves.toEqual({ hash: 'fallback-only' });
+    await assertion;
     expect(sendUserOperation).toHaveBeenCalledTimes(2);
-  });
 
-  it('surfaces timeout only when the in-flight send ultimately fails', async () => {
-    vi.useFakeTimers();
-
-    let rejectUsdc!: (error: Error) => void;
-    const usdcFallbackPending = new Promise<{ hash: string }>((_, reject) => {
-      rejectUsdc = reject;
-    });
-
-    const sendUserOperation = vi
-      .fn()
-      .mockRejectedValueOnce(
-        new Error('Sponsorship failed: max number of userOps for this policy'),
-      )
-      .mockImplementationOnce(() => usdcFallbackPending);
-
-    const params = {
-      client: mockClient(sendUserOperation),
-      uo: UO,
-      ownerAddress: OWNER,
-      primary: { context: SPONSORED, isSponsored: true },
-      usdcContext: USDC,
-      readUsdcBalance: async () => 5_000_000n,
-    };
-
-    const resultPromise = raceMeTokenTradeUserOp(params, { timeoutMs: 20 });
-    await vi.advanceTimersByTimeAsync(20);
-    rejectUsdc(new Error('network down'));
-
-    await expect(resultPromise).rejects.toMatchObject({
-      kind: 'generic',
-      message: 'Something went wrong, please try again.',
-    });
+    resolveUsdc({ hash: 'fallback-only' });
+    await vi.advanceTimersByTimeAsync(1);
     expect(sendUserOperation).toHaveBeenCalledTimes(2);
   });
 
@@ -116,5 +141,4 @@ describe('raceMeTokenTradeUserOp', () => {
     expect(result.hash).toBe('fast');
     expect(sendUserOperation).toHaveBeenCalledOnce();
   });
-
 });

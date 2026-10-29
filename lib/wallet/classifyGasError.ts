@@ -189,15 +189,19 @@ export function classifyGasError(
   return { kind: 'other', phase };
 }
 
-/** Sponsor limit / policy rejection before a UserOp hash exists — eligible for silent USDC retry. */
+/**
+ * Opt-in USDC fallback: only when a provisional sponsor/policy matcher matched
+ * and the failure is clearly pre-submit (never on unknown/unclassified errors).
+ */
 export function isSponsorFallbackEligible(
   error: unknown,
   options?: { userOpHash?: string | null },
 ): boolean {
   if (options?.userOpHash) return false;
   const classified = classifyGasError(error, options);
-  if (classified.phase === 'post_submit') return false;
-  return classified.kind === 'sponsor_policy_rejection';
+  if (classified.kind !== 'sponsor_policy_rejection') return false;
+  if (classified.phase !== 'pre_submit') return false;
+  return Boolean(classified.provisionalMatcherId);
 }
 
 export function isInsufficientUsdcForGasError(error: unknown): boolean {

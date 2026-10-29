@@ -28,6 +28,17 @@ describe('classifyGasError', () => {
     expect(isSponsorFallbackEligible(err)).toBe(false);
   });
 
+  it('does not allow sponsor fallback for unclassified errors', () => {
+    const err = new Error('unexpected upstream failure');
+    expect(classifyGasError(err).kind).toBe('other');
+    expect(isSponsorFallbackEligible(err)).toBe(false);
+  });
+
+  it('does not allow sponsor fallback when phase is not pre_submit', () => {
+    const err = new Error('user operation reverted during sponsorship');
+    expect(isSponsorFallbackEligible(err)).toBe(false);
+  });
+
   it('does not allow sponsor fallback after a user op hash exists', () => {
     const err = new Error('Sponsorship failed: max number of userOps');
     expect(

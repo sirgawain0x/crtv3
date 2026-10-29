@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Address } from 'viem';
-import { sendMeTokenTradeUserOp } from './sendMeTokenTradeUserOp';
+import {
+  MIN_USDC_BALANCE_FOR_GAS,
+  sendMeTokenTradeUserOp,
+} from './sendMeTokenTradeUserOp';
 import type { CompatSmartAccountClient } from '@/lib/wallet/smart-wallet-client';
 import { isMeTokenTradeUserFacingError } from './meTokenTradeErrors';
 
@@ -101,6 +104,70 @@ describe('sendMeTokenTradeUserOp', () => {
       kind: 'low_usdc_gas',
       message: 'You need a little USDC on Base to pay gas.',
     });
+  });
+
+  it('does not USDC-fallback on unclassified sponsored errors', async () => {
+    const sendUserOperation = vi
+      .fn()
+      .mockRejectedValue(new Error('unexpected upstream failure'));
+
+    await expect(
+      sendMeTokenTradeUserOp({
+        client: mockClient(sendUserOperation),
+        uo: UO,
+        ownerAddress: OWNER,
+        primary: { context: SPONSORED, isSponsored: true },
+        usdcContext: USDC,
+        readUsdcBalance: async () => 5_000_000n,
+      }),
+    ).rejects.toMatchObject({
+      kind: 'generic',
+      message: 'Something went wrong, please try again.',
+    });
+
+    expect(sendUserOperation).toHaveBeenCalledOnce();
+  });
+
+  it('shows generic (not low-USDC) when any-token policy context is missing', async () => {
+    await expect(
+      sendMeTokenTradeUserOp({
+        client: mockClient(vi.fn()),
+        uo: UO,
+        ownerAddress: OWNER,
+        primary: { context: undefined, isSponsored: false },
+        usdcContext: undefined,
+        readUsdcBalance: async () => 5_000_000n,
+      }),
+    ).rejects.toMatchObject({
+      kind: 'generic',
+      message: 'Something went wrong, please try again.',
+    });
+  });
+
+  it('uses ~$0.10 USDC minimum before USDC gas', async () => {
+    expect(MIN_USDC_BALANCE_FOR_GAS).toBe(100_000n);
+
+    const sendUserOperation = vi.fn().mockResolvedValue({ hash: 'ok' });
+    await sendMeTokenTradeUserOp({
+      client: mockClient(sendUserOperation),
+      uo: UO,
+      ownerAddress: OWNER,
+      primary: { context: undefined, isSponsored: false },
+      usdcContext: USDC,
+      readUsdcBalance: async () => MIN_USDC_BALANCE_FOR_GAS,
+    });
+    expect(sendUserOperation).toHaveBeenCalledOnce();
+
+    await expect(
+      sendMeTokenTradeUserOp({
+        client: mockClient(vi.fn()),
+        uo: UO,
+        ownerAddress: OWNER,
+        primary: { context: undefined, isSponsored: false },
+        usdcContext: USDC,
+        readUsdcBalance: async () => MIN_USDC_BALANCE_FOR_GAS - 1n,
+      }),
+    ).rejects.toMatchObject({ kind: 'low_usdc_gas' });
   });
 
   it('shows generic message for unknown prepare errors', async () => {
