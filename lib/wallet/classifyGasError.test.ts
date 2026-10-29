@@ -14,6 +14,13 @@ describe('classifyGasError', () => {
     }
   });
 
+  it('treats bare Gas Manager policy strings as pre-submit fallback eligible', () => {
+    const err = new Error('Policy rejected');
+    expect(classifyGasError(err).kind).toBe('sponsor_policy_rejection');
+    expect(classifyGasError(err).phase).toBe('pre_submit');
+    expect(isSponsorFallbackEligible(err)).toBe(true);
+  });
+
   it('classifies policy not found as sponsor rejection', () => {
     const err = new Error(
       'Sponsorship failed: [invalid_argument] Policy ID(s) not found.',
