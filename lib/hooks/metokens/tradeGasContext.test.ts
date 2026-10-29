@@ -18,8 +18,12 @@ const mockGetAllMemberships = vi.mocked(unlockService.getAllMemberships);
 const SPONSORED_POLICY = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
 const USDC_POLICY = "11111111-2222-3333-4444-555555555555";
 
-function mockGetGasContext(isMember: boolean) {
-  return (preferredMethod: "sponsored" | "usdc" | "eth") => {
+function mockGetGasContext(defaultMember: boolean) {
+  return (
+    preferredMethod: "sponsored" | "usdc" | "eth",
+    options?: { isMember?: boolean },
+  ) => {
+    const isMember = options?.isMember ?? defaultMember;
     if (preferredMethod === "sponsored" && isMember) {
       return {
         context: { paymasterService: { policyId: SPONSORED_POLICY } },
@@ -43,7 +47,7 @@ describe("resolveTradeGasContextForMembership", () => {
   it("returns sponsored context for members", () => {
     const result = resolveTradeGasContextForMembership(
       true,
-      mockGetGasContext(true),
+      mockGetGasContext(false),
     );
     expect(result.isSponsored).toBe(true);
     expect(result.context?.paymasterService?.policyId).toBe(SPONSORED_POLICY);
@@ -52,7 +56,7 @@ describe("resolveTradeGasContextForMembership", () => {
   it("returns USDC context for non-members", () => {
     const result = resolveTradeGasContextForMembership(
       false,
-      mockGetGasContext(false),
+      mockGetGasContext(true),
     );
     expect(result.isSponsored).toBe(false);
     expect(result.context?.paymasterService?.policyId).toBe(USDC_POLICY);
@@ -80,7 +84,7 @@ describe("resolveMemberForTradeGas", () => {
 
     const gas = resolveTradeGasContextForMembership(
       isMember,
-      mockGetGasContext(true),
+      mockGetGasContext(false),
     );
     expect(gas.isSponsored).toBe(true);
   });
@@ -97,9 +101,20 @@ describe("resolveMemberForTradeGas", () => {
 
     const gas = resolveTradeGasContextForMembership(
       isMember,
-      mockGetGasContext(false),
+      mockGetGasContext(true),
     );
     expect(gas.context?.paymasterService?.policyId).toBe(USDC_POLICY);
+  });
+
+  it("falls back to non-member when verification ended with error", async () => {
+    const isMember = await resolveMemberForTradeGas("0xabc", {
+      isVerified: false,
+      isLoading: false,
+      isMember: false,
+    });
+
+    expect(isMember).toBe(false);
+    expect(mockGetAllMemberships).not.toHaveBeenCalled();
   });
 });
 
@@ -114,15 +129,21 @@ describe("fetchMembershipForGas", () => {
     ]);
     await expect(fetchMembershipForGas("0xdead")).resolves.toBe(false);
   });
+
+  it("returns false when unlock throws", async () => {
+    mockGetAllMemberships.mockRejectedValue(new Error("network"));
+    await expect(fetchMembershipForGas("0xdead")).resolves.toBe(false);
+  });
 });
 
 describe("trade button membership gate", () => {
-  it("disables trade actions while membership is loading", () => {
+  it("disables trade actions while membership is loading without tx spinner", () => {
     const isMembershipLoading = true;
     const isPending = false;
     const isConfirming = false;
-    const disabled =
-      isPending || isConfirming || isMembershipLoading || !"1".length;
-    expect(disabled).toBe(true);
+    const isLoading = isPending || isConfirming;
+    const tradeDisabled = isLoading || isMembershipLoading;
+    expect(tradeDisabled).toBe(true);
+    expect(isLoading).toBe(false);
   });
 });

@@ -10,8 +10,13 @@ export type TradeGasContextResult = {
   isSponsored: boolean;
 };
 
+export type GetTradeGasContextOptions = {
+  isMember?: boolean;
+};
+
 export type GetTradeGasContextFn = (
   preferredMethod: "sponsored" | "usdc" | "eth",
+  options?: GetTradeGasContextOptions,
 ) => TradeGasContextResult;
 
 /** Resolve buy/sell gas policy once membership is known. */
@@ -21,20 +26,24 @@ export function resolveTradeGasContextForMembership(
   onSponsoredFallback?: () => void,
 ): TradeGasContextResult {
   if (isMember) {
-    const sponsored = getGasContext("sponsored");
+    const sponsored = getGasContext("sponsored", { isMember: true });
     if (sponsored.context) {
       return sponsored;
     }
     onSponsoredFallback?.();
   }
-  return getGasContext("usdc");
+  return getGasContext("usdc", { isMember: false });
 }
 
 export async function fetchMembershipForGas(
   walletAddress: string,
 ): Promise<boolean> {
-  const memberships = await unlockService.getAllMemberships(walletAddress);
-  return memberships.some(({ isValid }) => isValid);
+  try {
+    const memberships = await unlockService.getAllMemberships(walletAddress);
+    return memberships.some(({ isValid }) => isValid);
+  } catch {
+    return false;
+  }
 }
 
 export type MembershipHookSnapshot = {
@@ -52,6 +61,9 @@ export async function resolveMemberForTradeGas(
 ): Promise<boolean> {
   if (membership.isVerified && !membership.isLoading) {
     return membership.isMember;
+  }
+  if (!membership.isLoading && !membership.isVerified) {
+    return false;
   }
   return fetchMembershipForGas(walletAddress);
 }

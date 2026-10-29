@@ -2,6 +2,7 @@
 
 import { useMembershipVerification } from "./useMembershipVerification";
 import { useUser } from "@/lib/wallet/react";
+import { computeIsMembershipLoading } from "./membershipLoading";
 
 /**
  * Hook to check if the current user has a valid Creative Membership
@@ -9,10 +10,15 @@ import { useUser } from "@/lib/wallet/react";
  */
 export function useIsMember() {
   const user = useUser();
-  const { isVerified, hasMembership, isLoading, refetch } =
+  const { isVerified, hasMembership, isLoading, error, refetch } =
     useMembershipVerification();
 
-  const isMembershipLoading = isLoading || (!!user && !isVerified);
+  const isMembershipLoading = computeIsMembershipLoading({
+    isLoading,
+    isVerified,
+    hasUser: !!user,
+    error,
+  });
 
   return {
     isMember: isVerified ? hasMembership : false,
