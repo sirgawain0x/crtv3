@@ -21,6 +21,7 @@ import {
   clearMeTokenHoldingsCache,
 } from '@/lib/hooks/metokens/useMeTokenHoldings';
 import { notifyMeTokenBalancesChanged } from '@/lib/hooks/metokens/meTokenBalanceEvents';
+import { isMeTokenTradingSellDisabled } from '@/lib/metokens/meTokenTradingSellGuard';
 
 interface MeTokenTradingProps {
   meToken: MeTokenData;
@@ -727,7 +728,11 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
             ) : (
               <Button
                 onClick={handleSell}
-                disabled={isLoading || !sellAmount || parseFloat(sellAmount) <= 0}
+                disabled={isMeTokenTradingSellDisabled(
+                  isLoading,
+                  sellAmount,
+                  meToken.balance,
+                )}
                 className="w-full bg-red-600 hover:bg-red-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? (
