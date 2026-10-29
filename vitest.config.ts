@@ -12,6 +12,7 @@ export default defineConfig({
       '.next',
       'packages/metokens/**',
       'subgraphs/**',
+      'components/home-page/capture-dear-creative-visual.test.tsx',
     ],
     coverage: {
       provider: 'v8',
