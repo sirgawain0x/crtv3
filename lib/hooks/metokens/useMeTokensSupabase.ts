@@ -38,6 +38,10 @@ import {
 } from '@/lib/wallet/meTokenTradeErrors';
 import { isInsufficientUsdcForGasError } from '@/lib/wallet/classifyGasError';
 import { reportUnexpectedTradeError } from '@/lib/wallet/reportUnexpectedTradeError';
+import {
+  classifyUsdcBuyBalanceShortfall,
+  shouldReserveUsdcGasBufferForBuy,
+} from '@/lib/metokens/meTokenTradeUsdcBuffer';
 
 // MeTokens contract addresses on Base
 const METOKEN_FACTORY = METOKEN_FACTORY_BASE;
@@ -1594,26 +1598,31 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         args: [ownerAddress],
       })) as bigint;
 
+      const gasBufferWei = parseHubAssetAmount(USDC_GAS_BUFFER, hubAsset);
+      const reserveUsdcGasBuffer = shouldReserveUsdcGasBufferForBuy({
+        collateralSymbol: hubAsset.symbol,
+        isSponsored,
+        usdcAnyTokenPolicyConfigured: !!usdcTradeGasContext(),
+      });
       let requiredBalance = collateralAmountWei;
-      const usdcGasPolicyAvailable = !!usdcTradeGasContext();
-      const reserveUsdcGasBuffer =
-        hubAsset.symbol === 'USDC' &&
-        (!isSponsored || (isSponsored && usdcGasPolicyAvailable));
       if (reserveUsdcGasBuffer) {
-        requiredBalance += parseHubAssetAmount(USDC_GAS_BUFFER, hubAsset);
+        requiredBalance += gasBufferWei;
       }
 
-      if (collateralBalance < requiredBalance) {
-        if (
-          hubAsset.symbol === 'USDC' &&
-          (reserveUsdcGasBuffer ||
-            collateralBalance < parseHubAssetAmount(USDC_GAS_BUFFER, hubAsset))
-        ) {
-          throw new MeTokenTradeUserFacingError(
-            'low_usdc_gas',
-            METOKEN_TRADE_LOW_USDC_MESSAGE,
-          );
-        }
+      const shortfall = classifyUsdcBuyBalanceShortfall({
+        collateralBalance,
+        requiredBalance,
+        collateralSymbol: hubAsset.symbol,
+        reserveUsdcGasBuffer,
+        minGasBuffer: gasBufferWei,
+      });
+      if (shortfall === 'low_usdc_gas') {
+        throw new MeTokenTradeUserFacingError(
+          'low_usdc_gas',
+          METOKEN_TRADE_LOW_USDC_MESSAGE,
+        );
+      }
+      if (shortfall === 'insufficient_collateral') {
         throw new Error(
           `Insufficient ${hubAsset.symbol} in your smart account. You need at least ${collateralAmount} ${hubAsset.symbol} for this purchase.`,
         );
