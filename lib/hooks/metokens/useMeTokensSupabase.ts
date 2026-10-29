@@ -208,7 +208,10 @@ export function useMeTokensSupabase(targetAddress?: string) {
       uo: Parameters<typeof sendMeTokenTradeUserOp>[0]['uo'],
       ownerAddress: `0x${string}`,
       memberForGas: boolean,
-      options?: { simulationTimeout?: boolean },
+      options?: {
+        simulationTimeout?: boolean;
+        meTokenAddress?: `0x${string}`;
+      },
     ) => {
       if (!client) throw new Error('Smart account client not initialized');
       const params = {
@@ -220,7 +223,9 @@ export function useMeTokensSupabase(targetAddress?: string) {
         readUsdcBalance,
       };
       if (options?.simulationTimeout) {
-        return raceMeTokenTradeUserOp(params);
+        return raceMeTokenTradeUserOp(params, {
+          meTokenAddress: options.meTokenAddress,
+        });
       }
       return sendMeTokenTradeUserOp(params);
     },
@@ -1772,7 +1777,10 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         mintOperation.uo,
         ownerAddress,
         memberForGas,
-        { simulationTimeout: true },
+        {
+          simulationTimeout: true,
+          meTokenAddress: meTokenAddress as `0x${string}`,
+        },
       );
 
       logger.debug('🎉 Mint UserOp sent! Hash:', operation.hash);
@@ -2266,7 +2274,10 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         burnOperation.uo,
         ownerAddress,
         memberForGas,
-        { simulationTimeout: true },
+        {
+          simulationTimeout: true,
+          meTokenAddress: meTokenAddress as `0x${string}`,
+        },
       );
 
       logger.debug('🎉 Burn UserOp sent! Hash:', operation.hash);

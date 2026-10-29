@@ -23,8 +23,10 @@ import {
 import { notifyMeTokenBalancesChanged } from '@/lib/hooks/metokens/meTokenBalanceEvents';
 import {
   isMeTokenTradeUserFacingError,
-  METOKEN_TRADE_PENDING_MESSAGE,
+  type MeTokenTradeErrorKind,
 } from '@/lib/wallet/meTokenTradeErrors';
+import { useMeTokenTradeInFlight } from '@/lib/wallet/useMeTokenTradeInFlight';
+import { isMeTokenTradingDisabled } from '@/lib/metokens/meTokenTradingTradeDisabled';
 import { AlchemySwapWidget } from '@/components/wallet/swap/AlchemySwapWidget';
 import {
   isMeTokenTradingSellDisabled,
@@ -43,6 +45,8 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
   const [buyPreview, setBuyPreview] = useState('0');
   const [sellPreview, setSellPreview] = useState('0');
   const [error, setError] = useState<string | null>(null);
+  const [tradeUserErrorKind, setTradeUserErrorKind] =
+    useState<MeTokenTradeErrorKind | null>(null);
   const [showLowUsdcForGas, setShowLowUsdcForGas] = useState(false);
   const [showUsdcToEthSwap, setShowUsdcToEthSwap] = useState(false);
   const [success, setSuccess] = useState<React.ReactNode | null>(null);
@@ -230,6 +234,7 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
     }
 
     setError(null);
+    setTradeUserErrorKind(null);
     setShowLowUsdcForGas(false);
     setShowUsdcToEthSwap(false);
     setSuccess(null);
@@ -351,6 +356,7 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
     }
 
     setError(null);
+    setTradeUserErrorKind(null);
     setShowLowUsdcForGas(false);
     setShowUsdcToEthSwap(false);
     setSuccess(null);
@@ -408,6 +414,7 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
   const applyTradeFailure = useCallback((err: unknown, action: 'buy' | 'sell') => {
     if (isMeTokenTradeUserFacingError(err)) {
       setError(err.message);
+      setTradeUserErrorKind(err.kind);
       setShowLowUsdcForGas(err.kind === 'low_usdc_gas');
       setShowUsdcToEthSwap(false);
       if (err.kind === 'generic') {
@@ -428,6 +435,7 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
 
     const errorMessage = err instanceof Error ? err.message : `Failed to ${action} MeTokens`;
     setError(errorMessage);
+    setTradeUserErrorKind(null);
     setShowLowUsdcForGas(false);
     toast({
       title: action === 'buy' ? 'Purchase Failed' : 'Sale Failed',
@@ -437,7 +445,12 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
   }, [toast]);
 
   const isLoading = isPending || isConfirming;
-  const tradeDisabled = isLoading || isMembershipLoading;
+  const tradeInFlight = useMeTokenTradeInFlight(meToken.address);
+  const tradeDisabled = isMeTokenTradingDisabled({
+    isLoading,
+    isMembershipLoading,
+    tradeInFlight,
+  });
 
   // Show loading state while checking subscription
   if (isCheckingSubscription) {
@@ -636,7 +649,7 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
         {error && !showLowUsdcForGas && (
           <Alert
             variant={
-              error === METOKEN_TRADE_PENDING_MESSAGE ? 'default' : 'destructive'
+              tradeUserErrorKind === 'trade_pending' ? 'default' : 'destructive'
             }
           >
             <AlertCircle className="h-4 w-4" />

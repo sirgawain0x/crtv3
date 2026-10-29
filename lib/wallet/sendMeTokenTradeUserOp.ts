@@ -48,7 +48,7 @@ function contextsEqual(
 function errorIndicatesSubmittedUserOp(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;
   const record = error as { hash?: string; userOpHash?: string; id?: string };
-  return Boolean(record.hash || record.userOpHash || record.id);
+  return Boolean(record.hash || record.userOpHash);
 }
 
 function toUserFacingError(error: unknown): MeTokenTradeUserFacingError {

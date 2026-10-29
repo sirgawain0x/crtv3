@@ -69,6 +69,30 @@ describe('sendMeTokenTradeUserOp', () => {
     expect(sendUserOperation.mock.calls[1][0].context).toEqual(USDC);
   });
 
+  it('does not treat a bare id field as a submitted user op', async () => {
+    const sendUserOperation = vi
+      .fn()
+      .mockRejectedValueOnce(
+        Object.assign(
+          new Error('Sponsorship failed: max number of userOps for this policy'),
+          { id: 'rpc-request-id-only' },
+        ),
+      )
+      .mockResolvedValueOnce({ hash: 'call-usdc' });
+
+    const result = await sendMeTokenTradeUserOp({
+      client: mockClient(sendUserOperation),
+      uo: UO,
+      ownerAddress: OWNER,
+      primary: { context: SPONSORED, isSponsored: true },
+      usdcContext: USDC,
+      readUsdcBalance: async () => 5_000_000n,
+    });
+
+    expect(result.hash).toBe('call-usdc');
+    expect(sendUserOperation).toHaveBeenCalledTimes(2);
+  });
+
   it('does not retry when the client already returned a user op hash', async () => {
     const sendUserOperation = vi.fn().mockImplementation(async () => {
       const err = new Error('wait failed') as Error & { hash?: string };

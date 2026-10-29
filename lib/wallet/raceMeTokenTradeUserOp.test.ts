@@ -2,7 +2,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Address } from 'viem';
 import type { CompatSmartAccountClient } from '@/lib/wallet/smart-wallet-client';
 import { METOKEN_TRADE_PENDING_MESSAGE } from '@/lib/wallet/meTokenTradeErrors';
+import { isMeTokenTradeInFlight } from '@/lib/wallet/meTokenTradeInFlight';
 import { raceMeTokenTradeUserOp } from './raceMeTokenTradeUserOp';
+
+const TRACKED_TOKEN = '0x00000000000000000000000000000000000000aa';
 
 const OWNER = '0x0000000000000000000000000000000000000001' as Address;
 const UO = {
@@ -84,6 +87,50 @@ describe('raceMeTokenTradeUserOp', () => {
     expect(result.hash).toBe('fast');
     expect(clearTimeoutSpy).toHaveBeenCalled();
     clearTimeoutSpy.mockRestore();
+  });
+
+  it('keeps the token in-flight until sendMeTokenTradeUserOp settles after trade_pending', async () => {
+    vi.useFakeTimers();
+
+    let resolveUsdc!: (value: { hash: string }) => void;
+    const usdcFallbackPending = new Promise<{ hash: string }>((resolve) => {
+      resolveUsdc = resolve;
+    });
+
+    const sendUserOperation = vi
+      .fn()
+      .mockRejectedValueOnce(
+        new Error('Sponsorship failed: max number of userOps for this policy'),
+      )
+      .mockImplementationOnce(() => usdcFallbackPending);
+
+    const params = {
+      client: mockClient(sendUserOperation),
+      uo: UO,
+      ownerAddress: OWNER,
+      primary: { context: SPONSORED, isSponsored: true },
+      usdcContext: USDC,
+      readUsdcBalance: async () => 5_000_000n,
+    };
+
+    const resultPromise = raceMeTokenTradeUserOp(params, {
+      timeoutMs: 50,
+      meTokenAddress: TRACKED_TOKEN,
+    });
+    const assertion = expect(resultPromise).rejects.toMatchObject({
+      kind: 'trade_pending',
+    });
+    await vi.advanceTimersByTimeAsync(50);
+    await assertion;
+
+    expect(isMeTokenTradeInFlight(TRACKED_TOKEN)).toBe(true);
+
+    vi.useRealTimers();
+    resolveUsdc({ hash: 'done' });
+    await vi.waitFor(() => {
+      expect(isMeTokenTradeInFlight(TRACKED_TOKEN)).toBe(false);
+    });
+    expect(sendUserOperation).toHaveBeenCalledTimes(2);
   });
 
   it('does not start a second trade send when USDC fallback is still in flight at timeout', async () => {

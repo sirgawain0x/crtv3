@@ -3,6 +3,7 @@ import {
   MeTokenTradeUserFacingError,
   METOKEN_TRADE_PENDING_MESSAGE,
 } from '@/lib/wallet/meTokenTradeErrors';
+import { registerMeTokenTradeInFlight } from '@/lib/wallet/meTokenTradeInFlight';
 import {
   sendMeTokenTradeUserOp,
   type SendMeTokenTradeUserOpParams,
@@ -20,7 +21,7 @@ export const ME_TOKEN_TRADE_UOP_TIMEOUT_MESSAGE =
  */
 export async function raceMeTokenTradeUserOp(
   params: SendMeTokenTradeUserOpParams,
-  options?: { timeoutMs?: number },
+  options?: { timeoutMs?: number; meTokenAddress?: string },
 ): Promise<{ hash: string }> {
   const timeoutMs = options?.timeoutMs ?? ME_TOKEN_TRADE_UOP_TIMEOUT_MS;
   let timedOut = false;
@@ -28,6 +29,9 @@ export async function raceMeTokenTradeUserOp(
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
 
   const inflight = sendMeTokenTradeUserOp(params);
+  if (options?.meTokenAddress) {
+    registerMeTokenTradeInFlight(options.meTokenAddress, inflight);
+  }
   inflight
     .then((result) => {
       if (timedOut) {
