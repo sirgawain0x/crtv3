@@ -7,7 +7,7 @@ const TEST_POLICY_ID = "11111111-2222-4333-8444-555555555555";
 const USDC = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
 
 describe("buildSendCallsPayload", () => {
-  it("hex-encodes zero value and maps paymaster policyId", () => {
+  it("passes bigint zero value and maps paymaster policyId", () => {
     const { calls, capabilities } = buildSendCallsPayload(
       [
         {
@@ -22,7 +22,7 @@ describe("buildSendCallsPayload", () => {
       },
     );
 
-    expect(calls[0].value).toBe("0x0");
+    expect(calls[0].value).toBe(0n);
     expect(calls[0].to).toBe(DIAMOND);
     expect(capabilities?.paymaster).toEqual({
       policyId: TEST_POLICY_ID,
@@ -30,24 +30,16 @@ describe("buildSendCallsPayload", () => {
     });
   });
 
-  it("supports burn on Diamond with zero value (sell path)", () => {
+  it("supports burn on Diamond with zero bigint value (sell path)", () => {
     const { calls } = buildSendCallsPayload([
       {
         target: DIAMOND,
-        data: "0xburncalldata" as Hex,
+        data: "0xdeadbeef" as Hex,
         value: BigInt(0),
       },
     ]);
 
-    expect(calls[0].value).toBe("0x0");
+    expect(calls[0].value).toBe(0n);
     expect(calls[0].to).toBe(DIAMOND);
-  });
-
-  it("defaults missing call data to 0x", () => {
-    const { calls } = buildSendCallsPayload([
-      { target: DIAMOND, value: 0n },
-    ]);
-    expect(calls[0].data).toBe("0x");
-    expect(calls[0].value).toBe("0x0");
   });
 });

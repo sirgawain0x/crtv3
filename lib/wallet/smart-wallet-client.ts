@@ -5,7 +5,6 @@ import {
 import type { LocalAccount } from "viem/accounts";
 import type { Address, Chain, Hash, Hex } from "viem";
 import { http, type Transport } from "viem";
-import { serializeEip5792Calls } from "@/lib/wallet/serializeEip5792Calls";
 
 const ALCHEMY_API_KEY = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY ?? "";
 
@@ -124,21 +123,25 @@ function mapSendCallsCapabilities(
   return Object.keys(capabilities).length > 0 ? capabilities : undefined;
 }
 
-/** Builds EIP-5792 sendCalls payload (used by compat sendUserOperation and tests). */
+export type SendCallsCall = {
+  to: Address;
+  data?: Hex;
+  value?: bigint;
+};
+
+/** Builds sendCalls payload (used by compat sendUserOperation and tests). */
 export function buildSendCallsPayload(
   uoArray: UserOperationCall[],
   context?: SendUserOperationArgs["context"],
 ): {
-  calls: ReturnType<typeof serializeEip5792Calls>;
+  calls: SendCallsCall[];
   capabilities: ReturnType<typeof mapSendCallsCapabilities>;
 } {
-  const calls = serializeEip5792Calls(
-    uoArray.map((uo) => ({
-      to: uo.target,
-      data: uo.data,
-      value: uo.value,
-    })),
-  );
+  const calls: SendCallsCall[] = uoArray.map((uo) => ({
+    to: uo.target,
+    data: uo.data,
+    value: uo.value ?? 0n,
+  }));
   const capabilities = mapSendCallsCapabilities(
     context,
     context?.permissions?.context,
