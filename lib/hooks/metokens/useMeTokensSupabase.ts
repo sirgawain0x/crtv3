@@ -42,6 +42,7 @@ import {
   classifyUsdcBuyBalanceShortfall,
   shouldReserveUsdcGasBufferForBuy,
 } from '@/lib/metokens/meTokenTradeUsdcBuffer';
+import { buildTradeGasLogFields } from '@/lib/hooks/metokens/tradeGasContext';
 
 // MeTokens contract addresses on Base
 const METOKEN_FACTORY = METOKEN_FACTORY_BASE;
@@ -175,26 +176,20 @@ export function useMeTokensSupabase(targetAddress?: string) {
   const user = useUser();
   const { client } = useSmartAccountClient({});
   const { toast } = useToast();
-  const { getGasContext, isMember } = useGasSponsorship();
+  const {
+    getGasContext,
+    isMember,
+    isMembershipLoading,
+    resolveTradeGasContext,
+    resolveMemberForTrade,
+  } = useGasSponsorship();
   const { getAuthHeaders } = useWalletAuth();
 
   // Use targetAddress if provided, otherwise use the smart account address from client
   const address = targetAddress || client?.account?.address || user?.address;
 
-  /** Members get sponsored gas; everyone else pays gas in USDC when the any-token policy is set. */
-  const resolveTradeGasContext = useCallback(() => {
-    if (isMember) {
-      const sponsored = getGasContext('sponsored');
-      if (sponsored.context) {
-        return sponsored;
-      }
-      logger.warn('⚠️ Member sponsored gas unavailable; falling back to USDC gas');
-    }
-    return getGasContext('usdc');
-  }, [getGasContext, isMember]);
-
   const usdcTradeGasContext = useCallback(
-    () => getGasContext('usdc').context,
+    () => getGasContext('usdc', { isMember: false }).context,
     [getGasContext],
   );
 
@@ -211,13 +206,14 @@ export function useMeTokensSupabase(targetAddress?: string) {
     async (
       uo: Parameters<typeof sendMeTokenTradeUserOp>[0]['uo'],
       ownerAddress: `0x${string}`,
+      memberForGas: boolean,
     ) => {
       if (!client) throw new Error('Smart account client not initialized');
       return sendMeTokenTradeUserOp({
         client,
         uo,
         ownerAddress,
-        primary: resolveTradeGasContext(),
+        primary: resolveTradeGasContext(memberForGas),
         usdcContext: usdcTradeGasContext(),
         readUsdcBalance,
       });
@@ -1529,16 +1525,15 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
     setTransactionError(null);
 
     try {
-      // Get gas sponsorship context (sponsored for members, USDC for non-members)
-      const { context: gasContext, isSponsored } = resolveTradeGasContext();
-      logger.debug('🔧 Gas context for buyMeTokens:', {
-        gasContext,
-        isMember,
-        isSponsored,
-        hasPolicyId: !!gasContext?.paymasterService?.policyId,
-        policyId: gasContext?.paymasterService?.policyId,
-        tokenAddress: gasContext?.erc20?.tokenAddress,
-      });
+      const ownerAddressForGas = (client.account?.address || address) as string;
+      const memberForGas = await resolveMemberForTrade(ownerAddressForGas);
+      const { context: gasContext, isSponsored } = resolveTradeGasContext(
+        memberForGas,
+      );
+      logger.debug(
+        '🔧 Gas context for buyMeTokens:',
+        buildTradeGasLogFields(memberForGas, gasContext, isSponsored),
+      );
 
       // Get the vault address that will actually perform transferFrom
       // 1. Get meToken's hubId
@@ -1661,6 +1656,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
             value: BigInt(0),
           },
           ownerAddress,
+          memberForGas,
         );
 
         logger.debug('⏳ Waiting for approval confirmation...', approveOp.hash);
@@ -1713,6 +1709,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
             value: BigInt(0),
           },
           ownerAddress,
+          memberForGas,
         );
 
         logger.debug('⏳ Waiting for DIAMOND approval confirmation...', approveOp.hash);
@@ -1786,6 +1783,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
           const sendMintOpPromise = sendTradeUserOp(
             mintOperation.uo,
             ownerAddress,
+            memberForGas,
           );
           operation = await Promise.race([sendMintOpPromise, timeoutPromise]) as any;
 
@@ -2107,15 +2105,14 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
       const sellAmountWei = parseEther(meTokenAmount);
       const ownerAddress = (client.account?.address || address) as `0x${string}`;
 
-      const { context: gasContext, isSponsored } = resolveTradeGasContext();
-      logger.debug('🔧 Gas context for sellMeTokens:', {
-        gasContext,
-        isMember,
-        isSponsored,
-        hasPolicyId: !!gasContext?.paymasterService?.policyId,
-        policyId: gasContext?.paymasterService?.policyId,
-        tokenAddress: gasContext?.erc20?.tokenAddress,
-      });
+      const memberForGas = await resolveMemberForTrade(ownerAddress);
+      const { context: gasContext, isSponsored } = resolveTradeGasContext(
+        memberForGas,
+      );
+      logger.debug(
+        '🔧 Gas context for sellMeTokens:',
+        buildTradeGasLogFields(memberForGas, gasContext, isSponsored),
+      );
 
       // Get the vault address that will actually perform transferFrom (same pattern as buyMeTokens)
       // 1. Get meToken's hubId
@@ -2190,6 +2187,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
             value: BigInt(0),
           },
           ownerAddress,
+          memberForGas,
         );
 
         logger.debug('⏳ Waiting for approval confirmation...', approveOp.hash);
@@ -2243,6 +2241,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
             value: BigInt(0),
           },
           ownerAddress,
+          memberForGas,
         );
 
         logger.debug('⏳ Waiting for DIAMOND approval confirmation...', approveOp.hash);
@@ -2317,6 +2316,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
           const sendBurnOpPromise = sendTradeUserOp(
             burnOperation.uo,
             ownerAddress,
+            memberForGas,
           );
           operation = await Promise.race([sendBurnOpPromise, timeoutPromise]) as any;
 
@@ -2559,6 +2559,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
     userMeToken,
     loading,
     error: meTokenError,
+    isMembershipLoading,
     createMeToken,
     buyMeTokens,
     sellMeTokens,

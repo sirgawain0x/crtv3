@@ -67,7 +67,7 @@ export function QuickTradeDialog({
     isConfirming,
     isConfirmed,
     transactionError,
-
+    isMembershipLoading,
   } = useMeTokensSupabase();
 
   const collateral = resolveHubAsset(Number(token?.hubId));
@@ -652,6 +652,7 @@ export function QuickTradeDialog({
                   onClick={mode === 'buy' ? handleBuy : handleSell}
                   disabled={
                     isLoading ||
+                    isMembershipLoading ||
                     !amount ||
                     parseFloat(amount) <= 0 ||
                     (mode === 'buy' && collateralBalance < parseUnits(amount || '0', collateral.decimals)) ||
