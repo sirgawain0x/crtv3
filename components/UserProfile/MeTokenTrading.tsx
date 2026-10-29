@@ -821,7 +821,7 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
               <Button
                 onClick={handleSell}
                 disabled={
-                  isMembershipLoading ||
+                  tradeDisabled ||
                   isMeTokenTradingSellDisabled(
                     isLoading,
                     sellAmount,
