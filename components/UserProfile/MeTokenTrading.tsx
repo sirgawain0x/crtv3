@@ -23,6 +23,10 @@ import {
 import { notifyMeTokenBalancesChanged } from '@/lib/hooks/metokens/meTokenBalanceEvents';
 import { isMeTokenTradeUserFacingError } from '@/lib/wallet/meTokenTradeErrors';
 import { AlchemySwapWidget } from '@/components/wallet/swap/AlchemySwapWidget';
+import {
+  isMeTokenTradingSellDisabled,
+  parseSellAmountWei,
+} from '@/lib/metokens/meTokenTradingSellGuard';
 
 interface MeTokenTradingProps {
   meToken: MeTokenData;
@@ -323,7 +327,16 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
       return;
     }
 
-    const sellAmountWei = parseEther(sellAmount);
+    const sellAmountWei = parseSellAmountWei(sellAmount);
+    if (sellAmountWei === null) {
+      setError('Please enter a valid amount');
+      toast({
+        title: "Error",
+        description: "Please enter a valid amount",
+        variant: "destructive",
+      });
+      return;
+    }
     if (meToken.balance < sellAmountWei) {
       setError(`Insufficient balance. You have ${formatEther(meToken.balance)} ${meToken.symbol}`);
       toast({
@@ -780,7 +793,11 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
             ) : (
               <Button
                 onClick={handleSell}
-                disabled={isLoading || !sellAmount || parseFloat(sellAmount) <= 0}
+                disabled={isMeTokenTradingSellDisabled(
+                  isLoading,
+                  sellAmount,
+                  meToken.balance,
+                )}
                 className="w-full bg-red-600 hover:bg-red-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? (
