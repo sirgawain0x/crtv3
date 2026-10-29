@@ -5,6 +5,56 @@
  * TODO(G2): Replace/adjust rows using captured error bodies from G2 test buy.
  */
 
+import { logger } from '@/lib/utils/logger';
+import { reportUnexpectedTradeError } from '@/lib/wallet/reportUnexpectedTradeError';
+
+export const GAS_ERROR_LOG_MAX_LENGTH = 2000;
+
+/** Redact secrets before logging classified gas error bodies. */
+export function redactGasErrorLogBody(raw: string): string {
+  let body = raw;
+  body = body.replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer [REDACTED]');
+  body = body.replace(
+    /(?:api[_-]?key|x-api-key|authorization)["':\s]*["']?[A-Za-z0-9._~+/=-]{8,}/gi,
+    'api_key=[REDACTED]',
+  );
+  body = body.replace(
+    /policy[_-]?id(?:["':\s=]+)["']?[a-f0-9-]{36}/gi,
+    'policy_id=[REDACTED]',
+  );
+  body = body.replace(
+    /"policyId"\s*:\s*"[^"]+"/gi,
+    '"policyId":"[REDACTED]"',
+  );
+  body = body.replace(
+    /0x[a-fA-F0-9]{128,}/g,
+    '0x[SIGNATURE_REDACTED]',
+  );
+  body = body.replace(
+    /(?:private[_-]?key|secret)["':\s]*["']?[A-Za-z0-9+/=._-]{16,}/gi,
+    'secret=[REDACTED]',
+  );
+  if (body.length > GAS_ERROR_LOG_MAX_LENGTH) {
+    return `${body.slice(0, GAS_ERROR_LOG_MAX_LENGTH)}…[truncated]`;
+  }
+  return body;
+}
+
+function logClassifiedGasError(
+  classified: ClassifiedGasError,
+  raw: string,
+): void {
+  const redactedErrorBody = redactGasErrorLogBody(raw);
+  logger.warn('[MeToken gas classification]', {
+    ...classified,
+    redactedErrorBody,
+  });
+  reportUnexpectedTradeError(new Error('MeToken gas error classified'), {
+    gasClassification: classified,
+    redactedErrorBody,
+  });
+}
+
 export type GasErrorPhase = 'pre_submit' | 'post_submit' | 'unknown';
 
 export type GasErrorKind =
@@ -108,6 +158,7 @@ const PRE_SUBMIT_MARKERS = [
   /sponsorship failed/i,
   /policy id/i,
   /gas manager/i,
+  // TODO(G2): Narrow generic markers (/paymaster/, -32000, -32500) once real failures are captured.
   /paymaster/i,
   /max number of userops/i,
   /policy rejected/i,
@@ -167,11 +218,13 @@ export function classifyGasError(
       continue;
     }
     if (matcher.test(normalized, raw)) {
-      return {
+      const classified: ClassifiedGasError = {
         kind: 'sponsor_policy_rejection',
         phase,
         provisionalMatcherId: matcher.id,
       };
+      logClassifiedGasError(classified, raw);
+      return classified;
     }
   }
 
@@ -179,17 +232,29 @@ export function classifyGasError(
     (m) => m.id === 'wallet_erc20_gas_insufficient_balance',
   );
   if (usdcMatcher?.test(normalized, raw)) {
-    return { kind: 'insufficient_usdc_for_gas', phase };
+    const classified: ClassifiedGasError = {
+      kind: 'insufficient_usdc_for_gas',
+      phase,
+    };
+    logClassifiedGasError(classified, raw);
+    return classified;
   }
 
   const precheckMatcher = PROVISIONAL_GAS_ERROR_MATCHERS.find(
     (m) => m.id === 'wallet_precheck_sender_balance',
   );
   if (precheckMatcher?.test(normalized, raw)) {
-    return { kind: 'insufficient_usdc_for_gas', phase };
+    const classified: ClassifiedGasError = {
+      kind: 'insufficient_usdc_for_gas',
+      phase,
+    };
+    logClassifiedGasError(classified, raw);
+    return classified;
   }
 
-  return { kind: 'other', phase };
+  const classified: ClassifiedGasError = { kind: 'other', phase };
+  logClassifiedGasError(classified, raw);
+  return classified;
 }
 
 /**

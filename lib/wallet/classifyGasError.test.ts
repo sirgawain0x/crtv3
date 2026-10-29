@@ -1,11 +1,60 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi, beforeEach } from 'vitest';
 import {
   classifyGasError,
   isSponsorFallbackEligible,
   PROVISIONAL_GAS_ERROR_MATCHERS,
+  redactGasErrorLogBody,
+  GAS_ERROR_LOG_MAX_LENGTH,
 } from './classifyGasError';
+import { logger } from '@/lib/utils/logger';
+import { reportUnexpectedTradeError } from '@/lib/wallet/reportUnexpectedTradeError';
+
+vi.mock('@/lib/utils/logger', () => ({
+  logger: { warn: vi.fn(), error: vi.fn(), debug: vi.fn(), info: vi.fn() },
+}));
+
+vi.mock('@/lib/wallet/reportUnexpectedTradeError', () => ({
+  reportUnexpectedTradeError: vi.fn(),
+}));
 
 describe('classifyGasError', () => {
+  beforeEach(() => {
+    vi.mocked(logger.warn).mockClear();
+    vi.mocked(reportUnexpectedTradeError).mockClear();
+  });
+
+  it('redacts policy ids, bearer tokens, and truncates long bodies', () => {
+    const policyId = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
+    const longTail = 'x'.repeat(GAS_ERROR_LOG_MAX_LENGTH + 50);
+    const raw = `Bearer secret-token policy_id=${policyId} "policyId":"${policyId}" ${longTail}`;
+    const redacted = redactGasErrorLogBody(raw);
+    expect(redacted).not.toContain('secret-token');
+    expect(redacted).not.toContain(policyId);
+    expect(redacted).toContain('[REDACTED]');
+    expect(redacted).toContain('…[truncated]');
+    expect(redacted.length).toBeLessThanOrEqual(
+      GAS_ERROR_LOG_MAX_LENGTH + '…[truncated]'.length,
+    );
+  });
+
+  it('logs redacted body when a gas error is classified', () => {
+    const policyId = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
+    const err = new Error(`Policy rejected policy_id=${policyId}`);
+    classifyGasError(err);
+
+    expect(logger.warn).toHaveBeenCalled();
+    const warnPayload = vi.mocked(logger.warn).mock.calls[0][1] as {
+      redactedErrorBody: string;
+    };
+    expect(warnPayload.redactedErrorBody).not.toContain(policyId);
+    expect(reportUnexpectedTradeError).toHaveBeenCalledWith(
+      expect.any(Error),
+      expect.objectContaining({
+        redactedErrorBody: expect.not.stringContaining(policyId),
+      }),
+    );
+  });
+
   it('lists provisional matchers with doc sources', () => {
     expect(PROVISIONAL_GAS_ERROR_MATCHERS.length).toBeGreaterThan(0);
     for (const row of PROVISIONAL_GAS_ERROR_MATCHERS) {
