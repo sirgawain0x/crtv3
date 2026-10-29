@@ -64,7 +64,7 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
     isConfirming,
     isConfirmed,
     transactionError,
-
+    isMembershipLoading,
   } = useMeTokensSupabase();
 
   // Check if MeToken is subscribed using the blockchain utility function
@@ -398,6 +398,7 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
   };
 
   const isLoading = isPending || isConfirming;
+  const tradeDisabled = isLoading || isMembershipLoading;
 
   // Show loading state while checking subscription
   if (isCheckingSubscription) {
@@ -612,7 +613,7 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
                   variant="ghost"
                   size="sm"
                   className="h-6 px-2 text-xs"
-                  disabled={isLoading || !isConnected}
+                  disabled={tradeDisabled || !isConnected}
                   onClick={() => setBuyAmount(formatUnits(collateralBalance, collateral.decimals))}
                 >
                   MAX
@@ -624,7 +625,7 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
                 placeholder="0.00"
                 value={buyAmount}
                 onChange={(e) => setBuyAmount(e.target.value)}
-                disabled={isLoading}
+                disabled={tradeDisabled}
                 step="0.01"
                 min="0"
               />
@@ -671,7 +672,7 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
             ) : (
               <Button
                 onClick={handleBuy}
-                disabled={isLoading || !buyAmount || parseFloat(buyAmount) <= 0 || collateralBalance < parseUnits(buyAmount || '0', collateral.decimals)}
+                disabled={tradeDisabled || !buyAmount || parseFloat(buyAmount) <= 0 || collateralBalance < parseUnits(buyAmount || '0', collateral.decimals)}
                 className="w-full bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? (
@@ -695,7 +696,7 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
                   variant="ghost"
                   size="sm"
                   className="h-6 px-2 text-xs"
-                  disabled={isLoading || !isConnected || meToken.balance <= 0n}
+                  disabled={tradeDisabled || !isConnected || meToken.balance <= 0n}
                   onClick={() => setSellAmount(formatEther(meToken.balance))}
                 >
                   MAX
@@ -707,7 +708,7 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
                 placeholder="0.00"
                 value={sellAmount}
                 onChange={(e) => setSellAmount(e.target.value)}
-                disabled={isLoading}
+                disabled={tradeDisabled}
                 step="0.01"
                 min="0"
                 max={formatEther(meToken.balance)}
@@ -727,7 +728,7 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
             ) : (
               <Button
                 onClick={handleSell}
-                disabled={isLoading || !sellAmount || parseFloat(sellAmount) <= 0}
+                disabled={tradeDisabled || !sellAmount || parseFloat(sellAmount) <= 0}
                 className="w-full bg-red-600 hover:bg-red-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? (
