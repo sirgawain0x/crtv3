@@ -241,6 +241,17 @@ export function useMeTokensSupabase(targetAddress?: string) {
 
     const message = err instanceof Error ? err.message : String(err);
     if (
+      message.includes('Insufficient USDC') ||
+      message.includes('for this purchase plus') ||
+      message.includes(METOKEN_TRADE_LOW_USDC_MESSAGE)
+    ) {
+      return new MeTokenTradeUserFacingError(
+        'low_usdc_gas',
+        METOKEN_TRADE_LOW_USDC_MESSAGE,
+        err,
+      );
+    }
+    if (
       message.includes('transfer amount exceeds allowance') ||
       message.includes('insufficient allowance') ||
       message.includes('ERC20: transfer amount exceeds allowance')
@@ -1584,16 +1595,27 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
       })) as bigint;
 
       let requiredBalance = collateralAmountWei;
-      if (!isSponsored && hubAsset.symbol === 'USDC') {
+      const usdcGasPolicyAvailable = !!usdcTradeGasContext();
+      const reserveUsdcGasBuffer =
+        hubAsset.symbol === 'USDC' &&
+        (!isSponsored || (isSponsored && usdcGasPolicyAvailable));
+      if (reserveUsdcGasBuffer) {
         requiredBalance += parseHubAssetAmount(USDC_GAS_BUFFER, hubAsset);
       }
 
       if (collateralBalance < requiredBalance) {
-        const needsGasBuffer = !isSponsored && hubAsset.symbol === 'USDC';
+        if (
+          hubAsset.symbol === 'USDC' &&
+          (reserveUsdcGasBuffer ||
+            collateralBalance < parseHubAssetAmount(USDC_GAS_BUFFER, hubAsset))
+        ) {
+          throw new MeTokenTradeUserFacingError(
+            'low_usdc_gas',
+            METOKEN_TRADE_LOW_USDC_MESSAGE,
+          );
+        }
         throw new Error(
-          needsGasBuffer
-            ? `Insufficient ${hubAsset.symbol} in your smart account. You need at least ${collateralAmount} ${hubAsset.symbol} for this purchase plus ~${USDC_GAS_BUFFER} ${hubAsset.symbol} for gas.`
-            : `Insufficient ${hubAsset.symbol} in your smart account. You need at least ${collateralAmount} ${hubAsset.symbol} for this purchase.`,
+          `Insufficient ${hubAsset.symbol} in your smart account. You need at least ${collateralAmount} ${hubAsset.symbol} for this purchase.`,
         );
       }
 

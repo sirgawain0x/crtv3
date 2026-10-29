@@ -601,6 +601,7 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
                 <AlchemySwapWidget
                   compact
                   hideHeader
+                  defaultFromToken="USDC"
                   defaultToToken="ETH"
                   className="border-0 bg-transparent shadow-none"
                 />
