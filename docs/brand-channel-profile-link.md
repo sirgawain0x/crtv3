@@ -35,3 +35,7 @@ No admin mapping or deploy is required; the slug is persisted on `creator_profil
 
 - Owner: `0x6aBAa01C84b8b962D197E8a62598fea3Cfe0c5AD` (Hack Beta admin in `lib/chones/hack-beta/admin-config.ts`)
 - Migration seeds `brand_channel_slug = 'chones'` for that wallet when a profile row exists.
+
+## Related docs
+
+- [Creator social profile links](./creator-social-profile-links.md) — Orb, Instagram, and X link-outs on the same creator profile (separate columns, same upsert route)
