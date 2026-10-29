@@ -160,6 +160,7 @@ export function useMeTokensSupabase(targetAddress?: string) {
   const { client } = useSmartAccountClient({});
   const { toast } = useToast();
   const {
+    getGasContext,
     isMember,
     isMembershipLoading,
     resolveTradeGasContext,
