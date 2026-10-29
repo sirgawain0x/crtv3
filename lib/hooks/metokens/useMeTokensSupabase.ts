@@ -30,6 +30,7 @@ import {
   sendMeTokenTradeUserOp,
   BASE_USDC_ADDRESS,
 } from '@/lib/wallet/sendMeTokenTradeUserOp';
+import { raceMeTokenTradeUserOp } from '@/lib/wallet/raceMeTokenTradeUserOp';
 import {
   isMeTokenTradeUserFacingError,
   MeTokenTradeUserFacingError,
@@ -207,16 +208,21 @@ export function useMeTokensSupabase(targetAddress?: string) {
       uo: Parameters<typeof sendMeTokenTradeUserOp>[0]['uo'],
       ownerAddress: `0x${string}`,
       memberForGas: boolean,
+      options?: { simulationTimeout?: boolean },
     ) => {
       if (!client) throw new Error('Smart account client not initialized');
-      return sendMeTokenTradeUserOp({
+      const params = {
         client,
         uo,
         ownerAddress,
         primary: resolveTradeGasContext(memberForGas),
         usdcContext: usdcTradeGasContext(),
         readUsdcBalance,
-      });
+      };
+      if (options?.simulationTimeout) {
+        return raceMeTokenTradeUserOp(params);
+      }
+      return sendMeTokenTradeUserOp(params);
     },
     [client, readUsdcBalance, resolveTradeGasContext, usdcTradeGasContext],
   );
@@ -1747,8 +1753,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         logger.warn('⚠️ Failed to calculate expected mint amount:', calcErr);
       }
 
-      // 4. Now mint with retry logic for timeout errors
-
+      // 4. Mint — single in-flight UserOp (sponsor + USDC fallback); no timeout resubmit
       logger.debug('📤 Sending Mint UserOp to DIAMOND...');
 
       const mintOperation = {
@@ -1763,51 +1768,12 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         },
       };
 
-      // Retry logic for transaction simulation timeouts
-      let operation: any;
-      let mintAttempts = 0;
-      const maxMintAttempts = 3;
-      const baseRetryDelay = 3000; // 3 seconds
-
-      while (mintAttempts < maxMintAttempts) {
-        mintAttempts++;
-        try {
-          logger.debug(`🔄 Mint attempt ${mintAttempts}/${maxMintAttempts}...`);
-
-          // Create a timeout promise (90 seconds per attempt)
-          const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('Transaction simulation timed out.')), 90000);
-          });
-
-          // Race the sendUserOperation with timeout
-          const sendMintOpPromise = sendTradeUserOp(
-            mintOperation.uo,
-            ownerAddress,
-            memberForGas,
-          );
-          operation = await Promise.race([sendMintOpPromise, timeoutPromise]) as any;
-
-          // Success - break out of retry loop
-          break;
-        } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          const isTimeoutError = errorMessage.includes('timed out') || errorMessage.includes('timeout');
-
-          if (isTimeoutError && mintAttempts < maxMintAttempts) {
-            // Calculate exponential backoff delay
-            const retryDelay = baseRetryDelay * Math.pow(2, mintAttempts - 1);
-            logger.debug(`⏳ Mint attempt ${mintAttempts} timed out. Retrying in ${retryDelay}ms...`);
-            await new Promise(resolve => setTimeout(resolve, retryDelay));
-            continue;
-          } else {
-            // Not a timeout error, or we've exhausted retries
-            if (isTimeoutError && mintAttempts >= maxMintAttempts) {
-              throw new Error('Transaction simulation timed out after multiple retries. The network may be busy. Please try again in a few moments.');
-            }
-            throw error;
-          }
-        }
-      }
+      const operation = await sendTradeUserOp(
+        mintOperation.uo,
+        ownerAddress,
+        memberForGas,
+        { simulationTimeout: true },
+      );
 
       logger.debug('🎉 Mint UserOp sent! Hash:', operation.hash);
       setIsPending(false);
@@ -2281,7 +2247,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         // Continue - we'll try to calculate it again after if needed
       }
 
-      // Send burn operation with retry logic for timeout errors
+      // Burn — single in-flight UserOp (sponsor + USDC fallback); no timeout resubmit
       logger.debug('📤 Sending Burn UserOp to DIAMOND...');
 
       const burnOperation = {
@@ -2296,51 +2262,12 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         },
       };
 
-      // Retry logic for transaction simulation timeouts
-      let operation: any;
-      let burnAttempts = 0;
-      const maxBurnAttempts = 3;
-      const baseRetryDelay = 3000; // 3 seconds
-
-      while (burnAttempts < maxBurnAttempts) {
-        burnAttempts++;
-        try {
-          logger.debug(`🔄 Burn attempt ${burnAttempts}/${maxBurnAttempts}...`);
-
-          // Create a timeout promise (90 seconds per attempt)
-          const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('Transaction simulation timed out.')), 90000);
-          });
-
-          // Race the sendUserOperation with timeout
-          const sendBurnOpPromise = sendTradeUserOp(
-            burnOperation.uo,
-            ownerAddress,
-            memberForGas,
-          );
-          operation = await Promise.race([sendBurnOpPromise, timeoutPromise]) as any;
-
-          // Success - break out of retry loop
-          break;
-        } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          const isTimeoutError = errorMessage.includes('timed out') || errorMessage.includes('timeout');
-
-          if (isTimeoutError && burnAttempts < maxBurnAttempts) {
-            // Calculate exponential backoff delay
-            const retryDelay = baseRetryDelay * Math.pow(2, burnAttempts - 1);
-            logger.debug(`⏳ Burn attempt ${burnAttempts} timed out. Retrying in ${retryDelay}ms...`);
-            await new Promise(resolve => setTimeout(resolve, retryDelay));
-            continue;
-          } else {
-            // Not a timeout error, or we've exhausted retries
-            if (isTimeoutError && burnAttempts >= maxBurnAttempts) {
-              throw new Error('Transaction simulation timed out after multiple retries. The network may be busy. Please try again in a few moments.');
-            }
-            throw error;
-          }
-        }
-      }
+      const operation = await sendTradeUserOp(
+        burnOperation.uo,
+        ownerAddress,
+        memberForGas,
+        { simulationTimeout: true },
+      );
 
       logger.debug('🎉 Burn UserOp sent! Hash:', operation.hash);
       setIsPending(false);
