@@ -93,6 +93,7 @@ export function VideoMeTokenBuyDialog({
     isConfirming,
     isConfirmed,
     transactionError,
+    isMembershipLoading,
     // getMeTokenVaultAddress, // not needed locally if we use ensureDaiApproval
   } = useMeTokensSupabase();
 
@@ -475,7 +476,7 @@ export function VideoMeTokenBuyDialog({
     }
   };
 
-  const isLoading = isPending || isConfirming;
+  const isLoading = isPending || isConfirming || isMembershipLoading;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

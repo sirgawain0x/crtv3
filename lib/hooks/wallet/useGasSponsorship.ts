@@ -1,8 +1,14 @@
 "use client";
 
+import { useCallback } from "react";
 import { useIsMember } from "../unlock/useIsMember";
 import { buildSponsoredAttestationGasContext } from "@/lib/eas/attestation-gas";
 import { buildMeTokenCreationGasContext } from "@/lib/metokens/metoken-gas";
+import {
+  resolveMemberForTradeGas,
+  resolveTradeGasContextForMembership,
+  type GetTradeGasContextFn,
+} from "@/lib/hooks/metokens/tradeGasContext";
 
 // Base USDC Address
 const USDC_ADDRESS = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
@@ -17,7 +23,7 @@ interface GasSponsorshipContext {
 }
 
 export function useGasSponsorship() {
-    const { isMember } = useIsMember();
+    const { isMember, isVerified, isLoading: isMembershipLoading } = useIsMember();
 
     // Strip quotes from environment variables (they may have quotes in .env.local)
     const SPONSORED_POLICY_ID = process.env.NEXT_PUBLIC_ALCHEMY_PAYMASTER_POLICY_ID?.replace(/^["']|["']$/g, '');
@@ -129,11 +135,34 @@ export function useGasSponsorship() {
      */
     const getMeTokenCreationGasContext = () => buildMeTokenCreationGasContext();
 
+    const resolveTradeGasContext = useCallback(
+        (memberOverride?: boolean) =>
+            resolveTradeGasContextForMembership(
+                memberOverride ?? isMember,
+                getGasContext as GetTradeGasContextFn,
+            ),
+        [getGasContext, isMember],
+    );
+
+    const resolveMemberForTrade = useCallback(
+        (walletAddress: string) =>
+            resolveMemberForTradeGas(walletAddress, {
+                isVerified,
+                isLoading: isMembershipLoading,
+                isMember,
+            }),
+        [isMember, isMembershipLoading, isVerified],
+    );
+
     return {
         getGasContext,
         getMeTokenCreationGasContext,
         getStoryGasContext,
         getAttestationGasContext,
         isMember,
+        isMembershipLoading,
+        isVerified,
+        resolveTradeGasContext,
+        resolveMemberForTrade,
     };
 }

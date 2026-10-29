@@ -159,23 +159,16 @@ export function useMeTokensSupabase(targetAddress?: string) {
   const user = useUser();
   const { client } = useSmartAccountClient({});
   const { toast } = useToast();
-  const { getGasContext, isMember } = useGasSponsorship();
+  const {
+    isMember,
+    isMembershipLoading,
+    resolveTradeGasContext,
+    resolveMemberForTrade,
+  } = useGasSponsorship();
   const { getAuthHeaders } = useWalletAuth();
 
   // Use targetAddress if provided, otherwise use the smart account address from client
   const address = targetAddress || client?.account?.address || user?.address;
-
-  /** Members get sponsored gas; everyone else pays gas in USDC when the any-token policy is set. */
-  const resolveTradeGasContext = useCallback(() => {
-    if (isMember) {
-      const sponsored = getGasContext('sponsored');
-      if (sponsored.context) {
-        return sponsored;
-      }
-      logger.warn('⚠️ Member sponsored gas unavailable; falling back to USDC gas');
-    }
-    return getGasContext('usdc');
-  }, [getGasContext, isMember]);
 
   const pokeHoldingsRefresh = useCallback(
     (opts?: { poll?: boolean }) => {
@@ -1456,8 +1449,11 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
     setTransactionError(null);
 
     try {
-      // Get gas sponsorship context (sponsored for members, USDC for non-members)
-      const { context: gasContext, isSponsored } = resolveTradeGasContext();
+      const ownerAddressForGas = (client.account?.address || address) as string;
+      const memberForGas = await resolveMemberForTrade(ownerAddressForGas);
+      const { context: gasContext, isSponsored } = resolveTradeGasContext(
+        memberForGas,
+      );
       logger.debug('🔧 Gas context for buyMeTokens:', {
         gasContext,
         isMember,
@@ -2018,7 +2014,10 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
       const sellAmountWei = parseEther(meTokenAmount);
       const ownerAddress = (client.account?.address || address) as `0x${string}`;
 
-      const { context: gasContext, isSponsored } = resolveTradeGasContext();
+      const memberForGas = await resolveMemberForTrade(ownerAddress);
+      const { context: gasContext, isSponsored } = resolveTradeGasContext(
+        memberForGas,
+      );
       logger.debug('🔧 Gas context for sellMeTokens:', {
         gasContext,
         isMember,
@@ -2470,6 +2469,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
     userMeToken,
     loading,
     error: meTokenError,
+    isMembershipLoading,
     createMeToken,
     buyMeTokens,
     sellMeTokens,

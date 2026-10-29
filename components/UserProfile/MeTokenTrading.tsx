@@ -64,7 +64,7 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
     isConfirming,
     isConfirmed,
     transactionError,
-
+    isMembershipLoading,
   } = useMeTokensSupabase();
 
   // Check if MeToken is subscribed using the blockchain utility function
@@ -397,7 +397,7 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
     }
   };
 
-  const isLoading = isPending || isConfirming;
+  const isLoading = isPending || isConfirming || isMembershipLoading;
 
   // Show loading state while checking subscription
   if (isCheckingSubscription) {
