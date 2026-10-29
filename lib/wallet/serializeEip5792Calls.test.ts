@@ -39,7 +39,7 @@ describe("serializeEip5792Calls", () => {
       },
       {
         to: DIAMOND,
-        data: "0xburn0001" as Hex,
+        data: "0xdead0001" as Hex,
         value: BigInt(0),
       },
     ]);

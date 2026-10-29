@@ -1,15 +1,29 @@
 import { parseEther } from "viem";
 
 /** Sell submit guard — mirrors buy collateral check in MeTokenTrading. */
+function parseSellAmountWei(sellAmount: string): bigint | null {
+  const parsed = parseFloat(sellAmount);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return null;
+  }
+  try {
+    return parseEther(sellAmount);
+  } catch {
+    return null;
+  }
+}
+
 export function isMeTokenTradingSellDisabled(
   isLoading: boolean,
   sellAmount: string,
   balance: bigint,
 ): boolean {
-  return (
-    isLoading ||
-    !sellAmount ||
-    parseFloat(sellAmount) <= 0 ||
-    balance < parseEther(sellAmount || "0")
-  );
+  if (isLoading || !sellAmount) {
+    return true;
+  }
+  const amountWei = parseSellAmountWei(sellAmount);
+  if (amountWei === null) {
+    return true;
+  }
+  return balance < amountWei;
 }

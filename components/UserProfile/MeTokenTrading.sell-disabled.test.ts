@@ -27,4 +27,10 @@ describe("isMeTokenTradingSellDisabled", () => {
       isMeTokenTradingSellDisabled(true, "0.1", balance),
     ).toBe(true);
   });
+
+  it("is disabled for non-numeric or partial numeric input", () => {
+    expect(isMeTokenTradingSellDisabled(false, "abc", balance)).toBe(true);
+    expect(isMeTokenTradingSellDisabled(false, ".", balance)).toBe(true);
+    expect(isMeTokenTradingSellDisabled(false, "1.2.3", balance)).toBe(true);
+  });
 });
