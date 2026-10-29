@@ -5,10 +5,13 @@ type FetchLike = typeof fetch;
 
 const DEAR_CREATIVE_FETCH_TIMEOUT_MS = 5000;
 
-function dearCreativeFetchInit(headers: Record<string, string>): RequestInit {
+function dearCreativeFetchInit(
+  headers: Record<string, string>,
+  fetchTimeoutMs = DEAR_CREATIVE_FETCH_TIMEOUT_MS,
+): RequestInit {
   return {
     headers,
-    signal: AbortSignal.timeout(DEAR_CREATIVE_FETCH_TIMEOUT_MS),
+    signal: AbortSignal.timeout(fetchTimeoutMs),
   };
 }
 
@@ -186,11 +189,12 @@ async function fetchJsonRecentPosts(
   origin: string,
   limit: number,
   fetchFn: FetchLike,
+  fetchTimeoutMs: number,
 ): Promise<DearCreativePost[] | null> {
   const url = `${origin.replace(/\/+$/, "")}/api/posts/recent?limit=${limit}`;
   const response = await fetchFn(
     url,
-    dearCreativeFetchInit({ Accept: "application/json" }),
+    dearCreativeFetchInit({ Accept: "application/json" }, fetchTimeoutMs),
   );
 
   if (!response.ok) {
@@ -206,13 +210,17 @@ async function fetchRssRecentPosts(
   origin: string,
   limit: number,
   fetchFn: FetchLike,
+  fetchTimeoutMs: number,
 ): Promise<DearCreativePost[] | null> {
   const url = `${origin.replace(/\/+$/, "")}/rss.xml`;
   const response = await fetchFn(
     url,
-    dearCreativeFetchInit({
-      Accept: "application/rss+xml, application/xml, text/xml",
-    }),
+    dearCreativeFetchInit(
+      {
+        Accept: "application/rss+xml, application/xml, text/xml",
+      },
+      fetchTimeoutMs,
+    ),
   );
 
   if (!response.ok) {
@@ -228,9 +236,10 @@ export async function fetchRecentDearCreativePosts(
   origin: string,
   limit: number,
   fetchFn: FetchLike = fetch,
+  fetchTimeoutMs = DEAR_CREATIVE_FETCH_TIMEOUT_MS,
 ): Promise<DearCreativePost[]> {
   try {
-    const fromJson = await fetchJsonRecentPosts(origin, limit, fetchFn);
+    const fromJson = await fetchJsonRecentPosts(origin, limit, fetchFn, fetchTimeoutMs);
     if (fromJson) {
       return fromJson;
     }
@@ -239,7 +248,7 @@ export async function fetchRecentDearCreativePosts(
   }
 
   try {
-    const fromRss = await fetchRssRecentPosts(origin, limit, fetchFn);
+    const fromRss = await fetchRssRecentPosts(origin, limit, fetchFn, fetchTimeoutMs);
     if (fromRss) {
       return fromRss;
     }

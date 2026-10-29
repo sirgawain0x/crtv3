@@ -108,7 +108,16 @@ describe("fetchRecentDearCreativePosts", () => {
       throw new Error(`Unexpected URL: ${url}`);
     });
 
-    const posts = await fetchRecentDearCreativePosts(ORIGIN, 3, fetchFn as typeof fetch);
+    // Production uses 5000ms; inject a short timeout so abort is deterministic
+    // without racing vitest's default 5000ms test limit (AbortSignal.timeout
+    // is not driven by vi.useFakeTimers in Node).
+    const posts = await fetchRecentDearCreativePosts(
+      ORIGIN,
+      3,
+      fetchFn as typeof fetch,
+      50,
+    );
+
     expect(posts).toHaveLength(1);
     expect(posts[0]?.slug).toBe("after-timeout");
     expect(fetchFn).toHaveBeenCalledWith(
