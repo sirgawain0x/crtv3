@@ -8,6 +8,7 @@ vi.mock("@/lib/sdk/unlock/services", () => ({
 
 import { unlockService } from "@/lib/sdk/unlock/services";
 import {
+  buildTradeGasLogFields,
   fetchMembershipForGas,
   resolveMemberForTradeGas,
   resolveTradeGasContextForMembership,
@@ -133,6 +134,18 @@ describe("fetchMembershipForGas", () => {
   it("returns false when unlock throws", async () => {
     mockGetAllMemberships.mockRejectedValue(new Error("network"));
     await expect(fetchMembershipForGas("0xdead")).resolves.toBe(false);
+  });
+});
+
+describe("buildTradeGasLogFields", () => {
+  it("logs awaited memberForGas, not hook isMember", () => {
+    const fields = buildTradeGasLogFields(
+      true,
+      { paymasterService: { policyId: SPONSORED_POLICY } },
+      true,
+    );
+    expect(fields.memberForGas).toBe(true);
+    expect(fields).not.toHaveProperty("isMember");
   });
 });
 

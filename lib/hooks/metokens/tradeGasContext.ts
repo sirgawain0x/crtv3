@@ -10,6 +10,22 @@ export type TradeGasContextResult = {
   isSponsored: boolean;
 };
 
+/** Debug payload for buy/sell gas resolution (uses awaited membership, not hook cache). */
+export function buildTradeGasLogFields(
+  memberForGas: boolean,
+  gasContext: TradeGasSponsorshipContext | undefined,
+  isSponsored: boolean,
+) {
+  return {
+    gasContext,
+    memberForGas,
+    isSponsored,
+    hasPolicyId: !!gasContext?.paymasterService?.policyId,
+    policyId: gasContext?.paymasterService?.policyId,
+    tokenAddress: gasContext?.erc20?.tokenAddress,
+  };
+}
+
 export type GetTradeGasContextOptions = {
   isMember?: boolean;
 };

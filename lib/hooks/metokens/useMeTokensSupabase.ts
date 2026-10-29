@@ -26,6 +26,7 @@ import {
   pollMeTokenBalanceRefresh,
 } from '@/lib/hooks/metokens/meTokenBalanceEvents';
 import { clearMeTokenHoldingsCache } from '@/lib/hooks/metokens/useMeTokenHoldings';
+import { buildTradeGasLogFields } from '@/lib/hooks/metokens/tradeGasContext';
 
 // MeTokens contract addresses on Base
 const METOKEN_FACTORY = METOKEN_FACTORY_BASE;
@@ -1455,14 +1456,10 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
       const { context: gasContext, isSponsored } = resolveTradeGasContext(
         memberForGas,
       );
-      logger.debug('🔧 Gas context for buyMeTokens:', {
-        gasContext,
-        isMember,
-        isSponsored,
-        hasPolicyId: !!gasContext?.paymasterService?.policyId,
-        policyId: gasContext?.paymasterService?.policyId,
-        tokenAddress: gasContext?.erc20?.tokenAddress,
-      });
+      logger.debug(
+        '🔧 Gas context for buyMeTokens:',
+        buildTradeGasLogFields(memberForGas, gasContext, isSponsored),
+      );
 
       // Get the vault address that will actually perform transferFrom
       // 1. Get meToken's hubId
@@ -2019,14 +2016,10 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
       const { context: gasContext, isSponsored } = resolveTradeGasContext(
         memberForGas,
       );
-      logger.debug('🔧 Gas context for sellMeTokens:', {
-        gasContext,
-        isMember,
-        isSponsored,
-        hasPolicyId: !!gasContext?.paymasterService?.policyId,
-        policyId: gasContext?.paymasterService?.policyId,
-        tokenAddress: gasContext?.erc20?.tokenAddress,
-      });
+      logger.debug(
+        '🔧 Gas context for sellMeTokens:',
+        buildTradeGasLogFields(memberForGas, gasContext, isSponsored),
+      );
 
       // Get the vault address that will actually perform transferFrom (same pattern as buyMeTokens)
       // 1. Get meToken's hubId
