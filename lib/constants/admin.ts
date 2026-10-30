@@ -1,3 +1,10 @@
 /** Wallet address allowed to see internal video status badges (ready/published). */
 export const VIDEO_ADMIN_ADDRESS =
-  "0x2953B96F9160955f6256c9D444F8F7950E6647Df";
+  "0xdE4b0371BBa20602685916ceeE5B22025a811734";
+
+export function isVideoAdminAddress(
+  address: string | null | undefined,
+): boolean {
+  if (!address) return false;
+  return address.toLowerCase() === VIDEO_ADMIN_ADDRESS.toLowerCase();
+}
