@@ -3,33 +3,46 @@
 import { useState } from "react";
 import {
   featuredProductLabel,
-  sanitizeStoredXmerchProfile,
-  type CreatorXmerchProfile,
+  getPublicXmerchProfile,
 } from "@/lib/creator/xmerch-profile";
 import { XmerchStoreEmbedModal } from "@/components/Creator/XmerchStoreEmbedModal";
-import { CreatorSocialLinks } from "@/components/Creator/CreatorSocialLinks";
 
 export type CreatorXmerchSectionProps = {
-  socialOrbUrl?: string | null;
-  socialInstagramUrl?: string | null;
-  socialXUrl?: string | null;
   xmerchStored?: unknown;
   className?: string;
 };
 
+const iconButtonClassName =
+  "inline-flex h-9 w-9 items-center justify-center rounded-md border border-border bg-background text-foreground transition-colors hover:bg-muted";
+
 const chipClassName =
   "inline-flex max-w-full items-center rounded-md border border-border bg-muted/60 px-3 py-1.5 text-sm text-foreground transition-colors hover:bg-muted";
 
+function XmerchMark({ className }: { className?: string }) {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- branded profile icon
+    <img
+      src="/icons/xmerch-icon-32.png"
+      alt=""
+      width={16}
+      height={16}
+      className={className}
+      aria-hidden
+    />
+  );
+}
+
 export function CreatorXmerchSection({
-  socialOrbUrl,
-  socialInstagramUrl,
-  socialXUrl,
   xmerchStored,
   className,
 }: CreatorXmerchSectionProps) {
-  const xmerch = sanitizeStoredXmerchProfile(xmerchStored);
+  const xmerch = getPublicXmerchProfile(xmerchStored);
   const [modalOpen, setModalOpen] = useState(false);
   const [activeUrl, setActiveUrl] = useState<string | null>(null);
+
+  if (!xmerch) {
+    return null;
+  }
 
   const openModal = (url: string) => {
     setActiveUrl(url);
@@ -37,22 +50,22 @@ export function CreatorXmerchSection({
   };
 
   const hasFeatured = xmerch.featuredProductUrls.length > 0;
-  const hasOtherSocial =
-    socialOrbUrl || socialInstagramUrl || socialXUrl || xmerch.storeUrl;
-
-  if (!hasOtherSocial && !hasFeatured) {
-    return null;
-  }
 
   return (
     <div className={className} data-testid="creator-xmerch-section">
-      <CreatorSocialLinks
-        socialOrbUrl={socialOrbUrl}
-        socialInstagramUrl={socialInstagramUrl}
-        socialXUrl={socialXUrl}
-        xmerchProfile={xmerch}
-        onOpenXmerch={openModal}
-      />
+      {xmerch.storeUrl ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            aria-label="xMerch store"
+            className={iconButtonClassName}
+            data-testid="xmerch-store-trigger"
+            onClick={() => openModal(xmerch.storeUrl!)}
+          >
+            <XmerchMark className="h-4 w-4 rounded-sm" />
+          </button>
+        </div>
+      ) : null}
       {hasFeatured ? (
         <ul
           className="mt-3 flex flex-wrap gap-2"

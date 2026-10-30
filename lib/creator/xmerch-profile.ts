@@ -1,13 +1,17 @@
-import { normalizeXmerchStoreUrl } from "@/lib/creator/social-profile-urls";
-
 export const MAX_XMERCH_FEATURED_PRODUCTS = 6;
 
 export type CreatorXmerchProfile = {
+  enabled: boolean;
   storeUrl: string | null;
   featuredProductUrls: string[];
 };
 
+export type SocialProfileNormalizeResult =
+  | { ok: true; url: string | null }
+  | { ok: false; error: string };
+
 const EMPTY_XMERCH: CreatorXmerchProfile = {
+  enabled: false,
   storeUrl: null,
   featuredProductUrls: [],
 };
@@ -16,7 +20,72 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function normalizeFeaturedProductUrl(input: string): ReturnType<typeof normalizeXmerchStoreUrl> {
+function isAllowedXmerchHostname(hostname: string): boolean {
+  const host = hostname.toLowerCase();
+  if (host === "xmerch.app") {
+    return true;
+  }
+  if (!host.endsWith(".xmerch.app")) {
+    return false;
+  }
+  const prefix = host.slice(0, -".xmerch.app".length);
+  return prefix.length > 0 && !prefix.includes("..");
+}
+
+export function normalizeXmerchStoreUrl(
+  input: string,
+): SocialProfileNormalizeResult {
+  const raw = input.trim();
+  if (!raw) {
+    return { ok: true, url: null };
+  }
+
+  let candidate = raw;
+  if (!/^https?:\/\//i.test(raw)) {
+    if (raw.includes("/")) {
+      candidate = `https://${raw}`;
+    } else if (/^[\w.-]+\.xmerch\.app$/i.test(raw) || /^xmerch\.app$/i.test(raw)) {
+      candidate = `https://${raw}`;
+    } else {
+      return {
+        ok: false,
+        error: "Enter an xMerch store URL (https://yourstore.xmerch.app)",
+      };
+    }
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(candidate);
+  } catch {
+    return { ok: false, error: "Enter a valid xMerch store URL" };
+  }
+
+  if (parsed.protocol !== "https:") {
+    return { ok: false, error: "xMerch store URL must use HTTPS" };
+  }
+
+  if (parsed.username || parsed.password) {
+    return { ok: false, error: "Enter a valid xMerch store URL" };
+  }
+
+  if (!isAllowedXmerchHostname(parsed.hostname)) {
+    return {
+      ok: false,
+      error: "Store URL must be on xmerch.app (e.g. https://creative.xmerch.app)",
+    };
+  }
+
+  let path = parsed.pathname;
+  if (path !== "/" && path.endsWith("/")) {
+    path = path.slice(0, -1);
+  }
+  const normalized = path === "/" ? parsed.origin : `${parsed.origin}${path}`;
+
+  return { ok: true, url: normalized };
+}
+
+function normalizeFeaturedProductUrl(input: string): SocialProfileNormalizeResult {
   const result = normalizeXmerchStoreUrl(input);
   if (!result.ok || !result.url) {
     return result;
@@ -50,6 +119,16 @@ export function validateAndNormalizeXmerchProfileInput(
   }
 
   const errors: Record<string, string> = {};
+  let enabled = false;
+
+  if ("enabled" in input) {
+    if (typeof input.enabled !== "boolean") {
+      errors.social_xmerch_enabled = "Enabled must be true or false";
+    } else {
+      enabled = input.enabled;
+    }
+  }
+
   let storeUrl: string | null = null;
 
   if ("storeUrl" in input) {
@@ -104,14 +183,52 @@ export function validateAndNormalizeXmerchProfileInput(
     }
   }
 
+  if (enabled && !storeUrl && featuredProductUrls.length === 0) {
+    errors.social_xmerch =
+      "When enabled, provide a store URL and/or at least one featured product URL";
+  }
+
   if (Object.keys(errors).length > 0) {
     return { ok: false, errors };
   }
 
   return {
     ok: true,
-    value: { storeUrl, featuredProductUrls },
+    value: { enabled, storeUrl, featuredProductUrls },
   };
+}
+
+function partialSanitize(stored: Record<string, unknown>): CreatorXmerchProfile {
+  const enabled = stored.enabled === true;
+  const partial: CreatorXmerchProfile = {
+    enabled,
+    storeUrl: null,
+    featuredProductUrls: [],
+  };
+  if (typeof stored.storeUrl === "string") {
+    const store = normalizeXmerchStoreUrl(stored.storeUrl);
+    if (store.ok) {
+      partial.storeUrl = store.url;
+    }
+  }
+  if (Array.isArray(stored.featuredProductUrls)) {
+    for (const entry of stored.featuredProductUrls) {
+      if (typeof entry !== "string") {
+        continue;
+      }
+      const product = normalizeFeaturedProductUrl(entry);
+      if (
+        product.ok &&
+        product.url &&
+        partial.featuredProductUrls.length < MAX_XMERCH_FEATURED_PRODUCTS
+      ) {
+        if (!partial.featuredProductUrls.includes(product.url)) {
+          partial.featuredProductUrls.push(product.url);
+        }
+      }
+    }
+  }
+  return partial;
 }
 
 /** Re-validates DB JSON before render (drops invalid entries). */
@@ -128,7 +245,11 @@ export function sanitizeStoredXmerchProfile(
     } catch {
       const legacyStore = normalizeXmerchStoreUrl(stored);
       if (legacyStore.ok && legacyStore.url) {
-        return { storeUrl: legacyStore.url, featuredProductUrls: [] };
+        return {
+          enabled: true,
+          storeUrl: legacyStore.url,
+          featuredProductUrls: [],
+        };
       }
       return EMPTY_XMERCH;
     }
@@ -140,34 +261,22 @@ export function sanitizeStoredXmerchProfile(
 
   const validated = validateAndNormalizeXmerchProfileInput(stored);
   if (!validated.ok) {
-    const partial: CreatorXmerchProfile = { storeUrl: null, featuredProductUrls: [] };
-    if (typeof stored.storeUrl === "string") {
-      const store = normalizeXmerchStoreUrl(stored.storeUrl);
-      if (store.ok) {
-        partial.storeUrl = store.url;
-      }
-    }
-    if (Array.isArray(stored.featuredProductUrls)) {
-      for (const entry of stored.featuredProductUrls) {
-        if (typeof entry !== "string") {
-          continue;
-        }
-        const product = normalizeFeaturedProductUrl(entry);
-        if (
-          product.ok &&
-          product.url &&
-          partial.featuredProductUrls.length < MAX_XMERCH_FEATURED_PRODUCTS
-        ) {
-          if (!partial.featuredProductUrls.includes(product.url)) {
-            partial.featuredProductUrls.push(product.url);
-          }
-        }
-      }
-    }
-    return partial;
+    return partialSanitize(stored);
   }
 
   return validated.value;
+}
+
+/** Public creator pages: invite-only xMerch when admin enabled flag is set. */
+export function getPublicXmerchProfile(stored: unknown): CreatorXmerchProfile | null {
+  const profile = sanitizeStoredXmerchProfile(stored);
+  if (!profile.enabled) {
+    return null;
+  }
+  if (!profile.storeUrl && profile.featuredProductUrls.length === 0) {
+    return null;
+  }
+  return profile;
 }
 
 export function featuredProductLabel(url: string): string {

@@ -59,10 +59,7 @@ CREATE TABLE IF NOT EXISTS creator_profiles (
   lens_account_id TEXT, -- Lens account address linked via Orb
   lens_handle TEXT, -- Lens username/handle for display
   lens_avatar_uri TEXT, -- Lens profile picture URI (ipfs/lens)
-  social_orb_url TEXT, -- https://orb.club/p/… link-out
-  social_instagram_url TEXT, -- https://instagram.com/… link-out
-  social_x_url TEXT, -- https://x.com/… link-out
-  social_xmerch JSONB, -- { storeUrl, featuredProductUrls[] } on xmerch.app
+  social_xmerch JSONB, -- admin-set { enabled, storeUrl, featuredProductUrls[] } on xmerch.app
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

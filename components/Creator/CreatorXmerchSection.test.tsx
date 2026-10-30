@@ -11,19 +11,31 @@ vi.mock("@/components/Creator/XmerchStoreEmbedModal", () => ({
 }));
 
 describe("CreatorXmerchSection", () => {
-  it("renders featured product chips when provided", () => {
+  it("renders nothing when xMerch is disabled", () => {
     const html = renderToStaticMarkup(
       <CreatorXmerchSection
         xmerchStored={{
+          enabled: false,
           storeUrl: "https://creative.xmerch.app",
-          featuredProductUrls: [
-            "https://creative.xmerch.app/products/tee",
-          ],
+          featuredProductUrls: ["https://creative.xmerch.app/products/tee"],
         }}
       />,
     );
+    expect(html).toBe("");
+  });
+
+  it("renders store trigger and featured chips when enabled", () => {
+    const html = renderToStaticMarkup(
+      <CreatorXmerchSection
+        xmerchStored={{
+          enabled: true,
+          storeUrl: "https://creative.xmerch.app",
+          featuredProductUrls: ["https://creative.xmerch.app/products/tee"],
+        }}
+      />,
+    );
+    expect(html).toContain('data-testid="xmerch-store-trigger"');
     expect(html).toContain('data-testid="xmerch-featured-products"');
-    expect(html).toContain('data-testid="xmerch-featured-product"');
     expect(html).toContain("tee");
   });
 });

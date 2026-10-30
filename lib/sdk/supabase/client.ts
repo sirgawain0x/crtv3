@@ -104,11 +104,7 @@ export interface CreatorProfile {
   lens_account_id?: string | null;
   lens_handle?: string | null;
   lens_avatar_uri?: string | null;
-  /** Brand channel slug (chones, spindrift, songchain) when linked by a Brand Pass holder */
-  brand_channel_slug?: string | null;
-  social_orb_url?: string | null;
-  social_instagram_url?: string | null;
-  social_x_url?: string | null;
+  /** Invite-only Creative Merch (admin-set JSON); public UI when enabled is true */
   social_xmerch?: CreatorXmerchProfile | null;
   created_at: string;
   updated_at: string;
@@ -127,11 +123,6 @@ export interface CreateCreatorProfileData {
   lens_account_id?: string | null;
   lens_handle?: string | null;
   lens_avatar_uri?: string | null;
-  brand_channel_slug?: string | null;
-  social_orb_url?: string | null;
-  social_instagram_url?: string | null;
-  social_x_url?: string | null;
-  social_xmerch?: CreatorXmerchProfile | null;
 }
 
 export interface UpdateCreatorProfileData {
@@ -146,11 +137,6 @@ export interface UpdateCreatorProfileData {
   lens_account_id?: string | null;
   lens_handle?: string | null;
   lens_avatar_uri?: string | null;
-  brand_channel_slug?: string | null;
-  social_orb_url?: string | null;
-  social_instagram_url?: string | null;
-  social_x_url?: string | null;
-  social_xmerch?: CreatorXmerchProfile | null;
 }
 
 // Types for Song Cup submissions

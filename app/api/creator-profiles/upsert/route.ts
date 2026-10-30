@@ -5,10 +5,6 @@ import { createClient } from '@/lib/sdk/supabase/server';
 import { serverLogger } from '@/lib/utils/logger';
 import { rateLimiters } from '@/lib/middleware/rateLimit';
 import { requireWalletAuthFor, WalletAuthError } from '@/lib/auth/require-wallet';
-import { addressHasBrandPass } from '@/lib/channels/brand-channel-access';
-import { isValidBrandChannelSlug } from '@/lib/channels/brand-channels';
-import { validateAndNormalizeSocialPayload } from '@/lib/creator/validate-social-payload';
-import { validateAndNormalizeXmerchProfileInput } from '@/lib/creator/xmerch-profile';
 
 export async function POST(request: NextRequest) {
   const verification = await checkBotIdDeep();
@@ -47,11 +43,6 @@ export async function POST(request: NextRequest) {
       lens_account_id,
       lens_handle,
       lens_avatar_uri,
-      brand_channel_slug,
-      social_orb_url,
-      social_instagram_url,
-      social_x_url,
-      social_xmerch,
     } = body;
 
     if (!owner_address) {
@@ -94,66 +85,6 @@ export async function POST(request: NextRequest) {
     if (lens_account_id !== undefined) payload.lens_account_id = lens_account_id;
     if (lens_handle !== undefined) payload.lens_handle = lens_handle;
     if (lens_avatar_uri !== undefined) payload.lens_avatar_uri = lens_avatar_uri;
-
-    const socialValidation = validateAndNormalizeSocialPayload({
-      social_orb_url,
-      social_instagram_url,
-      social_x_url,
-    });
-    if (!socialValidation.ok) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Invalid social profile links',
-          fieldErrors: socialValidation.errors,
-        },
-        { status: 400 },
-      );
-    }
-    Object.assign(payload, socialValidation.payload);
-
-    if (social_xmerch !== undefined) {
-      const xmerchValidation = validateAndNormalizeXmerchProfileInput(social_xmerch);
-      if (!xmerchValidation.ok) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: 'Invalid xMerch profile',
-            fieldErrors: xmerchValidation.errors,
-          },
-          { status: 400 },
-        );
-      }
-      payload.social_xmerch = xmerchValidation.value;
-    }
-
-    if (brand_channel_slug !== undefined) {
-      const normalizedOwner = owner_address.toLowerCase();
-      const hasBrandPass = await addressHasBrandPass(normalizedOwner);
-      if (!hasBrandPass) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: 'Brand Pass required to link a brand channel',
-          },
-          { status: 403 }
-        );
-      }
-
-      if (brand_channel_slug === null || brand_channel_slug === '') {
-        payload.brand_channel_slug = null;
-      } else if (isValidBrandChannelSlug(String(brand_channel_slug))) {
-        payload.brand_channel_slug = brand_channel_slug;
-      } else {
-        return NextResponse.json(
-          {
-            success: false,
-            error: 'Invalid brand channel slug',
-          },
-          { status: 400 }
-        );
-      }
-    }
 
     let data, error;
 
