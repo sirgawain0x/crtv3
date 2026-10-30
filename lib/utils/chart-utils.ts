@@ -39,6 +39,137 @@ export function convertToChartData(priceHistory: PriceHistoryPoint[]): ChartData
   } as LineData<Time>));
 }
 
+export interface ChartPriceDisplay {
+  headerPrice: number;
+  /** Null when period change cannot be computed (no history or flat open). */
+  periodChangePercent: number | null;
+  isPositive: boolean;
+  isNeutral: boolean;
+  basePrice: number;
+}
+
+const MAX_PERIOD_BASE_SPOT_RATIO = 1000;
+
+export function isImplausiblePeriodBase(basePrice: number, spotPrice: number): boolean {
+  if (!(basePrice > 0) || !(spotPrice > 0)) {
+    return true;
+  }
+  const ratio = basePrice / spotPrice;
+  return ratio > MAX_PERIOD_BASE_SPOT_RATIO || ratio < 1 / MAX_PERIOD_BASE_SPOT_RATIO;
+}
+
+/**
+ * Header price prefers the live spot (stat card / market list). Period % uses first valid history point.
+ */
+export function buildChartPriceDisplay(
+  history: PriceHistoryPoint[],
+  spotPrice?: number | null,
+): ChartPriceDisplay | null {
+  const validHistory = history.filter((p) => p.price > 0);
+  const headerFromHistory =
+    validHistory.length > 0 ? validHistory[validHistory.length - 1].price : null;
+
+  const headerPrice =
+    spotPrice != null && spotPrice > 0
+      ? spotPrice
+      : headerFromHistory != null && headerFromHistory > 0
+        ? headerFromHistory
+        : null;
+
+  if (headerPrice == null || headerPrice <= 0) {
+    return null;
+  }
+
+  if (validHistory.length === 0) {
+    return {
+      headerPrice,
+      periodChangePercent: null,
+      isPositive: false,
+      isNeutral: true,
+      basePrice: headerPrice,
+    };
+  }
+
+  const basePrice = validHistory[0].price;
+  if (basePrice <= 0 || isImplausiblePeriodBase(basePrice, headerPrice)) {
+    return {
+      headerPrice,
+      periodChangePercent: null,
+      isPositive: false,
+      isNeutral: true,
+      basePrice: headerPrice,
+    };
+  }
+
+  const periodChangePercent = ((headerPrice - basePrice) / basePrice) * 100;
+  const isNeutral = periodChangePercent === 0;
+
+  return {
+    headerPrice,
+    periodChangePercent,
+    isPositive: periodChangePercent > 0,
+    isNeutral,
+    basePrice,
+  };
+}
+
+/**
+ * Drop invalid points; ensure at least one series point at the current spot when history is empty or stale.
+ */
+export function prepareChartHistory(
+  history: PriceHistoryPoint[],
+  spotPrice?: number | null,
+  nowSec: number = Math.floor(Date.now() / 1000),
+): PriceHistoryPoint[] {
+  const validHistory = history.filter((p) => p.price > 0);
+
+  const resolvedSpot =
+    spotPrice != null && spotPrice > 0
+      ? spotPrice
+      : validHistory.length > 0
+        ? validHistory[validHistory.length - 1].price
+        : 0;
+
+  if (resolvedSpot <= 0) {
+    return [];
+  }
+
+  if (validHistory.length === 0) {
+    return [
+      {
+        timestamp: nowSec,
+        price: resolvedSpot,
+        volume: 0,
+        tvl: 0,
+      },
+    ];
+  }
+
+  const last = validHistory[validHistory.length - 1];
+  const stale = nowSec - last.timestamp > 3600;
+  const priceDrift = Math.abs(last.price - resolvedSpot) / resolvedSpot > 0.0001;
+
+  if (!stale && !priceDrift) {
+    return validHistory;
+  }
+
+  const spotPoint: PriceHistoryPoint = {
+    timestamp: nowSec,
+    price: resolvedSpot,
+    volume: 0,
+    tvl: last.tvl ?? 0,
+  };
+
+  if (nowSec <= last.timestamp) {
+    return [
+      ...validHistory.slice(0, -1),
+      { ...last, price: resolvedSpot },
+    ];
+  }
+
+  return [...validHistory, spotPoint];
+}
+
 /**
  * Convert price history to candlestick format
  * Note: This creates synthetic OHLC from price data

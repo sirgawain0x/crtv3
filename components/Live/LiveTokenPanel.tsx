@@ -44,6 +44,7 @@ export function LiveTokenPanel({
   const [activeTab, setActiveTab] = useState("chart");
   const [streamerMeToken, setStreamerMeToken] = useState<MeTokenInfo | null>(null);
   const [isLoadingStreamerMeToken, setIsLoadingStreamerMeToken] = useState(false);
+  const [chartSpotPrice, setChartSpotPrice] = useState<number | null>(null);
   const { balances, fetchBalances } = useVideoTip();
   const { address } = useSmartAccountClient({});
 
@@ -91,6 +92,28 @@ export function LiveTokenPanel({
     if (streamerMeToken?.address) return streamerMeToken;
     return null;
   }, [tokenInfo, creatorMeToken, streamerMeToken]);
+
+  useEffect(() => {
+    const address = displayToken?.address;
+    if (!address) {
+      setChartSpotPrice(null);
+      return;
+    }
+    let cancelled = false;
+    fetch(`/api/market/tokens/${encodeURIComponent(address)}/fresh`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((payload) => {
+        if (cancelled) return;
+        const price = payload?.data?.price;
+        setChartSpotPrice(typeof price === 'number' && price > 0 ? price : null);
+      })
+      .catch(() => {
+        if (!cancelled) setChartSpotPrice(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [displayToken?.address]);
 
   const meTokenBalance = useMemo(() => {
     if (!displayToken?.address) return null;
@@ -145,6 +168,7 @@ export function LiveTokenPanel({
               <TokenPriceChart
                 tokenAddress={displayToken.address as `0x${string}`}
                 tokenSymbol={displayToken.symbol}
+                spotPrice={chartSpotPrice}
                 height={260}
               />
             ) : (

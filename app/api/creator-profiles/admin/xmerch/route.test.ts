@@ -44,6 +44,7 @@ vi.mock("@/lib/sdk/supabase/service", () => ({
 }));
 
 import { PATCH } from "@/app/api/creator-profiles/admin/xmerch/route";
+import { PLATFORM_ADMIN_ADDRESS } from "@/lib/access/platform-admin";
 
 const OWNER = "0xAbCdEf0123456789012345678901234567890AbCd";
 
@@ -88,7 +89,7 @@ describe("PATCH /api/creator-profiles/admin/xmerch", () => {
 
   it("returns 404 when creator profile does not exist", async () => {
     requirePlatformAdminMock.mockResolvedValue({
-      address: "0x2953B96F9160955f6256c9D444F8F7950E6647Df",
+      address: PLATFORM_ADMIN_ADDRESS,
     });
     maybeSingleMock.mockResolvedValue({ data: null, error: null });
 
@@ -107,7 +108,7 @@ describe("PATCH /api/creator-profiles/admin/xmerch", () => {
 
   it("accepts admin payload and normalizes xMerch data", async () => {
     requirePlatformAdminMock.mockResolvedValue({
-      address: "0x2953B96F9160955f6256c9D444F8F7950E6647Df",
+      address: PLATFORM_ADMIN_ADDRESS,
     });
 
     const res = await PATCH(
