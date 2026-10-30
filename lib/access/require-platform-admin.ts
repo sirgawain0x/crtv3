@@ -12,7 +12,11 @@ export class PlatformAdminAuthError extends Error {
   }
 }
 
-/** Wallet auth + platform admin address check (server routes). */
+/**
+ * Wallet auth + platform admin address check (server routes).
+ * The verified header address must be the platform admin EOA or smart account;
+ * clients should use `resolvePlatformAdminAuthAddress` + matching signature.
+ */
 export async function requirePlatformAdmin(
   request: NextRequest,
 ): Promise<{ address: string }> {
