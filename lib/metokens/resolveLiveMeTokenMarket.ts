@@ -3,6 +3,13 @@ import { baseMainnet } from '@/lib/utils/chains/base';
 import { METOKEN_DIAMOND_BASE } from '@/lib/contracts/metokens/deployments';
 import { METOKEN_ABI } from '@/lib/contracts/MeToken';
 import { computeMeTokenSpotPriceUsd } from '@/lib/metokens/spotPrice';
+import {
+  getCachedLiveMeTokenMarket,
+  setCachedLiveMeTokenMarket,
+  type LiveMeTokenMarket,
+} from '@/lib/metokens/liveMeTokenMarketCache';
+
+export type { LiveMeTokenMarket };
 
 const ERC20_SUPPLY_ABI = parseAbi(['function totalSupply() view returns (uint256)']);
 
@@ -22,17 +29,24 @@ function buildPublicClient() {
   });
 }
 
-export interface LiveMeTokenMarket {
-  totalSupplyWei: bigint;
-  tvl: number;
-  price: number;
-  hubId: number;
+type LiveMarketFetcher = (
+  meTokenAddress: string,
+  hubIdHint?: number
+) => Promise<LiveMeTokenMarket | null>;
+
+let liveMarketFetcher: LiveMarketFetcher = fetchLiveMeTokenMarketUncachedImpl;
+
+export function __setLiveMeTokenMarketFetcherForTests(
+  fetcher: LiveMarketFetcher
+): void {
+  liveMarketFetcher = fetcher;
 }
 
-/**
- * Same TVL/price source as the market list (`getBulkMeTokenInfo` / fresh route).
- */
-export async function resolveLiveMeTokenMarket(
+export function __resetLiveMeTokenMarketFetcherForTests(): void {
+  liveMarketFetcher = fetchLiveMeTokenMarketUncachedImpl;
+}
+
+async function fetchLiveMeTokenMarketUncachedImpl(
   meTokenAddress: string,
   hubIdHint?: number
 ): Promise<LiveMeTokenMarket | null> {
@@ -73,6 +87,33 @@ export async function resolveLiveMeTokenMarket(
   } catch {
     return null;
   }
+}
+
+export async function fetchLiveMeTokenMarketUncached(
+  meTokenAddress: string,
+  hubIdHint?: number
+): Promise<LiveMeTokenMarket | null> {
+  return liveMarketFetcher(meTokenAddress, hubIdHint);
+}
+
+/**
+ * Same TVL/price source as the market list (`getBulkMeTokenInfo` / fresh route).
+ */
+export async function resolveLiveMeTokenMarket(
+  meTokenAddress: string,
+  hubIdHint?: number,
+  nowMs: number = Date.now()
+): Promise<LiveMeTokenMarket | null> {
+  const cached = getCachedLiveMeTokenMarket(meTokenAddress, nowMs);
+  if (cached) {
+    return cached;
+  }
+
+  const live = await liveMarketFetcher(meTokenAddress, hubIdHint);
+  if (live) {
+    setCachedLiveMeTokenMarket(meTokenAddress, live, nowMs);
+  }
+  return live;
 }
 
 export function formatEtherSupply(totalSupplyWei: bigint): number {

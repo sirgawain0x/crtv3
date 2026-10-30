@@ -55,28 +55,44 @@ describe('CRTVAI price-history (scaled TVL + chain spot)', () => {
         };
       }
       if (table === 'metoken_transactions') {
+        const txRows = [
+          {
+            created_at: '2026-07-10T06:30:00.000Z',
+            transaction_type: 'mint',
+            amount: 1,
+            collateral_amount: 3.13,
+          },
+          {
+            created_at: '2026-07-15T06:30:00.000Z',
+            transaction_type: 'mint',
+            amount: 2,
+            collateral_amount: 5.99,
+          },
+        ];
+        const orderResult = async () => ({ data: txRows, error: null });
         return {
           select: () => ({
             eq: () => ({
               gte: () => ({
-                order: async () => ({
-                  data: [
-                    {
-                      created_at: '2026-07-10T06:30:00.000Z',
-                      transaction_type: 'mint',
-                      amount: 1.5,
-                      collateral_amount: 4.27,
-                    },
-                  ],
-                  error: null,
-                }),
+                order: orderResult,
               }),
+              order: orderResult,
             }),
           }),
         };
       }
       throw new Error(`unexpected table ${table}`);
     });
+  });
+
+  it('ALL history starts at first transaction, not epoch', async () => {
+    const res = await GET(makeRequest('all'), {
+      params: Promise.resolve({ address: CRTVAI }),
+    });
+    const body = await res.json();
+    const firstTs = body.data[0]?.timestamp ?? 0;
+    expect(firstTs).toBeGreaterThan(1_000_000_000);
+    expect(firstTs).toBeLessThan(2_000_000_000);
   });
 
   for (const period of ['7d', '30d', 'all'] as const) {

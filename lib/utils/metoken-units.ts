@@ -41,18 +41,14 @@ function parseIntegerScientificNotationToWei(raw: string): bigint | null {
   }
 }
 
-/** Never throws; returns 0n on invalid input. */
-export function decimalStringToWei(raw: string): bigint {
+/** Human MeToken amounts (metoken_transactions.amount). Never treats "1" as 1 wei. */
+export function humanTokenDecimalStringToWei(raw: string): bigint {
   const trimmed = raw.trim();
   if (!trimmed || trimmed === '0') {
     return 0n;
   }
 
   try {
-    if (/^[+-]?\d+$/.test(trimmed)) {
-      return BigInt(trimmed);
-    }
-
     const normalized = normalizeDecimalTokenString(trimmed);
     if (!normalized) {
       return 0n;
@@ -61,6 +57,11 @@ export function decimalStringToWei(raw: string): bigint {
   } catch {
     return 0n;
   }
+}
+
+/** @deprecated Use humanTokenDecimalStringToWei or dbMetokenTotalSupplyToWei */
+export function decimalStringToWei(raw: string): bigint {
+  return humanTokenDecimalStringToWei(raw);
 }
 
 function normalizeDecimalTokenString(raw: string): string | null {
@@ -103,9 +104,9 @@ export function dbMeTokenTransactionAmountToWei(
   }
   if (typeof value === 'number') {
     if (!Number.isFinite(value)) return 0n;
-    return decimalStringToWei(String(value));
+    return humanTokenDecimalStringToWei(String(value));
   }
-  return decimalStringToWei(value);
+  return humanTokenDecimalStringToWei(value);
 }
 
 /**

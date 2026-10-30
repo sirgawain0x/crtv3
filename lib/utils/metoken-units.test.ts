@@ -3,13 +3,20 @@ import { parseEther } from 'viem';
 import {
   dbMeTokenTransactionAmountToWei,
   dbMetokenTotalSupplyToWei,
-  decimalStringToWei,
+  humanTokenDecimalStringToWei,
 } from './metoken-units';
 
 describe('dbMeTokenTransactionAmountToWei', () => {
   it('parses human token amounts from metoken_transactions', () => {
     expect(dbMeTokenTransactionAmountToWei(1.0858)).toBe(parseEther('1.0858'));
     expect(dbMeTokenTransactionAmountToWei('3.2')).toBe(parseEther('3.2'));
+  });
+
+  it('parses whole-token mint amounts 1 and 2 as ether units, not wei', () => {
+    expect(dbMeTokenTransactionAmountToWei(1)).toBe(parseEther('1'));
+    expect(dbMeTokenTransactionAmountToWei(2)).toBe(parseEther('2'));
+    expect(dbMeTokenTransactionAmountToWei('1')).toBe(parseEther('1'));
+    expect(dbMeTokenTransactionAmountToWei('2')).toBe(parseEther('2'));
   });
 
   it('handles scientific notation without throwing', () => {
@@ -42,8 +49,10 @@ describe('dbMetokenTotalSupplyToWei', () => {
   });
 });
 
-describe('decimalStringToWei', () => {
-  it('treats integer-only strings as wei', () => {
-    expect(decimalStringToWei('9999999999')).toBe(9999999999n);
+describe('humanTokenDecimalStringToWei', () => {
+  it('never treats integer-only strings as raw wei', () => {
+    expect(humanTokenDecimalStringToWei('9999999999')).toBe(
+      parseEther('9999999999')
+    );
   });
 });

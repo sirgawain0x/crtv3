@@ -73,6 +73,20 @@ describe("chart price header and history", () => {
     expect(display?.periodChangePercent).toBeNull();
   });
 
+  it("computes ALL-style period change from first real transaction, not epoch", () => {
+    const firstTxTime = 1_785_000_000;
+    const display = buildChartPriceDisplay(
+      [
+        { timestamp: firstTxTime, price: 3.13, volume: 1, tvl: 9 },
+        { timestamp: firstTxTime + 86_400, price: 2.95, volume: 0, tvl: 9.1 },
+      ],
+      2.85,
+    );
+    expect(display?.headerPrice).toBe(2.85);
+    expect(display?.periodChangePercent).toBeCloseTo(-8.95, 0);
+    expect(display?.basePrice).toBe(3.13);
+  });
+
   it("falls back to a single point when history is empty", () => {
     const series = prepareChartHistory([], 2.85, now);
     expect(series).toHaveLength(1);

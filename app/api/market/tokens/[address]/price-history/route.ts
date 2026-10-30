@@ -66,9 +66,9 @@ export async function GET(
       );
     }
 
-    // Calculate time range
     const now = new Date();
-    let startDate: Date;
+    const isAllPeriod = period === 'all';
+    let startDate: Date | null = null;
 
     switch (period) {
       case '7d':
@@ -78,19 +78,25 @@ export async function GET(
         startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
         break;
       case 'all':
-        startDate = new Date(0); // Beginning of time
+        startDate = null;
         break;
       default:
         startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     }
 
-    // Fetch transactions for this token
-    const { data: transactions, error: txError } = await supabase
+    let txQuery = supabase
       .from('metoken_transactions')
-      .select('created_at, transaction_type, amount, collateral_amount') // Removed non-existent columns
-      .eq('metoken_id', meToken.id)
-      .gte('created_at', startDate.toISOString())
-      .order('created_at', { ascending: true });
+      .select('created_at, transaction_type, amount, collateral_amount')
+      .eq('metoken_id', meToken.id);
+
+    if (startDate) {
+      txQuery = txQuery.gte('created_at', startDate.toISOString());
+    }
+
+    const { data: transactions, error: txError } = await txQuery.order(
+      'created_at',
+      { ascending: true }
+    );
 
     const liveMarket = await resolveLiveMeTokenMarket(
       meToken.address,
@@ -274,25 +280,25 @@ export async function GET(
       bucket.volumes.push(volume);
     }
 
-    // Add Start Point (Crucial for Charts/Gains)
-    // We use the state calculated after Reverse Replay (runningSupply, runningTvl)
-    // This represents the state at 'startDate'
-    const startTimestamp = Math.floor(startDate.getTime() / 1000);
-    const startBucketKey = interval === 'hour'
-      ? startDate.toISOString().slice(0, 13) + ':00:00'
-      : startDate.toISOString().slice(0, 10);
+    // Period-open snapshot for 7d/30d only — ALL uses the first real transaction bucket.
+    if (!isAllPeriod && startDate) {
+      const startTimestamp = Math.floor(startDate.getTime() / 1000);
+      const startBucketKey = interval === 'hour'
+        ? startDate.toISOString().slice(0, 13) + ':00:00'
+        : startDate.toISOString().slice(0, 10);
 
-    if (!historyMap.has(startBucketKey)) {
-      const startPrice = runningSupply > 0n
-        ? runningTvl / parseFloat(formatEther(runningSupply))
-        : 0;
+      if (!historyMap.has(startBucketKey)) {
+        const startPrice = runningSupply > 0n
+          ? runningTvl / parseFloat(formatEther(runningSupply))
+          : 0;
 
-      historyMap.set(startBucketKey, {
-        timestamp: startTimestamp,
-        prices: [startPrice],
-        volumes: [0], // No volume at the exact start snapshot
-        tvls: [runningTvl],
-      });
+        historyMap.set(startBucketKey, {
+          timestamp: startTimestamp,
+          prices: [startPrice],
+          volumes: [0],
+          tvls: [runningTvl],
+        });
+      }
     }
 
     // Convert map to array and aggregate by bucket
