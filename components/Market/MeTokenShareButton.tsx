@@ -29,18 +29,20 @@ interface MeTokenShareButtonProps {
 
 export function MeTokenShareButton({
     creatorOwnerAddress,
+    address,
     symbol,
     name,
     type,
     playbackId,
 }: MeTokenShareButtonProps) {
+    const resolvedCreatorOwnerAddress = creatorOwnerAddress ?? address;
     const [isOpen, setIsOpen] = useState(false);
     const [copied, setCopied] = useState(false);
 
     const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
     const shareUrl = buildMeTokenShareUrl(baseUrl, {
         type,
-        creatorOwnerAddress,
+        creatorOwnerAddress: resolvedCreatorOwnerAddress,
         playbackId,
     });
 
