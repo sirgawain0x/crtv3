@@ -6,6 +6,7 @@ import { METOKEN_ABI } from '@/lib/contracts/MeToken';
 import { serverLogger } from '@/lib/utils/logger';
 import { METOKEN_DIAMOND_BASE } from '@/lib/contracts/metokens/deployments';
 import { calculateMeTokenVaultTvlUsd } from '@/lib/utils/hubAssetUtils';
+import { dbNumericToWei } from '@/lib/utils/metoken-units';
 
 const DIAMOND = METOKEN_DIAMOND_BASE;
 
@@ -93,9 +94,7 @@ export async function GET(
       .gte('created_at', startDate.toISOString())
       .order('created_at', { ascending: true });
 
-    // Calculate current price for fallback response
-    // Calculate current price for fallback response
-    let currentTotalSupply = BigInt(meToken.total_supply || 0);
+    let currentTotalSupply = dbNumericToWei(meToken.total_supply);
     let currentTvl = meToken.tvl || 0;
 
     // Fallback to blockchain if data is zero/missing in DB
@@ -214,7 +213,7 @@ export async function GET(
     );
 
     for (const tx of reverseTxs) {
-      const amount = BigInt(Math.floor(tx.amount || 0));
+      const amount = dbNumericToWei(tx.amount);
       const collateral = parseFloat(tx.collateral_amount?.toString() || '0');
 
       // Price at this moment (approximate using current replay state)
@@ -283,12 +282,12 @@ export async function GET(
       // Update running totals based on transaction type
       if (tx.transaction_type === 'mint') {
         // Fallback: Use 'amount' as proxy for minted tokens if better data unavailable
-        const minted = BigInt(Math.floor(tx.amount || 0));
+        const minted = dbNumericToWei(tx.amount);
         const collateral = parseFloat(tx.collateral_amount?.toString() || '0');
         runningSupply += minted;
         runningTvl += collateral;
       } else if (tx.transaction_type === 'burn') {
-        const burned = BigInt(Math.floor(tx.amount || 0));
+        const burned = dbNumericToWei(tx.amount);
 
         // ESTIMATION: We lack assets_returned in DB.
         // Estimate returned assets based on the price *before* the burn.
