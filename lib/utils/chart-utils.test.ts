@@ -64,6 +64,15 @@ describe("chart price header and history", () => {
     expect(display?.periodChangePercent).toBeCloseTo(14, 0);
   });
 
+  it("hides period change when base price is implausibly far from spot", () => {
+    const display = buildChartPriceDisplay(
+      [{ timestamp: now - 7200, price: 2.85e-12, volume: 0, tvl: 0 }],
+      2.85,
+    );
+    expect(display?.headerPrice).toBe(2.85);
+    expect(display?.periodChangePercent).toBeNull();
+  });
+
   it("falls back to a single point when history is empty", () => {
     const series = prepareChartHistory([], 2.85, now);
     expect(series).toHaveLength(1);

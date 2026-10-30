@@ -1,14 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/sdk/supabase/server';
-import { formatEther, createPublicClient, http, fallback, parseAbi } from 'viem';
-import { baseMainnet } from '@/lib/utils/chains/base';
-import { METOKEN_ABI } from '@/lib/contracts/MeToken';
+import { formatEther } from 'viem';
 import { serverLogger } from '@/lib/utils/logger';
-import { METOKEN_DIAMOND_BASE } from '@/lib/contracts/metokens/deployments';
-import { calculateMeTokenVaultTvlUsd } from '@/lib/utils/hubAssetUtils';
-import { dbNumericToWei } from '@/lib/utils/metoken-units';
-
-const DIAMOND = METOKEN_DIAMOND_BASE;
+import { resolveLiveMeTokenMarket } from '@/lib/metokens/resolveLiveMeTokenMarket';
+import {
+  dbMeTokenTransactionAmountToWei,
+  dbMetokenTotalSupplyToWei,
+} from '@/lib/utils/metoken-units';
 
 export interface PriceHistoryPoint {
   timestamp: number;
@@ -94,71 +92,20 @@ export async function GET(
       .gte('created_at', startDate.toISOString())
       .order('created_at', { ascending: true });
 
-    let currentTotalSupply = dbNumericToWei(meToken.total_supply);
-    let currentTvl = meToken.tvl || 0;
+    const liveMarket = await resolveLiveMeTokenMarket(
+      meToken.address,
+      meToken.hub_id ?? undefined
+    );
 
-    // Fallback to blockchain if data is zero/missing in DB
-    // This ensures we show the correct price even if the DB indexer is lagging
-    if (currentTotalSupply === BigInt(0) || currentTvl === 0) {
-      try {
-        serverLogger.debug('DB data missing/zero, fetching from blockchain for:', meToken.address);
-        const apiKey = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY;
-        const alchemyRpc = process.env.NEXT_PUBLIC_ALCHEMY_RPC_URL;
-        const baseRpc = process.env.NEXT_PUBLIC_BASE_RPC_URL;
-        const rpcUrls: string[] = [];
-        if (apiKey) rpcUrls.push(`https://base-mainnet.g.alchemy.com/v2/${apiKey}`);
-        if (alchemyRpc) rpcUrls.push(alchemyRpc);
-        if (baseRpc) rpcUrls.push(baseRpc);
-        rpcUrls.push('https://mainnet.base.org');
+    let currentTotalSupply =
+      liveMarket?.totalSupplyWei ?? dbMetokenTotalSupplyToWei(meToken.total_supply);
+    let currentTvl = liveMarket?.tvl ?? (meToken.tvl || 0);
 
-        const publicClient = createPublicClient({
-          chain: baseMainnet,
-          transport: fallback(rpcUrls.map((url) => http(url))),
-        });
-
-        // Fetch fresh data
-        const [totalSupply, infoData] = await Promise.all([
-          publicClient.readContract({
-            address: meToken.address as `0x${string}`,
-            abi: parseAbi(['function totalSupply() view returns (uint256)']),
-            functionName: 'totalSupply',
-          }) as Promise<bigint>,
-          publicClient.readContract({
-            address: DIAMOND,
-            abi: METOKEN_ABI,
-            functionName: 'getMeTokenInfo',
-            args: [meToken.address as `0x${string}`],
-          }) as Promise<any>
-        ]);
-
-        if (totalSupply) {
-          currentTotalSupply = totalSupply;
-        }
-
-        if (infoData) {
-          // TVL = pooled + locked (in DAI terms)
-          // Note: The struct return might vary depending on viem version/ABI parsing, 
-          // usually it returns an object if named outputs, or array.
-          // Based on useMeTokensSupabase, it seems to return an object property access compatible result
-          const balancePooled = BigInt(infoData.balancePooled || infoData[2] || 0);
-          const balanceLocked = BigInt(infoData.balanceLocked || infoData[3] || 0);
-          const hubId = Number(infoData.hubId ?? infoData[1] ?? meToken.hub_id ?? 0);
-          currentTvl = calculateMeTokenVaultTvlUsd(balancePooled, balanceLocked, hubId);
-        }
-
-        serverLogger.debug('Fetched live data:', {
-          supply: currentTotalSupply.toString(),
-          tvl: currentTvl
-        });
-
-      } catch (chainErr) {
-        serverLogger.warn('Failed to fetch live blockchain data:', chainErr);
-      }
-    }
-
-    const currentPrice = currentTotalSupply > 0
-      ? currentTvl / parseFloat(formatEther(currentTotalSupply))
-      : 0;
+    const currentPrice =
+      liveMarket?.price ??
+      (currentTotalSupply > 0n
+        ? currentTvl / parseFloat(formatEther(currentTotalSupply))
+        : 0);
 
     serverLogger.debug('Final price values (DB + Chain fallback):', {
       address: meToken.address,
@@ -177,7 +124,7 @@ export async function GET(
         token: {
           address: meToken.address,
           current_price: currentPrice,
-          current_tvl: meToken.tvl,
+          current_tvl: currentTvl,
         },
       });
     }
@@ -213,7 +160,7 @@ export async function GET(
     );
 
     for (const tx of reverseTxs) {
-      const amount = dbNumericToWei(tx.amount);
+      const amount = dbMeTokenTransactionAmountToWei(tx.amount);
       const collateral = parseFloat(tx.collateral_amount?.toString() || '0');
 
       // Price at this moment (approximate using current replay state)
@@ -282,12 +229,12 @@ export async function GET(
       // Update running totals based on transaction type
       if (tx.transaction_type === 'mint') {
         // Fallback: Use 'amount' as proxy for minted tokens if better data unavailable
-        const minted = dbNumericToWei(tx.amount);
+        const minted = dbMeTokenTransactionAmountToWei(tx.amount);
         const collateral = parseFloat(tx.collateral_amount?.toString() || '0');
         runningSupply += minted;
         runningTvl += collateral;
       } else if (tx.transaction_type === 'burn') {
-        const burned = dbNumericToWei(tx.amount);
+        const burned = dbMeTokenTransactionAmountToWei(tx.amount);
 
         // ESTIMATION: We lack assets_returned in DB.
         // Estimate returned assets based on the price *before* the burn.

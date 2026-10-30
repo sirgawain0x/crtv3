@@ -48,6 +48,16 @@ export interface ChartPriceDisplay {
   basePrice: number;
 }
 
+const MAX_PERIOD_BASE_SPOT_RATIO = 1000;
+
+export function isImplausiblePeriodBase(basePrice: number, spotPrice: number): boolean {
+  if (!(basePrice > 0) || !(spotPrice > 0)) {
+    return true;
+  }
+  const ratio = basePrice / spotPrice;
+  return ratio > MAX_PERIOD_BASE_SPOT_RATIO || ratio < 1 / MAX_PERIOD_BASE_SPOT_RATIO;
+}
+
 /**
  * Header price prefers the live spot (stat card / market list). Period % uses first valid history point.
  */
@@ -81,7 +91,7 @@ export function buildChartPriceDisplay(
   }
 
   const basePrice = validHistory[0].price;
-  if (basePrice <= 0) {
+  if (basePrice <= 0 || isImplausiblePeriodBase(basePrice, headerPrice)) {
     return {
       headerPrice,
       periodChangePercent: null,
