@@ -8,11 +8,17 @@ import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils/utils';
 import { TradingViewChart } from './TradingViewChart';
 import { logger } from '@/lib/utils/logger';
+import {
+  buildChartPriceDisplay,
+  prepareChartHistory,
+} from '@/lib/utils/chart-utils';
 
 
 interface TokenPriceChartProps {
   tokenAddress: string;
   tokenSymbol?: string;
+  /** Live price from the same source as surrounding stat cards (TVL / supply). */
+  spotPrice?: number | null;
   className?: string;
   height?: number;
   showControls?: boolean;
@@ -21,15 +27,36 @@ interface TokenPriceChartProps {
 export function TokenPriceChart({
   tokenAddress,
   tokenSymbol,
+  spotPrice,
   className,
   height = 200,
   showControls = true,
 }: TokenPriceChartProps) {
   const [period, setPeriod] = useState<'7d' | '30d' | 'all'>('7d');
   const [data, setData] = useState<PriceHistoryPoint[]>([]);
-  const [currentPrice, setCurrentPrice] = useState<number | null>(null);
+  const [apiCurrentPrice, setApiCurrentPrice] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const resolvedSpotPrice = useMemo(() => {
+    if (spotPrice != null && spotPrice > 0) {
+      return spotPrice;
+    }
+    if (apiCurrentPrice != null && apiCurrentPrice > 0) {
+      return apiCurrentPrice;
+    }
+    return null;
+  }, [spotPrice, apiCurrentPrice]);
+
+  const chartData = useMemo(
+    () => prepareChartHistory(data, resolvedSpotPrice ?? undefined),
+    [data, resolvedSpotPrice],
+  );
+
+  const priceInfo = useMemo(
+    () => buildChartPriceDisplay(data, resolvedSpotPrice ?? undefined),
+    [data, resolvedSpotPrice],
+  );
 
   // Fetch price history
   useEffect(() => {
@@ -56,11 +83,10 @@ export function TokenPriceChart({
             // If JSON parsing fails, use default message
           }
 
-          // For 404, just return empty data (token might not have transactions yet)
           if (response.status === 404) {
             logger.debug('Token not found or no price history available');
             setData([]);
-            setCurrentPrice(null);
+            setApiCurrentPrice(null);
             setError(null);
             return;
           }
@@ -70,16 +96,15 @@ export function TokenPriceChart({
 
         const result = await response.json();
         logger.debug('📊 Price History API Response:', result);
-        logger.debug('📈 History Data Points:', result.data?.length || 0);
-        logger.debug('💰 Current Price from API:', result.token?.current_price);
 
         setData(result.data || []);
-        setCurrentPrice(result.token?.current_price || null);
+        const fromApi = result.token?.current_price;
+        setApiCurrentPrice(typeof fromApi === 'number' ? fromApi : null);
       } catch (err) {
         logger.error('Error fetching price history:', err);
         setError(err instanceof Error ? err.message : 'Failed to load chart');
-        setData([]); // Set empty data on error
-        setCurrentPrice(null);
+        setData([]);
+        setApiCurrentPrice(null);
       } finally {
         setLoading(false);
       }
@@ -88,49 +113,24 @@ export function TokenPriceChart({
     fetchData();
   }, [tokenAddress, period]);
 
-  // Calculate price change for display (neutral when flat)
-  const priceInfo = useMemo(() => {
-    logger.debug('🔍 Calculating priceInfo:', {
-      dataLength: data.length,
-      currentPrice,
-      firstDataPoint: data[0],
-      lastDataPoint: data[data.length - 1]
-    });
+  const periodLabel =
+    period === '7d' ? '7 Days' : period === '30d' ? '30 Days' : 'All Time';
 
-    if (data.length === 0) {
-      // If no data but we have currentPrice from API, use it (no period change)
-      if (currentPrice !== null && currentPrice > 0) {
-        return {
-          lastPrice: currentPrice,
-          priceChange: 0,
-          isPositive: false,
-          isNeutral: true,
-          basePrice: currentPrice,
-        };
-      }
-      return null;
-    }
-
-    const firstPrice = data[0]?.price || 0;
-    const lastPrice = data[data.length - 1]?.price || 0;
-
-    logger.debug('💵 Price values:', { firstPrice, lastPrice, currentPrice });
-
-    // If lastPrice is 0 but we have currentPrice from API, use that instead
-    const displayPrice = (lastPrice > 0) ? lastPrice : (currentPrice || 0);
-
-    const priceChange = firstPrice > 0 ? ((displayPrice - firstPrice) / firstPrice) * 100 : 0;
-    const isNeutral = priceChange === 0;
-    const isPositive = priceChange > 0;
-
-    return {
-      lastPrice: displayPrice,
-      priceChange,
-      isPositive,
-      isNeutral,
-      basePrice: firstPrice,
-    };
-  }, [data, currentPrice]);
+  const periodControls = showControls ? (
+    <div className="flex gap-1">
+      {(['7d', '30d', 'all'] as const).map((p) => (
+        <Button
+          key={p}
+          variant={period === p ? 'default' : 'ghost'}
+          size="sm"
+          onClick={() => setPeriod(p)}
+          className="h-7 text-xs"
+        >
+          {p === '7d' ? '7D' : p === '30d' ? '30D' : 'ALL'}
+        </Button>
+      ))}
+    </div>
+  ) : null;
 
   if (loading) {
     return (
@@ -141,38 +141,9 @@ export function TokenPriceChart({
               <CardTitle className="text-sm font-medium">
                 {tokenSymbol ? `${tokenSymbol} Price` : 'Price Chart'}
               </CardTitle>
-              <CardDescription className="text-xs">
-                {period === '7d' ? '7 Days' : period === '30d' ? '30 Days' : 'All Time'}
-              </CardDescription>
+              <CardDescription className="text-xs">{periodLabel}</CardDescription>
             </div>
-            {showControls && (
-              <div className="flex gap-1">
-                <Button
-                  variant={period === '7d' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setPeriod('7d')}
-                  className="h-7 text-xs"
-                >
-                  7D
-                </Button>
-                <Button
-                  variant={period === '30d' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setPeriod('30d')}
-                  className="h-7 text-xs"
-                >
-                  30D
-                </Button>
-                <Button
-                  variant={period === 'all' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setPeriod('all')}
-                  className="h-7 text-xs"
-                >
-                  ALL
-                </Button>
-              </div>
-            )}
+            {periodControls}
           </div>
         </CardHeader>
         <CardContent className="flex items-center justify-center" style={{ height }}>
@@ -197,7 +168,7 @@ export function TokenPriceChart({
     );
   }
 
-  if (data.length === 0) {
+  if (chartData.length === 0) {
     return (
       <Card className={className}>
         <CardHeader className="pb-2">
@@ -220,70 +191,43 @@ export function TokenPriceChart({
             <CardTitle className="text-sm font-medium">
               {tokenSymbol ? `${tokenSymbol} Price` : 'Price Chart'}
             </CardTitle>
-            <CardDescription className="text-xs">
-              {period === '7d' ? '7 Days' : period === '30d' ? '30 Days' : 'All Time'}
-            </CardDescription>
+            <CardDescription className="text-xs">{periodLabel}</CardDescription>
           </div>
-          {showControls && (
-            <div className="flex gap-1">
-              <Button
-                variant={period === '7d' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => setPeriod('7d')}
-                className="h-7 text-xs"
-              >
-                7D
-              </Button>
-              <Button
-                variant={period === '30d' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => setPeriod('30d')}
-                className="h-7 text-xs"
-              >
-                30D
-              </Button>
-              <Button
-                variant={period === 'all' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => setPeriod('all')}
-                className="h-7 text-xs"
-              >
-                ALL
-              </Button>
-            </div>
-          )}
+          {periodControls}
         </div>
       </CardHeader>
       <CardContent>
         <div className="space-y-2">
-          {/* Price Info */}
           {priceInfo && (
             <div className="flex items-baseline gap-2">
               <span className="text-2xl font-bold">
-                ${priceInfo.lastPrice.toFixed(4)}
+                ${priceInfo.headerPrice.toFixed(4)}
               </span>
-              <span
-                className={cn(
-                  'text-sm font-medium',
-                  priceInfo.isNeutral
-                    ? 'text-muted-foreground'
-                    : priceInfo.isPositive
-                      ? 'text-green-600 dark:text-green-400'
-                      : 'text-red-600 dark:text-red-400'
-                )}
-              >
-                {priceInfo.isPositive ? '+' : ''}
-                {priceInfo.priceChange.toFixed(2)}%
-              </span>
+              {priceInfo.periodChangePercent != null ? (
+                <span
+                  className={cn(
+                    'text-sm font-medium',
+                    priceInfo.isNeutral
+                      ? 'text-muted-foreground'
+                      : priceInfo.isPositive
+                        ? 'text-green-600 dark:text-green-400'
+                        : 'text-red-600 dark:text-red-400'
+                  )}
+                >
+                  {priceInfo.isPositive ? '+' : ''}
+                  {priceInfo.periodChangePercent.toFixed(2)}%
+                </span>
+              ) : (
+                <span className="text-sm font-medium text-muted-foreground">—</span>
+              )}
             </div>
           )}
 
-          {/* TradingView Chart — baseline shows green above / red below period open */}
           <div className="relative" style={{ width: '100%', height }}>
             <TradingViewChart
-              data={data}
+              data={chartData}
               chartType="baseline"
-              showVolume={true}
+              showVolume={chartData.length > 1}
               basePrice={priceInfo?.basePrice}
               isPositive={priceInfo?.isNeutral ? undefined : priceInfo?.isPositive}
               height={height}
@@ -295,4 +239,3 @@ export function TokenPriceChart({
     </Card>
   );
 }
-

@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/sdk/supabase/server';
-import { formatEther, createPublicClient, http, fallback, parseAbi } from 'viem';
-import { baseMainnet } from '@/lib/utils/chains/base';
-import { METOKEN_ABI } from '@/lib/contracts/MeToken';
+import { formatEther } from 'viem';
 import { serverLogger } from '@/lib/utils/logger';
-import { METOKEN_DIAMOND_BASE } from '@/lib/contracts/metokens/deployments';
-import { calculateMeTokenVaultTvlUsd } from '@/lib/utils/hubAssetUtils';
-
-const DIAMOND = METOKEN_DIAMOND_BASE;
+import { resolveLiveMeTokenMarket } from '@/lib/metokens/resolveLiveMeTokenMarket';
+import {
+  dbMeTokenTransactionAmountToWei,
+  dbMetokenTotalSupplyToWei,
+} from '@/lib/utils/metoken-units';
 
 export interface PriceHistoryPoint {
   timestamp: number;
@@ -67,9 +66,9 @@ export async function GET(
       );
     }
 
-    // Calculate time range
     const now = new Date();
-    let startDate: Date;
+    const isAllPeriod = period === 'all';
+    let startDate: Date | null = null;
 
     switch (period) {
       case '7d':
@@ -79,87 +78,40 @@ export async function GET(
         startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
         break;
       case 'all':
-        startDate = new Date(0); // Beginning of time
+        startDate = null;
         break;
       default:
         startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     }
 
-    // Fetch transactions for this token
-    const { data: transactions, error: txError } = await supabase
+    let txQuery = supabase
       .from('metoken_transactions')
-      .select('created_at, transaction_type, amount, collateral_amount') // Removed non-existent columns
-      .eq('metoken_id', meToken.id)
-      .gte('created_at', startDate.toISOString())
-      .order('created_at', { ascending: true });
+      .select('created_at, transaction_type, amount, collateral_amount')
+      .eq('metoken_id', meToken.id);
 
-    // Calculate current price for fallback response
-    // Calculate current price for fallback response
-    let currentTotalSupply = BigInt(meToken.total_supply || 0);
-    let currentTvl = meToken.tvl || 0;
-
-    // Fallback to blockchain if data is zero/missing in DB
-    // This ensures we show the correct price even if the DB indexer is lagging
-    if (currentTotalSupply === BigInt(0) || currentTvl === 0) {
-      try {
-        serverLogger.debug('DB data missing/zero, fetching from blockchain for:', meToken.address);
-        const apiKey = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY;
-        const alchemyRpc = process.env.NEXT_PUBLIC_ALCHEMY_RPC_URL;
-        const baseRpc = process.env.NEXT_PUBLIC_BASE_RPC_URL;
-        const rpcUrls: string[] = [];
-        if (apiKey) rpcUrls.push(`https://base-mainnet.g.alchemy.com/v2/${apiKey}`);
-        if (alchemyRpc) rpcUrls.push(alchemyRpc);
-        if (baseRpc) rpcUrls.push(baseRpc);
-        rpcUrls.push('https://mainnet.base.org');
-
-        const publicClient = createPublicClient({
-          chain: baseMainnet,
-          transport: fallback(rpcUrls.map((url) => http(url))),
-        });
-
-        // Fetch fresh data
-        const [totalSupply, infoData] = await Promise.all([
-          publicClient.readContract({
-            address: meToken.address as `0x${string}`,
-            abi: parseAbi(['function totalSupply() view returns (uint256)']),
-            functionName: 'totalSupply',
-          }) as Promise<bigint>,
-          publicClient.readContract({
-            address: DIAMOND,
-            abi: METOKEN_ABI,
-            functionName: 'getMeTokenInfo',
-            args: [meToken.address as `0x${string}`],
-          }) as Promise<any>
-        ]);
-
-        if (totalSupply) {
-          currentTotalSupply = totalSupply;
-        }
-
-        if (infoData) {
-          // TVL = pooled + locked (in DAI terms)
-          // Note: The struct return might vary depending on viem version/ABI parsing, 
-          // usually it returns an object if named outputs, or array.
-          // Based on useMeTokensSupabase, it seems to return an object property access compatible result
-          const balancePooled = BigInt(infoData.balancePooled || infoData[2] || 0);
-          const balanceLocked = BigInt(infoData.balanceLocked || infoData[3] || 0);
-          const hubId = Number(infoData.hubId ?? infoData[1] ?? meToken.hub_id ?? 0);
-          currentTvl = calculateMeTokenVaultTvlUsd(balancePooled, balanceLocked, hubId);
-        }
-
-        serverLogger.debug('Fetched live data:', {
-          supply: currentTotalSupply.toString(),
-          tvl: currentTvl
-        });
-
-      } catch (chainErr) {
-        serverLogger.warn('Failed to fetch live blockchain data:', chainErr);
-      }
+    if (startDate) {
+      txQuery = txQuery.gte('created_at', startDate.toISOString());
     }
 
-    const currentPrice = currentTotalSupply > 0
-      ? currentTvl / parseFloat(formatEther(currentTotalSupply))
-      : 0;
+    const { data: transactions, error: txError } = await txQuery.order(
+      'created_at',
+      { ascending: true }
+    );
+
+    const liveMarket = await resolveLiveMeTokenMarket(
+      meToken.address,
+      meToken.hub_id ?? undefined
+    );
+
+    let currentTotalSupply =
+      liveMarket?.totalSupplyWei ?? dbMetokenTotalSupplyToWei(meToken.total_supply);
+    let currentTvl = liveMarket?.tvl ?? (meToken.tvl || 0);
+
+    const currentPrice =
+      liveMarket?.price ??
+      (currentTotalSupply > 0n
+        ? currentTvl / parseFloat(formatEther(currentTotalSupply))
+        : 0);
 
     serverLogger.debug('Final price values (DB + Chain fallback):', {
       address: meToken.address,
@@ -178,7 +130,7 @@ export async function GET(
         token: {
           address: meToken.address,
           current_price: currentPrice,
-          current_tvl: meToken.tvl,
+          current_tvl: currentTvl,
         },
       });
     }
@@ -214,7 +166,7 @@ export async function GET(
     );
 
     for (const tx of reverseTxs) {
-      const amount = BigInt(Math.floor(tx.amount || 0));
+      const amount = dbMeTokenTransactionAmountToWei(tx.amount);
       const collateral = parseFloat(tx.collateral_amount?.toString() || '0');
 
       // Price at this moment (approximate using current replay state)
@@ -283,12 +235,12 @@ export async function GET(
       // Update running totals based on transaction type
       if (tx.transaction_type === 'mint') {
         // Fallback: Use 'amount' as proxy for minted tokens if better data unavailable
-        const minted = BigInt(Math.floor(tx.amount || 0));
+        const minted = dbMeTokenTransactionAmountToWei(tx.amount);
         const collateral = parseFloat(tx.collateral_amount?.toString() || '0');
         runningSupply += minted;
         runningTvl += collateral;
       } else if (tx.transaction_type === 'burn') {
-        const burned = BigInt(Math.floor(tx.amount || 0));
+        const burned = dbMeTokenTransactionAmountToWei(tx.amount);
 
         // ESTIMATION: We lack assets_returned in DB.
         // Estimate returned assets based on the price *before* the burn.
@@ -328,25 +280,25 @@ export async function GET(
       bucket.volumes.push(volume);
     }
 
-    // Add Start Point (Crucial for Charts/Gains)
-    // We use the state calculated after Reverse Replay (runningSupply, runningTvl)
-    // This represents the state at 'startDate'
-    const startTimestamp = Math.floor(startDate.getTime() / 1000);
-    const startBucketKey = interval === 'hour'
-      ? startDate.toISOString().slice(0, 13) + ':00:00'
-      : startDate.toISOString().slice(0, 10);
+    // Period-open snapshot for 7d/30d only — ALL uses the first real transaction bucket.
+    if (!isAllPeriod && startDate) {
+      const startTimestamp = Math.floor(startDate.getTime() / 1000);
+      const startBucketKey = interval === 'hour'
+        ? startDate.toISOString().slice(0, 13) + ':00:00'
+        : startDate.toISOString().slice(0, 10);
 
-    if (!historyMap.has(startBucketKey)) {
-      const startPrice = runningSupply > 0n
-        ? runningTvl / parseFloat(formatEther(runningSupply))
-        : 0;
+      if (!historyMap.has(startBucketKey)) {
+        const startPrice = runningSupply > 0n
+          ? runningTvl / parseFloat(formatEther(runningSupply))
+          : 0;
 
-      historyMap.set(startBucketKey, {
-        timestamp: startTimestamp,
-        prices: [startPrice],
-        volumes: [0], // No volume at the exact start snapshot
-        tvls: [runningTvl],
-      });
+        historyMap.set(startBucketKey, {
+          timestamp: startTimestamp,
+          prices: [startPrice],
+          volumes: [0],
+          tvls: [runningTvl],
+        });
+      }
     }
 
     // Convert map to array and aggregate by bucket
