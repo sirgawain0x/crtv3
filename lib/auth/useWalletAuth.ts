@@ -39,11 +39,26 @@ function buildMessage(address: string, timestamp: number): string {
   return `Authorize Creative TV request for address ${address.toLowerCase()} at ${timestamp}`;
 }
 
-export function useWalletAuth() {
+export type UseWalletAuthOptions = {
+  /** Sign for this address when it matches the connected EOA or smart account. */
+  addressOverride?: string | null;
+};
+
+export function useWalletAuth(options?: UseWalletAuthOptions) {
   const user = useUser();
   const { smartAccountClient: accountClient, address: smartAccountAddress } =
     useModularAccount();
-  const address = (smartAccountAddress || user?.address || "").toLowerCase();
+  const smartLower = (smartAccountAddress || "").toLowerCase();
+  const eoaLower = (user?.address || "").toLowerCase();
+  const overrideLower = options?.addressOverride?.trim().toLowerCase() || "";
+
+  const address =
+    overrideLower && (overrideLower === smartLower || overrideLower === eoaLower)
+      ? overrideLower
+      : smartLower || eoaLower;
+
+  const signAsSmartAccount =
+    !!address && !!accountClient && address === smartLower;
 
   const cacheRef = useRef<AuthCache | null>(null);
   const pendingRef = useRef<{
@@ -52,7 +67,7 @@ export function useWalletAuth() {
   } | null>(null);
 
   const { signMessage } = useSignMessage({
-    client: accountClient || undefined,
+    client: signAsSmartAccount ? accountClient : undefined,
     onSuccess: (sig: string) => {
       pendingRef.current?.resolve(sig);
       pendingRef.current = null;
@@ -121,11 +136,15 @@ export function useWalletAuth() {
     cacheRef.current = null;
   }, []);
 
+  const isReady =
+    !!address &&
+    (signAsSmartAccount ? !!accountClient : !!eoaLower && address === eoaLower);
+
   return {
     address: address || null,
     getAuthHeaders,
     clearAuthCache,
-    /** Whether signMessage is wired up — false if the smart account client isn't ready yet. */
-    isReady: !!accountClient && !!address,
+    /** Whether signMessage is wired up for the active auth address. */
+    isReady,
   };
 }

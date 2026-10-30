@@ -12,10 +12,14 @@ import {
   validateAndNormalizeXmerchProfileInput,
 } from "@/lib/creator/xmerch-profile";
 import { useWalletAuth } from "@/lib/auth/useWalletAuth";
+import { usePlatformAdmin } from "@/lib/hooks/admin/usePlatformAdmin";
 
 export function CreatorXmerchAdminPanel() {
   const { toast } = useToast();
-  const { getAuthHeaders, isReady } = useWalletAuth();
+  const { adminAuthAddress } = usePlatformAdmin();
+  const { getAuthHeaders, isReady } = useWalletAuth({
+    addressOverride: adminAuthAddress,
+  });
   const [ownerAddress, setOwnerAddress] = useState("");
   const [enabled, setEnabled] = useState(false);
   const [storeUrl, setStoreUrl] = useState("");

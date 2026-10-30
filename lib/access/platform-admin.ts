@@ -11,3 +11,21 @@ export function isPlatformAdmin(address: string | null | undefined): boolean {
     return false;
   }
 }
+
+/**
+ * Wallet address to authenticate as for platform-admin API calls when the
+ * session has both an EOA and a smart account. Matches server
+ * `requirePlatformAdmin` (checks the signed header address only).
+ */
+export function resolvePlatformAdminAuthAddress(
+  smartAccountAddress: string | null | undefined,
+  eoaAddress: string | null | undefined,
+): string | null {
+  if (isPlatformAdmin(smartAccountAddress)) {
+    return getAddress(smartAccountAddress as `0x${string}`).toLowerCase();
+  }
+  if (isPlatformAdmin(eoaAddress)) {
+    return getAddress(eoaAddress as `0x${string}`).toLowerCase();
+  }
+  return null;
+}
