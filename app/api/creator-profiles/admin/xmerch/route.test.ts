@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
-const { requirePlatformAdminMock } = vi.hoisted(() => ({
+const { requirePlatformAdminMock, maybeSingleMock, updateSelectMock } = vi.hoisted(() => ({
   requirePlatformAdminMock: vi.fn(),
+  maybeSingleMock: vi.fn(),
+  updateSelectMock: vi.fn(),
 }));
 
 vi.mock("@/lib/middleware/botIdGuard", () => ({
@@ -27,8 +29,15 @@ vi.mock("@/lib/access/require-platform-admin", () => ({
 vi.mock("@/lib/sdk/supabase/service", () => ({
   supabaseService: {
     from: vi.fn(() => ({
-      upsert: vi.fn(() => ({
-        select: vi.fn(async () => ({ data: [{ owner_address: "0xabc" }], error: null })),
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          maybeSingle: maybeSingleMock,
+        })),
+      })),
+      update: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          select: updateSelectMock,
+        })),
       })),
     })),
   },
@@ -36,9 +45,26 @@ vi.mock("@/lib/sdk/supabase/service", () => ({
 
 import { PATCH } from "@/app/api/creator-profiles/admin/xmerch/route";
 
+const OWNER = "0xAbCdEf0123456789012345678901234567890AbCd";
+
+function patchRequest(body: object) {
+  return new NextRequest("http://localhost/api/creator-profiles/admin/xmerch", {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
 describe("PATCH /api/creator-profiles/admin/xmerch", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    maybeSingleMock.mockResolvedValue({
+      data: { owner_address: OWNER.toLowerCase() },
+      error: null,
+    });
+    updateSelectMock.mockResolvedValue({
+      data: [{ owner_address: OWNER.toLowerCase() }],
+      error: null,
+    });
   });
 
   it("rejects non-admin callers", async () => {
@@ -49,18 +75,34 @@ describe("PATCH /api/creator-profiles/admin/xmerch", () => {
       new PlatformAdminAuthError(403, "Platform admin wallet required"),
     );
 
-    const req = new NextRequest("http://localhost/api/creator-profiles/admin/xmerch", {
-      method: "PATCH",
-      body: JSON.stringify({
-        owner_address: "0xAbCdEf0123456789012345678901234567890AbCd",
+    const res = await PATCH(
+      patchRequest({
+        owner_address: OWNER,
         social_xmerch: { enabled: true, storeUrl: "https://creative.xmerch.app" },
       }),
-    });
-
-    const res = await PATCH(req);
+    );
     expect(res.status).toBe(403);
     const json = await res.json();
     expect(json.error).toMatch(/admin/i);
+  });
+
+  it("returns 404 when creator profile does not exist", async () => {
+    requirePlatformAdminMock.mockResolvedValue({
+      address: "0x2953B96F9160955f6256c9D444F8F7950E6647Df",
+    });
+    maybeSingleMock.mockResolvedValue({ data: null, error: null });
+
+    const res = await PATCH(
+      patchRequest({
+        owner_address: OWNER,
+        social_xmerch: { enabled: true, storeUrl: "https://creative.xmerch.app" },
+      }),
+    );
+    expect(res.status).toBe(404);
+    const json = await res.json();
+    expect(json.success).toBe(false);
+    expect(json.error).toMatch(/not found/i);
+    expect(updateSelectMock).not.toHaveBeenCalled();
   });
 
   it("accepts admin payload and normalizes xMerch data", async () => {
@@ -68,21 +110,19 @@ describe("PATCH /api/creator-profiles/admin/xmerch", () => {
       address: "0x2953B96F9160955f6256c9D444F8F7950E6647Df",
     });
 
-    const req = new NextRequest("http://localhost/api/creator-profiles/admin/xmerch", {
-      method: "PATCH",
-      body: JSON.stringify({
-        owner_address: "0xAbCdEf0123456789012345678901234567890AbCd",
+    const res = await PATCH(
+      patchRequest({
+        owner_address: OWNER,
         social_xmerch: {
           enabled: true,
           storeUrl: "https://creative.xmerch.app",
           featuredProductUrls: ["https://creative.xmerch.app/products/tee"],
         },
       }),
-    });
-
-    const res = await PATCH(req);
+    );
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.success).toBe(true);
+    expect(updateSelectMock).toHaveBeenCalled();
   });
 });

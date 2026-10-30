@@ -13,6 +13,7 @@ import { serverLogger } from "@/lib/utils/logger";
 /**
  * PATCH /api/creator-profiles/admin/xmerch
  * Platform-admin only: set invite-only Creative Merch profile data for a creator.
+ * Update-only: the creator must already have a creator_profiles row.
  */
 export async function PATCH(request: NextRequest) {
   const verification = await checkBotIdDeep();
@@ -72,35 +73,44 @@ export async function PATCH(request: NextRequest) {
     );
   }
 
-  const payload = {
-    owner_address: owner_address.toLowerCase(),
+  const ownerAddress = owner_address.toLowerCase();
+  const updatePayload = {
     social_xmerch: xmerchValidation.value,
     updated_at: new Date().toISOString(),
   };
 
   try {
-    let data;
-    let error;
+    const client = supabaseService ?? (await createClient());
 
-    if (supabaseService) {
-      const result = await supabaseService
-        .from("creator_profiles")
-        .upsert(payload, { onConflict: "owner_address" })
-        .select();
-      data = result.data;
-      error = result.error;
-    } else {
-      const supabase = await createClient();
-      const result = await supabase
-        .from("creator_profiles")
-        .upsert(payload, { onConflict: "owner_address" })
-        .select();
-      data = result.data;
-      error = result.error;
+    const { data: existing, error: lookupError } = await client
+      .from("creator_profiles")
+      .select("owner_address")
+      .eq("owner_address", ownerAddress)
+      .maybeSingle();
+
+    if (lookupError) {
+      serverLogger.error("[creator-profiles/admin/xmerch] lookup error:", lookupError);
+      return NextResponse.json(
+        { success: false, error: lookupError.message },
+        { status: 500 },
+      );
     }
 
+    if (!existing) {
+      return NextResponse.json(
+        { success: false, error: "Creator profile not found" },
+        { status: 404 },
+      );
+    }
+
+    const { data, error } = await client
+      .from("creator_profiles")
+      .update(updatePayload)
+      .eq("owner_address", ownerAddress)
+      .select();
+
     if (error) {
-      serverLogger.error("[creator-profiles/admin/xmerch] upsert error:", error);
+      serverLogger.error("[creator-profiles/admin/xmerch] update error:", error);
       return NextResponse.json(
         { success: false, error: error.message },
         { status: 500 },
