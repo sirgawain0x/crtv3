@@ -13,7 +13,18 @@ import { useToast } from '@/components/ui/use-toast';
 import { useWalletStatus } from '@/lib/hooks/accountkit/useWalletStatus';
 import { AvatarUpload } from './AvatarUpload';
 import { DigitalTwinSection } from './DigitalTwinSection';
+import { BrandChannelSection } from './BrandChannelSection';
 import { Loader2, CheckCircle, AlertCircle, User, Save, Edit3 } from 'lucide-react';
+import {
+  CREATOR_SOCIAL_URL_FIELDS,
+  normalizeCreatorSocialProfileUrl,
+  type CreatorSocialPlatform,
+} from '@/lib/creator/social-profile-urls';
+import {
+  MAX_XMERCH_FEATURED_PRODUCTS,
+  sanitizeStoredXmerchProfile,
+  validateAndNormalizeXmerchProfileInput,
+} from '@/lib/creator/xmerch-profile';
 
 interface CreatorProfileManagerProps {
   targetAddress?: string;
@@ -31,8 +42,64 @@ export function CreatorProfileManager({ targetAddress, onProfileUpdated }: Creat
     username: '',
     bio: '',
     avatar_url: '',
+    social_orb_url: '',
+    social_instagram_url: '',
+    social_x_url: '',
+    social_xmerch_store: '',
+    social_xmerch_featured: '',
   });
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
+
+  const validateSocialField = (platform: CreatorSocialPlatform, value: string) => {
+    const fieldKey = CREATOR_SOCIAL_URL_FIELDS[platform];
+    const result = normalizeCreatorSocialProfileUrl(platform, value);
+    setFieldErrors((prev) => {
+      const next = { ...prev };
+      if (result.ok) {
+        delete next[fieldKey];
+      } else {
+        next[fieldKey] = result.error;
+      }
+      return next;
+    });
+    return result;
+  };
+
+  const buildXmerchInputFromForm = () => ({
+    storeUrl: formData.social_xmerch_store,
+    featuredProductUrls: formData.social_xmerch_featured
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean),
+  });
+
+  const validateXmerchFields = () => {
+    const result = validateAndNormalizeXmerchProfileInput(buildXmerchInputFromForm());
+    setFieldErrors((prev) => {
+      const next = { ...prev };
+      delete next.social_xmerch_store;
+      delete next.social_xmerch_featured;
+      for (const key of Object.keys(next)) {
+        if (key.startsWith('social_xmerch_featured_')) {
+          delete next[key];
+        }
+      }
+      if (!result.ok) {
+        Object.assign(next, result.errors);
+      }
+      return next;
+    });
+    return result;
+  };
+
+  const validateAllSocialFields = () => {
+    const orb = validateSocialField('orb', formData.social_orb_url);
+    const instagram = validateSocialField('instagram', formData.social_instagram_url);
+    const x = validateSocialField('x', formData.social_x_url);
+    const xmerch = validateXmerchFields();
+    return orb.ok && instagram.ok && x.ok && xmerch.ok;
+  };
 
   // Initialize form data when profile loads
   useEffect(() => {
@@ -41,6 +108,12 @@ export function CreatorProfileManager({ targetAddress, onProfileUpdated }: Creat
         username: profile.username || '',
         bio: profile.bio || '',
         avatar_url: profile.avatar_url || '',
+        social_orb_url: profile.social_orb_url || '',
+        social_instagram_url: profile.social_instagram_url || '',
+        social_x_url: profile.social_x_url || '',
+        social_xmerch_store: sanitizeStoredXmerchProfile(profile.social_xmerch).storeUrl || '',
+        social_xmerch_featured: sanitizeStoredXmerchProfile(profile.social_xmerch)
+          .featuredProductUrls.join('\n'),
       });
     }
   }, [profile]);
@@ -55,11 +128,39 @@ export function CreatorProfileManager({ targetAddress, onProfileUpdated }: Creat
       return;
     }
 
+    if (!validateAllSocialFields()) {
+      toast({
+        variant: "destructive",
+        title: "Fix social links",
+        description: "One or more social profile fields are invalid.",
+      });
+      return;
+    }
+
+    const orb = normalizeCreatorSocialProfileUrl('orb', formData.social_orb_url);
+    const instagram = normalizeCreatorSocialProfileUrl(
+      'instagram',
+      formData.social_instagram_url,
+    );
+    const x = normalizeCreatorSocialProfileUrl('x', formData.social_x_url);
+    const xmerch = validateAndNormalizeXmerchProfileInput(buildXmerchInputFromForm());
+    const socialPayload = {
+      social_orb_url: orb.ok ? orb.url : null,
+      social_instagram_url: instagram.ok ? instagram.url : null,
+      social_x_url: x.ok ? x.url : null,
+      social_xmerch: xmerch.ok ? xmerch.value : null,
+    };
+
     setIsSaving(true);
     try {
       if (profile) {
         // Update existing profile
-        await updateProfile(formData);
+        await updateProfile({
+          username: formData.username,
+          bio: formData.bio,
+          avatar_url: formData.avatar_url,
+          ...socialPayload,
+        });
         toast({
           title: "Profile Updated",
           description: "Your creator profile has been updated successfully",
@@ -68,7 +169,10 @@ export function CreatorProfileManager({ targetAddress, onProfileUpdated }: Creat
         // Create new profile
         await upsertProfile({
           owner_address: user.address,
-          ...formData,
+          username: formData.username,
+          bio: formData.bio,
+          avatar_url: formData.avatar_url,
+          ...socialPayload,
         });
         toast({
           title: "Profile Created",
@@ -94,10 +198,67 @@ export function CreatorProfileManager({ targetAddress, onProfileUpdated }: Creat
         username: profile.username || '',
         bio: profile.bio || '',
         avatar_url: profile.avatar_url || '',
+        social_orb_url: profile.social_orb_url || '',
+        social_instagram_url: profile.social_instagram_url || '',
+        social_x_url: profile.social_x_url || '',
+        social_xmerch_store: sanitizeStoredXmerchProfile(profile.social_xmerch).storeUrl || '',
+        social_xmerch_featured: sanitizeStoredXmerchProfile(profile.social_xmerch)
+          .featuredProductUrls.join('\n'),
       });
+      setFieldErrors({});
     }
     setIsEditing(false);
   };
+
+  const renderSocialField = (
+    id: keyof Pick<
+      typeof formData,
+      'social_orb_url' | 'social_instagram_url' | 'social_x_url'
+    >,
+    label: string,
+    placeholder: string,
+    platform: CreatorSocialPlatform,
+    hint = 'Handle or full profile URL. Leave blank to hide on your creator page.',
+  ) => (
+    <div className="space-y-2">
+      <Label htmlFor={id}>{label}</Label>
+      {isEditing ? (
+        <>
+          <Input
+            id={id}
+            placeholder={placeholder}
+            value={formData[id]}
+            onChange={(e) => {
+              const value = e.target.value;
+              setFormData((prev) => ({ ...prev, [id]: value }));
+              if (fieldErrors[id]) {
+                validateSocialField(platform, value);
+              }
+            }}
+            onBlur={(e) => validateSocialField(platform, e.target.value)}
+            disabled={!isOwner}
+            aria-invalid={Boolean(fieldErrors[id])}
+            aria-describedby={fieldErrors[id] ? `${id}-error` : undefined}
+          />
+          {fieldErrors[id] ? (
+            <p id={`${id}-error`} className="text-sm text-destructive" role="alert">
+              {fieldErrors[id]}
+            </p>
+          ) : (
+            <p className="text-xs text-muted-foreground">{hint}</p>
+          )}
+        </>
+      ) : (
+        <div className="p-2 border rounded-md bg-muted">
+          {formData[id] ? (
+            <span className="break-all">{formData[id]}</span>
+          ) : (
+            <span className="text-muted-foreground">Not set</span>
+          )}
+        </div>
+      )}
+    </div>
+  );
 
   const isOwner = !targetAddress || targetAddress === user?.address || targetAddress === smartAccountAddress;
 
@@ -189,6 +350,111 @@ export function CreatorProfileManager({ targetAddress, onProfileUpdated }: Creat
                 </div>
               )}
             </div>
+
+            <div className="space-y-4 pt-2 border-t">
+              <p className="text-sm font-medium">Social profiles</p>
+              {renderSocialField(
+                'social_orb_url',
+                'Orb',
+                '@handle or https://orb.club/p/handle',
+                'orb',
+              )}
+              {renderSocialField(
+                'social_instagram_url',
+                'Instagram',
+                '@handle or https://instagram.com/handle',
+                'instagram',
+              )}
+              {renderSocialField(
+                'social_x_url',
+                'X',
+                '@handle or https://x.com/handle',
+                'x',
+              )}
+              <div className="space-y-2">
+                <Label htmlFor="social_xmerch_store">xMerch store</Label>
+                {isEditing ? (
+                  <>
+                    <Input
+                      id="social_xmerch_store"
+                      placeholder="https://yourstore.xmerch.app"
+                      value={formData.social_xmerch_store}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          social_xmerch_store: e.target.value,
+                        }))
+                      }
+                      onBlur={() => validateXmerchFields()}
+                      disabled={!isOwner}
+                      aria-invalid={Boolean(fieldErrors.social_xmerch_store)}
+                    />
+                    {fieldErrors.social_xmerch_store ? (
+                      <p className="text-sm text-destructive" role="alert">
+                        {fieldErrors.social_xmerch_store}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        HTTPS store URL on xmerch.app. Leave blank to hide the store icon.
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <div className="p-2 border rounded-md bg-muted">
+                    {formData.social_xmerch_store ? (
+                      <span className="break-all">{formData.social_xmerch_store}</span>
+                    ) : (
+                      <span className="text-muted-foreground">Not set</span>
+                    )}
+                  </div>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="social_xmerch_featured">Featured xMerch products</Label>
+                {isEditing ? (
+                  <>
+                    <Textarea
+                      id="social_xmerch_featured"
+                      placeholder={'https://yourstore.xmerch.app/products/example\n(one HTTPS product URL per line, max 6)'}
+                      value={formData.social_xmerch_featured}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          social_xmerch_featured: e.target.value,
+                        }))
+                      }
+                      onBlur={() => validateXmerchFields()}
+                      disabled={!isOwner}
+                      rows={4}
+                      aria-invalid={Boolean(
+                        fieldErrors.social_xmerch_featured ||
+                          Object.keys(fieldErrors).some((k) =>
+                            k.startsWith('social_xmerch_featured_'),
+                          ),
+                      )}
+                    />
+                    {fieldErrors.social_xmerch_featured ? (
+                      <p className="text-sm text-destructive" role="alert">
+                        {fieldErrors.social_xmerch_featured}
+                      </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        Up to {MAX_XMERCH_FEATURED_PRODUCTS} product page URLs on your xMerch
+                        store. Clicks open the same in-app store modal.
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <div className="p-2 border rounded-md bg-muted min-h-[80px] whitespace-pre-wrap break-all">
+                    {formData.social_xmerch_featured ? (
+                      formData.social_xmerch_featured
+                    ) : (
+                      <span className="text-muted-foreground">None</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -243,6 +509,12 @@ export function CreatorProfileManager({ targetAddress, onProfileUpdated }: Creat
         ownerAddress={(targetAddress || user?.address) as string}
         initialProfile={profile ?? null}
         isOwner={isOwner}
+        onSaved={onProfileUpdated}
+      />
+    )}
+    {isOwner && (
+      <BrandChannelSection
+        targetAddress={targetAddress}
         onSaved={onProfileUpdated}
       />
     )}

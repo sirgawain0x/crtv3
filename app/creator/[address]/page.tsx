@@ -14,7 +14,6 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import makeBlockie from "ethereum-blockies-base64";
 import { shortenAddress } from "@/lib/utils/utils";
-import { AddressWithCopy } from "@/components/Creator/AddressWithCopy";
 import { convertFailingGateway } from "@/lib/utils/image-gateway";
 import { meTokenSupabaseService } from "@/lib/sdk/supabase/metokens";
 import { CreatorProfileHeader } from "@/components/Creator/CreatorProfileHeader";
@@ -36,7 +35,9 @@ async function fetchCreatorProfile(address: string) {
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("creator_profiles")
-      .select("id, owner_address, username, bio, avatar_url, created_at, updated_at")
+      .select(
+        "id, owner_address, username, bio, avatar_url, brand_channel_slug, social_orb_url, social_instagram_url, social_x_url, social_xmerch, created_at, updated_at",
+      )
       .eq("owner_address", address.toLowerCase())
       .single();
 
@@ -93,7 +94,10 @@ export async function generateMetadata(
   // Fetch market data for the token
   const marketData = await getTokenMarketData(meToken.address);
 
-  const price = marketData?.price ? `$${marketData.price.toFixed(4)}` : 'N/A';
+  const priceFormatted =
+    marketData?.price != null && marketData.price > 0
+      ? marketData.price.toFixed(4)
+      : null;
   // Format TVL: e.g. $1.5K
   const tvl = marketData?.tvl
     ? marketData.tvl >= 1000
@@ -105,7 +109,9 @@ export async function generateMetadata(
   const symbol = meToken.symbol;
   const displayName = creatorProfile?.username || name;
 
-  const title = `${symbol} ($${price}) - ${displayName}`;
+  const title = priceFormatted
+    ? `${symbol} ($${priceFormatted}) - ${displayName}`
+    : `${symbol} - ${displayName}`;
   const description = `Trade ${symbol} on Creative TV. TVL: ${tvl}. ${creatorProfile?.bio || ''}`.trim();
 
   return {

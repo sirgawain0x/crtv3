@@ -16,6 +16,11 @@ import { MarketToken } from "@/app/api/market/tokens/route";
 import { MeTokenShareButton } from "@/components/Market/MeTokenShareButton";
 import { MembershipVerifiedBadge } from "@/components/User/MembershipVerifiedBadge";
 import { CreatorPredictButton } from "@/components/Creator/CreatorPredictButton";
+import { ProfileGoLiveButton } from "@/components/Live/ProfileGoLiveButton";
+import { CreatorBrandChannelButton } from "@/components/Creator/CreatorBrandChannelButton";
+import { CreatorXmerchSection } from "@/components/Creator/CreatorXmerchSection";
+import { useMeTokenMarketStats } from "@/lib/hooks/market/useMeTokenMarketStats";
+import { formatUsdTokenPrice } from "@/lib/metokens/spotPrice";
 
 interface CreatorProfileHeaderProps {
   address: string;
@@ -33,6 +38,7 @@ export function CreatorProfileHeader({
   // Determine display name and symbol
   const displayName = meToken?.name || creatorProfile?.username || shortenAddress(address);
   const displaySymbol = meToken?.symbol || null;
+  const copyAddress = meToken?.address ?? address;
   const avatarUrl = creatorProfile?.avatar_url
     ? convertFailingGateway(creatorProfile.avatar_url)
     : makeBlockie(address);
@@ -45,8 +51,9 @@ export function CreatorProfileHeader({
 
   const [quickTradeOpen, setQuickTradeOpen] = useState(false);
   const [chartDialogOpen, setChartDialogOpen] = useState(false);
+  const { stats: marketStats } = useMeTokenMarketStats(meToken?.address);
 
-  // Convert MeToken to MarketToken for dialogs
+  // Convert MeToken to MarketToken for dialogs (price/TVL from market API — same as Trading Market)
   const marketToken: MarketToken | null = meToken ? {
     id: meToken.id,
     address: meToken.address,
@@ -54,14 +61,19 @@ export function CreatorProfileHeader({
     symbol: meToken.symbol,
     owner_address: meToken.owner_address,
     type: 'metoken',
-    price: 0, // Placeholder
-    tvl: meToken.tvl,
-    total_supply: meToken.total_supply?.toString() || '0',
-    market_cap: meToken.tvl,
+    price: marketStats?.price ?? 0,
+    tvl: marketStats?.tvl ?? meToken.tvl,
+    total_supply: marketStats?.total_supply ?? meToken.total_supply?.toString() ?? '0',
+    market_cap: marketStats?.market_cap ?? meToken.tvl,
+    price_change_24h: marketStats?.price_change_24h,
+    volume_24h: marketStats?.volume_24h,
     created_at: meToken.created_at,
     creator_username: creatorProfile?.username,
     creator_avatar_url: creatorProfile?.avatar_url,
   } : null;
+
+  const displayPrice = marketStats?.price;
+  const displayTvl = marketStats?.tvl ?? meToken?.tvl;
 
   return (
     <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
@@ -81,7 +93,7 @@ export function CreatorProfileHeader({
           )}
         </div>
         <div className="mb-4">
-          <AddressWithCopy address={address} />
+          <AddressWithCopy address={copyAddress} />
         </div>
 
         {creatorProfile?.username && (
@@ -97,35 +109,64 @@ export function CreatorProfileHeader({
           </p>
         )}
 
-        {marketToken && (
-          <div className="flex flex-wrap gap-2 mt-4">
-            <Button
-              variant="default"
-              size="sm"
-              onClick={() => setQuickTradeOpen(true)}
-            >
-              Quick Trade
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setChartDialogOpen(true)}
-            >
-              <BarChart3 className="h-4 w-4 mr-2" />
-              View Chart
-            </Button>
-            <CreatorPredictButton
-              creatorAddress={address}
-              creatorName={creatorProfile?.username || marketToken.name}
-            />
-            <MeTokenShareButton
-              address={marketToken.address}
-              symbol={marketToken.symbol}
-              name={marketToken.name}
-              type="creator"
-            />
+        <CreatorXmerchSection
+          className="mt-3"
+          socialOrbUrl={creatorProfile?.social_orb_url}
+          socialInstagramUrl={creatorProfile?.social_instagram_url}
+          socialXUrl={creatorProfile?.social_x_url}
+          xmerchStored={creatorProfile?.social_xmerch}
+        />
+
+        {meToken && displayPrice != null && (
+          <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 mt-3 text-sm">
+            <p>
+              <span className="text-muted-foreground">Price </span>
+              <span className="font-semibold">{formatUsdTokenPrice(displayPrice)}</span>
+            </p>
+            {displayTvl != null && (
+              <p>
+                <span className="text-muted-foreground">TVL </span>
+                <span className="font-semibold">${displayTvl.toFixed(2)}</span>
+              </p>
+            )}
           </div>
         )}
+
+        <div className="flex flex-wrap gap-2 mt-4">
+          <ProfileGoLiveButton profileAddress={address} />
+          <CreatorBrandChannelButton
+            brandChannelSlug={creatorProfile?.brand_channel_slug}
+          />
+          {marketToken ? (
+            <>
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => setQuickTradeOpen(true)}
+              >
+                Quick Trade
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setChartDialogOpen(true)}
+              >
+                <BarChart3 className="h-4 w-4 mr-2" />
+                View Chart
+              </Button>
+              <CreatorPredictButton
+                creatorAddress={address}
+                creatorName={creatorProfile?.username || marketToken.name}
+              />
+              <MeTokenShareButton
+                creatorOwnerAddress={address}
+                symbol={marketToken.symbol}
+                name={marketToken.name}
+                type="creator"
+              />
+            </>
+          ) : null}
+        </div>
       </div>
 
       <QuickTradeDialog
@@ -144,4 +185,3 @@ export function CreatorProfileHeader({
     </div>
   );
 }
-
