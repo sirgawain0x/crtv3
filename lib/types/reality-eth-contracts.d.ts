@@ -15,6 +15,10 @@ declare module '@reality.eth/contracts' {
     tokenTicker: string;
   }
 
+  interface ChainTokenMeta {
+    decimals: number;
+  }
+
   interface RealityETHContracts {
     isChainSupported(chainId: number): boolean;
     realityETHConfig(
@@ -22,8 +26,14 @@ declare module '@reality.eth/contracts' {
       tokenTicker: string,
       version: string
     ): RealityETHConfig | null;
+    realityETHConfigs(
+      chainId: number,
+      tokenTicker: string
+    ): Record<string, RealityETHConfig>;
     realityETHInstance?(config: RealityETHConfig): RealityETHInstance;
     defaultTokenForChain(chainId: number): string;
+    chainTokenList(chainId: number): Record<string, ChainTokenMeta>;
+    chainData(chainId: number): { graphURL?: string };
   }
 
   const reality_eth_contracts: RealityETHContracts;

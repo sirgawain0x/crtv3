@@ -183,12 +183,26 @@ Question titles may suffix:
 - `https://core.precog.markets/api/markets/{chainId}/{marketId}`
 - `https://core.precog.markets/api/v1/markets/{chainId}/{marketId}`
 
+## Social distribution (X + Mastodon)
+
+New questions and finalized answers can be dual-posted automatically:
+
+- **Hosted cron:** `GET /api/predictions/social-sync/cron` (Bearer `CRON_SECRET`) uses `lib/reality-social/*`, links to `/predict/{id}`, and stores cursors in Supabase (`reality_social_sync_state`).
+- **X posting:** `POST https://api.x.com/2/tweets` with OAuth 1.0a user tokens — not the legacy v1.1 statuses API. Setup: [Reality.social — X integration](./reality-social-twitter-integration.md).
+- **Subgraph queries:** Graph Studio `Question` entity (`lib/reality-social/reality-social-subgraph-queries.ts`), not the legacy Goldsky `@reality.eth/twitter-bot` schema.
+  - **New markets:** `created_gt` cursor, `last_bond: "0"`, `finalize_ts: null`.
+  - **Answered / finalized:** `or` branch — bond activity after cursor (`last_bond_ts_gt`, `last_bond_gt: "0"`) **or** arbitrator finalize (`last_bond_ts_gt`, `finalize_ts_not: null`). Filters are built in `lib/reality-social/social-sync-where-filters.ts` (Graph Node rejects `or` mixed with sibling column keys at the same level).
+- **Upstream bots:** Optional CLI packages in `scripts/reality-social/` ([@reality.eth/twitter-bot](https://www.npmjs.com/package/@reality.eth/twitter-bot), [@reality.eth/mastodon-bot](https://www.npmjs.com/package/@reality.eth/mastodon-bot)) — post reality.eth.limo links and use local filesystem state.
+
+Prioritize **X** for reach; enable **Mastodon** as a low-cost secondary channel with transparency-focused copy and `#OpenData` hashtags. Operational env vars: [scripts/reality-social/README.md](../scripts/reality-social/README.md).
+
 ## Environment
 
 | Variable | Required for |
 |----------|--------------|
 | `NEXT_PUBLIC_ALCHEMY_API_KEY` | Base RPC (read questions, claim status) |
 | Supabase service role (via `supabaseService`) | Quota, record, metadata, search |
+| Twitter / Mastodon vars (optional) | Social sync cron — see `scripts/reality-social/README.md` |
 
 Reality.eth contract on Base: see `REALITY_ETH_SUBGRAPH_CONFIG.md` (`0x2F39f464d16402Ca3D8527dA89617b73DE2F60e8`).
 
@@ -222,3 +236,5 @@ Confirm reference format at end of title. Check `/api/predictions/precog` return
 
 - [Reality.eth subgraph config](../REALITY_ETH_SUBGRAPH_CONFIG.md) — contract address, start block, ABI
 - [Reality.eth subgraph hosting](../REALITY_ETH_SUBGRAPH_HOSTING.md) — indexing deployed markets
+- [Reality.social — X integration](./reality-social-twitter-integration.md) — X API v2 credentials and verification
+- [Creator social profile links](./creator-social-profile-links.md) — Orb / Instagram / X on creator pages (not the prediction bot)

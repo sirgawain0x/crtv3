@@ -21,6 +21,7 @@ export function CreatorXmerchAdminPanel() {
   const [storeUrl, setStoreUrl] = useState("");
   const [featuredLines, setFeaturedLines] = useState("");
   const [saving, setSaving] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   const handleSave = async () => {
     const featuredProductUrls = featuredLines
@@ -35,6 +36,7 @@ export function CreatorXmerchAdminPanel() {
     });
 
     if (!validation.ok) {
+      setFieldErrors(validation.errors);
       toast({
         variant: "destructive",
         title: "Invalid xMerch data",
@@ -42,6 +44,7 @@ export function CreatorXmerchAdminPanel() {
       });
       return;
     }
+    setFieldErrors({});
 
     if (!ownerAddress.trim()) {
       toast({
@@ -143,7 +146,16 @@ export function CreatorXmerchAdminPanel() {
           placeholder={`One HTTPS URL per line (max ${MAX_XMERCH_FEATURED_PRODUCTS})`}
           value={featuredLines}
           onChange={(e) => setFeaturedLines(e.target.value)}
+          aria-invalid={Boolean(fieldErrors.social_xmerch_featured)}
+          aria-describedby={
+            fieldErrors.social_xmerch_featured ? "xmerch_featured-error" : undefined
+          }
         />
+        {fieldErrors.social_xmerch_featured ? (
+          <p id="xmerch_featured-error" className="text-sm text-destructive" role="alert">
+            {fieldErrors.social_xmerch_featured}
+          </p>
+        ) : null}
       </div>
 
       <Button onClick={handleSave} disabled={saving}>

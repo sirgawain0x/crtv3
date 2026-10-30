@@ -124,10 +124,14 @@ export async function fetchStreamKeyForCreator(
   creatorAddress: string,
   authHeaders: Record<string, string>,
   legacyCreatorAddress?: string | null,
+  options?: { forceReplace?: boolean },
 ) {
   const params = new URLSearchParams({ creatorAddress });
   if (legacyCreatorAddress) {
     params.set("legacyCreatorAddress", legacyCreatorAddress);
+  }
+  if (options?.forceReplace) {
+    params.set("forceReplace", "1");
   }
   const res = await fetch(`/api/livepeer/stream-key?${params.toString()}`, {
     headers: authHeaders,
@@ -141,6 +145,7 @@ export async function fetchStreamKeyForCreator(
     streamKey: string;
     replaced?: boolean;
     reused?: boolean;
+    synced?: boolean;
   }>;
 }
 
@@ -229,7 +234,13 @@ function BroadcastWithControls({
   const refreshStreamKey = React.useCallback(async () => {
     try {
       const authHeaders = await getAuthHeaders();
-      const data = await fetchStreamKeyForCreator(creatorAddress, authHeaders);
+      let data = await fetchStreamKeyForCreator(creatorAddress, authHeaders);
+      // WHIP already failed with this key — if heal returned the same key, force recreate.
+      if (data.streamKey === activeStreamKey && !data.synced && !data.replaced) {
+        data = await fetchStreamKeyForCreator(creatorAddress, authHeaders, null, {
+          forceReplace: true,
+        });
+      }
       setActiveStreamKey(data.streamKey);
       setActiveStreamId(data.streamId);
       setActivePlaybackId(data.playbackId);
@@ -241,13 +252,15 @@ function BroadcastWithControls({
       logger.info("Refreshed Livepeer stream credentials after WHIP 404", {
         streamId: data.streamId,
         playbackId: data.playbackId,
+        replaced: data.replaced,
+        synced: data.synced,
       });
       return data.streamKey;
     } catch (err) {
       logger.error("Failed to refresh stream key after WHIP 404:", err);
       return null;
     }
-  }, [creatorAddress, getAuthHeaders, onCredentialsChange]);
+  }, [activeStreamKey, creatorAddress, getAuthHeaders, onCredentialsChange]);
 
   const {
     status,

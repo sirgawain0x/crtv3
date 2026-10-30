@@ -20,8 +20,10 @@ export type StreamCredentials = {
 export type EnsureLivepeerStreamResult = StreamCredentials & {
   /** True when an existing Supabase row was kept and Livepeer still had the stream. */
   reused: boolean;
-  /** True when Livepeer stream was missing and credentials were recreated. */
+  /** True when Livepeer stream was missing (or force-replaced) and credentials were recreated. */
   replaced: boolean;
+  /** True when DB credentials were updated from a still-living Studio stream. */
+  synced: boolean;
 };
 
 export type EnsureLivepeerStreamOptions = {
@@ -32,6 +34,11 @@ export type EnsureLivepeerStreamOptions = {
   playbackPolicy: Record<string, unknown>;
   /** Existing Supabase stream row, if any. */
   existing: Stream | null;
+  /**
+   * When true and a DB row exists, always recreate the Livepeer stream and
+   * replace Supabase credentials (used after WHIP 404 with an unchanged key).
+   */
+  forceReplace?: boolean;
 };
 
 const DEFAULT_PROFILES: CreateLivepeerStreamParams["profiles"] = [
@@ -84,11 +91,50 @@ export function defaultStreamCreateOptions(creatorId: string): Omit<
   };
 }
 
+async function recreateLivepeerCredentials(
+  creatorId: string,
+  options: EnsureLivepeerStreamOptions,
+  existing: Stream | null,
+  reason: string,
+): Promise<EnsureLivepeerStreamResult> {
+  serverLogger.warn("[ensureLivepeerStream] Recreating Livepeer stream", {
+    creatorId,
+    reason,
+    staleStreamId: existing?.stream_id,
+  });
+
+  const created = await createLivepeerStream({
+    name: options.name || existing?.name || `Broadcast-${Date.now()}`,
+    profiles: options.profiles,
+    record: options.record,
+    playbackPolicy: options.playbackPolicy,
+    creatorId,
+  });
+
+  await replaceStreamLivepeerCredentials(creatorId, {
+    stream_id: created.streamId,
+    stream_key: created.streamKey,
+    playback_id: created.playbackId,
+  });
+
+  return {
+    streamId: created.streamId,
+    playbackId: created.playbackId,
+    streamKey: created.streamKey,
+    reused: false,
+    replaced: true,
+    synced: false,
+  };
+}
+
 /**
  * Ensure the creator has a Livepeer stream that still exists in Studio.
  * - No DB row → create Livepeer + Supabase row
- * - DB row + Livepeer alive → reuse credentials
+ * - DB row + Livepeer alive + matching key → reuse credentials
+ * - DB row + Livepeer alive + mismatched key/playback → sync from Studio
+ * - DB row + Livepeer alive but no usable key → recreate
  * - DB row + Livepeer missing → recreate Livepeer and replace Supabase credentials
+ * - forceReplace → always recreate
  */
 export async function ensureLivepeerStreamForCreator(
   options: EnsureLivepeerStreamOptions,
@@ -101,43 +147,76 @@ export async function ensureLivepeerStreamForCreator(
   const existing = options.existing;
 
   if (existing?.stream_id) {
+    if (options.forceReplace) {
+      return recreateLivepeerCredentials(
+        creatorId,
+        options,
+        existing,
+        "forceReplace",
+      );
+    }
+
     const live = await getLivepeerStreamOrNull(existing.stream_id);
     if (live) {
+      const studioKey = live.streamKey?.trim();
+      if (!studioKey) {
+        return recreateLivepeerCredentials(
+          creatorId,
+          options,
+          existing,
+          "studio_missing_stream_key",
+        );
+      }
+
+      const studioPlaybackId = live.playbackId?.trim() || existing.playback_id;
+      const keyMismatch = studioKey !== existing.stream_key;
+      const playbackMismatch =
+        Boolean(live.playbackId?.trim()) &&
+        live.playbackId !== existing.playback_id;
+
+      if (keyMismatch || playbackMismatch) {
+        serverLogger.info(
+          "[ensureLivepeerStream] Syncing credentials from Studio",
+          {
+            creatorId,
+            streamId: existing.stream_id,
+            keyMismatch,
+            playbackMismatch,
+          },
+        );
+
+        await replaceStreamLivepeerCredentials(creatorId, {
+          stream_id: existing.stream_id,
+          stream_key: studioKey,
+          playback_id: studioPlaybackId,
+        });
+
+        return {
+          streamId: existing.stream_id,
+          playbackId: studioPlaybackId,
+          streamKey: studioKey,
+          reused: false,
+          replaced: false,
+          synced: true,
+        };
+      }
+
       return {
         streamId: existing.stream_id,
         playbackId: existing.playback_id,
         streamKey: existing.stream_key,
         reused: true,
         replaced: false,
+        synced: false,
       };
     }
 
-    serverLogger.warn("[ensureLivepeerStream] Livepeer stream missing; recreating", {
+    return recreateLivepeerCredentials(
       creatorId,
-      staleStreamId: existing.stream_id,
-    });
-
-    const created = await createLivepeerStream({
-      name: options.name || existing.name || `Broadcast-${Date.now()}`,
-      profiles: options.profiles,
-      record: options.record,
-      playbackPolicy: options.playbackPolicy,
-      creatorId,
-    });
-
-    await replaceStreamLivepeerCredentials(creatorId, {
-      stream_id: created.streamId,
-      stream_key: created.streamKey,
-      playback_id: created.playbackId,
-    });
-
-    return {
-      streamId: created.streamId,
-      playbackId: created.playbackId,
-      streamKey: created.streamKey,
-      reused: false,
-      replaced: true,
-    };
+      options,
+      existing,
+      "livepeer_stream_missing",
+    );
   }
 
   const created = await createLivepeerStream({
@@ -164,5 +243,6 @@ export async function ensureLivepeerStreamForCreator(
     streamKey: created.streamKey,
     reused: false,
     replaced: false,
+    synced: false,
   };
 }

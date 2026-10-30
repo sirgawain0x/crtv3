@@ -1,7 +1,6 @@
 import { keccak256, stringToHex } from "viem";
-import { parseQuestionText } from "@/lib/sdk/reality-eth/reality-eth-utils";
 import type { QuestionType } from "@/lib/sdk/reality-eth/reality-eth-utils";
-import { getTemplateTextForId } from "@/lib/predictions/reality-template";
+import { parseQuestionLocal } from "@/lib/reality-social/parse-question-local";
 
 const UNIT_SEP = "\u241F";
 
@@ -18,38 +17,6 @@ const ZERO_ANSWER =
   "0x0000000000000000000000000000000000000000000000000000000000000000" as const;
 const ONE_ANSWER =
   "0x0000000000000000000000000000000000000000000000000000000000000001" as const;
-
-function isBadParsedTitle(title: string): boolean {
-  const t = title.trim();
-  if (!t) return true;
-  if (t.startsWith("[Badly formatted question]")) return true;
-  if (/^␟+$/.test(t) || /^[\u241F]+$/.test(t)) return true;
-  return false;
-}
-
-function buildDisplayFromParsed(
-  parsed: Record<string, unknown>,
-  raw: string
-): ParsedPredictionDisplay | null {
-  const title = String(parsed.title ?? "").trim();
-  if (isBadParsedTitle(title)) return null;
-
-  const outcomes = Array.isArray(parsed.outcomes)
-    ? parsed.outcomes.map(String)
-    : parseOutcomesSegment(String(parsed.outcomes ?? ""));
-  const type =
-    (parsed.type as ParsedPredictionDisplay["type"]) ??
-    inferTypeFromOutcomes(outcomes);
-
-  return {
-    title,
-    type,
-    outcomes: outcomes.length ? outcomes : type === "bool" ? ["Yes", "No"] : [],
-    category: String(parsed.category ?? "general"),
-    language: String(parsed.lang ?? parsed.language ?? "en_US"),
-    description: parsed.description ? String(parsed.description) : undefined,
-  };
-}
 
 function parseOutcomesSegment(segment: string): string[] {
   const trimmed = segment.trim();
@@ -88,6 +55,37 @@ function inferTypeFromOutcomes(outcomes: string[]): ParsedPredictionDisplay["typ
   }
   if (outcomes.length > 2) return "single-select";
   return "bool";
+}
+
+/** Mirrors Reality.eth template IDs from `getTemplateIdForQuestionType` / templates.json. */
+const REALITY_TEMPLATE_ID_TO_TYPE: Record<
+  number,
+  ParsedPredictionDisplay["type"]
+> = {
+  0: "bool",
+  1: "uint",
+  2: "single-select",
+  3: "multiple-select",
+};
+
+function applyTemplateIdToDisplay(
+  parsed: ParsedPredictionDisplay,
+  templateId?: string | number | bigint | null
+): ParsedPredictionDisplay {
+  if (templateId == null) return parsed;
+  const id = Number(templateId);
+  if (!Number.isFinite(id)) return parsed;
+
+  const fromTemplate = REALITY_TEMPLATE_ID_TO_TYPE[id];
+  if (!fromTemplate) return parsed;
+
+  const next = { ...parsed, type: fromTemplate };
+  if (fromTemplate === "uint") {
+    next.outcomes = [];
+  } else if (fromTemplate === "bool" && next.outcomes.length === 0) {
+    next.outcomes = ["Yes", "No"];
+  }
+  return next;
 }
 
 function isValidQuestionType(value: string): value is ParsedPredictionDisplay["type"] {
@@ -167,18 +165,17 @@ export function parsePredictionDisplay(
     };
   }
 
-  const tid = templateId != null ? Number(templateId) : NaN;
-  if (!Number.isNaN(tid)) {
-    const templateText = getTemplateTextForId(tid);
-    if (templateText) {
-      try {
-        const parsed = parseQuestionText(templateText, raw);
-        const display = buildDisplayFromParsed(parsed, raw);
-        if (display) return display;
-      } catch {
-        // fall through to manual split
-      }
-    }
+  // Unit-separator format (Creative TV default). Avoid @reality.eth/reality-eth-lib here —
+  // it pulls jsdom/html-encoding-sniffer and crashes Vercel Node (ERR_REQUIRE_ESM).
+  const local = parseQuestionLocal(raw);
+  if (local) {
+    return applyTemplateIdToDisplay(
+      {
+        ...local,
+        language: "en_US",
+      },
+      templateId
+    );
   }
 
   const parts = raw.split(UNIT_SEP);
@@ -197,13 +194,16 @@ export function parsePredictionDisplay(
 
   const type = inferTypeFromOutcomes(outcomes);
 
-  return {
-    title,
-    type,
-    outcomes: outcomes.length ? outcomes : type === "bool" ? ["Yes", "No"] : [],
-    category: resolvedCategory,
-    language: language.match(/^[a-z]{2}_[A-Z]{2}$/) ? language : "en_US",
-  };
+  return applyTemplateIdToDisplay(
+    {
+      title,
+      type,
+      outcomes: outcomes.length ? outcomes : type === "bool" ? ["Yes", "No"] : [],
+      category: resolvedCategory,
+      language: language.match(/^[a-z]{2}_[A-Z]{2}$/) ? language : "en_US",
+    },
+    templateId
+  );
 }
 
 function looksLikeUintAnswer(normalized: string): boolean {

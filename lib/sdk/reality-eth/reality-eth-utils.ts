@@ -1,4 +1,4 @@
-import { question as realityQuestion, template as realityTemplate } from "@reality.eth/reality-eth-lib";
+import * as realityQuestion from "@reality.eth/reality-eth-lib/formatters/question.js";
 import { serverLogger } from '@/lib/utils/logger';
 
 

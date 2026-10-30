@@ -12,6 +12,7 @@ export default defineConfig({
       '.next',
       'packages/metokens/**',
       'subgraphs/**',
+      'components/home-page/capture-dear-creative-visual.test.tsx',
     ],
     coverage: {
       provider: 'v8',
@@ -29,6 +30,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './'),
+      'server-only': path.resolve(__dirname, './lib/reality-social/__mocks__/server-only.ts'),
     },
   },
 });

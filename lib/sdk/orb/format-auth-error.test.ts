@@ -18,6 +18,26 @@ describe('formatOrbAuthError', () => {
     );
   });
 
+  it('maps opaque SDK missing qrCode/secret parse errors', () => {
+    expect(
+      formatOrbAuthError(
+        new Error('QR init response did not include qrCode and secret.'),
+      ),
+    ).toMatch(/temporarily unavailable/i);
+  });
+
+  it('maps QR init HTTP failures from the proxy', () => {
+    expect(
+      formatOrbAuthError(new Error('QR init request failed (503).')),
+    ).toMatch(/temporarily unavailable/i);
+  });
+
+  it('maps missing origin header failures', () => {
+    expect(formatOrbAuthError(new Error('Missing origin header'))).toMatch(
+      /origin/i,
+    );
+  });
+
   it('maps wallet link prerequisites', () => {
     expect(formatOrbAuthError('Sign in with your wallet to link your profile.')).toMatch(
       /Get Started/i,

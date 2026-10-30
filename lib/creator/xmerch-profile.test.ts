@@ -34,6 +34,19 @@ describe("validateAndNormalizeXmerchProfileInput", () => {
     expect(result.ok).toBe(false);
   });
 
+  it("returns featured validation errors under social_xmerch_featured", () => {
+    const result = validateAndNormalizeXmerchProfileInput({
+      enabled: true,
+      storeUrl: "https://creative.xmerch.app",
+      featuredProductUrls: ["https://creative.xmerch.app"],
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.errors.social_xmerch_featured).toMatch(/Line 1:/);
+      expect(result.errors.social_xmerch_featured_0).toBeUndefined();
+    }
+  });
+
   it("rejects more than the featured limit", () => {
     const urls = Array.from(
       { length: MAX_XMERCH_FEATURED_PRODUCTS + 1 },

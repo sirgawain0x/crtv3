@@ -37,10 +37,12 @@
  * pointer landscape viewports with a short height (typical phone landscape).
  */
 @media (orientation: landscape) and (max-height: 600px) and (pointer: coarse) {
-  .chones-banner-mobile {
+  .chones-banner-mobile,
+  .spindrift-banner-mobile {
     display: block !important;
   }
-  .chones-banner-desktop {
+  .chones-banner-desktop,
+  .spindrift-banner-desktop {
     display: none !important;
   }
 }

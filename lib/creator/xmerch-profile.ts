@@ -159,25 +159,29 @@ export function validateAndNormalizeXmerchProfileInput(
         errors.social_xmerch_featured = `Add at most ${MAX_XMERCH_FEATURED_PRODUCTS} featured products`;
       } else {
         const seen = new Set<string>();
+        const featuredLineErrors: string[] = [];
         for (let i = 0; i < rawFeatured.length; i += 1) {
           const entry = rawFeatured[i];
           if (typeof entry !== "string") {
-            errors[`social_xmerch_featured_${i}`] = "Each featured URL must be text";
+            featuredLineErrors.push(`Line ${i + 1}: Each featured URL must be text`);
             continue;
           }
           const normalized = normalizeFeaturedProductUrl(entry);
           if (!normalized.ok) {
-            errors[`social_xmerch_featured_${i}`] = normalized.error;
+            featuredLineErrors.push(`Line ${i + 1}: ${normalized.error}`);
             continue;
           }
           if (normalized.url && seen.has(normalized.url)) {
-            errors[`social_xmerch_featured_${i}`] = "Duplicate product URL";
+            featuredLineErrors.push(`Line ${i + 1}: Duplicate product URL`);
             continue;
           }
           if (normalized.url) {
             seen.add(normalized.url);
             featuredProductUrls.push(normalized.url);
           }
+        }
+        if (featuredLineErrors.length > 0) {
+          errors.social_xmerch_featured = featuredLineErrors.join(" ");
         }
       }
     }

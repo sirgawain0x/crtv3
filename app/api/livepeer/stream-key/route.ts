@@ -10,7 +10,8 @@ import { serverLogger } from "@/lib/utils/logger";
 
 /**
  * Owner-only: return RTMP/WHIP stream key for the authenticated creator's channel.
- * Validates the Livepeer stream still exists; recreates credentials if Studio returns 404.
+ * Validates the Livepeer stream still exists; syncs or recreates credentials when stale.
+ * Pass forceReplace=1 after a WHIP 404 when the key was unchanged to recreate the Studio stream.
  */
 export async function GET(req: NextRequest) {
   const rl = await rateLimiters.standard(req);
@@ -23,6 +24,11 @@ export async function GET(req: NextRequest) {
 
   const legacyCreatorAddress =
     req.nextUrl.searchParams.get("legacyCreatorAddress")?.trim() || undefined;
+  const forceReplaceParam = req.nextUrl.searchParams.get("forceReplace")?.trim();
+  const forceReplace =
+    forceReplaceParam === "1" ||
+    forceReplaceParam === "true" ||
+    forceReplaceParam === "yes";
 
   const normalizedCreator = creatorAddress.toLowerCase();
 
@@ -50,12 +56,16 @@ export async function GET(req: NextRequest) {
       name: stream.name || defaults.name,
       record: stream.save_recording !== false,
       existing: stream,
+      forceReplace,
     });
 
-    if (ensured.replaced) {
-      serverLogger.info("[stream-key] healed stale Livepeer credentials", {
+    if (ensured.replaced || ensured.synced) {
+      serverLogger.info("[stream-key] healed Livepeer credentials", {
         creatorId: normalizedCreator,
         streamId: ensured.streamId,
+        replaced: ensured.replaced,
+        synced: ensured.synced,
+        forceReplace,
       });
     }
 
@@ -65,6 +75,7 @@ export async function GET(req: NextRequest) {
       streamKey: ensured.streamKey,
       replaced: ensured.replaced,
       reused: ensured.reused,
+      synced: ensured.synced,
     });
   } catch (error) {
     if (error instanceof Error && error.message === "MISSING_API_KEY") {

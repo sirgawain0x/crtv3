@@ -5,7 +5,9 @@ import { NextPage } from "next";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useEffect, type ReactNode } from "react";
+import { usePrivy } from "@privy-io/react-auth";
 import { useUser } from "@/lib/wallet/react";
+import { GuardLoadingFallback } from "@/components/auth/GuardLoadingFallback";
 import { userToAccount } from "@/lib/types/account";
 import { ListUploadedAssets } from "@/components/UserProfile/list-uploaded-assets/ListUploadedAssets";
 import {
@@ -23,13 +25,14 @@ import { useMembershipContext } from "@/lib/context/MembershipContext";
 import type { MembershipDetails } from "@/lib/hooks/unlock/useMembershipVerification";
 import { MeTokensSection } from "./MeTokensSection";
 import { UserDisplay } from "@/components/User/UserDisplay";
-import { CreativeBankTab } from "./CreativeBankTab";
+import { CreativeFinanceTab } from "./CreativeFinanceTab";
 import { MembershipHome } from "@/components/memberships/MembershipHome";
 import { CancelMembershipButton } from "./CancelMembershipButton";
 import { getPassDisplayName } from "@/lib/access/membership-labels";
 import { isValidProfileTab, type ProfileTab } from "@/lib/utils/profile-urls";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CreatorAnalyticsTab } from "./CreatorAnalyticsTab";
+import { ProfileGoLiveButton } from "@/components/Live/ProfileGoLiveButton";
 
 const LIFETIME_EXPIRATION_THRESHOLD = 32503680000;
 
@@ -46,6 +49,7 @@ const MEMBERSHIP_ERROR_MESSAGES: Record<string, string> = {
 
 function ProfilePageGuard({ children }: { children: ReactNode }) {
   const router = useRouter();
+  const { ready, authenticated } = usePrivy();
   const activeAccount = useUser();
   const account = userToAccount(activeAccount);
 
@@ -54,7 +58,23 @@ function ProfilePageGuard({ children }: { children: ReactNode }) {
     // if (!account?.address && typeof window !== "undefined") router.replace("/");
   }, [account?.address, router]);
 
-  if (!account?.address) return null;
+  if (!ready) {
+    return (
+      <GuardLoadingFallback isLoading allowBypass message="Loading your session…">
+        {null}
+      </GuardLoadingFallback>
+    );
+  }
+
+  if (!authenticated) return null;
+
+  if (!account?.address) {
+    return (
+      <GuardLoadingFallback isLoading allowBypass message="Loading your session…">
+        {null}
+      </GuardLoadingFallback>
+    );
+  }
   return <>{children}</>;
 }
 
@@ -105,8 +125,8 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
     );
   };
 
-  const switchToBankTab = () => {
-    handleTabChange("Bank");
+  const switchToFinanceTab = () => {
+    handleTabChange("Finance");
   };
 
   const validMembership = (
@@ -123,7 +143,7 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
       <div className="container mx-auto px-4 py-8">
         {/* Profile Header */}
         {displayAddress && (
-          <div className="mb-6">
+          <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <UserDisplay
               address={displayAddress}
               avatarSize="lg"
@@ -131,6 +151,7 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
               clickable={false}
               variant="inline"
             />
+            <ProfileGoLiveButton profileAddress={displayAddress} />
           </div>
         )}
         <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
@@ -154,10 +175,10 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
               MeTokens
             </TabsTrigger>
             <TabsTrigger
-              value="Bank"
+              value="Finance"
               className="flex-shrink-0 rounded-md px-3 py-2 text-sm font-medium"
             >
-              Bank
+              Finance
             </TabsTrigger>
             <TabsTrigger
               value="Membership"
@@ -206,8 +227,8 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
               <MeTokensSection walletAddress={displayAddress} />
             </TabsContent>
 
-            <TabsContent value="Bank">
-              <CreativeBankTab />
+            <TabsContent value="Finance">
+              <CreativeFinanceTab />
             </TabsContent>
 
             {/* Membership Tab Content */}
@@ -298,7 +319,7 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
                       <MembershipHome
                         currentMembershipAddress={validMembership.address}
                         onPurchaseSuccess={refetchMembership}
-                        onSwitchToBankTab={switchToBankTab}
+                        onSwitchToFinanceTab={switchToFinanceTab}
                       />
                     </div>
                   </CardContent>
@@ -306,7 +327,7 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
               ) : (
                 <MembershipHome
                   onPurchaseSuccess={refetchMembership}
-                  onSwitchToBankTab={switchToBankTab}
+                  onSwitchToFinanceTab={switchToFinanceTab}
                 />
               )}
             </TabsContent>

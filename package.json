@@ -69,7 +69,6 @@
     "@livepeer/react": "^4.3.6",
     "@neondatabase/serverless": "^1.0.0",
     "@orbclub/modules": "^0.1.1",
-    "@paragraph-com/sdk": "^1.1.0",
     "@privy-io/alchemy-migration": "^0.0.5",
     "@privy-io/node": "^0.34.0",
     "@privy-io/react-auth": "^3.32.2",
@@ -91,8 +90,8 @@
     "@radix-ui/react-visually-hidden": "^1.1.2",
     "@react-three/drei": "^9.114.0",
     "@react-three/fiber": "^8.17.10",
-    "@reality.eth/contracts": "^3.2.25",
-    "@reality.eth/reality-eth-lib": "^3.4.28",
+    "@reality.eth/contracts": "^3.2.30",
+    "@reality.eth/reality-eth-lib": "^3.4.34",
     "@simplewebauthn/browser": "^13.1.0",
     "@snapshot-labs/snapshot.js": "^0.14.18",
     "@solana-program/system": "^0.8.0",
@@ -198,10 +197,14 @@
       "next@16.2.4": "patches/next@16.2.4.patch"
     },
     "overrides": {
-      "viem": "2.48.8"
+      "viem": "2.48.8",
+      "@reality.eth/reality-eth-lib": "3.4.34"
     }
   },
   "resolutions": {
+    "@solana-program/compute-budget": "0.11.0",
+    "@reality.eth/reality-eth-lib": "3.4.34",
+    "html-encoding-sniffer": "4.0.0",
     "@lens-protocol/client": "0.0.0-canary-20250820102520",
     "@lens-protocol/env": "0.0.0-canary-20250820102520",
     "@lens-protocol/graphql": "0.0.0-canary-20250820102520",

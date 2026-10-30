@@ -13,10 +13,9 @@ export type MembershipTierConfig = {
 };
 
 /**
- * Memberships offered for purchase. Plus locks are retired — AI agents are
- * purchased/deployed on Pinata and connected from the creator profile.
- * Existing Plus holders still map to the matching base tier via
- * {@link getTierIndexByAddress}.
+ * Memberships offered for purchase. Pinata AI agents are available to any
+ * pass holder and are purchased/deployed on Pinata, then connected from the
+ * creator profile.
  */
 export const MEMBERSHIP_TIERS: MembershipTierConfig[] = [
   {
@@ -42,21 +41,27 @@ export const MEMBERSHIP_TIERS: MembershipTierConfig[] = [
     ],
   },
   {
-    name: "Creative Investor Pass",
+    name: "Creative Professional Pass",
     price: "100",
     periodLabel: "per month",
     priceLabel: "$100 USD per month",
     decimals: 6,
     address: LOCK_ADDRESSES.BASE_CREATIVE_PASS_2,
-    features: ["Priority Access", "Investment Reports", "Direct Creator Access"],
+    features: [
+      "Priority Access",
+      "Investment Reports",
+      "Bring Your Own Pinata Agent",
+      "Direct Creator Access",
+    ],
     detailedFeatures: [
       "Exclusive access to emerging creative talent",
       "Priority investment opportunities in creative projects",
       "Detailed market analysis and trend reports",
       "Direct connections with top-tier creators",
       "Portfolio diversification strategies",
-      "Exclusive investor-only events and networking",
+      "Exclusive professional-only events and networking",
       "Advanced analytics and performance tracking",
+      "Attach a Pinata AI agent to your profile for live streams (purchase/deploy on Pinata)",
     ],
     recommended: true,
   },
@@ -70,6 +75,7 @@ export const MEMBERSHIP_TIERS: MembershipTierConfig[] = [
     features: [
       "Partnership Opportunities",
       "Brand Showcase",
+      "Bring Your Own Pinata Agent",
       "Strategic Consulting",
     ],
     detailedFeatures: [
@@ -80,27 +86,16 @@ export const MEMBERSHIP_TIERS: MembershipTierConfig[] = [
       "Exclusive brand showcase and visibility opportunities",
       "Priority access to trending creators and influencers",
       "Comprehensive brand analytics and ROI tracking",
+      "Attach a Pinata AI agent to your profile for live streams (purchase/deploy on Pinata)",
     ],
   },
 ];
 
-/** Retired Plus locks → matching base tier address (for UI highlight / upgrades). */
-const PLUS_TO_BASE_TIER: Record<string, LockAddressValue> = {
-  [LOCK_ADDRESSES.BASE_CREATIVE_CREATOR_PLUS.toLowerCase()]:
-    LOCK_ADDRESSES.BASE_CREATIVE_PASS,
-  [LOCK_ADDRESSES.BASE_CREATIVE_INVESTOR_PLUS.toLowerCase()]:
-    LOCK_ADDRESSES.BASE_CREATIVE_PASS_2,
-  [LOCK_ADDRESSES.BASE_CREATIVE_BRAND_PLUS.toLowerCase()]:
-    LOCK_ADDRESSES.BASE_CREATIVE_PASS_3,
-};
-
 export function getTierIndexByAddress(address?: string | null): number {
   if (!address) return 0;
   const normalized = address.toLowerCase();
-  const resolved =
-    PLUS_TO_BASE_TIER[normalized] ?? (address as LockAddressValue);
   const index = MEMBERSHIP_TIERS.findIndex(
-    (tier) => tier.address.toLowerCase() === resolved.toLowerCase()
+    (tier) => tier.address.toLowerCase() === normalized
   );
   return index >= 0 ? index : 0;
 }
@@ -110,9 +105,5 @@ export function isCurrentTier(
   currentMembershipAddress?: string
 ): boolean {
   if (!currentMembershipAddress) return false;
-  const current = currentMembershipAddress.toLowerCase();
-  const tier = tierAddress.toLowerCase();
-  if (tier === current) return true;
-  // Treat a Plus lock as "current" for its matching base tier card.
-  return PLUS_TO_BASE_TIER[current]?.toLowerCase() === tier;
+  return tierAddress.toLowerCase() === currentMembershipAddress.toLowerCase();
 }

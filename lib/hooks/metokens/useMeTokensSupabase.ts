@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useUser, useSmartAccountClient } from '@/lib/wallet/react';
-import { parseEther, formatEther, formatUnits, encodeFunctionData, maxUint256, type Abi } from 'viem';
+import { parseEther, formatEther, formatUnits, encodeFunctionData, maxUint256, erc20Abi, type Abi } from 'viem';
 import { meTokenSupabaseService, MeToken, MeTokenBalance } from '@/lib/sdk/supabase/metokens';
 import { CreateMeTokenData, UpdateMeTokenData } from '@/lib/sdk/supabase/client';
 import { getMeTokenFactoryContract, METOKEN_FACTORY_ADDRESSES } from '@/lib/contracts/MeTokenFactory';
@@ -26,6 +26,26 @@ import {
   pollMeTokenBalanceRefresh,
 } from '@/lib/hooks/metokens/meTokenBalanceEvents';
 import { clearMeTokenHoldingsCache } from '@/lib/hooks/metokens/useMeTokenHoldings';
+import {
+  sendMeTokenTradeUserOp,
+  BASE_USDC_ADDRESS,
+} from '@/lib/wallet/sendMeTokenTradeUserOp';
+import { raceMeTokenTradeUserOp } from '@/lib/wallet/raceMeTokenTradeUserOp';
+import {
+  isMeTokenTradeUserFacingError,
+  MeTokenTradeUserFacingError,
+  METOKEN_TRADE_GENERIC_MESSAGE,
+  METOKEN_TRADE_LOW_USDC_MESSAGE,
+} from '@/lib/wallet/meTokenTradeErrors';
+import { isInsufficientUsdcForGasError } from '@/lib/wallet/classifyGasError';
+import { reportUnexpectedTradeError } from '@/lib/wallet/reportUnexpectedTradeError';
+import {
+  classifyUsdcBuyBalanceShortfall,
+  shouldReserveUsdcGasBufferForBuy,
+} from '@/lib/metokens/meTokenTradeUsdcBuffer';
+import { buildTradeGasLogFields } from '@/lib/hooks/metokens/tradeGasContext';
+import { requireMeTokenAddress } from '@/lib/hooks/metokens/meTokenHookAddresses';
+import { resolveEvmAddress } from '@/lib/hooks/metokens/resolveEvmAddress';
 
 // MeTokens contract addresses on Base
 const METOKEN_FACTORY = METOKEN_FACTORY_BASE;
@@ -159,23 +179,60 @@ export function useMeTokensSupabase(targetAddress?: string) {
   const user = useUser();
   const { client } = useSmartAccountClient({});
   const { toast } = useToast();
-  const { getGasContext, isMember } = useGasSponsorship();
+  const {
+    getGasContext,
+    isMember,
+    isMembershipLoading,
+    resolveTradeGasContext,
+    resolveMemberForTrade,
+  } = useGasSponsorship();
   const { getAuthHeaders } = useWalletAuth();
 
   // Use targetAddress if provided, otherwise use the smart account address from client
   const address = targetAddress || client?.account?.address || user?.address;
 
-  /** Members get sponsored gas; everyone else pays gas in USDC when the any-token policy is set. */
-  const resolveTradeGasContext = useCallback(() => {
-    if (isMember) {
-      const sponsored = getGasContext('sponsored');
-      if (sponsored.context) {
-        return sponsored;
+  const usdcTradeGasContext = useCallback(
+    () => getGasContext('usdc', { isMember: false }).context,
+    [getGasContext],
+  );
+
+  const readUsdcBalance = useCallback(async (owner: `0x${string}`) => {
+    return (await publicClient.readContract({
+      address: BASE_USDC_ADDRESS,
+      abi: erc20Abi,
+      functionName: 'balanceOf',
+      args: [owner],
+    })) as bigint;
+  }, []);
+
+  const sendTradeUserOp = useCallback(
+    async (
+      uo: Parameters<typeof sendMeTokenTradeUserOp>[0]['uo'],
+      ownerAddress: `0x${string}`,
+      memberForGas: boolean,
+      options?: {
+        simulationTimeout?: boolean;
+        meTokenAddress?: `0x${string}`;
+      },
+    ) => {
+      if (!client) throw new Error('Smart account client not initialized');
+      const params = {
+        client,
+        uo,
+        ownerAddress,
+        primary: resolveTradeGasContext(memberForGas),
+        usdcContext: usdcTradeGasContext(),
+        readUsdcBalance,
+      };
+      if (options?.simulationTimeout) {
+        return raceMeTokenTradeUserOp(params, {
+          meTokenAddress: options.meTokenAddress,
+        });
       }
-      logger.warn('⚠️ Member sponsored gas unavailable; falling back to USDC gas');
-    }
-    return getGasContext('usdc');
-  }, [getGasContext, isMember]);
+      return sendMeTokenTradeUserOp(params);
+    },
+    [client, readUsdcBalance, resolveTradeGasContext, usdcTradeGasContext],
+  );
 
   const pokeHoldingsRefresh = useCallback(
     (opts?: { poll?: boolean }) => {
@@ -193,7 +250,20 @@ export function useMeTokensSupabase(targetAddress?: string) {
   );
 
   const toFriendlyTradeError = (err: unknown, fallback: string): Error => {
+    if (isMeTokenTradeUserFacingError(err)) return err;
+
     const message = err instanceof Error ? err.message : String(err);
+    if (
+      message.includes('Insufficient USDC') ||
+      message.includes('for this purchase plus') ||
+      message.includes(METOKEN_TRADE_LOW_USDC_MESSAGE)
+    ) {
+      return new MeTokenTradeUserFacingError(
+        'low_usdc_gas',
+        METOKEN_TRADE_LOW_USDC_MESSAGE,
+        err,
+      );
+    }
     if (
       message.includes('transfer amount exceeds allowance') ||
       message.includes('insufficient allowance') ||
@@ -203,7 +273,19 @@ export function useMeTokensSupabase(targetAddress?: string) {
         'USDC/meToken approval is missing or too low for this trade. Please try again so the wallet can approve the vault, then complete the swap.',
       );
     }
-    return err instanceof Error ? err : new Error(fallback);
+    if (isInsufficientUsdcForGasError(err)) {
+      return new MeTokenTradeUserFacingError(
+        'low_usdc_gas',
+        METOKEN_TRADE_LOW_USDC_MESSAGE,
+        err,
+      );
+    }
+    reportUnexpectedTradeError(err, { fallback });
+    return new MeTokenTradeUserFacingError(
+      'generic',
+      METOKEN_TRADE_GENERIC_MESSAGE,
+      err,
+    );
   };
 
   const [userMeToken, setUserMeToken] = useState<MeTokenData | null>(null);
@@ -216,16 +298,19 @@ export function useMeTokensSupabase(targetAddress?: string) {
 
   // Convert Supabase MeToken to our MeTokenData format
   const convertToMeTokenData = useCallback(async (supabaseMeToken: MeToken, userAddress: string): Promise<MeTokenData> => {
+    const tokenAddress = resolveEvmAddress(supabaseMeToken.address);
+    const holderAddress = resolveEvmAddress(userAddress);
+
     // Get user's balance from contract
     let userBalance = BigInt(0);
     try {
-      if (client) {
-        logger.debug('🔍 Fetching user balance for MeToken:', supabaseMeToken.address);
+      if (client && tokenAddress && holderAddress) {
+        logger.debug('🔍 Fetching user balance for MeToken:', tokenAddress);
         userBalance = await publicClient.readContract({
-          address: supabaseMeToken.address as `0x${string}`,
+          address: tokenAddress,
           abi: ERC20_ABI,
           functionName: 'balanceOf',
-          args: [userAddress as `0x${string}`],
+          args: [holderAddress],
         }) as bigint;
         logger.debug('✅ User balance fetched:', userBalance.toString());
       } else {
@@ -252,12 +337,12 @@ export function useMeTokensSupabase(targetAddress?: string) {
     };
 
     try {
-      if (client && supabaseMeToken?.address) {
-        logger.debug('🔍 Fetching fresh contract data for MeToken:', supabaseMeToken.address);
+      if (client && tokenAddress) {
+        logger.debug('🔍 Fetching fresh contract data for MeToken:', tokenAddress);
 
         // Fetch total supply
         const supplyData = await publicClient.readContract({
-          address: supabaseMeToken.address as `0x${string}`,
+          address: tokenAddress,
           abi: ERC20_ABI,
           functionName: 'totalSupply',
         }) as bigint;
@@ -268,7 +353,7 @@ export function useMeTokensSupabase(targetAddress?: string) {
           address: DIAMOND,
           abi: METOKEN_ABI,
           functionName: 'getMeTokenInfo',
-          args: [supabaseMeToken.address as `0x${string}`],
+          args: [tokenAddress],
         }) as any;
 
         if (infoData) {
@@ -335,88 +420,97 @@ export function useMeTokensSupabase(targetAddress?: string) {
 
           if (client) {
             // We need to fetch name/symbol/totalSupply from contract since subgraph might just have ID
-            const contractAddress = latestToken.id as `0x${string}`;
+            const contractAddress = resolveEvmAddress(latestToken.id);
+            if (!contractAddress) {
+              logger.warn(
+                '⚠️ Subgraph MeToken id is not a valid address, skipping contract fetch:',
+                latestToken.id,
+              );
+            } else {
+              const [name, symbol, totalSupply] = await Promise.all([
+                publicClient.readContract({ address: contractAddress, abi: ERC20_ABI, functionName: 'name' }),
+                publicClient.readContract({ address: contractAddress, abi: ERC20_ABI, functionName: 'symbol' }),
+                publicClient.readContract({ address: contractAddress, abi: ERC20_ABI, functionName: 'totalSupply' })
+              ]) as [string, string, bigint];
 
-            const [name, symbol, totalSupply] = await Promise.all([
-              publicClient.readContract({ address: contractAddress, abi: ERC20_ABI, functionName: 'name' }),
-              publicClient.readContract({ address: contractAddress, abi: ERC20_ABI, functionName: 'symbol' }),
-              publicClient.readContract({ address: contractAddress, abi: ERC20_ABI, functionName: 'totalSupply' })
-            ]) as [string, string, bigint];
+              // Get fresh info from Diamond for pooled/locked
+              let currentInfo = {
+                owner: latestToken.owner || address,
+                hubId: BigInt(latestToken.hubId || 1),
+                balancePooled: BigInt(latestToken.balancePooled || 0),
+                balanceLocked: BigInt(latestToken.balanceLocked || 0),
+                startTime: BigInt(latestToken.startTime || 0),
+                endTime: BigInt(latestToken.endTime || 0),
+                endCooldown: BigInt(latestToken.endCooldown || 0),
+                targetHubId: BigInt(latestToken.targetHubId || 0),
+                migration: latestToken.migration || "0x0000000000000000000000000000000000000000",
+              };
 
-            // Get fresh info from Diamond for pooled/locked
-            let currentInfo = {
-              owner: latestToken.owner || address,
-              hubId: BigInt(latestToken.hubId || 1),
-              balancePooled: BigInt(latestToken.balancePooled || 0),
-              balanceLocked: BigInt(latestToken.balanceLocked || 0),
-              startTime: BigInt(latestToken.startTime || 0),
-              endTime: BigInt(latestToken.endTime || 0),
-              endCooldown: BigInt(latestToken.endCooldown || 0),
-              targetHubId: BigInt(latestToken.targetHubId || 0),
-              migration: latestToken.migration || "0x0000000000000000000000000000000000000000",
-            };
-
-            // Try to refresh info from contract if possible
-            try {
-              const infoData = await publicClient.readContract({
-                address: DIAMOND,
-                abi: METOKEN_ABI,
-                functionName: 'getMeTokenInfo',
-                args: [contractAddress],
-              }) as any;
-              if (infoData) {
-                currentInfo = {
-                  owner: infoData.owner,
-                  hubId: BigInt(infoData.hubId),
-                  balancePooled: BigInt(infoData.balancePooled),
-                  balanceLocked: BigInt(infoData.balanceLocked),
-                  startTime: BigInt(infoData.startTime),
-                  endTime: BigInt(infoData.endTime),
-                  endCooldown: BigInt(infoData.endCooldown),
-                  targetHubId: BigInt(infoData.targetHubId),
-                  migration: infoData.migration,
-                };
+              // Try to refresh info from contract if possible
+              try {
+                const infoData = await publicClient.readContract({
+                  address: DIAMOND,
+                  abi: METOKEN_ABI,
+                  functionName: 'getMeTokenInfo',
+                  args: [contractAddress],
+                }) as any;
+                if (infoData) {
+                  currentInfo = {
+                    owner: infoData.owner,
+                    hubId: BigInt(infoData.hubId),
+                    balancePooled: BigInt(infoData.balancePooled),
+                    balanceLocked: BigInt(infoData.balanceLocked),
+                    startTime: BigInt(infoData.startTime),
+                    endTime: BigInt(infoData.endTime),
+                    endCooldown: BigInt(infoData.endCooldown),
+                    targetHubId: BigInt(infoData.targetHubId),
+                    migration: infoData.migration,
+                  };
+                }
+              } catch (e) {
+                logger.warn('⚠️ Failed to refresh info from contract, using subgraph data', e);
               }
-            } catch (e) {
-              logger.warn('⚠️ Failed to refresh info from contract, using subgraph data', e);
-            }
 
-            // Vault TVL in USD-stable units (hub asset decimals: USDC=6, others=18)
-            const calculatedTvl = calculateMeTokenVaultTvlUsd(
-              currentInfo.balancePooled,
-              currentInfo.balanceLocked,
-              Number(currentInfo.hubId)
-            );
+              // Vault TVL in USD-stable units (hub asset decimals: USDC=6, others=18)
+              const calculatedTvl = calculateMeTokenVaultTvlUsd(
+                currentInfo.balancePooled,
+                currentInfo.balanceLocked,
+                Number(currentInfo.hubId)
+              );
 
-            // Get user balance
-            let userBalance = BigInt(0);
-            try {
-              userBalance = await publicClient.readContract({
+              // Get user balance
+              let userBalance = BigInt(0);
+              const holderAddress = resolveEvmAddress(address);
+              try {
+                if (holderAddress) {
+                  userBalance = await publicClient.readContract({
+                    address: contractAddress,
+                    abi: ERC20_ABI,
+                    functionName: 'balanceOf',
+                    args: [holderAddress],
+                  }) as bigint;
+                }
+              } catch (e) { }
+
+              const meTokenData: MeTokenData = {
                 address: contractAddress,
-                abi: ERC20_ABI,
-                functionName: 'balanceOf',
-                args: [address as `0x${string}`],
-              }) as bigint;
-            } catch (e) { }
+                name,
+                symbol,
+                totalSupply,
+                balance: userBalance,
+                info: currentInfo,
+                tvl: calculatedTvl,
+                hubId: Number(currentInfo.hubId),
+                balancePooled: currentInfo.balancePooled,
+                balanceLocked: currentInfo.balanceLocked,
+                owner: currentInfo.owner,
+                created_at: new Date(Number(currentInfo.startTime) * 1000).toISOString(),
+                updated_at: new Date().toISOString(),
+              };
 
-            const meTokenData: MeTokenData = {
-              address: latestToken.id,
-              name,
-              symbol,
-              totalSupply,
-              balance: userBalance,
-              info: currentInfo,
-              tvl: calculatedTvl,
-              hubId: Number(currentInfo.hubId),
-              balancePooled: currentInfo.balancePooled,
-              balanceLocked: currentInfo.balanceLocked,
-              owner: currentInfo.owner,
-              created_at: new Date(Number(currentInfo.startTime) * 1000).toISOString(),
-              updated_at: new Date().toISOString(),
-            };
-
-            setUserMeToken(meTokenData);
-            foundInSubgraph = true;
+              setUserMeToken(meTokenData);
+              foundInSubgraph = true;
+            }
           }
         }
       } catch (subgraphErr) {
@@ -1456,16 +1550,21 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
     setTransactionError(null);
 
     try {
-      // Get gas sponsorship context (sponsored for members, USDC for non-members)
-      const { context: gasContext, isSponsored } = resolveTradeGasContext();
-      logger.debug('🔧 Gas context for buyMeTokens:', {
-        gasContext,
-        isMember,
-        isSponsored,
-        hasPolicyId: !!gasContext?.paymasterService?.policyId,
-        policyId: gasContext?.paymasterService?.policyId,
-        tokenAddress: gasContext?.erc20?.tokenAddress,
-      });
+      const tokenAddress = requireMeTokenAddress(meTokenAddress);
+      const ownerAddress = resolveEvmAddress(client.account?.address || address);
+      if (!ownerAddress) {
+        throw new Error('Invalid wallet address');
+      }
+
+      const ownerAddressForGas = ownerAddress;
+      const memberForGas = await resolveMemberForTrade(ownerAddressForGas);
+      const { context: gasContext, isSponsored } = resolveTradeGasContext(
+        memberForGas,
+      );
+      logger.debug(
+        '🔧 Gas context for buyMeTokens:',
+        buildTradeGasLogFields(memberForGas, gasContext, isSponsored),
+      );
 
       // Get the vault address that will actually perform transferFrom
       // 1. Get meToken's hubId
@@ -1473,7 +1572,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         address: DIAMOND,
         abi: METOKEN_ABI,
         functionName: 'getMeTokenInfo',
-        args: [meTokenAddress as `0x${string}`],
+        args: [tokenAddress],
       }) as any;
 
       const hubIdRaw = meTokenInfo.hubId ?? meTokenInfo[1] ?? BigInt(1);
@@ -1506,8 +1605,10 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
       const hubAsset = resolveHubAsset(hubIdNum, assetAddress);
       const collateralAmountWei = parseHubAssetAmount(collateralAmount, hubAsset);
       const collateralAbi = getCollateralErc20Abi();
-      const collateralAddress = hubAsset.address as `0x${string}`;
-      const ownerAddress = (client.account?.address || address) as `0x${string}`;
+      const collateralAddress = resolveEvmAddress(hubAsset.address);
+      if (!collateralAddress) {
+        throw new Error('Invalid hub collateral address');
+      }
 
       // Fallback to Diamond if vault is zero address (shouldn't happen, but safe)
       if (!vaultAddress || vaultAddress === '0x0000000000000000000000000000000000000000') {
@@ -1525,17 +1626,33 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         args: [ownerAddress],
       })) as bigint;
 
+      const gasBufferWei = parseHubAssetAmount(USDC_GAS_BUFFER, hubAsset);
+      const reserveUsdcGasBuffer = shouldReserveUsdcGasBufferForBuy({
+        collateralSymbol: hubAsset.symbol,
+        isSponsored,
+        usdcAnyTokenPolicyConfigured: !!usdcTradeGasContext(),
+      });
       let requiredBalance = collateralAmountWei;
-      if (!isSponsored && hubAsset.symbol === 'USDC') {
-        requiredBalance += parseHubAssetAmount(USDC_GAS_BUFFER, hubAsset);
+      if (reserveUsdcGasBuffer) {
+        requiredBalance += gasBufferWei;
       }
 
-      if (collateralBalance < requiredBalance) {
-        const needsGasBuffer = !isSponsored && hubAsset.symbol === 'USDC';
+      const shortfall = classifyUsdcBuyBalanceShortfall({
+        collateralBalance,
+        requiredBalance,
+        collateralSymbol: hubAsset.symbol,
+        reserveUsdcGasBuffer,
+        minGasBuffer: gasBufferWei,
+      });
+      if (shortfall === 'low_usdc_gas') {
+        throw new MeTokenTradeUserFacingError(
+          'low_usdc_gas',
+          METOKEN_TRADE_LOW_USDC_MESSAGE,
+        );
+      }
+      if (shortfall === 'insufficient_collateral') {
         throw new Error(
-          needsGasBuffer
-            ? `Insufficient ${hubAsset.symbol} in your smart account. You need at least ${collateralAmount} ${hubAsset.symbol} for this purchase plus ~${USDC_GAS_BUFFER} ${hubAsset.symbol} for gas.`
-            : `Insufficient ${hubAsset.symbol} in your smart account. You need at least ${collateralAmount} ${hubAsset.symbol} for this purchase.`,
+          `Insufficient ${hubAsset.symbol} in your smart account. You need at least ${collateralAmount} ${hubAsset.symbol} for this purchase.`,
         );
       }
 
@@ -1565,14 +1682,15 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         });
 
         logger.debug(`📤 Sending ${hubAsset.symbol} approve UserOp...`);
-        const approveOp = await client.sendUserOperation({
-          uo: {
+        const approveOp = await sendTradeUserOp(
+          {
             target: collateralAddress,
             data: appendBuilderCode(approveData),
             value: BigInt(0),
           },
-          context: gasContext,
-        });
+          ownerAddress,
+          memberForGas,
+        );
 
         logger.debug('⏳ Waiting for approval confirmation...', approveOp.hash);
         await client.waitForUserOperationTransaction({
@@ -1617,14 +1735,15 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
           args: [DIAMOND as `0x${string}`, maxUint256],
         });
 
-        const approveOp = await client.sendUserOperation({
-          uo: {
+        const approveOp = await sendTradeUserOp(
+          {
             target: collateralAddress,
             data: appendBuilderCode(approveData),
             value: BigInt(0),
           },
-          context: gasContext,
-        });
+          ownerAddress,
+          memberForGas,
+        );
 
         logger.debug('⏳ Waiting for DIAMOND approval confirmation...', approveOp.hash);
         await client.waitForUserOperationTransaction({
@@ -1661,8 +1780,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         logger.warn('⚠️ Failed to calculate expected mint amount:', calcErr);
       }
 
-      // 4. Now mint with retry logic for timeout errors
-
+      // 4. Mint — single in-flight UserOp (sponsor + USDC fallback); no timeout resubmit
       logger.debug('📤 Sending Mint UserOp to DIAMOND...');
 
       const mintOperation = {
@@ -1671,56 +1789,21 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
           data: appendBuilderCode(encodeFunctionData({
             abi: METOKEN_ABI,
             functionName: 'mint',
-            args: [meTokenAddress as `0x${string}`, collateralAmountWei, ownerAddress],
+            args: [tokenAddress, collateralAmountWei, ownerAddress],
           })),
           value: BigInt(0),
         },
       };
 
-      // Retry logic for transaction simulation timeouts
-      let operation: any;
-      let mintAttempts = 0;
-      const maxMintAttempts = 3;
-      const baseRetryDelay = 3000; // 3 seconds
-
-      while (mintAttempts < maxMintAttempts) {
-        mintAttempts++;
-        try {
-          logger.debug(`🔄 Mint attempt ${mintAttempts}/${maxMintAttempts}...`);
-
-          // Create a timeout promise (90 seconds per attempt)
-          const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('Transaction simulation timed out.')), 90000);
-          });
-
-          // Race the sendUserOperation with timeout
-          const sendMintOpPromise = client.sendUserOperation({
-            ...mintOperation,
-            context: gasContext,
-          });
-          operation = await Promise.race([sendMintOpPromise, timeoutPromise]) as any;
-
-          // Success - break out of retry loop
-          break;
-        } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          const isTimeoutError = errorMessage.includes('timed out') || errorMessage.includes('timeout');
-
-          if (isTimeoutError && mintAttempts < maxMintAttempts) {
-            // Calculate exponential backoff delay
-            const retryDelay = baseRetryDelay * Math.pow(2, mintAttempts - 1);
-            logger.debug(`⏳ Mint attempt ${mintAttempts} timed out. Retrying in ${retryDelay}ms...`);
-            await new Promise(resolve => setTimeout(resolve, retryDelay));
-            continue;
-          } else {
-            // Not a timeout error, or we've exhausted retries
-            if (isTimeoutError && mintAttempts >= maxMintAttempts) {
-              throw new Error('Transaction simulation timed out after multiple retries. The network may be busy. Please try again in a few moments.');
-            }
-            throw error;
-          }
-        }
-      }
+      const operation = await sendTradeUserOp(
+        mintOperation.uo,
+        ownerAddress,
+        memberForGas,
+        {
+          simulationTimeout: true,
+          meTokenAddress: tokenAddress,
+        },
+      );
 
       logger.debug('🎉 Mint UserOp sent! Hash:', operation.hash);
       setIsPending(false);
@@ -1736,12 +1819,12 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
       setIsConfirmed(true);
 
       // Update MeToken data in Supabase via API route (uses service role client)
-      const meToken = await meTokenSupabaseService.getMeTokenByAddress(meTokenAddress);
+      const meToken = await meTokenSupabaseService.getMeTokenByAddress(tokenAddress);
       if (meToken) {
         // Record the transaction with video tracking if provided via API route
         try {
           const authHeaders = await getAuthHeaders();
-          const response = await fetch(`/api/metokens/${meTokenAddress}/transactions`, {
+          const response = await fetch(`/api/metokens/${tokenAddress}/transactions`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', ...authHeaders },
             body: JSON.stringify({
@@ -1769,18 +1852,22 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         // Update user balance in Supabase via API route (uses service role client)
         try {
           // Read actual balance from chain to ensure accuracy
-          const actualBalance = await publicClient.readContract({
-            address: meTokenAddress as `0x${string}`,
+          const holderAddress = resolveEvmAddress(address);
+          if (!holderAddress) {
+            throw new Error('Invalid wallet address for balance sync');
+          }
+          const actualBalance = (await publicClient.readContract({
+            address: tokenAddress,
             abi: ERC20_ABI,
             functionName: 'balanceOf',
-            args: [address as `0x${string}`],
-          }) as bigint;
+            args: [holderAddress],
+          })) as bigint;
 
           const newBalance = parseFloat(formatEther(actualBalance));
           logger.debug(`📊 Syncing balance to Supabase: ${newBalance} (Chain balance: ${actualBalance.toString()})`);
 
           const authHeaders = await getAuthHeaders();
-          const balanceResponse = await fetch(`/api/metokens/${meTokenAddress}/balance`, {
+          const balanceResponse = await fetch(`/api/metokens/${tokenAddress}/balance`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json', ...authHeaders },
             body: JSON.stringify({
@@ -1834,14 +1921,20 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
     if (!client || !address) throw new Error('Client or address not available');
 
     try {
+      const tokenAddress = requireMeTokenAddress(meTokenAddress);
+      const ownerAddress = resolveEvmAddress(address);
+      if (!ownerAddress) {
+        throw new Error('Invalid wallet address');
+      }
+
       // Get the vault address that will actually perform transferFrom
       // 1. Get meToken's hubId
-      logger.debug('🔍 ensureDaiApproval: Fetching Hub ID for token:', meTokenAddress);
+      logger.debug('🔍 ensureDaiApproval: Fetching Hub ID for token:', tokenAddress);
       const meTokenInfo = await publicClient.readContract({
         address: DIAMOND,
         abi: METOKEN_ABI,
         functionName: 'getMeTokenInfo',
-        args: [meTokenAddress as `0x${string}`],
+        args: [tokenAddress],
       }) as any;
 
       const hubIdRaw = meTokenInfo.hubId || meTokenInfo[1] || BigInt(1);
@@ -1880,15 +1973,22 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
       logger.debug('🔍 ensureDaiApproval: Using vault address:', vaultAddress, 'for Hub ID:', hubIdNum, 'asset:', hubAsset.symbol);
 
       const collateralAbi = getCollateralErc20Abi();
-      const collateralAddress = hubAsset.address as `0x${string}`;
+      const collateralAddress = resolveEvmAddress(hubAsset.address);
+      if (!collateralAddress) {
+        throw new Error('Invalid hub collateral address');
+      }
       const requiredAmount = parseHubAssetAmount(collateralAmount, hubAsset);
+      const vaultSpender = resolveEvmAddress(vaultAddress);
+      if (!vaultSpender) {
+        throw new Error('Invalid vault address');
+      }
 
       // Check current allowance for vault (not Diamond!)
       const currentAllowance = await publicClient.readContract({
         address: collateralAddress,
         abi: collateralAbi,
         functionName: 'allowance',
-        args: [address as `0x${string}`, vaultAddress as `0x${string}`],
+        args: [ownerAddress, vaultSpender],
       }) as bigint;
 
       logger.debug(`📊 Current ${hubAsset.symbol} allowance for vault:`, {
@@ -1907,7 +2007,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
             data: appendBuilderCode(encodeFunctionData({
               abi: collateralAbi,
               functionName: 'approve',
-              args: [vaultAddress as `0x${string}`, BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff')], // Max approval
+              args: [vaultSpender, BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff')], // Max approval
             })),
             value: BigInt(0),
           },
@@ -1920,8 +2020,8 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
 
         await readAllowanceWithRetry({
           token: collateralAddress,
-          owner: address as `0x${string}`,
-          spender: vaultAddress as `0x${string}`,
+          owner: ownerAddress,
+          spender: vaultSpender,
           abi: collateralAbi,
           minAmount: requiredAmount,
           label: `${hubAsset.symbol} vault`,
@@ -1945,11 +2045,18 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         return '0';
       }
 
+      const tokenAddress = resolveEvmAddress(meTokenAddress);
+      const senderAddress = resolveEvmAddress(address);
+      if (!tokenAddress || !senderAddress) {
+        logger.warn('⚠️ calculateAssetsReturned: Invalid MeToken or wallet address');
+        return '0';
+      }
+
       logger.debug('📊 calculateAssetsReturned input:', {
-        meTokenAddress,
+        meTokenAddress: tokenAddress,
         meTokenAmount,
         meTokenAmountWei: parseEther(meTokenAmount).toString(),
-        senderAddress: address,
+        senderAddress,
         diamondAddress: DIAMOND
       });
 
@@ -1957,7 +2064,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         address: DIAMOND,
         abi: METOKEN_ABI,
         functionName: 'calculateAssetsReturned',
-        args: [meTokenAddress as `0x${string}`, parseEther(meTokenAmount), address as `0x${string}`],
+        args: [tokenAddress, parseEther(meTokenAmount), senderAddress],
       });
 
       // Determine the collateral token's decimals from the MeToken's hub
@@ -1965,7 +2072,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         address: DIAMOND,
         abi: METOKEN_ABI,
         functionName: 'getMeTokenInfo',
-        args: [meTokenAddress as `0x${string}`],
+        args: [tokenAddress],
       }) as any;
 
       const hubIdNum = Number(meTokenInfo.hubId ?? meTokenInfo[1] ?? 1n);
@@ -2015,18 +2122,22 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
 
     try {
       logger.debug('💸 Sell requested:', { meTokenAddress, meTokenAmount });
-      const sellAmountWei = parseEther(meTokenAmount);
-      const ownerAddress = (client.account?.address || address) as `0x${string}`;
+      const tokenAddress = requireMeTokenAddress(meTokenAddress);
+      const ownerAddress = resolveEvmAddress(client.account?.address || address);
+      if (!ownerAddress) {
+        throw new Error('Invalid wallet address');
+      }
 
-      const { context: gasContext, isSponsored } = resolveTradeGasContext();
-      logger.debug('🔧 Gas context for sellMeTokens:', {
-        gasContext,
-        isMember,
-        isSponsored,
-        hasPolicyId: !!gasContext?.paymasterService?.policyId,
-        policyId: gasContext?.paymasterService?.policyId,
-        tokenAddress: gasContext?.erc20?.tokenAddress,
-      });
+      const sellAmountWei = parseEther(meTokenAmount);
+
+      const memberForGas = await resolveMemberForTrade(ownerAddress);
+      const { context: gasContext, isSponsored } = resolveTradeGasContext(
+        memberForGas,
+      );
+      logger.debug(
+        '🔧 Gas context for sellMeTokens:',
+        buildTradeGasLogFields(memberForGas, gasContext, isSponsored),
+      );
 
       // Get the vault address that will actually perform transferFrom (same pattern as buyMeTokens)
       // 1. Get meToken's hubId
@@ -2034,7 +2145,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         address: DIAMOND,
         abi: METOKEN_ABI,
         functionName: 'getMeTokenInfo',
-        args: [meTokenAddress as `0x${string}`],
+        args: [tokenAddress],
       }) as any;
 
       const hubId = meTokenInfo.hubId || meTokenInfo[1] || BigInt(1);
@@ -2068,13 +2179,15 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
 
       logger.debug('🔍 Burn flow: Using vault address:', vaultAddress, 'for Hub ID:', hubId.toString());
 
+      const vaultSpender = resolveEvmAddress(vaultAddress) ?? DIAMOND;
+
       // 3. Check and approve MeToken for the vault (not Diamond!)
       logger.debug('🔍 Checking MeToken allowance for vault...');
       let currentAllowance = await publicClient.readContract({
-        address: meTokenAddress as `0x${string}`,
+        address: tokenAddress,
         abi: ERC20_ABI,
         functionName: 'allowance',
-        args: [ownerAddress, vaultAddress as `0x${string}`],
+        args: [ownerAddress, vaultSpender],
       }) as bigint;
 
       logger.debug('📊 Current MeToken allowance for vault:', {
@@ -2090,18 +2203,19 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         const approveData = encodeFunctionData({
           abi: ERC20_ABI,
           functionName: 'approve',
-          args: [vaultAddress as `0x${string}`, maxUint256],
+          args: [vaultSpender, maxUint256],
         });
 
         logger.debug('📤 Sending MeToken approve UserOp...');
-        const approveOp = await client.sendUserOperation({
-          uo: {
-            target: meTokenAddress as `0x${string}`,
+        const approveOp = await sendTradeUserOp(
+          {
+            target: tokenAddress,
             data: appendBuilderCode(approveData),
             value: BigInt(0),
           },
-          context: gasContext,
-        });
+          ownerAddress,
+          memberForGas,
+        );
 
         logger.debug('⏳ Waiting for approval confirmation...', approveOp.hash);
         await client.waitForUserOperationTransaction({
@@ -2109,9 +2223,9 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         });
 
         currentAllowance = await readAllowanceWithRetry({
-          token: meTokenAddress as `0x${string}`,
+          token: tokenAddress,
           owner: ownerAddress,
-          spender: vaultAddress as `0x${string}`,
+          spender: vaultSpender,
           abi: ERC20_ABI as Abi,
           minAmount: sellAmountWei,
           label: 'MeToken vault',
@@ -2126,10 +2240,10 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
       // This covers the case where Diamond is the spender, or Vault is the spender.
       logger.debug('🔍 Checking MeToken allowance for DIAMOND...');
       let diamondAllowance = await publicClient.readContract({
-        address: meTokenAddress as `0x${string}`,
+        address: tokenAddress,
         abi: ERC20_ABI,
         functionName: 'allowance',
-        args: [ownerAddress, DIAMOND as `0x${string}`],
+        args: [ownerAddress, DIAMOND],
       }) as bigint;
 
       logger.debug('📊 Current MeToken allowance for DIAMOND:', {
@@ -2147,14 +2261,15 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
           args: [DIAMOND as `0x${string}`, maxUint256],
         });
 
-        const approveOp = await client.sendUserOperation({
-          uo: {
-            target: meTokenAddress as `0x${string}`,
+        const approveOp = await sendTradeUserOp(
+          {
+            target: tokenAddress,
             data: appendBuilderCode(approveData),
             value: BigInt(0),
           },
-          context: gasContext,
-        });
+          ownerAddress,
+          memberForGas,
+        );
 
         logger.debug('⏳ Waiting for DIAMOND approval confirmation...', approveOp.hash);
         await client.waitForUserOperationTransaction({
@@ -2162,9 +2277,9 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         });
 
         diamondAllowance = await readAllowanceWithRetry({
-          token: meTokenAddress as `0x${string}`,
+          token: tokenAddress,
           owner: ownerAddress,
-          spender: DIAMOND as `0x${string}`,
+          spender: DIAMOND,
           abi: ERC20_ABI as Abi,
           minAmount: sellAmountWei,
           label: 'MeToken Diamond',
@@ -2193,7 +2308,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         // Continue - we'll try to calculate it again after if needed
       }
 
-      // Send burn operation with retry logic for timeout errors
+      // Burn — single in-flight UserOp (sponsor + USDC fallback); no timeout resubmit
       logger.debug('📤 Sending Burn UserOp to DIAMOND...');
 
       const burnOperation = {
@@ -2202,56 +2317,21 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
           data: appendBuilderCode(encodeFunctionData({
             abi: METOKEN_ABI,
             functionName: 'burn',
-            args: [meTokenAddress as `0x${string}`, sellAmountWei, ownerAddress],
+            args: [tokenAddress, sellAmountWei, ownerAddress],
           })),
           value: BigInt(0),
         },
       };
 
-      // Retry logic for transaction simulation timeouts
-      let operation: any;
-      let burnAttempts = 0;
-      const maxBurnAttempts = 3;
-      const baseRetryDelay = 3000; // 3 seconds
-
-      while (burnAttempts < maxBurnAttempts) {
-        burnAttempts++;
-        try {
-          logger.debug(`🔄 Burn attempt ${burnAttempts}/${maxBurnAttempts}...`);
-
-          // Create a timeout promise (90 seconds per attempt)
-          const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('Transaction simulation timed out.')), 90000);
-          });
-
-          // Race the sendUserOperation with timeout
-          const sendBurnOpPromise = client.sendUserOperation({
-            ...burnOperation,
-            context: gasContext,
-          });
-          operation = await Promise.race([sendBurnOpPromise, timeoutPromise]) as any;
-
-          // Success - break out of retry loop
-          break;
-        } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          const isTimeoutError = errorMessage.includes('timed out') || errorMessage.includes('timeout');
-
-          if (isTimeoutError && burnAttempts < maxBurnAttempts) {
-            // Calculate exponential backoff delay
-            const retryDelay = baseRetryDelay * Math.pow(2, burnAttempts - 1);
-            logger.debug(`⏳ Burn attempt ${burnAttempts} timed out. Retrying in ${retryDelay}ms...`);
-            await new Promise(resolve => setTimeout(resolve, retryDelay));
-            continue;
-          } else {
-            // Not a timeout error, or we've exhausted retries
-            if (isTimeoutError && burnAttempts >= maxBurnAttempts) {
-              throw new Error('Transaction simulation timed out after multiple retries. The network may be busy. Please try again in a few moments.');
-            }
-            throw error;
-          }
-        }
-      }
+      const operation = await sendTradeUserOp(
+        burnOperation.uo,
+        ownerAddress,
+        memberForGas,
+        {
+          simulationTimeout: true,
+          meTokenAddress: tokenAddress,
+        },
+      );
 
       logger.debug('🎉 Burn UserOp sent! Hash:', operation.hash);
       setIsPending(false);
@@ -2267,13 +2347,13 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
       setIsConfirmed(true);
 
       // Update MeToken data in Supabase via API route (uses service role client)
-      const meToken = await meTokenSupabaseService.getMeTokenByAddress(meTokenAddress);
+      const meToken = await meTokenSupabaseService.getMeTokenByAddress(tokenAddress);
       if (meToken) {
         // Record the transaction via API route
         // Note: collateralAmountReturned was calculated before the burn for accuracy
         try {
           const authHeaders = await getAuthHeaders();
-          const response = await fetch(`/api/metokens/${meTokenAddress}/transactions`, {
+          const response = await fetch(`/api/metokens/${tokenAddress}/transactions`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', ...authHeaders },
             body: JSON.stringify({
@@ -2299,18 +2379,22 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         // Update user balance in Supabase via API route (uses service role client)
         try {
           // Read actual balance from chain to ensure accuracy
-          const actualBalance = await publicClient.readContract({
-            address: meTokenAddress as `0x${string}`,
+          const holderAddress = resolveEvmAddress(address);
+          if (!holderAddress) {
+            throw new Error('Invalid wallet address for balance sync');
+          }
+          const actualBalance = (await publicClient.readContract({
+            address: tokenAddress,
             abi: ERC20_ABI,
             functionName: 'balanceOf',
-            args: [address as `0x${string}`],
-          }) as bigint;
+            args: [holderAddress],
+          })) as bigint;
 
           const newBalance = parseFloat(formatEther(actualBalance));
           logger.debug(`📊 Syncing balance to Supabase: ${newBalance} (Chain balance: ${actualBalance.toString()})`);
 
           const authHeaders = await getAuthHeaders();
-          const balanceResponse = await fetch(`/api/metokens/${meTokenAddress}/balance`, {
+          const balanceResponse = await fetch(`/api/metokens/${tokenAddress}/balance`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json', ...authHeaders },
             body: JSON.stringify({
@@ -2364,11 +2448,17 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
     try {
       if (!client) return '0';
 
+      const tokenAddress = resolveEvmAddress(meTokenAddress);
+      if (!tokenAddress) {
+        logger.warn('⚠️ calculateMeTokensMinted: Invalid MeToken address');
+        return '0';
+      }
+
       const meTokenInfo = await publicClient.readContract({
         address: DIAMOND,
         abi: METOKEN_ABI,
         functionName: 'getMeTokenInfo',
-        args: [meTokenAddress as `0x${string}`],
+        args: [tokenAddress],
       }) as any;
 
       const hubIdNum = Number(meTokenInfo.hubId ?? meTokenInfo[1] ?? 1n);
@@ -2390,7 +2480,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
         address: DIAMOND,
         abi: METOKEN_ABI,
         functionName: 'calculateMeTokensMinted',
-        args: [meTokenAddress as `0x${string}`, collateralAmountWei],
+        args: [tokenAddress, collateralAmountWei],
       });
 
       return formatEther(result as bigint);
@@ -2404,8 +2494,14 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
   const checkSpecificMeToken = async (meTokenAddress: string) => {
     if (!address || !client) return null;
 
+    const tokenAddress = resolveEvmAddress(meTokenAddress);
+    if (!tokenAddress) {
+      logger.warn('⚠️ checkSpecificMeToken: Invalid MeToken address', meTokenAddress);
+      return null;
+    }
+
     try {
-      const supabaseMeToken = await meTokenSupabaseService.getMeTokenByAddress(meTokenAddress);
+      const supabaseMeToken = await meTokenSupabaseService.getMeTokenByAddress(tokenAddress);
 
       if (supabaseMeToken) {
         const ownerLower = supabaseMeToken.owner_address.toLowerCase();
@@ -2470,6 +2566,7 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
     userMeToken,
     loading,
     error: meTokenError,
+    isMembershipLoading,
     createMeToken,
     buyMeTokens,
     sellMeTokens,
@@ -2483,12 +2580,17 @@ You can try creating your MeToken with 0 DAI deposit and add liquidity later.`;
     transactionError,
     getMeTokenVaultAddress: async (meTokenAddress: string) => {
       if (!client) return null;
+      const tokenAddress = resolveEvmAddress(meTokenAddress);
+      if (!tokenAddress) {
+        logger.warn('⚠️ getMeTokenVaultAddress: Invalid MeToken address');
+        return null;
+      }
       try {
         const meTokenInfo = await publicClient.readContract({
           address: DIAMOND,
           abi: METOKEN_ABI,
           functionName: 'getMeTokenInfo',
-          args: [meTokenAddress as `0x${string}`],
+          args: [tokenAddress],
         });
         const hubId = (meTokenInfo as any).hubId;
         const hubInfo = await publicClient.readContract({

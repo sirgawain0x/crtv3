@@ -43,8 +43,12 @@ describe("ensureLivepeerStreamForCreator", () => {
     mockHasLivepeerPrivateApiKey.mockReturnValue(true);
   });
 
-  it("reuses credentials when Livepeer stream still exists", async () => {
-    mockGetLivepeerStreamOrNull.mockResolvedValue({ id: "stream-1" });
+  it("reuses credentials when Livepeer stream still exists and keys match", async () => {
+    mockGetLivepeerStreamOrNull.mockResolvedValue({
+      id: "stream-1",
+      streamKey: "key-1",
+      playbackId: "playback-1",
+    });
 
     const result = await ensureLivepeerStreamForCreator({
       ...baseOpts,
@@ -66,8 +70,114 @@ describe("ensureLivepeerStreamForCreator", () => {
       streamKey: "key-1",
       reused: true,
       replaced: false,
+      synced: false,
     });
     expect(mockCreateLivepeerStream).not.toHaveBeenCalled();
+    expect(mockReplaceStreamLivepeerCredentials).not.toHaveBeenCalled();
+  });
+
+  it("syncs credentials when Studio stream key differs from DB", async () => {
+    mockGetLivepeerStreamOrNull.mockResolvedValue({
+      id: "stream-1",
+      streamKey: "studio-key",
+      playbackId: "playback-1",
+    });
+    mockReplaceStreamLivepeerCredentials.mockResolvedValue({});
+
+    const result = await ensureLivepeerStreamForCreator({
+      ...baseOpts,
+      existing: {
+        id: "db-1",
+        creator_id: CREATOR,
+        stream_id: "stream-1",
+        playback_id: "playback-1",
+        stream_key: "stale-db-key",
+        is_live: false,
+        created_at: "",
+        updated_at: "",
+      },
+    });
+
+    expect(result).toEqual({
+      streamId: "stream-1",
+      playbackId: "playback-1",
+      streamKey: "studio-key",
+      reused: false,
+      replaced: false,
+      synced: true,
+    });
+    expect(mockReplaceStreamLivepeerCredentials).toHaveBeenCalledWith(CREATOR, {
+      stream_id: "stream-1",
+      stream_key: "studio-key",
+      playback_id: "playback-1",
+    });
+    expect(mockCreateLivepeerStream).not.toHaveBeenCalled();
+  });
+
+  it("recreates when Studio stream exists but has no usable streamKey", async () => {
+    mockGetLivepeerStreamOrNull.mockResolvedValue({
+      id: "stream-1",
+      playbackId: "playback-1",
+    });
+    mockCreateLivepeerStream.mockResolvedValue({
+      streamId: "new-stream",
+      playbackId: "new-playback",
+      streamKey: "new-key",
+    });
+    mockReplaceStreamLivepeerCredentials.mockResolvedValue({});
+
+    const result = await ensureLivepeerStreamForCreator({
+      ...baseOpts,
+      existing: {
+        id: "db-1",
+        creator_id: CREATOR,
+        stream_id: "stream-1",
+        playback_id: "playback-1",
+        stream_key: "old-key",
+        is_live: false,
+        created_at: "",
+        updated_at: "",
+      },
+    });
+
+    expect(result.replaced).toBe(true);
+    expect(result.streamKey).toBe("new-key");
+    expect(mockCreateLivepeerStream).toHaveBeenCalled();
+  });
+
+  it("forceReplace recreates even when Studio stream exists", async () => {
+    mockCreateLivepeerStream.mockResolvedValue({
+      streamId: "forced-stream",
+      playbackId: "forced-playback",
+      streamKey: "forced-key",
+    });
+    mockReplaceStreamLivepeerCredentials.mockResolvedValue({});
+
+    const result = await ensureLivepeerStreamForCreator({
+      ...baseOpts,
+      forceReplace: true,
+      existing: {
+        id: "db-1",
+        creator_id: CREATOR,
+        stream_id: "stream-1",
+        playback_id: "playback-1",
+        stream_key: "key-1",
+        is_live: false,
+        created_at: "",
+        updated_at: "",
+      },
+    });
+
+    expect(result).toEqual({
+      streamId: "forced-stream",
+      playbackId: "forced-playback",
+      streamKey: "forced-key",
+      reused: false,
+      replaced: true,
+      synced: false,
+    });
+    expect(mockGetLivepeerStreamOrNull).not.toHaveBeenCalled();
+    expect(mockCreateLivepeerStream).toHaveBeenCalled();
   });
 
   it("recreates and replaces credentials when Livepeer stream is missing", async () => {
@@ -94,6 +204,7 @@ describe("ensureLivepeerStreamForCreator", () => {
     });
 
     expect(result.replaced).toBe(true);
+    expect(result.synced).toBe(false);
     expect(result.streamKey).toBe("new-key");
     expect(mockReplaceStreamLivepeerCredentials).toHaveBeenCalledWith(CREATOR, {
       stream_id: "new-stream",
@@ -122,6 +233,7 @@ describe("ensureLivepeerStreamForCreator", () => {
       streamKey: "key-2",
       reused: false,
       replaced: false,
+      synced: false,
     });
     expect(mockCreateStreamRecord).toHaveBeenCalled();
     expect(mockGetLivepeerStreamOrNull).not.toHaveBeenCalled();
