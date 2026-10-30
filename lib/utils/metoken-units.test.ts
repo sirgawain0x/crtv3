@@ -35,6 +35,11 @@ describe('dbMetokenTotalSupplyToWei', () => {
     expect(dbMetokenTotalSupplyToWei(3.2)).toBe(parseEther('3.2'));
     expect(dbMetokenTotalSupplyToWei('3.2')).toBe(parseEther('3.2'));
   });
+
+  it('treats large JS numbers and 1e+21 strings as wei, not human tokens', () => {
+    expect(dbMetokenTotalSupplyToWei(1e21)).toBe(10n ** 21n);
+    expect(dbMetokenTotalSupplyToWei('1e+21')).toBe(10n ** 21n);
+  });
 });
 
 describe('decimalStringToWei', () => {

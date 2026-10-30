@@ -13,6 +13,33 @@ import { parseEther } from 'viem';
  */
 
 const MAX_ETHER_DECIMALS = 18;
+/** Above this, JS number total_supply values are treated as wei (not human tokens). */
+const MIN_WEI_LIKE_TOTAL_SUPPLY_NUMBER = 1e15;
+
+function parseIntegerScientificNotationToWei(raw: string): bigint | null {
+  const match = raw
+    .trim()
+    .match(/^([+-]?)(\d+)(?:\.(\d+))?[eE]([+-]?)(\d+)$/);
+  if (!match) {
+    return null;
+  }
+
+  const sign = match[1] === '-' ? -1n : 1n;
+  const whole = match[2];
+  const fraction = match[3] ?? '';
+  const exponent = parseInt(`${match[4]}${match[5]}`, 10);
+
+  if (!Number.isFinite(exponent) || fraction.length > 0) {
+    return null;
+  }
+
+  try {
+    const magnitude = BigInt(whole) * 10n ** BigInt(exponent);
+    return sign * magnitude;
+  } catch {
+    return null;
+  }
+}
 
 /** Never throws; returns 0n on invalid input. */
 export function decimalStringToWei(raw: string): bigint {
@@ -91,6 +118,15 @@ export function dbMetokenTotalSupplyToWei(
     return 0n;
   }
 
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value) || value === 0) {
+      return 0n;
+    }
+    if (Number.isInteger(value) && Math.abs(value) >= MIN_WEI_LIKE_TOTAL_SUPPLY_NUMBER) {
+      return BigInt(value);
+    }
+  }
+
   const str = typeof value === 'number' ? String(value) : value.trim();
   if (!str || str === '0') {
     return 0n;
@@ -98,6 +134,11 @@ export function dbMetokenTotalSupplyToWei(
 
   if (/^\d+$/.test(str)) {
     return BigInt(str);
+  }
+
+  const sciWei = parseIntegerScientificNotationToWei(str);
+  if (sciWei != null) {
+    return sciWei;
   }
 
   return dbMeTokenTransactionAmountToWei(str);

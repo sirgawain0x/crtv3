@@ -79,4 +79,15 @@ describe("chart price header and history", () => {
     expect(series[0].price).toBe(2.85);
     expect(series[0].timestamp).toBe(now);
   });
+
+  it("replaces the last point when spot update shares the same timestamp", () => {
+    const series = prepareChartHistory(
+      [{ timestamp: now, price: 2.5, volume: 0, tvl: 9 }],
+      2.85,
+      now,
+    );
+    expect(series).toHaveLength(1);
+    expect(series[0].timestamp).toBe(now);
+    expect(series[0].price).toBe(2.85);
+  });
 });

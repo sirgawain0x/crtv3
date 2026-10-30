@@ -149,19 +149,25 @@ export function prepareChartHistory(
   const stale = nowSec - last.timestamp > 3600;
   const priceDrift = Math.abs(last.price - resolvedSpot) / resolvedSpot > 0.0001;
 
-  if (stale || priceDrift) {
+  if (!stale && !priceDrift) {
+    return validHistory;
+  }
+
+  const spotPoint: PriceHistoryPoint = {
+    timestamp: nowSec,
+    price: resolvedSpot,
+    volume: 0,
+    tvl: last.tvl ?? 0,
+  };
+
+  if (nowSec <= last.timestamp) {
     return [
-      ...validHistory,
-      {
-        timestamp: nowSec,
-        price: resolvedSpot,
-        volume: 0,
-        tvl: last.tvl ?? 0,
-      },
+      ...validHistory.slice(0, -1),
+      { ...last, price: resolvedSpot },
     ];
   }
 
-  return validHistory;
+  return [...validHistory, spotPoint];
 }
 
 /**
