@@ -21,6 +21,7 @@ import Link from "next/link";
 import { logger } from '@/lib/utils/logger';
 import { getTokenMarketData } from "@/lib/services/market";
 import { Metadata, ResolvingMetadata } from "next";
+import { fetchCreatorProfileForPage } from "@/lib/creator/fetch-creator-profile-for-page";
 
 
 
@@ -33,17 +34,10 @@ type CreatorPageProps = {
 async function fetchCreatorProfile(address: string) {
   try {
     const supabase = await createClient();
-    const { data, error } = await supabase
-      .from("creator_profiles")
-      .select(
-        "id, owner_address, username, bio, avatar_url, brand_channel_slug, social_orb_url, social_instagram_url, social_x_url, created_at, updated_at",
-      )
-      .eq("owner_address", address.toLowerCase())
-      .single();
+    const { data, error } = await fetchCreatorProfileForPage(supabase, address);
 
     if (error) {
       if (error.code === "PGRST116") {
-        // Profile doesn't exist, that's okay
         return null;
       }
       logger.error("Error fetching creator profile:", error);

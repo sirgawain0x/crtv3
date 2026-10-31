@@ -19,6 +19,7 @@ import { CreatorPredictButton } from "@/components/Creator/CreatorPredictButton"
 import { ProfileGoLiveButton } from "@/components/Live/ProfileGoLiveButton";
 import { CreatorBrandChannelButton } from "@/components/Creator/CreatorBrandChannelButton";
 import { CreatorSocialLinks } from "@/components/Creator/CreatorSocialLinks";
+import { CreatorXmerchSection } from "@/components/Creator/CreatorXmerchSection";
 import { useMeTokenMarketStats } from "@/lib/hooks/market/useMeTokenMarketStats";
 import { formatUsdTokenPrice } from "@/lib/metokens/spotPrice";
 
@@ -35,7 +36,6 @@ export function CreatorProfileHeader({
   meToken,
   bio,
 }: CreatorProfileHeaderProps) {
-  // Determine display name and symbol
   const displayName = meToken?.name || creatorProfile?.username || shortenAddress(address);
   const displaySymbol = meToken?.symbol || null;
   const copyAddress = meToken?.address ?? address;
@@ -53,24 +53,25 @@ export function CreatorProfileHeader({
   const [chartDialogOpen, setChartDialogOpen] = useState(false);
   const { stats: marketStats } = useMeTokenMarketStats(meToken?.address);
 
-  // Convert MeToken to MarketToken for dialogs (price/TVL from market API — same as Trading Market)
-  const marketToken: MarketToken | null = meToken ? {
-    id: meToken.id,
-    address: meToken.address,
-    name: meToken.name,
-    symbol: meToken.symbol,
-    owner_address: meToken.owner_address,
-    type: 'metoken',
-    price: marketStats?.price ?? 0,
-    tvl: marketStats?.tvl ?? meToken.tvl,
-    total_supply: marketStats?.total_supply ?? meToken.total_supply?.toString() ?? '0',
-    market_cap: marketStats?.market_cap ?? meToken.tvl,
-    price_change_24h: marketStats?.price_change_24h,
-    volume_24h: marketStats?.volume_24h,
-    created_at: meToken.created_at,
-    creator_username: creatorProfile?.username,
-    creator_avatar_url: creatorProfile?.avatar_url,
-  } : null;
+  const marketToken: MarketToken | null = meToken
+    ? {
+        id: meToken.id,
+        address: meToken.address,
+        name: meToken.name,
+        symbol: meToken.symbol,
+        owner_address: meToken.owner_address,
+        type: "metoken",
+        price: marketStats?.price ?? 0,
+        tvl: marketStats?.tvl ?? meToken.tvl,
+        total_supply: marketStats?.total_supply ?? meToken.total_supply?.toString() ?? "0",
+        market_cap: marketStats?.market_cap ?? meToken.tvl,
+        price_change_24h: marketStats?.price_change_24h,
+        volume_24h: marketStats?.volume_24h,
+        created_at: meToken.created_at,
+        creator_username: creatorProfile?.username,
+        creator_avatar_url: creatorProfile?.avatar_url,
+      }
+    : null;
 
   const displayPrice = marketStats?.price;
   const displayTvl = marketStats?.tvl ?? meToken?.tvl;
@@ -79,9 +80,7 @@ export function CreatorProfileHeader({
     <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
       <Avatar className="h-24 w-24 border-4 border-background shadow-lg">
         <AvatarImage src={avatarUrl} alt={displayName} />
-        <AvatarFallback>
-          {avatarFallback}
-        </AvatarFallback>
+        <AvatarFallback>{avatarFallback}</AvatarFallback>
       </Avatar>
       <div className="flex-1">
         <div className="flex items-center gap-2 mb-2 flex-wrap">
@@ -104,9 +103,7 @@ export function CreatorProfileHeader({
         )}
 
         {bio && (
-          <p className="text-sm text-muted-foreground max-w-2xl">
-            {bio}
-          </p>
+          <p className="text-sm text-muted-foreground max-w-2xl">{bio}</p>
         )}
 
         <CreatorSocialLinks
@@ -114,6 +111,11 @@ export function CreatorProfileHeader({
           socialOrbUrl={creatorProfile?.social_orb_url}
           socialInstagramUrl={creatorProfile?.social_instagram_url}
           socialXUrl={creatorProfile?.social_x_url}
+        />
+
+        <CreatorXmerchSection
+          className="mt-3"
+          xmerchStored={creatorProfile?.social_xmerch}
         />
 
         {meToken && displayPrice != null && (

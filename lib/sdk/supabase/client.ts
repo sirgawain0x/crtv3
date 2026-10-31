@@ -78,6 +78,8 @@ export interface UpdateMeTokenData {
   end_cooldown?: string;
 }
 
+import type { CreatorXmerchProfile } from "@/lib/creator/xmerch-profile";
+
 // Types for Creator Profiles (replacing OrbisDB metadata)
 export interface CreatorProfile {
   id: string;
@@ -107,6 +109,8 @@ export interface CreatorProfile {
   social_orb_url?: string | null;
   social_instagram_url?: string | null;
   social_x_url?: string | null;
+  /** Invite-only Creative Merch (admin-set JSON); public UI when enabled is true */
+  social_xmerch?: CreatorXmerchProfile | null;
   created_at: string;
   updated_at: string;
 }

@@ -62,6 +62,7 @@ CREATE TABLE IF NOT EXISTS creator_profiles (
   social_orb_url TEXT, -- https://orb.club/p/… link-out
   social_instagram_url TEXT, -- https://instagram.com/… link-out
   social_x_url TEXT, -- https://x.com/… link-out
+  social_xmerch JSONB, -- admin-set { enabled, storeUrl, featuredProductUrls[] } on xmerch.app
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
