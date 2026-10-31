@@ -7,7 +7,6 @@ import {
 } from "@/lib/access/require-platform-admin";
 import { validateAndNormalizeXmerchProfileInput } from "@/lib/creator/xmerch-profile";
 import { supabaseService } from "@/lib/sdk/supabase/service";
-import { createClient } from "@/lib/sdk/supabase/server";
 import { serverLogger } from "@/lib/utils/logger";
 
 /**
@@ -30,6 +29,19 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: error.status });
     }
     throw error;
+  }
+
+  if (!supabaseService) {
+    serverLogger.error(
+      "[creator-profiles/admin/xmerch] supabaseService unavailable (service role required)",
+    );
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Admin xMerch updates require server database access",
+      },
+      { status: 503 },
+    );
   }
 
   let body: unknown;
@@ -80,9 +92,7 @@ export async function PATCH(request: NextRequest) {
   };
 
   try {
-    const client = supabaseService ?? (await createClient());
-
-    const { data: existing, error: lookupError } = await client
+    const { data: existing, error: lookupError } = await supabaseService
       .from("creator_profiles")
       .select("owner_address")
       .eq("owner_address", ownerAddress)
@@ -103,7 +113,7 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    const { data, error } = await client
+    const { data, error } = await supabaseService
       .from("creator_profiles")
       .update(updatePayload)
       .eq("owner_address", ownerAddress)
@@ -117,7 +127,21 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({ success: true, data: data?.[0] ?? null });
+    if (!data?.length) {
+      serverLogger.error(
+        "[creator-profiles/admin/xmerch] update matched zero rows",
+        { ownerAddress },
+      );
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Creator profile update did not apply (no rows updated)",
+        },
+        { status: 500 },
+      );
+    }
+
+    return NextResponse.json({ success: true, data: data[0] });
   } catch (error) {
     serverLogger.error("[creator-profiles/admin/xmerch] failed:", error);
     return NextResponse.json(

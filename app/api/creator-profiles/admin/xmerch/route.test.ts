@@ -1,11 +1,28 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
-const { requirePlatformAdminMock, maybeSingleMock, updateSelectMock } = vi.hoisted(() => ({
-  requirePlatformAdminMock: vi.fn(),
-  maybeSingleMock: vi.fn(),
-  updateSelectMock: vi.fn(),
-}));
+const { requirePlatformAdminMock, maybeSingleMock, updateSelectMock, supabaseServiceRef } =
+  vi.hoisted(() => ({
+    requirePlatformAdminMock: vi.fn(),
+    maybeSingleMock: vi.fn(),
+    updateSelectMock: vi.fn(),
+    supabaseServiceRef: {
+      value: {
+        from: vi.fn(() => ({
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: maybeSingleMock,
+            })),
+          })),
+          update: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              select: updateSelectMock,
+            })),
+          })),
+        })),
+      } as unknown,
+    },
+  }));
 
 vi.mock("@/lib/middleware/botIdGuard", () => ({
   checkBotIdDeep: vi.fn(async () => ({ isBot: false })),
@@ -27,19 +44,8 @@ vi.mock("@/lib/access/require-platform-admin", () => ({
 }));
 
 vi.mock("@/lib/sdk/supabase/service", () => ({
-  supabaseService: {
-    from: vi.fn(() => ({
-      select: vi.fn(() => ({
-        eq: vi.fn(() => ({
-          maybeSingle: maybeSingleMock,
-        })),
-      })),
-      update: vi.fn(() => ({
-        eq: vi.fn(() => ({
-          select: updateSelectMock,
-        })),
-      })),
-    })),
+  get supabaseService() {
+    return supabaseServiceRef.value;
   },
 }));
 
@@ -55,9 +61,32 @@ function patchRequest(body: object) {
   });
 }
 
+const validBody = {
+  owner_address: OWNER,
+  social_xmerch: {
+    enabled: true,
+    storeUrl: "https://creative.xmerch.app",
+    featuredProductUrls: ["https://creative.xmerch.app/products/tee"],
+  },
+};
+
 describe("PATCH /api/creator-profiles/admin/xmerch", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    supabaseServiceRef.value = {
+      from: vi.fn(() => ({
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            maybeSingle: maybeSingleMock,
+          })),
+        })),
+        update: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            select: updateSelectMock,
+          })),
+        })),
+      })),
+    };
     maybeSingleMock.mockResolvedValue({
       data: { owner_address: OWNER.toLowerCase() },
       error: null,
@@ -65,6 +94,9 @@ describe("PATCH /api/creator-profiles/admin/xmerch", () => {
     updateSelectMock.mockResolvedValue({
       data: [{ owner_address: OWNER.toLowerCase() }],
       error: null,
+    });
+    requirePlatformAdminMock.mockResolvedValue({
+      address: PLATFORM_ADMIN_ADDRESS,
     });
   });
 
@@ -87,18 +119,20 @@ describe("PATCH /api/creator-profiles/admin/xmerch", () => {
     expect(json.error).toMatch(/admin/i);
   });
 
+  it("returns 503 when supabaseService is unavailable", async () => {
+    supabaseServiceRef.value = null;
+
+    const res = await PATCH(patchRequest(validBody));
+    expect(res.status).toBe(503);
+    const json = await res.json();
+    expect(json.success).toBe(false);
+    expect(json.error).toMatch(/server database access/i);
+  });
+
   it("returns 404 when creator profile does not exist", async () => {
-    requirePlatformAdminMock.mockResolvedValue({
-      address: PLATFORM_ADMIN_ADDRESS,
-    });
     maybeSingleMock.mockResolvedValue({ data: null, error: null });
 
-    const res = await PATCH(
-      patchRequest({
-        owner_address: OWNER,
-        social_xmerch: { enabled: true, storeUrl: "https://creative.xmerch.app" },
-      }),
-    );
+    const res = await PATCH(patchRequest(validBody));
     expect(res.status).toBe(404);
     const json = await res.json();
     expect(json.success).toBe(false);
@@ -106,21 +140,18 @@ describe("PATCH /api/creator-profiles/admin/xmerch", () => {
     expect(updateSelectMock).not.toHaveBeenCalled();
   });
 
-  it("accepts admin payload and normalizes xMerch data", async () => {
-    requirePlatformAdminMock.mockResolvedValue({
-      address: PLATFORM_ADMIN_ADDRESS,
-    });
+  it("returns 500 when update matches zero rows", async () => {
+    updateSelectMock.mockResolvedValue({ data: [], error: null });
 
-    const res = await PATCH(
-      patchRequest({
-        owner_address: OWNER,
-        social_xmerch: {
-          enabled: true,
-          storeUrl: "https://creative.xmerch.app",
-          featuredProductUrls: ["https://creative.xmerch.app/products/tee"],
-        },
-      }),
-    );
+    const res = await PATCH(patchRequest(validBody));
+    expect(res.status).toBe(500);
+    const json = await res.json();
+    expect(json.success).toBe(false);
+    expect(json.error).toMatch(/no rows updated/i);
+  });
+
+  it("accepts admin payload and normalizes xMerch data", async () => {
+    const res = await PATCH(patchRequest(validBody));
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.success).toBe(true);

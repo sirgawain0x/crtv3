@@ -11,15 +11,13 @@ import {
   MAX_XMERCH_FEATURED_PRODUCTS,
   validateAndNormalizeXmerchProfileInput,
 } from "@/lib/creator/xmerch-profile";
-import { useWalletAuth } from "@/lib/auth/useWalletAuth";
 import { usePlatformAdmin } from "@/lib/hooks/admin/usePlatformAdmin";
+import { usePlatformAdminWalletAuth } from "@/lib/hooks/admin/usePlatformAdminWalletAuth";
 
 export function CreatorXmerchAdminPanel() {
   const { toast } = useToast();
   const { adminAuthAddress } = usePlatformAdmin();
-  const { getAuthHeaders, isReady } = useWalletAuth({
-    addressOverride: adminAuthAddress,
-  });
+  const { getAuthHeaders, isReady } = usePlatformAdminWalletAuth(adminAuthAddress);
   const [ownerAddress, setOwnerAddress] = useState("");
   const [enabled, setEnabled] = useState(false);
   const [storeUrl, setStoreUrl] = useState("");
