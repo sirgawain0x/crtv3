@@ -4,9 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { meTokenSupabaseService, MeTokenTransaction } from '@/lib/sdk/supabase/metokens';
 import { MeTokenData } from '@/lib/hooks/metokens/useMeTokensSupabase';
 import { Loader2, ExternalLink, ArrowUpRight, ArrowDownLeft, Plus } from 'lucide-react';
-import { formatEther } from 'viem';
 import { Button } from '@/components/ui/button';
 import { logger } from '@/lib/utils/logger';
+import { resolveHubAsset } from '@/lib/utils/hubAssetUtils';
 
 
 interface MeTokenHistoryProps {
@@ -14,6 +14,7 @@ interface MeTokenHistoryProps {
 }
 
 export function MeTokenHistory({ meToken }: MeTokenHistoryProps) {
+    const collateral = resolveHubAsset(Number(meToken.info?.hubId ?? meToken.hubId));
     const [transactions, setTransactions] = useState<MeTokenTransaction[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -111,7 +112,7 @@ export function MeTokenHistory({ meToken }: MeTokenHistoryProps) {
                                                 </td>
                                                 <td className="p-4 align-middle">
                                                     {tx.collateral_amount ? (
-                                                        <span>{tx.collateral_amount.toLocaleString(undefined, { maximumFractionDigits: 4 })} DAI</span>
+                                                        <span>{tx.collateral_amount.toLocaleString(undefined, { maximumFractionDigits: 4 })} {collateral.symbol}</span>
                                                     ) : (
                                                         <span className="text-muted-foreground">-</span>
                                                     )}
