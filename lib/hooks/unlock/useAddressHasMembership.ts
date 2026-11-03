@@ -27,6 +27,13 @@ const EMPTY_STATUS: AddressMembershipStatus = {
 };
 
 const cache = new Map<string, AddressMembershipStatus>();
+const cachedAt = new Map<string, number>();
+const CACHE_TTL = 60_000;
+
+function cachedStatus(address: string) {
+  return Date.now() - (cachedAt.get(address) ?? 0) < CACHE_TTL ? cache.get(address) : undefined;
+}
+
 const inflight = new Map<string, Promise<AddressMembershipStatus>>();
 
 function summarizeMemberships(
@@ -53,7 +60,7 @@ async function fetchMembershipStatus(
   address: string,
 ): Promise<AddressMembershipStatus> {
   const key = address.toLowerCase();
-  const cached = cache.get(key);
+  const cached = cachedStatus(key);
   if (cached !== undefined) return cached;
 
   const existing = inflight.get(key);
@@ -67,15 +74,15 @@ async function fetchMembershipStatus(
         body: JSON.stringify({ address: key }),
       });
       if (!res.ok) {
-        cache.set(key, EMPTY_STATUS);
         return EMPTY_STATUS;
       }
       const data = (await res.json()) as MembershipApiResponse;
+      if (data.error || !Array.isArray(data.memberships)) return EMPTY_STATUS;
       const status = summarizeMemberships(data.memberships);
       cache.set(key, status);
+      cachedAt.set(key, Date.now());
       return status;
     } catch {
-      cache.set(key, EMPTY_STATUS);
       return EMPTY_STATUS;
     } finally {
       inflight.delete(key);
@@ -89,16 +96,16 @@ async function fetchMembershipStatus(
 /**
  * Whether `address` holds a valid Unlock Creative membership (any lock),
  * and whether Brand Pass specifically is held (gold badge).
- * Results are cached in-memory for the session.
+ * Successful results are cached for one minute; failed lookups are retried.
  */
 export function useAddressHasMembership(address?: string | null) {
   const normalized =
     address && isAddress(address) ? address.toLowerCase() : null;
   const [status, setStatus] = useState<AddressMembershipStatus>(() =>
-    normalized ? (cache.get(normalized) ?? EMPTY_STATUS) : EMPTY_STATUS,
+    normalized ? (cachedStatus(normalized) ?? EMPTY_STATUS) : EMPTY_STATUS,
   );
   const [isLoading, setIsLoading] = useState(() =>
-    normalized ? !cache.has(normalized) : false,
+    normalized ? !cachedStatus(normalized) : false,
   );
 
   useEffect(() => {
@@ -108,22 +115,23 @@ export function useAddressHasMembership(address?: string | null) {
       return;
     }
 
-    if (cache.has(normalized)) {
-      setStatus(cache.get(normalized) ?? EMPTY_STATUS);
-      setIsLoading(false);
-      return;
-    }
-
     let cancelled = false;
-    setIsLoading(true);
-    void fetchMembershipStatus(normalized).then((value) => {
+    setStatus(cachedStatus(normalized) ?? EMPTY_STATUS);
+    const refresh = async () => {
+      if (document.visibilityState === "hidden") return;
+      setIsLoading(!cachedStatus(normalized));
+      const value = await fetchMembershipStatus(normalized);
       if (cancelled) return;
       setStatus(value);
       setIsLoading(false);
-    });
-
+    };
+    void refresh();
+    const interval = window.setInterval(() => void refresh(), CACHE_TTL);
+    window.addEventListener("focus", refresh);
     return () => {
       cancelled = true;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refresh);
     };
   }, [normalized]);
 

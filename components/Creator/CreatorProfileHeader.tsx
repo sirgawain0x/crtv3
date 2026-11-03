@@ -85,6 +85,7 @@ export function CreatorProfileHeader({
       <div className="flex-1">
         <div className="flex items-center gap-2 mb-2 flex-wrap">
           <h1 className="text-3xl font-bold">{displayName}</h1>
+          {meToken && <MembershipVerifiedBadge address={meToken.owner_address} size="md" />}
           {displaySymbol && (
             <Badge variant="secondary" className="text-sm">
               {displaySymbol}

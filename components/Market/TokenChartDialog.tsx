@@ -1,5 +1,6 @@
 "use client";
 
+import { MembershipVerifiedBadge } from "@/components/User/MembershipVerifiedBadge";
 import {
   Dialog,
   DialogContent,
@@ -27,8 +28,10 @@ export function TokenChartDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>
-            {token.symbol} Price Chart
+          <DialogTitle className="flex items-center gap-2">
+            {token.symbol}
+            <MembershipVerifiedBadge address={token.owner_address} size="md" />
+            Price Chart
           </DialogTitle>
           <DialogDescription>
             Historical price data for {token.name}
