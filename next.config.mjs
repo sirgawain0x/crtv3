@@ -8,6 +8,7 @@ const require = createRequire(import.meta.url);
 const withPWA = createPWA({
   dest: "public",
   disable: process.env.NODE_ENV === "development" || process.env.VERCEL === "1",
+  swSrc: "public/sw-custom.js",
 });
 
 /** @type {import('next').NextConfig} */
@@ -498,6 +499,10 @@ const nextConfig = {
             value: embedCsp,
           },
         ],
+      },
+      {
+        source: '/push-sw.js',
+        headers: [{ key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' }],
       },
       {
         // Apply to all routes

@@ -48,6 +48,7 @@ import {
   type AccountDropdownHandle,
 } from "@/components/account-dropdown/AccountDropdown";
 import { MobileOrbSection } from "@/components/account-dropdown/MobileOrbSection";
+import { NotificationCenter } from "@/components/NotificationCenter";
 import { useUnifiedLogout } from "@/hooks/useUnifiedLogout";
 import { shortenAddress } from "@/lib/utils/utils";
 import { useMembershipContext } from "@/lib/context/MembershipContext";
@@ -378,6 +379,7 @@ export default function Navbar() {
           {/* Desktop: account dropdown. Mobile: hamburger only. */}
           <div className="flex items-center gap-2">
             <CreativePlatformAppsDrawer />
+            <NotificationCenter onOpen={(href) => window.location.href = href} />
             <ThemeToggleComponent />
             <HydrationSafe>
               <AccountDropdown ref={accountDropdownRef} />
