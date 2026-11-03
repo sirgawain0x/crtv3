@@ -10,6 +10,7 @@ import { requestQuoteV0 } from "@alchemy/wallet-apis/experimental";
 import type { Address, Hex } from "viem";
 import { useWalletChain } from "./chain-context";
 import { useWalletClientContext } from "./wallet-context";
+import { clearWalletAuth } from "@/lib/auth/wallet-auth-cache";
 import type { CompatSmartAccountClient, SendUserOperationArgs } from "./smart-wallet-client";
 
 export type RequestQuoteV0Result = Awaited<ReturnType<typeof requestQuoteV0>>;
@@ -50,7 +51,11 @@ export function useAuthModal() {
 
 export function useLogout() {
   const { logout } = usePrivyLogout();
-  return { logout };
+  const logoutAndClearProof = useCallback(() => {
+    clearWalletAuth();
+    return logout();
+  }, [logout]);
+  return { logout: logoutAndClearProof };
 }
 
 export function useSignerStatus() {
