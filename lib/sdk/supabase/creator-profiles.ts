@@ -63,10 +63,17 @@ export class CreatorProfileSupabaseService {
   // Create a new creator profile
   async createCreatorProfile(profileData: CreateCreatorProfileData): Promise<CreatorProfile> {
     try {
+      const {
+        social_orb_url: _socialOrb,
+        social_instagram_url: _socialInstagram,
+        social_x_url: _socialX,
+        ...profileWithoutSocial
+      } = profileData;
+
       const { data, error } = await supabase
         .from('creator_profiles')
         .insert({
-          ...profileData,
+          ...profileWithoutSocial,
           owner_address: profileData.owner_address.toLowerCase(),
         })
         .select()

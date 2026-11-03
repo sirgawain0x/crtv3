@@ -519,7 +519,7 @@ export default function WatchClient({ initialMarketData, tokenInfo, videoTitle, 
         {tokenInfo && (
           <div className="flex justify-end mb-4">
             <MeTokenShareButton
-              address={tokenInfo.address}
+              creatorOwnerAddress={streamData?.creator_id ?? undefined}
               symbol={tokenInfo.symbol}
               name={tokenInfo.name}
               type="content"

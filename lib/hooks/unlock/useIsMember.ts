@@ -2,25 +2,28 @@
 
 import { useMembershipVerification } from "./useMembershipVerification";
 import { useUser } from "@/lib/wallet/react";
-import { useEffect, useState } from "react";
+import { computeIsMembershipLoading } from "./membershipLoading";
 
 /**
  * Hook to check if the current user has a valid Creative Membership
  * Returns true if the user holds a valid key to any of the configured locks
  */
 export function useIsMember() {
-    const user = useUser();
-    const { isVerified, hasMembership, isLoading } = useMembershipVerification();
-    const [isMember, setIsMember] = useState(false);
+  const user = useUser();
+  const { isVerified, hasMembership, isLoading, error, refetch } =
+    useMembershipVerification();
 
-    useEffect(() => {
-        if (!isLoading) {
-            setIsMember(hasMembership);
-        }
-    }, [hasMembership, isLoading]);
+  const isMembershipLoading = computeIsMembershipLoading({
+    isLoading,
+    isVerified,
+    hasUser: !!user,
+    error,
+  });
 
-    return {
-        isMember,
-        isLoading: isLoading || (!!user && !isVerified),
-    };
+  return {
+    isMember: isVerified ? hasMembership : false,
+    isVerified,
+    isLoading: isMembershipLoading,
+    refetch,
+  };
 }

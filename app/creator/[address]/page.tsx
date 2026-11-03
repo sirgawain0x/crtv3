@@ -21,6 +21,7 @@ import Link from "next/link";
 import { logger } from '@/lib/utils/logger';
 import { getTokenMarketData } from "@/lib/services/market";
 import { Metadata, ResolvingMetadata } from "next";
+import { fetchCreatorProfileForPage } from "@/lib/creator/fetch-creator-profile-for-page";
 
 
 
@@ -33,15 +34,10 @@ type CreatorPageProps = {
 async function fetchCreatorProfile(address: string) {
   try {
     const supabase = await createClient();
-    const { data, error } = await supabase
-      .from("creator_profiles")
-      .select("id, owner_address, username, bio, avatar_url, brand_channel_slug, created_at, updated_at")
-      .eq("owner_address", address.toLowerCase())
-      .single();
+    const { data, error } = await fetchCreatorProfileForPage(supabase, address);
 
     if (error) {
       if (error.code === "PGRST116") {
-        // Profile doesn't exist, that's okay
         return null;
       }
       logger.error("Error fetching creator profile:", error);
@@ -92,7 +88,10 @@ export async function generateMetadata(
   // Fetch market data for the token
   const marketData = await getTokenMarketData(meToken.address);
 
-  const price = marketData?.price ? `$${marketData.price.toFixed(4)}` : 'N/A';
+  const priceFormatted =
+    marketData?.price != null && marketData.price > 0
+      ? marketData.price.toFixed(4)
+      : null;
   // Format TVL: e.g. $1.5K
   const tvl = marketData?.tvl
     ? marketData.tvl >= 1000
@@ -104,7 +103,9 @@ export async function generateMetadata(
   const symbol = meToken.symbol;
   const displayName = creatorProfile?.username || name;
 
-  const title = `${symbol} ($${price}) - ${displayName}`;
+  const title = priceFormatted
+    ? `${symbol} ($${priceFormatted}) - ${displayName}`
+    : `${symbol} - ${displayName}`;
   const description = `Trade ${symbol} on Creative TV. TVL: ${tvl}. ${creatorProfile?.bio || ''}`.trim();
 
   return {

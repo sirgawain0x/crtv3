@@ -41,6 +41,11 @@ export function buildMeTokenCreationGasContext(): MeTokenCreationGasResult {
   };
 }
 
+/** ETH-sponsored policy for existing-token hub subscribe (approve / mint) UserOps. */
+export function buildMeTokenSubscribeGasContext(): MeTokenCreationGasResult {
+  return buildMeTokenCreationGasContext();
+}
+
 /** Alchemy paymaster policies expire sponsored UserOps after ~10 minutes. */
 export const METOKEN_PAYMASTER_EXPIRY_MS = 10 * 60 * 1000;
 

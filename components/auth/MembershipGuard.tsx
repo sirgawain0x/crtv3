@@ -7,6 +7,8 @@ import { createContext, useContext } from "react";
 import type { MembershipStatus } from "@/lib/hooks/unlock/useMembershipVerification";
 import { logger } from '@/lib/utils/logger';
 import { GuardLoadingFallback } from "@/components/auth/GuardLoadingFallback";
+import { WALLET_INIT_TIMEOUT_CODE } from "@/lib/hooks/unlock/membership-wallet-wait";
+import { Button } from "@/components/ui/button";
 
 
 interface MembershipGuardProps {
@@ -22,6 +24,8 @@ const PUBLIC_PATHS = [
   '/vote',
   '/news',
   '/live',
+  '/go-live',
+  '/stream',
   '/watch',
   '/profile',
   '/upload',
@@ -36,7 +40,8 @@ export function MembershipGuard({ children }: MembershipGuardProps) {
   const router = useRouter();
   const pathname = usePathname();
   const membership = useMembershipVerification();
-  const { isVerified, hasMembership, isLoading } = membership;
+  const { isVerified, hasMembership, isLoading, error, refetch } = membership;
+  const walletInitTimedOut = error?.code === WALLET_INIT_TIMEOUT_CODE;
   const isHomePage = pathname === "/";
   const isPublicPath = PUBLIC_PATHS.some(path => pathname?.startsWith(path));
   const canBypassLoading = isHomePage || isPublicPath;
@@ -63,6 +68,30 @@ export function MembershipGuard({ children }: MembershipGuardProps) {
       );
     }
     return null;
+  }
+
+  if (walletInitTimedOut && canBypassLoading) {
+    return (
+      <MembershipContext.Provider value={membership}>
+        <div className="flex min-h-[40vh] flex-col items-center justify-center gap-4 p-6">
+          <p className="max-w-md text-center text-sm text-muted-foreground">
+            {error?.message ?? "Smart wallet did not finish loading."}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" variant="outline" onClick={() => void refetch()}>
+              Retry
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => window.location.reload()}
+            >
+              Reload page
+            </Button>
+          </div>
+        </div>
+      </MembershipContext.Provider>
+    );
   }
 
   if (isLoading && !canBypassLoading) {

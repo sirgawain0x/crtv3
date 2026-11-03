@@ -39,6 +39,14 @@ function buildMessage(address: string, timestamp: number): string {
   return `Authorize Creative TV request for address ${address.toLowerCase()} at ${timestamp}`;
 }
 
+/** Global wallet auth waits for the smart account client (EOA-only early ready is not supported here). */
+export function computeWalletAuthIsReady(
+  accountClient: unknown,
+  address: string,
+): boolean {
+  return !!accountClient && !!address;
+}
+
 export function useWalletAuth() {
   const user = useUser();
   const { smartAccountClient: accountClient, address: smartAccountAddress } =
@@ -126,6 +134,6 @@ export function useWalletAuth() {
     getAuthHeaders,
     clearAuthCache,
     /** Whether signMessage is wired up — false if the smart account client isn't ready yet. */
-    isReady: !!accountClient && !!address,
+    isReady: computeWalletAuthIsReady(accountClient, address),
   };
 }

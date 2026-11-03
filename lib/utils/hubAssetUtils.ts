@@ -12,17 +12,37 @@ import type { HubCollateralConfig } from '@/lib/metokens/hub-onchain';
 
 export type { HubAssetConfig, HubAssetSymbol };
 
-type AmountAsset = HubAssetConfig | string | HubCollateralConfig;
+/** Hub id, token address, or collateral config with decimals. */
+type AmountAsset = HubAssetConfig | string | HubCollateralConfig | number;
+
+function resolveAmountAsset(asset: AmountAsset): HubAssetConfig | HubCollateralConfig {
+  if (typeof asset === 'number') {
+    return resolveHubAsset(asset);
+  }
+  if (typeof asset === 'string') {
+    return getHubAssetByAddress(asset) ?? HUB_ASSET_CONFIGS[DEFAULT_HUB_ASSET];
+  }
+  return asset;
+}
 
 function resolveDecimals(asset: AmountAsset): number {
-  if (typeof asset === 'string') {
-    return (getHubAssetByAddress(asset) ?? HUB_ASSET_CONFIGS[DEFAULT_HUB_ASSET]).decimals;
-  }
-  return asset.decimals;
+  return resolveAmountAsset(asset).decimals;
 }
 
 export function parseHubAssetAmount(amount: string, asset: AmountAsset): bigint {
   return parseUnits(amount || '0', resolveDecimals(asset));
+}
+
+/** Minimum initial collateral for MeToken create ($1 in hub token raw units). */
+export function getMinimumMeTokenCreateDepositRaw(asset: AmountAsset): bigint {
+  return parseUnits('1', resolveDecimals(asset));
+}
+
+export function isMeTokenCreateDepositSufficient(
+  amount: bigint,
+  asset: AmountAsset
+): boolean {
+  return amount >= getMinimumMeTokenCreateDepositRaw(asset);
 }
 
 export function formatHubAssetAmount(amount: bigint, asset: AmountAsset): string {

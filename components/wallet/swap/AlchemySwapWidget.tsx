@@ -128,6 +128,7 @@ interface AlchemySwapWidgetProps {
   onSwapSuccess?: () => void;
   className?: string;
   hideHeader?: boolean;
+  defaultFromToken?: TokenSymbol;
   defaultToToken?: TokenSymbol;
   /** If true, reduces spacing and presets for a compact side-panel view */
   compact?: boolean;
@@ -145,7 +146,14 @@ interface SwapState {
   transactionHash: string | null;
 }
 
-export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false, defaultToToken = 'USDC', compact = false }: AlchemySwapWidgetProps) {
+export function AlchemySwapWidget({
+  onSwapSuccess,
+  className,
+  hideHeader = false,
+  defaultFromToken = 'ETH',
+  defaultToToken = 'USDC',
+  compact = false,
+}: AlchemySwapWidgetProps) {
 
   const { address, client } = useSmartAccountClient({});
   const { chain } = useChain();
@@ -176,7 +184,7 @@ export function AlchemySwapWidget({ onSwapSuccess, className, hideHeader = false
   };
 
   const [swapState, setSwapState] = useState<SwapState>({
-    fromToken: 'ETH',
+    fromToken: defaultFromToken,
     toToken: defaultToToken,
     fromAmount: '',
     toAmount: '',

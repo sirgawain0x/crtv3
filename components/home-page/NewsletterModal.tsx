@@ -10,8 +10,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { ExternalLink } from "lucide-react";
 import Link from "next/link";
-import { DearCreativeTradeButton } from "./DearCreativeTradeButton";
-
 
 interface NewsletterModalProps {
     isOpen: boolean;
@@ -32,14 +30,13 @@ export function NewsletterModal({
                 <DialogHeader className="px-6 py-4 flex flex-row items-center justify-between border-b bg-background z-10">
                     <DialogTitle className="truncate pr-4 flex-1">{title}</DialogTitle>
                     <DialogDescription className="sr-only">
-                        Read the full publication in this modal or open it in a new tab.
+                        Read the full publication in this modal or open it on Dear Creative in a new tab.
                     </DialogDescription>
                     <div className="flex items-center gap-2">
-                        <DearCreativeTradeButton />
                         <Button variant="ghost" size="sm" asChild className="hidden sm:flex" onClick={(e) => e.stopPropagation()}>
                             <Link href={postUrl} target="_blank" rel="noopener noreferrer">
                                 <ExternalLink className="h-4 w-4 mr-2" />
-                                Open in New Tab
+                                Open on Dear Creative
                             </Link>
                         </Button>
                     </div>

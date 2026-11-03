@@ -55,6 +55,10 @@ console.log({
 ## 🛠️ Common Commands
 
 ```bash
+# Unit tests (Vitest — same as CI .github/workflows/typescript.yml)
+pnpm test
+pnpm test:watch
+
 # Clean everything
 rm -rf .next node_modules
 npm install

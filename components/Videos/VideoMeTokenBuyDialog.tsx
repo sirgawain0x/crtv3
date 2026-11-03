@@ -93,6 +93,7 @@ export function VideoMeTokenBuyDialog({
     isConfirming,
     isConfirmed,
     transactionError,
+    isMembershipLoading,
     // getMeTokenVaultAddress, // not needed locally if we use ensureDaiApproval
   } = useMeTokensSupabase();
 
@@ -476,6 +477,7 @@ export function VideoMeTokenBuyDialog({
   };
 
   const isLoading = isPending || isConfirming;
+  const tradeDisabled = isLoading || isMembershipLoading;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -623,7 +625,7 @@ export function VideoMeTokenBuyDialog({
                     variant="ghost"
                     size="sm"
                     className="h-6 px-2 text-xs"
-                    disabled={isLoading || !isConnected}
+                    disabled={tradeDisabled || !isConnected}
                     onClick={() => {
                       if (mode === 'buy') {
                         setAmount(formatUnits(collateralBalance, collateral.decimals));
@@ -666,7 +668,7 @@ export function VideoMeTokenBuyDialog({
                     placeholder="0.00"
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
-                    disabled={isLoading || !isConnected}
+                    disabled={tradeDisabled || !isConnected}
                     min="0"
                     step="0.01"
                     className={mode === 'buy' || mode === 'sell' ? 'pl-10' : ''}
@@ -787,7 +789,7 @@ export function VideoMeTokenBuyDialog({
                     <Button
                       onClick={mode === 'buy' ? handleBuy : handleSell}
                       disabled={
-                        isLoading ||
+                        tradeDisabled ||
                         !amount ||
                         parseFloat(amount) <= 0 ||
                         (mode === 'buy' && collateralBalance < parseUnits(amount || '0', collateral.decimals)) ||

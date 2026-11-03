@@ -4,21 +4,34 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { NewsletterModal } from "./NewsletterModal";
-import { getPublicationPosts, getSubscriberCount, getCoinData } from "@/app/actions/paragraph";
-import { useUser } from "@/lib/wallet/react";
+import {
+    getDearCreativeActiveSubscriberCount,
+    getDearCreativeOriginForClient,
+    getDearCreativeRecentPosts,
+} from "@/app/actions/dear-creative";
+import type { DearCreativePost } from "@/lib/dear-creative/types";
+import {
+    formatDearCreativeSubscriberLine,
+    shouldShowSubscriberContentBadge,
+} from "@/lib/dear-creative/feed";
+import { buildDearCreativePostUrl } from "@/lib/dear-creative/origin";
 import { Newspaper } from "lucide-react";
 import { logger } from '@/lib/utils/logger';
 
-
-const COIN_ADDRESS = "0x81ced3c6e7058c1fe8d9b6c5a2435a65a4593292";
+function formatPublishedDate(publishedAt: string): string {
+    const date = new Date(publishedAt);
+    if (Number.isNaN(date.getTime())) {
+        return "";
+    }
+    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
 
 export default function DearCreativePublications() {
-    const user = useUser();
-    const [posts, setPosts] = useState<any[]>([]);
+    const [posts, setPosts] = useState<DearCreativePost[]>([]);
     const [subscriberCount, setSubscriberCount] = useState<number | null>(null);
-    const [coinData, setCoinData] = useState<any | null>(null);
+    const [origin, setOrigin] = useState("https://news.creativeplatform.xyz");
     const [loading, setLoading] = useState(true);
-    const [activePost, setActivePost] = useState<any | null>(null);
+    const [activePost, setActivePost] = useState<DearCreativePost | null>(null);
 
     useEffect(() => {
         let isMounted = true;
@@ -26,27 +39,19 @@ export default function DearCreativePublications() {
         async function fetchData() {
             try {
                 setLoading(true);
-                // Fetch public posts
-                const fetchedPosts = await getPublicationPosts(3);
+                const [fetchedPosts, count, resolvedOrigin] = await Promise.all([
+                    getDearCreativeRecentPosts(3),
+                    getDearCreativeActiveSubscriberCount(),
+                    getDearCreativeOriginForClient(),
+                ]);
 
                 if (isMounted) {
                     setPosts(fetchedPosts);
-                }
-
-                // If user is connected, fetch authenticated/extra data
-                if (user) {
-                    const [count, coin] = await Promise.all([
-                        getSubscriberCount(),
-                        getCoinData(COIN_ADDRESS)
-                    ]);
-
-                    if (isMounted) {
-                        setSubscriberCount(count);
-                        setCoinData(coin);
-                    }
+                    setSubscriberCount(count);
+                    setOrigin(resolvedOrigin);
                 }
             } catch (error) {
-                logger.error("Failed to fetch Paragraph data:", error);
+                logger.error("Failed to fetch Dear Creative data:", error);
             } finally {
                 if (isMounted) {
                     setLoading(false);
@@ -59,9 +64,9 @@ export default function DearCreativePublications() {
         return () => {
             isMounted = false;
         };
-    }, [user]);
+    }, []);
 
-    const handlePostClick = (e: React.MouseEvent, post: any) => {
+    const handlePostClick = (e: React.MouseEvent, post: DearCreativePost) => {
         e.preventDefault();
         setActivePost(post);
     };
@@ -108,39 +113,16 @@ export default function DearCreativePublications() {
                     <span className="text-primary">LATEST ARTICLES</span>
                 </h3>
 
-                {/* Stats Section - Visible only when connected */}
-                {user && (
-                    <div className="mb-6 flex justify-center gap-8 text-sm items-center">
-                        {subscriberCount !== null && (
-                            <div className="flex flex-col items-center">
-                                <span className="font-bold text-xl">{subscriberCount}</span>
-                                <span className="text-muted-foreground">Subscribers</span>
-                            </div>
-                        )}
-                        {coinData && coinData.metadata && (
-                            <div className="flex flex-col items-center animate-in fade-in zoom-in duration-300">
-                                {coinData.metadata.image ? (
-                                    <Image
-                                        src={coinData.metadata.image}
-                                        alt={coinData.metadata.name || "Coin"}
-                                        width={40}
-                                        height={40}
-                                        className="rounded-full mb-1 border border-border/50"
-                                    />
-                                ) : (
-                                    <div className="w-10 h-10 rounded-full bg-secondary mb-1 flex items-center justify-center border border-border/50">
-                                        <span className="text-xs">🪙</span>
-                                    </div>
-                                )}
-                                <span className="text-muted-foreground font-medium">{coinData.metadata.name || "Coin"}</span>
-                            </div>
-                        )}
-                    </div>
+                {subscriberCount !== null && (
+                    <p className="text-sm text-muted-foreground mb-2">
+                        {formatDearCreativeSubscriberLine(subscriberCount)}
+                    </p>
                 )}
 
                 <Link
-                    href="https://news.creativeplatform.xyz"
+                    href={origin}
                     target="_blank"
+                    rel="noopener noreferrer"
                     className="text-sm text-primary hover:underline transition-colors block mt-2"
                 >
                     Read all issues
@@ -148,19 +130,21 @@ export default function DearCreativePublications() {
             </div>
 
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                {posts.map((post) => (
+                {posts.map((post) => {
+                    const postUrl = post.canonicalUrl ?? buildDearCreativePostUrl(origin, post.slug);
+                    const publishedLabel = formatPublishedDate(post.publishedAt);
+                    return (
                     <Link
-                        key={post.id}
-                        href={`https://news.creativeplatform.xyz/${post.slug}`}
+                        key={post.slug}
+                        href={postUrl}
                         onClick={(e) => handlePostClick(e, post)}
                         className="group block h-full cursor-pointer"
                     >
                         <div className="relative flex h-full flex-col overflow-hidden rounded-xl bg-card border border-border/50 shadow-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-md">
-                            {/* Image */}
                             <div className="relative aspect-video w-full overflow-hidden bg-muted">
-                                {post.imageUrl || post.cover_image ? (
+                                {post.coverImage ? (
                                     <Image
-                                        src={post.imageUrl || post.cover_image}
+                                        src={post.coverImage}
                                         alt={post.title}
                                         fill
                                         className="object-cover transition-transform duration-500 group-hover:scale-110"
@@ -170,24 +154,32 @@ export default function DearCreativePublications() {
                                         No Image
                                     </div>
                                 )}
-                                {/* Overlay Gradient */}
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-60 transition-opacity group-hover:opacity-40" />
 
-                                <div className="absolute bottom-4 left-4 right-4">
-                                    <span className="inline-block rounded-full bg-primary/90 px-2 py-1 text-xs font-medium text-primary-foreground backdrop-blur-sm">
-                                        {new Date(Number(post.publishedAt)).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                                    </span>
+                                <div className="absolute top-4 left-4 flex flex-wrap gap-2">
+                                    {shouldShowSubscriberContentBadge(post.isGated) && (
+                                        <span className="inline-block rounded-full bg-amber-500/90 px-2 py-1 text-xs font-medium text-white backdrop-blur-sm">
+                                            Subscriber content
+                                        </span>
+                                    )}
                                 </div>
+
+                                {publishedLabel && (
+                                    <div className="absolute bottom-4 left-4 right-4">
+                                        <span className="inline-block rounded-full bg-primary/90 px-2 py-1 text-xs font-medium text-primary-foreground backdrop-blur-sm">
+                                            {publishedLabel}
+                                        </span>
+                                    </div>
+                                )}
                             </div>
 
-                            {/* Content */}
                             <div className="flex flex-grow flex-col p-5">
                                 <h3 className="mb-2 text-xl font-bold leading-tight tracking-tight text-card-foreground group-hover:text-primary transition-colors line-clamp-2">
                                     {post.title}
                                 </h3>
-                                {post.subtitle && (
+                                {post.excerpt && (
                                     <p className="text-sm text-muted-foreground line-clamp-2 mb-4 flex-grow">
-                                        {post.subtitle}
+                                        {post.excerpt}
                                     </p>
                                 )}
                                 <div className="mt-auto pt-4 flex items-center text-sm font-medium text-primary/80 group-hover:text-primary group-hover:translate-x-1 transition-all">
@@ -199,14 +191,15 @@ export default function DearCreativePublications() {
                             </div>
                         </div>
                     </Link>
-                ))}
+                    );
+                })}
             </div>
 
             {activePost && (
                 <NewsletterModal
                     isOpen={!!activePost}
                     onClose={() => setActivePost(null)}
-                    postUrl={`https://news.creativeplatform.xyz/${activePost.slug}`}
+                    postUrl={activePost.canonicalUrl ?? buildDearCreativePostUrl(origin, activePost.slug)}
                     title={activePost.title}
                 />
             )}

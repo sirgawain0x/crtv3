@@ -69,7 +69,6 @@
     "@livepeer/react": "^4.3.6",
     "@neondatabase/serverless": "^1.0.0",
     "@orbclub/modules": "^0.1.1",
-    "@paragraph-com/sdk": "^1.1.0",
     "@privy-io/alchemy-migration": "^0.0.5",
     "@privy-io/node": "^0.34.0",
     "@privy-io/react-auth": "^3.32.2",
@@ -164,23 +163,23 @@
     "tailwind-merge": "^3.2.0",
     "tailwindcss-animate": "^1.0.7",
     "three": "^0.169.0",
-    "twit": "^2.2.11",
     "tus-js-client": "^4.3.1",
     "uuid": "^11.1.0",
     "viem": "^2.48.8",
     "wagmi": "^2.15.3",
     "web-vitals": "^5.1.0",
     "x402-fetch": "^0.6.6",
-    "zod": "^3.25.0"
+    "zod": "^3.25.0",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.14",
     "@thirdweb-dev/contracts": "^3.15.0",
     "@types/d3": "^7.4.3",
     "@types/node": "^22.15.18",
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "@types/three": "^0.169.0",
-    "@types/twit": "^2.2.35",
     "@vitest/coverage-v8": "^2.1.0",
     "eslint": "^8.57.0",
     "eslint-config-next": "^16.1.6",
@@ -190,7 +189,8 @@
     "tailwindcss": "^3.4.4",
     "tsx": "^4.20.5",
     "typescript": "^5.8.3",
-    "vitest": "^2.1.0"
+    "vitest": "^2.1.0",
+    "@types/web-push": "^3.6.4"
   },
   "optionalDependencies": {
     "@mark3labs/louper-cli": "^0.5.10"
@@ -205,6 +205,7 @@
     }
   },
   "resolutions": {
+    "@solana-program/compute-budget": "0.11.0",
     "@reality.eth/reality-eth-lib": "3.4.34",
     "html-encoding-sniffer": "4.0.0",
     "@lens-protocol/client": "0.0.0-canary-20250820102520",

@@ -38,6 +38,7 @@ export function TokenChartDialog({
           <TokenPriceChart
             tokenAddress={token.address}
             tokenSymbol={token.symbol}
+            spotPrice={token.price > 0 ? token.price : null}
             height={400}
             showControls={true}
           />

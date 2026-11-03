@@ -13,7 +13,9 @@ const SPINDRIFT_HUB_OG_IMAGE = {
   type: "image/png",
 } as const;
 
+// Temporary: noindex while Spindrift is on public HOLD — remove when the hold lifts.
 export const metadata: Metadata = {
+  robots: { index: false, follow: false },
   title: "Spindrift | Creative TV",
   description:
     "Spindrift on Creative TV — real fruit sparkling water, made the hard way. Community pours, recipes, and events.",

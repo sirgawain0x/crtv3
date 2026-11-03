@@ -462,6 +462,11 @@ export function MeTokensSection({ walletAddress }: MeTokensSectionProps) {
               <TokenPriceChart
                 tokenAddress={userMeToken.address}
                 tokenSymbol={userMeToken.symbol}
+                spotPrice={
+                  userMeToken.totalSupply > BigInt(0)
+                    ? userMeToken.tvl / parseFloat(formatEther(userMeToken.totalSupply))
+                    : null
+                }
                 height={400}
                 showControls={true}
               />

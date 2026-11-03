@@ -11,6 +11,12 @@ import {
   fetchLockAndKey,
 } from "../../sdk/unlock/services";
 import useModularAccount from "@/lib/hooks/accountkit/useModularAccount";
+import { usePrivy } from "@privy-io/react-auth";
+import { useWalletInitTimeout } from "@/lib/hooks/accountkit/useWalletInitTimeout";
+import {
+  shouldWaitForMembershipWalletInit,
+  WALLET_INIT_TIMEOUT_CODE,
+} from "@/lib/hooks/unlock/membership-wallet-wait";
 
 export interface MembershipDetails {
   name: LockAddress;
@@ -33,12 +39,23 @@ export interface MembershipStatus {
 }
 
 export function useMembershipVerification() {
+  const { authenticated, ready } = usePrivy();
   const user = useUser();
   const {
     smartAccountClient: client,
     address: modularAddress,
     loading: isModularLoading,
   } = useModularAccount();
+  const scaAddressForWait =
+    client?.account?.address ?? modularAddress ?? null;
+  const waitingForWalletInit = shouldWaitForMembershipWalletInit({
+    ready,
+    authenticated,
+    userType: user?.type,
+    smartAccountAddress: scaAddressForWait,
+    userAddress: user?.address ?? null,
+  });
+  const walletInitTimedOut = useWalletInitTimeout(waitingForWalletInit);
 
   const [status, setStatus] = useState<Omit<MembershipStatus, "refetch">>({
     isVerified: false,
@@ -79,6 +96,52 @@ export function useMembershipVerification() {
   );
 
   const refetch = useCallback(async () => {
+    if (!authenticated) {
+      if (!ready) {
+        if (walletInitTimedOut) {
+          setStatus({
+            isVerified: false,
+            hasMembership: false,
+            isLoading: false,
+            error: {
+              name: "Error",
+              message: "Wallet session did not finish loading. Try again.",
+              code: WALLET_INIT_TIMEOUT_CODE,
+            } as MembershipError,
+          });
+          return;
+        }
+        setStatus((prev) => ({ ...prev, isLoading: true }));
+        return;
+      }
+      setStatus({
+        isVerified: false,
+        hasMembership: false,
+        isLoading: false,
+        error: null,
+      });
+      return;
+    }
+
+    if (waitingForWalletInit && !walletInitTimedOut) {
+      setStatus((prev) => ({ ...prev, isLoading: true }));
+      return;
+    }
+
+    if (waitingForWalletInit && walletInitTimedOut) {
+      setStatus({
+        isVerified: false,
+        hasMembership: false,
+        isLoading: false,
+        error: {
+          name: "Error",
+          message: "Smart wallet did not finish loading. Try again.",
+          code: WALLET_INIT_TIMEOUT_CODE,
+        } as MembershipError,
+      });
+      return;
+    }
+
     const userAddress = user?.address;
 
     if (!userAddress) {
@@ -86,7 +149,11 @@ export function useMembershipVerification() {
         isVerified: false,
         hasMembership: false,
         isLoading: false,
-        error: null,
+        error: {
+          name: "Error",
+          message: "Wallet address unavailable",
+          code: "NO_VALID_ADDRESS",
+        } as MembershipError,
       });
       return;
     }
@@ -100,23 +167,15 @@ export function useMembershipVerification() {
       }
 
       const scaAddress = client?.account?.address ?? modularAddress ?? null;
-      const waitingForClient = isModularLoading;
 
       if (!scaAddress) {
-        if (waitingForClient) {
-          setStatus((prev) =>
-            prev.isLoading ? prev : { ...prev, isLoading: true },
-          );
-          return;
-        }
-
         setStatus({
           isVerified: false,
           hasMembership: false,
           isLoading: false,
           error: {
             name: "Error",
-            message: "No valid address found for verification",
+            message: "Smart wallet address unavailable",
             code: "NO_VALID_ADDRESS",
           } as MembershipError,
         });
@@ -134,11 +193,14 @@ export function useMembershipVerification() {
       });
     }
   }, [
+    ready,
+    authenticated,
     user?.address,
     user?.type,
     client?.account?.address,
     modularAddress,
-    isModularLoading,
+    waitingForWalletInit,
+    walletInitTimedOut,
     verifyMembership,
   ]);
 

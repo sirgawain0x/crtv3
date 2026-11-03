@@ -82,13 +82,7 @@ export async function syncRealitySocialForChain(
 
     result.processed += 1;
 
-    const templateText = q.template?.questionText;
-    if (!templateText) {
-      result.skipped += 1;
-      continue;
-    }
-
-    const parsed = parseQuestionLocal(q.data, templateText);
+    const parsed = parseQuestionLocal(q.data, q.template?.questionText);
     if (!parsed?.title) {
       result.skipped += 1;
       continue;

@@ -1,6 +1,13 @@
-import { resolveSubgraphEndpoints } from "@/lib/subgraph/creative-platform-proxy";
-
-const PER_QUERY = 100;
+import { getRealityEthContractAddress } from "@/lib/sdk/reality-eth/reality-eth-client";
+import {
+  buildSubgraphRequestHeaders,
+  resolveSubgraphEndpoints,
+} from "@/lib/subgraph/creative-platform-proxy";
+import {
+  buildSocialSyncQuestionQueries,
+  type GraphQuestionEntity,
+} from "@/lib/reality-social/reality-social-subgraph-queries";
+import { mapGraphQuestionToRow } from "@/lib/reality-social/map-graph-question";
 
 export type SubgraphQuestionRow = {
   id: string;
@@ -18,9 +25,10 @@ async function postGraphql<T>(
   endpoint: string,
   query: string,
 ): Promise<T> {
+  const headers = buildSubgraphRequestHeaders(endpoint);
   const response = await fetch(endpoint, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify({ query }),
     cache: "no-store",
   });
@@ -63,56 +71,23 @@ async function queryWithFallback<T>(
 export async function fetchNewAndAnsweredQuestions(
   afterTimestamp: number,
 ): Promise<SubgraphQuestionRow[]> {
-  const ts = Math.max(0, afterTimestamp);
+  const contractAddress = getRealityEthContractAddress();
+  const { newQuestionsQuery, answeredQuestionsQuery } =
+    buildSocialSyncQuestionQueries(afterTimestamp);
 
-  const newQuestionsQuery = `
-    {
-      questions(
-        orderBy: createdTimestamp
-        orderDirection: asc
-        first: ${PER_QUERY}
-        where: { createdTimestamp_gt: ${ts}, currentAnswerTimestamp: null }
-      ) {
-        id
-        createdTimestamp
-        contract
-        data
-        bounty
-        currentAnswer
-        currentAnswerTimestamp
-        currentAnswerBond
-        template { questionText }
-      }
-    }
-  `;
-
-  const answeredQuery = `
-    {
-      questions(
-        orderBy: currentAnswerTimestamp
-        orderDirection: asc
-        first: ${PER_QUERY}
-        where: { currentAnswerTimestamp_gt: ${ts} }
-      ) {
-        id
-        createdTimestamp
-        contract
-        data
-        bounty
-        currentAnswer
-        currentAnswerTimestamp
-        currentAnswerBond
-        template { questionText }
-      }
-    }
-  `;
-
-  type QuestionPayload = { questions: SubgraphQuestionRow[] };
+  type QuestionPayload = { questions: GraphQuestionEntity[] };
 
   const [newData, answeredData] = await Promise.all([
     queryWithFallback<QuestionPayload>(newQuestionsQuery, (d) => d.questions),
-    queryWithFallback<QuestionPayload>(answeredQuery, (d) => d.questions),
+    queryWithFallback<QuestionPayload>(
+      answeredQuestionsQuery,
+      (d) => d.questions,
+    ),
   ]);
 
-  return [...newData.questions, ...answeredData.questions];
+  const byId = new Map<string, SubgraphQuestionRow>();
+  for (const row of [...newData.questions, ...answeredData.questions]) {
+    byId.set(row.id, mapGraphQuestionToRow(row, contractAddress));
+  }
+  return [...byId.values()];
 }

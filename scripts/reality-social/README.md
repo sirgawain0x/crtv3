@@ -2,6 +2,8 @@
 
 Creative TV can announce new prediction markets on **X (primary reach)** and **Mastodon (free, bot-friendly secondary channel)** using the same subgraph cursor model as the official [@reality.eth/twitter-bot](https://www.npmjs.com/package/@reality.eth/twitter-bot) and [@reality.eth/mastodon-bot](https://www.npmjs.com/package/@reality.eth/mastodon-bot) packages.
 
+**Hosted X posts** use **X API v2** `POST https://api.x.com/2/tweets` (OAuth 1.0a). See [docs/reality-social-twitter-integration.md](../../docs/reality-social-twitter-integration.md) for developer portal setup (app must be attached to a Project).
+
 ## Hosted dual-post (recommended on Vercel)
 
 The app includes **`GET /api/predictions/social-sync/cron`**, which:

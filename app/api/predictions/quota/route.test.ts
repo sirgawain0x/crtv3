@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 
-const ADMIN = "0x2953B96F9160955f6256c9D444F8F7950E6647Df";
+const ADMIN = "0xdE4b0371BBa20602685916ceeE5B22025a811734";
+const FORMER_ADMIN = "0x2953B96F9160955f6256c9D444F8F7950E6647Df";
 const USER = "0x1111111111111111111111111111111111111111";
 
 const mockGetAllMemberships = vi.fn();
@@ -60,6 +61,19 @@ describe("GET /api/predictions/quota", () => {
     expect(body.unlimited).toBe(true);
     expect(body.remaining).toBeNull();
     expect(mockGetAllMemberships).not.toHaveBeenCalled();
+  });
+
+  it("returns monthly quota for the former platform admin address", async () => {
+    const { GET } = await import("./route");
+    const req = new NextRequest(
+      `http://localhost/api/predictions/quota?address=${FORMER_ADMIN}`,
+    );
+    const res = await GET(req);
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.unlimited).toBe(false);
+    expect(mockGetAllMemberships).toHaveBeenCalled();
   });
 
   it("returns monthly quota for non-admin users", async () => {

@@ -8,6 +8,7 @@ const require = createRequire(import.meta.url);
 const withPWA = createPWA({
   dest: "public",
   disable: process.env.NODE_ENV === "development" || process.env.VERCEL === "1",
+  swSrc: "public/sw-custom.js",
 });
 
 /** @type {import('next').NextConfig} */
@@ -32,7 +33,6 @@ const nextConfig = {
     'jsdom',
     'html-encoding-sniffer',
     '@exodus/bytes',
-    'twit',
   ],
   // Webpack configuration for WebAssembly support
   webpack: (config, { isServer, webpack, dev }) => {
@@ -274,6 +274,20 @@ const nextConfig = {
     // number of pages that should be kept simultaneously without being disposed
     pagesBufferLength: 2,
   },
+  async redirects() {
+    return [
+      {
+        source: "/clips",
+        destination: "/discover",
+        permanent: true,
+      },
+      {
+        source: "/clips/:path*",
+        destination: "/discover",
+        permanent: true,
+      },
+    ];
+  },
   images: {
     remotePatterns: [
       {
@@ -485,6 +499,10 @@ const nextConfig = {
             value: embedCsp,
           },
         ],
+      },
+      {
+        source: '/push-sw.js',
+        headers: [{ key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' }],
       },
       {
         // Apply to all routes

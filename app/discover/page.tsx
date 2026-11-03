@@ -25,11 +25,11 @@ const AllVideosContent: React.FC = () => {
     <div className="min-h-screen px-0 py-6 sm:px-6 sm:py-6">
       <div className="mb-8 rounded-lg bg-white dark:bg-gray-800/60 p-8 shadow-md">
         <h1 className="mb-6 text-center text-4xl font-bold text-gray-800 dark:text-gray-200">
-          Discover Amazing Music Videos
+          Discover Creator Videos
         </h1>
         <p className="mb-8 text-center text-gray-600 dark:text-gray-400">
-          Explore our collection of creative music videos from talented creators
-          worldwide. Find something inspiring and share it with your friends!
+          Music, code, campaigns, and culture from creators worldwide. Find
+          something that inspires you and share it.
         </p>
       </div>
       <div className="mx-auto mb-8 max-w-7xl px-4 sm:px-0">

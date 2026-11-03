@@ -12,7 +12,10 @@ import { METOKEN_DIAMOND_BASE } from '@/lib/contracts/metokens/deployments';
 import { publicClient } from '@/lib/viem';
 import type { HubCollateralConfig } from '@/lib/metokens/hub-onchain';
 import type { CompatSmartAccountClient, SendUserOperationArgs } from '@/lib/wallet/smart-wallet-client';
-import type { MeTokenCreationGasResult } from '@/lib/metokens/metoken-gas';
+import {
+  buildMeTokenCreationGasContext,
+  type MeTokenCreationGasResult,
+} from '@/lib/metokens/metoken-gas';
 import { formatMeTokenCreationError } from '@/lib/metokens/metoken-gas';
 
 const DIAMOND = METOKEN_DIAMOND_BASE;
@@ -176,6 +179,22 @@ export async function verifyMeTokenCreationReceipt(params: {
 
 const SEND_TIMEOUT_MS = 60_000;
 const WAIT_TIMEOUT_MS = 120_000;
+
+/** Single-call helper for subscribe / mint flows (same paymaster policy as creation). */
+export async function sendMeTokenSponsoredUserOp(params: {
+  client: CompatSmartAccountClient;
+  call: MeTokenCreationCall;
+  gas?: MeTokenCreationGasResult;
+  ethFallback?: () => MeTokenCreationGasResult;
+}): Promise<{ hash: string; policyId?: string; usedEthFallback: boolean }> {
+  const gas = params.gas ?? buildMeTokenCreationGasContext();
+  return sendMeTokenCreationUserOp({
+    client: params.client,
+    calls: [params.call],
+    gas,
+    ethFallback: params.ethFallback,
+  });
+}
 
 export async function sendMeTokenCreationUserOp(params: {
   client: CompatSmartAccountClient;
