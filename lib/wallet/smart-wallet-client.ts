@@ -46,7 +46,7 @@ export type CompatSmartAccountClient = {
   }) => Promise<{ address: Address }>;
   signPreparedCalls: (calls: unknown) => Promise<unknown>;
   sendPreparedCalls: (calls: unknown) => Promise<{ preparedCallIds: string[] }>;
-  signMessage: (args: { message: string | { raw: Uint8Array } }) => Promise<Hex>;
+  signMessage: (args: { message: string | { raw: Uint8Array }; account?: Address }) => Promise<Hex>;
   signTypedData: (args: Record<string, unknown>) => Promise<Hex>;
   extend: <T>(fn: (client: unknown) => T) => T;
   /** @deprecated use a dedicated publicClient for reads; the smart-account client is write-only */

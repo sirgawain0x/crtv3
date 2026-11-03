@@ -87,6 +87,7 @@ describe('useSignMessage', () => {
 
   it('prefers the smart-account client over the raw signer when client is provided', async () => {
     const smartClient = {
+      account: { address: '0x2222222222222222222222222222222222222222' },
       signMessage: vi.fn().mockResolvedValue('0xsmart'),
     } as unknown as CompatSmartAccountClient;
 
@@ -97,6 +98,7 @@ describe('useSignMessage', () => {
     const signature = await result.current.signMessage({ message: 'hello' });
     expect(signature).toBe('0xsmart');
     expect(smartClient.signMessage).toHaveBeenCalledWith({
+      account: '0x2222222222222222222222222222222222222222',
       message: 'hello',
     });
     expect(mockSigner.signMessage).not.toHaveBeenCalled();
