@@ -144,7 +144,7 @@ export function OrbLoginModal() {
     >
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Link Lens with Orb</DialogTitle>
+          <DialogTitle>Link Orb</DialogTitle>
           <DialogDescription>
             {deepLink && !displayError
               ? 'Scan the QR on desktop, or open the Orb app on this phone to approve sign-in.'

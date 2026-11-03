@@ -54,7 +54,7 @@ export function SongchainOrbConnect() {
             ? 'Sign in again'
             : lensWrite.needsLink
               ? 'Sync profile'
-              : 'Sign in with Orb'}
+              : 'Link Orb'}
       </Button>
     </div>
   );

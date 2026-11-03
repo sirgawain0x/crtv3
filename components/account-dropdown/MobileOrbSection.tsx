@@ -68,7 +68,7 @@ export function MobileOrbSection() {
             openOrbLogin();
           }}
         >
-          Sign in with Orb
+          Link Orb
         </Button>
       )}
     </div>

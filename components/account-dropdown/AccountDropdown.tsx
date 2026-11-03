@@ -1612,7 +1612,7 @@ export const AccountDropdown = forwardRef<AccountDropdownHandle>(
                     openOrbLogin();
                   }}
                 >
-                  Sign in with Orb
+                  Link Orb
                 </Button>
               )}
             </div>
