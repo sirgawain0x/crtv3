@@ -1,5 +1,6 @@
 "use client";
 
+import { MembershipVerifiedBadge } from "@/components/User/MembershipVerifiedBadge";
 import { useState } from 'react';
 import { MarketToken } from '@/app/api/market/tokens/route';
 import { Card, CardContent } from '@/components/ui/card';
@@ -76,6 +77,7 @@ export function TokenCard({ token, onQuickTrade, showChart = false }: TokenCardP
                 >
                   {token.symbol}
                 </Link>
+                <MembershipVerifiedBadge address={token.owner_address} />
                 {isContentCoin && (
                   <span className="px-1.5 py-0.5 text-xs rounded bg-blue-500/10 text-blue-600 dark:text-blue-400">
                     Content

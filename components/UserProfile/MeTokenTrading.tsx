@@ -1,5 +1,6 @@
 "use client";
-import { useState, useEffect, useCallback } from 'react';
+import { MembershipVerifiedBadge } from "@/components/User/MembershipVerifiedBadge";
+import { useState, useEffect, useCallback, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -49,7 +50,7 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
     useState<MeTokenTradeErrorKind | null>(null);
   const [showLowUsdcForGas, setShowLowUsdcForGas] = useState(false);
   const [showUsdcToEthSwap, setShowUsdcToEthSwap] = useState(false);
-  const [success, setSuccess] = useState<React.ReactNode | null>(null);
+  const [success, setSuccess] = useState<ReactNode | null>(null);
 
   // Initialize subscription status from meToken prop data immediately
   // This prevents showing "not subscribed" while waiting for blockchain check
@@ -459,6 +460,7 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <span>Trade {meToken.symbol}</span>
+            <MembershipVerifiedBadge address={meToken.owner} size="md" />
             <Loader2 className="h-4 w-4 animate-spin" />
           </CardTitle>
           <CardDescription>Checking subscription status...</CardDescription>
@@ -481,6 +483,7 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <span>Trade {meToken.symbol}</span>
+              <MembershipVerifiedBadge address={meToken.owner} size="md" />
               <Lock className="h-5 w-5 text-orange-500" />
             </CardTitle>
             <CardDescription>
@@ -530,6 +533,7 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <span>Trade {meToken.symbol}</span>
+              <MembershipVerifiedBadge address={meToken.owner} size="md" />
               <AlertCircle className="h-5 w-5 text-orange-500" />
             </CardTitle>
             <CardDescription>
@@ -605,6 +609,7 @@ export function MeTokenTrading({ meToken, onRefresh }: MeTokenTradingProps) {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <span>Trade {meToken.symbol}</span>
+          <MembershipVerifiedBadge address={meToken.owner} size="md" />
           {isConfirmed && <CheckCircle className="h-5 w-5 text-green-500" />}
         </CardTitle>
         <CardDescription>

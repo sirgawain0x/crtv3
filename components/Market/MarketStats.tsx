@@ -1,5 +1,6 @@
 "use client";
 
+import { MembershipVerifiedBadge } from "@/components/User/MembershipVerifiedBadge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { MarketStats as MarketStatsType } from '@/app/api/market/tokens/route';
 import { TrendingUp, TrendingDown, DollarSign, Coins, BarChart3 } from 'lucide-react';
@@ -143,7 +144,10 @@ export function MarketStats({ stats, loading }: MarketStatsProps) {
                         </Avatar>
                       )}
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm truncate">{token.symbol}</p>
+                        <p className="flex items-center gap-1.5 font-medium text-sm min-w-0">
+                          <span className="truncate">{token.symbol}</span>
+                          <MembershipVerifiedBadge address={token.owner_address} />
+                        </p>
                         <p className="text-xs text-muted-foreground truncate">{token.name}</p>
                       </div>
                     </div>
@@ -200,7 +204,10 @@ export function MarketStats({ stats, loading }: MarketStatsProps) {
                         </Avatar>
                       )}
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm truncate">{token.symbol}</p>
+                        <p className="flex items-center gap-1.5 font-medium text-sm min-w-0">
+                          <span className="truncate">{token.symbol}</span>
+                          <MembershipVerifiedBadge address={token.owner_address} />
+                        </p>
                         <p className="text-xs text-muted-foreground truncate">{token.name}</p>
                       </div>
                     </div>

@@ -12,39 +12,9 @@ import { base } from "@account-kit/infra";
 import { parseIpfsUriWithFallback } from "@/lib/utils/image-gateway";
 import { serverLogger } from "@/lib/utils/logger";
 
-/** Resolve Base mainnet RPC URL. Avoids Alchemy client when key is missing (returns non-JSON → parse error). */
-function getBaseRpcUrl(): string {
-  const apiKey = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY;
-
-  // Only use Alchemy URL if we have a valid, non-empty API key
-  if (apiKey && typeof apiKey === 'string' && apiKey.trim().length > 0) {
-    const trimmedKey = apiKey.trim();
-    // Ensure the URL includes the API key
-    const alchemyUrl = `https://base-mainnet.g.alchemy.com/v2/${trimmedKey}`;
-    serverLogger.debug('[RPC] Using Alchemy RPC with API key');
-    return alchemyUrl;
-  }
-
-  // Fallback to other RPC URLs if Alchemy key is missing
-  const alchemyRpc = process.env.NEXT_PUBLIC_ALCHEMY_RPC_URL;
-  if (alchemyRpc && typeof alchemyRpc === 'string' && alchemyRpc.trim().length > 0) {
-    serverLogger.debug('[RPC] Using NEXT_PUBLIC_ALCHEMY_RPC_URL');
-    return alchemyRpc.trim();
-  }
-
-  const baseRpc = process.env.NEXT_PUBLIC_BASE_RPC_URL;
-  if (baseRpc && typeof baseRpc === 'string' && baseRpc.trim().length > 0) {
-    serverLogger.debug('[RPC] Using NEXT_PUBLIC_BASE_RPC_URL');
-    return baseRpc.trim();
-  }
-
-  // Final fallback to public Base RPC
-  serverLogger.warn('[RPC] No Alchemy API key found, falling back to public Base RPC');
-  return "https://mainnet.base.org";
-}
+import { getBaseRpcUrl } from "@/lib/chain/base-rpc";
 
 const baseRpcUrl = getBaseRpcUrl();
-serverLogger.debug('[RPC] Base RPC URL configured:', baseRpcUrl.replace(/\/v2\/[^/]+/, '/v2/***'));
 
 const accountKitClient = createPublicClient({
   chain: base,
@@ -519,6 +489,7 @@ export class UnlockService {
             name: name as LockAddress,
             address,
             isValid: false,
+            error: "Membership lookup unavailable",
             lock: null,
             tokenId: null,
           };
