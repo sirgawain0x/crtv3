@@ -1,109 +1,49 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { checkBotIdDeep } from '@/lib/middleware/botIdGuard';
-import { rateLimiters } from '@/lib/middleware/rateLimit';
-import { supabaseService } from '@/lib/sdk/supabase/service';
-import { createClient } from '@/lib/sdk/supabase/server';
-import { serverLogger } from '@/lib/utils/logger';
-import { notificationInbox, markNotificationRead, subscribePush, unsubscribePush, pushDeviceStatus, dispatchPush, testPush } from '@/lib/notifications';
+import { NextRequest, NextResponse } from "next/server";
+import { z, ZodError } from "zod";
+import { requireWalletAuth, WalletAuthError } from "@/lib/auth/require-wallet";
+import { rateLimiters } from "@/lib/middleware/rateLimit";
+import { NotificationError } from "@/lib/notification-errors";
+import { allowedPushEndpoint } from "@/lib/push-policy";
+import { notificationInbox, markNotificationRead, subscribePush, unsubscribePush, pushDeviceStatus, testPush } from "@/lib/notifications";
 
-function getSupabase() {
-  return supabaseService || createClient();
+export const runtime = "nodejs";
+export const maxDuration = 300;
+const endpoint = z.string().max(4096).refine(allowedPushEndpoint);
+const action = z.discriminatedUnion("action", [
+  z.object({ action: z.literal("read"), id: z.string().min(1).max(128).optional() }).strict(),
+  z.object({ action: z.literal("push-subscribe"), subscription: z.unknown() }).strict(),
+  z.object({ action: z.literal("push-status"), endpoint }).strict(),
+  z.object({ action: z.literal("push-unsubscribe"), endpoint }).strict(),
+  z.object({ action: z.literal("push-test"), endpoint }).strict(),
+]);
+const json = (value: unknown, status = 200) => NextResponse.json(value, {
+  status, headers: { "Cache-Control": "private, no-store" },
+});
+function failure(error: unknown) {
+  if (error instanceof WalletAuthError || error instanceof NotificationError) return json({ error: error.message }, error.status);
+  if (error instanceof ZodError || error instanceof SyntaxError) return json({ error: "Invalid notification request." }, 400);
+  return json({ error: "Notifications are temporarily unavailable." }, 503);
 }
-
-// GET /api/notifications - Get user's notification inbox
 export async function GET(request: NextRequest) {
   try {
-    // Get the user from the request - in a real implementation, this would come from auth
-    // For now, we'll use a header or query param
-    const ownerId = request.headers.get('x-user-id') || request.nextUrl.searchParams.get('ownerId');
-
-    if (!ownerId) {
-      return NextResponse.json(
-        { success: false, error: 'ownerId is required' },
-        { status: 400 }
-      );
-    }
-
-    const inbox = await notificationInbox(ownerId);
-
-    return NextResponse.json({
-      success: true,
-      data: inbox,
-    });
-  } catch (error) {
-    serverLogger.error('Error fetching notifications:', error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to fetch notifications',
-      },
-      { status: 500 }
-    );
-  }
+    const limited = await rateLimiters.standard(request);
+    if (limited) return limited;
+    const { address } = await requireWalletAuth(request);
+    return json(await notificationInbox(address));
+  } catch (error) { return failure(error); }
 }
-
-// POST /api/notifications - Handle notification actions
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { action, ...data } = body;
-
-    // Get the user ID
-    const ownerId = request.headers.get('x-user-id') || data.ownerId;
-
-    if (!ownerId) {
-      return NextResponse.json(
-        { success: false, error: 'ownerId is required' },
-        { status: 400 }
-      );
+    const limited = await rateLimiters.standard(request);
+    if (limited) return limited;
+    const { address } = await requireWalletAuth(request);
+    const input = action.parse(await request.json());
+    switch (input.action) {
+      case "read": return json(await markNotificationRead(address, input.id));
+      case "push-subscribe": return json(await subscribePush(address, input.subscription));
+      case "push-unsubscribe": return json(await unsubscribePush(address, input.endpoint));
+      case "push-status": return json(await pushDeviceStatus(address, input.endpoint));
+      case "push-test": return json(await testPush(address, input.endpoint));
     }
-
-    switch (action) {
-      case 'read': {
-        const result = await markNotificationRead(ownerId, data.id);
-        return NextResponse.json({ success: true, data: result });
-      }
-
-      case 'push-subscribe': {
-        const rl = await rateLimiters.standard(request);
-        if (rl) return rl;
-
-        const result = await subscribePush(ownerId, data);
-        return NextResponse.json({ success: true, data: result });
-      }
-
-      case 'push-unsubscribe': {
-        const result = await unsubscribePush(ownerId, data.endpoint);
-        return NextResponse.json({ success: true, data: result });
-      }
-
-      case 'push-status': {
-        const result = await pushDeviceStatus(ownerId, data.endpoint);
-        return NextResponse.json({ success: true, data: result });
-      }
-
-      case 'push-test': {
-        const rl = await rateLimiters.standard(request);
-        if (rl) return rl;
-
-        const result = await testPush(ownerId);
-        return NextResponse.json({ success: true, data: result });
-      }
-
-      default:
-        return NextResponse.json(
-          { success: false, error: 'Invalid action' },
-          { status: 400 }
-        );
-    }
-  } catch (error) {
-    serverLogger.error('Error handling notification action:', error);
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to handle notification action',
-      },
-      { status: 500 }
-    );
-  }
+  } catch (error) { return failure(error); }
 }

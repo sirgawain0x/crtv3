@@ -14,6 +14,7 @@ export function allowedPushEndpoint(value: string) {
         "updates.push.services.mozilla.com",
         "web.push.apple.com",
       ].includes(u.hostname) ||
+        /^[a-z0-9-]+\.push\.apple\.com$/.test(u.hostname) ||
         /^[a-z0-9-]+\.notify\.windows\.com$/.test(u.hostname))
     );
   } catch {
@@ -33,7 +34,7 @@ export const pushSubscriptionInput = z.object({
 });
 
 export function notificationHref(href: string) {
-  return /^\/\?(entry=[A-Za-z0-9_-]+|view=(studio|results|notifications))$/.test(href)
+  return /^(\/watch\/[A-Za-z0-9_-]+|\/\?notifications=1)$/.test(href)
     ? href
     : "/";
 }
