@@ -3,8 +3,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   addPassCancelAcknowledgement,
-  clearPassCancelAcknowledgementsForLock,
-  passCancelLockPrefix,
   prunePassCancelAcknowledgements,
   readPassCancelAcknowledgements,
 } from "@/lib/access/pass-cancel-acknowledgements";
@@ -42,8 +40,11 @@ export function usePassCancelAcknowledgements(
     for (const key of sessionOverlay) {
       merged.add(key);
     }
+    if (activePassKeys.size > 0) {
+      return new Set([...merged].filter((key) => activePassKeys.has(key)));
+    }
     return merged;
-  }, [persistedKeys, sessionOverlay]);
+  }, [persistedKeys, sessionOverlay, activePassKeys]);
 
   const cancelControlsReady = Boolean(walletAddress);
 
@@ -65,22 +66,9 @@ export function usePassCancelAcknowledgements(
     [walletAddress],
   );
 
-  const clearPassCancelForLock = useCallback(
-    (lockAddress: string) => {
-      if (!walletAddress) {
-        return;
-      }
-      clearPassCancelAcknowledgementsForLock(walletAddress, lockAddress);
-      const prefix = passCancelLockPrefix(walletAddress, lockAddress);
-      setSessionOverlay((prev) => new Set([...prev].filter((key) => !key.startsWith(prefix))));
-    },
-    [walletAddress],
-  );
-
   return {
     cancelledPassKeys,
     acknowledgePassCancel,
-    clearPassCancelForLock,
     cancelControlsReady,
   };
 }

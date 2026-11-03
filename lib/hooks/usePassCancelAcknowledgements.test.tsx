@@ -76,24 +76,13 @@ describe("usePassCancelAcknowledgements", () => {
     await view.unmount();
   });
 
-  it("drops stale expiration keys and clears a lock after buy-again", async () => {
+  it("drops stale expiration keys when the active pass key changes after renewal", async () => {
     const oldKey = passCancelStorageKey(WALLET, LOCK, "1", EXPIRATION);
     writePassCancelAcknowledgements(WALLET, new Set([oldKey]));
 
     const view = await renderHook(WALLET, activeKeys(NEW_EXPIRATION));
     expect(view.result.cancelledPassKeys.has(oldKey)).toBe(false);
-
-    const renewedKey = passCancelStorageKey(WALLET, LOCK, "1", NEW_EXPIRATION);
-    await act(async () => {
-      view.result.acknowledgePassCancel(renewedKey);
-    });
-    expect(view.result.cancelledPassKeys.has(renewedKey)).toBe(true);
-
-    await act(async () => {
-      view.result.clearPassCancelForLock(LOCK);
-    });
-    expect(view.result.cancelledPassKeys.has(renewedKey)).toBe(false);
-    expect(readPassCancelAcknowledgements(WALLET).has(renewedKey)).toBe(false);
+    expect(readPassCancelAcknowledgements(WALLET).has(oldKey)).toBe(false);
     await view.unmount();
   });
 });

@@ -145,12 +145,8 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
     return buildActivePassCancelKeys(walletAddress, validMemberships);
   }, [walletAddress, validMemberships]);
 
-  const {
-    cancelledPassKeys,
-    acknowledgePassCancel,
-    clearPassCancelForLock,
-    cancelControlsReady,
-  } = usePassCancelAcknowledgements(walletAddress, activePassCancelKeys);
+  const { cancelledPassKeys, acknowledgePassCancel, cancelControlsReady } =
+    usePassCancelAcknowledgements(walletAddress, activePassCancelKeys);
 
   const handlePassCancelConfirm = useCallback(
     async (passKey: string) => {
@@ -158,17 +154,6 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
       await refetchMembership();
     },
     [acknowledgePassCancel, refetchMembership],
-  );
-
-  const handleMembershipPurchaseSuccess = useCallback(
-    async (purchasedLockAddress?: string) => {
-      const lockToClear = purchasedLockAddress ?? primaryMembership?.address;
-      if (lockToClear) {
-        clearPassCancelForLock(lockToClear);
-      }
-      await refetchMembership();
-    },
-    [clearPassCancelForLock, primaryMembership?.address, refetchMembership],
   );
 
   const membershipErrorMessage = membershipError
@@ -310,9 +295,7 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
                       <h3 className="text-lg font-medium">Buy again or upgrade</h3>
                       <MembershipHome
                         currentMembershipAddress={primaryMembership.address}
-                        onPurchaseSuccess={() =>
-                          handleMembershipPurchaseSuccess(primaryMembership.address)
-                        }
+                        onPurchaseSuccess={refetchMembership}
                         onSwitchToFinanceTab={switchToFinanceTab}
                       />
                     </div>
@@ -320,7 +303,7 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
                 </Card>
               ) : (
                 <MembershipHome
-                  onPurchaseSuccess={handleMembershipPurchaseSuccess}
+                  onPurchaseSuccess={refetchMembership}
                   onSwitchToFinanceTab={switchToFinanceTab}
                 />
               )}

@@ -21,8 +21,11 @@ import type { MembershipDetails } from "@/lib/hooks/unlock/useMembershipVerifica
 import { LOCK_ADDRESSES } from "@/lib/sdk/unlock/services";
 import { passAccessUntilMessage } from "@/lib/access/format-pass-expiration";
 import {
+  buildActivePassCancelKeys,
   passCancelStorageKey,
+  prunePassCancelAcknowledgements,
   readPassCancelAcknowledgements,
+  writePassCancelAcknowledgements,
 } from "@/lib/access/pass-cancel-acknowledgements";
 import { showMembershipTabSkeleton } from "@/lib/hooks/unlock/showMembershipTabSkeleton";
 
@@ -121,29 +124,62 @@ describe("MembershipPassRows", () => {
     );
   });
 
-  it("shows Cancel pass again after buy-again changes expiration and clears the acknowledgement", async () => {
-    const lock = LOCK_ADDRESSES.BASE_CREATIVE_PASS;
-    const oldPass = makePass(lock, "1", EXPIRATION);
-    const newPass = makePass(lock, "1", NEW_EXPIRATION);
-    const oldKey = passCancelStorageKey(WALLET, lock, "1", EXPIRATION);
+  it("with two passes, renewing the non-cancelled pass keeps the other cancelled", async () => {
+    const lockA = LOCK_ADDRESSES.BASE_CREATIVE_PASS;
+    const lockB = LOCK_ADDRESSES.BASE_CREATIVE_PASS_2;
+    const passA = makePass(lockA, "1", EXPIRATION);
+    const passB = makePass(lockB, "2", EXPIRATION);
+    const passBRenewed = makePass(lockB, "2", NEW_EXPIRATION);
+    const keyA = passCancelStorageKey(WALLET, lockA, "1", EXPIRATION);
+    writePassCancelAcknowledgements(WALLET, new Set([keyA]));
+
+    const cancelledAfterOtherRenewal = prunePassCancelAcknowledgements(
+      WALLET,
+      buildActivePassCancelKeys(WALLET, [passA, passBRenewed]),
+    );
 
     await act(async () => {
       root.render(
         <MembershipPassRows
-          passes={[oldPass]}
-          cancelledPassKeys={new Set([oldKey])}
+          passes={[passA, passBRenewed]}
+          cancelledPassKeys={cancelledAfterOtherRenewal}
           {...defaultRowsProps}
         />,
       );
     });
-    expect(container.querySelector('[data-testid="pass-cancel-trigger"]')).toBeNull();
+
+    const rows = container.querySelectorAll('[data-testid="membership-pass-row"]');
+    expect(rows[0].querySelector('[data-testid="pass-cancel-acknowledged"]')).not.toBeNull();
+    expect(rows[1].querySelector('[data-testid="pass-cancel-trigger"]')).not.toBeNull();
+  });
+
+  it("renewing the cancelled pass restores Cancel pass when expiration changes", async () => {
+    const lockA = LOCK_ADDRESSES.BASE_CREATIVE_PASS;
+    const lockB = LOCK_ADDRESSES.BASE_CREATIVE_PASS_2;
+    const passARenewed = makePass(lockA, "1", NEW_EXPIRATION);
+    const passB = makePass(lockB, "2", EXPIRATION);
+    const oldKeyA = passCancelStorageKey(WALLET, lockA, "1", EXPIRATION);
+    writePassCancelAcknowledgements(WALLET, new Set([oldKeyA]));
+
+    const cancelledAfterRenewA = prunePassCancelAcknowledgements(
+      WALLET,
+      buildActivePassCancelKeys(WALLET, [passARenewed, passB]),
+    );
+    expect(cancelledAfterRenewA.has(oldKeyA)).toBe(false);
 
     await act(async () => {
       root.render(
-        <MembershipPassRows passes={[newPass]} cancelledPassKeys={new Set()} {...defaultRowsProps} />,
+        <MembershipPassRows
+          passes={[passARenewed, passB]}
+          cancelledPassKeys={cancelledAfterRenewA}
+          {...defaultRowsProps}
+        />,
       );
     });
-    expect(container.querySelector('[data-testid="pass-cancel-trigger"]')).not.toBeNull();
+
+    const rows = container.querySelectorAll('[data-testid="membership-pass-row"]');
+    expect(rows[0].querySelector('[data-testid="pass-cancel-trigger"]')).not.toBeNull();
+    expect(rows[0].querySelector('[data-testid="pass-cancel-acknowledged"]')).toBeNull();
   });
 
   it("keeps cancelled acknowledgement visible through a refetch-style remount", async () => {
