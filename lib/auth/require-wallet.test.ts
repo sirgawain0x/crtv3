@@ -80,6 +80,29 @@ describe('verifyWalletSignature', () => {
     expect(mockFallbackVerifyMessage).toHaveBeenCalledOnce();
   });
 
+  it('verifies a wrapped smart-account signature when the primary simulation returns false', async () => {
+    const wrappedSignature = `0x${"ab".repeat(200)}` as `0x${string}`;
+    mockEoaVerifyMessage.mockResolvedValue(false);
+    mockPrimaryVerifyMessage.mockResolvedValue(false);
+    mockFallbackVerifyMessage.mockResolvedValue(true);
+    expect(await verifyWalletSignature(ADDRESS, 'hello', wrappedSignature)).toEqual({ ok: true });
+    expect(mockFallbackVerifyMessage).toHaveBeenCalledWith({ address: ADDRESS, message: 'hello', signature: wrappedSignature });
+  });
+
+  it('does not accept a signature rejected by both RPCs', async () => {
+    mockEoaVerifyMessage.mockResolvedValue(false);
+    mockPrimaryVerifyMessage.mockResolvedValue(false);
+    mockFallbackVerifyMessage.mockResolvedValue(false);
+    expect(await verifyWalletSignature(ADDRESS, 'hello', SIGNATURE)).toEqual({ ok: false, reason: 'invalid' });
+  });
+
+  it('reports verification unavailable when the backup RPC cannot confirm a primary rejection', async () => {
+    mockEoaVerifyMessage.mockResolvedValue(false);
+    mockPrimaryVerifyMessage.mockResolvedValue(false);
+    mockFallbackVerifyMessage.mockRejectedValue(new Error('RPC unavailable'));
+    expect(await verifyWalletSignature(ADDRESS, 'hello', SIGNATURE)).toEqual({ ok: false, reason: 'unavailable' });
+  });
+
   it('returns unavailable when both RPC paths throw', async () => {
     mockEoaVerifyMessage.mockResolvedValue(false);
     mockPrimaryVerifyMessage.mockRejectedValue(new Error('Alchemy 500'));
@@ -97,7 +120,7 @@ describe('verifyWalletSignature', () => {
     const result = await verifyWalletSignature(ADDRESS, 'hello', SIGNATURE);
 
     expect(result).toEqual({ ok: false, reason: 'invalid' });
-    expect(mockFallbackVerifyMessage).not.toHaveBeenCalled();
+    expect(mockFallbackVerifyMessage).toHaveBeenCalledOnce();
   });
 
   it('returns invalid for malformed signatures without calling RPC', async () => {

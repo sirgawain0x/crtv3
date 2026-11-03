@@ -7,7 +7,7 @@ import { clearWalletAuth, requestWalletAuth, setWalletAuthOwner } from "@/lib/au
 
 const A = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 const B = "0xbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
-const mocks = vi.hoisted(() => ({ address: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" as string | null, sign: vi.fn(), fetch: vi.fn(), client: {} }));
+const mocks = vi.hoisted(() => ({ address: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" as string | null, sign: vi.fn(), fetch: vi.fn(), client: { account: { address: "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" } } }));
 vi.mock("@/lib/wallet/react", () => ({
   useUser: () => mocks.address ? { address: mocks.address } : null,
   useSignMessage: () => ({ signMessage: mocks.sign }),
@@ -41,6 +41,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   Object.defineProperty(document, "visibilityState", { configurable: true, value: "visible" });
   mocks.address = A;
+  mocks.client.account.address = A;
   mocks.sign.mockResolvedValue("0xverified");
   mocks.fetch.mockResolvedValue(reply(inbox));
   vi.stubGlobal("fetch", mocks.fetch);
@@ -75,6 +76,22 @@ describe("notification inbox authentication", () => {
     expect(container.textContent).not.toContain("Verify wallet");
     expect(mocks.sign).not.toHaveBeenCalled();
     expect(mocks.fetch).toHaveBeenCalledWith("/api/notifications", expect.objectContaining({ method: "GET", cache: "no-store", headers: expect.objectContaining({ "X-Wallet-Address": A, "X-Wallet-Signature": "0xcached" }) }));
+  });
+  it("uses a filled, high-contrast verification button with a touch-sized target", async () => {
+    await render(); await click("Notifications");
+    const verify = button("Verify wallet");
+    expect(verify.tagName).toBe("BUTTON");
+    expect(verify.className).toContain("bg-primary");
+    expect(verify.className).toContain("text-primary-foreground");
+    expect(verify.className).toContain("min-h-11");
+    expect(verify.className).toContain("rounded-md");
+  });
+  it("does not sign a wallet proof with a different account client", async () => {
+    mocks.client.account.address = B;
+    await render(); await click("Notifications"); await click("Verify wallet");
+    expect(container.textContent).toContain("wallet is still connecting");
+    expect(mocks.sign).not.toHaveBeenCalled();
+    expect(mocks.fetch).not.toHaveBeenCalled();
   });
   it("requires an explicit verification action then loads immediately", async () => {
     await render(); await click("Notifications");

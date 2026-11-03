@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Bell } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useWalletAuth, type AuthHeaders } from "@/lib/auth/useWalletAuth";
 import { notificationApi, NotificationApiError, type NotificationAction, type NotificationInbox } from "@/lib/client-api";
@@ -157,13 +158,13 @@ function NotificationPanel({ auth, open, setOpen, onOpen }: {
         </SheetHeader>
         <div className="notification-settings" aria-busy={busy}>
           {!address ? <p>Connect your wallet to view notifications.</p> : <>
-            <button type="button" className="btn secondary w-full" disabled={busy || (needsVerification && !auth.isReady)} onClick={() => void execute(load, needsVerification)}>
+            <Button type="button" className="min-h-11 w-full" disabled={busy || (needsVerification && !auth.isReady)} onClick={() => void execute(load, needsVerification)}>
               {busy ? "Loading notifications…" : needsVerification ? "Verify wallet" : "Refresh notifications"}
-            </button>
+            </Button>
             {needsVerification && <p className="fine-print">Verify your wallet to load your private inbox. This signature does not send a transaction.</p>}
           </>}
           {inbox && !needsVerification && (supported ? <>
-            <button type="button" className="btn secondary w-full" disabled={busy || !inbox.publicKey} onClick={() => void execute(togglePush)}>{enabled ? "Disable push on this device" : "Enable push notifications"}</button>
+            <Button type="button" variant="secondary" className="min-h-11 w-full border border-foreground/30" disabled={busy || !inbox.publicKey} onClick={() => void execute(togglePush)}>{enabled ? "Disable push on this device" : "Enable push notifications"}</Button>
             {!inbox.publicKey && <p className="fine-print">Push is not configured yet. Your inbox still works.</p>}
             {enabled && <button type="button" className="text-btn w-full" disabled={busy} onClick={() => void execute(async (api) => {
               const subscription = await (await getPushRegistration())?.pushManager.getSubscription();

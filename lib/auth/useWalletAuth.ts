@@ -40,8 +40,11 @@ export function useWalletAuth() {
 
   const getAuthHeaders = useCallback(async (): Promise<AuthHeaders> => {
     if (currentAddress.current !== address) throw new Error("The connected account changed. Please retry.");
+    if (!accountClient || accountClient.account.address.toLowerCase() !== address) {
+      throw new Error("Your wallet is still connecting. Please try again in a moment.");
+    }
     return requestWalletAuth(address, (message) => signMessage({ message }));
-  }, [address, signMessage]);
+  }, [address, accountClient, signMessage]);
 
   return {
     address: address || null,

@@ -70,7 +70,8 @@ export type VerifyWalletSignatureResult =
 
 /**
  * Verifies a wallet signature for EOAs (local) and smart accounts (EIP-1271).
- * Retries on-chain verification via the public Base RPC when Alchemy errors.
+ * Confirms a failed primary result via the independent Base RPC as well:
+ * RPC clients can return false for failed counterfactual account simulations.
  */
 export async function verifyWalletSignature(
   address: `0x${string}`,
@@ -89,27 +90,19 @@ export async function verifyWalletSignature(
   }
   if (valid) return { ok: true };
 
-  let primaryRpcFailed = false;
   try {
     valid = await publicClient.verifyMessage({ address, message, signature });
     if (valid) return { ok: true };
   } catch (err) {
-    primaryRpcFailed = true;
     serverLogger.warn("EIP-1271 verifyMessage failed on primary RPC:", err);
   }
 
-  if (primaryRpcFailed) {
-    try {
-      valid = await fallbackPublicClient.verifyMessage({
-        address,
-        message,
-        signature,
-      });
-      if (valid) return { ok: true };
-    } catch (err) {
-      serverLogger.warn("EIP-1271 verifyMessage failed on fallback RPC:", err);
-      return { ok: false, reason: "unavailable" };
-    }
+  try {
+    valid = await fallbackPublicClient.verifyMessage({ address, message, signature });
+    if (valid) return { ok: true };
+  } catch (err) {
+    serverLogger.warn("EIP-1271 verifyMessage failed on fallback RPC:", err);
+    return { ok: false, reason: "unavailable" };
   }
 
   return { ok: false, reason: "invalid" };

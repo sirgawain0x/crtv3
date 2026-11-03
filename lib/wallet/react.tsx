@@ -133,6 +133,7 @@ export function useSignMessage(options: SignMessageHookOptions = {}) {
           // Smart-account path: produces an EIP-1271 / ERC-6492 compatible
           // signature that validates against the smart account address.
           signature = await client.signMessage({
+            account: client.account.address,
             message: typeof message === "string" ? message : { raw: message },
           });
         } else if (signer?.signMessage) {
