@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requirePrivyAuth } from "@/lib/auth/privy-server-auth";
 import { isEarnConfigured } from "@/lib/sdk/privy/config";
 import { fetchVaultPosition } from "@/lib/sdk/privy/earn";
-import { getErc20Balance } from "@/lib/viem";
-import { USDC_TOKEN_ADDRESSES } from "@/lib/contracts/USDCToken";
+import { getEarnUsdcBalance } from "@/lib/earn/balance.server";
 import type { Address } from "viem";
 
 export async function GET(request: NextRequest) {
@@ -20,10 +19,7 @@ export async function GET(request: NextRequest) {
   try {
     const [position, embeddedUsdcBalance] = await Promise.all([
       fetchVaultPosition(auth.embeddedWallet.walletId),
-      getErc20Balance({
-        token: USDC_TOKEN_ADDRESSES.base as Address,
-        owner: auth.embeddedWallet.address as Address,
-      }),
+      getEarnUsdcBalance(auth.embeddedWallet.address as Address),
     ]);
 
     return NextResponse.json({

@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { requirePrivyAuth } from "@/lib/auth/privy-server-auth";
 import { isEarnConfigured } from "@/lib/sdk/privy/config";
 import { depositToVault } from "@/lib/sdk/privy/earn";
-import { getErc20Balance } from "@/lib/viem";
-import { USDC_TOKEN_ADDRESSES, USDC_TOKEN_DECIMALS } from "@/lib/contracts/USDCToken";
+import { getEarnUsdcBalance } from "@/lib/earn/balance.server";
+import { USDC_TOKEN_DECIMALS } from "@/lib/contracts/USDCToken";
 import { parseUnits } from "viem";
 import type { Address } from "viem";
 
@@ -35,10 +35,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const required = parseUnits(amount, USDC_TOKEN_DECIMALS);
-    const balance = await getErc20Balance({
-      token: USDC_TOKEN_ADDRESSES.base as Address,
-      owner: auth.embeddedWallet.address as Address,
-    });
+    const balance = await getEarnUsdcBalance(auth.embeddedWallet.address as Address);
 
     if (balance < required) {
       return NextResponse.json(
