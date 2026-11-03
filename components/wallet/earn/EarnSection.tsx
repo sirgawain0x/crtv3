@@ -37,6 +37,7 @@ export function EarnSection({ isVisible, onSuccess, onTopUp }: EarnSectionProps)
     isPending,
     error,
     isConfigured,
+    refetch,
     deposit,
     withdraw,
     claim,
@@ -60,7 +61,8 @@ export function EarnSection({ isVisible, onSuccess, onTopUp }: EarnSectionProps)
     ? formatBalanceDisplay(positionFormatted)
     : "0";
   const hasEmbeddedUsdc = Number.parseFloat(embeddedUsdcFormatted) > 0;
-  const needsTopUp = !hasEmbeddedUsdc && !hasPosition;
+  const hasLoadedBalances = position !== null && embeddedWallet !== null;
+  const needsTopUp = hasLoadedBalances && !hasEmbeddedUsdc && !hasPosition;
   const embeddedAddress = embeddedWallet?.address ?? null;
   const rewardsApr = Number.parseFloat(vault?.totalRewardsAprPercent ?? "0");
   const canClaimRewards =
@@ -168,9 +170,9 @@ export function EarnSection({ isVisible, onSuccess, onTopUp }: EarnSectionProps)
             <p className="text-xs text-muted-foreground">In vault</p>
             <p className="text-lg font-semibold flex items-center gap-1.5">
               <TrendingUp className="h-4 w-4 text-green-500" />
-              {displayAmount} USDC
+              {position ? displayAmount : "—"} USDC
             </p>
-            {!hasPosition ? (
+            {position && !hasPosition ? (
               <p className="text-xs text-muted-foreground">Nothing earning yet</p>
             ) : Number.parseFloat(earnedYieldFormatted) > 0 ? (
               <p className="text-xs text-green-600 dark:text-green-400">
@@ -182,7 +184,7 @@ export function EarnSection({ isVisible, onSuccess, onTopUp }: EarnSectionProps)
           {isConfigured ? (
             <>
               <p className="text-xs text-muted-foreground">
-                Available to deposit: {embeddedUsdcFormatted} USDC
+                Available to deposit: {embeddedWallet ? embeddedUsdcFormatted : "—"} USDC
               </p>
 
               {needsTopUp ? (
@@ -193,7 +195,12 @@ export function EarnSection({ isVisible, onSuccess, onTopUp }: EarnSectionProps)
               ) : null}
 
               {error ? (
-                <p className="text-xs text-red-500">{error}</p>
+                <div className="space-y-1">
+                  <p role="alert" className="text-xs text-red-500">{error}</p>
+                  <Button size="sm" variant="ghost" disabled={isPending} onClick={() => void refetch()}>
+                    Retry
+                  </Button>
+                </div>
               ) : null}
 
               {mode === "topup" ? (
