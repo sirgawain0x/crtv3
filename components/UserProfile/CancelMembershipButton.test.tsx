@@ -38,9 +38,11 @@ afterEach(async () => {
   container.remove();
 });
 
-async function renderButton() {
+async function renderButton(props: Partial<React.ComponentProps<typeof CancelMembershipButton>> = {}) {
   await act(async () => {
-    root.render(<CancelMembershipButton expiration={EXPIRATION} />);
+    root.render(
+      <CancelMembershipButton expiration={EXPIRATION} onConfirm={props.onConfirm} {...props} />,
+    );
   });
 }
 
@@ -50,7 +52,8 @@ function queryInDocument(selector: string) {
 
 describe("CancelMembershipButton", () => {
   it("never calls cancelAndRefund or sends a user operation", async () => {
-    await renderButton();
+    const onConfirm = vi.fn();
+    await renderButton({ onConfirm });
     const trigger = container.querySelector('[data-testid="pass-cancel-trigger"]');
     expect(trigger).not.toBeNull();
     await act(async () => {
@@ -62,24 +65,23 @@ describe("CancelMembershipButton", () => {
       (confirm as HTMLButtonElement).click();
     });
     expect(encodeFunctionData).not.toHaveBeenCalled();
-    const cancelCalls = vi
-      .mocked(encodeFunctionData)
-      .mock.calls.filter((call) => call[0]?.functionName === "cancelAndRefund");
-    expect(cancelCalls).toHaveLength(0);
+    expect(onConfirm).toHaveBeenCalled();
   });
 
-  it("shows expiry copy in the confirm dialog and after acknowledging", async () => {
+  it("shows expiry copy in the confirm dialog and when acknowledged is controlled", async () => {
     const message = passAccessUntilMessage(EXPIRATION);
     await renderButton();
     await act(async () => {
       (container.querySelector('[data-testid="pass-cancel-trigger"]') as HTMLButtonElement).click();
     });
     expect(document.body.textContent).toContain(message);
+
     await act(async () => {
-      (queryInDocument('[data-testid="pass-cancel-confirm"]') as HTMLButtonElement).click();
+      root.render(<CancelMembershipButton expiration={EXPIRATION} acknowledged />);
     });
-    const ack = container.querySelector('[data-testid="pass-cancel-acknowledged"]');
-    expect(ack?.textContent).toBe(message);
+    expect(container.querySelector('[data-testid="pass-cancel-acknowledged"]')?.textContent).toBe(
+      message,
+    );
   });
 
   it("does not mention subscription or prorated refund language", async () => {

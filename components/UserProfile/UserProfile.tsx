@@ -3,7 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { NextPage } from "next";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, useEffect, type ReactNode } from "react";
+import { useState, useEffect, useCallback, type ReactNode } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import { useUser } from "@/lib/wallet/react";
 import { GuardLoadingFallback } from "@/components/auth/GuardLoadingFallback";
@@ -31,6 +31,8 @@ import { isValidProfileTab, type ProfileTab } from "@/lib/utils/profile-urls";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CreatorAnalyticsTab } from "./CreatorAnalyticsTab";
 import { ProfileGoLiveButton } from "@/components/Live/ProfileGoLiveButton";
+import { usePassCancelAcknowledgements } from "@/lib/hooks/usePassCancelAcknowledgements";
+import { showMembershipTabSkeleton } from "@/lib/hooks/unlock/showMembershipTabSkeleton";
 
 const MEMBERSHIP_ERROR_MESSAGES: Record<string, string> = {
   LOCK_NOT_FOUND: "Unable to verify membership. Please try again later.",
@@ -131,6 +133,20 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
     ) ?? []
   );
   const primaryMembership = validMemberships[0];
+  const membershipTabLoading = showMembershipTabSkeleton(
+    membershipLoading,
+    validMemberships.length > 0,
+  );
+  const { cancelledPassKeys, acknowledgePassCancel } =
+    usePassCancelAcknowledgements(walletAddress);
+
+  const handlePassCancelConfirm = useCallback(
+    async (passKey: string) => {
+      acknowledgePassCancel(passKey);
+      await refetchMembership();
+    },
+    [acknowledgePassCancel, refetchMembership],
+  );
 
   const membershipErrorMessage = membershipError
     ? MEMBERSHIP_ERROR_MESSAGES[membershipError.code] ??
@@ -232,7 +248,7 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
 
             {/* Membership Tab Content */}
             <TabsContent value="Membership">
-              {membershipLoading ? (
+              {membershipTabLoading ? (
                 <div className="space-y-4">
                   <Skeleton className="h-8 w-48" />
                   <Skeleton className="h-32 w-full" />
@@ -255,7 +271,9 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
                   <CardContent className="space-y-6">
                     <MembershipPassRows
                       passes={validMemberships}
-                      onCancelSuccess={refetchMembership}
+                      walletAddress={walletAddress ?? ""}
+                      cancelledPassKeys={cancelledPassKeys}
+                      onPassCancelConfirm={handlePassCancelConfirm}
                       onRenewScroll={() => {
                         const element = document.getElementById("membership-renewal-options");
                         if (element) {

@@ -18,23 +18,23 @@ import { passAccessUntilMessage } from "@/lib/access/format-pass-expiration";
 
 interface CancelMembershipButtonProps {
   expiration: number;
-  onSuccess?: () => void | Promise<void>;
+  acknowledged?: boolean;
+  onConfirm?: () => void | Promise<void>;
 }
 
 export function CancelMembershipButton({
   expiration,
-  onSuccess,
+  acknowledged = false,
+  onConfirm,
 }: CancelMembershipButtonProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [acknowledged, setAcknowledged] = useState(false);
 
   const accessMessage = passAccessUntilMessage(expiration);
 
   const handleConfirm = async () => {
-    setAcknowledged(true);
     setIsOpen(false);
     toast.success(accessMessage);
-    await onSuccess?.();
+    await onConfirm?.();
   };
 
   if (acknowledged) {

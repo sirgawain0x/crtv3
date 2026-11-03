@@ -6,6 +6,7 @@ import type { MembershipDetails } from "@/lib/hooks/unlock/useMembershipVerifica
 import { LOCK_ADDRESSES } from "@/lib/sdk/unlock/services";
 
 const EXPIRATION = 1_900_000_000;
+const HARNESS_WALLET = "0x1111111111111111111111111111111111111111";
 
 function makePass(address: string, tokenId: string): MembershipDetails {
   return {
@@ -21,7 +22,12 @@ function makePass(address: string, tokenId: string): MembershipDetails {
 export function renderSinglePassCancelMarkup(): string {
   return renderToStaticMarkup(
     <div className="p-6 max-w-2xl mx-auto bg-background text-foreground">
-      <MembershipPassRows passes={[makePass(LOCK_ADDRESSES.BASE_CREATIVE_PASS, "1")]} />
+      <MembershipPassRows
+        passes={[makePass(LOCK_ADDRESSES.BASE_CREATIVE_PASS, "1")]}
+        walletAddress={HARNESS_WALLET}
+        cancelledPassKeys={new Set()}
+        onPassCancelConfirm={() => undefined}
+      />
     </div>,
   );
 }
@@ -34,6 +40,9 @@ export function renderMultiPassCancelMarkup(): string {
           makePass(LOCK_ADDRESSES.BASE_CREATIVE_PASS, "1"),
           makePass(LOCK_ADDRESSES.BASE_CREATIVE_PASS_3, "9"),
         ]}
+        walletAddress={HARNESS_WALLET}
+        cancelledPassKeys={new Set()}
+        onPassCancelConfirm={() => undefined}
       />
     </div>,
   );
