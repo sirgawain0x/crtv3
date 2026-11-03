@@ -13,6 +13,7 @@ export interface MembershipPassRowsProps {
   passes: MembershipDetails[];
   walletAddress: string;
   cancelledPassKeys: ReadonlySet<string>;
+  cancelControlsReady: boolean;
   onRenewScroll?: () => void;
   onPassCancelConfirm: (passKey: string) => void | Promise<void>;
 }
@@ -21,6 +22,7 @@ export function MembershipPassRows({
   passes,
   walletAddress,
   cancelledPassKeys,
+  cancelControlsReady,
   onRenewScroll,
   onPassCancelConfirm,
 }: MembershipPassRowsProps) {
@@ -28,7 +30,10 @@ export function MembershipPassRows({
     <div className="space-y-4" data-testid="membership-pass-rows">
       {passes.map((pass) => {
         const tokenId = pass.tokenId ?? "unknown";
-        const passKey = passCancelStorageKey(walletAddress, pass.address, tokenId);
+        const passKey =
+          pass.expiration != null
+            ? passCancelStorageKey(walletAddress, pass.address, tokenId, pass.expiration)
+            : `${walletAddress}:${pass.address}:${tokenId}`;
         return (
           <div
             key={passKey}
@@ -71,11 +76,19 @@ export function MembershipPassRows({
                 </Button>
               ) : null}
               {pass.expiration && pass.expiration < LIFETIME_EXPIRATION_THRESHOLD ? (
-                <CancelMembershipButton
-                  expiration={pass.expiration}
-                  acknowledged={cancelledPassKeys.has(passKey)}
-                  onConfirm={() => onPassCancelConfirm(passKey)}
-                />
+                cancelControlsReady ? (
+                  <CancelMembershipButton
+                    expiration={pass.expiration}
+                    acknowledged={cancelledPassKeys.has(passKey)}
+                    onConfirm={() => onPassCancelConfirm(passKey)}
+                  />
+                ) : (
+                  <div
+                    className="h-9 w-[7.5rem] animate-pulse rounded-md bg-muted"
+                    data-testid="pass-cancel-loading"
+                    aria-hidden
+                  />
+                )
               ) : null}
             </div>
           </div>

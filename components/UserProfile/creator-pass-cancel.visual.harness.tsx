@@ -26,6 +26,7 @@ export function renderSinglePassCancelMarkup(): string {
         passes={[makePass(LOCK_ADDRESSES.BASE_CREATIVE_PASS, "1")]}
         walletAddress={HARNESS_WALLET}
         cancelledPassKeys={new Set()}
+        cancelControlsReady
         onPassCancelConfirm={() => undefined}
       />
     </div>,
@@ -42,6 +43,7 @@ export function renderMultiPassCancelMarkup(): string {
         ]}
         walletAddress={HARNESS_WALLET}
         cancelledPassKeys={new Set()}
+        cancelControlsReady
         onPassCancelConfirm={() => undefined}
       />
     </div>,

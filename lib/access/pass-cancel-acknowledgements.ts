@@ -4,8 +4,13 @@ export function passCancelStorageKey(
   walletAddress: string,
   lockAddress: string,
   tokenId: string,
+  expirationSeconds: number,
 ): string {
-  return `${walletAddress.toLowerCase()}:${lockAddress.toLowerCase()}:${tokenId}`;
+  return `${walletAddress.toLowerCase()}:${lockAddress.toLowerCase()}:${tokenId}:${expirationSeconds}`;
+}
+
+export function passCancelLockPrefix(walletAddress: string, lockAddress: string): string {
+  return `${walletAddress.toLowerCase()}:${lockAddress.toLowerCase()}:`;
 }
 
 function storageKeyForWallet(walletAddress: string): string {
@@ -21,7 +26,13 @@ export function readPassCancelAcknowledgements(walletAddress: string): Set<strin
     if (!raw) return new Set();
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return new Set();
-    return new Set(parsed.filter((entry): entry is string => typeof entry === "string"));
+    return new Set(
+      parsed.filter((entry): entry is string => {
+        if (typeof entry !== "string") return false;
+        // Require expiration segment so renewals with the same tokenId get a fresh key.
+        return entry.split(":").length >= 4;
+      }),
+    );
   } catch {
     return new Set();
   }
@@ -44,6 +55,21 @@ export function writePassCancelAcknowledgements(
   }
 }
 
+export function prunePassCancelAcknowledgements(
+  walletAddress: string,
+  activePassKeys: ReadonlySet<string>,
+): Set<string> {
+  const stored = readPassCancelAcknowledgements(walletAddress);
+  if (activePassKeys.size === 0) {
+    return stored;
+  }
+  const pruned = new Set([...stored].filter((key) => activePassKeys.has(key)));
+  if (pruned.size !== stored.size) {
+    writePassCancelAcknowledgements(walletAddress, pruned);
+  }
+  return pruned;
+}
+
 export function addPassCancelAcknowledgement(
   walletAddress: string,
   passKey: string,
@@ -53,4 +79,33 @@ export function addPassCancelAcknowledgement(
   next.add(passKey);
   writePassCancelAcknowledgements(walletAddress, next);
   return next;
+}
+
+export function clearPassCancelAcknowledgementsForLock(
+  walletAddress: string,
+  lockAddress: string,
+): Set<string> {
+  const prefix = passCancelLockPrefix(walletAddress, lockAddress);
+  const stored = readPassCancelAcknowledgements(walletAddress);
+  const next = new Set([...stored].filter((key) => !key.startsWith(prefix)));
+  writePassCancelAcknowledgements(walletAddress, next);
+  return next;
+}
+
+export function buildActivePassCancelKeys(
+  walletAddress: string,
+  passes: ReadonlyArray<{
+    address: string;
+    tokenId?: string | null;
+    expiration?: number;
+  }>,
+): Set<string> {
+  const keys = new Set<string>();
+  for (const pass of passes) {
+    if (!pass.tokenId || pass.expiration == null) continue;
+    keys.add(
+      passCancelStorageKey(walletAddress, pass.address, pass.tokenId, pass.expiration),
+    );
+  }
+  return keys;
 }

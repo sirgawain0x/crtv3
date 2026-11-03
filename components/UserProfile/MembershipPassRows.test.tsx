@@ -28,14 +28,19 @@ import { showMembershipTabSkeleton } from "@/lib/hooks/unlock/showMembershipTabS
 
 const WALLET = "0x1111111111111111111111111111111111111111";
 const EXPIRATION = 1_900_000_000;
+const NEW_EXPIRATION = 1_900_086_400;
 
-function makePass(address: string, tokenId: string): MembershipDetails {
+function makePass(
+  address: string,
+  tokenId: string,
+  expiration = EXPIRATION,
+): MembershipDetails {
   return {
     name: "BASE_CREATIVE_PASS",
     address: address as MembershipDetails["address"],
     isValid: true,
     lock: null,
-    expiration: EXPIRATION,
+    expiration,
     tokenId,
   };
 }
@@ -60,6 +65,12 @@ afterEach(async () => {
   container.remove();
 });
 
+const defaultRowsProps = {
+  walletAddress: WALLET,
+  cancelControlsReady: true,
+  onPassCancelConfirm: vi.fn(),
+};
+
 describe("MembershipPassRows", () => {
   it("renders a cancel control for each valid pass", async () => {
     const passes = [
@@ -67,38 +78,77 @@ describe("MembershipPassRows", () => {
       makePass(LOCK_ADDRESSES.BASE_CREATIVE_PASS_2, "2"),
     ];
     await act(async () => {
-      root.render(
-        <MembershipPassRows
-          passes={passes}
-          walletAddress={WALLET}
-          cancelledPassKeys={new Set()}
-          onPassCancelConfirm={vi.fn()}
-        />,
-      );
+      root.render(<MembershipPassRows passes={passes} cancelledPassKeys={new Set()} {...defaultRowsProps} />);
     });
     expect(container.querySelectorAll('[data-testid="membership-pass-row"]')).toHaveLength(2);
     expect(container.querySelectorAll('[data-testid="pass-cancel-trigger"]')).toHaveLength(2);
   });
 
-  it("renders expires on copy for timed passes", async () => {
-    const passes = [makePass(LOCK_ADDRESSES.BASE_CREATIVE_PASS, "1")];
+  it("does not flash Cancel pass before acknowledgement state is ready", async () => {
+    const pass = makePass(LOCK_ADDRESSES.BASE_CREATIVE_PASS, "1");
+    const passKey = passCancelStorageKey(WALLET, pass.address, "1", EXPIRATION);
     await act(async () => {
       root.render(
         <MembershipPassRows
-          passes={passes}
+          passes={[pass]}
+          cancelledPassKeys={new Set([passKey])}
+          cancelControlsReady={false}
           walletAddress={WALLET}
-          cancelledPassKeys={new Set()}
           onPassCancelConfirm={vi.fn()}
         />,
       );
     });
-    expect(container.textContent).toContain("Expires on");
-    expect(container.textContent).toContain("2030-03-17");
+    expect(container.querySelector('[data-testid="pass-cancel-trigger"]')).toBeNull();
+    expect(container.querySelector('[data-testid="pass-cancel-loading"]')).not.toBeNull();
+  });
+
+  it("shows acknowledged copy on first render when the pass key is already cancelled", async () => {
+    const pass = makePass(LOCK_ADDRESSES.BASE_CREATIVE_PASS, "1");
+    const passKey = passCancelStorageKey(WALLET, pass.address, "1", EXPIRATION);
+    const message = passAccessUntilMessage(EXPIRATION);
+    await act(async () => {
+      root.render(
+        <MembershipPassRows
+          passes={[pass]}
+          cancelledPassKeys={new Set([passKey])}
+          {...defaultRowsProps}
+        />,
+      );
+    });
+    expect(container.querySelector('[data-testid="pass-cancel-trigger"]')).toBeNull();
+    expect(container.querySelector('[data-testid="pass-cancel-acknowledged"]')?.textContent).toBe(
+      message,
+    );
+  });
+
+  it("shows Cancel pass again after buy-again changes expiration and clears the acknowledgement", async () => {
+    const lock = LOCK_ADDRESSES.BASE_CREATIVE_PASS;
+    const oldPass = makePass(lock, "1", EXPIRATION);
+    const newPass = makePass(lock, "1", NEW_EXPIRATION);
+    const oldKey = passCancelStorageKey(WALLET, lock, "1", EXPIRATION);
+
+    await act(async () => {
+      root.render(
+        <MembershipPassRows
+          passes={[oldPass]}
+          cancelledPassKeys={new Set([oldKey])}
+          {...defaultRowsProps}
+        />,
+      );
+    });
+    expect(container.querySelector('[data-testid="pass-cancel-trigger"]')).toBeNull();
+
+    await act(async () => {
+      root.render(
+        <MembershipPassRows passes={[newPass]} cancelledPassKeys={new Set()} {...defaultRowsProps} />,
+      );
+    });
+    expect(container.querySelector('[data-testid="pass-cancel-trigger"]')).not.toBeNull();
   });
 
   it("keeps cancelled acknowledgement visible through a refetch-style remount", async () => {
     const pass = makePass(LOCK_ADDRESSES.BASE_CREATIVE_PASS, "1");
-    const passKey = passCancelStorageKey(WALLET, pass.address, "1");
+    const passKey = passCancelStorageKey(WALLET, pass.address, "1", EXPIRATION);
     const message = passAccessUntilMessage(EXPIRATION);
     let loading = false;
     const cancelled = new Set<string>();
@@ -124,6 +174,7 @@ describe("MembershipPassRows", () => {
               passes={[pass]}
               walletAddress={WALLET}
               cancelledPassKeys={cancelled}
+              cancelControlsReady
               onPassCancelConfirm={onPassCancelConfirm}
             />
           ),

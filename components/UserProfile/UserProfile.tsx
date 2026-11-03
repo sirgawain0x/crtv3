@@ -3,7 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { NextPage } from "next";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, useEffect, useCallback, type ReactNode } from "react";
+import { useState, useEffect, useCallback, useMemo, type ReactNode } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import { useUser } from "@/lib/wallet/react";
 import { GuardLoadingFallback } from "@/components/auth/GuardLoadingFallback";
@@ -33,6 +33,7 @@ import { CreatorAnalyticsTab } from "./CreatorAnalyticsTab";
 import { ProfileGoLiveButton } from "@/components/Live/ProfileGoLiveButton";
 import { usePassCancelAcknowledgements } from "@/lib/hooks/usePassCancelAcknowledgements";
 import { showMembershipTabSkeleton } from "@/lib/hooks/unlock/showMembershipTabSkeleton";
+import { buildActivePassCancelKeys } from "@/lib/access/pass-cancel-acknowledgements";
 
 const MEMBERSHIP_ERROR_MESSAGES: Record<string, string> = {
   LOCK_NOT_FOUND: "Unable to verify membership. Please try again later.",
@@ -137,8 +138,19 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
     membershipLoading,
     validMemberships.length > 0,
   );
-  const { cancelledPassKeys, acknowledgePassCancel } =
-    usePassCancelAcknowledgements(walletAddress);
+  const activePassCancelKeys = useMemo((): Set<string> => {
+    if (!walletAddress) {
+      return new Set<string>();
+    }
+    return buildActivePassCancelKeys(walletAddress, validMemberships);
+  }, [walletAddress, validMemberships]);
+
+  const {
+    cancelledPassKeys,
+    acknowledgePassCancel,
+    clearPassCancelForLock,
+    cancelControlsReady,
+  } = usePassCancelAcknowledgements(walletAddress, activePassCancelKeys);
 
   const handlePassCancelConfirm = useCallback(
     async (passKey: string) => {
@@ -146,6 +158,17 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
       await refetchMembership();
     },
     [acknowledgePassCancel, refetchMembership],
+  );
+
+  const handleMembershipPurchaseSuccess = useCallback(
+    async (purchasedLockAddress?: string) => {
+      const lockToClear = purchasedLockAddress ?? primaryMembership?.address;
+      if (lockToClear) {
+        clearPassCancelForLock(lockToClear);
+      }
+      await refetchMembership();
+    },
+    [clearPassCancelForLock, primaryMembership?.address, refetchMembership],
   );
 
   const membershipErrorMessage = membershipError
@@ -273,6 +296,7 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
                       passes={validMemberships}
                       walletAddress={walletAddress ?? ""}
                       cancelledPassKeys={cancelledPassKeys}
+                      cancelControlsReady={cancelControlsReady}
                       onPassCancelConfirm={handlePassCancelConfirm}
                       onRenewScroll={() => {
                         const element = document.getElementById("membership-renewal-options");
@@ -286,7 +310,9 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
                       <h3 className="text-lg font-medium">Buy again or upgrade</h3>
                       <MembershipHome
                         currentMembershipAddress={primaryMembership.address}
-                        onPurchaseSuccess={refetchMembership}
+                        onPurchaseSuccess={() =>
+                          handleMembershipPurchaseSuccess(primaryMembership.address)
+                        }
                         onSwitchToFinanceTab={switchToFinanceTab}
                       />
                     </div>
@@ -294,7 +320,7 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
                 </Card>
               ) : (
                 <MembershipHome
-                  onPurchaseSuccess={refetchMembership}
+                  onPurchaseSuccess={handleMembershipPurchaseSuccess}
                   onSwitchToFinanceTab={switchToFinanceTab}
                 />
               )}
