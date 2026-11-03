@@ -169,7 +169,8 @@
     "wagmi": "^2.15.3",
     "web-vitals": "^5.1.0",
     "x402-fetch": "^0.6.6",
-    "zod": "^3.25.0"
+    "zod": "^3.25.0",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@thirdweb-dev/contracts": "^3.15.0",
@@ -187,7 +188,8 @@
     "tailwindcss": "^3.4.4",
     "tsx": "^4.20.5",
     "typescript": "^5.8.3",
-    "vitest": "^2.1.0"
+    "vitest": "^2.1.0",
+    "@types/web-push": "^3.6.4"
   },
   "optionalDependencies": {
     "@mark3labs/louper-cli": "^0.5.10"
