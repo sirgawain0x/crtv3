@@ -51,7 +51,7 @@ export function FairVideoGrid({ videos, className }: FairVideoGridProps) {
           Videos coming soon
         </p>
         <p className="mt-2 max-w-md mx-auto">
-          The FAIR lineup will appear here once videos are added to the static config.
+          The FAIR BETA lineup will appear here once videos are added to the static config.
         </p>
       </div>
     );
