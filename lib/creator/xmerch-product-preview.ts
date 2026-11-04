@@ -9,30 +9,60 @@ export type XmerchProductPreview = {
   imageUrl: string | null;
 };
 
-function extractMeta(html: string, property: string): string | undefined {
-  const patterns = [
-    new RegExp(
-      `<meta[^>]+property=["']${property}["'][^>]+content=["']([^"']+)["']`,
-      "i",
-    ),
-    new RegExp(
-      `<meta[^>]+content=["']([^"']+)["'][^>]+property=["']${property}["']`,
-      "i",
-    ),
-    new RegExp(
-      `<meta[^>]+name=["']${property}["'][^>]+content=["']([^"']+)["']`,
-      "i",
-    ),
-    new RegExp(
-      `<meta[^>]+content=["']([^"']+)["'][^>]+name=["']${property}["']`,
-      "i",
-    ),
-  ];
+/** Decode common HTML entities in OG meta values. */
+export function decodeHtmlEntities(input: string): string {
+  return input.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (entity, body) => {
+    const token = body.toLowerCase();
+    if (token.startsWith("#x")) {
+      const codePoint = Number.parseInt(token.slice(2), 16);
+      return Number.isFinite(codePoint) ? String.fromCodePoint(codePoint) : entity;
+    }
+    if (token.startsWith("#")) {
+      const codePoint = Number.parseInt(token.slice(1), 10);
+      return Number.isFinite(codePoint) ? String.fromCodePoint(codePoint) : entity;
+    }
+    switch (token) {
+      case "amp":
+        return "&";
+      case "apos":
+        return "'";
+      case "quot":
+        return '"';
+      case "lt":
+        return "<";
+      case "gt":
+        return ">";
+      default:
+        return entity;
+    }
+  });
+}
 
-  for (const pattern of patterns) {
-    const match = html.match(pattern);
-    if (match?.[1]) {
-      return match[1].trim();
+function readQuotedAttribute(tag: string, attributeName: string): string | undefined {
+  const pattern = new RegExp(
+    `${attributeName}\\s*=\\s*("([^"]*)"|'([^']*)')`,
+    "i",
+  );
+  const match = tag.match(pattern);
+  if (!match) {
+    return undefined;
+  }
+  return match[2] ?? match[3];
+}
+
+function extractMeta(html: string, property: string): string | undefined {
+  const metaTags = html.match(/<meta\b[^>]*>/gi) ?? [];
+  const wanted = property.toLowerCase();
+
+  for (const tag of metaTags) {
+    const key =
+      readQuotedAttribute(tag, "property") ?? readQuotedAttribute(tag, "name");
+    if (!key || key.toLowerCase() !== wanted) {
+      continue;
+    }
+    const content = readQuotedAttribute(tag, "content");
+    if (content !== undefined) {
+      return decodeHtmlEntities(content.trim());
     }
   }
 
@@ -43,8 +73,9 @@ function resolvePreviewImage(raw: string | undefined, pageUrl: string): string |
   if (!raw) {
     return null;
   }
+  const decoded = decodeHtmlEntities(raw);
   try {
-    return new URL(raw, pageUrl).href;
+    return new URL(decoded, pageUrl).href;
   } catch {
     return null;
   }
@@ -88,10 +119,9 @@ export async function fetchXmerchProductPreview(
     }
 
     const ogTitle = extractMeta(html, "og:title");
-    const title =
-      ogTitle ||
-      html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]?.trim() ||
-      fallbackTitle;
+    const rawTitle =
+      ogTitle || html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1]?.trim();
+    const title = rawTitle ? decodeHtmlEntities(rawTitle) : fallbackTitle;
     const imageUrl = resolvePreviewImage(extractMeta(html, "og:image"), pageUrl);
 
     return { title, imageUrl };
