@@ -18,4 +18,11 @@ export const CHONES_EVENTS: ChonesEvent[] = [
     status: "active",
     href: "/chones/hack-beta",
   },
+  {
+    slug: "fair",
+    title: "FAIR",
+    description: "Curated Creative TV showcase",
+    status: "active",
+    href: "/chones/fair",
+  },
 ];
