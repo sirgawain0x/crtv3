@@ -28,6 +28,7 @@ import { RemixInPixelsButton } from "@/components/Videos/RemixInPixelsButton";
 import { AddToMixtapeButton } from "@/components/Videos/AddToMixtapeButton";
 import { VideoPredictButton } from "@/components/Videos/VideoPredictButton";
 import { ActivePredictionsStripServer } from "./ActivePredictionsStripServer";
+import { NewsletterSignupStrip } from "@/components/dear-creative/NewsletterSignupStrip";
 import { logger } from '@/lib/utils/logger';
 import {
   getSiteOrigin,
@@ -157,6 +158,9 @@ export default async function VideoDetailsPage({
               contractAddress={videoAsset?.contract_address ?? null}
               tokenId={videoAsset?.token_id ?? null}
             />
+            <div className="mt-4">
+              <NewsletterSignupStrip variant="compact" />
+            </div>
             {creatorAddress && (
               <div className="mt-4">
                 <VideoHeartBitSection

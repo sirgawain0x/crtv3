@@ -8,6 +8,7 @@ import { ChannelBannersCarousel } from "@/components/channels/ChannelBannersCaro
 import { TopVideos } from "./TopVideos";
 import { useAuthStateMonitor } from '@/lib/hooks/accountkit/useAuthStateMonitor';
 import DearCreativePublications from "./DearCreativePublications";
+import { NewsletterSignupStrip } from "@/components/dear-creative/NewsletterSignupStrip";
 
 const NonLoggedInView: React.FC = () => {
   // Monitor auth state for logout/timeout scenarios
@@ -16,6 +17,7 @@ const NonLoggedInView: React.FC = () => {
   return (
     <div>
       <HeroSection />
+      <NewsletterSignupStrip variant="full-width" />
       <div className="w-full max-w-7xl mx-auto py-3 px-4 sm:px-6">
         <ChannelBannersCarousel />
       </div>
