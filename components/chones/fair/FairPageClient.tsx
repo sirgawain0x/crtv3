@@ -21,16 +21,16 @@ export function FairPageClient({ videos }: FairPageClientProps) {
           Chones
         </Link>
         <span className="mx-2">/</span>
-        <span className="text-foreground">FAIR</span>
+        <span className="text-foreground">FAIR BETA</span>
       </nav>
 
       <header className="mb-8 space-y-3">
         <p className="text-xs font-semibold uppercase tracking-wider text-amber-400">
           Chones event
         </p>
-        <h1 className="text-3xl font-bold text-foreground sm:text-4xl">FAIR</h1>
+        <h1 className="text-3xl font-bold text-foreground sm:text-4xl">FAIR BETA</h1>
         <p className="max-w-2xl text-muted-foreground">
-          A fixed showcase of Creative TV videos curated for the Chones FAIR event.
+          A fixed showcase of Creative TV videos curated for the Chones FAIR BETA event.
         </p>
       </header>
 

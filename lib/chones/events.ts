@@ -20,7 +20,7 @@ export const CHONES_EVENTS: ChonesEvent[] = [
   },
   {
     slug: "fair",
-    title: "FAIR",
+    title: "FAIR BETA",
     description: "Curated Creative TV showcase",
     status: "active",
     href: "/chones/fair",
