@@ -1,5 +1,7 @@
+import dns from "node:dns";
 import {
   featuredProductLabel,
+  isAllowedXmerchHostname,
   MAX_XMERCH_FEATURED_PRODUCTS,
   normalizeXmerchStoreUrl,
 } from "@/lib/creator/xmerch-profile";
@@ -8,6 +10,154 @@ export type XmerchProductPreview = {
   title: string;
   imageUrl: string | null;
 };
+
+const XMERCH_FETCH_TIMEOUT_MS = 8_000;
+const XMERCH_MAX_HTML_BYTES = 2 * 1024 * 1024;
+const MAX_REDIRECT_HOPS = 3;
+
+function isPrivateIp(ip: string): boolean {
+  if (
+    ip.startsWith("127.") ||
+    ip.startsWith("10.") ||
+    ip.startsWith("192.168.") ||
+    ip.startsWith("169.254.") ||
+    ip.startsWith("0.")
+  ) {
+    return true;
+  }
+  if (ip.startsWith("172.")) {
+    const second = Number.parseInt(ip.split(".")[1] ?? "", 10);
+    if (second >= 16 && second <= 31) {
+      return true;
+    }
+  }
+  if (
+    ip === "::1" ||
+    ip.startsWith("fe80:") ||
+    ip.startsWith("fc00:") ||
+    ip.startsWith("fd00:")
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function isIpLiteralHostname(hostname: string): boolean {
+  const host = hostname.toLowerCase();
+  if (host.startsWith("[") && host.endsWith("]")) {
+    return true;
+  }
+  if (host.includes(":")) {
+    return true;
+  }
+  return /^\d{1,3}(\.\d{1,3}){3}$/.test(host);
+}
+
+function isBlockedFetchHostname(hostname: string): boolean {
+  const host = hostname.toLowerCase();
+  return (
+    host === "localhost" ||
+    host.endsWith(".local") ||
+    host === "0.0.0.0" ||
+    host === "[::1]"
+  );
+}
+
+/** Validates HTTPS xMerch hosts and rejects private/link-local targets (SSRF). */
+export async function isSafeXmerchFetchUrl(url: string): Promise<boolean> {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return false;
+  }
+
+  if (parsed.protocol !== "https:") {
+    return false;
+  }
+  if (parsed.username || parsed.password) {
+    return false;
+  }
+
+  const hostname = parsed.hostname.toLowerCase();
+  if (
+    isBlockedFetchHostname(hostname) ||
+    isIpLiteralHostname(hostname) ||
+    !isAllowedXmerchHostname(hostname)
+  ) {
+    return false;
+  }
+
+  try {
+    const addresses = await dns.promises.lookup(hostname, { all: true });
+    if (addresses.length === 0) {
+      return false;
+    }
+    if (addresses.some(({ address }) => isPrivateIp(address))) {
+      return false;
+    }
+  } catch {
+    return false;
+  }
+
+  return true;
+}
+
+async function fetchXmerchHtml(startUrl: string): Promise<string | null> {
+  let current = startUrl;
+
+  for (let hop = 0; hop <= MAX_REDIRECT_HOPS; hop += 1) {
+    if (!(await isSafeXmerchFetchUrl(current))) {
+      return null;
+    }
+
+    const response = await fetch(current, {
+      headers: {
+        "User-Agent": "CreativeTV-xMerchPreview/1.0",
+        Accept: "text/html,application/xhtml+xml",
+      },
+      signal: AbortSignal.timeout(XMERCH_FETCH_TIMEOUT_MS),
+      redirect: "manual",
+      next: { revalidate: 3600 },
+    });
+
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get("location");
+      if (!location) {
+        return null;
+      }
+      current = new URL(location, current).href;
+      continue;
+    }
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const contentType = response.headers.get("content-type") || "";
+    if (
+      contentType &&
+      !contentType.includes("text/html") &&
+      !contentType.includes("application/xhtml+xml")
+    ) {
+      return null;
+    }
+
+    const contentLength = response.headers.get("content-length");
+    if (contentLength && Number.parseInt(contentLength, 10) > XMERCH_MAX_HTML_BYTES) {
+      return null;
+    }
+
+    const html = await response.text();
+    if (html.length > XMERCH_MAX_HTML_BYTES) {
+      return null;
+    }
+
+    return html;
+  }
+
+  return null;
+}
 
 /** Decode common HTML entities in OG meta values. */
 export function decodeHtmlEntities(input: string): string {
@@ -99,22 +249,8 @@ export async function fetchXmerchProductPreview(
       return { title: fallbackTitle, imageUrl: null };
     }
 
-    const response = await fetch(pageUrl, {
-      headers: {
-        "User-Agent": "CreativeTV-xMerchPreview/1.0",
-        Accept: "text/html,application/xhtml+xml",
-      },
-      signal: AbortSignal.timeout(8000),
-      redirect: "follow",
-      next: { revalidate: 3600 },
-    });
-
-    if (!response.ok) {
-      return { title: fallbackTitle, imageUrl: null };
-    }
-
-    const html = await response.text();
-    if (html.length > 2 * 1024 * 1024) {
+    const html = await fetchXmerchHtml(pageUrl);
+    if (!html) {
       return { title: fallbackTitle, imageUrl: null };
     }
 
