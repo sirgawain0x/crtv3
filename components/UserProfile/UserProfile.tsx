@@ -1,10 +1,9 @@
 "use client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
 import { NextPage } from "next";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState, useEffect, type ReactNode } from "react";
+import { useState, useEffect, useCallback, useMemo, type ReactNode } from "react";
 import { usePrivy } from "@privy-io/react-auth";
 import { useUser } from "@/lib/wallet/react";
 import { GuardLoadingFallback } from "@/components/auth/GuardLoadingFallback";
@@ -27,14 +26,14 @@ import { MeTokensSection } from "./MeTokensSection";
 import { UserDisplay } from "@/components/User/UserDisplay";
 import { CreativeFinanceTab } from "./CreativeFinanceTab";
 import { MembershipHome } from "@/components/memberships/MembershipHome";
-import { CancelMembershipButton } from "./CancelMembershipButton";
-import { getPassDisplayName } from "@/lib/access/membership-labels";
+import { MembershipPassRows } from "./MembershipPassRows";
 import { isValidProfileTab, type ProfileTab } from "@/lib/utils/profile-urls";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CreatorAnalyticsTab } from "./CreatorAnalyticsTab";
 import { ProfileGoLiveButton } from "@/components/Live/ProfileGoLiveButton";
-
-const LIFETIME_EXPIRATION_THRESHOLD = 32503680000;
+import { usePassCancelAcknowledgements } from "@/lib/hooks/usePassCancelAcknowledgements";
+import { showMembershipTabSkeleton } from "@/lib/hooks/unlock/showMembershipTabSkeleton";
+import { buildActivePassCancelKeys } from "@/lib/access/pass-cancel-acknowledgements";
 
 const MEMBERSHIP_ERROR_MESSAGES: Record<string, string> = {
   LOCK_NOT_FOUND: "Unable to verify membership. Please try again later.",
@@ -129,9 +128,33 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
     handleTabChange("Finance");
   };
 
-  const validMembership = (
-    membershipDetails as MembershipDetails[] | undefined
-  )?.find((m: MembershipDetails) => m.isValid);
+  const validMemberships = (
+    (membershipDetails as MembershipDetails[] | undefined)?.filter(
+      (m: MembershipDetails) => m.isValid
+    ) ?? []
+  );
+  const primaryMembership = validMemberships[0];
+  const membershipTabLoading = showMembershipTabSkeleton(
+    membershipLoading,
+    validMemberships.length > 0,
+  );
+  const activePassCancelKeys = useMemo((): Set<string> => {
+    if (!walletAddress) {
+      return new Set<string>();
+    }
+    return buildActivePassCancelKeys(walletAddress, validMemberships);
+  }, [walletAddress, validMemberships]);
+
+  const { cancelledPassKeys, acknowledgePassCancel, cancelControlsReady } =
+    usePassCancelAcknowledgements(walletAddress, activePassCancelKeys);
+
+  const handlePassCancelConfirm = useCallback(
+    async (passKey: string) => {
+      acknowledgePassCancel(passKey);
+      await refetchMembership();
+    },
+    [acknowledgePassCancel, refetchMembership],
+  );
 
   const membershipErrorMessage = membershipError
     ? MEMBERSHIP_ERROR_MESSAGES[membershipError.code] ??
@@ -233,7 +256,7 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
 
             {/* Membership Tab Content */}
             <TabsContent value="Membership">
-              {membershipLoading ? (
+              {membershipTabLoading ? (
                 <div className="space-y-4">
                   <Skeleton className="h-8 w-48" />
                   <Skeleton className="h-32 w-full" />
@@ -245,79 +268,33 @@ const ProfilePage: NextPage<ProfilePageProps> = ({ targetAddress }) => {
                   <AlertTitle>Membership verification failed</AlertTitle>
                   <AlertDescription>{membershipErrorMessage}</AlertDescription>
                 </Alert>
-              ) : validMembership ? (
+              ) : primaryMembership ? (
                 <Card>
                   <CardHeader className="space-y-1">
                     <CardTitle className="text-2xl">Membership</CardTitle>
                     <CardDescription>
-                      Manage your membership details and benefits
+                      Manage your pass details and benefits
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
-                    <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between p-4 sm:p-6 border rounded-xl bg-card">
-                      <div className="space-y-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-semibold text-lg">
-                            {getPassDisplayName(validMembership.address)}
-                          </p>
-                          <span className="inline-flex items-center rounded-full bg-green-500/15 px-2.5 py-0.5 text-xs font-medium text-green-500">
-                            Active
-                          </span>
-                        </div>
-                        {validMembership.expiration && validMembership.expiration < LIFETIME_EXPIRATION_THRESHOLD ? (
-                          <div className="space-y-1">
-                            <p className="text-sm text-muted-foreground">
-                              Expires on {new Date(validMembership.expiration * 1000).toISOString().split("T")[0]}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {(() => {
-                                const now = Date.now();
-                                const exp = validMembership.expiration! * 1000;
-                                const diff = exp - now;
-                                const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
-                                if (days < 0) return "Expired";
-                                if (days === 0) return "Expires today";
-                                return `${days} day${days === 1 ? '' : 's'} remaining`;
-                              })()}
-                            </p>
-                          </div>
-                        ) : (
-                          <p className="text-sm text-muted-foreground">
-                            Lifetime / Never expires
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="flex flex-col gap-3 sm:flex-row">
-                        {/* Show renewal options if needed */}
-                        <Button
-                          variant="outline"
-                          onClick={() => {
-                            // Toggle renewal view locally if we want, or just scroll/show the options
-                            // For now, simpler to just show the tiers below this card if they click renew?
-                            // Or simpler: Just render MembershipHome below this card with a "Renew / Upgrade" header
-                            const element = document.getElementById("membership-renewal-options");
-                            if (element) {
-                              element.scrollIntoView({ behavior: 'smooth' });
-                            }
-                          }}
-                        >
-                          Extend Membership
-                        </Button>
-                        {validMembership.tokenId && (
-                          <CancelMembershipButton
-                            lockAddress={validMembership.address}
-                            tokenId={validMembership.tokenId}
-                            onSuccess={refetchMembership}
-                          />
-                        )}
-                      </div>
-                    </div>
+                    <MembershipPassRows
+                      passes={validMemberships}
+                      walletAddress={walletAddress ?? ""}
+                      cancelledPassKeys={cancelledPassKeys}
+                      cancelControlsReady={cancelControlsReady}
+                      onPassCancelConfirm={handlePassCancelConfirm}
+                      onRenewScroll={() => {
+                        const element = document.getElementById("membership-renewal-options");
+                        if (element) {
+                          element.scrollIntoView({ behavior: "smooth" });
+                        }
+                      }}
+                    />
 
                     <div id="membership-renewal-options" className="space-y-4 pt-4 border-t">
-                      <h3 className="text-lg font-medium">Upgrade or Renew</h3>
+                      <h3 className="text-lg font-medium">Buy again or upgrade</h3>
                       <MembershipHome
-                        currentMembershipAddress={validMembership.address}
+                        currentMembershipAddress={primaryMembership.address}
                         onPurchaseSuccess={refetchMembership}
                         onSwitchToFinanceTab={switchToFinanceTab}
                       />

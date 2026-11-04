@@ -1,5 +1,6 @@
 "use client";
 
+import { MembershipVerifiedBadge } from "@/components/User/MembershipVerifiedBadge";
 import { useState, useEffect, useCallback } from 'react';
 import {
   Dialog,
@@ -371,6 +372,7 @@ export function QuickTradeDialog({
             <div className="flex-1">
               <DialogTitle className="flex items-center gap-2">
                 {mode === 'buy' ? 'Buy' : 'Sell'} {token.symbol}
+                <MembershipVerifiedBadge address={token.owner_address} size="md" />
               </DialogTitle>
               {token.type === 'content_coin' && token.video_title && (
                 <p className="text-sm font-normal text-muted-foreground mt-1">

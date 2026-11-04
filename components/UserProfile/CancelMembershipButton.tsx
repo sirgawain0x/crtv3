@@ -1,110 +1,87 @@
 "use client";
 
 import { useState } from "react";
-import { useSendUserOperation, useSmartAccountClient } from "@/lib/wallet/react";
-import { encodeFunctionData, type Abi } from "viem";
 import { Button } from "@/components/ui/button";
-import { appendBuilderCode } from "@/lib/utils/builder-code";
 import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-    AlertDialogTrigger,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { toast } from "sonner";
-import unlockAbiJson from "@/lib/abis/Unlock.json";
+import { passAccessUntilMessage } from "@/lib/access/format-pass-expiration";
 
 interface CancelMembershipButtonProps {
-    lockAddress: string;
-    tokenId: string;
-    onSuccess?: () => void | Promise<void>;
+  expiration: number;
+  acknowledged?: boolean;
+  onConfirm?: () => void | Promise<void>;
 }
 
 export function CancelMembershipButton({
-    lockAddress,
-    tokenId,
-    onSuccess,
+  expiration,
+  acknowledged = false,
+  onConfirm,
 }: CancelMembershipButtonProps) {
-    const [isOpen, setIsOpen] = useState(false);
-    const { client } = useSmartAccountClient({ type: "LightAccount" });
+  const [isOpen, setIsOpen] = useState(false);
 
-    const { sendUserOperation, isSendingUserOperation } = useSendUserOperation({
-        client,
-        waitForTxn: true,
-        onSuccess: async ({ hash }) => {
-            console.log("Cancellation successful:", hash);
-            toast.success("Membership cancelled successfully");
-            setIsOpen(false);
-            await onSuccess?.();
-        },
-        onError: (error) => {
-            console.error("Cancellation error:", error);
-            toast.error("Failed to cancel membership. Please try again.");
-            setIsOpen(false);
-        },
-    });
+  const accessMessage = passAccessUntilMessage(expiration);
 
-    const handleCancel = () => {
-        if (!client) {
-            toast.error("Wallet client not initialized");
-            return;
-        }
+  const handleConfirm = async () => {
+    setIsOpen(false);
+    toast.success(accessMessage);
+    await onConfirm?.();
+  };
 
-        try {
-            const data = encodeFunctionData({
-                abi: unlockAbiJson.abi as Abi,
-                functionName: "cancelAndRefund",
-                args: [BigInt(tokenId)],
-            });
-
-            sendUserOperation({
-                uo: {
-                    target: lockAddress as `0x${string}`,
-                    data: appendBuilderCode(data),
-                    value: 0n,
-                },
-            });
-        } catch (error) {
-            console.error("Error preparing transaction:", error);
-            toast.error("Error preparing cancellation transaction");
-        }
-    };
-
+  if (acknowledged) {
     return (
-        <AlertDialog open={isOpen} onOpenChange={setIsOpen}>
-            <AlertDialogTrigger asChild>
-                <Button variant="destructive" size="sm">
-                    Cancel Membership
-                </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        This will cancel your membership immediately. You may receive a prorated refund depending on the lock settings, but access will be revoked right away.
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel disabled={isSendingUserOperation}>
-                        Keep Membership
-                    </AlertDialogCancel>
-                    <AlertDialogAction
-                        onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-                            e.preventDefault(); // Prevent auto-close
-                            handleCancel();
-                        }}
-                        disabled={isSendingUserOperation}
-                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    >
-                        {isSendingUserOperation ? "Cancelling..." : "Yes, Cancel"}
-                    </AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
+      <p className="text-sm text-muted-foreground" data-testid="pass-cancel-acknowledged">
+        {accessMessage}
+      </p>
     );
+  }
+
+  return (
+    <AlertDialog open={isOpen} onOpenChange={setIsOpen}>
+      <AlertDialogTrigger asChild>
+        <Button variant="destructive" size="sm" data-testid="pass-cancel-trigger">
+          Cancel pass
+        </Button>
+      </AlertDialogTrigger>
+      <AlertDialogContent data-testid="pass-cancel-dialog">
+        <AlertDialogHeader>
+          <AlertDialogTitle>Cancel this pass?</AlertDialogTitle>
+          <AlertDialogDescription asChild>
+            <div className="space-y-2 text-sm text-muted-foreground">
+              <p>
+                Creative passes are 30-day access passes. You buy again manually when you want
+                continued access—nothing charges on its own.
+              </p>
+              <p>
+                Cancelling means you will not buy again for this pass when it expires.{" "}
+                {accessMessage}
+              </p>
+            </div>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Keep pass</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
+              e.preventDefault();
+              void handleConfirm();
+            }}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            data-testid="pass-cancel-confirm"
+          >
+            Yes, cancel pass
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
 }

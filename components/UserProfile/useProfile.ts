@@ -172,27 +172,8 @@ export function useProfile(account: Account | null) {
     }
   };
 
-  const handleCancelMembership = async () => {
-    if (!walletClient || !account?.address) {
-      toast.error("Please connect your wallet");
-      return;
-    }
-
-    dispatch({ type: "SET_LOADING", payload: true });
-    try {
-      // Implement cancellation logic
-      toast.success("Membership cancelled successfully");
-    } catch (error) {
-      logger.error("Error cancelling membership:", error);
-      toast.error("Failed to cancel membership");
-    } finally {
-      dispatch({ type: "SET_LOADING", payload: false });
-    }
-  };
-
   return {
     ...state,
     handleRenewMembership,
-    handleCancelMembership,
   };
 }

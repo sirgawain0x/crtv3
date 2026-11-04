@@ -1,3 +1,4 @@
+import { isAddress } from "viem";
 import { NextRequest, NextResponse } from "next/server";
 import { unlockService } from "@/lib/sdk/unlock/services";
 import { rateLimiters } from "@/lib/middleware/rateLimit";
@@ -12,21 +13,27 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     address = body.address;
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  if (!address) {
-    return NextResponse.json({ error: "Missing address" }, { status: 400 });
+  if (typeof address !== "string" || !isAddress(address)) {
+    return NextResponse.json({ error: "A valid wallet address is required" }, { status: 400 });
   }
 
   try {
     // This runs server-side, so no CORS issues!
     const memberships = await unlockService.getAllMemberships(address);
+    if (memberships.some((membership) => "error" in membership)) {
+      return NextResponse.json(
+        { error: "Membership verification is temporarily unavailable. Please retry." },
+        { status: 503 },
+      );
+    }
     return NextResponse.json({ memberships }, { status: 200 });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
-      { error: (error as Error).message },
+      { error: "Membership verification is temporarily unavailable. Please retry." },
       { status: 500 }
     );
   }

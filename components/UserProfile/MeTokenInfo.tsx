@@ -1,3 +1,4 @@
+import { MembershipVerifiedBadge } from "@/components/User/MembershipVerifiedBadge";
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -84,6 +85,7 @@ export function MeTokenInfo({ meToken }: MeTokenInfoProps) {
         <CardHeader>
           <CardTitle className="flex flex-wrap items-center gap-2">
             <span className="truncate">{meToken.name}</span>
+            <MembershipVerifiedBadge address={meToken.info.owner} size="md" />
             <Badge variant="secondary" className="flex-shrink-0">${meToken.symbol}</Badge>
           </CardTitle>
           <CardDescription>
