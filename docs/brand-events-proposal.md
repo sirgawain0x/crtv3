@@ -50,6 +50,7 @@ A brand owner creating an event **at runtime** (name + channel + video IDs) cann
 
 1. **Schema** — persist event metadata and video membership (not in `CHONES_EVENTS` or hack_beta submission shape).
 2. **Auth / access gating** — enforce exclusive brand-channel owner on create/update/delete APIs (403 for non-owner).
+3. **Single-channel ownership (required prerequisite)** — a **mandatory** partial unique index on `creator_profiles.brand_channel_slug` so each brand slug maps to at most one profile row. Owner lookup and `assertBrandChannelOwner` **depend on this invariant**; without the index, `LIMIT 1` owner queries are ambiguous and must not ship.
 
 **Out of scope for zero-migration workaround:** deploy-time edits to `lib/chones/events.ts` + a static TS config of video IDs could render FAIR without DB changes, but that is not the requested self-serve dashboard flow and still would not add owner-only API guards.
 
@@ -57,7 +58,76 @@ A brand owner creating an event **at runtime** (name + channel + video IDs) cann
 
 ## Proposed schema (migration SQL)
 
-Apply as a new Supabase migration (filename example: `supabase/migrations/YYYYMMDDHHMMSS_brand_channel_events.sql`). Mirror under `lib/sdk/supabase/migrations/` per repo convention.
+Apply as **two** ordered migrations (or one file with sections in this order). Mirror under `lib/sdk/supabase/migrations/` per repo convention.
+
+1. **`YYYYMMDDHHMMSS_enforce_unique_brand_channel_slug.sql`** — **required first**; blocks brand-events APIs until applied.
+2. **`YYYYMMDDHHMMSS_brand_channel_events.sql`** — event tables (depends on ownership invariant for API design, not FK).
+
+### Step 1 — Enforce single owner per brand channel (required)
+
+Run manually in Supabase SQL editor **before** applying the migration if you need to inspect duplicates; the migration itself must fail closed if duplicates remain.
+
+**Pre-migration duplicate audit (run first, review output):**
+
+```sql
+-- Rows sharing the same brand_channel_slug (must return zero rows before unique index)
+SELECT
+    brand_channel_slug,
+    COUNT(*) AS profile_count,
+    array_agg(id ORDER BY updated_at DESC NULLS LAST, created_at DESC) AS profile_ids,
+    array_agg(owner_address ORDER BY updated_at DESC NULLS LAST, created_at DESC) AS owner_addresses
+FROM public.creator_profiles
+WHERE brand_channel_slug IS NOT NULL
+  AND btrim(brand_channel_slug) <> ''
+GROUP BY brand_channel_slug
+HAVING COUNT(*) > 1;
+```
+
+**Pre-migration cleanup (human decision — pick canonical owner per slug, then clear others):**
+
+```sql
+-- Example: keep the most recently updated profile for 'chones', unlink the rest.
+-- Repeat per slug returned by the audit query, or use a one-off script with explicit wallet choices.
+WITH ranked AS (
+    SELECT
+        id,
+        brand_channel_slug,
+        owner_address,
+        ROW_NUMBER() OVER (
+            PARTITION BY brand_channel_slug
+            ORDER BY updated_at DESC NULLS LAST, created_at DESC
+        ) AS rn
+    FROM public.creator_profiles
+    WHERE brand_channel_slug IS NOT NULL
+      AND btrim(brand_channel_slug) <> ''
+)
+UPDATE public.creator_profiles cp
+SET brand_channel_slug = NULL,
+    updated_at = now()
+FROM ranked r
+WHERE cp.id = r.id
+  AND r.rn > 1;
+```
+
+Re-run the **duplicate audit** until it returns no rows. Document the chosen canonical `owner_address` per slug (e.g. Chones → seeded Hack Beta admin wallet from `docs/brand-channel-profile-link.md`).
+
+**Migration (required — not optional):**
+
+```sql
+-- REQUIRED: at most one creator_profiles row per brand_channel_slug.
+-- Brand-events owner lookup assumes this uniqueness; do not ship assertBrandChannelOwner without it.
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_creator_profiles_brand_channel_slug_unique
+    ON public.creator_profiles (brand_channel_slug)
+    WHERE brand_channel_slug IS NOT NULL;
+
+COMMENT ON INDEX public.idx_creator_profiles_brand_channel_slug_unique IS
+    'Single owner per brand channel; required for assertBrandChannelOwner and profile slug upsert conflicts.';
+```
+
+**Profile upsert (implementation follow-up):** when setting `brand_channel_slug`, rely on DB unique violation (HTTP 409) if another profile already holds that slug — in addition to Brand Pass checks in `app/api/creator-profiles/upsert/route.ts`.
+
+### Step 2 — Brand channel event tables
 
 ```sql
 -- Brand channel events: metadata + curated video lists (owner-managed)
@@ -97,11 +167,6 @@ CREATE TABLE IF NOT EXISTS public.brand_channel_event_videos (
 CREATE INDEX IF NOT EXISTS idx_brand_channel_event_videos_asset
     ON public.brand_channel_event_videos (video_asset_id);
 
--- Optional: one profile row per brand slug (enforces single owner at DB level)
-CREATE UNIQUE INDEX IF NOT EXISTS idx_creator_profiles_brand_channel_slug_unique
-    ON public.creator_profiles (brand_channel_slug)
-    WHERE brand_channel_slug IS NOT NULL;
-
 ALTER TABLE public.brand_channel_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.brand_channel_event_videos ENABLE ROW LEVEL SECURITY;
 
@@ -132,20 +197,27 @@ CREATE POLICY brand_channel_event_videos_service_all
 
 - `slug` is URL segment: `/chones/fair` for title FAIR → slug `fair`.
 - `video_asset_id` matches `video_assets.asset_id` (text), consistent with `hack_beta_submissions.video_asset_id`.
-- Unique index on `creator_profiles.brand_channel_slug` aligns runtime ownership with “one channel, one linked profile”; resolve conflicts before enabling in production if multiple rows already share a slug.
+- **Step 1 unique index is a hard dependency** for owner authorization below; event tables alone do not define channel ownership.
 
 ---
 
 ## Ownership check (server)
 
+**Prerequisite:** Step 1 unique index `idx_creator_profiles_brand_channel_slug_unique` applied and duplicate audit clean.
+
 Add `lib/channels/assert-brand-channel-owner.ts`:
 
 ```ts
+/**
+ * Owner resolution relies on DB uniqueness: at most one creator_profiles row
+ * per brand_channel_slug. Query by slug only — never LIMIT 1 without the index.
+ */
 export async function getBrandChannelOwnerAddress(
   slug: BrandChannelSlug
 ): Promise<string | null> {
   // SELECT owner_address FROM creator_profiles
-  // WHERE LOWER(brand_channel_slug) = slug LIMIT 1
+  // WHERE brand_channel_slug = slug   -- exact match; slug validated as BrandChannelSlug
+  // Expect 0 or 1 row (1 enforced by idx_creator_profiles_brand_channel_slug_unique).
 }
 
 export async function assertBrandChannelOwner(
@@ -154,10 +226,22 @@ export async function assertBrandChannelOwner(
 ): Promise<void> {
   const owner = await getBrandChannelOwnerAddress(slug);
   if (!owner || owner.toLowerCase() !== walletAddress.toLowerCase()) {
-    throw new BrandChannelForbiddenError(); // maps to HTTP 403
+    throw new BrandChannelForbiddenError(); // HTTP 403 — not owner or channel unassigned
   }
 }
+
+/** Implementation follow-up: if a query ever returns >1 row, log + 500 (index violated). */
 ```
+
+**Semantics:**
+
+| `getBrandChannelOwnerAddress` result | `assertBrandChannelOwner` |
+|--------------------------------------|---------------------------|
+| `null` (no profile linked to slug) | 403 for mutate APIs |
+| address ≠ session wallet | 403 |
+| address = session wallet | allow (plus Brand Pass where already required) |
+
+Non-owner with their **own** `brand_channel_slug` on profile may create events only for **their** slug, not another brand’s.
 
 **API routes** (all use existing wallet session verification pattern from `app/api/creator-profiles/upsert/route.ts` — no Privy/env changes):
 
@@ -179,6 +263,7 @@ export async function assertBrandChannelOwner(
 
 - Owner wallet linked to `chones` → `POST` 201, event appears in `GET` list.
 - Random wallet → `POST` 403.
+- Second profile attempting same `brand_channel_slug` on upsert → 409 (unique index).
 - Event page renders chosen videos (integration or API + component test).
 
 ---
@@ -189,7 +274,7 @@ export async function assertBrandChannelOwner(
 
 **File:** `components/UserProfile/list-uploaded-assets/ListUploadedAssets.tsx` (header row next to existing controls).
 
-**Visibility:** Client loads current user’s `creator_profiles.brand_channel_slug`; show button only when slug is non-null **and** `useUser().address` matches server-confirmed owner (optional lightweight `GET /api/brand-channel-events/ownership` to avoid exposing other owners’ addresses).
+**Visibility:** Show **New event** only when the session wallet is the exclusive owner: `creator_profiles.brand_channel_slug` is non-null for the viewer **and** `GET /api/brand-channel-events/ownership?brand=<slug>` returns `{ isOwner: true }` (server uses the same unique-index-backed lookup as `assertBrandChannelOwner`).
 
 **Flow (modal or dedicated route `/profile/.../events/new`):**
 
@@ -234,6 +319,7 @@ Do **not** change per-video upload pipeline.
 
 ## Acceptance criteria (implementation PR after this proposal merges)
 
+- [ ] **Step 1** unique index applied; duplicate audit query returns zero rows in production.
 - [ ] Owner sees **New event** on Uploads History; non-owner does not (UI) and receives 403 on API.
 - [ ] FAIR (or equivalent) appears on `/chones` Events grid like HACKATHON BETA.
 - [ ] Event detail shows only selected library videos.
