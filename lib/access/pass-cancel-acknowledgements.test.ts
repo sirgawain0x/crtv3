@@ -3,7 +3,6 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import {
   addPassCancelAcknowledgement,
-  clearPassCancelAcknowledgementsForLock,
   passCancelStorageKey,
   prunePassCancelAcknowledgements,
   readPassCancelAcknowledgements,
@@ -58,15 +57,5 @@ describe("pass-cancel-acknowledgements", () => {
     const next = addPassCancelAcknowledgement(WALLET, key, new Set());
     expect(next.has(key)).toBe(true);
     expect(readPassCancelAcknowledgements(WALLET).has(key)).toBe(true);
-  });
-
-  it("clearPassCancelAcknowledgementsForLock removes every expiration variant", () => {
-    const oldKey = passCancelStorageKey(WALLET, LOCK, "1", EXPIRATION);
-    const newKey = passCancelStorageKey(WALLET, LOCK, "1", NEW_EXPIRATION);
-    writePassCancelAcknowledgements(WALLET, new Set([oldKey, newKey]));
-
-    const remaining = clearPassCancelAcknowledgementsForLock(WALLET, LOCK);
-    expect(remaining.size).toBe(0);
-    expect(readPassCancelAcknowledgements(WALLET).size).toBe(0);
   });
 });

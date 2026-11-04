@@ -78,6 +78,7 @@ export function ChonesPageClient({ config: _config }: ChonesPageClientProps) {
             );
 
             if (isActive) {
+              const isHackBeta = event.slug === "hack-beta";
               return (
                 <li key={event.slug}>
                   <Link
@@ -85,19 +86,22 @@ export function ChonesPageClient({ config: _config }: ChonesPageClientProps) {
                     className={cn(
                       "group relative block min-h-[220px] overflow-hidden rounded-xl border border-amber-500/30 p-6",
                       "transition hover:border-amber-400/50 hover:shadow-md",
+                      !isHackBeta && "bg-gradient-to-br from-stone-950 via-stone-900 to-amber-950/40",
                     )}
                   >
-                    <div className="absolute inset-0 -z-10" aria-hidden>
-                      <Image
-                        src="/chones/hack-beta/hackathon-beta-tv-background.svg"
-                        alt=""
-                        fill
-                        className="object-cover object-center opacity-70 transition duration-500 group-hover:opacity-85"
-                        sizes="(max-width: 640px) 100vw, 50vw"
-                        unoptimized
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-r from-stone-950/85 via-stone-950/60 to-stone-950/80" />
-                    </div>
+                    {isHackBeta && (
+                      <div className="absolute inset-0 -z-10" aria-hidden>
+                        <Image
+                          src="/chones/hack-beta/hackathon-beta-tv-background.svg"
+                          alt=""
+                          fill
+                          className="object-cover object-center opacity-70 transition duration-500 group-hover:opacity-85"
+                          sizes="(max-width: 640px) 100vw, 50vw"
+                          unoptimized
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-r from-stone-950/85 via-stone-950/60 to-stone-950/80" />
+                      </div>
+                    )}
                     {cardContent}
                   </Link>
                 </li>
