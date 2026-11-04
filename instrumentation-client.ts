@@ -33,6 +33,7 @@ if (!botIdGlobal.__crtvBotIdInit) {
       botIdDeepAnalysisRoute('/api/ipfs/upload', 'POST'),
       botIdDeepAnalysisRoute('/api/creator-profiles/upsert', 'POST'),
       botIdDeepAnalysisRoute('/api/creator-profiles/link-orb', 'POST'),
+      botIdDeepAnalysisRoute('/api/creator-profiles/admin/xmerch', 'PATCH'),
       // Orb QR init/poll omitted: high-frequency polling; rate-limited server routes instead.
       botIdDeepAnalysisRoute('/api/creator-profiles', 'POST'),
       botIdDeepAnalysisRoute('/api/creator-profiles', 'PUT'),
