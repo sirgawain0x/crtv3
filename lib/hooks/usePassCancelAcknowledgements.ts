@@ -11,10 +11,11 @@ function readCancelledKeysForWallet(
   walletAddress: string,
   activePassKeys: ReadonlySet<string>,
 ): Set<string> {
+  const stored = readPassCancelAcknowledgements(walletAddress);
   if (activePassKeys.size > 0) {
-    return prunePassCancelAcknowledgements(walletAddress, activePassKeys);
+    return new Set([...stored].filter((key) => activePassKeys.has(key)));
   }
-  return readPassCancelAcknowledgements(walletAddress);
+  return stored;
 }
 
 export function usePassCancelAcknowledgements(
@@ -33,6 +34,17 @@ export function usePassCancelAcknowledgements(
       return new Set<string>();
     }
     return readCancelledKeysForWallet(walletAddress, activePassKeys);
+  }, [walletAddress, activePassKeys, activePassKeysFingerprint]);
+
+  // Persist the pruning of stale acknowledgement keys (e.g. after a renewal
+  // changes a pass's expiration). The render-path read stays synchronous and
+  // pure so the first render already reflects the pruned set; only the
+  // localStorage write moves out of render into this effect.
+  useEffect(() => {
+    if (!walletAddress || activePassKeys.size === 0) {
+      return;
+    }
+    prunePassCancelAcknowledgements(walletAddress, activePassKeys);
   }, [walletAddress, activePassKeys, activePassKeysFingerprint]);
 
   const cancelledPassKeys = useMemo(() => {

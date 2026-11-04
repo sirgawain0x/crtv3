@@ -9,10 +9,6 @@ export function passCancelStorageKey(
   return `${walletAddress.toLowerCase()}:${lockAddress.toLowerCase()}:${tokenId}:${expirationSeconds}`;
 }
 
-export function passCancelLockPrefix(walletAddress: string, lockAddress: string): string {
-  return `${walletAddress.toLowerCase()}:${lockAddress.toLowerCase()}:`;
-}
-
 function storageKeyForWallet(walletAddress: string): string {
   return `${STORAGE_PREFIX}${walletAddress.toLowerCase()}`;
 }
@@ -77,17 +73,6 @@ export function addPassCancelAcknowledgement(
 ): Set<string> {
   const next = new Set(existing);
   next.add(passKey);
-  writePassCancelAcknowledgements(walletAddress, next);
-  return next;
-}
-
-export function clearPassCancelAcknowledgementsForLock(
-  walletAddress: string,
-  lockAddress: string,
-): Set<string> {
-  const prefix = passCancelLockPrefix(walletAddress, lockAddress);
-  const stored = readPassCancelAcknowledgements(walletAddress);
-  const next = new Set([...stored].filter((key) => !key.startsWith(prefix)));
   writePassCancelAcknowledgements(walletAddress, next);
   return next;
 }
