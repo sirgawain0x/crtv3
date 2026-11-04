@@ -16,6 +16,7 @@ import makeBlockie from "ethereum-blockies-base64";
 import { shortenAddress } from "@/lib/utils/utils";
 import { convertFailingGateway } from "@/lib/utils/image-gateway";
 import { meTokenSupabaseService } from "@/lib/sdk/supabase/metokens";
+import type { CreatorProfile } from "@/lib/sdk/supabase/client";
 import { CreatorProfileHeader } from "@/components/Creator/CreatorProfileHeader";
 import Link from "next/link";
 import { logger } from '@/lib/utils/logger';
@@ -33,7 +34,7 @@ type CreatorPageProps = {
   }>;
 };
 
-async function fetchCreatorProfile(address: string) {
+async function fetchCreatorProfile(address: string): Promise<CreatorProfile | null> {
   try {
     const supabase = await createClient();
     const { data, error } = await fetchCreatorProfileForPage(supabase, address);
@@ -46,7 +47,7 @@ async function fetchCreatorProfile(address: string) {
       return null;
     }
 
-    return data;
+    return data as CreatorProfile;
   } catch (error) {
     logger.error("Unexpected error fetching creator profile:", error);
     return null;
