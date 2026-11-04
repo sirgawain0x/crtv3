@@ -22,6 +22,8 @@ import { logger } from '@/lib/utils/logger';
 import { getTokenMarketData } from "@/lib/services/market";
 import { Metadata, ResolvingMetadata } from "next";
 import { fetchCreatorProfileForPage } from "@/lib/creator/fetch-creator-profile-for-page";
+import { fetchXmerchProductPreviews } from "@/lib/creator/xmerch-product-preview";
+import { getPublicXmerchProfile } from "@/lib/creator/xmerch-profile";
 
 
 
@@ -144,6 +146,12 @@ export default async function CreatorPage({ params }: CreatorPageProps) {
     : makeBlockie(address);
   const bio = creatorProfile?.bio || null;
 
+  const publicXmerch = getPublicXmerchProfile(creatorProfile?.social_xmerch);
+  const xmerchProductPreviews =
+    publicXmerch && publicXmerch.featuredProductUrls.length > 0
+      ? await fetchXmerchProductPreviews(publicXmerch.featuredProductUrls)
+      : undefined;
+
   return (
     <div className="min-h-screen px-4 py-6 sm:p-6">
       {/* Breadcrumb Navigation */}
@@ -187,6 +195,7 @@ export default async function CreatorPage({ params }: CreatorPageProps) {
               creatorProfile={creatorProfile}
               meToken={meToken}
               bio={bio}
+              xmerchProductPreviews={xmerchProductPreviews}
             />
           </CardHeader>
           <CardContent className="pt-6">

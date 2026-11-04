@@ -1,4 +1,4 @@
-export const MAX_XMERCH_FEATURED_PRODUCTS = 6;
+export const MAX_XMERCH_FEATURED_PRODUCTS = 3;
 
 export type CreatorXmerchProfile = {
   enabled: boolean;
