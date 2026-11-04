@@ -5,13 +5,13 @@ import type { Metadata } from "next";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "FAIR | Chones | Creative TV",
+  title: "FAIR BETA | Chones | Creative TV",
   description:
-    "Chones FAIR — a curated showcase of Creative TV videos on the Chones brand channel.",
+    "Chones FAIR BETA — a curated showcase of Creative TV videos on the Chones brand channel.",
   openGraph: {
-    title: "FAIR | Chones | Creative TV",
+    title: "FAIR BETA | Chones | Creative TV",
     description:
-      "Chones FAIR — a curated showcase of Creative TV videos on the Chones brand channel.",
+      "Chones FAIR BETA — a curated showcase of Creative TV videos on the Chones brand channel.",
     url: "/chones/fair",
   },
 };
