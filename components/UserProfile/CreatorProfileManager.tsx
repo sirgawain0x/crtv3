@@ -19,10 +19,11 @@ import {
   normalizeCreatorSocialProfileUrl,
   type CreatorSocialPlatform,
 } from '@/lib/creator/social-profile-urls';
+import { CreatorStockPickEditor } from '@/components/UserProfile/CreatorStockPickEditor';
 import {
-  CreatorStockPickEditor,
+  stockPickEditorValueFromStored,
   type StockPickEditorValue,
-} from '@/components/UserProfile/CreatorStockPickEditor';
+} from '@/lib/creator-stock-picks/stock-pick-form-state';
 import { CreatorStockPickDisplay } from '@/components/UserProfile/CreatorStockPickDisplay';
 import {
   getCreatorStockPicksBlocker,
@@ -97,12 +98,11 @@ export function CreatorProfileManager({ targetAddress, onProfileUpdated }: Creat
         social_instagram_url: profile.social_instagram_url || '',
         social_x_url: profile.social_x_url || '',
       });
-      const pick = parseCreatorStockPickFromRow(profile.stock_pick);
-      setStockPickForm({
-        ticker: pick?.ticker ?? '',
-        note: pick?.note ?? '',
-        video_asset_id: pick?.video_asset_id ?? '',
-      });
+      setStockPickForm(
+        stockPickEditorValueFromStored(
+          parseCreatorStockPickFromRow(profile.stock_pick),
+        ),
+      );
     }
   }, [profile]);
 
@@ -205,6 +205,11 @@ export function CreatorProfileManager({ targetAddress, onProfileUpdated }: Creat
         social_x_url: profile.social_x_url || '',
       });
       setFieldErrors({});
+      setStockPickForm(
+        stockPickEditorValueFromStored(
+          parseCreatorStockPickFromRow(profile.stock_pick),
+        ),
+      );
     }
     setIsEditing(false);
   };

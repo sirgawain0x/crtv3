@@ -13,6 +13,7 @@ import {
   getCreatorStockPicksBlocker,
   isCreatorStockPicksRuntimeEnabled,
 } from '@/lib/creator-stock-picks/runtime-policy';
+import { verifyStockPickVideoOwnership } from '@/lib/creator-stock-picks/verify-stock-pick-video';
 
 export async function POST(request: NextRequest) {
   const verification = await checkBotIdDeep();
@@ -152,38 +153,47 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      if (
-        stockValidation.value?.video_asset_id &&
-        supabaseService
-      ) {
-        const { data: videoRow, error: videoError } = await supabaseService
-          .from('video_assets')
-          .select('id, creator_id')
-          .eq('id', stockValidation.value.video_asset_id)
-          .maybeSingle();
-
-        if (videoError || !videoRow) {
+      if (stockValidation.value?.video_asset_id) {
+        const db = supabaseService;
+        if (!db) {
           return NextResponse.json(
             {
               success: false,
-              error: 'Linked video was not found',
+              error: 'Video ownership could not be verified',
               field: 'stock_pick_video_asset_id',
             },
-            { status: 400 },
+            { status: 503 },
           );
         }
 
-        if (
-          String(videoRow.creator_id).toLowerCase() !==
-          owner_address.toLowerCase()
-        ) {
+        const videoCheck = await verifyStockPickVideoOwnership(
+          async (assetId) => {
+            const { data, error } = await db
+              .from('video_assets')
+              .select('asset_id, creator_id, playback_id')
+              .eq('asset_id', assetId)
+              .maybeSingle();
+            if (error || !data) {
+              return null;
+            }
+            return {
+              asset_id: data.asset_id,
+              creator_id: data.creator_id,
+              playback_id: data.playback_id,
+            };
+          },
+          owner_address,
+          stockValidation.value.video_asset_id,
+        );
+
+        if (!videoCheck.ok) {
           return NextResponse.json(
             {
               success: false,
-              error: 'You can only link your own videos',
-              field: 'stock_pick_video_asset_id',
+              error: videoCheck.error,
+              field: videoCheck.field,
             },
-            { status: 403 },
+            { status: videoCheck.status },
           );
         }
       }

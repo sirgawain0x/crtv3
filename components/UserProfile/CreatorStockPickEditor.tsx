@@ -18,11 +18,9 @@ import {
   isCreatorStockPicksRuntimeEnabled,
 } from "@/lib/creator-stock-picks/runtime-policy";
 
-export type StockPickEditorValue = {
-  ticker: string;
-  note: string;
-  video_asset_id: string;
-};
+import type { StockPickEditorValue } from "@/lib/creator-stock-picks/stock-pick-form-state";
+
+export type { StockPickEditorValue };
 
 type CreatorStockPickEditorProps = {
   initial: CreatorStockPickStored | null;
@@ -121,7 +119,7 @@ export function CreatorStockPickEditor({
             emit({ video_asset_id: e.target.value });
           }}
           disabled={disabled || !ticker}
-          placeholder="UUID of your uploaded video"
+          placeholder="Livepeer asset_id (UUID from your upload)"
         />
       </div>
 

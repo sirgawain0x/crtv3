@@ -5,6 +5,7 @@ import {
 } from "@/lib/creator-stock-picks/stock-catalog";
 import { isCreatorStockPicksRuntimeEnabled } from "@/lib/creator-stock-picks/runtime-policy";
 import { validateCreatorStockPickPartnerUrl } from "@/lib/creator-stock-picks/validate-partner-url";
+import { LIVEPEER_ASSET_ID_UUID } from "@/lib/creator-stock-picks/verify-stock-pick-video";
 
 export const MAX_STOCK_PICK_NOTE_LENGTH = 280;
 
@@ -112,10 +113,10 @@ export function validateCreatorStockPickPayload(body: {
       };
     }
     const id = videoRaw.trim();
-    if (!/^[0-9a-f-]{36}$/i.test(id)) {
+    if (!LIVEPEER_ASSET_ID_UUID.test(id)) {
       return {
         ok: false,
-        error: "Video link must be a valid video asset id",
+        error: "Video link must be a Livepeer asset_id UUID",
         field: "stock_pick_video_asset_id",
       };
     }
