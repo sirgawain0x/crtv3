@@ -79,6 +79,7 @@ export interface UpdateMeTokenData {
 }
 
 import type { CreatorXmerchProfile } from "@/lib/creator/xmerch-profile";
+import type { CreatorStockPickStored } from "@/lib/creator-stock-picks/validate-stock-pick";
 
 // Types for Creator Profiles (replacing OrbisDB metadata)
 export interface CreatorProfile {
@@ -111,6 +112,8 @@ export interface CreatorProfile {
   social_x_url?: string | null;
   /** Invite-only Creative Merch (admin-set JSON); public UI when enabled is true */
   social_xmerch?: CreatorXmerchProfile | null;
+  /** Pinned o1 Base stock token (deep-link only); requires migration + feature flag */
+  stock_pick?: CreatorStockPickStored | null;
   created_at: string;
   updated_at: string;
 }
@@ -132,6 +135,9 @@ export interface CreateCreatorProfileData {
   social_orb_url?: string | null;
   social_instagram_url?: string | null;
   social_x_url?: string | null;
+  stock_pick_ticker?: string | null;
+  stock_pick_note?: string | null;
+  stock_pick_video_asset_id?: string | null;
 }
 
 export interface UpdateCreatorProfileData {
@@ -150,6 +156,9 @@ export interface UpdateCreatorProfileData {
   social_orb_url?: string | null;
   social_instagram_url?: string | null;
   social_x_url?: string | null;
+  stock_pick_ticker?: string | null;
+  stock_pick_note?: string | null;
+  stock_pick_video_asset_id?: string | null;
 }
 
 // Types for Song Cup submissions

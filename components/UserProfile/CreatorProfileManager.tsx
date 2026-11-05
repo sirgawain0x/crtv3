@@ -19,6 +19,18 @@ import {
   normalizeCreatorSocialProfileUrl,
   type CreatorSocialPlatform,
 } from '@/lib/creator/social-profile-urls';
+import { CreatorStockPickEditor } from '@/components/UserProfile/CreatorStockPickEditor';
+import {
+  stockPickEditorValueFromStored,
+  type StockPickEditorValue,
+} from '@/lib/creator-stock-picks/stock-pick-form-state';
+import { CreatorStockPickDisplay } from '@/components/UserProfile/CreatorStockPickDisplay';
+import {
+  getCreatorStockPicksBlocker,
+  isCreatorStockPicksRuntimeEnabled,
+  shouldRenderCreatorStockPick,
+} from '@/lib/creator-stock-picks/runtime-policy';
+import { parseCreatorStockPickFromRow } from '@/lib/creator-stock-picks/parse-stock-pick';
 
 interface CreatorProfileManagerProps {
   targetAddress?: string;
@@ -42,6 +54,11 @@ export function CreatorProfileManager({ targetAddress, onProfileUpdated }: Creat
   });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
+  const [stockPickForm, setStockPickForm] = useState<StockPickEditorValue>({
+    ticker: '',
+    note: '',
+    video_asset_id: '',
+  });
 
   const validateSocialField = (platform: CreatorSocialPlatform, value: string) => {
     const fieldKey =
@@ -81,6 +98,11 @@ export function CreatorProfileManager({ targetAddress, onProfileUpdated }: Creat
         social_instagram_url: profile.social_instagram_url || '',
         social_x_url: profile.social_x_url || '',
       });
+      setStockPickForm(
+        stockPickEditorValueFromStored(
+          parseCreatorStockPickFromRow(profile.stock_pick),
+        ),
+      );
     }
   }, [profile]);
 
@@ -124,6 +146,14 @@ export function CreatorProfileManager({ targetAddress, onProfileUpdated }: Creat
           bio: formData.bio,
           avatar_url: formData.avatar_url,
           ...socialPayload,
+          ...(isCreatorStockPicksRuntimeEnabled()
+            ? {
+                stock_pick_ticker: stockPickForm.ticker || null,
+                stock_pick_note: stockPickForm.note || null,
+                stock_pick_video_asset_id:
+                  stockPickForm.video_asset_id || null,
+              }
+            : {}),
         });
         toast({
           title: "Profile Updated",
@@ -137,6 +167,14 @@ export function CreatorProfileManager({ targetAddress, onProfileUpdated }: Creat
           bio: formData.bio,
           avatar_url: formData.avatar_url,
           ...socialPayload,
+          ...(isCreatorStockPicksRuntimeEnabled()
+            ? {
+                stock_pick_ticker: stockPickForm.ticker || null,
+                stock_pick_note: stockPickForm.note || null,
+                stock_pick_video_asset_id:
+                  stockPickForm.video_asset_id || null,
+              }
+            : {}),
         });
         toast({
           title: "Profile Created",
@@ -167,6 +205,11 @@ export function CreatorProfileManager({ targetAddress, onProfileUpdated }: Creat
         social_x_url: profile.social_x_url || '',
       });
       setFieldErrors({});
+      setStockPickForm(
+        stockPickEditorValueFromStored(
+          parseCreatorStockPickFromRow(profile.stock_pick),
+        ),
+      );
     }
     setIsEditing(false);
   };
@@ -333,6 +376,30 @@ export function CreatorProfileManager({ targetAddress, onProfileUpdated }: Creat
                 '@handle or https://x.com/handle',
                 'x',
               )}
+            </div>
+
+            <div className="space-y-4 pt-2 border-t">
+              <p className="text-sm font-medium">Creator stock pick</p>
+              {isEditing && isOwner ? (
+                <CreatorStockPickEditor
+                  initial={parseCreatorStockPickFromRow(profile?.stock_pick)}
+                  disabled={!isOwner}
+                  onChange={setStockPickForm}
+                />
+              ) : (() => {
+                const pick = parseCreatorStockPickFromRow(profile?.stock_pick);
+                if (pick && shouldRenderCreatorStockPick(pick)) {
+                  return <CreatorStockPickDisplay stockPick={pick} />;
+                }
+                if (getCreatorStockPicksBlocker() === "feature_flag_off") {
+                  return null;
+                }
+                return (
+                  <p className="text-sm text-muted-foreground">
+                    Unavailable ({getCreatorStockPicksBlocker() ?? "disabled"}).
+                  </p>
+                );
+              })()}
             </div>
           </div>
         </div>

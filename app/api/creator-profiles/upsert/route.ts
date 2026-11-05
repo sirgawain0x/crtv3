@@ -8,6 +8,12 @@ import { requireWalletAuthFor, WalletAuthError } from '@/lib/auth/require-wallet
 import { addressHasBrandPass } from '@/lib/channels/brand-channel-access';
 import { isValidBrandChannelSlug } from '@/lib/channels/brand-channels';
 import { validateAndNormalizeSocialPayload } from '@/lib/creator/validate-social-payload';
+import { validateCreatorStockPickPayload } from '@/lib/creator-stock-picks/validate-stock-pick';
+import {
+  getCreatorStockPicksBlocker,
+  isCreatorStockPicksRuntimeEnabled,
+} from '@/lib/creator-stock-picks/runtime-policy';
+import { verifyStockPickVideoOwnership } from '@/lib/creator-stock-picks/verify-stock-pick-video';
 
 export async function POST(request: NextRequest) {
   const verification = await checkBotIdDeep();
@@ -50,6 +56,9 @@ export async function POST(request: NextRequest) {
       social_orb_url,
       social_instagram_url,
       social_x_url,
+      stock_pick_ticker,
+      stock_pick_note,
+      stock_pick_video_asset_id,
     } = body;
 
     if (!owner_address) {
@@ -109,6 +118,107 @@ export async function POST(request: NextRequest) {
       );
     }
     Object.assign(payload, socialValidation.payload);
+
+    const stockPickFieldsPresent =
+      stock_pick_ticker !== undefined ||
+      stock_pick_note !== undefined ||
+      stock_pick_video_asset_id !== undefined;
+
+    if (stockPickFieldsPresent) {
+      if (!isCreatorStockPicksRuntimeEnabled()) {
+        const blocker = getCreatorStockPicksBlocker();
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Creator Stock Picks are disabled',
+            blocker,
+          },
+          { status: 403 },
+        );
+      }
+
+      const stockValidation = validateCreatorStockPickPayload({
+        stock_pick_ticker,
+        stock_pick_note,
+        stock_pick_video_asset_id,
+      });
+      if (!stockValidation.ok) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: stockValidation.error,
+            field: stockValidation.field,
+          },
+          { status: 400 },
+        );
+      }
+
+      if (stockValidation.value?.video_asset_id) {
+        const db = supabaseService;
+        if (!db) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: 'Video ownership could not be verified',
+              field: 'stock_pick_video_asset_id',
+            },
+            { status: 503 },
+          );
+        }
+
+        const ownerLower = owner_address.toLowerCase();
+        const videoCheck = await verifyStockPickVideoOwnership(
+          {
+            byAssetIdAndOwner: async (assetId) => {
+              const { data, error } = await db
+                .from('video_assets')
+                .select('asset_id, creator_id, playback_id')
+                .eq('asset_id', assetId)
+                .eq('creator_id', ownerLower)
+                .maybeSingle();
+              if (error || !data) {
+                return null;
+              }
+              return {
+                asset_id: data.asset_id,
+                creator_id: data.creator_id,
+                playback_id: data.playback_id,
+              };
+            },
+            byAssetIdOnly: async (assetId) => {
+              const { data, error } = await db
+                .from('video_assets')
+                .select('asset_id, creator_id, playback_id')
+                .eq('asset_id', assetId)
+                .maybeSingle();
+              if (error || !data) {
+                return null;
+              }
+              return {
+                asset_id: data.asset_id,
+                creator_id: data.creator_id,
+                playback_id: data.playback_id,
+              };
+            },
+          },
+          owner_address,
+          stockValidation.value.video_asset_id,
+        );
+
+        if (!videoCheck.ok) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: videoCheck.error,
+              field: videoCheck.field,
+            },
+            { status: videoCheck.status },
+          );
+        }
+      }
+
+      payload.stock_pick = stockValidation.value;
+    }
 
     if (brand_channel_slug !== undefined) {
       const normalizedOwner = owner_address.toLowerCase();
