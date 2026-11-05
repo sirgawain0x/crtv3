@@ -58,6 +58,6 @@ External agents must **not** call this route; admin API keys are not a BotID byp
 
 ## Public display
 
-`/creator/[address]` → `CreatorXmerchSection` renders only when `enabled === true` and at least one valid store or featured URL exists. Store icon and featured chips open `XmerchStoreEmbedModal` (sandboxed iframe).
+`/creator/[address]` → `CreatorXmerchSection` renders only when `enabled === true` and at least one valid store or featured URL exists. Up to **3** featured product URLs. If featured products are set, the profile shows responsive product cards (Open Graph image when available, otherwise the xMerch icon). If only a store URL is set, the profile shows the store button. Both open `XmerchStoreEmbedModal` (sandboxed iframe).
 
 Tests: `app/api/creator-profiles/admin/xmerch/route.test.ts`, `components/Creator/CreatorXmerchSection.test.tsx`.

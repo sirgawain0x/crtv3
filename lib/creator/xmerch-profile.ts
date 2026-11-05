@@ -1,4 +1,4 @@
-export const MAX_XMERCH_FEATURED_PRODUCTS = 6;
+export const MAX_XMERCH_FEATURED_PRODUCTS = 3;
 
 export type CreatorXmerchProfile = {
   enabled: boolean;
@@ -20,7 +20,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function isAllowedXmerchHostname(hostname: string): boolean {
+export function isAllowedXmerchHostname(hostname: string): boolean {
   const host = hostname.toLowerCase();
   if (host === "xmerch.app") {
     return true;

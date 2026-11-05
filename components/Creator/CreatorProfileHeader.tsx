@@ -23,11 +23,14 @@ import { CreatorXmerchSection } from "@/components/Creator/CreatorXmerchSection"
 import { useMeTokenMarketStats } from "@/lib/hooks/market/useMeTokenMarketStats";
 import { formatUsdTokenPrice } from "@/lib/metokens/spotPrice";
 
+import type { XmerchProductPreview } from "@/lib/creator/xmerch-product-preview";
+
 interface CreatorProfileHeaderProps {
   address: string;
   creatorProfile: CreatorProfile | null;
   meToken: MeToken | null;
   bio: string | null;
+  xmerchProductPreviews?: Record<string, XmerchProductPreview>;
 }
 
 export function CreatorProfileHeader({
@@ -35,6 +38,7 @@ export function CreatorProfileHeader({
   creatorProfile,
   meToken,
   bio,
+  xmerchProductPreviews,
 }: CreatorProfileHeaderProps) {
   const displayName = meToken?.name || creatorProfile?.username || shortenAddress(address);
   const displaySymbol = meToken?.symbol || null;
@@ -75,6 +79,7 @@ export function CreatorProfileHeader({
 
   const displayPrice = marketStats?.price;
   const displayTvl = marketStats?.tvl ?? meToken?.tvl;
+  const verifiedAddress = meToken?.owner_address ?? address;
 
   return (
     <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
@@ -85,7 +90,7 @@ export function CreatorProfileHeader({
       <div className="flex-1">
         <div className="flex items-center gap-2 mb-2 flex-wrap">
           <h1 className="text-3xl font-bold">{displayName}</h1>
-          {meToken && <MembershipVerifiedBadge address={meToken.owner_address} size="md" />}
+          <MembershipVerifiedBadge address={verifiedAddress} size="md" />
           {displaySymbol && (
             <Badge variant="secondary" className="text-sm">
               {displaySymbol}
@@ -97,10 +102,7 @@ export function CreatorProfileHeader({
         </div>
 
         {creatorProfile?.username && (
-          <p className="text-lg font-medium mb-2 flex items-center gap-1.5">
-            {creatorProfile.username}
-            <MembershipVerifiedBadge address={address} size="md" />
-          </p>
+          <p className="text-lg font-medium mb-2">{creatorProfile.username}</p>
         )}
 
         {bio && (
@@ -117,6 +119,7 @@ export function CreatorProfileHeader({
         <CreatorXmerchSection
           className="mt-3"
           xmerchStored={creatorProfile?.social_xmerch}
+          productPreviews={xmerchProductPreviews}
         />
 
         {meToken && displayPrice != null && (
