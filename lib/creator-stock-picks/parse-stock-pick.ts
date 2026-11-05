@@ -35,11 +35,17 @@ export function parseCreatorStockPickFromRow(
       : typeof raw.video_asset_id === "string"
         ? raw.video_asset_id
         : null;
+  const chain_id =
+    typeof raw.chain_id === "number" && Number.isFinite(raw.chain_id)
+      ? raw.chain_id
+      : undefined;
+
   return {
     ticker,
     token_address,
     partner_url,
     note,
     video_asset_id,
+    ...(chain_id !== undefined ? { chain_id } : {}),
   };
 }

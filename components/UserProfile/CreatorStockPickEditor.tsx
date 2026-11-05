@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -11,10 +11,12 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { O1_BASE_STOCK_TOKENS } from "@/lib/creator-stock-picks/o1-base-stock-catalog";
+import { O1_BASE_SEPOLIA_STOCK_CATALOG } from "@/lib/creator-stock-picks/sepolia-stock-catalog";
 import type { CreatorStockPickStored } from "@/lib/creator-stock-picks/validate-stock-pick";
-import { useChain } from "@account-kit/react";
-import { isCreatorStockPicksChainAllowed } from "@/lib/creator-stock-picks/feature-flag";
+import {
+  getCreatorStockPicksBlocker,
+  isCreatorStockPicksRuntimeEnabled,
+} from "@/lib/creator-stock-picks/runtime-policy";
 
 export type StockPickEditorValue = {
   ticker: string;
@@ -28,38 +30,32 @@ type CreatorStockPickEditorProps = {
   onChange: (value: StockPickEditorValue) => void;
 };
 
+const BLOCKER_COPY: Record<string, string> = {
+  feature_flag_off:
+    "Disabled (default). Set NEXT_PUBLIC_CREATOR_STOCK_PICKS_ENABLED=true on a non-production deployment to test.",
+  production_deployment:
+    "Disabled on production deployments (fail-closed).",
+  no_verified_sepolia_catalog:
+    "Blocked: no official o1 Base Sepolia stock catalog yet. Mainnet quotes must not be used on Sepolia.",
+};
+
 export function CreatorStockPickEditor({
   initial,
   disabled,
   onChange,
 }: CreatorStockPickEditorProps) {
-  const { chain } = useChain();
-  const chainId = chain?.id;
-  const enabled = isCreatorStockPicksChainAllowed(chainId);
+  const enabled = isCreatorStockPicksRuntimeEnabled();
+  const blocker = getCreatorStockPicksBlocker();
   const [ticker, setTicker] = useState(initial?.ticker ?? "");
   const [note, setNote] = useState(initial?.note ?? "");
   const [videoAssetId, setVideoAssetId] = useState(
     initial?.video_asset_id ?? "",
   );
 
-  const previewUrl = useMemo(() => {
-    const token = O1_BASE_STOCK_TOKENS.find((t) => t.ticker === ticker);
-    if (!token) {
-      return null;
-    }
-    const params = new URLSearchParams({
-      chainId: "8453",
-      inputCurrency: token.address,
-    });
-    return `https://o1.exchange/swap?${params.toString()}`;
-  }, [ticker]);
-
   if (!enabled) {
     return (
-      <p className="text-xs text-muted-foreground">
-        Creator Stock Picks are disabled. Enable{" "}
-        <code className="text-[11px]">NEXT_PUBLIC_CREATOR_STOCK_PICKS_ENABLED=true</code>{" "}
-        on Base Sepolia only (testnet).
+      <p className="text-xs text-muted-foreground leading-snug">
+        {blocker ? BLOCKER_COPY[blocker] : "Creator Stock Picks unavailable."}
       </p>
     );
   }
@@ -76,7 +72,7 @@ export function CreatorStockPickEditor({
   return (
     <div className="space-y-4 rounded-lg border p-4">
       <div>
-        <Label htmlFor="stock-pick-ticker">o1 Base stock token</Label>
+        <Label htmlFor="stock-pick-ticker">o1 Base Sepolia stock token</Label>
         <Select
           value={ticker || "__none__"}
           onValueChange={(v) => {
@@ -91,7 +87,7 @@ export function CreatorStockPickEditor({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="__none__">None</SelectItem>
-            {O1_BASE_STOCK_TOKENS.map((token) => (
+            {O1_BASE_SEPOLIA_STOCK_CATALOG.map((token) => (
               <SelectItem key={token.address} value={token.ticker}>
                 {token.ticker} — {token.name}
               </SelectItem>
@@ -128,12 +124,6 @@ export function CreatorStockPickEditor({
           placeholder="UUID of your uploaded video"
         />
       </div>
-
-      {previewUrl ? (
-        <p className="text-xs text-muted-foreground break-all">
-          Partner link preview: {previewUrl}
-        </p>
-      ) : null}
 
       <p className="text-xs text-muted-foreground leading-snug">
         No issuer endorsement or shareholder rights. External partner only — not

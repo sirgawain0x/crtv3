@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { ExternalLink } from "lucide-react";
 import type { CreatorStockPickStored } from "@/lib/creator-stock-picks/validate-stock-pick";
-import { getO1BaseStockTokenByTicker } from "@/lib/creator-stock-picks/o1-base-stock-catalog";
+import { getStockPickTokenByTicker } from "@/lib/creator-stock-picks/stock-catalog";
 
 const DISCLAIMER =
   "External partner link — not financial advice. Tokenized stocks do not confer shareholder rights or issuer endorsement (o1 terms §6.7).";
@@ -17,7 +17,7 @@ export function CreatorStockPickDisplay({
   stockPick,
   videoHref,
 }: CreatorStockPickDisplayProps) {
-  const catalog = getO1BaseStockTokenByTicker(stockPick.ticker);
+  const catalog = getStockPickTokenByTicker(stockPick.ticker);
 
   return (
     <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
@@ -37,7 +37,10 @@ export function CreatorStockPickDisplay({
 
       {videoHref ? (
         <p className="text-sm">
-          <Link href={videoHref} className="text-primary underline-offset-4 hover:underline">
+          <Link
+            href={videoHref}
+            className="text-primary underline-offset-4 hover:underline"
+          >
             Related video
           </Link>
         </p>

@@ -24,7 +24,11 @@ import {
   type StockPickEditorValue,
 } from '@/components/UserProfile/CreatorStockPickEditor';
 import { CreatorStockPickDisplay } from '@/components/UserProfile/CreatorStockPickDisplay';
-import { isCreatorStockPicksFeatureEnabled } from '@/lib/creator-stock-picks/feature-flag';
+import {
+  getCreatorStockPicksBlocker,
+  isCreatorStockPicksRuntimeEnabled,
+  shouldRenderCreatorStockPick,
+} from '@/lib/creator-stock-picks/runtime-policy';
 import { parseCreatorStockPickFromRow } from '@/lib/creator-stock-picks/parse-stock-pick';
 
 interface CreatorProfileManagerProps {
@@ -142,7 +146,7 @@ export function CreatorProfileManager({ targetAddress, onProfileUpdated }: Creat
           bio: formData.bio,
           avatar_url: formData.avatar_url,
           ...socialPayload,
-          ...(isCreatorStockPicksFeatureEnabled()
+          ...(isCreatorStockPicksRuntimeEnabled()
             ? {
                 stock_pick_ticker: stockPickForm.ticker || null,
                 stock_pick_note: stockPickForm.note || null,
@@ -163,7 +167,7 @@ export function CreatorProfileManager({ targetAddress, onProfileUpdated }: Creat
           bio: formData.bio,
           avatar_url: formData.avatar_url,
           ...socialPayload,
-          ...(isCreatorStockPicksFeatureEnabled()
+          ...(isCreatorStockPicksRuntimeEnabled()
             ? {
                 stock_pick_ticker: stockPickForm.ticker || null,
                 stock_pick_note: stockPickForm.note || null,
@@ -369,27 +373,29 @@ export function CreatorProfileManager({ targetAddress, onProfileUpdated }: Creat
               )}
             </div>
 
-            {isCreatorStockPicksFeatureEnabled() ? (
-              <div className="space-y-4 pt-2 border-t">
-                <p className="text-sm font-medium">Creator stock pick</p>
-                {isEditing && isOwner ? (
-                  <CreatorStockPickEditor
-                    initial={parseCreatorStockPickFromRow(profile?.stock_pick)}
-                    disabled={!isOwner}
-                    onChange={setStockPickForm}
-                  />
-                ) : profile?.stock_pick ? (
-                  (() => {
-                    const pick = parseCreatorStockPickFromRow(profile.stock_pick);
-                    return pick ? (
-                      <CreatorStockPickDisplay stockPick={pick} />
-                    ) : null;
-                  })()
-                ) : (
-                  <p className="text-sm text-muted-foreground">No stock pick pinned.</p>
-                )}
-              </div>
-            ) : null}
+            <div className="space-y-4 pt-2 border-t">
+              <p className="text-sm font-medium">Creator stock pick</p>
+              {isEditing && isOwner ? (
+                <CreatorStockPickEditor
+                  initial={parseCreatorStockPickFromRow(profile?.stock_pick)}
+                  disabled={!isOwner}
+                  onChange={setStockPickForm}
+                />
+              ) : (() => {
+                const pick = parseCreatorStockPickFromRow(profile?.stock_pick);
+                if (pick && shouldRenderCreatorStockPick(pick)) {
+                  return <CreatorStockPickDisplay stockPick={pick} />;
+                }
+                if (getCreatorStockPicksBlocker() === "feature_flag_off") {
+                  return null;
+                }
+                return (
+                  <p className="text-sm text-muted-foreground">
+                    Unavailable ({getCreatorStockPicksBlocker() ?? "disabled"}).
+                  </p>
+                );
+              })()}
+            </div>
           </div>
         </div>
 

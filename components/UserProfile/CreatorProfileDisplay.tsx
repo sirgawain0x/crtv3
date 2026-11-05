@@ -8,8 +8,8 @@ import { Loader2, User, TrendingUp, Wallet } from 'lucide-react';
 import { convertFailingGateway } from '@/lib/utils/image-gateway';
 import { ProfileGoLiveButton } from '@/components/Live/ProfileGoLiveButton';
 import { CreatorStockPickDisplay } from '@/components/UserProfile/CreatorStockPickDisplay';
-import { isCreatorStockPicksFeatureEnabled } from '@/lib/creator-stock-picks/feature-flag';
 import { parseCreatorStockPickFromRow } from '@/lib/creator-stock-picks/parse-stock-pick';
+import { shouldRenderCreatorStockPick } from '@/lib/creator-stock-picks/runtime-policy';
 
 interface CreatorProfileDisplayProps {
   ownerAddress: string;
@@ -55,10 +55,11 @@ export function CreatorProfileDisplay({
   const displayName = profile?.username || `${ownerAddress.slice(0, 6)}...${ownerAddress.slice(-4)}`;
   const displayBio = profile?.bio || 'No bio available';
   const avatarUrl = profile?.avatar_url ? convertFailingGateway(profile.avatar_url) : undefined;
+  const parsedPick = profile?.stock_pick
+    ? parseCreatorStockPickFromRow(profile.stock_pick)
+    : null;
   const stockPick =
-    isCreatorStockPicksFeatureEnabled() && profile?.stock_pick
-      ? parseCreatorStockPickFromRow(profile.stock_pick)
-      : null;
+    parsedPick && shouldRenderCreatorStockPick(parsedPick) ? parsedPick : null;
 
   return (
     <Card>

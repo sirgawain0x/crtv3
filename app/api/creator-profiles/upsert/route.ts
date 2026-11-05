@@ -9,7 +9,10 @@ import { addressHasBrandPass } from '@/lib/channels/brand-channel-access';
 import { isValidBrandChannelSlug } from '@/lib/channels/brand-channels';
 import { validateAndNormalizeSocialPayload } from '@/lib/creator/validate-social-payload';
 import { validateCreatorStockPickPayload } from '@/lib/creator-stock-picks/validate-stock-pick';
-import { isCreatorStockPicksFeatureEnabled } from '@/lib/creator-stock-picks/feature-flag';
+import {
+  getCreatorStockPicksBlocker,
+  isCreatorStockPicksRuntimeEnabled,
+} from '@/lib/creator-stock-picks/runtime-policy';
 
 export async function POST(request: NextRequest) {
   const verification = await checkBotIdDeep();
@@ -121,11 +124,13 @@ export async function POST(request: NextRequest) {
       stock_pick_video_asset_id !== undefined;
 
     if (stockPickFieldsPresent) {
-      if (!isCreatorStockPicksFeatureEnabled()) {
+      if (!isCreatorStockPicksRuntimeEnabled()) {
+        const blocker = getCreatorStockPicksBlocker();
         return NextResponse.json(
           {
             success: false,
             error: 'Creator Stock Picks are disabled',
+            blocker,
           },
           { status: 403 },
         );

@@ -1,8 +1,9 @@
 import {
-  buildO1PartnerDeepLink,
-  getO1BaseStockTokenByAddress,
-  getO1BaseStockTokenByTicker,
-} from "@/lib/creator-stock-picks/o1-base-stock-catalog";
+  buildStockPickPartnerDeepLink,
+  getStockPickTokenByAddress,
+  getStockPickTokenByTicker,
+} from "@/lib/creator-stock-picks/stock-catalog";
+import { isCreatorStockPicksRuntimeEnabled } from "@/lib/creator-stock-picks/runtime-policy";
 import { validateCreatorStockPickPartnerUrl } from "@/lib/creator-stock-picks/validate-partner-url";
 
 export const MAX_STOCK_PICK_NOTE_LENGTH = 280;
@@ -13,6 +14,8 @@ export type CreatorStockPickStored = {
   partner_url: string;
   note: string | null;
   video_asset_id: string | null;
+  /** Present on new writes; legacy rows may omit. */
+  chain_id?: number;
 };
 
 export type StockPickValidationResult =
@@ -54,6 +57,14 @@ export function validateCreatorStockPickPayload(body: {
     return { ok: true, value: null };
   }
 
+  if (!isCreatorStockPicksRuntimeEnabled()) {
+    return {
+      ok: false,
+      error: "Creator Stock Picks are not available (fail-closed)",
+      field: "stock_pick_ticker",
+    };
+  }
+
   if (!ticker) {
     return {
       ok: false,
@@ -62,11 +73,11 @@ export function validateCreatorStockPickPayload(body: {
     };
   }
 
-  const catalog = getO1BaseStockTokenByTicker(ticker);
+  const catalog = getStockPickTokenByTicker(ticker);
   if (!catalog) {
     return {
       ok: false,
-      error: "Ticker must be selected from the o1 Base stock catalog",
+      error: "Ticker must be selected from the verified Sepolia catalog",
       field: "stock_pick_ticker",
     };
   }
@@ -111,7 +122,7 @@ export function validateCreatorStockPickPayload(body: {
     video_asset_id = id;
   }
 
-  const partner_url = buildO1PartnerDeepLink(catalog);
+  const partner_url = buildStockPickPartnerDeepLink(catalog);
   const partnerCheck = validateCreatorStockPickPartnerUrl(partner_url);
   if (!partnerCheck.ok) {
     return {
@@ -121,9 +132,13 @@ export function validateCreatorStockPickPayload(body: {
     };
   }
 
-  const byAddr = getO1BaseStockTokenByAddress(catalog.address);
+  const byAddr = getStockPickTokenByAddress(catalog.address);
   if (!byAddr) {
-    return { ok: false, error: "Catalog address mismatch", field: "stock_pick_ticker" };
+    return {
+      ok: false,
+      error: "Catalog address mismatch",
+      field: "stock_pick_ticker",
+    };
   }
 
   return {
@@ -134,6 +149,7 @@ export function validateCreatorStockPickPayload(body: {
       partner_url: partnerCheck.url,
       note,
       video_asset_id,
+      chain_id: catalog.chainId,
     },
   };
 }

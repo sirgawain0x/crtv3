@@ -4,17 +4,11 @@ import {
   isIpLiteralHostname,
   validateCreatorStockPickPartnerUrl,
 } from "@/lib/creator-stock-picks/validate-partner-url";
-import { buildO1PartnerDeepLink } from "@/lib/creator-stock-picks/o1-base-stock-catalog";
 
 describe("validateCreatorStockPickPartnerUrl", () => {
   it("accepts HTTPS o1.exchange swap links", () => {
-    const url = buildO1PartnerDeepLink({
-      ticker: "AMC",
-      name: "AMC",
-      address: "0xB200000000000000000000CD7e6b8042cb7c2BB5",
-      decimals: 8,
-      addressSource: "test",
-    });
+    const url =
+      "https://o1.exchange/swap?chainId=84532&inputCurrency=0xB200000000000000000000CD7e6b8042cb7c2BB5";
     expect(validateCreatorStockPickPartnerUrl(url)).toEqual({
       ok: true,
       url,

@@ -1,16 +1,16 @@
-import { baseSepolia } from "@/lib/utils/chains/base";
+import {
+  getCreatorStockPicksBlocker,
+  isCreatorStockPicksRuntimeEnabled,
+  shouldRenderCreatorStockPick,
+} from "@/lib/creator-stock-picks/runtime-policy";
 
-/** Base Sepolia only; default off. No mainnet enable in PR1. */
+/** @deprecated Use isCreatorStockPicksRuntimeEnabled / getCreatorStockPicksBlocker */
 export function isCreatorStockPicksFeatureEnabled(): boolean {
-  return (
-    process.env.NEXT_PUBLIC_CREATOR_STOCK_PICKS_ENABLED?.toLowerCase() ===
-    "true"
-  );
+  return isCreatorStockPicksRuntimeEnabled();
 }
 
-export function isCreatorStockPicksChainAllowed(chainId: number | undefined): boolean {
-  if (!isCreatorStockPicksFeatureEnabled()) {
-    return false;
-  }
-  return chainId === baseSepolia.id;
-}
+export {
+  getCreatorStockPicksBlocker,
+  isCreatorStockPicksRuntimeEnabled,
+  shouldRenderCreatorStockPick,
+};
