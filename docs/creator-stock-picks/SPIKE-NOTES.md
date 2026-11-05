@@ -7,7 +7,7 @@
 | Network | Evidence | Result |
 |---------|----------|--------|
 | Base mainnet (8453) | [base-stock-quotes.json](https://docs.o1.exchange/launchpad/reference/base-stock-quotes.json), [stock-paired launches catalog](https://docs.o1.exchange/launchpad/create/stock-paired-launches#base-stock-token-catalog) | 8-decimal stock quotes; chainId **8453** in JSON |
-| Base Sepolia (84532) | `base-sepolia-stock-quotes.json` → **404**; [alpha-tokens](https://docs.o1.exchange/api/alpha-tokens) `networkId=84532` → **`[]`** | **No verified Sepolia catalog** — Creative TV fails closed |
+| Base Sepolia (84532) | o1 Sepolia quotes **404**; alpha-tokens `84532` → **`[]`**; **CTO-supplied:** Coinbase `/v1/tokenized-stocks/chains` lists only **8453**; sampled stock addresses have no Sepolia code (not independently verified in PR1) | **No verified Sepolia catalog** — runtime stays **empty / fail-closed**; do not substitute mainnet addresses |
 
 ## MeToken / diamond (provisional)
 

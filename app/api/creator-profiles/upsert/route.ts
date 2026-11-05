@@ -166,21 +166,40 @@ export async function POST(request: NextRequest) {
           );
         }
 
+        const ownerLower = owner_address.toLowerCase();
         const videoCheck = await verifyStockPickVideoOwnership(
-          async (assetId) => {
-            const { data, error } = await db
-              .from('video_assets')
-              .select('asset_id, creator_id, playback_id')
-              .eq('asset_id', assetId)
-              .maybeSingle();
-            if (error || !data) {
-              return null;
-            }
-            return {
-              asset_id: data.asset_id,
-              creator_id: data.creator_id,
-              playback_id: data.playback_id,
-            };
+          {
+            byAssetIdAndOwner: async (assetId) => {
+              const { data, error } = await db
+                .from('video_assets')
+                .select('asset_id, creator_id, playback_id')
+                .eq('asset_id', assetId)
+                .eq('creator_id', ownerLower)
+                .maybeSingle();
+              if (error || !data) {
+                return null;
+              }
+              return {
+                asset_id: data.asset_id,
+                creator_id: data.creator_id,
+                playback_id: data.playback_id,
+              };
+            },
+            byAssetIdOnly: async (assetId) => {
+              const { data, error } = await db
+                .from('video_assets')
+                .select('asset_id, creator_id, playback_id')
+                .eq('asset_id', assetId)
+                .maybeSingle();
+              if (error || !data) {
+                return null;
+              }
+              return {
+                asset_id: data.asset_id,
+                creator_id: data.creator_id,
+                playback_id: data.playback_id,
+              };
+            },
           },
           owner_address,
           stockValidation.value.video_asset_id,

@@ -17,10 +17,15 @@ export type StockPickVideoVerifyResult =
       field: "stock_pick_video_asset_id";
     };
 
+export type StockPickVideoLookup = {
+  /** Must filter by Livepeer `asset_id` and owner `creator_id`. */
+  byAssetIdAndOwner: (assetId: string) => Promise<VideoAssetRow | null>;
+  /** Asset exists check when owner-scoped lookup misses (403 vs 400). */
+  byAssetIdOnly: (assetId: string) => Promise<VideoAssetRow | null>;
+};
+
 export async function verifyStockPickVideoOwnership(
-  lookupByLivepeerAssetId: (
-    assetId: string,
-  ) => Promise<VideoAssetRow | null>,
+  lookup: StockPickVideoLookup,
   ownerAddress: string,
   livepeerAssetId: string,
 ): Promise<StockPickVideoVerifyResult> {
@@ -34,17 +39,22 @@ export async function verifyStockPickVideoOwnership(
     };
   }
 
-  const row = await lookupByLivepeerAssetId(trimmed);
-  if (!row) {
-    return {
-      ok: false,
-      status: 400,
-      error: "Linked video was not found",
-      field: "stock_pick_video_asset_id",
-    };
+  const ownerLower = ownerAddress.toLowerCase();
+  const owned = await lookup.byAssetIdAndOwner(trimmed);
+  if (owned) {
+    if (owned.creator_id.toLowerCase() !== ownerLower) {
+      return {
+        ok: false,
+        status: 403,
+        error: "You can only link your own videos",
+        field: "stock_pick_video_asset_id",
+      };
+    }
+    return { ok: true, row: owned };
   }
 
-  if (row.creator_id.toLowerCase() !== ownerAddress.toLowerCase()) {
+  const anyRow = await lookup.byAssetIdOnly(trimmed);
+  if (anyRow) {
     return {
       ok: false,
       status: 403,
@@ -53,5 +63,10 @@ export async function verifyStockPickVideoOwnership(
     };
   }
 
-  return { ok: true, row };
+  return {
+    ok: false,
+    status: 400,
+    error: "Linked video was not found",
+    field: "stock_pick_video_asset_id",
+  };
 }

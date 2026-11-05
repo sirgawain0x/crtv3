@@ -3,12 +3,12 @@ import { baseSepolia } from "@/lib/utils/chains/base";
 /**
  * Runtime catalog for Creator Stock Picks — Base Sepolia only.
  *
- * BLOCKER: o1 publishes Base **mainnet** stock quotes at
- * https://docs.o1.exchange/launchpad/reference/base-stock-quotes.json (chainId 8453).
- * No official Base Sepolia stock catalog was found (404 for base-sepolia-stock-quotes.json;
- * GET https://api.o1.exchange/api/v1/alpha-tokens?networkId=84532 returns []).
- *
- * Fail closed: do not map mainnet token addresses onto Sepolia.
+ * BLOCKER: Runtime catalog stays **empty** until a verified Base Sepolia stock list exists.
+ * o1 mainnet quotes (chainId 8453) are reference-only — never mapped onto Sepolia.
+ * Prior probes: o1 Sepolia quotes 404; alpha-tokens on 84532 returned [].
+ * **CTO-supplied finding (not independently verified here):** Coinbase
+ * `/v1/tokenized-stocks/chains` lists **only** Base mainnet (8453); sampled stock
+ * addresses have no contract code on Sepolia. Do not pursue a Sepolia catalog as if available.
  */
 export type O1SepoliaStockToken = {
   ticker: string;
