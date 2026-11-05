@@ -1,7 +1,8 @@
 # Brand-created channel events (proposal)
 
-**Status:** Proposal only — no migration applied in this PR.  
-**Example:** Chones channel (`/chones`) shows HACKATHON BETA today; brand owner needs a second event **FAIR** with a curated set of existing library videos.
+**Status:** Proposal — DB-backed self-serve events not shipped.  
+**Shipped workaround:** [Chones FAIR BETA](./chones-fair-event.md) uses static `CHONES_FAIR_VIDEO_REFERENCES` + `/chones/fair` (deploy-time curation).  
+**Example:** Chones channel (`/chones`) lists HACKATHON BETA (submissions) and FAIR BETA (static lineup).
 
 ## Investigation summary
 
