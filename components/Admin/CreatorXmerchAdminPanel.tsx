@@ -85,11 +85,26 @@ export function CreatorXmerchAdminPanel() {
         throw new Error(json.error || "Save failed");
       }
 
+      const saved = validation.value;
+      let savedDescription = "Creative Merch hidden for this creator.";
+      if (enabled) {
+        const hasFeatured = saved.featuredProductUrls.length > 0;
+        const hasStore = Boolean(saved.storeUrl);
+        if (hasFeatured && hasStore) {
+          savedDescription =
+            "Public profile shows featured product cards (up to 3). The store URL is saved; featured items take the profile slot.";
+        } else if (hasFeatured) {
+          savedDescription =
+            "Public profile will show featured product cards with images (or the xMerch icon when no image is available).";
+        } else if (hasStore) {
+          savedDescription =
+            "Public profile will show the xMerch store button.";
+        }
+      }
+
       toast({
         title: "xMerch profile saved",
-        description: enabled
-          ? "Creator will see store + featured items on their public profile."
-          : "Creative Merch hidden for this creator.",
+        description: savedDescription,
       });
     } catch (error) {
       toast({
@@ -107,7 +122,10 @@ export function CreatorXmerchAdminPanel() {
       <div>
         <h1 className="text-xl font-semibold">Creator xMerch (invite-only)</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Platform admin only. Enables Creative Merch on a creator&apos;s public profile.
+          Platform admin only. Set a store URL, featured product URLs, or both. On the public
+          profile these are different displays: the store button, or up to{" "}
+          {MAX_XMERCH_FEATURED_PRODUCTS} featured product cards. If featured products are set,
+          they are shown instead of the store button.
         </p>
       </div>
 
@@ -131,7 +149,7 @@ export function CreatorXmerchAdminPanel() {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="xmerch_store">Store URL</Label>
+        <Label htmlFor="xmerch_store">Store URL (store button on profile)</Label>
         <Input
           id="xmerch_store"
           placeholder="https://yourstore.xmerch.app"
@@ -141,11 +159,13 @@ export function CreatorXmerchAdminPanel() {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="xmerch_featured">Featured product URLs</Label>
+        <Label htmlFor="xmerch_featured">
+          Featured product URLs (product cards on profile)
+        </Label>
         <Textarea
           id="xmerch_featured"
-          rows={5}
-          placeholder={`One HTTPS URL per line (max ${MAX_XMERCH_FEATURED_PRODUCTS})`}
+          rows={4}
+          placeholder={`One product page URL per line (max ${MAX_XMERCH_FEATURED_PRODUCTS})`}
           value={featuredLines}
           onChange={(e) => setFeaturedLines(e.target.value)}
           aria-invalid={Boolean(fieldErrors.social_xmerch_featured)}

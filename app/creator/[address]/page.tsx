@@ -16,12 +16,15 @@ import makeBlockie from "ethereum-blockies-base64";
 import { shortenAddress } from "@/lib/utils/utils";
 import { convertFailingGateway } from "@/lib/utils/image-gateway";
 import { meTokenSupabaseService } from "@/lib/sdk/supabase/metokens";
+import type { CreatorProfile } from "@/lib/sdk/supabase/client";
 import { CreatorProfileHeader } from "@/components/Creator/CreatorProfileHeader";
 import Link from "next/link";
 import { logger } from '@/lib/utils/logger';
 import { getTokenMarketData } from "@/lib/services/market";
 import { Metadata, ResolvingMetadata } from "next";
 import { fetchCreatorProfileForPage } from "@/lib/creator/fetch-creator-profile-for-page";
+import { fetchXmerchProductPreviews } from "@/lib/creator/xmerch-product-preview";
+import { getPublicXmerchProfile } from "@/lib/creator/xmerch-profile";
 
 
 
@@ -31,7 +34,7 @@ type CreatorPageProps = {
   }>;
 };
 
-async function fetchCreatorProfile(address: string) {
+async function fetchCreatorProfile(address: string): Promise<CreatorProfile | null> {
   try {
     const supabase = await createClient();
     const { data, error } = await fetchCreatorProfileForPage(supabase, address);
@@ -44,7 +47,7 @@ async function fetchCreatorProfile(address: string) {
       return null;
     }
 
-    return data;
+    return data as CreatorProfile;
   } catch (error) {
     logger.error("Unexpected error fetching creator profile:", error);
     return null;
@@ -144,6 +147,12 @@ export default async function CreatorPage({ params }: CreatorPageProps) {
     : makeBlockie(address);
   const bio = creatorProfile?.bio || null;
 
+  const publicXmerch = getPublicXmerchProfile(creatorProfile?.social_xmerch);
+  const xmerchProductPreviews =
+    publicXmerch && publicXmerch.featuredProductUrls.length > 0
+      ? await fetchXmerchProductPreviews(publicXmerch.featuredProductUrls)
+      : undefined;
+
   return (
     <div className="min-h-screen px-4 py-6 sm:p-6">
       {/* Breadcrumb Navigation */}
@@ -187,6 +196,7 @@ export default async function CreatorPage({ params }: CreatorPageProps) {
               creatorProfile={creatorProfile}
               meToken={meToken}
               bio={bio}
+              xmerchProductPreviews={xmerchProductPreviews}
             />
           </CardHeader>
           <CardContent className="pt-6">
