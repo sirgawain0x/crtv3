@@ -238,6 +238,11 @@ This application can be deployed on Vercel or any other Next.js-compatible hosti
 - [Platform API](./docs/platform-api.md) — tiered playback resolver and x402 gating
 - [Predictions](./docs/predictions.md) — Reality.eth markets, quotas, display enrichment, API routes
 - [Live stream MeToken gate](./docs/live-stream-metoken-gate.md) — gated live playback, JWT auth, linked-wallet balance checks
+- [Creator xMerch (invite-only)](./docs/creator-xmerch-invite-only.md) — admin PATCH, BotID, public profile embed
+- [Chones FAIR BETA](./docs/chones-fair-event.md) — static curated event lineup
+- [Dear Creative newsletter strip](./docs/dear-creative-newsletter.md) — CTA surfaces and copy source
+- [Membership pass cancel](./docs/membership-pass-cancel.md) — crypto pass renewal acknowledgment (no on-chain refund)
+- [Brand channel events (proposal)](./docs/brand-events-proposal.md) — future self-serve event schema
 
 ### External
 
