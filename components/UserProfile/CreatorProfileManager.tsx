@@ -19,6 +19,13 @@ import {
   normalizeCreatorSocialProfileUrl,
   type CreatorSocialPlatform,
 } from '@/lib/creator/social-profile-urls';
+import {
+  CreatorStockPickEditor,
+  type StockPickEditorValue,
+} from '@/components/UserProfile/CreatorStockPickEditor';
+import { CreatorStockPickDisplay } from '@/components/UserProfile/CreatorStockPickDisplay';
+import { isCreatorStockPicksFeatureEnabled } from '@/lib/creator-stock-picks/feature-flag';
+import { parseCreatorStockPickFromRow } from '@/lib/creator-stock-picks/parse-stock-pick';
 
 interface CreatorProfileManagerProps {
   targetAddress?: string;
@@ -42,6 +49,11 @@ export function CreatorProfileManager({ targetAddress, onProfileUpdated }: Creat
   });
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
+  const [stockPickForm, setStockPickForm] = useState<StockPickEditorValue>({
+    ticker: '',
+    note: '',
+    video_asset_id: '',
+  });
 
   const validateSocialField = (platform: CreatorSocialPlatform, value: string) => {
     const fieldKey =
@@ -80,6 +92,12 @@ export function CreatorProfileManager({ targetAddress, onProfileUpdated }: Creat
         social_orb_url: profile.social_orb_url || '',
         social_instagram_url: profile.social_instagram_url || '',
         social_x_url: profile.social_x_url || '',
+      });
+      const pick = parseCreatorStockPickFromRow(profile.stock_pick);
+      setStockPickForm({
+        ticker: pick?.ticker ?? '',
+        note: pick?.note ?? '',
+        video_asset_id: pick?.video_asset_id ?? '',
       });
     }
   }, [profile]);
@@ -124,6 +142,14 @@ export function CreatorProfileManager({ targetAddress, onProfileUpdated }: Creat
           bio: formData.bio,
           avatar_url: formData.avatar_url,
           ...socialPayload,
+          ...(isCreatorStockPicksFeatureEnabled()
+            ? {
+                stock_pick_ticker: stockPickForm.ticker || null,
+                stock_pick_note: stockPickForm.note || null,
+                stock_pick_video_asset_id:
+                  stockPickForm.video_asset_id || null,
+              }
+            : {}),
         });
         toast({
           title: "Profile Updated",
@@ -137,6 +163,14 @@ export function CreatorProfileManager({ targetAddress, onProfileUpdated }: Creat
           bio: formData.bio,
           avatar_url: formData.avatar_url,
           ...socialPayload,
+          ...(isCreatorStockPicksFeatureEnabled()
+            ? {
+                stock_pick_ticker: stockPickForm.ticker || null,
+                stock_pick_note: stockPickForm.note || null,
+                stock_pick_video_asset_id:
+                  stockPickForm.video_asset_id || null,
+              }
+            : {}),
         });
         toast({
           title: "Profile Created",
@@ -334,6 +368,28 @@ export function CreatorProfileManager({ targetAddress, onProfileUpdated }: Creat
                 'x',
               )}
             </div>
+
+            {isCreatorStockPicksFeatureEnabled() ? (
+              <div className="space-y-4 pt-2 border-t">
+                <p className="text-sm font-medium">Creator stock pick</p>
+                {isEditing && isOwner ? (
+                  <CreatorStockPickEditor
+                    initial={parseCreatorStockPickFromRow(profile?.stock_pick)}
+                    disabled={!isOwner}
+                    onChange={setStockPickForm}
+                  />
+                ) : profile?.stock_pick ? (
+                  (() => {
+                    const pick = parseCreatorStockPickFromRow(profile.stock_pick);
+                    return pick ? (
+                      <CreatorStockPickDisplay stockPick={pick} />
+                    ) : null;
+                  })()
+                ) : (
+                  <p className="text-sm text-muted-foreground">No stock pick pinned.</p>
+                )}
+              </div>
+            ) : null}
           </div>
         </div>
 

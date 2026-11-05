@@ -8,6 +8,8 @@ import { requireWalletAuthFor, WalletAuthError } from '@/lib/auth/require-wallet
 import { addressHasBrandPass } from '@/lib/channels/brand-channel-access';
 import { isValidBrandChannelSlug } from '@/lib/channels/brand-channels';
 import { validateAndNormalizeSocialPayload } from '@/lib/creator/validate-social-payload';
+import { validateCreatorStockPickPayload } from '@/lib/creator-stock-picks/validate-stock-pick';
+import { isCreatorStockPicksFeatureEnabled } from '@/lib/creator-stock-picks/feature-flag';
 
 export async function POST(request: NextRequest) {
   const verification = await checkBotIdDeep();
@@ -50,6 +52,9 @@ export async function POST(request: NextRequest) {
       social_orb_url,
       social_instagram_url,
       social_x_url,
+      stock_pick_ticker,
+      stock_pick_note,
+      stock_pick_video_asset_id,
     } = body;
 
     if (!owner_address) {
@@ -109,6 +114,77 @@ export async function POST(request: NextRequest) {
       );
     }
     Object.assign(payload, socialValidation.payload);
+
+    const stockPickFieldsPresent =
+      stock_pick_ticker !== undefined ||
+      stock_pick_note !== undefined ||
+      stock_pick_video_asset_id !== undefined;
+
+    if (stockPickFieldsPresent) {
+      if (!isCreatorStockPicksFeatureEnabled()) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Creator Stock Picks are disabled',
+          },
+          { status: 403 },
+        );
+      }
+
+      const stockValidation = validateCreatorStockPickPayload({
+        stock_pick_ticker,
+        stock_pick_note,
+        stock_pick_video_asset_id,
+      });
+      if (!stockValidation.ok) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: stockValidation.error,
+            field: stockValidation.field,
+          },
+          { status: 400 },
+        );
+      }
+
+      if (
+        stockValidation.value?.video_asset_id &&
+        supabaseService
+      ) {
+        const { data: videoRow, error: videoError } = await supabaseService
+          .from('video_assets')
+          .select('id, creator_id')
+          .eq('id', stockValidation.value.video_asset_id)
+          .maybeSingle();
+
+        if (videoError || !videoRow) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: 'Linked video was not found',
+              field: 'stock_pick_video_asset_id',
+            },
+            { status: 400 },
+          );
+        }
+
+        if (
+          String(videoRow.creator_id).toLowerCase() !==
+          owner_address.toLowerCase()
+        ) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: 'You can only link your own videos',
+              field: 'stock_pick_video_asset_id',
+            },
+            { status: 403 },
+          );
+        }
+      }
+
+      payload.stock_pick = stockValidation.value;
+    }
 
     if (brand_channel_slug !== undefined) {
       const normalizedOwner = owner_address.toLowerCase();

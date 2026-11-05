@@ -7,6 +7,9 @@ import { useCreatorProfileWithMeToken } from '@/lib/hooks/metokens/useCreatorPro
 import { Loader2, User, TrendingUp, Wallet } from 'lucide-react';
 import { convertFailingGateway } from '@/lib/utils/image-gateway';
 import { ProfileGoLiveButton } from '@/components/Live/ProfileGoLiveButton';
+import { CreatorStockPickDisplay } from '@/components/UserProfile/CreatorStockPickDisplay';
+import { isCreatorStockPicksFeatureEnabled } from '@/lib/creator-stock-picks/feature-flag';
+import { parseCreatorStockPickFromRow } from '@/lib/creator-stock-picks/parse-stock-pick';
 
 interface CreatorProfileDisplayProps {
   ownerAddress: string;
@@ -52,6 +55,10 @@ export function CreatorProfileDisplay({
   const displayName = profile?.username || `${ownerAddress.slice(0, 6)}...${ownerAddress.slice(-4)}`;
   const displayBio = profile?.bio || 'No bio available';
   const avatarUrl = profile?.avatar_url ? convertFailingGateway(profile.avatar_url) : undefined;
+  const stockPick =
+    isCreatorStockPicksFeatureEnabled() && profile?.stock_pick
+      ? parseCreatorStockPickFromRow(profile.stock_pick)
+      : null;
 
   return (
     <Card>
@@ -92,6 +99,8 @@ export function CreatorProfileDisplay({
             {displayBio}
           </p>
         </div>
+
+        {stockPick ? <CreatorStockPickDisplay stockPick={stockPick} /> : null}
 
         {showMeTokenInfo && (meToken || (meTokenName && meTokenSymbol)) && (
           <div className="border-t pt-4">
