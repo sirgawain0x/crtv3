@@ -1,5 +1,4 @@
 import type { ArchiveManifest, ArchiveStorageBackend, StudioAssetRecord } from "../types";
-import { sha256Buffer } from "./checksum";
 import { createEmptyManifest, touchManifest } from "./manifest";
 
 export type ArchiveDownloadFn = (
@@ -23,12 +22,11 @@ async function verifyExistingFile(
   storage: ArchiveStorageBackend,
   relativePath: string,
   expectedSha256: string,
-): Promise<"ok" | "checksum_mismatch" | "missing"> {
+): Promise<"ok" | "checksum_mismatch" | "missing" | { mismatch: { actual: string } }> {
   const exists = await storage.fileExists(relativePath);
   if (!exists) return "missing";
-  const data = await storage.readFile(relativePath);
-  const actual = sha256Buffer(data);
-  return actual === expectedSha256 ? "ok" : "checksum_mismatch";
+  const actual = await storage.sha256File(relativePath);
+  return actual === expectedSha256 ? "ok" : { mismatch: { actual } };
 }
 
 function toAsyncIterable(body: ReadableStream<Uint8Array> | AsyncIterable<Uint8Array>) {
@@ -84,13 +82,12 @@ export async function archiveStudioAssets(params: {
         results.push({ assetId: asset.assetId, status: "skipped", bytes: prior.sizeBytes });
         continue;
       }
-      if (check === "checksum_mismatch") {
-        const data = await params.storage.readFile(prior.relativePath);
+      if (typeof check === "object" && "mismatch" in check) {
         results.push({
           assetId: asset.assetId,
           status: "checksum_mismatch",
           expected: prior.sha256,
-          actual: sha256Buffer(data),
+          actual: check.mismatch.actual,
         });
         continue;
       }

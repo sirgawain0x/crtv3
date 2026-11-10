@@ -1,4 +1,5 @@
 import type {
+  DbCrossReferenceStatus,
   InventoryReport,
   InventoryRow,
   InventoryTotals,
@@ -54,6 +55,7 @@ export function buildInventoryReport(params: {
   studioAssets: StudioAssetRecord[];
   dbRows: VideoAssetDbRow[];
   studioApiBaseUrl: string;
+  dbCrossReference: DbCrossReferenceStatus;
   generatedAt?: string;
   studioListPageCount?: number;
 }): InventoryReport {
@@ -94,6 +96,7 @@ export function buildInventoryReport(params: {
   return {
     generatedAt: params.generatedAt ?? new Date().toISOString(),
     studioApiBaseUrl: params.studioApiBaseUrl,
+    dbCrossReference: params.dbCrossReference,
     studioRows,
     studioOnlyOrphans,
     dbOnlyOrphans,
@@ -103,9 +106,17 @@ export function buildInventoryReport(params: {
   };
 }
 
-export function formatInventoryTotalsLine(totals: InventoryTotals): string {
+export function formatInventoryTotalsLine(
+  totals: InventoryTotals,
+  dbCrossReference?: DbCrossReferenceStatus,
+): string {
   const mb = (totals.totalBytes / (1024 * 1024)).toFixed(2);
+  const dbLine =
+    dbCrossReference === "skipped"
+      ? "DB cross-reference: SKIPPED (--skip-db)"
+      : "DB cross-reference: ok";
   return [
+    dbLine,
     `Studio assets: ${totals.studioAssetCount}`,
     `Total size (known): ${totals.totalBytes} bytes (${mb} MiB)`,
     `Size unknown: ${totals.bytesUnknownCount} assets`,

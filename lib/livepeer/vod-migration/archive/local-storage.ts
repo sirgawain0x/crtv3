@@ -1,10 +1,11 @@
 import { createHash } from "node:crypto";
 import { createWriteStream } from "node:fs";
-import { mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, stat, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { Readable, Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ArchiveManifest, ArchiveStorageBackend, StreamWriteResult } from "../types";
+import { sha256FileOnDisk } from "./file-hash";
 import { MANIFEST_FILE } from "./manifest";
 
 export class LocalFilesystemArchiveStorage implements ArchiveStorageBackend {
@@ -40,6 +41,11 @@ export class LocalFilesystemArchiveStorage implements ArchiveStorageBackend {
     return readFile(this.resolve(relativePath));
   }
 
+  async sha256File(relativePath: string): Promise<string> {
+    const { sha256 } = await sha256FileOnDisk(this.resolve(relativePath));
+    return sha256;
+  }
+
   async writeFile(relativePath: string, data: Buffer): Promise<void> {
     const full = this.resolve(relativePath);
     await mkdir(path.dirname(full), { recursive: true });
@@ -64,9 +70,14 @@ export class LocalFilesystemArchiveStorage implements ArchiveStorageBackend {
       },
     });
 
-    await pipeline(Readable.from(stream), hashTransform, createWriteStream(tempPath));
-    await rename(tempPath, full);
-    return { sha256: hash.digest("hex"), sizeBytes };
+    try {
+      await pipeline(Readable.from(stream), hashTransform, createWriteStream(tempPath));
+      await rename(tempPath, full);
+      return { sha256: hash.digest("hex"), sizeBytes };
+    } catch (err) {
+      await unlink(tempPath).catch(() => undefined);
+      throw err;
+    }
   }
 
   async readManifest(): Promise<ArchiveManifest | null> {

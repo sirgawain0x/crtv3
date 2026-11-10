@@ -39,9 +39,12 @@ export type InventoryTotals = {
   dbOrphanCount: number;
 };
 
+export type DbCrossReferenceStatus = "ok" | "skipped";
+
 export type InventoryReport = {
   generatedAt: string;
   studioApiBaseUrl: string;
+  dbCrossReference: DbCrossReferenceStatus;
   /** Studio API assets only (excludes db-only orphans). */
   studioRows: InventoryRow[];
   /** Studio assets with no matching `video_assets` row. */
@@ -93,6 +96,7 @@ export interface ArchiveStorageBackend {
   fileExists(relativePath: string): Promise<boolean>;
   readFile(relativePath: string): Promise<Buffer>;
   writeFile(relativePath: string, data: Buffer): Promise<void>;
+  sha256File(relativePath: string): Promise<string>;
   writeFileFromStream(
     relativePath: string,
     stream: AsyncIterable<Uint8Array>,

@@ -194,6 +194,7 @@ describe("buildInventoryReport orphan detection", () => {
     const report = buildInventoryReport({
       studioAssets: studio,
       dbRows: db,
+      dbCrossReference: "ok",
       studioApiBaseUrl: "https://livepeer.studio",
     });
     expect(report.totals.studioAssetCount).toBe(2);

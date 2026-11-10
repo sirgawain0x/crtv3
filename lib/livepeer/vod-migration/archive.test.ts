@@ -1,7 +1,10 @@
 import { createHash } from "node:crypto";
+import { readdir } from "node:fs/promises";
+import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { archiveStudioAssets } from "./archive/archiver";
 import { sha256Buffer } from "./archive/checksum";
+import { LocalFilesystemArchiveStorage } from "./archive/local-storage";
 import type { ArchiveManifest, ArchiveStorageBackend, StudioAssetRecord } from "./types";
 
 function memoryStorage(): ArchiveStorageBackend & {
@@ -29,6 +32,11 @@ function memoryStorage(): ArchiveStorageBackend & {
       const buf = files.get(rel);
       if (!buf) throw new Error("missing");
       return buf;
+    },
+    async sha256File(rel) {
+      const buf = files.get(rel);
+      if (!buf) throw new Error("missing");
+      return sha256Buffer(buf);
     },
     async writeFile(rel, data) {
       files.set(rel, data);
@@ -98,7 +106,7 @@ describe("archiveStudioAssets", () => {
     expect(download).not.toHaveBeenCalled();
   });
 
-  it("reports checksum mismatch when on-disk file differs from manifest", async () => {
+  it("reports checksum mismatch via streaming hash without re-buffering", async () => {
     const storage = memoryStorage();
     const relativePath = "assets/a1/a1.mp4";
     storage.files.set(relativePath, Buffer.from("wrong"));
@@ -118,12 +126,14 @@ describe("archiveStudioAssets", () => {
       },
     });
 
+    const readFileSpy = vi.spyOn(storage, "readFile");
     const { results } = await archiveStudioAssets({
       assets,
       storage,
       download: vi.fn(),
     });
     expect(results[0]?.status).toBe("checksum_mismatch");
+    expect(readFileSpy).not.toHaveBeenCalled();
   });
 
   it("streams downloads and updates manifest", async () => {
@@ -142,5 +152,22 @@ describe("archiveStudioAssets", () => {
       createHash("sha256").update(Buffer.from(payload)).digest("hex"),
     );
     expect(storage.files.has("assets/a1/clip.mp4")).toBe(true);
+  });
+
+  it("removes .part temp file when stream pipeline fails", async () => {
+    const dir = `/tmp/lp-archive-test-${process.pid}-${Date.now()}`;
+    const storage = new LocalFilesystemArchiveStorage(dir);
+    async function* badStream() {
+      yield new Uint8Array([1, 2, 3]);
+      throw new Error("stream broke");
+    }
+    await expect(
+      storage.writeFileFromStream("assets/x/fail.mp4", badStream()),
+    ).rejects.toThrow(/stream broke/);
+    const exists = await storage.fileExists("assets/x/fail.mp4");
+    expect(exists).toBe(false);
+    const partialDir = path.join(dir, "assets/x");
+    const leftover = await readdir(partialDir).catch(() => [] as string[]);
+    expect(leftover.some((name) => name.includes(".part-"))).toBe(false);
   });
 });
