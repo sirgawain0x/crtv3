@@ -22,7 +22,7 @@ describe("loadVideoAssetsForInventory", () => {
     ).rejects.toThrow(/SUPABASE/);
   });
 
-  it("records dbCrossReference ok in the inventory report", async () => {
+  it("records dbCrossReference skipped in the inventory report", async () => {
     const report = buildInventoryReport({
       studioAssets: [],
       dbRows: [],
@@ -30,5 +30,15 @@ describe("loadVideoAssetsForInventory", () => {
       studioApiBaseUrl: "https://livepeer.studio",
     });
     expect(report.dbCrossReference).toBe("skipped");
+  });
+
+  it("records dbCrossReference ok in the inventory report", async () => {
+    const report = buildInventoryReport({
+      studioAssets: [],
+      dbRows: [{ id: 1, asset_id: "x", playback_id: "p", title: "t", status: "published", creator_id: "c" }],
+      dbCrossReference: "ok",
+      studioApiBaseUrl: "https://livepeer.studio",
+    });
+    expect(report.dbCrossReference).toBe("ok");
   });
 });

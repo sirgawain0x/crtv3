@@ -41,9 +41,20 @@ export class LocalFilesystemArchiveStorage implements ArchiveStorageBackend {
     return readFile(this.resolve(relativePath));
   }
 
-  async sha256File(relativePath: string): Promise<string> {
-    const { sha256 } = await sha256FileOnDisk(this.resolve(relativePath));
-    return sha256;
+  async sha256File(relativePath: string): Promise<{ sha256: string; sizeBytes: number }> {
+    return sha256FileOnDisk(this.resolve(relativePath));
+  }
+
+  async quarantineFile(relativePath: string): Promise<string> {
+    const full = this.resolve(relativePath);
+    const base = path.basename(relativePath);
+    const quarantineRel = path
+      .join("quarantine", relativePath.replace(/\\/g, "/").replace(/\//g, "__"), `${base}.mismatch-${Date.now()}`)
+      .replace(/\\/g, "/");
+    const dest = this.resolve(quarantineRel);
+    await mkdir(path.dirname(dest), { recursive: true });
+    await rename(full, dest);
+    return quarantineRel;
   }
 
   async writeFile(relativePath: string, data: Buffer): Promise<void> {

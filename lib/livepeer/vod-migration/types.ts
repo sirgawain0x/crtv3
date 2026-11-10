@@ -69,12 +69,22 @@ export type StudioAssetListOptions = {
   fetchImpl?: typeof fetch;
 };
 
+export type ArchiveManifestEntryFailed = {
+  at: string;
+  expectedSha256: string;
+  observedSha256: string;
+  observedSizeBytes: number;
+  quarantineRelativePath: string;
+};
+
 export type ArchiveManifestEntry = {
   assetId: string;
   relativePath: string;
   sha256: string;
   sizeBytes: number;
   completedAt: string;
+  /** Set after a verify/download mismatch; cleared on successful re-archive. */
+  failed?: ArchiveManifestEntryFailed;
 };
 
 export type ArchiveManifest = {
@@ -96,7 +106,9 @@ export interface ArchiveStorageBackend {
   fileExists(relativePath: string): Promise<boolean>;
   readFile(relativePath: string): Promise<Buffer>;
   writeFile(relativePath: string, data: Buffer): Promise<void>;
-  sha256File(relativePath: string): Promise<string>;
+  sha256File(relativePath: string): Promise<{ sha256: string; sizeBytes: number }>;
+  /** Move a mismatched file out of the canonical path into quarantine/. */
+  quarantineFile(relativePath: string): Promise<string>;
   writeFileFromStream(
     relativePath: string,
     stream: AsyncIterable<Uint8Array>,

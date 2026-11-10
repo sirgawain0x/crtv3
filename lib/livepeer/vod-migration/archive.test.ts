@@ -3,6 +3,7 @@ import { readdir } from "node:fs/promises";
 import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { archiveStudioAssets } from "./archive/archiver";
+import { archiveHasBlockingFailures } from "./archive/exit-status";
 import { sha256Buffer } from "./archive/checksum";
 import { LocalFilesystemArchiveStorage } from "./archive/local-storage";
 import type { ArchiveManifest, ArchiveStorageBackend, StudioAssetRecord } from "./types";
@@ -36,7 +37,15 @@ function memoryStorage(): ArchiveStorageBackend & {
     async sha256File(rel) {
       const buf = files.get(rel);
       if (!buf) throw new Error("missing");
-      return sha256Buffer(buf);
+      return { sha256: sha256Buffer(buf), sizeBytes: buf.length };
+    },
+    async quarantineFile(rel) {
+      const buf = files.get(rel);
+      if (!buf) throw new Error(`quarantine: missing ${rel}`);
+      const q = `quarantine/${rel.replace(/\//g, "__")}.mismatch-${Date.now()}`;
+      files.set(q, buf);
+      files.delete(rel);
+      return q;
     },
     async writeFile(rel, data) {
       files.set(rel, data);
@@ -126,14 +135,78 @@ describe("archiveStudioAssets", () => {
       },
     });
 
-    const readFileSpy = vi.spyOn(storage, "readFile");
-    const { results } = await archiveStudioAssets({
+    const { results, manifest } = await archiveStudioAssets({
       assets,
       storage,
       download: vi.fn(),
     });
     expect(results[0]?.status).toBe("checksum_mismatch");
-    expect(readFileSpy).not.toHaveBeenCalled();
+    expect(storage.files.has(relativePath)).toBe(false);
+    expect(manifest.entries.a1?.failed?.expectedSha256).toBe(sha256Buffer(Buffer.from("abcd")));
+    expect(manifest.entries.a1?.failed?.observedSha256).toBe(sha256Buffer(Buffer.from("wrong")));
+  });
+
+  it("quarantines bad re-download then resumes to a clean manifest", async () => {
+    const storage = memoryStorage();
+    const good = Buffer.from("expected-v1");
+    const bad = Buffer.from("wrong-bytes");
+    const goodSha = sha256Buffer(good);
+    const relativePath = "assets/a1/a1.mp4";
+
+    storage.manifest = {
+      version: 1,
+      destinationRoot: storage.root,
+      startedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      entries: {
+        a1: {
+          assetId: "a1",
+          relativePath,
+          sha256: goodSha,
+          sizeBytes: good.length,
+          completedAt: new Date().toISOString(),
+        },
+      },
+    };
+
+    let downloadCalls = 0;
+    const download = vi.fn(async () => {
+      downloadCalls += 1;
+      const payload = downloadCalls === 1 ? bad : good;
+      async function* gen() {
+        yield payload;
+      }
+      return { stream: gen(), suggestedFilename: "a1.mp4" };
+    });
+
+    const first = await archiveStudioAssets({ assets, storage, download });
+    expect(first.results[0]?.status).toBe("checksum_mismatch");
+    expect(archiveHasBlockingFailures(first.results)).toBe(true);
+    expect(storage.files.has(relativePath)).toBe(false);
+    expect(first.manifest.entries.a1?.failed).toBeDefined();
+    expect(first.manifest.entries.a1?.sha256).toBe(goodSha);
+
+    const second = await archiveStudioAssets({
+      assets,
+      storage,
+      download,
+      existingManifest: first.manifest,
+    });
+    expect(second.results[0]?.status).toBe("archived");
+    expect(archiveHasBlockingFailures(second.results)).toBe(false);
+    expect(second.manifest.entries.a1?.failed).toBeUndefined();
+    expect(storage.files.has(relativePath)).toBe(true);
+    expect(second.manifest.entries.a1?.sha256).toBe(goodSha);
+
+    const third = await archiveStudioAssets({
+      assets,
+      storage,
+      download,
+      existingManifest: second.manifest,
+    });
+    expect(third.results[0]?.status).toBe("skipped");
+    expect(archiveHasBlockingFailures(third.results)).toBe(false);
+    expect(download).toHaveBeenCalledTimes(2);
   });
 
   it("streams downloads and updates manifest", async () => {

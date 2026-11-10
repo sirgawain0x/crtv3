@@ -32,6 +32,8 @@ npx tsx scripts/livepeer-studio-vod-inventory.ts --archive /path/to/destination
 
 Uses `GET /api/asset/{id}` → `downloadUrl` ([Retrieve an asset](https://docs.livepeer.org/v2/solutions/livepeer-studio/api-reference/assets/get)), streams to disk with SHA-256 manifest. **G2 approval before production bulk download.**
 
+**Checksum mismatch policy (quarantine):** If an on-disk file or a re-download does not match the manifest’s expected SHA-256, the bytes are moved under `quarantine/` inside the archive root (canonical path cleared), the manifest entry records `failed` with expected vs observed hash/size, and the run exits non-zero. The next resume re-downloads into the canonical path; a matching download clears `failed` and updates the manifest.
+
 ### Archive destination options (cost rough order)
 
 1. **Local disk** — $0; samples only.
