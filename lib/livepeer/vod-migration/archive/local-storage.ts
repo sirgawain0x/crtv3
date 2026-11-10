@@ -1,21 +1,27 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { createWriteStream } from "node:fs";
+import { mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
-import type { ArchiveManifest, ArchiveStorageBackend } from "../types";
+import { Readable, Transform } from "node:stream";
+import { pipeline } from "node:stream/promises";
+import type { ArchiveManifest, ArchiveStorageBackend, StreamWriteResult } from "../types";
 import { MANIFEST_FILE } from "./manifest";
 
 export class LocalFilesystemArchiveStorage implements ArchiveStorageBackend {
   readonly root: string;
   private readonly manifestPath: string;
+  private readonly rootWithSep: string;
 
   constructor(destinationRoot: string) {
     this.root = path.resolve(destinationRoot);
+    this.rootWithSep = this.root.endsWith(path.sep) ? this.root : `${this.root}${path.sep}`;
     this.manifestPath = path.join(this.root, MANIFEST_FILE);
   }
 
   private resolve(relativePath: string): string {
     const normalized = path.normalize(relativePath).replace(/^(\.\.(\/|\\|$))+/, "");
-    const full = path.join(this.root, normalized);
-    if (!full.startsWith(this.root)) {
+    const full = path.resolve(this.root, normalized);
+    if (full !== this.root && !full.startsWith(this.rootWithSep)) {
       throw new Error(`Path escapes archive root: ${relativePath}`);
     }
     return full;
@@ -23,7 +29,7 @@ export class LocalFilesystemArchiveStorage implements ArchiveStorageBackend {
 
   async fileExists(relativePath: string): Promise<boolean> {
     try {
-      await readFile(this.resolve(relativePath));
+      await stat(this.resolve(relativePath));
       return true;
     } catch {
       return false;
@@ -38,6 +44,29 @@ export class LocalFilesystemArchiveStorage implements ArchiveStorageBackend {
     const full = this.resolve(relativePath);
     await mkdir(path.dirname(full), { recursive: true });
     await writeFile(full, data);
+  }
+
+  async writeFileFromStream(
+    relativePath: string,
+    stream: AsyncIterable<Uint8Array>,
+  ): Promise<StreamWriteResult> {
+    const full = this.resolve(relativePath);
+    await mkdir(path.dirname(full), { recursive: true });
+    const tempPath = `${full}.part-${process.pid}-${Date.now()}`;
+    const hash = createHash("sha256");
+    let sizeBytes = 0;
+
+    const hashTransform = new Transform({
+      transform(chunk: Buffer, _encoding, callback) {
+        hash.update(chunk);
+        sizeBytes += chunk.length;
+        callback(null, chunk);
+      },
+    });
+
+    await pipeline(Readable.from(stream), hashTransform, createWriteStream(tempPath));
+    await rename(tempPath, full);
+    return { sha256: hash.digest("hex"), sizeBytes };
   }
 
   async readManifest(): Promise<ArchiveManifest | null> {

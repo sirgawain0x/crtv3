@@ -2,23 +2,27 @@
 
 Studio shuts down **2026-11-30**. Parent issue: [#401](https://github.com/sirgawain0x/crtv3/issues/401).
 
-| PR | Scope |
-|----|--------|
-| **PR1 (this)** | Inventory + archive tooling (`scripts/livepeer-studio-vod-inventory.ts`). New FrameWorks IDs and DB remap are **not** in this PR. |
-| **PR2** | Additive Supabase schema (`provider`, FrameWorks IDs alongside Livepeer IDs per [#407](https://github.com/sirgawain0x/crtv3/issues/407)). |
-| **PR3** | Import/re-upload from archive → FrameWorks; remap `video_assets` and related tables; idempotent dry-run then cutover. |
+Per [#407](https://github.com/sirgawain0x/crtv3/issues/407) (G2 plan, Nov 10 comment):
 
-G2 decisions: custom import script; **new** FrameWorks asset IDs with link/DB updates in PR2/PR3; **archive all sources before cutover**; **no new captions at cutover** ([#408](https://github.com/sirgawain0x/crtv3/issues/408) option 1+3).
+| Step | Scope |
+|------|--------|
+| **PR1 (this)** | **Inventory + archive script** (read-only toward Studio). List every Studio asset; cross-reference `video_assets`; download sources to archive with checksum manifest ( `--archive` only, after G2 OK). |
+| **PR2** | **Import script** — `importVodAsset` from Studio `downloadUrl`; resumable/idempotent; write **id-map** (Studio asset/playback → FrameWorks IDs). |
+| **PR3** | **Remap** — dry-run script showing DB/embed changes from id-map + rollback file; prod apply needs G2 OK. (Additive schema/IDs may land with PR2/PR3 as needed — separate from this PR.) |
+
+G2: custom import; **new** FrameWorks IDs; archive all sources first; no caption migration at cutover ([#408](https://github.com/sirgawain0x/crtv3/issues/408)).
+
+## Studio list API
+
+Inventory uses `GET /api/asset` with `limit`, `cursor`, `order`, and `count=true` per [Get All Assets](https://docs.livepeer.org/v2/solutions/livepeer-studio/api-reference/assets/get-all) and the [Studio asset controller](https://github.com/livepeer/studio/blob/master/packages/api/src/controllers/asset.ts). Next page: `Link: <...?cursor=...>; rel="next"`.
 
 ## PR1 — inventory (default)
-
-Read-only. Requires `LIVEPEER_API_KEY` or `LIVEPEER_FULL_API_KEY`. Optional Supabase service role for `video_assets` cross-reference.
 
 ```bash
 yarn livepeer:studio-vod-inventory --json ./livepeer-studio-inventory.json --csv ./livepeer-studio-inventory.csv
 ```
 
-Outputs asset id, playback id, name, status, size, duration, source/download availability, DB linkage, and orphans.
+Outputs separate `studioRows`, `studioOnlyOrphans`, and `dbOnlyOrphans` in JSON; CSV contains Studio rows only.
 
 ## PR1 — archive (explicit)
 
@@ -26,10 +30,10 @@ Outputs asset id, playback id, name, status, size, duration, source/download ava
 npx tsx scripts/livepeer-studio-vod-inventory.ts --archive /path/to/destination
 ```
 
-Resumable, SHA-256 manifest, skips completed files. Storage is pluggable via `ArchiveStorageBackend` (local filesystem implementation included). **Requires G2 approval before production bulk download.**
+Uses `GET /api/asset/{id}` → `downloadUrl` ([Retrieve an asset](https://docs.livepeer.org/v2/solutions/livepeer-studio/api-reference/assets/get)), streams to disk with SHA-256 manifest. **G2 approval before production bulk download.**
 
 ### Archive destination options (cost rough order)
 
-1. **Local disk / engineer workstation** — $0; fine for dry-run samples; not durable for prod handoff.
-2. **Cloud object storage** (e.g. S3 ~$0.023/GB-mo, R2 ~$0.015/GB-mo, Backblaze B2 ~$0.006/GB-mo) — recommended for prod archive; egress fees apply on restore.
-3. **Supabase Storage / Vercel Blob** — convenient if already on platform; per-GB pricing similar to object storage; confirm egress and retention with G2 before spend.
+1. **Local disk** — $0; samples only.
+2. **S3 / R2 / B2** — ~$0.006–0.023/GB-mo + egress.
+3. **Supabase Storage / Vercel Blob** — convenience; confirm spend with G2.

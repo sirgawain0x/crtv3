@@ -7,10 +7,18 @@ export type VideoAssetsDbClient = {
 export type SupabaseLikeClient = {
   from(table: string): {
     select(columns: string): {
-      range(from: number, to: number): Promise<{
-        data: VideoAssetDbRow[] | null;
-        error: { message: string } | null;
-      }>;
+      order(
+        column: string,
+        options?: { ascending?: boolean },
+      ): {
+        range(
+          from: number,
+          to: number,
+        ): Promise<{
+          data: VideoAssetDbRow[] | null;
+          error: { message: string } | null;
+        }>;
+      };
     };
   };
 };
@@ -26,6 +34,7 @@ export async function listVideoAssetsFromSupabase(
     const { data, error } = await client
       .from("video_assets")
       .select("id, asset_id, playback_id, title, status, creator_id")
+      .order("id", { ascending: true })
       .range(offset, offset + PAGE - 1);
     if (error) {
       throw new Error(`Supabase video_assets read failed: ${error.message}`);

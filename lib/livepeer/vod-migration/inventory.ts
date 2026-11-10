@@ -22,19 +22,18 @@ function isMissingOrFailed(asset: StudioAssetRecord): boolean {
   return !asset.hasDownloadUrl && !asset.hasSourceUrl;
 }
 
-function computeTotals(
-  rows: InventoryRow[],
-  dbOnlyOrphans: VideoAssetDbRow[],
-  dbRowCount: number,
-): InventoryTotals {
+function computeStudioTotals(studioRows: InventoryRow[]): Pick<
+  InventoryTotals,
+  "studioAssetCount" | "totalBytes" | "bytesUnknownCount" | "missingOrFailedCount" | "linkedCount" | "studioOrphanCount"
+> {
   let totalBytes = 0;
   let bytesUnknownCount = 0;
   let missingOrFailedCount = 0;
   let linkedCount = 0;
   let studioOrphanCount = 0;
 
-  for (const row of rows) {
-    if (row.dbLinked && row.orphanSide !== "db_only") linkedCount++;
+  for (const row of studioRows) {
+    if (row.dbLinked) linkedCount++;
     if (row.orphanSide === "studio_only") studioOrphanCount++;
     if (isMissingOrFailed(row)) missingOrFailedCount++;
     if (row.sizeBytes === null) bytesUnknownCount++;
@@ -42,14 +41,12 @@ function computeTotals(
   }
 
   return {
-    studioAssetCount: rows.length,
+    studioAssetCount: studioRows.length,
     totalBytes,
     bytesUnknownCount,
     missingOrFailedCount,
-    dbRowCount,
     linkedCount,
     studioOrphanCount,
-    dbOrphanCount: dbOnlyOrphans.length,
   };
 }
 
@@ -58,6 +55,7 @@ export function buildInventoryReport(params: {
   dbRows: VideoAssetDbRow[];
   studioApiBaseUrl: string;
   generatedAt?: string;
+  studioListPageCount?: number;
 }): InventoryReport {
   const dbByAssetId = new Map<string, VideoAssetDbRow>();
   for (const row of params.dbRows) {
@@ -65,7 +63,8 @@ export function buildInventoryReport(params: {
   }
 
   const studioAssetIds = new Set(params.studioAssets.map((a) => a.assetId));
-  const rows: InventoryRow[] = params.studioAssets.map((asset) => {
+
+  const studioRows: InventoryRow[] = params.studioAssets.map((asset) => {
     const db = dbByAssetId.get(asset.assetId);
     const dbLinked = Boolean(db);
     return {
@@ -82,32 +81,25 @@ export function buildInventoryReport(params: {
     (row) => !studioAssetIds.has(row.asset_id),
   );
 
-  for (const orphan of dbOnlyOrphans) {
-    rows.push({
-      assetId: orphan.asset_id,
-      playbackId: orphan.playback_id ?? null,
-      name: orphan.title,
-      statusPhase: null,
-      sizeBytes: null,
-      durationSeconds: null,
-      hasDownloadUrl: false,
-      hasSourceUrl: false,
-      dbRowId: orphan.id,
-      dbTitle: orphan.title,
-      dbStatus: orphan.status,
-      dbLinked: true,
-      orphanSide: "db_only",
-    });
-  }
+  const studioOnlyOrphans = studioRows.filter((r) => r.orphanSide === "studio_only");
 
-  const totals = computeTotals(rows, dbOnlyOrphans, params.dbRows.length);
+  const studioPart = computeStudioTotals(studioRows);
+
+  const totals: InventoryTotals = {
+    ...studioPart,
+    dbRowCount: params.dbRows.length,
+    dbOrphanCount: dbOnlyOrphans.length,
+  };
 
   return {
     generatedAt: params.generatedAt ?? new Date().toISOString(),
     studioApiBaseUrl: params.studioApiBaseUrl,
-    rows,
+    studioRows,
+    studioOnlyOrphans,
     dbOnlyOrphans,
+    rows: studioRows,
     totals,
+    studioListPageCount: params.studioListPageCount,
   };
 }
 
@@ -118,7 +110,7 @@ export function formatInventoryTotalsLine(totals: InventoryTotals): string {
     `Total size (known): ${totals.totalBytes} bytes (${mb} MiB)`,
     `Size unknown: ${totals.bytesUnknownCount} assets`,
     `Missing/failed or no source URL: ${totals.missingOrFailedCount}`,
-    `DB rows (linked + db-only orphans): ${totals.dbRowCount}`,
+    `DB rows (all video_assets): ${totals.dbRowCount}`,
     `Linked (studio ∩ DB): ${totals.linkedCount}`,
     `Studio-only orphans: ${totals.studioOrphanCount}`,
     `DB-only orphans: ${totals.dbOrphanCount}`,

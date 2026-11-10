@@ -4,7 +4,10 @@ import { createEmptyManifest, touchManifest } from "./manifest";
 
 export type ArchiveDownloadFn = (
   assetId: string,
-) => Promise<{ data: Buffer; suggestedFilename?: string }>;
+) => Promise<{
+  stream: AsyncIterable<Uint8Array>;
+  suggestedFilename?: string;
+}>;
 
 export type ArchiveAssetResult =
   | { assetId: string; status: "skipped" | "archived"; bytes: number }
@@ -26,6 +29,31 @@ async function verifyExistingFile(
   const data = await storage.readFile(relativePath);
   const actual = sha256Buffer(data);
   return actual === expectedSha256 ? "ok" : "checksum_mismatch";
+}
+
+function toAsyncIterable(body: ReadableStream<Uint8Array> | AsyncIterable<Uint8Array>) {
+  if (
+    typeof body === "object" &&
+    body !== null &&
+    Symbol.asyncIterator in body &&
+    typeof (body as AsyncIterable<Uint8Array>)[Symbol.asyncIterator] === "function"
+  ) {
+    return body as AsyncIterable<Uint8Array>;
+  }
+  const reader = (body as ReadableStream<Uint8Array>).getReader();
+  return {
+    async *[Symbol.asyncIterator]() {
+      try {
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          if (value) yield value;
+        }
+      } finally {
+        reader.releaseLock();
+      }
+    },
+  };
 }
 
 /**
@@ -69,39 +97,36 @@ export async function archiveStudioAssets(params: {
     }
 
     try {
-      const { data, suggestedFilename } = await params.download(asset.assetId);
-      const sha256 = sha256Buffer(data);
+      const { stream, suggestedFilename } = await params.download(asset.assetId);
       const relativePath = relativePathForAsset(asset.assetId, suggestedFilename);
+      const iterable = toAsyncIterable(
+        stream as ReadableStream<Uint8Array> | AsyncIterable<Uint8Array>,
+      );
+      const { sha256, sizeBytes } = await params.storage.writeFileFromStream(
+        relativePath,
+        iterable,
+      );
 
-      if (prior && prior.relativePath === relativePath) {
-        const check = await verifyExistingFile(
-          params.storage,
-          relativePath,
-          prior.sha256,
-        );
-        if (check === "checksum_mismatch") {
-          results.push({
-            assetId: asset.assetId,
-            status: "checksum_mismatch",
-            expected: prior.sha256,
-            actual: sha256,
-          });
-          continue;
-        }
+      if (prior && prior.relativePath === relativePath && prior.sha256 !== sha256) {
+        results.push({
+          assetId: asset.assetId,
+          status: "checksum_mismatch",
+          expected: prior.sha256,
+          actual: sha256,
+        });
+        continue;
       }
 
-      await params.storage.writeFile(relativePath, data);
       manifest.entries[asset.assetId] = {
         assetId: asset.assetId,
         relativePath,
         sha256,
-        sizeBytes: data.length,
+        sizeBytes,
         completedAt: new Date().toISOString(),
       };
-      const next = touchManifest(manifest);
-      Object.assign(manifest, next);
+      Object.assign(manifest, touchManifest(manifest));
       await params.storage.writeManifest(manifest);
-      results.push({ assetId: asset.assetId, status: "archived", bytes: data.length });
+      results.push({ assetId: asset.assetId, status: "archived", bytes: sizeBytes });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       results.push({ assetId: asset.assetId, status: "error", message });

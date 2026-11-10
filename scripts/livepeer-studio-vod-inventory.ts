@@ -19,6 +19,10 @@ import {
   formatInventoryTotalsLine,
 } from "@/lib/livepeer/vod-migration/inventory";
 import { writeInventoryCsv, writeInventoryJson } from "@/lib/livepeer/vod-migration/output";
+import {
+  fetchStudioAssetDownloadTarget,
+  fetchStudioAssetSourceStream,
+} from "@/lib/livepeer/vod-migration/studio-asset-download";
 import { listAllStudioAssets } from "@/lib/livepeer/vod-migration/studio-asset-client";
 import {
   livepeerStudioApiBaseUrl,
@@ -78,15 +82,18 @@ async function runInventory(opts: CliOptions): Promise<void> {
   }
 
   const baseUrl = livepeerStudioApiBaseUrl();
-  const [studioAssets, dbRows] = await Promise.all([
+  const [studioList, dbRows] = await Promise.all([
     listAllStudioAssets({ baseUrl, authToken: token }),
     loadDbRows(),
   ]);
 
+  console.log(`Studio list pages fetched: ${studioList.pageCount}`);
+
   const report = buildInventoryReport({
-    studioAssets,
+    studioAssets: studioList.assets,
     dbRows,
     studioApiBaseUrl: baseUrl,
+    studioListPageCount: studioList.pageCount,
   });
 
   const jsonDefault = path.join(process.cwd(), "livepeer-studio-inventory.json");
@@ -107,24 +114,27 @@ async function runArchive(dest: string): Promise<void> {
   }
 
   const baseUrl = livepeerStudioApiBaseUrl();
-  const studioAssets = await listAllStudioAssets({ baseUrl, authToken: token });
+  const studioList = await listAllStudioAssets({ baseUrl, authToken: token });
+  console.log(`Studio list pages fetched: ${studioList.pageCount}`);
   const storage = new LocalFilesystemArchiveStorage(dest);
 
   const download = async (assetId: string) => {
-    const res = await fetch(`${baseUrl}/api/asset/${encodeURIComponent(assetId)}/download`, {
-      headers: { Authorization: `Bearer ${token}` },
+    const target = await fetchStudioAssetDownloadTarget({
+      baseUrl,
+      authToken: token,
+      assetId,
     });
-    if (!res.ok) {
-      throw new Error(`Download failed for ${assetId}: ${res.status}`);
-    }
-    const buffer = Buffer.from(await res.arrayBuffer());
-    const cd = res.headers.get("content-disposition") ?? "";
-    const match = /filename="?([^";]+)"?/i.exec(cd);
-    return { data: buffer, suggestedFilename: match?.[1] };
+    const { body, suggestedFilename } = await fetchStudioAssetSourceStream({
+      downloadUrl: target.downloadUrl,
+    });
+    return {
+      stream: body,
+      suggestedFilename: suggestedFilename ?? target.suggestedFilename,
+    };
   };
 
   const { manifest, results } = await archiveStudioAssets({
-    assets: studioAssets,
+    assets: studioList.assets,
     storage,
     download,
   });

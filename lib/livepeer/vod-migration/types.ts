@@ -42,9 +42,16 @@ export type InventoryTotals = {
 export type InventoryReport = {
   generatedAt: string;
   studioApiBaseUrl: string;
-  rows: InventoryRow[];
+  /** Studio API assets only (excludes db-only orphans). */
+  studioRows: InventoryRow[];
+  /** Studio assets with no matching `video_assets` row. */
+  studioOnlyOrphans: InventoryRow[];
+  /** `video_assets` rows with no Studio asset. */
   dbOnlyOrphans: VideoAssetDbRow[];
+  /** Alias of `studioRows` for CSV export convenience. */
+  rows: InventoryRow[];
   totals: InventoryTotals;
+  studioListPageCount?: number;
 };
 
 export type ListStudioAssetsPage = {
@@ -75,12 +82,21 @@ export type ArchiveManifest = {
   entries: Record<string, ArchiveManifestEntry>;
 };
 
+export type StreamWriteResult = {
+  sha256: string;
+  sizeBytes: number;
+};
+
 export interface ArchiveStorageBackend {
   /** Absolute or backend-specific root for this archive run. */
   readonly root: string;
   fileExists(relativePath: string): Promise<boolean>;
   readFile(relativePath: string): Promise<Buffer>;
   writeFile(relativePath: string, data: Buffer): Promise<void>;
+  writeFileFromStream(
+    relativePath: string,
+    stream: AsyncIterable<Uint8Array>,
+  ): Promise<StreamWriteResult>;
   readManifest(): Promise<ArchiveManifest | null>;
   writeManifest(manifest: ArchiveManifest): Promise<void>;
 }

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 import { archiveStudioAssets } from "./archive/archiver";
 import { sha256Buffer } from "./archive/checksum";
@@ -9,10 +10,18 @@ function memoryStorage(): ArchiveStorageBackend & {
 } {
   const files = new Map<string, Buffer>();
   let manifest: ArchiveManifest | null = null;
-  return {
+  const storage: ArchiveStorageBackend & {
+    files: Map<string, Buffer>;
+    manifest: ArchiveManifest | null;
+  } = {
     root: "/tmp/archive-test",
     files,
-    manifest,
+    get manifest() {
+      return manifest;
+    },
+    set manifest(v) {
+      manifest = v;
+    },
     async fileExists(rel) {
       return files.has(rel);
     },
@@ -24,14 +33,23 @@ function memoryStorage(): ArchiveStorageBackend & {
     async writeFile(rel, data) {
       files.set(rel, data);
     },
+    async writeFileFromStream(rel, stream) {
+      const chunks: Buffer[] = [];
+      for await (const chunk of stream) {
+        chunks.push(Buffer.from(chunk));
+      }
+      const data = Buffer.concat(chunks);
+      files.set(rel, data);
+      return { sha256: sha256Buffer(data), sizeBytes: data.length };
+    },
     async readManifest() {
       return manifest;
     },
     async writeManifest(next) {
       manifest = next;
-      Object.assign(this, { manifest: next });
     },
   };
+  return storage;
 }
 
 const assets: StudioAssetRecord[] = [
@@ -108,16 +126,21 @@ describe("archiveStudioAssets", () => {
     expect(results[0]?.status).toBe("checksum_mismatch");
   });
 
-  it("writes new files and updates manifest", async () => {
+  it("streams downloads and updates manifest", async () => {
     const storage = memoryStorage();
-    const payload = Buffer.from("video-bytes");
+    const payload = new TextEncoder().encode("video-bytes");
+    async function* gen() {
+      yield payload;
+    }
     const { results, manifest } = await archiveStudioAssets({
       assets,
       storage,
-      download: async () => ({ data: payload, suggestedFilename: "clip.mp4" }),
+      download: async () => ({ stream: gen(), suggestedFilename: "clip.mp4" }),
     });
     expect(results[0]).toMatchObject({ status: "archived", bytes: payload.length });
-    expect(manifest.entries.a1?.sha256).toBe(sha256Buffer(payload));
+    expect(manifest.entries.a1?.sha256).toBe(
+      createHash("sha256").update(Buffer.from(payload)).digest("hex"),
+    );
     expect(storage.files.has("assets/a1/clip.mp4")).toBe(true);
   });
 });
