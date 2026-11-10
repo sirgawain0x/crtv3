@@ -1,0 +1,15 @@
+# Livepeer Studio VOD inventory dry-run (PR1)
+
+Date: 2026-11-10
+Mode: inventory (read-only)
+Environment: Cursor Cloud Agent (no Livepeer API key present)
+
+## Result: BLOCKED — missing LIVEPEER_API_KEY / LIVEPEER_FULL_API_KEY
+
+No Studio asset list was fetched; no signed URLs or playback identifiers were logged.
+
+Re-run locally or in an environment with credentials:
+
+  npx tsx scripts/livepeer-studio-vod-inventory.ts --json ./livepeer-studio-inventory.json --csv ./livepeer-studio-inventory.csv
+
+Commit an updated redacted summary (counts and total bytes only) after a successful inventory run.
