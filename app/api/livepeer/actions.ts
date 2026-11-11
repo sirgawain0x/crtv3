@@ -1,5 +1,5 @@
 "use server";
-import { fullLivepeer } from "@/lib/sdk/livepeer/fullClient";
+import { getVideoProvider } from "@/lib/video-provider";
 import {
   Asset,
   NewAssetFromUrlPayload,
@@ -17,9 +17,11 @@ export const fetchAllAssets = async (options?: {
     const offset = options?.offset || 0;
     
     // The Livepeer SDK's getAll() method retrieves all assets
-    const response = await fullLivepeer.asset.getAll();
-    
-    const allAssets = (response.data as Asset[]) || [];
+    const response = (await getVideoProvider().assets.getAll()) as {
+      data?: Asset[];
+    };
+
+    const allAssets = response.data ?? [];
     
     // Implement client-side pagination
     const paginatedData = allAssets.slice(offset, offset + limit);
@@ -54,7 +56,9 @@ export const fetchAssetId = async (
       assetId = queryAssetId;
     }
 
-    const asset = await fullLivepeer?.asset.get(assetId);
+    const asset = (await getVideoProvider().assets.getById(assetId)) as {
+      asset?: Asset;
+    } | null;
 
     return asset;
   } catch (error) {
@@ -83,7 +87,7 @@ export const updateAsset = async (
       assetId = queryAssetId;
     }
 
-    const asset = await fullLivepeer?.asset.update(data, assetId);
+    const asset = await getVideoProvider().assets.update(data, assetId);
 
     return asset;
   } catch (error: unknown) {
@@ -98,7 +102,7 @@ export const updateAsset = async (
 // CREATE ASSET
 export const createAsset = async (data: NewAssetPayload) => {
   try {
-    const asset = await fullLivepeer?.asset.create(data);
+    const asset = await getVideoProvider().assets.create(data);
     return [asset];
   } catch (error: unknown) {
     const errorMessage =
@@ -110,7 +114,7 @@ export const createAsset = async (data: NewAssetPayload) => {
 // CREATE ASSET VIA URL
 export const createViaUrl = async (data: NewAssetFromUrlPayload) => {
   try {
-    const asset = await fullLivepeer?.asset?.createViaUrl(data);
+    const asset = await getVideoProvider().assets.createViaUrl(data);
     return [asset];
   } catch (error: unknown) {
     const errorMessage =
@@ -135,11 +139,8 @@ export const deleteAsset = async (
       assetId = id;
     }
 
-    const response = await fullLivepeer?.asset.delete(assetId);
-
-    const asset = response;
-
-    return asset;
+    await getVideoProvider().assets.delete(assetId);
+    return { assetId, deleted: true };
   } catch (error) {
     const errorMessage =
       error instanceof Error

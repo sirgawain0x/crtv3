@@ -4,7 +4,7 @@
 import { createClient } from "@/lib/sdk/supabase/server";
 import { createServiceClient } from "@/lib/sdk/supabase/service";
 import type { VideoAsset } from "@/lib/types/video-asset";
-import { fullLivepeer } from "@/lib/sdk/livepeer/fullClient";
+import { getVideoProvider } from "@/lib/video-provider";
 import type { CollaboratorFormData } from "@/lib/types/splits";
 
 export async function createVideoAsset(
@@ -797,13 +797,13 @@ export async function createMultistreamTarget({
   const targetName = name || `Target ${Date.now()}`;
 
   try {
-    const target = await fullLivepeer.stream.addMultistreamTarget(
+    const target = await getVideoProvider().streams.addMultistreamTarget(
       {
         profile,
         videoOnly,
         spec: { name: targetName, url },
       },
-      streamId
+      streamId,
     );
 
     if (!target) {
@@ -844,7 +844,9 @@ export async function listMultistreamTargets(
 
   try {
     // Fetch the stream to get its multistream targets
-    const stream = await fullLivepeer.stream.get(streamId);
+    const stream = (await getVideoProvider().streams.getWithMultistream(
+      streamId,
+    )) as { stream?: { multistream?: { targets?: unknown } } } | null;
 
     if (!stream || !stream.stream) {
       return { error: "Stream not found" };
@@ -881,7 +883,7 @@ export async function deleteMultistreamTarget({
 }: DeleteMultistreamTargetParams): Promise<DeleteMultistreamTargetResult> {
   if (!id) return { success: false, error: "Missing target ID" };
   try {
-    await fullLivepeer.multistream.delete(id);
+    await getVideoProvider().multistream.delete(id);
     return { success: true };
   } catch (e) {
     return { success: false, error: "Failed to delete multistream target" };
@@ -914,7 +916,7 @@ export async function deleteVideoAsset(assetId: string, creatorId: string) {
 
   // 2. Delete from Livepeer
   try {
-    await fullLivepeer.asset.delete(assetId);
+    await getVideoProvider().assets.delete(assetId);
   } catch (error: any) {
     console.error('Error deleting from Livepeer:', error);
     // Proceed to delete from DB even if Livepeer fails (e.g. if already deleted)

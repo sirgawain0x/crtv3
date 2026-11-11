@@ -1,5 +1,4 @@
-import { Livepeer } from "livepeer";
-import { fullLivepeer } from "@/lib/sdk/livepeer/fullClient";
+import { getVideoProvider } from "@/lib/video-provider";
 
 /**
  * Best-effort server-side lookup for a Livepeer asset's thumbnail URL.
@@ -8,8 +7,9 @@ import { fullLivepeer } from "@/lib/sdk/livepeer/fullClient";
 export async function getClipThumbnailUrl(playbackId: string): Promise<string | null> {
   if (!playbackId) return null;
   try {
-    const response = await fullLivepeer.playback.get(playbackId);
-    const sources = (response.playbackInfo?.meta?.source ?? []) as Array<{
+    const response = await getVideoProvider().playback.get(playbackId);
+    const sources = (response.playbackInfo?.meta?.source ??
+      []) as Array<{
       type?: string;
       hrn?: string;
       url?: string;
@@ -39,30 +39,19 @@ export async function createClip({
   if (!playbackId || !sessionId || !startTime || !endTime)
     return { playbackUrl: "", assetId: "", newPlaybackId: "", error: "Missing required fields" };
   try {
-    const result = await fullLivepeer.stream.createClip({
+    return getVideoProvider().streams.createClip({
       playbackId,
+      sessionId,
       startTime,
       endTime,
       name,
-      sessionId,
     });
-    const playbackUrl = result.data?.asset.playbackUrl ?? "";
-    const assetId = result.data?.asset.id ?? "";
-    const newPlaybackId = result.data?.asset.playbackId ?? "";
-    if (!playbackUrl)
-      return {
-        playbackUrl: "",
-        assetId,
-        newPlaybackId,
-        error: "Clip created but playback URL not ready yet.",
-      };
-    return { playbackUrl, assetId, newPlaybackId };
-  } catch (e: any) {
+  } catch (e: unknown) {
     return {
       playbackUrl: "",
       assetId: "",
       newPlaybackId: "",
-      error: e?.message ?? "Unknown error",
+      error: e instanceof Error ? e.message : "Unknown error",
     };
   }
 }

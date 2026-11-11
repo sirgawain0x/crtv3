@@ -1,5 +1,6 @@
 "use server";
 
+import { getVideoProviderId } from "@/lib/video-provider";
 import { createServiceClient } from "../lib/sdk/supabase/service";
 import { getStreamByCreator } from "./streams";
 import {
@@ -23,8 +24,8 @@ export interface ModeratorRecord {
 /**
  * Look up the streams row for the moderation key. The chat keys moderation by
  * playback_id (matches the URL/session id), so we check that first and fall
- * back to stream_id for the rare creator-side flow that hands us the Livepeer
- * stream id directly.
+ * back to stream_id for the rare creator-side flow that hands us the upstream
+ * stream id directly (provider: {@link getVideoProviderId}).
  */
 async function lookupStream(streamId: string) {
   const supabase = createServiceClient();
@@ -97,6 +98,11 @@ async function authorizeCreator(
  * Fetch the full moderation state for a stream. Open to anonymous reads so
  * every chat client can apply the same view filter.
  */
+/** Active video backend for stream/chat IDs (#403 provider layer). */
+export function getStreamModerationVideoProvider(): ReturnType<typeof getVideoProviderId> {
+  return getVideoProviderId();
+}
+
 export async function getModerationState(streamId: string): Promise<ModerationState> {
   const supabase = createServiceClient();
 

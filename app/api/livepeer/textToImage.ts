@@ -1,12 +1,17 @@
 "use server";
-import { fullLivepeer } from "@/lib/sdk/livepeer/fullClient";
+import { getVideoProvider } from "@/lib/video-provider";
 import { TextToImageParams } from "livepeer/models/components";
 import { serverLogger } from "@/lib/utils/logger";
 
 export const getLivepeerAiGeneratedImages = async (
   params: TextToImageParams
 ) => {
-  const result = await fullLivepeer.generate.textToImage(params);
+  if (!getVideoProvider().ai.isEnabled()) {
+    throw new Error("Video AI is disabled for the active video provider");
+  }
+  const result = (await getVideoProvider().ai.textToImage(params)) as {
+    imageResponse: unknown;
+  };
 
   serverLogger.debug("Text to image result:", result);
 
