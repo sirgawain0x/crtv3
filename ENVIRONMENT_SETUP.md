@@ -76,6 +76,12 @@ Your Livepeer webhook ID for video processing callbacks.
 2. Create a new webhook pointing to your application URL
 3. Copy the webhook ID
 
+#### `LIVEPEER_AI_CAPTIONS_ENABLED`
+Server-only gate for Livepeer AI **transcription and translation** (`audioToText`, `translate`). Unset or `true` keeps current behavior; `false` returns a typed disabled result with no outbound Livepeer AI calls and shows a calm “Captions coming soon” state in upload/player caption UI.
+
+#### `LIVEPEER_AI_TEXT_TO_IMAGE_ENABLED`
+Server-only gate for Livepeer AI **text-to-image** (`livepeerAiActions`, `textToImage`). Unset or `true` keeps current behavior; `false` returns a typed disabled result with no outbound calls and shows a calm “Text-to-image coming soon” state in the upload entry surface (follow-up: #432).
+
 ### 3. Supabase Configuration
 
 #### `NEXT_PUBLIC_SUPABASE_URL`

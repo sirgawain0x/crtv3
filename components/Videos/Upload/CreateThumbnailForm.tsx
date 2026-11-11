@@ -27,6 +27,7 @@ import type { StoryLicenseTerms } from "@/lib/types/story-protocol";
 import type { Address } from "viem";
 import { logger } from '@/lib/utils/logger';
 import { useNsfwDetection } from '@/lib/hooks/useNsfwDetection';
+import { LivepeerTextToImageEntry } from "@/components/Videos/LivepeerTextToImageEntry";
 
 
 interface FormValues {
@@ -686,6 +687,7 @@ const CreateThumbnailForm = ({
 
   return (
     <div className="space-y-6">
+      <LivepeerTextToImageEntry />
       {/* Thumbnail Type Selection */}
       <Tabs value={thumbnailType} onValueChange={(value) => setValue("thumbnailType", value as "custom" | "ai")}>
         <TabsList className="grid w-full grid-cols-2">

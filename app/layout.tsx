@@ -11,6 +11,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Analytics } from "@vercel/analytics/next";
 import { LayoutClientChunks } from "@/components/LayoutClientChunks";
 import { CreativeGuideChat } from "@/components/agent/CreativeGuideChat";
+import { getLivepeerAiClientFeatureFlags } from "@/lib/livepeer/livepeer-ai-gating";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -58,6 +59,7 @@ export default async function RootLayout({
   const isEmbedRoute = headersList.get("x-crtv-embed-route") === "1";
   const isTvRoute = headersList.get("x-crtv-tv-route") === "1";
   const hideSiteChrome = isEmbedRoute || isTvRoute;
+  const livepeerAiFeatures = getLivepeerAiClientFeatureFlags();
 
   return (
     <html lang="en" suppressHydrationWarning>
@@ -79,7 +81,7 @@ export default async function RootLayout({
       >
         <div id="alchemy-signer-iframe-container" style={{ display: "none" }} />
         <LayoutClientChunks />
-        <Providers>
+        <Providers livepeerAiFeatures={livepeerAiFeatures}>
           <ErrorBoundary>
             {!hideSiteChrome ? <Navbar /> : null}
             <div className="min-h-screen flex flex-col">

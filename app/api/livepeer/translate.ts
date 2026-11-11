@@ -1,4 +1,9 @@
 'use server';
+import {
+  isLivepeerAiCaptionsEnabled,
+  livepeerAiCaptionsDisabledResult,
+  type LivepeerAiDisabledResult,
+} from '@/lib/livepeer/livepeer-ai-gating';
 import { serverLogger } from '@/lib/utils/logger';
 
 type TranslateParams = {
@@ -11,7 +16,11 @@ type TranslateParams = {
 
 export const getLivepeerTranslation = async (
   params: TranslateParams,
-) => {
+): Promise<unknown | LivepeerAiDisabledResult> => {
+    if (!isLivepeerAiCaptionsEnabled()) {
+        return livepeerAiCaptionsDisabledResult();
+    }
+
     try {
         if (!params.text) throw new Error('No text provided');
         if (!params.source) throw new Error('No source language provided');

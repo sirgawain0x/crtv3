@@ -34,6 +34,7 @@ import {
   SubtitlesControl,
   SubtitlesProvider,
   SubtitlesLanguageSelect,
+  SubtitlesCaptionsAiPanel,
   useSubtitles,
 } from "@/components/Player/Subtitles";
 import { getDetailPlaybackSource } from "@/lib/hooks/livepeer/useDetailPlaybackSources";
@@ -639,6 +640,7 @@ export default function VideoDetails({
                 </div>
                 <div className="flex flex-col gap-2">
                   {subtitles && <SubtitlesLanguageSelect />}
+                  <SubtitlesCaptionsAiPanel hasStoredSubtitles={Boolean(subtitles)} />
                 </div>
               </div>
               <Popover.Close
