@@ -8,6 +8,10 @@ import {
   assertUploadsAndAssetsAvailable,
   FrameWorksUploadsAssetsUnavailableError,
 } from "./uploads-assets-guard";
+import {
+  assertStreamCreationAvailable,
+  FrameWorksStreamsCreateUnavailableError,
+} from "./streams-create-guard";
 
 const mockLoggerWarn = vi.fn();
 
@@ -153,38 +157,41 @@ describe("frameworks provider", () => {
     fetchMock.mockReset();
   });
 
-  it("createStream calls GraphQL createStream mutation", async () => {
+  it("streams.create is blocked by stream guard (#404)", async () => {
+    await expect(
+      getVideoProvider().streams.create({
+        name: "Launch",
+        profiles: [],
+        record: true,
+        playbackPolicy: {},
+        creatorId: "0x1",
+      }),
+    ).rejects.toBeInstanceOf(FrameWorksStreamsCreateUnavailableError);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("assertStreamCreationAvailable throws typed error", () => {
+    expect(() => assertStreamCreationAvailable("test")).toThrow(/#404/);
+  });
+
+  it("setRecording surfaces updateStream ValidationError", async () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,
       status: 200,
       json: async () => ({
         data: {
-          createStream: {
-            __typename: "StreamWithKey",
-            id: "c3RyZWFtOjE",
-            playbackId: "playback-1",
-            streamKey: "key-1",
+          updateStream: {
+            __typename: "ValidationError",
+            message: "record not allowed",
+            field: "record",
           },
         },
       }),
     });
 
-    const created = await getVideoProvider().streams.create({
-      name: "Launch",
-      profiles: [],
-      record: true,
-      playbackPolicy: {},
-      creatorId: "0x1",
-    });
-
-    expect(created.streamId).toBe("c3RyZWFtOjE");
-    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    const body = JSON.parse(String(init.body)) as {
-      query: string;
-      variables: { input: { name: string } };
-    };
-    expect(body.query).toContain("createStream");
-    expect(body.variables.input.name).toBe("Launch");
+    await expect(
+      getVideoProvider().streams.setRecording("stream-1", true),
+    ).rejects.toThrow("record not allowed");
   });
 
   it("assets are blocked by uploads guard before provider stub", () => {

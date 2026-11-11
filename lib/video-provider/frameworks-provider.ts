@@ -15,6 +15,10 @@ import {
 } from "./errors";
 import { frameworksGraphqlRequest } from "./frameworks-graphql";
 import { isFrameworksConfigured, frameworksGraphqlUrl } from "./config";
+import {
+  assertStreamCreationAvailable,
+  FrameWorksStreamsCreateUnavailableError,
+} from "./streams-create-guard";
 
 function notImplemented(operation: string): never {
   throw new VideoProviderNotImplementedError("frameworks", operation);
@@ -46,6 +50,8 @@ type UpdateStreamMutation = {
     __typename: string;
     id?: string;
     record?: boolean;
+    message?: string;
+    field?: string;
   };
 };
 
@@ -85,6 +91,10 @@ const UPDATE_STREAM = `
         id
         record
       }
+      ... on ValidationError {
+        message
+        field
+      }
     }
   }
 `;
@@ -120,34 +130,27 @@ export const frameworksVideoProvider: VideoProvider = {
         throw err;
       }
     },
-    create: async (params: CreateStreamParams): Promise<CreatedStream> => {
-      const data = await frameworksGraphqlRequest<CreateStreamMutation>(
-        CREATE_STREAM,
+    create: async (_params: CreateStreamParams): Promise<CreatedStream> => {
+      assertStreamCreationAvailable("frameworks-provider.streams.create");
+      throw new FrameWorksStreamsCreateUnavailableError();
+    },
+    setRecording: async (streamId, record) => {
+      const data = await frameworksGraphqlRequest<UpdateStreamMutation>(
+        UPDATE_STREAM,
         {
-          input: {
-            name: params.name,
-            record: params.record,
-          },
+          id: streamId,
+          input: { record },
         },
       );
-      const result = data.createStream;
+      const result = data.updateStream;
       if (result.__typename === "ValidationError") {
         throw new Error(result.message ?? "FrameWorks validation error");
       }
-      if (!result.id || !result.playbackId || !result.streamKey) {
-        throw new Error("FrameWorks createStream missing identifiers");
+      if (result.__typename !== "Stream") {
+        throw new Error(
+          `FrameWorks updateStream failed (${result.__typename ?? "unknown"})`,
+        );
       }
-      return {
-        streamId: result.id,
-        playbackId: result.playbackId,
-        streamKey: result.streamKey,
-      };
-    },
-    setRecording: async (streamId, record) => {
-      await frameworksGraphqlRequest<UpdateStreamMutation>(UPDATE_STREAM, {
-        id: streamId,
-        input: { record },
-      });
     },
     getSessions: async (): Promise<StreamSession[]> => notImplemented("streams.getSessions"),
     getWithMultistream: async () => notImplemented("streams.getWithMultistream"),

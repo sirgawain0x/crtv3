@@ -1,5 +1,6 @@
 import {
   getVideoProvider,
+  requireVideoProviderForStreamCreate,
   requireVideoProviderForUploadsAndAssets,
 } from "@/lib/video-provider";
 export type {
@@ -25,7 +26,10 @@ export async function getLivepeerStreamOrNull(
 export async function createLivepeerStream(
   params: import("@/lib/video-provider/types").CreateStreamParams,
 ): Promise<import("@/lib/video-provider/types").CreatedStream> {
-  return getVideoProvider().streams.create(params);
+  const provider = requireVideoProviderForStreamCreate(
+    "studio-api.createLivepeerStream",
+  );
+  return provider.streams.create(params);
 }
 
 export async function enableStreamRecording(
