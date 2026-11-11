@@ -5,7 +5,10 @@ import {
   InputCreatorIdType,
   type Asset,
 } from "livepeer/models/components";
-import { getVideoProvider } from "@/lib/video-provider";
+import {
+  FrameWorksUploadsAssetsUnavailableError,
+  requireVideoProviderForUploadsAndAssets,
+} from "@/lib/video-provider";
 import { WebhookContext } from "./token-gate/route";
 import { serverLogger } from "@/lib/utils/logger";
 
@@ -64,7 +67,9 @@ export const getLivepeerUploadUrl = async (
     };
   }
 
-  const result = (await getVideoProvider().assets.create(createAssetBody)) as {
+  const result = (await requireVideoProviderForUploadsAndAssets(
+    "assetUploadActions.getLivepeerUploadUrl",
+  ).assets.create(createAssetBody)) as {
     data?: unknown;
   };
 
@@ -79,7 +84,9 @@ export const getLivepeerAsset = async (
       throw new Error('Asset ID is required');
     }
 
-    const result = (await getVideoProvider().assets.getById(livePeerAssetId)) as {
+    const result = (await requireVideoProviderForUploadsAndAssets(
+      "assetUploadActions.getLivepeerAsset",
+    ).assets.getById(livePeerAssetId)) as {
       asset?: unknown;
     } | null;
 
@@ -89,17 +96,21 @@ export const getLivepeerAsset = async (
     }
 
     return result.asset as Asset;
-  } catch (error: any) {
+  } catch (error: unknown) {
+    if (error instanceof FrameWorksUploadsAssetsUnavailableError) throw error;
+    const err = error as { message?: string; statusCode?: number };
     serverLogger.error('Error fetching Livepeer asset:', {
       assetId: livePeerAssetId,
-      error: error?.message,
-      statusCode: error?.statusCode,
+      error: err?.message,
+      statusCode: err?.statusCode,
     });
-    throw new Error(error?.message || 'Failed to fetch video asset');
+    throw new Error(err?.message || 'Failed to fetch video asset');
   }
 };
 
 export const getLivepeerPlaybackInfo = async (playbackId: string) => {
-  const result = await getVideoProvider().playback.get(playbackId);
+  const result = await requireVideoProviderForUploadsAndAssets(
+    "assetUploadActions.getLivepeerPlaybackInfo",
+  ).playback.get(playbackId);
   return result.playbackInfo as import("livepeer/models/components").PlaybackInfo | undefined;
 };

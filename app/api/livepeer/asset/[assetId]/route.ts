@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getVideoProvider } from '@/lib/video-provider';
+import { requireVideoProviderForUploadsAndAssets } from '@/lib/video-provider';
 import { LIVEPEER_NOT_CONFIGURED } from '@/lib/sdk/livepeer/studioAuth';
 import { serverLogger } from '@/lib/utils/logger';
 
@@ -29,7 +29,9 @@ export async function GET(
       );
     }
 
-    const provider = getVideoProvider();
+    const provider = requireVideoProviderForUploadsAndAssets(
+      "asset.[assetId].GET",
+    );
     if (!provider.isConfigured()) {
       return NextResponse.json(
         {

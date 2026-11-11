@@ -1,4 +1,7 @@
-import { getVideoProvider } from "@/lib/video-provider";
+import {
+  getVideoProvider,
+  requireVideoProviderForUploadsAndAssets,
+} from "@/lib/video-provider";
 export type {
   AssetSummary as LivepeerAssetSummary,
   AssetSource as LivepeerAssetSource,
@@ -42,11 +45,17 @@ export async function getStreamSessions(
 export async function getLivepeerAsset(
   assetId: string,
 ): Promise<import("@/lib/video-provider/types").AssetSummary | null> {
-  return getVideoProvider().assets.get(assetId);
+  const provider = requireVideoProviderForUploadsAndAssets(
+    "studio-api.getLivepeerAsset",
+  );
+  return provider.assets.get(assetId);
 }
 
 export async function listRecentRecordingAssets(
   limit = 20,
 ): Promise<import("@/lib/video-provider/types").AssetSummary[]> {
-  return getVideoProvider().assets.listRecentRecordings(limit);
+  const provider = requireVideoProviderForUploadsAndAssets(
+    "studio-api.listRecentRecordingAssets",
+  );
+  return provider.assets.listRecentRecordings(limit);
 }

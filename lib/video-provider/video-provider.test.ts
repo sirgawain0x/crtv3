@@ -3,8 +3,11 @@ import {
   getVideoProvider,
   getVideoProviderId,
   resetVideoProviderForTests,
-  VideoProviderNotImplementedError,
 } from "./index";
+import {
+  assertUploadsAndAssetsAvailable,
+  FrameWorksUploadsAssetsUnavailableError,
+} from "./uploads-assets-guard";
 
 describe("video provider selection", () => {
   afterEach(() => {
@@ -136,13 +139,16 @@ describe("frameworks provider", () => {
     expect(body.variables.input.name).toBe("Launch");
   });
 
-  it("stubs unknown asset APIs with NotImplemented", async () => {
-    await expect(getVideoProvider().assets.get("x")).rejects.toBeInstanceOf(
-      VideoProviderNotImplementedError,
-    );
+  it("assets are blocked by uploads guard before provider stub", () => {
+    expect(() => assertUploadsAndAssetsAvailable("test")).toThrow(/#406/);
+    try {
+      assertUploadsAndAssetsAvailable("test");
+    } catch (e) {
+      expect(e).toBeInstanceOf(FrameWorksUploadsAssetsUnavailableError);
+    }
   });
 
-  it("ai.isEnabled is false (Livepeer AI cutover guard)", () => {
+  it("ai.isEnabled is false on frameworks provider surface", () => {
     expect(getVideoProvider().ai.isEnabled()).toBe(false);
   });
 });

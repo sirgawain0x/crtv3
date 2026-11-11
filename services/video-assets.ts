@@ -4,7 +4,11 @@
 import { createClient } from "@/lib/sdk/supabase/server";
 import { createServiceClient } from "@/lib/sdk/supabase/service";
 import type { VideoAsset } from "@/lib/types/video-asset";
-import { getVideoProvider } from "@/lib/video-provider";
+import {
+  FrameWorksUploadsAssetsUnavailableError,
+  getVideoProvider,
+  requireVideoProviderForUploadsAndAssets,
+} from "@/lib/video-provider";
 import type { CollaboratorFormData } from "@/lib/types/splits";
 
 export async function createVideoAsset(
@@ -916,8 +920,13 @@ export async function deleteVideoAsset(assetId: string, creatorId: string) {
 
   // 2. Delete from Livepeer
   try {
-    await getVideoProvider().assets.delete(assetId);
-  } catch (error: any) {
+    await requireVideoProviderForUploadsAndAssets(
+      "video-assets.deleteVideoAsset",
+    ).assets.delete(assetId);
+  } catch (error: unknown) {
+    if (error instanceof FrameWorksUploadsAssetsUnavailableError) {
+      throw error;
+    }
     console.error('Error deleting from Livepeer:', error);
     // Proceed to delete from DB even if Livepeer fails (e.g. if already deleted)
   }

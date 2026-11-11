@@ -1,5 +1,8 @@
 "use server";
-import { getVideoProvider } from "@/lib/video-provider";
+import {
+  FrameWorksUploadsAssetsUnavailableError,
+  requireVideoProviderForUploadsAndAssets,
+} from "@/lib/video-provider";
 import {
   Asset,
   NewAssetFromUrlPayload,
@@ -17,7 +20,9 @@ export const fetchAllAssets = async (options?: {
     const offset = options?.offset || 0;
     
     // The Livepeer SDK's getAll() method retrieves all assets
-    const response = (await getVideoProvider().assets.getAll()) as {
+    const response = (await requireVideoProviderForUploadsAndAssets(
+      "actions.fetchAllAssets",
+    ).assets.getAll()) as {
       data?: Asset[];
     };
 
@@ -31,6 +36,7 @@ export const fetchAllAssets = async (options?: {
       total: allAssets.length,
     };
   } catch (error) {
+    if (error instanceof FrameWorksUploadsAssetsUnavailableError) throw error;
     serverLogger.error("Error fetching assets:", error);
     throw new Error(
       `Failed to fetch assets: ${
@@ -56,12 +62,15 @@ export const fetchAssetId = async (
       assetId = queryAssetId;
     }
 
-    const asset = (await getVideoProvider().assets.getById(assetId)) as {
+    const asset = (await requireVideoProviderForUploadsAndAssets(
+      "actions.fetchAssetId",
+    ).assets.getById(assetId)) as {
       asset?: Asset;
     } | null;
 
     return asset;
   } catch (error) {
+    if (error instanceof FrameWorksUploadsAssetsUnavailableError) throw error;
     const errorMessage =
       error instanceof Error
         ? error.message
@@ -87,10 +96,13 @@ export const updateAsset = async (
       assetId = queryAssetId;
     }
 
-    const asset = await getVideoProvider().assets.update(data, assetId);
+    const asset = await requireVideoProviderForUploadsAndAssets(
+      "actions.updateAsset",
+    ).assets.update(data, assetId);
 
     return asset;
   } catch (error: unknown) {
+    if (error instanceof FrameWorksUploadsAssetsUnavailableError) throw error;
     const errorMessage =
       error instanceof Error
         ? error.message
@@ -102,9 +114,12 @@ export const updateAsset = async (
 // CREATE ASSET
 export const createAsset = async (data: NewAssetPayload) => {
   try {
-    const asset = await getVideoProvider().assets.create(data);
+    const asset = await requireVideoProviderForUploadsAndAssets(
+      "actions.createAsset",
+    ).assets.create(data);
     return [asset];
   } catch (error: unknown) {
+    if (error instanceof FrameWorksUploadsAssetsUnavailableError) throw error;
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error occurred";
     throw new Error(`Failed to create asset: ${errorMessage}`);
@@ -114,9 +129,12 @@ export const createAsset = async (data: NewAssetPayload) => {
 // CREATE ASSET VIA URL
 export const createViaUrl = async (data: NewAssetFromUrlPayload) => {
   try {
-    const asset = await getVideoProvider().assets.createViaUrl(data);
+    const asset = await requireVideoProviderForUploadsAndAssets(
+      "actions.createViaUrl",
+    ).assets.createViaUrl(data);
     return [asset];
   } catch (error: unknown) {
+    if (error instanceof FrameWorksUploadsAssetsUnavailableError) throw error;
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error occurred";
     throw new Error(`Error creating url: ${errorMessage}`);
@@ -139,9 +157,12 @@ export const deleteAsset = async (
       assetId = id;
     }
 
-    await getVideoProvider().assets.delete(assetId);
+    await requireVideoProviderForUploadsAndAssets(
+      "actions.deleteAsset",
+    ).assets.delete(assetId);
     return { assetId, deleted: true };
   } catch (error) {
+    if (error instanceof FrameWorksUploadsAssetsUnavailableError) throw error;
     const errorMessage =
       error instanceof Error
         ? error.message

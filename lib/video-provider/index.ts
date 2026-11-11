@@ -2,6 +2,7 @@ import type { VideoProvider } from "./interface";
 import { resolveVideoProviderId, type VideoProviderId } from "./config";
 import { livepeerVideoProvider } from "./livepeer-provider";
 import { frameworksVideoProvider } from "./frameworks-provider";
+import { assertUploadsAndAssetsAvailable } from "./uploads-assets-guard";
 
 export type { VideoProvider } from "./interface";
 export type { VideoProviderId } from "./config";
@@ -24,11 +25,23 @@ export {
   frameworksGraphqlUrl,
   isFrameworksConfigured,
 } from "./config";
+export {
+  assertUploadsAndAssetsAvailable,
+  FrameWorksUploadsAssetsUnavailableError,
+} from "./uploads-assets-guard";
 
 let cached: VideoProvider | undefined;
 
 export function getVideoProviderId(): VideoProviderId {
   return resolveVideoProviderId();
+}
+
+/** Upload/asset boundary guard (#406 removes this when FrameWorks assets ship). */
+export function requireVideoProviderForUploadsAndAssets(
+  operation: string,
+): VideoProvider {
+  assertUploadsAndAssetsAvailable(operation);
+  return getVideoProvider();
 }
 
 /** Returns the active server-side video provider (default Livepeer). */
