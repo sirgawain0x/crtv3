@@ -53,6 +53,7 @@ describe("frameworks assets (#406)", () => {
             uploadId: "up-1",
             assetId: "vod-2",
             playbackId: "pb-2",
+            partSize: 4096,
             presignedParts: [{ partNumber: 1, url: "https://s3.example/part1" }],
           },
         },
@@ -62,9 +63,49 @@ describe("frameworks assets (#406)", () => {
     const result = (await getVideoProvider().assets.create({
       name: "demo.mp4",
       sizeBytes: 4096,
-    })) as { data?: { tusEndpoint?: string; asset?: { id?: string } } };
+    })) as {
+      data?: {
+        tusEndpoint?: string;
+        presignedParts?: Array<{ url?: string }>;
+        asset?: { id?: string };
+      };
+    };
     expect(result.data?.asset?.id).toBe("vod-2");
-    expect(result.data?.tusEndpoint).toBe("https://s3.example/part1");
+    expect(result.data?.tusEndpoint).toBeUndefined();
+    expect(result.data?.presignedParts?.[0]?.url).toBe("https://s3.example/part1");
+
+    const [, createInit] = fetchMock.mock.calls[0] ?? [];
+    const createBody = JSON.parse(String((createInit as RequestInit).body));
+    expect(createBody.variables.input.sizeBytes).toBe(4096);
+    expect(createBody.variables.input.sizeBytes).not.toBe(1);
+  });
+
+  it("rejects create when sizeBytes is omitted", async () => {
+    await expect(getVideoProvider().assets.create({ name: "demo.mp4" })).rejects.toThrow(
+      /sizeBytes/i,
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("getAll returns { data: Asset[] } shape for fetchAllAssets", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        data: {
+          storageArtifactsConnection: {
+            nodes: [{ id: "vod-1", playbackId: "pb-1", title: "Demo", status: "ready" }],
+          },
+        },
+      }),
+    });
+
+    const response = (await getVideoProvider().assets.getAll()) as {
+      data?: Array<{ id: string }>;
+      assets?: unknown;
+    };
+    expect(response.assets).toBeUndefined();
+    expect(response.data?.[0]?.id).toBe("vod-1");
   });
 
   it("createViaUrl uses importVodAsset", async () => {

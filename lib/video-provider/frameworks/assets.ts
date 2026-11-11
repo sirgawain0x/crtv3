@@ -46,7 +46,19 @@ type CreateVodUploadMutation = {
     uploadId?: string;
     assetId?: string;
     playbackId?: string;
+    partSize?: number;
     presignedParts?: Array<{ partNumber?: number; url?: string }>;
+    message?: string;
+    field?: string;
+  };
+};
+
+type CompleteVodUploadMutation = {
+  completeVodUpload: {
+    __typename: string;
+    id?: string;
+    playbackId?: string;
+    status?: string;
     message?: string;
     field?: string;
   };
@@ -124,10 +136,28 @@ const CREATE_VOD_UPLOAD = `
         uploadId
         assetId
         playbackId
+        partSize
         presignedParts {
           partNumber
           url
         }
+      }
+      ... on ValidationError {
+        message
+        field
+      }
+    }
+  }
+`;
+
+const COMPLETE_VOD_UPLOAD = `
+  mutation CompleteVodUpload($input: CompleteVodUploadInput!) {
+    completeVodUpload(input: $input) {
+      __typename
+      ... on VodAsset {
+        id
+        playbackId
+        status
       }
       ... on ValidationError {
         message
@@ -258,7 +288,7 @@ export const frameworksAssets = {
     const data = await frameworksGraphqlRequest<StorageArtifactsQuery>(LIST_ARTIFACTS, {
       input: { first: 50 },
     });
-    return { assets: (data.storageArtifactsConnection?.nodes ?? []).map(mapArtifactToSummary) };
+    return { data: (data.storageArtifactsConnection?.nodes ?? []).map(mapArtifactToSummary) };
   },
 
   getById: async (assetId: string): Promise<unknown> => {
@@ -273,7 +303,10 @@ export const frameworksAssets = {
       contentType?: string;
     };
     const filename = payload.filename ?? payload.name ?? "upload.mp4";
-    const sizeBytes = payload.sizeBytes ?? 1;
+    const sizeBytes = payload.sizeBytes;
+    if (typeof sizeBytes !== "number" || !Number.isFinite(sizeBytes) || sizeBytes <= 0) {
+      throw new Error("sizeBytes is required and must be a positive number");
+    }
     const data = await frameworksGraphqlRequest<CreateVodUploadMutation>(CREATE_VOD_UPLOAD, {
       input: {
         filename,
@@ -286,7 +319,6 @@ export const frameworksAssets = {
       throw new Error(data.createVodUpload.message ?? "Invalid VOD upload");
     }
     const upload = data.createVodUpload;
-    const tusEndpoint = upload.presignedParts?.[0]?.url;
     return {
       data: {
         asset: upload.assetId
@@ -297,9 +329,44 @@ export const frameworksAssets = {
               name: payload.name,
             }
           : { id: upload.uploadId },
-        tusEndpoint,
         uploadId: upload.uploadId,
+        partSize: upload.partSize,
         presignedParts: upload.presignedParts,
+      },
+    };
+  },
+
+  completeUpload: async (body: unknown): Promise<unknown> => {
+    const payload = body as {
+      uploadId?: string;
+      parts?: Array<{ partNumber: number; etag: string }>;
+    };
+    if (!payload.uploadId?.trim()) {
+      throw new Error("uploadId is required");
+    }
+    if (!payload.parts?.length) {
+      throw new Error("parts are required");
+    }
+    const data = await frameworksGraphqlRequest<CompleteVodUploadMutation>(
+      COMPLETE_VOD_UPLOAD,
+      {
+        input: {
+          uploadId: payload.uploadId,
+          parts: payload.parts,
+        },
+      },
+    );
+    const result = data.completeVodUpload;
+    if (result.__typename === "ValidationError") {
+      throw new Error(result.message ?? "Failed to complete VOD upload");
+    }
+    return {
+      data: {
+        asset: {
+          id: result.id,
+          playbackId: result.playbackId,
+          status: { phase: result.status ?? "processing" },
+        },
       },
     };
   },

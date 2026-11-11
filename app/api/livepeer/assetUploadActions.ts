@@ -12,15 +12,32 @@ import {
 import { WebhookContext } from "./token-gate/route";
 import { serverLogger } from "@/lib/utils/logger";
 
+export type LivepeerUploadSession = {
+  asset?: Asset;
+  tusEndpoint?: string;
+  uploadId?: string;
+  partSize?: number;
+  presignedParts?: Array<{ partNumber?: number; url?: string }>;
+};
+
 export const getLivepeerUploadUrl = async (
   fileName: string,
   creatorAddress: string,
+  sizeBytes: number,
   tokenId?: string,
   contractAddress?: string,
-  tokenGated: boolean = false
-): Promise<{ asset?: Asset; tusEndpoint?: string } | undefined> => {
+  tokenGated: boolean = false,
+  fileMeta?: { filename?: string; contentType?: string },
+): Promise<LivepeerUploadSession | undefined> => {
+  if (typeof sizeBytes !== "number" || !Number.isFinite(sizeBytes) || sizeBytes <= 0) {
+    throw new Error("sizeBytes is required and must be a positive number");
+  }
+
   const createAssetBody: {
     name: string;
+    sizeBytes: number;
+    filename?: string;
+    contentType?: string;
     storage: {
       ipfs: boolean;
     };
@@ -36,6 +53,9 @@ export const getLivepeerUploadUrl = async (
     };
   } = {
     name: fileName,
+    sizeBytes,
+    filename: fileMeta?.filename ?? fileName,
+    contentType: fileMeta?.contentType,
     storage: {
       ipfs: true,
     },
@@ -73,7 +93,24 @@ export const getLivepeerUploadUrl = async (
     data?: unknown;
   };
 
-  return result.data as { asset?: Asset; tusEndpoint?: string } | undefined;
+  return result.data as LivepeerUploadSession | undefined;
+};
+
+export const completeFrameworksVodUpload = async (
+  uploadId: string,
+  parts: Array<{ partNumber: number; etag: string }>,
+) => {
+  const assets = requireVideoProviderForUploadsAndAssets(
+    "assetUploadActions.completeFrameworksVodUpload",
+  ).assets as {
+    completeUpload?: (body: unknown) => Promise<unknown>;
+  };
+
+  if (typeof assets.completeUpload !== "function") {
+    throw new Error("completeUpload is only available with FrameWorks");
+  }
+
+  return assets.completeUpload({ uploadId, parts });
 };
 
 export const getLivepeerAsset = async (
