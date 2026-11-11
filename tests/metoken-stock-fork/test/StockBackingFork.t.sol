@@ -24,6 +24,8 @@ interface IDiamond {
     function register(address, address, address, uint256, uint256, uint32, bytes calldata) external;
     function subscribe(string calldata, string calldata, uint256, uint256) external;
     function getOwnerMeToken(address) external view returns (address);
+    function viewMeTokensMinted(uint256, uint256, uint256, uint256) external view returns (uint256);
+    function getCurveInfo(uint256) external view returns (uint256, uint256, uint32, uint32);
     function mint(address, uint256, address) external returns (uint256);
     function burn(address, uint256, address) external returns (uint256);
 }
@@ -118,6 +120,24 @@ contract StockBackingForkTest {
         diamond.subscribe("Default Curve Test", "DCT", defaultHub, 100 * 1e8);
         require(stock.balanceOf(secondCreator) == 100 * 1e8, "deposit not rolled back");
         vm.stopPrank();
+    }
+
+    function testDeployedUsdcHubCurveAtPinnedBlock() public view {
+        (uint256 baseY,, uint32 weight,) = diamond.getCurveInfo(2);
+        require(baseY == 1e6 && weight == 500000, "USDC curve changed");
+        require(diamond.viewMeTokensMinted(1e6, 2, 0, 0) > 0, "USDC initial quote failed");
+    }
+
+    function testZeroSupplyCurveRevertsAcrossCollateralScalesWithDefaultWeight() public {
+        uint256 defaultHub = diamond.count() + 1;
+        vm.prank(diamond.registerController());
+        diamond.register(CREATOR, address(stock), vault, 800000, 224, 32, "");
+        uint256[3] memory rawDeposits = [uint256(1e6), uint256(1e8), uint256(1e18)];
+        for (uint256 i = 0; i < rawDeposits.length; i++) {
+            vm.expectRevert();
+            diamond.viewMeTokensMinted(rawDeposits[i], defaultHub, 0, 0);
+            require(diamond.viewMeTokensMinted(rawDeposits[i], stockHub, 0, 0) > 0, "test curve failed");
+        }
     }
 
     function testBlockedTransferRevertsMintAndBurnWithoutLosingPosition() public {
