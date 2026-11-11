@@ -66,6 +66,7 @@ describe("frameworks assets (#406)", () => {
                 kind: "CHAPTER",
                 status: "ready",
                 streamId: "stream-77",
+                durationSeconds: 95.4,
               },
             ],
           },
@@ -76,6 +77,7 @@ describe("frameworks assets (#406)", () => {
     const asset = await getVideoProvider().assets.get("chapter-hash");
     expect(asset?.id).toBe("chapter-1");
     expect(asset?.source?.type).toBe("recording");
+    expect(asset?.videoSpec?.duration).toBe(95);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [, init] = fetchMock.mock.calls[0] ?? [];
     const body = JSON.parse(String((init as RequestInit).body));
@@ -90,11 +92,11 @@ describe("frameworks assets (#406)", () => {
         data: {
           createVodUpload: {
             __typename: "VodUploadSession",
-            uploadId: "up-1",
-            assetId: "vod-2",
+            id: "up-1",
+            artifactId: "vod-2",
             playbackId: "pb-2",
             partSize: 4096,
-            presignedParts: [{ partNumber: 1, url: "https://s3.example/part1" }],
+            parts: [{ partNumber: 1, presignedUrl: "https://s3.example/part1" }],
           },
         },
       }),
@@ -113,6 +115,7 @@ describe("frameworks assets (#406)", () => {
     expect(result.data?.asset?.id).toBe("vod-2");
     expect(result.data?.tusEndpoint).toBeUndefined();
     expect(result.data?.presignedParts?.[0]?.url).toBe("https://s3.example/part1");
+    expect((result.data as { uploadId?: string })?.uploadId).toBe("up-1");
 
     const [, createInit] = fetchMock.mock.calls[0] ?? [];
     const createBody = JSON.parse(String((createInit as RequestInit).body));

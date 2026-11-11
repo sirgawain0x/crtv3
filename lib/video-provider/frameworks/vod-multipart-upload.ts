@@ -1,7 +1,12 @@
 export type VodPresignedPart = {
   partNumber?: number;
   url?: string;
+  presignedUrl?: string;
 };
+
+function partUploadUrl(part: VodPresignedPart): string | undefined {
+  return part.url ?? part.presignedUrl;
+}
 
 export type CompletedVodPart = {
   partNumber: number;
@@ -29,7 +34,7 @@ export async function uploadFileViaPresignedParts(
 ): Promise<CompletedVodPart[]> {
   const fetchFn = options?.fetchImpl ?? fetch;
   const sorted = [...parts]
-    .filter((p) => p.partNumber != null && p.url)
+    .filter((p) => p.partNumber != null && partUploadUrl(p))
     .sort((a, b) => (a.partNumber ?? 0) - (b.partNumber ?? 0));
 
   if (sorted.length === 0) {
@@ -50,7 +55,7 @@ export async function uploadFileViaPresignedParts(
     const end = i === sorted.length - 1 ? file.size : Math.min(start + partSize, file.size);
     const chunk = file.slice(start, end);
 
-    const response = await fetchFn(part.url!, {
+    const response = await fetchFn(partUploadUrl(part)!, {
       method: "PUT",
       body: chunk,
       headers: {

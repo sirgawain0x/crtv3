@@ -32,7 +32,7 @@ type StorageArtifactsQuery = {
       title?: string;
       kind?: string;
       status?: string;
-      durationMs?: number;
+      durationSeconds?: number;
       createdAt?: string;
       streamId?: string;
     }>;
@@ -43,11 +43,13 @@ type StorageArtifactsQuery = {
 type CreateVodUploadMutation = {
   createVodUpload: {
     __typename: string;
-    uploadId?: string;
-    assetId?: string;
+    id?: string;
+    artifactId?: string;
+    artifactHash?: string;
     playbackId?: string;
     partSize?: number;
-    presignedParts?: Array<{ partNumber?: number; url?: string }>;
+    expiresAt?: string;
+    parts?: Array<{ partNumber?: number; presignedUrl?: string }>;
     message?: string;
     field?: string;
   };
@@ -120,7 +122,7 @@ const LIST_ARTIFACTS = `
         title
         kind
         status
-        durationMs
+        durationSeconds
         createdAt
         streamId
       }
@@ -133,13 +135,15 @@ const CREATE_VOD_UPLOAD = `
     createVodUpload(input: $input) {
       __typename
       ... on VodUploadSession {
-        uploadId
-        assetId
+        id
+        artifactId
+        artifactHash
         playbackId
         partSize
-        presignedParts {
+        expiresAt
+        parts {
           partNumber
-          url
+          presignedUrl
         }
       }
       ... on ValidationError {
@@ -229,17 +233,20 @@ function mapArtifactToSummary(
   node: StorageArtifactsQuery["storageArtifactsConnection"]["nodes"][number],
 ): AssetSummary {
   const kind = (node.kind ?? "VOD").toLowerCase();
-  return mapVodToSummary(
+  const summary = mapVodToSummary(
     {
       id: node.id,
       playbackId: node.playbackId,
       title: node.title,
       status: node.status,
-      durationMs: node.durationMs,
       streamId: node.streamId,
     },
     kind === "chapter" || kind === "dvr" ? "recording" : kind,
   );
+  if (node.durationSeconds != null) {
+    summary.videoSpec = { duration: Math.round(node.durationSeconds) };
+  }
+  return summary;
 }
 
 async function fetchStorageArtifactByHash(hash: string): Promise<AssetSummary | null> {
@@ -330,19 +337,24 @@ export const frameworksAssets = {
       throw new Error(data.createVodUpload.message ?? "Invalid VOD upload");
     }
     const upload = data.createVodUpload;
+    const presignedParts = (upload.parts ?? []).map((part) => ({
+      partNumber: part.partNumber,
+      url: part.presignedUrl,
+    }));
     return {
       data: {
-        asset: upload.assetId
+        asset: upload.artifactId
           ? {
-              id: upload.assetId,
+              id: upload.artifactId,
               playbackId: upload.playbackId,
               status: { phase: "waiting" },
               name: payload.name,
             }
-          : { id: upload.uploadId },
-        uploadId: upload.uploadId,
+          : { id: upload.id },
+        uploadId: upload.id,
         partSize: upload.partSize,
-        presignedParts: upload.presignedParts,
+        expiresAt: upload.expiresAt,
+        presignedParts,
       },
     };
   },
