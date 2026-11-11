@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getLivepeerAiGeneratedImages as getSdkTextToImage } from './textToImage';
 import { getLivepeerAiGeneratedImages as getFetchTextToImage } from './livepeerAiActions';
 import { getLivepeerTranslation } from './translate';
-import { getLivepeerAudioToText } from './audioToText';
 import { LIVEPEER_AI_DISABLED_STATUS } from '@/lib/livepeer/livepeer-ai-gating';
 
 vi.mock('@/lib/sdk/livepeer/fullClient', () => ({
@@ -23,7 +22,7 @@ describe('Livepeer AI server action gating', () => {
   beforeEach(() => {
     fetchMock.mockResolvedValue({
       ok: true,
-      json: async () => ({ chunks: [] }),
+      json: async () => ({ text: 'hola' }),
       status: 200,
       statusText: 'OK',
     });
@@ -37,9 +36,9 @@ describe('Livepeer AI server action gating', () => {
     fetchMock.mockReset();
   });
 
-  it('captions off: zero Livepeer AI fetch for translation and audio-to-text', async () => {
+  it('both flags off: typed disabled results and zero network or SDK calls', async () => {
     vi.stubEnv('LIVEPEER_AI_CAPTIONS_ENABLED', 'false');
-    vi.stubEnv('LIVEPEER_AI_TEXT_TO_IMAGE_ENABLED', 'true');
+    vi.stubEnv('LIVEPEER_AI_TEXT_TO_IMAGE_ENABLED', 'false');
 
     const translation = await getLivepeerTranslation({
       text: 'hello',
@@ -51,10 +50,32 @@ describe('Livepeer AI server action gating', () => {
       feature: 'captions',
     });
 
-    const formData = new FormData();
-    formData.append('file', new Blob(['audio']), 'audio.wav');
-    const transcription = await getLivepeerAudioToText({ formData });
-    expect(transcription).toEqual({
+    const sdkResult = await getSdkTextToImage({ prompt: 'test' } as never);
+    expect(sdkResult).toEqual({
+      status: LIVEPEER_AI_DISABLED_STATUS,
+      feature: 'text-to-image',
+    });
+
+    const fetchResult = await getFetchTextToImage({ prompt: 'test' } as never);
+    expect(fetchResult).toEqual({
+      status: LIVEPEER_AI_DISABLED_STATUS,
+      feature: 'text-to-image',
+    });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fullLivepeer.generate.textToImage).not.toHaveBeenCalled();
+  });
+
+  it('captions off: zero Livepeer AI fetch for translation', async () => {
+    vi.stubEnv('LIVEPEER_AI_CAPTIONS_ENABLED', 'false');
+    vi.stubEnv('LIVEPEER_AI_TEXT_TO_IMAGE_ENABLED', 'true');
+
+    const translation = await getLivepeerTranslation({
+      text: 'hello',
+      source: 'English',
+      target: 'Spanish',
+    });
+    expect(translation).toEqual({
       status: LIVEPEER_AI_DISABLED_STATUS,
       feature: 'captions',
     });

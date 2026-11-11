@@ -1,12 +1,26 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   getLivepeerAiClientFeatureFlags,
   isLivepeerAiCaptionsEnabled,
   isLivepeerAiTextToImageEnabled,
   readLivepeerAiEnvFlag,
+  resetLivepeerAiEnvFlagWarningsForTests,
 } from './livepeer-ai-gating';
 
+vi.mock('@/lib/utils/logger', () => ({
+  serverLogger: {
+    warn: vi.fn(),
+  },
+}));
+
+import { serverLogger } from '@/lib/utils/logger';
+
 describe('livepeer AI env flags', () => {
+  beforeEach(() => {
+    resetLivepeerAiEnvFlagWarningsForTests();
+    vi.mocked(serverLogger.warn).mockClear();
+  });
+
   afterEach(() => {
     vi.unstubAllEnvs();
   });
@@ -23,10 +37,16 @@ describe('livepeer AI env flags', () => {
   });
 
   it('parses explicit false and true values', () => {
-    expect(readLivepeerAiEnvFlag('false')).toBe(false);
-    expect(readLivepeerAiEnvFlag('off')).toBe(false);
-    expect(readLivepeerAiEnvFlag('true')).toBe(true);
-    expect(readLivepeerAiEnvFlag('1')).toBe(true);
+    expect(readLivepeerAiEnvFlag('false', 'TEST_FLAG')).toBe(false);
+    expect(readLivepeerAiEnvFlag('off', 'TEST_FLAG')).toBe(false);
+    expect(readLivepeerAiEnvFlag('true', 'TEST_FLAG')).toBe(true);
+    expect(readLivepeerAiEnvFlag('1', 'TEST_FLAG')).toBe(true);
+  });
+
+  it('treats unrecognized values as disabled (fail closed) and warns once', () => {
+    expect(readLivepeerAiEnvFlag('flase', 'TEST_FLAG')).toBe(false);
+    expect(readLivepeerAiEnvFlag('flase', 'TEST_FLAG')).toBe(false);
+    expect(serverLogger.warn).toHaveBeenCalledTimes(1);
   });
 
   it('allows independent toggles', () => {

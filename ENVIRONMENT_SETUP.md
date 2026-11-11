@@ -77,10 +77,10 @@ Your Livepeer webhook ID for video processing callbacks.
 3. Copy the webhook ID
 
 #### `LIVEPEER_AI_CAPTIONS_ENABLED`
-Server-only gate for Livepeer AI **transcription and translation** (`audioToText`, `translate`). Unset or `true` keeps current behavior; `false` returns a typed disabled result with no outbound Livepeer AI calls and shows a calm “Captions coming soon” state in upload/player caption UI.
+Server-only gate for Livepeer AI **translation** (`translate`). Unset or `true` keeps current behavior; `false` returns a typed disabled result with no outbound Livepeer AI calls and shows a calm “Captions coming soon” state in the upload flow. Unrecognized values are treated as `false` (fail closed) with a one-time server warning.
 
 #### `LIVEPEER_AI_TEXT_TO_IMAGE_ENABLED`
-Server-only gate for Livepeer AI **text-to-image** (`livepeerAiActions`, `textToImage`). Unset or `true` keeps current behavior; `false` returns a typed disabled result with no outbound calls and shows a calm “Text-to-image coming soon” state in the upload entry surface (follow-up: #432).
+Server-only gate for Livepeer AI **text-to-image** (`livepeerAiActions`, `textToImage`). Unset or `true` keeps current behavior; `false` returns a typed disabled result with no outbound calls and shows a calm “Text-to-image coming soon” state on the Livepeer text-to-image entry only (follow-up: #432). Unrecognized values fail closed with a one-time server warning.
 
 ### 3. Supabase Configuration
 

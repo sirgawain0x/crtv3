@@ -26,11 +26,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { FormControl } from "@/components/ui/form";
-import { Button } from "@/components/ui/button";
-import { useLivepeerAiFeatureFlags } from "@/context/LivepeerAiFeatureContext";
-import { getLivepeerAudioToText } from "@/app/api/livepeer/audioToText";
-import { getLivepeerTranslation } from "@/app/api/livepeer/translate";
-import { LIVEPEER_AI_DISABLED_STATUS } from "@/lib/livepeer/livepeer-ai-gating";
 
 interface SubtitlesContextType {
   subtitles: Subtitles | undefined;
@@ -145,78 +140,6 @@ export function SubtitlesLanguageSelect() {
           })}
         </SelectContent>
       </Select>
-    </div>
-  );
-}
-
-function isDisabledLivepeerAiResult(
-  value: unknown,
-): value is { status: typeof LIVEPEER_AI_DISABLED_STATUS } {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "status" in value &&
-    (value as { status: string }).status === LIVEPEER_AI_DISABLED_STATUS
-  );
-}
-
-export function SubtitlesCaptionsAiPanel({
-  hasStoredSubtitles,
-}: {
-  hasStoredSubtitles: boolean;
-}) {
-  const { captionsEnabled } = useLivepeerAiFeatureFlags();
-
-  if (hasStoredSubtitles) {
-    return null;
-  }
-
-  if (!captionsEnabled) {
-    return (
-      <p className="text-xs text-white/80" role="status">
-        Captions coming soon
-      </p>
-    );
-  }
-
-  const handleGenerate = async () => {
-    const result = await getLivepeerAudioToText();
-    if (isDisabledLivepeerAiResult(result)) {
-      return;
-    }
-  };
-
-  const handleTranslate = async () => {
-    const result = await getLivepeerTranslation({
-      text: "caption",
-      source: "English",
-      target: "Spanish",
-    });
-    if (isDisabledLivepeerAiResult(result)) {
-      return;
-    }
-  };
-
-  return (
-    <div className="flex flex-col gap-2">
-      <Button
-        type="button"
-        size="sm"
-        variant="secondary"
-        className="h-7 text-xs"
-        onClick={handleGenerate}
-      >
-        Generate captions
-      </Button>
-      <Button
-        type="button"
-        size="sm"
-        variant="secondary"
-        className="h-7 text-xs"
-        onClick={handleTranslate}
-      >
-        Translate captions
-      </Button>
     </div>
   );
 }
