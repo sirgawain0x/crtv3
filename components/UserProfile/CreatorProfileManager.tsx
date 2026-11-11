@@ -25,11 +25,7 @@ import {
   type StockPickEditorValue,
 } from '@/lib/creator-stock-picks/stock-pick-form-state';
 import { CreatorStockPickDisplay } from '@/components/UserProfile/CreatorStockPickDisplay';
-import {
-  getCreatorStockPicksBlocker,
-  isCreatorStockPicksRuntimeEnabled,
-  shouldRenderCreatorStockPick,
-} from '@/lib/creator-stock-picks/runtime-policy';
+import { isCreatorStockPicksRuntimeEnabled } from '@/lib/creator-stock-picks/runtime-policy';
 import { parseCreatorStockPickFromRow } from '@/lib/creator-stock-picks/parse-stock-pick';
 
 interface CreatorProfileManagerProps {
@@ -42,6 +38,9 @@ export function CreatorProfileManager({ targetAddress, onProfileUpdated }: Creat
   const { toast } = useToast();
   const { smartAccountAddress } = useWalletStatus();
   const { profile, loading, error, updateProfile, upsertProfile } = useCreatorProfile(targetAddress);
+
+  const stockPicksEnabled = isCreatorStockPicksRuntimeEnabled();
+  const savedStockPick = parseCreatorStockPickFromRow(profile?.stock_pick);
 
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
@@ -146,7 +145,7 @@ export function CreatorProfileManager({ targetAddress, onProfileUpdated }: Creat
           bio: formData.bio,
           avatar_url: formData.avatar_url,
           ...socialPayload,
-          ...(isCreatorStockPicksRuntimeEnabled()
+          ...(stockPicksEnabled
             ? {
                 stock_pick_ticker: stockPickForm.ticker || null,
                 stock_pick_note: stockPickForm.note || null,
@@ -167,7 +166,7 @@ export function CreatorProfileManager({ targetAddress, onProfileUpdated }: Creat
           bio: formData.bio,
           avatar_url: formData.avatar_url,
           ...socialPayload,
-          ...(isCreatorStockPicksRuntimeEnabled()
+          ...(stockPicksEnabled
             ? {
                 stock_pick_ticker: stockPickForm.ticker || null,
                 stock_pick_note: stockPickForm.note || null,
@@ -378,29 +377,19 @@ export function CreatorProfileManager({ targetAddress, onProfileUpdated }: Creat
               )}
             </div>
 
-            <div className="space-y-4 pt-2 border-t">
-              <p className="text-sm font-medium">Creator stock pick</p>
-              {isEditing && isOwner ? (
-                <CreatorStockPickEditor
-                  initial={parseCreatorStockPickFromRow(profile?.stock_pick)}
-                  disabled={!isOwner}
-                  onChange={setStockPickForm}
-                />
-              ) : (() => {
-                const pick = parseCreatorStockPickFromRow(profile?.stock_pick);
-                if (pick && shouldRenderCreatorStockPick(pick)) {
-                  return <CreatorStockPickDisplay stockPick={pick} />;
-                }
-                if (getCreatorStockPicksBlocker() === "feature_flag_off") {
-                  return null;
-                }
-                return (
-                  <p className="text-sm text-muted-foreground">
-                    Unavailable ({getCreatorStockPicksBlocker() ?? "disabled"}).
-                  </p>
-                );
-              })()}
-            </div>
+            {stockPicksEnabled && (
+              <div className="space-y-4 pt-2 border-t">
+                <p className="text-sm font-medium">Creator stock pick</p>
+                {isEditing && isOwner ? (
+                  <CreatorStockPickEditor
+                    initial={savedStockPick}
+                    onChange={setStockPickForm}
+                  />
+                ) : (
+                  savedStockPick && <CreatorStockPickDisplay stockPick={savedStockPick} />
+                )}
+              </div>
+            )}
           </div>
         </div>
 

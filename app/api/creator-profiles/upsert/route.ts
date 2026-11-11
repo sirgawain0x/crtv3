@@ -174,7 +174,7 @@ export async function POST(request: NextRequest) {
                 .from('video_assets')
                 .select('asset_id, creator_id, playback_id')
                 .eq('asset_id', assetId)
-                .eq('creator_id', ownerLower)
+                .ilike('creator_id', ownerLower)
                 .maybeSingle();
               if (error || !data) {
                 return null;

@@ -9,23 +9,37 @@ const mockRequireWalletAuthFor = vi.fn();
 const mockValidate = vi.fn();
 const mockUpsert = vi.fn();
 
-type EqCall = { column: string; value: string };
+type FilterCall = { operator: "eq" | "ilike"; column: string; value: string };
 
 function createVideoAssetsTableMock() {
-  const eqCallsByQuery: EqCall[][] = [];
+  const filterCallsByQuery: FilterCall[][] = [];
   let ownedRow: { data: unknown; error: unknown } = { data: null, error: null };
   let anyRow: { data: unknown; error: unknown } = { data: null, error: null };
   let nextQueryIndex = 0;
 
   const buildSelectChain = (queryIndex: number) => {
-    const calls: EqCall[] = [];
-    eqCallsByQuery[queryIndex] = calls;
+    const calls: FilterCall[] = [];
+    filterCallsByQuery[queryIndex] = calls;
     const chain = {
       eq: (column: string, value: string) => {
-        calls.push({ column, value });
+        calls.push({ operator: "eq", column, value });
         return chain;
       },
-      maybeSingle: async () => (queryIndex === 0 ? ownedRow : anyRow),
+      ilike: (column: string, value: string) => {
+        calls.push({ operator: "ilike", column, value });
+        return chain;
+      },
+      maybeSingle: async () => {
+        if (queryIndex !== 0 || !ownedRow.data) {
+          return queryIndex === 0 ? ownedRow : anyRow;
+        }
+        const { creator_id } = ownedRow.data as { creator_id: string };
+        const ownerFilter = calls.find(({ column }) => column === "creator_id");
+        const matchesOwner = ownerFilter?.operator === "ilike"
+          ? creator_id.toLowerCase() === ownerFilter.value.toLowerCase()
+          : creator_id === ownerFilter?.value;
+        return matchesOwner ? ownedRow : { data: null, error: null };
+      },
     };
     return chain;
   };
@@ -37,8 +51,8 @@ function createVideoAssetsTableMock() {
     setAnyRow(row: typeof anyRow) {
       anyRow = row;
     },
-    getEqCalls() {
-      return eqCallsByQuery;
+    getFilterCalls() {
+      return filterCallsByQuery;
     },
     from() {
       const queryIndex = nextQueryIndex;
@@ -49,7 +63,7 @@ function createVideoAssetsTableMock() {
     },
     resetQueryIndex() {
       nextQueryIndex = 0;
-      eqCallsByQuery.length = 0;
+      filterCallsByQuery.length = 0;
     },
   };
 }
@@ -148,11 +162,11 @@ describe("upsert POST — stock pick video asset_id lookup", () => {
     vi.clearAllMocks();
   });
 
-  it("accepts owner Livepeer asset_id (eq asset_id + creator_id on lookup)", async () => {
+  it("accepts the owner when the stored wallet address uses mixed case", async () => {
     videoAssetsMock.setOwnedRow({
       data: {
         asset_id: ASSET_ID,
-        creator_id: OWNER,
+        creator_id: "0xCcCc" + OWNER.slice(6),
         playback_id: "pb-1",
       },
       error: null,
@@ -167,10 +181,10 @@ describe("upsert POST — stock pick video asset_id lookup", () => {
     expect(res.status).toBe(200);
     expect(mockUpsert).toHaveBeenCalled();
 
-    const eqCalls = videoAssetsMock.getEqCalls();
-    expect(eqCalls[0]).toEqual([
-      { column: "asset_id", value: ASSET_ID },
-      { column: "creator_id", value: OWNER.toLowerCase() },
+    const filterCalls = videoAssetsMock.getFilterCalls();
+    expect(filterCalls[0]).toEqual([
+      { operator: "eq", column: "asset_id", value: ASSET_ID },
+      { operator: "ilike", column: "creator_id", value: OWNER.toLowerCase() },
     ]);
   });
 
@@ -194,13 +208,14 @@ describe("upsert POST — stock pick video asset_id lookup", () => {
     expect(res.status).toBe(403);
     expect(mockUpsert).not.toHaveBeenCalled();
 
-    const eqCalls = videoAssetsMock.getEqCalls();
-    expect(eqCalls[0]).toContainEqual({ column: "asset_id", value: ASSET_ID });
-    expect(eqCalls[0]).toContainEqual({
+    const filterCalls = videoAssetsMock.getFilterCalls();
+    expect(filterCalls[0]).toContainEqual({ operator: "eq", column: "asset_id", value: ASSET_ID });
+    expect(filterCalls[0]).toContainEqual({
+      operator: "ilike",
       column: "creator_id",
       value: OWNER.toLowerCase(),
     });
-    expect(eqCalls[1]).toEqual([{ column: "asset_id", value: ASSET_ID }]);
+    expect(filterCalls[1]).toEqual([{ operator: "eq", column: "asset_id", value: ASSET_ID }]);
   });
 
   it("rejects missing asset", async () => {
