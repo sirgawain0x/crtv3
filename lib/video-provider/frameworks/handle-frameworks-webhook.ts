@@ -1,10 +1,11 @@
 import type { AssetSummary } from "../types";
 import { getVideoProvider } from "../index";
-import { claimFrameworksWebhookEvent } from "./webhook-dedupe";
 import {
-  finalizeStreamRecordings,
-  persistRecordingAsset,
-} from "@/services/livestream-recordings";
+  isFrameworksWebhookDuplicate,
+  markFrameworksWebhookProcessed,
+} from "./webhook-dedupe";
+import { FrameworksWebhookRetryableError } from "./webhook-errors";
+import { persistRecordingAsset } from "@/services/livestream-recordings";
 import {
   markStreamLiveByStreamId,
   markStreamOfflineByStreamId,
@@ -49,12 +50,20 @@ async function handleArtifactReadyEvent(
 ): Promise<void> {
   const artifactId = extractArtifactId(data);
   if (!artifactId) {
+    if (eventType === "recording.ready") {
+      throw new FrameworksWebhookRetryableError("recording.ready missing artifactId");
+    }
     serverLogger.warn("FrameWorks webhook missing artifactId", { eventType });
     return;
   }
 
   const resolved = await resolveAssetFromArtifact(artifactId);
   if (!resolved) {
+    if (eventType === "recording.ready") {
+      throw new FrameworksWebhookRetryableError(
+        `recording.ready artifact not resolvable yet: ${artifactId}`,
+      );
+    }
     serverLogger.warn("FrameWorks webhook could not resolve artifact playback", {
       eventType,
       artifactId,
@@ -63,7 +72,17 @@ async function handleArtifactReadyEvent(
   }
 
   const streamId = readString(data, "streamId") ?? resolved.streamId;
-  if (eventType === "recording.ready" && resolved.asset.status?.phase === "ready") {
+  if (eventType === "recording.ready") {
+    if (resolved.asset.source?.type !== "recording") {
+      throw new FrameworksWebhookRetryableError(
+        `recording.ready artifact is not a recording: ${artifactId}`,
+      );
+    }
+    if (resolved.asset.status?.phase !== "ready") {
+      throw new FrameworksWebhookRetryableError(
+        `recording.ready artifact not ready yet: ${artifactId}`,
+      );
+    }
     await persistRecordingAsset(resolved.asset, { streamId });
   }
 }
@@ -74,36 +93,42 @@ export async function handleFrameworksWebhookEvent(
   if (!event.id?.trim()) {
     throw new Error("Missing webhook event id");
   }
-  if (!claimFrameworksWebhookEvent(event.id)) {
+  if (isFrameworksWebhookDuplicate(event.id)) {
     return "duplicate";
   }
 
   const type = event.type;
   const data = event.data ?? {};
 
-  if (type === "stream.live") {
-    const streamId = readString(data, "streamId");
-    if (streamId) {
-      await markStreamLiveByStreamId(streamId);
-      serverLogger.info("Marked stream live from stream.live webhook", { streamId });
+  let result: ArtifactHandleResult;
+  try {
+    if (type === "stream.live") {
+      const streamId = readString(data, "streamId");
+      if (streamId) {
+        await markStreamLiveByStreamId(streamId);
+        serverLogger.info("Marked stream live from stream.live webhook", { streamId });
+      }
+      result = "processed";
+    } else if (type === "stream.idle") {
+      const streamId = readString(data, "streamId");
+      if (streamId) {
+        await markStreamOfflineByStreamId(streamId);
+        serverLogger.info("Marked stream offline from stream.idle webhook", { streamId });
+      }
+      result = "processed";
+    } else if (type === "recording.ready") {
+      await handleArtifactReadyEvent(data, type);
+      result = "processed";
+    } else if (type === "clip.ready" || type === "upload.ready") {
+      await handleArtifactReadyEvent(data, type);
+      result = "processed";
+    } else {
+      result = "ignored";
     }
-    return "processed";
+  } catch (err) {
+    throw err;
   }
 
-  if (type === "stream.idle") {
-    const streamId = readString(data, "streamId");
-    if (streamId) {
-      await markStreamOfflineByStreamId(streamId);
-      serverLogger.info("Marked stream offline from stream.idle webhook", { streamId });
-      await finalizeStreamRecordings(streamId);
-    }
-    return "processed";
-  }
-
-  if (type === "recording.ready" || type === "clip.ready" || type === "upload.ready") {
-    await handleArtifactReadyEvent(data, type);
-    return "processed";
-  }
-
-  return "ignored";
+  markFrameworksWebhookProcessed(event.id);
+  return result;
 }

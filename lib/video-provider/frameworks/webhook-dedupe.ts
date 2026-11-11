@@ -7,13 +7,18 @@ function pruneExpired(now: number): void {
   }
 }
 
-/** Returns false when this event id was already processed recently. */
-export function claimFrameworksWebhookEvent(eventId: string): boolean {
+/** True when this event id was successfully processed recently. */
+export function isFrameworksWebhookDuplicate(eventId: string): boolean {
   const now = Date.now();
   pruneExpired(now);
-  if (seenEventIds.has(eventId)) return false;
+  return seenEventIds.has(eventId);
+}
+
+/** Record successful processing so retries are deduplicated. */
+export function markFrameworksWebhookProcessed(eventId: string): void {
+  const now = Date.now();
+  pruneExpired(now);
   seenEventIds.set(eventId, now + DEDUPE_TTL_MS);
-  return true;
 }
 
 export function resetFrameworksWebhookDedupeForTests(): void {

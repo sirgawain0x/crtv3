@@ -25,6 +25,15 @@ describe("frameworks assets (#406)", () => {
       status: 200,
       json: async () => ({
         data: {
+          storageArtifactsConnection: { nodes: [] },
+        },
+      }),
+    });
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        data: {
           vodAsset: {
             id: "vod-1",
             playbackId: "pb-vod",
@@ -40,6 +49,37 @@ describe("frameworks assets (#406)", () => {
     expect(asset?.id).toBe("vod-1");
     expect(asset?.status?.phase).toBe("ready");
     expect(asset?.playbackUrl).toContain("pb-vod");
+  });
+
+  it("assets.get resolves CHAPTER artifacts via artifactHash before vodAsset", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        data: {
+          storageArtifactsConnection: {
+            nodes: [
+              {
+                id: "chapter-1",
+                playbackId: "pb-ch",
+                title: "Broadcast part",
+                kind: "CHAPTER",
+                status: "ready",
+                streamId: "stream-77",
+              },
+            ],
+          },
+        },
+      }),
+    });
+
+    const asset = await getVideoProvider().assets.get("chapter-hash");
+    expect(asset?.id).toBe("chapter-1");
+    expect(asset?.source?.type).toBe("recording");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [, init] = fetchMock.mock.calls[0] ?? [];
+    const body = JSON.parse(String((init as RequestInit).body));
+    expect(body.variables.input.artifactHash).toBe("chapter-hash");
   });
 
   it("create maps createVodUpload for upload pipeline", async () => {

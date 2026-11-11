@@ -242,7 +242,18 @@ function mapArtifactToSummary(
   );
 }
 
+async function fetchStorageArtifactByHash(hash: string): Promise<AssetSummary | null> {
+  const data = await frameworksGraphqlRequest<StorageArtifactsQuery>(LIST_ARTIFACTS, {
+    input: { artifactHash: hash, first: 1 },
+  });
+  const node = data.storageArtifactsConnection?.nodes?.[0];
+  return node ? mapArtifactToSummary(node) : null;
+}
+
 async function fetchAssetSummary(assetId: string): Promise<AssetSummary | null> {
+  const storageArtifact = await fetchStorageArtifactByHash(assetId);
+  if (storageArtifact) return storageArtifact;
+
   const vod = await frameworksGraphqlRequest<VodAssetQuery>(GET_VOD_ASSET, { id: assetId });
   if (vod.vodAsset) return mapVodToSummary(vod.vodAsset);
   const clip = await frameworksGraphqlRequest<ClipQuery>(GET_CLIP, { id: assetId });
