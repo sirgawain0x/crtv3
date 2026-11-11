@@ -8,10 +8,7 @@ import {
   assertUploadsAndAssetsAvailable,
   FrameWorksUploadsAssetsUnavailableError,
 } from "./uploads-assets-guard";
-import {
-  assertStreamCreationAvailable,
-  FrameWorksStreamsCreateUnavailableError,
-} from "./streams-create-guard";
+import { assertStreamCreationAvailable } from "./streams-create-guard";
 
 const mockLoggerWarn = vi.fn();
 
@@ -157,21 +154,51 @@ describe("frameworks provider", () => {
     fetchMock.mockReset();
   });
 
-  it("streams.create is blocked by stream guard (#404)", async () => {
-    await expect(
-      getVideoProvider().streams.create({
-        name: "Launch",
-        profiles: [],
-        record: true,
-        playbackPolicy: {},
-        creatorId: "0x1",
-      }),
-    ).rejects.toBeInstanceOf(FrameWorksStreamsCreateUnavailableError);
-    expect(fetchMock).not.toHaveBeenCalled();
+  it("createStream returns streamKey and applies jwt playbackPolicy", async () => {
+    vi.stubEnv("FRAMEWORKS_SIGNING_KID", "kid-1");
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          data: {
+            createStream: {
+              __typename: "StreamWithKey",
+              id: "c3RyZWFtOjE",
+              playbackId: "playback-1",
+              streamKey: "key-1",
+            },
+          },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          data: {
+            setPlaybackPolicy: { __typename: "Stream", id: "c3RyZWFtOjE" },
+          },
+        }),
+      });
+
+    const created = await getVideoProvider().streams.create({
+      name: "Launch",
+      profiles: [],
+      record: true,
+      playbackPolicy: { type: "jwt" },
+      creatorId: "0x1",
+    });
+
+    expect(created.streamKey).toBe("key-1");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const policyBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body)) as {
+      query: string;
+    };
+    expect(policyBody.query).toContain("setPlaybackPolicy");
   });
 
-  it("assertStreamCreationAvailable throws typed error", () => {
-    expect(() => assertStreamCreationAvailable("test")).toThrow(/#404/);
+  it("assertStreamCreationAvailable is a no-op after #404", () => {
+    expect(() => assertStreamCreationAvailable("test")).not.toThrow();
   });
 
   it("setRecording surfaces updateStream ValidationError", async () => {

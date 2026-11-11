@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import {
   assertStreamCreationAvailable,
-  FrameWorksStreamsCreateUnavailableError,
   resetVideoProviderForTests,
 } from "./index";
 import { createLivepeerStream } from "@/lib/livepeer/studio-api";
@@ -52,16 +51,6 @@ vi.mock("@/lib/livepeer/ensure-stream", () => ({
     mockDefaultStreamCreateOptions(...args),
 }));
 
-const EXPECTED =
-  "FrameWorks stream creation not available yet (#404)" as const;
-
-async function expectFrameworksRefusal(run: () => Promise<unknown>) {
-  await expect(run()).rejects.toThrow(EXPECTED);
-  await expect(run()).rejects.toBeInstanceOf(
-    FrameWorksStreamsCreateUnavailableError,
-  );
-}
-
 const validProxyBody = {
   creatorAddress: CREATOR,
   name: "Test Stream",
@@ -82,97 +71,66 @@ const validProxyBody = {
   playbackPolicy: { type: "jwt" },
 };
 
-describe("streams create guard", () => {
+describe("streams create guard (#404)", () => {
+  const fetchMock = vi.fn();
+
   afterEach(() => {
+    vi.unstubAllGlobals();
     vi.unstubAllEnvs();
     resetVideoProviderForTests();
     vi.clearAllMocks();
+    fetchMock.mockReset();
   });
 
   describe("frameworks mode", () => {
     beforeEach(() => {
       vi.stubEnv("VIDEO_PROVIDER", "frameworks");
       vi.stubEnv("FRAMEWORKS_API_TOKEN", "token");
+      vi.stubEnv("FRAMEWORKS_SIGNING_KID", "kid-1");
       resetVideoProviderForTests();
+      vi.stubGlobal("fetch", fetchMock);
       mockRequireWalletAuthFor.mockResolvedValue({ address: CREATOR });
-      process.env.LIVEPEER_FULL_API_KEY = "test-full-key";
     });
 
-    it("assertStreamCreationAvailable throws typed error", () => {
-      expect(() => assertStreamCreationAvailable("test")).toThrow(EXPECTED);
+    it("assertStreamCreationAvailable is a no-op after #404", () => {
+      expect(() => assertStreamCreationAvailable("test")).not.toThrow();
     });
 
-    it("studio-api.createLivepeerStream refuses before provider call", async () => {
-      await expectFrameworksRefusal(() =>
-        createLivepeerStream({
-          name: "x",
-          profiles: [],
-          record: true,
-          playbackPolicy: {},
-          creatorId: CREATOR,
-        }),
-      );
-    });
+    it("studio-api.createLivepeerStream calls FrameWorks createStream", async () => {
+      fetchMock
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            data: {
+              createStream: {
+                __typename: "StreamWithKey",
+                id: "stream-gql",
+                playbackId: "pb",
+                streamKey: "sk",
+              },
+            },
+          }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            data: {
+              setPlaybackPolicy: { __typename: "Stream", id: "stream-gql" },
+            },
+          }),
+        });
 
-    it("livepeer-proxy POST returns 503 JSON", async () => {
-      mockResolveStreamForCreator.mockResolvedValue(null);
-      mockEnsureLivepeerStreamForCreator.mockImplementation(() =>
-        createLivepeerStream({
-          name: "x",
-          profiles: validProxyBody.profiles,
-          record: true,
-          playbackPolicy: {},
-          creatorId: CREATOR,
-        }),
-      );
-
-      const res = await livepeerProxyPost(
-        new NextRequest("http://localhost/api/livepeer/livepeer-proxy", {
-          method: "POST",
-          body: JSON.stringify(validProxyBody),
-          headers: { "Content-Type": "application/json" },
-        }),
-      );
-      expect(res.status).toBe(503);
-      const body = await res.json();
-      expect(body.error).toBe(EXPECTED);
-    });
-
-    it("stream-key GET returns 503 when ensure creates a stream", async () => {
-      mockDefaultStreamCreateOptions.mockReturnValue({
-        creatorId: CREATOR,
-        name: "Broadcast-1",
+      const created = await createLivepeerStream({
+        name: "x",
         profiles: [],
         record: true,
         playbackPolicy: { type: "jwt" },
+        creatorId: CREATOR,
       });
-      mockResolveStreamForCreator.mockResolvedValue({
-        id: "db-1",
-        creator_id: CREATOR,
-        stream_id: null,
-        playback_id: null,
-        stream_key: null,
-        name: "My Stream",
-        save_recording: true,
-      });
-      mockEnsureLivepeerStreamForCreator.mockImplementation(() =>
-        createLivepeerStream({
-          name: "x",
-          profiles: [],
-          record: true,
-          playbackPolicy: {},
-          creatorId: CREATOR,
-        }),
-      );
-
-      const res = await streamKeyGet(
-        new NextRequest(
-          `http://localhost/api/livepeer/stream-key?creatorAddress=${CREATOR}`,
-        ),
-      );
-      expect(res.status).toBe(503);
-      const body = await res.json();
-      expect(body.error).toBe(EXPECTED);
+      expect(created.streamKey).toBe("sk");
+      expect(fetchMock).toHaveBeenCalled();
     });
   });
 
