@@ -21,6 +21,7 @@ import {
   getLivepeerAsset,
   listRecentRecordingAssets,
 } from "@/lib/livepeer/studio-api";
+import { GET as assetByIdGet } from "@/app/api/livepeer/asset/[assetId]/route";
 import { POST as livepeerRoutePost } from "@/app/api/livepeer/route";
 import { deleteVideoAsset } from "@/services/video-assets";
 import requestUploadHandler from "@/app/api/livepeer/asset/request-upload";
@@ -146,6 +147,17 @@ describe("uploads/assets guard", () => {
       );
       expect(res.status).toHaveBeenCalledWith(503);
       expect(res.json).toHaveBeenCalledWith({ error: EXPECTED });
+    });
+
+    it("asset.[assetId].GET returns 503 JSON", async () => {
+      const assetId = "550e8400-e29b-41d4-a716-446655440000";
+      const res = await assetByIdGet(
+        new NextRequest(`https://crtv.test/api/livepeer/asset/${assetId}`),
+        { params: Promise.resolve({ assetId }) },
+      );
+      expect(res.status).toBe(503);
+      const body = await res.json();
+      expect(body.error).toBe(EXPECTED);
     });
   });
 

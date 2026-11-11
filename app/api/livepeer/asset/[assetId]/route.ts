@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireVideoProviderForUploadsAndAssets } from '@/lib/video-provider';
+import {
+  FrameWorksUploadsAssetsUnavailableError,
+  requireVideoProviderForUploadsAndAssets,
+} from '@/lib/video-provider';
 import { LIVEPEER_NOT_CONFIGURED } from '@/lib/sdk/livepeer/studioAuth';
 import { serverLogger } from '@/lib/utils/logger';
 
@@ -73,6 +76,10 @@ export async function GET(
 
     return NextResponse.json(assetResponse);
   } catch (error: unknown) {
+    if (error instanceof FrameWorksUploadsAssetsUnavailableError) {
+      return NextResponse.json({ error: error.message }, { status: 503 });
+    }
+
     serverLogger.error('Error fetching asset:', error);
 
     const err = error as { errors?: string[]; message?: string };
