@@ -13,3 +13,23 @@ Re-run locally or in an environment with credentials:
   npx tsx scripts/livepeer-studio-vod-inventory.ts --json ./livepeer-studio-inventory.json --csv ./livepeer-studio-inventory.csv
 
 Commit an updated redacted summary (counts and total bytes only) after a successful inventory run.
+
+## Result: PASSED — authenticated read-only run
+
+Date: 2026-11-10 ET
+Environment: local application environment with Livepeer Studio and Supabase credentials
+
+Studio list pages fetched: 1
+DB cross-reference: ok
+Studio assets: 46
+Ready assets with a download target in the list: 40
+Known total size: 5,504,324,739 bytes (about 5.13 GiB)
+Assets with unknown size: 6
+Linked Studio assets: 31
+Studio-only assets: 15 (9 ready, 6 uploading)
+DB rows: 47
+DB-only rows: 16 (all drafts)
+
+A read-only detail lookup for each of the six unlinked uploads confirmed
+that Studio returned neither a download target nor a source URL.
+The archive and checksum verification are pending.
